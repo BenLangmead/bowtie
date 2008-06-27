@@ -1,0 +1,95 @@
+A Blockwise Suffix Array Builder for the Burrows-Wheeler Transform
+Benjamin Langmead
+CMSC858P Final Project, Spring 2008
+
+Overview
+========
+
+The CSAMapper and SeqAn-1.0 subdirectories respectively contain the
+code for my blockwise suffix array builder and for the SeqAn C++
+library.  My code depends on SeqAn for handling sequences, moving
+sequences too and from files, and for solving some algorithmic
+subproblems such as the call to Larsson-Sadakane in the difference-
+cover calculation. 
+
+The CSAMapper directory also contains code for my Enhanced Burrows-
+Wheeler Transform builder (ebwt_build) and searching tool,
+(ebwt_search).  The searching tool is still a work in progress, but the
+builder, as described in the report provided, is now fairly robust.
+Both tools come in three varieties: a "release" version, a
+"with-asserts" version and a "debug" version.
+
+The CSAMapper directory also contains code for a few smaller utilities
+for sorting (multikey_qsort), calculating LCPs (lcp), creating packed
+sequence files (pack_fasta), calculating difference-covers and
+difference-cover samples (diff_sample), printing and sanity checking
+results produced by the blockwise suffix-array builder (blockwise_sa),
+and a very small and simple utility that uses the blockwise suffix-
+array-building library to calculate and print the BWT of a Fasta input
+sequence.
+
+The following sections will take you through building and running the
+simple blockwise BWT builder and the EBWT builder.  As of today
+(5/13/08), I can compile all Makefile targets with no warnings or
+errors both on my home Macintosh (g++ 4.0.1) and on sycamore (g++
+3.4.6).  Let me know if you see any warnings or errors.
+
+Simple Blockwise SA BWT-Builder
+===============================
+
+   Build
+   -----
+   From the CSAMapper directory:
+   
+   1. make bwt
+   
+   That's it!
+
+   Run
+   ---
+   From the CSAMapper directory
+   
+   1. ./bwt <fasta_infile>
+   
+   That's it!  The bwt utility will then read in the fasta file,
+   calculate the suffix array using the KarkkainenBlockwiseSA class,
+   and print the corresponding blocks of BWT text.  For long texts,
+   bwt may pause between chunks of output - this is because the
+   blockwise SA builder is busy building the next block.  For the
+   maximum bucket size, the bwt utility uses the length of the input
+   string divided by 5.  The bwt utility always uses 1024 as the
+   difference-cover sample periodicity.
+
+EBWT Builder
+============
+
+   Build
+   -----
+   From the CSAMapper directory:
+   
+   1. make ebwt_build ebwt_build_packed
+   
+   That's it!  Run ./ebwt_build (no arguments) for details about how to
+   configure and invoke the ebwt_build command.  The ebwt_build_packed
+   tool is just like ebwt_build except the input texts are stored and
+   permanently kept "packed", with 4 DNA characters.   The interface of
+   ebwt_build_packed is almost identical to that of ebwt_build, except
+   that ebwt_build_packed does not support the "raw" input format.
+   This is due to a bug in the SeqAn library's support for packed
+   strings (http://www.seqan.de/trac/ticket/20).
+
+The CSAMapper/scripts directories contains a suite of scripts that were
+used to test various aspects of the suite.  The human.pl and
+human_harness.mk scripts in particular were used to drive all of the
+experiments described in the report.  To use them, make all of the
+relevant targets (usually just ebwt_build and ebwt_build_packed) in the
+CSAMapper directory first then use:
+
+    'make -f scripts/human_harness.mk <target_name>'
+
+If you'd like to use those scripts to reproduce my results, let me know
+and I can help with that.
+
+If you are curious to build and run the other utilities in this
+package, take a look at the targets in the Makefile, build them using
+those targets, and read the usage messages for those commands.  

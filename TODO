@@ -1,0 +1,8 @@
+- Write prefetching / simulated multithreading version of search
+- Memory usage statistics
+- Optionally handle reverse complement on the text side rather than on
+  the pattern side
+- Do trimming
+  + Trimming is related to flipping; if a difference occurs after some threshold 
+- Why do so few of the 1000genomes reads map?
+- Hits should be easily mappable back to read ids and reference ids

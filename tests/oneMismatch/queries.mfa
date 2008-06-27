@@ -1,0 +1,49 @@
+# ebwt_search args: -1fra
+# vmatch args: -d -p -h 1 -complete -noevalue -noscore
+#
+# Stretch of chromosome 22 we're interested in:
+# gtgtctcatgcctgtaatcccaacactttgggagcctgaggtagaagttgaggtcaggaggtccaagaca
+#
+# Exact hit:
+>0+:<0,24,0>
+actttgggagcctgaggtagaagttg
+# Reverse-complement exact hit:
+>1-:<0,24,0>
+caacttctacctcaggctcccaaagt
+# 1-mismatch hit
+>2+:<0,24,1>
+actttgggagcctcaggtagaagttg
+#            ^
+# Reverse-complement 1-mismatch hit:
+>3-:<0,24,1>
+caacttctacctgaggctcccaaagt
+#           ^
+# 1-mismatch hit, 1 more off center
+>4+:<0,24,1>
+actttgggagcctgtggtagaagttg
+#             ^
+# Reverse-complement 1-mismatch hit:
+>5-:<0,24,1>
+caacttctaccacaggctcccaaagt
+#          ^
+# 2-mismatch hit (non-hit for ebwt):
+>6
+actttgggagcctatggtagaagttg
+#            ^^
+# Reverse-complement 2-mismatch hit (non-hit for ebwt):
+>7
+caacttctaccataggctcccaaagt
+#          ^^
+# Exact hit with wildcards:
+>8+:<0,24,0>
+actttgggagcctgaggtagNNgttg
+#                   ^^
+# Reverse complement exact hit with wildcards:
+>9-:<0,24,0>
+caacttctacctcaggctcccNNNgt
+# Non-hit with wildcards:
+>10
+acNNNgggagcctgaggtagaagttg
+# Reverse complement non-hit with wildcards:
+>11
+caacNNctacctcaggctcccaaagt
