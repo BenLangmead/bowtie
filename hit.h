@@ -1,6 +1,7 @@
 #ifndef HIT_H_
 #define HIT_H_
 
+#include <vector>
 #include <stdint.h>
 #include <iostream>
 #include "assert_helpers.h"
@@ -33,9 +34,7 @@ struct Hit {
 };
 
 /// Sort by text-id then by text-offset
-bool operator< (const Hit& a, const Hit& b) {
-    return a.h < b.h;
-}
+bool operator< (const Hit& a, const Hit& b);
 
 /**
  * Encapsulates an object that accepts hits, optionally retains them in
@@ -99,6 +98,32 @@ protected:
 	vector<Hit> _provisionalHits;
 	bool _keep;
 	uint64_t _numHits;
+};
+
+class HitBucket : public HitSink
+{
+public:
+	HitBucket() : HitSink(cout, true) { }
+	virtual void reportHit(const U32Pair& h,
+						   uint32_t pat,
+						   bool fw,
+						   uint32_t mms,
+						   uint32_t oms) 
+	{
+		_hits.push_back(Hit(h, pat, fw, mms, oms));
+		_numHits++;
+	}
+	
+	virtual void reportProvisionalHit(
+									  const U32Pair& h,
+									  uint32_t pat,
+									  bool fw,
+									  uint32_t mms,
+									  uint32_t oms)
+	{
+		_hits.push_back(Hit(h, pat, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, pat, fw, mms, oms));
+	}
 };
 
 /**
@@ -273,4 +298,6 @@ private:
 	char _buf[BUFSZ];
 };
 
+
 #endif /*HIT_H_*/
+

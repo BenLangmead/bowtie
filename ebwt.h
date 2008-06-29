@@ -83,7 +83,7 @@ public:
 	{
 		assert(repOk());
 	}
-
+	
 	EbwtParams(const EbwtParams& eh) :
 	           _len(eh._len),
 	           _bwtLen(eh._bwtLen), 
@@ -329,9 +329,13 @@ public:
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
+		string file3 = file + ".3.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
+		ofstream out(file3.c_str());
+		writePacked<Dna>(out, ss, __verbose);
+
 		// Build
 		initFromVector(ss,
 		               fout1,
@@ -743,6 +747,7 @@ public:
 	inline bool report(uint32_t off, uint32_t oms, EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, uint32_t oms /* = 0 */, SideLocus *l /* = NULL */) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
+	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
 	inline bool reportOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
 	inline int rowL(const SideLocus& l) const;
@@ -838,17 +843,14 @@ private:
 	EbwtParams _eh;
 };
 
+#define SAMPLE_THRESH 20
+
 typedef enum {
 	MHP_CHASE_ALL = 0,
 	MHP_MULTICHASE_ALL,
-	MHP_PICK_1_RANDOM
+	MHP_PICK_1_RANDOM,
+	MHP_CHASE_SAMPLE
 } MultiHitPolicy;
-
-const char *mhpToStr[] = {
-	"Chase all",
-	"Multichase all",
-	"Random pick 1"
-};
 
 /**
  * Keeps some statistics about how many patterns were tried and placed
@@ -1140,6 +1142,11 @@ public:
 		}
 	}
 	void write(ostream& out) const {
+		const char *mhpToStr[] = {
+			"Chase all",
+			"Multichase all",
+			"Random pick 1"
+		};
 		out << "Multi-hit policy: " << mhpToStr[_mhp] << endl;
 	}
 	bool comprehensiveBacktrack() const {
@@ -2041,7 +2048,9 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 	VMSG_NL("In reportChaseOne");
 	uint32_t off;
 	uint32_t jumps = 0;
+	bool own_locus = false;
 	if(l == NULL) {
+		own_locus = true;
 		l = new SideLocus(i, this->_eh, this->_ebwt);
 	}
 	assert(l != NULL);
@@ -2063,19 +2072,46 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 		off = this->offs()[i >> this->_eh.offRate()] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
+	if (own_locus)
+		delete l;
 	return report(off, oms, s);
 }
-		
+
+#define NUM_SAMPLES 10
+
+/**
+ * Report a randomly-selected sample from a range of hits.  The goal is to 
+ * reduce the time spent enumerating a large range of hits and is predicated
+ * on the assumption that the vast majority of those hits have similar
+ * extensions.
+ */
+template<typename TStr>
+inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
+{	
+	assert_gt(s.spread(), NUM_SAMPLES);
+	set<uint32_t> sampled_hits;
+	bool reported = false;
+	while (sampled_hits.size() < NUM_SAMPLES)
+	{
+		uint32_t r = s.top() + (s.rand().nextU32() % s.spread());
+		if (sampled_hits.find(r) == sampled_hits.end())
+		{
+			sampled_hits.insert(r);
+			if(_verbose) cout << "reportChaseRange r: " << r << endl;
+			// TODO: Could calculate i's locus here, as an offset from
+			// s.top()'s locus
+			if (reportChaseOne(r, s)) reported = true;
+		}
+	}
+	return reported;
+}
+
 /**
  * Report a range of results by chasing down each one individually.
- * Returns true if one or more results were reported.  If false is
- * returned, that means that one or more results were spurious becuase
- * they overlapped padding between two text sequences.
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseRange(EbwtSearchState<TStr>& s) const
 {
-	VMSG_NL("In reportChaseRange");
 	assert_gt(s.spread(), 1);
 	bool reported = false;
 	for(uint32_t i = s.top(); i < s.bot(); i++)  {
@@ -2123,6 +2159,14 @@ inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
 	switch(s.params().multiHitPolicy()) {
 		case MHP_CHASE_ALL: {
 			return reportChaseRange(s);
+			break;
+		}
+		case MHP_CHASE_SAMPLE: {
+			if (s.spread() > SAMPLE_THRESH)
+				return reportChaseSample(s);
+			else
+				return reportChaseRange(s);
+			break;
 		}
 		case MHP_MULTICHASE_ALL: {
 			throw runtime_error("MHP_MULTICHASE_ALL not yet implemented");
@@ -2264,7 +2308,7 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
  * Do an fchr lookup to find (coarse) initial top and bottom then call
  * searchFinish().
  * 
- * The Ebwt must be in memory.  The SearchState must be 
+ * The Ebwt must be in memory.
  */
 template<typename TStr>
 inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const

@@ -50,6 +50,18 @@ throw(UnexpectedTypeSizeException)
 	}
 }
 
+template<typename TVal>
+static void
+writePacked(ostream& out, const vector<String<TVal, Alloc<> > >& ss, bool verbose = false)
+throw(UnexpectedTypeSizeException)
+{
+	for(size_t i = 0; i < ss.size(); i++) {
+		String<TVal, Packed<> > packed_ss(ss[i]);
+		//assign(packed_ss, ss[i]);
+		writePacked(out, packed_ss, verbose);
+	}
+}
+
 /**
  * Writes given packed string to given output stream.  Format of the
  * packed file is simply a list of packed sequences, where each packed
@@ -58,6 +70,8 @@ throw(UnexpectedTypeSizeException)
  * 
  * Assumes the host of a packed string is a String<unsigned int>
  */
+
+
 template<typename TVal>
 static void
 writePacked(ostream& out, const String<TVal, Packed<> >& s, bool verbose = false)
@@ -147,6 +161,7 @@ throw(MalformedFastaException)
 		// Error; needs to be at least one line
 		throw MalformedFastaException("EOF reading first line");
 	}
+	
 	if(line[0] != '>') {
 		throw MalformedFastaException("First line did not begin with '>'");
 	}
@@ -192,6 +207,7 @@ throw(UnexpectedTypeSizeException)
 	while(in.tellg() < flen) {
 		String<TVal, Packed<> > ps;
 		readPacked(in, ps, verbose);
+		//cerr << "adding text # " << ss.size() << " len = " << length(ps) << endl;
 		ss.push_back(ps);
 		if(upto != -1 && ss.size() >= (size_t)upto) {
 			return;
@@ -284,5 +300,9 @@ throw(UnexpectedTypeSizeException)
 	assign(host(s), h);
 	_setLength(s, len);
 }
+
+void unpack(const string& infile,
+			vector<String<Dna, Packed<> > >& ss,
+			string* outfile);
 
 #endif /*PACKEDSTRINGIO_H_*/

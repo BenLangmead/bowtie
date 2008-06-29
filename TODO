@@ -1,3 +1,47 @@
+Test data generator:
+1) [X] generate random reference 
+1) [X] identify unique 22-mers with meryl
+-) [ ] make reads that map exactly to unique 22-mers at the 5' end AND EITHER:
+	1) [X] exact map end to end
+	1) [X] have mismatches on the 3' end (exact search with extension)
+
+Code changes and cleanup:		 
+2) [ ] Consider bit-packed queries for all search policies, to avoid
+		unnecessary conversions in extension-based polcies (after profiling)
+2) [ ] Filter low-complexity reads/mers, and/or cap # hits for a search
+1) [X] Rename modules and directories (e.g. CSAMapper -> Bowtie)
+1) [X] Subversion/CVS import
+
+Output:
+2) [ ] Maq-compatible alignment results
+1) [ ] Compact edit transcript for inxact matches
+2) [ ] Human readable edit transcript for inexact matches
+
+Performance profiling and optimization:
+1) [ ] 3' extension (LV)
+2) [ ] ebwt_build
+
+Results and data collection:
+1) [ ] benchmark suite for table and figure generation
+1) [ ] Instrument search policies for collection of mapping stats
+
+UI:
+3) [ ] Cocoa interface
+1) [ ] CL options review, cleanup
+2) [ ] Windows interface
+
+Website:
+1) [ ] Basic project page with source and binaries
+1) [ ] User manual for ebwt_build and ebwt_search
+2) [ ] Cute logo
+3) [ ] Wiki
+
+Paper:
+	1) [ ] Find reads for benchmarking Maq, SOAP, ELAND, Bowtie
+	2) [ ] ...
+	
+	
+Ben's old TODO items:
 - Write prefetching / simulated multithreading version of search
 - Memory usage statistics
 - Optionally handle reverse complement on the text side rather than on

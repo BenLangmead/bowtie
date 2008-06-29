@@ -1,6 +1,7 @@
 #ifdef PACK_FASTA_MAIN
 #include <iostream>
 #include <fstream>
+#include <exception>
 #include <string>
 #include <seqan/index.h>
 #include <seqan/sequence.h>
@@ -80,56 +81,49 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	outfile = argv[optind++];
+	vector<String<Dna, Packed<> > > ss;
 	
 	if(pack) {
-		if(dna) {
-			vector<String<Dna, Packed<> > > ss;
-			try {
-				for(size_t i = 0; i < infiles.size(); i++) {
-					ifstream in(infiles[i].c_str());
-					readAndPackFasta(in, ss, verbose);
-					in.close();
-				}
-			} catch(MalformedFastaException& e) {
-				cerr << "MalformedFastaException for \"" << infile << "\": " << e.what() << endl;
-				return 2;
+			
+		try {
+			for(size_t i = 0; i < infiles.size(); i++) {
+				ifstream in(infiles[i].c_str());
+				//TODO: check open success?
+				cerr << "packing " << infiles[i]<<"..."<<endl;
+				readAndPackFasta(in, ss, verbose);
+				in.close();
 			}
-			if(verbose) cout << "Read " << ss.size() << " packed sequences" << endl;
-			try {
-				ofstream out(outfile.c_str());
-				writePacked(out, ss, verbose);
-				out.close();
-			} catch(UnexpectedTypeSizeException& e) {
-				cerr << "UnexpectedTypeSizeException for \"" << outfile << "\": " << e.what() << endl;
-				return 2;
-			}
-		} else if(rna) {
-		} else if(pro) {
+		} catch(MalformedFastaException& e) {
+			cerr << "MalformedFastaException for \"" << infile << "\": " << e.what() << endl;
+			return 2;
+		} catch(exception& e)
+		{
+			cerr << "Error packing fasta file \""<< infile << "\": " << e.what() << endl;
+			return 2;
+		}
+		if(verbose) cout << "Read " << ss.size() << " packed sequences" << endl;
+		try {
+			ofstream out(outfile.c_str());
+			writePacked(out, ss, verbose);
+			out.close();
+		} catch(UnexpectedTypeSizeException& e) {
+			cerr << "UnexpectedTypeSizeException for \"" << outfile << "\": " << e.what() << endl;
+			return 2;
+		} 
+		catch(ofstream::failure e) {
+			cerr << "Could not write to \"" << outfile << "\": " << e.what() << endl;
+			return 2;
+		}
+		catch(exception& e)
+		{
+			cerr << "Error packing fasta file \""<< infile << "\": " << e.what() << endl;
+			return 2;
 		}
 	} else {
-		// Unpack
-		if(dna) {
-			vector<String<Dna, Packed<> > > ss;
-			ifstream in(infile.c_str());
-			try {
-				readPacked(in, ss, verbose);
-			} catch(MalformedFastaException& e) {
-				cerr << "MalformedFastaException for \"" << infile << "\": " << e.what() << endl;
-				return 2;
-			}
-			in.close();
-			
-			ofstream out(outfile.c_str());
-			for(size_t i = 0; i < ss.size(); i++) {
-				out << ">" << endl;
-				out << ss[i] << endl;
-			}
-			out.close();
-		} else if(rna) {
-		} else if(pro) {
-		}
+		unpack(infile, ss, &outfile);
 	}
 
 	return 0;
 }
+
 #endif

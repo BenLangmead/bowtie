@@ -17,32 +17,35 @@
 #include "tokenize.h"
 #include "hit.h"
 #include "pat.h"
+#include "inexact_extend.h"
 
 using namespace std;
 using namespace seqan;
 
-static int verbose       = 0;
-static int sanityCheck   = 0;
-static int format        = FASTA;
-static string origString = "";
-static int revcomp       = 0; // search for reverse complements?
-static int seed          = 0; // srandom() seed
-static int timing        = 0; // whether to report basic timing data
-static bool oneHit       = true; // for multihits, report just one
-static int ipause        = 0; // pause before maching?
-static int binOut        = 0; // write hits in binary
-static int qUpto         = -1; // max # of queries to read
-static int skipSearch    = 0; // abort before searching
-static int qSameLen      = 0; // abort before searching
-static int trim5         = 0; // amount to trim from 5' end
-static int trim3         = 0; // amount to trim from 3' end
-static int printStats    = 0; // whether to print statistics
-static int reportOpps    = 0; // whether to report # of other mappings
-static int mismatches    = 0; // allow 0 mismatches by default
-static int offRate       = -1; // keep default offRate
-static char *patDumpfile = NULL; // filename to dump patterns to
+static int verbose				= 0;
+static int allowed_diffs		= -1;
+static int kmer					= -1;
+static int sanityCheck			= 0;
+static int format				= FASTA;
+static string origString		= "";
+static int revcomp				= 0; // search for reverse complements?
+static int seed					= 0; // srandom() seed
+static int timing				= 0; // whether to report basic timing data
+static bool oneHit				= true; // for multihits, report just one
+static int ipause				= 0; // pause before maching?
+static int binOut				= 0; // write hits in binary
+static int qUpto				= -1; // max # of queries to read
+static int skipSearch			= 0; // abort before searching
+static int qSameLen				= 0; // abort before searching
+static int trim5				= 0; // amount to trim from 5' end
+static int trim3				= 0; // amount to trim from 3' end
+static int printStats			= 0; // whether to print statistics
+static int reportOpps			= 0; // whether to report # of other mappings
+static int offRate				= -1; // keep default offRate
+static int mismatches			= 0; // allow 0 mismatches by default
+static char *patDumpfile		= NULL; // filename to dump patterns to
 
-static const char *short_options = "fqbmlcu:rvsat3:5:1o:";
+static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 
 #define ORIG_ARG 256
 #define ARG_SEED 257
@@ -69,6 +72,8 @@ static struct option long_options[] = {
 	{"reportOpps", no_argument, &reportOpps, 1},
 	{"dumpPats",   required_argument, 0, ARG_DUMP_PATS},
 	{"revcomp", no_argument, 0, 'r'},
+	{"kmer", required_argument, 0, 'k'},
+	{"3prime-diffs", required_argument, 0, 'd'},
 	{0, 0, 0, 0}
 };
 
@@ -93,6 +98,8 @@ static void printUsage(ostream& out) {
 	    << "  -3/--trim3 <int>   # of bases to trim from 3' (left) end of queries" << endl
 	    << "  -u/--qUpto <int>   stop after <int> queries (counting reverse complements)" << endl
 	    << "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
+		<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
+		<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
 	    << "  -b/--binOut        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print basic timing statistics" << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
@@ -167,6 +174,18 @@ static void parseOptions(int argc, char **argv) {
 	   		case 's': sanityCheck = true; break;
 	   		case 't': timing = true; break;
 	   		case 'b': binOut = true; break;
+			case 'k': 
+				if (optarg != NULL)
+					kmer = parseInt(1, "-k/--kmer must be at least 1");
+				else
+					kmer = 22;
+				break;
+			case 'd': 
+				if (optarg)
+					allowed_diffs = parseInt(0, "-d/--3prime-diffs must be at least 0");
+				else
+					allowed_diffs = 4;
+				break;
 	   		case ARG_DUMP_PATS:
 	   			patDumpfile = optarg;
 	   			break;
@@ -245,7 +264,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    }
     	// Optionally sanity-check results by confirming with a
     	// different matcher that the pattern occurs in exactly
-    	// those locations reported.
+    	// those locations reported.  
     	if(sanityCheck && !oneHit && !os.empty()) {
     	    vector<Hit>& results = sink.retainedHits();
 		    vector<U32Pair> results2;
@@ -289,6 +308,79 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	}
     }
 }
+
+
+
+/**
+ * Search through a single (forward) Ebwt index for exact query hits in the 
+ * 5' end of each read, and then extend that hit by shift-and to allow for 3'
+ * mismatches.
+ *
+ * Ebwt (ebwt) is already loaded into memory.
+ */
+template<typename TStr>
+static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_texts,
+									 PatternSource<TStr>& patsrc,
+									 HitSink& sink,
+									 EbwtSearchStats<TStr>& stats,
+									 EbwtSearchParams<TStr>& params,
+									 Ebwt<TStr>& ebwt,
+									 vector<TStr>& os)
+{
+	uint32_t patid = 0;
+	uint64_t lastHits= 0llu;
+	uint32_t lastLen = 0;
+	assert(patsrc.hasMorePatterns());
+	
+	if (allowed_diffs == -1)
+		allowed_diffs = default_allowed_diffs;
+	
+	ExactSearchWithLowQualityThreePrime<TStr> extend_policy(packed_texts, 
+															false, 
+															kmer,/* global, override */ 
+															allowed_diffs /*global, override*/);
+	
+    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+    	params.setFw(!revcomp || !patsrc.nextIsReverseComplement());
+    	params.setPatId(patid++);
+    	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
+    	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
+    	TStr pat = patsrc.nextPattern();
+    	assert(!empty(pat));
+    	if(lastLen == 0) lastLen = length(pat);
+    	if(qSameLen && length(pat) != lastLen) {
+    		throw runtime_error("All reads must be the same length");
+    	}
+		
+    	// FIXME:
+    	//params.stats().incRead(s, pat);
+	    extend_policy.search(ebwt, stats, params, pat, sink);
+		
+	    // If the forward direction matched exactly, ignore the
+	    // reverse complement
+	    if(oneHit && revcomp && sink.numHits() > lastHits) {
+	    	lastHits = sink.numHits();
+	    	if(params.fw()) {
+	    		assert(patsrc.nextIsReverseComplement());
+	    		assert(patsrc.hasMorePatterns());
+	    		// Ignore this pattern (the reverse complement of
+	    		// the one we just matched)
+		    	const TStr& pat2 = patsrc.nextPattern();
+		    	assert(!empty(pat2));
+		    	patid++;
+		    	if(qSameLen && length(pat2) != lastLen) {
+		    		throw runtime_error("All reads must be the same length");
+		    	}
+		    	params.setFw(false);
+				
+				//FIXME:
+		    	//params.stats().incRead(s, pat2);
+	    		assert(!patsrc.nextIsReverseComplement());
+	    	}
+	    }
+    }
+}
+
 
 /**
  * Given a pattern, a list of reference texts, and some other state,
@@ -468,7 +560,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	assert(!ebwtBw.isInMemory());
 	assert(patsrc.hasMorePatterns());
     patsrc.setReverse(false); // reverse patterns
-    params.setEbwtFw(true); // let search parameters reflect the reverse index
+    params.setEbwtFw(true); // let search parameters reflect the forward index
 	vector<Hit> sanityHits;
 	uint32_t patid = 0;
 	uint64_t lastHits = 0llu;
@@ -522,8 +614,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		ebwtFw.search1MismatchOrBetter(s, params);
     	}
     	bool gotHits = sink.numHits() > lastHits;
-	    // Set a bit indicating this pattern is done and needn't be
-	    // considered by the 1-mismatch loop
+	    
 	    if(oneHit && gotHits) {
 	    	assert_eq(0, sink.numProvisionalHits());
 	    	uint32_t mElt = patid >> 3;
@@ -531,6 +622,9 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		// Add 50% more elements, initialized to 0
 	    		fill(doneMask, mElt + patid>>4, 0);
 	    	}
+			
+			// Set a bit indicating this pattern is done and needn't be
+			// considered by the 1-mismatch loop
 	    	doneMask[mElt] |= (1 << (patid & 7));
 	    	if(revcomp && params.fw()) {
 	    		assert(patsrc.hasMorePatterns());
@@ -819,10 +913,25 @@ static void driver(const char * type,
 		                              mismatches > 0);
 		if(mismatches > 0) {
 			// Search with mismatches
+			if (kmer != -1 || allowed_diffs != -1)
+				cerr << "1-mismatch ker extension not yet implemented, ignoring -k, -d" << endl;
+				
 			mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+			
 		} else {
-			// Search without mismatches
-			exactSearch(*patsrc, *sink, stats, params, ebwt, os);
+			if (kmer != -1)
+			{
+				vector<String<Dna, Packed<> > > ss;
+				unpack(infile + ".3.ebwt", ss, NULL);
+				// Search for hits on the 5' end, and then try to extend them
+				// with a dynamic programming algorithm
+				exactSearchWithExtension(ss, *patsrc, *sink, stats, params, ebwt, os);
+			}
+			else
+			{
+				// Search without mismatches
+				exactSearch(*patsrc, *sink, stats, params, ebwt, os);
+			}
 		}
 	    sink->finish(); // end the hits section of the hit file
 	    if(printStats) {
@@ -918,5 +1027,102 @@ int main(int argc, char **argv) {
 	driver<String<Dna, Alloc<> > >("DNA", infile, query, queries, outfile);
     return 0;
 }
+
+template<typename TStr>
+static void prioritySearch(PatternSource<TStr>& patsrc,
+						   Ebwt<TStr>& ebwt,
+						   vector<String<Dna, Packed<> > >* ss,
+						   bool revcomp)
+
+{
+	uint32_t patid = 0;
+	assert(patsrc.hasMorePatterns());
+	
+	list<SearchPolicy<TStr>*> search_heirarchy;
+	
+	
+	// ExactSearchWithLowQualityThreePrime uses Landau Vishkin extension,
+	// which assumes that a 5 prime hit has a difference on the 3 prime end.
+	// Exact end to end matches will screw it up.  This is easy to change, but
+	// I haven't done so yet for performance reasons.  For now, prioritySearch
+	// screens out all exact matches first.
+	
+	search_heirarchy.push_back(new ExactSearch<TStr>());
+	search_heirarchy.push_back(new ExactSearchWithLowQualityThreePrime<TStr>(*ss));
+	
+	HitSink hit_sink(cout, true);
+	
+	// Since I'm manually accumulating hits against both strands for a given
+	// policy, I don't want the hit_sink to >> my patId for me.  I'll manage
+	// the ids and corresponding hits myself.
+	PrettyHitSink report_sink(cout, false, false);
+	
+	EbwtSearchStats<TStr> stats;
+	EbwtSearchParams<TStr> params(hit_sink,
+								  stats,
+								  MHP_PICK_1_RANDOM,
+								  false);
+	
+    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) 
+	{
+		
+		// Grab a pattern...
+		const TStr& pat = patsrc.nextPattern();
+		assert(!empty(pat));
+		
+		TStr pat_rc;
+		
+		// ...and if we are doing RC, it's RC pattern from the pattern source.
+		if (revcomp)
+		{
+			assert (patsrc.hasMorePatterns() && 
+					patsrc.nextIsReverseComplement());
+			pat_rc = patsrc.nextPattern();
+			assert(!empty(pat_rc));
+			//cerr << "\tfwd: " << pat << endl;
+			//cerr << "\trev: " << pat_rc << endl;
+		}
+		
+		params.setPatId(patid++);
+		
+		// Search for hits, stopping at the first (i.e. highest priority) 
+		// matching policy for which there is at least one hit.
+		for (typename list<SearchPolicy<TStr>*>::iterator pol_itr = search_heirarchy.begin();
+			 pol_itr != search_heirarchy.end(); 
+			 ++pol_itr)
+		{
+			SearchPolicy<TStr>* policy = *pol_itr;
+			params.setFw(true);
+			policy->search(ebwt, stats, params, pat, hit_sink);
+			if (revcomp)
+			{
+				params.setFw(false);
+				policy->search(ebwt, stats, params, pat_rc, hit_sink);
+			}
+			
+			vector<Hit>& hits = hit_sink.retainedHits();
+			if (hits.size())
+			{
+				// FIXME: this is a bullshit reporting policy.  We need a real 
+				// one.
+				Hit& hit = hits[0];
+				report_sink.reportHit(hit.h, hit.pat, hit.fw);
+				break;
+			}
+		}
+		
+		hit_sink.clearRetainedHits();
+	}
+	
+	report_sink.finish();
+	
+	for (typename list<SearchPolicy<TStr>*>::iterator pol_itr = search_heirarchy.begin();
+		 pol_itr != search_heirarchy.end(); 
+		 ++pol_itr)
+	{
+		delete *pol_itr;
+	}
+}
+
 
 #endif
