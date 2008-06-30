@@ -744,8 +744,8 @@ public:
 	void restore(TStr& s) const;
 	
 	// Searching and reporting
-	inline bool report(uint32_t off, uint32_t oms, EbwtSearchState<TStr>& s) const;
-	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, uint32_t oms /* = 0 */, SideLocus *l /* = NULL */) const;
+	inline bool report(uint32_t off, uint32_t top, uint32_t bot, EbwtSearchState<TStr>& s) const;
+	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
@@ -1051,6 +1051,7 @@ public:
 	                 const vector<TStr>& __texts,
 	                 bool __fw = true,
 	                 bool __ebwtFw = true,
+	                 bool __arrowMode = false,
 	                 bool __comprehensiveBacktrack = false) :
 		_sink(__sink),
 		_stats(__stats),
@@ -1059,6 +1060,8 @@ public:
 		_patid(0xffffffff),
 		_fw(__fw),
 		_ebwtFw(__ebwtFw),
+		_backtracking(false),
+        _arrowMode(__arrowMode),
 		_comprehensiveBacktrack(__comprehensiveBacktrack),
 		_suppress(false) { }
 	MultiHitPolicy multiHitPolicy() const { return _mhp; }
@@ -1070,22 +1073,26 @@ public:
 	void setEbwtFw(bool __ebwtFw)    { _ebwtFw = __ebwtFw; }
 	bool ebwtFw() const              { return _ebwtFw; }
 	EbwtSearchStats<TStr>& stats() const { return _stats; }
+	/**
+	 * Report a hit 
+	 */
 	void reportHit(EbwtSearchState<TStr>& s,
-	               U32Pair h,
-	               uint32_t tlen,
-	               uint32_t len,
-	               uint32_t oms) const
+	               U32Pair h,          // hit locus
+	               U32Pair a,          // arrow pair
+	               uint32_t tlen,      // length of text
+	               uint32_t len,       // length of query
+	               uint32_t oms) const 
 	{
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
 		uint32_t mm = _backtracking ? 1 : 0;
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw);
-		if(!_ebwtFw) {
+		if(!_ebwtFw && !_arrowMode) {
 			h.second = tlen - h.second - 1;
 			h.second -= (s.qlen()-1);
 		}
 		// Check the hit against the original text, if it's available
-		if(_texts.size() > 0) {
+		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
 			assert_eq(tlen, length(_texts[h.first]));
 			uint32_t diffs = 0;
@@ -1136,9 +1143,9 @@ public:
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
 			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(h, _patid, _fw, mm, oms);
+			sink().reportProvisionalHit(_arrowMode? a : h, _patid, _fw, mm, oms);
 		} else {
-			sink().reportHit(h, _patid, _fw, mm, oms);
+			sink().reportHit(_arrowMode? a : h, _patid, _fw, mm, oms);
 		}
 	}
 	void write(ostream& out) const {
@@ -1148,6 +1155,9 @@ public:
 			"Random pick 1"
 		};
 		out << "Multi-hit policy: " << mhpToStr[_mhp] << endl;
+	}
+	bool arrowMode() const {
+		return _arrowMode;
 	}
 	bool comprehensiveBacktrack() const {
 		return _comprehensiveBacktrack;
@@ -1173,10 +1183,11 @@ private:
 	MultiHitPolicy _mhp;    // policy for when read hits multiple spots
     const vector<TStr>& _texts; // original texts, if available (if not
                                 // available, _texts.size() == 0)
-	uint32_t _patid;        // id of current read
-	bool _fw;               // current read is forward-oriented
-	bool _ebwtFw;           // current Ebwt is forward-oriented
-	bool _backtracking;     // we're currently backtracking
+	uint32_t _patid;      // id of current read
+	bool _fw;             // current read is forward-oriented
+	bool _ebwtFw;         // current Ebwt is forward-oriented
+	bool _backtracking;   // we're currently backtracking
+	bool _arrowMode;      // report arrows
 	bool _comprehensiveBacktrack; // Allow backtracking to points after
 	                           // the read's halfway mark (for
 	                           // 1-mismatch)
@@ -2005,11 +2016,24 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c) const {
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::report(uint32_t off,
-                               uint32_t oms,
+                               uint32_t top,
+                               uint32_t bot,
                                EbwtSearchState<TStr>& s) const
 {
 	VMSG_NL("In report");
 	assert_lt(off, this->eh().len());
+	if(s.params().arrowMode()) {
+		// Call reportHit with a bogus genome position; in this mode,
+		// all we care about are the top and bottom arrows
+		s.params().reportHit(
+				s,                   // state
+				make_pair(0, 0),     // (bogus) position
+				make_pair(top, bot), // arrows
+				0,                   // (bogus) tlen
+				s.qlen(),            // qlen
+				bot-top-1);          // # other hits
+		return true;
+	}
 	// Check whether our match overlaps with the padding between two
 	// texts, in which case the match is spurious
 	uint32_t ptabOff = (off >> this->eh().chunkRate())*2;
@@ -2027,7 +2051,13 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 		if(_verbose) {
 			cout << "report tidx=" << tidx << ", off=" << (toff+coff) << ", absoff=" << off << ", toff=" << toff << endl;
 		}
-		s.params().reportHit(s, make_pair(tidx, toff + coff), tlen, s.qlen(), oms);
+		s.params().reportHit(
+				s,                            // state
+				make_pair(tidx, toff + coff), // position
+				make_pair(top, bot),          // arrows
+				tlen,                         // tlen
+				s.qlen(),                     // qlen
+				bot-top-1);                   // # other hits
 		return true;
 	}
 }
@@ -2042,10 +2072,10 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
                                        EbwtSearchState<TStr>& s,
-                                       uint32_t oms = 0,
                                        SideLocus *l = NULL) const
 {
 	VMSG_NL("In reportChaseOne");
+	assert(!s.params().arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
 	bool own_locus = false;
@@ -2072,9 +2102,8 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 		off = this->offs()[i >> this->_eh.offRate()] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
-	if (own_locus)
-		delete l;
-	return report(off, oms, s);
+	if (own_locus) delete l;
+	return report(off, s.top(), s.bot(), s);
 }
 
 #define NUM_SAMPLES 10
@@ -2088,6 +2117,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
 {	
+	assert(!s.params().arrowMode());
 	assert_gt(s.spread(), NUM_SAMPLES);
 	set<uint32_t> sampled_hits;
 	bool reported = false;
@@ -2112,13 +2142,14 @@ inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseRange(EbwtSearchState<TStr>& s) const
 {
+	assert(!s.params().arrowMode());
 	assert_gt(s.spread(), 1);
 	bool reported = false;
 	for(uint32_t i = s.top(); i < s.bot(); i++)  {
 		if(_verbose) cout << "reportChaseRange i: " << i << endl;
 		// TODO: Could calculate i's locus here, as an offset from
 		// s.top()'s locus
-		if(reportChaseOne(i, s, s.spread())) reported = true;
+		if(reportChaseOne(i, s)) reported = true;
 	}
 	return reported;
 }
@@ -2134,11 +2165,17 @@ template<typename TStr>
 inline bool Ebwt<TStr>::reportOne(uint32_t i,
                                   EbwtSearchState<TStr>& s,
                                   SideLocus *l = NULL) const
-{	
+{
 	VMSG_NL("In reportOne");
+	assert_eq(1, s.spread());
 	if(s.params().suppressHits()) return true; // return without reporting
 	s.params().stats().addExactHits(s);
-	return reportChaseOne(i, s, 0);
+	if(s.params().arrowMode()) {
+		// Don't chase anything; just report arrows and bail
+		report(i, s.top(), s.bot(), s);
+		return true;
+	}
+	return reportChaseOne(i, s, l);
 }
 
 /**
@@ -2156,6 +2193,11 @@ inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
 	assert_gt(s.spread(), 1);
 	if(s.params().suppressHits()) return true; // return without reporting
 	s.params().stats().addExactHits(s);
+	if(s.params().arrowMode()) {
+		// Don't chase anything; just report arrows and bail
+		report(0, s.top(), s.bot(), s);
+		return true;
+	}
 	switch(s.params().multiHitPolicy()) {
 		case MHP_CHASE_ALL: {
 			return reportChaseRange(s);
@@ -2179,7 +2221,7 @@ inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
 				if(ri >= s.bot()) ri -= s.spread();
 				// TODO: Could calculate r's locus here, as an offset
 				// from s.top()'s locus
-				if(reportChaseOne(ri, s, s.spread())) return true;
+				if(reportChaseOne(ri, s)) return true;
 			}
 			return false;
 		}
@@ -2207,18 +2249,25 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 		if(r == 0xffffffff) return false; // no match
 		// Did we stumble into a row with a known offset?  If so, make
 		// note so that don't have to chase it later.
-		if(off == 0xffffffff && ((r & this->eh().offMask()) == r || r == _zOff)) {
-			off = ((r == _zOff) ? 0 : this->offs()[r >> this->eh().offRate()]);
-			assert_lt(off, this->eh().len());
-			jumps = 0; // reset
-		} else {
-			jumps++;
+		if(!s.params().arrowMode()) {
+			if(off == 0xffffffff && ((r & this->eh().offMask()) == r || r == _zOff)) {
+				off = ((r == _zOff) ? 0 : this->offs()[r >> this->eh().offRate()]);
+				assert_lt(off, this->eh().len());
+				jumps = 0; // reset
+			} else {
+				jumps++;
+			}
 		}
 	}
 	assert(!s.closed());
 	assert_neq(s.top(), 0xffffffff);
 	assert_geq(jumps, 0);
 	if(s.params().suppressHits()) return true; // return without reporting
+	if(s.params().arrowMode()) {
+		// Just return arrows; we haven't tried to set off and we're
+		// not going to try to chase the result
+		return report(0, s.top(), s.bot(), s); 
+	}
 	if(off != 0xffffffff) {
 		// Good luck - we previously made note of a marked row and
 		// need not chase it any further 
@@ -2228,7 +2277,7 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 		assert_geq(jumps, 0);
 		VMSG_NL("searchFinish1 pre-found off=" << off);
 		s.params().stats().addExactHits(s);
-		return report(off, 0, s);
+		return report(off, s.top(), s.bot(), s); 
 		assert_leq(s.params().sink().numProvisionalHits(), 1);
 	} else {
 		// Haven't yet encountered a marked row for this result;

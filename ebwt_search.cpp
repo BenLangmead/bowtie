@@ -32,6 +32,7 @@ static int revcomp				= 0; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
 static bool oneHit				= true; // for multihits, report just one
+static bool arrowMode			= false;// report SA arrows instead of locs
 static int ipause				= 0; // pause before maching?
 static int binOut				= 0; // write hits in binary
 static int qUpto				= -1; // max # of queries to read
@@ -47,9 +48,10 @@ static char *patDumpfile		= NULL; // filename to dump patterns to
 
 static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 
-#define ORIG_ARG 256
+#define ARG_ORIG 256
 #define ARG_SEED 257
 #define ARG_DUMP_PATS 258
+#define ARG_ARROW 259
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -57,7 +59,7 @@ static struct option long_options[] = {
 	{"sanity",  no_argument, 0, 's'},
 	{"1mismatch",  no_argument, 0, '1'},
 	{"pause",   no_argument, &ipause, 1},
-	{"orig",    required_argument, 0, ORIG_ARG},
+	{"orig",    required_argument, 0, ARG_ORIG},
 	{"allHits", no_argument, 0, 'a'},
 	{"binOut",  no_argument, 0, 'b'},
 	{"time",    no_argument, 0, 't'},
@@ -74,6 +76,7 @@ static struct option long_options[] = {
 	{"revcomp", no_argument, 0, 'r'},
 	{"kmer", required_argument, 0, 'k'},
 	{"3prime-diffs", required_argument, 0, 'd'},
+	{"arrows", no_argument, 0, ARG_ARROW},
 	{0, 0, 0, 0}
 };
 
@@ -109,6 +112,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --qSameLen         die with error if queries don't all have the same length" << endl
 	    << "  --stats            write statistics after hits" << endl
 	    << "  --reportOpps       report # of other potential mapping targets for each hit" << endl
+	    << "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    //<< "  --dumpPats <file>  dump all patterns read to a file" << endl
 	    << "  --seed <int>       seed for random number generator" << endl;
 }
@@ -154,6 +158,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'c': format = CMDLINE; break;
 	   		case '1': mismatches = 1; break;
 	   		case 'r': revcomp = 1; break;
+	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -189,7 +194,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_PATS:
 	   			patDumpfile = optarg;
 	   			break;
-	   		case ORIG_ARG:
+	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
    					cerr << "--orig arg must be followed by a string" << endl;
    					printUsage(cerr);
@@ -265,7 +270,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	// Optionally sanity-check results by confirming with a
     	// different matcher that the pattern occurs in exactly
     	// those locations reported.  
-    	if(sanityCheck && !oneHit && !os.empty()) {
+    	if(sanityCheck && !oneHit && !arrowMode && !os.empty()) {
     	    vector<Hit>& results = sink.retainedHits();
 		    vector<U32Pair> results2;
 		    results2.reserve(256);
@@ -433,7 +438,7 @@ static bool findSanityHits(const TStr1& pat,
 					}
 				}
 			}
-			// If the extend yielded 1 or fewer hits, keep it
+			// If the extend yielded 1 or fewer mismatches, keep it
 			if((diffs == 0 && allowExact) || diffs == 1) {
 				uint32_t off = pos - ohlen;
 				if(transpose) {
@@ -657,7 +662,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    	}
 	    }
 	    // Check all hits against a naive oracle
-    	if(sanityCheck && !os.empty()) {
+    	if(sanityCheck && !os.empty() && !arrowMode) {
     	    vector<Hit>& hits = sink.retainedHits();
     	    // Accumulate hits found using a naive seed-and-extend into
     	    // sanityHits
@@ -775,7 +780,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    }
 	    // Check that all hits are sane (NOT that all true hits were
 	    // found - not yet, at least)
-    	if(sanityCheck && !os.empty()) {
+    	if(sanityCheck && !os.empty() && !arrowMode) {
     	    vector<Hit>& hits = sink.retainedHits();
     	    // Accumulate hits found using a naive seed-and-extend into
     	    // sanityHits
@@ -916,11 +921,14 @@ static void driver(const char * type,
 					reportOpps,
 					sanityCheck && !os.empty());
 		EbwtSearchStats<TStr> stats;
-		EbwtSearchParams<TStr> params(*sink,
-		                              stats,
+		EbwtSearchParams<TStr> params(*sink,   // HitSink
+		                              stats,   // EbwtSearchStats
+		                              // Policy for how to resolve multiple hits
 		                              (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
-		                              os,
-		                              mismatches > 0);
+		                              os,      //
+		                              mismatches > 0,
+		                              true,
+		                              arrowMode);
 		if(mismatches > 0) {
 			// Search with mismatches
 			if (kmer != -1 || allowed_diffs != -1)
