@@ -86,7 +86,7 @@ throw(UnexpectedTypeSizeException)
 	// Get length of string and write to stream, being careful to swap
 	// if this is a little-endian machine
 	uint64_t len = tmp = length(s);
-	if(verbose) cout << "len: " << len << endl;
+//	if(verbose) cout << "len: " << len << endl;
 	if(littleEndian) tmp = endianSwapU64(tmp);
 	out.write((char*)&tmp, 8);
 	
@@ -106,10 +106,10 @@ throw(UnexpectedTypeSizeException)
 	}
 	int charsPerUi64 = charsPerUi * uisPerUi64;
 	
-	if(verbose) cout << "sui: " << sui << endl;
-	if(verbose) cout << "charsPerUi: " << charsPerUi << endl;
-	if(verbose) cout << "uisPerUi64: " << uisPerUi64 << endl;
-	if(verbose) cout << "charsPerUi64: " << charsPerUi64 << endl;
+//	if(verbose) cout << "sui: " << sui << endl;
+//	if(verbose) cout << "charsPerUi: " << charsPerUi << endl;
+//	if(verbose) cout << "uisPerUi64: " << uisPerUi64 << endl;
+//	if(verbose) cout << "charsPerUi64: " << charsPerUi64 << endl;
 	
 	// Write the packed sequence in 64-bit chunks, being careful to
 	// swap if this is a little-endian machine.
@@ -117,7 +117,7 @@ throw(UnexpectedTypeSizeException)
 	// Round up to nearest 8-byte boundary to get the number of 8-byte
 	// chunks
 	uint64_t blen64 = (len+(charsPerUi64-1))/charsPerUi64;
-	if(verbose) cout << "blen64: " << blen64 << endl;
+//	if(verbose) cout << "blen64: " << blen64 << endl;
 	for(uint64_t i = 0; i < blen64; i++) {
 		uint64_t tmp;
 		uint64_t off = i * uisPerUi64;
@@ -225,7 +225,7 @@ static void readPacked(istream& in,
                        bool verbose = false)
 throw(UnexpectedTypeSizeException)
 {
-	if(verbose) cout << "Reading a packed string" << endl;
+//	if(verbose) cout << "Reading a packed string" << endl;
 	
 	// Endianness test
 	static uint8_t __etest[2] = { 1, 0 };
@@ -252,10 +252,10 @@ throw(UnexpectedTypeSizeException)
 		default: throw; // can't happen
 	}
 	int charsPerUi64 = charsPerUi * uisPerUi64;
-	if(verbose) cout << "sui: " << sui << endl;
-	if(verbose) cout << "charsPerUi: " << charsPerUi << endl;
-	if(verbose) cout << "uisPerUi64: " << uisPerUi64 << endl;
-	if(verbose) cout << "charsPerUi64: " << charsPerUi64 << endl;
+//	if(verbose) cout << "sui: " << sui << endl;
+//	if(verbose) cout << "charsPerUi: " << charsPerUi << endl;
+//	if(verbose) cout << "uisPerUi64: " << uisPerUi64 << endl;
+//	if(verbose) cout << "charsPerUi64: " << charsPerUi64 << endl;
 
 	// Number of unsigned ints in the packed String<>
 	uint64_t blen64 = (len+(charsPerUi64-1))/charsPerUi64;
