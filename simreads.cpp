@@ -329,7 +329,7 @@ void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 					read[i] = (TVal)(((int)read[i])+1);
 					// I tuned this to 4 in order to make the mapping
 					// rates look like SRR001115
-					if((random() % 4) != 0) {
+					if((random() % 5) != 0) {
 						for(int j = i+1; j < readLen; j++) {
 							read[j] = (TVal)(((int)read[j])+1);
 						}
