@@ -572,6 +572,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	{
 	Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+    	bool exactOnly = false;
     	bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
     	params.setFw(sfw);
     	uint32_t spatid = patid;
@@ -593,6 +594,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		// pick-one and this is a reverse complement
     		assert(oneHit);
     		assert(!params.fw());
+    		exactOnly = true;
     		// There is a provisional inexact match for the forward
     		// orientation of this pattern, so just try exact
     		ebwtFw.search(s, params);
@@ -614,7 +616,8 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		ebwtFw.search1MismatchOrBetter(s, params);
     	}
     	bool gotHits = sink.numHits() > lastHits;
-	    
+	    // Set a bit indicating this pattern is done and needn't be
+	    // considered by the 1-mismatch loop
 	    if(oneHit && gotHits) {
 	    	assert_eq(0, sink.numProvisionalHits());
 	    	uint32_t mElt = patid >> 3;
@@ -670,9 +673,16 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     				}
     			}
     			reconcileHits(pat, spatid, sfw, os, hits, sanityHits, true, false);
-    		} else {
-    			// If we didn't hit, then oracle shouldn't have hit
+    		} else if(!exactOnly) {
+    			// If we tried exact and inexact and didn't hit, then
+    			// oracle shouldn't have hit
         		assert_eq(0, sanityHits.size());
+    		} else {
+    			// If we tried exact only and didn't hit, then oracle
+    			// shouldn't have any exact
+				for(size_t i = 0; i < sanityHits.size(); i++) {
+					assert_gt(sanityHits[i].mms, 0);
+				}
     		}
     		if(oneHit) {
     			// Ignore the rest of the oracle hits
