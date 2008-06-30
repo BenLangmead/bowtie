@@ -53,7 +53,7 @@ static const int ARG_CUTOFF    = 261;
  */
 static void printUsage(ostream& out) {
 	out << "Usage: ebwt_build [options]* <reference_in> <ebwt_outfile_base>" << endl
-	    << "    seq_in                  comma-separated list of files with ref sequences" << endl
+	    << "    reference_in            comma-separated list of files with ref sequences" << endl
 	    << "    ebwt_outfile_base       write Ebwt data to files with this dir/basename" << endl
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
