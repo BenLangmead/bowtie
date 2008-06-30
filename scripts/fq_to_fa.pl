@@ -21,10 +21,10 @@
 # X      G or A or T or C
 # N      G or A or T or C
 
-open(FQ, "egrep '^[ACGTUMRWSYKVHDBXN]{40}\$' $ARGV[0] |") || die "Could not open .fq";
+open(FQ, "egrep '^[ACGTUMRWSYKVHDBXN]{25}[ACGTUMRWSYKVHDBXN]*\$' $ARGV[0] |") || die "Could not open .fq";
 my $i = 0;
 while(<FQ>) {
-    print ">fakelab$i\n";
+    print ">r$i\n";
     print $_;
     $i++;
 }

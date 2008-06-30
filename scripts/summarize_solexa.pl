@@ -11,6 +11,8 @@
 use strict;
 use warnings;
 
+defined($ARGV[0]) || die "Must specify solexa _seq.txt file as first argument";
+
 my $cutoff = -1;
 $cutoff = $ARGV[1] || defined($ARGV[1]);
 
@@ -84,11 +86,13 @@ printf "  # Reads with dots: $with_dots (%2.1f%% of total)\n", ($with_dots * 100
 printf "    # Reads with 8 or more dots: $with_8_dots (%2.1f%% of total)\n", ($with_8_dots * 100.0 / $o);
 print "Number of reads (RHS) with given length (LHS):\n";
 for my $k (sort keys %lengths) {
-	print "  $k: $lengths{$k}\n";
+	print "  $k: $lengths{$k} (";
+	printf "%2.1f%%)\n", ($lengths{$k} * 100.0 / $o);
 }
 print "Number of reads (RHS) with given number of dots (LHS):\n";
 for my $k (sort keys %numDots) {
-	print "  $k: $numDots{$k}\n";
+	print "  $k: $numDots{$k} (";
+	printf "%2.1f%%)\n", ($numDots{$k} * 100.0 / $o);
 }
 print "Per-position occurrence rates:\n";
 print "  Pos\tA\tC\tG\tT\t.\n";

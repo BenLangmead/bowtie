@@ -14,17 +14,30 @@ use strict;
 use warnings;
 use Getopt::Std;
 
+sub countEntries {
+	my $h = shift;
+	my $c = 0;
+	for my $k (keys %{$h}) {
+		$c++;
+	}
+	return $c;
+}
+
 my %options=();
-getopts("ovl",\%options);
+getopts("ovrli:",\%options);
 my $ebwtOneHit = 0; $ebwtOneHit = $options{o} if defined $options{o};
-my $verbose = 0; $verbose = $options{o} if defined $options{v};
+my $verbose = 0; $verbose = $options{v} if defined $options{v};
 my $lax = 0; $lax = $options{l} if defined $options{l};
+my $ignoreQueriesGt = 0xffffffff; $ignoreQueriesGt = $options{i} if defined($options{i});
+my $ignoreRevcomp = 0; $ignoreRevcomp = $options{r} if defined($options{r});
 
 print "ebwtOneHit: $ebwtOneHit\n";
 print "lax: $lax\n";
 
 my %vhitsFw = ();
 my %vhitsRc = ();
+my %vhitsFwStr = ();
+my %vhitsRcStr = ();
 
 defined($ARGV[0]) || die "Must specify vmatch hit file as first argument";
 defined($ARGV[1]) || die "Must specify ebwt_search hit file as second argument";
@@ -49,21 +62,48 @@ if($ebwtHitsFile =~ /\.gz$/) {
     open(EBWT, $ebwtHitsFile) || die "Could not open ebwt hit file $ebwtHitsFile";
 }
 
+sub toHitString($$$$$) {
+	my ($q, $fw, $r, $o, $mm) = @_;
+	return "$q".($fw?"+":"-").":<$r,$o,$mm>";
+}
+
+sub toKey($$$) {
+	my ($r, $o, $mm) = @_;
+	return ((($o * 50) + $r) * 2) + $mm;
+}
+
 # Read in vmatch hits and install in the global hashes
 print "Reading Vmatch hits into hashes...\n";
 while(<VMATCH>) {
 	my @s = split;
 	next if /^#/;
-	my $vhits = ($s[3] eq "D") ? \%vhitsFw : \%vhitsRc;
+	my $fw = ($s[3] eq "D") ? 1 : 0;
+	my $vhits = $fw? \%vhitsFw : \%vhitsRc;
+	my $vhitsStr = $fw? \%vhitsFwStr : \%vhitsRcStr;
+	next if ($s[3] eq "P" && $ignoreRevcomp);
 	my $q = int($s[5]);
+	$q = -$q unless $fw;
+	next if $q > $ignoreQueriesGt;
 	unless(defined $vhits->{$q}) {
 		$vhits->{$q} = {};
 	}
+	if($verbose) {
+		unless(defined $vhitsStr->{$q}) {
+			$vhitsStr->{$q} = {};
+		}
+	}
+	$s[7] eq "-1" || $s[7] eq "0" || die "Bad s: $s[7]";
 	my $mm = ($s[7] eq "-1")? 1 : 0;
-	my $key = (int($s[1]) + int($s[2]) + $mm);
-	print "Vmatch query: $q, key: $key\n" if $verbose;
+	$mm == 1 || $mm == 0 || die "Bad mm: $mm";
+	my $r = int($s[1]);
+	my $o = int($s[2]);
+	my $key = toKey($r, $o, $mm);
+	print "Vmatch:\n" if $verbose;
+	print "  $_" if $verbose;
+	print "  q: $q, fw: $fw, r: $r, o: $o, mm: $mm\n" if $verbose;
 	$numVmatchHits++;
 	$vhits->{$q}->{$key} = 1;
+	$vhitsStr->{$q}->{toHitString($q, $fw, $r, $o, $mm)} = 1 if $verbose;
 }
 
 # Read in ebwt hits and compare against the global hashes
@@ -75,8 +115,12 @@ while(<EBWT>) {
 	my @s = split(/:/);
 	my $q = $s[0];
 	my $fw = (chop($q) eq '+') ? 1 : 0;
-	my $vhits = ($fw == 1)? \%vhitsFw : \%vhitsRc;
+	next if (!$fw && $ignoreRevcomp);
+	my $vhits = $fw? \%vhitsFw : \%vhitsRc;
+	my $vhitsStr = $fw? \%vhitsFwStr : \%vhitsRcStr;
 	$q = int($q); # convert query index to int
+	$q = -$q unless $fw;
+	next if $q > $ignoreQueriesGt;
 	print "Ebwt query: $q\n" if $verbose;
 	# Immediately check whether there are *any* hits for this same
 	# query in the Vmatch output
@@ -109,10 +153,11 @@ while(<EBWT>) {
 		my $r = int($tri[0]);
 		my $o = int($tri[1]);
 		my $mm = 0;
+		defined($tri[2]) || die "tri[2] not defined";
 		$mm = int($tri[2]) if defined($tri[2]); # 0 or 1
 		$mm == 0 || $mm == 1 || die "Bad mm: $mm";
 		print "  r: $r, o: $o, mm: $mm\n" if $verbose;
-		my $key = $r + $o + $mm;
+		my $key = toKey($r, $o, $mm);
 		print "Ebwt query: $q, key: $key\n" if $verbose;
 		push(@hInts, $key);
 		push(@mms, $mm);
@@ -147,18 +192,18 @@ while(<EBWT>) {
 				delete $vhitsFw{$q} if defined($vhitsFw{$q});
 				delete $vhitsRc{$q} if defined($vhitsRc{$q});
 			} elsif($found == 0) {
-				print "No matching Vmatch hit for Ebwt hit: $q";
-				if($fw) { print "+"; } else { print "-"; }
+				print "No matching Vmatch hit for Ebwt hit on $q".($fw?"+":"-");
 				print ":<$hStr>\n";
 				$problems++;
 			}
 		}
 	} else {
 		# All-against-all
-		my @vmatchHits = sort keys %{$vhits->{$q}};
-		my @ebwtHits = sort @hInts;
+		my @vmatchHits = sort {$a <=> $b} (keys %{$vhits->{$q}});
+		my @ebwtHits = sort {$a <=> $b} @hInts;
 		my $vi = 0;
 		my $ei = 0;
+		my $iproblems = $problems;
 		while($ei <= $#ebwtHits && $vi <= $#vmatchHits) {
 			if($vmatchHits[$vi] == $ebwtHits[$ei]) {
 				delete $vhits->{$q}->{$vmatchHits[$vi]};
@@ -171,16 +216,27 @@ while(<EBWT>) {
 				$vi++; # This is OK
 			} else {
 				# Not OK; Ebwt has hit that vmatch doesn't have
-				print "Unmatched Ebwt hit\n";
+				# Print out some diagnostic info
+				print "Unmatched Ebwt hit on $q".($fw?"+":"-").": vi: $vmatchHits[$vi], ei: $ebwtHits[$ei]\n";
+				if($vi < $#vmatchHits) {
+					print "  Next vi: $vmatchHits[$vi+1]\n";
+				} elsif($ei < $#ebwtHits) {
+					print "  Next ei: $vmatchHits[$ei+1]\n";
+				}
 				$ei++; $problems++;
 			}
+		}
+		if($iproblems > $problems) {
+			print "Arrays:\n";
+			print "Arrays:\n";
+			print "Arrays:\n";
 		}
 		# Unmatched Ebwt hits are a problem, but unmatched Vmatch hits
 		# are not, since they may be matched later on when we process
 		# the transposed index.
 		for(; $ei <= $#ebwtHits; $ei++) {
 			# Problem: unmatched Ebwt hit
-			print "Unmatched Ebwt hit\n";
+			print "Unmatched Ebwt hit after vmatch hits for this query were exhausted\n";
 			$problems++;
 		}
 	}
@@ -189,12 +245,16 @@ while(<EBWT>) {
 # Any remaining entries in vhitsFw and vhitsRc correspond to Vmatch
 # hits that were not matched up with Ebwt hits
 foreach my $q (keys %vhitsFw) {
-	print "FW Vmatch query that wasn't covered by Ebwt: $q+:\n";
-	$problems++;
+	if(countEntries(\%{$vhitsFw{$q}}) > 0) {
+		print "FW Vmatch query that wasn't covered by Ebwt: $q+:\n";
+		$problems++;
+	}
 }
 foreach my $q (keys %vhitsRc) {
-	print "RC Vmatch query that wasn't covered by Ebwt: $q-:\n";
-	$problems++;
+	if(countEntries(\%{$vhitsRc{$q}}) > 0) {
+		print "RC Vmatch query that wasn't covered by Ebwt: $q-:\n";
+		$problems++;
+	}
 }
 print "Found $problems discrepencies\n";
 print "Total Ebwt hits: $numEbwtHits\n";

@@ -19,6 +19,7 @@ if($child == 0) {
 	# I'm the child
 	my $cmd = "time ";
 	$cmd .= join " ", @ARGV;
+	$cmd .= " 2>&1 | tee out.$runname";
 	print "Spawning child with command: $cmd\n";
 	exec(@ARGV);
 }
