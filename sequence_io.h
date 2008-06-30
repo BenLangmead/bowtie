@@ -118,7 +118,7 @@ static void readSequenceFile(const std::string& infile,
 			}
 			#ifndef NDEBUG
 			for(size_t i = 0; i < length(tmp); i++) {
-				assert_lt(tmp[i], 4);
+				assert_lt(tmp[i], (int)(ValueSize<TVal>::VALUE));
 				assert_geq(tmp[i], 0);
 			}
 			#endif
