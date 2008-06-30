@@ -39,7 +39,8 @@ BIN_LIST = ebwt_build \
            diff_sample-with-asserts \
            lcp \
            rusage \
-           pack_fasta
+           pack_fasta \
+           simreads
 LIBS = -lz
 
 all: $(BIN_LIST)
@@ -118,6 +119,9 @@ bwt: bwt.cpp blockwise_sa.h
 
 pack_fasta: pack_fasta.cpp packed_io.h endian.cpp tokenize.h tokenize.cpp packed_io.cpp
 	$(CXX) $(RELEASE_FLAGS) -DPACK_FASTA_MAIN -Wall $(INC) $(LIBS) -o $@ $< endian.cpp tokenize.cpp packed_io.cpp
+
+simreads: simreads.cpp tokenize.h tokenize.cpp
+	$(CXX) $(DEBUG_FLAGS) -DSIMREADS_MAIN -Wall $(INC) $(LIBS) -o $@ $< tokenize.cpp
 
 .PHONY: clean
 clean:
