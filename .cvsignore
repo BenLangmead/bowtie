@@ -27,3 +27,5 @@ ebwt_search_prof0
 pop
 core.*
 *.hits
+simreads
+.ebwt_search.md5
