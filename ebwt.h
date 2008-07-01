@@ -1049,6 +1049,7 @@ public:
 	                 EbwtSearchStats<TStr>& __stats,
 	                 MultiHitPolicy __mhp,
 	                 const vector<TStr>& __texts,
+	                 bool __revcomp = true,
 	                 bool __fw = true,
 	                 bool __ebwtFw = true,
 	                 bool __arrowMode = false,
@@ -1058,6 +1059,7 @@ public:
 		_mhp(__mhp),
 		_texts(__texts),
 		_patid(0xffffffff),
+		_revcomp(__revcomp),
 		_fw(__fw),
 		_ebwtFw(__ebwtFw),
 		_backtracking(false),
@@ -1095,7 +1097,7 @@ public:
 				mm.set(len - s.mismatch() - 1);
 		}
 		
-		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw);
+		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
 		if(!_ebwtFw && !_arrowMode) {
 			h.second = tlen - h.second - 1;
 			h.second -= (s.qlen()-1);
@@ -1193,6 +1195,7 @@ private:
     const vector<TStr>& _texts; // original texts, if available (if not
                                 // available, _texts.size() == 0)
 	uint32_t _patid;      // id of current read
+	bool _revcomp;        // whether reverse complements are enabled
 	bool _fw;             // current read is forward-oriented
 	bool _ebwtFw;         // current Ebwt is forward-oriented
 	bool _backtracking;   // we're currently backtracking

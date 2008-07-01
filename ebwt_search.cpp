@@ -32,6 +32,7 @@ static int revcomp				= 0; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
 static bool oneHit				= true; // for multihits, report just one
+static bool concise				= false; // for multihits, report just one
 static bool arrowMode			= false;// report SA arrows instead of locs
 static int ipause				= 0; // pause before maching?
 static int binOut				= 0; // write hits in binary
@@ -52,6 +53,7 @@ static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 #define ARG_SEED 257
 #define ARG_DUMP_PATS 258
 #define ARG_ARROW 259
+#define ARG_CONCISE 260
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -62,6 +64,7 @@ static struct option long_options[] = {
 	{"orig",    required_argument, 0, ARG_ORIG},
 	{"allHits", no_argument, 0, 'a'},
 	{"binOut",  no_argument, 0, 'b'},
+	{"concise", no_argument, 0, ARG_CONCISE},
 	{"time",    no_argument, 0, 't'},
 	{"trim3",   required_argument, 0, '3'},
 	{"trim5",   required_argument, 0, '5'},
@@ -99,11 +102,12 @@ static void printUsage(ostream& out) {
 	    << "  -1/--1mismatch     allow 1 mismatch (requires both fw and bw Ebwts)" << endl
 	    << "  -5/--trim5 <int>   # of bases to trim from 5' (right) end of queries" << endl
 	    << "  -3/--trim3 <int>   # of bases to trim from 3' (left) end of queries" << endl
-	    << "  -u/--qUpto <int>   stop after <int> queries (counting reverse complements)" << endl
+	    << "  -u/--qUpto <int>   stop after <int> queries (not counting reverse complements)" << endl
 	    << "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
 		<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
 		<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
 	    << "  -b/--binOut        write hits in binary format (must specify <hit_outfile>)" << endl
+	    << "  --concise          write hits in a concise ASCII format" << endl
 	    << "  -t/--time          print basic timing statistics" << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
@@ -159,6 +163,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '1': mismatches = 1; break;
 	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
+	   		case ARG_CONCISE: concise = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -213,6 +218,8 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
+	// If revomp is enabled, double qUpto to match
+	if(revcomp && qUpto != -1) qUpto <<= 1;
 }
 
 static char *argv0 = NULL;
@@ -903,7 +910,6 @@ static void driver(const char * type,
 		assert_eq(joinedo, rs);
 	}
 	{
-		bool copious_out = true;
 		Timer _t(cout, "Time searching: ", timing);
 		// Set up hit sink; if sanityCheck && !os.empty() is true,
 		// then instruct the sink to "retain" hits in a vector in
@@ -917,7 +923,7 @@ static void driver(const char * type,
 					reportOpps,
 					sanityCheck && !os.empty());
 		}
-		else if(copious_out)
+		else if(!concise)
 		{
 			sink = new VerboseHitSink(*fout,
 									 revcomp,
@@ -937,7 +943,8 @@ static void driver(const char * type,
 		                              // Policy for how to resolve multiple hits
 		                              (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
 		                              os,      //
-		                              mismatches > 0,
+		                              revcomp,
+		                              true,
 		                              true,
 		                              arrowMode);
 		if(mismatches > 0) {

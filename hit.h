@@ -174,8 +174,8 @@ public:
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
-		assert((patId & 1) == 0 || !fw);
-		assert((patId & 1) == 1 || fw);
+		assert(!_revcomp || (patId & 1) == 0 || !fw);
+		assert(!_revcomp || (patId & 1) == 1 || fw);
 		if(_revcomp) patId >>= 1;
 		if(patId != _lastPat || fw != _lastFw) {
 			// First hit on a new line
@@ -254,8 +254,8 @@ public:
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms)
 	{
-		assert((patId & 1) == 0 || !fw);
-		assert((patId & 1) == 1 || fw);
+		assert(!_revcomp || (patId & 1) == 0 || !fw);
+		assert(!_revcomp || (patId & 1) == 1 || fw);
 		if(_revcomp) patId >>= 1;
 		
 		_first = false;
