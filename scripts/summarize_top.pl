@@ -154,3 +154,4 @@ if($max_rsmaxM > 0) {
 	print "  RES: max=$max_rsmaxK KB\n";
 }
 print "  Total time: $min:$secs\n";
+print "$secstottot,$max_vmmaxK,$max_rsmaxK\n";
