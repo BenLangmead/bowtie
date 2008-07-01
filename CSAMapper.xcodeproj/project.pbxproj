@@ -55,8 +55,16 @@
 		ED8FBE180E0C027B00D3FF10 /* LVKernel.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = LVKernel.cpp; sourceTree = "<group>"; };
 		ED8FBE190E0C027B00D3FF10 /* LVKernel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LVKernel.h; sourceTree = "<group>"; };
 		ED9AECBA0E11840F003CC4DA /* TODO */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = TODO; sourceTree = "<group>"; };
+		EDAEFC760E1948B9006D9D87 /* bowtie_convert.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = bowtie_convert.cpp; sourceTree = "<group>"; };
+		EDAEFC800E19498C006D9D87 /* read_bfq.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = read_bfq.h; sourceTree = "<group>"; };
+		EDAEFC810E1949C4006D9D87 /* const.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = const.c; sourceTree = "<group>"; };
+		EDAEFC820E1949C4006D9D87 /* const.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = const.h; sourceTree = "<group>"; };
+		EDAEFC830E1949C4006D9D87 /* maqmap.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = maqmap.c; sourceTree = "<group>"; };
+		EDAEFC840E1949C4006D9D87 /* maqmap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = maqmap.h; sourceTree = "<group>"; };
+		EDAEFCD00E194E07006D9D87 /* alphabet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = alphabet.h; sourceTree = "<group>"; };
 		EDD9703A0E0B0F8100F3ED5E /* packed_io.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packed_io.cpp; sourceTree = "<group>"; };
 		EDF8ECD00E09E2A4009FA071 /* hit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hit.cpp; sourceTree = "<group>"; };
+		EDF980B30E1A94EA00243AA5 /* algo.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = algo.hh; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -74,6 +82,7 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				EDAEFCD00E194E07006D9D87 /* alphabet.h */,
 				ED8D1ECA0E0994970068432F /* inexact_extend.h */,
 				ED8D1ECB0E0994970068432F /* inexact_extend.cpp */,
 				ED8FBE180E0C027B00D3FF10 /* LVKernel.cpp */,
@@ -110,6 +119,8 @@
 				ED6322500E09891C00F83FB6 /* word_io.cpp */,
 				ED6322510E09891C00F83FB6 /* word_io.h */,
 				ED6322520E09891C00F83FB6 /* zbox.h */,
+				EDAEFC760E1948B9006D9D87 /* bowtie_convert.cpp */,
+				EDAEFC7F0E19498C006D9D87 /* maq */,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -173,6 +184,19 @@
 			path = random_unique;
 			sourceTree = "<group>";
 		};
+		EDAEFC7F0E19498C006D9D87 /* maq */ = {
+			isa = PBXGroup;
+			children = (
+				EDF980B30E1A94EA00243AA5 /* algo.hh */,
+				EDAEFC830E1949C4006D9D87 /* maqmap.c */,
+				EDAEFC810E1949C4006D9D87 /* const.c */,
+				EDAEFC820E1949C4006D9D87 /* const.h */,
+				EDAEFC840E1949C4006D9D87 /* maqmap.h */,
+				EDAEFC800E19498C006D9D87 /* read_bfq.h */,
+			);
+			path = maq;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXLegacyTarget section */
@@ -218,6 +242,19 @@
 			passBuildSettingsInEnvironment = 1;
 			productName = ebwt_build;
 		};
+		EDAEFCA00E194A37006D9D87 /* bowtie_convert */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION) bowtie_convert";
+			buildConfigurationList = EDAEFCA30E194A76006D9D87 /* Build configuration list for PBXLegacyTarget "bowtie_convert" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			dependencies = (
+			);
+			name = bowtie_convert;
+			passBuildSettingsInEnvironment = 1;
+			productName = bowtie_convert;
+		};
 /* End PBXLegacyTarget section */
 
 /* Begin PBXProject section */
@@ -233,6 +270,7 @@
 				ED63222F0E0988C900F83FB6 /* ebwt_search */,
 				ED8FBC690E0BEFD000D3FF10 /* pack_fasta */,
 				ED9AEC130E114702003CC4DA /* ebwt_build */,
+				EDAEFCA00E194A37006D9D87 /* bowtie_convert */,
 			);
 		};
 /* End PBXProject section */
@@ -325,6 +363,27 @@
 			};
 			name = Release;
 		};
+		EDAEFCA10E194A37006D9D87 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = bowtie_convert;
+			};
+			name = Debug;
+		};
+		EDAEFCA20E194A37006D9D87 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = bowtie_convert;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -360,6 +419,15 @@
 			buildConfigurations = (
 				ED9AEC140E114702003CC4DA /* Debug */,
 				ED9AEC150E114702003CC4DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EDAEFCA30E194A76006D9D87 /* Build configuration list for PBXLegacyTarget "bowtie_convert" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EDAEFCA10E194A37006D9D87 /* Debug */,
+				EDAEFCA20E194A37006D9D87 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1085,7 +1085,16 @@ public:
 	{
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
-		uint32_t mm = _backtracking ? 1 : 0;
+		//uint32_t mm = _backtracking ? 1 : 0;
+		bitset<max_read_bp> mm = 0;
+		if (_backtracking)
+		{	
+			if (_ebwtFw)
+				mm.set(s.mismatch());
+			else
+				mm.set(len - s.mismatch() - 1);
+		}
+		
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw);
 		if(!_ebwtFw && !_arrowMode) {
 			h.second = tlen - h.second - 1;
@@ -1095,7 +1104,7 @@ public:
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
 			assert_eq(tlen, length(_texts[h.first]));
-			uint32_t diffs = 0;
+			bitset<max_read_bp> diffs = 0;
 			// This type of check assumes that only mismatches are
 			// possible.  If indels are possible, then we either need
 			// the caller to provide information about indel locations,
@@ -1105,12 +1114,12 @@ public:
 				if(_ebwtFw) {
 					// Forward pattern appears at h
 					if(s.query()[i] != _texts[h.first][h.second + i]) {
-						diffs++;
+						diffs.set(i);
 					}
 				} else {
 					// Reverse of pattern appears at h
 					if(s.query()[len-i-1] != _texts[h.first][h.second + i]) {
-						diffs++;
+						diffs.set(len-i-1);
 					}
 				}
 			}
@@ -1143,9 +1152,9 @@ public:
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
 			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(_arrowMode? a : h, _patid, _fw, mm, oms);
+			sink().reportProvisionalHit(_arrowMode? a : h, _patid, s.query(), _fw, mm, oms);
 		} else {
-			sink().reportHit(_arrowMode? a : h, _patid, _fw, mm, oms);
+			sink().reportHit(_arrowMode? a : h, _patid, s.query(), _fw, mm, oms);
 		}
 	}
 	void write(ostream& out) const {
@@ -1271,7 +1280,8 @@ public:
 		_qlen(length(__query)),
 		_qidx(length(_query)-1),
 		_topSideLocus(),
-		_botSideLocus()
+		_botSideLocus(),
+		_mism(0xffffffff)
 	{
 		_narrowHalfLen = _qlen;
 		// Let the forward Ebwt take the middle character
@@ -1321,6 +1331,7 @@ public:
 	}
 	uint32_t qlen() const       { return _qlen; }
 	uint32_t qidx() const       { return _qidx; }
+	uint32_t mismatch() const	{ return _mism; }
 	/// Return true iff we're currently matching in the "back half" of the read
 	bool inNarrowHalf() const {
 		return _qidx < _narrowHalfLen;
@@ -1347,6 +1358,7 @@ public:
 		assert_eq(0xffffffff, _top);
 		assert_eq(0xffffffff, _bot);
 		assert_eq(_qlen-1, _qidx);
+		assert_eq(_mism, 0xffffffff);
 		return true;
 	}
 	/**
@@ -1551,6 +1563,9 @@ public:
 				#endif
 				continue;
 			}
+			
+			_mism = i;
+			
 			if(backtrack1From(ebwt, i) && oneHit) {
 				// We got one or more 1-mismatch hits; we can stop now
 				return;
@@ -1584,6 +1599,7 @@ private:
     SideLocus _topSideLocus; // top EBWT side coordinates
     SideLocus _botSideLocus; // bot EBWT side coordinates
     uint32_t _narrowHalfLen;
+	uint32_t _mism;
 };
 
 ///////////////////////////////////////////////////////////////////////

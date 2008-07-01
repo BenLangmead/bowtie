@@ -2,11 +2,14 @@
 #define PAT_H_
 
 #include <cassert>
+#include <stdexcept>
 #include <vector>
 #include <string>
 #include <ctype.h>
 #include <zlib.h>
+#include <fstream>
 #include <seqan/sequence.h>
+#include "assert_helpers.h"
 
 using namespace std;
 using namespace seqan;

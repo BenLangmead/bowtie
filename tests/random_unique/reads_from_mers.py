@@ -31,18 +31,20 @@ def main(argv=None):
         argv = sys.argv
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ho:ve:rq:", 
+            opts, args = getopt.getopt(argv[1:], "ho:ve:rq:m", 
                                         ["help", 
                                         "output=", 
                                         "extension",
                                         "reverse-complement",
-                                        "low-qual-mismatches"])
+                                        "low-qual-mismatches",
+                                        "maq-fastq"])
         except getopt.error, msg:
             raise Usage(msg)
     
         extension = 10
         rc = False
         low_qual_mismatches = 0
+        fastq = False
         
         # option processing
         for option, value in opts:
@@ -58,6 +60,8 @@ def main(argv=None):
                 rc = True
             if option in ("-q", "--low-qual-mismatches"):
                 low_qual_mismatches  = int(value)
+            if option in ("-m", "--maq-fastq"):
+                fastq = True
                 
         ref = open(args[0])
         mummer_out = open(args[1])
@@ -102,7 +106,10 @@ def main(argv=None):
                     print >> sys.stderr, "Skipping", rid
                     continue
                 
-                defline = ">%s" % rid
+                if fastq:
+                    defline = "@%s" % rid
+                else:
+                    defline = ">%s" % rid
                 
                 if rc:
                     rc_ref_start = ref_pos - extension + 1 
@@ -111,15 +118,6 @@ def main(argv=None):
                     read_seq.reverse()
                     read_seq = [complement[a] for a in read_seq]
                     
-                    # if low_qual_mismatches > 0:
-                    #                         mis_pos = set([])
-                    #                         while len(mis_pos) < low_qual_mismatches:
-                    #                             mis_pos.add(random.choice(range(0, extension)))
-                    #                         print >> sys.stderr, range(0, extension)
-                    #                         for pos in mis_pos:
-                    #                             read_seq[pos] = mismatch[read_seq[pos]]
-                    
-                    #read_seq = ''.join(read_seq)
                     read_out = "%d-:<0,%d,%d>" % (read_num, rc_ref_start, low_qual_mismatches)
                 else:
                     read_seq = seq[ref_pos:ref_pos + mer_len + extension]
@@ -137,7 +135,11 @@ def main(argv=None):
                 read_seq = ''.join(read_seq)        
                 print >> reads_fna, defline
                 print >> reads_fna, read_seq
+                if fastq:
+                    print >> reads_fna, "+"
+                    print >> reads_fna, (";" * len(read_seq))
                 print >> ebwt_expect_out, read_out
+                
                 read_num += 1
         
         

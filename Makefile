@@ -14,6 +14,12 @@ OTHER_CPPS = endian.cpp \
              rusage.cpp \
              diff_sample.cpp \
 			 hit.cpp
+
+MAQ_HEADERS = maq/maqmap.h \
+              maq/const.h
+			  
+MAQ_CPPS	= maq/maqmap.c \
+              maq/const.c
 			 
 SEARCH_CPPS = LVKernel.cpp \
               inexact_extend.cpp \
@@ -119,6 +125,9 @@ bwt: bwt.cpp blockwise_sa.h
 
 pack_fasta: pack_fasta.cpp packed_io.h endian.cpp tokenize.h tokenize.cpp packed_io.cpp
 	$(CXX) $(RELEASE_FLAGS) -DPACK_FASTA_MAIN -Wall $(INC) $(LIBS) -o $@ $< endian.cpp tokenize.cpp packed_io.cpp
+
+bowtie_convert: bowtie_convert.cpp tokenize.h tokenize.cpp pat.h hit.h params.h $(MAQ_HEADERS) $(MAQ_CPPS)
+	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(INC) -o $@ $< $(MAQ_CPPS) tokenize.cpp
 
 simreads: simreads.cpp tokenize.h tokenize.cpp
 	$(CXX) $(DEBUG_FLAGS) -DSIMREADS_MAIN -Wall $(INC) $(LIBS) -o $@ $< tokenize.cpp

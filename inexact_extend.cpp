@@ -1,10 +1,9 @@
 /*
  *  inexact_extend.cpp
- *  CSAMapper
+ *  Bowtie
  *
  *  Created by Cole Trapnell on 6/18/08.
- *  Copyright 2008 __MyCompanyName__. All rights reserved.
- *
+ *  
  */
 #include <vector>
 #include "inexact_extend.h"
@@ -41,9 +40,9 @@ DnaWord pack_dna_string(String<Dna,Packed<> >& dna, bool pack_left)
 	
 }
 
-unsigned int num_mismatches(const DnaWord& w1, const DnaWord& w2, bool left_extend)
+bitset<max_read_bp> mismatching_bases(const DnaWord& w1, const DnaWord& w2, bool left_extend)
 {
-	int diffs = 0;
+	bitset<max_read_bp> diffs = 0;
 	int l = min(w2.len, w1.len);
 	
 	uint64_t w1_word = w1.word;
@@ -62,7 +61,17 @@ unsigned int num_mismatches(const DnaWord& w1, const DnaWord& w2, bool left_exte
 		if (match_chars == -1)
 		{
 			match_chars = min(w2_len, w1_len);
-			diffs += abs(w2_len - w1_len);
+			//diffs += abs(w2_len - w1_len);
+			if (w2_len < w1_len)
+			{
+				for (int i = w2_len + 1; i < w1_len; ++i)
+					 diffs.set(i);
+			}
+			else
+			{
+				 for (int i = w2_len + 1; i < w1_len; ++i)
+					  diffs.set(i);
+			}
 			shift = l;
 		}
 		else
@@ -87,7 +96,7 @@ unsigned int num_mismatches(const DnaWord& w1, const DnaWord& w2, bool left_exte
 			}
 			
 			shift += shift_chars;
-			diffs += 1;
+			diffs.set(shift - 1);
 		}
 	}
 	return diffs;

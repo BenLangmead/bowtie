@@ -429,17 +429,17 @@ static bool findSanityHits(const TStr1& pat,
 		Finder<TStr> finder(o);
 		while (find(finder, pattern)) {
 			uint32_t pos = position(finder);
-			uint32_t diffs = 0;
+			bitset<max_read_bp> diffs = 0;
 			if(pos >= ohlen) {
 				// Extend, counting mismatches
-				for(uint32_t j = 0; j < ohlen && diffs <= 1; j++) {
+				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
 					if(o[pos-j-1] != pat[ohlen-j-1]) {
-						diffs++;
+						diffs.set(ohlen-j-1);
 					}
 				}
 			}
 			// If the extend yielded 1 or fewer mismatches, keep it
-			if((diffs == 0 && allowExact) || diffs == 1) {
+			if((diffs == 0 && allowExact) || diffs.count() == 1) {
 				uint32_t off = pos - ohlen;
 				if(transpose) {
 					off = length(o) - off;
@@ -448,7 +448,7 @@ static bool findSanityHits(const TStr1& pat,
 				// A hit followed by a transpose can sometimes fall
 				// off the beginning of the text
 				if(off < (0xffffffff - length(pat))) {
-					sanityHits.push_back(Hit(make_pair(i, off), patid, fw, diffs));
+					sanityHits.push_back(Hit(make_pair(i, off), patid, pat, fw, diffs));
 				}
 			}
 		}
@@ -474,7 +474,7 @@ static bool checkSanityExhausted(const TStr& pat,
     // we assert.
     size_t unfoundHits = 0;
 	for(size_t j = 0; j < sanityHits.size(); j++) {
-		uint32_t patid = sanityHits[j].pat;
+		uint32_t patid = sanityHits[j].patId;
 		bool fw = sanityHits[j].fw;
 		cout << "Did not find sanity hit: "
 		     << (patid>>revcomp) << (fw? "+":"-")
@@ -670,11 +670,11 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		if(hits.size() > 0) {
     			// We hit, check that oracle also got our hits
         	    assert(!oneHit || hits.size() == 1);
-    			if(oneHit && hits[0].mms > 0) {
+    			if(oneHit && hits[0].mms.count() > 0) {
 					// If our oneHit hit is inexact, then there had
     				// better be no exact sanity hits
     				for(size_t i = 0; i < sanityHits.size(); i++) {
-    					assert_gt(sanityHits[i].mms, 0);
+    					assert_gt(sanityHits[i].mms.count(), 0);
     				}
     			}
     			reconcileHits(pat, spatid, sfw, os, hits, sanityHits, true, false);
@@ -686,7 +686,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     			// If we tried exact only and didn't hit, then oracle
     			// shouldn't have any exact
 				for(size_t i = 0; i < sanityHits.size(); i++) {
-					assert_gt(sanityHits[i].mms, 0);
+					assert_gt(sanityHits[i].mms.count(), 0);
 				}
     		}
     		if(oneHit) {
@@ -903,23 +903,34 @@ static void driver(const char * type,
 		assert_eq(joinedo, rs);
 	}
 	{
+		bool copious_out = true;
 		Timer _t(cout, "Time searching: ", timing);
 		// Set up hit sink; if sanityCheck && !os.empty() is true,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
 		if(binOut)
+		{
 			sink = new BufferedBinaryHitSink(
 					*fout,
 					revcomp,
 					reportOpps,
 					sanityCheck && !os.empty());
+		}
+		else if(copious_out)
+		{
+			sink = new VerboseHitSink(*fout,
+									 revcomp,
+									 sanityCheck && !os.empty());
+		}
 		else
+		{
 			sink = new PrettyHitSink(
 					*fout,
 					revcomp,
 					reportOpps,
 					sanityCheck && !os.empty());
+		}
 		EbwtSearchStats<TStr> stats;
 		EbwtSearchParams<TStr> params(*sink,   // HitSink
 		                              stats,   // EbwtSearchStats
@@ -1124,7 +1135,7 @@ static void prioritySearch(PatternSource<TStr>& patsrc,
 				// FIXME: this is a bullshit reporting policy.  We need a real 
 				// one.
 				Hit& hit = hits[0];
-				report_sink.reportHit(hit.h, hit.pat, hit.fw);
+				report_sink.reportHit(hit.h, hit.patId, hit.patSeq, hit.fw, hit.mms, hit.oms);
 				break;
 			}
 		}

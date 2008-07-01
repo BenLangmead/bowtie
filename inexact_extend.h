@@ -2,10 +2,10 @@
 #define INEXACT_EXTEND_H
 /*
  *  inexact_extend.h
- *  CSAMapper
+ *  Bowtie
  *
  *  Created by Cole Trapnell on 6/18/08.
- *  Copyright 2008 __MyCompanyName__. All rights reserved.
+ *  
  *
  */
 #include <vector>
@@ -51,7 +51,9 @@ public:
 	};
 };
 
-unsigned int num_mismatches(const DnaWord& w1, const DnaWord& w2, bool left_extend);
+bitset<max_read_bp> mismatching_bases(const DnaWord& w1, 
+									  const DnaWord& w2, 
+									  bool left_extend);
 
 static const unsigned int default_allowed_diffs = 4;
 static const unsigned int default_left_mer_length = 22;
@@ -60,7 +62,6 @@ class ExactSearchWithLowQualityThreePrime : public SearchPolicy<TStr>
 {
 public:
 	ExactSearchWithLowQualityThreePrime(vector<String<Dna, Packed<> > >& ss,
-
 										bool allow_indels = false,
 										unsigned int left_mer_length = default_left_mer_length,
 										unsigned int allowed_differences = default_allowed_diffs) : 
@@ -147,20 +148,30 @@ public:
 					{
 						Hit hit = *itr;
 						// FIXME: need a clear range here
-						hit_sink.reportHit(hit.h, hit.pat, hit.fw, hit.mms, hit.oms);
+						hit_sink.reportHit(hit.h, 
+										   hit.patId, 
+										   pat, 
+										   hit.fw, 
+										   hit.mms, 
+										   hit.oms);
 						if (params.multiHitPolicy() == MHP_PICK_1_RANDOM)
 							break;
 					}
 				}
 				else
 				{
-					unsigned int mismatches = num_mismatches(ref_right, 
-													pat_right, 
-													false);
-					if (mismatches <= _allowed_diffs)
+					bitset<max_read_bp> mism = mismatching_bases(ref_right, 
+																pat_right, 
+																false);
+					if (mism.count() <= _allowed_diffs)
 					{
 						Hit hit = *itr;
-						hit_sink.reportHit(hit.h, hit.pat, hit.fw, hit.mms + mismatches, hit.oms);
+						hit_sink.reportHit(hit.h, 
+										   hit.patId, 
+										   pat, 
+										   hit.fw, 
+										   hit.mms | (mism << _mer),
+										   hit.oms);
 						if (params.multiHitPolicy() == MHP_PICK_1_RANDOM)
 							break;	
 					}
@@ -207,9 +218,9 @@ public:
 						pair<uint32_t, uint32_t> hit_coords;
 						hit_coords = make_pair<uint32_t, uint32_t>(hit.h.first, ref_left_start + ref_chars_remaining);
 						
-						// FIXME: need a clear range here
 						hit_sink.reportHit(hit_coords,
-										   hit.pat, 
+										   hit.patId, 
+										   pat,
 										   hit.fw,
 										   hit.mms, 
 										   hit.oms);
@@ -219,19 +230,21 @@ public:
 				}
 				else
 				{
-					unsigned int mismatches = num_mismatches(ref_left, 
-													pat_left, 
-													true);
-					if (mismatches <= _allowed_diffs)
+					
+					bitset<max_read_bp> mism = mismatching_bases(ref_left, 
+																pat_left, 
+																true);
+					if (mism.count() <= _allowed_diffs)
 					{
 						Hit hit = *itr;
 						pair<uint32_t, uint32_t> hit_coords;
 						hit_coords = make_pair<uint32_t, uint32_t>(hit.h.first, ref_left_start);
 						
 						hit_sink.reportHit(hit_coords,
-										   hit.pat, 
+										   hit.patId, 
+										   pat,
 										   hit.fw,
-										   hit.mms + mismatches, 
+										   hit.mms | (mism << _mer), 
 										   hit.oms);
 						if (params.multiHitPolicy() == MHP_PICK_1_RANDOM)
 							break;	

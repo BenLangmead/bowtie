@@ -4,31 +4,51 @@
 #include <vector>
 #include <stdint.h>
 #include <iostream>
+#include <bitset>
+#include <seqan/sequence.h>
 #include "assert_helpers.h"
 
 using namespace std;
+using namespace seqan;
 
 typedef pair<uint32_t,uint32_t> U32Pair;
 
+// For now, we support reads up to 63 bp long, which is the same as Maq, as 
+// of 0.6.7
+static const int max_read_bp = 63;
+
 /**
- * Encapsualtes a hit, including a text-id/text-offset pair, a pattern
+ * Encapsulates a hit, including a text-id/text-offset pair, a pattern
  * id, and a boolean indicating whether it matched as its forward or
  * reverse-complement version.
  */
-struct Hit {
-	Hit(U32Pair _h, uint32_t _pat, bool _fw, uint32_t _mms, uint32_t _oms = 0) :
-		h(_h), pat(_pat), fw(_fw), mms(_mms), oms(_oms) { }
+struct Hit {	
+	Hit(U32Pair _h, 
+		uint32_t _patId,
+		const String< Dna, Packed<> >& _patSeq,
+		bool _fw, 
+		const bitset<max_read_bp>& _mms,
+		uint32_t _oms = 0) : h(_h), 
+							 patId(_patId),
+							 patSeq(_patSeq),
+							 mms(_mms),
+							 oms(_oms),
+							 fw(_fw) {}
+	
 	U32Pair  h;
-	uint32_t pat;
-	bool     fw;
-	uint32_t mms;   // # of mismatches
+	uint32_t patId;
+	String< Dna, Packed<> > patSeq;
+	
+	bitset<max_read_bp> mms;
 	uint32_t oms;   // # of other possible mappings; 0 -> this is unique
+	bool fw;
 	Hit& operator = (const Hit &other) {
-	    this->h   = other.h;
-	    this->pat = other.pat;
-	    this->fw  = other.fw;
+	    this->h = other.h;
+	    this->patId = other.patId;
+		this->patSeq = other.patSeq;
 	    this->mms = other.mms;
 	    this->oms = other.oms;
+		this->fw  = other.fw;
 	    return *this;
 	}
 };
@@ -50,21 +70,22 @@ public:
 		_keep(__keep),
 		_numHits(0llu) { }
 	virtual ~HitSink() { }
-	virtual void reportHit(
-			const U32Pair& h,
-	        uint32_t pat,
-	        bool fw,
-	        uint32_t mms,
-	        uint32_t oms) = 0;
+	virtual void reportHit(const U32Pair& h,
+						   uint32_t patId,
+						   const String<Dna, Packed<> >& patSeq,
+						   bool fw,
+						   const bitset<max_read_bp>& mms,
+						   uint32_t oms) = 0;
 	/**
 	 * A provisional hit is a hit that we might want to report, but we
 	 * aren't sure yet.
 	 */
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
-			uint32_t pat,
+			uint32_t patId,
+			const String<Dna, Packed<> >& patSeq,
             bool fw,
-            uint32_t mms,
+            const bitset<max_read_bp>& mms,
             uint32_t oms) = 0;
 	/// Report and purge all accumulated provisional hits
 	virtual void acceptProvisionalHits() {
@@ -75,7 +96,7 @@ public:
 		_keep = false;
 		for(size_t i = 0; i < _provisionalHits.size(); i++) {
 			const Hit& h = _provisionalHits[i];
-			reportHit(h.h, h.pat, h.fw, h.mms, h.oms);
+			reportHit(h.h, h.patId, h.patSeq, h.fw, h.mms, h.oms);
 		}
 		_keep = keep; // restore _keep
 		_provisionalHits.clear();
@@ -105,24 +126,25 @@ class HitBucket : public HitSink
 public:
 	HitBucket() : HitSink(cout, true) { }
 	virtual void reportHit(const U32Pair& h,
-						   uint32_t pat,
+						   uint32_t patId,
+						   const String<Dna, Packed<> >& patSeq,
 						   bool fw,
-						   uint32_t mms,
+						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) 
 	{
-		_hits.push_back(Hit(h, pat, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
 		_numHits++;
 	}
 	
-	virtual void reportProvisionalHit(
-									  const U32Pair& h,
-									  uint32_t pat,
+	virtual void reportProvisionalHit(const U32Pair& h,
+									  uint32_t patId,
+									  const String<Dna, Packed<> >& patSeq,
 									  bool fw,
-									  uint32_t mms,
+									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
 	{
-		_hits.push_back(Hit(h, pat, fw, mms, oms));
-		_provisionalHits.push_back(Hit(h, pat, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
 	}
 };
 
@@ -146,32 +168,33 @@ public:
 
 	virtual void reportHit(
 			const U32Pair& h,
-			uint32_t pat,
+			uint32_t patId,
+			const String<Dna, Packed<> >& patSeq,
 			bool fw,
-			uint32_t mms,
+			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
-		assert((pat & 1) == 0 || !fw);
-		assert((pat & 1) == 1 || fw);
-		if(_revcomp) pat >>= 1;
-		if(pat != _lastPat || fw != _lastFw) {
+		assert((patId & 1) == 0 || !fw);
+		assert((patId & 1) == 1 || fw);
+		if(_revcomp) patId >>= 1;
+		if(patId != _lastPat || fw != _lastFw) {
 			// First hit on a new line
-			_lastPat = pat;
+			_lastPat = patId;
 			_lastFw = fw;
 			if(_first) _first = false;
 			else       out() << endl;
-			out() << pat << (fw? "+":"-") << ":";
+			out() << patId << (fw? "+":"-") << ":";
 		} else {
 			// Not the first hit on the line
 			out() << ",";
 		}
 		assert(!_first);
     	// .first is text id, .second is offset
-		out() << "<" << h.first << "," << h.second << "," << mms;
+		out() << "<" << h.first << "," << h.second << "," << mms.count();
 		if(_reportOpps) out() << "," << oms;
 		out() << ">";
 		if(_keep) {
-			_hits.push_back(Hit(h, pat, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
 		}
 		_numHits++;
 	}
@@ -181,15 +204,16 @@ public:
 	 */
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
-			uint32_t pat,
+			uint32_t patId,
+			const String<Dna, Packed<> >& patSeq,
 			bool fw,
-			uint32_t mms,
+			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
 		if(_keep) {
-			_hits.push_back(Hit(h, pat, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, pat, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
 	}
 	virtual void finishImpl() {
 		if(_first) {
@@ -206,6 +230,100 @@ private:
 	bool _lastFw;
 	bool _first;
 };
+
+/**
+ * Sink that prints lines like this:
+ * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
+ */
+class VerboseHitSink : public HitSink {
+public:
+	VerboseHitSink(
+				  ostream& __out,
+				  bool __revcomp = false,
+				  bool __keep = false) :
+	HitSink(__out, __keep),
+	_revcomp(__revcomp),
+	_lastPat(0xffffffff),
+	_lastFw(false),
+	_first(true) { }
+	
+	virtual void reportHit(const U32Pair& h,
+						   uint32_t patId,
+						   const String<Dna, Packed<> >& patSeq,
+						   bool fw,
+						   const bitset<max_read_bp>& mms,
+						   uint32_t oms)
+	{
+		assert((patId & 1) == 0 || !fw);
+		assert((patId & 1) == 1 || fw);
+		if(_revcomp) patId >>= 1;
+		
+		_first = false;
+		
+		out() << patId <<" \t" << (fw? "+":"-") << "\t";
+		
+    	// .first is text id, .second is offset
+		
+		out() << h.first;
+		out() << "\t" << h.second;
+		out() << "\t" << patSeq;
+		
+		// FIXME: need to replace X with oms when it starts having a 
+		// meaningful value.
+		out() << "\tX";
+		out() << "\t";
+		
+		bool firstmiss = true;
+		for (unsigned int i = 0; i < mms.size(); ++ i)
+		{
+			if (mms.test(i))
+			{
+				if (!firstmiss)
+					out() <<",";
+				out() << i;
+				firstmiss = false;
+			}
+		}
+		
+		out () << endl;
+		if(_keep) {
+			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		}
+		_numHits++;
+	}
+	/**
+	 * A provisional hit is a hit that we might want to report, but we
+	 * aren't sure yet.
+	 */
+	virtual void reportProvisionalHit(
+									  const U32Pair& h,
+									  uint32_t patId,
+									  const String<Dna, Packed<> >& patSeq,
+									  bool fw,
+									  const bitset<max_read_bp>& mms,
+									  uint32_t oms)
+	{
+		if(_keep) {
+			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		}
+		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+	}
+	virtual void finishImpl() {
+		if(_first) {
+			out() << "No results" << endl;
+		} else {
+			//out() << endl;
+		}
+	}
+	
+private:
+	bool _revcomp;
+	bool _reportOpps;
+	uint32_t _lastPat;
+	bool _lastFw;
+	bool _first;
+};
+
 
 /**
  * Sink that writes 16-byte binary records for each hit.  It also
@@ -225,19 +343,22 @@ public:
 	
 	virtual void reportHit(
 			const U32Pair& h,
-			uint32_t pat,
+			uint32_t patId,
+			const String<Dna, Packed<> >& patSeq,
 			bool fw,
-			uint32_t mms,
+			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
+		//FIXME:
+/*
 		assert((pat & 1) == 0 || !fw);
 		assert((pat & 1) == 1 || fw);
-		if(_revcomp) pat >>= 1;
+		if(_revcomp) patId >>= 1;
 		assert_eq(8, sizeof(U32Pair));
 		assert_eq(4, sizeof(uint32_t));
 		*((U32Pair*)&_buf[_cur]) = h;
 		_cur += 8;
-		*((uint32_t*)&_buf[_cur]) = pat; // pattern 
+		*((uint32_t*)&_buf[_cur]) = patId; // pattern 
 		_cur += 4;
 		*((uint32_t*)&_buf[_cur]) = fw? 1 : 0; // orientation
 		_cur += 4;
@@ -254,9 +375,10 @@ public:
 			_cur = 0;
 		}
 		if(_keep) {
-			_hits.push_back(Hit(h, pat, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, fw, mms, oms));
 		}
 		_numHits++;
+ */
 	}
 	/**
 	 * A provisional hit is a hit that we might want to report, but we
@@ -264,15 +386,18 @@ public:
 	 */
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
-			uint32_t pat,
+			uint32_t patId,
+			const String<Dna, Packed<> >& patSeq,
 			bool fw,
-			uint32_t mms,
+			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
+		/*
 		if(_keep) {
-			_hits.push_back(Hit(h, pat, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, pat, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, fw, mms, oms));
+		 */
 	}
 	virtual void finish() {
 		finishImpl();
