@@ -72,17 +72,20 @@ static inline char * u32ToDna(uint32_t a, int len) {
  * Return the complement of Dna (or Rna) char c.
  */
 static inline int complement(int c) {
-	return c ^ 3;
+	return (c < 4)? c ^ 3 : c;
 }
 
 /**
  * Return the reverse-complement of s.
  */
-static inline String<Dna> reverseComplement(const String<Dna>& s) {
-	String<Dna> s_rc;
-	resize(s_rc, length(s));
-	for(size_t i = 0; i < length(s); i++) {
-		s_rc[i] = complement(s[length(s)-i-1]);
+template<typename TStr>
+static inline TStr reverseComplement(const TStr& s) {
+	typedef typename Value<TStr>::Type TVal;
+	TStr s_rc;
+	size_t slen = length(s);
+	resize(s_rc, slen);
+	for(size_t i = 0; i < slen; i++) {
+		s_rc[i] = (TVal)complement((int)s[slen-i-1]);
 	}
 	return s_rc;
 }

@@ -285,6 +285,7 @@ static string fastqQuals = "EDCCCBAAAA@@@@?>===<;;9:9998777655443322";
 template<typename TStr>
 void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 	typedef typename Value<TStr>::Type TVal;
+	typedef typename Value<TStr>::Type TVal;
 	vector<TStr> ss;
 	int64_t savedCutoff = cutoff;
 	readSequenceFiles<TStr, Fasta>(infiles, ss, cutoff, -1, false);
@@ -330,12 +331,12 @@ void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 					// Mutate not just this base, but all subsequent
 					// bases
 					TVal old = read[i];
-					read[i] = (TVal)(((int)read[i])+1);
+					read[i] = (TVal)((((int)read[i])+(random()&3))%ValueSize<TVal>::VALUE);
 					// I tuned this to 4 in order to make the mapping
 					// rates look like SRR001115
 					if((random() % 5) != 0) {
 						for(int j = i+1; j < readLen; j++) {
-							read[j] = (TVal)(((int)read[j])+1);
+							read[j] = (TVal)((((int)read[j])+(random()&3))%ValueSize<TVal>::VALUE);
 						}
 						break;
 					}
