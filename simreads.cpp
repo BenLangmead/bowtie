@@ -33,17 +33,17 @@ static bool     addzs    = true;       // add Zs from 3' end
  */
 static void printUsage(ostream& out) {
 	out << "Usage: simreads [options]* <reference_in> [<fa_outfile>] [<fq_outfile>]" << endl
-	    << "    reference_in            comma-separated list of (multi-)FASTA files with ref sequences" << endl
-	    << "    fa_outfile              FASTA output file (default: stdout)" << endl
-	    << "    fq_outfile              FASTQ output file (default: stderr)" << endl
+	    << "    reference_in         comma-separated list of (multi-)FASTA reference files" << endl
+	    << "    fa_outfile           FASTA output file (default: stdout)" << endl
+	    << "    fq_outfile           FASTQ output file (default: stderr)" << endl
 	    << "Options:" << endl
-	    << "    -r/--numreads <int>     # reads to generate (default: 10)" << endl
-	    << "    -l/--length <int>       length of reads to generate (up to 35)" << endl
-	    << "    -c/--cutoff <int>       generate reads only up to <int>-length prefix of reference" << endl
-	    << "    -e/--errscale <int>     increase incidence of errors by <int> times (0=disable errs)" << endl
-	    << "    -s/--seed <int>         seed for random number generator" << endl
-	    << "    -n/--nozs               don't add stretches of Ns from 3' end" << endl
-	    << "    -v/--verbose            verbose output (for debugging)" << endl
+	    << "    -r/--numreads <int>  # reads to generate (default: 10)" << endl
+	    << "    -l/--length <int>    length of reads to generate (up to 35)" << endl
+	    << "    -c/--cutoff <int>    generate reads only up to <int>-length prefix of ref" << endl
+	    << "    -e/--errscale <int>  increase errors by <int> times (0=disable errs)" << endl
+	    << "    -s/--seed <int>      seed for random number generator" << endl
+	    << "    -n/--nozs            don't add stretches of Ns from 3' end" << endl
+	    << "    -v/--verbose         verbose output (for debugging)" << endl
 	    ;
 }
 
@@ -312,6 +312,9 @@ void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 				}
 				for(int i = 0; i < readLen; i++) {
 					append(read, ss[ti][boff+i]);
+				}
+				if((random() % 2) == 0) {
+					read = reverseComplement(read);
 				}
 				break;
 			}
