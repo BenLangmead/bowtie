@@ -8,6 +8,7 @@
 #include <seqan/sequence.h>
 #include <seqan/file.h>
 #include <getopt.h>
+#include "alphabet.h"
 #include "assert_helpers.h"
 #include "params.h"
 #include "sequence_io.h"
