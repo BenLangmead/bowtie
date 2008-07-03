@@ -47,9 +47,26 @@ sub parseSz {
 	return $s;
 }
 
+# Aware of two top output formats:
+#   PID USER      PR  NI %CPU    TIME+  %MEM  VIRT  RES  SHR S COMMAND
+#   PID USER      PR  NI  VIRT  RES  SHR S %CPU %MEM    TIME+  COMMAND
+
+my $virtCol = 4;  # or 7
+my $resCol  = 5;  # or 8
+my $timeCol = 10; # or 5
+
 open(TOP, $topFile);
 while(<TOP>) {
 	$_ = trim($_);
+	if(/PID.*USER.*PR/) {
+	    # Grab column headers
+	    my @line = split;
+	    if($line[7] eq "VIRT") {
+		$virtCol = 7;
+		$resCol  = 8;
+		$timeCol = 5;
+	    }
+	}
 	next if not /$appName/;
 	my @line = split;
 	my $pid = int($line[0]);
@@ -59,7 +76,7 @@ while(<TOP>) {
 	$lines{$pid}++;
 	
 	# Parse VIRT
-	my $vm = parseSz($line[4], "VIRT");
+	my $vm = parseSz($line[$virtCol], "VIRT");
 	$vmmax{$pid} = 0 unless defined($vmmax{$pid});
 	$vmtot{$pid} = 0 unless defined($vmtot{$pid});
 	if($vm > $vmmax{$pid}) {
@@ -68,7 +85,7 @@ while(<TOP>) {
 	$vmtot{$pid} += $vm;
 
 	# Parse RES
-	my $rs = parseSz($line[5], "RES");
+	my $rs = parseSz($line[$resCol], "RES");
 	$rsmax{$pid} = 0 unless defined($rsmax{$pid});
 	$rstot{$pid} = 0 unless defined($rstot{$pid});
 	if($rs > $rsmax{$pid}) {
@@ -76,7 +93,7 @@ while(<TOP>) {
 	}
 	$rstot{$pid} += $rs;
 	
-	my @ts = split(/:/, $line[10]);
+	my @ts = split(/:/, $line[$timeCol]);
 	$ts[1] =~ s/\..*//; # chop everything starting at the dot
 	my $secsacc = int($ts[1]);
 	$secsacc += (int($ts[0]) * 60);
