@@ -65,6 +65,7 @@
 		EDD9703A0E0B0F8100F3ED5E /* packed_io.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packed_io.cpp; sourceTree = "<group>"; };
 		EDF8ECD00E09E2A4009FA071 /* hit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hit.cpp; sourceTree = "<group>"; };
 		EDF980B30E1A94EA00243AA5 /* algo.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = algo.hh; sourceTree = "<group>"; };
+		EDF981FB0E1C026700243AA5 /* simreads.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simreads.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -120,6 +121,7 @@
 				ED6322510E09891C00F83FB6 /* word_io.h */,
 				ED6322520E09891C00F83FB6 /* zbox.h */,
 				EDAEFC760E1948B9006D9D87 /* bowtie_convert.cpp */,
+				EDF981FB0E1C026700243AA5 /* simreads.cpp */,
 				EDAEFC7F0E19498C006D9D87 /* maq */,
 			);
 			name = Source;
@@ -207,7 +209,7 @@
 			buildPhases = (
 			);
 			buildToolPath = /usr/bin/make;
-			buildWorkingDirectory = "/Users/cole/Data/Documents/CBCB/comparative mapping/bowtie";
+			buildWorkingDirectory = /Users/cole/Data/Documents/CBCB/sr_mapping/bowtie;
 			dependencies = (
 			);
 			name = ebwt_search;

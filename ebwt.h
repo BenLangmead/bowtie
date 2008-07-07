@@ -1089,6 +1089,22 @@ public:
 		assert(!_suppress);
 		//uint32_t mm = _backtracking ? 1 : 0;
 		bitset<max_read_bp> mm = 0;
+		hit_pat_t pat;
+		string patQuals;
+		if (_ebwtFw)
+		{
+			pat = s.query();
+			patQuals = s.query_quals();
+		}
+		else
+		{
+			for(size_t i = 0; i < len; i++) 
+			{
+				appendValue(pat, s.query()[len-i-1]);
+				patQuals.push_back(s.query_quals()[len-i-1]);
+			}
+		}
+		
 		if (_backtracking)
 		{	
 			if (_ebwtFw)
@@ -1154,9 +1170,9 @@ public:
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
 			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(_arrowMode? a : h, _patid, s.query(), _fw, mm, oms);
+			sink().reportProvisionalHit(_arrowMode? a : h, _patid, pat, patQuals, _fw, mm, oms);
 		} else {
-			sink().reportHit(_arrowMode? a : h, _patid, s.query(), _fw, mm, oms);
+			sink().reportHit(_arrowMode? a : h, _patid, pat, patQuals, _fw, mm, oms);
 		}
 	}
 	void write(ostream& out) const {
@@ -1267,6 +1283,7 @@ public:
 	typedef typename Value<TStr>::Type TVal;
 	EbwtSearchState(const Ebwt<TStr>& __ebwt,
 	                const TStr& __query,
+					const string& __query_quals,
 	                const EbwtSearchParams<TStr>& __params,
 	                uint32_t seed = 0) :
 	    _ebwt(__ebwt),
@@ -1275,6 +1292,7 @@ public:
 		_top(0xffffffff),
 		_bot(0xffffffff),
 		_query(__query),
+		_query_quals(__query_quals),
 		_remainders(),
 		_tried(),
 		_tops(),
@@ -1298,6 +1316,7 @@ public:
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
 	const TStr& query() const                    { return _query;  }
+	const string& query_quals() const			 { return _query_quals; }
 	uint32_t top() const                         { return _top;    }
 	uint32_t bot() const                         { return _bot;    }
 	void setTopBot(uint32_t __top, uint32_t __bot) {
@@ -1592,6 +1611,7 @@ private:
 	uint32_t _top;      // top index
 	uint32_t _bot;      // bot index
 	const TStr& _query; // query string
+	const string& _query_quals; // query qualities string
 	String<uint32_t> _remainders; // space left to explore
 	String<uint8_t> _tried; // denotes characters originally tried at each pos
 	String<uint32_t> _tops; // tops we might want to backtrack to

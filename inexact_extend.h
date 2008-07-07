@@ -32,6 +32,7 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						const TStr& pat,
+						const string& patQuals,
 						HitSink& hit_sink) = 0;
 	virtual ~SearchPolicy() {}
 };
@@ -43,7 +44,8 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat, 
+						const TStr& pat,
+						const string& patQuals,
 						HitSink& hit_sink) 
 	{
 		EbwtSearchState<TStr> s(ebwt, pat, params, 0);
@@ -57,6 +59,7 @@ bitset<max_read_bp> mismatching_bases(const DnaWord& w1,
 
 static const unsigned int default_allowed_diffs = 4;
 static const unsigned int default_left_mer_length = 22;
+
 template<class TStr>
 class ExactSearchWithLowQualityThreePrime : public SearchPolicy<TStr>
 {
@@ -79,7 +82,8 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat, 
+						const TStr& pat,
+						const string& patQuals,
 						HitSink& hit_sink) 
 	{
 		
@@ -93,11 +97,20 @@ public:
 		_mer_search_params.setPatId(params.patId());
 		_mer_search_params.setFw(!revcomp);
 		
-		EbwtSearchState<TStr> s(ebwt, mer, _mer_search_params, 0);
+		EbwtSearchState<TStr> s(ebwt, mer, "", _mer_search_params, 0);
 		ebwt.search(s, _mer_search_params);
 		
-		int max_diffs = _allowed_diffs;
+		extendHits(pat, patQuals, hit_sink, params, revcomp);
 		
+		_mer_hit_sink.clearRetainedHits();
+	}
+	
+	void extendHits(const TStr& pat,
+					const string& patQuals,
+					HitSink& hit_sink, 
+					EbwtSearchParams<TStr>& params,
+					bool revcomp)
+	{
 		vector<Hit>& mer_hits = _mer_hit_sink.retainedHits();
 		for (vector<Hit>::iterator itr = mer_hits.begin(); 
 			 itr != mer_hits.end(); 
@@ -113,7 +126,7 @@ public:
 			{
 				int ref_right_end = ref_hit_end + length(pat) - _mer;
 				if (_allow_indels)
-					ref_right_end += max_diffs;
+					ref_right_end += _allowed_diffs;
 				ref_right_end = min((int)length(ref) - 1, ref_right_end);
 				
 				String<Dna, Packed<> > ref_right_str;
@@ -139,18 +152,19 @@ public:
 				{
 					edit_distance(ref_right, 
 								  pat_right, 
-								  max_diffs, 
+								  _allowed_diffs, 
 								  false,
 								  &diffs,
 								  &ref_chars_remaining);
 					
-					if (diffs <= max_diffs)
+					if (diffs <= (int)_allowed_diffs)
 					{
 						Hit hit = *itr;
 						// FIXME: need a clear range here
 						hit_sink.reportHit(hit.h, 
 										   hit.patId, 
-										   pat, 
+										   pat,
+										   patQuals,
 										   hit.fw, 
 										   hit.mms, 
 										   hit.oms);
@@ -161,14 +175,15 @@ public:
 				else
 				{
 					bitset<max_read_bp> mism = mismatching_bases(ref_right, 
-																pat_right, 
-																false);
+																 pat_right, 
+																 false);
 					if (mism.count() <= _allowed_diffs)
 					{
 						Hit hit = *itr;
 						hit_sink.reportHit(hit.h, 
 										   hit.patId, 
 										   pat, 
+										   patQuals,
 										   hit.fw, 
 										   hit.mms | (mism << _mer),
 										   hit.oms);
@@ -182,7 +197,7 @@ public:
 				int mer_start = length(pat) - _mer;
 				int ref_left_start = ref_hit_start - mer_start;
 				if (_allow_indels)
-					mer_start -= max_diffs;
+					mer_start -= _allowed_diffs;
 				
 				ref_left_start = max(ref_left_start, 0);
 				
@@ -198,21 +213,21 @@ public:
 				String<Dna, Packed<> > pat_str = prefix(pat, mer_start);
 				DnaWord pat_left = pack_dna_string(pat_str, true);
 				
-//								cerr << "comparing: " << endl;
-//								cerr << "\t" << ref_left_str << endl;
-//								cerr << "\t" << pat_str << endl;
+				//								cerr << "comparing: " << endl;
+				//								cerr << "\t" << ref_left_str << endl;
+				//								cerr << "\t" << pat_str << endl;
 				
 				if (_allow_indels)
 				{
-				
+					
 					int diffs;
 					int ref_chars_remaining;
 					edit_distance(ref_left, 
 								  pat_left, 
-								  max_diffs, true,
+								  _allowed_diffs, true,
 								  &diffs,
 								  &ref_chars_remaining);
-					if (diffs <= max_diffs)
+					if (diffs <= (int)_allowed_diffs)
 					{
 						Hit hit = *itr;
 						pair<uint32_t, uint32_t> hit_coords;
@@ -221,6 +236,7 @@ public:
 						hit_sink.reportHit(hit_coords,
 										   hit.patId, 
 										   pat,
+										   patQuals,
 										   hit.fw,
 										   hit.mms, 
 										   hit.oms);
@@ -232,8 +248,8 @@ public:
 				{
 					
 					bitset<max_read_bp> mism = mismatching_bases(ref_left, 
-																pat_left, 
-																true);
+																 pat_left, 
+																 true);
 					if (mism.count() <= _allowed_diffs)
 					{
 						Hit hit = *itr;
@@ -243,6 +259,7 @@ public:
 						hit_sink.reportHit(hit_coords,
 										   hit.patId, 
 										   pat,
+										   patQuals,
 										   hit.fw,
 										   hit.mms | (mism << _mer), 
 										   hit.oms);
@@ -254,9 +271,8 @@ public:
 			
 		}
 		
-		_mer_hit_sink.clearRetainedHits();
-	};
-protected:
+	}
+	
 	vector<String<Dna, Packed<> > >& _text_strs;
 	unsigned int _mer;
 	bool _allow_indels;
@@ -265,6 +281,51 @@ protected:
 	EbwtSearchStats<TStr> _stats;
 	EbwtSearchParams<TStr> _mer_search_params;
 	vector<TStr> os;
+};
+
+template<class TStr>
+class OneMismatchSearchWithLowQualityThreePrime : public ExactSearchWithLowQualityThreePrime<TStr>
+{
+	
+public:
+	OneMismatchSearchWithLowQualityThreePrime(vector<String<Dna, Packed<> > >& ss,
+										bool allow_indels = false,
+										unsigned int left_mer_length = default_left_mer_length,
+										unsigned int allowed_differences = default_allowed_diffs) : 
+	ExactSearchWithLowQualityThreePrime<TStr>(ss, allow_indels, left_mer_length, allowed_differences),
+	_suppressExact(false)
+	{
+	}
+	
+	void suppressExact(bool _supExact) { _suppressExact = _supExact; } 
+	
+	virtual void search(Ebwt<TStr>& ebwt,
+						EbwtSearchStats<TStr>& stats,
+						EbwtSearchParams<TStr>& params,
+						const TStr& pat,
+						const string& patQuals,
+						HitSink& hit_sink)
+	{
+		
+		TStr mer;
+		bool revcomp = !params.fw();
+		if (!revcomp)
+			mer = prefix(pat, this->_mer);
+		else
+			mer = suffix(pat, length(pat) - this->_mer);
+		cerr << mer << endl;
+		this->_mer_search_params.setPatId(params.patId());
+		this->_mer_search_params.setFw(!revcomp);
+		
+		EbwtSearchState<TStr> s(ebwt, mer, "", this->_mer_search_params, 0);
+		ebwt.search1MismatchOrBetter(s, this->_mer_search_params, _suppressExact);
+		
+		extendHits(pat, patQuals, hit_sink, params, revcomp);
+		
+		this->_mer_hit_sink.clearRetainedHits();
+	};
+protected:
+	bool _suppressExact;
 };
 
 #endif

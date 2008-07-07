@@ -31,13 +31,14 @@ def main(argv=None):
         argv = sys.argv
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ho:ve:rq:m", 
+            opts, args = getopt.getopt(argv[1:], "ho:ve:rq:m1", 
                                         ["help", 
                                         "output=", 
                                         "extension",
                                         "reverse-complement",
                                         "low-qual-mismatches",
-                                        "maq-fastq"])
+                                        "maq-fastq",
+                                        "5-prime-mismatch"])
         except getopt.error, msg:
             raise Usage(msg)
     
@@ -45,6 +46,7 @@ def main(argv=None):
         rc = False
         low_qual_mismatches = 0
         fastq = False
+        five_prime_mismatch = False
         
         # option processing
         for option, value in opts:
@@ -62,6 +64,8 @@ def main(argv=None):
                 low_qual_mismatches  = int(value)
             if option in ("-m", "--maq-fastq"):
                 fastq = True
+            if option in ("-1", "--5-prime-mismatch"):
+                five_prime_mismatch = True
                 
         ref = open(args[0])
         mummer_out = open(args[1])
@@ -118,21 +122,38 @@ def main(argv=None):
                     read_seq.reverse()
                     read_seq = [complement[a] for a in read_seq]
                     
-                    read_out = "%d-:<0,%d,%d>" % (read_num, rc_ref_start, low_qual_mismatches)
+                    #read_out = "%d-:<0,%d,%d>" % (read_num, rc_ref_start, low_qual_mismatches)
+                    read_out = "%d\t-\t0\t%d" % (read_num, rc_ref_start)
                 else:
                     read_seq = seq[ref_pos:ref_pos + mer_len + extension]
-                    
-                    #read_seq = ''.join(read_seq)
-                    read_out = "%d+:<0,%d,%d>" % (read_num, ref_pos, low_qual_mismatches)
+                    #read_out = "%d+:<0,%d,%d>" % (read_num, ref_pos, low_qual_mismatches)
+                    read_out = "%d\t+\t0\t%d" %  (read_num, ref_pos)
+                
+                read_mismatch_positions = []
+                if five_prime_mismatch:
+                    pos = random.choice(range(0, mer_len))
+                    read_seq[pos] = mismatch[read_seq[pos]]
+                    read_mismatch_positions.append(pos)
                         
                 if low_qual_mismatches > 0:
                     mis_pos = set([])
                     while len(mis_pos) < low_qual_mismatches:
-                        mis_pos.add(random.choice(range(mer_len, mer_len + extension)))
+                        pos = random.choice(range(mer_len, mer_len + extension))
+                        #print >>sys.stderr, pos,
+                        mis_pos.add(pos)
+                    #print >> sys.stderr, ""
                     for pos in mis_pos:
-                        read_seq[pos] = mismatch[read_seq[pos]]        
+                        read_seq[pos] = mismatch[read_seq[pos]]      
+                    read_mismatch_positions.extend(mis_pos)  
                 
-                read_seq = ''.join(read_seq)        
+                read_seq = ''.join(read_seq)       
+                read_out += "\t%s\t%s\tX\t" % (read_seq, (";" * len(read_seq)))
+                read_mismatch_positions.sort()
+                for pos in range(0,len(read_mismatch_positions) - 1):
+                    read_out += "%d," % read_mismatch_positions[pos]
+                if len(read_mismatch_positions) > 0:
+                    read_out += "%d" % read_mismatch_positions[-1]
+                    
                 print >> reads_fna, defline
                 print >> reads_fna, read_seq
                 if fastq:

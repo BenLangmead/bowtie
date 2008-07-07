@@ -28,7 +28,7 @@ static bool verbose				= false;
 
 static void print_usage() 
 {
-	cout << "Usage: bowtie_convert <in.bwtmap> <out.map>" << endl;
+	cout << "Usage: bowtie_convert <in.bwtmap> <out.map> [refnames]" << endl;
 	cout << "    -v     verbose output" << endl;
 }
 
@@ -37,7 +37,9 @@ static const int max_read_name = MAX_NAMELEN;
 static const int max_read_bp = MAX_READLEN;
 
 // Maq's default mapping quality
-static int DEFAULT_QUAL = 25;
+static int DEFAULT_QUAL = 84;
+static int FIVE_PRIME_PHRED_QUAL = 'Z' - 33;
+//static int THREE_PRIME_PHRED_QUAL = ';' - 33;
 
 // Number of bases consider "reliable" on the five prime end of each read
 static int MAQ_FIVE_PRIME = 24;
@@ -48,7 +50,8 @@ static inline int operator < (const maqmap1_t &a, const maqmap1_t &b)
 }
 
 int convert_bwt_to_maq(const string& bwtmap_fname, 
-					   const string& maqmap_fname)
+					   const string& maqmap_fname, 
+					   const string* refnames_fname = NULL)
 {
 	FILE* bwtf = fopen(bwtmap_fname.c_str(), "r");
 	
@@ -65,6 +68,38 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		exit(1);
 	}
 
+	map<unsigned int, string> seqid_to_name;
+	char bwt_buf[2048];
+	static const int buf_size = 256;
+	char name[buf_size];
+	int bwtf_ret = 0;
+	
+	FILE* refnamef = NULL;
+	if (refnames_fname)
+	{
+		refnamef = fopen(refnames_fname->c_str(), "r");	
+		if (!refnamef)
+		{
+			fprintf(stderr, 
+					"Error: could not open reference names file for reading\n");
+			exit(1);
+		}
+		while (fgets(bwt_buf, 2048, refnamef))
+		{
+			//char* nl = strrchr(bwt_buf, '\n');
+			//if (nl) *nl = 0;
+			int seqid = 0;
+			bwtf_ret = sscanf(bwt_buf, "%d %s\n", &seqid, name);
+			if (bwtf_ret != 2)
+			{
+				fprintf(stderr, 
+						"Warning: bad sequence id, name pair, skipping\n");
+				continue;
+			}
+			seqid_to_name[seqid] = name;
+		}
+	}
+	
 	// Initialize a new Maq map table
 	maqmap_t *mm = maq_new_maqmap();
 
@@ -75,24 +110,23 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		3) text id
 		4) text offset
 		5) sequence of hit (i.e. trimmed read)
-		6) # of other hits in EBWT (ignored for now)
-		7) mismatch positions - this is a comma-delimited list of positions
+	    6) quality values of sequence (trimmed)
+		7) # of other hits in EBWT (ignored for now)
+		8) mismatch positions - this is a comma-delimited list of positions
 			w.r.t. the 5 prime end of the read.
 	 */
-	char* bwt_fmt_str = "%s %c %d %d %s %s %s";
-	static const int buf_size = 256;
-	char name[buf_size];
+	char* bwt_fmt_str = "%s %c %d %d %s %s %s %s";
+
+	
 	char orientation;
 	unsigned int text_id;
 	unsigned int text_offset;
 	char sequence[buf_size];
+	char qualities[buf_size];
 	char other_occs[buf_size];
 	char mismatches[buf_size];
-	int bwtf_ret = 0;
+
 	int max = 0;
-	char bwt_buf[2048];
-	
-	map<unsigned int, string> seqid_to_name;
 	
 	while (fgets(bwt_buf, 2048, bwtf))
 	{
@@ -108,6 +142,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 						  &text_id, 
 						  &text_offset, 
 						  sequence, 
+						  qualities,
 						  other_occs, 
 						  mismatches);
 		
@@ -132,10 +167,10 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		memset(m1->seq, 0, max_read_bp);
 		m1->size = strlen(sequence);
 		
-		// FIXME: we need to get real text names, not just ascii conversions
-		// of ids, and put them in this mapping.
 		m1->seqid = text_id;
-		if (seqid_to_name.find(text_id) == seqid_to_name.end())
+		
+		if (!refnames_fname && 
+			seqid_to_name.find(text_id) == seqid_to_name.end())
 		{
 			char name_buf[1024];
 			sprintf(name_buf, "%d", text_id);
@@ -143,12 +178,18 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			
 		}
 		
+		//const char* default_quals = "EDCCCBAAAA@@@@?>===<;;9:99987776666554444";
+		//int qual_len = sizeof(default_quals);
+		
+		int qual_len = strlen(qualities);
+		
 		if (orientation == '+')
 		{
 			for (int i = 0; i != m1->size; ++i) 
 			{
 				int tmp = nst_nt4_table[(int)sequence[i]];
-				m1->seq[i] = (tmp > 3)? 0 : (tmp <<6 | DEFAULT_QUAL);
+				m1->seq[i] = (tmp > 3)? 0 : 
+				(tmp <<6 | (i < qual_len ? qualities[i] - 33 : 0));
 			}
 		}
 		else
@@ -157,7 +198,8 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			{
 				int tmp = nst_nt4_table[(int)sequence[i]];
 				tmp = (m1->seq[i] == 0) ? 0 : (0xc0 - (m1->seq[i]&0xc0)) | (m1->seq[i]&0x3f);
-				m1->seq[m1->size-i-1] = m1->seq[i] = (tmp > 3)? 0 : (tmp <<6 | DEFAULT_QUAL);
+				m1->seq[m1->size-i-1] = m1->seq[i] = (tmp > 3)? 0 : 
+				 (tmp <<6 |  (i < qual_len ? qualities[i] - 33 : 0));
 			}	
 		}
 		
@@ -176,8 +218,11 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 				++three_prime_mismatches;
 		}
 		
-		m1->c[0] = 0;
-		m1->c[1] = 0;
+		m1->c[0] = m1->c[1] = 0;
+		if (three_prime_mismatches + five_prime_mismatches)
+			m1->c[1] = 1;
+		else
+			m1->c[0] = 1;
 		m1->flag = 0;
 		m1->dist = 0;
 		
@@ -185,7 +230,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		m1->info1 = five_prime_mismatches << 4 | 
 			(three_prime_mismatches + five_prime_mismatches);
 		
-		m1->info2 = (three_prime_mismatches + five_prime_mismatches) * DEFAULT_QUAL;
+		m1->info2 = (five_prime_mismatches) * FIVE_PRIME_PHRED_QUAL;
 		
 		// FIXME: this is a bullshit mapping quality, we need to consider
 		// mismatches, etc.
@@ -195,10 +240,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	
 	mm->n_ref = seqid_to_name.size();
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
+	int j = 0;
 	for (map<unsigned int,string>::iterator i = seqid_to_name.begin();
 		 i != seqid_to_name.end(); ++i)
 	{
-		mm->ref_name[i->first] = strdup(i->second.c_str());
+		char* name = strdup(i->second.c_str());
+		if (name)
+			mm->ref_name[j++] = name;
+		//cerr << mm->ref_name[i->first] << endl;
 	}
 	
 	
@@ -217,7 +266,7 @@ int main(int argc, char **argv)
 {
 	string bwtmap_filename;
 	string maqmap_filename;
-	
+	string* refnames_filename = NULL;
 	const char *short_options = "v";
 	int next_option;
 	do { 
@@ -247,5 +296,11 @@ int main(int argc, char **argv)
 	}
 	maqmap_filename = argv[optind++];
 	
-	return convert_bwt_to_maq(bwtmap_filename, maqmap_filename);
+	if(optind < argc)
+		refnames_filename = new string(argv[optind++]);
+	
+	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, refnames_filename);
+	
+	delete refnames_filename;
+	return ret;
 }

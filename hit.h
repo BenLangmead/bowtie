@@ -12,7 +12,7 @@ using namespace std;
 using namespace seqan;
 
 typedef pair<uint32_t,uint32_t> U32Pair;
-
+typedef String<Dna, Packed<> > hit_pat_t;
 // For now, we support reads up to 63 bp long, which is the same as Maq, as 
 // of 0.6.7
 static const int max_read_bp = 63;
@@ -25,12 +25,14 @@ static const int max_read_bp = 63;
 struct Hit {	
 	Hit(U32Pair _h, 
 		uint32_t _patId,
-		const String< Dna, Packed<> >& _patSeq,
+		const hit_pat_t& _patSeq,
+		const string& _patQualities,
 		bool _fw, 
 		const bitset<max_read_bp>& _mms,
 		uint32_t _oms = 0) : h(_h), 
 							 patId(_patId),
 							 patSeq(_patSeq),
+							 patQualities(_patQualities),
 							 mms(_mms),
 							 oms(_oms),
 							 fw(_fw) {}
@@ -38,7 +40,7 @@ struct Hit {
 	U32Pair  h;
 	uint32_t patId;
 	String< Dna, Packed<> > patSeq;
-	
+	string patQualities;
 	bitset<max_read_bp> mms;
 	uint32_t oms;   // # of other possible mappings; 0 -> this is unique
 	bool fw;
@@ -46,6 +48,7 @@ struct Hit {
 	    this->h = other.h;
 	    this->patId = other.patId;
 		this->patSeq = other.patSeq;
+		this->patQualities = other.patQualities;
 	    this->mms = other.mms;
 	    this->oms = other.oms;
 		this->fw  = other.fw;
@@ -72,7 +75,8 @@ public:
 	virtual ~HitSink() { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const String<Dna, Packed<> >& patSeq,
+						   const hit_pat_t& patSeq,
+						   const string& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) = 0;
@@ -83,7 +87,8 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const String<Dna, Packed<> >& patSeq,
+			const hit_pat_t& patSeq,
+			const string& patQualities,
             bool fw,
             const bitset<max_read_bp>& mms,
             uint32_t oms) = 0;
@@ -96,7 +101,7 @@ public:
 		_keep = false;
 		for(size_t i = 0; i < _provisionalHits.size(); i++) {
 			const Hit& h = _provisionalHits[i];
-			reportHit(h.h, h.patId, h.patSeq, h.fw, h.mms, h.oms);
+			reportHit(h.h, h.patId, h.patSeq, h.patQualities, h.fw, h.mms, h.oms);
 		}
 		_keep = keep; // restore _keep
 		_provisionalHits.clear();
@@ -127,24 +132,26 @@ public:
 	HitBucket() : HitSink(cout, true) { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const String<Dna, Packed<> >& patSeq,
+						   const hit_pat_t& patSeq,
+						   const string& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) 
 	{
-		_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 		_numHits++;
 	}
 	
 	virtual void reportProvisionalHit(const U32Pair& h,
 									  uint32_t patId,
-									  const String<Dna, Packed<> >& patSeq,
+									  const hit_pat_t& patSeq,
+									  const string& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
 	{
-		_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
-		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 	}
 };
 
@@ -169,7 +176,8 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const String<Dna, Packed<> >& patSeq,
+			const hit_pat_t& patSeq,
+		    const string& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
@@ -194,7 +202,7 @@ public:
 		if(_reportOpps) out() << "," << oms;
 		out() << ">";
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 		}
 		_numHits++;
 	}
@@ -205,15 +213,16 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const String<Dna, Packed<> >& patSeq,
+			const hit_pat_t& patSeq,
+			const string& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
 	{
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 	}
 	virtual void finishImpl() {
 		if(_first) {
@@ -249,7 +258,8 @@ public:
 	
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const String<Dna, Packed<> >& patSeq,
+						   const hit_pat_t& patSeq,
+						   const string& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms)
@@ -267,6 +277,8 @@ public:
 		out() << h.first;
 		out() << "\t" << h.second;
 		out() << "\t" << patSeq;
+		
+		out() << "\t" << patQualities;
 		
 		// FIXME: need to replace X with oms when it starts having a 
 		// meaningful value.
@@ -287,7 +299,7 @@ public:
 		
 		out () << endl;
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 		}
 		_numHits++;
 	}
@@ -298,15 +310,16 @@ public:
 	virtual void reportProvisionalHit(
 									  const U32Pair& h,
 									  uint32_t patId,
-									  const String<Dna, Packed<> >& patSeq,
+									  const hit_pat_t& patSeq,
+									  const string& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
 	{
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, patId, patSeq, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
 	}
 	virtual void finishImpl() {
 		if(_first) {
@@ -344,7 +357,8 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const String<Dna, Packed<> >& patSeq,
+			const hit_pat_t& patSeq,
+		    const string& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
@@ -387,7 +401,8 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const String<Dna, Packed<> >& patSeq,
+			const hit_pat_t& patSeq,
+			const string& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)

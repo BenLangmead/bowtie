@@ -1,0 +1,25 @@
+SNP calling experiment
+----------------------
+
+Objective: 
+    Demonstrate that Bowtie can call SNPs as well as Maq at least an 
+order of magnitude faster than Maq.
+
+Input data: 
+    Human reference (NCBI build 36)
+    Donors:
+        - Human permuted uniformly randomly at 1/800 bp on avg
+        - Human via SNP set from dbSNP
+    Simulated reads: 25-40bp @ 1-5x coverage of:
+        - chrY
+        - chr2
+        - chr22
+        - whole human
+        
+Output data:
+    Bowtie mapping stats:
+        - # best mappings for each read (histogram)
+        - Total mapped (matching) sequence
+        - Strand bias
+    Maq cns2snp output
+

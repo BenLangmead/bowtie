@@ -1,7 +1,7 @@
 Test data generator:
 1) [X] generate random reference 
 1) [X] identify unique 22-mers with meryl
--) [ ] make reads that map exactly to unique 22-mers at the 5' end AND EITHER:
+-) [X] make reads that map exactly to unique 22-mers at the 5' end AND EITHER:
 	1) [X] exact map end to end
 	1) [X] have mismatches on the 3' end (exact search with extension)
 
