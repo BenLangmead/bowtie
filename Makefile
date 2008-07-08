@@ -52,54 +52,70 @@ LIBS = -lz
 all: $(BIN_LIST)
 
 ebwt_build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build_prof0: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) -fno-inline -pg -g -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=$$m -fno-inline -pg -g -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build_prof1: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) -pg -g -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=$$m -pg -g -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build-with-asserts: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build_packed: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_MAIN -DPACKED_STIRNGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN -DPACKED_STIRNGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build_packed-with-asserts: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_MAIN -DPACKED_STIRNGS -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN -DPACKED_STIRNGS -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_build_packed-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_MAIN -DPACKED_STIRNGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=$$m -DEBWT_BUILD_MAIN -DPACKED_STIRNGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 ebwt_search: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum > .ebwt_search.md5
-	m=`cat .ebwt_search.md5 | awk '{print $$1}'` && \
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
 	$(CXX) $(RELEASE_FLAGS) -DEBWT_SEARCH_HASH=$$m -DEBWT_SEARCH_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 ebwt_search_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .ebwt_search.md5
-	m=`cat .ebwt_search.md5` && \
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
 	$(CXX) $(RELEASE_FLAGS) -DEBWT_SEARCH_HASH=$$m -DEBWT_SEARCH_MAIN $(NOASSERT_FLAGS) -g -pg -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 # Just like ebwt_search_prof but with inlines turned off so that it's
 # easier to interpret the gprof results
 ebwt_search_prof0: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .ebwt_search.md5
-	m=`cat .ebwt_search.md5` && \
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
 	$(CXX) $(RELEASE_FLAGS) -fno-inline -DEBWT_SEARCH_HASH=$$m -DEBWT_SEARCH_MAIN $(NOASSERT_FLAGS) -g -pg -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 ebwt_search-with-asserts: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) 
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .ebwt_search.md5
-	m=`cat .ebwt_search.md5` && \
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
 	$(CXX) $(DEBUG_FLAGS) -DEBWT_SEARCH_HASH=$$m -DEBWT_SEARCH_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 ebwt_search-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .ebwt_search.md5
-	m=`cat .ebwt_search.md5` && \
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	m=`cat .$@.cksum` && \
 	$(CXX) $(DEBUG_FLAGS) -DEBWT_SEARCH_HASH=$$m -DEBWT_SEARCH_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 multikey_qsort: multikey_qsort.cpp diff_sample.cpp tokenize.cpp endian.cpp $(HEADERS)

@@ -30,6 +30,7 @@ static int noDc         = 0;     // disable difference-cover sample
 static int entireSA     = 0;     // 1 = disable blockwise SA
 static int profile      = 0;     // print out profiling info on exit
 static int seed         = 0;     // srandom seed
+static int showVersion  = 0;     // just print version and quit?
 static bool doubleEbwt  = false; // build forward and reverse Ebwts
 static int64_t cutoff   = 0xffffffff; // max # of reference bases
 //   Ebwt parameters
@@ -79,6 +80,7 @@ static void printUsage(ostream& out) {
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -v/--verbose            verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
+	    << "    --version               print version information and quit" << endl
 	    ;
 }
 
@@ -99,6 +101,7 @@ static struct option long_options[] = {
 	{"noDc",         no_argument, &noDc, 1},
 	{"seed",         required_argument, 0, ARG_SEED},
 	{"entireSA",     no_argument,       &entireSA, 1},
+	{"version",      no_argument,       &showVersion, 1},
 	{"lineRate",     required_argument, 0, 'l'},
 	{"linesPerSide", required_argument, 0, 'i'},
 	{"offRate",      required_argument, 0, 'o'},
@@ -286,6 +289,8 @@ static void driver(const char * type,
 	}
 }
 
+static char *argv0 = NULL;
+
 /**
  * main function.  Parses command-line arguments.
  */
@@ -296,6 +301,13 @@ int main(int argc, char **argv) {
 	string outfile;
 	
 	parseOptions(argc, argv);
+	argv0 = argv[0];
+	if(showVersion) {
+		// TODO: handle versioning better
+		cout << argv0 << " version 0.1 (beta)" << endl;
+		cout << "Hash: " << EBWT_BUILD_HASH << endl;
+		return 0;
+	}
 
 	// Get input filename
 	if(optind >= argc) {
