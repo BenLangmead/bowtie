@@ -314,9 +314,9 @@ public:
 	     int32_t chunkRate,
 	     const string& file,   // base filename for EBWT files
 	     bool useBlockwise,
-	     int bmax,
-         int bmaxSqrtMult,
-         int bmaxDivN,
+	     uint32_t bmax,
+	     uint32_t bmaxSqrtMult,
+	     uint32_t bmaxDivN,
 	     int dcv,
 	     vector<TStr>& ss,
 	     bool destroySs,
@@ -397,9 +397,9 @@ public:
 	                    ostream& out1,
 	                    ostream& out2,
 	                    bool useBlockwise,
-	                    int bmax,
-	                    int bmaxSqrtMult,
-	                    int bmaxDivN,
+	                    uint32_t bmax,
+	                    uint32_t bmaxSqrtMult,
+	                    uint32_t bmaxDivN,
 	                    int dcv,
 	                    uint32_t seed,
 	                    bool destroySs) 
@@ -433,17 +433,20 @@ public:
 		}
 		assert_eq(length(s), jlen);
 		if(useBlockwise) {
-			if(bmax == -1) {
-				bmax = (int)sqrt(length(s));
+			if(bmax != 0xffffffff) {
 				VMSG_NL("bmax according to bmax setting: " << bmax);
 			}
-			if(bmaxSqrtMult != -1) {
+			else if(bmaxSqrtMult != 0xffffffff) {
 				bmax *= bmaxSqrtMult;
 				VMSG_NL("bmax according to bmaxSqrtMult setting: " << bmax);
 			}
-			if(bmaxDivN != -1) {
-				bmax = max((int)(jlen / bmaxDivN), 1);
+			else if(bmaxDivN != 0xffffffff) {
+				bmax = max<uint32_t>(jlen / bmaxDivN, 1);
 				VMSG_NL("bmax according to bmaxDivN setting: " << bmax);
+			}
+			else {
+				bmax = (uint32_t)sqrt(length(s));
+				VMSG_NL("bmax defaulted to: " << bmax);
 			}
 			VMSG("Using blockwise SA w/ bmax=" << bmax);
 			if(dcv == 0) {

@@ -22,9 +22,9 @@
 static int verbose      = 0;     // be talkative
 static int sanityCheck  = 0;     // do slow sanity checks
 static int format       = FASTA; // input sequence format
-static int bmax         = -1;    // max blockwise SA bucket size 
-static int bmaxMultSqrt = -1;    // same, as multplier of sqrt(n) 
-static int bmaxDivN     = 8;     // same, as divisor of n 
+static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
+static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n) 
+static uint32_t bmaxDivN     = 8;     // same, as divisor of n 
 static int dcv          = 1024;  // bwise SA difference-cover sample sz
 static int noDc         = 0;     // disable difference-cover sample
 static int entireSA     = 0;     // 1 = disable blockwise SA
@@ -167,13 +167,13 @@ static void parseOptions(int argc, char **argv) {
 	   			chunkRate = parseNumber<int>(1, "-h/--chunkRate arg must be at least 1");
 	   			break;
 	   		case ARG_BMAX:
-	   			bmax = parseNumber<int>(1, "--bmax arg must be at least 1");
+	   			bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
 	   			break;
 	   		case ARG_BMAX_MULT:
-	   			bmaxMultSqrt = parseNumber<int>(1, "--bmaxMultSqrt arg must be at least 1");
+	   			bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxMultSqrt arg must be at least 1");
 	   			break;
 	   		case ARG_BMAX_DIV:
-	   			bmaxDivN = parseNumber<int>(1, "--bmaxDivN arg must be at least 1");
+	   			bmaxDivN = parseNumber<uint32_t>(1, "--bmaxDivN arg must be at least 1");
 	   			break;
 	   		case ARG_DCV:
 	   			dcv = parseNumber<int>(3, "--dcv arg must be at least 3");
@@ -341,17 +341,17 @@ int main(int argc, char **argv) {
 		     << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
 		     << "  FTable chars: " << ftabChars << endl
 		     << "  Chunk rate: " << chunkRate << " (chunk is " << (1 << chunkRate) << " bytes)" << endl;
-		if(bmax == -1) {
+		if(bmax == 0xffffffff) {
 			cout << "  Max bucket size: default" << endl;
 		} else {
 			cout << "  Max bucket size: " << bmax << endl;
 		}
-		if(bmaxMultSqrt == -1) {
+		if(bmaxMultSqrt == 0xffffffff) {
 			cout << "  Max bucket size, sqrt multiplier: default" << endl;
 		} else {
 			cout << "  Max bucket size, sqrt multiplier: " << bmaxMultSqrt << endl;
 		}
-		if(bmaxDivN == -1) {
+		if(bmaxDivN == 0xffffffff) {
 			cout << "  Max bucket size, len divisor: default" << endl;
 		} else {
 			cout << "  Max bucket size, len divisor: " << bmaxDivN << endl;
