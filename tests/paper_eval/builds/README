@@ -1,0 +1,8 @@
+builds
+------
+
+Runs double-index ebwt_build on texts of various sizes: human
+chromosomes 22 and 2, and the whole human genome.  These texts
+correspond to the texts used in 'simreads_competition'.  Results will
+be presented in a table, either folded into the simreads_competition
+results or in a separate table.
