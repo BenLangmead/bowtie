@@ -17,11 +17,23 @@ using namespace seqan;
  * Swap elements a and b in seqan::String s
  */
 template <typename TStr, typename TPos>
-static inline void swap(TStr& s, TPos a, TPos b) {
+static inline void swap(TStr& s, size_t slen, TPos a, TPos b) {
 	typedef typename Value<TStr>::Type TAlphabet;
-	assert_lt(a, length(s));
-	assert_lt(b, length(s));
+	assert_lt(a, slen);
+	assert_lt(b, slen);
 	TAlphabet tmp = s[a];
+	s[a] = s[b];
+	s[b] = tmp;
+}
+
+/**
+ * Swap elements a and b in array s
+ */
+template <typename TVal, typename TPos>
+static inline void swap(TVal* s, size_t slen, TPos a, TPos b) {
+	assert_lt(a, slen);
+	assert_lt(b, slen);
+	TVal tmp = s[a];
 	s[a] = s[b];
 	s[b] = tmp;
 }
@@ -36,7 +48,7 @@ static inline void swap(TStr& s, TPos a, TPos b) {
 	assert_geq(b, begin); \
 	assert_lt(a, end); \
 	assert_lt(b, end); \
-	swap(s, a, b); \
+	swap(s, slen, a, b); \
 }
 
 /**
@@ -48,7 +60,7 @@ static inline void swap(TStr& s, TPos a, TPos b) {
  */
 #define SWAP2(s, s2, a, b) { \
 	SWAP(s, a, b); \
-	swap(s2, a, b); \
+	swap(s2, slen, a, b); \
 }
 
 #define SWAP1(s, s2, a, b) { \
@@ -60,7 +72,7 @@ static inline void swap(TStr& s, TPos a, TPos b) {
  * range [j, j+n) in seqan::String s.
  */
 #define VECSWAP(s, i, j, n) { \
-	if(n > 0) { vecswap(s, i, j, n, begin, end); } \
+	if(n > 0) { vecswap(s, slen, i, j, n, begin, end); } \
 }
 
 /**
@@ -68,7 +80,7 @@ static inline void swap(TStr& s, TPos a, TPos b) {
  * range [j, j+n) both in seqan::String s and seqan::String s2.
  */
 #define VECSWAP2(s, s2, i, j, n) { \
-	if(n > 0) { vecswap2(s, s2, i, j, n, begin, end); } \
+	if(n > 0) { vecswap2(s, slen, s2, i, j, n, begin, end); } \
 }
 
 /**
@@ -78,7 +90,7 @@ static inline void swap(TStr& s, TPos a, TPos b) {
  * recursive multikey_quicksort routines below).
  */
 template <typename TStr, typename TPos>
-static inline void vecswap(TStr& s, TPos i, TPos j, TPos n, TPos begin, TPos end) {
+static inline void vecswap(TStr& s, size_t slen, TPos i, TPos j, TPos n, TPos begin, TPos end) {
 	assert_geq(i, begin);
 	assert_geq(j, begin);
 	assert_lt(i, end);
@@ -91,7 +103,25 @@ static inline void vecswap(TStr& s, TPos i, TPos j, TPos n, TPos begin, TPos end
 		assert_geq(b, begin);
 		assert_lt(a, end);
 		assert_lt(b, end);
-		swap(s, a, b);
+		swap(s, slen, a, b);
+	}
+}
+
+template <typename TVal, typename TPos>
+static inline void vecswap(TVal *s, size_t slen, TPos i, TPos j, TPos n, TPos begin, TPos end) {
+	assert_geq(i, begin);
+	assert_geq(j, begin);
+	assert_lt(i, end);
+	assert_lt(j, end);
+	while(n-- > 0) {
+		assert_geq(n, 0);
+		TPos a = i+n;
+		TPos b = j+n;
+		assert_geq(a, begin);
+		assert_geq(b, begin);
+		assert_lt(a, end);
+		assert_lt(b, end);
+		swap(s, slen, a, b);
 	}
 }
 
@@ -102,7 +132,7 @@ static inline void vecswap(TStr& s, TPos i, TPos j, TPos n, TPos begin, TPos end
  * caller (one of the recursive multikey_quicksort routines below).
  */
 template <typename TStr, typename TPos>
-static inline void vecswap2(TStr& s, TStr& s2, TPos i, TPos j, TPos n, TPos begin, TPos end) {
+static inline void vecswap2(TStr& s, size_t slen, TStr& s2, TPos i, TPos j, TPos n, TPos begin, TPos end) {
 	assert_geq(i, begin);
 	assert_geq(j, begin);
 	assert_lt(i, end);
@@ -115,8 +145,27 @@ static inline void vecswap2(TStr& s, TStr& s2, TPos i, TPos j, TPos n, TPos begi
 		assert_geq(b, begin);
 		assert_lt(a, end);
 		assert_lt(b, end);
-		swap(s, a, b);
-		swap(s2, a, b);
+		swap(s, slen, a, b);
+		swap(s2, slen, a, b);
+	}
+}
+
+template <typename TVal, typename TPos>
+static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos n, TPos begin, TPos end) {
+	assert_geq(i, begin);
+	assert_geq(j, begin);
+	assert_lt(i, end);
+	assert_lt(j, end);
+	while(n-- > 0) {
+		assert_geq(n, 0);
+		TPos a = i+n;
+		TPos b = j+n;
+		assert_geq(a, begin);
+		assert_geq(b, begin);
+		assert_lt(a, end);
+		assert_lt(b, end);
+		swap(s, slen, a, b);
+		swap(s2, slen, a, b);
 	}
 }
 
@@ -128,7 +177,7 @@ static inline void vecswap2(TStr& s, TStr& s2, TPos i, TPos j, TPos n, TPos begi
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
 /// than any TAlphabet character - 'hi'.
-#define CHAR_AT_SUF(si, off) (((off+s[si]) < length(host)) ? ((int)(Dna)(host[off+s[si]])) : (hi))
+#define CHAR_AT_SUF(si, off) (((off+s[si]) < hlen) ? ((int)(Dna)(host[off+s[si]])) : (hi))
 
 #define CHOOSE_AND_SWAP_RANDOM_PIVOT(sw, ch) {                            \
 	/* Note: rand() didn't really cut it here; it seemed to run out of */ \
@@ -250,6 +299,7 @@ void mkeyQSort(TStr& s, int hi, bool verbose = false, bool sanityCheck = false) 
  */
 template<typename TStr>
 void mkeyQSort(TStr& s, int hi, size_t begin, size_t end, size_t depth) {
+	size_t slen = length(s);
 	typedef typename Value<TStr>::Type TAlphabet;
 	// Helper for making the recursive call; sanity-checks arguments to
 	// make sure that the problem actually got smaller.
@@ -257,8 +307,8 @@ void mkeyQSort(TStr& s, int hi, size_t begin, size_t end, size_t depth) {
 		assert(nbegin > begin || nend < end || ndepth > depth); \
 		mkeyQSort(s, hi, nbegin, nend, ndepth); \
 	}
-	assert_leq(begin, length(s));
-	assert_leq(end, length(s));
+	assert_leq(begin, slen);
+	assert_leq(end, slen);
 	size_t a, b, c, d, e, r;
 	size_t n = end - begin;
 	if(n <= 1) return;                // 1-element list already sorted
@@ -327,9 +377,24 @@ void printSuffixList(const THost& host,
 }
 
 /**
+ * Simple helper to print a list of suffixes with indices.
+ */
+template<typename THost>
+void printSuffixList(const THost& host,
+                     uint32_t *s,
+                     size_t slen,
+                     uint32_t *idxs,
+                     ostream& out)
+{
+	for(size_t i = 0; i < slen; i++) {
+		out << "  " << suffix(host, s[i]) << " (" << idxs[i] << ")" << endl;
+	}
+}
+
+/**
  * Simple helper to print a list of suffixes.
  */
-template<typename THost, typename TElt1, typename TElt2>
+template<typename THost, typename TElt1>
 void printSuffixList(const THost& host,
                      const String<TElt1> s,
                      ostream& out)
@@ -339,6 +404,19 @@ void printSuffixList(const THost& host,
 	}
 }
 
+/**
+ * Simple helper to print a list of suffixes.
+ */
+template<typename THost>
+void printSuffixList(const THost& host,
+                     uint32_t *s,
+                     size_t slen,
+                     ostream& out)
+{
+	for(size_t i = 0; i < slen; i++) {
+		out << "  " << suffix(host, s[i]) << endl;
+	}
+}
 
 #ifndef NDEBUG
 /**
@@ -347,15 +425,17 @@ void printSuffixList(const THost& host,
  * according to the ternary paritioning strategy of Bentley and McIlroy
  * (*prior to* swapping the = regions to the center)
  */
-template<typename THost, typename TStr>
+template<typename THost>
 bool assertPartitionedSuf(const THost& host,
-                          TStr& s,
+                          uint32_t *s,
+                          size_t slen,
                           int hi,
                           int pivot,
                           size_t begin,
                           size_t end,
                           size_t depth)
 {
+	size_t hlen = length(host);
 	int state = 0; // 0 -> 1st = section, 1 -> < section, 2 -> > section, 3 -> 2nd = section
 	for(size_t i = begin; i < end; i++) {
 		switch(state) {
@@ -383,15 +463,17 @@ bool assertPartitionedSuf(const THost& host,
  * according to the ternary paritioning strategy of Bentley and McIlroy
  * (*after* swapping the = regions to the center)
  */
-template<typename THost, typename TStr>
+template<typename THost>
 bool assertPartitionedSuf2(const THost& host,
-                           TStr& s,
+                           uint32_t *s,
+                           size_t slen,
                            int hi,
                            int pivot,
                            size_t begin,
                            size_t end,
                            size_t depth)
 {
+	size_t hlen = length(host);
 	int state = 0; // 0 -> < section, 1 -> = section, 2 -> > section
 	for(size_t i = begin; i < end; i++) {
 		switch(state) {
@@ -415,16 +497,16 @@ bool assertPartitionedSuf2(const THost& host,
  * 'host' is a legitimate suffix-offset list (doesn't list any suffix
  * twice and doesn't fall off of host).
  */
-template <typename THost, typename TStr>
-void sanityCheckInputSufs(const THost& host, TStr& s) {
+template <typename T>
+void sanityCheckInputSufs(const T& host, uint32_t *s, size_t slen) {
 	assert_gt(length(host), 0);
-	assert_gt(length(s), 0);
-	for(size_t i = 0; i < length(s); i++) {
+	assert_gt(slen, 0);
+	for(size_t i = 0; i < slen; i++) {
 		// Actually, it's convenient to allow the caller to provide
 		// suffix offsets thare are off the end of the host string.
 		// See, e.g., build() in diff_sample.cpp.
 		//assert_lt(s[i], length(host));
-		for(size_t j = i+1; j < length(s); j++) {
+		for(size_t j = i+1; j < slen; j++) {
 			assert_neq(s[i], s[j]);
 		}
 	}
@@ -434,10 +516,14 @@ void sanityCheckInputSufs(const THost& host, TStr& s) {
  * Assert that the seqan::String s of suffix offsets into seqan::String
  * 'host' really are in lexicographical order up to depth 'upto'.
  */
-template <typename THost, typename TStr>
-void sanityCheckOrderedSufs(const THost& host, TStr& s, size_t upto) {
+template <typename T>
+void sanityCheckOrderedSufs(const T& host,
+                            uint32_t *s,
+                            size_t slen,
+                            size_t upto)
+{
 	assert_lt(s[0], length(host));
-	for(size_t i = 0; i < length(s)-1; i++) {
+	for(size_t i = 0; i < slen-1; i++) {
 		// Allow s[i+t] to point off the end of the string; this is
 		// convenient for some callers
 		if(s[i+1] >= length(host)) continue;
@@ -462,40 +548,47 @@ void sanityCheckOrderedSufs(const THost& host, TStr& s, size_t upto) {
 /**
  * Toplevel function for multikey quicksort over suffixes.
  */
-template<typename THost, typename TStr>
-void mkeyQSortSuf(const THost& host,
-                  TStr& s,
+template<typename T>
+void mkeyQSortSuf(const T& host,
+                  uint32_t *s,
+                  size_t slen,
                   int hi,
                   bool verbose = false,
                   bool sanityCheck = false,
                   size_t upto = 0xffffffff)
 {
+	size_t hlen = length(host);
 	assert(!empty(s));
-	if(sanityCheck) sanityCheckInputSufs(host, s);
-	mkeyQSortSuf(host, s, hi, 0, length(s), 0, upto);
-	if(sanityCheck) sanityCheckOrderedSufs(host, s, upto);
+	if(sanityCheck) sanityCheckInputSufs(host, s, slen);
+	mkeyQSortSuf(host, hlen, s, slen, hi, 0, slen, 0, upto);
+	if(sanityCheck) sanityCheckOrderedSufs(host, s, slen, upto);
 }
 
 /**
  * Toplevel function for multikey quicksort over suffixes with double
  * swapping.
  */
-template<typename THost, typename TStr>
-void mkeyQSortSuf2(const THost& host,
-                   TStr& s,
-                   TStr& s2,
+template<typename T>
+void mkeyQSortSuf2(const T& host,
+                   uint32_t *s,
+                   size_t slen,
+                   uint32_t *s2,
                    int hi,
                    bool verbose = false,
                    bool sanityCheck = false,
                    size_t upto = 0xffffffff)
 {
-	assert_eq(length(s), length(s2));
-	if(sanityCheck) sanityCheckInputSufs(host, s);
-	TStr sOrig = s;
-	mkeyQSortSuf2(host, s, s2, hi, 0, length(s), 0, upto);
+	size_t hlen = length(host);
+	if(sanityCheck) sanityCheckInputSufs(host, s, slen);
+	uint32_t *sOrig = NULL;
 	if(sanityCheck) {
-		sanityCheckOrderedSufs(host, s, upto);
-		for(size_t i = 0; i < length(s); i++) {
+		sOrig = new uint32_t[slen];
+		memcpy(sOrig, s, 4 * slen);
+	}
+	mkeyQSortSuf2(host, hlen, s, slen, s2, hi, 0, slen, 0, upto);
+	if(sanityCheck) {
+		sanityCheckOrderedSufs(host, s, slen, upto);
+		for(size_t i = 0; i < slen; i++) {
 			assert_eq(s[i], sOrig[s2[i]]);
 		}
 	}
@@ -523,26 +616,27 @@ void mkeyQSortSuf2(const THost& host,
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
-template<typename THost, typename TStr>
-void mkeyQSortSuf(const THost& host,
-                  TStr& s,
+template<typename T>
+void mkeyQSortSuf(const T& host,
+                  size_t hlen,
+                  uint32_t *s,
+                  size_t slen,
                   int hi,
                   size_t begin,
                   size_t end,
                   size_t depth,
                   size_t upto = 0xffffffff)
 {
-	typedef typename Value<TStr>::Type TAlphabet;
 	// Helper for making the recursive call; sanity-checks arguments to
 	// make sure that the problem actually got smaller.
 	#define MQS_RECURSE_SUF(nbegin, nend, ndepth) { \
 		assert(nbegin > begin || nend < end || ndepth > depth); \
 		if(ndepth < upto) { /* don't exceed depth of 'upto' */ \
-			mkeyQSortSuf(host, s, hi, nbegin, nend, ndepth, upto); \
+			mkeyQSortSuf(host, hlen, s, slen, hi, nbegin, nend, ndepth, upto); \
 		} \
 	}
-	assert_leq(begin, length(s));
-	assert_leq(end, length(s));
+	assert_leq(begin, slen);
+	assert_leq(end, slen);
 	size_t a, b, c, d, /*e,*/ r;
 	size_t n = end - begin;
 	if(n <= 1) return;                 // 1-element list already sorted
@@ -555,7 +649,7 @@ void mkeyQSortSuf(const THost& host,
 	{
 		bool stillInBounds = false;
 		for(size_t i = begin; i < end; i++) {
-			if(depth < (length(host)-s[i])) {
+			if(depth < (hlen-s[i])) {
 				stillInBounds = true;
 				break;
 			} else { /* already fell off this suffix */ }
@@ -592,10 +686,10 @@ void mkeyQSortSuf(const THost& host,
 	assert(a > begin || c < end-1);                      // there was at least one =s
 	assert_lt(d-c, n); // they can't all have been > pivot
 	assert_lt(b-a, n); // they can't all have been < pivot
-	assert(assertPartitionedSuf(host, s, hi, v, begin, end, depth));  // check pre-=-swap invariant
+	assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
 	r = min(a-begin, b-a); VECSWAP(s, begin, b-r,   r);  // swap left = to center
 	r = min(d-c, end-d-1); VECSWAP(s, b,     end-r, r);  // swap right = to center
-	assert(assertPartitionedSuf2(host, s, hi, v, begin, end, depth)); // check post-=-swap invariant
+	assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
 	r = b-a; // r <- # of <'s
 	if(r > 0) {
 		MQS_RECURSE_SUF(begin, begin + r, depth); // recurse on <'s
@@ -618,27 +712,28 @@ void mkeyQSortSuf(const THost& host,
  * the caller would let s2 be an array s2[] where s2 is the same length
  * as s and s2[i] = i). 
  */
-template<typename THost, typename TStr>
-void mkeyQSortSuf2(const THost& host,
-                   TStr& s,
-                   TStr& s2,
+template<typename T>
+void mkeyQSortSuf2(const T& host,
+                   size_t hlen,
+                   uint32_t *s,
+                   size_t slen,
+                   uint32_t *s2,
                    int hi,
                    size_t begin,
                    size_t end,
                    size_t depth,
                    size_t upto = 0xffffffff)
 {
-	typedef typename Value<TStr>::Type TAlphabet;
 	// Helper for making the recursive call; sanity-checks arguments to
 	// make sure that the problem actually got smaller.
 	#define MQS_RECURSE_SUF_DS(nbegin, nend, ndepth) { \
 		assert(nbegin > begin || nend < end || ndepth > depth); \
 		if(ndepth < upto) { /* don't exceed depth of 'upto' */ \
-			mkeyQSortSuf2(host, s, s2, hi, nbegin, nend, ndepth, upto); \
+			mkeyQSortSuf2(host, hlen, s, slen, s2, hi, nbegin, nend, ndepth, upto); \
 		} \
 	}
-	assert_leq(begin, length(s));
-	assert_leq(end, length(s));
+	assert_leq(begin, slen);
+	assert_leq(end, slen);
 	size_t a, b, c, d, /*e,*/ r;
 	size_t n = end - begin;
 	if(n <= 1) return;                 // 1-element list already sorted
@@ -651,7 +746,7 @@ void mkeyQSortSuf2(const THost& host,
 	{
 		bool stillInBounds = false;
 		for(size_t i = begin; i < end; i++) {
-			if(depth < (length(host)-s[i])) {
+			if(depth < (hlen-s[i])) {
 				stillInBounds = true;
 				break;
 			} else { /* already fell off this suffix */ }
@@ -689,10 +784,10 @@ void mkeyQSortSuf2(const THost& host,
 	assert(a > begin || c < end-1);                      // there was at least one =s
 	assert_lt(/*e*/d-c, n); // they can't all have been > pivot
 	assert_lt(b-a, n); // they can't all have been < pivot
-	assert(assertPartitionedSuf(host, s, hi, v, begin, end, depth));  // check pre-=-swap invariant
+	assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
 	r = min(a-begin, b-a); VECSWAP2(s, s2, begin, b-r,   r);  // swap left = to center
 	r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
-	assert(assertPartitionedSuf2(host, s, hi, v, begin, end, depth)); // check post-=-swap invariant
+	assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
 	r = b-a; // r <- # of <'s
 	if(r > 0) {
 		MQS_RECURSE_SUF_DS(begin, begin + r, depth); // recurse on <'s
@@ -716,17 +811,19 @@ class DifferenceCoverSample;
 /**
  * Toplevel function for multikey quicksort over suffixes.
  */
-template<typename T1, typename T2>
-void mkeyQSortSufDc(const T1& host,
-                    String<T2>& s,
-                    const DifferenceCoverSample<T1>& dc,
+template<typename T>
+void mkeyQSortSufDc(const T& host,
+                    uint32_t* s,
+                    size_t slen,
+                    const DifferenceCoverSample<T>& dc,
                     int hi,
                     bool verbose = false,
                     bool sanityCheck = false)
 {
-	if(sanityCheck) sanityCheckInputSufs(host, s);
-	mkeyQSortSufDc(host, s, dc, hi, 0, length(s), 0, sanityCheck);
-	if(sanityCheck) sanityCheckOrderedSufs(host, s, 0xffffffff);
+	size_t hlen = length(host);
+	if(sanityCheck) sanityCheckInputSufs(host, s, slen);
+	mkeyQSortSufDc(host, hlen, s, slen, dc, hi, 0, slen, 0, sanityCheck);
+	if(sanityCheck) sanityCheckOrderedSufs(host, s, slen, 0xffffffff);
 }
 
 /**
@@ -758,16 +855,18 @@ bool sufDcLt(const T1& host,
 /**
  * k log(k)
  */
-template<typename T1, typename TAlphabet> inline
-void qsortSufDc(const T1& host,
-                String<TAlphabet>& s,
-                const DifferenceCoverSample<T1>& dc,
+template<typename T> inline
+void qsortSufDc(const T& host,
+                size_t hlen,
+                uint32_t* s,
+                size_t slen,
+                const DifferenceCoverSample<T>& dc,
                 size_t begin,
                 size_t end,
                 bool sanityCheck = false)
 {
-	assert_leq(end, length(s));
-	assert_lt(begin, length(s));
+	assert_leq(end, slen);
+	assert_lt(begin, slen);
 	assert_gt(end, begin);
 	size_t n = end - begin;
 	if(n <= 1) return;                 // 1-element list already sorted
@@ -791,8 +890,8 @@ void qsortSufDc(const T1& host,
 	// Put pivot into place
 	assert_lt(cur, end-begin);
 	SWAP(s, end-1, begin+cur);
-	if(begin+cur > begin) qsortSufDc(host, s, dc, begin, begin+cur);
-	if(end > begin+cur+1) qsortSufDc(host, s, dc, begin+cur+1, end);
+	if(begin+cur > begin) qsortSufDc(host, hlen, s, slen, dc, begin, begin+cur);
+	if(end > begin+cur+1) qsortSufDc(host, hlen, s, slen, dc, begin+cur+1, end);
 }
 
 /**
@@ -817,10 +916,12 @@ void qsortSufDc(const T1& host,
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
-template<typename T1, typename TAlphabet>
-void mkeyQSortSufDc(const T1& host,
-                    String<TAlphabet>& s,
-                    const DifferenceCoverSample<T1>& dc,
+template<typename T>
+void mkeyQSortSufDc(const T& host,
+                    size_t hlen,
+                    uint32_t* s,
+                    size_t slen,
+                    const DifferenceCoverSample<T>& dc,
                     int hi,
                     size_t begin,
                     size_t end,
@@ -831,17 +932,17 @@ void mkeyQSortSufDc(const T1& host,
 	// make sure that the problem actually got smaller.
 	#define MQS_RECURSE_SUF_DC(nbegin, nend, ndepth) { \
 		assert(nbegin > begin || nend < end || ndepth > depth); \
-		mkeyQSortSufDc(host, s, dc, hi, nbegin, nend, ndepth, sanityCheck); \
+		mkeyQSortSufDc(host, hlen, s, slen, dc, hi, nbegin, nend, ndepth, sanityCheck); \
 	}
-	assert_leq(begin, length(s));
-	assert_leq(end, length(s));
+	assert_leq(begin, slen);
+	assert_leq(end, slen);
 	size_t n = end - begin;
 	if(n <= 1) return; // 1-element list already sorted
 	if(depth > dc.v()) {
 		// Quicksort the remaining suffixes using difference cover
 		// for constant-time comparisons; this is O(k*log(k)) where
 		// k=(end-begin)
-		qsortSufDc<T1, TAlphabet>(host, s, dc, begin, end, sanityCheck);
+		qsortSufDc<T>(host, hlen, s, slen, dc, begin, end, sanityCheck);
 		return;
 	}
 	size_t a, b, c, d, r;
@@ -851,7 +952,7 @@ void mkeyQSortSufDc(const T1& host,
 	{
 		bool stillInBounds = false;
 		for(size_t i = begin; i < end; i++) {
-			if(depth < (length(host)-s[i])) {
+			if(depth < (hlen-s[i])) {
 				stillInBounds = true;
 				break;
 			} else { /* already fell off this suffix */ }
@@ -888,10 +989,10 @@ void mkeyQSortSufDc(const T1& host,
 	assert(a > begin || c < end-1);                      // there was at least one =s
 	assert_lt(d-c, n); // they can't all have been > pivot
 	assert_lt(b-a, n); // they can't all have been < pivot
-	assert(assertPartitionedSuf(host, s, hi, v, begin, end, depth));  // check pre-=-swap invariant
+	assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
 	r = min(a-begin, b-a); VECSWAP(s, begin, b-r,   r);  // swap left = to center
 	r = min(d-c, end-d-1); VECSWAP(s, b,     end-r, r);  // swap right = to center
-	assert(assertPartitionedSuf2(host, s, hi, v, begin, end, depth)); // check post-=-swap invariant
+	assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
 	r = b-a; // r <- # of <'s
 	if(r > 0) {
 		MQS_RECURSE_SUF_DC(begin, begin + r, depth); // recurse on <'s

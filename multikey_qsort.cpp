@@ -24,7 +24,7 @@ static int seed         = 0;
 static const int ARG_DCV       = 259;
 static const int ARG_SEED      = 260;
 
-static const char *short_options = "drpfegcxqvsu:";
+static const char *short_options = "d:rpfegcxqvsu:";
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -145,7 +145,9 @@ static void driver(const char * type,
 	typedef DifferenceCoverSample<TStr> TDC;
 	typedef Value<TStr> TChar;
 	vector<TStr> ss;
-	if(verbose) cout << "About to read text files" << endl;
+	if(verbose) {
+		cout << "About to read text files (" << file_format_names[format] << ")" << endl;
+	}
 	switch(format) {
 		case FASTA:   readSequenceFiles<TStr, Fasta>(infiles, ss);   break;
 		case EMBL:    readSequenceFiles<TStr, Embl>(infiles, ss);    break;
@@ -166,34 +168,55 @@ static void driver(const char * type,
 		cerr << "Error: Empty input!  Check that file format is correct." << endl;
 		exit(1);
 	}
+	if(verbose && !quiet) {
+		cout << "Input strings:" << endl;
+		for(size_t i = 0; i < ss.size(); i++) {
+			cout << "  " << ss[i] << endl;
+		}
+	}
 	if(suffixes) {
 		// Select a random subset of the suffixes of ss[0] to sort
-		TU32Str sufs;
-		TU32Str idxs;
+		uint32_t* sufs = new uint32_t[length(ss[0])];
+		size_t sufslen = 0;
+		uint32_t* idxs = new uint32_t[length(ss[0])];
+		size_t idxslen = 0;
 		for(uint32_t i = 0; i < length(ss[0]); i++) {
 			if((random() % 20) >= 3) {
-				append(sufs, i);
+				sufs[sufslen++] = i;
 			}
 		}
-		if(empty(sufs)) {
-			append(sufs, 0);
+		if(sufslen == 0) {
+			sufs[sufslen++] = 0;
 		}
-		for(uint32_t i = 0; i < length(sufs); i++) {
-			append(idxs, i);
+		for(uint32_t i = 0; i < sufslen; i++) {
+			idxs[idxslen++] = i;
 		}
 		if(dcv > 0) {
 			TDC dc(ss[0], dcv, verbose, sanityCheck, cout);
 			dc.build();
-			mkeyQSortSufDc(ss[0], sufs, dc, ValueSize<Dna>::VALUE, verbose, sanityCheck);
+			mkeyQSortSufDc(ss[0],
+			               sufs,
+			               sufslen,
+			               dc,
+			               ValueSize<Dna>::VALUE,
+			               verbose,
+			               sanityCheck);
 			if(!quiet) {
 				cout << "Sorted strings:" << endl;
-				printSuffixList(ss[0], sufs, idxs, cout);
+				printSuffixList(ss[0], sufs, sufslen, idxs, cout);
 			}
 		} else {
-			mkeyQSortSuf2(ss[0], sufs, idxs, ValueSize<Dna>::VALUE, verbose, sanityCheck, upto);
+			mkeyQSortSuf2(ss[0],
+			              sufs,
+			              sufslen,
+			              idxs,
+			              ValueSize<Dna>::VALUE,
+			              verbose,
+			              sanityCheck,
+			              upto);
 			if(!quiet) {
 				cout << "Sorted strings:" << endl;
-				printSuffixList(ss[0], sufs, idxs, cout);
+				printSuffixList(ss[0], sufs, sufslen, idxs, cout);
 			}
 		}
 	} else {

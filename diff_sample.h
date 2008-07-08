@@ -674,8 +674,19 @@ void DifferenceCoverSample<TStr>::build() {
 	{
 		Timer timer(cout, "  V-Sorting samples time: ", this->verbose());
 		VMSG_NL("  V-Sorting samples");
-		mkeyQSortSuf2(t, sPrime, sPrimeOrder, ValueSize<TAlphabet>::VALUE,
+		uint32_t *sPrimeArr = (uint32_t*)begin(sPrime);
+		size_t slen = length(sPrime);
+		assert_eq(sPrimeArr[0], sPrime[0]);
+		assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+		uint32_t *sPrimeOrderArr = (uint32_t*)begin(sPrimeOrder);
+		assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
+		assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+		mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, ValueSize<TAlphabet>::VALUE,
 		              this->verbose(), this->sanityCheck(), v);
+		assert_eq(sPrimeArr[0], sPrime[0]);
+		assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+		assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
+		assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
 	}
 	// Now assign the ranking implied by the sorted sPrime/sPrimeOrder
 	// arrays back into sPrime.

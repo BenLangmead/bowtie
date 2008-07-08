@@ -408,16 +408,18 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	{
 		Timer timer(cout, "  Multikey QSorting samples time: ", this->verbose());
 		VMSG_NL("Multikey QSorting " << length(_sampleSuffs) << " samples");
+		uint32_t *s = begin(_sampleSuffs);
+		size_t slen = length(_sampleSuffs);
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDc(t, _sampleSuffs, *_dc, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSufDc(t, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
 			               this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
 			// We don't have a difference cover - just do a normal
 			// suffix sort
-			mkeyQSortSuf(t, _sampleSuffs, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSuf(t, s, slen, ValueSize<TAlphabet>::VALUE,
 			             this->verbose(), this->sanityCheck());
 		}
 	}
@@ -797,16 +799,18 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	if(length(bucket) > 0) {
 		Timer timer(cout, "  Sorting block time: ", this->verbose());
 		VMSG_NL("  Sorting block of length " << length(bucket));
+		uint32_t *s = (uint32_t*)begin(bucket);
+		size_t slen = length(bucket);
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDc(t, bucket, *_dc, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSufDc(t, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
 			               this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
 			// We don't have a difference cover - just do a normal
 			// suffix sort
-			mkeyQSortSuf(t, bucket, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSuf(t, s, slen, ValueSize<TAlphabet>::VALUE,
 			             this->verbose(), this->sanityCheck());
 		}
 	}
