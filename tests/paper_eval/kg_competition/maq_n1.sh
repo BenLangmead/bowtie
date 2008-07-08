@@ -27,10 +27,10 @@ echo Using NAME: ${NAME}
 
 # This is version 0.6.6
 MAQ=/fs/sz-user-supported/Linux-x86_64/bin/maq
-MAQ_ARGS=""
-EXTRA_EXT=""
+MAQ_ARGS="-n 1"
+EXTRA_EXT=".n1"
 REF=hs_ref_${NAME}.bfa
-READ_BASE=${NAME}_sim
+READ_BASE=kg_reads
 
 # Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
 if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map -a `wc -c whole.maq.1${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then

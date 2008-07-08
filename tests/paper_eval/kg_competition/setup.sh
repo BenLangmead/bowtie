@@ -4,6 +4,7 @@ dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
+KG_READS=/fs/szasmg/langmead/reads/SRR001115/s_7_0000_0255
 
 # Make link for FASTA sequence
 ln -s -f ../../hs_ref_${NAME}.mfa hs_ref_${NAME}.mfa
@@ -17,19 +18,6 @@ ln -s -f ../../hs_ref_${NAME}.bfa hs_ref_${NAME}.bfa
 if ! wc -c hs_ref_${NAME}.bfa 2> /dev/null > /dev/null ; then
     echo "Broken link for hs_ref_${NAME}.bfa; aborting..."
     exit 1
-fi
-
-# Simulate 8M 35-bp reads if necessary
-if [ ! -f ${NAME}_sim.fa ] ; then
-    rm -f ${NAME}_sim*.bfq
-    make -C ${BOWTIE_HOME} simreads
-    cp ${BOWTIE_HOME}/simreads .
-    ./simreads \
-	-r 8000000 \
-	-l 35 \
-	hs_ref_${NAME}.mfa \
-	${NAME}_sim.fa \
-	${NAME}_sim.fq
 fi
 
 # Make links for ebwt files
@@ -52,14 +40,18 @@ if [ "$err" = "0" ] ; then
     exit 1
 fi
 
+# Make link to 1000-Genomes reads
+ln -s -f ${KG_READS}.fastq kg_reads.fq
+ln -s -f ${KG_READS}.fa kg_reads.fa
+
 # Convert fq file to a set of bfq files with 2M reads each
-if [ ! -f ${NAME}_sim@6000001.bfq ] ; then
-    maq fastq2bfq -n 2000000 ${NAME}_sim.fq ${NAME}_sim.bfq
+if [ ! -f kg_reads@6000001.bfq ] ; then
+    maq fastq2bfq -n 2000000 kg_reads.fq kg_reads.bfq
 fi
 
 # Convert fq to one big bfq file
-if [ ! -f ${NAME}_sim.bfq ] ; then
-    maq fastq2bfq ${NAME}_sim.fq ${NAME}_sim.bfq
+if [ ! -f kg_reads.bfq ] ; then
+    maq fastq2bfq kg_reads.fq kg_reads.bfq
 fi
 
 # Copy analysis scripts from bowtie dir

@@ -40,7 +40,7 @@ if [ ! -f ${NAME}.soap.v2.map ] ; then
 	$SOAP -s 11 -v 2 -w 1 -f 35 -r 1 -n 0 \
 	  -o ${NAME}.soap.v2.map \
 	  -d hs_ref_${NAME}.mfa \
-	  -a ${NAME}_sim_8000000.fq
+	  -a ${NAME}_sim.fq
 fi
 
 # Do 1-mismatch
@@ -51,5 +51,5 @@ if [ ! -f ${NAME}.soap.v1.map ] ; then
 	$SOAP -v 1 -w 1 -f 35 -r 1 -n 0 \
 	  -o ${NAME}.soap.v1.map \
 	  -d hs_ref_${NAME}.mfa \
-	  -a ${NAME}_sim_8000000.fq
+	  -a ${NAME}_sim.fq
 fi

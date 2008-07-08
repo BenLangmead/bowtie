@@ -95,7 +95,7 @@ if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA
       $MAQ map $MAQ_ARGS \
          ${NAME}.maq.all1bfq${EXTRA_EXT}.map \
          ${REF} \
-         ${READ_BASE}_8000000.bfq
+         ${READ_BASE}.bfq
    if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
       echo "Failed to create legitimate map file: ${NAME}.maq.all1bfq${EXTRA_EXT}.map; aborting..."
       exit 1
