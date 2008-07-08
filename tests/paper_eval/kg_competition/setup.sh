@@ -35,7 +35,7 @@ if ! wc -c ${NAME}.rev.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.rev.2.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 # (allow the .3.ebwt files to be absent for now)
 
-if [ "$err" = "0" ] ; then
+if [ "$err" != "0" ] ; then
     echo "One more more ebwt links are invalid; aborting..."
     exit 1
 fi
