@@ -31,9 +31,10 @@ static string origString		= "";
 static int revcomp				= 0; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
-static bool oneHit				= true; // for multihits, report just one
+static bool oneHit				= true;  // for multihits, report just one
 static bool concise				= false; // for multihits, report just one
-static bool arrowMode			= false;// report SA arrows instead of locs
+static bool arrowMode			= false; // report SA arrows instead of locs
+static int showVersion			= 0; // just print version and quit?
 static int ipause				= 0; // pause before maching?
 static int binOut				= 0; // write hits in binary
 static int qUpto				= -1; // max # of queries to read
@@ -75,6 +76,7 @@ static struct option long_options[] = {
 	{"qSameLen",   no_argument, &qSameLen, 1},
 	{"stats",      no_argument, &printStats, 1},
 	{"reportOpps", no_argument, &reportOpps, 1},
+	{"version",    no_argument, &showVersion, 1},
 	{"dumpPats",   required_argument, 0, ARG_DUMP_PATS},
 	{"revcomp", no_argument, 0, 'r'},
 	{"kmer", required_argument, 0, 'k'},
@@ -118,7 +120,9 @@ static void printUsage(ostream& out) {
 	    << "  --reportOpps       report # of other potential mapping targets for each hit" << endl
 	    << "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    //<< "  --dumpPats <file>  dump all patterns read to a file" << endl
-	    << "  --seed <int>       seed for random number generator" << endl;
+	    << "  --seed <int>       seed for random number generator" << endl
+	    << "  --version          print version information and quit" << endl
+	    ;
 }
 
 /**
@@ -1244,6 +1248,12 @@ int main(int argc, char **argv) {
 	string outfile; // write query results to this file
 	parseOptions(argc, argv);
 	argv0 = argv[0];
+	if(showVersion) {
+		// TODO: handle versioning better
+		cout << argv0 << " version 0.1 (beta)" << endl;
+		cout << "Hash: " << EBWT_SEARCH_HASH << endl;
+		return 0;
+	}
 	Timer _t(cout, "Overall time: ", timing);
 
 	// Get input filename
