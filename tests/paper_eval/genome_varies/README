@@ -1,11 +1,10 @@
 genome_varies
 -------------
 
-Runs bowtie against genomes of sizes varying in length from whole human
-genome, down to a 1/16th-length prefix of the human genome, with
-intermediate points at each log2.  In each case the read set used is
-the same size and all reads are simulated from only the relevant prefix
-of the human genome.  In each case, bowtie is run in both
-exact-hits-only mode and 1-mismatch mode.  The goal is to characterize
-how bowtie's running time and memory usage scale with the size of the
-genome in both modes.
+Runs bowtie against genomes of sizes varying in length from whole-human
+down to a 1/16th-length prefix of whole-human, with intermediate points
+at each log2.  The size of the read set is held constant.  All reads
+are simulated from only the relevant prefix of the human genome.  For
+each genome length, bowtie is run in both exact-hits-only mode and
+1-mismatch mode.  The goal is to characterize how bowtie's running time
+scale with the size of the genome in both modes.
