@@ -60,7 +60,7 @@ system($cmd);
 # Search the Ebwt index
 my $ebwt_search = "./ebwt_search";
 $ebwt_search .= "-with-asserts" if $asserts;
-$cmd = "$ebwt_search $ebwt_args .regr $qry .regr.hits";
+$cmd = "$ebwt_search --concise $ebwt_args .regr $qry .regr.hits";
 print "$cmd\n" if $verbose;
 system($cmd);
 

@@ -113,7 +113,7 @@ sub search {
 	} else {
 		$mismatches = "";
 	}
-	my $cmd = "./ebwt_search-with-asserts $revcomp $mismatches --orig $t $oneHit -s -c .tmp $p";
+	my $cmd = "./ebwt_search-with-asserts $revcomp $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
