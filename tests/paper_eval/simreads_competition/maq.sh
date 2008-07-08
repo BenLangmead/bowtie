@@ -27,92 +27,151 @@ echo Using NAME: ${NAME}
 
 # This is version 0.6.6
 MAQ=/fs/sz-user-supported/Linux-x86_64/bin/maq
+MAQ_ARGS=""
+EXTRA_EXT=""
 
 # Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
-if [ ! -f ${NAME}.maq.1.map ] ; then
-   echo > ${NAME}.maq.top
-   sh wrap.sh ${NAME}.maq \
-      $MAQ map \
-         ${NAME}.maq.1.map \
+if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map -a `wc -c whole.maq.1${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   echo > ${NAME}.maq${EXTRA_EXT}.top
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.1${EXTRA_EXT}.map \
          hs_ref_${NAME}.bfa \
          ${NAME}_sim\@1.bfq
+   if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map -a `wc -c whole.maq.1${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.1${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi
-if [ ! -f ${NAME}.maq.1.map ] ; then
-   sh wrap.sh ${NAME}.maq \
-      $MAQ map \
-         ${NAME}.maq.2.map \
+if [ ! -f ${NAME}.maq.2${EXTRA_EXT}.map -a `wc -c whole.maq.2${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.2${EXTRA_EXT}.map \
          hs_ref_${NAME}.bfa \
          ${NAME}_sim\@2000001.bfq
+   if [ ! -f ${NAME}.maq.2${EXTRA_EXT}.map -a `wc -c whole.maq.2${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.2${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi
-if [ ! -f ${NAME}.maq.1.map ] ; then
-   sh wrap.sh ${NAME}.maq \
-      $MAQ map \
-         ${NAME}.maq.3.map \
+if [ ! -f ${NAME}.maq.3${EXTRA_EXT}.map -a `wc -c whole.maq.3${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.3${EXTRA_EXT}.map \
          hs_ref_${NAME}.bfa \
          ${NAME}_sim\@4000001.bfq
+   if [ ! -f ${NAME}.maq.3${EXTRA_EXT}.map -a `wc -c whole.maq.3${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.3${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi
-if [ ! -f ${NAME}.maq.1.map ] ; then
-   sh wrap.sh ${NAME}.maq \
-      $MAQ map \
-         ${NAME}.maq.4.map \
+if [ ! -f ${NAME}.maq.4${EXTRA_EXT}.map -a `wc -c whole.maq.4${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.4${EXTRA_EXT}.map \
          hs_ref_${NAME}.bfa \
          ${NAME}_sim\@6000001.bfq 
+   if [ ! -f ${NAME}.maq.4${EXTRA_EXT}.map -a `wc -c whole.maq.4${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.4${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi
 
-if [ ! -f ${NAME}.maq.map ] ; then
-   maq mapmerge ${NAME}.maq.map \
-                ${NAME}.maq.1.map \
-                ${NAME}.maq.2.map \
-                ${NAME}.maq.3.map \
-                ${NAME}.maq.4.map
-fi
-
-# Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
-if [ ! -f ${NAME}.maq.n1.map ] ; then
-    echo > ${NAME}.maq.n1.top
-    sh wrap.sh ${NAME}.maq.n1 \
-	$MAQ map -n 1 \
-	  ${NAME}.maq.n1.1.map \
-	  hs_ref_${NAME}.bfa \
-	  ${NAME}_sim\@1.bfq
-    sh wrap.sh ${NAME}.maq.n1 \
-	$MAQ map -n 1 \
-	  ${NAME}.maq.n1.2.map \
-	  hs_ref_${NAME}.bfa \
-	  ${NAME}_sim\@2000001.bfq
-    sh wrap.sh ${NAME}.maq.n1 \
-	$MAQ map -n 1 \
-	  ${NAME}.maq.n1.3.map \
-	  hs_ref_${NAME}.bfa \
-	  ${NAME}_sim\@4000001.bfq
-    sh wrap.sh ${NAME}.maq.n1 \
-	$MAQ map -n 1 \
-	  ${NAME}.maq.n1.4.map \
-	  hs_ref_${NAME}.bfa \
-	  ${NAME}_sim\@6000001.bfq 
-
-    maq mapmerge ${NAME}.maq.n1.map ${NAME}.maq.n1.1.map \
-	                            ${NAME}.maq.n1.2.map \
-	                            ${NAME}.maq.n1.3.map \
-	                            ${NAME}.maq.n1.4.map
+# Merge all 2M-read ${EXTRA_EXT}.map files into one big map
+if [ ! -f ${NAME}.maq${EXTRA_EXT}.map -a `wc -c whole.maq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   maq mapmerge ${NAME}.maq${EXTRA_EXT}.map \
+                  ${NAME}.maq.1${EXTRA_EXT}.map \
+                  ${NAME}.maq.2${EXTRA_EXT}.map \
+                  ${NAME}.maq.3${EXTRA_EXT}.map \
+                  ${NAME}.maq.4${EXTRA_EXT}.map
 fi
 
 # Maq, all reads in 1 shot, default parameters (2 mm allowed in first 24 bases)
-if [ ! -f ${NAME}.maq.all1bfq.map ] ; then
-   echo > ${NAME}.maq.all1bfq.top
-   sh wrap.sh ${NAME}.maq.all1bfq \
-      $MAQ map \
-         ${NAME}.maq.all1bfq.map \
+if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   echo > ${NAME}.maq.all1bfq${EXTRA_EXT}.top
+   sh wrap.sh ${NAME}.maq.all1bfq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.all1bfq${EXTRA_EXT}.map \
          hs_ref_${NAME}.bfa \
          ${NAME}_sim_8000000.bfq
+   if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.all1bfq${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi
 
-# Maq, all reads in 1 shot, with -n 1 (only 1 mm allowed in first 24 bases)
-if [ ! -f ${NAME}.maq.n1.all1bfq.top ] ; then
-    echo > ${NAME}.maq.n1.all1bfq.top
-    sh wrap.sh ${NAME}.maq.n1.all1bfq \
-	$MAQ map -n 1 \
-	  ${NAME}.maq.n1.all1bfq.map \
-	  hs_ref_${NAME}.bfa \
-	  ${NAME}_sim_8000000.bfq
+#
+# Do it all again in -n 1 mode
+# 
+MAQ_ARGS="-n 1"
+EXTRA_EXT=".n1"
+
+# Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
+if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map -a `wc -c whole.maq.1${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   echo > ${NAME}.maq${EXTRA_EXT}.top
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.1${EXTRA_EXT}.map \
+         hs_ref_${NAME}.bfa \
+         ${NAME}_sim\@1.bfq
+   if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map -a `wc -c whole.maq.1${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.1${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
+fi
+if [ ! -f ${NAME}.maq.2${EXTRA_EXT}.map -a `wc -c whole.maq.2${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.2${EXTRA_EXT}.map \
+         hs_ref_${NAME}.bfa \
+         ${NAME}_sim\@2000001.bfq
+   if [ ! -f ${NAME}.maq.2${EXTRA_EXT}.map -a `wc -c whole.maq.2${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.2${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
+fi
+if [ ! -f ${NAME}.maq.3${EXTRA_EXT}.map -a `wc -c whole.maq.3${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.3${EXTRA_EXT}.map \
+         hs_ref_${NAME}.bfa \
+         ${NAME}_sim\@4000001.bfq
+   if [ ! -f ${NAME}.maq.3${EXTRA_EXT}.map -a `wc -c whole.maq.3${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.3${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
+fi
+if [ ! -f ${NAME}.maq.4${EXTRA_EXT}.map -a `wc -c whole.maq.4${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.4${EXTRA_EXT}.map \
+         hs_ref_${NAME}.bfa \
+         ${NAME}_sim\@6000001.bfq 
+   if [ ! -f ${NAME}.maq.4${EXTRA_EXT}.map -a `wc -c whole.maq.4${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.4${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
+fi
+
+# Merge all 2M-read ${EXTRA_EXT}.map files into one big map
+if [ ! -f ${NAME}.maq${EXTRA_EXT}.map -a `wc -c whole.maq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   maq mapmerge ${NAME}.maq${EXTRA_EXT}.map \
+                  ${NAME}.maq.1${EXTRA_EXT}.map \
+                  ${NAME}.maq.2${EXTRA_EXT}.map \
+                  ${NAME}.maq.3${EXTRA_EXT}.map \
+                  ${NAME}.maq.4${EXTRA_EXT}.map
+fi
+
+# Maq, all reads in 1 shot, default parameters (2 mm allowed in first 24 bases)
+if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   echo > ${NAME}.maq.all1bfq${EXTRA_EXT}.top
+   sh wrap.sh ${NAME}.maq.all1bfq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.all1bfq${EXTRA_EXT}.map \
+         hs_ref_${NAME}.bfa \
+         ${NAME}_sim_8000000.bfq
+   if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map -a `wc -c whole.maq.all1bfq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.all1bfq${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
 fi

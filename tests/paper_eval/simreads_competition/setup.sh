@@ -31,6 +31,7 @@ if [ ! -f ${NAME}_sim_8000000.fa ] ; then
 	${NAME}_sim_8000000.fq
 fi
 
+# Make links for ebwt files
 ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.1.ebwt ${NAME}.1.ebwt
 ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.2.ebwt ${NAME}.2.ebwt
 ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.3.ebwt ${NAME}.3.ebwt
@@ -43,6 +44,7 @@ if ! wc -c ${NAME}.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.2.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.rev.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.rev.2.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
+# (allow the .3.ebwt files to be absent for now)
 
 if [ "$err" = "0" ] ; then
     echo "One more more ebwt links are invalid; aborting..."
