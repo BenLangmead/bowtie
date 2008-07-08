@@ -409,13 +409,20 @@ public:
 		VMSG_NL("Calculating joined length");
 		TStr s;
 		uint32_t jlen = joinedLen(ss, _eh.chunkRate());
+		assert_gt(jlen, 0);
+		VMSG_NL("  = " << jlen);
 		// Write the header info
 		VMSG_NL("Writing header");
 		writeFromMemory(true, out1, out2);
 		try {
 			VMSG_NL("Reserving space for joined string");
-			reserve(s, jlen, Exact());
-			// Note that joining the string also causes the 
+			seqan::reserve(s, jlen, Exact());
+			// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
+			// here, causing the assert to fire?  When I run in a
+			// debugger, seqan::capacity() returns the correct value.
+			// Happens even with optimizations turned off.  Very, very
+			// strange.
+			//assert_gt(cap, seqan::capacity(s));
 			VMSG_NL("Joining string to disk");
 			joinToDisk(ss, s, out1, out2, destroySs, seed);
 		} catch(bad_alloc& e) {
@@ -2944,8 +2951,14 @@ TStr Ebwt<TStr>::join(vector<TStr>& l,
 	for(size_t i = 0; i < l.size(); i++) {
 		TStr& s = l[i];
 		assert_gt(length(s), 0);
+		// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
+		// here, causing the appendNE assert to fire?  When I run in a
+		// debugger, seqan::capacity() returns the correct value.
+		// Happens even with optimizations turned off.  Very, very
+		// strange.
 		// Append it onto the joined string
-		appendNE(ret, s);
+		//appendNE(ret, s);
+		append(ret, s);
 		if(i < l.size() - 1) {
 			// s isn't the last pattern; padding between s and the next
 			// pattern may be necessary
@@ -2962,7 +2975,14 @@ TStr Ebwt<TStr>::join(vector<TStr>& l,
 				// the randomness is reproducible as long as the 'seed'
 				// argument is the same, which helps us to sanity-check
 				// the result.
-				appendNE(ret, rand.nextU32() & 3); // append random junk
+
+				// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
+				// here, causing the appendNE assert to fire?  When I run in a
+				// debugger, seqan::capacity() returns the correct value.
+				// Happens even with optimizations turned off.  Very, very
+				// strange.
+				//appendNE(ret, rand.nextU32() & 3); // append random junk
+				append(ret, rand.nextU32() & 3); // append random junk
 			}
 			// Padded pattern ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & chunkMask);
@@ -3022,8 +3042,14 @@ void Ebwt<TStr>::joinToDisk(vector<TStr>& l,
 	// For each pattern, set pmap
 	for(unsigned int i = 0; i < l.size(); i++) {
 		TStr& s = l[i];
+		// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
+		// here, causing the appendNE assert to fire?  When I run in a
+		// debugger, seqan::capacity() returns the correct value.
+		// Happens even with optimizations turned off.  Very, very
+		// strange.
 		// Append it onto the joined string
-		appendNE(ret, s);
+		//appendNE(ret, s);
+		append(ret, s);
 		if(destroySs) destroy(s); // free s
 		if(i < l.size() - 1) {
 			// s isn't the last text, so padding between s and the next
@@ -3042,7 +3068,8 @@ void Ebwt<TStr>::joinToDisk(vector<TStr>& l,
 				// the randomness is reproducible as long as the 'seed'
 				// argument is the same, which helps us to sanity-check
 				// the result.
-				appendNE(ret, rand.nextU32() & 3);
+				append(ret, rand.nextU32() & 3);
+				//appendNE(ret, rand.nextU32() & 3);
 			}
 			// Pattern now ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & eh.chunkMask());
