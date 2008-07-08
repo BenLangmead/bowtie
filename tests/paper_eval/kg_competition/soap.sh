@@ -32,7 +32,7 @@ echo Using NAME: ${NAME}
 SOAP=`which soap.contig`
 echo Using soap.contig: ${SOAP}
 REF=hs_ref_${NAME}.mfa
-READ_BASE=${NAME}_sim
+READ_BASE=kg_reads
 
 # Do 2-mismatch
 if [ ! -f ${NAME}.soap.v2.map ] ; then

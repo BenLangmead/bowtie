@@ -78,6 +78,17 @@ if [ ! -f ${NAME}.maq.4${EXTRA_EXT}.map -a `wc -c whole.maq.4${EXTRA_EXT}.map | 
       exit 1
    fi
 fi
+if [ ! -f ${NAME}.maq.5${EXTRA_EXT}.map -a `wc -c whole.maq.5${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+   sh wrap.sh ${NAME}.maq${EXTRA_EXT} \
+      $MAQ map $MAQ_ARGS \
+         ${NAME}.maq.5${EXTRA_EXT}.map \
+         ${REF} \
+         ${READ_BASE}\@6000001.bfq 
+   if [ ! -f ${NAME}.maq.5${EXTRA_EXT}.map -a `wc -c whole.maq.5${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
+      echo "Failed to create legitimate map file: ${NAME}.maq.5${EXTRA_EXT}.map; aborting..."
+      exit 1
+   fi
+fi
 
 # Merge all 2M-read ${EXTRA_EXT}.map files into one big map
 if [ ! -f ${NAME}.maq${EXTRA_EXT}.map -a `wc -c whole.maq${EXTRA_EXT}.map | sed 's/ .*//'` -gt 10 ] ; then
@@ -85,7 +96,8 @@ if [ ! -f ${NAME}.maq${EXTRA_EXT}.map -a `wc -c whole.maq${EXTRA_EXT}.map | sed 
                   ${NAME}.maq.1${EXTRA_EXT}.map \
                   ${NAME}.maq.2${EXTRA_EXT}.map \
                   ${NAME}.maq.3${EXTRA_EXT}.map \
-                  ${NAME}.maq.4${EXTRA_EXT}.map
+                  ${NAME}.maq.4${EXTRA_EXT}.map \
+                  ${NAME}.maq.5${EXTRA_EXT}.map
 fi
 
 # Maq, all reads in 1 shot, default parameters (2 mm allowed in first 24 bases)
