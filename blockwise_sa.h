@@ -332,7 +332,14 @@ private:
 			_dc->build();
 		}
 		// Calculate sample suffixes
-		buildSamples();
+		if(this->bucketSz() <= length(this->text())) {
+			VMSG_NL("Building samples");
+			buildSamples();
+		} else {
+			VMSG_NL("Skipping building samples since text length " <<
+			        length(this->text()) << " is less than bucket size: " <<
+			        this->bucketSz());
+		}
 		_built = true;
 	}
 	
@@ -414,7 +421,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDcU8(host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSufDcU8(t, host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
 			                 this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
@@ -426,8 +433,9 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	}
 	// Calculate bucket sizes
 	VMSG_NL("Calculating bucket sizes");
+	uint32_t limit = 20;
 	// Iterate until all buckets are less than 
-	while(true) {
+	while(--limit != 0) {
 		// Calculate bucket sizes by doing a binary search for each
 		// suffix and noting where it lands
 		uint32_t numBuckets = length(_sampleSuffs)+1;
@@ -454,7 +462,9 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 					if(r == 0xffffffff) continue; // r was one of the samples
 					assert_lt(r, numBuckets);
 					bucketSzs[r]++;
-					bucketReps[r] = i; // clobbers previous one, but that's OK
+					if(bucketReps[r] == 0xffffffff || (_randomSrc.nextU32() & 1) == 0) {
+						bucketReps[r] = i; // clobbers previous one, but that's OK
+					}
 				}
 			}
 			VMSG_NL("  100%");
@@ -511,6 +521,10 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		// Otherwise, continue until no more buckets need to be
 		// split
 		VMSG_NL("Split " << added << ", merged " << merged << "; iterating...");
+	}
+	if(limit == 0) {
+		VMSG_NL("Iterated too many times; trying again...");
+		buildSamples();
 	}
 	VMSG_NL("Avg bucket size: " << ((float)(len-length(_sampleSuffs)) / (length(_sampleSuffs)+1)) << " (target: " << bsz << ")");
 }
@@ -806,7 +820,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDcU8(host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSufDcU8(t, host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
 			                 this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
