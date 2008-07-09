@@ -792,7 +792,7 @@ int64_t DifferenceCoverSample<TStr>::breakTie(uint32_t i, uint32_t j) const {
 	assert_lt(djmodv+1, length(_doffs));
 	// assert_lt: expected (32024) < (0)
 	assert_lt(ioff, _doffs[dimodv+1] - _doffs[dimodv]);
-	assert_lt(joff, _doffs[dimodv+1] - _doffs[dimodv]);
+	assert_lt(joff, _doffs[djmodv+1] - _doffs[djmodv]);
 	uint32_t isaIIdx = _doffs[dimodv] + ioff;
 	uint32_t isaJIdx = _doffs[djmodv] + joff;
 	assert_lt(isaIIdx, length(_isaPrime));
