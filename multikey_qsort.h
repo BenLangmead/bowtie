@@ -179,6 +179,11 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 /// than any TAlphabet character - 'hi'.
 #define CHAR_AT_SUF(si, off) (((off+s[si]) < hlen) ? ((int)(Dna)(host[off+s[si]])) : (hi))
 
+/// Retrieve an int-ized version of the ath character of string s, or,
+/// if a goes off the end of s, return a (user-specified) int greater
+/// than any TAlphabet character - 'hi'.
+#define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)host[off+s[si]] : (hi))
+
 #define CHOOSE_AND_SWAP_RANDOM_PIVOT(sw, ch) {                            \
 	/* Note: rand() didn't really cut it here; it seemed to run out of */ \
 	/* randomness and, after a time, returned the same thing over and */  \
@@ -1007,5 +1012,208 @@ void mkeyQSortSufDc(const T& host,
 		MQS_RECURSE_SUF_DC(end-r, end, depth); // recurse on >'s
 	}
 }
+
+/**
+ * Toplevel function for multikey quicksort over suffixes.
+ */
+template<typename T>
+void mkeyQSortSufDcU8(const uint8_t *host,
+                      size_t hlen,
+                      uint32_t* s,
+                      size_t slen,
+                      const DifferenceCoverSample<T>& dc,
+                      int hi,
+                      bool verbose = false,
+                      bool sanityCheck = false)
+{
+	//if(sanityCheck) sanityCheckInputSufs(host, s, slen);
+	mkeyQSortSufDcU8(host, hlen, s, slen, dc, hi, 0, slen, 0, sanityCheck);
+	//if(sanityCheck) sanityCheckOrderedSufs(host, s, slen, 0xffffffff);
+}
+
+/**
+ * Constant time
+ */
+template<typename T1, typename T2> inline
+bool sufDcLtU8(const uint8_t *host,
+               size_t hlen,
+               const T2& s1,
+               const T2& s2,
+               const DifferenceCoverSample<T1>& dc,
+               bool sanityCheck = false)
+{
+	hlen += 0;
+	uint32_t diff = dc.tieBreakOff(s1, s2);
+	assert_lt(diff, dc.v());
+	assert_lt(diff, hlen-s1);
+	assert_lt(diff, hlen-s2);
+	if(sanityCheck) {
+		for(uint32_t i = 0; i < diff; i++) {
+			assert_eq(host[s1+i], host[s2+i]);
+		}
+	}
+	bool ret = dc.breakTie(s1+diff, s2+diff) < 0;
+	if(sanityCheck && ret != dollarLt(suffix(host, s1), suffix(host, s2))) {
+		assert(false);
+	}
+	return ret;
+}
+
+/**
+ * k log(k)
+ */
+template<typename T> inline
+void qsortSufDcU8(const uint8_t *host,
+                  size_t hlen,
+                  uint32_t* s,
+                  size_t slen,
+                  const DifferenceCoverSample<T>& dc,
+                  size_t begin,
+                  size_t end,
+                  bool sanityCheck = false)
+{
+	assert_leq(end, slen);
+	assert_lt(begin, slen);
+	assert_gt(end, begin);
+	size_t n = end - begin;
+	if(n <= 1) return;                 // 1-element list already sorted
+	// Note: rand() didn't really cut it here; it seemed to run out of
+	// randomness and, after a time, returned the same thing over and
+	// over again
+	size_t a = (random() % n) + begin; // choose pivot between begin and end
+	assert_lt(a, end);
+	assert_geq(a, begin);
+	SWAP(s, end-1, a); // move pivot to end
+	size_t cur = 0;
+	for(size_t i = begin; i < end-1; i++) {
+		if(sufDcLtU8(host, hlen, s[i], s[end-1], dc, sanityCheck)) {
+			if(sanityCheck)
+				assert(dollarLt(suffix(host, s[i]), suffix(host, s[end-1])));
+			assert_lt(begin + cur, end-1);
+			SWAP(s, i, begin + cur);
+			cur++;
+		}
+	}
+	// Put pivot into place
+	assert_lt(cur, end-begin);
+	SWAP(s, end-1, begin+cur);
+	if(begin+cur > begin) qsortSufDcU8(host, hlen, s, slen, dc, begin, begin+cur);
+	if(end > begin+cur+1) qsortSufDcU8(host, hlen, s, slen, dc, begin+cur+1, end);
+}
+
+/**
+ * Main multikey quicksort function for suffixes.  Based on Bentley &
+ * Sedgewick's algorithm on p.5 of their paper "Fast Algorithms for
+ * Sorting and Searching Strings".  That algorithm has been extended in
+ * three ways: 
+ * 
+ *  1. Deal with keys of different lengths by checking bounds and
+ *     considering off-the-end values to be 'hi' (b/c our goal is the
+ *     BWT transform, we're biased toward considring prefixes as
+ *     lexicographically *greater* than their extensions).
+ *  2. The multikey_qsort_suffixes version takes a single host string
+ *     and a list of suffix offsets as input.  This reduces memory
+ *     footprint compared to an approach that treats its input
+ *     generically as a set of strings (not necessarily suffixes), thus
+ *     requiring that we store at least two integers worth of
+ *     information for each string.
+ *  3. Sorting functions take an extra "upto" parameter that upper-
+ *     bounds the depth to which the function sorts.
+ * 
+ * TODO: Consult a tie-breaker (like a difference cover sample) if two
+ * keys share a long prefix.
+ */
+template<typename T>
+void mkeyQSortSufDcU8(const uint8_t *host,
+                      size_t hlen,
+                      uint32_t* s,
+                      size_t slen,
+                      const DifferenceCoverSample<T>& dc,
+                      int hi,
+                      size_t begin,
+                      size_t end,
+                      size_t depth,
+                      bool sanityCheck = false)
+{
+	// Helper for making the recursive call; sanity-checks arguments to
+	// make sure that the problem actually got smaller.
+	#define MQS_RECURSE_SUF_DC_U8(nbegin, nend, ndepth) { \
+		assert(nbegin > begin || nend < end || ndepth > depth); \
+		mkeyQSortSufDcU8(host, hlen, s, slen, dc, hi, nbegin, nend, ndepth, sanityCheck); \
+	}
+	assert_leq(begin, slen);
+	assert_leq(end, slen);
+	size_t n = end - begin;
+	if(n <= 1) return; // 1-element list already sorted
+	if(depth > dc.v()) {
+		// Quicksort the remaining suffixes using difference cover
+		// for constant-time comparisons; this is O(k*log(k)) where
+		// k=(end-begin)
+		qsortSufDcU8<T>(host, hlen, s, slen, dc, begin, end, sanityCheck);
+		return;
+	}
+	size_t a, b, c, d, r;
+	CHOOSE_AND_SWAP_PIVOT(SWAP1, CHAR_AT_SUF_U8); // choose pivot, swap to begin
+	int v = CHAR_AT_SUF_U8(begin, depth); // v <- pivot value
+	#ifndef NDEBUG
+	{
+		bool stillInBounds = false;
+		for(size_t i = begin; i < end; i++) {
+			if(depth < (hlen-s[i])) {
+				stillInBounds = true;
+				break;
+			} else { /* already fell off this suffix */ }
+		}
+		assert(stillInBounds); // >=1 suffix must still be in bounds
+	}
+	#endif
+	a = b = begin;
+	c = d = end-1;
+	while(true) {
+		// Invariant: everything before a is = pivot, everything
+		// between a and b is <
+		int bc = 0; // shouldn't have to init but gcc on Mac complains
+		while(b <= c && v >= (bc = CHAR_AT_SUF_U8(b, depth))) {
+			if(v == bc) {
+				SWAP(s, a, b); a++;
+			}
+			b++;
+		}
+		// Invariant: everything after d is = pivot, everything
+		// between c and d is >
+		int cc = 0; // shouldn't have to init but gcc on Mac complains
+		while(b <= c && v <= (cc = CHAR_AT_SUF_U8(c, depth))) {
+			if(v == cc) {
+				SWAP(s, c, d); d--;
+			}
+			c--;
+		}
+		if(b > c) break;
+		SWAP(s, b, c);
+		b++;
+		c--;
+	}
+	assert(a > begin || c < end-1);                      // there was at least one =s
+	assert_lt(d-c, n); // they can't all have been > pivot
+	assert_lt(b-a, n); // they can't all have been < pivot
+	//assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
+	r = min(a-begin, b-a); VECSWAP(s, begin, b-r,   r);  // swap left = to center
+	r = min(d-c, end-d-1); VECSWAP(s, b,     end-r, r);  // swap right = to center
+	//assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
+	r = b-a; // r <- # of <'s
+	if(r > 0) {
+		MQS_RECURSE_SUF_DC_U8(begin, begin + r, depth); // recurse on <'s
+	}
+	// Do not recurse on ='s if the pivot was the off-the-end value;
+	// they're already fully sorted 
+	if(v != hi) {
+		MQS_RECURSE_SUF_DC_U8(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
+	}
+	r = d-c; // r <- # of >'s excluding those exhausted
+	if(r > 0 && v < hi-1) {
+		MQS_RECURSE_SUF_DC_U8(end-r, end, depth); // recurse on >'s
+	}
+}
+
 
 #endif /*MULTIKEY_QSORT_H_*/

@@ -410,11 +410,12 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		VMSG_NL("Multikey QSorting " << length(_sampleSuffs) << " samples");
 		uint32_t *s = begin(_sampleSuffs);
 		size_t slen = length(_sampleSuffs);
+		uint8_t *host = (uint8_t*)begin(t, Standard());
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDc(t, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
-			               this->verbose(), this->sanityCheck());
+			mkeyQSortSufDcU8(host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
+			                 this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
 			// We don't have a difference cover - just do a normal
@@ -801,11 +802,12 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 		VMSG_NL("  Sorting block of length " << length(bucket));
 		uint32_t *s = (uint32_t*)begin(bucket);
 		size_t slen = length(bucket);
+		uint8_t *host = (uint8_t*)begin(t, Standard());
 		if(_dc != NULL) {
 			VMSG_NL("  (Using difference cover)");
 			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDc(t, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
-			               this->verbose(), this->sanityCheck());
+			mkeyQSortSufDcU8(host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
+			                 this->verbose(), this->sanityCheck());
 		} else {
 			VMSG_NL("  (Not using difference cover)");
 			// We don't have a difference cover - just do a normal
