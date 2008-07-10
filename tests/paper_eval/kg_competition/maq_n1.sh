@@ -31,6 +31,7 @@ MAQ_ARGS="-n 1"
 EXTRA_EXT=".n1"
 REF=hs_ref_${NAME}.bfa
 READ_BASE=kg_reads
+WORKSTATION=0
 
 # Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
 if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map ] ; then
@@ -98,6 +99,10 @@ if [ ! -f ${NAME}.maq${EXTRA_EXT}.map ] ; then
                   ${NAME}.maq.3${EXTRA_EXT}.map \
                   ${NAME}.maq.4${EXTRA_EXT}.map \
                   ${NAME}.maq.5${EXTRA_EXT}.map
+fi
+
+if [ "$WORKSTATION" = "1" ] ; then
+	exit 0
 fi
 
 # Maq, all reads in 1 shot, default parameters (2 mm allowed in first 24 bases)
