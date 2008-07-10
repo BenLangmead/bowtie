@@ -39,7 +39,7 @@ if [ ! -f ${NAME}.soap.v2.map ] ; then
     echo Doing 2-mismatch...
     echo > ${NAME}.soap.v2.top
     sh wrap.sh ${NAME}.soap.v2 \
-	$SOAP -v 2 -w 1 -f 35 -r 1 -n 0 \
+	$SOAP -v 2 -f 35 \
 	  -o ${NAME}.soap.v2.map \
 	  -d ${REF} \
 	  -a ${READ_BASE}.fq
@@ -54,7 +54,7 @@ if [ ! -f ${NAME}.soap.v1.map ] ; then
     echo Doing 1-mismatch...
     echo > ${NAME}.soap.v1.top
     sh wrap.sh ${NAME}.soap.v1 \
-	$SOAP -v 1 -w 1 -f 35 -r 1 -n 0 \
+	$SOAP -v 1 -f 35 \
 	  -o ${NAME}.soap.v1.map \
 	  -d ${REF} \
 	  -a ${READ_BASE}.fq
