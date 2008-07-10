@@ -152,7 +152,7 @@ static void driver(const char * type,
 		case FASTA:   readSequenceFiles<TStr, Fasta>(infiles, ss);   break;
 		case EMBL:    readSequenceFiles<TStr, Embl>(infiles, ss);    break;
 	    case GENBANK: readSequenceFiles<TStr, Genbank>(infiles, ss); break;
-		#ifdef PACKED_STIRNGS
+		#ifdef PACKED_STRINGS
 		case RAW:
 			cerr << "RAW format not supported in packed-string mode" << endl;
 			exit(1); break;
@@ -263,7 +263,7 @@ int main(int argc, char** argv) {
 	switch(seqType) {
 		case DNA: {
 			Timer timer(cout, "Total time for call to driver(): ", verbose);
-			#ifdef PACKED_STIRNGS
+			#ifdef PACKED_STRINGS
 			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles);
 			#else
 			driver<String<Dna, Alloc<> > >("DNA", infile, infiles);

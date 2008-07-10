@@ -182,7 +182,11 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
 /// than any TAlphabet character - 'hi'.
+#ifndef PACKED_STRINGS
 #define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)host[off+s[si]] : (hi))
+#else
+#define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)(Dna)host[off+s[si]] : (hi))
+#endif
 
 #define CHOOSE_AND_SWAP_RANDOM_PIVOT(sw, ch) {                            \
 	/* Note: rand() didn't really cut it here; it seemed to run out of */ \
@@ -1018,13 +1022,13 @@ void mkeyQSortSufDc(const T& host,
 /**
  * Toplevel function for multikey quicksort over suffixes.
  */
-template<typename T>
-void mkeyQSortSufDcU8(const T& seqanHost,
-                      const uint8_t *host,
+template<typename T1, typename T2>
+void mkeyQSortSufDcU8(const T1& seqanHost,
+                      const T2& host,
                       size_t hlen,
                       uint32_t* s,
                       size_t slen,
-                      const DifferenceCoverSample<T>& dc,
+                      const DifferenceCoverSample<T1>& dc,
                       int hi,
                       bool verbose = false,
                       bool sanityCheck = false)
@@ -1039,10 +1043,10 @@ void mkeyQSortSufDcU8(const T& seqanHost,
  */
 template<typename T1, typename T2> inline
 bool sufDcLtU8(const T1& seqanHost,
-               const uint8_t *host,
+               const T2& host,
                size_t hlen,
-               const T2& s1,
-               const T2& s2,
+               uint32_t s1,
+               uint32_t s2,
                const DifferenceCoverSample<T1>& dc,
                bool sanityCheck = false)
 {
@@ -1066,13 +1070,13 @@ bool sufDcLtU8(const T1& seqanHost,
 /**
  * k log(k)
  */
-template<typename T> inline
-void qsortSufDcU8(const T& seqanHost,
-                  const uint8_t *host,
+template<typename T1, typename T2> inline
+void qsortSufDcU8(const T1& seqanHost,
+                  const T2& host,
                   size_t hlen,
                   uint32_t* s,
                   size_t slen,
-                  const DifferenceCoverSample<T>& dc,
+                  const DifferenceCoverSample<T1>& dc,
                   size_t begin,
                   size_t end,
                   bool sanityCheck = false)
@@ -1112,14 +1116,14 @@ void qsortSufDcU8(const T& seqanHost,
 // 5 64-element buckets for bucket-sorting A, C, G, T, $
 static uint32_t bkts[4][4 * 1024 * 1024];
 
-template<typename T>
+template<typename T1, typename T2>
 static void selectionSortSufDcU8(
-		const T& seqanHost,
-		const uint8_t *host,
+		const T1& seqanHost,
+		const T2& host,
         size_t hlen,
         uint32_t* s,
         size_t slen,
-        const DifferenceCoverSample<T>& dc,
+        const DifferenceCoverSample<T1>& dc,
         uint8_t hi,
         size_t begin,
         size_t end,
@@ -1134,7 +1138,7 @@ static void selectionSortSufDcU8(
 		uint32_t off = dc.tieBreakOff(s[begin], s[begin+1]);
 		if(off != 0xffffffff) {
 			if(off < depth) {
-				qsortSufDcU8<T>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
+				qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
 				// It's helpful for debugging if we call this here
 				if(sanityCheck) {
 					sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
@@ -1156,8 +1160,13 @@ static void selectionSortSufDcU8(
 			uint32_t joff = depth + s[j];
 			uint32_t k;
 			for(k = 0; k <= lim; k++) {
+				#ifndef PACKED_STRINGS
 				uint8_t jc = (k + joff < hlen) ? host[k + joff] : hi;
 				uint8_t tc = (k + targoff < hlen) ? host[k + targoff] : hi;
+				#else
+				uint8_t jc = (k + joff < hlen) ? (uint8_t)(Dna)host[k + joff] : hi;
+				uint8_t tc = (k + targoff < hlen) ? (uint8_t)(Dna)host[k + targoff] : hi;
+				#endif
 				if(jc > tc) {
 					// the jth suffix is greater than the current
 					// smallest suffix
@@ -1188,7 +1197,7 @@ static void selectionSortSufDcU8(
 		}
 	}
 	if(atLeastOneTie) {
-		qsortSufDcU8<T>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
+		qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
 		// It's helpful for debugging if we call this here
 		if(sanityCheck) {
 			sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
@@ -1203,14 +1212,14 @@ static void selectionSortSufDcU8(
 	}
 }
 
-template<typename T>
+template<typename T1, typename T2>
 static void bucketSortSufDcU8(
-		const T& seqanHost,
-		const uint8_t *host,
+		const T1& seqanHost,
+		const T2& host,
         size_t hlen,
         uint32_t* s,
         size_t slen,
-        const DifferenceCoverSample<T>& dc,
+        const DifferenceCoverSample<T1>& dc,
         uint8_t hi,
         size_t begin,
         size_t end,
@@ -1219,8 +1228,8 @@ static void bucketSortSufDcU8(
 {
 	uint32_t cnts[] = { 0, 0, 0, 0, 0 };
 	#define BKT_RECURSE_SUF_DC_U8(nbegin, nend) { \
-		bucketSortSufDcU8<T>(seqanHost, host, hlen, s, slen, dc, hi, \
-		                     (nbegin), (nend), depth+1, sanityCheck); \
+		bucketSortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, hi, \
+		                         (nbegin), (nend), depth+1, sanityCheck); \
 	}
 	assert_gt(end, begin);
 	assert_leq(end-begin, BUCKET_SORT_CUTOFF);
@@ -1230,7 +1239,7 @@ static void bucketSortSufDcU8(
 		// Quicksort the remaining suffixes using difference cover
 		// for constant-time comparisons; this is O(k*log(k)) where
 		// k=(end-begin)
-		qsortSufDcU8<T>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
+		qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
 		return;
 	}
 	if(end-begin <= SELECTION_SORT_CUTOFF) {
@@ -1246,7 +1255,11 @@ static void bucketSortSufDcU8(
 	for(size_t i = begin; i < end; i++) {
 		uint32_t off = depth+s[i];
 		// Following line is a huge chunk of the gprof profile
+		#ifndef PACKED_STRINGS
 		uint8_t c = (off < hlen) ? host[off] : hi;
+		#else
+		uint8_t c = (off < hlen) ? (uint8_t)(Dna)host[off] : hi;
+		#endif
 		assert_leq(c, 4);
 		if(c == 0) {
 			s[begin + cnts[0]++] = s[i];
@@ -1324,13 +1337,13 @@ static void bucketSortSufDcU8(
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
-template<typename T>
-void mkeyQSortSufDcU8(const T& seqanHost,
-                      const uint8_t *host,
+template<typename T1, typename T2>
+void mkeyQSortSufDcU8(const T1& seqanHost,
+                      const T2& host,
                       size_t hlen,
                       uint32_t* s,
                       size_t slen,
-                      const DifferenceCoverSample<T>& dc,
+                      const DifferenceCoverSample<T1>& dc,
                       int hi,
                       size_t begin,
                       size_t end,
@@ -1351,7 +1364,7 @@ void mkeyQSortSufDcU8(const T& seqanHost,
 		// Quicksort the remaining suffixes using difference cover
 		// for constant-time comparisons; this is O(k*log(k)) where
 		// k=(end-begin)
-		qsortSufDcU8<T>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
+		qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
 		if(sanityCheck) {
 			sanityCheckOrderedSufs(seqanHost, hlen, s, slen, 0xffffffff, begin, end);
 		}

@@ -217,7 +217,7 @@ static void driver(const char * type,
 		case FASTA:   readSequenceFiles<TStr, Fasta>  (infiles, ss, cutoff, -1, reverse); break;
 		case EMBL:    readSequenceFiles<TStr, Embl>   (infiles, ss, cutoff, -1, reverse); break;
 	    case GENBANK: readSequenceFiles<TStr, Genbank>(infiles, ss, cutoff, -1, reverse); break;
-		#ifndef PACKED_STIRNGS
+		#ifndef PACKED_STRINGS
 		case RAW:     readSequenceFiles<TStr, Raw>    (infiles, ss, cutoff, -1, reverse); break;
 		#endif
 		case CMDLINE: readSequenceString<TStr>        (infile,  ss, cutoff, -1, reverse); break;
@@ -377,7 +377,7 @@ int main(int argc, char **argv) {
 	int64_t origCutoff = cutoff; // save cutoff since it gets modified
 	{
 		Timer timer(cout, "Total time for call to driver(): ", verbose);
-		#ifdef PACKED_STIRNGS
+		#ifdef PACKED_STRINGS
 		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
 		#else
 		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
@@ -387,7 +387,7 @@ int main(int argc, char **argv) {
 	if(doubleEbwt) {
 		srandom(seed);
 		Timer timer(cout, "Total time for backward call to driver(): ", verbose);
-		#ifdef PACKED_STIRNGS
+		#ifdef PACKED_STRINGS
 		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile, true);
 		#else
 		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
