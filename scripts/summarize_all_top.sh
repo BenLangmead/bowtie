@@ -9,5 +9,8 @@ for d in `ls *.top` ; do
 	e=`echo $d | sed 's/[^.]*[.]//'`
 	# e = everything before first . (everything between first two dots)
 	e=`echo $e | sed 's/[.].*//'`
+	if [ -n "$1" ] ; then
+		e=$1
+	fi
 	perl summarize_top.pl $d $e | tail -1
 done
