@@ -22,8 +22,12 @@ if [ "$MAKE_LINKS" = "1" ] ; then
 	    exit 1
 	fi
 else
-	cp ${GENOME_DIR}/hs_ref_${NAME}.mfa .
-	cp ${GENOME_DIR}/hs_ref_${NAME}.bfa .
+	if [ ! -f hs_ref_${NAME}.mfa ] ; then
+		cp ${GENOME_DIR}/hs_ref_${NAME}.mfa .
+	fi
+	if [ ! -f hs_ref_${NAME}.bfa ] ; then
+		cp ${GENOME_DIR}/hs_ref_${NAME}.bfa .
+	fi
 fi
 
 # Simulate 8M 35-bp reads if necessary
