@@ -15,18 +15,21 @@ if ! wc -c hs_ref_${NAME}.mfa 2> /dev/null > /dev/null ; then
 fi
 
 # Build and copy ebwt_build to here
-make -C ${BOWTIE_HOME} ebwt_build
-make -C ${BOWTIE_HOME} ebwt_build_packed
-cp ${BOWTIE_HOME}/ebwt_build .
-cp ${BOWTIE_HOME}/ebwt_build_packed .
-
 if [ ! -f ebwt_build ] ; then
-	echo "Could not build ebwt_build; aborting..."
-	exit 1
+	make -C ${BOWTIE_HOME} ebwt_build
+	cp ${BOWTIE_HOME}/ebwt_build .
+	if [ ! -f ebwt_build ] ; then
+		echo "Could not build ebwt_build; aborting..."
+		exit 1
+	fi
 fi
 if [ ! -f ebwt_build_packed ] ; then
-	echo "Could not build ebwt_build_packed; aborting..."
-	exit 1
+	make -C ${BOWTIE_HOME} ebwt_build_packed
+	cp ${BOWTIE_HOME}/ebwt_build_packed .
+	if [ ! -f ebwt_build_packed ] ; then
+		echo "Could not build ebwt_build_packed; aborting..."
+		exit 1
+	fi
 fi
 
 # Copy analysis scripts from bowtie dir
