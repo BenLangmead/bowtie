@@ -5,6 +5,7 @@ NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 
 ./ebwt_build --version
+./ebwt_build_packed --version
 
 if [ ! -f ${NAME}.esa.1.ebwt ] ; then
 	echo > ${NAME}.ebwt_build.esa.top
