@@ -388,7 +388,7 @@ int main(int argc, char **argv) {
 		srandom(seed);
 		Timer timer(cout, "Total time for backward call to driver(): ", verbose);
 		#ifdef PACKED_STRINGS
-		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile, true);
+		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
 		#else
 		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
 		#endif
