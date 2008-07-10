@@ -7,4 +7,4 @@ at each log2.  The size of the read set is held constant.  All reads
 are simulated from only the relevant prefix of the human genome.  For
 each genome length, bowtie is run in both exact-hits-only mode and
 1-mismatch mode.  The goal is to characterize how bowtie's running time
-scale with the size of the genome in both modes.
+scales with the size of the genome in both modes.
