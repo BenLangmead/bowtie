@@ -432,9 +432,9 @@ static bool findSanityHits(const TStr1& pat,
 	for(size_t i = ((plen+bump)>>1); i < plen; i++) {
 		appendValue(half, (TVal)pat[i]);
 	}
-    uint32_t hlen = length(half); // length of seed half
+    uint32_t hlen = length(half); // length of seed (right) half
     assert_leq(hlen, plen);
-    uint32_t ohlen = plen - hlen; // length of other half
+    uint32_t ohlen = plen - hlen; // length of other (left) half
     assert_leq(ohlen, plen);
 	Pattern<TStr, Horspool> pattern(half);
 	for(size_t i = 0; i < os.size(); i++) {
@@ -454,7 +454,12 @@ static bool findSanityHits(const TStr1& pat,
 				// Extend, counting mismatches
 				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
 					if(o[pos-j-1] != pat[ohlen-j-1]) {
-						diffs.set(ohlen-j-1);
+						if(transpose) {
+							// Transpose mismatch bit
+							diffs.set(plen-(ohlen-j));
+						} else {
+							diffs.set(ohlen-j-1);
+						}
 					}
 				}
 			}
@@ -812,8 +817,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    	params.stats().incRead(s, pat2);
     		assert(!patsrc.nextIsReverseComplement());
 	    }
-	    // Check that all hits are sane (NOT that all true hits were
-	    // found - not yet, at least)
+	    // Check all hits against a naive oracle
     	if(sanityCheck && !os.empty() && !arrowMode) {
     	    vector<Hit>& hits = sink.retainedHits();
     	    // Accumulate hits found using a naive seed-and-extend into

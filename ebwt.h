@@ -771,8 +771,8 @@ public:
 	inline bool searchFinish1(EbwtSearchState<TStr>& s) const;
 	inline void searchWithFchr(EbwtSearchState<TStr>& s) const;
 	inline void searchWithFtab(EbwtSearchState<TStr>& s) const;
-	void search(const TStr& qry, EbwtSearchParams<TStr>& params, uint32_t seed /* = 0 */) const;
-	void search(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params) const;
+	void search(const TStr& qry, EbwtSearchParams<TStr>& params, uint32_t seed /* = 0 */, bool inexact /* = false */) const;
+	void search(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool inexact /* = false */) const;
 	bool search1MismatchOrBetter(const TStr& qry, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/, uint32_t seed /* = 0*/) const;
 	bool search1MismatchOrBetter(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/) const;
 	
@@ -1147,7 +1147,9 @@ public:
 				} else {
 					// Reverse of pattern appears at h
 					if(s.query()[len-i-1] != _texts[h.first][h.second + i]) {
-						diffs.set(len-i-1);
+						// Text and query are already reversed, so we
+						// don't need to reverse our entries in diffs
+						diffs.set(i);
 					}
 				}
 			}
@@ -2422,11 +2424,17 @@ inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const
 
 template<typename TStr>
 void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
-                        EbwtSearchParams<TStr>& params) const
+                        EbwtSearchParams<TStr>& params,
+                        bool inexact = false) const
 {
 	assert(isInMemory());
 	params.setBacktracking(false);
-	if(s.qlen() >= (unsigned int)this->eh().ftabChars()) {
+	if(s.qlen() >= (unsigned int)this->eh().ftabChars() &&
+	   // If we're backtracking, don't let ftab skip over any of the
+	   // revisitable region
+	   (!inexact ||
+	    (unsigned int)this->eh().ftabChars() <= (s.qlen()>>1)))
+	{
 		searchWithFtab(s);
 	} else {
 		searchWithFchr(s);
@@ -2443,12 +2451,13 @@ void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
 template<typename TStr>
 void Ebwt<TStr>::search(const TStr& qry,
                         EbwtSearchParams<TStr>& params,
-                        uint32_t seed = 0) const
+                        uint32_t seed = 0,
+                        bool inexact = false) const
 {
 	assert(isInMemory());
 	assert(!empty(qry));
 	EbwtSearchState<TStr> s(*this, qry, params, seed);
-	search(s, params);
+	search(s, params, inexact);
 }
 
 /**
@@ -2473,7 +2482,7 @@ bool Ebwt<TStr>::search1MismatchOrBetter(EbwtSearchState<TStr>& s,
 	// to search() will still fill the EbwtSearchState with the
 	// appropriate backtrack points
 	params.setSuppressHits(!allowExactHits);
-	search(s, params);
+	search(s, params, true);
 	// Un-suppress hits
 	params.setSuppressHits(false);
 	assert(s.params().sink().numHits() == hits || allowExactHits);
