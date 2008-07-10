@@ -27,6 +27,6 @@ fi
 if [ ! -f ${NAME}.pkf.1.ebwt ] ; then
 	echo > ${NAME}.ebwt_build.pkf.top
 	sh wrap.sh ${NAME}.ebwt_build.pkf \
-	    ./ebwt_build -d --bmax 3000000000 -v hs_ref_${NAME}.mfa ${NAME}.pkf \
+	    ./ebwt_build_packed -d --bmax 3000000000 -v hs_ref_${NAME}.mfa ${NAME}.pkf \
 	    2>&1 | tee ${NAME}.ebwt_build.pkf.out
 fi
