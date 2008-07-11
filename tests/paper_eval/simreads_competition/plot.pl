@@ -15,7 +15,7 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 }
 print RUNTIME "}\n";
 print RUNTIME "\\hline\n";
-print RUNTIME " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
+print RUNTIME " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
@@ -52,6 +52,14 @@ sub readfline {
 	return "";
 }
 
+sub toMinsAndSecs {
+	my $s = shift;
+	my $mins = $s / 60;
+	my $secs = $s % 60;
+	while(length($secs) < 2) { $secs = "0".$secs; }
+	return $mins."m:".$secs."s";
+}
+
 my @names = ("Bowtie",
              "Maq with -n 1",
              "Maq",
@@ -69,7 +77,7 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			print RUNTIME "$s2[0] ";
+			print RUNTIME toMinsAndSecs($s2[0])." ";
 		}
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
