@@ -4,7 +4,7 @@ dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
-KG_READS=/fs/szasmg/langmead/reads/SRR001115/s_7_0000_0255
+KG_READS=/fs/szasmg/langmead/reads/SRR001115/s_7_0000_0255.trim12
 MAKE_LINKS=1
 GENOME_DIR=../..
 
