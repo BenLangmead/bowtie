@@ -8,6 +8,7 @@ my @runnames = @ARGV; # -> column names
 
 open(RUNTIME, ">runtime.tex") || die "Could not open >runtime.tex";
 print RUNTIME "\\documentclass{article}\n";
+print RUNTIME "\\usepackage{booktabs}\n";
 print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{table}[tp]\n";
 print RUNTIME "\\centering\n";
@@ -24,6 +25,7 @@ print RUNTIME "\\otoprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
+print MEMORY "\\usepackage{booktabs}\n";
 print MEMORY "\\begin{document}\n";
 print MEMORY "\\begin{table}[tp]\n";
 print MEMORY "\\centering\n";
