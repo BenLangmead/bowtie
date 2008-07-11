@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 defined($ARGV[0]) || die "Must specify run names";
-my @runnames = $ARGV; # -> column names
+my @runnames = @ARGV; # -> column names
 
 sub readlines {
 	my $f = shift;

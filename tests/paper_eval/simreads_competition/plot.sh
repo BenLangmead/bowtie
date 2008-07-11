@@ -13,3 +13,5 @@ while [ $# -ge 1 ]; do
 	awk '{print $2}' $name.results.txt | cut -d, -f 3 > $name.results.rsmax.txt
 	shift
 done
+
+perl plot.pl chr22 chr2 whole
