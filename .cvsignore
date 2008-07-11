@@ -1,6 +1,7 @@
 ebwt_build
 ebwt_build-with-asserts
 ebwt_build-debug
+ebwt_build_prof1
 ebwt_search-debug
 ebwt_search
 ebwt_search-with-asserts
@@ -30,3 +31,4 @@ core.*
 bowtie_convert
 simreads
 .ebwt_search.md5
+gmon.*
