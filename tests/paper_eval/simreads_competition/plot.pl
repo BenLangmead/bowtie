@@ -65,7 +65,7 @@ for(my $i = 0; $i < 5; $i++) {
 		my $n = $runnames[$j];
 		my $l = readfline("$n.results.txt", $i);
 		if($l eq "") {
-			print RUNTIME "$names[$j] - ";
+			print RUNTIME "- ";
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
