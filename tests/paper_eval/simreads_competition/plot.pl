@@ -20,7 +20,7 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
-print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
+print RUNTIME " & \\column{c}{Time} & \\column{c}{Speedup} & \\column{c}{Time} & \\column{c}{Speedup} & \\column{c}{Time} & \\column{c}{Speedup} \\\\ \n";
 print RUNTIME "\\toprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
@@ -122,9 +122,9 @@ for(my $i = 0; $i < 5; $i++) {
 		}
 		if($j < $#runnames) { print MEMORY "& "; }
 	}
-	print RUNTIME " \\\\ ";
-	print RUNTIME "\\midrule " if $i < 4;
-	print RUNTIME "\n";
+	print MEMORY " \\\\ ";
+	print MEMORY "\\midrule " if $i < 4;
+	print MEMORY "\n";
 }
 
 print RUNTIME "\\bottomrule\n";
