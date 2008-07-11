@@ -10,20 +10,22 @@ open(RUNTIME, ">runtime.tex") || die "Could not open >runtime.tex";
 print RUNTIME "\\documentclass{article}\n";
 print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{table}\n";
-print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome.}\n";
+print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
 print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
-	print RUNTIME "r";
+	print RUNTIME "rr";
 }
 print RUNTIME "}\n";
-print RUNTIME "\\hline\n";
-print RUNTIME " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
+print RUNTIME "\\toprule%\n";
+print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
+print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
+print RUNTIME "\\otoprule%\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
 print MEMORY "\\begin{document}\n";
 print MEMORY "\\begin{table}\n";
-print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome.}\n";
+print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
 print MEMORY "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print MEMORY "r";
@@ -76,6 +78,8 @@ my @names = ("Bowtie",
              "Soap with -v 1",
              "Soap");
 
+my @bowtieResults = (0, 0, 0);
+
 # Output 
 for(my $i = 0; $i < 5; $i++) {
 	print RUNTIME "$names[$i] & ";
@@ -87,11 +91,16 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			print RUNTIME toMinsSecsHrs($s2[0])." ";
+			$bowtieResults[$j] = $s2[0] if $i == 0;
+			print RUNTIME toMinsSecsHrs($s2[0])." & ";
+			my $speedup = sprintf("%2.1fx", $s2[0] * 1.0 / $bowtieResults[$j]);
+			print "$speedup ";
 		}
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
-	print RUNTIME " \\\\ \\hline \n";
+	print RUNTIME " \\\\ ";
+	print RUNTIME "\\midrule " if $i < 4;
+	print RUNTIME "\n";
 }
 
 # Output 
@@ -109,13 +118,17 @@ for(my $i = 0; $i < 5; $i++) {
 		}
 		if($j < $#runnames) { print MEMORY "& "; }
 	}
-	print MEMORY " \\\\ \\hline \n";
+	print RUNTIME " \\\\ ";
+	print RUNTIME "\\midrule " if $i < 4;
+	print RUNTIME "\n";
 }
 
+print RUNTIME "\\bottomrule\n";
 print RUNTIME "\\end{tabular}\n";
 print RUNTIME "\\end{table}\n";
 print RUNTIME "\\end{document}\n";
 
+print MEMORY "\\bottomrule\n";
 print MEMORY "\\end{tabular}\n";
 print MEMORY "\\end{table}\n";
 print MEMORY "\\end{document}\n";
