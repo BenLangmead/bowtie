@@ -39,8 +39,9 @@ sub readlines {
 	return @ret;
 }
 
-sub readfline($$) {
-	my ($f, $l) = $@;
+sub readfline {
+	my $f = shift;
+	my $l = shift;
 	my @ret;
 	open(FILE, $f) || die "Could not open $f";
 	while(<FILE>) {
