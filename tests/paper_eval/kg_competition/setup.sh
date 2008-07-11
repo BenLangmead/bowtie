@@ -5,10 +5,13 @@ NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
 KG_READS=/fs/szasmg/langmead/reads/SRR001115/s_7_0000_0255.trim12
-MAKE_LINKS=1
+LINK_GENOMES=1
+LINK_EBWTS=1
+LINK_READS=1
 GENOME_DIR=../..
+EBWTS_DIR=../..
 
-if [ "$MAKE_LINKS" = "1" ] ; then
+if [ "$LINK_GENOMES" = "1" ] ; then
 	# Make link for FASTA sequence
 	ln -s -f ${GENOME_DIR}/hs_ref_${NAME}.mfa hs_ref_${NAME}.mfa
 	if ! wc -c hs_ref_${NAME}.mfa 2> /dev/null > /dev/null ; then
@@ -31,13 +34,22 @@ else
 	fi
 fi
 
-# Make links for ebwt files
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.1.ebwt ${NAME}.1.ebwt
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.2.ebwt ${NAME}.2.ebwt
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.3.ebwt ${NAME}.3.ebwt
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.rev.1.ebwt ${NAME}.rev.1.ebwt
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.rev.2.ebwt ${NAME}.rev.2.ebwt
-ln -s -f /fs/szasmg/langmead/ebwts/${NAME}.rev.3.ebwt ${NAME}.rev.3.ebwt
+if [ "$LINK_EBWTS" = "1" ] ; then
+	# Make links for ebwt files
+	ln -s -f ${EBWTS_DIR}/${NAME}.1.ebwt ${NAME}.1.ebwt
+	ln -s -f ${EBWTS_DIR}/${NAME}.2.ebwt ${NAME}.2.ebwt
+	ln -s -f ${EBWTS_DIR}/${NAME}.3.ebwt ${NAME}.3.ebwt
+	ln -s -f ${EBWTS_DIR}/${NAME}.rev.1.ebwt ${NAME}.rev.1.ebwt
+	ln -s -f ${EBWTS_DIR}/${NAME}.rev.2.ebwt ${NAME}.rev.2.ebwt
+	ln -s -f ${EBWTS_DIR}/${NAME}.rev.3.ebwt ${NAME}.rev.3.ebwt
+else
+	cp ${EBWTS_DIR}/${NAME}.1.ebwt .
+	cp ${EBWTS_DIR}/${NAME}.2.ebwt .
+	cp ${EBWTS_DIR}/${NAME}.3.ebwt .
+	cp ${EBWTS_DIR}/${NAME}.rev.1.ebwt .
+	cp ${EBWTS_DIR}/${NAME}.rev.2.ebwt .
+	cp ${EBWTS_DIR}/${NAME}.rev.3.ebwt .
+fi
 
 err=0
 if ! wc -c ${NAME}.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
@@ -52,7 +64,7 @@ if [ "$err" != "0" ] ; then
 fi
 
 # Make link to 1000-Genomes reads
-if [ "$MAKE_LINKS" = "1" ] ; then
+if [ "$LINK_READS" = "1" ] ; then
 	ln -s -f ${KG_READS}.fastq kg_reads.fq
 	ln -s -f ${KG_READS}.fa kg_reads.fa
 else
