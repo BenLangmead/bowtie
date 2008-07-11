@@ -60,7 +60,7 @@ my @names = ("Bowtie",
 
 # Output 
 for(my $i = 0; $i < 5; $i++) {
-	print RUNTIME "$names[$i] ";
+	print RUNTIME "$names[$i] & ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
 		my $l = readfline("$n.results.txt", $i);
@@ -78,7 +78,7 @@ for(my $i = 0; $i < 5; $i++) {
 
 # Output 
 for(my $i = 0; $i < 5; $i++) {
-	print RUNTIME "$names[$i] ";
+	print MEMORY "$names[$i] & ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
 		my $l = readfline("$n.results.txt", $i);
