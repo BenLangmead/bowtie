@@ -17,6 +17,7 @@ if [ -f whole.ebwt.hits ] ; then
 	fi
 	echo -n "Bowtie: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
+	echo
 fi
 
 if [ -f whole.maq.map ] ; then
@@ -34,6 +35,7 @@ if [ -f whole.maq.map ] ; then
 	fi
 	echo -n "Maq: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
+	echo
 fi
 
 if [ -f whole.maq.n1.map ] ; then
@@ -51,4 +53,5 @@ if [ -f whole.maq.n1.map ] ; then
 	fi
 	echo -n "Maq -n 1: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
+	echo
 fi
