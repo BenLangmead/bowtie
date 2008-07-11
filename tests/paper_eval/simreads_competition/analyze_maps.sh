@@ -72,7 +72,7 @@ if [ -f ${NAME}.soap.v1.map ] ; then
 		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
 	fi
-	echo -n "Bowtie: % reads mapped: "
+	echo -n "Soap -v 1: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
 fi
@@ -90,7 +90,7 @@ if [ -f ${NAME}.soap.v2.map ] ; then
 		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
 	fi
-	echo -n "Bowtie: % reads mapped: "
+	echo -n "Soap -v 2: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
 fi
