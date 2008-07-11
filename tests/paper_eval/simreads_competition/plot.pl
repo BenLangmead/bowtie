@@ -7,8 +7,8 @@ defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
 
 open(RUNTIME, ">runtime.tex") || die "Could not open >runtime.tex";
-print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\documentclass{article}\n";
+print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{tabular}{ | l || ";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print RUNTIME "r | ";
@@ -19,8 +19,8 @@ print RUNTIME " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome 
 print RUNTIME "\\end{tabular}\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
+print MEMORY "\\documentclass{article}\n";
 print MEMORY "\\begin{document}\n";
-print RUNTIME "\\documentclass{article}\n";
 print MEMORY "\\begin{tabular}{ | l || ";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print MEMORY "r | ";
