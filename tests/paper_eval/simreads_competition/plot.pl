@@ -52,12 +52,18 @@ sub readfline {
 	return "";
 }
 
-sub toMinsAndSecs {
+sub toMinsSecsHrs {
 	my $s = shift;
-	my $mins = $s / 60;
-	my $secs = $s % 60;
+	my $hrs  = int($s / 60 / 60);
+	my $mins = int(($s / 60) % 60);
+	my $secs = int($s % 60);
 	while(length($secs) < 2) { $secs = "0".$secs; }
-	return $mins."m:".$secs."s";
+	if($hrs > 0) {
+		while(length($mins) < 2) { $mins = "0".$mins; }
+		return $hrs."h:".$mins."m:".$secs."s";
+	} else {
+		return $mins."m:".$secs."s";
+	}
 }
 
 my @names = ("Bowtie",
