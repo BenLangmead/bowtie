@@ -1,6 +1,6 @@
 #!/bin/sh
 
-TOT_READS=8000000
+export TOT_READS=8000000
 
 if [ -f whole.ebwt.hits ] ; then
 	if [ ! -f whole.ebwt.reads.mapped ] ; then
@@ -16,7 +16,7 @@ if [ -f whole.ebwt.hits ] ; then
 		exit 1
 	fi
 	echo -n "Bowtie: % reads mapped: "
-	echo `perl -e 'print $num * 100.0 / $TOT_READS'`
+	perl -e "print $num * 100.0 / $TOT_READS"
 fi
 
 if [ -f whole.maq.map ] ; then
@@ -33,7 +33,7 @@ if [ -f whole.maq.map ] ; then
 		exit 1
 	fi
 	echo -n "Maq: % reads mapped: "
-	echo `perl -e 'print $num * 100.0 / $TOT_READS'`
+	perl -e "print $num * 100.0 / $TOT_READS"
 fi
 
 if [ -f whole.maq.n1.map ] ; then
@@ -50,5 +50,5 @@ if [ -f whole.maq.n1.map ] ; then
 		exit 1
 	fi
 	echo -n "Maq -n 1: % reads mapped: "
-	echo `perl -e 'print $num * 100.0 / $TOT_READS'`
+	perl -e "print $num * 100.0 / $TOT_READS"
 fi
