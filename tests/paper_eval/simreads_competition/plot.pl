@@ -52,33 +52,22 @@ sub readfline {
 	return "";
 }
 
+my @names = ("Bowtie",
+             "Maq with -n 1",
+             "Maq",
+             "Soap with -v 1",
+             "Soap (defaults)");
+
 # Output 
 for(my $i = 0; $i < 5; $i++) {
+	print RUNTIME "$names[$i] ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
 		my $l = readfline("$n.results.txt", $i);
 		if($l eq "") {
-			print RUNTIME "- ";
+			print RUNTIME "$names[$j] - ";
 		} else {
 			my @s = split(/ /, $l);
-			if($s[0] =~ /ebwt/) {
-				print RUNTIME "Bowtie ";
-			}
-			elsif($s[0] =~ /maq\.n1/) {
-				print RUNTIME "Maq with -n 1 ";
-			}
-			elsif($s[0] =~ /maq/) {
-				print RUNTIME "Maq ";
-			}
-			elsif($s[0] =~ /soap.v2/) {
-				print RUNTIME "Soap with -v 2 ";
-			}
-			elsif($s[0] =~ /soap.v1/) {
-				print RUNTIME "Soap with -v 1 ";
-			}
-			else {
-				die "Unknown program type: $s[0]";
-			}
 			my @s2 = split(/,/, $s[1]);
 			print RUNTIME "$s2[0] ";
 		}
@@ -89,6 +78,7 @@ for(my $i = 0; $i < 5; $i++) {
 
 # Output 
 for(my $i = 0; $i < 5; $i++) {
+	print RUNTIME "$names[$i] ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
 		my $l = readfline("$n.results.txt", $i);
@@ -96,24 +86,6 @@ for(my $i = 0; $i < 5; $i++) {
 			print MEMORY "- ";
 		} else {
 			my @s = split(/ /, $l);
-			if($s[0] =~ /ebwt/) {
-				print RUNTIME "Bowtie ";
-			}
-			elsif($s[0] =~ /maq\.n1/) {
-				print RUNTIME "Maq with -n 1 ";
-			}
-			elsif($s[0] =~ /maq/) {
-				print RUNTIME "Maq ";
-			}
-			elsif($s[0] =~ /soap.v2/) {
-				print RUNTIME "Soap with -v 2 ";
-			}
-			elsif($s[0] =~ /soap.v1/) {
-				print RUNTIME "Soap with -v 1 ";
-			}
-			else {
-				die "Unknown program type: $s[0]";
-			}
 			my @s2 = split(/,/, $s[1]);
 			print MEMORY "$s2[1] ($s2[2]) ";
 		}
