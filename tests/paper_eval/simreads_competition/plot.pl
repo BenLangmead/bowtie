@@ -12,7 +12,7 @@ print RUNTIME "\\usepackage{booktabs}\n";
 print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{table}[tp]\n";
 print RUNTIME "\\centering\n";
-print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
+print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap is omitted from Whole Human because its memory footprint exceeds physical RAM.  Simulated reads were exacted only from the relevant region.}\n";
 print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print RUNTIME "rr";
@@ -20,7 +20,8 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
-print RUNTIME " & {c}{Time} & {c}{Speedup} & {c}{Time} & {c}{Speedup} & {c}{Time} & {c}{Speedup} \\\\ \n";
+# TODO: Can I avoid using this fake \\multicolumn to get these centered?
+print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
 print RUNTIME "\\toprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
@@ -29,14 +30,18 @@ print MEMORY "\\usepackage{booktabs}\n";
 print MEMORY "\\begin{document}\n";
 print MEMORY "\\begin{table}[tp]\n";
 print MEMORY "\\centering\n";
-print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
+print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap is omitted from Whole Human because its memory footprint exceeds physical RAM.  Simulated reads were exacted only from the relevant region.}\n";
 print MEMORY "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
-	print MEMORY "r";
+	print MEMORY "rr";
 }
 print MEMORY "}\n";
-print MEMORY "\\hline\n";
+print MEMORY "\\toprule\n";
 print MEMORY " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
+print MEMORY " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
+# TODO: Can I avoid using this fake \\multicolumn to get these centered?
+print MEMORY " & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} \\\\ \n";
+print MEMORY "\\toprule\n";
 
 sub readlines {
 	my $f = shift;
@@ -118,7 +123,7 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			print MEMORY "$s2[1] ($s2[2]) ";
+			print MEMORY "$s2[1] & $s2[2] ";
 		}
 		if($j < $#runnames) { print MEMORY "& "; }
 	}
