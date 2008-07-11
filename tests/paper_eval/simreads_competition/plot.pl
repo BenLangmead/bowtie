@@ -30,7 +30,7 @@ print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
 #print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
-print RUNTIME "\\\\[2pt]\n";
+print RUNTIME "\\\\[1pt]\n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
 print RUNTIME "\\toprule\n";
 
@@ -59,7 +59,7 @@ print MEMORY "\\toprule\n";
 print MEMORY " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
 #print MEMORY " & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} \\\\ \n";
-print MEMORY "\\\\[2pt]\n";
+print MEMORY "\\\\[1pt]\n";
 print MEMORY " & Virtual & Resident & Virtual & Resident & Virtual & Resident \\\\ \n";
 print MEMORY "\\toprule\n";
 
@@ -99,6 +99,15 @@ sub toMinsSecsHrs {
 	} else {
 		return $mins."m:".$secs."s";
 	}
+}
+
+sub commaize {
+	my $s = shift;
+	my $t = "";
+	if(length($s) > 3) {
+		$t = commaize(substr($s, 0, length($s)-3)) . "," . substr($s, length($s)-3, 3);
+	}
+	return $t;
 }
 
 my @names = ("Bowtie",
@@ -143,8 +152,10 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			my $vm = ($s2[1] + 512) / 1024;
-			my $rs = ($s2[2] + 512) / 1024;
+			my $vm = int(($s2[1] + 512) / 1024);
+			my $rs = int(($s2[2] + 512) / 1024);
+			$vm = commaize($vm);
+			$rs = commaize($rs);
 			print MEMORY "$vm MB & $rs MB ";
 		}
 		if($j < $#runnames) { print MEMORY "& "; }
