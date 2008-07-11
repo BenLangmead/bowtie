@@ -83,7 +83,7 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			print RUNTIME toMinsAndSecs($s2[0])." ";
+			print RUNTIME toMinsSecsHrs($s2[0])." ";
 		}
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
