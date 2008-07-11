@@ -9,7 +9,8 @@ my @runnames = @ARGV; # -> column names
 open(RUNTIME, ">runtime.tex") || die "Could not open >runtime.tex";
 print RUNTIME "\\documentclass{article}\n";
 print RUNTIME "\\begin{document}\n";
-print RUNTIME "\\begin{table}\n";
+print RUNTIME "\\begin{table}[tp]\n";
+print RUNTIME "\\centering\n";
 print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
 print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
@@ -24,7 +25,8 @@ print RUNTIME "\\otoprule\n";
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
 print MEMORY "\\begin{document}\n";
-print MEMORY "\\begin{table}\n";
+print MEMORY "\\begin{table}[tp]\n";
+print MEMORY "\\centering\n";
 print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap was not tested against the whole human genome because its memory footprint far exceeded the physical RAM available.}\n";
 print MEMORY "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
