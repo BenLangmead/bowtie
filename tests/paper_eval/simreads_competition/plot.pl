@@ -12,7 +12,15 @@ print RUNTIME "\\usepackage{booktabs}\n";
 print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{table}[tp]\n";
 print RUNTIME "\\centering\n";
-print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap is omitted from Whole Human because its memory footprint exceeds physical RAM.  Simulated reads were exacted only from the relevant region.}\n";
+print RUNTIME "\\caption{".
+	"Running time for mapping 8M simulated reads against human ".
+	"chromosomes 22 and 2 and the whole human genome on a workstation ".
+	"with 2 GB of RAM.  Soap is omitted from Whole Human because its ".
+	"memory footprint exceeds physical RAM.  Simulated reads were ".
+	"exacted only from the relevant region.  For the Maq runs, the ".
+	"reads were first divided into chunks of 2 million reads each, ".
+	"as per the Maq Manual.".
+	"}\n";
 print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print RUNTIME "rr";
@@ -21,7 +29,9 @@ print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
-print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
+#print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
+print RUNTIME "\\\\[2pt]\n";
+print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
 print RUNTIME "\\toprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
@@ -30,17 +40,27 @@ print MEMORY "\\usepackage{booktabs}\n";
 print MEMORY "\\begin{document}\n";
 print MEMORY "\\begin{table}[tp]\n";
 print MEMORY "\\centering\n";
-print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap is omitted from Whole Human because its memory footprint exceeds physical RAM.  Simulated reads were exacted only from the relevant region.}\n";
+print MEMORY "\\caption{".
+	"Peak virtual and resident memory usage for mapping 8M simulated ".
+	"reads against human chromosomes 22 and 2 and the whole human ".
+	"genome on a workstation with 2 GB of RAM.  ".
+	"Soap is omitted from Whole Human because its ".
+	"memory footprint exceeds physical RAM.  Simulated reads were ".
+	"exacted only from the relevant region.  For the Maq runs, the ".
+	"reads were first divided into chunks of 2 million reads each, ".
+	"as per the Maq Manual.".
+	"}\n";
 print MEMORY "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
 	print MEMORY "rr";
 }
 print MEMORY "}\n";
 print MEMORY "\\toprule\n";
-print MEMORY " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
 print MEMORY " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
-print MEMORY " & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} \\\\ \n";
+#print MEMORY " & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} \\\\ \n";
+print MEMORY "\\\\[2pt]\n";
+print MEMORY " & Virtual & Resident & Virtual & Resident & Virtual & Resident \\\\ \n";
 print MEMORY "\\toprule\n";
 
 sub readlines {
@@ -123,7 +143,9 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			print MEMORY "$s2[1] & $s2[2] ";
+			my $vm = ($s2[1] + 512) / 1024;
+			my $rs = ($s2[2] + 512) / 1024;
+			print MEMORY "$vm MB & $rs MB ";
 		}
 		if($j < $#runnames) { print MEMORY "& "; }
 	}
