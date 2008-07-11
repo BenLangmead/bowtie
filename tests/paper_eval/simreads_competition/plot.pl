@@ -16,10 +16,10 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 	print RUNTIME "rr";
 }
 print RUNTIME "}\n";
-print RUNTIME "\\toprule%\n";
+print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
-print RUNTIME "\\otoprule%\n";
+print RUNTIME "\\otoprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
