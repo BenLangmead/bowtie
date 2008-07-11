@@ -65,7 +65,7 @@ for(my $i = 0; $i < 5; $i++) {
 		}
 		if($i < 4) { print RUNTIME "& "; }
 	}
-	print " \\\\ \\hline \n";
+	print RUNTIME " \\\\ \\hline \n";
 }
 
 # Output 
@@ -79,9 +79,9 @@ for(my $i = 0; $i < 5; $i++) {
 			my @s2 = split(/,/, $s[1]);
 			print MEMORY "$s2[1] ($s2[2]) ";
 		}
-		if($i < 4) { print RUNTIME "& "; }
+		if($i < 4) { print MEMORY "& "; }
 	}
-	print " \\\\ \\hline \n";
+	print MEMORY " \\\\ \\hline \n";
 }
 
 print RUNTIME "\\end{tabular}\n";
