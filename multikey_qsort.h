@@ -1039,7 +1039,8 @@ void mkeyQSortSufDcU8(const T1& seqanHost,
 }
 
 /**
- * Constant time
+ * Return a boolean indicating whether s1 < s2 using the difference
+ * cover to break the tie.
  */
 template<typename T1, typename T2> inline
 bool sufDcLtU8(const T1& seqanHost,
@@ -1061,7 +1062,10 @@ bool sufDcLtU8(const T1& seqanHost,
 		}
 	}
 	bool ret = dc.breakTie(s1+diff, s2+diff) < 0;
-	if(sanityCheck && ret != dollarLt(suffix(seqanHost, s1), suffix(seqanHost, s2))) {
+	// Sanity-check return value using dollarLt
+	if(sanityCheck &&
+	   ret != dollarLt(suffix(seqanHost, s1), suffix(seqanHost, s2)))
+	{
 		assert(false);
 	}
 	return ret;
@@ -1111,7 +1115,7 @@ void qsortSufDcU8(const T1& seqanHost,
 }
 
 #define BUCKET_SORT_CUTOFF (4 * 1024 * 1024)
-#define SELECTION_SORT_CUTOFF 4
+#define SELECTION_SORT_CUTOFF 6
 
 // 5 64-element buckets for bucket-sorting A, C, G, T, $
 static uint32_t bkts[4][4 * 1024 * 1024];
@@ -1130,15 +1134,30 @@ static void selectionSortSufDcU8(
         size_t depth,
         bool sanityCheck = false)
 {
+#define ASSERT_SUF_LT(l, r) \
+	if(sanityCheck && \
+	   !dollarLt(suffix(seqanHost, s[l]), \
+	             suffix(seqanHost, s[r]))) { \
+		cout << "l: " << suffix(seqanHost, s[l]) << endl; \
+		cout << "r: " << suffix(seqanHost, s[r]) << endl; \
+		assert(false); \
+	}
+
 	assert_gt(end, begin+1);
 	assert_leq(end-begin, SELECTION_SORT_CUTOFF);
 	assert_eq(hi, 4);
 	uint32_t v = dc.v();
 	if(end == begin+2) {
 		uint32_t off = dc.tieBreakOff(s[begin], s[begin+1]);
+		if(off + s[begin] >= hlen ||
+		   off + s[begin+1] >= hlen)
+		{
+			off = 0xffffffff;
+		}
 		if(off != 0xffffffff) {
 			if(off < depth) {
-				qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
+				qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc,
+				                    begin, end, sanityCheck);
 				// It's helpful for debugging if we call this here
 				if(sanityCheck) {
 					sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
@@ -1146,20 +1165,21 @@ static void selectionSortSufDcU8(
 				}
 				return;
 			}
-			v = off - depth;
+			v = off - depth + 1;
 		}
 	}
 	assert_leq(v, dc.v());
 	uint32_t lim = v;
 	assert_geq(lim, 0);
-	bool atLeastOneTie = false;
 	for(size_t i = begin; i < end-1; i++) {
 		uint32_t targ = i;
 		uint32_t targoff = depth + s[i];
 		for(size_t j = i+1; j < end; j++) {
+			assert_neq(j, targ);
 			uint32_t joff = depth + s[j];
 			uint32_t k;
 			for(k = 0; k <= lim; k++) {
+				assert_neq(j, targ);
 				#ifndef PACKED_STRINGS
 				uint8_t jc = (k + joff < hlen) ? host[k + joff] : hi;
 				uint8_t tc = (k + targoff < hlen) ? host[k + targoff] : hi;
@@ -1167,48 +1187,71 @@ static void selectionSortSufDcU8(
 				uint8_t jc = (k + joff < hlen) ? (uint8_t)(Dna)host[k + joff] : hi;
 				uint8_t tc = (k + targoff < hlen) ? (uint8_t)(Dna)host[k + targoff] : hi;
 				#endif
+				assert(jc != hi || tc != hi);
 				if(jc > tc) {
 					// the jth suffix is greater than the current
 					// smallest suffix
+					ASSERT_SUF_LT(targ, j);
 					break;
 				} else if(jc < tc) {
 					// the jth suffix is less than the current smallest
 					// suffix, so update smallest to be j
+					ASSERT_SUF_LT(j, targ);
 					targ = j;
 					targoff = joff;
 					break;
+				} else if(k == lim) {
+					// Check whether either string ends immediately
+					// after this character
+					assert_leq(k + joff + 1, hlen);
+					assert_leq(k + targoff + 1, hlen);
+					if(k + joff + 1 == hlen) {
+						// targ < j
+						assert_neq(k + targoff + 1, hlen);
+						ASSERT_SUF_LT(targ, j);
+						break;
+					} else if(k + targoff + 1 == hlen) {
+						// j < targ
+						ASSERT_SUF_LT(j, targ);
+						targ = j;
+						targoff = joff;
+						break;
+					}
 				} else {
 					// They're equal so far, keep going
 				}
 			}
 			// The jth suffix was equal to the current smallest suffix
-			// up to the difference-cover period, so disambiguation
-			// with difference cover will be necessary.  Note that we
-			// never change the relative order of two equal keys.
+			// up to the difference-cover period, so disambiguate with
+			// difference cover 
 			if(k == lim+1) {
-				atLeastOneTie = true;
+				assert_neq(j, targ);
+				if(sufDcLtU8(seqanHost, host, hlen, s[j], s[targ], dc, sanityCheck)) {
+					// j < targ
+					assert(!sufDcLtU8(seqanHost, host, hlen, s[targ], s[j], dc, sanityCheck));
+					ASSERT_SUF_LT(j, targ);
+					targ = j;
+					targoff = joff;
+				} else {
+					assert(sufDcLtU8(seqanHost, host, hlen, s[targ], s[j], dc, sanityCheck));
+					ASSERT_SUF_LT(targ, j); // !
+				}
 			}
 		}
 		if(i != targ) {
+			ASSERT_SUF_LT(targ, i);
 			// swap i and targ
 			uint32_t tmp = s[i];
 			s[i] = s[targ];
 			s[targ] = tmp;
 		}
+		for(size_t j = i+1; j < end; j++) {
+			ASSERT_SUF_LT(i, j);
+		}
 	}
-	if(atLeastOneTie) {
-		qsortSufDcU8<T1,T2>(seqanHost, host, hlen, s, slen, dc, begin, end, sanityCheck);
-		// It's helpful for debugging if we call this here
-		if(sanityCheck) {
-			sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
-			                       0xffffffff, begin, end);
-		}
-	} else {
-		// It's helpful for debugging if we call this here
-		if(sanityCheck) {
-			sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
-			                       0xffffffff, begin, end);
-		}
+	if(sanityCheck) {
+		sanityCheckOrderedSufs(seqanHost, hlen, s, slen,
+		                       0xffffffff, begin, end);
 	}
 }
 
