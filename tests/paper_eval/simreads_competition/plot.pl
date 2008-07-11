@@ -16,8 +16,6 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print RUNTIME "}\n";
 print RUNTIME "\\hline\n";
 print RUNTIME " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
-print RUNTIME "\\end{tabular}\n";
-print RUNTIME "\\end{document}\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
@@ -29,8 +27,6 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print MEMORY "}\n";
 print MEMORY "\\hline\n";
 print MEMORY " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
-print MEMORY "\\end{tabular}\n";
-print MEMORY "\\end{document}\n";
 
 sub readlines {
 	my $f = shift;
@@ -43,12 +39,55 @@ sub readlines {
 	return @ret;
 }
 
-foreach my $n (@runnames)  {
-	my @names = readlines("$n.results.names.txt");
-	my @times = readlines("$n.results.times.txt");
-	my @vmmax = readlines("$n.results.vmmax.txt");
-	my @rsmax = readlines("$n.results.rsmax.txt");
+sub readfline($$) {
+	my ($f, $l) = $@;
+	my @ret;
+	open(FILE, $f) || die "Could not open $f";
+	while(<FILE>) {
+		chomp;
+		push(@ret, $_)
+	}
+	return $ret[$l] if $l <= $#ret;
+	return "";
 }
+
+# Output 
+for(my $i = 0; $i < 5; $i++) {
+	foreach my $n (@runnames)  {
+		my $l = readfline("$n.results.txt", $i);
+		if($l eq "") {
+			print RUNTIME "- ";
+		} else {
+			my @s = split(/ /, $l);
+			my @s2 = split(/,/, $s[1]);
+			print RUNTIME "$s2[0] ";
+		}
+		if($i < 4) { print RUNTIME "& "; }
+	}
+	print " \\\\ \\hline \n";
+}
+
+# Output 
+for(my $i = 0; $i < 5; $i++) {
+	foreach my $n (@runnames)  {
+		my $l = readfline("$n.results.txt", $i);
+		if($l eq "") {
+			print MEMORY "- ";
+		} else {
+			my @s = split(/ /, $l);
+			my @s2 = split(/,/, $s[1]);
+			print MEMORY "$s2[1] ($s2[2]) ";
+		}
+		if($i < 4) { print RUNTIME "& "; }
+	}
+	print " \\\\ \\hline \n";
+}
+
+print RUNTIME "\\end{tabular}\n";
+print RUNTIME "\\end{document}\n";
+
+print MEMORY "\\end{tabular}\n";
+print MEMORY "\\end{document}\n";
 
 close(RUNTIME);
 close(MEMORY);
