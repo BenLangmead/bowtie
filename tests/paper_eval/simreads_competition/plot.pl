@@ -9,9 +9,11 @@ my @runnames = @ARGV; # -> column names
 open(RUNTIME, ">runtime.tex") || die "Could not open >runtime.tex";
 print RUNTIME "\\documentclass{article}\n";
 print RUNTIME "\\begin{document}\n";
-print RUNTIME "\\begin{tabular}{ | l || ";
+print RUNTIME "\\begin{table}\n";
+print RUNTIME "\\caption{Running time for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome.}\n";
+print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
-	print RUNTIME "r | ";
+	print RUNTIME "r";
 }
 print RUNTIME "}\n";
 print RUNTIME "\\hline\n";
@@ -20,9 +22,11 @@ print RUNTIME " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
 print MEMORY "\\begin{document}\n";
-print MEMORY "\\begin{tabular}{ | l || ";
+print MEMORY "\\begin{table}\n";
+print MEMORY "\\caption{Peak virtual and resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome.}\n";
+print MEMORY "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
-	print MEMORY "r | ";
+	print MEMORY "r";
 }
 print MEMORY "}\n";
 print MEMORY "\\hline\n";
@@ -70,7 +74,7 @@ my @names = ("Bowtie",
              "Maq with -n 1",
              "Maq",
              "Soap with -v 1",
-             "Soap (defaults)");
+             "Soap");
 
 # Output 
 for(my $i = 0; $i < 5; $i++) {
@@ -109,9 +113,11 @@ for(my $i = 0; $i < 5; $i++) {
 }
 
 print RUNTIME "\\end{tabular}\n";
+print RUNTIME "\\end{table}\n";
 print RUNTIME "\\end{document}\n";
 
 print MEMORY "\\end{tabular}\n";
+print MEMORY "\\end{table}\n";
 print MEMORY "\\end{document}\n";
 
 close(RUNTIME);
