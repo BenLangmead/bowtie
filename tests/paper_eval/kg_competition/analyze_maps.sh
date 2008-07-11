@@ -9,8 +9,8 @@ if [ -f whole.ebwt.hits ] ; then
 	if [ ! -f whole.ebwt.reads.mapped.uniq ] ; then
 		sort -u whole.ebwt.reads.mapped > whole.ebwt.reads.mapped.uniq
 	fi
-	num=`wc -l whole.ebwt.reads.mapped`
-	numuniq=`wc -l whole.ebwt.reads.mapped.uniq`
+	num=`wc -l whole.ebwt.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l whole.ebwt.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
@@ -26,8 +26,8 @@ if [ -f whole.maq.map ] ; then
 	if [ ! -f whole.maq.reads.mapped.uniq ] ; then
 		sort -u whole.maq.reads.mapped > whole.maq.reads.mapped.uniq
 	fi
-	num=`wc -l whole.maq.reads.mapped`
-	numuniq=`wc -l whole.maq.reads.mapped.uniq`
+	num=`wc -l whole.maq.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l whole.maq.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Maq: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
@@ -43,8 +43,8 @@ if [ -f whole.maq.n1.map ] ; then
 	if [ ! -f whole.maq.n1.reads.mapped.uniq ] ; then
 		sort -u whole.maq.n1.reads.mapped > whole.maq.n1.reads.mapped.uniq
 	fi
-	num=`wc -l whole.maq.n1.reads.mapped`
-	numuniq=`wc -l whole.maq.n1.reads.mapped.uniq`
+	num=`wc -l whole.maq.n1.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l whole.maq.n1.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Maq -n 1: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
