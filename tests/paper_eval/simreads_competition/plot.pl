@@ -21,7 +21,7 @@ print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
-print RUNTIME "\\otoprule\n";
+print RUNTIME "\\toprule\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
@@ -36,7 +36,7 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 }
 print MEMORY "}\n";
 print MEMORY "\\hline\n";
-print MEMORY " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
+print MEMORY " & Chr 22 & Chr 2 & Whole Genome \\\\ \\hline \n";
 
 sub readlines {
 	my $f = shift;
