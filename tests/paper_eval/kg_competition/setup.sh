@@ -85,3 +85,4 @@ fi
 # Copy analysis scripts from bowtie dir
 cp ${BOWTIE_HOME}/scripts/summarize_top.pl .
 cp ${BOWTIE_HOME}/scripts/summarize_all_top.sh .
+cp ${BOWTIE_HOME}/scripts/wrap.sh .

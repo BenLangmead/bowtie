@@ -4,7 +4,7 @@ dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
-READS=${NAME}_sim.fq
+READS=kg_reads.fq
 
 # Make ebwt_search
 if [ ! -f ${BOWTIE_HOME}/ebwt_search ] ; then
