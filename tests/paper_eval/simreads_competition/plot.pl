@@ -103,10 +103,8 @@ sub toMinsSecsHrs {
 
 sub commaize {
 	my $s = shift;
-	my $t = "";
-	if(length($s) > 3) {
-		$t = commaize(substr($s, 0, length($s)-3)) . "," . substr($s, length($s)-3, 3);
-	}
+	return $s if length($s) <= 3;
+	my $t = commaize(substr($s, 0, length($s)-3)) . "," . substr($s, length($s)-3, 3);
 	return $t;
 }
 
