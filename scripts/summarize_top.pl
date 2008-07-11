@@ -16,6 +16,9 @@ my $topFile = $ARGV[0];
 defined($ARGV[1]) || die "Must specify search string as second argument";
 my $appName = $ARGV[1];
 
+# Any process that lasts fewer than this many seconds doesn't count
+my $threshold = 120;
+
 my %vmmax = (); my %vmtot = ();
 my %rsmax = (); my %rstot = ();
 my %secstot = ();
@@ -111,6 +114,7 @@ my $max_rsmax = 0;
 my $secstottot = 0;
 for my $k (keys %secstot) {
 	$secstot{$k} += $secslast{$k} if defined($secslast{$k});
+	next if $secstot{$k} < $threshold;
 
 	my $vmavg = int($vmtot{$k} / $lines{$k});
 	my $rsavg = int($rstot{$k} / $lines{$k});
