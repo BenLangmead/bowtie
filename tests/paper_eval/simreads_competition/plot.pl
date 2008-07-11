@@ -94,7 +94,7 @@ for(my $i = 0; $i < 5; $i++) {
 			$bowtieResults[$j] = $s2[0] if $i == 0;
 			print RUNTIME toMinsSecsHrs($s2[0])." & ";
 			my $speedup = sprintf("%2.1fx", $s2[0] * 1.0 / $bowtieResults[$j]);
-			print "$speedup ";
+			print RUNTIME "$speedup ";
 		}
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
