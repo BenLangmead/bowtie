@@ -17,6 +17,7 @@ print RUNTIME "}\n";
 print RUNTIME "\\hline\n";
 print RUNTIME " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
 print RUNTIME "\\end{tabular}\n";
+print RUNTIME "\\end{document}\n";
 
 open(MEMORY, ">memory.tex") || die "Could not open >memory.tex";
 print MEMORY "\\documentclass{article}\n";
@@ -29,6 +30,7 @@ print MEMORY "}\n";
 print MEMORY "\\hline\n";
 print MEMORY " & Human Chromosome 22 & Human Chromosome 2 & Whole Human Genome \\\\ \\hline \n";
 print MEMORY "\\end{tabular}\n";
+print MEMORY "\\end{document}\n";
 
 sub readlines {
 	my $f = shift;
