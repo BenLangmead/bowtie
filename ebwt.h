@@ -1115,12 +1115,21 @@ public:
 			}
 		}
 		
-		if (_backtracking)
+		if (s.mismatch() != 0xffffffff)
 		{	
-			if (_ebwtFw)
-				mm.set(s.mismatch());
-			else
+			
+			if (!_ebwtFw)
 				mm.set(len - s.mismatch() - 1);
+			else
+				mm.set(s.mismatch());
+			
+			//else
+//			{
+//				if ((_ebwtFw && !_fw) || (!_ebwtFw && _fw))
+//					mm.set(len - s.mismatch() - 1);
+//				else
+//					mm.set(s.mismatch());
+//			}
 		}
 		
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);

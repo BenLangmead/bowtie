@@ -774,7 +774,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	assert(patsrc.hasMorePatterns());
 	assert(!patsrc.nextIsReverseComplement());
 	patid = 0;       // start again from id 0
-	lastHits = 0llu; // start again from 0 hits
+	//lastHits = 0llu; // start again from 0 hits
 	{
 	Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -799,6 +799,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	}
 		patid++;
     	// Try to match with one mismatch while suppressing exact hits
+		//cerr << "searching for "<< pat<<endl;
     	ebwtBw.search1MismatchOrBetter(s, params, false /* suppress exact */);
     	sink.acceptProvisionalHits(); // automatically approve provisional hits
 	    // If the forward direction matched with one mismatch, ignore
@@ -811,6 +812,8 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    	TStr pat2;
 			string qual2;
 			patsrc.nextPattern(pat2, qual2);
+			//cerr << "ignoring "<< pat2<<endl;
+
 	    	assert(!empty(pat2));
 	    	patid++;
 	    	params.setFw(false);
@@ -888,14 +891,16 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 		allowed_diffs = default_allowed_diffs;
 	
 	ExactSearchWithLowQualityThreePrime<TStr> extend_exact(packed_texts, 
-															false, 
-															kmer,/* global, override */ 
-															allowed_diffs /*global, override*/);
+														   false, 
+														   kmer,/* global, override */ 
+														   allowed_diffs /*global, override*/,
+														   revcomp /*global, override*/);
 	
 	OneMismatchSearchWithLowQualityThreePrime<TStr> extend_one_mismatch(packed_texts, 
-															false, 
-															kmer,/* global, override */ 
-															allowed_diffs /*global, override*/);
+																		false, 
+																		kmer,/* global, override */ 
+																		allowed_diffs /*global, override*/,
+																		revcomp /*global, override*/);
 	
 	fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
 	{
@@ -911,6 +916,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			TStr pat;
 			string qual;
 			patsrc.nextPattern(pat, qual);
+			
 			assert(!empty(pat));
 			if(lastLen == 0) lastLen = length(pat);
 			if(qSameLen && length(pat) != lastLen) {
@@ -1011,7 +1017,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	assert(patsrc.hasMorePatterns());
 	assert(!patsrc.nextIsReverseComplement());
 	patid = 0;       // start again from id 0
-	lastHits = 0llu; // start again from 0 hits
+	//lastHits = 0llu; // start again from 0 hits
 	{
 		Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
 		while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1189,7 +1195,8 @@ static void driver(const char * type,
 		                              true,
 		                              true,
 		                              arrowMode);
-		if(mismatches > 0) {
+		if(mismatches > 0) 
+		{
 			// Search with mismatches
 			if (kmer != -1 || allowed_diffs != -1)
 			{

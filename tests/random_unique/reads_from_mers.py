@@ -31,7 +31,7 @@ def main(argv=None):
         argv = sys.argv
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "ho:ve:rq:m1", 
+            opts, args = getopt.getopt(argv[1:], "ho:ve:rq3:1", 
                                         ["help", 
                                         "output=", 
                                         "extension",
@@ -60,9 +60,9 @@ def main(argv=None):
                 extension = int(value)
             if option in ("-r", "--reverse-complement"):
                 rc = True
-            if option in ("-q", "--low-qual-mismatches"):
+            if option in ("-3", "--low-qual-mismatches"):
                 low_qual_mismatches  = int(value)
-            if option in ("-m", "--maq-fastq"):
+            if option in ("-q", "--maq-fastq"):
                 fastq = True
             if option in ("-1", "--5-prime-mismatch"):
                 five_prime_mismatch = True
@@ -107,7 +107,6 @@ def main(argv=None):
                 # reference
                 if (ref_pos + mer_len + extension >= len(seq) or 
                     ref_pos - extension < 0):
-                    print >> sys.stderr, "Skipping", rid
                     continue
                 
                 if fastq:
@@ -115,10 +114,16 @@ def main(argv=None):
                 else:
                     defline = ">%s" % rid
                 
+                read_mismatch_positions = []
+                
                 if rc:
                     rc_ref_start = ref_pos - extension + 1 
                     rc_ref_end = rc_ref_start + mer_len + extension
                     read_seq = seq[rc_ref_start : rc_ref_end]
+                    if five_prime_mismatch:
+                        pos = random.choice(range(0, mer_len))
+                        read_seq[pos] = mismatch[read_seq[pos]]
+                        read_mismatch_positions.append(pos)
                     read_seq.reverse()
                     read_seq = [complement[a] for a in read_seq]
                     
@@ -126,14 +131,14 @@ def main(argv=None):
                     read_out = "%d\t-\t0\t%d" % (read_num, rc_ref_start)
                 else:
                     read_seq = seq[ref_pos:ref_pos + mer_len + extension]
+                    if five_prime_mismatch:
+                        pos = random.choice(range(0, mer_len))
+                        read_seq[pos] = mismatch[read_seq[pos]]
+                        read_mismatch_positions.append(pos)
                     #read_out = "%d+:<0,%d,%d>" % (read_num, ref_pos, low_qual_mismatches)
                     read_out = "%d\t+\t0\t%d" %  (read_num, ref_pos)
                 
-                read_mismatch_positions = []
-                if five_prime_mismatch:
-                    pos = random.choice(range(0, mer_len))
-                    read_seq[pos] = mismatch[read_seq[pos]]
-                    read_mismatch_positions.append(pos)
+                
                         
                 if low_qual_mismatches > 0:
                     mis_pos = set([])
@@ -146,8 +151,14 @@ def main(argv=None):
                         read_seq[pos] = mismatch[read_seq[pos]]      
                     read_mismatch_positions.extend(mis_pos)  
                 
-                read_seq = ''.join(read_seq)       
-                read_out += "\t%s\t%s\tX\t" % (read_seq, (";" * len(read_seq)))
+                read_out_seq = list(read_seq)
+                if rc:
+                    read_out_seq.reverse()
+                    read_out_seq = [complement[a] for a in read_out_seq]
+                read_out_seq = ''.join(read_out_seq)
+                read_seq = ''.join(read_seq)
+                
+                read_out += "\t%s\t%s\tX\t" % (read_out_seq, (";" * len(read_seq)))
                 read_mismatch_positions.sort()
                 for pos in range(0,len(read_mismatch_positions) - 1):
                     read_out += "%d," % read_mismatch_positions[pos]
