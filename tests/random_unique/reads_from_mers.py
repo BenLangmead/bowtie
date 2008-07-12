@@ -141,11 +141,14 @@ def main(argv=None):
                 
                         
                 if low_qual_mismatches > 0:
-                    mis_pos = set([])
+                    mis_pos = []
                     while len(mis_pos) < low_qual_mismatches:
                         pos = random.choice(range(mer_len, mer_len + extension))
                         #print >>sys.stderr, pos,
-                        mis_pos.add(pos)
+                        if not pos in mis_pos:
+                            mis_pos.append(pos)
+                    mis_pos.sort()
+                    
                     #print >> sys.stderr, ""
                     for pos in mis_pos:
                         read_seq[pos] = mismatch[read_seq[pos]]      

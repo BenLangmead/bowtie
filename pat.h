@@ -665,7 +665,7 @@ protected:
 		// Now read the qualities
 		begin = 0;
 		while(true) {
-			if(c == '\n' || c == '\r') {
+			if(c == '@' || feof(this->_in)) {
 				
 				if (_solexa_quals)
 				{
@@ -686,12 +686,12 @@ protected:
 					std::reverse(rqual->begin(), rqual->end());
 				}
 				// Skip additional linebreak chars
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return;
-				}
-				if(c == '@') break;
+//				while(c == '\n' || c == '\r') {
+//					c = fgetc(this->_in); if(feof(this->_in)) return;
+//				}
+				break;
 			}
-			else
+			else if (c != '\r' && c != '\n')
 			{
 				if (begin++ >= this->_trim5){
 					qual->push_back(c);
