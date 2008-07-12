@@ -669,6 +669,7 @@ protected:
 				
 				if (_solexa_quals)
 				{
+					// TODO: refactor!
 					vector<string> s_quals;
 					tokenize(*qual, " ", s_quals);
 					qual->clear();
@@ -677,6 +678,15 @@ protected:
 						int sQ = atoi(s_quals[j].c_str());
 						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
 						qual->push_back((char)(pQ + 33));
+					}
+					
+					tokenize(*rqual, " ", s_quals);
+					rqual->clear();
+					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					{
+						int sQ = atoi(s_quals[j].c_str());
+						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+						rqual->push_back((char)(pQ + 33));
 					}
 				}
 				
