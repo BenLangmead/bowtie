@@ -16,11 +16,12 @@ if [ -f ${NAME}.ebwt.hits ] ; then
 	numuniq=`wc -l ${NAME}.ebwt.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
-		exit 1
 	fi
 	echo -n "Bowtie: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.ebwt.hits"
 fi
 
 if [ -f ${NAME}.maq.map ] ; then
@@ -34,11 +35,12 @@ if [ -f ${NAME}.maq.map ] ; then
 	numuniq=`wc -l ${NAME}.maq.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Maq: Num hits: $num, num unique hits: $numuniq!"
-		exit 1
 	fi
 	echo -n "Maq: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.maq.map"
 fi
 
 if [ -f ${NAME}.maq.n1.map ] ; then
@@ -57,6 +59,8 @@ if [ -f ${NAME}.maq.n1.map ] ; then
 	echo -n "Maq -n 1: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.maq.map"
 fi
 
 if [ -f ${NAME}.soap.v1.map ] ; then
@@ -75,6 +79,8 @@ if [ -f ${NAME}.soap.v1.map ] ; then
 	echo -n "Soap -v 1: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.soap.v1.map"
 fi
 
 if [ -f ${NAME}.soap.v2.map ] ; then
@@ -93,4 +99,6 @@ if [ -f ${NAME}.soap.v2.map ] ; then
 	echo -n "Soap -v 2: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.soap.v2.map"
 fi

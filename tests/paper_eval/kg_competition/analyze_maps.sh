@@ -1,52 +1,57 @@
 #!/bin/sh
 
+dir=`pwd`
+NAME=`basename $dir | sed 's/_.*//'`
+echo Using NAME: ${NAME}
 export TOT_READS=8956597
 
-if [ -f whole.ebwt.hits ] ; then
-	if [ ! -f whole.ebwt.reads.mapped ] ; then
-		awk '{print $1}' whole.ebwt.hits > whole.ebwt.reads.mapped
+if [ -f ${NAME}.ebwt.hits ] ; then
+	if [ ! -f ${NAME}.ebwt.reads.mapped ] ; then
+		awk '{print $1}' ${NAME}.ebwt.hits > ${NAME}.ebwt.reads.mapped
 	fi
-	if [ ! -f whole.ebwt.reads.mapped.uniq ] ; then
-		sort -u whole.ebwt.reads.mapped > whole.ebwt.reads.mapped.uniq
+	if [ ! -f ${NAME}.ebwt.reads.mapped.uniq ] ; then
+		sort -u ${NAME}.ebwt.reads.mapped > ${NAME}.ebwt.reads.mapped.uniq
 	fi
-	num=`wc -l whole.ebwt.reads.mapped | cut -d" " -f1`
-	numuniq=`wc -l whole.ebwt.reads.mapped.uniq | cut -d" " -f1`
+	num=`wc -l ${NAME}.ebwt.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l ${NAME}.ebwt.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
-		exit 1
 	fi
 	echo -n "Bowtie: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.ebwt.hits"
 fi
 
-if [ -f whole.maq.map ] ; then
-	if [ ! -f whole.maq.reads.mapped ] ; then
-		maq mapview whole.maq.map | awk '{print $1}' > whole.maq.reads.mapped
+if [ -f ${NAME}.maq.map ] ; then
+	if [ ! -f ${NAME}.maq.reads.mapped ] ; then
+		maq mapview ${NAME}.maq.map | awk '{print $1}' > ${NAME}.maq.reads.mapped
 	fi
-	if [ ! -f whole.maq.reads.mapped.uniq ] ; then
-		sort -u whole.maq.reads.mapped > whole.maq.reads.mapped.uniq
+	if [ ! -f ${NAME}.maq.reads.mapped.uniq ] ; then
+		sort -u ${NAME}.maq.reads.mapped > ${NAME}.maq.reads.mapped.uniq
 	fi
-	num=`wc -l whole.maq.reads.mapped | cut -d" " -f1`
-	numuniq=`wc -l whole.maq.reads.mapped.uniq | cut -d" " -f1`
+	num=`wc -l ${NAME}.maq.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l ${NAME}.maq.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Maq: Num hits: $num, num unique hits: $numuniq!"
-		exit 1
 	fi
 	echo -n "Maq: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.maq.map"
 fi
 
-if [ -f whole.maq.n1.map ] ; then
-	if [ ! -f whole.maq.n1.reads.mapped ] ; then
-		maq mapview whole.maq.n1.map | awk '{print $1}' > whole.maq.n1.reads.mapped
+if [ -f ${NAME}.maq.n1.map ] ; then
+	if [ ! -f ${NAME}.maq.n1.reads.mapped ] ; then
+		maq mapview ${NAME}.maq.n1.map | awk '{print $1}' > ${NAME}.maq.n1.reads.mapped
 	fi
-	if [ ! -f whole.maq.n1.reads.mapped.uniq ] ; then
-		sort -u whole.maq.n1.reads.mapped > whole.maq.n1.reads.mapped.uniq
+	if [ ! -f ${NAME}.maq.n1.reads.mapped.uniq ] ; then
+		sort -u ${NAME}.maq.n1.reads.mapped > ${NAME}.maq.n1.reads.mapped.uniq
 	fi
-	num=`wc -l whole.maq.n1.reads.mapped | cut -d" " -f1`
-	numuniq=`wc -l whole.maq.n1.reads.mapped.uniq | cut -d" " -f1`
+	num=`wc -l ${NAME}.maq.n1.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l ${NAME}.maq.n1.reads.mapped.uniq | cut -d" " -f1`
 	if [ $num -ne $numuniq ] ; then
 		echo "Maq -n 1: Num hits: $num, num unique hits: $numuniq!"
 		exit 1
@@ -54,4 +59,47 @@ if [ -f whole.maq.n1.map ] ; then
 	echo -n "Maq -n 1: % reads mapped: "
 	perl -e "print $num * 100.0 / $TOT_READS"
 	echo
+else
+	echo "Didn't find whole.maq.map"
 fi
+
+if [ -f ${NAME}.soap.v1.map ] ; then
+	if [ ! -f ${NAME}.soap.v1.reads.mapped ] ; then
+		awk '{print $1}' ${NAME}.soap.v1.map > ${NAME}.soap.v1.reads.mapped
+	fi
+	if [ ! -f ${NAME}.soap.v1.reads.mapped.uniq ] ; then
+		sort -u ${NAME}.soap.v1.reads.mapped > ${NAME}.soap.v1.reads.mapped.uniq
+	fi
+	num=`wc -l ${NAME}.soap.v1.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l ${NAME}.soap.v1.reads.mapped.uniq | cut -d" " -f1`
+	if [ $num -ne $numuniq ] ; then
+		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
+		exit 1
+	fi
+	echo -n "Soap -v 1: % reads mapped: "
+	perl -e "print $num * 100.0 / $TOT_READS"
+	echo
+else
+	echo "Didn't find whole.soap.v1.map"
+fi
+
+if [ -f ${NAME}.soap.v2.map ] ; then
+	if [ ! -f ${NAME}.soap.v2.reads.mapped ] ; then
+		awk '{print $1}' ${NAME}.soap.v2.map > ${NAME}.soap.v2.reads.mapped
+	fi
+	if [ ! -f ${NAME}.soap.v2.reads.mapped.uniq ] ; then
+		sort -u ${NAME}.soap.v2.reads.mapped > ${NAME}.soap.v2.reads.mapped.uniq
+	fi
+	num=`wc -l ${NAME}.soap.v2.reads.mapped | cut -d" " -f1`
+	numuniq=`wc -l ${NAME}.soap.v2.reads.mapped.uniq | cut -d" " -f1`
+	if [ $num -ne $numuniq ] ; then
+		echo "Bowtie: Num hits: $num, num unique hits: $numuniq!"
+		exit 1
+	fi
+	echo -n "Soap -v 2: % reads mapped: "
+	perl -e "print $num * 100.0 / $TOT_READS"
+	echo
+else
+	echo "Didn't find whole.soap.v2.map"
+fi
+
