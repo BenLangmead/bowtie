@@ -128,7 +128,7 @@ def main(argv=None):
                     read_seq = [complement[a] for a in read_seq]
                     
                     #read_out = "%d-:<0,%d,%d>" % (read_num, rc_ref_start, low_qual_mismatches)
-                    read_out = "%d\t-\t0\t%d" % (read_num, rc_ref_start)
+                    read_out = "%s\t-\t0\t%d" % (rid, rc_ref_start)
                 else:
                     read_seq = seq[ref_pos:ref_pos + mer_len + extension]
                     if five_prime_mismatch:
@@ -136,7 +136,7 @@ def main(argv=None):
                         read_seq[pos] = mismatch[read_seq[pos]]
                         read_mismatch_positions.append(pos)
                     #read_out = "%d+:<0,%d,%d>" % (read_num, ref_pos, low_qual_mismatches)
-                    read_out = "%d\t+\t0\t%d" %  (read_num, ref_pos)
+                    read_out = "%s\t+\t0\t%d" %  (rid, ref_pos)
                 
                 
                         

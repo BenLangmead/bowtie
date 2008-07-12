@@ -25,12 +25,14 @@ static const int max_read_bp = 63;
 struct Hit {	
 	Hit(U32Pair _h, 
 		uint32_t _patId,
+		const string& _patName,
 		const hit_pat_t& _patSeq,
 		const string& _patQualities,
 		bool _fw, 
 		const bitset<max_read_bp>& _mms,
 		uint32_t _oms = 0) : h(_h), 
 							 patId(_patId),
+							 patName(_patName),
 							 patSeq(_patSeq),
 							 patQualities(_patQualities),
 							 mms(_mms),
@@ -39,6 +41,7 @@ struct Hit {
 	
 	U32Pair  h;
 	uint32_t patId;
+	string patName;
 	String< Dna, Packed<> > patSeq;
 	string patQualities;
 	bitset<max_read_bp> mms;
@@ -47,6 +50,7 @@ struct Hit {
 	Hit& operator = (const Hit &other) {
 	    this->h = other.h;
 	    this->patId = other.patId;
+		this->patName = other.patName;
 		this->patSeq = other.patSeq;
 		this->patQualities = other.patQualities;
 	    this->mms = other.mms;
@@ -75,6 +79,7 @@ public:
 	virtual ~HitSink() { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
+						   const string& patName,
 						   const hit_pat_t& patSeq,
 						   const string& patQualities,
 						   bool fw,
@@ -87,6 +92,7 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
+		    const string& patName,
 			const hit_pat_t& patSeq,
 			const string& patQualities,
             bool fw,
@@ -101,7 +107,7 @@ public:
 		_keep = false;
 		for(size_t i = 0; i < _provisionalHits.size(); i++) {
 			const Hit& h = _provisionalHits[i];
-			reportHit(h.h, h.patId, h.patSeq, h.patQualities, h.fw, h.mms, h.oms);
+			reportHit(h.h, h.patId, h.patName, h.patSeq, h.patQualities, h.fw, h.mms, h.oms);
 		}
 		_keep = keep; // restore _keep
 		_provisionalHits.clear();
@@ -132,26 +138,28 @@ public:
 	HitBucket() : HitSink(cout, true) { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
+						   const string& patName,
 						   const hit_pat_t& patSeq,
 						   const string& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) 
 	{
-		_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 		_numHits++;
 	}
 	
 	virtual void reportProvisionalHit(const U32Pair& h,
 									  uint32_t patId,
+									  const string& patName,
 									  const hit_pat_t& patSeq,
 									  const string& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
 	{
-		_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
-		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+		_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 	}
 };
 
@@ -176,6 +184,7 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
+			const string& patName,
 			const hit_pat_t& patSeq,
 		    const string& patQualities,
 			bool fw,
@@ -202,7 +211,7 @@ public:
 		if(_reportOpps) out() << "," << oms;
 		out() << ">";
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 		}
 		_numHits++;
 	}
@@ -213,6 +222,7 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
+			const string& patName,
 			const hit_pat_t& patSeq,
 			const string& patQualities,
 			bool fw,
@@ -220,9 +230,9 @@ public:
 			uint32_t oms)
 	{
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 	}
 	virtual void finishImpl() {
 		if(_first) {
@@ -258,6 +268,7 @@ public:
 	
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
+						   const string& patName,
 						   const hit_pat_t& patSeq,
 						   const string& patQualities,
 						   bool fw,
@@ -270,7 +281,7 @@ public:
 		
 		_first = false;
 		
-		out() << patId <<" \t" << (fw? "+":"-") << "\t";
+		out() << patName <<" \t" << (fw? "+":"-") << "\t";
 		
     	// .first is text id, .second is offset
 		
@@ -299,7 +310,7 @@ public:
 		
 		out () << endl;
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 		}
 		_numHits++;
 	}
@@ -310,6 +321,7 @@ public:
 	virtual void reportProvisionalHit(
 									  const U32Pair& h,
 									  uint32_t patId,
+									  const string& patName,
 									  const hit_pat_t& patSeq,
 									  const string& patQualities,
 									  bool fw,
@@ -317,9 +329,9 @@ public:
 									  uint32_t oms)
 	{
 		if(_keep) {
-			_hits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 		}
-		_provisionalHits.push_back(Hit(h, patId, patSeq, patQualities, fw, mms, oms));
+		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
 	}
 	virtual void finishImpl() {
 		if(_first) {
@@ -357,6 +369,7 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
+			const string& patName,
 			const hit_pat_t& patSeq,
 		    const string& patQualities,
 			bool fw,
@@ -401,6 +414,7 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
+			const string& patName,
 			const hit_pat_t& patSeq,
 			const string& patQualities,
 			bool fw,

@@ -47,6 +47,7 @@ static int reportOpps			= 0; // whether to report # of other mappings
 static int offRate				= -1; // keep default offRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
+static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
 
 static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 
@@ -55,6 +56,7 @@ static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 #define ARG_DUMP_PATS 258
 #define ARG_ARROW 259
 #define ARG_CONCISE 260
+#define ARG_SOLEXA_QUALS 261
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -66,6 +68,7 @@ static struct option long_options[] = {
 	{"allHits", no_argument, 0, 'a'},
 	{"binOut",  no_argument, 0, 'b'},
 	{"concise", no_argument, 0, ARG_CONCISE},
+	{"solexa-quals", no_argument, 0, ARG_SOLEXA_QUALS},
 	{"time",    no_argument, 0, 't'},
 	{"trim3",   required_argument, 0, '3'},
 	{"trim5",   required_argument, 0, '5'},
@@ -112,6 +115,7 @@ static void printUsage(ostream& out) {
 	    << "  --concise          write hits in a concise ASCII format" << endl
 	    << "  -t/--time          print basic timing statistics" << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
+		<< "  --solexa-quals  convert quality strings in FASTQ files from solexa-scaled to phred" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
 	    << "  -a/--allHits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
@@ -168,6 +172,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
+			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -251,13 +256,14 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
     	TStr pat;
 		string qual;
-		patsrc.nextPattern(pat, qual);
+		string name;
+		patsrc.nextPattern(pat, qual, name);
     	assert(!empty(pat));
     	if(lastLen == 0) lastLen = length(pat);
     	if(qSameLen && length(pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
-    	EbwtSearchState<TStr> s(ebwt, pat, qual, params, seed);
+    	EbwtSearchState<TStr> s(ebwt, pat, name, qual, params, seed);
     	params.stats().incRead(s, pat);
 	    ebwt.search(s, params);
 	    // If the forward direction matched exactly, ignore the
@@ -271,7 +277,8 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    		// the one we just matched)
 		    	TStr pat2;
 				string qual2;
-				patsrc.nextPattern(pat2, qual2);
+				string name2;
+				patsrc.nextPattern(pat2, qual2, name2);
 		    	assert(!empty(pat2));
 		    	patid++;
 		    	if(qSameLen && length(pat2) != lastLen) {
@@ -367,7 +374,8 @@ static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_tex
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
     	TStr pat;
 		string qual;
-		patsrc.nextPattern(pat, qual);
+		string name;
+		patsrc.nextPattern(pat, qual, name);
     	assert(!empty(pat));
     	if(lastLen == 0) lastLen = length(pat);
     	if(qSameLen && length(pat) != lastLen) {
@@ -376,7 +384,7 @@ static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_tex
 		
     	// FIXME: not accumulating stats for search with extension
     	//params.stats().incRead(s, pat);
-	    extend_policy.search(ebwt, stats, params, pat, qual, sink);
+	    extend_policy.search(ebwt, stats, params, pat, name, qual, sink);
 		
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
@@ -390,7 +398,8 @@ static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_tex
 				
 		    	TStr pat2;
 				string qual2;
-				patsrc.nextPattern(pat2, qual2);
+				string name2;
+				patsrc.nextPattern(pat2, qual2, name2);
 		    	assert(!empty(pat2));
 		    	patid++;
 		    	if(qSameLen && length(pat2) != lastLen) {
@@ -475,6 +484,7 @@ static bool findSanityHits(const TStr1& pat,
 				if(off < (0xffffffff - length(pat))) {
 					Hit h(make_pair(i, off), 
 						  patid, 
+						  "",
 						  pat, 
 						  "" /*no need for qualities*/, 
 						  fw, 
@@ -617,14 +627,15 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
     	TStr pat;
 		string qual;
-		patsrc.nextPattern(pat, qual);
+		string name;
+		patsrc.nextPattern(pat, qual, name);
     	assert(!empty(pat));
     	if(lastLen == 0) lastLen = length(pat);
     	if(qSameLen && length(pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
     	// Create state for a search on in the forward index
-    	EbwtSearchState<TStr> s(ebwtFw, pat, qual, params, seed);
+    	EbwtSearchState<TStr> s(ebwtFw, pat, name, qual, params, seed);
     	params.stats().incRead(s, pat);
     	// Are there provisional hits?
     	if(sink.numProvisionalHits() > 0) {
@@ -674,7 +685,8 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		// the one we just matched)
 		    	TStr pat2;
 				string qual2;
-				patsrc.nextPattern(pat2, qual2);
+				string name2;
+				patsrc.nextPattern(pat2, qual2, name2);
 		    	assert(!empty(pat2));
 		    	patid++;
 		    	// Set a bit indicating this pattern is done
@@ -786,9 +798,10 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
     	TStr pat;
 		string qual;
-		patsrc.nextPattern(pat, qual);
+		string name;
+		patsrc.nextPattern(pat, qual, name);
     	assert(!empty(pat));
-    	EbwtSearchState<TStr> s(ebwtBw, pat, qual, params, seed);
+    	EbwtSearchState<TStr> s(ebwtBw, pat, name, qual, params, seed);
     	params.stats().incRead(s, pat);
 		// Skip if previous phase determined this read is "done"; this
 		// should only happen in oneHit mode
@@ -811,7 +824,8 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		// the one we just matched)
 	    	TStr pat2;
 			string qual2;
-			patsrc.nextPattern(pat2, qual2);
+			string name2;
+			patsrc.nextPattern(pat2, qual2, name2);
 			//cerr << "ignoring "<< pat2<<endl;
 
 	    	assert(!empty(pat2));
@@ -915,7 +929,8 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
 			TStr pat;
 			string qual;
-			patsrc.nextPattern(pat, qual);
+			string name;
+			patsrc.nextPattern(pat, qual, name);
 			
 			assert(!empty(pat));
 			if(lastLen == 0) lastLen = length(pat);
@@ -923,7 +938,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				throw runtime_error("All reads must be the same length");
 			}
 			// Create state for a search on in the forward index
-			EbwtSearchState<TStr> s(ebwtFw, pat, qual, params, seed);
+			EbwtSearchState<TStr> s(ebwtFw, pat, name, qual, params, seed);
 			params.stats().incRead(s, pat);
 			// Are there provisional hits?
 			if(sink.numProvisionalHits() > 0) {
@@ -935,7 +950,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				// There is a provisional inexact match for the forward
 				// orientation of this pattern, so just try exact
 
-				extend_exact.search(ebwtFw, stats, params, pat, qual, sink);
+				extend_exact.search(ebwtFw, stats, params, pat, name, qual, sink);
 				
 				if(sink.numHits() > lastHits) {
 					// Got one or more exact hits from the reverse
@@ -953,7 +968,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				assert_eq(0, sink.numProvisionalHits());
 			} else {
 				//ebwtFw.search1MismatchOrBetter(s, params);
-				extend_one_mismatch.search(ebwtFw, stats, params, pat, qual, sink);
+				extend_one_mismatch.search(ebwtFw, stats, params, pat, name, qual, sink);
 			}
 			bool gotHits = sink.numHits() > lastHits;
 			// Set a bit indicating this pattern is done and needn't be
@@ -976,7 +991,8 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 					// the one we just matched)
 					TStr pat2;
 					string qual2;
-					patsrc.nextPattern(pat2, qual2);
+					string name2;
+					patsrc.nextPattern(pat2, qual2, name2);
 					assert(!empty(pat2));
 					patid++;
 					// Set a bit indicating this pattern is done
@@ -1029,9 +1045,10 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
 			TStr pat;
 			string qual;
-			patsrc.nextPattern(pat, qual);
+			string name;
+			patsrc.nextPattern(pat, qual, name);
 			assert(!empty(pat));
-			EbwtSearchState<TStr> s(ebwtBw, pat, qual, params, seed);
+			EbwtSearchState<TStr> s(ebwtBw, pat, name, qual, params, seed);
 			params.stats().incRead(s, pat);
 			// Skip if previous phase determined this read is "done"; this
 			// should only happen in oneHit mode
@@ -1044,7 +1061,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			// Try to match with one mismatch while suppressing exact hits
 			//ebwtBw.search1MismatchOrBetter(s, params, false /* suppress exact */);
 			extend_one_mismatch.suppressExact(true);
-			extend_one_mismatch.search(ebwtBw, stats, params, pat, qual, sink);
+			extend_one_mismatch.search(ebwtBw, stats, params, pat, name, qual, sink);
 						
 			sink.acceptProvisionalHits(); // automatically approve provisional hits
 			// If the forward direction matched with one mismatch, ignore
@@ -1056,7 +1073,8 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				// the one we just matched)
 				TStr pat2;
 				string qual2;
-				patsrc.nextPattern(pat2, qual2);
+				string name2;
+				patsrc.nextPattern(pat2, qual2, name2);
 				assert(!empty(pat2));
 				patid++;
 				params.setFw(false);
@@ -1095,7 +1113,7 @@ static void driver(const char * type,
 	PatternSource<TStr> *patsrc = NULL;
 	switch(format) {
 		case FASTA:   patsrc = new FastaPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5); break;
-		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5); break;
+		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, solexa_quals); break;
 	    case BFQ:     patsrc = new BfqPatternSource<TStr>   (queries, revcomp, false, patDumpfile, trim3, trim5); break;
 	    case SOLEXA:  patsrc = new SolexaPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
 		case CMDLINE: patsrc = new VectorPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;

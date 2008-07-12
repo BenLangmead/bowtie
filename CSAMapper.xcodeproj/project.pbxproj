@@ -62,6 +62,7 @@
 		EDAEFC830E1949C4006D9D87 /* maqmap.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = maqmap.c; sourceTree = "<group>"; };
 		EDAEFC840E1949C4006D9D87 /* maqmap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = maqmap.h; sourceTree = "<group>"; };
 		EDAEFCD00E194E07006D9D87 /* alphabet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = alphabet.h; sourceTree = "<group>"; };
+		EDC73BB40E294EA1004234FC /* txt_to_fastq.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = txt_to_fastq.cpp; sourceTree = "<group>"; };
 		EDD9703A0E0B0F8100F3ED5E /* packed_io.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packed_io.cpp; sourceTree = "<group>"; };
 		EDF8ECD00E09E2A4009FA071 /* hit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hit.cpp; sourceTree = "<group>"; };
 		EDF980B30E1A94EA00243AA5 /* algo.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = algo.hh; sourceTree = "<group>"; };
@@ -122,6 +123,7 @@
 				ED6322520E09891C00F83FB6 /* zbox.h */,
 				EDAEFC760E1948B9006D9D87 /* bowtie_convert.cpp */,
 				EDF981FB0E1C026700243AA5 /* simreads.cpp */,
+				EDC73BB40E294EA1004234FC /* txt_to_fastq.cpp */,
 				EDAEFC7F0E19498C006D9D87 /* maq */,
 			);
 			name = Source;
@@ -257,6 +259,19 @@
 			passBuildSettingsInEnvironment = 1;
 			productName = bowtie_convert;
 		};
+		EDC73BB50E295103004234FC /* txt_to_fastq */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION) txt_to_fastq";
+			buildConfigurationList = EDC73BB90E29512F004234FC /* Build configuration list for PBXLegacyTarget "txt_to_fastq" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			dependencies = (
+			);
+			name = txt_to_fastq;
+			passBuildSettingsInEnvironment = 1;
+			productName = txt_to_fastq;
+		};
 /* End PBXLegacyTarget section */
 
 /* Begin PBXProject section */
@@ -273,6 +288,7 @@
 				ED8FBC690E0BEFD000D3FF10 /* pack_fasta */,
 				ED9AEC130E114702003CC4DA /* ebwt_build */,
 				EDAEFCA00E194A37006D9D87 /* bowtie_convert */,
+				EDC73BB50E295103004234FC /* txt_to_fastq */,
 			);
 		};
 /* End PBXProject section */
@@ -386,6 +402,27 @@
 			};
 			name = Release;
 		};
+		EDC73BB60E295103004234FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = txt_to_fastq;
+			};
+			name = Debug;
+		};
+		EDC73BB70E295103004234FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = txt_to_fastq;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -430,6 +467,15 @@
 			buildConfigurations = (
 				EDAEFCA10E194A37006D9D87 /* Debug */,
 				EDAEFCA20E194A37006D9D87 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EDC73BB90E29512F004234FC /* Build configuration list for PBXLegacyTarget "txt_to_fastq" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EDC73BB60E295103004234FC /* Debug */,
+				EDC73BB70E295103004234FC /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

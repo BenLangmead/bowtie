@@ -32,6 +32,7 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						const TStr& pat,
+						const string& patName,
 						const string& patQuals,
 						HitSink& hit_sink) = 0;
 	virtual ~SearchPolicy() {}
@@ -45,6 +46,7 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						const TStr& pat,
+						const string& patName,
 						const string& patQuals,
 						HitSink& hit_sink) 
 	{
@@ -85,6 +87,7 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						const TStr& pat,
+						const string& patName,
 						const string& patQuals,
 						HitSink& hit_sink) 
 	{
@@ -100,7 +103,7 @@ public:
 		_mer_search_params.setFw(!revcomp);
 		_mer_search_params.setEbwtFw(params.ebwtFw());
 		
-		EbwtSearchState<TStr> s(ebwt, mer, "", _mer_search_params, 0);
+		EbwtSearchState<TStr> s(ebwt, mer, patName, "", _mer_search_params, 0);
 		ebwt.search(s, _mer_search_params);
 		
 		extendHits(pat, patQuals, hit_sink, params, revcomp, revcomp, false);
@@ -196,23 +199,23 @@ public:
 				bitset<max_read_bp> mism_to_print;
 				unsigned int ext_len;
 				
-				if (!swap_mismatches)
-				{
-					ext_len = length(pat);
-					mism_to_print = mism;
-					//cerr << mism_to_print << endl;
-
-					for (unsigned int i = 0; i < mism.size() && i < ext_len; ++i)
-					{
-						if (mism.test(i) && !mism.test(ext_len - i - 1))
-						{
-							mism_to_print.reset(i);
-							mism_to_print.set(ext_len - i - 1,1);
-						}
-					}
-					mism = mism_to_print;
-					//cerr << mism_to_print << endl;
-				}
+				//if (!swap_mismatches)
+//				{
+//					ext_len = length(pat);
+//					mism_to_print = mism;
+//					//cerr << mism_to_print << endl;
+//
+//					for (unsigned int i = 0; i < mism.size() && i < ext_len; ++i)
+//					{
+//						if (mism.test(i) && !mism.test(ext_len - i - 1))
+//						{
+//							mism_to_print.reset(i);
+//							mism_to_print.set(ext_len - i - 1,1);
+//						}
+//					}
+//					mism = mism_to_print;
+//					//cerr << mism_to_print << endl;
+//				}
 //				if(extend_left_pat)
 //				{
 //					mism_to_print = itr->mms;
@@ -269,7 +272,8 @@ public:
 					mms = mism | (hit.mms << (length(pat) - _mer));
 				
 				hit_sink.reportHit(hit.h, 
-								   hit.patId, 
+								   hit.patId,
+								   hit.patName,
 								   pat_to_print, 
 								   patQuals,
 								   hit.fw, 
@@ -313,6 +317,7 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						const TStr& pat,
+						const string& patName,
 						const string& patQuals,
 						HitSink& hit_sink)
 	{
@@ -334,7 +339,7 @@ public:
 		this->_mer_search_params.setEbwtFw(params.ebwtFw());
 		
 		
-		EbwtSearchState<TStr> s(ebwt, mer, "", this->_mer_search_params, 0);
+		EbwtSearchState<TStr> s(ebwt, mer, patName, "", this->_mer_search_params, 0);
 		ebwt.search1MismatchOrBetter(s, this->_mer_search_params, !_suppressExact);
 		
 		extendHits(pat, patQuals, hit_sink, params, extend_left_pat, !params.fw(), !params.fw());

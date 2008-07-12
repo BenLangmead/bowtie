@@ -153,6 +153,10 @@ bowtie_convert: bowtie_convert.cpp tokenize.h tokenize.cpp pat.h hit.h params.h 
 simreads: simreads.cpp tokenize.h tokenize.cpp
 	$(CXX) $(DEBUG_FLAGS) -DSIMREADS_MAIN -Wall $(INC) $(LIBS) -o $@ $< tokenize.cpp
 
+txt_to_fastq: txt_to_fastq.cpp pat.h
+	$(CXX) $(DEBUG_FLAGS) -DTXT_TO_FASTQ_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+
+
 .PHONY: clean
 clean:
 	rm -f $(BIN_LIST)
