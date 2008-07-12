@@ -74,6 +74,7 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
+print RUNTIME " & \\multicolumn{2}{c}{35.1 Mbases} & \\multicolumn{2}{c}{238 Mbases} & \\multicolumn{2}{c}{2.91 Gbases} \\\\[3pt] \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
 #print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
@@ -98,9 +99,8 @@ for(my $i = 0; $i < 5; $i++) {
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
 	print RUNTIME " \\\\";
-	print RUNTIME "[3pt]" if ($i == 4 && $all1);
 	print RUNTIME " \\midrule " if ($i < 4);
-	print RUNTIME " \\bottomrule " if ($i == 4 && $all1);
+	print RUNTIME "[2pt] \\bottomrule \\\\ " if ($i == 4 && $all1);
 	print RUNTIME "\n";
 }
 
