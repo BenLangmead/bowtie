@@ -84,7 +84,7 @@ if [ ! -f ${NAME}.maq.5${EXTRA_EXT}.map ] ; then
       $MAQ map $MAQ_ARGS \
          ${NAME}.maq.5${EXTRA_EXT}.map \
          ${REF} \
-         ${READ_BASE}\@6000001.bfq 
+         ${READ_BASE}\@8000001.bfq 
    if [ ! -f ${NAME}.maq.5${EXTRA_EXT}.map ] ; then
       echo "Failed to create legitimate map file: ${NAME}.maq.5${EXTRA_EXT}.map; aborting..."
       exit 1
