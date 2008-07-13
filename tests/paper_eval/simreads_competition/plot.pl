@@ -110,7 +110,8 @@ if(!$all1) {
 	print RUNTIME "\\caption{".
 		"Running time for mapping 8M simulated reads against human ".
 		"chromosomes 22 and 2 and the whole human genome on a workstation ".
-		"with 2 GB of RAM.  Soap is omitted from Whole Human because its ".
+		"with a 2.40GHz Intel\registered Core\tm2 Q6600 and 2 GB of RAM.  Soap is not run against the whole-human ".
+		"reference because its ".
 		"memory footprint exceeds physical RAM.  Simulated reads were ".
 		"exacted only from the relevant region and the read simulator ".
 		"attempts to recreate the error profile of Illumina/Solexa reads. ".
@@ -179,8 +180,8 @@ print MEMORY "Running time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
 	"for mapping 8M simulated ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
-	"genome on a workstation with 2 GB of RAM.  ".
-	"Soap is omitted from Whole Human because its ".
+	"genome on a workstation with a 2.40GHz Intel\registered Core\tm2 Q6600 and 2 GB of RAM.  ".
+	"Soap is not run against the whole-human reference because its ".
 	"memory footprint exceeds physical RAM.  Simulated reads were ".
 	"exacted only from the relevant region and the read simulator ".
 	"attempts to recreate the error profile of Illumina/Solexa reads. ".
