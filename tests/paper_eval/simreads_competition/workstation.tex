@@ -1,0 +1,43 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{Chr 22} & \multicolumn{2}{c}{Chr 2} & \multicolumn{2}{c}{Whole Genome} \\[3pt] 
+ & \multicolumn{2}{c}{35.1 Mbases} & \multicolumn{2}{c}{238 Mbases} & \multicolumn{2}{c}{2.91 Gbases} \\[3pt] 
+ & Time & Speedup & Time & Speedup & Time & Speedup \\ 
+\toprule
+Bowtie & 11m:54s & 1.0x & 12m:26s & 1.0x & 16m:42s & 1.0x  \\ \midrule 
+Maq with -n 1 & 8m:18s & 0.7x & 19m:40s & 1.6x & 4h:51m:45s & 17.5x  \\ \midrule 
+Maq & 21m:23s & 1.8x & 54m:22s & 4.4x & 13h:53m:20s & 49.9x  \\ \midrule 
+Soap with -v 1 & 27m:55s & 2.3x & 2h:23m:27s & 11.5x & - & -  \\ \midrule 
+Soap & 36m:04s & 3.0x & 3h:04m:26s & 14.8x & - & -  \\[2pt] \bottomrule \\ 
+ & Virtual & Resident & Virtual & Resident & Virtual & Resident \\ 
+\toprule
+Bowtie & 23 MB & 23 MB & 110 MB & 103 MB & 1,152 MB & 1,126 MB  \\ \midrule 
+Maq with -n 1 & 767 MB & 726 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
+Maq & 767 MB & 727 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
+Soap with -v 1 & 391 MB & 380 MB & 1,416 MB & 1,331 MB & - & -  \\ \midrule 
+Soap & 393 MB & 380 MB & 1,417 MB & 1,331 MB & - & -  \\ 
+\bottomrule
+\end{tabular}
+\scriptsize\caption{Running time and peak virtual/resident memory usage for mapping 8M simulated reads against human chromosomes 22 and 2 and the whole human genome on a workstation with 2 GB of RAM.  Soap is omitted from Whole Human because its memory footprint exceeds physical RAM.  Simulated reads were exacted only from the relevant region.  For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
+\end{table}
+\end{document}
