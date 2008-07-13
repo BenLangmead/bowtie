@@ -112,9 +112,12 @@ if(!$all1) {
 		"chromosomes 22 and 2 and the whole human genome on a workstation ".
 		"with 2 GB of RAM.  Soap is omitted from Whole Human because its ".
 		"memory footprint exceeds physical RAM.  Simulated reads were ".
-		"exacted only from the relevant region.  For the Maq runs, the ".
+		"exacted only from the relevant region and the read simulator ".
+		"attempts to recreate the error profile of Illumina/Solexa reads. ".
+		"For the Maq runs, the ".
 		"reads were first divided into chunks of 2M reads each, ".
-		"as per the Maq Manual.".
+		"as per the Maq Manual.  Reference sequences are taken from the ".
+		"contigs of Genbank human genome build 36.3.".
 		"}\n";
 	print RUNTIME "\\end{table}\n";
 	print RUNTIME "\\end{document}\n";
@@ -179,9 +182,12 @@ print MEMORY
 	"genome on a workstation with 2 GB of RAM.  ".
 	"Soap is omitted from Whole Human because its ".
 	"memory footprint exceeds physical RAM.  Simulated reads were ".
-	"exacted only from the relevant region.  For the Maq runs, the ".
+	"exacted only from the relevant region and the read simulator ".
+	"attempts to recreate the error profile of Illumina/Solexa reads. ".
+	"For the Maq runs, the ".
 	"reads were first divided into chunks of 2M reads each, ".
-	"as per the Maq Manual.".
+	"as per the Maq Manual.  Reference sequences are taken from the ".
+	"contigs of Genbank human genome build 36.3.".
 	"}\n";
 print MEMORY "\\end{table}\n";
 print MEMORY "\\end{document}\n";
