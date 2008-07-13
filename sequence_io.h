@@ -96,34 +96,41 @@ static void readSequenceFile(const std::string& infile,
 	// Read entries using SeqAn
 	int cnt = 0;
 	while(!feof(in)) {
-		TStr tmp;
 		while(true) {
-			seqan::read(in, tmp, TFile());
-			if(seqan::empty(tmp)) {
+			ss.push_back(TStr()); // add a new empty string to the end
+			// Fill the new empty string with the next sequence from
+			// the file.  SeqAn allocates just enough mem for it (at
+			// the expense of lots of file seeks, which can add up)
+			seqan::read(in, ss.back(), TFile()); 
+			if(seqan::empty(ss.back())) {
+				ss.pop_back();
 				break;
 			}
-			if((int64_t)length(tmp) > baseCutoff) {
-				resize(tmp, baseCutoff);
+			// Enforce the base cutoff
+			if((int64_t)length(ss.back()) > baseCutoff) {
+				resize(ss.back(), baseCutoff);
 				baseCutoff = 0;
 			} else {
-				baseCutoff -= length(tmp);
+				baseCutoff -= length(ss.back());
 			}
+			// Reverse the newly-read sequence in-place if desired
 			if(reverse) {
-				size_t len = length(tmp);
+				size_t len = length(ss.back());
 				for(size_t i = 0; i < len/2; i++) {
-					TVal t = tmp[i];
-					tmp[i] = tmp[len-i-1];
-					tmp[len-i-1] = t;
+					TVal t = ss.back()[i];
+					ss.back()[i] = ss.back()[len-i-1];
+					ss.back()[len-i-1] = t;
 				}
 			}
 			#ifndef NDEBUG
-			for(size_t i = 0; i < length(tmp); i++) {
-				assert_lt(tmp[i], (int)(ValueSize<TVal>::VALUE));
-				assert_geq(tmp[i], 0);
+			// Sanity check that all (int) values are in range
+			for(size_t i = 0; i < length(ss.back()); i++) {
+				assert_lt(ss.back()[i], (int)(ValueSize<TVal>::VALUE));
+				assert_geq(ss.back()[i], 0);
 			}
 			#endif
-			ss.push_back(tmp);
 			cnt++;
+			// Enforce the sequence cutoff
 			if(seqCutoff != -1 && cnt >= seqCutoff) {
 				fclose(in);
 				return;
