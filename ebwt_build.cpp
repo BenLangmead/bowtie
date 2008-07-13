@@ -212,21 +212,24 @@ static void driver(const char * type,
                    bool reverse = false)
 {
 	vector<TStr> ss;
-	if(verbose) cout << "About to read text files" << endl;
-	switch(format) {
-		case FASTA:   readSequenceFiles<TStr, Fasta>  (infiles, ss, cutoff, -1, reverse); break;
-		case EMBL:    readSequenceFiles<TStr, Embl>   (infiles, ss, cutoff, -1, reverse); break;
-	    case GENBANK: readSequenceFiles<TStr, Genbank>(infiles, ss, cutoff, -1, reverse); break;
-		#ifndef PACKED_STRINGS
-		case RAW:     readSequenceFiles<TStr, Raw>    (infiles, ss, cutoff, -1, reverse); break;
-		#endif
-		case CMDLINE: readSequenceString<TStr>        (infile,  ss, cutoff, -1, reverse); break;
-		default: assert(false);
-	}
-	// Check that input is non-empty
-	if(ss.size() == 0) {
-		cerr << "Error: Empty input!  Check that file format is correct." << endl;
-		exit(1);
+	{
+		Timer _t(cout, "  Read text files in: ", verbose);
+		if(verbose) cout << "About to read text files" << endl;
+		switch(format) {
+			case FASTA:   readSequenceFiles<TStr, Fasta>  (infiles, ss, cutoff, -1, reverse); break;
+			case EMBL:    readSequenceFiles<TStr, Embl>   (infiles, ss, cutoff, -1, reverse); break;
+		    case GENBANK: readSequenceFiles<TStr, Genbank>(infiles, ss, cutoff, -1, reverse); break;
+			#ifndef PACKED_STRINGS
+			case RAW:     readSequenceFiles<TStr, Raw>    (infiles, ss, cutoff, -1, reverse); break;
+			#endif
+			case CMDLINE: readSequenceString<TStr>        (infile,  ss, cutoff, -1, reverse); break;
+			default: assert(false);
+		}
+		// Check that input is non-empty
+		if(ss.size() == 0) {
+			cerr << "Error: Empty input!  Check that file format is correct." << endl;
+			exit(1);
+		}
 	}
 	// Echo input strings
 	if(verbose) {

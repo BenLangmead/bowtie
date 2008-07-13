@@ -334,8 +334,11 @@ public:
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
 		ofstream out(file3.c_str());
-		writePacked<Dna>(out, ss, __verbose);
-
+		{
+			Timer timer(cout, "  Time for call to writePacked: ", __verbose);
+			VMSG_NL("Writing packed representation to " << file3);
+			writePacked<Dna>(out, ss, __verbose);
+		}
 		// Build
 		initFromVector(ss,
 		               fout1,
@@ -424,7 +427,10 @@ public:
 			// strange.
 			//assert_gt(cap, seqan::capacity(s));
 			VMSG_NL("Joining string to disk");
-			joinToDisk(ss, s, out1, out2, destroySs, seed);
+			{
+				Timer timer(cout, "  Time for call to joining string: ", _verbose);
+				joinToDisk(ss, s, out1, out2, destroySs, seed);
+			}
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory creating joined string in "
 			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
