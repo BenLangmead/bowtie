@@ -108,7 +108,7 @@ if(!$all1) {
 	print RUNTIME "\\bottomrule\n";
 	print RUNTIME "\\end{tabular}\n";
 	print RUNTIME "\\caption{".
-		"Running time for mapping 8M simulated reads against human ".
+		"CPU time for mapping 8M simulated reads against human ".
 		"chromosomes 22 and 2 and the whole human genome on a workstation ".
 		"with a 2.40GHz Intel\registered Core\tm2 Q6600 and 2 GB of RAM.  Soap is not run against the whole-human ".
 		"reference because its ".
@@ -176,7 +176,7 @@ print MEMORY "\\bottomrule\n";
 print MEMORY "\\end{tabular}\n";
 print MEMORY "\\scriptsize\\caption{";
 print MEMORY "Peak virtual and resident memory usage " if !$all1;
-print MEMORY "Running time and peak virtual/resident memory usage " if $all1;
+print MEMORY "CPU time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
 	"for mapping 8M simulated ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
