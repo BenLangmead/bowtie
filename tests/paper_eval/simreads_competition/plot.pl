@@ -74,7 +74,7 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
-print RUNTIME " & \\multicolumn{2}{c}{35.1 Mbases} & \\multicolumn{2}{c}{238 Mbases} & \\multicolumn{2}{c}{2.91 Gbases} \\\\[3pt] \n";
+print RUNTIME " & \\multicolumn{2}{c}{35.1 Mbases} & \\multicolumn{2}{c}{238 Mbases} & \\multicolumn{2}{c}{2.87 Gbases} \\\\[3pt] \n";
 # TODO: Can I avoid using this fake \\multicolumn to get these centered?
 #print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
@@ -180,7 +180,7 @@ print MEMORY "CPU time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
 	"for mapping 8M simulated ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
-	"genome on a workstation with a 2.40GHz Intel\textregistered Core\texttrademark2 Q6600 and 2 GB of RAM.  ".
+	"genome on a workstation with a 2.40GHz Intel{\textregistered} Core{\texttrademark}2 Q6600 and 2 GB of RAM.  ".
 	"Soap is not run against the whole-human reference because its ".
 	"memory footprint exceeds physical RAM.  Simulated reads were ".
 	"exacted only from the relevant region and the read simulator ".
