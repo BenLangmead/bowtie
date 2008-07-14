@@ -178,7 +178,7 @@ print MEMORY "\\scriptsize\\caption{";
 print MEMORY "Peak virtual and resident memory usage " if !$all1;
 print MEMORY "CPU time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
-	"for mapping 8M simulated 35bp".
+	"for mapping 8M simulated 35bp ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
 	"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM.  ".
 	"Soap is not run against the whole-human reference because its ".
