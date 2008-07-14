@@ -156,6 +156,8 @@ simreads: simreads.cpp tokenize.h tokenize.cpp
 txt_to_fastq: txt_to_fastq.cpp pat.h
 	$(CXX) $(DEBUG_FLAGS) -DTXT_TO_FASTQ_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
+cvg_islands: cvg_islands.cpp tokenize.cpp tokenize.h $(MAQ_HEADERS) $(MAQ_CPPS)
+	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(INC) -o $@ $< $(MAQ_CPPS) tokenize.cpp
 
 .PHONY: clean
 clean:

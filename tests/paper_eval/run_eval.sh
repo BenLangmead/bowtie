@@ -62,7 +62,7 @@ fi
 
 mkdir bwt_out
 cd $BWT_OUT
-../../../ebwt_search  -1 -q -3 8 ../ref ../reads.fq > reads1@1.bwtmap
+../../../ebwt_search  -1 -q -k 22 ../ref ../reads.fq > reads1@1.bwtmap
 ../$BOWTIE/bowtie_convert reads1@1.bwtmap reads1@1.map ../ref.ids
 maq mapcheck -s ../maq_out/ref.bfa reads1@1.map >mapcheck.txt
 maq assemble -s consensus.cns ../maq_out/ref.bfa reads1@1.map 2>assemble.log

@@ -120,13 +120,13 @@ def main(argv=None):
                     rc_ref_start = ref_pos - extension + 1 
                     rc_ref_end = rc_ref_start + mer_len + extension
                     read_seq = seq[rc_ref_start : rc_ref_end]
+                    
+                    read_seq.reverse()
+                    read_seq = [complement[a] for a in read_seq]
                     if five_prime_mismatch:
                         pos = random.choice(range(0, mer_len))
                         read_seq[pos] = mismatch[read_seq[pos]]
                         read_mismatch_positions.append(pos)
-                    read_seq.reverse()
-                    read_seq = [complement[a] for a in read_seq]
-                    
                     #read_out = "%d-:<0,%d,%d>" % (read_num, rc_ref_start, low_qual_mismatches)
                     read_out = "%s\t-\t0\t%d" % (rid, rc_ref_start)
                 else:

@@ -43,9 +43,9 @@ $CSAMapper/ebwt_search -q ref exact_e2e_reads.fq > exact_e2e.actual_out
 
 # and then check that they all map to where they are supposed to
 if diff -w exact_e2e.ebwt_out exact_e2e.actual_out > /dev/null; then
-    $ECHO "Exact e2e forward matching:\t\tOK"
+    $ECHO "Exact e2e forward matching:\t\t\t\t\tOK"
 else
-    $ECHO "Exact e2e forward matching:\t\tFAILED"
+    $ECHO "Exact e2e forward matching:\t\t\t\t\tFAILED"
 fi
 
 ######################################################################
@@ -64,9 +64,9 @@ $CSAMapper/ebwt_search -r ref -q exact_e2e_reads_rc.fq > exact_e2e_rc.actual_out
 
 # and then check that they all map to where they are supposed to
 if diff -w exact_e2e_rc.ebwt_out exact_e2e_rc.actual_out > /dev/null; then
-    $ECHO "Exact e2e reverse matching:\t\tOK"
+    $ECHO "Exact e2e reverse matching:\t\t\t\t\tOK"
 else
-    $ECHO "Exact e2e reverse matching:\t\tFAILED"
+    $ECHO "Exact e2e reverse matching:\t\t\t\t\tFAILED"
 fi
 
 ######################################################################
@@ -85,9 +85,9 @@ $CSAMapper/ebwt_search -q -k 22 ref exact_ext_reads.fq > exact_ext.actual_out
 
 # and then check that they all map to where they are supposed to
 if diff -w exact_ext.ebwt_out exact_ext.actual_out > /dev/null; then
-    $ECHO "Exact ext. forward matching:\t\tOK"
+    $ECHO "Exact ext. forward matching:\t\t\t\t\tOK"
 else
-    $ECHO "Exact ext. forward matching:\t\tFAILED"
+    $ECHO "Exact ext. forward matching:\t\t\t\t\tFAILED"
 fi
 
 ######################################################################
@@ -106,9 +106,9 @@ $CSAMapper/ebwt_search -k 22 -r ref -q exact_ext_reads_rc.fq > exact_ext_rc.actu
 
 # and then check that they all map to where they are supposed to
 if diff -w exact_ext_rc.ebwt_out exact_ext_rc.actual_out > /dev/null; then
-    $ECHO "Exact ext. reverse matching:\t\tOK"
+    $ECHO "Exact ext. reverse matching:\t\t\t\t\tOK"
 else
-    $ECHO "Exact ext. reverse matching:\t\tFAILED"
+    $ECHO "Exact ext. reverse matching:\t\t\t\t\tFAILED"
 fi
 
 ######################################################################
@@ -127,12 +127,12 @@ $CSAMapper/ebwt_search -k 22 ref -q 3mis_reads.fq > 3mis_reads.actual_out
 
 # and then check that they all map to where they are supposed to
 if diff -w 3mis_reads.ebwt_out 3mis_reads.actual_out > /dev/null; then
-    $ECHO "3' mismatch forward matching:\tOK"
+    $ECHO "3' mismatch forward matching:\t\t\t\t\tOK"
 else
-    $ECHO "3' mismatch forward matching:\tFAILED"
+    $ECHO "3' mismatch forward matching:\t\t\t\t\tFAILED"
 fi
 
-######################################################################
+#####################################################################
 
 # Make reverse complemented reads from unique 22-mers that 
 # have mismatches at the 3' end
@@ -149,9 +149,9 @@ $CSAMapper/ebwt_search -q -r -k 22 ref 3mis_reads_rc.fq  > 3mis_reads_rc.actual_
 
 # and then check that they all map to where they are supposed to
 if diff -w 3mis_reads_rc.ebwt_out 3mis_reads_rc.actual_out > /dev/null; then
-    $ECHO "3' mismatch reverse matching:\tOK"
+    $ECHO "3' mismatch reverse matching:\t\t\t\t\tOK"
 else
-    $ECHO "3' mismatch reverse matching:\tFAILED"
+    $ECHO "3' mismatch reverse matching:\t\t\t\t\tFAILED"
 fi
 
 #####################################################################
@@ -172,9 +172,9 @@ mv xxx 1_mis_reads.ebwt_out
 
 # and then check that they all map to where they are supposed to
 if diff -w 1_mis_reads.ebwt_out 1_mis_reads.actual_out > /dev/null; then
-    $ECHO "1-mismatch in 5' mer forward matching:\tOK"
+    $ECHO "1-mismatch in 5' mer forward matching:\t\t\t\t\tOK"
 else
-    $ECHO "1-mismatch in 5' mer forward matching:\tFAILED"
+    $ECHO "1-mismatch in 5' mer forward matching:\t\t\t\t\tFAILED"
 fi
 
 ###################################################################
@@ -196,9 +196,9 @@ mv xxx 1_mis_reads_rc.ebwt_out
 
 # and then check that they all map to where they are supposed to
 if diff -w 1_mis_reads_rc.ebwt_out 1_mis_reads_rc.actual_out > /dev/null; then
-    $ECHO "1-mismatch in 5' mer reverse matching:\tOK"
+    $ECHO "1-mismatch in 5' mer reverse matching:\t\t\t\t\tOK"
 else
-    $ECHO "1-mismatch in 5' mer reverse matching:\tFAILED"
+    $ECHO "1-mismatch in 5' mer reverse matching:\t\t\t\t\tFAILED"
 fi
 
 # Run extension ebwt search on the mismatching reads...
@@ -206,9 +206,9 @@ $CSAMapper/ebwt_search -k 22 -r -1 -q ref 1_mis_reads_rc.fq | sort -n -k4 > 1_mi
 
 # and then check that they all map to where they are supposed to
 if diff -w 1_mis_reads_rc.ebwt_out 1_mis_reads_ext_rc.actual_out > /dev/null; then
-    $ECHO "1-mismatch in 5' mer reverse extension matching:\tOK"
+    $ECHO "1-mismatch in 5' mer reverse extension matching:\t\t\t\t\tOK"
 else
-    $ECHO "1-mismatch in 5' mer reverse extension matching:\tFAILED"
+    $ECHO "1-mismatch in 5' mer reverse extension matching:\t\t\t\t\tFAILED"
 fi
 
 
@@ -232,9 +232,9 @@ mv xxx 1_mis_with_3mis_reads.ebwt_out
 
 # and then check that they all map to where they are supposed to
 if diff -w 1_mis_with_3mis_reads.ebwt_out 1_mis_with_3mis_reads.actual_out > /dev/null; then
-    $ECHO "1-mismatch in 5' mer + 3' mismatch forward matching:\tOK"
+    $ECHO "1-mismatch in 5' mer + 3' mismatch forward matching:\t\t\t\t\tOK"
 else
-    $ECHO "1-mismatch in 5' mer + 3' mismatch forward matching:\tFAILED"
+    $ECHO "1-mismatch in 5' mer + 3' mismatch forward matching:\t\t\t\t\tFAILED"
 fi
 
 
@@ -255,7 +255,7 @@ mv xxx 1_mis_with_3mis_reads_rc.ebwt_out
 
 # and then check that they all map to where they are supposed to
 if diff -w 1_mis_with_3mis_reads_rc.ebwt_out 1_mis_with_3mis_reads_rc.actual_out > /dev/null; then
-    $ECHO "1-mismatch in 5' mer + 3' mismatch reverse matching:\tOK"
+    $ECHO "1-mismatch in 5' mer + 3' mismatch reverse matching:\t\t\t\t\tOK"
 else
-    $ECHO "1-mismatch in 5' mer + 3' mismatch reverse matching:\tFAILED"
+    $ECHO "1-mismatch in 5' mer + 3' mismatch reverse matching:\t\t\t\t\tFAILED"
 fi

@@ -652,7 +652,7 @@ protected:
 		}
 		
 		// Chew up the optional name on the '+' line
-		while(c != '\n' && c != '\r')
+		while(c == '+' || (c != '\n' && c != '\r'))
 		{
 			c = fgetc(this->_in); if(feof(this->_in)) return;
 		}
@@ -664,8 +664,9 @@ protected:
 		
 		// Now read the qualities
 		begin = 0;
+		
 		while(true) {
-			if(c == '@' || feof(this->_in)) {
+			if(begin >= length(*dst)|| feof(this->_in)) {
 				
 				if (_solexa_quals)
 				{
@@ -679,14 +680,17 @@ protected:
 						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
 						qual->push_back((char)(pQ + 33));
 					}
-					
-					tokenize(*rqual, " ", s_quals);
-					rqual->clear();
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					s_quals.clear();
+					if (rqual != NULL)
 					{
-						int sQ = atoi(s_quals[j].c_str());
-						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-						rqual->push_back((char)(pQ + 33));
+						tokenize(*rqual, " ", s_quals);
+						rqual->clear();
+						for (unsigned int j = 0; j < s_quals.size(); ++j)
+						{
+							int sQ = atoi(s_quals[j].c_str());
+							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+							rqual->push_back((char)(pQ + 33));
+						}
 					}
 				}
 				
@@ -695,10 +699,17 @@ protected:
 					rqual->resize(rqual->length() - this->_trim3);
 					std::reverse(rqual->begin(), rqual->end());
 				}
+				
+				// chew up any qualities beyond length(*dst)
+				while((c != '\n' && c != '\r'))
+				{
+					c = fgetc(this->_in); if(feof(this->_in)) return;
+				}
+				
 				// Skip additional linebreak chars
-//				while(c == '\n' || c == '\r') {
-//					c = fgetc(this->_in); if(feof(this->_in)) return;
-//				}
+				while(c == '\n' || c == '\r') {
+					c = fgetc(this->_in); if(feof(this->_in)) return;
+				}
 				break;
 			}
 			else if (c != '\r' && c != '\n')

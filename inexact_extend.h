@@ -199,78 +199,29 @@ public:
 				bitset<max_read_bp> mism_to_print;
 				unsigned int ext_len;
 				
-				//if (!swap_mismatches)
-//				{
-//					ext_len = length(pat);
-//					mism_to_print = mism;
-//					//cerr << mism_to_print << endl;
-//
-//					for (unsigned int i = 0; i < mism.size() && i < ext_len; ++i)
-//					{
-//						if (mism.test(i) && !mism.test(ext_len - i - 1))
-//						{
-//							mism_to_print.reset(i);
-//							mism_to_print.set(ext_len - i - 1,1);
-//						}
-//					}
-//					mism = mism_to_print;
-//					//cerr << mism_to_print << endl;
-//				}
-//				if(extend_left_pat)
-//				{
-//					mism_to_print = itr->mms;
-//					//cerr << mism_to_print << endl;
-//					ext_len = _mer;
-//					for (unsigned int i = 0; i < itr->mms.size() && i < ext_len; ++i)
-//					{
-//						if (itr->mms.test(i) && !itr->mms.test(ext_len - i - 1))
-//						{
-//							mism_to_print.reset(i);
-//							mism_to_print.set(ext_len - i - 1,1);
-//						}
-//					}
-//					itr->mms = mism_to_print;
-//					//cerr << mism_to_print << endl;
-////					if (extend_left_ref)
-////					{
-////						mism_to_print = itr->mms;
-////						//cerr << mism_to_print << endl;
-////						ext_len = length(pat);
-////						for (unsigned int i = 0; i < itr->mms.size() && i < ext_len; ++i)
-////						{
-////							if (itr->mms.test(i) && !itr->mms.test(ext_len - i - 1))
-////							{
-////								mism_to_print.reset(i);
-////								mism_to_print.set(ext_len - i - 1,1);
-////							}
-////						}
-////						itr->mms = mism_to_print;
-////						//cerr << mism_to_print << endl;
-////					}
-//				}
-					
-//					mism_to_print = itr->mms;
-//					ext_len = length(pat);
-//					for (unsigned int i = 0; i < itr->mms.size() && i < ext_len; ++i)
-//					{
-//						if (itr->mms.test(i) && !itr->mms.test(ext_len - i - 1))
-//						{
-//							mism_to_print.reset(i);
-//							mism_to_print.set(ext_len - i - 1,1);
-//						}
-//					}
-//					itr->mms = mism_to_print;
-					
-				
+				bitset<max_read_bp> mms;
 				Hit hit = *itr;
 				hit.h.second = ref_hit_start;
 				
-				bitset<max_read_bp> mms;
-				if (!swap_mismatches)
-					mms = hit.mms | (mism << _mer);
-				else
-					mms = mism | (hit.mms << (length(pat) - _mer));
+				if (!params.fw())
+				{
+						ext_len = length(pat) - _mer;
+						mism_to_print = mism;
+						
+						for (unsigned int i = 0; i < mism.size() && i < ext_len; ++i)
+						{
+							if (mism.test(i) && !mism.test(ext_len - i - 1))
+							{
+								mism_to_print.reset(i);
+								mism_to_print.set(ext_len - i - 1,1);
+							}
+						}
+						mism = mism_to_print;
 				
+				}
+				
+				mms = hit.mms | (mism << _mer);
+
 				hit_sink.reportHit(hit.h, 
 								   hit.patId,
 								   hit.patName,
@@ -342,7 +293,7 @@ public:
 		EbwtSearchState<TStr> s(ebwt, mer, patName, "", this->_mer_search_params, 0);
 		ebwt.search1MismatchOrBetter(s, this->_mer_search_params, !_suppressExact);
 		
-		extendHits(pat, patQuals, hit_sink, params, extend_left_pat, !params.fw(), !params.fw());
+		extendHits(pat, patQuals, hit_sink, params, extend_left_pat, !params.fw(), !params.ebwtFw());
 		
 		this->_mer_hit_sink.clearRetainedHits();
 	};

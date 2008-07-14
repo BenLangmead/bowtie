@@ -1125,7 +1125,7 @@ public:
 		if (s.mismatch() != 0xffffffff)
 		{	
 			
-			if (!_ebwtFw)
+			if ((_ebwtFw && !_fw) || (_fw && !_ebwtFw))
 				mm.set(len - s.mismatch() - 1);
 			else
 				mm.set(s.mismatch());

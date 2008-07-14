@@ -63,6 +63,7 @@
 		EDAEFC840E1949C4006D9D87 /* maqmap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = maqmap.h; sourceTree = "<group>"; };
 		EDAEFCD00E194E07006D9D87 /* alphabet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = alphabet.h; sourceTree = "<group>"; };
 		EDC73BB40E294EA1004234FC /* txt_to_fastq.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = txt_to_fastq.cpp; sourceTree = "<group>"; };
+		EDC73CE60E2AD053004234FC /* cvg_islands.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = cvg_islands.cpp; sourceTree = "<group>"; };
 		EDD9703A0E0B0F8100F3ED5E /* packed_io.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = packed_io.cpp; sourceTree = "<group>"; };
 		EDF8ECD00E09E2A4009FA071 /* hit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = hit.cpp; sourceTree = "<group>"; };
 		EDF980B30E1A94EA00243AA5 /* algo.hh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = algo.hh; sourceTree = "<group>"; };
@@ -124,6 +125,7 @@
 				EDAEFC760E1948B9006D9D87 /* bowtie_convert.cpp */,
 				EDF981FB0E1C026700243AA5 /* simreads.cpp */,
 				EDC73BB40E294EA1004234FC /* txt_to_fastq.cpp */,
+				EDC73CE60E2AD053004234FC /* cvg_islands.cpp */,
 				EDAEFC7F0E19498C006D9D87 /* maq */,
 			);
 			name = Source;
@@ -272,6 +274,19 @@
 			passBuildSettingsInEnvironment = 1;
 			productName = txt_to_fastq;
 		};
+		EDC73CF50E2AD2E5004234FC /* cvg_islands */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION) cvg_islands";
+			buildConfigurationList = EDC73D000E2AD2EA004234FC /* Build configuration list for PBXLegacyTarget "cvg_islands" */;
+			buildPhases = (
+			);
+			buildToolPath = /usr/bin/make;
+			dependencies = (
+			);
+			name = cvg_islands;
+			passBuildSettingsInEnvironment = 1;
+			productName = cvg_islands;
+		};
 /* End PBXLegacyTarget section */
 
 /* Begin PBXProject section */
@@ -289,6 +304,7 @@
 				ED9AEC130E114702003CC4DA /* ebwt_build */,
 				EDAEFCA00E194A37006D9D87 /* bowtie_convert */,
 				EDC73BB50E295103004234FC /* txt_to_fastq */,
+				EDC73CF50E2AD2E5004234FC /* cvg_islands */,
 			);
 		};
 /* End PBXProject section */
@@ -423,6 +439,27 @@
 			};
 			name = Release;
 		};
+		EDC73CF60E2AD2E5004234FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				PRODUCT_NAME = cvg_islands;
+			};
+			name = Debug;
+		};
+		EDC73CF70E2AD2E5004234FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				PRODUCT_NAME = cvg_islands;
+				ZERO_LINK = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -476,6 +513,15 @@
 			buildConfigurations = (
 				EDC73BB60E295103004234FC /* Debug */,
 				EDC73BB70E295103004234FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EDC73D000E2AD2EA004234FC /* Build configuration list for PBXLegacyTarget "cvg_islands" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EDC73CF60E2AD2E5004234FC /* Debug */,
+				EDC73CF70E2AD2E5004234FC /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
