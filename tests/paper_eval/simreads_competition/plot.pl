@@ -113,7 +113,7 @@ if(!$all1) {
 		"reads against human chromosomes 22 and 2 and the whole human ".
 		"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
 		"Simulated reads were ".
-		"exacted only from the relevant region using a read simulator that ".
+		"extracted only from the relevant region using a read simulator that ".
 		"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
 		"Reference sequences were taken from the ".
 		"contigs of Genbank human genome build 36.3. ".
@@ -185,7 +185,7 @@ print MEMORY
 	"reads against human chromosomes 22 and 2 and the whole human ".
 	"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
 	"Simulated reads were ".
-	"exacted only from the relevant region using a read simulator that ".
+	"extracted only from the relevant region using a read simulator that ".
 	"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
 	"Reference sequences were taken from the ".
 	"contigs of Genbank human genome build 36.3. ".
