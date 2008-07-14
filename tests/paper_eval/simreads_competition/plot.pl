@@ -115,9 +115,9 @@ if(!$all1) {
 		"Simulated reads were ".
 		"exacted only from the relevant region using a read simulator that ".
 		"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
-		"Reference sequences are taken from the ".
+		"Reference sequences were taken from the ".
 		"contigs of Genbank human genome build 36.3. ".
-		"Soap is not run against the whole-human reference because its ".
+		"Soap was not run against the whole-human reference because its ".
 		"memory footprint exceeds physical RAM. ".  
 		"For the Maq runs, the ".
 		"reads were first divided into chunks of 2M reads each, ".
@@ -187,9 +187,9 @@ print MEMORY
 	"Simulated reads were ".
 	"exacted only from the relevant region using a read simulator that ".
 	"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
-	"Reference sequences are taken from the ".
+	"Reference sequences were taken from the ".
 	"contigs of Genbank human genome build 36.3. ".
-	"Soap is not run against the whole-human reference because its ".
+	"Soap was not run against the whole-human reference because its ".
 	"memory footprint exceeds physical RAM. ".  
 	"For the Maq runs, the ".
 	"reads were first divided into chunks of 2M reads each, ".
