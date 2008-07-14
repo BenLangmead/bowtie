@@ -22,7 +22,7 @@ if [ -f ${NAME}.ebwt.hits ] ; then
 	perl -e "print $numuniq * 100.0 / $TOT_READS"
 	echo
 else
-	echo "Didn't find whole.ebwt.hits"
+	echo "Didn't find ${NAME}.ebwt.hits"
 fi
 
 if [ -f ${NAME}.maq.map ] ; then
@@ -42,7 +42,7 @@ if [ -f ${NAME}.maq.map ] ; then
 	perl -e "print $numuniq * 100.0 / $TOT_READS"
 	echo
 else
-	echo "Didn't find whole.maq.map"
+	echo "Didn't find ${NAME}.maq.map"
 fi
 
 if [ -f ${NAME}.maq.n1.map ] ; then
@@ -62,7 +62,7 @@ if [ -f ${NAME}.maq.n1.map ] ; then
 	perl -e "print $numuniq * 100.0 / $TOT_READS"
 	echo
 else
-	echo "Didn't find whole.maq.map"
+	echo "Didn't find ${NAME}.maq.n1.map"
 fi
 
 if [ -f ${NAME}.soap.v1.map ] ; then
@@ -82,7 +82,7 @@ if [ -f ${NAME}.soap.v1.map ] ; then
 	perl -e "print $numuniq * 100.0 / $TOT_READS"
 	echo
 else
-	echo "Didn't find whole.soap.v1.map"
+	echo "Didn't find ${NAME}.soap.v1.map"
 fi
 
 if [ -f ${NAME}.soap.v2.map ] ; then
@@ -102,5 +102,5 @@ if [ -f ${NAME}.soap.v2.map ] ; then
 	perl -e "print $numuniq * 100.0 / $TOT_READS"
 	echo
 else
-	echo "Didn't find whole.soap.v2.map"
+	echo "Didn't find ${NAME}.soap.v2.map"
 fi

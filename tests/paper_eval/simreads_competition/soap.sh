@@ -39,7 +39,7 @@ if [ ! -f ${NAME}.soap.v2.map ] ; then
     echo Doing 2-mismatch...
     echo > ${NAME}.soap.v2.top
     sh wrap.sh ${NAME}.soap.v2 \
-	$SOAP -v 2 -f 35 \
+	$SOAP -f 35 \
 	  -o ${NAME}.soap.v2.map \
 	  -d ${REF} \
 	  -a ${READ_BASE}.fq
