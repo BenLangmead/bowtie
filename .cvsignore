@@ -33,3 +33,6 @@ simreads
 .ebwt_search.md5
 gmon.*
 *.cksum
+.regr.*
+.qry.fa
+.ref.fa
