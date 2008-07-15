@@ -12,11 +12,11 @@ set multiplot
 set data style lines
 set border 3
 set xtics border nomirror 
-set xrange [89725594.5:5742438064.0]
-set ytics border mirror 0, 50, 600
-set y2tics border mirror 0, 50, 600
+set xrange [149542657.5:3445462838.4]
+set ytics border mirror (179451189, 358902379, 717804758, 1435609516, 2871219032)
+set y2tics border mirror (179451189, 358902379, 717804758, 1435609516, 2871219032)
 set mytics 5
-set yrange [0:600]
-set y2range [0:600]
+set yrange [150:550]
+set y2range [150:550]
 set origin 0.0,0.0
 set title "%TITLE%" font "%TFONT%,%TFONTSIZE%"
