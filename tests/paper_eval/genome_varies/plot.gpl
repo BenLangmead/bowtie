@@ -1,0 +1,21 @@
+IF TYPE eq ps   set terminal postscript landscape color
+IF TYPE eq eps  set terminal postscript eps color
+IF TYPE eq jpg  set terminal jpeg
+IF TYPE eq png  set terminal png
+IF TYPE eq pbm  set terminal pbm
+IF TYPE ne xwin set output "%OUTFILE%"
+set xlabel "%XLABEL%" font "%FONT%,%FONTSIZE%"
+set ylabel "%YLABEL%" font "%FONT%,%FONTSIZE%"
+set multiplot
+#set autoscale
+set data style lines
+set border 3
+set xtics border nomirror 40, -5, 21
+set xrange [41:24]
+set ytics border mirror 0, 10, 300
+set y2tics border mirror 0, 10, 300
+set mytics 2
+set yrange [0:300]
+set y2range [0:300]
+set origin 0.0,0.0
+set title "%TITLE%" font "%TFONT%,%TFONTSIZE%"

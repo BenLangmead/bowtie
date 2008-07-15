@@ -4,21 +4,21 @@
 
 for t in 0 5 10 ; do
 	# Truncate output files
-	echo > trim$t_0mm.dat
-	echo > trim$t_1mm.dat
+	echo -n > trim${t}_0mm.dat
+	echo -n > trim${t}_1mm.dat
 	for s in whole.179451189 \
 	         whole.358902379 \
 	         whole.717804758 \
 	         whole.1435609516 \
 	         whole ; do
-		perl summarize_top.pl $s.sim_reads.t$t.top ebwt_search \
+		perl summarize_top.pl ${s}.sim_reads.t${t}.top ebwt_search \
 		  | tail -1 \
 		  | cut -d" " -f 2 \
-		  | cut -d"," -f 1 >> trim$t_0mm.dat
-		perl summarize_top.pl $s.sim_reads.1.t$t.top ebwt_search \
+		  | cut -d"," -f 1 >> trim${t}_0mm.dat
+		perl summarize_top.pl ${s}.sim_reads.1.t${t}.top ebwt_search \
 		  | tail -1 \
 		  | cut -d" " -f 2 \
-		  | cut -d"," -f 1 >> trim$t_1mm.dat
+		  | cut -d"," -f 1 >> trim${t}_1mm.dat
 	done
 done
 
