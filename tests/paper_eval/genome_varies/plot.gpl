@@ -4,7 +4,7 @@ IF TYPE eq jpg  set terminal jpeg
 IF TYPE eq png  set terminal png
 IF TYPE eq pbm  set terminal pbm
 IF TYPE ne xwin set output "%OUTFILE%"
-set xlabel "%XLABEL%" font "%FONT%,%FONTSIZE%" +0,-1
+set xlabel "%XLABEL%" font "%FONT%,%FONTSIZE%" +0,-2
 set ylabel "%YLABEL%" font "%FONT%,%FONTSIZE%"
 set logscale x
 set multiplot
