@@ -3061,7 +3061,7 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 				// argument is the same, which helps us to sanity-check
 				// the result.
 				appendValue(ret, (Dna)(rand.nextU32() & 3));
-				assert_lt((uint8_t)ret[length(ret)-1], 4);
+				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
 				//appendNE(ret, rand.nextU32() & 3);
 			}
 			// Pattern now ends on a chunk boundary
@@ -3155,7 +3155,9 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 					assert_gt(len, 0);
 					assert_leq(len, 4096);
 					if(upper == nlen) {
-						// Add a bunch of 0s on the end
+						// Add a bunch of 0s on the end, clobbering the
+						// existing random junk - this ensures the
+						// content of the .3.ebwt file is deterministic 
 						for(size_t j = 0; j < 31; j++) {
 							appendValue(pchunk, (Dna)0);
 						}
@@ -3179,7 +3181,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 				// argument is the same, which helps us to sanity-check
 				// the result.
 				appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
-				assert_lt((uint8_t)ret[length(ret)-1], 4);
+				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
 			}
 			// Pattern now ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & eh.chunkMask());

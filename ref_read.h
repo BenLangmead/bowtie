@@ -88,7 +88,7 @@ static size_t fastaRefReadAppend(istream& in,
 		// though a comment can end a sequence
 		if(isalpha(c)) {
 			appendValue(dst, (Dna)(char)c);
-			assert_lt((uint8_t)dst[length(dst)-1], 4);
+			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
 			seqCharsRead++;
 			if((int64_t)seqCharsRead >= refparams.baseCutoff) {
 				return seqCharsRead;
