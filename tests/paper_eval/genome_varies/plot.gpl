@@ -12,7 +12,7 @@ set multiplot
 set data style lines
 set border 3
 #set xtics border nomirror 
-set xrange [0:2871219032.0]
+set xrange [1:2871219032.0]
 set ytics border mirror 0, 25, 300
 set y2tics border mirror 0, 25, 300
 set mytics 2
