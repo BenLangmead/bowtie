@@ -4,13 +4,18 @@
 
 for t in 0 5 10 ; do
 	# Truncate output files
-	echo > trim${t}_0mm.dat
-	echo > trim${t}_1mm.dat
+	echo -n > trim${t}_0mm.dat
+	echo -n > trim${t}_1mm.dat
 	for s in whole.179451189 \
 	         whole.358902379 \
 	         whole.717804758 \
 	         whole.1435609516 \
 	         whole ; do
+	    n=`echo $s | sed 's/whole\.//'`
+	    if [ -z "$n" ] ; then
+	    	n=2871219032
+	    fi
+	   	echo $n
 		perl summarize_top.pl ${s}.sim_reads.t${t}.top ebwt_search \
 		  | tail -1 \
 		  | cut -d" " -f 2 \
