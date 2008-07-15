@@ -679,7 +679,7 @@ protected:
 		{
 			char buf[1024];
 				
-			while (fgets(buf, sizeof(buf), this->_in) && begin < length(*dst))
+			while (fgets(buf, sizeof(buf), this->_in) && (size_t)begin < length(*dst))
 			{
 				char* nl = strrchr(buf, '\n');
 				if (nl) *nl = 0;
@@ -705,7 +705,7 @@ protected:
 		}
 		else
 		{
-			while(begin < length(*dst) && !feof(this->_in)) {
+			while((size_t)begin < length(*dst) && !feof(this->_in)) {
 				c = fgetc(this->_in);
 				if (c != '\r' && c != '\n')
 				{
