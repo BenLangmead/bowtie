@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <ctype.h>
 #include <zlib.h>
 #include <fstream>
@@ -541,12 +542,20 @@ protected:
 			assert(c == '>' || c == '#');
 			_first = false;
 		}
-		// Skip to the end of the id line; if the next line is either
-		// another id line or a comment line, keep skipping
-		// TODO: grab name here, stick in *name
-		do {
-			if((c = skipToEnd()) == -1) return;
-		} while (c == '>' || c == '#');
+		
+		// Read to the end of the id line, sticking everything after the '>'
+		// into *name
+		while(true) {
+			c = fgetc(this->_in); if(feof(this->_in)) return;
+			if(c == '\n' || c == '\r') {
+				while(c == '\n' || c == '\r') {
+					c = fgetc(this->_in); if(feof(this->_in)) return;
+				}
+				break;
+			}
+			name->push_back(c);
+		}
+		
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
@@ -656,72 +665,142 @@ protected:
 		{
 			c = fgetc(this->_in); if(feof(this->_in)) return;
 		}
-		
-		// Move to the line after the + line, which has the qualities
-		do {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
-		} while(c == '\n' && c == '\r');
-		
+
 		// Now read the qualities
 		begin = 0;
 		
-		while(true) {
-			if(begin >= length(*dst)|| feof(this->_in)) {
+		//Move to the line after the + line, which has the qualities
+//		while(c == '\n' && c == '\r'){
+//			c = fgetc(this->_in); if(feof(this->_in)) return;
+//		} 
+		
+		qual->clear();
+		if (_solexa_quals)
+		{
+			char buf[1024];
 				
-				if (_solexa_quals)
-				{
-					// TODO: refactor!
-					vector<string> s_quals;
-					tokenize(*qual, " ", s_quals);
-					qual->clear();
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
-					{
-						int sQ = atoi(s_quals[j].c_str());
-						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-						qual->push_back((char)(pQ + 33));
-					}
-					s_quals.clear();
-					if (rqual != NULL)
-					{
-						tokenize(*rqual, " ", s_quals);
-						rqual->clear();
-						for (unsigned int j = 0; j < s_quals.size(); ++j)
-						{
-							int sQ = atoi(s_quals[j].c_str());
-							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-							rqual->push_back((char)(pQ + 33));
-						}
-					}
-				}
-				
-				qual->resize(qual->length() - this->_trim3);
-				if (rqual != NULL) {
-					rqual->resize(rqual->length() - this->_trim3);
-					std::reverse(rqual->begin(), rqual->end());
-				}
-				
-				// chew up any qualities beyond length(*dst)
-				while((c != '\n' && c != '\r'))
-				{
-					c = fgetc(this->_in); if(feof(this->_in)) return;
-				}
-				
-				// Skip additional linebreak chars
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return;
-				}
-				break;
-			}
-			else if (c != '\r' && c != '\n')
+			while (fgets(buf, sizeof(buf), this->_in) && begin < length(*dst))
 			{
-				if (begin++ >= this->_trim5){
-					qual->push_back(c);
-					if (rqual != NULL)
-						rqual->push_back(c);
-				}	
+				char* nl = strrchr(buf, '\n');
+				if (nl) *nl = 0;
+				
+				vector<string> s_quals;
+				tokenize(string(buf), " ", s_quals);
+				
+				for (unsigned int j = 0; j < s_quals.size(); ++j)
+				{
+					int sQ = atoi(s_quals[j].c_str());
+					int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+					if (begin >= this->_trim5)
+					{
+						c = (char)(pQ + 33);
+						qual->push_back(c);
+						if (rqual != NULL)
+							rqual->push_back(c);
+					}
+					++begin;
+				}
 			}
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			
 		}
+		else
+		{
+			while(begin < length(*dst) && !feof(this->_in)) {
+				c = fgetc(this->_in);
+				if (c != '\r' && c != '\n')
+				{
+					if (begin++ >= (int) this->_trim5){
+						qual->push_back(c);
+						if (rqual != NULL)
+							rqual->push_back(c);
+					}	
+				}
+			}
+			
+		}
+		
+		// Trim the 3' end of the quality string
+		qual->resize(qual->length() - this->_trim3);
+		
+		// Now make the reversed qual string if necessary
+		if (rqual != NULL) {
+			rqual->resize(rqual->length() - this->_trim3);
+			std::reverse(rqual->begin(), rqual->end());
+		}
+		
+		if (feof(this->_in))
+			return;
+		else
+		{
+			do {
+				c = fgetc(this->_in);
+			}while(c != '@' && !feof(this->_in));
+		}
+//		
+//		
+//		while(true) {
+//			if(begin >= length(*dst)|| feof(this->_in)) {
+//				
+//				if (_solexa_quals)
+//				{
+//					// TODO: refactor!
+//					vector<string> s_quals;
+//					tokenize(*qual, " ", s_quals);
+//					qual->clear();
+//					for (unsigned int j = 0; j < s_quals.size(); ++j)
+//					{
+//						int sQ = atoi(s_quals[j].c_str());
+//						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+//						qual->push_back((char)(pQ + 33));
+//					}
+//					s_quals.clear();
+//					if (rqual != NULL)
+//					{
+//						tokenize(*rqual, " ", s_quals);
+//						rqual->clear();
+//						for (unsigned int j = 0; j < s_quals.size(); ++j)
+//						{
+//							int sQ = atoi(s_quals[j].c_str());
+//							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+//							rqual->push_back((char)(pQ + 33));
+//						}
+//					}
+//				}
+//				
+//				qual->resize(qual->length() - this->_trim3);
+//				if (rqual != NULL) {
+//					rqual->resize(rqual->length() - this->_trim3);
+//					std::reverse(rqual->begin(), rqual->end());
+//				}
+//				
+//				// chew up any qualities beyond length(*dst)
+//				//while((c != '\n' && c != '\r'))
+////				{
+////					c = fgetc(this->_in); if(feof(this->_in)) return;
+////				}
+////				
+////				// Skip additional linebreak chars
+////				while(c == '\n' || c == '\r') {
+////					c = fgetc(this->_in); if(feof(this->_in)) return;
+////				}
+//				
+//				// Chew up anything left over until we get to the next read
+//				while(c != '@' && !feof(this->_in))
+//				{
+//					c = fgetc(this->_in); if(feof(this->_in)) return;
+//				}
+//				break;
+//			}
+//			else if (c != '\r' && c != '\n')
+//			{
+//				if (begin++ >= this->_trim5){
+//					qual->push_back(c);
+//					if (rqual != NULL)
+//						rqual->push_back(c);
+//				}	
+//			}
+//			c = fgetc(this->_in); if(feof(this->_in)) return;
+//		}
 	}
 	virtual void resetForNextFile() {
 		_first = true;
