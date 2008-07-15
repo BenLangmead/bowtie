@@ -58,7 +58,7 @@ if [ ! -f /tmp/gplot.eps ] ; then
 	exit 1
 fi
 
-cat plot.gnuplot | sed -e 's/set style line [0-9]* /set style line 0 /' > plot.gnuplot.2
+cat plot.gnuplot | sed -e 's/set style line [0-9]* /set style line 1 /' > plot.gnuplot.2
 gnuplot plot.gnuplot.2
 
 cp /tmp/gplot.eps .
