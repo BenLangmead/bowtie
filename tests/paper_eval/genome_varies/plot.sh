@@ -4,8 +4,8 @@
 
 for t in 0 5 10 ; do
 	# Truncate output files
-	echo -n > trim${t}_0mm.dat
-	echo -n > trim${t}_1mm.dat
+	echo > trim${t}_0mm.dat
+	echo > trim${t}_1mm.dat
 	for s in whole.179451189 \
 	         whole.358902379 \
 	         whole.717804758 \
