@@ -171,7 +171,7 @@ public:
 				
 			if (!extend_left_pat)
 			{
-				pat_str = suffix(pat, _mer);
+				pat_str = suffix(pat, min(length(pat) - 1,_mer));
 				//cerr << "\t len: " <<length(pat)<<" "<< pat_str << endl;
 				if (extend_left_ref)
 					::reverse(pat_str);
@@ -179,7 +179,7 @@ public:
 			}
 			else
 			{
-				pat_str = prefix(pat, length(pat) - _mer);
+				pat_str = prefix(pat, max(0u,length(pat) - _mer));
 				//cerr << "\t" << pat_str << endl;
 				if (!extend_left_ref)
 					::reverse(pat_str);
