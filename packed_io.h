@@ -46,7 +46,7 @@ writePacked(ostream& out, const vector<String<TVal, Packed<> > >& ss, bool verbo
 throw(UnexpectedTypeSizeException)
 {
 	for(size_t i = 0; i < ss.size(); i++) {
-		writePacked(out, ss[i], verbose);
+		writePacked(out, ss[i], true, verbose);
 	}
 }
 
@@ -58,8 +58,32 @@ throw(UnexpectedTypeSizeException)
 	for(size_t i = 0; i < ss.size(); i++) {
 		String<TVal, Packed<> > packed_ss(ss[i]);
 		//assign(packed_ss, ss[i]);
-		writePacked(out, packed_ss, verbose);
+		writePacked(out, packed_ss, true, verbose);
 	}
+}
+
+/**
+ * 
+ */
+static void
+writePackedLen(ostream& out, uint64_t len, bool verbose = false) {
+	// Endianness test
+	static uint8_t __etest[2] = { 1, 0 };
+	bool littleEndian = (*(uint16_t *)__etest == 1);
+	if(littleEndian) len = endianSwapU64(len);
+	out.write((char*)&len, 8);
+}
+
+/// Helper for writePacked below that fills in sz according to the
+/// length of the string
+template<typename TVal>
+static void
+writePacked(ostream& out,
+            const String<TVal, Packed<> >& s,
+            bool writeLen = true,
+            bool verbose = false)
+{
+	writePacked(out, s, length(s), writeLen, verbose);
 }
 
 /**
@@ -70,25 +94,23 @@ throw(UnexpectedTypeSizeException)
  * 
  * Assumes the host of a packed string is a String<unsigned int>
  */
-
-
 template<typename TVal>
 static void
-writePacked(ostream& out, const String<TVal, Packed<> >& s, bool verbose = false)
+writePacked(ostream& out,
+            const String<TVal, Packed<> >& s,
+            size_t sz,
+            bool writeLen = true,
+            bool verbose = false)
 throw(UnexpectedTypeSizeException)
 {
-	uint64_t tmp;
-	
 	// Endianness test
 	static uint8_t __etest[2] = { 1, 0 };
 	bool littleEndian = (*(uint16_t *)__etest == 1);
 
 	// Get length of string and write to stream, being careful to swap
 	// if this is a little-endian machine
-	uint64_t len = tmp = length(s);
-//	if(verbose) cout << "len: " << len << endl;
-	if(littleEndian) tmp = endianSwapU64(tmp);
-	out.write((char*)&tmp, 8);
+	uint64_t len = sz;
+	if(writeLen) writePackedLen(out, len, verbose);
 	
 	// Determine size of unsigned int; can only handle 2-, 4-, 8-byte
 	// ints for now
@@ -106,18 +128,12 @@ throw(UnexpectedTypeSizeException)
 	}
 	int charsPerUi64 = charsPerUi * uisPerUi64;
 	
-//	if(verbose) cout << "sui: " << sui << endl;
-//	if(verbose) cout << "charsPerUi: " << charsPerUi << endl;
-//	if(verbose) cout << "uisPerUi64: " << uisPerUi64 << endl;
-//	if(verbose) cout << "charsPerUi64: " << charsPerUi64 << endl;
-	
 	// Write the packed sequence in 64-bit chunks, being careful to
 	// swap if this is a little-endian machine.
 	const String<unsigned int>& h = host(s);
 	// Round up to nearest 8-byte boundary to get the number of 8-byte
 	// chunks
 	uint64_t blen64 = (len+(charsPerUi64-1))/charsPerUi64;
-//	if(verbose) cout << "blen64: " << blen64 << endl;
 	for(uint64_t i = 0; i < blen64; i++) {
 		uint64_t tmp;
 		uint64_t off = i * uisPerUi64;

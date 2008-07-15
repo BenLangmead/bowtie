@@ -1172,7 +1172,7 @@ static void driver(const char * type,
     // its detransformation equals the original.
 	if(sanityCheck && !os.empty()) {
 		TStr rs; ebwt.restore(rs);
-		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed, false);
+		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
 		assert_eq(joinedo, rs);
 	}
 	{

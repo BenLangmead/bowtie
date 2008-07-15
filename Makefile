@@ -13,7 +13,8 @@ OTHER_CPPS = endian.cpp \
              blockwise_sa.cpp \
              rusage.cpp \
              diff_sample.cpp \
-			 hit.cpp
+             hit.cpp \
+             ref_read.cpp
 
 MAQ_HEADERS = maq/maqmap.h \
               maq/const.h

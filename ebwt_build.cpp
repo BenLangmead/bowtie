@@ -17,6 +17,7 @@
 #include "tokenize.h"
 #include "rusage.h"
 #include "timer.h"
+#include "ref_read.h"
 
 // Build parameters
 static int verbose      = 0;     // be talkative
@@ -58,8 +59,6 @@ static void printUsage(ostream& out) {
 	    << "    ebwt_outfile_base       write Ebwt data to files with this dir/basename" << endl
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
-	    << "    -e                      reference files are Embl" << endl
-	    << "    -g                      reference files are Genbank" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
 	    << "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
 	    << "    --entireSA              build whole suffix array at once; huge mem footprint" << endl
@@ -84,7 +83,7 @@ static void printUsage(ostream& out) {
 	    ;
 }
 
-static const char *short_options = "vdrpscfeal:i:o:t:h:";
+static const char *short_options = "vdrpscfl:i:o:t:h:";
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -146,9 +145,6 @@ static void parseOptions(int argc, char **argv) {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
 	   		case 'f': format = FASTA; break;
-	   		case 'g': format = GENBANK; break;
-	   		case 'e': format = EMBL; break;
-	   		case 'a': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
 	   		case 'd': doubleEbwt = true; break;
 	   		case 'l':
@@ -202,7 +198,8 @@ static void parseOptions(int argc, char **argv) {
 }
 
 /**
- * 
+ * Drive the Ebwt construction process and optionally sanity-check the
+ * result.
  */
 template<typename TStr>
 static void driver(const char * type,
@@ -211,52 +208,47 @@ static void driver(const char * type,
                    const string& outfile,
                    bool reverse = false)
 {
-	vector<TStr> ss;
+	vector<istream*> is;
+	RefReadInParams refparams(cutoff, -1, reverse);
+	if(format == CMDLINE) {
+		// Adapt sequence strings to stringstreams open for input
+		for(size_t i = 0; i < infiles.size(); i++) {
+			stringstream ss;
+			ss << ">" << i << endl << infiles[i] << endl;
+			is.push_back(new stringstream(ss.str(), ios::in));
+		}
+	} else {
+		assert_eq(FASTA, format);
+		// Adapt sequence files to ifstreams
+		for(size_t i = 0; i < infiles.size(); i++) {
+			is.push_back(new ifstream(infiles[i].c_str()));
+		}
+	}
+	vector<uint32_t> szs;
+	uint32_t sztot;
 	{
-		Timer _t(cout, "  Read text files in: ", verbose);
-		if(verbose) cout << "About to read text files" << endl;
-		switch(format) {
-			case FASTA:   readSequenceFiles<TStr, Fasta>  (infiles, ss, cutoff, -1, reverse); break;
-			case EMBL:    readSequenceFiles<TStr, Embl>   (infiles, ss, cutoff, -1, reverse); break;
-		    case GENBANK: readSequenceFiles<TStr, Genbank>(infiles, ss, cutoff, -1, reverse); break;
-			#ifndef PACKED_STRINGS
-			case RAW:     readSequenceFiles<TStr, Raw>    (infiles, ss, cutoff, -1, reverse); break;
-			#endif
-			case CMDLINE: readSequenceString<TStr>        (infile,  ss, cutoff, -1, reverse); break;
-			default: assert(false);
-		}
-		// Check that input is non-empty
-		if(ss.size() == 0) {
-			cerr << "Error: Empty input!  Check that file format is correct." << endl;
-			exit(1);
-		}
+		if(verbose) cout << "Reading reference sizes" << endl;
+		Timer _t(cout, "  Time reading reference sizes: ", verbose);
+		sztot = fastaRefReadSizes(is, szs, refparams);
 	}
-	// Echo input strings
-	if(verbose) {
-		cout << type << " input strings:" << endl;
-		for(unsigned int i = 0; i < ss.size(); i++) {
-			uint32_t ssz = length(ss[i]);
-			if(ssz < 1000) {
-				cout << "  " << i << ": " << ss[i] << endl;
-			} else {
-				cout << "  " << i << ": (" << ssz << " chars)" << endl;
-			}
-		}
-	}
+	assert_gt(sztot, 0);
+	assert_gt(szs.size(), 0);
 	// Construct Ebwt from input strings and parameters
 	Ebwt<TStr> ebwt(lineRate,
 	                linesPerSide,
-	                offRate,
-	                ftabChars,
-	                chunkRate,
+	                offRate,      // suffix-array sampling rate
+	                ftabChars,    // number of chars in initial arrow-pair calc
+	                chunkRate,    // alignment 
 	                outfile,      // basename for .?.ebwt files
 	                !entireSA,    // useBlockwise
 	                bmax,         // block size for blockwise SA builder
                     bmaxMultSqrt, // block size as multiplier of sqrt(len)
                     bmaxDivN,     // block size as divisor of len
 	                noDc? 0 : dcv,// difference-cover period
-	                ss,           // list of texts
-	                !sanityCheck, // destroy ss entries only when !sanityCheck
+	                is,           // list of input streams
+	                szs,          // list of reference sizes
+	                sztot,        // total size of all references
+	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
 	                verbose,      // be talkative
@@ -275,12 +267,9 @@ static void driver(const char * type,
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			// Note: we need not to have destroyed the entries in ss
-			TStr joinedss = Ebwt<TStr>::join(ss, ebwt.eh().chunkRate(), seed, true);
-			assert_eq(length(joinedss), length(s2));  // destroys entries in ss!
-			// We cannot compare then char-for-char because the padding
-			// between strings is random
-			assert_eq(joinedss, s2);  // destroys entries in ss!
+			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed);
+			assert_eq(length(joinedss), length(s2));
+			assert_eq(joinedss, s2);
 		}
 		if(verbose) {
 			if(length(s2) < 1000) {

@@ -17,6 +17,7 @@
 #include "ccnt_lut.h"
 #include "random_source.h"
 #include "hit.h"
+#include "ref_read.h"
 
 using namespace std;
 using namespace seqan;
@@ -247,7 +248,7 @@ public:
 		std::runtime_error(msg) { }
 };
 
-// Forward declarations
+// Forward declarations for Ebwt class
 class SideLocus;
 template<typename TStr> class EbwtSearchParams;
 template<typename TStr> class EbwtSearchState;
@@ -318,14 +319,16 @@ public:
 	     uint32_t bmaxSqrtMult,
 	     uint32_t bmaxDivN,
 	     int dcv,
-	     vector<TStr>& ss,
-	     bool destroySs,
+	     vector<istream*>& is,
+	     vector<uint32_t>& szs,
+	     uint32_t sztot,
+	     const RefReadInParams& refparams,
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
 	     bool __verbose = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
-	     _eh(joinedLen(ss, chunkRate), lineRate, linesPerSide, offRate, ftabChars, chunkRate)
+	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, ftabChars, chunkRate)
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
@@ -333,23 +336,26 @@ public:
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
-		ofstream out(file3.c_str());
-		{
-			Timer timer(cout, "  Time for call to writePacked: ", __verbose);
-			VMSG_NL("Writing packed representation to " << file3);
-			writePacked<Dna>(out, ss, __verbose);
-		}
+		ofstream fout3(file3.c_str(), ios::binary);
+//		{
+//			Timer timer(cout, "  Time for call to writePacked: ", __verbose);
+//			VMSG_NL("Writing packed representation to " << file3);
+//			writePacked<Dna>(fout3, ss, __verbose);
+//		}
 		// Build
-		initFromVector(ss,
+		initFromVector(is,
+		               szs,
+		               sztot,
+		               refparams,
 		               fout1,
 		               fout2,
+		               fout3,
 		               useBlockwise,
 		               bmax,
 		               bmaxSqrtMult,
 		               bmaxDivN,
 		               dcv,
-		               seed,
-		               destroySs);
+		               seed);
 		// Close output files
 		fout1.flush();
 		VMSG_NL("Wrote " << fout1.tellp() << " bytes to primary EBWT file: " << file1);
@@ -396,25 +402,27 @@ public:
 	 * Both the suffix array and the joined string go out of scope at
 	 * the end of this function, causing them both to be freed.
 	 */
-	void initFromVector(vector<TStr>& ss,
-	                    ostream& out1,
-	                    ostream& out2,
+	void initFromVector(vector<istream*>& is,
+	                    vector<uint32_t>& szs,
+	                    uint32_t sztot,
+	                    const RefReadInParams& refparams,
+	                    ofstream& out1,
+	                    ofstream& out2,
+	                    ofstream& out3,
 	                    bool useBlockwise,
 	                    uint32_t bmax,
 	                    uint32_t bmaxSqrtMult,
 	                    uint32_t bmaxDivN,
 	                    int dcv,
-	                    uint32_t seed,
-	                    bool destroySs) 
+	                    uint32_t seed) 
 	{
 		// Compose text strings into single string; doing so
 		// initializes _plen, _pmap, _nPat
 		VMSG_NL("Calculating joined length");
-		TStr s;
-		uint32_t jlen = joinedLen(ss, _eh.chunkRate());
-		assert_gt(jlen, 0);
-		VMSG_NL("  = " << jlen);
-		// Write the header info
+		TStr s; // holds the entire joined reference after call to joinToDisk
+		uint32_t jlen = joinedLen(szs, _eh.chunkRate());
+		assert_geq(jlen, sztot);
+		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " bytes of padding)");
 		VMSG_NL("Writing header");
 		writeFromMemory(true, out1, out2);
 		try {
@@ -426,18 +434,21 @@ public:
 			// Happens even with optimizations turned off.  Very, very
 			// strange.
 			//assert_gt(cap, seqan::capacity(s));
-			VMSG_NL("Joining string to disk");
+			VMSG_NL("Joining reference sequences");
 			{
-				Timer timer(cout, "  Time for call to joining string: ", _verbose);
-				joinToDisk(ss, s, out1, out2, destroySs, seed);
+				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
+				joinToDisk(is, szs, sztot, refparams, s, out1, out2, out3, seed);
 			}
+			out3.flush();
+			VMSG_NL("Wrote " << out3.tellp() << " bytes to tertiary EBWT file");
+			out3.close();
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory creating joined string in "
 			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
 			     << __LINE__ << endl;
 			throw e;
 		}
-		assert_eq(length(s), jlen);
+		assert_geq(length(s), jlen);
 		if(useBlockwise) {
 			if(bmax != 0xffffffff) {
 				VMSG_NL("bmax according to bmax setting: " << bmax);
@@ -474,24 +485,19 @@ public:
 			buildToDisk(bsa, s, out1, out2);
 		}
 		assert(repOk());
-		// s (which can be big) and sa (which can be extremely big) go
-		// out of scope; ss (which can be big) is maanged by the caller
-		// and is presumably still in scope, although the call to join
-		// may have freed its associated memory (depending on the value
-		// of destroySs)
 		VMSG_NL("Returning from initFromVector");
 	}
 	
 	/// Return the length that the joined string of the given string list will have
-	uint32_t joinedLen(vector<TStr>& ss, uint32_t chunkRate) {
+	uint32_t joinedLen(vector<uint32_t>& szs, uint32_t chunkRate) {
 		uint32_t ret = 0;
 		uint32_t chunkLen = 1 << chunkRate;
-		for(unsigned int i = 0; i < ss.size(); i++) {
-			if(i < ss.size() - 1) {
-				ret += ((length(ss[i]) + chunkLen - 1) / chunkLen) * chunkLen;
-			} else {
-				ret += length(ss[i]);
-			}
+		for(unsigned int i = 0; i < szs.size(); i++) {
+			//if(i < szs.size() - 1) {
+			ret += ((szs[i] + chunkLen - 1) / chunkLen) * chunkLen;
+			//} else {
+			//	ret += szs[i];
+			//}
 		}
 		return ret;
 	}
@@ -740,8 +746,9 @@ public:
 	}
 	
 	// Building
-	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool destroySs);
-	void joinToDisk(vector<TStr>& l, TStr& ret, ostream& out1, ostream& out2, bool destroySs, uint32_t seed);
+	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
+	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
+	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, ostream& out3, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -2963,60 +2970,101 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt<TStr>::join(vector<TStr>& l,
-                      uint32_t chunkRate,
-                      uint32_t seed,
-                      bool destroySs = false)
-{
+TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed) {
 	RandomSource rand(seed); // reproducible given same seed
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
 	size_t guessLen = 0;
 	for(size_t i = 0; i < l.size(); i++) {
-		guessLen += length(l[i]);
-		if(i < l.size()-1) {
-			guessLen += chunkLen;
-		}
+		guessLen += length(l[i]) + chunkLen;
 	}
 	reserve(ret, guessLen, Exact());
 	for(size_t i = 0; i < l.size(); i++) {
 		TStr& s = l[i];
 		assert_gt(length(s), 0);
-		// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
-		// here, causing the appendNE assert to fire?  When I run in a
-		// debugger, seqan::capacity() returns the correct value.
-		// Happens even with optimizations turned off.  Very, very
-		// strange.
-		// Append it onto the joined string
-		//appendNE(ret, s);
 		append(ret, s);
-		if(i < l.size() - 1) {
-			// s isn't the last pattern; padding between s and the next
-			// pattern may be necessary
+		// s isn't the last pattern; padding between s and the next
+		// pattern may be necessary
+		uint32_t diff = 0;
+		uint32_t leftover = length(ret) & ~chunkMask;
+		if(leftover > 0) {
+			// The joined string currently ends in the middle of a
+			// chunk, so we have to pad it by 'diff'
+			diff = chunkLen - leftover;
+			assert_gt(diff, 0);
+		}
+		for(size_t j = 0; j < diff; j++) {
+			// Append random characters to fill the gap; note that
+			// the randomness is reproducible as long as the 'seed'
+			// argument is the same, which helps us to sanity-check
+			// the result.
+			appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
+			assert_lt((uint8_t)ret[length(ret)-1], 4);
+		}
+		// Padded pattern ends on a chunk boundary
+		assert_eq(length(ret), length(ret) & chunkMask);
+	}
+	return ret;
+}
+
+/**
+ * Join several text strings together in a way that's compatible with
+ * the text-chunking scheme dictated by chunkRate parameter.
+ * 
+ * The non-static member Ebwt::join additionally builds auxilliary
+ * arrays that maintain a mapping between chunks in the joined string
+ * and the original text strings.
+ */
+template<typename TStr>
+TStr Ebwt<TStr>::join(vector<istream*>& l,
+                      vector<uint32_t>& szs,
+                      uint32_t sztot,
+                      const RefReadInParams& refparams,
+                      uint32_t chunkRate,
+                      uint32_t seed)
+{
+	RandomSource rand(seed); // reproducible given same seed
+	RefReadInParams rpcp = refparams;
+	uint32_t chunkLen = 1 << chunkRate;
+	uint32_t chunkMask = 0xffffffff << chunkRate;
+	TStr ret;
+	size_t guessLen = sztot + (szs.size() * chunkLen);
+	reserve(ret, guessLen, Exact());
+	for(size_t i = 0; i < l.size(); i++) {
+		// For each sequence we can pull out of istream l[i]...
+		assert(l[i]->good());
+		assert_geq(rpcp.numSeqCutoff, -1);
+		assert_geq(rpcp.baseCutoff, -1);
+		bool first = true;
+		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, first);
+			if(bases == 0) continue;
+			first = false;
+			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
+			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
+			assert_geq(rpcp.numSeqCutoff, -1);
+			assert_geq(rpcp.baseCutoff, -1);
+		    // insert padding
 			uint32_t diff = 0;
-			uint32_t leftover = length(ret) & ~chunkMask;
+			uint32_t rlen = length(ret);
+			uint32_t leftover = rlen & ~chunkMask;
 			if(leftover > 0) {
 				// The joined string currently ends in the middle of a
 				// chunk, so we have to pad it by 'diff'
 				diff = chunkLen - leftover;
 				assert_gt(diff, 0);
 			}
-			for(size_t j = 0; j < diff; j++) {
+			for(uint32_t i = 0; i < diff; i++) {
 				// Append random characters to fill the gap; note that
 				// the randomness is reproducible as long as the 'seed'
 				// argument is the same, which helps us to sanity-check
 				// the result.
-
-				// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
-				// here, causing the appendNE assert to fire?  When I run in a
-				// debugger, seqan::capacity() returns the correct value.
-				// Happens even with optimizations turned off.  Very, very
-				// strange.
-				//appendNE(ret, rand.nextU32() & 3); // append random junk
-				append(ret, rand.nextU32() & 3); // append random junk
+				appendValue(ret, (Dna)(rand.nextU32() & 3));
+				assert_lt((uint8_t)ret[length(ret)-1], 4);
+				//appendNE(ret, rand.nextU32() & 3);
 			}
-			// Padded pattern ends on a chunk boundary
+			// Pattern now ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & chunkMask);
 		}
 	}
@@ -3041,51 +3089,81 @@ TStr Ebwt<TStr>::join(vector<TStr>& l,
  * the same seed.
  */
 template<typename TStr>
-void Ebwt<TStr>::joinToDisk(vector<TStr>& l,
+void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
+                            vector<uint32_t>& szs,
+                            uint32_t sztot,
+                            const RefReadInParams& refparams,
                             TStr& ret,
                             ostream& out1,
                             ostream& out2,
-                            bool destroySs = false,
+                            ostream& out3,
                             uint32_t seed = 0)
 {
 	RandomSource rand(seed); // reproducible given same seed
 	const EbwtParams& eh = this->eh();
-	assert_gt(l.size(), 0);
-	this->_nPat = l.size(); // store this in memory
+	RefReadInParams rpcp = refparams;
+	assert_gt(szs.size(), 0);
+	assert_gt(sztot, 0);
+	this->_nPat = szs.size(); // store this in memory
 	this->_pmap = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
 	ASSERT_ONLY(uint32_t pmapEnts = eh.numChunks()*2);
 	uint32_t pmapOff = 0;
 	// Allocate plen[]
 	try {
-		this->_plen = new uint32_t[this->nPat()];
+		this->_plen = new uint32_t[this->_nPat];
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating plen[] in Ebwt::join()"
 		     << " at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
 	// For each pattern, set plen
-	for(unsigned int i = 0; i < l.size(); i++) {
-		TStr& s = l[i];
-		assert_gt(length(s), 0);
-		this->_plen[i] = length(s);
+	for(size_t i = 0; i < this->_nPat; i++) {
+		this->_plen[i] = szs[i];
 		writeU32(out1, this->_plen[i], this->toBe());
 	}
-	// For each pattern, set pmap
+	size_t seqsRead = 0;
 	for(unsigned int i = 0; i < l.size(); i++) {
-		TStr& s = l[i];
-		// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
-		// here, causing the appendNE assert to fire?  When I run in a
-		// debugger, seqan::capacity() returns the correct value.
-		// Happens even with optimizations turned off.  Very, very
-		// strange.
-		// Append it onto the joined string
-		//appendNE(ret, s);
-		append(ret, s);
-		if(destroySs) destroy(s); // free s
-		if(i < l.size() - 1) {
-			// s isn't the last text, so padding between s and the next
-			// pattern may be necessary
+		assert(l[i]->good());
+		streampos pos = l[i]->tellg();
+		assert_geq(rpcp.numSeqCutoff, -1);
+		assert_geq(rpcp.baseCutoff, -1);
+		bool first = true;
+		// For each sequence we can pull out of istream l[i]...
+		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+			size_t ilen = length(ret);
+			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, first);
+			size_t nlen = length(ret);
+			if(bases == 0) continue;
+			first = false;
+			assert_eq(bases, this->_plen[seqsRead]);
+			seqsRead++;
+			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
+			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
+			assert_geq(rpcp.numSeqCutoff, -1);
+			assert_geq(rpcp.baseCutoff, -1);
+			// Write reference bases (but not padding) to .3.ebwt index
+			{
+				String<Dna, Packed<> > pchunk;
+				reserve(pchunk, 4096 + 32);
+				writePackedLen(out3, bases, _verbose);
+				for(size_t j = 0; j < bases; j += 4096) {
+					clear(pchunk);
+					size_t upper = min<size_t>(ilen + j + 4096, nlen);
+					append(pchunk, infix(ret, ilen + j, upper));
+					size_t len = length(pchunk);
+					assert_gt(len, 0);
+					assert_leq(len, 4096);
+					if(upper == nlen) {
+						// Add a bunch of 0s on the end
+						for(size_t j = 0; j < 31; j++) {
+							appendValue(pchunk, (Dna)0);
+						}
+					}
+					writePacked(out3, pchunk, len, false, _verbose);
+				}
+			}
+		    // insert padding
 			uint32_t diff = 0;
 			uint32_t rlen = length(ret);
 			uint32_t leftover = rlen & ~(eh.chunkMask());
@@ -3100,19 +3178,36 @@ void Ebwt<TStr>::joinToDisk(vector<TStr>& l,
 				// the randomness is reproducible as long as the 'seed'
 				// argument is the same, which helps us to sanity-check
 				// the result.
-				append(ret, rand.nextU32() & 3);
-				//appendNE(ret, rand.nextU32() & 3);
+				appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
+				assert_lt((uint8_t)ret[length(ret)-1], 4);
 			}
 			// Pattern now ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & eh.chunkMask());
+			// Initialize elements of the pmap that cover this pattern
+			for(unsigned int j = 0; j < bases; j += eh.chunkLen()) {
+				assert_lt(pmapOff+1, pmapEnts);
+				pmapOff += 2;
+				writeU32(out1, seqsRead-1, this->toBe()); // pattern id
+				writeU32(out1, j, this->toBe()); // offset into pattern
+			}
 		}
-		// Initialize elements of the pmap that cover this pattern
-		for(unsigned int j = 0; j < this->plen()[i]; j += eh.chunkLen()) {
-			assert_lt(pmapOff+1, pmapEnts);
-			pmapOff += 2;
-			writeU32(out1, i, this->toBe()); // pattern id
-			writeU32(out1, j, this->toBe()); // offset into pattern
-		}
+		l[i]->clear();
+		l[i]->seekg(pos);
+		assert(!l[i]->bad());
+		assert(!l[i]->fail());
+		l[i]->clear();
+		assert(l[i]->good());
+		assert(!l[i]->eof());
+		#ifndef NDEBUG
+		int c = l[i]->get();
+		assert_eq('>', c);
+		assert(l[i]->good());
+		assert(!l[i]->eof());
+		l[i]->seekg(pos);
+		l[i]->clear();
+		assert(l[i]->good());
+		assert(!l[i]->eof());
+		#endif
 	}
 	assert_eq(pmapOff, pmapEnts); // initialized every pmap element
 }
