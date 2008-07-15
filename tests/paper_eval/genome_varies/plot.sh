@@ -12,7 +12,7 @@ for t in 0 5 10 ; do
 	         whole.1435609516 \
 	         whole ; do
 	    n=`echo $s | sed 's/whole\.//'`
-	    if [ -z "$n" ] ; then
+	    if [ "$n" = "whole" ] ; then
 	    	n=2871219032
 	    fi
 	   	echo $n
