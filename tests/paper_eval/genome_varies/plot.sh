@@ -15,7 +15,8 @@ for t in 0 5 10 ; do
 	    if [ "$n" = "whole" ] ; then
 	    	n=2871219032
 	    fi
-	   	echo $n
+	   	echo -n "$n " >> trim${t}_0mm.dat
+	   	echo -n "$n " >> trim${t}_1mm.dat
 		perl summarize_top.pl ${s}.sim_reads.t${t}.top ebwt_search \
 		  | tail -1 \
 		  | cut -d" " -f 2 \
