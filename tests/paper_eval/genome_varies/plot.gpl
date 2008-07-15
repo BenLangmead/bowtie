@@ -11,6 +11,7 @@ set multiplot
 #set autoscale
 set data style lines
 set border 3
+set xtics border nomirror ("1/16 (180 Mbases)" 179451189.0, "1/8 (359 Mbases)" 358902379.0, "1/4 (718 Mbases)" 717804758.0, "1/2 (1.44 Gbases)" 1435609516.0, "Whole (2.87 Gbases)" 2871219032.0)
 set xtics border nomirror (179451189.0, 358902379.0, 717804758.0, 1435609516.0, 2871219032.0)
 set xrange [149542657.5:3445462838.4]
 set mytics 5
