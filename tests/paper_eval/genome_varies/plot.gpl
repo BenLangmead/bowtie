@@ -6,16 +6,17 @@ IF TYPE eq pbm  set terminal pbm
 IF TYPE ne xwin set output "%OUTFILE%"
 set xlabel "%XLABEL%" font "%FONT%,%FONTSIZE%"
 set ylabel "%YLABEL%" font "%FONT%,%FONTSIZE%"
+set logscale x
 set multiplot
 #set autoscale
 set data style lines
 set border 3
-set xtics border nomirror 40, -5, 21
-set xrange [41:24]
-set ytics border mirror 0, 10, 300
-set y2tics border mirror 0, 10, 300
+#set xtics border nomirror 
+set xrange [0:2871219032]
+set ytics border mirror 0, 25, 300
+set y2tics border mirror 0, 25, 300
 set mytics 2
-set yrange [0:300]
-set y2range [0:300]
+set yrange [200:500]
+set y2range [200:500]
 set origin 0.0,0.0
 set title "%TITLE%" font "%TFONT%,%TFONTSIZE%"
