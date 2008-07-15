@@ -45,11 +45,11 @@ perl ~/software/gplot-1.3/gplot.pl \
      -name "30bp reads, exact matching"      trim5_0mm.dat \
   -thickness 2 -color black -point downtriangle -pointsize 1.3 \
      -name "25bp reads, exact matching"      trim10_0mm.dat \
-  -thickness 2 -color black -point box          -pointsize 1.3 \
+  -thickness 2 -color black -point filledbox    -pointsize 1.3 \
      -name "35bp reads, 1-mismatch matching" trim0_1mm.dat \
-  -thickness 2 -color black -point circle       -pointsize 1.3 \
+  -thickness 2 -color black -point filledcircle       -pointsize 1.3 \
      -name "30bp reads, 1-mismatch matching" trim5_1mm.dat \
-  -thickness 2 -color black -point downtriangle -pointsize 1.3 \
+  -thickness 2 -color black -point filleddowntriangle -pointsize 1.3 \
      -name "25bp reads, 1-mismatch matching" trim10_1mm.dat \
   | grep -v "GUPLOT" > plot.gnuplot
 
@@ -57,5 +57,8 @@ if [ ! -f /tmp/gplot.eps ] ; then
 	echo "Error: didn't find gnuplot output in /tmp/gplot.eps"
 	exit 1
 fi
+
+sed -e 's/set style line [0-9]+ /set style line 0 /' < plot.gnuplot > plot.gnuplot.2
+gnuplot plot.gnuplot.2
 
 cp /tmp/gplot.eps .
