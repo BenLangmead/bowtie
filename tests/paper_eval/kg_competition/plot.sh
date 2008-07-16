@@ -2,13 +2,13 @@
 
 # Goal:
 #
-# Workstation:
+# WORKSTATION=1:
 #                 Running Time        % Reads Mapped
 #  Bowtie              YYm:ZZs                 XX.X%
 #  Maq -n 1         Xh:YYm:ZZs                 XX.X%
 #  Maq             XXh:YYm:ZZs                 XX.X%
 #
-# Server:
+# WORKSTATION=0:
 #                 Running Time        % Reads Mapped
 #  Bowtie              YYm:ZZs                 XX.X%
 #  Maq -n 1         Xh:YYm:ZZs                 XX.X%
@@ -59,6 +59,7 @@ if [ "$WORKSTATION" = "0" ] ; then
 	tmp=`head -5 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 1`
 	echo -n "$tmp," >> $NAME.results.soap.txt
 	head -5 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.soap.txt
+	perl plot.pl bowtie maq.n1 maq soap.v1 soap
+else 
+	perl plot.pl bowtie maq.n1 maq
 fi
-
-perl plot.pl
