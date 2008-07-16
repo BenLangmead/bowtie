@@ -249,6 +249,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0;
 	assert(patsrc.hasMorePatterns());
+	EbwtSearchState<TStr> s(ebwt, params, seed);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
     	params.setFw(!revcomp || !patsrc.nextIsReverseComplement());
     	params.setPatId(patid++);
@@ -263,7 +264,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	if(qSameLen && length(pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
-    	EbwtSearchState<TStr> s(ebwt, pat, name, qual, params, seed);
+    	s.newQuery(&pat, &name, &qual);
     	params.stats().incRead(s, pat);
 	    ebwt.search(s, params);
 	    // If the forward direction matched exactly, ignore the
@@ -617,6 +618,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
 	{
 	Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
+	EbwtSearchState<TStr> s(ebwtFw, params, seed);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
     	bool exactOnly = false;
     	bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
@@ -635,7 +637,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		throw runtime_error("All reads must be the same length");
     	}
     	// Create state for a search on in the forward index
-    	EbwtSearchState<TStr> s(ebwtFw, pat, name, qual, params, seed);
+    	s.newQuery(&pat, &name, &qual);
     	params.stats().incRead(s, pat);
     	// Are there provisional hits?
     	if(sink.numProvisionalHits() > 0) {
@@ -789,6 +791,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	//lastHits = 0llu; // start again from 0 hits
 	{
 	Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
+	EbwtSearchState<TStr> s(ebwtBw, params, seed);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
     	bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
     	params.setFw(sfw);
@@ -801,7 +804,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 		string name;
 		patsrc.nextPattern(pat, qual, name);
     	assert(!empty(pat));
-    	EbwtSearchState<TStr> s(ebwtBw, pat, name, qual, params, seed);
+    	s.newQuery(&pat, &name, &qual);
     	params.stats().incRead(s, pat);
 		// Skip if previous phase determined this read is "done"; this
 		// should only happen in oneHit mode
@@ -919,6 +922,8 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
 	{
 		Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
+		// Create state for a search on in the forward index
+		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 			bool exactOnly = false;
 			bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
@@ -937,8 +942,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			if(qSameLen && length(pat) != lastLen) {
 				throw runtime_error("All reads must be the same length");
 			}
-			// Create state for a search on in the forward index
-			EbwtSearchState<TStr> s(ebwtFw, pat, name, qual, params, seed);
+			s.newQuery(&pat, &qual, &name);
 			params.stats().incRead(s, pat);
 			// Are there provisional hits?
 			if(sink.numProvisionalHits() > 0) {
@@ -1036,6 +1040,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	//lastHits = 0llu; // start again from 0 hits
 	{
 		Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
+		EbwtSearchState<TStr> s(ebwtBw, params, seed);
 		while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 			bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
 			params.setFw(sfw);
@@ -1048,7 +1053,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			string name;
 			patsrc.nextPattern(pat, qual, name);
 			assert(!empty(pat));
-			EbwtSearchState<TStr> s(ebwtBw, pat, name, qual, params, seed);
+			s.newQuery(&pat, &name, &qual);
 			params.stats().incRead(s, pat);
 			// Skip if previous phase determined this read is "done"; this
 			// should only happen in oneHit mode

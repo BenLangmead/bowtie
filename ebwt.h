@@ -1272,7 +1272,7 @@ struct SideLocus {
 	SideLocus(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
 		initFromRow(row, ep, ebwt);
 	}
-	
+
 	/**
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the Ebwt.
@@ -1316,10 +1316,11 @@ template<typename TStr>
 class EbwtSearchState {
 public:
 	typedef typename Value<TStr>::Type TVal;
+
 	EbwtSearchState(const Ebwt<TStr>& __ebwt,
-	                const TStr& __query,
-					const string& __query_name,
-					const string& __query_quals,
+	                TStr* __query,
+					string* __query_name,
+					string* __query_quals,
 	                const EbwtSearchParams<TStr>& __params,
 	                uint32_t seed = 0) :
 	    _ebwt(__ebwt),
@@ -1335,8 +1336,8 @@ public:
 		_tops(),
 		_bots(),
 		_firstNzRemainder(-1),
-		_qlen(length(__query)),
-		_qidx(length(_query)-1),
+		_qlen(length(*__query)),
+		_qidx(length(*_query)-1),
 		_topSideLocus(),
 		_botSideLocus(),
 		_mism(0xffffffff)
@@ -1350,11 +1351,61 @@ public:
 		fill(_tops,       _narrowHalfLen, 0);
 		fill(_bots,       _narrowHalfLen, 0);
 	}
+
+	EbwtSearchState(const Ebwt<TStr>& __ebwt,
+	                const EbwtSearchParams<TStr>& __params,
+	                uint32_t seed = 0) :
+	    _ebwt(__ebwt),
+		_params(__params),
+		_rand(seed),
+		_top(0xffffffff),
+		_bot(0xffffffff),
+		_query(NULL),
+		_query_name(NULL),
+		_query_quals(NULL),
+		_remainders(),
+		_tried(),
+		_tops(),
+		_bots(),
+		_firstNzRemainder(-1),
+		_qlen(0),
+		_qidx(0),
+		_topSideLocus(),
+		_botSideLocus(),
+		_mism(0xffffffff)
+	{ }
+	
+	void newQuery(TStr* __query,
+	              string* __query_name,
+	              string* __query_quals)
+	{
+		assert(__query != NULL);
+		assert(__query_name != NULL);
+		assert(__query_quals != NULL);
+		_query = __query;
+		_query_name = __query_name;
+		_query_quals = __query_quals;
+		_firstNzRemainder = -1;
+		_mism = 0xffffffff;
+		if(length(*_query) != _qlen) {
+			_qlen = length(*_query);
+			_narrowHalfLen = _qlen;
+			// Let the forward Ebwt take the middle character
+			if(_params.ebwtFw()) _narrowHalfLen++;
+			_narrowHalfLen >>= 1;
+		}
+		_qidx = _qlen-1;
+		fill(_remainders, _narrowHalfLen, 0);
+		fill(_tried,      _narrowHalfLen, 0);
+		fill(_tops,       _narrowHalfLen, 0);
+		fill(_bots,       _narrowHalfLen, 0);
+	}
+	
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
-	const TStr& query() const                    { return _query;  }
-	const string& query_quals() const			 { return _query_quals; }
-	const string& query_name() const			 { return _query_name; }
+	const TStr& query() const                    { return *_query;  }
+	const string& query_quals() const			 { return *_query_quals; }
+	const string& query_name() const			 { return *_query_name; }
 	uint32_t top() const                         { return _top;    }
 	uint32_t bot() const                         { return _bot;    }
 	void setTopBot(uint32_t __top, uint32_t __bot) {
@@ -1408,19 +1459,19 @@ public:
 	/// Get char at a query position
 	int chr(uint32_t qidx) const {
 		assert(!qExhausted());
-		int c = (TVal)_query[qidx];
+		int c = (TVal)(*_query)[qidx];
 		assert_lt(c, 4);  // for sanity
 		assert_geq(c, 0); // for sanity
 		return c;
 	}
 	/// Assert that state is initialized
-	bool initialized() const {
-		assert_eq(0xffffffff, _top);
-		assert_eq(0xffffffff, _bot);
-		assert_eq(_qlen-1, _qidx);
-		assert_eq(_mism, 0xffffffff);
-		return true;
-	}
+//	bool initialized() const {
+//		assert_eq(0xffffffff, _top);
+//		assert_eq(0xffffffff, _bot);
+//		assert_eq(_qlen-1, _qidx);
+//		assert_eq(_mism, 0xffffffff);
+//		return true;
+//	}
 	/**
 	 * 
 	 */
@@ -1645,12 +1696,12 @@ public:
 private:
 	const Ebwt<TStr>& _ebwt; // EBWT
 	const EbwtSearchParams<TStr>& _params; // search params
-	RandomSource _rand; // random source for picking a random hit
-	uint32_t _top;      // top index
-	uint32_t _bot;      // bot index
-	const TStr& _query; // query string
-	const string& _query_name; // query name
-	const string& _query_quals; // query qualities string
+	RandomSource _rand;   // random source for picking a random hit
+	uint32_t _top;        // top index
+	uint32_t _bot;        // bot index
+	TStr*   _query;       // query string
+	string* _query_name;  // query name
+	string* _query_quals; // query qualities string
 	String<uint32_t> _remainders; // space left to explore
 	String<uint8_t> _tried; // denotes characters originally tried at each pos
 	String<uint32_t> _tops; // tops we might want to backtrack to
@@ -1660,7 +1711,7 @@ private:
     uint32_t _qidx;     // offset into query (moves from high to low offsets)
     SideLocus _topSideLocus; // top EBWT side coordinates
     SideLocus _botSideLocus; // bot EBWT side coordinates
-    uint32_t _narrowHalfLen;
+    uint32_t _narrowHalfLen; // length of the "revisitable" region
 	uint32_t _mism;
 };
 
@@ -1938,9 +1989,6 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	assert_geq(bp, 0);
 	uint32_t cCnt = countUpTo(l, c);
 	assert_leq(cCnt, eh.sideBwtLen());
-	// Now factor in the occ[] count at the side break
-	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);                // prev
-	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8); // cur
 	if(c == 0 && sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
@@ -1951,12 +1999,16 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 		}
 	}
 	uint32_t ret;
-	switch(c) {
-		case 0: ret = cCnt + ac[0] + this->_fchr[c]; break;
-		case 1: ret = cCnt + ac[1] + this->_fchr[c]; break;
-		case 2: ret = cCnt + gt[0] + this->_fchr[c]; break;
-		case 3: ret = cCnt + gt[1] + this->_fchr[c]; break;
-		default: throw;
+	// Now factor in the occ[] count at the side break
+	if(c < 2) {
+		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
+		assert_leq(ac[0], eh.numSides() * eh.sideBwtLen()); // b/c it's used as padding
+		assert_lt(ac[1], eh.len());
+		ret = ac[c] + cCnt + this->_fchr[c];
+	} else {
+		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8); // next
+		assert_lt(gt[0], eh.len()); assert_lt(gt[1], eh.len());
+		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
 	assert_leq(ret, this->_fchr[c+1]); // can't have jumpded into next char's section
@@ -1990,11 +2042,6 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	uint32_t cCnt = countUpTo(l, c);
 	if(unpack_2b_from_8b(ebwtSide[by], bp) == c) cCnt++;
 	assert_leq(cCnt, eh.sideBwtLen());
-	// Now factor in the occ[] count at the side break
-	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8);     // cur
-	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh.sideSz()) - 8); // next
-	assert_leq(ac[0], eh.numSides() * eh.sideBwtLen()); // b/c it's used as padding
-	assert_lt(ac[1], eh.len()); assert_lt(gt[0], eh.len()); assert_lt(gt[1], eh.len());
 	if(c == 0 && sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
@@ -2006,15 +2053,19 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 		}
 	}
 	uint32_t ret;
-	switch(c) {
-		case 0: ret = ac[0] - cCnt + this->_fchr[c]; break;
-		case 1: ret = ac[1] - cCnt + this->_fchr[c]; break;
-		case 2: ret = gt[0] - cCnt + this->_fchr[c]; break;
-		case 3: ret = gt[1] - cCnt + this->_fchr[c]; break;
-		default: throw;
+	// Now factor in the occ[] count at the side break
+	if(c < 2) {
+		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8);
+		assert_leq(ac[0], eh.numSides() * eh.sideBwtLen()); // b/c it's used as padding
+		assert_lt(ac[1], eh.len());
+		ret = ac[c] - cCnt + this->_fchr[c];
+	} else {
+		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh.sideSz()) - 8); // next
+		assert_lt(gt[0], eh.len()); assert_lt(gt[1], eh.len());
+		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
-	assert_leq(ret, this->_fchr[c+1]); // can't have jumpded into next char's section
+	assert_leq(ret, this->_fchr[c+1]); // can't have jumped into next char's section
 	if(c == 0) {
 		assert_leq(cCnt, eh.sideBwtLen());
 	} else {
@@ -2412,7 +2463,7 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 {
 	typedef typename Value<TStr>::Type TVal;
 	assert(isInMemory());
-	assert(s.initialized());
+//	assert(s.initialized());
 	assert(s.qAtBeginning());
 	s.params().stats().incTry(s);
 	int ftabChars = this->eh().ftabChars();
@@ -2441,7 +2492,7 @@ template<typename TStr>
 inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const
 {
 	assert(isInMemory());
-	assert(s.initialized());
+//	assert(s.initialized());
 	assert(s.qAtBeginning());
 	s.params().stats().incTry(s);
 	s.setTopBot(this->_fchr[s.chr()], this->_fchr[s.chr()+1]);

@@ -31,9 +31,9 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat,
-						const string& patName,
-						const string& patQuals,
+						TStr& pat,
+						string& patName,
+						string& patQuals,
 						HitSink& hit_sink) = 0;
 	virtual ~SearchPolicy() {}
 };
@@ -45,9 +45,9 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat,
-						const string& patName,
-						const string& patQuals,
+						TStr& pat,
+						string& patName,
+						string& patQuals,
 						HitSink& hit_sink) 
 	{
 		EbwtSearchState<TStr> s(ebwt, pat, params, 0);
@@ -86,9 +86,9 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat,
-						const string& patName,
-						const string& patQuals,
+						TStr& pat,
+						string& patName,
+						string& patQuals,
 						HitSink& hit_sink) 
 	{
 		
@@ -103,7 +103,8 @@ public:
 		_mer_search_params.setFw(!revcomp);
 		_mer_search_params.setEbwtFw(params.ebwtFw());
 		
-		EbwtSearchState<TStr> s(ebwt, mer, patName, "", _mer_search_params, 0);
+		string quals = "";
+		EbwtSearchState<TStr> s(ebwt, &mer, &patName, &quals, _mer_search_params, 0);
 		ebwt.search(s, _mer_search_params);
 		
 		extendHits(pat, patQuals, hit_sink, params, revcomp, revcomp, false);
@@ -267,9 +268,9 @@ public:
 	virtual void search(Ebwt<TStr>& ebwt,
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
-						const TStr& pat,
-						const string& patName,
-						const string& patQuals,
+						TStr& pat,
+						string& patName,
+						string& patQuals,
 						HitSink& hit_sink)
 	{
 		
@@ -289,8 +290,8 @@ public:
 		this->_mer_search_params.setFw(params.fw());
 		this->_mer_search_params.setEbwtFw(params.ebwtFw());
 		
-		
-		EbwtSearchState<TStr> s(ebwt, mer, patName, "", this->_mer_search_params, 0);
+		string quals = "";
+		EbwtSearchState<TStr> s(ebwt, &mer, &patName, &quals, this->_mer_search_params, 0);
 		ebwt.search1MismatchOrBetter(s, this->_mer_search_params, !_suppressExact);
 		
 		extendHits(pat, patQuals, hit_sink, params, extend_left_pat, !params.fw(), !params.ebwtFw());
