@@ -1,0 +1,41 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\usepackage{multirow}
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{rrrrcr}\toprule
+Target peak & Actual peak & \# Suffix   & Difference   & 2-bit-per-base & \multirow{2}{*}{Build time} \\
+footprint   & footprint   & array blocks & cover period & references     & \\ 
+\toprule
+16 GB & 14.40 GB & 1
+ & 256
+ & no & 4h:56m \\\midrule
+8 GB & 4.70 GB & 9
+ & 1024
+ & no & 5h:31m \\\midrule
+4 GB & 3.39 GB & 34
+ & 4096
+ & no & 8h:07m \\\midrule
+2 GB & 1.38 GB &  & 4096
+ & yes & 1h:14m \\
+\bottomrule
+\end{tabular}
+\caption{Maximum virtual memory footprint and wall-clock running times for various configurations of the Bowtie index-building tool.In all cases, the index produced is about 2.2 GB on disk.THE FINAL ROW OF RESULTS IS BOGUS (THE RUN WASN'T DONE YET).  ALL RESULTS ARE GOING TO BE RECALCULATED ON PRIVET OR LARCH.}
+\end{table}
+\end{document}
