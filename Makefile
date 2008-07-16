@@ -127,8 +127,8 @@ ebwt_search-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
 multikey_qsort: multikey_qsort.cpp diff_sample.cpp tokenize.cpp endian.cpp $(HEADERS)
 	$(CXX) $(DEBUG_FLAGS) -DMULTIKEY_QSORT_MAIN -Wall $(INC) $(LIBS) -o $@ $< diff_sample.cpp tokenize.cpp endian.cpp
 
-blockwise_sa: blockwise_sa.cpp $(HEADERS) diff_sample.cpp
-	$(CXX) $(DEBUG_FLAGS) -DBLOCKWISE_SA_MAIN -Wall $(INC) $(LIBS) -o $@ $< diff_sample.cpp
+blockwise_sa: blockwise_sa.cpp $(HEADERS) diff_sample.cpp endian.cpp
+	$(CXX) $(DEBUG_FLAGS) -DBLOCKWISE_SA_MAIN -Wall $(INC) $(LIBS) -o $@ $< diff_sample.cpp endian.cpp
 
 lcp: lcp.cpp $(HEADERS)
 	$(CXX) $(DEBUG_FLAGS) -DLCP_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
