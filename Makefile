@@ -152,7 +152,7 @@ bowtie_convert: bowtie_convert.cpp tokenize.h tokenize.cpp pat.h hit.h params.h 
 	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(INC) -o $@ $< $(MAQ_CPPS) tokenize.cpp
 
 simreads: simreads.cpp tokenize.h tokenize.cpp
-	$(CXX) $(DEBUG_FLAGS) -DSIMREADS_MAIN -Wall $(INC) $(LIBS) -o $@ $< tokenize.cpp
+	$(CXX) $(DEBUG_FLAGS) -DSIMREADS_MAIN -Wall $(INC) $(LIBS) -o $@ $< tokenize.cpp endian.cpp
 
 txt_to_fastq: txt_to_fastq.cpp pat.h
 	$(CXX) $(DEBUG_FLAGS) -DTXT_TO_FASTQ_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)

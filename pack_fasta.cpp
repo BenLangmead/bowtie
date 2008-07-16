@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
 		if(verbose) cout << "Read " << ss.size() << " packed sequences" << endl;
 		try {
 			ofstream out(outfile.c_str());
-			writePacked(out, ss, true, verbose);
+			writePacked(out, ss, verbose);
 			out.close();
 		} catch(UnexpectedTypeSizeException& e) {
 			cerr << "UnexpectedTypeSizeException for \"" << outfile << "\": " << e.what() << endl;
