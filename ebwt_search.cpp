@@ -433,6 +433,8 @@ static bool findSanityHits(const TStr1& pat,
 {
 	typedef TStr1 TStr;
 	typedef typename Value<TStr>::Type TVal;
+	bool ebwtFw = !transpose;
+	bool fivePrimeOnLeft = (ebwtFw == fw);
     uint32_t plen = length(pat);
 	TStr half;
 	reserve(half, plen);
@@ -461,14 +463,19 @@ static bool findSanityHits(const TStr1& pat,
 			uint32_t pos = position(finder);
 			bitset<max_read_bp> diffs = 0;
 			if(pos >= ohlen) {
-				// Extend, counting mismatches
+				// Extend toward the left end of the pattern, counting
+				// mismatches
 				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
 					if(o[pos-j-1] != pat[ohlen-j-1]) {
-						if(transpose) {
-							// Transpose mismatch bit
-							diffs.set(plen-(ohlen-j));
+						uint32_t off = ohlen-j-1;
+						if(fivePrimeOnLeft) {
+							diffs.set(off);
 						} else {
-							diffs.set(ohlen-j-1);
+							// The 3' end is on on the left end of the
+							// pattern, but the diffs vector should
+							// encode mismatches w/r/t the 5' end, so
+							// we flip
+							diffs.set(plen-off-1);
 						}
 					}
 				}
@@ -559,8 +566,13 @@ static bool reconcileHits(const TStr1& pat,
 			assert_gt(sanityHits.size(), 0);
     		if(h.h.first == itr->h.first && h.h.second == itr->h.second) {
     			// Assert that number of mismatches matches
-    			assert_eq(h.mms, itr->mms);
+    			if(h.fw != itr->fw || h.mms != itr->mms) {
+    				cout << endl;
+    				cout << "actual hit: fw=" << h.fw << endl;
+    				cout << "sanity hit: fw=" << itr->fw << endl;
+    			}
     			assert_eq(h.fw, itr->fw);
+    			assert_eq(h.mms, itr->mms);
     			found = true;
     			sanityHits.erase(itr); // Retire this sanity hit
     			break;
@@ -1348,6 +1360,7 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+#if 0
 template<typename TStr>
 static void prioritySearch(PatternSource<TStr>& patsrc,
 						   Ebwt<TStr>& ebwt,
@@ -1443,6 +1456,6 @@ static void prioritySearch(PatternSource<TStr>& patsrc,
 		delete *pol_itr;
 	}
 }
-
+#endif
 
 #endif

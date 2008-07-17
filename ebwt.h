@@ -1101,7 +1101,6 @@ public:
 	{
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
-		//uint32_t mm = _backtracking ? 1 : 0;
 		bitset<max_read_bp> mm = 0;
 		hit_pat_t pat;
 		string patQuals;
@@ -1113,6 +1112,9 @@ public:
 		}
 		else
 		{
+			// Note: this is re-reversing the pattern back to its
+			// normal orientation; the pattern source reversed it
+			// initially
 			for(size_t i = 0; i < len; i++) 
 			{
 				appendValue(pat, s.query()[len-i-1]);
@@ -1122,19 +1124,14 @@ public:
 		
 		if (s.mismatch() != 0xffffffff)
 		{	
-			
-			if ((_ebwtFw && !_fw) || (_fw && !_ebwtFw))
+			if (_ebwtFw != _fw) {
+				// The 3' end is on the left but the mm vector encodes
+				// mismatches w/r/t the 5' end, so we flip
 				mm.set(len - s.mismatch() - 1);
-			else
+			}
+			else {
 				mm.set(s.mismatch());
-			
-			//else
-//			{
-//				if ((_ebwtFw && !_fw) || (!_ebwtFw && _fw))
-//					mm.set(len - s.mismatch() - 1);
-//				else
-//					mm.set(s.mismatch());
-//			}
+			}
 		}
 		
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
@@ -1156,14 +1153,24 @@ public:
 				if(_ebwtFw) {
 					// Forward pattern appears at h
 					if(s.query()[i] != _texts[h.first][h.second + i]) {
-						diffs.set(i);
+						uint32_t qoff = i;
+						// if _ebwtFw != _fw the 3' end is on on the
+						// left end of the pattern, but the diff vector
+						// should encode mismatches w/r/t the 5' end,
+						// so we flip
+						if (_ebwtFw != _fw) diffs.set(len - qoff - 1);
+						else                diffs.set(qoff);
 					}
 				} else {
 					// Reverse of pattern appears at h
 					if(s.query()[len-i-1] != _texts[h.first][h.second + i]) {
-						// Text and query are already reversed, so we
-						// don't need to reverse our entries in diffs
-						diffs.set(i);
+						uint32_t qoff = len-i-1;
+						// if _ebwtFw != _fw the 3' end is on on the
+						// left end of the pattern, but the diff vector
+						// should encode mismatches w/r/t the 5' end,
+						// so we flip
+						if (_ebwtFw != _fw) diffs.set(len - qoff - 1);
+						else                diffs.set(qoff);
 					}
 				}
 			}
@@ -1183,6 +1190,7 @@ public:
 				if(length(_texts[h.first]) < 80) {
 					cerr << "  Text: " << _texts[h.first] << endl;
 				}
+				cerr << "  s.mismatch(): " << s.mismatch() << endl;
 				cerr << "  FW: " << _fw << endl;
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
 				cerr << "  Provisional: " << provisional << endl;
@@ -1699,7 +1707,7 @@ private:
     SideLocus _topSideLocus; // top EBWT side coordinates
     SideLocus _botSideLocus; // bot EBWT side coordinates
     uint32_t _narrowHalfLen; // length of the "revisitable" region
-	uint32_t _mism;
+	uint32_t _mism;          // mismatch vector (LSB=extreme 5' end)
 };
 
 ///////////////////////////////////////////////////////////////////////
