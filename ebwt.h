@@ -1471,21 +1471,29 @@ public:
 			_params.stats().incStopAt(*this);
 			if(!_params.backtracking() && inNarrowHalf()) {
 				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				assert_eq(0, _remainders[_qidx]);
-				assert_eq(0, _tried[_qidx]);
-				assert_eq(0, _tops[_qidx]);
-				assert_eq(0, _bots[_qidx]);
+				//assert_eq(0, _remainders[_qidx]);
+				//assert_eq(0, _tried[_qidx]);
+				//assert_eq(0, _tops[_qidx]);
+				//assert_eq(0, _bots[_qidx]);
 				_firstNzRemainder = _qidx;
 				_remainders[_qidx] = 1;
 				_tried[_qidx] = c;
 				_tops[_qidx] = _top;
 				_bots[_qidx] = _bot;
 			}
-		} else {
+		} else if(!_params.backtracking() && inNarrowHalf()) {
 			_params.stats().incPushthrough(*this);
 			if(inNarrowHalf()) _params.stats().incNarrowHalfAdvance(*this);
 			setTopBot(r, r+1);
+			_remainders[_qidx] = 0;
+			_tried[_qidx] = 0;
+			_tops[_qidx] = 0;
+			_bots[_qidx] = 0;
+		} else {
+			_params.stats().incPushthrough(*this);
+			setTopBot(r, r+1);
 		}
+		
 		assert(_qidx != 0xffffffff); _qidx--;
 		return r;
 	}
@@ -1509,10 +1517,10 @@ public:
 				// Arrows moved closer together; might want to
 				// backtrack to here
 				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				assert_eq(0, _remainders[_qidx]);
-				assert_eq(0, _tried[_qidx]);
-				assert_eq(0, _tops[_qidx]);
-				assert_eq(0, _bots[_qidx]);
+				//assert_eq(0, _remainders[_qidx]);
+				//assert_eq(0, _tried[_qidx]);
+				//assert_eq(0, _tops[_qidx]);
+				//assert_eq(0, _bots[_qidx]);
 				_firstNzRemainder = _qidx;
 				_remainders[_qidx] = diff;
 				_tried[_qidx] = c;
@@ -1534,17 +1542,20 @@ public:
 			// Arrows moved closer together; might want to backtrack
 			// to here
 			assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-			assert_eq(0, _remainders[_qidx]);
-			assert_eq(0, _tried[_qidx]);
-			assert_eq(0, _tops[_qidx]);
-			assert_eq(0, _bots[_qidx]);
+			//assert_eq(0, _remainders[_qidx]);
+			//assert_eq(0, _tried[_qidx]);
+			//assert_eq(0, _tops[_qidx]);
+			//assert_eq(0, _bots[_qidx]);
 			_firstNzRemainder = _qidx;
 			_remainders[_qidx] = diffDiff;
 			_tried[_qidx] = c;
 			_tops[_qidx] = oldTop;
 			_bots[_qidx] = oldBot;
 		} else if(!_params.backtracking() && inNarrowHalf()) {
-			assert_eq(0, _remainders[_qidx]);
+			_remainders[_qidx] = 0;
+			_tried[_qidx] = 0;
+			_tops[_qidx] = 0;
+			_bots[_qidx] = 0;
 		}
 		if(inNarrowHalf()) {
 			_params.stats().incNarrowHalfAdvance(*this, diffDiff > 0);
@@ -1642,23 +1653,12 @@ public:
 		#ifndef NDEBUG
 		// It can't be the case that arrows narrowed after any query
 		// position "after" (to the left of) _firstNzRemainder
-		for(int i = 0; i < _firstNzRemainder; i++) {
-			assert_eq(0, _remainders[i]);
-		}
-		// If we have the texts...
-		if(_firstNzRemainder > 0 && _params.texts().size() > 0) {
-			// ...then we can double-check that each position "before" 
-			// (to the right of) and including _firstNzRemainder match
-			// their text counterparts
-			for(size_t i = _firstNzRemainder; i < _qlen; i++) {
-				// ...
-			}
-		}
+		//for(int i = 0; i < _firstNzRemainder; i++) {
+		//	assert_eq(0, _remainders[i]);
+		//}
 		#endif
 		for(uint32_t i = _firstNzRemainder; i < _narrowHalfLen; i++) {
 			if(_remainders[i] == 0) {
-				#ifndef NDEBUG
-				#endif
 				continue;
 			}
 			
