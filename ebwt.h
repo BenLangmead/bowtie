@@ -207,7 +207,7 @@ public:
             << "    numChunks: "    << _numChunks << endl;
 	}
 
-private:
+//private:
     uint32_t _len;
     uint32_t _bwtLen;
     uint32_t _sz;
@@ -297,9 +297,9 @@ public:
 		// Read offs from secondary stream; if the offRate has been
 		// overridden, make sure to sample the offs rather than take them
 		// all
-		if(_overrideOffRate > _eh.offRate()) {
+		if(_overrideOffRate > _eh._offRate) {
 			_eh.setOffRate(_overrideOffRate);
-			assert_eq(_overrideOffRate, _eh.offRate());
+			assert_eq(_overrideOffRate, _eh._offRate);
 		}
 		assert(repOk());
 	}
@@ -337,11 +337,6 @@ public:
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
 		ofstream fout3(file3.c_str(), ios::binary);
-//		{
-//			Timer timer(cout, "  Time for call to writePacked: ", __verbose);
-//			VMSG_NL("Writing packed representation to " << file3);
-//			writePacked<Dna>(fout3, ss, __verbose);
-//		}
 		// Build
 		initFromVector(is,
 		               szs,
@@ -420,7 +415,7 @@ public:
 		// initializes _plen, _pmap, _nPat
 		VMSG_NL("Calculating joined length");
 		TStr s; // holds the entire joined reference after call to joinToDisk
-		uint32_t jlen = joinedLen(szs, _eh.chunkRate());
+		uint32_t jlen = joinedLen(szs, _eh._chunkRate);
 		assert_geq(jlen, sztot);
 		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " bytes of padding)");
 		VMSG_NL("Writing header");
@@ -493,11 +488,7 @@ public:
 		uint32_t ret = 0;
 		uint32_t chunkLen = 1 << chunkRate;
 		for(unsigned int i = 0; i < szs.size(); i++) {
-			//if(i < szs.size() - 1) {
 			ret += ((szs[i] + chunkLen - 1) / chunkLen) * chunkLen;
-			//} else {
-			//	ret += szs[i];
-			//}
 		}
 		return ret;
 	}
@@ -596,7 +587,7 @@ public:
 	 * Non-static facade for static function ftabHi.
 	 */
 	uint32_t ftabHi(uint32_t i) const {
-		return Ebwt::ftabHi(_ftab, _eftab, _eh.len(), _eh.ftabLen(), _eh.eftabLen(), i);
+		return Ebwt::ftabHi(_ftab, _eftab, _eh._len, _eh._ftabLen, _eh._eftabLen, i);
 	}
 	
 	/**
@@ -629,7 +620,7 @@ public:
 	 * Non-static facade for static function ftabLo.
 	 */
 	uint32_t ftabLo(uint32_t i) const {
-		return Ebwt::ftabLo(_ftab, _eftab, _eh.len(), _eh.ftabLen(), _eh.eftabLen(), i);
+		return Ebwt::ftabLo(_ftab, _eftab, _eh._len, _eh._ftabLen, _eh._eftabLen, i);
 	}
 
 	/**
@@ -666,16 +657,16 @@ public:
 	 * _zEbwtBpOff from _zOff.
 	 */
 	void postReadInit(EbwtParams& eh) {
-		uint32_t sideNum     = _zOff / eh.sideBwtLen();
-		uint32_t sideCharOff = _zOff % eh.sideBwtLen();
-		uint32_t sideByteOff = sideNum * eh.sideSz();
+		uint32_t sideNum     = _zOff / eh._sideBwtLen;
+		uint32_t sideCharOff = _zOff % eh._sideBwtLen;
+		uint32_t sideByteOff = sideNum * eh._sideSz;
 		_zEbwtByteOff = sideCharOff >> 2;
-		assert_lt(_zEbwtByteOff, eh.sideBwtSz());
+		assert_lt(_zEbwtByteOff, eh._sideBwtSz);
 		_zEbwtBpOff = sideCharOff & 3;
 		assert_lt(_zEbwtBpOff, 4);
 		if((sideNum & 1) == 0) {
 			// This is an even (backward) side
-			_zEbwtByteOff = eh.sideBwtSz() - _zEbwtByteOff - 1;
+			_zEbwtByteOff = eh._sideBwtSz - _zEbwtByteOff - 1;
 			_zEbwtBpOff = 3 - _zEbwtBpOff;
 			assert_lt(_zEbwtBpOff, 4);
 		}
@@ -795,8 +786,8 @@ public:
 		assert_leq(ValueSize<TAlphabet>::VALUE, 4);
 		assert_geq(_zEbwtBpOff, 0);
 		assert_lt(_zEbwtBpOff, 4);
-		assert_lt(_zEbwtByteOff, eh.ebwtTotSz());
-		assert_lt(_zOff, eh.bwtLen());
+		assert_lt(_zEbwtByteOff, eh._ebwtTotSz);
+		assert_lt(_zOff, eh._bwtLen);
 		return true;
 	}
 
@@ -819,21 +810,6 @@ public:
 	/// Check that Ebwt is internally consistent; assert if not
 	bool repOk() const {
 		return repOk(_eh);
-	}
-
-private:
-	
-	ostream& log() const {
-		return cout; // TODO: turn this into a parameter
-	}
-	
-	/// Print a verbose message and flush (flushing is helpful for
-	/// debugging)
-	void verbose(const string& s) const {
-		if(this->verbose()) {
-			this->log() << s;
-			this->log().flush();
-		}
 	}
 
 	bool       _toBigEndian;
@@ -864,6 +840,21 @@ private:
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
 	EbwtParams _eh;
+
+private:
+	
+	ostream& log() const {
+		return cout; // TODO: turn this into a parameter
+	}
+	
+	/// Print a verbose message and flush (flushing is helpful for
+	/// debugging)
+	void verbose(const string& s) const {
+		if(this->verbose()) {
+			this->log() << s;
+			this->log().flush();
+		}
+	}
 };
 
 #define SAMPLE_THRESH 20
@@ -931,25 +922,25 @@ struct EbwtSearchStats {
 		bzero(stopsAtDepthFw,           64 * sizeof(uint64_t));
 		bzero(stopsAtDepthRc,           64 * sizeof(uint64_t));
 	}
-	void incRead(const EbwtSearchState<TStr> state, const TStr& pat) {
+	void incRead(const EbwtSearchState<TStr>& state, const TStr& pat) {
 		read++;
 		readLenTot += length(pat);
 		if(state.params().fw()) fwRead++;
 		else rcRead++;
 	}
-	void incTry(const EbwtSearchState<TStr> state) {
+	void incTry(const EbwtSearchState<TStr>& state) {
 		tries++;
 		exactTries++;
 		if(state.params().fw()) { fwTries++; fwExactTries++; }
 		else { rcTries++; rcExactTries++; }
 	}
-	void addExactHits(const EbwtSearchState<TStr> state) {
+	void addExactHits(const EbwtSearchState<TStr>& state) {
 		exactHitTotalCnt += state.spread();
 		exactHitOneOrMore++;
 		if(state.params().fw()) exactHitOneOrMoreFw++;
 		else exactHitOneOrMoreRc++;
 	}
-	void incPushthrough(const EbwtSearchState<TStr> state,
+	void incPushthrough(const EbwtSearchState<TStr>& state,
 	                    bool chase = false,
 	                    bool singleOverride = false)
 	{
@@ -965,7 +956,7 @@ struct EbwtSearchStats {
 			}
 		}
 	}
-	void incStopAt(const EbwtSearchState<TStr> state) {
+	void incStopAt(const EbwtSearchState<TStr>& state) {
 		int i = (int)(state.qlen() - state.qidx() - 1);
 		assert_lt(i, 64);
 		assert_geq(i, 0);
@@ -974,7 +965,7 @@ struct EbwtSearchStats {
 		if(state.params().fw()) stopsAtDepthFw[i]++;
 		else stopsAtDepthRc[i]++;
 	}
-	void incNarrowHalfAdvance(const EbwtSearchState<TStr> state, bool narrowing = false) {
+	void incNarrowHalfAdvance(const EbwtSearchState<TStr>& state, bool narrowing = false) {
 		int i = (int)(state.qlen() - state.qidx() - 1);
 		assert_lt(i, 64);
 		assert_geq(i, 0);
@@ -1278,18 +1269,22 @@ struct SideLocus {
 	 * information about the Ebwt.
 	 */
 	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
-		const uint32_t sideBwtLen = ep.sideBwtLen();
-		const uint32_t sideBwtSz  = ep.sideBwtSz();
-		const uint32_t sideSz     = ep.sideSz();
+		const uint32_t sideBwtLen = ep._sideBwtLen;
+		const uint32_t sideBwtSz  = ep._sideBwtSz;
+		const uint32_t sideSz     = ep._sideSz;
 		const uint32_t sideNum    = row / sideBwtLen;
 		_charOff                  = row % sideBwtLen;
 		_sideByteOff              = sideNum * sideSz;
-		assert_leq(_sideByteOff + sideSz, ep.ebwtTotSz());
+		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
+		// TODO: prefetch the opposite side too
 		_fw = sideNum & 1;   // odd-numbered sides are forward
+		__builtin_prefetch((const void *)(_side + (_fw? -128 : 128)),
+		                   0 /* prepare for read */,
+		                   0 /* no locality */);
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)sideBwtSz);
 		if(!_fw) _by = sideBwtSz - _by - 1;
@@ -1414,24 +1409,24 @@ public:
 		if(_bot > _top) {
 			uint32_t diff = _bot - _top;
 			// Calculate top from scratch and (possibly) prefetch
-			_topSideLocus.initFromRow(_top, _ebwt.eh(), _ebwt.ebwt());
+			_topSideLocus.initFromRow(_top, _ebwt._eh, _ebwt._ebwt);
 			// Is bot within the same side?
-			if(_topSideLocus._charOff + diff < _ebwt.eh().sideBwtLen()) {
+			if(_topSideLocus._charOff + diff < _ebwt._eh._sideBwtLen) {
 				// Yes; copy most of top's info; don't prefetch a 2nd time
 				SideLocus& tsl = _topSideLocus;
 				SideLocus& bsl = _botSideLocus;
 				bsl._charOff     = tsl._charOff + diff;
 				bsl._sideByteOff = tsl._sideByteOff;
-				assert_leq(bsl._sideByteOff + _ebwt.eh().sideSz(), _ebwt.eh().ebwtTotSz());
+				assert_leq(bsl._sideByteOff + _ebwt._eh._sideSz, _ebwt._eh._ebwtTotSz);
 				bsl._side        = tsl._side;
 				bsl._fw          = tsl._fw;
 				bsl._by          = bsl._charOff >> 2; // byte within side
-				if(!bsl._fw) bsl._by = _ebwt.eh().sideBwtSz() - bsl._by - 1;
+				if(!bsl._fw) bsl._by = _ebwt._eh._sideBwtSz - bsl._by - 1;
 				bsl._bp          = bsl._charOff & 3;  // bit-pair within byte
 				if(!bsl._fw) bsl._bp ^= 3;
 			} else {
 				// No; calculate bot from scratch and (possibly) prefetch
-				_botSideLocus.initFromRow(_bot, _ebwt.eh(), _ebwt.ebwt());
+				_botSideLocus.initFromRow(_bot, _ebwt._eh, _ebwt._ebwt);
 			}
 		}
 	}
@@ -1464,14 +1459,6 @@ public:
 		assert_geq(c, 0); // for sanity
 		return c;
 	}
-	/// Assert that state is initialized
-//	bool initialized() const {
-//		assert_eq(0xffffffff, _top);
-//		assert_eq(0xffffffff, _bot);
-//		assert_eq(_qlen-1, _qidx);
-//		assert_eq(_mism, 0xffffffff);
-//		return true;
-//	}
 	/**
 	 * 
 	 */
@@ -1732,7 +1719,7 @@ void Ebwt<TStr>::printRangeFw(uint32_t begin, uint32_t end) const {
 	uint32_t occ[] = {0, 0, 0, 0};
 	assert_gt(end, begin);
 	for(uint32_t i = begin; i < end; i++) {
-		uint8_t by = this->ebwt()[i];
+		uint8_t by = this->_ebwt[i];
 		for(int j = 0; j < 4; j++) {
 			// Unpack from lowest to highest bit pair
 			int twoBit = unpack_2b_from_8b(by, j);
@@ -1755,7 +1742,7 @@ void Ebwt<TStr>::printRangeBw(uint32_t begin, uint32_t end) const {
 	uint32_t occ[] = {0, 0, 0, 0};
 	assert_gt(end, begin);
 	for(uint32_t i = end-1; i >= begin; i--) {
-		uint8_t by = this->ebwt()[i];
+		uint8_t by = this->_ebwt[i];
 		for(int j = 3; j >= 0; j--) {
 			// Unpack from lowest to highest bit pair
 			int twoBit = unpack_2b_from_8b(by, j);
@@ -1779,12 +1766,12 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 	uint32_t occ[] = {0, 0, 0, 0};
 	uint32_t occ_save[] = {0, 0};
 	uint32_t cur = 0; // byte pointer
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	bool fw = false;
-	while(cur < (upToSide * eh.sideSz())) {
-		assert_leq(cur + eh.sideSz(), eh.ebwtTotLen());
-		for(uint32_t i = 0; i < eh.sideBwtSz(); i++) {
-			uint8_t by = this->ebwt()[cur + (fw ? i : eh.sideBwtSz()-i-1)];
+	while(cur < (upToSide * eh._sideSz)) {
+		assert_leq(cur + eh._sideSz, eh._ebwtTotLen);
+		for(uint32_t i = 0; i < eh._sideBwtSz; i++) {
+			uint8_t by = this->_ebwt[cur + (fw ? i : eh._sideBwtSz-i-1)];
 			for(int j = 0; j < 4; j++) {
 				// Unpack from lowest to highest bit pair
 				int twoBit = unpack_2b_from_8b(by, fw ? j : 3-j);
@@ -1793,11 +1780,11 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 			}
 			assert_eq(0, (occ[0] + occ[1] + occ[2] + occ[3]) % 4);
 		}
-		assert_eq(0, (occ[0] + occ[1] + occ[2] + occ[3]) % eh.sideBwtLen());
+		assert_eq(0, (occ[0] + occ[1] + occ[2] + occ[3]) % eh._sideBwtLen);
 		if(fw) {
 			// Finished forward bucket; check saved [G] and [T]
 			// against the two uint32_ts encoded here
-			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->ebwt()[cur + eh.sideBwtSz()]));
+			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->_ebwt[cur + eh._sideBwtSz]));
 			ASSERT_ONLY(uint32_t gs = u32ebwt[0]);
 			ASSERT_ONLY(uint32_t ts = u32ebwt[1]);
 			assert_eq(gs, occ_save[0]);
@@ -1806,7 +1793,7 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 		} else {
 			// Finished backward bucket; check current [A] and [C]
 			// against the two uint32_ts encoded here
-			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->ebwt()[cur + eh.sideBwtSz()]));
+			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->_ebwt[cur + eh._sideBwtSz]));
 			ASSERT_ONLY(uint32_t as = u32ebwt[0]);
 			ASSERT_ONLY(uint32_t cs = u32ebwt[1]);
 			assert(as == occ[0] || as == occ[0]-1); // one 'a' is a skipped '$' and doesn't count toward occ[]
@@ -1815,7 +1802,7 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
  			occ_save[1] = occ[3]; // save ts
 			fw = true;
 		}
-		cur += eh.sideSz();
+		cur += eh._sideSz;
 	}
 }
 
@@ -1824,18 +1811,18 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
  */
 template<typename TStr>
 void Ebwt<TStr>::sanityCheckAll() const {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	assert(isInMemory());
 	// Check ftab
-	for(uint32_t i = 1; i < eh.ftabLen(); i++) {
+	for(uint32_t i = 1; i < eh._ftabLen; i++) {
 		assert_geq(this->ftabHi(i), this->ftabLo(i-1));
 		assert_geq(this->ftabLo(i), this->ftabHi(i-1));
-		assert_leq(this->ftabHi(i), eh.bwtLen()+1);
+		assert_leq(this->ftabHi(i), eh._bwtLen+1);
 	}
-	assert_eq(this->ftabHi(eh.ftabLen()-1), eh.bwtLen());
+	assert_eq(this->ftabHi(eh._ftabLen-1), eh._bwtLen);
 
 	// Check offs
-	int seenLen = (eh.bwtLen() + 31) >> 5; 
+	int seenLen = (eh._bwtLen + 31) >> 5; 
 	uint32_t *seen;
 	try {
 		seen = new uint32_t[seenLen]; // bitvector marking seen offsets
@@ -1844,37 +1831,37 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		throw e;
 	}
 	bzero(seen, 4 * seenLen);
-	uint32_t offsLen = eh.offsLen();
+	uint32_t offsLen = eh._offsLen;
 	for(uint32_t i = 0; i < offsLen; i++) {
-		assert_lt(this->offs()[i], eh.bwtLen());
-		int w = this->offs()[i] >> 5;
-		int r = this->offs()[i] & 31;
+		assert_lt(this->_offs[i], eh._bwtLen);
+		int w = this->_offs[i] >> 5;
+		int r = this->_offs[i] & 31;
 		assert_eq(0, (seen[w] >> r) & 1); // shouldn't have been seen before
 		seen[w] |= (1 << r);
 	}
 	delete[] seen;
 	
 	// Check nPat
-	assert_gt(this->nPat(), 0);
+	assert_gt(this->_nPat, 0);
 	
 	// Check plen
-	for(uint32_t i = 0; i < this->nPat(); i++) {
-		assert_gt(this->plen()[i], 0);
+	for(uint32_t i = 0; i < this->_nPat; i++) {
+		assert_gt(this->_plen[i], 0);
 	}
 
 	// Check pmap/plen
-	for(uint32_t i = 0; i < eh.numChunks()*2; i += 2) {
-		assert_lt(this->pmap()[i], this->nPat());             // valid pattern id
-		if(i > 0) { assert_geq(this->pmap()[i], this->pmap()[i-2]); } // pattern id in order
-		assert_lt(this->pmap()[i+1], this->plen()[this->pmap()[i]]); // valid offset into that pattern
-		assert_eq(this->pmap()[i+1] & eh.chunkMask(), this->pmap()[i+1]);
-		if(i >= 2 && this->pmap()[i] == this->pmap()[i-2]) {  // same pattern as last entry?
-			assert_eq(this->pmap()[i+1], this->pmap()[i-2+1] + eh.chunkLen())
+	for(uint32_t i = 0; i < eh._numChunks*2; i += 2) {
+		assert_lt(this->_pmap[i], this->_nPat);             // valid pattern id
+		if(i > 0) { assert_geq(this->_pmap[i], this->_pmap[i-2]); } // pattern id in order
+		assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]); // valid offset into that pattern
+		assert_eq(this->_pmap[i+1] & eh._chunkMask, this->_pmap[i+1]);
+		if(i >= 2 && this->_pmap[i] == this->_pmap[i-2]) {  // same pattern as last entry?
+			assert_eq(this->_pmap[i+1], this->_pmap[i-2+1] + eh._chunkLen)
 		}
 	}
 
 	// Check ebwt
-	sanityCheckUpToSide(eh.numSides());
+	sanityCheckUpToSide(eh._numSides);
 	VMSG_NL("Ebwt::sanityCheck passed");
 }
 
@@ -1976,19 +1963,19 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
  */
 template<typename TStr>
 inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
 	uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	assert_lt(by, (int)eh.sideBwtSz());
+	assert_lt(by, (int)eh._sideBwtSz);
 	assert_geq(by, 0);
 	assert_lt(bp, 4);
 	assert_geq(bp, 0);
 	uint32_t cCnt = countUpTo(l, c);
-	assert_leq(cCnt, eh.sideBwtLen());
+	assert_leq(cCnt, eh._sideBwtLen);
 	if(c == 0 && sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
@@ -2002,20 +1989,20 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
 		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
-		assert_leq(ac[0], eh.numSides() * eh.sideBwtLen()); // b/c it's used as padding
-		assert_lt(ac[1], eh.len());
+		assert_leq(ac[0], eh._numSides * eh._sideBwtLen); // b/c it's used as padding
+		assert_lt(ac[1], eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
-		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8); // next
-		assert_lt(gt[0], eh.len()); assert_lt(gt[1], eh.len());
+		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8); // next
+		assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
 	assert_leq(ret, this->_fchr[c+1]); // can't have jumpded into next char's section
 	if(c == 0) {
-		assert_leq(cCnt, eh.sideBwtLen());
+		assert_leq(cCnt, eh._sideBwtLen);
 	} else {
-		assert_lt(ret, eh.bwtLen());
+		assert_lt(ret, eh._bwtLen);
 	}
 #endif
 	return ret;
@@ -2028,20 +2015,20 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
  */
 template<typename TStr>
 inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
 	uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
-	assert_lt(by, (int)eh.sideBwtSz());
+	assert_lt(by, (int)eh._sideBwtSz);
 	assert_geq(by, 0);
 	assert_lt(bp, 4);
 	assert_geq(bp, 0);
 	uint32_t cCnt = countUpTo(l, c);
 	if(unpack_2b_from_8b(ebwtSide[by], bp) == c) cCnt++;
-	assert_leq(cCnt, eh.sideBwtLen());
+	assert_leq(cCnt, eh._sideBwtLen);
 	if(c == 0 && sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
@@ -2055,21 +2042,21 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	uint32_t ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh.sideSz() - 8);
-		assert_leq(ac[0], eh.numSides() * eh.sideBwtLen()); // b/c it's used as padding
-		assert_lt(ac[1], eh.len());
+		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+		assert_leq(ac[0], eh._numSides * eh._sideBwtLen); // b/c it's used as padding
+		assert_lt(ac[1], eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
-		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh.sideSz()) - 8); // next
-		assert_lt(gt[0], eh.len()); assert_lt(gt[1], eh.len());
+		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh._sideSz) - 8); // next
+		assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
 	assert_leq(ret, this->_fchr[c+1]); // can't have jumped into next char's section
 	if(c == 0) {
-		assert_leq(cCnt, eh.sideBwtLen());
+		assert_leq(cCnt, eh._sideBwtLen);
 	} else {
-		assert_lt(ret, eh.bwtLen());
+		assert_lt(ret, eh._bwtLen);
 	}
 #endif
 	return ret;
@@ -2086,7 +2073,7 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l) const {
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
-	assert_lt(ret, this->eh().bwtLen());
+	assert_lt(ret, this->_eh._bwtLen);
 	return ret;
 }
 
@@ -2101,7 +2088,7 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c) const {
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
-	assert_lt(ret, this->eh().bwtLen());
+	assert_lt(ret, this->_eh._bwtLen);
 	return ret;
 }
 
@@ -2134,7 +2121,7 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c) const {
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
-	assert_lt(ret, this->eh().bwtLen());
+	assert_lt(ret, this->_eh._bwtLen);
 	return ret;
 }
 
@@ -2150,7 +2137,7 @@ inline bool Ebwt<TStr>::report(uint32_t off,
                                EbwtSearchState<TStr>& s) const
 {
 	VMSG_NL("In report");
-	assert_lt(off, this->eh().len());
+	assert_lt(off, this->_eh._len);
 	if(s.params().arrowMode()) {
 		// Call reportHit with a bogus genome position; in this mode,
 		// all we care about are the top and bottom arrows
@@ -2165,13 +2152,13 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 	}
 	// Check whether our match overlaps with the padding between two
 	// texts, in which case the match is spurious
-	uint32_t ptabOff = (off >> this->eh().chunkRate())*2;
-	uint32_t coff = off & ~(this->eh().chunkMask()); // offset into chunk
-	uint32_t tidx = this->pmap()[ptabOff];           // id of text matched
-	uint32_t toff = this->pmap()[ptabOff+1];         // hit's offset in text
-	uint32_t tlen = this->plen()[tidx];              // length of text
+	uint32_t ptabOff = (off >> this->_eh._chunkRate)*2;
+	uint32_t coff = off & ~(this->_eh._chunkMask); // offset into chunk
+	uint32_t tidx = this->_pmap[ptabOff];           // id of text matched
+	uint32_t toff = this->_pmap[ptabOff+1];         // hit's offset in text
+	uint32_t tlen = this->_plen[tidx];              // length of text
 	assert_lt(toff, tlen);
-	assert_lt(tidx, this->nPat());
+	assert_lt(tidx, this->_nPat);
 	if(toff + coff + s.qlen() > tlen) {
 		// Spurious result
 		return false;
@@ -2195,7 +2182,7 @@ inline bool Ebwt<TStr>::report(uint32_t off,
  * Report a result.  Involves walking backwards along the original
  * string by way of the LF-mapping until we reach a marked SA row or
  * the row corresponding to the 0th suffix.  A marked row's offset
- * into the original string can be read directly from the this->offs()[]
+ * into the original string can be read directly from the this->_offs[]
  * array.
  */
 template<typename TStr>
@@ -2207,6 +2194,9 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 	assert(!s.params().arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
+	const uint32_t offMask = this->_eh._offMask;
+	const uint32_t offRate = this->_eh._offRate;
+	const uint32_t* offs = this->_offs;
 	bool own_locus = false;
 	if(l == NULL) {
 		own_locus = true;
@@ -2214,7 +2204,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 	}
 	assert(l != NULL);
 	// Walk along until we reach the next marked row to the left
-	while(((i & this->_eh.offMask()) != i) && i != _zOff) {
+	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
 		s.params().stats().incPushthrough(s, true, true);
 		uint32_t newi = mapLF(*l); // calc next row
@@ -2228,7 +2218,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 		off = jumps;
 		VMSG_NL("reportChaseOne found zoff off=" << off << " (jumps=" << jumps << ")");
 	} else {
-		off = this->offs()[i >> this->_eh.offRate()] + jumps;
+		off = offs[i >> offRate] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
 	if (own_locus) delete l;
@@ -2371,7 +2361,7 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 	assert_eq(1, s.spread());
 	int jumps = 0;
 	uint32_t off = 0xffffffff;
-	assert_lt(s.top(), this->eh().len());
+	assert_lt(s.top(), this->_eh._len);
 	while(!s.closed() && !s.qExhausted()) {
 		VMSG_NL("searchFinish1: qidx: " << s.qidx() << ", top: " << s.top());
 		uint32_t r = s.mapLF1(*this);
@@ -2379,9 +2369,9 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 		// Did we stumble into a row with a known offset?  If so, make
 		// note so that don't have to chase it later.
 		if(!s.params().arrowMode()) {
-			if(off == 0xffffffff && ((r & this->eh().offMask()) == r || r == _zOff)) {
-				off = ((r == _zOff) ? 0 : this->offs()[r >> this->eh().offRate()]);
-				assert_lt(off, this->eh().len());
+			if(off == 0xffffffff && ((r & this->_eh._offMask) == r || r == _zOff)) {
+				off = ((r == _zOff) ? 0 : this->_offs[r >> this->_eh._offRate]);
+				assert_lt(off, this->_eh._len);
 				jumps = 0; // reset
 			} else {
 				jumps++;
@@ -2401,7 +2391,7 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 		// Good luck - we previously made note of a marked row and
 		// need not chase it any further 
 		off -= jumps;
-		assert_lt(off, this->eh().len());
+		assert_lt(off, this->_eh._len);
 		assert_lt((unsigned int)jumps, s.qlen());
 		assert_geq(jumps, 0);
 		VMSG_NL("searchFinish1 pre-found off=" << off);
@@ -2463,10 +2453,9 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 {
 	typedef typename Value<TStr>::Type TVal;
 	assert(isInMemory());
-//	assert(s.initialized());
 	assert(s.qAtBeginning());
 	s.params().stats().incTry(s);
-	int ftabChars = this->eh().ftabChars();
+	int ftabChars = this->_eh._ftabChars;
 	assert_geq(s.qlen(), (unsigned int)ftabChars);
 	// Rightmost char gets least significant bit-pair
 	const TStr& qry = s.query();
@@ -2475,7 +2464,7 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 		ftabOff <<= 2;
 		ftabOff |= (int)(TVal)qry[s.qlen()-i];
 	}
-	assert_lt(ftabOff, this->eh().ftabLen()-1);
+	assert_lt(ftabOff, this->_eh._ftabLen-1);
 	if(_verbose) cout << "Looking up in ftab with: " << u32ToDna(ftabOff, ftabChars) << endl;
 	s.setTopBot(ftabHi(ftabOff), ftabLo(ftabOff+1));
 	s.subQidx(ftabChars);
@@ -2492,7 +2481,6 @@ template<typename TStr>
 inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const
 {
 	assert(isInMemory());
-//	assert(s.initialized());
 	assert(s.qAtBeginning());
 	s.params().stats().incTry(s);
 	s.setTopBot(this->_fchr[s.chr()], this->_fchr[s.chr()+1]);
@@ -2507,11 +2495,11 @@ void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
 {
 	assert(isInMemory());
 	params.setBacktracking(false);
-	if(s.qlen() >= (unsigned int)this->eh().ftabChars() &&
+	if(s.qlen() >= (unsigned int)this->_eh._ftabChars &&
 	   // If we're backtracking, don't let ftab skip over any of the
 	   // revisitable region
 	   (!inexact ||
-	    (unsigned int)this->eh().ftabChars() <= (s.qlen()>>1)))
+	    (unsigned int)this->_eh._ftabChars <= (s.qlen()>>1)))
 	{
 		searchWithFtab(s);
 	} else {
@@ -2583,22 +2571,22 @@ bool Ebwt<TStr>::search1MismatchOrBetter(EbwtSearchState<TStr>& s,
 template<typename TStr>
 void Ebwt<TStr>::restore(TStr& s) const {
 	assert(isInMemory());
-	resize(s, this->eh().len(), Exact());
+	resize(s, this->_eh._len, Exact());
 	uint32_t jumps = 0;
-	uint32_t i = this->_eh.len(); // should point to final SA elt (starting with '$')
+	uint32_t i = this->_eh._len; // should point to final SA elt (starting with '$')
 	SideLocus l(i, this->_eh, this->_ebwt);
 	while(i != _zOff) {
-		assert_lt(jumps, this->_eh.len());
+		assert_lt(jumps, this->_eh._len);
 		if(_verbose) cout << "restore: i: " << i << endl;
 		// Not a marked row; go back a char in the original string
 		uint32_t newi = mapLF(l);
 		assert_neq(newi, i);
-		s[this->eh().len() - jumps - 1] = rowL(l);
+		s[this->_eh._len - jumps - 1] = rowL(l);
 		i = newi;
 		l.initFromRow(i, this->_eh, this->_ebwt);
 		jumps++;
 	}
-	assert_eq(jumps, this->_eh.len());
+	assert_eq(jumps, this->_eh._len);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -2713,7 +2701,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams eh(len, lineRate, linesPerSide, offRate, ftabChars, chunkRate);
 	if(_verbose) eh.print(cout);
-	uint32_t offsLen = eh.offsLen();
+	uint32_t offsLen = eh._offsLen;
 	uint32_t offRateDiff = 0;
 	uint32_t offsLenSampled = offsLen;
 	if(_overrideOffRate > offRate) {
@@ -2725,17 +2713,17 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	this->_nPat = readI32(_in1, be);
 	try {
 		// Read plen from primary stream
-		if(_verbose) cout << "Reading plen (" << this->nPat() << ")" << endl;
-		this->_plen = new uint32_t[this->nPat()];
+		if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
+		this->_plen = new uint32_t[this->_nPat];
 		if(be) {
-			for(uint32_t i = 0; i < this->nPat(); i++) {
+			for(uint32_t i = 0; i < this->_nPat; i++) {
 				this->_plen[i] = readU32(_in1, be);
 			}
 		} else {
-			_in1.read((char *)this->_plen, this->nPat()*4);
+			_in1.read((char *)this->_plen, this->_nPat*4);
 			assert_eq(this->_nPat*4, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < this->nPat(); i++) {
+		for(uint32_t i = 0; i < this->_nPat; i++) {
 			assert_leq(this->_plen[i], len);
 			assert_gt(this->_plen[i], 0);
 		}
@@ -2753,7 +2741,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 
 	// Read pmap from primary stream
 	try {
-		uint32_t pmapEnts = eh.numChunks()*2;
+		uint32_t pmapEnts = eh._numChunks*2;
 		if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
 		this->_pmap = new uint32_t[pmapEnts];
 		if(be) {
@@ -2776,17 +2764,17 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	}
 
 	// Allocate ebwt (big allocation) 
-	if(_verbose) cout << "Reading ebwt (" << eh.ebwtTotLen() << ")" << endl;
+	if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ")" << endl;
 	try {
-		this->_ebwt = new uint8_t[eh.ebwtTotLen()];
+		this->_ebwt = new uint8_t[eh._ebwtTotLen];
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating ebwt[] in Ebwt::read()"
 		     << " at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
 	// Read ebwt from primary stream
-	_in1.read((char *)this->_ebwt, eh.ebwtTotLen());
-	assert_eq(eh.ebwtTotLen(), (uint32_t)_in1.gcount());
+	_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
+	assert_eq(eh._ebwtTotLen, (uint32_t)_in1.gcount());
 
 	// Read zOff from primary stream
 	_zOff = readU32(_in1, be);
@@ -2802,26 +2790,26 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			if(i > 0) assert_geq(this->_fchr[i], this->_fchr[i-1]);
 		}
 		// Read ftab from primary stream
-		if(_verbose) cout << "Reading ftab (" << eh.ftabLen() << ")" << endl;
-		this->_ftab = new uint32_t[eh.ftabLen()];
+		if(_verbose) cout << "Reading ftab (" << eh._ftabLen << ")" << endl;
+		this->_ftab = new uint32_t[eh._ftabLen];
 		if(be) {
-			for(uint32_t i = 0; i < eh.ftabLen(); i++)
+			for(uint32_t i = 0; i < eh._ftabLen; i++)
 				this->_ftab[i] = readU32(_in1, be);
 		} else {
-			_in1.read((char *)this->_ftab, eh.ftabLen()*4);
-			assert_eq(eh.ftabLen()*4, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_ftab, eh._ftabLen*4);
+			assert_eq(eh._ftabLen*4, (uint32_t)_in1.gcount());
 		}
 		// Read etab from primary stream
-		if(_verbose) cout << "Reading eftab (" << eh.eftabLen() << ")" << endl;
-		this->_eftab = new uint32_t[eh.eftabLen()];
+		if(_verbose) cout << "Reading eftab (" << eh._eftabLen << ")" << endl;
+		this->_eftab = new uint32_t[eh._eftabLen];
 		if(be) {
-			for(uint32_t i = 0; i < eh.eftabLen(); i++)
+			for(uint32_t i = 0; i < eh._eftabLen; i++)
 				this->_eftab[i] = readU32(_in1, be);
 		} else {
-			_in1.read((char *)this->_eftab, eh.eftabLen()*4);
-			assert_eq(eh.eftabLen()*4, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_eftab, eh._eftabLen*4);
+			assert_eq(eh._eftabLen*4, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < eh.eftabLen(); i++) {
+		for(uint32_t i = 0; i < eh._eftabLen; i++) {
 			if(i > 0 && this->_eftab[i] > 0) {
 				assert_geq(this->_eftab[i], this->_eftab[i-1]);
 			} else if(i > 0 && this->_eftab[i-1] == 0) {
@@ -2890,7 +2878,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
                                  ostream& out1,
                                  ostream& out2) const
 {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	assert(eh.repOk());
 	uint32_t be = this->toBe();
 	assert(out1.good());
@@ -2901,34 +2889,34 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	// before we join() or buildToDisk() 
 	writeI32(out1, 1, be); // endian hint for priamry stream
 	writeI32(out2, 1, be); // endian hint for secondary stream
-	writeU32(out1, eh.len(),          be); // length of string (and bwt and suffix array)
-	writeI32(out1, eh.lineRate(),     be); // 2^lineRate = size in bytes of 1 line
-	writeI32(out1, eh.linesPerSide(), be); // not used
-	writeI32(out1, eh.offRate(),      be); // every 2^offRate chars is "marked"
-	writeI32(out1, eh.ftabChars(),    be); // number of 2-bit chars used to address ftab
-	writeI32(out1, eh.chunkRate(),    be);
+	writeU32(out1, eh._len,          be); // length of string (and bwt and suffix array)
+	writeI32(out1, eh._lineRate,     be); // 2^lineRate = size in bytes of 1 line
+	writeI32(out1, eh._linesPerSide, be); // not used
+	writeI32(out1, eh._offRate,      be); // every 2^offRate chars is "marked"
+	writeI32(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
+	writeI32(out1, eh._chunkRate,    be);
 
 	if(!justHeader) {
 		assert(isInMemory());
 		// These Ebwt parameters are known after the inputs strings have
 		// been joined() but before they have been built().  These can
 		// written to the disk next and then discarded from memory.
-		writeU32(out1, this->nPat(),      be);
-		for(uint32_t i = 0; i < this->nPat(); i++)
-		writeU32(out1, this->plen()[i], be);
-		for(uint32_t i = 0; i < eh.numChunks()*2; i++)
-			writeU32(out1, this->pmap()[i], be);
+		writeU32(out1, this->_nPat,      be);
+		for(uint32_t i = 0; i < this->_nPat; i++)
+		writeU32(out1, this->_plen[i], be);
+		for(uint32_t i = 0; i < eh._numChunks*2; i++)
+			writeU32(out1, this->_pmap[i], be);
 	
 		// These Ebwt parameters are discovered only as the Ebwt is being
 		// built (in buildToDisk()).  Of these, only 'offs' and 'ebwt' are
 		// terribly large.  'ebwt' is written to the primary file and then
 		// discarded from memory as it is built; 'offs' is similarly
 		// written to the secondary file and discarded.
-		out1.write((const char *)this->ebwt(), eh.ebwtTotLen());
+		out1.write((const char *)this->ebwt(), eh._ebwtTotLen);
 		writeU32(out1, this->zOff(), be);
-		uint32_t offsLen = eh.offsLen();
+		uint32_t offsLen = eh._offsLen;
 		for(uint32_t i = 0; i < offsLen; i++)
-			writeU32(out2, this->offs()[i], be);
+			writeU32(out2, this->_offs[i], be);
 	
 		// 'fchr', 'ftab' and 'eftab' are not fully determined until the
 		// loop is finished, so they are written to the primary file after
@@ -2936,9 +2924,9 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		// from memory.
 		for(int i = 0; i < 5; i++)
 			writeU32(out1, this->_fchr[i], be);
-		for(uint32_t i = 0; i < eh.ftabLen(); i++)
+		for(uint32_t i = 0; i < eh._ftabLen; i++)
 			writeU32(out1, this->ftab()[i], be);
-		for(uint32_t i = 0; i < eh.eftabLen(); i++)
+		for(uint32_t i = 0; i < eh._eftabLen; i++)
 			writeU32(out1, this->eftab()[i], be);
 	}
 }
@@ -2958,7 +2946,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
                                  const string& out1,
                                  const string& out2) const
 {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	assert(isInMemory());
 	assert(eh.repOk());
     
@@ -2976,29 +2964,29 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		assert(!isInMemory());
 		copy.loadIntoMemory();
 		assert(isInMemory());
-	    assert_eq(eh.lineRate(),     copy.eh().lineRate());
-	    assert_eq(eh.linesPerSide(), copy.eh().linesPerSide());
-	    assert_eq(eh.offRate(),      copy.eh().offRate());
-	    assert_eq(eh.ftabChars(),    copy.eh().ftabChars());
-	    assert_eq(eh.len(),          copy.eh().len());
-	    assert_eq(eh.chunkRate(),    copy.eh().chunkRate());
+	    assert_eq(eh._lineRate,     copy.eh()._lineRate);
+	    assert_eq(eh._linesPerSide, copy.eh()._linesPerSide);
+	    assert_eq(eh._offRate,      copy.eh()._offRate);
+	    assert_eq(eh._ftabChars,    copy.eh()._ftabChars);
+	    assert_eq(eh._len,          copy.eh()._len);
+	    assert_eq(eh._chunkRate,    copy.eh()._chunkRate);
 	    assert_eq(_zOff,             copy.zOff());
 	    assert_eq(_zEbwtBpOff,       copy.zEbwtBpOff());
 	    assert_eq(_zEbwtByteOff,     copy.zEbwtByteOff());
 		assert_eq(_nPat,             copy.nPat());
 		for(uint32_t i = 0; i < _nPat; i++)
-			assert_eq(this->plen()[i], copy.plen()[i]);
-		for(uint32_t i = 0; i < eh.numChunks()*2; i++)
-			assert_eq(this->pmap()[i], copy.pcap()[i]);
+			assert_eq(this->_plen[i], copy.plen()[i]);
+		for(uint32_t i = 0; i < eh._numChunks*2; i++)
+			assert_eq(this->_pmap[i], copy.pcap()[i]);
 		for(uint32_t i = 0; i < 5; i++)
 			assert_eq(this->_fchr[i], copy.fchr()[i]);
-		for(uint32_t i = 0; i < eh.ftabLen(); i++)
+		for(uint32_t i = 0; i < eh._ftabLen; i++)
 			assert_eq(this->ftab()[i], copy.ftab()[i]);
-		for(uint32_t i = 0; i < eh.eftabLen(); i++)
+		for(uint32_t i = 0; i < eh._eftabLen; i++)
 			assert_eq(this->eftab()[i], copy.eftab()[i]);
-		for(uint32_t i = 0; i < eh.offsLen(); i++)
-			assert_eq(this->offs()[i], copy.offs()[i]);
-		for(uint32_t i = 0; i < eh.ebwtTotLen(); i++)
+		for(uint32_t i = 0; i < eh._offsLen; i++)
+			assert_eq(this->_offs[i], copy.offs()[i]);
+		for(uint32_t i = 0; i < eh._ebwtTotLen; i++)
 			assert_eq(this->ebwt()[i], copy.ebwt()[i]);
 		copy.sanityCheckAll();
 		if(_verbose)
@@ -3113,7 +3101,6 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 				// the result.
 				appendValue(ret, (Dna)(rand.nextU32() & 3));
 				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
-				//appendNE(ret, rand.nextU32() & 3);
 			}
 			// Pattern now ends on a chunk boundary
 			assert_eq(length(ret), length(ret) & chunkMask);
@@ -3151,14 +3138,14 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
                             uint32_t seed = 0)
 {
 	RandomSource rand(seed); // reproducible given same seed
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	RefReadInParams rpcp = refparams;
 	assert_gt(szs.size(), 0);
 	assert_gt(sztot, 0);
 	this->_nPat = szs.size(); // store this in memory
 	this->_pmap = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
-	ASSERT_ONLY(uint32_t pmapEnts = eh.numChunks()*2);
+	ASSERT_ONLY(uint32_t pmapEnts = eh._numChunks*2);
 	uint32_t pmapOff = 0;
 	// Allocate plen[]
 	try {
@@ -3219,11 +3206,11 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		    // insert padding
 			uint32_t diff = 0;
 			uint32_t rlen = length(ret);
-			uint32_t leftover = rlen & ~(eh.chunkMask());
+			uint32_t leftover = rlen & ~(eh._chunkMask);
 			if(leftover > 0) {
 				// The joined string currently ends in the middle of a
 				// chunk, so we have to pad it by 'diff'
-				diff = eh.chunkLen() - leftover;
+				diff = eh._chunkLen - leftover;
 				assert_gt(diff, 0);
 			}
 			for(uint32_t i = 0; i < diff; i++) {
@@ -3235,9 +3222,9 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
 			}
 			// Pattern now ends on a chunk boundary
-			assert_eq(length(ret), length(ret) & eh.chunkMask());
+			assert_eq(length(ret), length(ret) & eh._chunkMask);
 			// Initialize elements of the pmap that cover this pattern
-			for(unsigned int j = 0; j < bases; j += eh.chunkLen()) {
+			for(unsigned int j = 0; j < bases; j += eh._chunkLen) {
 				assert_lt(pmapOff+1, pmapEnts);
 				pmapOff += 2;
 				writeU32(out1, seqsRead-1, this->toBe()); // pattern id
@@ -3294,19 +3281,19 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
                              ostream& out1,
                              ostream& out2)
 {
-	const EbwtParams& eh = this->eh();
+	const EbwtParams& eh = this->_eh;
 	
 	assert(eh.repOk());
 	assert_eq(length(s)+1, sa.size());
-	assert_eq(length(s), eh.len());
-	assert_gt(eh.lineRate(), 3);
+	assert_eq(length(s), eh._len);
+	assert_gt(eh._lineRate, 3);
 	assert(sa.suffixItrIsReset());
 	assert_leq((int)ValueSize<Dna>::VALUE, 4);
 	
-	uint32_t  len = eh.len();
-	uint32_t  ftabLen = eh.ftabLen();
-	uint32_t  sideSz = eh.sideSz();
-	uint32_t  ebwtTotSz = eh.ebwtTotSz();
+	uint32_t  len = eh._len;
+	uint32_t  ftabLen = eh._ftabLen;
+	uint32_t  sideSz = eh._sideSz;
+	uint32_t  ebwtTotSz = eh._ebwtTotSz;
 	uint32_t  fchr[] = {0, 0, 0, 0, 0};
 	uint32_t* ftab = NULL;
 	uint32_t  zOff = 0xffffffff;
@@ -3354,7 +3341,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	uint32_t side = 0;
 	// Points to a byte offset from 'side' within ebwt[] where next
 	// char should be written
-	int sideCur = eh.sideBwtSz() - 1;
+	int sideCur = eh._sideBwtSz - 1;
 
 	// Whether we're assembling a forward or a reverse bucket
 	bool fw = false;
@@ -3378,7 +3365,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		wroteFwBucket = false;
 		// Sanity-check our cursor into the side buffer
 		assert_geq(sideCur, 0);
-		assert_lt(sideCur, (int)eh.sideBwtSz());
+		assert_lt(sideCur, (int)eh._sideBwtSz);
 		assert_eq(0, side % sideSz); // 'side' must be on side boundary
 		ebwtSide[sideCur] = 0; // clear 
 		assert_lt(side + sideCur, ebwtTotSz);
@@ -3406,11 +3393,11 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					fchr[bwtChar]++;
 				}
 				// Update ftab
-				if((len-saElt) >= (uint32_t)eh.ftabChars()) {
+				if((len-saElt) >= (uint32_t)eh._ftabChars) {
 					// Turn the first ftabChars characters of the
 					// suffix into an integer index into ftab
 					uint32_t sufInt = 0;
-					for(int i = 0; i < eh.ftabChars(); i++) {
+					for(int i = 0; i < eh._ftabChars; i++) {
 						sufInt <<= 2;
 						assert_lt(i, (int)(len-saElt));
 						sufInt |= (unsigned char)(Dna)(s[saElt+i]);
@@ -3439,8 +3426,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					absorbCnt++;
 				}
 				// Offset boundary? - update offset array
-				if((si & eh.offMask()) == si) {
-					assert_lt((si >> eh.offRate()), eh.offsLen());
+				if((si & eh._offMask) == si) {
+					assert_lt((si >> eh._offRate), eh._offsLen);
 					// Write offsets directly to the secondary output
 					// stream, thereby avoiding keeping them in memory
 					writeU32(out2, saElt, this->toBe());
@@ -3476,30 +3463,30 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		assert_eq(0, si & 3);
 		if(fw) sideCur++;
 		else   sideCur--;
-		if(sideCur == (int)eh.sideBwtSz()) {
+		if(sideCur == (int)eh._sideBwtSz) {
 			// Forward side boundary
-			assert_eq(0, si % eh.sideBwtLen());
-			sideCur = eh.sideBwtSz() - 1;
+			assert_eq(0, si % eh._sideBwtLen);
+			sideCur = eh._sideBwtSz - 1;
 			assert(fw); fw = false; wroteFwBucket = true;
 			// Write 'G' and 'T'
 			assert_leq(occSave[0], occ[2]);
 			assert_leq(occSave[1], occ[3]);
 			uint32_t *u32side = reinterpret_cast<uint32_t*>(ebwtSide);
 			side += sideSz;
-			assert_leq(side, eh.ebwtTotSz());
+			assert_leq(side, eh._ebwtTotSz);
 			u32side[(sideSz >> 2)-2] = endianizeU32(occSave[0], this->toBe());
 			u32side[(sideSz >> 2)-1] = endianizeU32(occSave[1], this->toBe());
 			// Write forward side to primary file
 			out1.write((const char *)ebwtSide, sideSz);
 		} else if (sideCur == -1) {
 			// Backward side boundary
-			assert_eq(0, si % eh.sideBwtLen());
+			assert_eq(0, si % eh._sideBwtLen);
 			sideCur = 0;
 			assert(!fw); fw = true;
 			// Write 'A' and 'C'
 			uint32_t *u32side = reinterpret_cast<uint32_t*>(ebwtSide);
 			side += sideSz;
-			assert_leq(side, eh.ebwtTotSz());
+			assert_leq(side, eh._ebwtTotSz);
 			u32side[(sideSz >> 2)-2] = endianizeU32(occ[0], this->toBe());
 			u32side[(sideSz >> 2)-1] = endianizeU32(occ[1], this->toBe());
 			occSave[0] = occ[2]; // save 'G' count
@@ -3517,9 +3504,9 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		absorbFtab[ftabLen-1] = absorbCnt;
 	}
 	// Assert that our loop counter got incremented right to the end
-	assert_eq(side, eh.ebwtTotSz());
+	assert_eq(side, eh._ebwtTotSz);
 	// Assert that we wrote the expected amount to out1
-	assert_eq(((uint32_t)out1.tellp() - beforeEbwtOff), eh.ebwtTotSz());
+	assert_eq(((uint32_t)out1.tellp() - beforeEbwtOff), eh._ebwtTotSz);
 	// assert that the last thing we did was write a forward bucket
 	assert(wroteFwBucket);
 	
@@ -3559,8 +3546,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	for(uint32_t i = 1; i < ftabLen; i++) {
 		if(absorbFtab[i] > 0) eftabLen += 2;
 	}
-	assert_leq(eftabLen, (uint32_t)eh.ftabChars()*2);
-	eftabLen = eh.ftabChars()*2;
+	assert_leq(eftabLen, (uint32_t)eh._ftabChars*2);
+	eftabLen = eh._ftabChars*2;
 	uint32_t *eftab = NULL;
 	try {
 		eftab = new uint32_t[eftabLen];
