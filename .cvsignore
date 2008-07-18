@@ -37,3 +37,4 @@ gmon.*
 .qry.fa
 .ref.fa
 ebwt_build_packed_prof1
+*.prof
