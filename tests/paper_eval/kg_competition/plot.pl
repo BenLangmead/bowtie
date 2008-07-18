@@ -17,10 +17,10 @@ open(KG, ">>kg.tex") || die "Could not open >>kg.tex";
 print KG "\\begin{document}\n";
 print KG "\\begin{table}[tp]\n";
 print KG "\\scriptsize\n";
-print KG "\\begin{tabular}{lrrrr}";
+print KG "\\begin{tabular}{lrrrrr}";
 print KG "\\toprule\n";
-print KG " & \\multirow{2}{*}{Time} & \\multirow{2}{*}{Speedup} & \\% reads & \\% more reads\\\\\n";
-print KG " &                        &                           & mapped    & mapped        \\\\[3pt]\n";
+print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
+print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
 print KG "\\toprule\n";
 
 my $bowtieSecs = 0;
@@ -30,14 +30,17 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $l = readfline("whole.results.$n.txt", 0);
 	my @ls = split(/,/, $l);
 	my $rt = toMinsSecsHrs($ls[1]);
-	my $pct = trim($ls[2]);
-	$bowtieSecs = $ls[1] if $ni == 0;
+	my $wrt = toMinsSecsHrs($ls[2]);
+	my $pct = trim($ls[3]);
+	$bowtieSecs = $ls[2] if $ni == 0;
 	$bowtiePct = $pct if $ni == 0;
-	my $speedup = sprintf("%2.1fx", $ls[1] * 1.0 / $bowtieSecs);
-	my $moreReads = sprintf("%2.1f\\%%", ($pct - $bowtiePct) * 100.0 / $bowtiePct);
-	print KG "$names[$ni] & $rt & $speedup & ";
-	printf KG "%2.1f", $pct;
-	print KG " & $moreReads \\\\";
+	my $speedup = ($ni == 0 ? "-" : sprintf("%2.1fx", $ls[2] * 1.0 / $bowtieSecs));
+	my $moreReads = ($ni == 0 ? "-" : sprintf("%2.1f\\%%", abs($pct - $bowtiePct) * 100.0 / $bowtiePct));
+	my $moreReadsSign = ($pct >= $bowtiePct)? "+" : "-";
+	$moreReadsSign = "" if $ni == 0;
+	print KG "$names[$ni] & $rt & $wrt & $speedup & ";
+	printf KG "%2.1f\\%%", $pct;
+	print KG " & $moreReadsSign$moreReads \\\\";
 	print KG "\\midrule" if $ni < $#runnames;
 	print KG "\n";
 }
@@ -50,7 +53,7 @@ print KG "\\caption{".
 	"Illumina/Solexa reads (1 lane's worth) against the whole human ".
 	"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
 	"Reads were originally extracted as part of the 1000-Genomes project pilot. ".
-	"They were downloaded from the NCBI Short Read archive, accession \#SRR001115. ".
+	"They were downloaded from the NCBI Short Read archive, accession \\#SRR001115. ".
 	"Reference sequences were the ".
 	"contigs of Genbank human genome build 36.3. ".
 	"Soap was not run against the whole-human reference because its ".
