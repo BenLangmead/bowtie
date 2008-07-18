@@ -1620,7 +1620,12 @@ public:
 			assert_eq(savedNz, _firstNzRemainder);
 			assert_eq(0, params().sink().numProvisionalHits());
 			// Now finish off the search
-			bool ret = ebwt.searchFinish(*this);
+			bool ret;
+			if(_bot == _top + 1) {
+				ret = ebwt.searchFinish1(*this);
+			} else {
+				ret = ebwt.searchFinish(*this);
+			}
 			// Did the call to searchFinish generate one or more hits?
 			if(ret || params().sink().numProvisionalHits() > 0) {
 				// Yes...
@@ -2370,9 +2375,11 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 	int jumps = 0;
 	uint32_t off = 0xffffffff;
 	assert_lt(s.top(), this->_eh._len);
+	if(s.top() == _zOff && !s.qExhausted()) return false; // can't wrap around - no match
 	while(!s.closed() && !s.qExhausted()) {
 		VMSG_NL("searchFinish1: qidx: " << s.qidx() << ", top: " << s.top());
 		uint32_t r = s.mapLF1(*this);
+		if(r == _zOff && !s.qExhausted()) return false; // can't wrap around - no match
 		if(r == 0xffffffff) return false; // no match
 		// Did we stumble into a row with a known offset?  If so, make
 		// note so that don't have to chase it later.
