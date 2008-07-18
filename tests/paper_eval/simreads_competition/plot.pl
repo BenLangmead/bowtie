@@ -65,7 +65,6 @@ system("cp headerinc.tex runtime.tex") == 0 || die ("Must have headerinc.tex");
 open(RUNTIME, ">>runtime.tex") || die "Could not open >>runtime.tex";
 print RUNTIME "\\begin{document}\n";
 print RUNTIME "\\begin{table}[tp]\n";
-#print RUNTIME "\\centering\n";
 print RUNTIME "\\scriptsize\n";
 print RUNTIME "\\begin{tabular}{l";
 for(my $i = 0; $i <= $#runnames; $i++) {
@@ -75,8 +74,6 @@ print RUNTIME "}\n";
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
 print RUNTIME " & \\multicolumn{2}{c}{35.1 Mbases} & \\multicolumn{2}{c}{238 Mbases} & \\multicolumn{2}{c}{2.87 Gbases} \\\\[3pt] \n";
-# TODO: Can I avoid using this fake \\multicolumn to get these centered?
-#print RUNTIME " & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} & \\multicolumn{1}{c}{Time} & \\multicolumn{1}{c}{Speedup} \\\\ \n";
 print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
 print RUNTIME "\\toprule\n";
 
@@ -91,9 +88,10 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			$bowtieResults[$j] = $s2[0] if $i == 0;
-			print RUNTIME toMinsSecsHrs($s2[0])." & ";
-			my $speedup = sprintf("%2.1fx", $s2[0] * 1.0 / $bowtieResults[$j]);
+			$bowtieResults[$j] = $s2[1] if $i == 0;
+			print RUNTIME toMinsSecsHrs($s2[1])." & ";
+			my $speedup = sprintf("%2.1fx", $s2[1] * 1.0 / $bowtieResults[$j]);
+			$speedup = "-" if $i == 0;
 			print RUNTIME "$speedup ";
 		}
 		if($j < $#runnames) { print RUNTIME "& "; }
@@ -108,10 +106,10 @@ if(!$all1) {
 	print RUNTIME "\\bottomrule\n";
 	print RUNTIME "\\end{tabular}\n";
 	print RUNTIME "\\caption{".
-		"CPU time ".
+		"Wall clock time ".
 		"for mapping 8M simulated 35bp ".
 		"reads against human chromosomes 22 and 2 and the whole human ".
-		"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
+		"genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
 		"Simulated reads were ".
 		"extracted only from the relevant region using a read simulator that ".
 		"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
@@ -129,7 +127,6 @@ if(!$all1) {
 	open(MEMORY, ">>memory.tex") || die "Could not open >memory.tex";
 	print MEMORY "\\begin{document}\n";
 	print MEMORY "\\begin{table}[tp]\n";
-	#print MEMORY "\\centering\n";
 	print MEMORY "\\scriptsize\n";
 	print MEMORY "\\begin{tabular}{l";
 	for(my $i = 0; $i <= $#runnames; $i++) {
@@ -138,8 +135,6 @@ if(!$all1) {
 	print MEMORY "}\n";
 	print MEMORY "\\toprule\n";
 	print MEMORY " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\ \n";
-	# TODO: Can I avoid using this fake \\multicolumn to get these centered?
-	#print MEMORY " & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} & \\multicolumn{1}{c}{Virtual} & \\multicolumn{1}{c}{Resident} \\\\ \n";
 	print RUNTIME "\\\\[1mm]\n";
 } else {
 	*MEMORY = *RUNTIME;
@@ -161,8 +156,8 @@ for(my $i = 0; $i < 5; $i++) {
 		} else {
 			my @s = split(/ /, $l);
 			my @s2 = split(/,/, $s[1]);
-			my $vm = int(($s2[1] + 512) / 1024);
-			my $rs = int(($s2[2] + 512) / 1024);
+			my $vm = int(($s2[2] + 512) / 1024);
+			my $rs = int(($s2[3] + 512) / 1024);
 			if($vm < $rs) { $vm = $rs; }
 			$vm = commaize($vm);
 			$rs = commaize($rs);
@@ -179,11 +174,11 @@ print MEMORY "\\bottomrule\n";
 print MEMORY "\\end{tabular}\n";
 print MEMORY "\\scriptsize\\caption{";
 print MEMORY "Peak virtual and resident memory usage " if !$all1;
-print MEMORY "CPU time and peak virtual/resident memory usage " if $all1;
+print MEMORY "Wall clock time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
 	"for mapping 8M simulated 35bp ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
-	"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
+	"genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
 	"Simulated reads were ".
 	"extracted only from the relevant region using a read simulator that ".
 	"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
