@@ -7,6 +7,7 @@
 #include <cassert>
 #include <seqan/find.h>
 #include <getopt.h>
+#include <vector>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian.h"
@@ -48,6 +49,7 @@ static int offRate				= -1; // keep default offRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
+static int maqLike				= 0; // do maq-like searching
 
 static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
 
@@ -80,6 +82,7 @@ static struct option long_options[] = {
 	{"stats",      no_argument, &printStats, 1},
 	{"reportOpps", no_argument, &reportOpps, 1},
 	{"version",    no_argument, &showVersion, 1},
+	{"maq",        no_argument, &maqLike, 1},
 	{"dumpPats",   required_argument, 0, ARG_DUMP_PATS},
 	{"revcomp", no_argument, 0, 'r'},
 	{"kmer", required_argument, 0, 'k'},
@@ -107,7 +110,8 @@ static void printUsage(ostream& out) {
 	    << "  -1/--1mismatch     allow 1 mismatch (requires both fw and bw Ebwts)" << endl
 	    << "  -5/--trim5 <int>   # of bases to trim from 5' (right) end of queries" << endl
 	    << "  -3/--trim3 <int>   # of bases to trim from 3' (left) end of queries" << endl
-	    << "  -u/--qUpto <int>   stop after <int> queries (not counting reverse complements)" << endl
+	    << "  -u/--qUpto <int>   stop after <int> reads" << endl
+	    << "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    << "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
 		<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
 		<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
@@ -1103,6 +1107,157 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	}
 }
 
+#define SWITCH_TO_FW_INDEX() { \
+	/* Evict the transposed index from memory if necessary */ \
+	if(ebwtBw.isInMemory()) ebwtBw.evictFromMemory(); \
+	assert(!ebwtBw.isInMemory()); \
+	/* Load the forward index into memory if necessary */ \
+	if(!ebwtFw.isInMemory()) { \
+		Timer _t(cout, "Time loading forward Bowtie Index: ", timing); \
+		ebwtFw.loadIntoMemory(); \
+	} \
+	assert(ebwtFw.isInMemory()); \
+	patsrc.reset(); /* rewind pattern source to first pattern */ \
+	assert(patsrc.hasMorePatterns()); \
+	patsrc.setReverse(false); /* tell pattern source not to reverse patterns */ \
+	params.setEbwtFw(true); /* tell search params that we're in the forward domain */ \
+}
+
+#define SWITCH_TO_BW_INDEX() { \
+	/* Evict the forward index from memory if necessary */ \
+	if(ebwtFw.isInMemory()) ebwtFw.evictFromMemory(); \
+	assert(!ebwtFw.isInMemory()); \
+	/* Load the forward index into memory if necessary */ \
+	if(!ebwtBw.isInMemory()) { \
+		Timer _t(cout, "Time loading transposed Bowtie Index: ", timing); \
+		ebwtBw.loadIntoMemory(); \
+	} \
+	assert(ebwtBw.isInMemory()); \
+	patsrc.reset(); /* rewind pattern source to first pattern */ \
+	assert(patsrc.hasMorePatterns()); \
+	patsrc.setReverse(true); /* tell pattern source to reverse patterns */ \
+	params.setEbwtFw(false); /* tell search params that we're in the transposed domain */ \
+}
+
+
+/**
+ * Search through a pair of Ebwt indexes, one for the forward direction
+ * and one for the backward direction, for exact query hits and hits
+ * with at most one mismatch.
+ * 
+ * Forward Ebwt (ebwtFw) is already loaded into memory and backward
+ * Ebwt (ebwtBw) is not loaded into memory.
+ */
+template<typename TStr>
+static void seededQualCutoffSearch(int seedLen,
+                                   int qualCutoff,
+                                   int qualWobble,
+                                   PatternSource<TStr>& patsrc,
+                                   HitSink& sink,
+                                   EbwtSearchStats<TStr>& stats,
+                                   EbwtSearchParams<TStr>& params,
+                                   Ebwt<TStr>& ebwtFw,
+                                   Ebwt<TStr>& ebwtBw,
+                                   vector<TStr>& os)
+{
+	typedef typename Value<TStr>::Type TVal;
+	vector<Hit> sanityHits;
+	uint32_t numPats;
+	assert(revcomp);
+	SWITCH_TO_FW_INDEX();
+	uint32_t numQs = ((qUpto == -1) ? 10 * 1024 * 1024 : qUpto);
+	vector<bool> doneMask(numQs, false);
+	{
+		// Phase 1: Consider cases 1R and 2R
+		Timer _t(cout, "Time for seeded quality search Phase 1: ", timing);
+		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		uint32_t patid = 0;
+		uint32_t lastLen = 0; // for checking if all reads have same length
+		TStr patFw; string qualFw; string nameFw;
+		TStr patRc; string qualRc; string nameRc;
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	if(patid>>1 > doneMask.capacity()) {
+	    		// Expand doneMask
+	    		doneMask.resize(doneMask.capacity()*2, 0);
+	    	}
+			patsrc.nextPattern(patFw, qualFw, nameFw);
+			assert(patsrc.nextIsReverseComplement());
+			patsrc.nextPattern(patRc, qualRc, nameRc);
+			assert(!patsrc.nextIsReverseComplement());
+			size_t plen = length(patFw);
+			if(qSameLen) {
+				if(lastLen == 0) lastLen = plen;
+				else assert_eq(lastLen, plen);
+			}
+			patid += 2;
+	    }
+	    numPats = patid;
+	    assert_leq(numPats, doneMask.size());
+	}
+	SWITCH_TO_BW_INDEX();
+	{
+		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
+		// for case 4R
+		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
+		EbwtSearchState<TStr> s(ebwtBw, params, seed);
+		uint32_t patid = 0;
+		TStr patFw; string qualFw; string nameFw;
+		TStr patRc; string qualRc; string nameRc;
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) { patid += 2; continue; }
+			patsrc.nextPattern(patFw, qualFw, nameFw);
+			assert(patsrc.nextIsReverseComplement());
+			patsrc.nextPattern(patRc, qualRc, nameRc);
+			assert(!patsrc.nextIsReverseComplement());
+			patid += 2;
+	    }
+	    assert_eq(numPats, patid);
+	}
+	SWITCH_TO_FW_INDEX();
+	{
+		// Phase 3: Consider cases 3R and 4R and generate seedlings for
+		// case 4F
+		Timer _t(cout, "Time for seeded quality search Phase 3: ", timing);
+		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		uint32_t patid = 0;
+		TStr patFw; string qualFw; string nameFw;
+		TStr patRc; string qualRc; string nameRc;
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) { patid += 2; continue; }
+			patsrc.nextPattern(patFw, qualFw, nameFw);
+			assert(patsrc.nextIsReverseComplement());
+			patsrc.nextPattern(patRc, qualRc, nameRc);
+			assert(!patsrc.nextIsReverseComplement());
+			patid += 2;
+	    }
+	    assert_eq(numPats, patid);
+	}
+	SWITCH_TO_BW_INDEX();
+	{
+		// Phase 4: Consider case 4F
+		Timer _t(cout, "Time for seeded quality search Phase 4: ", timing);
+		EbwtSearchState<TStr> s(ebwtBw, params, seed);
+		uint32_t patid = 0;
+		TStr patFw; string qualFw; string nameFw;
+		TStr patRc; string qualRc; string nameRc;
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) { patid += 2; continue; }
+			patsrc.nextPattern(patFw, qualFw, nameFw);
+			assert(patsrc.nextIsReverseComplement());
+			patsrc.nextPattern(patRc, qualRc, nameRc);
+			assert(!patsrc.nextIsReverseComplement());
+			patid += 2;
+	    }
+	    assert_eq(numPats, patid);
+	}
+}
+
 template<typename TStr>
 static void driver(const char * type,
                    const string& infile,
@@ -1230,7 +1385,19 @@ static void driver(const char * type,
 		                              true,
 		                              true,
 		                              arrowMode);
-		if(mismatches > 0) 
+		if(maqLike) {
+			seededQualCutoffSearch(24,
+			                       70,
+			                       15,
+			                       *patsrc,
+			                       *sink,
+			                       stats,
+			                       params,
+			                       ebwt,
+			                       *ebwtBw,
+			                       os);
+		}
+		else if(mismatches > 0) 
 		{
 			// Search with mismatches
 			if (kmer != -1 || allowed_diffs != -1)
