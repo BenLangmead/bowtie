@@ -15,60 +15,6 @@
 #include "pat.h"
 
 /**
- * Encapsualtes a source of patterns where reading is handled by a
- * SeqAn read() function. 
- */
-template <typename TStr, typename TFile>
-class SeqanPatternSource : public PatternSource<TStr> {
-public:
-	SeqanPatternSource(const std::string& infile) :
-		PatternSource<TStr>(), _sz(64), _cur(), _next(), _in(NULL)
-	{
-		// Open input file
-		_in = fopen(infile.c_str(), "r");
-		if(_in == NULL) {
-			throw runtime_error("Could not open sequence file");
-		}
-		// Associate large input buffer with FILE *in
-		if(setvbuf(_in, _buf, _IOFBF, 256 * 1024) != 0) {
-			throw runtime_error("Could not create input buffer for sequence file");
-		}
-		read();
-		assert(!seqan::empty(_next));
-	}
-	virtual ~SeqanPatternSource() {
-		if(_in != NULL) fclose(_in);
-	}
-	virtual const TStr& nextPattern() {
-		assert(!seqan::empty(_next));
-		_cur = _next;
-		read();
-		return _cur;
-	}
-	virtual bool hasMorePatterns() {
-		return !seqan::empty(_next);
-	}
-private:
-	void read() {
-		seqan::clear(_next);
-		seqan::resize(_next, _sz, Exact());
-		while(true) {
-			seqan::read2(_in, _next, TFile());
-			if(seqan::length(_next) > _sz) {
-				_sz = seqan::length(_next) + 4;
-			} else {
-				break;
-			}
-		}
-	}
-	size_t _sz;  // default pattern size (expandable)
-	TStr _cur;   // current pattern; outsider might hold a reference to it
-	TStr _next;  // next pattern; might be empty
-	FILE *_in;   // file to read patterns from
-	char _buf[256 * 1024]; // (large) input buffer
-};
-
-/**
  * Read a sequence file of the given format and alphabet type.  Store
  * all of the extracted sequences in vector ss.  Note that SeqAn's
  * policy for when it encounters characters not from the specified

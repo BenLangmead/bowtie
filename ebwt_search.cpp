@@ -259,17 +259,17 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(patid++);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr pat;
-		string qual;
-		string name;
-		patsrc.nextPattern(pat, qual, name);
-    	assert(!empty(pat));
-    	if(lastLen == 0) lastLen = length(pat);
-    	if(qSameLen && length(pat) != lastLen) {
+    	TStr* pat;
+		String<char>* qual;
+		String<char>* name;
+		patsrc.nextPattern(&pat, &qual, &name);
+    	assert(!empty(*pat));
+    	if(lastLen == 0) lastLen = length(*pat);
+    	if(qSameLen && length(*pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
-    	s.newQuery(&pat, &name, &qual);
-    	params.stats().incRead(s, pat);
+    	s.newQuery(pat, name, qual);
+    	params.stats().incRead(s, *pat);
 	    ebwt.search(s, params);
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
@@ -280,17 +280,17 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.hasMorePatterns());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-		    	TStr pat2;
-				string qual2;
-				string name2;
-				patsrc.nextPattern(pat2, qual2, name2);
-		    	assert(!empty(pat2));
+	        	TStr* pat2;
+	    		String<char>* qual2;
+	    		String<char>* name2;
+				patsrc.nextPattern(&pat2, &qual2, &name2);
+		    	assert(!empty(*pat2));
 		    	patid++;
-		    	if(qSameLen && length(pat2) != lastLen) {
+		    	if(qSameLen && length(*pat2) != lastLen) {
 		    		throw runtime_error("All reads must be the same length");
 		    	}
 		    	params.setFw(false);
-		    	params.stats().incRead(s, pat2);
+		    	params.stats().incRead(s, *pat2);
 	    		assert(!patsrc.nextIsReverseComplement());
 	    	}
 	    }
@@ -304,7 +304,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 		    for(unsigned int i = 0; i < os.size(); i++) {
 	    		// Forward
 	    		Finder<TStr> finder(os[i]);
-	    		Pattern<TStr, Horspool> pattern(pat);
+	    		Pattern<TStr, Horspool> pattern(*pat);
 	    		while (find(finder, pattern)) {
 	    			results2.push_back(make_pair(i, position(finder)));
 	    		}
@@ -377,19 +377,19 @@ static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_tex
     	params.setPatId(patid++);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr pat;
-		string qual;
-		string name;
-		patsrc.nextPattern(pat, qual, name);
-    	assert(!empty(pat));
-    	if(lastLen == 0) lastLen = length(pat);
-    	if(qSameLen && length(pat) != lastLen) {
+    	TStr* pat;
+		String<char>* qual;
+		String<char>* name;
+		patsrc.nextPattern(&pat, &qual, &name);
+    	assert(!empty(*pat));
+    	if(lastLen == 0) lastLen = length(*pat);
+    	if(qSameLen && length(*pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
 		
     	// FIXME: not accumulating stats for search with extension
     	//params.stats().incRead(s, pat);
-	    extend_policy.search(ebwt, stats, params, pat, name, qual, sink);
+	    extend_policy.search(ebwt, stats, params, *pat, *name, *qual, sink);
 		
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
@@ -401,13 +401,13 @@ static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_tex
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
 				
-		    	TStr pat2;
-				string qual2;
-				string name2;
-				patsrc.nextPattern(pat2, qual2, name2);
-		    	assert(!empty(pat2));
+		    	TStr* pat2;
+				String<char>* qual2;
+				String<char>* name2;
+				patsrc.nextPattern(&pat2, &qual2, &name2);
+		    	assert(!empty(*pat2));
 		    	patid++;
-		    	if(qSameLen && length(pat2) != lastLen) {
+		    	if(qSameLen && length(*pat2) != lastLen) {
 		    		throw runtime_error("All reads must be the same length");
 		    	}
 		    	params.setFw(false);
@@ -643,18 +643,18 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr pat;
-		string qual;
-		string name;
-		patsrc.nextPattern(pat, qual, name);
-    	assert(!empty(pat));
-    	if(lastLen == 0) lastLen = length(pat);
-    	if(qSameLen && length(pat) != lastLen) {
+    	TStr* pat;
+		String<char>* qual;
+		String<char>* name;
+		patsrc.nextPattern(&pat, &qual, &name);
+    	assert(!empty(*pat));
+    	if(lastLen == 0) lastLen = length(*pat);
+    	if(qSameLen && length(*pat) != lastLen) {
     		throw runtime_error("All reads must be the same length");
     	}
     	// Create state for a search on in the forward index
-    	s.newQuery(&pat, &name, &qual);
-    	params.stats().incRead(s, pat);
+    	s.newQuery(pat, name, qual);
+    	params.stats().incRead(s, *pat);
     	// Are there provisional hits?
     	if(sink.numProvisionalHits() > 0) {
     		// Shouldn't be any provisional hits unless we're doing
@@ -701,19 +701,19 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.nextIsReverseComplement());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-		    	TStr pat2;
-				string qual2;
-				string name2;
-				patsrc.nextPattern(pat2, qual2, name2);
-		    	assert(!empty(pat2));
+		    	TStr* pat2;
+				String<char>* qual2;
+				String<char>* name2;
+				patsrc.nextPattern(&pat2, &qual2, &name2);
+		    	assert(!empty(*pat2));
 		    	patid++;
 		    	// Set a bit indicating this pattern is done
 		    	doneMask[patid >> 3] |= (1 << (patid & 7));
-		    	if(qSameLen && length(pat2) != lastLen) {
+		    	if(qSameLen && length(*pat2) != lastLen) {
 		    		throw runtime_error("All reads must be the same length");
 		    	}
 		    	params.setFw(false);
-		    	params.stats().incRead(s, pat2);
+		    	params.stats().incRead(s, *pat2);
 	    		assert(!patsrc.nextIsReverseComplement());
 	    	} else if(revcomp) {
     	    	// The reverse-complement version hit, so retroactively
@@ -731,7 +731,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	    vector<Hit>& hits = sink.retainedHits();
     	    // Accumulate hits found using a naive seed-and-extend into
     	    // sanityHits
-    		findSanityHits(pat, spatid, sfw, os, sanityHits, true, false);
+    		findSanityHits(*pat, spatid, sfw, os, sanityHits, true, false);
     		if(hits.size() > 0) {
     			// We hit, check that oracle also got our hits
         	    assert(!oneHit || hits.size() == 1);
@@ -742,7 +742,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     					assert_gt(sanityHits[i].mms.count(), 0);
     				}
     			}
-    			reconcileHits(pat, spatid, sfw, os, hits, sanityHits, true, false);
+    			reconcileHits(*pat, spatid, sfw, os, hits, sanityHits, true, false);
     		} else if(!exactOnly) {
     			// If we tried exact and inexact and didn't hit, then
     			// oracle shouldn't have hit
@@ -760,7 +760,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		} else {
     			// If in allHit mode, check that we covered *all* the
     			// hits produced by the oracle
-    			checkSanityExhausted(pat, spatid, sfw, sanityHits, false);
+    			checkSanityExhausted(*pat, spatid, sfw, sanityHits, false);
     		}
     		assert_eq(0, sanityHits.size());
     	    // Check that orientation of hits squares with orientation
@@ -815,13 +815,13 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr pat;
-		string qual;
-		string name;
-		patsrc.nextPattern(pat, qual, name);
-    	assert(!empty(pat));
-    	s.newQuery(&pat, &name, &qual);
-    	params.stats().incRead(s, pat);
+    	TStr* pat;
+		String<char>* qual;
+		String<char>* name;
+		patsrc.nextPattern(&pat, &qual, &name);
+    	assert(!empty(*pat));
+    	s.newQuery(pat, name, qual);
+    	params.stats().incRead(s, *pat);
 		// Skip if previous phase determined this read is "done"; this
 		// should only happen in oneHit mode
     	if((doneMask[patid >> 3] & (1 << (patid & 7))) != 0) {
@@ -841,16 +841,15 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		assert(patsrc.hasMorePatterns());
     		// Ignore this pattern (the reverse complement of
     		// the one we just matched)
-	    	TStr pat2;
-			string qual2;
-			string name2;
-			patsrc.nextPattern(pat2, qual2, name2);
-			//cerr << "ignoring "<< pat2<<endl;
+	    	TStr* pat2;
+			String<char>* qual2;
+			String<char>* name2;
+			patsrc.nextPattern(&pat2, &qual2, &name2);
 
-	    	assert(!empty(pat2));
+	    	assert(!empty(*pat2));
 	    	patid++;
 	    	params.setFw(false);
-	    	params.stats().incRead(s, pat2);
+	    	params.stats().incRead(s, *pat2);
     		assert(!patsrc.nextIsReverseComplement());
 	    }
 	    // Check all hits against a naive oracle
@@ -858,10 +857,10 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	    vector<Hit>& hits = sink.retainedHits();
     	    // Accumulate hits found using a naive seed-and-extend into
     	    // sanityHits
-    		findSanityHits(pat, spatid, sfw, os, sanityHits, false, true);
+    		findSanityHits(*pat, spatid, sfw, os, sanityHits, false, true);
     		if(hits.size() > 0) {
     			// We hit, check that oracle also got our hits
-    			reconcileHits(pat, spatid, sfw, os, hits, sanityHits, false, true);
+    			reconcileHits(*pat, spatid, sfw, os, hits, sanityHits, false, true);
     		} else {
     			// If we didn't hit, then oracle shouldn't have hit
         		assert_eq(0, sanityHits.size());
@@ -872,7 +871,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		} else {
     			// If in allHit mode, check that we covered *all* the
     			// hits produced by the oracle
-    			checkSanityExhausted(pat, spatid, sfw, sanityHits, true);
+    			checkSanityExhausted(*pat, spatid, sfw, sanityHits, true);
     		}
     		assert_eq(0, sanityHits.size());
     	    // Check that orientation of hits squares with orientation
@@ -948,18 +947,18 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			params.setPatId(spatid);
 			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-			TStr pat;
-			string qual;
-			string name;
-			patsrc.nextPattern(pat, qual, name);
+			TStr* pat;
+			String<char>* qual;
+			String<char>* name;
+			patsrc.nextPattern(&pat, &qual, &name);
 			
-			assert(!empty(pat));
-			if(lastLen == 0) lastLen = length(pat);
-			if(qSameLen && length(pat) != lastLen) {
+			assert(!empty(*pat));
+			if(lastLen == 0) lastLen = length(*pat);
+			if(qSameLen && length(*pat) != lastLen) {
 				throw runtime_error("All reads must be the same length");
 			}
-			s.newQuery(&pat, &qual, &name);
-			params.stats().incRead(s, pat);
+			s.newQuery(pat, qual, name);
+			params.stats().incRead(s, *pat);
 			// Are there provisional hits?
 			if(sink.numProvisionalHits() > 0) {
 				// Shouldn't be any provisional hits unless we're doing
@@ -970,7 +969,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				// There is a provisional inexact match for the forward
 				// orientation of this pattern, so just try exact
 
-				extend_exact.search(ebwtFw, stats, params, pat, name, qual, sink);
+				extend_exact.search(ebwtFw, stats, params, *pat, *name, *qual, sink);
 				
 				if(sink.numHits() > lastHits) {
 					// Got one or more exact hits from the reverse
@@ -988,7 +987,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				assert_eq(0, sink.numProvisionalHits());
 			} else {
 				//ebwtFw.search1MismatchOrBetter(s, params);
-				extend_one_mismatch.search(ebwtFw, stats, params, pat, name, qual, sink);
+				extend_one_mismatch.search(ebwtFw, stats, params, *pat, *name, *qual, sink);
 			}
 			bool gotHits = sink.numHits() > lastHits;
 			// Set a bit indicating this pattern is done and needn't be
@@ -1009,19 +1008,19 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 					assert(patsrc.nextIsReverseComplement());
 					// Ignore this pattern (the reverse complement of
 					// the one we just matched)
-					TStr pat2;
-					string qual2;
-					string name2;
-					patsrc.nextPattern(pat2, qual2, name2);
-					assert(!empty(pat2));
+					TStr* pat2;
+					String<char>* qual2;
+					String<char>* name2;
+					patsrc.nextPattern(&pat2, &qual2, &name2);
+					assert(!empty(*pat2));
 					patid++;
 					// Set a bit indicating this pattern is done
 					doneMask[patid >> 3] |= (1 << (patid & 7));
-					if(qSameLen && length(pat2) != lastLen) {
+					if(qSameLen && length(*pat2) != lastLen) {
 						throw runtime_error("All reads must be the same length");
 					}
 					params.setFw(false);
-					params.stats().incRead(s, pat2);
+					params.stats().incRead(s, *pat2);
 					assert(!patsrc.nextIsReverseComplement());
 				} else if(revcomp) {
 					// The reverse-complement version hit, so retroactively
@@ -1064,13 +1063,13 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			params.setPatId(spatid);
 			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-			TStr pat;
-			string qual;
-			string name;
-			patsrc.nextPattern(pat, qual, name);
-			assert(!empty(pat));
-			s.newQuery(&pat, &name, &qual);
-			params.stats().incRead(s, pat);
+			TStr* pat;
+			String<char>* qual;
+			String<char>* name;
+			patsrc.nextPattern(&pat, &qual, &name);
+			assert(!empty(*pat));
+			s.newQuery(pat, name, qual);
+			params.stats().incRead(s, *pat);
 			// Skip if previous phase determined this read is "done"; this
 			// should only happen in oneHit mode
 			if((doneMask[patid >> 3] & (1 << (patid & 7))) != 0) {
@@ -1082,7 +1081,7 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			// Try to match with one mismatch while suppressing exact hits
 			//ebwtBw.search1MismatchOrBetter(s, params, false /* suppress exact */);
 			extend_one_mismatch.suppressExact(true);
-			extend_one_mismatch.search(ebwtBw, stats, params, pat, name, qual, sink);
+			extend_one_mismatch.search(ebwtBw, stats, params, *pat, *name, *qual, sink);
 						
 			sink.acceptProvisionalHits(); // automatically approve provisional hits
 			// If the forward direction matched with one mismatch, ignore
@@ -1092,14 +1091,14 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 				assert(patsrc.hasMorePatterns());
 				// Ignore this pattern (the reverse complement of
 				// the one we just matched)
-				TStr pat2;
-				string qual2;
-				string name2;
-				patsrc.nextPattern(pat2, qual2, name2);
-				assert(!empty(pat2));
+				TStr* pat2;
+				String<char>* qual2;
+				String<char>* name2;
+				patsrc.nextPattern(&pat2, &qual2, &name2);
+				assert(!empty(*pat2));
 				patid++;
 				params.setFw(false);
-				params.stats().incRead(s, pat2);
+				params.stats().incRead(s, *pat2);
 				assert(!patsrc.nextIsReverseComplement());
 			}
 			lastHits = sink.numHits();
@@ -1173,18 +1172,18 @@ static void seededQualCutoffSearch(int seedLen,
 		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
-		TStr patFw; string qualFw; string nameFw;
-		TStr patRc; string qualRc; string nameRc;
+		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
+		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 > doneMask.capacity()) {
 	    		// Expand doneMask
 	    		doneMask.resize(doneMask.capacity()*2, 0);
 	    	}
-			patsrc.nextPattern(patFw, qualFw, nameFw);
+			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
 			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(patRc, qualRc, nameRc);
+			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
 			assert(!patsrc.nextIsReverseComplement());
-			size_t plen = length(patFw);
+			size_t plen = length(*patFw);
 			if(qSameLen) {
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
@@ -1192,7 +1191,7 @@ static void seededQualCutoffSearch(int seedLen,
 			patid += 2;
 	    }
 	    numPats = patid;
-	    assert_leq(numPats, doneMask.size());
+	    assert_leq(numPats>>1, doneMask.size());
 	}
 	SWITCH_TO_BW_INDEX();
 	{
@@ -1201,15 +1200,15 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
 		EbwtSearchState<TStr> s(ebwtBw, params, seed);
 		uint32_t patid = 0;
-		TStr patFw; string qualFw; string nameFw;
-		TStr patRc; string qualRc; string nameRc;
+		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
+		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
 	    	if(doneMask[patid>>1]) { patid += 2; continue; }
-			patsrc.nextPattern(patFw, qualFw, nameFw);
+			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
 			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(patRc, qualRc, nameRc);
+			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
 			assert(!patsrc.nextIsReverseComplement());
 			patid += 2;
 	    }
@@ -1222,15 +1221,15 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 3: ", timing);
 		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		uint32_t patid = 0;
-		TStr patFw; string qualFw; string nameFw;
-		TStr patRc; string qualRc; string nameRc;
+		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
+		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
 	    	if(doneMask[patid>>1]) { patid += 2; continue; }
-			patsrc.nextPattern(patFw, qualFw, nameFw);
+			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
 			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(patRc, qualRc, nameRc);
+			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
 			assert(!patsrc.nextIsReverseComplement());
 			patid += 2;
 	    }
@@ -1242,15 +1241,15 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 4: ", timing);
 		EbwtSearchState<TStr> s(ebwtBw, params, seed);
 		uint32_t patid = 0;
-		TStr patFw; string qualFw; string nameFw;
-		TStr patRc; string qualRc; string nameRc;
+		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
+		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
 	    	if(doneMask[patid>>1]) { patid += 2; continue; }
-			patsrc.nextPattern(patFw, qualFw, nameFw);
+			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
 			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(patRc, qualRc, nameRc);
+			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
 			assert(!patsrc.nextIsReverseComplement());
 			patid += 2;
 	    }
@@ -1286,8 +1285,8 @@ static void driver(const char * type,
 	switch(format) {
 		case FASTA:   patsrc = new FastaPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5); break;
 		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, solexa_quals); break;
-	    case BFQ:     patsrc = new BfqPatternSource<TStr>   (queries, revcomp, false, patDumpfile, trim3, trim5); break;
-	    case SOLEXA:  patsrc = new SolexaPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
+	    //case BFQ:     patsrc = new BfqPatternSource<TStr>   (queries, revcomp, false, patDumpfile, trim3, trim5); break;
+	    //case SOLEXA:  patsrc = new SolexaPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
 		case CMDLINE: patsrc = new VectorPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
 		default: assert(false);
 	}
@@ -1308,7 +1307,8 @@ static void driver(const char * type,
     Ebwt<TStr> ebwt(infile, /* overriding: */ offRate, verbose, sanityCheck);
     assert_geq(ebwt.eh().offRate(), offRate);
     Ebwt<TStr>* ebwtBw = NULL;
-    if(mismatches > 0) {
+    // We need the transposed index if mismatches are allowed
+    if(mismatches > 0 || maqLike) {
     	ebwtBw = new Ebwt<TStr>(infile + ".rev", /* overriding: */ offRate, verbose, sanityCheck);
     }
 	if(sanityCheck && !os.empty()) {
@@ -1320,7 +1320,7 @@ static void driver(const char * type,
 		}
 	}
     // Load rest of (vast majority of) Ebwt into memory
-	{
+	if(!maqLike) {
 		Timer _t(cout, "Time loading Ebwt: ", timing);
 	    ebwt.loadIntoMemory();
 	}

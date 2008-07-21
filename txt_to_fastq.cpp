@@ -34,14 +34,14 @@ int main(int argc, char** argv)
 	
 	while(patsrc.hasMorePatterns())
 	{
-		String<Dna, Alloc<> > pat;
-		string qual;
-		string name;
-		patsrc.nextPattern(pat, qual, name);
-		cout << "@"  << name << endl;
-		cout << pat  << endl;
+		String<Dna, Alloc<> >* pat;
+		String<char>* qual;
+		String<char>* name;
+		patsrc.nextPattern(&pat, &qual, &name);
+		cout << "@"  << (*name) << endl;
+		cout << (*pat)  << endl;
 		cout << "+"  << endl;
-		cout << qual << endl;
+		cout << (*qual) << endl;
 	}
 	return 0;
 }

@@ -530,8 +530,8 @@ public:
 	
 	/// Return true iff the Ebwt is currently in memory
 	bool isInMemory() const {
-		assert(_eh.repOk());
 		if(_ebwt != NULL) {
+			assert(_eh.repOk());
 			assert(_ftab != NULL);
 			assert(_eftab != NULL);
 			assert(_fchr != NULL);
@@ -1103,8 +1103,10 @@ public:
 		assert(!_suppress);
 		bitset<max_read_bp> mm = 0;
 		hit_pat_t pat;
-		string patQuals;
-		string patName = s.query_name();
+		reserve(pat, length(s.query()));
+		String<char> patQuals;
+		reserve(patQuals, length(s.query_quals()));
+		const String<char>& patName = s.query_name();
 		if (_ebwtFw)
 		{
 			pat = s.query();
@@ -1118,7 +1120,7 @@ public:
 			for(size_t i = 0; i < len; i++) 
 			{
 				appendValue(pat, s.query()[len-i-1]);
-				patQuals.push_back(s.query_quals()[len-i-1]);
+				appendValue(patQuals, s.query_quals()[len-i-1]);
 			}
 		}
 		
@@ -1322,8 +1324,8 @@ public:
 
 	EbwtSearchState(const Ebwt<TStr>& __ebwt,
 	                TStr* __query,
-					string* __query_name,
-					string* __query_quals,
+					String<char>* __query_name,
+					String<char>* __query_quals,
 	                const EbwtSearchParams<TStr>& __params,
 	                uint32_t seed = 0) :
 	    _ebwt(__ebwt),
@@ -1379,8 +1381,8 @@ public:
 	{ }
 	
 	void newQuery(TStr* __query,
-	              string* __query_name,
-	              string* __query_quals)
+	              String<char>* __query_name,
+	              String<char>* __query_quals)
 	{
 		assert(__query != NULL);
 		assert(__query_name != NULL);
@@ -1407,8 +1409,8 @@ public:
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
 	const TStr& query() const                    { return *_query;  }
-	const string& query_quals() const			 { return *_query_quals; }
-	const string& query_name() const			 { return *_query_name; }
+	const String<char>& query_quals() const		 { return *_query_quals; }
+	const String<char>& query_name() const		 { return *_query_name; }
 	uint32_t top() const                         { return _top;    }
 	uint32_t bot() const                         { return _bot;    }
 	void setTopBot(uint32_t __top, uint32_t __bot) {
@@ -1700,8 +1702,8 @@ private:
 	uint32_t _top;        // top index
 	uint32_t _bot;        // bot index
 	TStr*   _query;       // query string
-	string* _query_name;  // query name
-	string* _query_quals; // query qualities string
+	String<char>* _query_name;  // query name
+	String<char>* _query_quals; // query qualities string
 	String<uint32_t> _remainders; // space left to explore
 	String<uint8_t> _tried; // denotes characters originally tried at each pos
 	String<uint32_t> _tops; // tops we might want to backtrack to

@@ -32,8 +32,8 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						TStr& pat,
-						string& patName,
-						string& patQuals,
+						String<char>& patName,
+						String<char>& patQuals,
 						HitSink& hit_sink) = 0;
 	virtual ~SearchPolicy() {}
 };
@@ -46,8 +46,8 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						TStr& pat,
-						string& patName,
-						string& patQuals,
+						String<char>& patName,
+						String<char>& patQuals,
 						HitSink& hit_sink) 
 	{
 		EbwtSearchState<TStr> s(ebwt, pat, params, 0);
@@ -87,8 +87,8 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						TStr& pat,
-						string& patName,
-						string& patQuals,
+						String<char>& patName,
+						String<char>& patQuals,
 						HitSink& hit_sink) 
 	{
 		
@@ -103,7 +103,7 @@ public:
 		_mer_search_params.setFw(!revcomp);
 		_mer_search_params.setEbwtFw(params.ebwtFw());
 		
-		string quals = "";
+		String<char> quals = "";
 		EbwtSearchState<TStr> s(ebwt, &mer, &patName, &quals, _mer_search_params, 0);
 		ebwt.search(s, _mer_search_params);
 		
@@ -113,7 +113,7 @@ public:
 	}
 	
 	void extendHits(const TStr& pat,
-					const string& patQuals,
+					const String<char>& patQuals,
 					HitSink& hit_sink, 
 					EbwtSearchParams<TStr>& params,
 					bool extend_left_pat,
@@ -269,8 +269,8 @@ public:
 						EbwtSearchStats<TStr>& stats,
 						EbwtSearchParams<TStr>& params,
 						TStr& pat,
-						string& patName,
-						string& patQuals,
+						String<char>& patName,
+						String<char>& patQuals,
 						HitSink& hit_sink)
 	{
 		
@@ -290,7 +290,7 @@ public:
 		this->_mer_search_params.setFw(params.fw());
 		this->_mer_search_params.setEbwtFw(params.ebwtFw());
 		
-		string quals = "";
+		String<char> quals = "";
 		EbwtSearchState<TStr> s(ebwt, &mer, &patName, &quals, this->_mer_search_params, 0);
 		ebwt.search1MismatchOrBetter(s, this->_mer_search_params, !_suppressExact);
 		

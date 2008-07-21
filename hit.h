@@ -25,9 +25,9 @@ static const int max_read_bp = 63;
 struct Hit {	
 	Hit(U32Pair _h, 
 		uint32_t _patId,
-		const string& _patName,
+		const String<char>& _patName,
 		const hit_pat_t& _patSeq,
-		const string& _patQualities,
+		const String<char>& _patQualities,
 		bool _fw, 
 		const bitset<max_read_bp>& _mms,
 		uint32_t _oms = 0) : h(_h), 
@@ -41,9 +41,9 @@ struct Hit {
 	
 	U32Pair  h;
 	uint32_t patId;
-	string patName;
+	String<char> patName;
 	String< Dna, Packed<> > patSeq;
-	string patQualities;
+	String<char> patQualities;
 	bitset<max_read_bp> mms;
 	uint32_t oms;   // # of other possible mappings; 0 -> this is unique
 	bool fw;
@@ -79,9 +79,9 @@ public:
 	virtual ~HitSink() { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const string& patName,
+						   const String<char>& patName,
 						   const hit_pat_t& patSeq,
-						   const string& patQualities,
+						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) = 0;
@@ -92,9 +92,9 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-		    const string& patName,
+		    const String<char>& patName,
 			const hit_pat_t& patSeq,
-			const string& patQualities,
+			const String<char>& patQualities,
             bool fw,
             const bitset<max_read_bp>& mms,
             uint32_t oms) = 0;
@@ -138,9 +138,9 @@ public:
 	HitBucket() : HitSink(cout, true) { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const string& patName,
+						   const String<char>& patName,
 						   const hit_pat_t& patSeq,
-						   const string& patQualities,
+						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms) 
@@ -151,9 +151,9 @@ public:
 	
 	virtual void reportProvisionalHit(const U32Pair& h,
 									  uint32_t patId,
-									  const string& patName,
+									  const String<char>& patName,
 									  const hit_pat_t& patSeq,
-									  const string& patQualities,
+									  const String<char>& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
@@ -184,9 +184,9 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const string& patName,
+			const String<char>& patName,
 			const hit_pat_t& patSeq,
-		    const string& patQualities,
+		    const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
@@ -222,9 +222,9 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const string& patName,
+			const String<char>& patName,
 			const hit_pat_t& patSeq,
-			const string& patQualities,
+			const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
@@ -268,9 +268,9 @@ public:
 	
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
-						   const string& patName,
+						   const String<char>& patName,
 						   const hit_pat_t& patSeq,
-						   const string& patQualities,
+						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
 						   uint32_t oms)
@@ -321,9 +321,9 @@ public:
 	virtual void reportProvisionalHit(
 									  const U32Pair& h,
 									  uint32_t patId,
-									  const string& patName,
+									  const String<char>& patName,
 									  const hit_pat_t& patSeq,
-									  const string& patQualities,
+									  const String<char>& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
 									  uint32_t oms)
@@ -369,9 +369,9 @@ public:
 	virtual void reportHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const string& patName,
+			const String<char>& patName,
 			const hit_pat_t& patSeq,
-		    const string& patQualities,
+		    const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)
@@ -414,9 +414,9 @@ public:
 	virtual void reportProvisionalHit(
 			const U32Pair& h,
 			uint32_t patId,
-			const string& patName,
+			const String<char>& patName,
 			const hit_pat_t& patSeq,
-			const string& patQualities,
+			const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
 			uint32_t oms)

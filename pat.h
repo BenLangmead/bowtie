@@ -29,70 +29,6 @@ static inline void reverse(TStr& s) {
 	}
 }
 
-static bool nRcA = false;
-
-/**
- * Install a character in forward-oriented and (optionally) a reverse-
- * complemented buffers where the size of the buffer is known
- * beforehand.
- */
-template <typename TStr>
-static inline void appendCharResized(TStr *dst,
-                                     TStr *rcDst,
-                                     uint32_t i,
-                                     uint32_t len,
-                                     char c)
-{
-	assert_geq(length(*dst), len);
-	if(rcDst != NULL) {
-		assert_geq(length(*rcDst), len);
-	}
-	if(c == 'A' || c == 'a') {
-		(*dst)[i] = 'A';
-		if(rcDst != NULL) (*rcDst)[len-i-1] = 'T';
-	} else if(c == 'C' || c == 'c') {
-		(*dst)[i] = 'C';
-		if(rcDst != NULL) (*rcDst)[len-i-1] = 'G';
-	} else if(c == 'G' || c == 'g') {
-		(*dst)[i] = 'G';
-		if(rcDst != NULL) (*rcDst)[len-i-1] = 'C';
-	} else if(c == 'T' || c == 't') {
-		(*dst)[i] = 'T';
-		if(rcDst != NULL) (*rcDst)[len-i-1] = 'A';
-	} else {
-		// Wildcard; give forward and reverse complements 'A's
-		(*dst)[i] = 'A';
-		if(rcDst != NULL) (*rcDst)[len-i-1] = (nRcA ? 'A' : 'T');
-	}
-}
-
-/**
- * Install a character in forward-oriented and (optionally) a reverse-
- * complemented buffers where the size of the buffer is not known
- * beforehand.  If rcDst is non-NULL, the caller must reverse it before
- * using it. 
- */
-template <typename TStr>
-static inline void appendChar(TStr *dst, TStr *rcDst, char c) {
-	if(c == 'A' || c == 'a') {
-		append(*dst, 'A');
-		if(rcDst != NULL) append(*rcDst, 'T');
-	} else if(c == 'C' || c == 'c') {
-		append(*dst, 'C');
-		if(rcDst != NULL) append(*rcDst, 'G');
-	} else if(c == 'G' || c == 'g') {
-		append(*dst, 'G');
-		if(rcDst != NULL) append(*rcDst, 'C');
-	} else if(c == 'T' || c == 't') {
-		append(*dst, 'T');
-		if(rcDst != NULL) append(*rcDst, 'A');
-	} else {
-		// Wildcard; give forward and reverse complements 'A's
-		append(*dst, 'A');
-		if(rcDst != NULL) append(*rcDst, (nRcA ? 'A' : 'T'));
-	}
-}
-
 /**
  * Encapsualtes a source of patterns; usually a file.  Handles dumping
  * patterns to a logfile (useful for debugging) and optionally
@@ -115,45 +51,57 @@ public:
 		}
 	}
 	virtual ~PatternSource() { }
-	virtual void nextPattern(TStr& s, string& qual, string& name) {
+	virtual void nextPattern(TStr** s, String<char>** qual, String<char>** name) {
 		nextPatternImpl(s, qual, name);
 		// Reverse it, if desired
 		if(_reverse) {
-			size_t len = length(s);
+			size_t len = length(**s);
 			resize(_revtmp, len, Exact());
-			_revqual.resize(len);
+			if(*qual != NULL) {
+				resize(_revqual, len);
+			}
 			// tmp = reverse of s
 			for(size_t i = 0; i < len; i++)
 			{
-				_revtmp[i] = s[len-i-1];
-				_revqual[i] = qual[len-i-1];
+				_revtmp[i] = (**s)[len-i-1];
+				if(*qual != NULL) {
+					_revqual[i] = (**qual)[len-i-1];
+				}
 			}
 			// Output it, if desired
 			if(_dumpfile != NULL) {
-				_out << _revtmp << "\t" << _revqual << endl;
+				dump(_out, _revtmp, _revqual, (**name));
 			}
-			s = _revtmp;
-			qual = _revqual;
+			(*s) = &_revtmp;
+			(*qual) = &_revqual;
 			return;
 		}
 		// Output it, if desired
 		if(_dumpfile != NULL) {
-			_out << s << endl;
+			dump(_out, (**s), (**qual), (**name));
 		}
 	}
-	virtual void nextPatternImpl(TStr& , string&, string&) = 0;
+	virtual void nextPatternImpl(TStr**, String<char>**, String<char>**) = 0;
 	virtual bool hasMorePatterns() = 0;
 	virtual bool nextIsReverseComplement() = 0;
 	virtual void reset() { }
 	const char *dumpfile() const { return _dumpfile; }
-	bool reverse() const { return _reverse; }
-	void setReverse(bool __reverse) {
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
+	}
+protected:
+	virtual void dump(ostream& out,
+	                  const TStr& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << name << ": " << seq << " " << qual << endl;
 	}
 private:
 	bool _reverse;         // reverse patterns before returning them
 	TStr _revtmp;          // temporary buffer for reversed patterns
-	string _revqual;
+	String<char> _revqual;
 	
 	const string _def_qual;
 	const string _def_rqual;
@@ -230,8 +178,8 @@ public:
 		return _revcomp && (_cur & 1) == 1;
 	}
 	virtual ~VectorPatternSource() { }
-	virtual void nextPatternImpl(TStr& s, string& qual, string& name) {
-		s = _v[_cur++];
+	virtual void nextPatternImpl(TStr** s, String<char>** qual, String<char>** name) {
+		(*s) = &(_v[_cur++]);
 	}
 	virtual bool hasMorePatterns() {
 		return _cur < _v.size();
@@ -267,15 +215,61 @@ public:
 		_revcomp(__revcomp),
 		_filecur(0),
 		_aCur(true),
-		_a(),
-		_aRc(),
-		_b(),
-		_bRc(),
-		_tmp(),
-		_tmpRc(),
 		_fw(true),
-		_in(NULL)
+		_in(NULL),
+		_gzin(),
+		_aLen(0),
+		_aTStr(),
+		_aRcTStr(),
+		_aQualStr(),
+		_aRcQualStr(),
+		_aNameLen(0),
+		_aNameStr(),
+		_bLen(0),
+		_bTStr(),
+		_bRcTStr(),
+		_bQualStr(),
+		_bRcQualStr(),
+		_bNameLen(0),
+		_bNameStr(),
+		_tmpLen(0),
+		_tmpTStr(),
+		_tmpRcTStr(),
+		_tmpQualStr(),
+		_tmpRcQualStr(),
+		_tmpNameLen(0),
+		_tmpNameStr(),
+		_a(_buf1),
+		_aRc(_rcBuf1),
+		_aQual(_qualBuf1),
+		_aRcQual(_rcQualBuf1),
+		_aName(_nameBuf1),
+		_b(_buf2),
+		_bRc(_rcBuf2),
+		_bQual(_qualBuf2),
+		_bRcQual(_rcQualBuf2),
+		_bName(_nameBuf2),
+		_tmp(_buf3),
+		_tmpRc(_rcBuf3),
+		_tmpQual(_qualBuf3),
+		_tmpRcQual(_rcQualBuf3),
+		_tmpName(_nameBuf3)
 	{
+		_setBegin(_aTStr, (Dna*)_a); _setLength(_aTStr, 0);
+		_setBegin(_aRcTStr, (Dna*)_aRc); _setLength(_aRcTStr, 0);
+		_setBegin(_aQualStr, (char*)_aQual); _setLength(_aQualStr, 0);
+		_setBegin(_aRcQualStr, (char*)_aRcQual); _setLength(_aRcQualStr, 0);
+		_setBegin(_aNameStr, (char*)_aName); _setLength(_aNameStr, 0);
+		_setBegin(_bTStr, (Dna*)_b); _setLength(_bTStr, 0);
+		_setBegin(_bRcTStr, (Dna*)_bRc); _setLength(_bRcTStr, 0);
+		_setBegin(_bQualStr, (char*)_bQual); _setLength(_bQualStr, 0);
+		_setBegin(_bRcQualStr, (char*)_bRcQual); _setLength(_bRcQualStr, 0);
+		_setBegin(_bNameStr, (char*)_bName); _setLength(_bNameStr, 0);
+		_setBegin(_tmpTStr, (Dna*)_tmp); _setLength(_tmpTStr, 0);
+		_setBegin(_tmpRcTStr, (Dna*)_tmpRc); _setLength(_tmpRcTStr, 0);
+		_setBegin(_tmpQualStr, (char*)_tmpQual); _setLength(_tmpQualStr, 0);
+		_setBegin(_tmpRcQualStr, (char*)_tmpRcQual); _setLength(_tmpRcQualStr, 0);
+		_setBegin(_tmpNameStr, (char*)_tmpName); _setLength(_tmpNameStr, 0);
 		assert_gt(infiles.size(), 0);
 		open(); _filecur++;
 	}
@@ -284,20 +278,30 @@ public:
 		else fclose(_in);
 	}
 	/// Return the next pattern from the file
-	virtual void nextPatternImpl(TStr& s, string& qual, string& name) {
+	virtual void nextPatternImpl(TStr** s,
+	                             String<char>** qual,
+	                             String<char>** name)
+	{
 		assert(hasMorePatterns());
 		readNext(s, qual, name);
 	}
 	/// Return true iff the next call to nextPattern() will succeed
 	virtual bool hasMorePatterns() {
 		if(_revcomp && !_fw) return true; // still a reverse comp to dish out
-		if(!empty(_tmp)) return true;    // still another pattern to dish out
-		this->read(&_tmp, 
-				   (_revcomp? &_tmpRc : NULL), 
-				   &_tmpQual,
-				   (_revcomp? &_tmpRQual : NULL),
-				   &_tmpName);
-		return !empty(_tmp) || _filecur < _infiles.size(); // still another pattern to dish out
+		if(_tmpLen > 0) return true;    // still another pattern to dish out
+		this->read(_tmp,
+		           _tmpTStr,
+				   _tmpRc,
+				   _tmpRcTStr,
+				   _tmpQual,
+				   _tmpQualStr,
+				   _tmpRcQual,
+				   _tmpRcQualStr,
+				   &_tmpLen,
+				   _tmpName,
+				   _tmpNameStr,
+				   &_tmpNameLen);
+		return _tmpLen > 0 || _filecur < _infiles.size(); // still another pattern to dish out
 	}
 	/// Return true iff the next will be a reverse complement
 	virtual bool nextIsReverseComplement() {
@@ -313,15 +317,29 @@ public:
 		_filecur = 0,
 		_fw = true; // dish forward next
 		_aCur = true; // currently dishing a
-		clear(_a);   clear(_aRc); _aQual.clear(); _aRQual.clear(); _aName.clear();
-		clear(_b);   clear(_bRc); _bQual.clear(); _bRQual.clear(); _bName.clear();
-		clear(_tmp); clear(_tmpRc); _tmpQual.clear(); _tmpRQual.clear(); _tmpName.clear();
+		_aLen = 0;
+		_aNameLen = 0;
+		_bLen = 0;
+		_bNameLen = 0;
+		_tmpLen = 0;
+		_tmpNameLen = 0;
 		open(); _filecur++;
 	}
 protected:
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
-	virtual void read(TStr* dst, TStr* rcDst, string* qual, string* rqual, string* name) = 0;
+	virtual void read(char* dst,      // destination buf for sequence
+	                  TStr& dstTStr,  // destination TStr for sequence
+	                  char* rcDst,    // destination buf for reverse-comp of dst
+	                  TStr& rcDstTStr,// destination TStr for reverse-comp of dst
+	                  char* qual,     // destination buf for qualities
+	                  String<char>& qualStr, // destination String for qualities
+	                  char* rcQual,   // destination buf for reverse-comp qualities
+	                  String<char>& rcQualStr, // destination String for reverse-comp quals
+	                  size_t* dstLen, // length of sequence installed in dst
+	                  char* name,     // destination buf for read name
+	                  String<char>& nameStr, // destination String for name
+	                  size_t* nameLen) = 0; // length of name
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() = 0;
 	/// Swap "current" status between _a/_aRc and _b/_bRc
@@ -330,102 +348,165 @@ protected:
 	}
 	/// Swap "current" with tmp
 	void swapCur() {
-		TStr tmp;
-		tmp = (_aCur? _a : _b);
-		if(_aCur) _a = _tmp; else _b = _tmp;
-		_tmp = tmp;
-		tmp = (_aCur? _aRc : _bRc);
-		if(_aCur) _aRc = _tmpRc; else _bRc = _tmpRc;
-		_tmpRc = tmp;
-	}
-	
-	void swapCurQual() {
-		string tmp;
-		tmp = (_aCur? _aQual : _bQual);
-		if(_aCur) _aQual = _tmpQual; else _bQual = _tmpQual;
-		_tmpQual = tmp;
-		tmp = (_aCur? _aRQual : _bRQual);
-		if(_aCur) _aRQual = _tmpRQual; else _bRQual = _tmpRQual;
-		_tmpRQual = tmp;
-	}
-	
-	void swapCurName() {
-		string tmp;
-		tmp = (_aCur ? _aName : _bName);
-		if (_aCur) _aName = _tmpName; else _bName = _tmpName;
-		_tmpName = tmp;
+		char   *tmp;
+		char   *tmpRc;
+		char   *tmpQual;
+		char   *tmpRcQual;
+		char   *tmpName;
+		if(_aCur) {
+			tmp       = _a;
+			tmpRc     = _aRc;
+			tmpQual   = _aQual;
+			tmpRcQual = _aRcQual;
+			tmpName   = _aName; 
+			_a       = _tmp;       _setBegin(_aTStr,      (Dna*)begin(_tmpTStr));
+			_aRc     = _tmpRc;     _setBegin(_aRcTStr,    (Dna*)begin(_tmpRcTStr));
+			_aQual   = _tmpQual;   _setBegin(_aQualStr,   (char*)begin(_tmpQualStr));
+			_aRcQual = _tmpRcQual; _setBegin(_aRcQualStr, (char*)begin(_tmpRcQualStr));
+			_aName   = _tmpName;   _setBegin(_aNameStr,   (char*)begin(_tmpNameStr));
+			_aLen = _tmpLen;
+			_setLength(_aTStr, _aLen);
+			_setLength(_aRcTStr, _aLen);
+			_setLength(_aQualStr, _aLen);
+			_setLength(_aRcQualStr, _aLen);
+			_aNameLen = _tmpNameLen;
+			_setLength(_aNameStr, _aNameLen);
+		} else {
+			tmp       = _b;
+			tmpRc     = _bRc;
+			tmpQual   = _bQual;
+			tmpRcQual = _bRcQual;
+			tmpName   = _bName;
+			_b       = _tmp;       _setBegin(_bTStr,      (Dna*)begin(_tmpTStr));
+			_bRc     = _tmpRc;     _setBegin(_bRcTStr,    (Dna*)begin(_tmpRcTStr));
+			_bQual   = _tmpQual;   _setBegin(_bQualStr,   (char*)begin(_tmpQualStr));
+			_bRcQual = _tmpRcQual; _setBegin(_bRcQualStr, (char*)begin(_tmpRcQualStr));
+			_bName   = _tmpName;   _setBegin(_bNameStr,   (char*)begin(_tmpNameStr));
+			_bLen = _tmpLen;
+			_setLength(_bTStr, _bLen);
+			_setLength(_bRcTStr, _bLen);
+			_setLength(_bQualStr, _bLen);
+			_setLength(_bRcQualStr, _bLen);
+			_bNameLen = _tmpNameLen;
+			_setLength(_bNameStr, _bNameLen);
+		}
+		//_tmp = tmp; _setBegin(_tmpTStr, (Dna*)_tmp);
+		//_tmpRc = tmpRc; _setBegin(_tmpRcTStr, (Dna*)_tmpRc);
+		//_tmpQual = tmpQual; _setBegin(_tmpQualStr, (char*)_tmpQual);
+		//_tmpRcQual = tmpRcQual; _setBegin(_tmpRcQualStr, (char*)_tmpRcQual);
+		_tmpLen = 0; // clear
+		//_tmpName = tmpName; _setBegin(_tmpNameStr, (char*)_tmpName);
+		_tmpNameLen = 0; // clear
 	}
 	
 	/// Return "current" forward-oriented pattern
-	TStr& cur() {
+	char *cur() {
 		return _aCur? _a : _b;
 	}
-	/// Return "current" reverse-complemented pattern
-	TStr& curRc() {
-		return _aCur? _aRc : _bRc;
+	TStr *curStr() {
+		return _aCur? &_aTStr : &_bTStr;
 	}
-	
-	string& curQual() {
+	/// Return "current" reverse-complemented pattern
+	char *curRc() {
+		if(_revcomp) {
+			return _aCur? _aRc : _bRc;
+		} else {
+			return NULL;
+		}
+	}
+	TStr *curRcStr() {
+		if(_revcomp) {
+			return _aCur? &_aRcTStr : &_bRcTStr;
+		} else {
+			return NULL;
+		}
+	}
+	char *curQual() {
 		return _aCur? _aQual: _bQual;
 	}
-	
-	string& curRQual() {
-		return _aCur? _aRQual: _bRQual;
+	String<char> *curQualStr() {
+		return _aCur? &_aQualStr: &_bQualStr;
 	}
-	
-	string& curName() {
-		return _aCur? _aName: _bName;
+	char *curRcQual() {
+		if(_revcomp) {
+			return _aCur? _aRcQual: _bRcQual;
+		} else {
+			return NULL;
+		}
+	}
+	String<char> *curRcQualStr() {
+		return _aCur? &_aRcQualStr: &_bRcQualStr;
+	}
+	size_t *curLen() {
+		return _aCur? &_aLen : &_bLen;
+	}
+	char *curName() {
+		return _aCur? _aName : _bName;
+	}
+	String<char> *curNameStr() {
+		return _aCur? &_aNameStr : &_bNameStr;
+	}
+	size_t *curNameLen() {
+		return _aCur? &_aNameLen : &_bNameLen;
+	}
+	void readCur() {
+		if(_aCur) {
+			this->read(_a,
+			           _aTStr,
+			           _aRc,
+			           _aRcTStr,
+			           _aQual,
+			           _aQualStr,
+			           _aRcQual,
+			           _aRcQualStr,
+			           &_aLen,
+			           _aName,
+			           _aNameStr,
+			           &_aNameLen);
+		} else {
+			this->read(_b,
+			           _bTStr,
+			           _bRc,
+			           _bRcTStr,
+			           _bQual,
+			           _bQualStr,
+			           _bRcQual,
+			           _bRcQualStr,
+			           &_bLen,
+			           _bName,
+			           _bNameStr,
+			           &_bNameLen);
+		}
 	}
 	/// Read in next pattern
-	virtual void readNext(TStr& s, string& qual, string& name) {
-		s = cur();
-		qual = curQual();
-		name = curName();
+	virtual void readNext(TStr** s, String<char>** qual, String<char>** name) {
+		(*s)    = curStr();
+		(*qual) = curQualStr();
+		(*name) = curNameStr();
 		if(_fw) {
-			clear(cur());
-			clear(curRc());
-			curQual().clear();
-			curRQual().clear();
-			curName().clear();
-			if(!empty(_tmp)) {
+			if(_tmpLen > 0) {
 				// Just swap
 				swapCur();
-				swapCurQual();
-				swapCurName();
-				s = cur();
-				qual = curQual();
-				name = curName();
+				(*s)    = curStr();
+				(*qual) = curQualStr();
+				(*name) = curNameStr();
 			} else {
 				// Read in a fresh pair
-				this->read(&cur(), 
-						   (_revcomp? &curRc() : NULL), 
-						   &curQual(), 
-						   (_revcomp? &curRQual() : NULL),
-						   &curName());
+				readCur();
 			}
-			assert(empty(_tmp));
-			assert(empty(_tmpRc));
-			assert(empty(_tmpQual));
-			assert(empty(_tmpName));
 		} else {
-			assert(empty(_tmp));
-			assert(empty(_tmpRc));
-			assert(empty(_tmpQual));
-			assert(empty(_tmpName));
-			s = curRc();
-			qual = curRQual();
-			name = curName();
-			assert(!empty(s));
+			assert(curRc() != NULL);
+			(*s)    = curRcStr();
+			(*qual) = curRcQualStr();
+			(*name) = curNameStr();
+			assert(!empty(**s));
 			swap();
 		}
-		assert(empty(_tmp));
-		assert(empty(_tmpRc));
-		assert(empty(_tmpQual));
-		assert(empty(_tmpName));
+		assert_eq(0, _tmpLen);
 		// If we exhausted all of the patterns in this file, go on to
 		// the next one
-		assert(!seqan::empty(s) || _fw);
-		if(seqan::empty(s) && _filecur < _infiles.size()) {
+		assert(!seqan::empty(**s) || _fw);
+		if(seqan::empty(**s) && _filecur < _infiles.size()) {
 			assert(_fw);
 			// Close current file
 			if(_gz) gzclose(_gzin);
@@ -433,16 +514,12 @@ protected:
 			// Open next file
 			open(); _filecur++;
 			this->resetForNextFile(); // reset state to handle a fresh file
-			this->read(&cur(), 
-					   (_revcomp? &curRc() : NULL), 
-					   &curQual(), 
-					   (_revcomp? &curRQual() : NULL),
-					   &curName());
-			
-			s = cur();
-			qual = curQual();
-			name = curName();
-			assert(!empty(s));
+			// Read in a fresh pair
+			readCur();
+			(*s)    = curStr();
+			(*qual) = curQualStr();
+			(*name) = curNameStr();
+			assert(!empty(**s));
 		}
 		// if !_revcomp, _fw always remains true
 		if(_revcomp) _fw = !_fw;
@@ -473,26 +550,117 @@ protected:
 	              // outsider might hold a reference to); otherwise _b
 	              // is the current pattern and _a will be the target
 	              // of the next read()
-	TStr _a;      // pattern (might be either current or next)
-	TStr _aRc;    // pattern (reverse-comp)
-	string _aQual;// pattern (qualities)
-	string _aRQual; //pattern (reversed qualities)
-	string _aName; //pattern (sequence name)
-	TStr _b;      // next-up buffer
-	TStr _bRc;    // next-up buffer (reverse-comp)
-	string _bQual;// next-up buffer (qualities)
-	string _bRQual; //next-up buffer (reversed qualities)
-	string _bName; //pattern (sequence name)
-	TStr _tmp;      // next-up buffer
-	TStr _tmpRc;    // next-up buffer (reverse-comp)
-	string _tmpQual; // next-up buffer (qualities)
-	string _tmpRQual; //next-up buffer (reversed qualities)
-	string _tmpName; //pattern (sequence name)
+
 	bool _fw;     // whether reverse complement should be returned next
 	FILE *_in;    // file to read patterns from
 	gzFile _gzin; // file to read patterns from
+
+	// Pattern a
+	size_t _aLen;
+	TStr   _aTStr;         // host is set to _a
+	TStr   _aRcTStr;       // host is set to _aRc
+	String<char> _aQualStr;
+	String<char> _aRcQualStr;
+	size_t       _aNameLen;      // length of read name
+	String<char> _aNameStr;      // if _aName changes, must assign to this
+	
+	// Pattern b
+	size_t _bLen;
+	TStr   _bTStr;         // host is set to _b
+	TStr   _bRcTStr;       // host is set to _bRc
+	String<char> _bQualStr;
+	String<char> _bRcQualStr;
+	size_t       _bNameLen;      // length of read name
+	String<char> _bNameStr;
+	
+	// Pattern tmp (for hasMorePatterns())
+	size_t _tmpLen;
+	TStr   _tmpTStr;
+	TStr   _tmpRcTStr;
+	String<char> _tmpQualStr;
+	String<char> _tmpRcQualStr;
+	size_t _tmpNameLen;
+	String<char> _tmpNameStr;
+	
 private:
+	char* _a;
+	char* _aRc;
+	char* _aQual;   // quality values for forward-strand version
+	char* _aRcQual; // quality values for reverse-comp version
+	char* _aName;   // read name
+	
+	char* _b;
+	char* _bRc;
+	char* _bQual;   // quality values for forward-strand version
+	char* _bRcQual; // quality values for reverse-comp version
+	char* _bName;   // read name
+
+	char* _tmp;
+	char* _tmpRc;
+	char* _tmpQual;   // next-up buffer (qualities)
+	char* _tmpRcQual; // next-up buffer (reversed qualities)
+	char* _tmpName;
+
+	char _buf1[1024];
+	char _buf2[1024];
+	char _buf3[1024];
+	char _rcBuf1[1024];
+	char _rcBuf2[1024];
+	char _rcBuf3[1024];
+	char _qualBuf1[1024];
+	char _qualBuf2[1024];
+	char _qualBuf3[1024];
+	char _rcQualBuf1[1024];
+	char _rcQualBuf2[1024];
+	char _rcQualBuf3[1024];
+	char _nameBuf1[1024];
+	char _nameBuf2[1024];
+	char _nameBuf3[1024];
+
 	char _buf[256 * 1024]; // (large) input buffer
+};
+
+
+static uint8_t charToDna[] = {
+	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  64 */ 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0,
+	       /*    A     C           G */              
+	/*  80 */ 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	       /*             T */
+	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 112 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 128 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 144 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 160 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 176 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 192 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 208 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 224 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+static uint8_t rcCharToDna[] = {
+	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  64 */ 0, 3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+	       /*    A     C           G */              
+	/*  80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	       /*             T */
+	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 112 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 128 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 144 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 160 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 176 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 192 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 208 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 224 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
 /**
@@ -508,14 +676,19 @@ public:
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0) :
-		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, __reverse, __dumpfile, __trim3, __trim5),
-		_first(true)
+		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		_first(true),
+		_reverse(__reverse)
 	{
 		assert(this->hasMorePatterns());
 	}
 	virtual void reset() {
 		_first = true;
 		BufferedFilePatternSource<TStr>::reset();
+	}
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
+		_reverse = __reverse;
 	}
 protected:
 	int skipToEnd() {
@@ -530,15 +703,35 @@ protected:
 			}
 		}
 	}
+	
 	/// Read another pattern from a FASTA input file
 	// TODO: store default qualities in qual
-	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-		int c;
+	virtual void read(char* dst,
+	                  TStr& dstTStr,
+	                  char *rcDst,
+	                  TStr& rcDstTStr,
+	                  char* qual,
+	                  String<char>& qualTStr,
+	                  char* rcQual,
+	                  String<char>& rcQualTStr,
+	                  size_t* dstLen,
+	                  char* name,
+	                  String<char>& nameStr,
+	                  size_t* nameLen)
+	{
 		assert(dst != NULL);
-		assert(empty(*dst)); // caller should have cleared this
+		assert(qual != NULL);
+		assert(dstLen != NULL);
+		assert(name != NULL);
+		assert(nameLen != NULL);
+		
+		int c;
+		*dstLen = 0;
+		*nameLen = 0;
+		
 		// Pick off the first carat
 		if(_first) {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			c = fgetc(this->_in); if(c < 0) return;
 			assert(c == '>' || c == '#');
 			_first = false;
 		}
@@ -546,43 +739,75 @@ protected:
 		// Read to the end of the id line, sticking everything after the '>'
 		// into *name
 		while(true) {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			c = fgetc(this->_in); if(c < 0) return;
 			if(c == '\n' || c == '\r') {
+				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return;
+					c = fgetc(this->_in); if(c < 0) return;
 				}
 				break;
 			}
-			name->push_back(c);
+			name[(*nameLen)++] = c;
 		}
+		_setBegin(nameStr, (char*)name);
+		_setLength(nameStr, *nameLen);
 		
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
-		while(c != '>' && c != '#') {
-			// Note: can't have a comment in the middle of a sequence,
-			// though a comment can end a sequence
-			if(isalpha(c)) {
-				// 5' trim
-				if(begin++ >= this->_trim5) {
-					appendChar(dst, rcDst, (char)c);
-					assert_lt((int)(*dst)[length(*dst)-1], 4);
+		if(!_reverse) {
+			while(c != '>' && c != '#') {
+				// Note: can't have a comment in the middle of a sequence,
+				// though a comment can end a sequence
+				if(isalpha(c) && begin++ >= this->_trim5) {
+					if(c == 'N' || c == 'n') c = 'A';
+					dst[(*dstLen)] = charToDna[c];
+					rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+					(*dstLen)++;
 				}
+				if((c = fgetc(this->_in)) < 0) break;
 			}
-			c = fgetc(this->_in);
-			if(feof(this->_in)) break;
-		}
-		resize(*dst, length(*dst) - this->_trim3);
-		if(rcDst != NULL) {
-			resize(*rcDst, length(*rcDst) - this->_trim3);
-			::reverse(*rcDst);
+			(*dstLen) -= this->_trim3;
+			_setBegin(dstTStr, (Dna*)dst);
+			_setLength(dstTStr, (*dstLen));
+			if(rcDst != NULL) {
+				_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+				_setLength(rcDstTStr, (*dstLen));
+			}
+		} else {
+			while(c != '>' && c != '#') {
+				// Note: can't have a comment in the middle of a sequence,
+				// though a comment can end a sequence
+				if(isalpha(c) && begin++ >= this->_trim5) {
+					if(c == 'N' || c == 'n') c = 'A';
+					dst[1024-(*dstLen)-1] = charToDna[c];
+					rcDst[(*dstLen)] = rcCharToDna[c];
+					(*dstLen)++;
+				}
+				if((c = fgetc(this->_in)) < 0) break;
+			}
+			(*dstLen) -= this->_trim3;
+			_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+			_setLength(dstTStr, (*dstLen));
+			if(rcDst != NULL) {
+				_setBegin(rcDstTStr, (Dna*)rcDst);
+				_setLength(rcDstTStr, (*dstLen));
+			}
 		}
 	}
 	virtual void resetForNextFile() {
 		_first = true;
 	}
+	virtual void dump(ostream& out,
+	                  const TStr& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << ">" << name << endl << seq << endl;
+	}
 private:
 	bool _first;
+	bool _reverse;
 };
 
 /**
@@ -600,8 +825,8 @@ public:
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
 					   bool solexa_quals = false) :
-		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, __reverse, __dumpfile, __trim3, __trim5),
-		_first(true), _solexa_quals(solexa_quals)
+		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals)
 	{
 		assert(this->hasMorePatterns());
 		
@@ -615,71 +840,119 @@ public:
 		_first = true;
 		BufferedFilePatternSource<TStr>::reset();
 	}
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
+		_reverse = __reverse;
+	}
 protected:
 	/// Read another pattern from a FASTQ input file
-	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-		int c;
+	virtual void read(char* dst,
+	                  TStr& dstTStr,
+	                  char *rcDst,
+	                  TStr& rcDstTStr,
+	                  char* qual,
+	                  String<char>& qualTStr,
+	                  char* rcQual,
+	                  String<char>& rcQualTStr,
+	                  size_t* dstLen,
+	                  char* name,
+	                  String<char>& nameStr,
+	                  size_t* nameLen)
+	{
 		assert(dst != NULL);
-		assert(empty(*dst)); // caller should have cleared this
-		assert(qual->length() == 0);
+		assert(qual != NULL);
+		assert(dstLen != NULL);
+		assert(name != NULL);
+		assert(nameLen != NULL);
+
+		int c;
+		*dstLen = 0;
+		*nameLen = 0;
+		
 		// Pick off the first at
 		if(_first) {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			c = fgetc(this->_in); if(c < 0) return;
 			assert_eq('@', c);
 			_first = false;
 		}
+		
 		// Read to the end of the id line, sticking everything after the '@'
 		// into *name
 		while(true) {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			c = fgetc(this->_in); if(c < 0) return;
 			if(c == '\n' || c == '\r') {
+				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return;
+					c = fgetc(this->_in); if(c < 0) return;
 				}
 				break;
 			}
-			name->push_back(c);
+			name[(*nameLen)++] = c;
 		}
+		_setBegin(nameStr, (char*)name);
+		_setLength(nameStr, *nameLen);
+		
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
-		int begin = 0;
-		while(c != '+') {
-			if(isalpha(c)) {
-				if(begin++ >= this->_trim5) {
-					appendChar(dst, rcDst, (char)c);
-					assert_lt((int)(*dst)[length(*dst)-1], 4);
+		int charsRead = 0;
+		if(!_reverse) {
+			while(c != '+') {
+				if(isalpha(c) && charsRead >= this->_trim5) {
+					if(c == 'N' || c == 'n') c = 'A';
+					dst[(*dstLen)] = charToDna[c];
+					rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+					charsRead++; (*dstLen)++;
 				}
+				c = fgetc(this->_in);
+				if(c < 0) break;
 			}
-			c = fgetc(this->_in);
-			if(feof(this->_in)) break;
-		}
-		// Trim dst and rcDst on 3' end and reverse rcDst
-		resize(*dst, length(*dst) - this->_trim3);
-		if(rcDst != NULL) {
-			resize(*rcDst, length(*rcDst) - this->_trim3);
-			::reverse(*rcDst);
+			(*dstLen) -= this->_trim3;
+			_setBegin(dstTStr, (Dna*)dst);
+			_setLength(dstTStr, (*dstLen));
+			if(rcDst != NULL) {
+				_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+				_setLength(rcDstTStr, (*dstLen));
+			}
+		} else {
+			while(c != '+') {
+				if(isalpha(c) && charsRead >= this->_trim5) {
+					if(c == 'N' || c == 'n') c = 'A';
+					dst[1024-(*dstLen)-1] = charToDna[c];
+					rcDst[(*dstLen)] = rcCharToDna[c];
+					charsRead++; (*dstLen)++;
+				}
+				c = fgetc(this->_in);
+				if(c < 0) break;
+			}
+			(*dstLen) -= this->_trim3;
+			_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+			_setLength(dstTStr, (*dstLen));
+			if(rcDst != NULL) {
+				_setBegin(rcDstTStr, (Dna*)rcDst);
+				_setLength(rcDstTStr, (*dstLen));
+			}
 		}
 		
 		// Chew up the optional name on the '+' line
 		while(c == '+' || (c != '\n' && c != '\r'))
 		{
-			c = fgetc(this->_in); if(feof(this->_in)) return;
+			c = fgetc(this->_in); if(c < 0) return;
 		}
 
 		// Now read the qualities
-		begin = 0;
+		size_t qualsRead = 0;
 		
 		//Move to the line after the + line, which has the qualities
 //		while(c == '\n' && c == '\r'){
 //			c = fgetc(this->_in); if(feof(this->_in)) return;
 //		} 
 		
-		qual->clear();
+		//qual->clear();
 		if (_solexa_quals)
 		{
 			char buf[1024];
 				
-			while (fgets(buf, sizeof(buf), this->_in) && (size_t)begin < length(*dst))
+			while (fgets(buf, sizeof(buf), this->_in) && qualsRead < (*dstLen) + this->_trim5)
 			{
 				char* nl = strrchr(buf, '\n');
 				if (nl) *nl = 0;
@@ -687,46 +960,111 @@ protected:
 				vector<string> s_quals;
 				tokenize(string(buf), " ", s_quals);
 				
-				for (unsigned int j = 0; j < s_quals.size(); ++j)
-				{
-					int sQ = atoi(s_quals[j].c_str());
-					int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-					if (begin >= this->_trim5)
+				if(!_reverse) {
+					for (unsigned int j = 0; j < s_quals.size(); ++j)
 					{
-						c = (char)(pQ + 33);
-						qual->push_back(c);
-						if (rqual != NULL)
-							rqual->push_back(c);
+						int sQ = atoi(s_quals[j].c_str());
+						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+						if (qualsRead >= (size_t)this->_trim5)
+						{
+							size_t off = qualsRead - this->_trim5;
+							c = (char)(pQ + 33);
+							qual[off] = c;
+							if (rcQual != NULL) {
+								rcQual[1024 - off - 1] = c;
+							}
+						}
+						++qualsRead;
 					}
-					++begin;
+				} else {
+					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					{
+						int sQ = atoi(s_quals[j].c_str());
+						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+						if (qualsRead >= (size_t)this->_trim5)
+						{
+							size_t off = qualsRead - this->_trim5;
+							c = (char)(pQ + 33);
+							qual[1024 - off - 1] = c;
+							if (rcQual != NULL) {
+								rcQual[off] = c;
+							}
+						}
+						++qualsRead;
+					}
+				}
+			} // done reading Solexa quality lines
+			if(!_reverse) {
+				_setBegin(qualTStr, (char*)qual);
+				_setLength(qualTStr, (*dstLen));
+				if(rcQual != NULL) {
+					_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
+					_setLength(rcQualTStr, (*dstLen));
+				}
+			} else {
+				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
+				_setLength(qualTStr, (*dstLen));
+				if(rcQual != NULL) {
+					_setBegin(rcQualTStr, (char*)&rcQual[(*dstLen)]);
+					_setLength(rcQualTStr, (*dstLen));
 				}
 			}
-			
 		}
 		else
 		{
-			while((size_t)begin < length(*dst) && !feof(this->_in)) {
-				c = fgetc(this->_in);
-				if (c != '\r' && c != '\n')
-				{
-					if (begin++ >= (int) this->_trim5){
-						qual->push_back(c);
-						if (rqual != NULL)
-							rqual->push_back(c);
-					}	
+			if(!_reverse) {
+				while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
+					c = fgetc(this->_in);
+					if (c != '\r' && c != '\n')
+					{
+						if (qualsRead >= (size_t)this->_trim5) {
+							size_t off = qualsRead - this->_trim5;
+							qual[off] = c;
+							if (rcQual != NULL) {
+								rcQual[1024 - off - 1] = c;
+							}
+							qualsRead++;
+						}	
+					}
+				}
+				_setBegin(qualTStr, (char*)qual);
+				_setLength(qualTStr, (*dstLen));
+				if(rcQual != NULL) {
+					_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
+					_setLength(rcQualTStr, (*dstLen));
+				}
+			} else {
+				while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
+					c = fgetc(this->_in);
+					if (c != '\r' && c != '\n')
+					{
+						if (qualsRead >= (size_t)this->_trim5) {
+							size_t off = qualsRead - this->_trim5;
+							qual[1024 - off - 1] = c;
+							if (rcQual != NULL) {
+								rcQual[off] = c;
+							}
+							qualsRead++;
+						}	
+					}
+				}
+				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
+				_setLength(qualTStr, (*dstLen));
+				if(rcQual != NULL) {
+					_setBegin(rcQualTStr, (char*)&rcQual[(*dstLen)]);
+					_setLength(rcQualTStr, (*dstLen));
 				}
 			}
-			
 		}
 		
 		// Trim the 3' end of the quality string
-		qual->resize(qual->length() - this->_trim3);
+		//qual->resize(qual->length() - this->_trim3);
 		
 		// Now make the reversed qual string if necessary
-		if (rqual != NULL) {
-			rqual->resize(rqual->length() - this->_trim3);
-			std::reverse(rqual->begin(), rqual->end());
-		}
+		//if (rqual != NULL) {
+		//	rqual->resize(rqual->length() - this->_trim3);
+		//	std::reverse(rqual->begin(), rqual->end());
+		//}
 		
 		if (feof(this->_in))
 			return;
@@ -734,7 +1072,7 @@ protected:
 		{
 			do {
 				c = fgetc(this->_in);
-			}while(c != '@' && !feof(this->_in));
+			} while(c != '@' && c >= 0);
 		}
 //		
 //		
@@ -805,8 +1143,16 @@ protected:
 	virtual void resetForNextFile() {
 		_first = true;
 	}
+	virtual void dump(ostream& out,
+	                  const TStr& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << "@" << name << endl << seq << endl << "+" << endl << qual << endl;
+	}
 private:
 	bool _first;
+	bool _reverse;
 	bool _solexa_quals;
 	int _table[128];
 };
@@ -814,119 +1160,119 @@ private:
 /**
  * 
  */
-template <typename TStr>
-class SolexaPatternSource : public BufferedFilePatternSource<TStr> {
-public:
-	typedef typename Value<TStr>::Type TVal;
-	SolexaPatternSource(const vector<string>& infiles,
-	                    bool __revcomp = true,
-	                    bool __reverse = false,
-	                    const char * __dumpfile = NULL,
-	                    int __trim3 = 0,
-	                    int __trim5 = 0) :
-		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, __reverse, __dumpfile, __trim3, __trim5),
-		_savedC(-1)
-	{
-		assert(this->hasMorePatterns());
-	}
-	virtual void reset() {
-		_savedC = -1;
-		BufferedFilePatternSource<TStr>::reset();
-	}
-protected:
-	//TODO: stick default quals in qual, rqual
-	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-		assert(dst != NULL);
-		assert(empty(*dst)); // caller should have cleared this
-		int c = (_savedC == -1) ? fgetc(this->_in) : _savedC;  
-		if(feof(this->_in)) return;
-		int begin = 0;
-		while(c != '\n' && c != '\r') {
-			if(isalpha(c)) {
-				if(begin++ >= this->_trim5) {
-					appendChar(dst, rcDst, (char)c);
-					assert_lt((int)(*dst)[length(*dst)-1], 4);
-				}
-			}
-			c = fgetc(this->_in);
-			if(feof(this->_in)) break;
-		}
-		// Trim dst, rcDst; reverse rcDst
-		resize(*dst, length(*dst) - this->_trim3);
-		if(rcDst != NULL) {
-			resize(*rcDst, length(*rcDst) - this->_trim3);
-			::reverse(*rcDst);
-		}
-		// Skip to next line
-		while(c == '\n' || c == '\r') {
-			c = fgetc(this->_in); if(feof(this->_in)) return;
-		}
-		_savedC = c;
-	}
-	virtual void resetForNextFile() {
-		_savedC = -1;
-	}
-private:
-	int _savedC;
-};
+//template <typename TStr>
+//class SolexaPatternSource : public BufferedFilePatternSource<TStr> {
+//public:
+//	typedef typename Value<TStr>::Type TVal;
+//	SolexaPatternSource(const vector<string>& infiles,
+//	                    bool __revcomp = true,
+//	                    bool __reverse = false,
+//	                    const char * __dumpfile = NULL,
+//	                    int __trim3 = 0,
+//	                    int __trim5 = 0) :
+//		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, __reverse, __dumpfile, __trim3, __trim5),
+//		_savedC(-1)
+//	{
+//		assert(this->hasMorePatterns());
+//	}
+//	virtual void reset() {
+//		_savedC = -1;
+//		BufferedFilePatternSource<TStr>::reset();
+//	}
+//protected:
+//	//TODO: stick default quals in qual, rqual
+//	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
+//		assert(dst != NULL);
+//		assert(empty(*dst)); // caller should have cleared this
+//		int c = (_savedC == -1) ? fgetc(this->_in) : _savedC;  
+//		if(feof(this->_in)) return;
+//		int begin = 0;
+//		while(c != '\n' && c != '\r') {
+//			if(isalpha(c)) {
+//				if(begin++ >= this->_trim5) {
+//					appendChar(dst, rcDst, (char)c);
+//					assert_lt((int)(*dst)[length(*dst)-1], 4);
+//				}
+//			}
+//			c = fgetc(this->_in);
+//			if(feof(this->_in)) break;
+//		}
+//		// Trim dst, rcDst; reverse rcDst
+//		resize(*dst, length(*dst) - this->_trim3);
+//		if(rcDst != NULL) {
+//			resize(*rcDst, length(*rcDst) - this->_trim3);
+//			::reverse(*rcDst);
+//		}
+//		// Skip to next line
+//		while(c == '\n' || c == '\r') {
+//			c = fgetc(this->_in); if(feof(this->_in)) return;
+//		}
+//		_savedC = c;
+//	}
+//	virtual void resetForNextFile() {
+//		_savedC = -1;
+//	}
+//private:
+//	int _savedC;
+//};
 
 /**
  * 
  */
-template <typename TStr>
-class BfqPatternSource : public BufferedFilePatternSource<TStr> {
-public:
-	typedef typename Value<TStr>::Type TVal;
-	BfqPatternSource(const vector<string>& infiles,
-	                 bool __revcomp = true,
-	                 bool __reverse = false,
-	                 const char *__dumpfile = NULL,
-	                 int __trim3 = 0,
-	                 int __trim5 = 0) :
-	BufferedFilePatternSource<TStr>(infiles, true, __revcomp, __reverse, __dumpfile, __trim3, __trim5)
-	{
-		assert(this->hasMorePatterns());
-	}
-	virtual void reset() {
-		BufferedFilePatternSource<TStr>::reset();
-	}
-protected:
-	/// Read another pattern from a FASTA input file
-	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-		typedef typename seqan::Value<TStr>::Type TVal;
-		assert(dst != NULL);
-		static char _name[2048]; // buffer for .bfq read names
-		static unsigned char seq[2048];  // buffer 
-		int len;
-		assert(empty(*dst));
-		// Read name length
-		if(gzread(this->_gzin, &len, sizeof(int)) != sizeof(int)) return;
-		if(len > 2047) {
-			throw std::runtime_error(
-				"One or more .bfq read names are longer than 2047 characters");
-		}
-		// Read name
-		if(gzread(this->_gzin, _name, len) != len) return;
-		_name[len] = '\0'; // TODO: do something with name (we just ignore it)
-		*name = _name;
-		// Read sequence length
-		if(gzread(this->_gzin, &len, 4) != 4) return;
-		if(len > 2048) {
-			throw std::runtime_error(
-				"One or more .bfq read sequences are longer than 2048 bases");
-		}
-		uint32_t tlen = len - this->_trim5 - this->_trim3;
-		resize(*dst, tlen, Exact());
-		if(rcDst != NULL) {
-			resize(*rcDst, tlen, Exact());
-		}
-		if(gzread(this->_gzin, seq, len) != len) return;
-		for(int i = this->_trim5; i < len - this->_trim3; i++) {
-			char c = (char)(seq[i] >> 6);
-			appendCharResized(dst, rcDst, i - this->_trim5, tlen, c);
-		}
-	}
-	virtual void resetForNextFile() { }
-};
+//template <typename TStr>
+//class BfqPatternSource : public BufferedFilePatternSource<TStr> {
+//public:
+//	typedef typename Value<TStr>::Type TVal;
+//	BfqPatternSource(const vector<string>& infiles,
+//	                 bool __revcomp = true,
+//	                 bool __reverse = false,
+//	                 const char *__dumpfile = NULL,
+//	                 int __trim3 = 0,
+//	                 int __trim5 = 0) :
+//	BufferedFilePatternSource<TStr>(infiles, true, __revcomp, __reverse, __dumpfile, __trim3, __trim5)
+//	{
+//		assert(this->hasMorePatterns());
+//	}
+//	virtual void reset() {
+//		BufferedFilePatternSource<TStr>::reset();
+//	}
+//protected:
+//	/// Read another pattern from a FASTA input file
+//	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
+//		typedef typename seqan::Value<TStr>::Type TVal;
+//		assert(dst != NULL);
+//		static char _name[2048]; // buffer for .bfq read names
+//		static unsigned char seq[2048];  // buffer 
+//		int len;
+//		assert(empty(*dst));
+//		// Read name length
+//		if(gzread(this->_gzin, &len, sizeof(int)) != sizeof(int)) return;
+//		if(len > 2047) {
+//			throw std::runtime_error(
+//				"One or more .bfq read names are longer than 2047 characters");
+//		}
+//		// Read name
+//		if(gzread(this->_gzin, _name, len) != len) return;
+//		_name[len] = '\0'; // TODO: do something with name (we just ignore it)
+//		*name = _name;
+//		// Read sequence length
+//		if(gzread(this->_gzin, &len, 4) != 4) return;
+//		if(len > 2048) {
+//			throw std::runtime_error(
+//				"One or more .bfq read sequences are longer than 2048 bases");
+//		}
+//		uint32_t tlen = len - this->_trim5 - this->_trim3;
+//		resize(*dst, tlen, Exact());
+//		if(rcDst != NULL) {
+//			resize(*rcDst, tlen, Exact());
+//		}
+//		if(gzread(this->_gzin, seq, len) != len) return;
+//		for(int i = this->_trim5; i < len - this->_trim3; i++) {
+//			char c = (char)(seq[i] >> 6);
+//			appendCharResized(dst, rcDst, i - this->_trim5, tlen, c);
+//		}
+//	}
+//	virtual void resetForNextFile() { }
+//};
 
 #endif /*PAT_H_*/
