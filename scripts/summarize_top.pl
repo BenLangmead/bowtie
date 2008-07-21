@@ -33,6 +33,29 @@ sub trim($) {
     return $string;
 }
 
+# Trim whitespace from a string argument
+sub minSecToSeconds {
+	my $time = shift;
+	my @ts = split(/:/, $time);
+	$#ts == 1 || die "m:s time string couldn't be parsed: $time";
+	$ts[1] =~ s/\..*//; # chop everything starting at the dot
+	my $secsacc = int($ts[1]);
+	$secsacc += (int($ts[0]) * 60);
+	return $secsacc;
+}
+
+# Trim whitespace from a string argument
+sub minSecHrToSeconds {
+	my $time = shift;
+	my @ts = split(/:/, $time);
+	$#ts == 2 || die "h:m:s time string couldn't be parsed: $time";
+	#$ts[1] =~ s/\..*//; # chop everything starting at the dot
+	my $secsacc = int($ts[2]);
+	$secsacc += (int($ts[1]) * 60);
+	$secsacc += (int($ts[0]) * 60 * 60);
+	return $secsacc;
+}
+
 sub parseSz {
 	my ($s, $name) = @_;
 	if($s =~ /([0-9\.]+)m/) {
@@ -58,6 +81,8 @@ my $virtCol = 4;  # or 7
 my $resCol  = 5;  # or 8
 my $timeCol = 10; # or 5
 
+my $lastTopTime = 0;
+my $timeTurnovers = 0;
 open(TOP, $topFile);
 while(<TOP>) {
 	$_ = trim($_);
@@ -65,10 +90,17 @@ while(<TOP>) {
 	    # Grab column headers
 	    my @line = split;
 	    if($line[7] eq "VIRT") {
-		$virtCol = 7;
-		$resCol  = 8;
-		$timeCol = 5;
+			$virtCol = 7;
+			$resCol  = 8;
+			$timeCol = 5;
 	    }
+	}
+	if(/^top/) {
+		my @s = split;
+		my $toptime = minSecHrToSeconds($s[2]);
+		$timeTurnovers++ if $toptime < $lastTopTime;
+		$lastTopTime = $toptime;
+		next;
 	}
 	next if not /$appName/;
 	my @line = split;
@@ -96,10 +128,7 @@ while(<TOP>) {
 	}
 	$rstot{$pid} += $rs;
 	
-	my @ts = split(/:/, $line[$timeCol]);
-	$ts[1] =~ s/\..*//; # chop everything starting at the dot
-	my $secsacc = int($ts[1]);
-	$secsacc += (int($ts[0]) * 60);
+	my $secsacc = minSecToSeconds($line[$timeCol]);
 	$secslast{$pid} = 0 unless defined($secslast{$pid});
 	$secstot{$pid} = 0 unless defined($secstot{$pid});
 	if($secsacc < $secslast{$pid}) {
@@ -107,6 +136,7 @@ while(<TOP>) {
 	}
 	$secslast{$pid} = $secsacc;
 }
+close(TOP);
 
 # Report
 my $max_vmmax = 0;
@@ -174,5 +204,21 @@ if($max_rsmaxM > 0) {
 } else {
 	print "  RES: max=$max_rsmaxK KB\n";
 }
-print "  Total time: $min:$secs\n";
-print "$secstottot,$max_vmmaxK,$max_rsmaxK\n";
+
+# Overall wall-clock time
+my $walli = minSecHrToSeconds(trim(`egrep '^top' $topFile | head -1 | cut -d' ' -f 3`));
+my $wallf = minSecHrToSeconds(trim(`egrep '^top' $topFile | tail -1 | cut -d' ' -f 3`));
+$wallf += ($timeTurnovers * 24 * 60 * 60);
+$walli >= 0 || die "Bad initial wall-clock time: $walli";
+$wallf >= 0 || die "Bad final wall-clock time: $wallf";
+$wallf >= $walli || die "Final wall-clock time $wallf does not exceed initial $walli";
+my $walltotsecs = $wallf-$walli;
+
+my $wmin = int(($wallf-$walli)/60);
+while(length($wmin) < 2) { $wmin = "0".$wmin; }
+my $wsecs = (($wallf-$walli) % 60);
+while(length($wsecs) < 2) { $wsecs = "0".$wsecs; }
+
+print "  Total CPU time: $min:$secs\n";
+print "  Total wall-clock time: $wmin:$wsecs\n";
+print "$secstottot,$walltotsecs,$max_vmmaxK,$max_rsmaxK\n";
