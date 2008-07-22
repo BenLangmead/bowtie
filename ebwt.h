@@ -1776,6 +1776,8 @@ private:
 	uint32_t _mism;          // mismatch vector (LSB=extreme 5' end)
 };
 
+#include "ebwt_search_backtrack.h"
+
 ///////////////////////////////////////////////////////////////////////
 //
 // Functions for printing and sanity-checking Ebwts
