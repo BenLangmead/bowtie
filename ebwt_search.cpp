@@ -259,9 +259,9 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(patid++);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat;
-		String<char>* qual;
-		String<char>* name;
+    	TStr* pat = NULL;
+		String<char>* qual = NULL;
+		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
     	assert(!empty(*pat));
     	if(lastLen == 0) lastLen = length(*pat);
@@ -643,9 +643,9 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat;
-		String<char>* qual;
-		String<char>* name;
+    	TStr* pat = NULL;
+		String<char>* qual = NULL;
+		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
     	assert(!empty(*pat));
     	if(lastLen == 0) lastLen = length(*pat);
@@ -815,9 +815,9 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat;
-		String<char>* qual;
-		String<char>* name;
+    	TStr* pat = NULL;
+		String<char>* qual = NULL;
+		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
     	assert(!empty(*pat));
     	s.newQuery(pat, name, qual);
@@ -947,11 +947,10 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			params.setPatId(spatid);
 			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-			TStr* pat;
-			String<char>* qual;
-			String<char>* name;
+	    	TStr* pat = NULL;
+			String<char>* qual = NULL;
+			String<char>* name = NULL;
 			patsrc.nextPattern(&pat, &qual, &name);
-			
 			assert(!empty(*pat));
 			if(lastLen == 0) lastLen = length(*pat);
 			if(qSameLen && length(*pat) != lastLen) {
@@ -1063,9 +1062,9 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 			params.setPatId(spatid);
 			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
 			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-			TStr* pat;
-			String<char>* qual;
-			String<char>* name;
+	    	TStr* pat = NULL;
+			String<char>* qual = NULL;
+			String<char>* name = NULL;
 			patsrc.nextPattern(&pat, &qual, &name);
 			assert(!empty(*pat));
 			s.newQuery(pat, name, qual);

@@ -759,7 +759,9 @@ public:
 	
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
+	inline bool report(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
+	inline bool reportChaseOne(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l /*= NULL*/) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
@@ -1097,8 +1099,8 @@ public:
 	 * Report a hit 
 	 */
 	void reportHit(const TStr& query,         // read sequence
-	               const String<char>& quals, // read quality values
-	               const String<char>& name,  // read name
+	               String<char>* quals, // read quality values
+	               String<char>* name,  // read name
 	               const uint32_t *mmui32,   // mismatch list
 	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
@@ -1114,12 +1116,15 @@ public:
 		uint32_t qlen = length(query);
 		reserve(pat, qlen);
 		String<char> patQuals;
-		reserve(patQuals, length(quals));
-		const String<char>& patName = name;
+		String<char> patName;
+		if(name != NULL) assign(patName, *name);
 		if (_ebwtFw)
 		{
 			pat = query;
-			patQuals = quals;
+			if(quals != NULL) {
+				reserve(patQuals, length(quals));
+				patQuals = *quals;
+			}
 		}
 		else
 		{
@@ -1129,7 +1134,9 @@ public:
 			for(size_t i = 0; i < len; i++) 
 			{
 				appendValue(pat, query[len-i-1]);
-				appendValue(patQuals, quals[len-i-1]);
+				if(quals != NULL) {
+					appendValue(patQuals, (*quals)[len-i-1]);
+				}
 			}
 		}
 		
@@ -1398,6 +1405,7 @@ public:
 		_botSideLocus(),
 		_mism(0xffffffff)
 	{
+		assert(_query != NULL); // name and quals are allowed to be NULL
 		_narrowHalfLen = _qlen;
 		// Let the forward Ebwt take the middle character
 		if(_params.ebwtFw()) _narrowHalfLen++;
@@ -1436,11 +1444,9 @@ public:
 	              String<char>* __query_quals)
 	{
 		assert(__query != NULL);
-		assert(__query_name != NULL);
-		assert(__query_quals != NULL);
 		_query = __query;
-		_query_name = __query_name;
-		_query_quals = __query_quals;
+		_query_name = __query_name; // might be NULL
+		_query_quals = __query_quals; // might be NULL
 		_firstNzRemainder = -1;
 		_mism = 0xffffffff;
 		if(length(*_query) != _qlen) {
@@ -1460,8 +1466,8 @@ public:
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
 	const TStr& query() const                    { return *_query;  }
-	const String<char>& query_quals() const		 { return *_query_quals; }
-	const String<char>& query_name() const		 { return *_query_name; }
+	String<char>* query_quals() 		         { return _query_quals; }
+	String<char>* query_name()       	    	 { return _query_name; }
 	uint32_t top() const                         { return _top;    }
 	uint32_t bot() const                         { return _bot;    }
 	void setTopBot(uint32_t __top, uint32_t __bot) {
@@ -1500,7 +1506,7 @@ public:
 	uint32_t  qidx() const          { return _qidx; }
 	uint32_t  mismatch() const      { return _mism; }
 	const uint32_t *mismatchPtr() const   { return &_mism; }
-	uint32_t  numMismatches() const { return 1; }
+	uint32_t  numMismatches() const { if(_mism == 0xffffffff) return 0; return 1; }
 	/// Return true iff we're currently matching in the "back half" of the read
 	bool inNarrowHalf() const {
 		return _qidx < _narrowHalfLen;
@@ -2345,8 +2351,8 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c) const {
 
 /**
  * Report a potential match at offset 'off' with pattern length
- * 'matchlen'.  We must be careful to filter out spurious matches that
- * fall partially within the padding that separates texts.
+ * 'qlen'.  This version adapts the EbwtSearchState into the arguments
+ * expected by the major report() member (below).
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::report(uint32_t off,
@@ -2355,18 +2361,47 @@ inline bool Ebwt<TStr>::report(uint32_t off,
                                uint32_t qlen,
                                EbwtSearchState<TStr>& s) const
 {
-	const EbwtSearchParams<TStr>& params = s.params();
+	return report(
+			s.query(),
+	        s.query_quals(),
+	        s.query_name(),
+	        s.mismatchPtr(),
+	        s.numMismatches(),
+	        off,
+	        top,
+	        bot,
+	        qlen,
+	        s.params());
+}
+
+/**
+ * Report a potential match at offset 'off' with pattern length
+ * 'qlen'.  We must be careful to filter out spurious matches that
+ * fall partially within the padding that separates texts.
+ */
+template<typename TStr>
+inline bool Ebwt<TStr>::report(const TStr& query,
+                               String<char>* quals,
+                               String<char>* name,
+                               const uint32_t *mmui32,
+                               size_t numMms,
+                               uint32_t off,
+                               uint32_t top,
+                               uint32_t bot,
+                               uint32_t qlen,
+                               const EbwtSearchParams<TStr>& params) const
+{
 	VMSG_NL("In report");
 	assert_lt(off, this->_eh._len);
 	if(params.arrowMode()) {
 		// Call reportHit with a bogus genome position; in this mode,
 		// all we care about are the top and bottom arrows
 		params.reportHit(
-				s.query(),           // read sequence
-				s.query_quals(),     // read quality values
-				s.query_name(),      // read name
-				s.mismatchPtr(),     // mismatch positions
-				s.numMismatches(),   // # mismatches
+				query,               // read sequence
+				quals,               // read quality values
+				name,                // read name
+				mmui32,              // mismatch positions
+				numMms,              // # mismatches
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) tlen
@@ -2392,11 +2427,11 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 			cout << "report tidx=" << tidx << ", off=" << (toff+coff) << ", absoff=" << off << ", toff=" << toff << endl;
 		}
 		params.reportHit(
-				s.query(),                    // read sequence
-				s.query_quals(),              // read quality values
-				s.query_name(),               // read name
-				s.mismatchPtr(),              // mismatch positions
-				s.numMismatches(),            // # mismatches
+				query,                        // read sequence
+				quals,                        // read quality values
+				name,                         // read name
+				mmui32,                       // mismatch positions
+				numMms,                       // # mismatches
 				make_pair(tidx, toff + coff), // position
 				make_pair(top, bot),          // arrows
 				tlen,                         // tlen
@@ -2404,6 +2439,25 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 				bot-top-1);                   // # other hits
 		return true;
 	}
+}
+
+template<typename TStr>
+inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
+                                       EbwtSearchState<TStr>& s,
+                                       SideLocus *l = NULL) const
+{
+	return reportChaseOne(
+			s.query(),
+	        s.query_quals(),
+	        s.query_name(),
+	        s.mismatchPtr(),
+	        s.numMismatches(),
+	        i,
+	        s.top(),
+	        s.bot(),
+	        s.qlen(),
+	        s.params(),
+	        l);
 }
 
 /**
@@ -2414,12 +2468,20 @@ inline bool Ebwt<TStr>::report(uint32_t off,
  * array.
  */
 template<typename TStr>
-inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
-                                       EbwtSearchState<TStr>& s,
+inline bool Ebwt<TStr>::reportChaseOne(const TStr& query,
+                                       String<char>* quals,
+                                       String<char>* name,
+                                       const uint32_t *mmui32,
+                                       size_t numMms,
+                                       uint32_t i,
+                                       uint32_t top,
+                                       uint32_t bot,
+                                       uint32_t qlen,
+                                       const EbwtSearchParams<TStr>& params,
                                        SideLocus *l = NULL) const
 {
 	VMSG_NL("In reportChaseOne");
-	assert(!s.params().arrowMode());
+	assert(!params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
 	const uint32_t offMask = this->_eh._offMask;
@@ -2434,7 +2496,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 	// Walk along until we reach the next marked row to the left
 	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
-		s.params().stats().incPushthrough(s, true, true);
+		//params.stats().incPushthrough(s, true, true);
 		uint32_t newi = mapLF(*l); // calc next row
 		assert_neq(newi, i);
 		i = newi;                                  // update row
@@ -2450,7 +2512,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
 	if (own_locus) delete l;
-	return report(off, s.top(), s.bot(), s.qlen(), s);
+	return report(query, quals, name, mmui32, numMms, off, top, bot, qlen, params);
 }
 
 #define NUM_SAMPLES 10
