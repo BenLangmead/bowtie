@@ -8,6 +8,13 @@
 #
 
 use List::Util qw[min max];
+use Getopt::Std;
+
+my %options=();
+getopts("m",\%options);
+
+my $maq = 0;
+$maq = $options{m} if defined $options{m};
 
 my $seed = 0;
 $seed = int $ARGV[0] if defined($ARGV[0]);
@@ -113,7 +120,12 @@ sub search {
 	} else {
 		$mismatches = "";
 	}
-	my $cmd = "./ebwt_search-with-asserts $revcomp $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
+	if($maq) {
+		$maq = "--maq";
+	} else {
+		$maq = "";
+	}
+	my $cmd = "./ebwt_search-with-asserts $maq $revcomp $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	

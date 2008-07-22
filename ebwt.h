@@ -774,7 +774,7 @@ public:
 	inline uint32_t countBwSide(const SideLocus& l, int c) const;
 	inline void countBwSideEx(const SideLocus& l, uint32_t *pairs) const;
 	inline uint32_t mapLF(const SideLocus& l) const;
-	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *topPairs, uint32_t *botPairs) const;
+	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots) const;
 	inline uint32_t mapLF(const SideLocus& l, int c) const;
 	inline uint32_t mapLF1(const SideLocus& l, int c) const;
 	inline bool searchFinish(EbwtSearchState<TStr>& s) const;
@@ -2164,7 +2164,13 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* pairs) const
 	// Now factor in the occ[] count at the side break
 	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
 	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
-	assert_lt(ac[0], eh._len); assert_lt(ac[1], eh._len);
+#ifndef NDEBUG
+	assert_leq(ac[0], this->_fchr[1] + eh.sideBwtLen());
+	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
+	assert_leq(gt[0], this->_fchr[3]-this->_fchr[2]);
+	assert_leq(gt[1], this->_fchr[4]-this->_fchr[3]);
+#endif
+	assert_lt(ac[0], eh._len + eh.sideBwtLen()); assert_lt(ac[1], eh._len);
 	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 	pairs[0] += (ac[0] + this->_fchr[0]);
 	pairs[1] += (ac[1] + this->_fchr[1]);
@@ -2264,9 +2270,15 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
-	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
-	assert_lt(ac[0], eh._len); assert_lt(ac[1], eh._len);
+	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh._sideSz) - 8);
+#ifndef NDEBUG
+	assert_leq(ac[0], this->_fchr[1] + eh.sideBwtLen());
+	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
+	assert_leq(gt[0], this->_fchr[3]-this->_fchr[2]);
+	assert_leq(gt[1], this->_fchr[4]-this->_fchr[3]);
+#endif
+	assert_lt(ac[0], eh._len + eh.sideBwtLen()); assert_lt(ac[1], eh._len);
 	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 	pairs[0] = (ac[0] - pairs[0] + this->_fchr[0]);
 	pairs[1] = (ac[1] - pairs[1] + this->_fchr[1]);
@@ -2287,15 +2299,19 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const
 template<typename TStr>
 inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
                                 const SideLocus& lbot,
-                                uint32_t *topPairs,
-                                uint32_t *botPairs) const
+                                uint32_t *tops,
+                                uint32_t *bots) const
 {
 	// TODO: Where there's overlap, don't re-calculate counts for the
 	// overlapping portion
-	if(ltop._fw) countFwSideEx(ltop, topPairs); // Forward side
-	else         countBwSideEx(ltop, topPairs); // Backward side
-	if(lbot._fw) countFwSideEx(lbot, botPairs); // Forward side
-	else         countBwSideEx(lbot, botPairs); // Backward side
+	assert_eq(0, tops[0]); assert_eq(0, bots[0]);
+	assert_eq(0, tops[1]); assert_eq(0, bots[1]);
+	assert_eq(0, tops[2]); assert_eq(0, bots[2]);
+	assert_eq(0, tops[3]); assert_eq(0, bots[3]);
+	if(ltop._fw) countFwSideEx(ltop, tops); // Forward side
+	else         countBwSideEx(ltop, tops); // Backward side
+	if(lbot._fw) countFwSideEx(lbot, bots); // Forward side
+	else         countBwSideEx(lbot, bots); // Backward side
 }
 
 /**

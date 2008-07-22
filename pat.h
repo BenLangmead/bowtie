@@ -73,7 +73,9 @@ public:
 				dump(_out, _revtmp, _revqual, (**name));
 			}
 			(*s) = &_revtmp;
-			(*qual) = &_revqual;
+			if(*qual != NULL) {
+				(*qual) = &_revqual;
+			}
 			return;
 		}
 		// Output it, if desired

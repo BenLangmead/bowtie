@@ -119,6 +119,8 @@ public:
 	virtual void finishImpl() { }
 	virtual void finish()               { finishImpl(); }
 	virtual void flush()                { _out.flush(); }
+	virtual void setRetainHits(bool r)  { _keep = r; }
+	virtual bool retainHits()           { return _keep; }
 	virtual void clearRetainedHits()    { _hits.clear(); }
 	virtual vector<Hit>& retainedHits() { return _hits; }
 	virtual ostream& out()              { return _out; }

@@ -1168,9 +1168,10 @@ static void seededQualCutoffSearch(int seedLen,
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Time for seeded quality search Phase 1: ", timing);
-		BacktrackManager<TStr> bt(ebwtFw, params, 0, 0, 0, 0, 70, 0, true, seed);
+		BacktrackManager<TStr> bt(ebwtFw, params, 0, 0, 0, 0, 70, 0, verbose, true, seed);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
+		params.setFw(false);  // we'll only look at reverse complements this round
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1179,10 +1180,10 @@ static void seededQualCutoffSearch(int seedLen,
 	    		doneMask.resize(doneMask.capacity()*2, 0);
 	    	}
 			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
+			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
+			assert(patRc != NULL);
 			assert(!patsrc.nextIsReverseComplement());
 			size_t plen = length(*patFw);
 			if(qSameLen) {
@@ -1190,8 +1191,9 @@ static void seededQualCutoffSearch(int seedLen,
 				else assert_eq(lastLen, plen);
 			}
 			bt.setQuery(patRc, qualRc, nameRc);
-			uint64_t numHits = sink.numHits();
-			bool hit = bt.backtrack();
+			params.setPatId(patid+1);
+			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			bool hit = bt.backtrack(&os);
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1209,23 +1211,25 @@ static void seededQualCutoffSearch(int seedLen,
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
 		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
-		BacktrackManager<TStr> bt(ebwtBw, params, 0, 0, 0, 0, 70, 0, true, seed);
+		BacktrackManager<TStr> bt(ebwtBw, params, 0, 0, 0, 0, 70, 0, verbose, true, seed);
 		uint32_t patid = 0;
+		params.setFw(true);  // we'll only look at forward strand this round
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
 	    	if(doneMask[patid>>1]) { patid += 2; continue; }
-			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
-			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
+			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
+			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
+			assert(patRc != NULL);
 			assert(!patsrc.nextIsReverseComplement());
 			bt.setQuery(patFw, qualFw, nameFw);
-			uint64_t numHits = sink.numHits();
-			bool hit = bt.backtrack();
+			params.setPatId(patid);
+			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			bool hit = bt.backtrack(&os);
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1348,7 +1352,7 @@ static void driver(const char * type,
 	    ebwt.loadIntoMemory();
 	}
 	// Sanity-check the restored version of the Ebwt
-	if(sanityCheck && !os.empty()) {
+	if(!maqLike && sanityCheck && !os.empty()) {
 		TStr rest; ebwt.restore(rest);
 		uint32_t restOff = 0;
 		for(size_t i = 0; i < os.size(); i++) {
@@ -1365,7 +1369,7 @@ static void driver(const char * type,
     // If sanity-check is enabled and an original text string
     // was specified, sanity-check the Ebwt by confirming that
     // its detransformation equals the original.
-	if(sanityCheck && !os.empty()) {
+	if(!maqLike && sanityCheck && !os.empty()) {
 		TStr rs; ebwt.restore(rs);
 		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
 		assert_eq(joinedo, rs);
