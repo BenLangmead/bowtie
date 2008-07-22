@@ -766,9 +766,13 @@ public:
 	inline bool reportOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
+	inline void countUpToEx(const SideLocus& l, uint32_t* pairs) const;
 	inline uint32_t countFwSide(const SideLocus& l, int c) const;
+	inline void countFwSideEx(const SideLocus& l, uint32_t *pairs) const;
 	inline uint32_t countBwSide(const SideLocus& l, int c) const;
+	inline void countBwSideEx(const SideLocus& l, uint32_t *pairs) const;
 	inline uint32_t mapLF(const SideLocus& l) const;
+	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *topPairs, uint32_t *botPairs) const;
 	inline uint32_t mapLF(const SideLocus& l, int c) const;
 	inline uint32_t mapLF1(const SideLocus& l, int c) const;
 	inline bool searchFinish(EbwtSearchState<TStr>& s) const;
@@ -1258,9 +1262,14 @@ private:
 	bool _suppress;         // suppress hits?
 };
 
+/**
+ * Encapsulates a location in the bwt text in terms of the side it
+ * occurs in and its offset within the side.
+ */
 struct SideLocus {
 	SideLocus() :
 	_sideByteOff(0),
+	_sideNum(0),
 	_charOff(0),
 	_fw(-1),
 	_by(-1),
@@ -1275,23 +1284,56 @@ struct SideLocus {
 	}
 
 	/**
+	 * Init two SideLocus objects from a top/bot pair, using the result
+	 * from one call to initFromRow to possibly avoid a second call.
+	 */
+	static void initFromTopBot(uint32_t top,
+	                           uint32_t bot,
+	                           const EbwtParams& ep,
+	                           uint8_t* ebwt,
+	                           SideLocus& ltop,
+	                           SideLocus& lbot)
+	{
+		const uint32_t sideBwtLen = ep._sideBwtLen;
+		const uint32_t sideBwtSz  = ep._sideBwtSz;
+		assert_gt(bot, top);
+		ltop.initFromRow(top, ep, ebwt);
+		uint32_t spread = bot - top;
+		if(ltop._charOff + spread < sideBwtLen) {
+			lbot._charOff = ltop._charOff + spread;
+			lbot._sideNum = ltop._sideNum;
+			lbot._sideByteOff = ltop._sideByteOff;
+			lbot._side = ltop._side;
+			lbot._fw = ltop._fw;
+			lbot._by = lbot._charOff >> 2;
+			assert_lt(lbot._by, (int)sideBwtSz);
+			if(!lbot._fw) lbot._by = sideBwtSz - lbot._by - 1;
+			lbot._bp = lbot._charOff & 3;
+			if(!lbot._fw) lbot._bp ^= 3;
+		} else {
+			lbot.initFromRow(bot, ep, ebwt);
+		}
+	}
+	
+	/**
 	 * Calculate SideLocus based on a row and other relevant
-	 * information about the Ebwt.
+	 * information about the shape of the Ebwt.
 	 */
 	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
 		const uint32_t sideBwtLen = ep._sideBwtLen;
 		const uint32_t sideBwtSz  = ep._sideBwtSz;
 		const uint32_t sideSz     = ep._sideSz;
-		const uint32_t sideNum    = row / sideBwtLen;
+		_sideNum                  = row / sideBwtLen;
 		_charOff                  = row % sideBwtLen;
-		_sideByteOff              = sideNum * sideSz;
+		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
+		// prefetch this side
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
-		// TODO: prefetch the opposite side too
-		_fw = sideNum & 1;   // odd-numbered sides are forward
+		// prefetch the opposite side too
+		_fw = _sideNum & 1;   // odd-numbered sides are forward
 		__builtin_prefetch((const void *)(_side + (_fw? -128 : 128)),
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
@@ -1303,6 +1345,7 @@ struct SideLocus {
 	}
 	
     uint32_t _sideByteOff; // offset of top side within ebwt[]
+    uint32_t _sideNum;     // index of side
     uint32_t _charOff;     // character offset within side
     int _fw;               // side is forward or backward?
     int _by;               // byte within side (not adjusted for bw sides)
@@ -1940,6 +1983,19 @@ inline static int countInU64(int c, uint64_t dw) {
 }
 
 /**
+ * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
+ * within a 64-bit argument.
+ */
+inline static void countInU64Ex(uint64_t dw, uint32_t* pairs) {
+	uint64_t dwA  = dw &  0xAAAAAAAAAAAAAAAAllu;
+	uint64_t dwNA = dw & ~0xAAAAAAAAAAAAAAAAllu;
+	pairs[0] += (32 - pop((dwA >> 1) | dwNA));
+	pairs[1] += pop(~(dwA >> 1) & dwNA);
+	pairs[2] += pop((dwA >> 1) & ~dwNA);
+	pairs[3] += pop((dwA >> 1) & dwNA);
+}
+
+/**
  * Counts the number of occurrences of character 'c' in the given Ebwt
  * side up to (but not including) the given byte/bitpair (by/bp).
  * 
@@ -1969,6 +2025,39 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 		if(unpack_2b_from_8b(l._side[l._by], i) == c) cCnt++;
 	}
 	return cCnt;
+}
+
+/**
+ * Counts the number of occurrences of character 'c' in the given Ebwt
+ * side up to (but not including) the given byte/bitpair (by/bp).
+ * 
+ * This is a performance-critical function.  This is the top search-
+ * related hit in the time profile.
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* pairs) const {
+	int i = 0;
+	// Count occurrences of c in each 64-bit (using bit trickery);
+	// note: this seems does not seem to lend a significant boost to
+	// performance.  If you comment out this whole loop (which won't
+	// affect correctness - it will just cause the following loop to
+	// take up the slack) then runtime does not change noticeably.
+	// Someday the countInU64() and pop() functions should be
+	// vectorized/SSE-ized in case that helps.
+	for(; i+7 < l._by; i += 8) {
+		countInU64Ex(*(uint64_t*)&l._side[i], pairs);
+	}
+	// Count occurences of c in the rest of the side (using LUT)
+	for(; i < l._by; i++) {
+		pairs[0] += cCntLUT[0][l._side[i]];
+		pairs[1] += cCntLUT[1][l._side[i]];
+		pairs[2] += cCntLUT[2][l._side[i]];
+		pairs[3] += cCntLUT[3][l._side[i]];
+	}
+	// Count occurences of c in the rest of the byte
+	for(i = 0; i < l._bp; i++) {
+		pairs[unpack_2b_from_8b(l._side[l._by], i)]++;
+	}
 }
 
 /**
@@ -2021,6 +2110,54 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	}
 #endif
 	return ret;
+}
+
+/**
+ * Count all occurrences of character c from the beginning of the
+ * forward side to <by,bp> and add in the occ[] count up to the side
+ * break just prior to the side.
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* pairs) const
+{
+	const EbwtParams& eh = this->_eh;
+	int by = l._by;
+	int bp = l._bp;
+	uint8_t *ebwtSide = l._side;
+	uint32_t sideByteOff = l._sideByteOff;
+	assert_lt(by, (int)eh._sideBwtSz);
+	assert_geq(by, 0);
+	assert_lt(bp, 4);
+	assert_geq(bp, 0);
+	countUpToEx(l, pairs);
+	assert_leq(pairs[0], eh._sideBwtLen);
+	assert_leq(pairs[1], eh._sideBwtLen);
+	assert_leq(pairs[2], eh._sideBwtLen);
+	assert_leq(pairs[3], eh._sideBwtLen);
+	if(sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
+		// Adjust for the fact that we represented $ with an 'A', but
+		// shouldn't count it as an 'A' here
+		if(sideByteOff + by > _zEbwtByteOff ||
+		   sideByteOff + by == _zEbwtByteOff && bp > _zEbwtBpOff)
+		{
+			pairs[0]--; // Adjust for '$' looking like an 'A'
+		}
+	}
+	// Now factor in the occ[] count at the side break
+	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
+	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+	assert_lt(ac[0], eh._len); assert_lt(ac[1], eh._len);
+	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
+	pairs[0] += (ac[0] + this->_fchr[0]);
+	pairs[1] += (ac[1] + this->_fchr[1]);
+	pairs[2] += (gt[0] + this->_fchr[2]);
+	pairs[3] += (gt[1] + this->_fchr[3]);
+#ifndef NDEBUG
+	assert_leq(pairs[0], this->_fchr[1]); // can't have jumpded into next char's section
+	assert_leq(pairs[1], this->_fchr[2]); // can't have jumpded into next char's section
+	assert_leq(pairs[2], this->_fchr[3]); // can't have jumpded into next char's section
+	assert_leq(pairs[3], this->_fchr[4]); // can't have jumpded into next char's section
+#endif
 }
 
 /**
@@ -2078,6 +2215,72 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 }
 
 /**
+ * Count all instances of character c from <by,bp> to the logical end
+ * (actual beginning) of the backward side, and subtract that from the
+ * occ[] count up to the side break.
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const {
+	const EbwtParams& eh = this->_eh;
+	int by = l._by;
+	int bp = l._bp;
+	uint8_t *ebwtSide = l._side;
+	uint32_t sideByteOff = l._sideByteOff;
+	assert_lt(by, (int)eh._sideBwtSz);
+	assert_geq(by, 0);
+	assert_lt(bp, 4);
+	assert_geq(bp, 0);
+	countUpToEx(l, pairs);
+	pairs[unpack_2b_from_8b(ebwtSide[by], bp)]++;
+	assert_leq(pairs[0], eh._sideBwtLen);
+	assert_leq(pairs[1], eh._sideBwtLen);
+	assert_leq(pairs[2], eh._sideBwtLen);
+	assert_leq(pairs[3], eh._sideBwtLen);
+	if(sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
+		// Adjust for the fact that we represented $ with an 'A', but
+		// shouldn't count it as an 'A' here
+		if(sideByteOff + by > _zEbwtByteOff ||
+		   sideByteOff + by == _zEbwtByteOff && bp >= _zEbwtBpOff)
+		{
+			pairs[0]--; // Adjust for '$' looking like an 'A'
+		}
+	}
+	// Now factor in the occ[] count at the side break
+	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
+	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+	assert_lt(ac[0], eh._len); assert_lt(ac[1], eh._len);
+	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
+	pairs[0] = (ac[0] - pairs[0] + this->_fchr[0]);
+	pairs[1] = (ac[1] - pairs[1] + this->_fchr[1]);
+	pairs[2] = (gt[0] - pairs[2] + this->_fchr[2]);
+	pairs[3] = (gt[1] - pairs[3] + this->_fchr[3]);
+#ifndef NDEBUG
+	assert_leq(pairs[0], this->_fchr[1]); // can't have jumpded into next char's section
+	assert_leq(pairs[1], this->_fchr[2]); // can't have jumpded into next char's section
+	assert_leq(pairs[2], this->_fchr[3]); // can't have jumpded into next char's section
+	assert_leq(pairs[3], this->_fchr[4]); // can't have jumpded into next char's section
+#endif
+}
+
+/**
+ * Given top and bot loci, calculate counts of all four DNA chars up to
+ * those loci.  Used for more advanced backtracking-search.
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
+                                const SideLocus& lbot,
+                                uint32_t *topPairs,
+                                uint32_t *botPairs) const
+{
+	// TODO: Where there's overlap, don't re-calculate counts for the
+	// overlapping portion
+	if(ltop._fw) countFwSideEx(ltop, topPairs); // Forward side
+	else         countBwSideEx(ltop, topPairs); // Backward side
+	if(lbot._fw) countFwSideEx(lbot, botPairs); // Forward side
+	else         countBwSideEx(lbot, botPairs); // Backward side
+}
+
+/**
  * Given row i, return the row that the LF mapping maps i to.
  */
 template<typename TStr>
@@ -2112,16 +2315,6 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c) const {
  * final column of row i is not c.  This is an optimization for the
  * (hopefully common) case where we're matching and the top and bottom
  * arrows are separated by a single row. 
- * 
- * This was at the top of the profile for a recent run:
- * 
- *   %    self              
- *  time  seconds   calls   name
- * 
- *  24.13  38.45 151119757  Ebwt<>::mapLF1(uint, int) const
- *  21.42  34.14 267596260  Ebwt<>::countUpTo(uchar*, int, int, int) const
- *   8.04  12.81 133825619  Ebwt<>::countBwSide(uchar*, uint, int, int, int) const
- *   5.35   8.53 133770641  Ebwt<>::countFwSide(uchar*, uint, int, int, int) const
  * 
  * Is it because this is the first place to read from the side, thus
  * taking the cache miss?
