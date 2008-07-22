@@ -758,7 +758,7 @@ public:
 	void restore(TStr& s) const;
 	
 	// Searching and reporting
-	inline bool report(uint32_t off, uint32_t top, uint32_t bot, EbwtSearchState<TStr>& s) const;
+	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
@@ -2342,19 +2342,21 @@ template<typename TStr>
 inline bool Ebwt<TStr>::report(uint32_t off,
                                uint32_t top,
                                uint32_t bot,
+                               uint32_t qlen,
                                EbwtSearchState<TStr>& s) const
 {
+	const EbwtSearchParams<TStr>& params = s.params();
 	VMSG_NL("In report");
 	assert_lt(off, this->_eh._len);
-	if(s.params().arrowMode()) {
+	if(params.arrowMode()) {
 		// Call reportHit with a bogus genome position; in this mode,
 		// all we care about are the top and bottom arrows
-		s.params().reportHit(
+		params.reportHit(
 				s,                   // state
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) tlen
-				s.qlen(),            // qlen
+				qlen,                // qlen
 				bot-top-1);          // # other hits
 		return true;
 	}
@@ -2367,7 +2369,7 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 	uint32_t tlen = this->_plen[tidx];              // length of text
 	assert_lt(toff, tlen);
 	assert_lt(tidx, this->_nPat);
-	if(toff + coff + s.qlen() > tlen) {
+	if(toff + coff + qlen > tlen) {
 		// Spurious result
 		return false;
 	} else {
@@ -2375,12 +2377,12 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 		if(_verbose) {
 			cout << "report tidx=" << tidx << ", off=" << (toff+coff) << ", absoff=" << off << ", toff=" << toff << endl;
 		}
-		s.params().reportHit(
+		params.reportHit(
 				s,                            // state
 				make_pair(tidx, toff + coff), // position
 				make_pair(top, bot),          // arrows
 				tlen,                         // tlen
-				s.qlen(),                     // qlen
+				qlen,                         // qlen
 				bot-top-1);                   // # other hits
 		return true;
 	}
@@ -2430,7 +2432,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
 	if (own_locus) delete l;
-	return report(off, s.top(), s.bot(), s);
+	return report(off, s.top(), s.bot(), s.qlen(), s);
 }
 
 #define NUM_SAMPLES 10
@@ -2499,7 +2501,7 @@ inline bool Ebwt<TStr>::reportOne(uint32_t i,
 	s.params().stats().addExactHits(s);
 	if(s.params().arrowMode()) {
 		// Don't chase anything; just report arrows and bail
-		report(i, s.top(), s.bot(), s);
+		report(i, s.top(), s.bot(), s.qlen(), s);
 		return true;
 	}
 	return reportChaseOne(i, s, l);
@@ -2522,7 +2524,7 @@ inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
 	s.params().stats().addExactHits(s);
 	if(s.params().arrowMode()) {
 		// Don't chase anything; just report arrows and bail
-		report(0, s.top(), s.bot(), s);
+		report(0, s.top(), s.bot(), s.qlen(), s);
 		return true;
 	}
 	switch(s.params().multiHitPolicy()) {
@@ -2595,7 +2597,7 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 	if(s.params().arrowMode()) {
 		// Just return arrows; we haven't tried to set off and we're
 		// not going to try to chase the result
-		return report(0, s.top(), s.bot(), s); 
+		return report(0, s.top(), s.bot(), s.qlen(), s); 
 	}
 	if(off != 0xffffffff) {
 		// Good luck - we previously made note of a marked row and
@@ -2606,7 +2608,7 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 		assert_geq(jumps, 0);
 		VMSG_NL("searchFinish1 pre-found off=" << off);
 		s.params().stats().addExactHits(s);
-		return report(off, s.top(), s.bot(), s); 
+		return report(off, s.top(), s.bot(), s.qlen(), s); 
 		assert_leq(s.params().sink().numProvisionalHits(), 1);
 	} else {
 		// Haven't yet encountered a marked row for this result;
