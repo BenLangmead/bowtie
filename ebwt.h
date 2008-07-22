@@ -1096,8 +1096,11 @@ public:
 	/**
 	 * Report a hit 
 	 */
-	void reportHit(EbwtSearchState<TStr>& s,
-	               U32Pair h,          // hit locus
+	void reportHit(const TStr& query,         // read sequence
+	               const String<char>& quals, // read quality values
+	               const String<char>& name,  // read name
+	               uint32_t mmui32,    // mismatch bitvector
+	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
@@ -1107,14 +1110,15 @@ public:
 		assert(!_suppress);
 		bitset<max_read_bp> mm = 0;
 		hit_pat_t pat;
-		reserve(pat, length(s.query()));
+		uint32_t qlen = length(query);
+		reserve(pat, qlen);
 		String<char> patQuals;
-		reserve(patQuals, length(s.query_quals()));
-		const String<char>& patName = s.query_name();
+		reserve(patQuals, length(quals));
+		const String<char>& patName = name;
 		if (_ebwtFw)
 		{
-			pat = s.query();
-			patQuals = s.query_quals();
+			pat = query;
+			patQuals = quals;
 		}
 		else
 		{
@@ -1123,27 +1127,27 @@ public:
 			// initially
 			for(size_t i = 0; i < len; i++) 
 			{
-				appendValue(pat, s.query()[len-i-1]);
-				appendValue(patQuals, s.query_quals()[len-i-1]);
+				appendValue(pat, query[len-i-1]);
+				appendValue(patQuals, quals[len-i-1]);
 			}
 		}
 		
-		if (s.mismatch() != 0xffffffff)
+		if (mmui32 != 0xffffffff)
 		{	
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
 				// mismatches w/r/t the 5' end, so we flip
-				mm.set(len - s.mismatch() - 1);
+				mm.set(len - mmui32 - 1);
 			}
 			else {
-				mm.set(s.mismatch());
+				mm.set(mmui32);
 			}
 		}
 		
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
 		if(!_ebwtFw && !_arrowMode) {
 			h.second = tlen - h.second - 1;
-			h.second -= (s.qlen()-1);
+			h.second -= (qlen-1);
 		}
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
@@ -1158,7 +1162,7 @@ public:
 				assert_lt(h.second + i, length(_texts[h.first]));
 				if(_ebwtFw) {
 					// Forward pattern appears at h
-					if(s.query()[i] != _texts[h.first][h.second + i]) {
+					if(query[i] != _texts[h.first][h.second + i]) {
 						uint32_t qoff = i;
 						// if _ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
@@ -1169,7 +1173,7 @@ public:
 					}
 				} else {
 					// Reverse of pattern appears at h
-					if(s.query()[len-i-1] != _texts[h.first][h.second + i]) {
+					if(query[len-i-1] != _texts[h.first][h.second + i]) {
 						uint32_t qoff = len-i-1;
 						// if _ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
@@ -1184,8 +1188,8 @@ public:
 				cerr << "Expected " << mm << " mismatches, got " << diffs << endl;
 				cerr << "  Pat:  ";
 				for(size_t i = 0; i < len; i++) {
-					if(_ebwtFw) cerr << s.query()[i];
-					else cerr << s.query()[len-i-1];
+					if(_ebwtFw) cerr << query[i];
+					else cerr << query[len-i-1];
 				}
 				cerr << endl;
 				cerr << "  Tseg: ";
@@ -1196,7 +1200,7 @@ public:
 				if(length(_texts[h.first]) < 80) {
 					cerr << "  Text: " << _texts[h.first] << endl;
 				}
-				cerr << "  s.mismatch(): " << s.mismatch() << endl;
+				cerr << "  mmui32: " << mmui32 << endl;
 				cerr << "  FW: " << _fw << endl;
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
 				cerr << "  Provisional: " << provisional << endl;
@@ -2352,7 +2356,10 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 		// Call reportHit with a bogus genome position; in this mode,
 		// all we care about are the top and bottom arrows
 		params.reportHit(
-				s,                   // state
+				s.query(),           // read sequence
+				s.query_quals(),     // read quality values
+				s.query_name(),      // read name
+				s.mismatch(),        // mismatch positions
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) tlen
@@ -2378,7 +2385,10 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 			cout << "report tidx=" << tidx << ", off=" << (toff+coff) << ", absoff=" << off << ", toff=" << toff << endl;
 		}
 		params.reportHit(
-				s,                            // state
+				s.query(),                    // read sequence
+				s.query_quals(),              // read quality values
+				s.query_name(),               // read name
+				s.mismatch(),                 // mismatch positions
 				make_pair(tidx, toff + coff), // position
 				make_pair(top, bot),          // arrows
 				tlen,                         // tlen
