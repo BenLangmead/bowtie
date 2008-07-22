@@ -1099,7 +1099,8 @@ public:
 	void reportHit(const TStr& query,         // read sequence
 	               const String<char>& quals, // read quality values
 	               const String<char>& name,  // read name
-	               uint32_t mmui32,    // mismatch bitvector
+	               const uint32_t *mmui32,   // mismatch list
+	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
@@ -1132,15 +1133,14 @@ public:
 			}
 		}
 		
-		if (mmui32 != 0xffffffff)
-		{	
+		for(size_t i = 0; i < numMms; i++) {
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
 				// mismatches w/r/t the 5' end, so we flip
-				mm.set(len - mmui32 - 1);
+				mm.set(len - mmui32[i] - 1);
 			}
 			else {
-				mm.set(mmui32);
+				mm.set(mmui32[i]);
 			}
 		}
 		
@@ -1200,7 +1200,11 @@ public:
 				if(length(_texts[h.first]) < 80) {
 					cerr << "  Text: " << _texts[h.first] << endl;
 				}
-				cerr << "  mmui32: " << mmui32 << endl;
+				cerr << "  mmui32: ";
+				for(size_t i = 0; i < numMms; i++) {
+					cerr << mmui32[i] << " ";
+				}
+				cerr << endl;
 				cerr << "  FW: " << _fw << endl;
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
 				cerr << "  Provisional: " << provisional << endl;
@@ -1492,9 +1496,11 @@ public:
 		assert_geq(_bot, _top);
 		return true;
 	}
-	uint32_t qlen() const       { return _qlen; }
-	uint32_t qidx() const       { return _qidx; }
-	uint32_t mismatch() const	{ return _mism; }
+	uint32_t  qlen() const          { return _qlen; }
+	uint32_t  qidx() const          { return _qidx; }
+	uint32_t  mismatch() const      { return _mism; }
+	const uint32_t *mismatchPtr() const   { return &_mism; }
+	uint32_t  numMismatches() const { return 1; }
 	/// Return true iff we're currently matching in the "back half" of the read
 	bool inNarrowHalf() const {
 		return _qidx < _narrowHalfLen;
@@ -2359,7 +2365,8 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 				s.query(),           // read sequence
 				s.query_quals(),     // read quality values
 				s.query_name(),      // read name
-				s.mismatch(),        // mismatch positions
+				s.mismatchPtr(),     // mismatch positions
+				s.numMismatches(),   // # mismatches
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) tlen
@@ -2388,7 +2395,8 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 				s.query(),                    // read sequence
 				s.query_quals(),              // read quality values
 				s.query_name(),               // read name
-				s.mismatch(),                 // mismatch positions
+				s.mismatchPtr(),              // mismatch positions
+				s.numMismatches(),            // # mismatches
 				make_pair(tidx, toff + coff), // position
 				make_pair(top, bot),          // arrows
 				tlen,                         // tlen
