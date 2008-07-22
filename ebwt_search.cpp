@@ -1168,24 +1168,36 @@ static void seededQualCutoffSearch(int seedLen,
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Time for seeded quality search Phase 1: ", timing);
-		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		BacktrackManager<TStr> bt(ebwtFw, params, 0, 0, 0, 0, 70, 0, true, seed);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
-		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
-		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 > doneMask.capacity()) {
 	    		// Expand doneMask
 	    		doneMask.resize(doneMask.capacity()*2, 0);
 	    	}
-			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
+			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
+			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
+			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
 			assert(!patsrc.nextIsReverseComplement());
 			size_t plen = length(*patFw);
 			if(qSameLen) {
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
+			}
+			bt.setQuery(patRc, qualRc, nameRc);
+			uint64_t numHits = sink.numHits();
+			bool hit = bt.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			if(hit) {
+				// The reverse complement hit, so we're done with this
+				// read
+				doneMask[patid>>1] = true;
 			}
 			patid += 2;
 	    }
@@ -1197,18 +1209,30 @@ static void seededQualCutoffSearch(int seedLen,
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
 		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
-		EbwtSearchState<TStr> s(ebwtBw, params, seed);
+		BacktrackManager<TStr> bt(ebwtBw, params, 0, 0, 0, 0, 70, 0, true, seed);
 		uint32_t patid = 0;
-		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
-		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
 	    	if(doneMask[patid>>1]) { patid += 2; continue; }
 			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
+			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
+			assert(patFw != NULL); assert(qualFw != NULL); assert(nameFw != NULL);
 			assert(!patsrc.nextIsReverseComplement());
+			bt.setQuery(patFw, qualFw, nameFw);
+			uint64_t numHits = sink.numHits();
+			bool hit = bt.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			if(hit) {
+				// The reverse complement hit, so we're done with this
+				// read
+				doneMask[patid>>1] = true;
+			}
 			patid += 2;
 	    }
 	    assert_eq(numPats, patid);
@@ -1220,8 +1244,8 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 3: ", timing);
 		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		uint32_t patid = 0;
-		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
-		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
@@ -1240,8 +1264,8 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 4: ", timing);
 		EbwtSearchState<TStr> s(ebwtBw, params, seed);
 		uint32_t patid = 0;
-		TStr* patFw; String<char>* qualFw; String<char>* nameFw;
-		TStr* patRc; String<char>* qualRc; String<char>* nameRc;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());

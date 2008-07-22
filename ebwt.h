@@ -760,8 +760,8 @@ public:
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
 	inline bool report(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
-	inline bool reportChaseOne(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l /*= NULL*/) const;
+	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l = NULL) const;
+	inline bool reportChaseOne(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
@@ -1134,7 +1134,7 @@ public:
 			for(size_t i = 0; i < len; i++) 
 			{
 				appendValue(pat, query[len-i-1]);
-				if(quals != NULL) {
+				if(quals != NULL && length(*quals) > 0) {
 					appendValue(patQuals, (*quals)[len-i-1]);
 				}
 			}
@@ -2446,7 +2446,7 @@ inline bool Ebwt<TStr>::report(const TStr& query,
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
                                        EbwtSearchState<TStr>& s,
-                                       SideLocus *l = NULL) const
+                                       SideLocus *l) const
 {
 	return reportChaseOne(
 			s.query(),
@@ -2480,7 +2480,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const TStr& query,
                                        uint32_t bot,
                                        uint32_t qlen,
                                        const EbwtSearchParams<TStr>& params,
-                                       SideLocus *l = NULL) const
+                                       SideLocus *l) const
 {
 	VMSG_NL("In reportChaseOne");
 	assert(!params.arrowMode());
