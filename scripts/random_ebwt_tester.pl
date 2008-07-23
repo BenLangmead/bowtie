@@ -52,6 +52,14 @@ sub randDna($) {
 	return $t;
 }
 
+# Utility function that returns the reverse complement of its argument
+sub reverseComp($) {
+	my $r = shift;
+	$r = reverse($r);
+	$r =~ tr/aAcCgGtT/tTgGcCaA/;
+	return $r;
+}
+
 # Trim whitespace from a string argument
 sub trim($) {
 	my $string = shift;
@@ -193,7 +201,7 @@ for(; $outer > 0; $outer--) {
 	my $ftabChars = 1 + int(rand(8));    # Must be >= 1
 	my $chunkRate = 1 + int(rand(10));   # Must be >= 1
 	my $big = int(rand(2));
-	my $revcomp = int(rand(2));
+	my $revcomp = int(rand(2)) || $maq;
 	my $endian = '';
 	if($big) {
 		$endian = "--big";
@@ -242,6 +250,9 @@ for(; $outer > 0; $outer--) {
 				my $rpad = randDna(max(0, int(rand(20)) - 10));
 				$p = $lpad . $p . $rpad;
 			}
+			if(int(rand(2)) == 0) {
+				$p = reverseComp($p);
+			}
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
@@ -263,6 +274,9 @@ for(; $outer > 0; $outer--) {
 		for(my $i = 0; $i < $np; $i++) {
 			my $plen = int(rand($prand)) + $pbase;
 			my $p = randDna($plen);
+			if(int(rand(2)) == 0) {
+				$p = reverseComp($p);
+			}
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
