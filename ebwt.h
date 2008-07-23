@@ -773,10 +773,11 @@ public:
 	inline void countFwSideEx(const SideLocus& l, uint32_t *pairs) const;
 	inline uint32_t countBwSide(const SideLocus& l, int c) const;
 	inline void countBwSideEx(const SideLocus& l, uint32_t *pairs) const;
-	inline uint32_t mapLF(const SideLocus& l) const;
-	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots) const;
-	inline uint32_t mapLF(const SideLocus& l, int c) const;
-	inline uint32_t mapLF1(const SideLocus& l, int c) const;
+	inline uint32_t mapLF(const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline void mapLFEx(const SideLocus& l, uint32_t *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline uint32_t mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline uint32_t mapLF1(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline bool searchFinish(EbwtSearchState<TStr>& s) const;
 	inline bool searchFinish1(EbwtSearchState<TStr>& s) const;
 	inline void searchWithFchr(EbwtSearchState<TStr>& s) const;
@@ -2004,13 +2005,13 @@ inline static int countInU64(int c, uint64_t dw) {
  * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
  * within a 64-bit argument.
  */
-inline static void countInU64Ex(uint64_t dw, uint32_t* pairs) {
+inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
 	uint64_t dwA  = dw &  0xAAAAAAAAAAAAAAAAllu;
 	uint64_t dwNA = dw & ~0xAAAAAAAAAAAAAAAAllu;
-	pairs[0] += (32 - pop((dwA >> 1) | dwNA));
-	pairs[1] += pop(~(dwA >> 1) & dwNA);
-	pairs[2] += pop((dwA >> 1) & ~dwNA);
-	pairs[3] += pop((dwA >> 1) & dwNA);
+	arrs[0] += (32 - pop((dwA >> 1) | dwNA));
+	arrs[1] += pop(~(dwA >> 1) & dwNA);
+	arrs[2] += pop((dwA >> 1) & ~dwNA);
+	arrs[3] += pop((dwA >> 1) & dwNA);
 }
 
 /**
@@ -2053,7 +2054,7 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
  * related hit in the time profile.
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* pairs) const {
+inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
 	int i = 0;
 	// Count occurrences of c in each 64-bit (using bit trickery);
 	// note: this seems does not seem to lend a significant boost to
@@ -2063,18 +2064,18 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* pairs) const {
 	// Someday the countInU64() and pop() functions should be
 	// vectorized/SSE-ized in case that helps.
 	for(; i+7 < l._by; i += 8) {
-		countInU64Ex(*(uint64_t*)&l._side[i], pairs);
+		countInU64Ex(*(uint64_t*)&l._side[i], arrs);
 	}
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
-		pairs[0] += cCntLUT[0][l._side[i]];
-		pairs[1] += cCntLUT[1][l._side[i]];
-		pairs[2] += cCntLUT[2][l._side[i]];
-		pairs[3] += cCntLUT[3][l._side[i]];
+		arrs[0] += cCntLUT[0][l._side[i]];
+		arrs[1] += cCntLUT[1][l._side[i]];
+		arrs[2] += cCntLUT[2][l._side[i]];
+		arrs[3] += cCntLUT[3][l._side[i]];
 	}
 	// Count occurences of c in the rest of the byte
 	for(i = 0; i < l._bp; i++) {
-		pairs[unpack_2b_from_8b(l._side[l._by], i)]++;
+		arrs[unpack_2b_from_8b(l._side[l._by], i)]++;
 	}
 }
 
@@ -2136,7 +2137,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
  * break just prior to the side.
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* pairs) const
+inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 {
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
@@ -2147,18 +2148,18 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* pairs) const
 	assert_geq(by, 0);
 	assert_lt(bp, 4);
 	assert_geq(bp, 0);
-	countUpToEx(l, pairs);
-	assert_leq(pairs[0], eh._sideBwtLen);
-	assert_leq(pairs[1], eh._sideBwtLen);
-	assert_leq(pairs[2], eh._sideBwtLen);
-	assert_leq(pairs[3], eh._sideBwtLen);
+	countUpToEx(l, arrs);
+	assert_leq(arrs[0], eh._sideBwtLen);
+	assert_leq(arrs[1], eh._sideBwtLen);
+	assert_leq(arrs[2], eh._sideBwtLen);
+	assert_leq(arrs[3], eh._sideBwtLen);
 	if(sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
 		if(sideByteOff + by > _zEbwtByteOff ||
 		   sideByteOff + by == _zEbwtByteOff && bp > _zEbwtBpOff)
 		{
-			pairs[0]--; // Adjust for '$' looking like an 'A'
+			arrs[0]--; // Adjust for '$' looking like an 'A'
 		}
 	}
 	// Now factor in the occ[] count at the side break
@@ -2172,15 +2173,15 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* pairs) const
 #endif
 	assert_lt(ac[0], eh._len + eh.sideBwtLen()); assert_lt(ac[1], eh._len);
 	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
-	pairs[0] += (ac[0] + this->_fchr[0]);
-	pairs[1] += (ac[1] + this->_fchr[1]);
-	pairs[2] += (gt[0] + this->_fchr[2]);
-	pairs[3] += (gt[1] + this->_fchr[3]);
+	arrs[0] += (ac[0] + this->_fchr[0]);
+	arrs[1] += (ac[1] + this->_fchr[1]);
+	arrs[2] += (gt[0] + this->_fchr[2]);
+	arrs[3] += (gt[1] + this->_fchr[3]);
 #ifndef NDEBUG
-	assert_leq(pairs[0], this->_fchr[1]); // can't have jumpded into next char's section
-	assert_leq(pairs[1], this->_fchr[2]); // can't have jumpded into next char's section
-	assert_leq(pairs[2], this->_fchr[3]); // can't have jumpded into next char's section
-	assert_leq(pairs[3], this->_fchr[4]); // can't have jumpded into next char's section
+	assert_leq(arrs[0], this->_fchr[1]); // can't have jumpded into next char's section
+	assert_leq(arrs[1], this->_fchr[2]); // can't have jumpded into next char's section
+	assert_leq(arrs[2], this->_fchr[3]); // can't have jumpded into next char's section
+	assert_leq(arrs[3], this->_fchr[4]); // can't have jumpded into next char's section
 #endif
 }
 
@@ -2211,7 +2212,6 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 		if(sideByteOff + by > _zEbwtByteOff ||
 		   sideByteOff + by == _zEbwtByteOff && bp >= _zEbwtBpOff)
 		{
-			if(_verbose) cout << "Adjusting for $" << endl;
 			cCnt--;
 		}
 	}
@@ -2244,7 +2244,7 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
  * occ[] count up to the side break.
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const {
+inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const {
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
@@ -2254,19 +2254,19 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const
 	assert_geq(by, 0);
 	assert_lt(bp, 4);
 	assert_geq(bp, 0);
-	countUpToEx(l, pairs);
-	pairs[unpack_2b_from_8b(ebwtSide[by], bp)]++;
-	assert_leq(pairs[0], eh._sideBwtLen);
-	assert_leq(pairs[1], eh._sideBwtLen);
-	assert_leq(pairs[2], eh._sideBwtLen);
-	assert_leq(pairs[3], eh._sideBwtLen);
+	countUpToEx(l, arrs);
+	arrs[unpack_2b_from_8b(ebwtSide[by], bp)]++;
+	assert_leq(arrs[0], eh._sideBwtLen);
+	assert_leq(arrs[1], eh._sideBwtLen);
+	assert_leq(arrs[2], eh._sideBwtLen);
+	assert_leq(arrs[3], eh._sideBwtLen);
 	if(sideByteOff <= _zEbwtByteOff && sideByteOff + by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
 		if(sideByteOff + by > _zEbwtByteOff ||
 		   sideByteOff + by == _zEbwtByteOff && bp >= _zEbwtBpOff)
 		{
-			pairs[0]--; // Adjust for '$' looking like an 'A'
+			arrs[0]--; // Adjust for '$' looking like an 'A'
 		}
 	}
 	// Now factor in the occ[] count at the side break
@@ -2280,15 +2280,15 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* pairs) const
 #endif
 	assert_lt(ac[0], eh._len + eh.sideBwtLen()); assert_lt(ac[1], eh._len);
 	assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
-	pairs[0] = (ac[0] - pairs[0] + this->_fchr[0]);
-	pairs[1] = (ac[1] - pairs[1] + this->_fchr[1]);
-	pairs[2] = (gt[0] - pairs[2] + this->_fchr[2]);
-	pairs[3] = (gt[1] - pairs[3] + this->_fchr[3]);
+	arrs[0] = (ac[0] - arrs[0] + this->_fchr[0]);
+	arrs[1] = (ac[1] - arrs[1] + this->_fchr[1]);
+	arrs[2] = (gt[0] - arrs[2] + this->_fchr[2]);
+	arrs[3] = (gt[1] - arrs[3] + this->_fchr[3]);
 #ifndef NDEBUG
-	assert_leq(pairs[0], this->_fchr[1]); // can't have jumpded into next char's section
-	assert_leq(pairs[1], this->_fchr[2]); // can't have jumpded into next char's section
-	assert_leq(pairs[2], this->_fchr[3]); // can't have jumpded into next char's section
-	assert_leq(pairs[3], this->_fchr[4]); // can't have jumpded into next char's section
+	assert_leq(arrs[0], this->_fchr[1]); // can't have jumpded into next char's section
+	assert_leq(arrs[1], this->_fchr[2]); // can't have jumpded into next char's section
+	assert_leq(arrs[2], this->_fchr[3]); // can't have jumpded into next char's section
+	assert_leq(arrs[3], this->_fchr[4]); // can't have jumpded into next char's section
 #endif
 }
 
@@ -2300,10 +2300,12 @@ template<typename TStr>
 inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
                                 const SideLocus& lbot,
                                 uint32_t *tops,
-                                uint32_t *bots) const
+                                uint32_t *bots
+                                ASSERT_ONLY(, bool overrideSanity)
+                                ) const
 {
-	// TODO: Where there's overlap, don't re-calculate counts for the
-	// overlapping portion
+	// TODO: Where there's overlap, reuse the count for the overlapping
+	// portion
 	assert_eq(0, tops[0]); assert_eq(0, bots[0]);
 	assert_eq(0, tops[1]); assert_eq(0, bots[1]);
 	assert_eq(0, tops[2]); assert_eq(0, bots[2]);
@@ -2312,13 +2314,58 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 	else         countBwSideEx(ltop, tops); // Backward side
 	if(lbot._fw) countFwSideEx(lbot, bots); // Forward side
 	else         countBwSideEx(lbot, bots); // Backward side
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with individual calls to mapLF;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		assert_eq(mapLF(ltop, 0, true), tops[0]);
+		assert_eq(mapLF(ltop, 1, true), tops[1]);
+		assert_eq(mapLF(ltop, 2, true), tops[2]);
+		assert_eq(mapLF(ltop, 3, true), tops[3]);
+		assert_eq(mapLF(lbot, 0, true), bots[0]);
+		assert_eq(mapLF(lbot, 1, true), bots[1]);
+		assert_eq(mapLF(lbot, 2, true), bots[2]);
+		assert_eq(mapLF(lbot, 3, true), bots[3]);
+	}
+}
+
+/**
+ * Given top and bot loci, calculate counts of all four DNA chars up to
+ * those loci.  Used for more advanced backtracking-search.
+ */
+template<typename TStr>
+inline void Ebwt<TStr>::mapLFEx(const SideLocus& l,
+                                uint32_t *arrs
+                                ASSERT_ONLY(, bool overrideSanity)
+                                ) const
+{
+	assert_eq(0, arrs[0]);
+	assert_eq(0, arrs[1]);
+	assert_eq(0, arrs[2]);
+	assert_eq(0, arrs[3]);
+	if(l._fw) countFwSideEx(l, arrs); // Forward side
+	else      countBwSideEx(l, arrs); // Backward side
+#ifndef NDEBUG
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with individual calls to mapLF;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		assert_eq(mapLF(l, 0, true), arrs[0]);
+		assert_eq(mapLF(l, 1, true), arrs[1]);
+		assert_eq(mapLF(l, 2, true), arrs[2]);
+		assert_eq(mapLF(l, 3, true), arrs[3]);
+	}
+#endif
 }
 
 /**
  * Given row i, return the row that the LF mapping maps i to.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l) const {
+inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
+                                  ASSERT_ONLY(, bool overrideSanity)
+                                  ) const
+{
 	uint32_t ret;
 	int c = unpack_2b_from_8b(l._side[l._by], l._bp);
 	assert_lt(c, 4);
@@ -2326,6 +2373,16 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l) const {
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
 	assert_lt(ret, this->_eh._bwtLen);
+#ifndef NDEBUG
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with results from mapLFEx;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		uint32_t arrs[] = { 0, 0, 0, 0 };
+		mapLFEx(l, arrs, true);
+		assert_eq(arrs[c], ret);
+	}
+#endif
 	return ret;
 }
 
@@ -2334,13 +2391,26 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l) const {
  * i to on character c.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c) const {
+inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
+                                  ASSERT_ONLY(, bool overrideSanity)
+                                  ) const
+{
 	uint32_t ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
 	assert_lt(ret, this->_eh._bwtLen);
+#ifndef NDEBUG
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with results from mapLFEx;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		uint32_t arrs[] = { 0, 0, 0, 0 };
+		mapLFEx(l, arrs, true);
+		assert_eq(arrs[c], ret);
+	}
+#endif
 	return ret;
 }
 
@@ -2354,7 +2424,9 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c) const {
  * taking the cache miss?
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c) const {
+inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
+                                   ASSERT_ONLY(, bool overrideSanity)) const
+{
 	uint32_t ret;
 	if(unpack_2b_from_8b(l._side[l._by], l._bp) != c) { // L2 miss?
 		return 0xffffffff;
@@ -2364,6 +2436,16 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c) const {
 	if(l._fw) ret = countFwSide(l, c); // Forward side
 	else      ret = countBwSide(l, c); // Backward side
 	assert_lt(ret, this->_eh._bwtLen);
+#ifndef NDEBUG
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with results from mapLFEx;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		uint32_t arrs[] = { 0, 0, 0, 0 };
+		mapLFEx(l, arrs, true);
+		assert_eq(arrs[c], ret);
+	}
+#endif
 	return ret;
 }
 

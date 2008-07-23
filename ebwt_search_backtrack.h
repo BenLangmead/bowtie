@@ -42,6 +42,7 @@ public:
 		_pairs(NULL),
 		_elims(NULL),
 		_mms(NULL),
+		_chars(NULL),
 	    _nameDefault("default"),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
@@ -68,7 +69,7 @@ public:
 			assert_lt(_itop, _ibot);
 		}
 		_mms = new uint32_t[DEFAULT_SPREAD];
-		bzero(_mms, sizeof(uint32_t) * DEFAULT_SPREAD);
+		_chars = new char[DEFAULT_SPREAD];
 	}
 	                 
 	~BacktrackManager() {
@@ -80,6 +81,9 @@ public:
 		}
 		if(_mms != NULL) {
 			delete[] _mms; _mms = NULL;
+		}
+		if(_chars != NULL) {
+			delete[] _chars; _chars = NULL;
 		}
 	}
 
@@ -96,8 +100,6 @@ public:
 		_qual = __qual;
 		_name = __name;
 		assert(_qry != NULL);
-		// Reset mismatch array
-		bzero(_mms, sizeof(uint32_t) * DEFAULT_SPREAD);
 		// Reset _qlen
 		_qlen = length(*_qry);
 		_spread = length(*_qry) - _off;
@@ -108,6 +110,13 @@ public:
 		assert_geq(length(*_qual), _qlen);
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
+		}
+		if(_verbose) {
+			String<char> qual = (*_qual);
+			if(length(qual) > length(*_qry)) {
+				resize(qual, length(*_qry));
+			}
+			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << qual << ")" << endl;
 		}
 	}
 
@@ -134,18 +143,25 @@ public:
 			oldRetainSz = _params.sink().retainedHits().size();
 			_params.sink().setRetainHits(true);
 		}
+		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
 		bool ret = backtrack(0, 0, top, bot, _iham, _pairs, _elims);
+		if(ret) {
+			assert_gt(_params.sink().numHits(), nhits);
+		} else {
+			assert_eq(_params.sink().numHits(), nhits);
+		}
 		// If these are end-to-end matches and we have the original
 		// texts, then we can double-check them with a naive oracle.
 		if(os != NULL && (*os).size() > 0 && top == 0 && bot == 0) {
 			_params.sink().setRetainHits(oldRetain);
 			vector<Hit> oracleHits;
 			naiveOracle(*os, oracleHits);
+			vector<Hit>& retainedHits = _params.sink().retainedHits();
 			if(ret == false) {
+				assert_eq(oldRetainSz, retainedHits.size());
 				assert_eq(0, oracleHits.size());
 			} else {
 				assert_gt(oracleHits.size(), 0);
-				vector<Hit>& retainedHits = _params.sink().retainedHits();
 				assert_eq(oldRetainSz+1, retainedHits.size());
 				// Get the most-recently-retained hit
 				Hit& rhit = retainedHits.back();
@@ -167,68 +183,6 @@ public:
 		return ret;
 	}
 
-	/**
-	 * Naively search for the same hits that should be found by 
-	 */
-	void naiveOracle(vector<TStr>& os, vector<Hit>& hits) {
-		typedef typename Value<TStr>::Type TVal;
-		bool ebwtFw = _params.ebwtFw();
-		bool fw = _params.fw();
-		bool fivePrimeOnLeft = (ebwtFw == fw);
-		uint32_t patid = _params.patId();
-	    uint32_t plen = length(_qry);
-		uint8_t *pstr = (uint8_t *)begin(_qry, Standard());
-	    // For each text...
-		for(size_t i = 0; i < os.size(); i++) {
-			// For each text position...
-			TStr o = os[i];
-			uint32_t olen = length(o);
-			if(!ebwtFw) {
-				for(size_t j = 0; j < olen>>1; j++) {
-					TVal tmp = o[j];
-					o[j] = o[olen-j-1];
-					o[olen-j-1] = tmp;
-				}
-			}
-			uint8_t *ostr = (uint8_t *)begin(os[i], Standard());
-			for(size_t j = 0; j <= olen - plen; j++) {
-				uint32_t ham = 0; // weighted hamming distance so far
-				bitset<max_read_bp> diffs = 0; // mismatch bitvector
-				for(size_t k = 0; k < plen; k++) {
-					if(pstr[k] != ostr[j+k]) {
-						ham += QUAL(k);
-						if(ham > _qualThresh) break;
-						if(fivePrimeOnLeft) {
-							diffs.set(k);
-						} else {
-							// The 3' end is on on the left end of the
-							// pattern, but the diffs vector should
-							// encode mismatches w/r/t the 5' end, so
-							// we flip
-							diffs.set(plen-k-1);
-						}
-					}
-				}
-				if(ham <= _qualThresh) {
-					// It's a hit
-					uint32_t off = j;
-					if(!ebwtFw) {
-						off = olen - off;
-						off -= plen;
-					}
-					Hit h(make_pair(i, off), 
-						  patid,  // read id
-						  *_name, // read name
-						  *_qry,  // read sequence
-						  *_qual, // read qualities 
-						  fw,     // forward/reverse-comp
-						  diffs); // mismatch bitvector
-					hits.push_back(h);
-				} // For each pattern character
-			} // For each alignment over current text
-		} // For each text
-	}
-	
 	/**
 	 * Recursive routine for progressing to the next backtracking
 	 * decision given some initial conditions.  If a hit is found, it
@@ -257,13 +211,19 @@ public:
 		assert(pairs != NULL);
 		assert(elims != NULL);
 		assert_lt(_off, _qlen);
-		if(_verbose) cout << "  backtrack(stackDepth=" << stackDepth << ", "
-		                 << "depth=" << depth << ", "
-		                 << "top=" << top << ", "
-		                 << "bot=" << bot << ", "
-		                 << "ham=" << ham << ", "
-		                 << "pairs=" << pairs << ", "
-		                 << "elims=" << (void*)elims << ")" << endl;
+		if(_verbose) {
+			cout << "  backtrack(stackDepth=" << stackDepth << ", "
+                 << "depth=" << depth << ", "
+                 << "top=" << top << ", "
+                 << "bot=" << bot << ", "
+                 << "ham=" << ham << ", "
+                 << "pairs=" << pairs << ", "
+                 << "elims=" << (void*)elims << "): \"";
+			for(int i = (int)depth - 1; i >= 0; i--) {
+				cout << _chars[i];
+			}
+			cout << "\"" << endl;
+		}
 		
 		// The total number of arrow pairs that are acceptable
 		// backtracking targets ("alternative" arrow pairs)
@@ -287,7 +247,13 @@ public:
 		}
 		// Advance along the read until we hit a mismatch
 		while(cur < _qlen) {
-			if(_verbose) cout << "    cur=" << cur << endl;
+			if(_verbose) {
+				cout << "    cur=" << cur << " \"";
+				for(int i = (int)d - 1; i >= 0; i--) {
+					cout << _chars[i];
+				}
+				cout << "\"" << endl;
+			}
 			assert_lt((int)(*_qry)[cur], 4);
 			bool curIsEligible = false;
 			// Reset eligibleNum and eligibleSz if there are any
@@ -419,8 +385,10 @@ public:
 				uint32_t bttop = 0;
 				uint32_t btbot = 0;
 				uint32_t btham = ham;
+				char btchar = 0;
+				uint32_t icur = 0;
 				for(; i <= d; i++) {
-					uint32_t icur = _qlen - _off - i - 1; // current offset into _qry
+					icur = _qlen - _off - i - 1; // current offset into _qry
 					uint8_t qi = QUAL(icur);
 					assert_lt(elims[i], 16);
 					assert_gt(elims[i], 0);
@@ -440,6 +408,7 @@ public:
 									bttop = PAIR_TOP(i, j);
 									btbot = PAIR_BOT(i, j);
 									btham += qi;
+									btchar = "acgt"[j];
 									assert_leq(btham, _qualThresh);
 									break;
 								}
@@ -451,6 +420,7 @@ public:
 				assert_leq(eligiblesVisited, eligibleNum);
 				assert_leq(i, d);
 				assert_lt(j, 4);
+				assert_neq(0, btchar);
 				assert_leq(cumSz, eligibleSz);
 				assert(foundTarget);
 				assert_gt(btbot, bttop);
@@ -462,13 +432,14 @@ public:
 				uint8_t  *newElims = elims + (_spread);
 				// Note the character that we're backtracking on in the
 				// mm array:
-				_mms[stackDepth] = i;
+				_mms[stackDepth] = icur;
+				_chars[i] = btchar;
 				// Now backtrack to target
 				ASSERT_ONLY(uint64_t numHits = _params.sink().numHits());
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
-					ret = report(stackDepth, bttop, btbot);
+					ret = report(stackDepth+1, bttop, btbot);
 				} else {
 					ret = backtrack(stackDepth+1,
 				                     i+1,
@@ -485,6 +456,7 @@ public:
 				assert_eq(_params.sink().numHits(), numHits);
 				// No hit was reported; update elims[], eligibleSz,
 				// eligibleNum, altNum
+				_chars[i] = (*_qry)[icur];
 				assert_neq(15, elims[i]);
 				ASSERT_ONLY(uint8_t oldElim = elims[i]);
 				elims[i] |= (1 << j);
@@ -559,6 +531,7 @@ public:
 				return false;
 			}
 			// Match!
+			_chars[d] = (*_qry)[cur];
 			d++; cur--;
 		}
 		assert_eq(0xffffffff, cur);
@@ -566,6 +539,10 @@ public:
 		return report(stackDepth, top, bot);
 	}
 	
+	/**
+	 * Report a hit with # mismatches = stackDepth, at rows delimited
+	 * by top and bot
+	 */
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		// Possibly report
 		if(_oneHit) {
@@ -633,6 +610,69 @@ protected:
 		return true;
 	}
 	
+	/**
+	 * Naively search for the same hits that should be found by 
+	 */
+	void naiveOracle(vector<TStr>& os, vector<Hit>& hits) {
+		typedef typename Value<TStr>::Type TVal;
+		bool ebwtFw = _params.ebwtFw();
+		bool fw = _params.fw();
+		bool fivePrimeOnLeft = (ebwtFw == fw);
+		uint32_t patid = _params.patId();
+	    uint32_t plen = length(*_qry);
+		uint8_t *pstr = (uint8_t *)begin(*_qry, Standard());
+	    // For each text...
+		for(size_t i = 0; i < os.size(); i++) {
+			// For each text position...
+			if(length(os[i]) < plen) continue;
+			TStr o = os[i];
+			uint32_t olen = length(o);
+			if(!ebwtFw) {
+				for(size_t j = 0; j < olen>>1; j++) {
+					TVal tmp = o[j];
+					o[j] = o[olen-j-1];
+					o[olen-j-1] = tmp;
+				}
+			}
+			uint8_t *ostr = (uint8_t *)begin(o, Standard());
+			for(size_t j = 0; j <= olen - plen; j++) {
+				uint32_t ham = 0; // weighted hamming distance so far
+				bitset<max_read_bp> diffs = 0; // mismatch bitvector
+				for(size_t k = 0; k < plen; k++) {
+					if(pstr[k] != ostr[j+k]) {
+						ham += QUAL(k);
+						if(ham > _qualThresh) break;
+						if(fivePrimeOnLeft) {
+							diffs.set(k);
+						} else {
+							// The 3' end is on on the left end of the
+							// pattern, but the diffs vector should
+							// encode mismatches w/r/t the 5' end, so
+							// we flip
+							diffs.set(plen-k-1);
+						}
+					}
+				}
+				if(ham <= _qualThresh) {
+					// It's a hit
+					uint32_t off = j;
+					if(!ebwtFw) {
+						off = olen - off;
+						off -= plen;
+					}
+					Hit h(make_pair(i, off), 
+						  patid,  // read id
+						  *_name, // read name
+						  *_qry,  // read sequence
+						  *_qual, // read qualities 
+						  fw,     // forward/reverse-comp
+						  diffs); // mismatch bitvector
+					hits.push_back(h);
+				} // For each pattern character
+			} // For each alignment over current text
+		} // For each text
+	}
+	
 	bool sanityCheckPairs(uint32_t* pairs) {
 		for(size_t i = 0; i < _spread; i++) {
 			if(pairs[i*2] == 0 && pairs[i*2+1] == 0) {
@@ -677,6 +717,7 @@ protected:
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
 	uint32_t           *_mms;    // array for holding mismatches
+	char               *_chars;  // characters selected so far
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals

@@ -11,6 +11,7 @@
 #include <zlib.h>
 #include <fstream>
 #include <seqan/sequence.h>
+#include "alphabet.h"
 #include "assert_helpers.h"
 #include "tokenize.h"
 
@@ -87,6 +88,12 @@ public:
 			     ((*name) == NULL) ? String<char>("NULL") : (**name));
 		}
 	}
+	virtual void skipPattern() {
+		TStr         *tmp1;
+		String<char> *tmp2;
+		String<char> *tmp3;
+		nextPattern(&tmp1, &tmp2, &tmp3);
+	}
 	virtual void nextPatternImpl(TStr**, String<char>**, String<char>**) = 0;
 	virtual bool hasMorePatterns() = 0;
 	virtual bool nextIsReverseComplement() = 0;
@@ -108,7 +115,6 @@ private:
 	bool _reverse;         // reverse patterns before returning them
 	TStr _revtmp;          // temporary buffer for reversed patterns
 	String<char> _revqual;
-	
 	const string _def_qual;
 	const string _def_rqual;
 	const char *_dumpfile; // dump patterns to this file before returning them
@@ -149,17 +155,23 @@ public:
 	                    size_t cur = 0,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0) :
-		TrimmingPatternSource<TStr>(__reverse, __dumpfile, __trim3, __trim5),
-		_revcomp(__revcomp), _cur(cur), _v()
+		TrimmingPatternSource<TStr>(false, __dumpfile, __trim3, __trim5),
+		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _v()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			TStr s(v[i]);
 			_v.push_back(s);
+			::reverse(s);
+			_vrev.push_back(s);
 			if(_revcomp) {
+				::reverse(s);
 				_v.push_back(reverseComplement(s));
+				::reverse(s);
+				_vrev.push_back(reverseComplement(s));
 			}
 		}
 		assert(!_v.empty());
+		assert(!_vrev.empty());
 	}
 	VectorPatternSource(vector<string> v,
 	                    bool __revcomp = true,
@@ -174,18 +186,29 @@ public:
 		for(size_t i = 0; i < v.size(); i++) {
 			TStr s(v[i]);
 			_v.push_back(s);
+			::reverse(s);
+			_vrev.push_back(s);
 			if(_revcomp) {
+				::reverse(s);
 				_v.push_back(reverseComplement(s));
+				::reverse(s);
+				_vrev.push_back(reverseComplement(s));
 			}
 		}
 		assert(!_v.empty());
+		assert(!_vrev.empty());
 	}
 	virtual bool nextIsReverseComplement() {
 		return _revcomp && (_cur & 1) == 1;
 	}
 	virtual ~VectorPatternSource() { }
 	virtual void nextPatternImpl(TStr** s, String<char>** qual, String<char>** name) {
-		(*s) = &(_v[_cur++]);
+		assert(hasMorePatterns());
+		if(!_reverse) {
+			(*s) = &(_v[_cur++]);
+		} else {
+			(*s) = &(_vrev[_cur++]);
+		}
 	}
 	virtual bool hasMorePatterns() {
 		return _cur < _v.size();
@@ -194,10 +217,16 @@ public:
 		TrimmingPatternSource<TStr>::reset();
 		_cur = 0;
 	}
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
+		_reverse = __reverse;
+	}
 private:
 	bool _revcomp;
+	bool _reverse;
 	size_t _cur;
 	vector<TStr> _v;
+	vector<TStr> _vrev;
 };
 
 /**

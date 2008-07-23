@@ -1190,6 +1190,7 @@ static void seededQualCutoffSearch(int seedLen,
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
 			}
+			assert(isReverseComplement(*patFw, *patRc));
 			bt.setQuery(patRc, qualRc, nameRc);
 			params.setPatId(patid+1);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
@@ -1219,13 +1220,20 @@ static void seededQualCutoffSearch(int seedLen,
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
-	    	if(doneMask[patid>>1]) { patid += 2; continue; }
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
 			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
 			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
 			assert(patRc != NULL);
+			assert(patRc != patFw);
 			assert(!patsrc.nextIsReverseComplement());
+			assert(isReverseComplement(*patFw, *patRc));
 			bt.setQuery(patFw, qualFw, nameFw);
 			params.setPatId(patid);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
@@ -1246,41 +1254,57 @@ static void seededQualCutoffSearch(int seedLen,
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
 		Timer _t(cout, "Time for seeded quality search Phase 3: ", timing);
-		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
-	    	if(doneMask[patid>>1]) { patid += 2; continue; }
-			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
+			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
+			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
+			assert(patRc != NULL);
+			assert(patRc != patFw);
 			assert(!patsrc.nextIsReverseComplement());
+			assert(isReverseComplement(*patFw, *patRc));
 			patid += 2;
 	    }
-	    assert_eq(numPats, patid);
+	    assert(numPats == patid || numPats+2 == patid);
 	}
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
 		Timer _t(cout, "Time for seeded quality search Phase 4: ", timing);
-		EbwtSearchState<TStr> s(ebwtBw, params, seed);
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
-	    	if(doneMask[patid>>1]) { patid += 2; continue; }
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
 			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
+			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
+			assert(patRc != NULL);
+			assert(patRc != patFw);
 			assert(!patsrc.nextIsReverseComplement());
+			assert(isReverseComplement(*patFw, *patRc));
 			patid += 2;
 	    }
-	    assert_eq(numPats, patid);
+	    assert(numPats == patid || numPats+2 == patid);
 	}
 }
 
