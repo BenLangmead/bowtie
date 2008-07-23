@@ -70,7 +70,9 @@ public:
 			}
 			// Output it, if desired
 			if(_dumpfile != NULL) {
-				dump(_out, _revtmp, _revqual, (**name));
+				dump(_out, _revtmp,
+				     ((*qual) == NULL) ? String<char>("NULL") : _revqual,
+				     ((*name) == NULL) ? String<char>("NULL") : (**name));
 			}
 			(*s) = &_revtmp;
 			if(*qual != NULL) {
@@ -80,7 +82,9 @@ public:
 		}
 		// Output it, if desired
 		if(_dumpfile != NULL) {
-			dump(_out, (**s), (**qual), (**name));
+			dump(_out, (**s),
+			     ((*qual) == NULL) ? String<char>("NULL") : (**qual),
+			     ((*name) == NULL) ? String<char>("NULL") : (**name));
 		}
 	}
 	virtual void nextPatternImpl(TStr**, String<char>**, String<char>**) = 0;
