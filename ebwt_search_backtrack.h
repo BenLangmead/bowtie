@@ -6,13 +6,17 @@
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
  * some range of a read sequence.
+ * 
+ * The creator can configure the BacktrackManager to treat different
+ * stretches of the read differently.
  */
 template<typename TStr>
 class BacktrackManager {
 public:
 	BacktrackManager(const Ebwt<TStr>& __ebwt,
 	                 const EbwtSearchParams<TStr>& __params,
-	                 uint32_t __off,
+	                 uint32_t __unrevOff, // size of unrevisitable chunk
+	                 uint32_t __1revOff,  // size of 1-revisitable chunk
 	                 uint32_t __itop,
 	                 uint32_t __ibot,
 	                 uint32_t __iham,
@@ -30,11 +34,13 @@ public:
 		_name(__name),
 		_ebwt(__ebwt),
 		_params(__params),
-		_off(__off),
+		_unrevOff(__unrevOff),
+		_1revOff(__1revOff),
 		_itop(__itop),
 		_ibot(__ibot),
 		_iham(__iham),
-		_spread(40),
+		_spread(DEFAULT_SPREAD),
+		_maxStackDepth(DEFAULT_SPREAD),
 		_qualThresh(__qualThresh),
 		_qualWobble(__qualWobble),
 		_oneHit(__oneHit),
@@ -50,10 +56,11 @@ public:
 	    // For a 40-bp query range, the _pairs array occupies
 	    // 40 * 40 * 8 * 4 = 51,200 bytes, and _elims
 	    // occupy 40 * 40 = 1,600 bytes
+	    assert_geq(__1revOff, __unrevOff);
 	    fill(_qualDefault, DEFAULT_SPREAD, (char)(40+33));
  		if(_qry != NULL) {
  			_qlen = length(*_qry);
- 			_spread = length(*_qry) - _off;
+ 			_spread = length(*_qry);
  			if(_qual == NULL || length(*_qual) == 0) {
  				_qual = &_qualDefault;
  			}
@@ -62,16 +69,17 @@ public:
  				_name = &_nameDefault;
  			}
  			assert_leq(_spread, DEFAULT_SPREAD);
+ 	 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 2;
+ 	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
+ 	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
  		}
-		_pairs  = new uint32_t[DEFAULT_SPREAD*DEFAULT_SPREAD*8];
-		_elims  = new uint8_t [DEFAULT_SPREAD*DEFAULT_SPREAD];
 		if(_itop != 0 || _ibot != 0) {
 			assert_lt(_itop, _ibot);
 		}
 		_mms = new uint32_t[DEFAULT_SPREAD];
 		_chars = new char[DEFAULT_SPREAD];
 	}
-	                 
+
 	~BacktrackManager() {
 		if(_pairs != NULL) {
 			delete[] _pairs; _pairs = NULL;
@@ -102,7 +110,7 @@ public:
 		assert(_qry != NULL);
 		// Reset _qlen
 		_qlen = length(*_qry);
-		_spread = length(*_qry) - _off;
+		_spread = _qlen;
 		assert_leq(_spread, DEFAULT_SPREAD);
 		if(_qual == NULL || length(*_qual) == 0) {
 			_qual = &_qualDefault;
@@ -111,6 +119,13 @@ public:
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}
+ 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 2;
+ 		if(_pairs == NULL) {
+ 			_pairs = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
+ 		}
+ 		if(_elims == NULL) {
+ 			_elims = new uint8_t[DEFAULT_SPREAD*_maxStackDepth];
+ 		}
 		if(_verbose) {
 			String<char> qual = (*_qual);
 			if(length(qual) > length(*_qry)) {
@@ -120,6 +135,9 @@ public:
 		}
 	}
 
+	/**
+	 * 
+	 */
 	bool backtrack(vector<TStr>* os = NULL)	{
 		return backtrack(_itop, _ibot, os);
 	}
@@ -144,7 +162,7 @@ public:
 			_params.sink().setRetainHits(true);
 		}
 		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
-		bool ret = backtrack(0, 0, top, bot, _iham, _pairs, _elims);
+		bool ret = backtrack(0, 0, _unrevOff, top, bot, _iham, _pairs, _elims);
 		if(ret) {
 			assert_gt(_params.sink().numHits(), nhits);
 		} else {
@@ -159,6 +177,32 @@ public:
 			vector<Hit>& retainedHits = _params.sink().retainedHits();
 			if(ret == false) {
 				assert_eq(oldRetainSz, retainedHits.size());
+				if(oracleHits.size() > 0) {
+					const Hit& h = oracleHits[0];
+					cout << "Oracle hit " << oracleHits.size()
+					     << " times, but backtracker did not hit" << endl;
+					cout << "First oracle hit: " << endl;
+					cout << "  Pat:  " << (*_qry) << endl;
+					cout << "  Tseg: ";
+					bool ebwtFw = _params.ebwtFw();
+					if(ebwtFw) {
+						for(size_t i = 0; i < _qlen; i++) {
+							cout << (*os)[h.h.first][h.h.second + i];
+						}
+					} else {
+						for(int i = (int)_qlen-1; i >= 0; i--) {
+							cout << (*os)[h.h.first][h.h.second + i];
+						}
+					}
+					cout << endl;
+					cout << "  Bt:   ";
+					for(int i = (int)_qlen-1; i >= 0; i--) {
+						if(i < (int)_unrevOff) cout << "0";
+						else if(i < (int)_1revOff) cout << "1";
+						else cout << "X";
+					}
+					cout << endl;
+				}
 				assert_eq(0, oracleHits.size());
 			} else {
 				assert_gt(oracleHits.size(), 0);
@@ -192,12 +236,13 @@ public:
 	 * mismatch and no backtracking opporunities, false is returned.
 	 */
 	bool backtrack(uint32_t  stackDepth,
-	               uint32_t  depth,  // next depth where a post-pair needs to be calculated
-	               uint32_t  top,    // top arrow in pair prior to 'depth'
-	               uint32_t  bot,    // bottom arrow in pair prior to 'depth'
-	               uint32_t  ham,    // weighted hamming distance so far
-	               uint32_t* pairs,  // portion of pairs array to be used for this backtrack frame
-	               uint8_t*  elims)
+	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
+	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
+	               uint32_t  top,      // top arrow in pair prior to 'depth'
+	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
+	               uint32_t  ham,      // weighted hamming distance so far
+	               uint32_t* pairs,    // portion of pairs array to be used for this backtrack frame
+	               uint8_t*  elims)    // portion of elims array to be used for this backtrack frame
 	{
 		// Can't have already exceeded weighted hamming distance threshold
 		assert_leq(stackDepth, depth);
@@ -210,7 +255,7 @@ public:
 		assert_geq(bot, top);    // could be that both are 0
 		assert(pairs != NULL);
 		assert(elims != NULL);
-		assert_lt(_off, _qlen);
+		assert_leq(stackDepth, _maxStackDepth);
 		if(_verbose) {
 			cout << "  backtrack(stackDepth=" << stackDepth << ", "
                  << "depth=" << depth << ", "
@@ -240,7 +285,7 @@ public:
 		// eligible
 		uint8_t lowAltQual = 0xff;
 		uint32_t d = depth;
-		uint32_t cur = _qlen - _off - d - 1; // current offset into _qry
+		uint32_t cur = _qlen - d - 1; // current offset into _qry
 		SideLocus ltop, lbot;
 		if(top != 0 || bot != 0) {
 			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
@@ -264,7 +309,7 @@ public:
 			int c = (int)(*_qry)[cur];
 			uint8_t q = QUAL(cur);
 			assert_lt((uint32_t)q, 100);
-			bool curIsAlternative = (ham + q <= _qualThresh);
+			bool curIsAlternative = (depth >= unrevOff) && (ham + q <= _qualThresh);
 			if(curIsAlternative) {
 				// q is low enough to make this position an alternative,
 				// but is it the best alternative?
@@ -321,33 +366,33 @@ public:
 			elims[d] = (1 << c);
 			assert_lt(elims[d], 16);
 			assert_gt(elims[d], 0);
-			// Given the just-calculated quartet of arrow pairs, update
-			// elims, altNum, eligibleNum, eligibleSz
-			for(int i = 0; i < 4; i++) {
-				assert_leq(PAIR_TOP(d, i), PAIR_BOT(d, i));
-				uint32_t spread = PAIR_SPREAD(d, i);
-				if(spread == 0) {
-					// Indicate this char at this position is
-					// eliminated as far as this backtracking frame is
-					// concerned, since its arrow pair is closed
-					elims[d] |= (1 << i);
-				}
-				if(i != c && spread > 0 && ((elims[d] & (1 << i)) == 0)) {
-					if(curIsEligible) {
-						if(curOverridesEligible) {
-							// Only now that we know there is at least
-							// one potential backtrack target at this
-							// most-eligible position should we reset
-							// these eligibility parameters
-							lowAltQual = q;
-							eligibleNum = 0;
-							eligibleSz = 0;
-							curOverridesEligible = false;
-						}
-						eligibleSz += spread;
-						eligibleNum++;
+			if(curIsAlternative) {
+				// Given the just-calculated quartet of arrow pairs, update
+				// elims, altNum, eligibleNum, eligibleSz
+				for(int i = 0; i < 4; i++) {
+					assert_leq(PAIR_TOP(d, i), PAIR_BOT(d, i));
+					uint32_t spread = PAIR_SPREAD(d, i);
+					if(spread == 0) {
+						// Indicate this char at this position is
+						// eliminated as far as this backtracking frame is
+						// concerned, since its arrow pair is closed
+						elims[d] |= (1 << i);
 					}
-					if(curIsAlternative) {
+					if(i != c && spread > 0 && ((elims[d] & (1 << i)) == 0)) {
+						if(curIsEligible) {
+							if(curOverridesEligible) {
+								// Only now that we know there is at least
+								// one potential backtrack target at this
+								// most-eligible position should we reset
+								// these eligibility parameters
+								lowAltQual = q;
+								eligibleNum = 0;
+								eligibleSz = 0;
+								curOverridesEligible = false;
+							}
+							eligibleSz += spread;
+							eligibleNum++;
+						}
 						assert_gt(eligibleSz, 0);
 						assert_gt(eligibleNum, 0);
 						altNum++;
@@ -361,7 +406,7 @@ public:
 			assert_leq(eligibleNum, eligibleSz);
 			assert_leq(eligibleNum, altNum);
 			assert_lt(elims[d], 16);
-			assert(sanityCheckEligibility(depth, d, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
+			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 			// Mismatch with alternatives
 			while(top == bot && altNum > 0) {
 				if(_verbose) cout << "    top (" << top << ") == bot ("
@@ -374,7 +419,7 @@ public:
 				// Mismatch!  Must now choose where we are going to
 				// take our quality penalty.  We can only look as far
 				// back as our last decision point.
-				assert(sanityCheckEligibility(depth, d, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
+				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Pick out the arrow pair we selected and target it
 				// for backtracking
 				uint32_t r = _rand.nextU32() % eligibleSz;
@@ -388,7 +433,11 @@ public:
 				char btchar = 0;
 				uint32_t icur = 0;
 				for(; i <= d; i++) {
-					icur = _qlen - _off - i - 1; // current offset into _qry
+					if(i < unrevOff) {
+						// i is an unrevisitable position, so don't consider it
+						continue;
+					}
+					icur = _qlen - i - 1; // current offset into _qry
 					uint8_t qi = QUAL(icur);
 					assert_lt(elims[i], 16);
 					assert_gt(elims[i], 0);
@@ -430,6 +479,16 @@ public:
 				// any of our parents' frames
 				uint32_t *newPairs = pairs + (_spread*8);
 				uint8_t  *newElims = elims + (_spread);
+				// If we've selected a backtracking target that's in
+				// the 1-revisitable region, then we ask the recursive
+				// callee to consider the 1-revisitable region as also
+				// being unrevisitable (since we just "used up" all of
+				// our visits)
+				uint32_t btUnrevOff = unrevOff;
+				if(i < _1revOff) {
+					assert_geq(_1revOff, unrevOff);
+					btUnrevOff = _1revOff;
+				}
 				// Note the character that we're backtracking on in the
 				// mm array:
 				_mms[stackDepth] = icur;
@@ -442,12 +501,13 @@ public:
 					ret = report(stackDepth+1, bttop, btbot);
 				} else {
 					ret = backtrack(stackDepth+1,
-				                     i+1,
-				                     bttop,  // top arrow in pair prior to 'depth'
-				                     btbot,  // bottom arrow in pair prior to 'depth'
-				                     btham,  // weighted hamming distance so far
-				                     newPairs,
-				                     newElims);
+				                    i+1,
+				                    btUnrevOff,
+				                    bttop,  // top arrow in pair prior to 'depth'
+				                    btbot,  // bottom arrow in pair prior to 'depth'
+				                    btham,  // weighted hamming distance so far
+				                    newPairs,
+				                    newElims);
 				}
 				if(ret) {
 					assert_gt(_params.sink().numHits(), numHits);
@@ -467,11 +527,8 @@ public:
 				altNum--;
 				assert_geq(altNum, 0);
 				if(altNum == 0) {
-					// No alternative backtracking points; either all
-					// possible backtracking targets have been
-					// exhausted or all backtracking targets that
-					// remain are on spaces with quality values that
-					// would exceed the threshold
+					// No alternative backtracking points; all legal
+					// backtracking targets have been exhausted
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
@@ -483,9 +540,9 @@ public:
 					// 'depth' up to 'd')
 					lowAltQual = 0xff;
 					for(size_t k = depth; k <= d; k++) {
-						uint32_t kcur = _qlen - _off - k - 1; // current offset into _qry
+						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
-						bool kCurIsAlternative = (ham + kq <= _qualThresh);
+						bool kCurIsAlternative = (k >= unrevOff) && (ham + kq <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
 							if(kq < lowAltQual) {
@@ -518,7 +575,7 @@ public:
 				assert_leq(eligibleNum, altNum);
 				assert_gt(eligibleSz, 0);
 				assert_geq(eligibleSz, eligibleNum);
-				assert(sanityCheckEligibility(depth, d, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
+				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Try again
 			} // while(top == bot && altNum > 0)
 			// Mismatch with no alternatives
@@ -574,8 +631,12 @@ public:
 
 protected:
 
+	/**
+	 * 
+	 */
 	bool sanityCheckEligibility(uint32_t  depth,
 	                            uint32_t  d,
+	                            uint32_t  unrevOff,
 	                            uint32_t  lowAltQual,
 	                            uint32_t  eligibleSz,
 	                            uint32_t  eligibleNum,
@@ -584,11 +645,11 @@ protected:
 	{
 		// Sanity check that the lay of the land is as we
 		// expect given eligibleNum and eligibleSz
-		size_t i = depth, j = 0;
+		size_t i = max(depth, unrevOff), j = 0;
 		uint32_t cumSz = 0;
 		uint32_t eligiblesVisited = 0;
 		for(; i <= d; i++) {
-			uint32_t icur = _qlen - _off - i - 1; // current offset into _qry
+			uint32_t icur = _qlen - i - 1; // current offset into _qry
 			uint8_t qi = QUAL(icur);
 			assert_lt(elims[i], 16);
 			assert_gt(elims[i], 0);
@@ -635,13 +696,40 @@ protected:
 				}
 			}
 			uint8_t *ostr = (uint8_t *)begin(o, Standard());
+			// For each possible alignment of pattern against text
 			for(size_t j = 0; j <= olen - plen; j++) {
+				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
 				uint32_t ham = 0; // weighted hamming distance so far
 				bitset<max_read_bp> diffs = 0; // mismatch bitvector
-				for(size_t k = 0; k < plen; k++) {
+				// For each alignment column, from right to left
+				bool success = true;
+				for(int k = (int)plen-1; k >= 0; k--) {
+					size_t kr = plen-1-k;
 					if(pstr[k] != ostr[j+k]) {
 						ham += QUAL(k);
-						if(ham > _qualThresh) break;
+						if(ham > _qualThresh) {
+							// Alignment is invalid because it exceeds
+							// our target weighted hamming distance
+							// threshold
+							success = false;
+							break;
+						}
+						// What region does the mm fall into?
+						if(kr < _unrevOff) {
+							// Alignment is invalid because it contains
+							// a mismatch in the unrevisitable region
+							success = false;
+							break;
+						} else if(kr < _1revOff) {
+							rev1mm++;
+							if(rev1mm > 1) {
+								// Alignment is invalid because it
+								// contains more than 1 mismatch in the
+								// 1-revisitable region
+								success = false;
+								break;
+							}
+						}
 						if(fivePrimeOnLeft) {
 							diffs.set(k);
 						} else {
@@ -653,7 +741,7 @@ protected:
 						}
 					}
 				}
-				if(ham <= _qualThresh) {
+				if(success) {
 					// It's a hit
 					uint32_t off = j;
 					if(!ebwtFw) {
@@ -689,8 +777,8 @@ protected:
 	String<char>*       _name;   // name of _qry
 	const Ebwt<TStr>&   _ebwt;   // Ebwt to search in
 	const EbwtSearchParams<TStr>& _params;   // Ebwt to search in
-	uint32_t            _off;    // number of charts from the end of
-	                             // the query to start from 
+	uint32_t            _unrevOff; // unrevisitable chunk
+	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _itop;   // initial top arrow, or 0xffffffff if
 	                             // we're starting from the beginning
 	                             // of the query
@@ -700,6 +788,7 @@ protected:
 	uint32_t            _iham;   // initial weighted hamming distance
 	uint32_t            _spread; // size of window within which to
 	                             // backtrack
+	uint32_t            _maxStackDepth;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
 	uint32_t            _qualWobble; // hits within _qualWobble weighted

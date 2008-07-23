@@ -233,6 +233,7 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 	// If revomp is enabled, double qUpto to match
 	if(revcomp && qUpto != -1) qUpto <<= 1;
+	if(maqLike) revcomp = true;
 }
 
 static char *argv0 = NULL;
@@ -1168,7 +1169,15 @@ static void seededQualCutoffSearch(int seedLen,
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Time for seeded quality search Phase 1: ", timing);
-		BacktrackManager<TStr> bt(ebwtFw, params, 0, 0, 0, 0, 70, 0, verbose, true, seed);
+		BacktrackManager<TStr> bt(ebwtFw, params,
+		                          12, 24,  // unrevOff, 1revOff
+		                          0, 0,    // itop, ibot
+		                          0,       // iham
+		                          70,      // qualThresh
+		                          0,       // qualWobble
+		                          verbose, // verbose
+		                          true,    // oneHit
+		                          seed);   // seed
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		params.setFw(false);  // we'll only look at reverse complements this round
@@ -1212,7 +1221,15 @@ static void seededQualCutoffSearch(int seedLen,
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
 		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
-		BacktrackManager<TStr> bt(ebwtBw, params, 0, 0, 0, 0, 70, 0, verbose, true, seed);
+		BacktrackManager<TStr> bt(ebwtBw, params,
+		                          12, 24,  // unrevOff, 1revOff
+		                          0, 0,    // itop, ibot
+		                          0,       // iham
+		                          70,      // qualThresh
+		                          0,       // qualWobble
+		                          verbose, // verbose
+		                          true,    // oneHit
+		                          seed+1); // seed
 		uint32_t patid = 0;
 		params.setFw(true);  // we'll only look at forward strand this round
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;

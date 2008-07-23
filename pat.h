@@ -148,32 +148,45 @@ protected:
 template <typename TStr>
 class VectorPatternSource : public TrimmingPatternSource<TStr> {
 public:
-	VectorPatternSource(vector<TStr> v,
+	VectorPatternSource(const vector<TStr>& v,           // sequences
+	                    const vector<String<char> >& vq, // quality strings
 	                    bool __revcomp = true,
 	                    bool __reverse = false,
 	                    const char *__dumpfile = NULL,
 	                    size_t cur = 0,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0) :
-		TrimmingPatternSource<TStr>(false, __dumpfile, __trim3, __trim5),
+		TrimmingPatternSource<TStr>(
+				false, // we'll take care of our own reversing
+		        __dumpfile, __trim3, __trim5),
 		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _v()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			TStr s(v[i]);
+			String<char> sq(vq[i]);
 			_v.push_back(s);
+			_quals.push_back(sq);
 			::reverse(s);
+			::reverse(sq);
 			_vrev.push_back(s);
+			_qualsrev.push_back(sq);
 			if(_revcomp) {
 				::reverse(s);
+				::reverse(sq);
 				_v.push_back(reverseComplement(s));
+				_quals.push_back(sq);
 				::reverse(s);
+				::reverse(sq);
 				_vrev.push_back(reverseComplement(s));
+				_qualsrev.push_back(sq);
 			}
 		}
 		assert(!_v.empty());
-		assert(!_vrev.empty());
+		assert_eq(_v.size(), _vrev.size());
+		assert_eq(_v.size(), _quals.size());
+		assert_eq(_v.size(), _qualsrev.size());
 	}
-	VectorPatternSource(vector<string> v,
+	VectorPatternSource(const vector<string>& v,
 	                    bool __revcomp = true,
 	                    bool __reverse = false,
 	                    const char *__dumpfile = NULL,
@@ -184,19 +197,44 @@ public:
 		_revcomp(__revcomp), _cur(cur), _v()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
-			TStr s(v[i]);
+			vector<string> ss;
+			tokenize(v[i], ":", ss);
+			assert_gt(ss.size(), 0);
+			assert_leq(ss.size(), 2);
+			TStr s(ss[0]);
+			string vq;
+			if(ss.size() == 2) {
+				vq = ss[1];
+			}
+			while(vq.length() < length(s)) {
+				vq.push_back('I');
+			}
+			if(vq.length() > length(s)) {
+				vq.erase(length(s));
+			}
+			assert_eq(vq.length(), length(s));
+			String<char> sq(vq);
 			_v.push_back(s);
+			_quals.push_back(sq);
 			::reverse(s);
+			::reverse(sq);
 			_vrev.push_back(s);
+			_qualsrev.push_back(sq);
 			if(_revcomp) {
 				::reverse(s);
+				::reverse(sq);
 				_v.push_back(reverseComplement(s));
+				_quals.push_back(sq);
 				::reverse(s);
+				::reverse(sq);
 				_vrev.push_back(reverseComplement(s));
+				_qualsrev.push_back(sq);
 			}
 		}
 		assert(!_v.empty());
-		assert(!_vrev.empty());
+		assert_eq(_v.size(), _vrev.size());
+		assert_eq(_v.size(), _quals.size());
+		assert_eq(_v.size(), _qualsrev.size());
 	}
 	virtual bool nextIsReverseComplement() {
 		return _revcomp && (_cur & 1) == 1;
@@ -205,10 +243,13 @@ public:
 	virtual void nextPatternImpl(TStr** s, String<char>** qual, String<char>** name) {
 		assert(hasMorePatterns());
 		if(!_reverse) {
-			(*s) = &(_v[_cur++]);
+			(*s) = &(_v[_cur]);
+			(*qual) = &(_quals[_cur]);
 		} else {
-			(*s) = &(_vrev[_cur++]);
+			(*s) = &(_vrev[_cur]);
+			(*qual) = &(_qualsrev[_cur]);
 		}
+		_cur++;
 	}
 	virtual bool hasMorePatterns() {
 		return _cur < _v.size();
@@ -225,8 +266,10 @@ private:
 	bool _revcomp;
 	bool _reverse;
 	size_t _cur;
-	vector<TStr> _v;
-	vector<TStr> _vrev;
+	vector<TStr>          _v;        // forward/rev-comp sequences
+	vector<String<char> > _quals;    // quality values parallel to _v
+	vector<TStr>          _vrev;     // reversed forward and rev-comp sequences 
+	vector<String<char> > _qualsrev; // quality values parallel to _vrev
 };
 
 /**
