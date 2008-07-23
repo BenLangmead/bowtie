@@ -2314,6 +2314,7 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 	else         countBwSideEx(ltop, tops); // Backward side
 	if(lbot._fw) countFwSideEx(lbot, bots); // Forward side
 	else         countBwSideEx(lbot, bots); // Backward side
+#ifndef NDEBUG
 	if(_sanity && !overrideSanity) {
 		// Make sure results match up with individual calls to mapLF;
 		// be sure to override sanity-checking in the callee, or we'll
@@ -2327,6 +2328,7 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 		assert_eq(mapLF(lbot, 2, true), bots[2]);
 		assert_eq(mapLF(lbot, 3, true), bots[3]);
 	}
+#endif
 }
 
 /**
