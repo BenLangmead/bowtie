@@ -65,6 +65,22 @@ sub reverseComp($) {
 	return $r;
 }
 
+# Add some random quality values to encourage excercising the
+# backtracking code
+sub addQual($) {
+	my $r = shift;
+	my $len = length($r);
+	$r .= ":";
+	for(my $i = 0; $i < $len; $i++) {
+		my $c = "-";
+		while(not $c =~ /[0-9A-Z]/) {
+			$c = chr(33 + int(rand(40)));
+		}
+		$r .= $c;
+	}
+	return $r;
+}
+
 # Trim whitespace from a string argument
 sub trim($) {
 	my $string = shift;
@@ -258,6 +274,7 @@ for(; $outer > 0; $outer--) {
 			if($revcomp && (int(rand(2)) == 0)) {
 				$p = reverseComp($p);
 			}
+			$p = addQual($p) if $maq;
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
@@ -282,6 +299,7 @@ for(; $outer > 0; $outer--) {
 			if($revcomp && int(rand(2)) == 0) {
 				$p = reverseComp($p);
 			}
+			$p = addQual($p) if $maq;
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
