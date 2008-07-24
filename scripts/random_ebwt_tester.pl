@@ -11,7 +11,12 @@ use List::Util qw[min max];
 use Getopt::Std;
 
 my %options=();
-getopts("m",\%options);
+getopts("mh",\%options);
+
+if(defined $options{h}) {
+	print "Usage: perl random_ebwt_tester.pl seed outer inner tbase trand pbase prand\n";
+	exit 0;
+}
 
 my $maq = 0;
 $maq = $options{m} if defined $options{m};

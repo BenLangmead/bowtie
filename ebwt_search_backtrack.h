@@ -139,8 +139,13 @@ public:
 		}
 	}
 
+	/**
+	 * Set _qlen according to parameter, except don't let it fall below
+	 * the length of the query.
+	 */
 	void setQlen(uint32_t qlen) {
-		_qlen = qlen;
+		assert(_qry != NULL);
+		_qlen = min(length(*_qry), qlen);
 	}
 
 	/**
@@ -157,16 +162,19 @@ public:
 			// so we can go ahead and use it
 			// Rightmost char gets least significant bit-pair
 			uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+			assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
 			for(int i = ftabChars - 1; i > 0; i--) {
 				ftabOff <<= 2;
+				assert_lt((uint32_t)(*_qry)[_qlen-i], 4);
 				ftabOff |= (uint32_t)(*_qry)[_qlen-i];
+				assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
 			}
 			assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
 			uint32_t top = _ebwt.ftabHi(ftabOff);
 			uint32_t bot = _ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
 				// We have a match!
-				report(0, top, bot);
+				return report(0, top, bot);
 			} else if (bot > top) {
 				// We have an arrow pair from which we can backtrack
 				return backtrack(ftabChars, // depth
