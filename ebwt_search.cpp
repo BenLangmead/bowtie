@@ -1175,6 +1175,8 @@ static void seededQualCutoffSearch(int seedLen,
 		                          0,       // iham
 		                          70,      // qualThresh
 		                          0,       // qualWobble
+		                          false,   // reportSeedlings (don't)
+		                          NULL,    // seedlings
 		                          verbose, // verbose
 		                          true,    // oneHit
 		                          seed);   // seed
@@ -1207,9 +1209,13 @@ static void seededQualCutoffSearch(int seedLen,
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
-				// The reverse complement hit, so we're done with this
-				// read
+				// If we reach here, then we obtained a hit for case
+				// 1R, 2R or 3R and can stop considering this read
 				doneMask[patid>>1] = true;
+			} else {
+				// If we reach here, then cases 1R, 2R, and 3R have
+				// been eliminated and the read needs further
+				// examination
 			}
 			patid += 2;
 	    }
@@ -1217,21 +1223,37 @@ static void seededQualCutoffSearch(int seedLen,
 	    assert_leq(numPats>>1, doneMask.size());
 	}
 	SWITCH_TO_BW_INDEX();
+	String<uint8_t> seedlings;
+	reserve(seedlings, 10 * 1024 * 1024, Exact());
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
 		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
-		BacktrackManager<TStr> bt(ebwtBw, params,
-		                          12, 24,  // unrevOff, 1revOff
-		                          0, 0,    // itop, ibot
-		                          0,       // iham
-		                          70,      // qualThresh
-		                          0,       // qualWobble
-		                          verbose, // verbose
-		                          true,    // oneHit
-		                          seed+1); // seed
+		// BacktrackManager to search for hits for cases 1F, 2F, 3F
+		BacktrackManager<TStr> btf(ebwtBw, params,
+		                           12, 24,  // unrevOff, 1revOff
+		                           0, 0,    // itop, ibot
+		                           0,       // iham
+		                           70,      // qualThresh
+		                           0,       // qualWobble
+		                           false,   // reportSeedlings (don't)
+		                           NULL,    // seedlings
+		                           verbose, // verbose
+		                           true,    // oneHit
+		                           seed+1); // seed
+		// BacktrackManager to search for seedlings for case 4R
+		BacktrackManager<TStr> btr(ebwtBw, params,
+		                           12, 24,  // unrevOff, 1revOff
+		                           0, 0,    // itop, ibot
+		                           0,       // iham
+		                           0xffff,  // qualThresh (none)
+		                           0,       // qualWobble
+		                           true,    // reportSeedlings (do)
+		                           NULL,    // seedlings
+		                           verbose, // verbose
+		                           true,    // oneHit
+		                           seed+2); // seed
 		uint32_t patid = 0;
-		params.setFw(true);  // we'll only look at forward strand this round
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1243,6 +1265,11 @@ static void seededQualCutoffSearch(int seedLen,
 	    		patid += 2;
 	    		continue;
 	    	}
+	    	
+			// If we reach here, then cases 1R, 2R, and 3R have been
+	    	// eliminated.  The next most likely cases are 1F, 2F and
+	    	// 3F...
+			params.setFw(true);  // looking at forward strand
 			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
 			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
@@ -1251,17 +1278,42 @@ static void seededQualCutoffSearch(int seedLen,
 			assert(patRc != patFw);
 			assert(!patsrc.nextIsReverseComplement());
 			assert(isReverseComplement(*patFw, *patRc));
-			bt.setQuery(patFw, qualFw, nameFw);
+			btf.setQuery(patFw, qualFw, nameFw);
 			params.setPatId(patid);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			bool hit = bt.backtrack(&os);
+			
+			// Do a 12/24 backtrack on the forward-strand read using
+			// the transposed index.  This will find all case 1F, 2F
+			// and 3F hits.
+			bool hit = btf.backtrack(&os);
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
 				// The reverse complement hit, so we're done with this
 				// read
 				doneMask[patid>>1] = true;
+				patid += 2;
+				continue;
 			}
+			
+			// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
+			// have been eliminated, leaving us with cases 4F and 4R
+			// (the cases with 1 mismatch in the 5' half of the seed)
+			// and the read needs further examination
+			params.setFw(false);  // looking at reverse-comp strand
+			params.setPatId(patid+1);
+			btr.setQuery(patRc, qualRc, nameRc);
+			btr.setQlen(24);
+			ASSERT_ONLY(numHits = length(seedlings));
+			// Do a 12/24 seedling backtrack on the reverse-comp read
+			// using the transposed index.  This will find seedlings
+			// for case 4R
+			btr.backtrack(&os);
+			hit = length(seedlings) > numHits;
+			if(!hit) {
+				append(seedlings, 0xff);
+			}
+			
 			patid += 2;
 	    }
 	    assert_eq(numPats, patid);
@@ -1311,7 +1363,7 @@ static void seededQualCutoffSearch(int seedLen,
 	    		patid += 2;
 	    		continue;
 	    	}
-			patsrc.nextPattern(&patFw,& qualFw, &nameFw);
+			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
 			assert(patFw != NULL);
 			assert(patsrc.nextIsReverseComplement());
 			patsrc.nextPattern(&patRc, &qualRc, &nameRc);

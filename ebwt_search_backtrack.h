@@ -22,6 +22,8 @@ public:
 	                 uint32_t __iham,
 	                 uint32_t __qualThresh,
 	                 uint32_t __qualWobble,
+	                 bool __reportSeedlings = false,
+	                 String<uint8_t>* __seedlings = NULL,
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
@@ -49,6 +51,8 @@ public:
 		_elims(NULL),
 		_mms(NULL),
 		_chars(NULL),
+		_reportSeedlings(__reportSeedlings),
+		_seedlings(__seedlings),
 	    _nameDefault("default"),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
@@ -135,17 +139,59 @@ public:
 		}
 	}
 
+	void setQlen(uint32_t qlen) {
+		_qlen = qlen;
+	}
+
 	/**
-	 * 
+	 * Initiate the recursive backtracking routine starting at the
+	 * extreme right-hand side of the pattern.  Use the ftab to match
+	 * the first several characters in one chomp, as long as doing so
+	 * does not "jump over" any legal backtracking targets.
 	 */
 	bool backtrack(vector<TStr>* os = NULL)	{
-		return backtrack(_itop, _ibot, os);
+		int ftabChars = _ebwt._eh._ftabChars;
+		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
+		if(m >= (uint32_t)ftabChars) {
+			// The ftab doesn't extend past the unrevisitable portion,
+			// so we can go ahead and use it
+			// Rightmost char gets least significant bit-pair
+			uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+			for(int i = ftabChars - 1; i > 0; i--) {
+				ftabOff <<= 2;
+				ftabOff |= (uint32_t)(*_qry)[_qlen-i];
+			}
+			assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
+			uint32_t top = _ebwt.ftabHi(ftabOff);
+			uint32_t bot = _ebwt.ftabLo(ftabOff+1);
+			if(_qlen == (uint32_t)ftabChars && bot > top) {
+				// We have a match!
+				report(0, top, bot);
+			} else if (bot > top) {
+				// We have an arrow pair from which we can backtrack
+				return backtrack(ftabChars, // depth
+				                 top,       // top
+				                 bot,       // bot
+				                 os);
+			}
+			// The arrows are already closed; give up
+			return false;
+		} else {
+			// The ftab *does* extend past the unrevisitable portion;
+			// we can't use it in this case, because we might jump past
+			// a legitimate mismatch
+			return backtrack(0,   // depth
+			                 0,   // top
+			                 0,   // bot
+			                 os);
+		}
 	}
 
 	/**
 	 * Run the backtracker with initial conditions in place
 	 */
-	bool backtrack(uint32_t top,
+	bool backtrack(uint32_t depth,
+	               uint32_t top,
 	               uint32_t bot,
 	               vector<TStr>* os = NULL)
 	{
@@ -162,7 +208,7 @@ public:
 			_params.sink().setRetainHits(true);
 		}
 		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
-		bool ret = backtrack(0, 0, _unrevOff, top, bot, _iham, _pairs, _elims);
+		bool ret = backtrack(0, depth, _unrevOff, top, bot, _iham, _pairs, _elims);
 		if(ret) {
 			assert_gt(_params.sink().numHits(), nhits);
 		} else {
@@ -601,12 +647,23 @@ public:
 		assert_gt(bot, top);
 		return report(stackDepth, top, bot);
 	}
+
+protected:
 	
+	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+		if(_reportSeedlings) {
+			reportSeedling(stackDepth);
+			return false; // keep going
+		} else {
+			return reportHit(stackDepth, top, bot);
+		}
+	}
+
 	/**
 	 * Report a hit with # mismatches = stackDepth, at rows delimited
 	 * by top and bot
 	 */
-	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+	bool reportHit(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		// Possibly report
 		if(_oneHit) {
 			uint32_t spread = bot - top;
@@ -635,7 +692,26 @@ public:
 		}
 	}
 
-protected:
+	/**
+	 * Report a "seedling hit" - i.e., we reached the maximum depth
+	 * with a single mismatch (in the 5' half of the seed, presumably)
+	 * and with some space between the arrows, so we report the
+	 * mismatch that got us here. 
+	 */
+	bool reportSeedling(uint32_t stackDepth) {
+		// Possibly report
+		assert(_reportSeedlings);
+		assert(_seedlings != NULL);
+		// Right now we only know how to report single-mismatch seedlings
+		assert_eq(1, stackDepth);
+		assert_geq(_mms[0], _qlen);
+		assert_lt(_mms[0], _qlen);
+		append((*_seedlings), (uint8_t)_mms[0]);
+		assert_geq(_chars[0], 0);
+		assert_lt(_chars[0], 4);
+		append((*_seedlings), (uint8_t)_chars[0]);
+		return true;
+	}
 
 	/**
 	 * 
@@ -813,6 +889,8 @@ protected:
 	                             // with decision stack
 	uint32_t           *_mms;    // array for holding mismatches
 	char               *_chars;  // characters selected so far
+	bool                _reportSeedlings;
+	String<uint8_t>    *_seedlings; // list in which to store seedlings
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals
