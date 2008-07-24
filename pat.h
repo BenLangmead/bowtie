@@ -148,44 +148,6 @@ protected:
 template <typename TStr>
 class VectorPatternSource : public TrimmingPatternSource<TStr> {
 public:
-	VectorPatternSource(const vector<TStr>& v,           // sequences
-	                    const vector<String<char> >& vq, // quality strings
-	                    bool __revcomp = true,
-	                    bool __reverse = false,
-	                    const char *__dumpfile = NULL,
-	                    size_t cur = 0,
-	                    int __trim3 = 0,
-	                    int __trim5 = 0) :
-		TrimmingPatternSource<TStr>(
-				false, // we'll take care of our own reversing
-		        __dumpfile, __trim3, __trim5),
-		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _v()
-	{
-		for(size_t i = 0; i < v.size(); i++) {
-			TStr s(v[i]);
-			String<char> sq(vq[i]);
-			_v.push_back(s);
-			_quals.push_back(sq);
-			::reverse(s);
-			::reverse(sq);
-			_vrev.push_back(s);
-			_qualsrev.push_back(sq);
-			if(_revcomp) {
-				::reverse(s);
-				::reverse(sq);
-				_v.push_back(reverseComplement(s));
-				_quals.push_back(sq);
-				::reverse(s);
-				::reverse(sq);
-				_vrev.push_back(reverseComplement(s));
-				_qualsrev.push_back(sq);
-			}
-		}
-		assert(!_v.empty());
-		assert_eq(_v.size(), _vrev.size());
-		assert_eq(_v.size(), _quals.size());
-		assert_eq(_v.size(), _qualsrev.size());
-	}
 	VectorPatternSource(const vector<string>& v,
 	                    bool __revcomp = true,
 	                    bool __reverse = false,
@@ -193,15 +155,18 @@ public:
 	                    size_t cur = 0,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0) :
-		TrimmingPatternSource<TStr>(__reverse, __dumpfile, __trim3, __trim5),
-		_revcomp(__revcomp), _cur(cur), _v()
+		TrimmingPatternSource<TStr>(false, __dumpfile, __trim3, __trim5),
+		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _v(),
+		_quals(), _vrev(), _qualsrev()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
 			tokenize(v[i], ":", ss);
 			assert_gt(ss.size(), 0);
 			assert_leq(ss.size(), 2);
-			TStr s(ss[0]);
+			// Initialize s
+			string s = ss[0];
+			//  Initialize vq
 			string vq;
 			if(ss.size() == 2) {
 				vq = ss[1];
@@ -213,22 +178,23 @@ public:
 				vq.erase(length(s));
 			}
 			assert_eq(vq.length(), length(s));
-			String<char> sq(vq);
 			_v.push_back(s);
-			_quals.push_back(sq);
-			::reverse(s);
-			::reverse(sq);
-			_vrev.push_back(s);
-			_qualsrev.push_back(sq);
+			_quals.push_back(vq);
+			{
+				_vrev.push_back(s);
+				::reverse(_vrev.back());
+				_qualsrev.push_back(vq);
+				::reverse(_qualsrev.back());
+			}
 			if(_revcomp) {
-				::reverse(s);
-				::reverse(sq);
-				_v.push_back(reverseComplement(s));
-				_quals.push_back(sq);
-				::reverse(s);
-				::reverse(sq);
-				_vrev.push_back(reverseComplement(s));
-				_qualsrev.push_back(sq);
+				_v.push_back(reverseComplement(TStr(s)));
+				_quals.push_back(vq);
+				::reverse(_quals.back());
+				{
+					_vrev.push_back(reverseComplement(TStr(s)));
+					::reverse(_vrev.back());
+					_qualsrev.push_back(vq);
+				}
 			}
 		}
 		assert(!_v.empty());

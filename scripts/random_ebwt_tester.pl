@@ -209,7 +209,7 @@ for(; $outer > 0; $outer--) {
 		$endian = "--little";
 	}
 	if($revcomp) {
-		$revcomp = "--revcomp";
+		$revcomp = "-r";
 	} else {
 		$revcomp = "";
 	}
@@ -250,7 +250,7 @@ for(; $outer > 0; $outer--) {
 				my $rpad = randDna(max(0, int(rand(20)) - 10));
 				$p = $lpad . $p . $rpad;
 			}
-			if(int(rand(2)) == 0) {
+			if($revcomp && (int(rand(2)) == 0)) {
 				$p = reverseComp($p);
 			}
 			$pfinal .= $p;
@@ -274,7 +274,7 @@ for(; $outer > 0; $outer--) {
 		for(my $i = 0; $i < $np; $i++) {
 			my $plen = int(rand($prand)) + $pbase;
 			my $p = randDna($plen);
-			if(int(rand(2)) == 0) {
+			if($revcomp && int(rand(2)) == 0) {
 				$p = reverseComp($p);
 			}
 			$pfinal .= $p;

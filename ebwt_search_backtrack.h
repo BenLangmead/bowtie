@@ -297,7 +297,7 @@ public:
 				for(int i = (int)d - 1; i >= 0; i--) {
 					cout << _chars[i];
 				}
-				cout << "\"" << endl;
+				cout << "\"";
 			}
 			assert_lt((int)(*_qry)[cur], 4);
 			bool curIsEligible = false;
@@ -309,7 +309,7 @@ public:
 			int c = (int)(*_qry)[cur];
 			uint8_t q = QUAL(cur);
 			assert_lt((uint32_t)q, 100);
-			bool curIsAlternative = (depth >= unrevOff) && (ham + q <= _qualThresh);
+			bool curIsAlternative = (d >= unrevOff) && (ham + q <= _qualThresh);
 			if(curIsAlternative) {
 				// q is low enough to make this position an alternative,
 				// but is it the best alternative?
@@ -331,6 +331,12 @@ public:
 			if(curIsAlternative && !curIsEligible) {
 				assert_gt(eligibleSz, 0);
 				assert_gt(eligibleNum, 0);
+			}
+			if(_verbose) {
+				cout << " alternative: " << curIsAlternative;
+				cout << ", eligible: " << curIsEligible;
+				if(curOverridesEligible) cout << "(overrides)";
+				cout << endl;
 			}
 			if(top == 0 && bot == 0) {
 				// Calculate first quartet of pairs using the _fchr[]
