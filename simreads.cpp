@@ -28,6 +28,7 @@ static int      seed     = 0;          // srandom seed
 static int      errScale = 2;          // srandom seed
 static bool     verbose  = false;      // be talkative
 static bool     addzs    = true;       // add Zs from 3' end
+static uint32_t snpRate  = 0;
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -42,13 +43,14 @@ static void printUsage(ostream& out) {
 	    << "    -l/--length <int>    length of reads to generate (up to 35)" << endl
 	    << "    -c/--cutoff <int>    generate reads only up to <int>-length prefix of ref" << endl
 	    << "    -e/--errscale <int>  increase errors by <int> times (0=disable errs)" << endl
+	    << "    -p/--polyRate <int>  artificial polymorphism rate (0=disable)" << endl
 	    << "    -s/--seed <int>      seed for random number generator" << endl
 	    << "    -n/--nozs            don't add stretches of Ns from 3' end" << endl
 	    << "    -v/--verbose         verbose output (for debugging)" << endl
 	    ;
 }
 
-static const char *short_options = "r:l:c:s:e:nv";
+static const char *short_options = "r:l:c:s:e:p:nv";
 
 static struct option long_options[] = {
 	/* These options set a flag. */
@@ -57,6 +59,7 @@ static struct option long_options[] = {
 	{"cutoff",   required_argument, 0, 'c'},
 	{"seed",     required_argument, 0, 's'},
 	{"errscale", required_argument, 0, 'e'},
+	{"polyRate", required_argument, 0, 'p'},
 	{"nozs",     no_argument, 0, 'n'},
 	{"verbose",  no_argument, 0, 'v'},
 	{0, 0, 0, 0}
@@ -100,6 +103,9 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'l':
 	   			readLen = parseNumber<int>(5, "-l/--length arg must be at least 5");
+	   			break;
+	   		case 'p':
+	   			snpRate = parseNumber<uint32_t>(0, "-p/--polyRate arg must be at least 0");
 	   			break;
 	   		case 'c':
 	   			cutoff = parseNumber<int64_t>(1, "-c/--cutoff arg must be at least 1");
@@ -290,6 +296,22 @@ void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 	int64_t savedCutoff = cutoff;
 	readSequenceFiles<TStr, Fasta>(infiles, ss, cutoff, -1, false);
 	uint32_t bases = (uint32_t)(savedCutoff - cutoff);
+	
+	// Polymorphize the reference
+	if(snpRate != 0) {
+		uint32_t numSnps = bases / snpRate;
+		for(uint32_t i = 0; i < numSnps; i++) {
+			uint32_t r = rand() % bases;
+			for(size_t j = 0; j < ss.size(); j++) {
+				if(r < length(ss[j])) {
+					ss[j][r] = (Dna)(((int)ss[j][r] + (rand()%3)) & 3);
+					break;
+				}
+				r -= length(ss[j]);
+			}
+		}
+	}
+	
 	// Chop characters off the end of the qual string as appropriate
 	if((size_t)readLen < fastqQuals.length()) {
 		fastqQuals = fastqQuals.substr(0, readLen);
