@@ -384,6 +384,20 @@ protected:
 	                  char* name,     // destination buf for read name
 	                  String<char>& nameStr, // destination String for name
 	                  size_t* nameLen) = 0; // length of name
+	/// Skip to the end of the current line; return the first character
+	/// of the next line
+	int skipToEnd() {
+		while(true) {
+			int c = fgetc(this->_in); if(feof(this->_in)) return -1;
+			if(c == '\n' || c == '\r') {
+				while(c == '\n' || c == '\r') {
+					c = fgetc(this->_in); if(feof(this->_in)) return -1;
+				}
+				// c now holds first character of next line
+				return c;
+			}
+		}
+	}
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() = 0;
 	/// Swap "current" status between _a/_aRc and _b/_bRc
@@ -735,18 +749,6 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-	int skipToEnd() {
-		while(true) {
-			int c = fgetc(this->_in); if(feof(this->_in)) return -1;
-			if(c == '\n' || c == '\r') {
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return -1;
-				}
-				// c now holds first character of next line
-				return c;
-			}
-		}
-	}
 	
 	/// Read another pattern from a FASTA input file
 	// TODO: store default qualities in qual
@@ -1063,6 +1065,8 @@ protected:
 					{
 						if (qualsRead >= (size_t)this->_trim5) {
 							size_t off = qualsRead - this->_trim5;
+							assert_geq(c, 33);
+							assert_leq(c, 73);
 							qual[off] = c;
 							if (rcQual != NULL) {
 								rcQual[1024 - off - 1] = c;
@@ -1071,6 +1075,7 @@ protected:
 						}	
 					}
 				}
+				assert_eq(qualsRead, (*dstLen) + this->_trim5);
 				_setBegin(qualTStr, (char*)qual);
 				_setLength(qualTStr, (*dstLen));
 				if(rcQual != NULL) {
@@ -1084,6 +1089,8 @@ protected:
 					{
 						if (qualsRead >= (size_t)this->_trim5) {
 							size_t off = qualsRead - this->_trim5;
+							assert_geq(c, 33);
+							assert_leq(c, 73);
 							qual[1024 - off - 1] = c;
 							if (rcQual != NULL) {
 								rcQual[off] = c;
@@ -1092,10 +1099,11 @@ protected:
 						}	
 					}
 				}
+				assert_eq(qualsRead, (*dstLen) + this->_trim5);
 				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
 				_setLength(qualTStr, (*dstLen));
 				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)&rcQual[(*dstLen)]);
+					_setBegin(rcQualTStr, (char*)rcQual);
 					_setLength(rcQualTStr, (*dstLen));
 				}
 			}

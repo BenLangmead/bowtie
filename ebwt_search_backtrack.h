@@ -3,6 +3,22 @@
 
 #define DEFAULT_SPREAD 64
 
+/// Encapsulates a change made to a query base, i.e. "the 3rd base from
+/// the 5' end was changed from an A to a T".  Useful when using
+/// for matching seeded by "seedlings".
+struct QueryMutation {
+	QueryMutation(uint8_t _pos, uint8_t _oldBase, uint8_t _newBase) :
+		pos(_pos), oldBase(_oldBase), newBase(_newBase)
+	{
+		assert_neq(oldBase, newBase);
+		assert_lt(oldBase, 4);
+		assert_lt(newBase, 4);
+	}
+	uint8_t pos;
+	uint8_t oldBase;
+	uint8_t newBase;
+};
+
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
  * some range of a read sequence.
@@ -19,11 +35,11 @@ public:
 	                 uint32_t __1revOff,  // size of 1-revisitable chunk
 	                 uint32_t __itop,
 	                 uint32_t __ibot,
-	                 uint32_t __iham,
 	                 uint32_t __qualThresh,
 	                 uint32_t __qualWobble,
 	                 bool __reportSeedlings = false,
 	                 String<uint8_t>* __seedlings = NULL,
+	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
@@ -40,7 +56,6 @@ public:
 		_1revOff(__1revOff),
 		_itop(__itop),
 		_ibot(__ibot),
-		_iham(__iham),
 		_spread(DEFAULT_SPREAD),
 		_maxStackDepth(DEFAULT_SPREAD),
 		_qualThresh(__qualThresh),
@@ -53,7 +68,8 @@ public:
 		_chars(NULL),
 		_reportSeedlings(__reportSeedlings),
 		_seedlings(__seedlings),
-	    _nameDefault("default"),
+		_muts(__muts),
+		_nameDefault("default"),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{
@@ -69,6 +85,11 @@ public:
  				_qual = &_qualDefault;
  			}
  			assert_geq(length(*_qual), _qlen);
+ 			for(size_t i = 0; i < length(*_qual); i++) {
+ 				assert_geq((*_qual)[i], 33);
+ 				assert_leq((*_qual)[i], 73);
+ 			}
+ 			assert_geq(length(*_qual), _qlen);
  			if(_name == NULL || length(*_name) == 0) {
  				_name = &_nameDefault;
  			}
@@ -76,6 +97,9 @@ public:
  	 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 2;
  	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
+ 			if(_muts != NULL) {
+ 				applyMutations();
+ 			}
  		}
 		if(_itop != 0 || _ibot != 0) {
 			assert_lt(_itop, _ibot);
@@ -102,15 +126,23 @@ public:
 	#define PAIR_TOP(d, c)    (pairs[d*8 + c + 0])
 	#define PAIR_BOT(d, c)    (pairs[d*8 + c + 4])
 	#define PAIR_SPREAD(d, c) (PAIR_BOT(d, c) - PAIR_TOP(d, c))
-	#define QUAL(k)           ((uint8_t)(*_qual)[k] - 33)
+	#define QUAL(k)           ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
 	
 	void setQuery(TStr* __qry,
 	              String<char>* __qual,
-	              String<char>* __name)
+	              String<char>* __name,
+	              String<QueryMutation>* __muts = NULL)
 	{
 		_qry = __qry;
 		_qual = __qual;
 		_name = __name;
+		if(_muts != NULL) {
+			undoMutations();
+		}
+		_muts = __muts;
+		if(_muts != NULL) {
+			applyMutations();
+		}
 		assert(_qry != NULL);
 		// Reset _qlen
 		_qlen = length(*_qry);
@@ -120,6 +152,10 @@ public:
 			_qual = &_qualDefault;
 		}
 		assert_geq(length(*_qual), _qlen);
+		for(size_t i = 0; i < length(*_qual); i++) {
+			assert_geq((*_qual)[i], 33);
+			assert_leq((*_qual)[i], 73);
+		}
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}
@@ -138,6 +174,19 @@ public:
 			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << qual << ")" << endl;
 		}
 	}
+	
+	void setMuts(String<QueryMutation>* __muts) {
+		if(_muts != NULL) {
+			// Undo previous mutations
+			assert_gt(length(*_muts), 0);
+			undoMutations();
+		}
+		_muts = __muts;
+		if(_muts != NULL) {
+			assert_gt(length(*_muts), 0);
+			applyMutations();
+		}
+	}
 
 	/**
 	 * Set _qlen according to parameter, except don't let it fall below
@@ -154,7 +203,10 @@ public:
 	 * the first several characters in one chomp, as long as doing so
 	 * does not "jump over" any legal backtracking targets.
 	 */
-	bool backtrack(vector<TStr>* os = NULL)	{
+	bool backtrack(vector<TStr>* os = NULL, uint32_t ham = 0) {
+		assert_gt(length(*_qry), 0);
+		assert_leq(_qlen, length(*_qry));
+		assert_geq(length(*_qual), length(*_qry));
 		int ftabChars = _ebwt._eh._ftabChars;
 		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
 		if(m >= (uint32_t)ftabChars) {
@@ -174,13 +226,25 @@ public:
 			uint32_t bot = _ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
 				// We have a match!
-				return report(0, top, bot);
+				if(_reportSeedlings) {
+					// Oops - we're trying to find seedlings, so we've
+					// gone too far; start again
+					return backtrack(0,   // depth
+					                 0,   // top
+					                 0,   // bot
+					                 os,
+					                 ham);
+				} else {
+					// We have a match!
+					return report(0, top, bot);
+				}
 			} else if (bot > top) {
 				// We have an arrow pair from which we can backtrack
 				return backtrack(ftabChars, // depth
 				                 top,       // top
 				                 bot,       // bot
-				                 os);
+				                 os,
+				                 ham);
 			}
 			// The arrows are already closed; give up
 			return false;
@@ -191,7 +255,8 @@ public:
 			return backtrack(0,   // depth
 			                 0,   // top
 			                 0,   // bot
-			                 os);
+			                 os,
+			                 ham);
 		}
 	}
 
@@ -201,22 +266,26 @@ public:
 	bool backtrack(uint32_t depth,
 	               uint32_t top,
 	               uint32_t bot,
-	               vector<TStr>* os = NULL)
+	               vector<TStr>* os = NULL,
+	               uint32_t iham = 0)
 	{
-		if(_verbose) cout << "backtrack(_itop=" << _itop << ", "
-		                 << "_ibot=" << _ibot << ", "
-		                 << "_iham=" << _iham << ", "
+		assert_gt(length(*_qry), 0);
+		assert_leq(_qlen, length(*_qry));
+		assert_geq(length(*_qual), length(*_qry));
+		if(_verbose) cout << "backtrack(top=" << top << ", "
+		                 << "bot=" << bot << ", "
+		                 << "iham=" << iham << ", "
 		                 << "_pairs" << _pairs << ", "
 		                 << "_elims=" << (void*)_elims << ")" << endl;
 		bool oldRetain = false;
 		size_t oldRetainSz = 0;
-		if(os != NULL && (*os).size() > 0 && top == 0 && bot == 0) {
+		if(os != NULL && (*os).size() > 0) {
 			oldRetain = _params.sink().retainHits();
 			oldRetainSz = _params.sink().retainedHits().size();
 			_params.sink().setRetainHits(true);
 		}
 		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
-		bool ret = backtrack(0, depth, _unrevOff, top, bot, _iham, _pairs, _elims);
+		bool ret = backtrack(0, depth, _unrevOff, top, bot, iham, _pairs, _elims);
 		if(ret) {
 			assert_gt(_params.sink().numHits(), nhits);
 		} else {
@@ -224,7 +293,7 @@ public:
 		}
 		// If these are end-to-end matches and we have the original
 		// texts, then we can double-check them with a naive oracle.
-		if(os != NULL && (*os).size() > 0 && top == 0 && bot == 0) {
+		if(os != NULL && (*os).size() > 0 && !_reportSeedlings) {
 			_params.sink().setRetainHits(oldRetain);
 			vector<Hit> oracleHits;
 			naiveOracle(*os, oracleHits);
@@ -300,6 +369,9 @@ public:
 	{
 		// Can't have already exceeded weighted hamming distance threshold
 		assert_leq(stackDepth, depth);
+		assert_gt(length(*_qry), 0);
+		assert_leq(_qlen, length(*_qry));
+		assert_geq(length(*_qual), length(*_qry));
 		assert(_qry != NULL);
 		assert(_qual != NULL);
 		assert(_name != NULL);
@@ -468,7 +540,9 @@ public:
 			assert_lt(elims[d], 16);
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 			// Mismatch with alternatives
-			while(top == bot && altNum > 0) {
+			while((top == bot && altNum > 0) ||
+			      (stackDepth == 0 && cur == 0 && _reportSeedlings && altNum > 0))
+			{
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -653,17 +727,70 @@ public:
 		}
 		assert_eq(0xffffffff, cur);
 		assert_gt(bot, top);
-		return report(stackDepth, top, bot);
+		if(!_reportSeedlings || stackDepth > 0) {
+			return report(stackDepth, top, bot);
+		} else {
+			return false;
+		}
 	}
 
 protected:
+	
+	void applyMutations() {
+		if(_muts == NULL) {
+			// No mutations to apply
+			return;
+		}
+		for(size_t i = 0; i < length(*_muts); i++) {
+			const QueryMutation& m = (*_muts)[i];
+			assert_lt(m.pos, _qlen);
+			assert_lt(m.oldBase, 4);
+			assert_lt(m.newBase, 4);
+			assert_neq(m.oldBase, m.newBase);
+			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.oldBase);
+			(*_qry)[m.pos] = (Dna)(int)m.newBase; // apply it
+		}
+	}
+	
+	void undoMutations() {
+		if(_muts == NULL) {
+			// No mutations to undo
+			return;
+		}
+		for(size_t i = 0; i < length(*_muts); i++) {
+			const QueryMutation& m = (*_muts)[i];
+			assert_lt(m.pos, _qlen);
+			assert_lt(m.oldBase, 4);
+			assert_lt(m.newBase, 4);
+			assert_neq(m.oldBase, m.newBase);
+			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.newBase);
+			(*_qry)[m.pos] = (Dna)(int)m.oldBase; // undo it
+		}
+	}
 	
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		if(_reportSeedlings) {
 			reportSeedling(stackDepth);
 			return false; // keep going
 		} else {
-			return reportHit(stackDepth, top, bot);
+			// Undo all the mutations
+			ASSERT_ONLY(TStr tmp = (*_qry));
+			undoMutations();
+			bool hit;
+			if(_muts != NULL) {
+				assert_neq(tmp, (*_qry));
+				for(size_t i = 0; i < length(*_muts); i++) {
+					// Entries in _mms[] are in terms of offset into
+					// _qry - not in terms of offset from 3' or 5' end
+					_mms[stackDepth] = (*_muts)[i].pos;
+				}
+				hit = reportHit(stackDepth+1, top, bot);
+			} else {
+				hit = reportHit(stackDepth, top, bot);
+			}
+			applyMutations();
+			assert_eq(tmp, (*_qry));
+			return hit;
 		}
 	}
 
@@ -679,17 +806,14 @@ protected:
 			for(uint32_t i = 0; i < spread; i++) {
 				uint32_t ri = r + i;
 				if(ri >= bot) ri -= spread;
-				if(_reportOnHit) {
-					if(_ebwt.reportChaseOne((*_qry), _qual, _name,
-					                        _mms, stackDepth, ri,
-					                        top, bot, _qlen, _params))
-					{
-						return true;
-					}
-				} else {
-					// Not yet smart enough to not immediately report
-					// hits 
-					assert(false);
+				// reportChaseOne takes ths _mms[] list in terms of
+				// their indices into the query string; not in terms
+				// of their offset from the 3' or 5' end.
+				if(_ebwt.reportChaseOne((*_qry), _qual, _name,
+				                        _mms, stackDepth, ri,
+				                        top, bot, _qlen, _params))
+				{
+					return true;
 				}
 			}
 			return false;
@@ -701,10 +825,8 @@ protected:
 	}
 
 	/**
-	 * Report a "seedling hit" - i.e., we reached the maximum depth
-	 * with a single mismatch (in the 5' half of the seed, presumably)
-	 * and with some space between the arrows, so we report the
-	 * mismatch that got us here. 
+	 * Report a "seedling hit" - i.e. report the mismatch that got us
+	 * here.  We only know how to deal with the mismatch in _mms[0].
 	 */
 	bool reportSeedling(uint32_t stackDepth) {
 		// Possibly report
@@ -712,17 +834,22 @@ protected:
 		assert(_seedlings != NULL);
 		// Right now we only know how to report single-mismatch seedlings
 		assert_eq(1, stackDepth);
-		assert_geq(_mms[0], _qlen);
+		// Enrties in _mms[] hold the offset from the 5' end 
 		assert_lt(_mms[0], _qlen);
-		append((*_seedlings), (uint8_t)_mms[0]);
-		assert_geq(_chars[0], 0);
-		assert_lt(_chars[0], 4);
-		append((*_seedlings), (uint8_t)_chars[0]);
+		append((*_seedlings), (uint8_t)_mms[0]); // pos
+		uint32_t i = _qlen - _mms[0] - 1;
+		// _chars[] is index in terms of RHS-relative depth
+		int c = (int)(Dna)_chars[i];
+		assert_lt(c, 4);
+		assert_neq(c, (int)(*_qry)[_mms[0]]);
+		append((*_seedlings), (uint8_t)c); // chr
 		return true;
 	}
 
 	/**
-	 * 
+	 * Check that the given eligibility parameters (lowAltQual,
+	 * eligibleSz, eligibleNum) are correct, given the appropriate
+	 * inputs (pairs, elims, depth, d, unrevOff)
 	 */
 	bool sanityCheckEligibility(uint32_t  depth,
 	                            uint32_t  d,
@@ -875,7 +1002,6 @@ protected:
 	uint32_t            _ibot;   // initial bot arrow, or 0xffffffff if
 	                             // we're starting from the beginning
 	                             // of the query
-	uint32_t            _iham;   // initial weighted hamming distance
 	uint32_t            _spread; // size of window within which to
 	                             // backtrack
 	uint32_t            _maxStackDepth;
@@ -896,9 +1022,12 @@ protected:
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
 	uint32_t           *_mms;    // array for holding mismatches
+	// Entries in _mms[] are in terms of offset into
+	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
 	bool                _reportSeedlings;
 	String<uint8_t>    *_seedlings; // list in which to store seedlings
+	String<QueryMutation> *_muts;
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals
