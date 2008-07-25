@@ -313,15 +313,7 @@ public:
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
-			undoMutations();
-			// This is an admittedly hacky way to detect whether we
-			// should consider seedling extension
-			if(_muts != NULL) {
-				assert_eq(_unrevOff, _1revOff);
-				naiveOracle(*os, oracleHits, _unrevOff, _1revOff/2, false);
-			} else {
-				naiveOracle(*os, oracleHits);
-			}
+			naiveOracle(*os, oracleHits, iham);
 			vector<Hit>& retainedHits = _params.sink().retainedHits();
 			if(ret == false) {
 				// If we didn't find any hits, then the oracle had
@@ -335,10 +327,10 @@ public:
 					cout << "Oracle hit " << oracleHits.size()
 					     << " times, but backtracker did not hit" << endl;
 					cout << "First oracle hit: " << endl;
+					undoMutations();
 					cout << "  Unmutated Pat:  " << (*_qry) << endl;
 					applyMutations();
 					cout << "  Mutated Pat:    " << (*_qry) << endl;
-					undoMutations();
 					cout << "  Tseg:           ";
 					bool ebwtFw = _params.ebwtFw();
 					if(ebwtFw) {
@@ -380,7 +372,6 @@ public:
 				}
 				assert_lt(i, oracleHits.size()); // assert we found a matchup
 			}
-			applyMutations();
 		}
 		return ret;
 	}
@@ -928,6 +919,7 @@ protected:
 	 */
 	void naiveOracle(vector<TStr>& os,
 	                 vector<Hit>& hits,
+	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
 	                 bool unrevTrumps1rev = true)
@@ -958,7 +950,7 @@ protected:
 			// For each possible alignment of pattern against text
 			for(size_t j = 0; j <= olen - plen; j++) {
 				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
-				uint32_t ham = 0; // weighted hamming distance so far
+				uint32_t ham = iham; // weighted hamming distance so far
 				bitset<max_read_bp> diffs = 0; // mismatch bitvector
 				// For each alignment column, from right to left
 				bool success = true;
@@ -1026,6 +1018,18 @@ protected:
 					if(!ebwtFw) {
 						off = olen - off;
 						off -= plen;
+					}
+					// Add in mismatches from _muts
+					if(_muts != NULL) {
+						for(size_t i = 0; i < length(*_muts); i++) {
+							// Entries in _mms[] are in terms of offset into
+							// _qry - not in terms of offset from 3' or 5' end
+							if(fivePrimeOnLeft) {
+								diffs.set((*_muts)[i].pos);
+							} else {
+								diffs.set(plen - (*_muts)[i].pos - 1);
+							}
+						}
 					}
 					Hit h(make_pair(i, off), 
 						  patid,  // read id
