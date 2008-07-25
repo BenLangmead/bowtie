@@ -1168,7 +1168,7 @@ static void seededQualCutoffSearch(int seedLen,
 	vector<bool> doneMask(numQs, false);
 	{
 		// Phase 1: Consider cases 1R and 2R
-		Timer _t(cout, "Time for seeded quality search Phase 1: ", timing);
+		Timer _t(cout, "Time for seeded quality search Phase 1 of 4: ", timing);
 		BacktrackManager<TStr> bt(ebwtFw, params,
 		                          12, 24,  // unrevOff, 1revOff
 		                          0, 0,    // itop, ibot
@@ -1236,7 +1236,7 @@ static void seededQualCutoffSearch(int seedLen,
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
-		Timer _t(cout, "Time for seeded quality search Phase 2: ", timing);
+		Timer _t(cout, "Time for seeded quality search Phase 2 of 4: ", timing);
 		// BacktrackManager to search for hits for cases 1F, 2F, 3F
 		BacktrackManager<TStr> btf(ebwtBw, params,
 		                           12, 24,  // unrevOff, 1revOff
@@ -1356,7 +1356,7 @@ static void seededQualCutoffSearch(int seedLen,
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
-		Timer _t(cout, "Time for seeded quality search Phase 3: ", timing);
+		Timer _t(cout, "Time for seeded quality search Phase 3 of 4: ", timing);
 		// BacktrackManager to search for seedlings for case 4F
 		BacktrackManager<TStr> btf(ebwtFw, params,
 		                           12, 24,     // unrevOff, 1revOff
@@ -1385,6 +1385,7 @@ static void seededQualCutoffSearch(int seedLen,
 		uint32_t seedlingId = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		ASSERT_ONLY(uint32_t seedlingsRcLen = length(seedlingsRc));
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
@@ -1518,7 +1519,7 @@ static void seededQualCutoffSearch(int seedLen,
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
-		Timer _t(cout, "Time for seeded quality search Phase 4: ", timing);
+		Timer _t(cout, "Time for seeded quality search Phase 4 of 4: ", timing);
 		// BacktrackManager to search for hits for case 4R
 		BacktrackManager<TStr> btf(ebwtBw, params,
 		                           24, 24,  // unrevOff, 1revOff

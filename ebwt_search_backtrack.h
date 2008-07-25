@@ -261,7 +261,11 @@ public:
 	}
 
 	/**
-	 * Run the backtracker with initial conditions in place
+	 * Starting at the given "depth" relative to the 5' end, and the
+	 * given top and bot arrows (where top=0 and bot=0 means it's up to
+	 * us to calculate the initial arrow pair), and initial weighted
+	 * hamming distance iham, find a hit using randomized, quality-
+	 * aware backtracking. 
 	 */
 	bool backtrack(uint32_t depth,
 	               uint32_t top,
@@ -269,6 +273,7 @@ public:
 	               vector<TStr>* os = NULL,
 	               uint32_t iham = 0)
 	{
+		// Initial sanity checking
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
@@ -280,33 +285,61 @@ public:
 		bool oldRetain = false;
 		size_t oldRetainSz = 0;
 		if(os != NULL && (*os).size() > 0) {
+			// Save some info about hits retained at this point
 			oldRetain = _params.sink().retainHits();
 			oldRetainSz = _params.sink().retainedHits().size();
 			_params.sink().setRetainHits(true);
 		}
 		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
+		
+		// Initiate the recursive, randomized quality-aware backtracker
+		// with a stack depth of 0 (no backtracks so far)
 		bool ret = backtrack(0, depth, _unrevOff, top, bot, iham, _pairs, _elims);
+
+		// Remainder of this function is sanity checking
+		
 		if(ret) {
+			// Return value of true implies there should be a fresh hit
 			assert_gt(_params.sink().numHits(), nhits);
 		} else {
+			// Return value of false implies no new hits
 			assert_eq(_params.sink().numHits(), nhits);
 		}
-		// If these are end-to-end matches and we have the original
-		// texts, then we can double-check them with a naive oracle.
+		// If we have the original texts, then we double-check the
+		// backtracking result against the naive oracle
+		// TODO: also check seedling hits
 		if(os != NULL && (*os).size() > 0 && !_reportSeedlings) {
-			_params.sink().setRetainHits(oldRetain);
+			_params.sink().setRetainHits(oldRetain); // restore old value
 			vector<Hit> oracleHits;
-			naiveOracle(*os, oracleHits);
+			// Invoke the naive oracle, which will place all qualifying
+			// hits in the 'oracleHits' vector
+			undoMutations();
+			// This is an admittedly hacky way to detect whether we
+			// should consider seedling extension
+			if(_muts != NULL) {
+				assert_eq(_unrevOff, _1revOff);
+				naiveOracle(*os, oracleHits, _unrevOff, _1revOff/2, false);
+			} else {
+				naiveOracle(*os, oracleHits);
+			}
 			vector<Hit>& retainedHits = _params.sink().retainedHits();
 			if(ret == false) {
+				// If we didn't find any hits, then the oracle had
+				// better not have found any either
 				assert_eq(oldRetainSz, retainedHits.size());
 				if(oracleHits.size() > 0) {
+					// Oops, the oracle found at least one hit; print
+					// detailed info about the first oracle hit (for
+					// debugging)
 					const Hit& h = oracleHits[0];
 					cout << "Oracle hit " << oracleHits.size()
 					     << " times, but backtracker did not hit" << endl;
 					cout << "First oracle hit: " << endl;
-					cout << "  Pat:  " << (*_qry) << endl;
-					cout << "  Tseg: ";
+					cout << "  Unmutated Pat:  " << (*_qry) << endl;
+					applyMutations();
+					cout << "  Mutated Pat:    " << (*_qry) << endl;
+					undoMutations();
+					cout << "  Tseg:           ";
 					bool ebwtFw = _params.ebwtFw();
 					if(ebwtFw) {
 						for(size_t i = 0; i < _qlen; i++) {
@@ -318,7 +351,7 @@ public:
 						}
 					}
 					cout << endl;
-					cout << "  Bt:   ";
+					cout << "  Bt:             ";
 					for(int i = (int)_qlen-1; i >= 0; i--) {
 						if(i < (int)_unrevOff) cout << "0";
 						else if(i < (int)_1revOff) cout << "1";
@@ -328,24 +361,26 @@ public:
 				}
 				assert_eq(0, oracleHits.size());
 			} else {
+				// If we found a hit, it had better be one of the ones
+				// that the oracle found
 				assert_gt(oracleHits.size(), 0);
 				assert_eq(oldRetainSz+1, retainedHits.size());
-				// Get the most-recently-retained hit
+				// Get the hit reported by the backtracker
 				Hit& rhit = retainedHits.back();
-				// Go through oracleHits and look for one that matches
-				// up with rhit
+				// Go through oracleHits and look for a match
 				size_t i;
 				for(i = 0; i < oracleHits.size(); i++) {
 					const Hit& h = oracleHits[i];
 		    		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
-		    			// Assert that number of mismatches matches
 		    			assert_eq(h.fw, rhit.fw);
 		    			assert_eq(h.mms, rhit.mms);
+		    			// It's a match - hit confirmed
 		    			break;
 		    		}
 				}
 				assert_lt(i, oracleHits.size()); // assert we found a matchup
 			}
+			applyMutations();
 		}
 		return ret;
 	}
@@ -358,7 +393,7 @@ public:
 	 * recursively and return the result.  As soon as there is a
 	 * mismatch and no backtracking opporunities, false is returned.
 	 */
-	bool backtrack(uint32_t  stackDepth,
+	bool backtrack(uint32_t  stackDepth, // depth of the recursion stack; = # mismatches so far
 	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
 	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
 	               uint32_t  top,      // top arrow in pair prior to 'depth'
@@ -891,8 +926,15 @@ protected:
 	/**
 	 * Naively search for the same hits that should be found by 
 	 */
-	void naiveOracle(vector<TStr>& os, vector<Hit>& hits) {
+	void naiveOracle(vector<TStr>& os,
+	                 vector<Hit>& hits,
+	                 uint32_t unrevOff = 0xffffffff,
+	                 uint32_t oneRevOff = 0xffffffff,
+	                 bool unrevTrumps1rev = true)
+	{
 		typedef typename Value<TStr>::Type TVal;
+		if(unrevOff  == 0xffffffff) unrevOff  = _unrevOff;
+		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
 		bool ebwtFw = _params.ebwtFw();
 		bool fw = _params.fw();
 		bool fivePrimeOnLeft = (ebwtFw == fw);
@@ -931,18 +973,38 @@ protected:
 							success = false;
 							break;
 						}
-						// What region does the mm fall into?
-						if(kr < _unrevOff) {
-							// Alignment is invalid because it contains
-							// a mismatch in the unrevisitable region
-							success = false;
-							break;
-						} else if(kr < _1revOff) {
-							rev1mm++;
-							if(rev1mm > 1) {
-								// Alignment is invalid because it
-								// contains more than 1 mismatch in the
-								// 1-revisitable region
+						if(unrevTrumps1rev) {
+							// What region does the mm fall into?
+							if(kr < _unrevOff) {
+								// Alignment is invalid because it contains
+								// a mismatch in the unrevisitable region
+								success = false;
+								break;
+							} else if(kr < _1revOff) {
+								rev1mm++;
+								if(rev1mm > 1) {
+									// Alignment is invalid because it
+									// contains more than 1 mismatch in the
+									// 1-revisitable region
+									success = false;
+									break;
+								}
+							}
+						} else {
+							// What region does the mm fall into?
+							if(kr < _1revOff) {
+								rev1mm++;
+								if(rev1mm> 1) {
+									// Alignment is invalid because it
+									// contains more than 1 mismatch in the
+									// 1-revisitable region
+									success = false;
+									break;
+								}
+							}
+							else if (kr < _unrevOff) {
+								// Alignment is invalid because it contains
+								// a mismatch in the unrevisitable region
 								success = false;
 								break;
 							}
