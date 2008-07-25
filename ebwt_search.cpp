@@ -1319,17 +1319,17 @@ static void seededQualCutoffSearch(int seedLen,
 			params.setPatId(patid+1);
 			btr.setQuery(patRc, qualRc, nameRc);
 			btr.setQlen(24); // just look at the seed
-			ASSERT_ONLY(numHits = length(seedlingsRc));
+			uint32_t numSeedlings = length(seedlingsRc);
 			// Do a 12/24 seedling backtrack on the reverse-comp read
 			// using the transposed index.  This will find seedlings
 			// for case 4R
 			btr.backtrack(&os);
-			hit = length(seedlingsRc) > numHits;
+			hit = length(seedlingsRc) > numSeedlings;
 			append(seedlingsRc, 0xff);
 #ifndef NDEBUG
 			append(seedlingsRc, (patid>>1));
 			{
-				uint32_t id2 = numHits;
+				uint32_t id2 = numSeedlings;
 				char lastQual = 0;
 				while(seedlingsRc[id2++] != 0xff) {
 					uint8_t pos = seedlingsRc[id2-1];
@@ -1383,7 +1383,6 @@ static void seededQualCutoffSearch(int seedLen,
 		                           seed+4); // seed
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
-		uint32_t seedlingsRcLen = length(seedlingsRc);
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1485,7 +1484,7 @@ static void seededQualCutoffSearch(int seedLen,
 			params.setPatId(patid);
 			btf.setQuery(patFw, qualFw, nameFw);
 			btf.setQlen(24); // just look at the seed
-			ASSERT_ONLY(uint32_t numHits = length(seedlingsFw));
+			ASSERT_ONLY(uint32_t numSeedlings = length(seedlingsFw));
 			// Do a 12/24 seedling backtrack on the forward read
 			// using the normal index.  This will find seedlings
 			// for case 4F
@@ -1494,7 +1493,7 @@ static void seededQualCutoffSearch(int seedLen,
 #ifndef NDEBUG
 			append(seedlingsFw, (patid>>1));
 			{
-				uint32_t id2 = numHits;
+				uint32_t id2 = numSeedlings;
 				char lastQual = 0;
 				while(seedlingsFw[id2++] != 0xff) {
 					uint8_t pos = seedlingsFw[id2-1];
