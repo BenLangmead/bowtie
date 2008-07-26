@@ -33,11 +33,12 @@ public:
 	                 const EbwtSearchParams<TStr>& __params,
 	                 uint32_t __unrevOff, // size of unrevisitable chunk
 	                 uint32_t __1revOff,  // size of 1-revisitable chunk
+	                 uint32_t __2revOff,  // size of 2-revisitable chunk
 	                 uint32_t __itop,
 	                 uint32_t __ibot,
 	                 uint32_t __qualThresh,
 	                 uint32_t __qualWobble,
-	                 bool __reportSeedlings = false,
+	                 uint32_t __reportSeedlings = 0,
 	                 String<uint8_t>* __seedlings = NULL,
 	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
@@ -54,6 +55,7 @@ public:
 		_params(__params),
 		_unrevOff(__unrevOff),
 		_1revOff(__1revOff),
+		_2revOff(__2revOff),
 		_itop(__itop),
 		_ibot(__ibot),
 		_spread(DEFAULT_SPREAD),
@@ -77,6 +79,7 @@ public:
 	    // 40 * 40 * 8 * 4 = 51,200 bytes, and _elims
 	    // occupy 40 * 40 = 1,600 bytes
 	    assert_geq(__1revOff, __unrevOff);
+	    assert_geq(__2revOff, __unrevOff);
 	    fill(_qualDefault, DEFAULT_SPREAD, (char)(40+33));
  		if(_qry != NULL) {
  			_qlen = length(*_qry);
@@ -94,7 +97,7 @@ public:
  				_name = &_nameDefault;
  			}
  			assert_leq(_spread, DEFAULT_SPREAD);
- 	 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 2;
+ 	 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 3 + 1;
  	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
  			if(_muts != NULL) {
@@ -127,6 +130,7 @@ public:
 	#define PAIR_BOT(d, c)    (pairs[d*8 + c + 4])
 	#define PAIR_SPREAD(d, c) (PAIR_BOT(d, c) - PAIR_TOP(d, c))
 	#define QUAL(k)           ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
+	#define QUAL2(q, k)       ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
 	
 	void setQuery(TStr* __qry,
 	              String<char>* __qual,
@@ -159,7 +163,7 @@ public:
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}
- 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 2;
+ 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 3 + 1;
  		if(_pairs == NULL) {
  			_pairs = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  		}
@@ -226,7 +230,7 @@ public:
 			uint32_t bot = _ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
 				// We have a match!
-				if(_reportSeedlings) {
+				if(_reportSeedlings > 0) {
 					// Oops - we're trying to find seedlings, so we've
 					// gone too far; start again
 					return backtrack(0,   // depth
@@ -294,7 +298,7 @@ public:
 		
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		bool ret = backtrack(0, depth, _unrevOff, top, bot, iham, _pairs, _elims);
+		bool ret = backtrack(0, depth, _unrevOff, _1revOff, top, bot, iham, _pairs, _elims);
 
 		// Remainder of this function is sanity checking
 		
@@ -308,7 +312,7 @@ public:
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
 		// TODO: also check seedling hits
-		if(os != NULL && (*os).size() > 0 && !_reportSeedlings) {
+		if(os != NULL && (*os).size() > 0 && _reportSeedlings == 0) {
 			_params.sink().setRetainHits(oldRetain); // restore old value
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
@@ -345,8 +349,9 @@ public:
 					cout << endl;
 					cout << "  Bt:             ";
 					for(int i = (int)_qlen-1; i >= 0; i--) {
-						if(i < (int)_unrevOff) cout << "0";
-						else if(i < (int)_1revOff) cout << "1";
+						if     (i < (int)_unrevOff) cout << "0";
+						else if(i < (int)_1revOff)  cout << "1";
+						else if(i < (int)_2revOff)  cout << "2";
 						else cout << "X";
 					}
 					cout << endl;
@@ -387,6 +392,7 @@ public:
 	bool backtrack(uint32_t  stackDepth, // depth of the recursion stack; = # mismatches so far
 	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
 	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
+	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable 
 	               uint32_t  top,      // top arrow in pair prior to 'depth'
 	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
 	               uint32_t  ham,      // weighted hamming distance so far
@@ -567,7 +573,7 @@ public:
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 			// Mismatch with alternatives
 			while((top == bot && altNum > 0) ||
-			      (stackDepth == 0 && cur == 0 && _reportSeedlings && altNum > 0))
+			      (stackDepth < _reportSeedlings && cur == 0 && altNum > 0))
 			{
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
@@ -644,10 +650,24 @@ public:
 				// callee to consider the 1-revisitable region as also
 				// being unrevisitable (since we just "used up" all of
 				// our visits)
-				uint32_t btUnrevOff = unrevOff;
-				if(i < _1revOff) {
-					assert_geq(_1revOff, unrevOff);
-					btUnrevOff = _1revOff;
+				uint32_t btUnrevOff  = unrevOff;
+				uint32_t btOneRevOff = oneRevOff;
+				if(i < oneRevOff) {
+					assert_geq(oneRevOff, unrevOff);
+					// Extend unrevisitable region to include former 1-
+					// revisitable region
+					btUnrevOff = oneRevOff; 
+				} else if(i < _2revOff) {
+					assert_geq(oneRevOff, unrevOff);
+					assert_geq(_2revOff, oneRevOff);
+					if(unrevOff == oneRevOff) {
+						// Extend unrevisitable region to include former
+						// 2-revisitable region
+						btUnrevOff = _2revOff;
+					}
+					// Extend 1-revisitable region to include former 2-
+					// revisitable region
+					btOneRevOff = _2revOff;
 				}
 				// Note the character that we're backtracking on in the
 				// mm array:
@@ -662,7 +682,8 @@ public:
 				} else {
 					ret = backtrack(stackDepth+1,
 				                    i+1,
-				                    btUnrevOff,
+				                    btUnrevOff,  // new unrevisitable boundary
+				                    btOneRevOff, // new 1-revisitable boundary
 				                    bttop,  // top arrow in pair prior to 'depth'
 				                    btbot,  // bottom arrow in pair prior to 'depth'
 				                    btham,  // weighted hamming distance so far
@@ -753,12 +774,129 @@ public:
 		}
 		assert_eq(0xffffffff, cur);
 		assert_gt(bot, top);
-		if(!_reportSeedlings || stackDepth > 0) {
+		if(_reportSeedlings > 0) assert_leq(stackDepth, _reportSeedlings);
+		if(stackDepth >= _reportSeedlings) {
 			return report(stackDepth, top, bot);
 		} else {
 			return false;
 		}
 	}
+	
+	/**
+	 * Naively search for the same hits that should be found by 
+	 */
+	static void naiveOracle(const TStr& qry,
+	                        const String<char>& qual,
+	                        const String<char>& name,
+	                        uint32_t patid,
+	                        vector<TStr>& os,
+	                        vector<Hit>& hits,
+	                        uint32_t qualThresh,
+	                        uint32_t unrevOff,
+	                        uint32_t oneRevOff,
+	                        uint32_t twoRevOff,
+	                        bool fw,
+	                        bool ebwtFw,
+	                        uint32_t iham = 0,
+	                        String<QueryMutation>* muts = NULL)
+	{
+		typedef typename Value<TStr>::Type TVal;
+		bool fivePrimeOnLeft = (ebwtFw == fw);
+	    uint32_t plen = length(qry);
+		uint8_t *pstr = (uint8_t *)begin(qry, Standard());
+	    // For each text...
+		for(size_t i = 0; i < os.size(); i++) {
+			// For each text position...
+			if(length(os[i]) < plen) continue;
+			uint32_t olen = length(os[i]);
+			uint8_t *ostr = (uint8_t *)begin(os[i], Standard());
+			// For each possible alignment of pattern against text
+			for(size_t j = 0; j <= olen - plen; j++) {
+				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
+				size_t rev2mm  = 0; // mismatches observed in the 2-revisitable region
+				uint32_t ham = iham; // weighted hamming distance so far
+				bitset<max_read_bp> diffs = 0; // mismatch bitvector
+				// For each alignment column, from right to left
+				bool success = true;
+				for(int k = (int)plen-1; k >= 0; k--) {
+					size_t kr = plen-1-k;
+					if(pstr[k] != ostr[ebwtFw ? (j+k) : (olen-(j+k)-1)]) {
+						ham += QUAL2(qual, k);
+						if(ham > qualThresh) {
+							// Alignment is invalid because it exceeds
+							// our target weighted hamming distance
+							// threshold
+							success = false;
+							break;
+						}
+						// What region does the mm fall into?
+						if(kr < unrevOff) {
+							// Alignment is invalid because it contains
+							// a mismatch in the unrevisitable region
+							success = false;
+							break;
+						} else if(kr < oneRevOff) {
+							rev1mm++;
+							if(rev1mm > 1) {
+								// Alignment is invalid because it
+								// contains more than 1 mismatch in the
+								// 1-revisitable region
+								success = false;
+								break;
+							}
+						} else if(kr < twoRevOff) {
+							rev2mm++;
+							if(rev2mm > 2) {
+								// Alignment is invalid because it
+								// contains more than 2 mismatches in the
+								// 2-revisitable region
+								success = false;
+								break;
+							}
+						}
+						if(fivePrimeOnLeft) {
+							diffs.set(k);
+						} else {
+							// The 3' end is on on the left end of the
+							// pattern, but the diffs vector should
+							// encode mismatches w/r/t the 5' end, so
+							// we flip
+							diffs.set(plen-k-1);
+						}
+					}
+				}
+				if(success) {
+					// It's a hit
+					uint32_t off = j;
+					if(!ebwtFw) {
+						off = olen - off;
+						off -= plen;
+					}
+					// Add in mismatches from _muts
+					if(muts != NULL) {
+						for(size_t i = 0; i < length(*muts); i++) {
+							// Entries in _mms[] are in terms of offset into
+							// _qry - not in terms of offset from 3' or 5' end
+							if(fivePrimeOnLeft) {
+								diffs.set((*muts)[i].pos);
+							} else {
+								diffs.set(plen - (*muts)[i].pos - 1);
+							}
+						}
+					}
+					Hit h(make_pair(i, off), 
+						  patid,  // read id
+						  name,   // read name
+						  qry,    // read sequence
+						  qual,   // read qualities 
+						  fw,     // forward/reverse-comp
+						  diffs); // mismatch bitvector
+					hits.push_back(h);
+				} // For each pattern character
+			} // For each alignment over current text
+		} // For each text
+	}
+
 
 protected:
 	
@@ -796,6 +934,7 @@ protected:
 	
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		if(_reportSeedlings) {
+			assert_leq(stackDepth, _reportSeedlings);
 			reportSeedling(stackDepth);
 			return false; // keep going
 		} else {
@@ -851,24 +990,27 @@ protected:
 	}
 
 	/**
-	 * Report a "seedling hit" - i.e. report the mismatch that got us
-	 * here.  We only know how to deal with the mismatch in _mms[0].
+	 * Report a "seedling hit" - i.e. report the mismatches that got us
+	 * here.
 	 */
 	bool reportSeedling(uint32_t stackDepth) {
 		// Possibly report
-		assert(_reportSeedlings);
+		assert_gt(_reportSeedlings, 0);
 		assert(_seedlings != NULL);
-		// Right now we only know how to report single-mismatch seedlings
-		assert_eq(1, stackDepth);
-		// Enrties in _mms[] hold the offset from the 5' end 
-		assert_lt(_mms[0], _qlen);
-		append((*_seedlings), (uint8_t)_mms[0]); // pos
-		uint32_t i = _qlen - _mms[0] - 1;
-		// _chars[] is index in terms of RHS-relative depth
-		int c = (int)(Dna)_chars[i];
-		assert_lt(c, 4);
-		assert_neq(c, (int)(*_qry)[_mms[0]]);
-		append((*_seedlings), (uint8_t)c); // chr
+		for(size_t i = 0; i < stackDepth; i++) {
+			// Enrties in _mms[] hold the offset from the 5' end 
+			assert_lt(_mms[i], _qlen);
+			append((*_seedlings), (uint8_t)_mms[i]); // pos
+			uint32_t ci = _qlen - _mms[i] - 1;
+			// _chars[] is index in terms of RHS-relative depth
+			int c = (int)(Dna)_chars[ci];
+			assert_lt(c, 4);
+			assert_neq(c, (int)(*_qry)[_mms[i]]);
+			append((*_seedlings), (uint8_t)c); // chr
+			if(i < stackDepth - 1) {
+				append((*_seedlings), 0xfe); // minor separator
+			}
+		}
 		return true;
 	}
 
@@ -915,133 +1057,38 @@ protected:
 	}
 	
 	/**
-	 * Naively search for the same hits that should be found by 
+	 * Naively search for hits for the current pattern under the
+	 * current backtracking strategy and store hits in hits vector.
 	 */
 	void naiveOracle(vector<TStr>& os,
 	                 vector<Hit>& hits,
 	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
-	                 bool unrevTrumps1rev = true)
+	                 uint32_t twoRevOff = 0xffffffff)
 	{
 		typedef typename Value<TStr>::Type TVal;
 		if(unrevOff  == 0xffffffff) unrevOff  = _unrevOff;
 		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
+		if(twoRevOff == 0xffffffff) twoRevOff = _2revOff;
 		bool ebwtFw = _params.ebwtFw();
 		bool fw = _params.fw();
-		bool fivePrimeOnLeft = (ebwtFw == fw);
 		uint32_t patid = _params.patId();
-	    uint32_t plen = length(*_qry);
-		uint8_t *pstr = (uint8_t *)begin(*_qry, Standard());
-	    // For each text...
-		for(size_t i = 0; i < os.size(); i++) {
-			// For each text position...
-			if(length(os[i]) < plen) continue;
-			TStr o = os[i];
-			uint32_t olen = length(o);
-			if(!ebwtFw) {
-				for(size_t j = 0; j < olen>>1; j++) {
-					TVal tmp = o[j];
-					o[j] = o[olen-j-1];
-					o[olen-j-1] = tmp;
-				}
-			}
-			uint8_t *ostr = (uint8_t *)begin(o, Standard());
-			// For each possible alignment of pattern against text
-			for(size_t j = 0; j <= olen - plen; j++) {
-				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
-				uint32_t ham = iham; // weighted hamming distance so far
-				bitset<max_read_bp> diffs = 0; // mismatch bitvector
-				// For each alignment column, from right to left
-				bool success = true;
-				for(int k = (int)plen-1; k >= 0; k--) {
-					size_t kr = plen-1-k;
-					if(pstr[k] != ostr[j+k]) {
-						ham += QUAL(k);
-						if(ham > _qualThresh) {
-							// Alignment is invalid because it exceeds
-							// our target weighted hamming distance
-							// threshold
-							success = false;
-							break;
-						}
-						if(unrevTrumps1rev) {
-							// What region does the mm fall into?
-							if(kr < _unrevOff) {
-								// Alignment is invalid because it contains
-								// a mismatch in the unrevisitable region
-								success = false;
-								break;
-							} else if(kr < _1revOff) {
-								rev1mm++;
-								if(rev1mm > 1) {
-									// Alignment is invalid because it
-									// contains more than 1 mismatch in the
-									// 1-revisitable region
-									success = false;
-									break;
-								}
-							}
-						} else {
-							// What region does the mm fall into?
-							if(kr < _1revOff) {
-								rev1mm++;
-								if(rev1mm> 1) {
-									// Alignment is invalid because it
-									// contains more than 1 mismatch in the
-									// 1-revisitable region
-									success = false;
-									break;
-								}
-							}
-							else if (kr < _unrevOff) {
-								// Alignment is invalid because it contains
-								// a mismatch in the unrevisitable region
-								success = false;
-								break;
-							}
-						}
-						if(fivePrimeOnLeft) {
-							diffs.set(k);
-						} else {
-							// The 3' end is on on the left end of the
-							// pattern, but the diffs vector should
-							// encode mismatches w/r/t the 5' end, so
-							// we flip
-							diffs.set(plen-k-1);
-						}
-					}
-				}
-				if(success) {
-					// It's a hit
-					uint32_t off = j;
-					if(!ebwtFw) {
-						off = olen - off;
-						off -= plen;
-					}
-					// Add in mismatches from _muts
-					if(_muts != NULL) {
-						for(size_t i = 0; i < length(*_muts); i++) {
-							// Entries in _mms[] are in terms of offset into
-							// _qry - not in terms of offset from 3' or 5' end
-							if(fivePrimeOnLeft) {
-								diffs.set((*_muts)[i].pos);
-							} else {
-								diffs.set(plen - (*_muts)[i].pos - 1);
-							}
-						}
-					}
-					Hit h(make_pair(i, off), 
-						  patid,  // read id
-						  *_name, // read name
-						  *_qry,  // read sequence
-						  *_qual, // read qualities 
-						  fw,     // forward/reverse-comp
-						  diffs); // mismatch bitvector
-					hits.push_back(h);
-				} // For each pattern character
-			} // For each alignment over current text
-		} // For each text
+		
+		naiveOracle((*_qry),
+		            (*_qual),
+		            (*_name),
+		            patid,
+		            os,
+		            hits,
+		            _qualThresh,
+		            unrevOff,
+		            oneRevOff,
+		            twoRevOff,
+		            fw,    // transpose
+		            ebwtFw,
+		            iham,
+		            _muts);
 	}
 	
 	bool sanityCheckPairs(uint32_t* pairs) {
@@ -1062,6 +1109,7 @@ protected:
 	const EbwtSearchParams<TStr>& _params;   // Ebwt to search in
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
+	uint32_t            _2revOff;  // 2-revisitable chunk
 	uint32_t            _itop;   // initial top arrow, or 0xffffffff if
 	                             // we're starting from the beginning
 	                             // of the query
@@ -1091,9 +1139,11 @@ protected:
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
-	bool                _reportSeedlings;
-	String<uint8_t>    *_seedlings; // list in which to store seedlings
-	String<QueryMutation> *_muts;
+	uint32_t            _reportSeedlings; // if > 0, report seedling
+	                             // hits up to this many mismatches
+	String<uint8_t>    *_seedlings; // append seedling hits here
+	String<QueryMutation> *_muts;// set of mutations that apply for a
+	                             // seedling
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals

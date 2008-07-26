@@ -23,17 +23,17 @@
 using namespace std;
 using namespace seqan;
 
-static int verbose				= 0;
-static int allowed_diffs		= -1;
-static int kmer					= -1;
-static int sanityCheck			= 0;
-static int format				= FASTA;
-static string origString		= "";
-static int revcomp				= 0; // search for reverse complements?
+static int verbose				= 0; // be talkative
+static int allowed_diffs		= -1; // 3' difference budget for extension mode
+static int kmer					= -1; // 5' kmer length for extension mode
+static int sanityCheck			= 0;  // enable expensive sanity checks
+static int format				= FASTQ; // default read format is FASTQ
+static string origString		= ""; // reference text, or filename(s)
+static int revcomp				= 1; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
 static bool oneHit				= true;  // for multihits, report just one
-static bool concise				= false; // for multihits, report just one
+static bool concise				= false; // report hits in id+/-:<x,y,z> format
 static bool arrowMode			= false; // report SA arrows instead of locs
 static int showVersion			= 0; // just print version and quit?
 static int ipause				= 0; // pause before maching?
@@ -49,9 +49,12 @@ static int offRate				= -1; // keep default offRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
-static int maqLike				= 0; // do maq-like searching
+static int maqLike				= 1; // do maq-like searching
+static int seedLen              = 24; // seed length (not configurable in maq)
+static int seedMms              = 1;  // # mismatches allowed in seed (maq's -n)
+static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 
-static const char *short_options = "fqbmlcu:rvsat3:5:1o:k:d:";
+static const char *short_options = "fqbmlcu:rvsat013:5:o:k:d:e:n:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -64,7 +67,8 @@ static struct option long_options[] = {
 	/* These options set a flag. */
 	{"verbose", no_argument, 0, 'v'},
 	{"sanity",  no_argument, 0, 's'},
-	{"1mismatch",  no_argument, 0, '1'},
+	{"exact",   no_argument, 0, '0'},
+	{"1mm",     no_argument, 0, '1'},
 	{"pause",   no_argument, &ipause, 1},
 	{"orig",    required_argument, 0, ARG_ORIG},
 	{"allHits", no_argument, 0, 'a'},
@@ -84,10 +88,12 @@ static struct option long_options[] = {
 	{"version",    no_argument, &showVersion, 1},
 	{"maq",        no_argument, &maqLike, 1},
 	{"dumpPats",   required_argument, 0, ARG_DUMP_PATS},
-	{"revcomp", no_argument, 0, 'r'},
-	{"kmer", required_argument, 0, 'k'},
+	{"revcomp",    no_argument, 0, 'r'},
+	{"err",        required_argument, 0, 'e'},
+	{"seedMms",    required_argument, 0, 'n'},
+	{"kmer",         required_argument, 0, 'k'},
 	{"3prime-diffs", required_argument, 0, 'd'},
-	{"arrows", no_argument, 0, ARG_ARROW},
+	{"arrows",       no_argument, 0, ARG_ARROW},
 	{0, 0, 0, 0}
 };
 
@@ -95,40 +101,43 @@ static struct option long_options[] = {
  * Print a detailed usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: ebwt_search [options]* <ebwt_infile_base> <query_in> [<hit_outfile>]" << endl
-	    << "  ebwt_infile_base   ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	    << "  query_in           comma-separated list of files containing query reads" << endl
+	out << "Usage: ebwt_search [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
+	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <query_in>         comma-separated list of files containing query reads" << endl
 	    << "                     (or the sequences themselves, if -c is specified)" << endl
-	    << "  hit_outfile        file to write hits to" << endl
+	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
 	    << "Options:" << endl
-	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa (default)" << endl
-	    << "  -q                 query input files are FASTQ .fq" << endl
-	    << "  -m                 query input files are Maq .bfq" << endl
-	    << "  -l                 query input files are Solexa _seq.txt" << endl
+	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
+	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
+	    //<< "  -m                 query input files are Maq .bfq" << endl
+	    //<< "  -l                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
-	    << "  -o/--offRate <int> override offRate of Ebwt (must be <= value in index)" << endl
-	    << "  -1/--1mismatch     allow 1 mismatch (requires both fw and bw Ebwts)" << endl
-	    << "  -5/--trim5 <int>   # of bases to trim from 5' (right) end of queries" << endl
-	    << "  -3/--trim3 <int>   # of bases to trim from 3' (left) end of queries" << endl
-	    << "  -u/--qUpto <int>   stop after <int> reads" << endl
-	    << "  --maq              maq-like matching (forces -r, -k 24)" << endl
-	    << "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
-		<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
-		<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
-	    << "  -b/--binOut        write hits in binary format (must specify <hit_outfile>)" << endl
-	    << "  --concise          write hits in a concise ASCII format" << endl
-	    << "  -t/--time          print basic timing statistics" << endl
-	    << "  -v/--verbose       verbose output (for debugging)" << endl
-		<< "  --solexa-quals  convert quality strings in FASTQ files from solexa-scaled to phred" << endl
+	    << "  -e/--err <int>     max sum of mismatch qualities (default: 70)" << endl
+	    << "  -n/--seedMms <int> max mismatches in 5' 24 bps (0, 1 or 2, default: 2)" << endl
+	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
+	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
+	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
+	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
+	    << "  -u/--qUpto <int>   stop after the first <int> reads" << endl
+	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
+	    //<< "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
+		//<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
+		//<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
+	    //<< "  -b/--binOut        write hits in binary format (must specify <hit_outfile>)" << endl
+	    << "  -t/--time          print wall-clock time taken by search phases" << endl
+		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
-	    << "  -a/--allHits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
 	    //<< "  --qSameLen         die with error if queries don't all have the same length" << endl
-	    << "  --stats            write statistics after hits" << endl
-	    << "  --reportOpps       report # of other potential mapping targets for each hit" << endl
-	    << "  --arrows           report hits as top/bottom offsets into SA" << endl
+	    //<< "  --stats            write statistics after hits" << endl
+	    //<< "  --reportOpps       report # of other potential mapping targets for each hit" << endl
+	    //<< "  -a/--allHits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
+	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
+	    << "  --concise          write hits in a concise format" << endl
 	    //<< "  --dumpPats <file>  dump all patterns read to a file" << endl
+	    << "  -o/--offRate <int> override offRate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
+	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
 }
@@ -172,7 +181,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'm': format = BFQ; break;
 	   		case 'l': format = SOLEXA; break;
 	   		case 'c': format = CMDLINE; break;
-	   		case '1': mismatches = 1; break;
+	   		case '0': maqLike = 0; mismatches = 0; break;
+	   		case '1': maqLike = 0; mismatches = 1; break;
 	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
@@ -191,6 +201,12 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'o':
 	   			offRate = parseInt(1, "-o/--offRate arg must be at least 1");
+	   			break;
+	   		case 'e':
+	   			qualThresh = parseInt(1, "-e/--err arg must be at least 1");
+	   			break;
+	   		case 'n':
+	   			seedMms = parseInt(0, "-n/--seedMms arg must be at least 0");
 	   			break;
 	   		case 'a': oneHit = false; break;
 	   		case 'v': verbose = true; break;
@@ -1140,46 +1156,61 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 
 
 /**
- * Search through a pair of Ebwt indexes, one for the forward direction
- * and one for the backward direction, for exact query hits and hits
- * with at most one mismatch.
+ * Search for a good alignments for each read using criteria that
+ * correspond somewhat faithfully to Maq's.  Search is aided by a pair
+ * of Ebwt indexes, one for the original references, and one for the
+ * transpose of all the references.  Neither index should be loaded
+ * upon entry.
  * 
- * Forward Ebwt (ebwtFw) is already loaded into memory and backward
- * Ebwt (ebwtBw) is not loaded into memory.
+ * Like Maq, we treat the first 24 base pairs of the read (those
+ * closest to the 5' end) differently from the remainder of the read.
+ * We call the first 24 base pairs the "seed."  
  */
 template<typename TStr>
-static void seededQualCutoffSearch(int seedLen,
-                                   int qualCutoff,
-                                   int qualWobble,
-                                   PatternSource<TStr>& patsrc,
-                                   HitSink& sink,
-                                   EbwtSearchStats<TStr>& stats,
-                                   EbwtSearchParams<TStr>& params,
-                                   Ebwt<TStr>& ebwtFw,
-                                   Ebwt<TStr>& ebwtBw,
-                                   vector<TStr>& os)
+static void seededQualCutoffSearch(
+		int seedLen,                    /// length of seed (not a maq option)
+        int qualCutoff,                 /// maximum sum of mismatch qualities
+                                        /// like maq map's -e option
+                                        /// default: 70
+        int qualWobble,                 /// currently unused
+        int seedMms,                    /// max # mismatches allowed in seed
+                                        /// (like maq map's -n option)
+                                        /// Can only be 1 or 2, default: 1
+        PatternSource<TStr>& patsrc,    /// pattern source
+        HitSink& sink,                  /// hit sink
+        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
+        EbwtSearchParams<TStr>& params, /// search parameters
+        Ebwt<TStr>& ebwtFw,             /// index of original text
+        Ebwt<TStr>& ebwtBw,             /// index of transposed text
+        vector<TStr>& os)    /// text strings, if available (empty otherwise)
 {
 	typedef typename Value<TStr>::Type TVal;
 	vector<Hit> sanityHits;
 	uint32_t numPats;
 	assert(revcomp);
+	// Load forward index
 	SWITCH_TO_FW_INDEX();
 	uint32_t numQs = ((qUpto == -1) ? 10 * 1024 * 1024 : qUpto);
 	vector<bool> doneMask(numQs, false);
+	uint32_t s = seedLen;
+	uint32_t s3 = seedLen >> 1; // length of 3' half of seed
+	uint32_t s5 = (seedLen >> 1) + (s & 1); // length of 5' half of seed
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Time for seeded quality search Phase 1 of 4: ", timing);
 		BacktrackManager<TStr> bt(ebwtFw, params,
-		                          12, 24,  // unrevOff, 1revOff
-		                          0, 0,    // itop, ibot
-		                          70,      // qualThresh
-		                          0,       // qualWobble
-		                          false,   // reportSeedlings (don't)
-		                          NULL,    // seedlings
-		                          NULL,    // mutations
-		                          verbose, // verbose
-		                          true,    // oneHit
-		                          seed);   // seed
+		                          (seedMms > 0)?  s5 : s,// unrevOff, 
+		                          (seedMms == 2)? s5 : s,// 1revOff
+		                          s,                     // 2revOff
+		                          0, 0,                  // itop, ibot
+		                          qualCutoff,            // qualThresh
+		                          0,                     // qualWobble
+		                          false,                 // reportSeedlings (don't)
+		                          NULL,                  // seedlings
+		                          NULL,                  // mutations
+		                          verbose,               // verbose
+		                          true,                  // oneHit
+		                          seed);                 // seed
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		params.setFw(false);  // we'll only look at reverse complements this round
@@ -1230,6 +1261,7 @@ static void seededQualCutoffSearch(int seedLen,
 	    numPats = patid;
 	    assert_leq(numPats>>1, doneMask.size());
 	}
+	// Unload forward index and load transposed index
 	SWITCH_TO_BW_INDEX();
 	String<uint8_t> seedlingsRc;
 	reserve(seedlingsRc, 10 * 1024 * 1024, Exact());
@@ -1239,28 +1271,32 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 2 of 4: ", timing);
 		// BacktrackManager to search for hits for cases 1F, 2F, 3F
 		BacktrackManager<TStr> btf(ebwtBw, params,
-		                           12, 24,  // unrevOff, 1revOff
-		                           0, 0,    // itop, ibot
-		                           70,      // qualThresh
-		                           0,       // qualWobble
-		                           false,   // reportSeedlings (don't)
-		                           NULL,    // seedlings
-			                       NULL,    // mutations
-		                           verbose, // verbose
-		                           true,    // oneHit
-		                           seed+1); // seed
+                                   (seedMms > 0)?  s5 : s,// unrevOff
+                                   (seedMms == 2)? s5 : s,// 1revOff
+                                   s,                     // 2revOff
+		                           0, 0,                  // itop, ibot
+		                           qualCutoff,            // qualThresh
+		                           0,                     // qualWobble
+		                           false,                 // reportSeedlings (no)
+		                           NULL,                  // seedlings
+			                       NULL,                  // mutations
+		                           verbose,               // verbose
+		                           true,                  // oneHit
+		                           seed+1);               // seed
 		// BacktrackManager to search for seedlings for case 4R
 		BacktrackManager<TStr> btr(ebwtBw, params,
-		                           12, 24,     // unrevOff, 1revOff
-		                           0, 0,       // itop, ibot
-		                           0xffff,     // qualThresh (none)
-		                           0,          // qualWobble
-		                           true,       // reportSeedlings (do)
-		                           &seedlingsRc, // seedlings
-			                       NULL,       // mutations
-		                           verbose,    // verbose
-		                           true,       // oneHit
-		                           seed+2);    // seed
+		                           s3,                    // unrevOff
+		                           (seedMms == 2)? s3 : s,// 1revOff
+		                           s,                     // 2revOff
+		                           0, 0,                  // itop, ibot
+		                           0xffff,                // qualThresh (none)
+		                           0,                     // qualWobble
+		                           true,                  // reportSeedlings (yes)
+		                           &seedlingsRc,          // seedlings
+			                       NULL,                  // mutations
+		                           verbose,               // verbose
+		                           true,                  // oneHit
+		                           seed+2);               // seed
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
@@ -1311,6 +1347,9 @@ static void seededQualCutoffSearch(int seedLen,
 				patid += 2;
 				continue;
 			}
+			// No need to collect seedlings if we're not allowing
+			// mismatches in the 5' seed half
+			if(seedMms == 0) continue;
 			
 			// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
 			// have been eliminated, leaving us with cases 4F and 4R
@@ -1318,7 +1357,7 @@ static void seededQualCutoffSearch(int seedLen,
 			params.setFw(false);  // looking at reverse-comp strand
 			params.setPatId(patid+1);
 			btr.setQuery(patRc, qualRc, nameRc);
-			btr.setQlen(24); // just look at the seed
+			btr.setQlen(s); // just look at the seed
 			uint32_t numSeedlings = length(seedlingsRc);
 			// Do a 12/24 seedling backtrack on the reverse-comp read
 			// using the transposed index.  This will find seedlings
@@ -1333,7 +1372,7 @@ static void seededQualCutoffSearch(int seedLen,
 				char lastQual = 0;
 				while(seedlingsRc[id2++] != 0xff) {
 					uint8_t pos = seedlingsRc[id2-1];
-					assert_lt(pos, 12);
+					assert_lt(pos, s5);
 					// Get the character to mutate it to
 					uint8_t chr = seedlingsRc[id2++];
 					assert_lt(chr, 4);
@@ -1350,6 +1389,7 @@ static void seededQualCutoffSearch(int seedLen,
 	    }
 	    assert_eq(numPats, patid);
 	}
+	// Unload transposed index and load forward index
 	SWITCH_TO_FW_INDEX();
 	String<uint8_t> seedlingsFw;
 	reserve(seedlingsFw, 10 * 1024 * 1024, Exact());
@@ -1359,21 +1399,29 @@ static void seededQualCutoffSearch(int seedLen,
 		Timer _t(cout, "Time for seeded quality search Phase 3 of 4: ", timing);
 		// BacktrackManager to search for seedlings for case 4F
 		BacktrackManager<TStr> btf(ebwtFw, params,
-		                           12, 24,     // unrevOff, 1revOff
-		                           0, 0,       // itop, ibot
-		                           0xffff,     // qualThresh (none)
-		                           0,          // qualWobble
-		                           true,       // reportSeedlings (do)
-		                           &seedlingsFw, // seedlings
-			                       NULL,       // mutations
-		                           verbose,    // verbose
-		                           true,       // oneHit
-		                           seed+3);    // seed
-		// BacktrackManager to search for hits for case 4R
+                                   s3,                    // unrevOff
+                                   (seedMms == 2)? s3 : s,// 1revOff
+                                   s,                     // 2revOff
+		                           0, 0,                  // itop, ibot
+		                           0xffff,                // qualThresh (none)
+		                           0,                     // qualWobble
+		                           true,                  // reportSeedlings (do)
+		                           &seedlingsFw,          // seedlings
+			                       NULL,                  // mutations
+		                           verbose,               // verbose
+		                           true,                  // oneHit
+		                           seed+3);               // seed
+		// BacktrackManager to search for hits for case 4R; default
+		// parameters are appropriate when searching with 1 mismatch
+		// allowed in the entire seed.  If 2 mismatches are allowed,
+		// then, depending on whether the seedling has 1 or 2
+		// mismatches, we may need to move unrevOff up to s2.
 		BacktrackManager<TStr> btr(ebwtFw, params,
-		                           24, 24,  // unrevOff, 1revOff
+		                           s,       // unrevOff
+		                           s,       // 1revOff
+		                           s,       // 2revOff
 		                           0, 0,    // itop, ibot
-		                           70,      // qualThresh
+		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
 		                           false,   // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1420,7 +1468,7 @@ static void seededQualCutoffSearch(int seedLen,
 					char lastQual = 0;
 					while(seedlingsRc[id2++] != 0xff) {
 						uint8_t pos = seedlingsRc[id2-1];
-						assert_lt(pos, 12);
+						assert_lt(pos, s5);
 						assert_lt(pos, plen);
 						// Get the character to mutate it to
 						uint8_t chr = seedlingsRc[id2++];
@@ -1478,10 +1526,35 @@ static void seededQualCutoffSearch(int seedLen,
 	    		patid += 2;
 	    		continue;
 	    	}
+	    	
+#ifndef NDEBUG
+			// The reverse-complement version of the read doesn't hit
+	    	// at all!  Check with the oracle to make sure it agrees.
+	    	if(sanityCheck && os.size() > 0) {
+				vector<Hit> hits;
+				uint32_t twoRevOff = s;
+				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
+				uint32_t unevOff   = (seedMms == 0) ? s : 0;
+				BacktrackManager<TStr>::naiveOracle(
+						*patRc,
+				        *qualRc,
+				        *nameRc,
+				        patid+1,    // patid
+				        os,
+				        hits,
+				        qualCutoff, 
+				        unevOff,
+				        oneRevOff,
+				        twoRevOff,
+				        false,      // fw
+				        true);      // ebwtFw
+				assert_eq(0, hits.size());
+	    	}
+#endif
 
 			// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, 3R and
 			// 4R have been eliminated leaving only 4F.
-			params.setFw(true);  // looking at reverse-comp strand
+			params.setFw(true);  // looking at forward strand
 			params.setPatId(patid);
 			btf.setQuery(patFw, qualFw, nameFw);
 			btf.setQlen(24); // just look at the seed
@@ -1498,7 +1571,7 @@ static void seededQualCutoffSearch(int seedLen,
 				char lastQual = 0;
 				while(seedlingsFw[id2++] != 0xff) {
 					uint8_t pos = seedlingsFw[id2-1];
-					assert_lt(pos, 12);
+					assert_lt(pos, s5);
 					// Get the character to mutate it to
 					uint8_t chr = seedlingsFw[id2++];
 					assert_lt(chr, 4);
@@ -1516,15 +1589,22 @@ static void seededQualCutoffSearch(int seedLen,
 	    assert_eq(seedlingId, seedlingsRcLen);
 	    assert(numPats == patid || numPats+2 == patid);
 	}
+	// Unload forward index and load transposed index
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
 		Timer _t(cout, "Time for seeded quality search Phase 4 of 4: ", timing);
-		// BacktrackManager to search for hits for case 4R
+		// BacktrackManager to search for hits for case 4F; default
+		// parameters are appropriate when searching with 1 mismatch
+		// allowed in the entire seed.  If 2 mismatches are allowed,
+		// then, depending on whether the seedling has 1 or 2
+		// mismatches, we may need to move unrevOff up to s2.
 		BacktrackManager<TStr> btf(ebwtBw, params,
-		                           24, 24,  // unrevOff, 1revOff
+                                   s,       // unrevOff
+                                   s,       // 1revOff
+                                   s,       // 2revOff
 		                           0, 0,    // itop, ibot
-		                           70,      // qualThresh
+		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
 		                           false,   // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1567,7 +1647,7 @@ static void seededQualCutoffSearch(int seedLen,
 					char lastQual = 0;
 					while(seedlingsFw[id2++] != 0xff) {
 						uint8_t pos = seedlingsFw[id2-1];
-						assert_lt(pos, 12);
+						assert_lt(pos, s5);
 						assert_lt(pos, plen);
 						uint8_t tpos = plen-1-pos;
 						// Get the character to mutate it to
@@ -1617,16 +1697,94 @@ static void seededQualCutoffSearch(int seedLen,
 					}
 				}
 				assert_leq(seedlingId, seedlingsFwLen);
-				if(seedlingId == seedlingsFwLen) return;
+				if(seedlingId == seedlingsFwLen) {
+					break; // break out of the pattern loop
+				}
 				assert_eq(0xff, seedlingsFw[seedlingId-1]);
-			}
+			} // if(seedlingsFw[seedlingId++] != 0xff)
 			assert_eq(0xff, seedlingsFw[seedlingId-1]);
 			assert_eq((patid>>1) & 0xff, seedlingsFw[seedlingId]);
 			ASSERT_ONLY(seedlingId++); // skip patid sanity marker
+			
+#ifndef NDEBUG
+			// Case 4F yielded a hit; mark this pattern as done and
+			// continue to next pattern
+	    	if(doneMask[patid>>1]) {
+	    		patid += 2;
+	    		continue;
+	    	}
+	    	
+			// The forward version of the read doesn't hit at all!
+			// Check with the oracle to make sure it agrees.
+	    	if(sanityCheck && os.size() > 0) {
+				vector<Hit> hits;
+				uint32_t twoRevOff = s;
+				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
+				uint32_t unevOff   = (seedMms == 0) ? s : 0;
+				BacktrackManager<TStr>::naiveOracle(
+						*patFw,
+				        *qualFw,
+				        *nameFw,
+				        patid,      // patid
+				        os,
+				        hits,
+				        qualCutoff, 
+				        unevOff,    // unevOff
+				        oneRevOff,  // oneRevOff
+				        twoRevOff,  // twoRevOff
+				        true,       // fw
+				        false);     // ebwtFw
+				assert_eq(0, hits.size());
+			}
+#endif
 			patid += 2;
-	    }
+	    } // while(patsrc.hasMorePatterns()...
 	    assert_eq(seedlingId, seedlingsFwLen);
-	}
+	} // end of Phase 4
+//	{
+//		// Sanity-checking phase: ensure that all patterns that didn't
+//		// map are indeed unmappable under the given policy.  Use a
+//		// naive algorithm.
+//		uint32_t patid = 0;
+//		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+//		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+//	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+//	    	assert_lt((patid>>1), doneMask.capacity());
+//	    	assert_lt((patid>>1), doneMask.size());
+//	    	if(doneMask[patid>>1]) {
+//				patsrc.skipPattern();
+//				patsrc.skipPattern();
+//	    		patid += 2;
+//	    		continue;
+//	    	}
+//			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
+//			assert(patFw != NULL);
+//			assert(patsrc.nextIsReverseComplement());
+//			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
+//			assert(patRc != NULL);
+//			assert(patRc != patFw);
+//			assert(!patsrc.nextIsReverseComplement());
+//			assert(isReverseComplement(*patFw, *patRc));
+//
+//			// Invoke naive oracle to confirm no hits for 
+//			vector<Hit> hits;
+//			static void naiveOracle(*patFw,
+//			                        *qualFw,
+//			                        *nameFw,
+//			                        patid,
+//			                        os,
+//			                        hits,
+//			                        qualCutoff,
+//			                        0,
+//			                        0,
+//			                        s,
+//			                        true,       // fw
+//			                        bool ebwtFw,
+//			                        uint32_t iham = 0,
+//			                        String<QueryMutation>* muts = NULL)
+//			patid += 2;
+//	    }
+//	}
 	return;
 }
 
@@ -1759,16 +1917,17 @@ static void driver(const char * type,
 		                              true,
 		                              arrowMode);
 		if(maqLike) {
-			seededQualCutoffSearch(24,
-			                       70,
-			                       15,
+			seededQualCutoffSearch(seedLen,
+			                       qualThresh,
+			                       15,      // qualWobble
+			                       seedMms,
 			                       *patsrc,
 			                       *sink,
 			                       stats,
 			                       params,
-			                       ebwt,
-			                       *ebwtBw,
-			                       os);
+			                       ebwt,    // forward index
+			                       *ebwtBw, // transposed index (not optional)
+			                       os);     // references, if available
 		}
 		else if(mismatches > 0) 
 		{
