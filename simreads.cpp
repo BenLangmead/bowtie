@@ -304,7 +304,7 @@ void driver(vector<string>& infiles, ostream& faout, ostream& fqout) {
 			uint32_t r = rand() % bases;
 			for(size_t j = 0; j < ss.size(); j++) {
 				if(r < length(ss[j])) {
-					ss[j][r] = (Dna)(((int)ss[j][r] + (rand()%3)) & 3);
+					ss[j][r] = (Dna)(((int)ss[j][r] + ((rand())%3+1)) & 3);
 					break;
 				}
 				r -= length(ss[j]);
