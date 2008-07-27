@@ -5,6 +5,9 @@ Runs bowtie against genomes of sizes varying in length from whole-human
 down to a 1/16th-length prefix of whole-human, with intermediate points
 at each log2.  The size of the read set is held constant.  All reads
 are simulated from only the relevant prefix of the human genome.  For
-each genome length, bowtie is run in both exact-hits-only mode and
-1-mismatch mode.  The goal is to characterize how bowtie's running time
-scales with the size of the genome in both modes.
+each genome length, bowtie is run in exact end-to-end mode, 1-mismatch
+end-to-end mode, and Maq mode.  The goal is to characterize how
+bowtie's running time scales with the size of the genome in all modes.
+We expect bowtie to scale largely independently of genome size in exact
+end-to-end mode.  We expect steeper scaling factors for the more
+complex modes.
