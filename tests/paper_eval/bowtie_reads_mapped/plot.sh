@@ -24,6 +24,8 @@ perl ~/software/gplot-1.3/gplot.pl \
      -name "Above, plus reads with one 1-mismatch hit" inexactu.dat \
   -thickness 2 -color black -point uptriangle   -pointsize 1.3 \
      -name "Above, plus reads with many 1-mismatch hits" inexact.dat \
+  -thickness 2 -color black -point diamond      -pointsize 1.3 \
+     -name "Above, plus reads mapped with Maq-like policy" other.dat \
   | grep -v "GUPLOT" > plot.gnuplot
 
 if [ ! -f /tmp/gplot.eps ] ; then

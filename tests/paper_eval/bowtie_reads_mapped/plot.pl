@@ -14,14 +14,14 @@ my @trims = (25, 30, 35, 40);
 my $reads = 8956597;
 my $asPercent = 1;
 
-open(EXACT, ">exact.dat") || die "Could not open >exact.dat";
-open(EXACTU, ">exactu.dat") || die "Could not open >exactu.dat";
-open(INEXACT, ">inexact.dat") || die "Could not open >inexact.dat";
+open(EXACT,    ">exact.dat")    || die "Could not open >exact.dat";
+open(EXACTU,   ">exactu.dat")   || die "Could not open >exactu.dat";
+open(INEXACT,  ">inexact.dat")  || die "Could not open >inexact.dat";
 open(INEXACTU, ">inexactu.dat") || die "Could not open >inexactu.dat";
+open(OTHER,    ">other.dat")    || die "Could not open >other.dat";
 
 for my $t (@trims) {
-    open(STATS, "ebwt.$t.1tfra.arrows.stats") || \
-	    die "Could not open stats ebwt.$t.1tfra.arrows.stats";
+    open(STATS, "ebwt.$t.1tfra.arrows.stats") || die "Could not open stats ebwt.$t.1tfra.arrows.stats";
     print "$t bp: \n";
     print "  # reads: $reads\n";
     my $add = 0;
@@ -59,5 +59,16 @@ for my $t (@trims) {
 	    print INEXACT "$t\t$foo\n";
 	    print "  1-mismatch hits: $1\n";
 	}
-    }
+    } # while(<STATS>)
+    my $hits = `wc -l ebwt.$t.maq.tfr.hits | awk '{print \$1}'`;
+	my $foo = $hits * 100.0 / $reads if $asPercent;
+	$foo /= 1000000 unless $asPercent;
+	print OTHER "$t\t$foo\n";
+	print "  Other hits: $hits\n";
 }
+
+close(EXACT);
+close(EXACTU);
+close(INEXACT);
+close(INEXACTU);
+close(OTHER);
