@@ -3,6 +3,7 @@
 BOWTIE_HOME=$HOME/workspace/bowtie
 GENOMES_HOME=../..
 
+# Grab the latest and greatest ebwt_build
 make -C ${BOWTIE_HOME} ebwt_build
 cp ${BOWTIE_HOME}/ebwt_build .
 
@@ -11,6 +12,8 @@ pid2=0
 pid3=0
 pid4=0
 
+# Build all 4 non-whole-human indexes in parallel
+ 
 if [ ! -f /fs/szasmg/langmead/ebwts/whole.1435609516.1.ebwt ] ; then
    ./ebwt_build --cutoff 1435609516 -d --bmaxDivN 6 \
       ${GENOMES_HOME}/hs_ref_all.mfa /fs/szasmg/langmead/ebwts/whole.1435609516 &

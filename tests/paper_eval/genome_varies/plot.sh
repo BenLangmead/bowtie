@@ -6,6 +6,7 @@ for t in 0 5 10 ; do
 	# Truncate output files
 	echo -n > trim${t}_0mm.dat
 	echo -n > trim${t}_1mm.dat
+	echo -n > trim${t}_maq.dat
 	for s in whole.179451189 \
 	         whole.358902379 \
 	         whole.717804758 \
@@ -17,6 +18,7 @@ for t in 0 5 10 ; do
 	    fi
 	   	echo -n "$n " >> trim${t}_0mm.dat
 	   	echo -n "$n " >> trim${t}_1mm.dat
+	   	echo -n "$n " >> trim${t}_maq.dat
 		perl summarize_top.pl ${s}.sim_reads.t${t}.top ebwt_search \
 		  | tail -1 \
 		  | cut -d" " -f 2 \
@@ -25,6 +27,10 @@ for t in 0 5 10 ; do
 		  | tail -1 \
 		  | cut -d" " -f 2 \
 		  | cut -d"," -f 1 >> trim${t}_1mm.dat
+		perl summarize_top.pl ${s}.sim_reads.m.t${t}.top ebwt_search \
+		  | tail -1 \
+		  | cut -d" " -f 2 \
+		  | cut -d"," -f 1 >> trim${t}_maq.dat
 	done
 done
 
@@ -51,6 +57,12 @@ perl ~/software/gplot-1.3/gplot.pl \
      -name "30bp reads, 1-mismatch matching" trim5_1mm.dat \
   -thickness 2 -color black -point filleddowntriangle -pointsize 1.3 \
      -name "25bp reads, 1-mismatch matching" trim10_1mm.dat \
+  -thickness 2 -color black -point box          -pointsize 1.3 \
+     -name "35bp reads, Maq-like matching"      trim0_maq.dat \
+  -thickness 2 -color black -point circle       -pointsize 1.3 \
+     -name "30bp reads, Maq-like matching"      trim5_maq.dat \
+  -thickness 2 -color black -point downtriangle -pointsize 1.3 \
+     -name "25bp reads, Maq-like matching"      trim10_maq.dat \
   | grep -v "GUPLOT" > plot.gnuplot
 
 if [ ! -f /tmp/gplot.eps ] ; then

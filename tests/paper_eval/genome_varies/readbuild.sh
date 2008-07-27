@@ -3,6 +3,7 @@
 BOWTIE_HOME=$HOME/workspace/bowtie
 GENOMES_HOME=../..
 
+# Grab the latest and greatest simreads
 make -C ${BOWTIE_HOME} simreads
 cp ${BOWTIE_HOME}/simreads .
 
@@ -12,6 +13,8 @@ pid2=0
 pid3=0
 pid4=0
 
+# Simulate all 5 sets of reads in parallel
+ 
 if [ ! -f whole.sim_reads.fq ] ; then
    ./simreads -r 4000000 \
       ${GENOMES_HOME}/hs_ref_all.mfa whole.sim_reads.fa \
