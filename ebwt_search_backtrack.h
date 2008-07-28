@@ -634,15 +634,14 @@ public:
 			assert_lt(elims[d], 16);
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 			// Achieved a match, but need to keep going
-			bool keepGoingDespiteMatch = false;
+			bool backtrackDespiteMatch = false;
 			if(cur == 0 &&  // we've consumed the entire pattern
 			   top < bot && // there's a hit to report
 			   stackDepth < _reportSeedlings && // not yet used up our mismatches
-			   _reportSeedlings > 0 &&
-			   altNum > 0)  // there are still legel backtracking targets
+			   _reportSeedlings > 0)  // there are still legel backtracking targets
 			{
 				assert(!_halfAndHalf);
-				keepGoingDespiteMatch = true;
+				if(altNum > 0) backtrackDespiteMatch = true;
 				if(stackDepth > 0) {
 					// This is a legit seedling; report it
 					reportSeedling(stackDepth);
@@ -650,33 +649,51 @@ public:
 				// Now continue on to find legitimate seedlings with
 				// more mismatches than this one
 			}
-			else if(_halfAndHalf && (d == (_5depth-1)) && top < bot) {
-				// About to transition into the 3' half of the seed;
-				// we should induce a mismatch if we haven't mismatched
-				// yet, so that we don't waste time pursuing a match
-				// that was covered by a previous phase
-				assert_eq(0, _reportSeedlings);
-				if(stackDepth == 0) {
-					keepGoingDespiteMatch = true;
-				} else {
-					assert_eq(1, stackDepth);
+			// Set this to true if the only way to make legal progress
+			// is via one or more additional backtracks.  This is
+			// helpful in half-and-half mode.
+			bool mustBacktrack = false;
+			if(_halfAndHalf) {
+				if((d == (_5depth-1)) && top < bot) {
+					// About to transition into the 3' half of the seed;
+					// we should induce a mismatch if we haven't mismatched
+					// yet, so that we don't waste time pursuing a match
+					// that was covered by a previous phase
+					assert_eq(0, _reportSeedlings);
+					assert_leq(stackDepth, 1);
+					if(stackDepth == 0 && altNum > 0) {
+						backtrackDespiteMatch = true;
+						mustBacktrack = true;
+					} else if(stackDepth == 0) {
+						return false;
+					}
 				}
-			}
-			else if(_halfAndHalf && (d == (_3depth-1)) && top < bot) {
-				// About to transition into the 3' half of the seed;
-				// we should induce a mismatch if we haven't mismatched
-				// yet, so that we don't waste time pursuing a match
-				// that was covered by a previous phase
-				assert_eq(0, _reportSeedlings);
-				if(stackDepth < 2) {
-					keepGoingDespiteMatch = true;
-				} else {
-					assert_eq(2, stackDepth);
+				else if((d == (_3depth-1)) && top < bot) {
+					// About to transition into the 3' half of the seed;
+					// we should induce a mismatch if we haven't mismatched
+					// yet, so that we don't waste time pursuing a match
+					// that was covered by a previous phase
+					assert_eq(0, _reportSeedlings);
+					assert_leq(stackDepth, 2);
+					assert_gt(stackDepth, 0);
+					if(stackDepth < 2 && altNum > 0) {
+						backtrackDespiteMatch = true;
+						mustBacktrack = true;
+					} else if(stackDepth < 2) {
+						return false;
+					}
+				}
+				if(d < _5depth-1) {
+					assert_leq(stackDepth, 1);
+				}
+				else if(d >= _5depth && d < _3depth-1) {
+					assert_gt(stackDepth, 0);
+					assert_leq(stackDepth, 2);
 				}
 			}
 			// Mismatch with alternatives
-			while((top == bot && altNum > 0) || keepGoingDespiteMatch) {
-				keepGoingDespiteMatch = false;
+			while((top == bot && altNum > 0) || backtrackDespiteMatch) {
+				backtrackDespiteMatch = false;
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -882,6 +899,7 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Try again
 			} // while(top == bot && altNum > 0)
+			if(mustBacktrack) return false;
 			// Mismatch with no alternatives
 			if(top == bot && altNum == 0) {
 				assert_eq(0, altNum);
@@ -1194,10 +1212,11 @@ protected:
 		// Possibly report
 		assert_gt(_reportSeedlings, 0);
 		assert(_seedlings != NULL);
+		ASSERT_ONLY(uint32_t qualTot = 0);
 		for(size_t i = 0; i < stackDepth; i++) {
-			// Enrties in _mms[] hold the offset from the 5' end 
 			assert_lt(_mms[i], _qlen);
 			append((*_seedlings), (uint8_t)_mms[i]); // pos
+			ASSERT_ONLY(qualTot += ((*_qual)[_mms[i]] - 33));
 			uint32_t ci = _qlen - _mms[i] - 1;
 			// _chars[] is index in terms of RHS-relative depth
 			int c = (int)(Dna)_chars[ci];
@@ -1208,6 +1227,7 @@ protected:
 				append((*_seedlings), 0xfe); // minor separator
 			}
 		}
+		assert_leq(qualTot, _qualThresh);
 		return true;
 	}
 

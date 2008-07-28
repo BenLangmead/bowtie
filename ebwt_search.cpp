@@ -1295,7 +1295,7 @@ static void seededQualCutoffSearch(
 		                           (seedMms == 2)? s3 : s,// 1revOff
 		                           s,                     // 2revOff
 		                           0, 0,                  // itop, ibot
-		                           0xffff,                // qualThresh (none)
+		                           qualCutoff,            // qualThresh (none)
 		                           0,                     // qualWobble
 		                           seedMms,               // reportSeedlings (yes)
 		                           &seedlingsRc,          // seedlings
@@ -1409,7 +1409,7 @@ static void seededQualCutoffSearch(
                                    (seedMms == 2)? s3 : s,// 1revOff
                                    s,                     // 2revOff
 		                           0, 0,                  // itop, ibot
-		                           0xffff,                // qualThresh (none)
+		                           qualCutoff,            // qualThresh (none)
 		                           0,                     // qualWobble
 		                           seedMms,               // reportSeedlings (do)
 		                           &seedlingsFw,          // seedlings
@@ -1523,7 +1523,8 @@ static void seededQualCutoffSearch(
 						// Get the character to mutate it to
 						uint8_t chr = seedlingsRc[seedlingId++];
 						uint8_t oldChar = (uint8_t)(*patRc)[tpos];
-						oldQuals += (uint8_t)(*qualRc)[tpos]-33;
+						oldQuals += ((uint8_t)(*qualRc)[tpos]-33);
+						assert_leq(oldQuals, qualCutoff);
 						append(muts, QueryMutation(tpos, oldChar, chr));
 					} while(seedlingsRc[seedlingId++] == 0xfe);
 					seedlingId--; // point to that non-0xfe character
@@ -1587,6 +1588,11 @@ static void seededQualCutoffSearch(
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
 				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
+				bool newName = false;
+				if(nameRc == NULL) {
+					nameRc = new String<char>("no_name");
+					newName = true;
+				}
 				BacktrackManager<TStr>::naiveOracle(
 				        os,
 						*patRc,
@@ -1612,6 +1618,9 @@ static void seededQualCutoffSearch(
 					    oneRevOff,
 					    twoRevOff,
 					    true);      // ebwtFw
+				}
+				if(newName) {
+					delete nameRc;
 				}
 				assert_eq(0, hits.size());
 	    	}
@@ -1643,7 +1652,9 @@ static void seededQualCutoffSearch(
 					uint8_t oldChar = (uint8_t)(*patFw)[pos];
 					uint8_t oldQual = (uint8_t)(*qualFw)[pos]-33;
 					assert_leq(oldQual, 40);
-					assert_geq((*qualFw)[pos], lastQual);
+					if(seedMms < 2) {
+						assert_geq((*qualFw)[pos], lastQual);
+					}
 					lastQual = (*qualFw)[pos];
 					assert_neq(oldChar, chr);
 					if(seedlingsFw[id2] == 0xfe) {
@@ -1741,7 +1752,9 @@ static void seededQualCutoffSearch(
 						uint8_t oldChar = (uint8_t)(*patFw)[tpos];
 						uint8_t oldQual = (uint8_t)(*qualFw)[tpos]-33;
 						assert_leq(oldQual, 40);
-						assert_geq((*qualFw)[tpos], lastQual);
+						if(seedMms < 2) {
+							assert_geq((*qualFw)[pos], lastQual);
+						}
 						lastQual = (*qualFw)[tpos];
 						assert_neq(oldChar, chr);
 						if(seedlingsFw[id2] == 0xfe) {
@@ -1768,7 +1781,8 @@ static void seededQualCutoffSearch(
 						// Get the character to mutate it to
 						uint8_t chr = seedlingsFw[seedlingId++];
 						uint8_t oldChar = (uint8_t)(*patFw)[tpos];
-						oldQuals += (uint8_t)(*qualFw)[tpos]-33;
+						oldQuals += ((uint8_t)(*qualFw)[tpos]-33);
+						assert_leq(oldQuals, qualCutoff);
 						append(muts, QueryMutation(tpos, oldChar, chr));
 					} while(seedlingsFw[seedlingId++] == 0xfe);
 					seedlingId--; // point to that non-0xfe character
@@ -1833,6 +1847,11 @@ static void seededQualCutoffSearch(
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
 				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
+				bool newName = false;
+				if(nameFw == NULL) {
+					nameFw = new String<char>("no_name");
+					newName = true;
+				}
 				BacktrackManager<TStr>::naiveOracle(
 				        os,
 						*patFw,
@@ -1858,6 +1877,9 @@ static void seededQualCutoffSearch(
 					    oneRevOff,
 					    twoRevOff,
 					    false);     // ebwtFw
+				}
+				if(newName) {
+					delete nameFw;
 				}
 				assert_eq(0, hits.size());
 			}
