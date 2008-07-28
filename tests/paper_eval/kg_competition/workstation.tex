@@ -23,9 +23,9 @@
  & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \multicolumn{2}{c}{Reads mapped} \\
  &                            & time       & Speedup & Overall    & w/r/t Bowtie \\[3pt]
 \toprule
-Bowtie & 10m:29s & 11m:30s & - & 64.0\% & - \\\midrule
-Maq with -n 1 & 6h:36m:57s & 6h:38m:53s & 34.7x & 71.8\% & +12.1\% \\\midrule
-Maq & 17h:46m:35s & 17h:53m:07s & 93.3x & 73.8\% & +15.3\% \\
+Bowtie & 8m:28s & 12m:06s & - & 71.6\% & - \\\midrule
+Maq with -n 1 & 6h:36m:57s & 6h:38m:53s & 33.0x & 70.3\% & -1.9\% \\\midrule
+Maq & 17h:46m:35s & 17h:53m:07s & 88.7x & 73.8\% & +3.0\% \\
 \bottomrule
 \end{tabular}
 \caption{CPU time for mapping 8.96M 35bp Illumina/Solexa reads (1 lane's worth) against the whole human genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. Reads were originally extracted as part of the 1000-Genomes project pilot. They were downloaded from the NCBI Short Read archive, accession \#SRR001115. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
