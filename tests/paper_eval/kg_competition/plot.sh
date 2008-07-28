@@ -21,9 +21,11 @@ NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 WORKSTATION=1
 if [ ! -f $NAME.results.txt ] ; then
-	perl summarize_top.pl $NAME.ebwt.top   ebwt_search | tail -1  > $NAME.results.txt
-	perl summarize_top.pl $NAME.maq.n1.top maq         | tail -1 >> $NAME.results.txt
-	perl summarize_top.pl $NAME.maq.top    maq         | tail -1 >> $NAME.results.txt
+	perl summarize_top.pl $NAME.ebwt.top    ebwt_search | tail -1  > $NAME.results.txt
+	perl summarize_top.pl $NAME.maq.n1.top  maq         | tail -1 >> $NAME.results.txt
+	perl summarize_top.pl $NAME.maq.top     maq         | tail -1 >> $NAME.results.txt
+	perl summarize_top.pl $NAME.soap.v1.top soap        | tail -1 >> $NAME.results.txt
+	perl summarize_top.pl $NAME.soap.v2.top soap        | tail -1 >> $NAME.results.txt
 fi
 if [ ! -f $NAME.maps.txt ] ; then
 	sh analyze_maps.sh > $NAME.maps.txt
