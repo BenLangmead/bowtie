@@ -23,5 +23,5 @@ cp ${BOWTIE_HOME}/ebwt_search .
 if [ ! -f ${NAME}.ebwt.hits ] ; then
    echo > ${NAME}.ebwt.top
    sh wrap.sh ${NAME}.ebwt \
-     ./ebwt_search -1tqr ${NAME} ${READS} ${NAME}.ebwt.hits
+     ./ebwt_search --maq -tqr ${NAME} ${READS} ${NAME}.ebwt.hits
 fi
