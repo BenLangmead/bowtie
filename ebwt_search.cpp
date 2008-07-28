@@ -1154,6 +1154,23 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	params.setEbwtFw(false); /* tell search params that we're in the transposed domain */ \
 }
 
+#define GET_BOTH_PATTERNS(pf, qf, nf, pr, qr, nr) { \
+	patsrc.nextPattern(&pf, &qf, &nf); \
+	assert(pf != NULL); \
+	assert(patsrc.nextIsReverseComplement()); \
+	patsrc.nextPattern(&pr, &qr, &nr); \
+	assert(pr != NULL); \
+	assert(pr != patFw); \
+	assert(!patsrc.nextIsReverseComplement()); \
+	assert(isReverseComplement(*pf, *pr)); \
+}
+
+#define GET_FW_PATTERN(pf, qf, nf) { \
+	patsrc.nextPattern(&pf, &qf, &nf); \
+	assert(pf != NULL); \
+	assert(patsrc.nextIsReverseComplement()); \
+}
+
 
 /**
  * Search for a good alignments for each read using criteria that
@@ -1205,12 +1222,13 @@ static void seededQualCutoffSearch(
 		                          0, 0,                  // itop, ibot
 		                          qualCutoff,            // qualThresh
 		                          0,                     // qualWobble
-		                          false,                 // reportSeedlings (don't)
+		                          0,                     // reportSeedlings (don't)
 		                          NULL,                  // seedlings
 		                          NULL,                  // mutations
 		                          verbose,               // verbose
 		                          true,                  // oneHit
-		                          seed);                 // seed
+		                          seed,                  // seed
+		                          &os);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		params.setFw(false);  // we'll only look at reverse complements this round
@@ -1221,30 +1239,17 @@ static void seededQualCutoffSearch(
 	    		// Expand doneMask
 	    		doneMask.resize(doneMask.capacity()*2, 0);
 	    	}
-			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-			for(size_t i = 0; i < length(*qualFw); i++) {
-				assert_geq((*qualFw)[i], 33);
-				assert_leq((*qualFw)[i], 73);
-			}
-			assert(patFw != NULL);
-			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-			for(size_t i = 0; i < length(*qualRc); i++) {
-				assert_geq((*qualRc)[i], 33);
-				assert_leq((*qualRc)[i], 73);
-			}
-			assert(patRc != NULL);
-			assert(!patsrc.nextIsReverseComplement());
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			size_t plen = length(*patFw);
 			if(qSameLen) {
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
 			}
-			assert(isReverseComplement(*patFw, *patRc));
+			// Set up backtracker with reverse complement
 			bt.setQuery(patRc, qualRc, nameRc);
 			params.setPatId(patid+1);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			bool hit = bt.backtrack(&os);
+			bool hit = bt.backtrack();
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1277,12 +1282,13 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh
 		                           0,                     // qualWobble
-		                           false,                 // reportSeedlings (no)
+		                           0,                     // reportSeedlings (no)
 		                           NULL,                  // seedlings
 			                       NULL,                  // mutations
 		                           verbose,               // verbose
 		                           true,                  // oneHit
-		                           seed+1);               // seed
+			                       seed+1,                // seed
+			                       &os);
 		// BacktrackManager to search for seedlings for case 4R
 		BacktrackManager<TStr> btr(ebwtBw, params,
 		                           s3,                    // unrevOff
@@ -1291,12 +1297,13 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           0xffff,                // qualThresh (none)
 		                           0,                     // qualWobble
-		                           true,                  // reportSeedlings (yes)
+		                           seedMms,               // reportSeedlings (yes)
 		                           &seedlingsRc,          // seedlings
 			                       NULL,                  // mutations
 		                           verbose,               // verbose
 		                           true,                  // oneHit
-		                           seed+2);               // seed
+			                       seed+2,                // seed
+			                       &os);
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
@@ -1314,22 +1321,7 @@ static void seededQualCutoffSearch(
 	    	// eliminated.  The next most likely cases are 1F, 2F and
 	    	// 3F...
 			params.setFw(true);  // looking at forward strand
-			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-			for(size_t i = 0; i < length(*qualFw); i++) {
-				assert_geq((*qualFw)[i], 33);
-				assert_leq((*qualFw)[i], 73);
-			}
-			assert(patFw != NULL);
-			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-			for(size_t i = 0; i < length(*qualRc); i++) {
-				assert_geq((*qualRc)[i], 33);
-				assert_leq((*qualRc)[i], 73);
-			}
-			assert(patRc != NULL);
-			assert(patRc != patFw);
-			assert(!patsrc.nextIsReverseComplement());
-			assert(isReverseComplement(*patFw, *patRc));
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			btf.setQuery(patFw, qualFw, nameFw);
 			params.setPatId(patid);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
@@ -1337,7 +1329,7 @@ static void seededQualCutoffSearch(
 			// Do a 12/24 backtrack on the forward-strand read using
 			// the transposed index.  This will find all case 1F, 2F
 			// and 3F hits.
-			bool hit = btf.backtrack(&os);
+			bool hit = btf.backtrack();
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1349,7 +1341,10 @@ static void seededQualCutoffSearch(
 			}
 			// No need to collect seedlings if we're not allowing
 			// mismatches in the 5' seed half
-			if(seedMms == 0) continue;
+			if(seedMms == 0) {
+				patid += 2;
+				continue;
+			}
 			
 			// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
 			// have been eliminated, leaving us with cases 4F and 4R
@@ -1362,10 +1357,11 @@ static void seededQualCutoffSearch(
 			// Do a 12/24 seedling backtrack on the reverse-comp read
 			// using the transposed index.  This will find seedlings
 			// for case 4R
-			btr.backtrack(&os);
+			btr.backtrack();
 			hit = length(seedlingsRc) > numSeedlings;
 			append(seedlingsRc, 0xff);
 #ifndef NDEBUG
+			// Sanity-check the generated seedling hits
 			append(seedlingsRc, (patid>>1));
 			{
 				uint32_t id2 = numSeedlings;
@@ -1379,15 +1375,25 @@ static void seededQualCutoffSearch(
 					uint8_t oldChar = (uint8_t)(*patRc)[pos];
 					uint8_t oldQual = (uint8_t)(*qualRc)[pos]-33;
 					assert_leq(oldQual, 40);
-					assert_geq((*qualRc)[pos], lastQual);
+					if(seedMms < 2) {
+						assert_geq((*qualRc)[pos], lastQual);
+					}
 					lastQual = (*qualRc)[pos];
 					assert_neq(oldChar, chr);
+					if(seedlingsRc[id2] == 0xfe) {
+						id2++;
+					}
 				}
 			}
 #endif
 			patid += 2;
 	    }
 	    assert_eq(numPats, patid);
+	}
+	if(seedMms == 0) {
+		// If we're not allowing any mismatches in the seed, then there
+		// is no need to continue to phases 3 and 4
+		return;
 	}
 	// Unload transposed index and load forward index
 	SWITCH_TO_FW_INDEX();
@@ -1405,12 +1411,13 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           0xffff,                // qualThresh (none)
 		                           0,                     // qualWobble
-		                           true,                  // reportSeedlings (do)
+		                           seedMms,               // reportSeedlings (do)
 		                           &seedlingsFw,          // seedlings
 			                       NULL,                  // mutations
 		                           verbose,               // verbose
 		                           true,                  // oneHit
-		                           seed+3);               // seed
+			                       seed+3,                // seed
+			                       &os);
 		// BacktrackManager to search for hits for case 4R; default
 		// parameters are appropriate when searching with 1 mismatch
 		// allowed in the entire seed.  If 2 mismatches are allowed,
@@ -1423,12 +1430,28 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
-		                           false,   // reportSeedlings (don't)
+		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
 		                           verbose, // verbose
 		                           true,    // oneHit
-		                           seed+4); // seed
+			                       seed+4,  // seed
+			                       &os);
+		BacktrackManager<TStr> btr2(ebwtFw, params,
+		                           0,       // unrevOff
+		                           s5,      // 1revOff
+		                           s,       // 2revOff
+		                           0, 0,    // itop, ibot
+		                           qualCutoff, // qualThresh
+		                           0,       // qualWobble
+		                           0,       // reportSeedlings (don't)
+		                           NULL,    // seedlings
+			                       NULL,    // mutations
+		                           verbose, // verbose
+		                           true,    // oneHit
+			                       seed+5,  // seed
+			                       &os,
+			                       true);   // halfAndHalf
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
@@ -1443,27 +1466,22 @@ static void seededQualCutoffSearch(
 	    		patid += 2;
 	    		continue;
 	    	}
-			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-			assert(patFw != NULL);
-			assert(patsrc.nextIsReverseComplement());
-			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-			assert(patRc != NULL);
-			assert(patRc != patFw);
-			assert(!patsrc.nextIsReverseComplement());
-			assert(isReverseComplement(*patFw, *patRc));
-			
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			params.setFw(false);  // looking at reverse-comp strand
+			params.setPatId(patid+1);
+			btr.setQuery(patRc, qualRc, nameRc);
+
 			// Given the seedlines generated in phase 2, check for hits
 			// for case 4R
+			uint32_t plen = length(*patRc);
 			if(seedlingsRc[seedlingId++] != 0xff) {
 				assert_lt(seedlingId, seedlingsRcLen);
 				seedlingId--;
-				params.setFw(false);  // looking at reverse-comp strand
-				params.setPatId(patid+1);
-				btr.setQuery(patRc, qualRc, nameRc);
 				bool hit = false;
-				uint32_t plen = length(*patRc);
 #ifndef NDEBUG
 				{
+					// Sanity-check the content of the seedlings array
+					// for this pattern; don't search yet
 					uint32_t id2 = seedlingId;
 					char lastQual = 0;
 					while(seedlingsRc[id2++] != 0xff) {
@@ -1476,9 +1494,15 @@ static void seededQualCutoffSearch(
 						uint8_t oldChar = (uint8_t)(*patRc)[plen-1-pos];
 						uint8_t oldQual = (uint8_t)(*qualRc)[plen-1-pos]-33;
 						assert_leq(oldQual, 40);
-						assert_geq((*qualRc)[plen-1-pos], lastQual);
+						if(seedMms < 2) {
+							assert_geq((*qualRc)[plen-1-pos], lastQual);
+						}
 						lastQual = (*qualRc)[plen-1-pos];
 						assert_neq(oldChar, chr);
+						if(seedlingsRc[id2] == 0xfe) {
+							// Skip minor separator
+							id2++;
+						}
 					}
 					// Make sure that we and the seedlings array are
 					// talking about the same patid
@@ -1486,24 +1510,34 @@ static void seededQualCutoffSearch(
 				}
 #endif
 				while(seedlingsRc[seedlingId++] != 0xff) {
-					assert_gt(plen, 0);
-					// Get the query position (offset from the 5' end)
-					// to be mutated
-					uint8_t pos = seedlingsRc[seedlingId-1];
-					uint8_t tpos = plen-1-pos;
-					// Get the character to mutate it to
-					uint8_t chr = seedlingsRc[seedlingId++];
-					uint8_t oldChar = (uint8_t)(*patRc)[tpos];
-					uint8_t oldQual = (uint8_t)(*qualRc)[tpos]-33;
+					seedlingId--; // point to that non-0xff character
 					String<QueryMutation> muts;
 					reserve(muts, 4);
-					append(muts, QueryMutation(tpos, oldChar, chr));
+					assert_gt(plen, 0);
+					uint8_t oldQuals = 0;
+					do {
+						// Get the query position (offset from the 5' end)
+						// to be mutated
+						uint8_t pos = seedlingsRc[seedlingId++];
+						uint8_t tpos = plen-1-pos;
+						// Get the character to mutate it to
+						uint8_t chr = seedlingsRc[seedlingId++];
+						uint8_t oldChar = (uint8_t)(*patRc)[tpos];
+						oldQuals += (uint8_t)(*qualRc)[tpos]-33;
+						append(muts, QueryMutation(tpos, oldChar, chr));
+					} while(seedlingsRc[seedlingId++] == 0xfe);
+					seedlingId--; // point to that non-0xfe character
+					assert_gt(length(muts), 0);
+					assert_leq(length(muts), 2);
+					// Set the backtracking thresholds appropriately
 					// Now begin the backtracking, treating the first
 					// 24 bases as unrevisitable
 					ASSERT_ONLY(uint64_t numHits = sink.numHits());
+					ASSERT_ONLY(TStr tmp = (*patRc));
 					btr.setMuts(&muts);
-					hit = btr.backtrack(&os, oldQual);
+					hit = btr.backtrack(oldQuals);
 					btr.setMuts(NULL);
+					assert_eq(tmp, (*patRc));
 					assert(hit  || numHits == sink.numHits());
 					assert(!hit || numHits <  sink.numHits());
 					if(hit) {
@@ -1520,11 +1554,29 @@ static void seededQualCutoffSearch(
 			assert_eq(0xff, seedlingsRc[seedlingId-1]);
 			assert_eq((patid>>1) & 0xff, seedlingsRc[seedlingId]);
 			ASSERT_ONLY(seedlingId++); // skip patid sanity marker
+			
 			// Case 4R yielded a hit; mark this pattern as done and
 			// continue to next pattern
 	    	if(doneMask[patid>>1]) {
 	    		patid += 2;
 	    		continue;
+	    	}
+	    	
+	    	// If we're in two-mismatch mode, then now is the time to
+	    	// try the final case that might apply to the reverse
+	    	// complement pattern: 1 mismatch in each of the 3' and 5'
+	    	// halves of the seed.
+	    	if(seedMms == 2) {
+				btr2.setQuery(patRc, qualRc, nameRc);
+				ASSERT_ONLY(uint64_t numHits = sink.numHits());
+				bool hit = btr2.backtrack();
+				assert(hit  || numHits == sink.numHits());
+				assert(!hit || numHits <  sink.numHits());
+				if(hit) {
+					doneMask[patid>>1] = true;
+		    		patid += 2;
+					continue;
+				}
 	    	}
 	    	
 #ifndef NDEBUG
@@ -1534,20 +1586,33 @@ static void seededQualCutoffSearch(
 				vector<Hit> hits;
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
-				uint32_t unevOff   = (seedMms == 0) ? s : 0;
+				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
 				BacktrackManager<TStr>::naiveOracle(
+				        os,
 						*patRc,
+						plen,
 				        *qualRc,
 				        *nameRc,
 				        patid+1,    // patid
-				        os,
 				        hits,
 				        qualCutoff, 
-				        unevOff,
+				        unrevOff,
 				        oneRevOff,
 				        twoRevOff,
 				        false,      // fw
 				        true);      // ebwtFw
+				if(hits.size() > 0) {
+					// Print offending hit obtained by oracle
+					BacktrackManager<TStr>::printHit(
+						os,
+						hits[0],
+						*patRc,
+						plen,
+					    unrevOff,
+					    oneRevOff,
+					    twoRevOff,
+					    true);      // ebwtFw
+				}
 				assert_eq(0, hits.size());
 	    	}
 #endif
@@ -1562,7 +1627,7 @@ static void seededQualCutoffSearch(
 			// Do a 12/24 seedling backtrack on the forward read
 			// using the normal index.  This will find seedlings
 			// for case 4F
-			btf.backtrack(&os);
+			btf.backtrack();
 			append(seedlingsFw, 0xff);
 #ifndef NDEBUG
 			append(seedlingsFw, (patid>>1));
@@ -1581,6 +1646,9 @@ static void seededQualCutoffSearch(
 					assert_geq((*qualFw)[pos], lastQual);
 					lastQual = (*qualFw)[pos];
 					assert_neq(oldChar, chr);
+					if(seedlingsFw[id2] == 0xfe) {
+						id2++;
+					}
 				}
 			}
 #endif
@@ -1606,12 +1674,28 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
-		                           false,   // reportSeedlings (don't)
+		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
 		                           verbose, // verbose
 		                           true,    // oneHit
-		                           seed+5); // seed
+		                           seed+6,  // seed
+		                           &os);
+		BacktrackManager<TStr> btf2(ebwtBw, params,
+                                   0,       // unrevOff
+                                   s5,      // 1revOff
+                                   s,       // 2revOff
+		                           0, 0,    // itop, ibot
+		                           qualCutoff, // qualThresh
+		                           0,       // qualWobble
+		                           0,       // reportSeedlings (don't)
+		                           NULL,    // seedlings
+			                       NULL,    // mutations
+		                           verbose, // verbose
+		                           true,    // oneHit
+		                           seed+7,  // seed
+		                           &os,
+		                           true);   // halfAndHalf
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
 		uint32_t seedlingsFwLen = length(seedlingsFw);
@@ -1626,23 +1710,24 @@ static void seededQualCutoffSearch(
 	    		patid += 2;
 	    		continue;
 	    	}
-			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-			assert(patFw != NULL);
-			assert(patsrc.nextIsReverseComplement());
-			patsrc.skipPattern();
+	    	GET_FW_PATTERN(patFw, qualFw, nameFw);
+	    	patsrc.skipPattern();
 			assert(!patsrc.nextIsReverseComplement());
+			params.setPatId(patid);
+			params.setFw(true);
+			btf.setQuery(patFw, qualFw, nameFw);
 
 			// Given the seedlines generated in phase 3, check for hits
 			// for case 4F
+			uint32_t plen = length(*patFw);
 			if(seedlingsFw[seedlingId++] != 0xff) {
 				assert_lt(seedlingId, seedlingsFwLen);
 				seedlingId--;
-				params.setPatId(patid);
-				btf.setQuery(patFw, qualFw, nameFw);
 				bool hit = false;
-				uint32_t plen = length(*patFw);
 #ifndef NDEBUG
 				{
+					// Sanity-check the content of the seedlings array
+					// for this pattern; don't search yet
 					uint32_t id2 = seedlingId;
 					char lastQual = 0;
 					while(seedlingsFw[id2++] != 0xff) {
@@ -1659,6 +1744,10 @@ static void seededQualCutoffSearch(
 						assert_geq((*qualFw)[tpos], lastQual);
 						lastQual = (*qualFw)[tpos];
 						assert_neq(oldChar, chr);
+						if(seedlingsFw[id2] == 0xfe) {
+							// Skip minor separator
+							id2++;
+						}
 					}
 					// Make sure that we and the seedlings array are
 					// talking about the same patid
@@ -1666,25 +1755,30 @@ static void seededQualCutoffSearch(
 				}
 #endif
 				while(seedlingsFw[seedlingId++] != 0xff) {
-					assert_gt(plen, 0);
-					// Get the query position (offset from the 5' end)
-					// to be mutated
-					uint8_t pos = seedlingsFw[seedlingId-1];
-					uint8_t tpos = plen-1-pos;
-					// Get the character to mutate it to
-					uint8_t chr = seedlingsFw[seedlingId++];
-					// Keep the original character and mutate it to the
-					// new one
-					uint8_t oldChar = (uint8_t)(*patFw)[tpos];
-					uint8_t oldQual = (uint8_t)(*qualFw)[tpos]-33;
+					seedlingId--; // point to that non-0xff character
 					String<QueryMutation> muts;
 					reserve(muts, 4);
-					append(muts, QueryMutation(tpos, oldChar, chr));
+					assert_gt(plen, 0);
+					uint8_t oldQuals = 0;
+					do {
+						// Get the query position (offset from the 5' end)
+						// to be mutated
+						uint8_t pos = seedlingsFw[seedlingId++];
+						uint8_t tpos = plen-1-pos;
+						// Get the character to mutate it to
+						uint8_t chr = seedlingsFw[seedlingId++];
+						uint8_t oldChar = (uint8_t)(*patFw)[tpos];
+						oldQuals += (uint8_t)(*qualFw)[tpos]-33;
+						append(muts, QueryMutation(tpos, oldChar, chr));
+					} while(seedlingsFw[seedlingId++] == 0xfe);
+					seedlingId--; // point to that non-0xfe character
+					assert_gt(length(muts), 0);
+					assert_leq(length(muts), 2);
 					// Now begin the backtracking, treating the first
 					// 24 bases as unrevisitable
 					ASSERT_ONLY(uint64_t numHits = sink.numHits());
 					btf.setMuts(&muts);
-					hit = btf.backtrack(&os, oldQual);
+					hit = btf.backtrack(oldQuals);
 					btf.setMuts(NULL);
 					assert(hit  || numHits == sink.numHits());
 					assert(!hit || numHits <  sink.numHits());
@@ -1705,14 +1799,32 @@ static void seededQualCutoffSearch(
 			assert_eq(0xff, seedlingsFw[seedlingId-1]);
 			assert_eq((patid>>1) & 0xff, seedlingsFw[seedlingId]);
 			ASSERT_ONLY(seedlingId++); // skip patid sanity marker
-			
-#ifndef NDEBUG
+
 			// Case 4F yielded a hit; mark this pattern as done and
 			// continue to next pattern
 	    	if(doneMask[patid>>1]) {
 	    		patid += 2;
 	    		continue;
 	    	}
+
+	    	// If we're in two-mismatch mode, then now is the time to
+	    	// try the final case that might apply to the reverse
+	    	// complement pattern: 1 mismatch in each of the 3' and 5'
+	    	// halves of the seed.
+	    	if(seedMms == 2) {
+				ASSERT_ONLY(uint64_t numHits = sink.numHits());
+				btf2.setQuery(patFw, qualFw, nameFw);
+				bool hit = btf2.backtrack();
+				assert(hit  || numHits == sink.numHits());
+				assert(!hit || numHits <  sink.numHits());
+				if(hit) {
+					doneMask[patid>>1] = true;
+		    		patid += 2;
+					continue;
+				}
+	    	}
+
+#ifndef NDEBUG
 	    	
 			// The forward version of the read doesn't hit at all!
 			// Check with the oracle to make sure it agrees.
@@ -1720,20 +1832,33 @@ static void seededQualCutoffSearch(
 				vector<Hit> hits;
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
-				uint32_t unevOff   = (seedMms == 0) ? s : 0;
+				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
 				BacktrackManager<TStr>::naiveOracle(
+				        os,
 						*patFw,
+						plen,
 				        *qualFw,
 				        *nameFw,
 				        patid,      // patid
-				        os,
 				        hits,
 				        qualCutoff, 
-				        unevOff,    // unevOff
-				        oneRevOff,  // oneRevOff
-				        twoRevOff,  // twoRevOff
+				        unrevOff,
+				        oneRevOff,
+				        twoRevOff,
 				        true,       // fw
 				        false);     // ebwtFw
+				if(hits.size() > 0) {
+					// Print offending hit obtained by oracle
+					BacktrackManager<TStr>::printHit(
+						os,
+						hits[0],
+						*patFw,
+						plen,
+					    unrevOff,
+					    oneRevOff,
+					    twoRevOff,
+					    false);     // ebwtFw
+				}
 				assert_eq(0, hits.size());
 			}
 #endif
@@ -1741,50 +1866,6 @@ static void seededQualCutoffSearch(
 	    } // while(patsrc.hasMorePatterns()...
 	    assert_eq(seedlingId, seedlingsFwLen);
 	} // end of Phase 4
-//	{
-//		// Sanity-checking phase: ensure that all patterns that didn't
-//		// map are indeed unmappable under the given policy.  Use a
-//		// naive algorithm.
-//		uint32_t patid = 0;
-//		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-//		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
-//	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-//	    	assert_lt((patid>>1), doneMask.capacity());
-//	    	assert_lt((patid>>1), doneMask.size());
-//	    	if(doneMask[patid>>1]) {
-//				patsrc.skipPattern();
-//				patsrc.skipPattern();
-//	    		patid += 2;
-//	    		continue;
-//	    	}
-//			patsrc.nextPattern(&patFw, &qualFw, &nameFw);
-//			assert(patFw != NULL);
-//			assert(patsrc.nextIsReverseComplement());
-//			patsrc.nextPattern(&patRc, &qualRc, &nameRc);
-//			assert(patRc != NULL);
-//			assert(patRc != patFw);
-//			assert(!patsrc.nextIsReverseComplement());
-//			assert(isReverseComplement(*patFw, *patRc));
-//
-//			// Invoke naive oracle to confirm no hits for 
-//			vector<Hit> hits;
-//			static void naiveOracle(*patFw,
-//			                        *qualFw,
-//			                        *nameFw,
-//			                        patid,
-//			                        os,
-//			                        hits,
-//			                        qualCutoff,
-//			                        0,
-//			                        0,
-//			                        s,
-//			                        true,       // fw
-//			                        bool ebwtFw,
-//			                        uint32_t iham = 0,
-//			                        String<QueryMutation>* muts = NULL)
-//			patid += 2;
-//	    }
-//	}
 	return;
 }
 

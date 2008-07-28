@@ -44,6 +44,8 @@ public:
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
+	                 vector<TStr>* __os = NULL,
+	                 bool __halfAndHalf = false, // hacky way of supporting separate 1-revisitable regions
 	                 TStr* __qry = NULL,
 	                 String<char>* __qual = NULL,
 	                 String<char>* __name = NULL) :
@@ -71,6 +73,10 @@ public:
 		_reportSeedlings(__reportSeedlings),
 		_seedlings(__seedlings),
 		_muts(__muts),
+		_os(__os),
+		_halfAndHalf(__halfAndHalf),
+		_5depth(__1revOff),
+		_3depth(__2revOff),
 		_nameDefault("default"),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
@@ -191,6 +197,27 @@ public:
 			applyMutations();
 		}
 	}
+	
+	/**
+	 * Set the depth before which no backtracks are allowed.
+	 */
+	uint32_t setUnrevOff(uint32_t unrevOff) {
+		uint32_t tmp = _unrevOff;
+		_unrevOff = unrevOff;
+		return tmp;
+	}
+
+	uint32_t set1RevOff(uint32_t oneRevOff) {
+		uint32_t tmp = _1revOff;
+		_1revOff = oneRevOff;
+		return tmp;
+	}
+
+	uint32_t set2RevOff(uint32_t twoRevOff) {
+		uint32_t tmp = _2revOff;
+		_2revOff = twoRevOff;
+		return tmp;
+	}
 
 	/**
 	 * Set _qlen according to parameter, except don't let it fall below
@@ -207,7 +234,7 @@ public:
 	 * the first several characters in one chomp, as long as doing so
 	 * does not "jump over" any legal backtracking targets.
 	 */
-	bool backtrack(vector<TStr>* os = NULL, uint32_t ham = 0) {
+	bool backtrack(uint32_t ham = 0) {
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
@@ -236,7 +263,6 @@ public:
 					return backtrack(0,   // depth
 					                 0,   // top
 					                 0,   // bot
-					                 os,
 					                 ham);
 				} else {
 					// We have a match!
@@ -247,7 +273,6 @@ public:
 				return backtrack(ftabChars, // depth
 				                 top,       // top
 				                 bot,       // bot
-				                 os,
 				                 ham);
 			}
 			// The arrows are already closed; give up
@@ -259,7 +284,6 @@ public:
 			return backtrack(0,   // depth
 			                 0,   // top
 			                 0,   // bot
-			                 os,
 			                 ham);
 		}
 	}
@@ -274,7 +298,6 @@ public:
 	bool backtrack(uint32_t depth,
 	               uint32_t top,
 	               uint32_t bot,
-	               vector<TStr>* os = NULL,
 	               uint32_t iham = 0)
 	{
 		// Initial sanity checking
@@ -286,11 +309,10 @@ public:
 		                 << "iham=" << iham << ", "
 		                 << "_pairs" << _pairs << ", "
 		                 << "_elims=" << (void*)_elims << ")" << endl;
-		bool oldRetain = false;
+		bool oldRetain = _params.sink().retainHits();
 		size_t oldRetainSz = 0;
-		if(os != NULL && (*os).size() > 0) {
+		if(_os != NULL && (*_os).size() > 0) {
 			// Save some info about hits retained at this point
-			oldRetain = _params.sink().retainHits();
 			oldRetainSz = _params.sink().retainedHits().size();
 			_params.sink().setRetainHits(true);
 		}
@@ -298,26 +320,27 @@ public:
 		
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		bool ret = backtrack(0, depth, _unrevOff, _1revOff, top, bot, iham, _pairs, _elims);
+		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff,
+		                     top, bot, iham, iham, _pairs, _elims);
 
 		// Remainder of this function is sanity checking
 		
 		if(ret) {
 			// Return value of true implies there should be a fresh hit
-			assert_gt(_params.sink().numHits(), nhits);
+			assert_eq(_params.sink().numHits(), nhits+1);
 		} else {
 			// Return value of false implies no new hits
 			assert_eq(_params.sink().numHits(), nhits);
 		}
+		_params.sink().setRetainHits(oldRetain); // restore old value
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
 		// TODO: also check seedling hits
-		if(os != NULL && (*os).size() > 0 && _reportSeedlings == 0) {
-			_params.sink().setRetainHits(oldRetain); // restore old value
+		if(_os != NULL && (*_os).size() > 0 && _reportSeedlings == 0) {
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
-			naiveOracle(*os, oracleHits, iham);
+			naiveOracle(oracleHits, iham);
 			vector<Hit>& retainedHits = _params.sink().retainedHits();
 			if(ret == false) {
 				// If we didn't find any hits, then the oracle had
@@ -331,22 +354,25 @@ public:
 					cout << "Oracle hit " << oracleHits.size()
 					     << " times, but backtracker did not hit" << endl;
 					cout << "First oracle hit: " << endl;
-					undoMutations();
-					cout << "  Unmutated Pat:  " << (*_qry) << endl;
-					applyMutations();
-					cout << "  Mutated Pat:    " << (*_qry) << endl;
+					if(_muts != NULL) {
+						undoMutations();
+						cout << "  Unmutated Pat:  " << (*_qry) << endl;
+						applyMutations();
+					}
+					cout << "  Pat:            " << (*_qry) << endl;
 					cout << "  Tseg:           ";
 					bool ebwtFw = _params.ebwtFw();
 					if(ebwtFw) {
 						for(size_t i = 0; i < _qlen; i++) {
-							cout << (*os)[h.h.first][h.h.second + i];
+							cout << (*_os)[h.h.first][h.h.second + i];
 						}
 					} else {
 						for(int i = (int)_qlen-1; i >= 0; i--) {
-							cout << (*os)[h.h.first][h.h.second + i];
+							cout << (*_os)[h.h.first][h.h.second + i];
 						}
 					}
 					cout << endl;
+					cout << "  Quals:          " << (*_qual) << endl;
 					cout << "  Bt:             ";
 					for(int i = (int)_qlen-1; i >= 0; i--) {
 						if     (i < (int)_unrevOff) cout << "0";
@@ -393,9 +419,11 @@ public:
 	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
 	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
 	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable 
+	               uint32_t  twoRevOff,// depths < twoRevOff are 2-revisitable 
 	               uint32_t  top,      // top arrow in pair prior to 'depth'
 	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
 	               uint32_t  ham,      // weighted hamming distance so far
+	               uint32_t  iham,     // initial weighted hamming distance
 	               uint32_t* pairs,    // portion of pairs array to be used for this backtrack frame
 	               uint8_t*  elims)    // portion of elims array to be used for this backtrack frame
 	{
@@ -414,18 +442,52 @@ public:
 		assert(pairs != NULL);
 		assert(elims != NULL);
 		assert_leq(stackDepth, _maxStackDepth);
+		if(_halfAndHalf) {
+			assert_eq(0, _reportSeedlings);
+			assert_gt(_3depth, _5depth);
+		}
+		if(_reportSeedlings) {
+			assert(!_halfAndHalf);
+		}
 		if(_verbose) {
 			cout << "  backtrack(stackDepth=" << stackDepth << ", "
                  << "depth=" << depth << ", "
                  << "top=" << top << ", "
                  << "bot=" << bot << ", "
                  << "ham=" << ham << ", "
+                 << "iham=" << iham << ", "
                  << "pairs=" << pairs << ", "
                  << "elims=" << (void*)elims << "): \"";
 			for(int i = (int)depth - 1; i >= 0; i--) {
 				cout << _chars[i];
 			}
 			cout << "\"" << endl;
+		}
+		
+		// If we're searching for a half-and-half solution (exactly one
+		// mismatch in both the 5' and the 3' half of the seed), then
+		// enforce the half-and-half constraint here
+		if(_halfAndHalf) {
+			assert_eq(0, _reportSeedlings);
+			if(depth == _5depth) {
+				// The backtracking logic should have prevented us from
+				// backtracking more than once into this region
+				assert_leq(stackDepth, 1);
+				// Must have encountered a mismatch by this point
+				if(stackDepth < 1) return false;
+			}
+			else if(depth == _3depth) {
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice within this region
+				assert_leq(stackDepth, 2);
+				// Must have encountered two mismatches by this point
+				if(stackDepth < 2) return false;
+			}
+			if(depth >= _5depth) {
+				assert_geq(stackDepth, 1);
+			} else if(depth >= _3depth) {
+				assert_geq(stackDepth, 2);
+			}
 		}
 		
 		// The total number of arrow pairs that are acceptable
@@ -448,8 +510,8 @@ public:
 		if(top != 0 || bot != 0) {
 			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
 		}
-		// Advance along the read until we hit a mismatch
 		while(cur < _qlen) {
+			// Try to advance further given that 
 			if(_verbose) {
 				cout << "    cur=" << cur << " \"";
 				for(int i = (int)d - 1; i >= 0; i--) {
@@ -571,10 +633,50 @@ public:
 			assert_leq(eligibleNum, altNum);
 			assert_lt(elims[d], 16);
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
-			// Mismatch with alternatives
-			while((top == bot && altNum > 0) ||
-			      (stackDepth < _reportSeedlings && cur == 0 && altNum > 0))
+			// Achieved a match, but need to keep going
+			bool keepGoingDespiteMatch = false;
+			if(cur == 0 &&  // we've consumed the entire pattern
+			   top < bot && // there's a hit to report
+			   stackDepth < _reportSeedlings && // not yet used up our mismatches
+			   _reportSeedlings > 0 &&
+			   altNum > 0)  // there are still legel backtracking targets
 			{
+				assert(!_halfAndHalf);
+				keepGoingDespiteMatch = true;
+				if(stackDepth > 0) {
+					// This is a legit seedling; report it
+					reportSeedling(stackDepth);
+				}
+				// Now continue on to find legitimate seedlings with
+				// more mismatches than this one
+			}
+			else if(_halfAndHalf && (d == (_5depth-1)) && top < bot) {
+				// About to transition into the 3' half of the seed;
+				// we should induce a mismatch if we haven't mismatched
+				// yet, so that we don't waste time pursuing a match
+				// that was covered by a previous phase
+				assert_eq(0, _reportSeedlings);
+				if(stackDepth == 0) {
+					keepGoingDespiteMatch = true;
+				} else {
+					assert_eq(1, stackDepth);
+				}
+			}
+			else if(_halfAndHalf && (d == (_3depth-1)) && top < bot) {
+				// About to transition into the 3' half of the seed;
+				// we should induce a mismatch if we haven't mismatched
+				// yet, so that we don't waste time pursuing a match
+				// that was covered by a previous phase
+				assert_eq(0, _reportSeedlings);
+				if(stackDepth < 2) {
+					keepGoingDespiteMatch = true;
+				} else {
+					assert_eq(2, stackDepth);
+				}
+			}
+			// Mismatch with alternatives
+			while((top == bot && altNum > 0) || keepGoingDespiteMatch) {
+				keepGoingDespiteMatch = false;
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -588,6 +690,8 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Pick out the arrow pair we selected and target it
 				// for backtracking
+				// TODO: optimize for (relatively common) case where
+				// eligibleSz == 1
 				uint32_t r = _rand.nextU32() % eligibleSz;
 				bool foundTarget = false;
 				uint32_t cumSz = 0;
@@ -597,6 +701,7 @@ public:
 				uint32_t btbot = 0;
 				uint32_t btham = ham;
 				char btchar = 0;
+				int btcint = 0;
 				uint32_t icur = 0;
 				for(; i <= d; i++) {
 					if(i < unrevOff) {
@@ -623,6 +728,7 @@ public:
 									bttop = PAIR_TOP(i, j);
 									btbot = PAIR_BOT(i, j);
 									btham += qi;
+									btcint = j;
 									btchar = "acgt"[j];
 									assert_leq(btham, _qualThresh);
 									break;
@@ -652,22 +758,33 @@ public:
 				// our visits)
 				uint32_t btUnrevOff  = unrevOff;
 				uint32_t btOneRevOff = oneRevOff;
+				uint32_t btTwoRevOff = twoRevOff;
+				assert_geq(i, unrevOff);
 				if(i < oneRevOff) {
 					assert_geq(oneRevOff, unrevOff);
+					assert_geq(twoRevOff, oneRevOff);
 					// Extend unrevisitable region to include former 1-
 					// revisitable region
-					btUnrevOff = oneRevOff; 
-				} else if(i < _2revOff) {
-					assert_geq(oneRevOff, unrevOff);
-					assert_geq(_2revOff, oneRevOff);
-					if(unrevOff == oneRevOff) {
-						// Extend unrevisitable region to include former
-						// 2-revisitable region
-						btUnrevOff = _2revOff;
-					}
+					btUnrevOff = oneRevOff;
 					// Extend 1-revisitable region to include former 2-
 					// revisitable region
 					btOneRevOff = _2revOff;
+				}
+				else if(i < twoRevOff) {
+					assert_geq(oneRevOff, unrevOff);
+					assert_geq(twoRevOff, oneRevOff);
+					// Extend 1-revisitable region to include former 2-
+					// revisitable region; note: this only works
+					if(!_halfAndHalf) {
+						btOneRevOff = twoRevOff;
+					} else {
+						// A hacky way of supporting two distinct 1-
+						// mismatch areas in the two halves of the seed;
+						// the default policy (_halfAndHalf == true)
+						// would allow multiple backtracks into the 3'
+						// half of the seed
+						btTwoRevOff = oneRevOff;
+					}
 				}
 				// Note the character that we're backtracking on in the
 				// mm array:
@@ -684,14 +801,17 @@ public:
 				                    i+1,
 				                    btUnrevOff,  // new unrevisitable boundary
 				                    btOneRevOff, // new 1-revisitable boundary
+				                    btTwoRevOff, // new 2-revisitable boundary
 				                    bttop,  // top arrow in pair prior to 'depth'
 				                    btbot,  // bottom arrow in pair prior to 'depth'
 				                    btham,  // weighted hamming distance so far
+				                    iham,   // initial weighted hamming distance
 				                    newPairs,
 				                    newElims);
 				}
 				if(ret) {
 					assert_gt(_params.sink().numHits(), numHits);
+					if(_os != NULL && (*_os).size() > 0) confirmHit(iham);
 					return true; // return, signaling that we've reported
 				}
 				assert_eq(_params.sink().numHits(), numHits);
@@ -713,6 +833,9 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
+					if(stackDepth == 0) {
+						if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
+					}
 					return false;
 				}
 				else if(eligibleNum == 0) {
@@ -766,30 +889,83 @@ public:
 				assert_eq(0, eligibleNum);
 				// Mismatched with no backtracking opportunities;
 				// return failure
+				if(stackDepth == 0) {
+					if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
+				}
 				return false;
 			}
 			// Match!
 			_chars[d] = (*_qry)[cur];
 			d++; cur--;
-		}
+		} // while(cur < _qlen)
 		assert_eq(0xffffffff, cur);
 		assert_gt(bot, top);
-		if(_reportSeedlings > 0) assert_leq(stackDepth, _reportSeedlings);
+		if(_reportSeedlings > 0) {
+			// Stack depth should not exceed given hamming distance
+			assert_leq(stackDepth, _reportSeedlings);
+		}
 		if(stackDepth >= _reportSeedlings) {
-			return report(stackDepth, top, bot);
+			bool ret = report(stackDepth, top, bot);
+			if(!ret && stackDepth == 0) {
+				if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
+			}
+			if(ret) {
+				if(_os != NULL && (*_os).size() > 0) confirmHit(iham);
+			}
+			return ret;
 		} else {
+			if(stackDepth == 0) {
+				if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
+			}
 			return false;
 		}
 	}
 	
 	/**
+	 * Print a hit along with information about the backtracking
+	 * regions constraining the hit.
+	 */
+	static void printHit(const vector<TStr>& os,
+	                     const Hit& h,
+	                     const TStr& qry,
+	                     size_t qlen,
+	                     uint32_t unrevOff,
+	                     uint32_t oneRevOff,
+	                     uint32_t twoRevOff,
+	                     bool ebwtFw)
+	{
+		// Print pattern sequence
+		cout << "  Pat:  " << qry << endl;
+		// Print text sequence
+		cout << "  Tseg: ";
+		if(ebwtFw) {
+			for(size_t i = 0; i < qlen; i++) {
+				cout << os[h.h.first][h.h.second + i];
+			}
+		} else {
+			for(int i = (int)qlen-1; i >= 0; i--) {
+				cout << os[h.h.first][h.h.second + i];
+			}
+		}
+		cout << endl;
+		cout << "  Bt:   ";
+		for(int i = (int)qlen-1; i >= 0; i--) {
+			if     (i < (int)unrevOff) cout << "0";
+			else if(i < (int)oneRevOff)  cout << "1";
+			else if(i < (int)twoRevOff)  cout << "2";
+			else cout << "X";
+		}
+		cout << endl;
+	}
+	/**
 	 * Naively search for the same hits that should be found by 
 	 */
-	static void naiveOracle(const TStr& qry,
+	static void naiveOracle(const vector<TStr>& os,
+	                        const TStr& qry,
+	                        uint32_t qlen,
 	                        const String<char>& qual,
 	                        const String<char>& name,
 	                        uint32_t patid,
-	                        vector<TStr>& os,
 	                        vector<Hit>& hits,
 	                        uint32_t qualThresh,
 	                        uint32_t unrevOff,
@@ -798,11 +974,12 @@ public:
 	                        bool fw,
 	                        bool ebwtFw,
 	                        uint32_t iham = 0,
-	                        String<QueryMutation>* muts = NULL)
+	                        String<QueryMutation>* muts = NULL,
+	                        bool halfAndHalf = false)
 	{
 		typedef typename Value<TStr>::Type TVal;
 		bool fivePrimeOnLeft = (ebwtFw == fw);
-	    uint32_t plen = length(qry);
+	    uint32_t plen = qlen;
 		uint8_t *pstr = (uint8_t *)begin(qry, Standard());
 	    // For each text...
 		for(size_t i = 0; i < os.size(); i++) {
@@ -818,9 +995,17 @@ public:
 				bitset<max_read_bp> diffs = 0; // mismatch bitvector
 				// For each alignment column, from right to left
 				bool success = true;
+				int ok, okInc;
+				if(ebwtFw) {
+					ok = j+(int)plen-1;
+					okInc = -1;
+				} else {
+					ok = olen-(j+((int)plen-1))-1;
+					okInc = 1;
+				}
 				for(int k = (int)plen-1; k >= 0; k--) {
 					size_t kr = plen-1-k;
-					if(pstr[k] != ostr[ebwtFw ? (j+k) : (olen-(j+k)-1)]) {
+					if(pstr[k] != ostr[ok]) {
 						ham += QUAL2(qual, k);
 						if(ham > qualThresh) {
 							// Alignment is invalid because it exceeds
@@ -837,7 +1022,7 @@ public:
 							break;
 						} else if(kr < oneRevOff) {
 							rev1mm++;
-							if(rev1mm > 1) {
+							if(rev1mm > 1 && !halfAndHalf) {
 								// Alignment is invalid because it
 								// contains more than 1 mismatch in the
 								// 1-revisitable region
@@ -846,13 +1031,20 @@ public:
 							}
 						} else if(kr < twoRevOff) {
 							rev2mm++;
-							if(rev2mm > 2) {
+							if(rev2mm > 2 && !halfAndHalf) {
 								// Alignment is invalid because it
 								// contains more than 2 mismatches in the
 								// 2-revisitable region
 								success = false;
 								break;
 							}
+						}
+						if(halfAndHalf && (rev1mm > 1 || rev2mm > 1)) {
+							// Half-and-half alignment is invalid
+							// because it contains more than 1 mismatch
+							// in either one or the other half
+							success = false;
+							break;
 						}
 						if(fivePrimeOnLeft) {
 							diffs.set(k);
@@ -864,6 +1056,10 @@ public:
 							diffs.set(plen-k-1);
 						}
 					}
+					ok += okInc;
+				}
+				if(halfAndHalf && success && (rev1mm != 1 || rev2mm != 1)) {
+					success = false;
 				}
 				if(success) {
 					// It's a hit
@@ -944,12 +1140,13 @@ protected:
 			bool hit;
 			if(_muts != NULL) {
 				assert_neq(tmp, (*_qry));
-				for(size_t i = 0; i < length(*_muts); i++) {
+				size_t numMuts = length(*_muts);
+				for(size_t i = 0; i < numMuts; i++) {
 					// Entries in _mms[] are in terms of offset into
 					// _qry - not in terms of offset from 3' or 5' end
-					_mms[stackDepth] = (*_muts)[i].pos;
+					_mms[stackDepth + i] = (*_muts)[i].pos;
 				}
-				hit = reportHit(stackDepth+1, top, bot);
+				hit = reportHit(stackDepth+numMuts, top, bot);
 			} else {
 				hit = reportHit(stackDepth, top, bot);
 			}
@@ -1057,11 +1254,89 @@ protected:
 	}
 	
 	/**
+	 * Confirm that no 
+	 */
+	void confirmNoHit(uint32_t iham) {
+		// Not smart enough to deal with seedling hits yet
+		if(_os == NULL || (*_os).size() == 0 || _reportSeedlings > 0) return;
+		vector<Hit> oracleHits;
+		// Invoke the naive oracle, which will place all qualifying
+		// hits in the 'oracleHits' vector
+		naiveOracle(oracleHits, iham);
+		if(oracleHits.size() > 0) {
+			// Oops, the oracle found at least one hit; print
+			// detailed info about the first oracle hit (for
+			// debugging)
+			const Hit& h = oracleHits[0];
+			cout << "Oracle hit " << oracleHits.size()
+			     << " times, but backtracker did not hit" << endl;
+			cout << "First oracle hit: " << endl;
+			if(_muts != NULL) {
+				undoMutations();
+				cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
+				applyMutations();
+			}
+			cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
+			cout << "  Tseg:           ";
+			bool ebwtFw = _params.ebwtFw();
+			if(ebwtFw) {
+				for(size_t i = 0; i < _qlen; i++) {
+					cout << (*_os)[h.h.first][h.h.second + i];
+				}
+			} else {
+				for(int i = (int)_qlen-1; i >= 0; i--) {
+					cout << (*_os)[h.h.first][h.h.second + i];
+				}
+			}
+			cout << endl;
+			cout << "  Quals:          " << prefix(*_qual, _qlen) << endl;
+			cout << "  Bt:             ";
+			for(int i = (int)_qlen-1; i >= 0; i--) {
+				if     (i < (int)_unrevOff) cout << "0";
+				else if(i < (int)_1revOff)  cout << "1";
+				else if(i < (int)_2revOff)  cout << "2";
+				else cout << "X";
+			}
+			cout << endl;
+		}
+		assert_eq(0, oracleHits.size());
+	}
+	
+	/**
+	 * 
+	 */
+	void confirmHit(uint32_t iham) {
+		// Not smart enough to deal with seedling hits yet
+		if(_os == NULL || (*_os).size() == 0 || _reportSeedlings > 0) return;
+		vector<Hit> oracleHits;
+		// Invoke the naive oracle, which will place all qualifying
+		// hits in the 'oracleHits' vector
+		naiveOracle(oracleHits, iham);
+		vector<Hit>& retainedHits = _params.sink().retainedHits();
+		// If we found a hit, it had better be one of the ones
+		// that the oracle found
+		assert_gt(oracleHits.size(), 0);
+		// Get the hit reported by the backtracker
+		Hit& rhit = retainedHits.back();
+		// Go through oracleHits and look for a match
+		size_t i;
+		for(i = 0; i < oracleHits.size(); i++) {
+			const Hit& h = oracleHits[i];
+    		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
+    			assert_eq(h.fw, rhit.fw);
+    			assert_eq(h.mms, rhit.mms);
+    			// It's a match - hit confirmed
+    			break;
+    		}
+		}
+		assert_lt(i, oracleHits.size()); // assert we found a matchup
+	}
+	
+	/**
 	 * Naively search for hits for the current pattern under the
 	 * current backtracking strategy and store hits in hits vector.
 	 */
-	void naiveOracle(vector<TStr>& os,
-	                 vector<Hit>& hits,
+	void naiveOracle(vector<Hit>& hits,
 	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
@@ -1075,11 +1350,12 @@ protected:
 		bool fw = _params.fw();
 		uint32_t patid = _params.patId();
 		
-		naiveOracle((*_qry),
+		naiveOracle((*_os),
+		            (*_qry),
+		            _qlen,
 		            (*_qual),
 		            (*_name),
 		            patid,
-		            os,
 		            hits,
 		            _qualThresh,
 		            unrevOff,
@@ -1088,17 +1364,8 @@ protected:
 		            fw,    // transpose
 		            ebwtFw,
 		            iham,
-		            _muts);
-	}
-	
-	bool sanityCheckPairs(uint32_t* pairs) {
-		for(size_t i = 0; i < _spread; i++) {
-			if(pairs[i*2] == 0 && pairs[i*2+1] == 0) {
-				continue;
-			}
-			assert_lt(pairs[i*2], pairs[i*2+1]);
-		}
-		return true;
+		            _muts,
+		            _halfAndHalf);
 	}
 	
 	TStr*               _qry;    // query (read) sequence
@@ -1107,6 +1374,7 @@ protected:
 	String<char>*       _name;   // name of _qry
 	const Ebwt<TStr>&   _ebwt;   // Ebwt to search in
 	const EbwtSearchParams<TStr>& _params;   // Ebwt to search in
+	String<uint8_t>*    _btEquivs; // backtracking equivalence classes
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _2revOff;  // 2-revisitable chunk
@@ -1135,6 +1403,8 @@ protected:
 	uint8_t            *_elims;  // which arrow pairs have been
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
+	uint8_t            *_bts;    // how many backtracks remain in each
+	                             // equivalence class
 	uint32_t           *_mms;    // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
@@ -1144,6 +1414,10 @@ protected:
 	String<uint8_t>    *_seedlings; // append seedling hits here
 	String<QueryMutation> *_muts;// set of mutations that apply for a
 	                             // seedling
+	vector<TStr>*       _os;     // reference texts
+	bool                _halfAndHalf;
+	uint32_t            _5depth; // depth of 5'-seed-half border
+	uint32_t            _3depth; // depth of 3'-seed-half border
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals
