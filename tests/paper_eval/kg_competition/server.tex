@@ -1,0 +1,33 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\usepackage{multirow}
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{lrrrrr}\toprule
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \multicolumn{2}{c}{Reads mapped} \\
+ &                            & time       & Speedup & Overall    & w/r/t Bowtie \\[3pt]
+\toprule
+Bowtie & 10m:39s & 11m:11s & - & 71.6\% & - \\\midrule
+Maq with -n 1 & 10h:52m:00s & 10h:52m:52s & 58.4x & 70.3\% & -1.9\% \\\midrule
+Maq & 32h:56m:53s & 32h:58m:39s & 176.9x & 73.8\% & +3.0\% \\
+\bottomrule
+\end{tabular}
+\caption{CPU time for mapping 8.96M 35bp Illumina/Solexa reads (1 lane's worth) against the whole human genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. Reads were originally extracted as part of the 1000-Genomes project pilot. They were downloaded from the NCBI Short Read archive, accession \#SRR001115. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
+\end{table}
+\end{document}

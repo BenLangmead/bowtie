@@ -1,0 +1,43 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{Chr 22} & \multicolumn{2}{c}{Chr 2} & \multicolumn{2}{c}{Whole Genome} \\[3pt] 
+ & \multicolumn{2}{c}{35.1 Mbases} & \multicolumn{2}{c}{238 Mbases} & \multicolumn{2}{c}{2.87 Gbases} \\[3pt] 
+ & Time & Speedup & Time & Speedup & Time & Speedup \\ 
+\toprule
+Bowtie & 7m:46s & - & 9m:25s & - & 12m:36s & -  \\ \midrule 
+Maq with -n 1 & 33m:32s & 4.3x & 1h:21m:56s & 8.7x & 8h:21m:55s & 39.8x  \\ \midrule 
+Maq & 12m:46s & 1.6x & 29m:02s & 3.1x & 22h:09m:29s & 105.5x  \\ \midrule 
+Soap with -v 1 & 12m:49s & 1.7x & 30m:46s & 3.3x & 8h:33m:07s & 40.7x  \\ \midrule 
+Soap & 33m:01s & 4.3x & 1h:26m:25s & 9.2x & 24h:25m:16s & 116.3x  \\[2pt] \bottomrule \\ 
+ & Virtual & Resident & Virtual & Resident & Virtual & Resident \\ 
+\toprule
+Bowtie & 29 MB & 29 MB & 128 MB & 109 MB & 1,169 MB & 1,126 MB  \\ \midrule 
+Maq with -n 1 & 3,008 MB & 2,867 MB & 3,008 MB & 2,867 MB & 3,008 MB & 2,867 MB  \\ \midrule 
+Maq & 3,008 MB & 2,867 MB & 3,008 MB & 2,867 MB & 3,008 MB & 2,867 MB  \\ \midrule 
+Soap with -v 1 & 767 MB & 726 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
+Soap & 767 MB & 727 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ 
+\bottomrule
+\end{tabular}
+\scriptsize\caption{Wall clock time and peak virtual/resident memory usage for mapping 8M simulated 35bp reads against human chromosomes 22 and 2 and the whole human genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. Simulated reads were extracted only from the relevant region using a read simulator that attempts to recreate the error profile of typical Illumina/Solexa reads. Reference sequences were taken from the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
+\end{table}
+\end{document}
