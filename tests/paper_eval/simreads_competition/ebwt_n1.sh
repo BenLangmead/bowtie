@@ -35,11 +35,11 @@ if [ ! -f ${NAME}.1.ebwt ] ; then
 	exit 1
 fi
 
-# Run ebwt_search in Maq-like mode to produce hits
-if [ ! -f ${NAME}.ebwt.hits ] ; then
-   echo > ${NAME}.ebwt.top
-   sh wrap.sh ${NAME}.ebwt \
-     ./ebwt_search -tqr ${NAME} ${READS} ${NAME}.ebwt.hits
+# Run ebwt_search in Maq -n 1 mode to produce hits
+if [ ! -f ${NAME}.ebwt.n1.hits ] ; then
+   echo > ${NAME}.ebwt.n1.top
+   sh wrap.sh ${NAME}.ebwt.n1 \
+     ./ebwt_search -n 1 -tqr ${NAME} ${READS} ${NAME}.ebwt.n1.hits
 else
-	echo "${NAME}.ebwt.hits already exists; skipping Maq-mode run"
+	echo "${NAME}.ebwt.n1.hits already exists; skipping Maq-mode -n 1 run"
 fi
