@@ -19,25 +19,22 @@
 \begin{table}[tp]
 \scriptsize
 \begin{tabular}{lrrrrrr}
+ & \multicolumn{6}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM} \\[3pt] 
 \toprule
  & \multicolumn{2}{c}{Chr 22} & \multicolumn{2}{c}{Chr 2} & \multicolumn{2}{c}{Whole Genome} \\[3pt] 
  & \multicolumn{2}{c}{35.1 Mbases} & \multicolumn{2}{c}{238 Mbases} & \multicolumn{2}{c}{2.87 Gbases} \\[3pt] 
  & Time & Speedup & Time & Speedup & Time & Speedup \\ 
 \toprule
-Bowtie & 5m:50s & - & 7m:05s & - & 11m:26s & -  \\ \midrule 
-Maq with -n 1 & 8m:33s & 1.5x & 19m:55s & 2.8x & 4h:53m:18s & 25.7x  \\ \midrule 
-Maq & 22m:06s & 3.8x & 54m:30s & 7.7x & 13h:58m:40s & 73.4x  \\ \midrule 
-Soap with -v 1 & 28m:12s & 4.8x & 2h:24m:31s & 20.4x & - & -  \\ \midrule 
-Soap & 36m:22s & 6.2x & 3h:06m:29s & 26.3x & - & -  \\[2pt] \bottomrule \\ 
+Bowtie & 8m:25s & - & 11m:06s & - & 22m:36s & -  \\ \midrule 
+Maq & 8m:33s & 1.0x & 19m:55s & 1.8x & 13h:58m:40s & 37.1x  \\ \midrule 
+Soap & 22m:06s & 2.6x & 54m:30s & 4.9x & - & -  \\[2pt] \bottomrule \\ 
  & Virtual & Resident & Virtual & Resident & Virtual & Resident \\ 
 \toprule
-Bowtie & 29 MB & 29 MB & 128 MB & 109 MB & 1,169 MB & 1,126 MB  \\ \midrule 
-Maq with -n 1 & 767 MB & 726 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
-Maq & 767 MB & 727 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
-Soap with -v 1 & 391 MB & 380 MB & 1,416 MB & 1,331 MB & - & -  \\ \midrule 
-Soap & 393 MB & 380 MB & 1,417 MB & 1,331 MB & - & -  \\ 
+Bowtie & 33 MB & 33 MB & 128 MB & 116 MB & 1,174 MB & 1,126 MB  \\ \midrule 
+Maq & 767 MB & 726 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
+Soap & 767 MB & 727 MB & 796 MB & 756 MB & - & -  \\ 
 \bottomrule
 \end{tabular}
-\scriptsize\caption{Wall clock time and peak virtual/resident memory usage for mapping 8M simulated 35bp reads against human chromosomes 22 and 2 and the whole human genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. Simulated reads were extracted only from the relevant region using a read simulator that attempts to recreate the error profile of typical Illumina/Solexa reads. Reference sequences were taken from the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
+\scriptsize\caption{Wall clock time and peak virtual/resident memory usage for mapping 8M simulated 35bp reads against human chromosomes 22 and 2 and the whole human genome on a single CPU of a workstation with a 2.4 GHz Intel Core 2 Q6600 processor and 2 GB of RAM. Simulated reads were extracted only from the relevant region using a read simulator that attempts to recreate the error profile of typical Illumina/Solexa reads. Reference sequences were taken from the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
 \end{table}
 \end{document}

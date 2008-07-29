@@ -1,6 +1,12 @@
 #!/bin/sh
 
 WORKSTATION=1
+if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
 echo "Don't forget to set WORKSTATION appropriately...";
 echo -n "Currently set to: "
 if [ "$WORKSTATION" = "1" ] ; then

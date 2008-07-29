@@ -20,8 +20,19 @@ dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 WORKSTATION=1
-
+if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
 echo "Don't forget to set WORKSTATION=? appropriately in plot.sh"
+echo -n "Currently set to: "
+if [ "$WORKSTATION" = "1" ] ; then
+	echo Workstation
+else
+	echo Server
+fi
 
 if [ ! -f $NAME.results.txt ] ; then
 	perl summarize_top.pl $NAME.ebwt.n1.top ebwt_search | tail -1  > $NAME.results.txt
@@ -93,3 +104,5 @@ if [ "$WORKSTATION" = "0" ] ; then
 else 
 	perl plot.pl -w bowtie.n1 maq.n1 - bowtie maq -
 fi
+
+echo Done
