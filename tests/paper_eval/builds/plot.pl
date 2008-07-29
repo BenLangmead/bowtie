@@ -39,10 +39,11 @@ print BUILD "\\bottomrule\n";
 print BUILD "\\end{tabular}\n";
 print BUILD "\\caption{".
 	"Maximum virtual memory footprint and wall-clock running times ".
-	"for various configurations of the Bowtie index-building tool.".
-	"In all cases, the index produced is about 2.2 GB on disk.".
-	"THE FINAL ROW OF RESULTS IS BOGUS (THE RUN WASN'T DONE YET).  ALL ".
-	"RESULTS ARE GOING TO BE RECALCULATED ON PRIVET OR LARCH.".
+	"for various configurations of the Bowtie index-building tool ".
+	"run on a single CPU of a server with a 1.8 Ghz AMD Opteron 875 ".
+	"processor and 32 GB of RAM. ".
+	"In all cases, the index produced is about 2.2 GB on disk. ".
+	"TODO: RECALCULATE ON PRIVET OR LARCH FOR CONSISTENCY.".
 	"}\n";
 print BUILD "\\end{table}\n";
 print BUILD "\\end{document}\n";
