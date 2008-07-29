@@ -160,7 +160,7 @@ print MEMORY "\\toprule\n";
 
 
 # Output 
-for(my $i = 0; $i < 5; $i++) {
+for(my $i = 0; $i <= $#names; $i++) {
 	print MEMORY "$names[$i] & ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
