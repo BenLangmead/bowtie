@@ -5,7 +5,7 @@ use warnings;
 use Getopt::Std;
 
 my %options=();
-getopts("v",\%options);
+getopts("vt:",\%options);
 
 my $verbose = 0;
 $verbose = $options{v} if defined $options{v};
@@ -18,6 +18,7 @@ my $appName = $ARGV[1];
 
 # Any process that lasts fewer than this many seconds doesn't count
 my $threshold = 120;
+$threshold = int($options{t}) if defined $options{t};
 
 my %vmmax = (); my %vmtot = ();
 my %rsmax = (); my %rstot = ();
@@ -59,17 +60,13 @@ sub minSecHrToSeconds {
 sub parseSz {
 	my ($s, $name) = @_;
 	if($s =~ /([0-9\.]+)m/) {
-		print "Parsing as MB: $s; $1\n" if $verbose;
 		$s = int($1 * 1024 * 1024);
 	} elsif($s =~ /([0-9\.]+)g/) {
-		print "Parsing as GB: $s; $1\n" if $verbose;
 		$s = int($1 * 1024 * 1024 * 1024);
 	} else {
 		$s =~ /^([0-9\.]+)/ || die "Bad format for $name: $s";
-		print "Parsing as B: $s; $1\n" if $verbose;
 		$s = int($1);
 	}
-	print "Got $name: $s\n" if $verbose;
 	return $s;
 }
 
@@ -144,6 +141,9 @@ my $max_rsmax = 0;
 my $secstottot = 0;
 for my $k (keys %secstot) {
 	$secstot{$k} += $secslast{$k} if defined($secslast{$k});
+	if($verbose) {
+		print "Skipping pid $k b/c secstot $secstot{$k} is less than threshold $threshold\n";
+	}
 	next if $secstot{$k} < $threshold;
 
 	my $vmavg = int($vmtot{$k} / $lines{$k});
