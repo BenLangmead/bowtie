@@ -26,13 +26,13 @@
  & Time & Speedup & Time & Speedup & Time & Speedup \\ 
 \toprule
 Bowtie & 10m:06s & - & 14m:57s & - & 26m:57s & -  \\ \midrule 
-Maq & 12m:49s & 1.3x & 30m:46s & 2.1x & 8h:33m:07s & 19.0x  \\ \midrule 
-Soap & 33m:01s & 3.3x & 1h:26m:25s & 5.8x & 24h:25m:16s & 54.4x  \\[2pt] \bottomrule \\ 
+Maq & 33m:01s & 3.3x & 1h:26m:25s & 5.8x & 24h:25m:16s & 54.4x  \\ \midrule 
+Soap & 53m:53s & 5.3x & 4h:13m:13s & 16.9x & 70h:07m:53s & 156.1x  \\[2pt] \bottomrule \\ 
  & Virtual & Resident & Virtual & Resident & Virtual & Resident \\ 
 \toprule
 Bowtie & 33 MB & 33 MB & 128 MB & 115 MB & 1,174 MB & 1,126 MB  \\ \midrule 
-Maq & 767 MB & 726 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
-Soap & 767 MB & 727 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ 
+Maq & 767 MB & 727 MB & 796 MB & 756 MB & 804 MB & 763 MB  \\ \midrule 
+Soap & 392 MB & 379 MB & 1,418 MB & 1,331 MB & 13,619 MB & 13,312 MB  \\ 
 \bottomrule
 \end{tabular}
 \scriptsize\caption{Wall clock time and peak virtual/resident memory usage for mapping 8M simulated 35bp reads against human chromosomes 22 and 2 and the whole human genome on a single CPU of a server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. Simulated reads were extracted only from the relevant region using a read simulator that attempts to recreate the error profile of typical Illumina/Solexa reads. Reference sequences were taken from the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}

@@ -24,7 +24,7 @@ while [ $# -ge 1 ]; do
 	if [ ! -f $dir/$name.results.txt ] ; then
 		sh summarize_all_top.sh | grep -v all1 | grep -v n1 | grep -v v1 > $dir/$name.results.txt
 	fi
-	#cd $dir
+	cd $dir
 	#awk '{print $1}' $name.results.txt > $name.results.names.txt
 	# Wall clock time
 	#awk '{print $2}' $name.results.txt | cut -d, -f 2 > $name.results.times.txt
