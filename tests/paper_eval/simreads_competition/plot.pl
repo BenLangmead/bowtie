@@ -2,6 +2,11 @@
 
 use strict;
 use warnings;
+use Getopt::Std;
+
+my %options=();
+getopts("w",\%options);
+my $workstation = 0; $workstation = $options{w} if defined($options{w});
 
 defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
@@ -72,6 +77,11 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 	print RUNTIME "rr";
 }
 print RUNTIME "}\n";
+if($workstation) {
+	print RUNTIME " & \\multicolumn{6}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM} \\\\[3pt] \n";
+} else {
+	print RUNTIME " & \\multicolumn{6}{c}{2.4 GHz AMD Opteron 850 server with 32 GB of RAM} \\\\[3pt] \n";
+}
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
 print RUNTIME " & \\multicolumn{2}{c}{35.1 Mbases} & \\multicolumn{2}{c}{238 Mbases} & \\multicolumn{2}{c}{2.87 Gbases} \\\\[3pt] \n";
@@ -110,7 +120,13 @@ if(!$all1) {
 		"Wall clock time ".
 		"for mapping 8M simulated 35bp ".
 		"reads against human chromosomes 22 and 2 and the whole human ".
-		"genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
+		"genome on a single CPU of a ";
+	if($workstation) {
+		print RUNTIME "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+	} else {
+		print RUNTIME "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
+	}
+	print RUNTIME
 		"Simulated reads were ".
 		"extracted only from the relevant region using a read simulator that ".
 		"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
@@ -179,7 +195,13 @@ print MEMORY "Wall clock time and peak virtual/resident memory usage " if $all1;
 print MEMORY 
 	"for mapping 8M simulated 35bp ".
 	"reads against human chromosomes 22 and 2 and the whole human ".
-	"genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
+	"genome on a single CPU of a ";
+	if($workstation) {
+		print RUNTIME "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+	} else {
+		print RUNTIME "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
+	}
+print MEMORY 
 	"Simulated reads were ".
 	"extracted only from the relevant region using a read simulator that ".
 	"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
