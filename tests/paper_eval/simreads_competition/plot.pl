@@ -75,9 +75,9 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 }
 print RUNTIME "}\n";
 if($workstation) {
-	print RUNTIME " & \\multicolumn{6}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM} \\\\[3pt] \n";
+	print RUNTIME " & \\multicolumn{6}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}} \\\\[3pt] \n";
 } else {
-	print RUNTIME " & \\multicolumn{6}{c}{2.4 GHz AMD Opteron 850 server with 32 GB of RAM} \\\\[3pt] \n";
+	print RUNTIME " & \\multicolumn{6}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}} \\\\[3pt] \n";
 }
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
@@ -128,9 +128,14 @@ if(!$all1) {
 		"extracted only from the relevant region using a read simulator that ".
 		"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
 		"Reference sequences were taken from the ".
-		"contigs of Genbank human genome build 36.3. ".
-		"Soap was not run against the whole-human reference because its ".
-		"memory footprint exceeds physical RAM. ".  
+		"contigs of Genbank human genome build 36.3. ";
+	if($workstation) {
+		print RUNTIME
+			"Soap was not run against the whole-human reference because its ".
+			"memory footprint would have exceeded the physical RAM of the ".
+			"workstation. ";  
+	}
+	print RUNTIME
 		"For the Maq runs, the ".
 		"reads were first divided into chunks of 2M reads each, ".
 		"as per the Maq Manual.".
@@ -194,22 +199,27 @@ print MEMORY
 	"reads against human chromosomes 22 and 2 and the whole human ".
 	"genome on a single CPU of a ";
 	if($workstation) {
-		print RUNTIME "workstation with a 2.4 GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+		print MEMORY "workstation with a 2.4 GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
 	} else {
-		print RUNTIME "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
+		print MEMORY "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 	}
-print MEMORY 
+print MEMORY
 	"Simulated reads were ".
 	"extracted only from the relevant region using a read simulator that ".
 	"attempts to recreate the error profile of typical Illumina/Solexa reads. ".
 	"Reference sequences were taken from the ".
-	"contigs of Genbank human genome build 36.3. ".
-	"Soap was not run against the whole-human reference because its ".
-	"memory footprint exceeds physical RAM. ".  
+	"contigs of Genbank human genome build 36.3. ";
+if($workstation) {
+	print MEMORY
+		"Soap was not run against the whole-human reference because its ".
+		"memory footprint exceeds physical RAM. ";
+}
+print MEMORY
 	"For the Maq runs, the ".
 	"reads were first divided into chunks of 2M reads each, ".
-	"as per the Maq Manual.".
-	"}\n";
+	"as per the Maq Manual. ";
+print MEMORY "Soap v1.10 and Maq v0.6.6 were used.";
+print MEMORY "}\n";
 print MEMORY "\\end{table}\n";
 print MEMORY "\\end{document}\n";
 
