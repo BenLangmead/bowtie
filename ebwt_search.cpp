@@ -1385,9 +1385,9 @@ static void seededQualCutoffSearch(
 					uint8_t oldQual = (uint8_t)(*qualRc)[pos]-33;
 					assert_leq(oldQual, 40);
 					if(seedMms < 2) {
-						assert_geq((*qualRc)[pos], lastQual);
+						assert_geq(oldQual, lastQual);
 					}
-					lastQual = (*qualRc)[pos];
+					lastQual = oldQual;
 					assert_neq(oldChar, chr);
 					if(seedlingsRc[id2] == 0xfe) {
 						id2++;
@@ -1576,10 +1576,22 @@ static void seededQualCutoffSearch(
 	    	// try the final case that might apply to the reverse
 	    	// complement pattern: 1 mismatch in each of the 3' and 5'
 	    	// halves of the seed.
+	    	bool gaveUp = false;
 	    	if(seedMms == 2) {
 				btr2.setQuery(patRc, qualRc, nameRc);
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
 				bool hit = btr2.backtrack();
+//				cout << "Time: "
+//			         << ", hit: " << hit
+//				     << ", numBts: " << btr2.numBacktracks()
+//				     << ", hiDepth: " << btr2.highStackDepth()
+//				     << endl;
+//				cout << "  " << (*patRc) << "  " << (*qualRc) << endl;
+//				btr2.resetHighStackDepth();
+				if(btr2.numBacktracks() == btr2.maxBacktracks()) {
+					gaveUp = true;
+				}
+				btr2.resetNumBacktracks();
 				assert(hit  || numHits == sink.numHits());
 				assert(!hit || numHits <  sink.numHits());
 				if(hit) {
@@ -1592,7 +1604,7 @@ static void seededQualCutoffSearch(
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0) {
+	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
 				vector<Hit> hits;
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
@@ -1762,9 +1774,9 @@ static void seededQualCutoffSearch(
 						uint8_t oldQual = (uint8_t)(*qualFw)[tpos]-33;
 						assert_leq(oldQual, 40);
 						if(seedMms < 2) {
-							assert_geq((*qualFw)[pos], lastQual);
+							assert_geq(oldQual, lastQual);
 						}
-						lastQual = (*qualFw)[tpos];
+						lastQual = oldQual;
 						assert_neq(oldChar, chr);
 						if(seedlingsFw[id2] == 0xfe) {
 							// Skip minor separator
@@ -1834,10 +1846,22 @@ static void seededQualCutoffSearch(
 	    	// try the final case that might apply to the reverse
 	    	// complement pattern: 1 mismatch in each of the 3' and 5'
 	    	// halves of the seed.
+	    	bool gaveUp = false;
 	    	if(seedMms == 2) {
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
 				btf2.setQuery(patFw, qualFw, nameFw);
 				bool hit = btf2.backtrack();
+//				cout << "Time: "
+//			         << ", hit: " << hit
+//				     << ", numBts: " << btf2.numBacktracks()
+//				     << ", hiDepth: " << btf2.highStackDepth()
+//				     << endl;
+//				cout << "  " << (*patFw) << "  " << (*qualFw) << endl;
+//				btf2.resetHighStackDepth();
+				if(btf2.numBacktracks() == btf2.maxBacktracks()) {
+					gaveUp = true;
+				}
+				btf2.resetNumBacktracks();
 				assert(hit  || numHits == sink.numHits());
 				assert(!hit || numHits <  sink.numHits());
 				if(hit) {
@@ -1851,7 +1875,7 @@ static void seededQualCutoffSearch(
 	    	
 			// The forward version of the read doesn't hit at all!
 			// Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0) {
+	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
 				vector<Hit> hits;
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;

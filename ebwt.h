@@ -1348,9 +1348,13 @@ struct SideLocus {
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
-		// prefetch the opposite side too
+		// prefetch the other half of this side
+		__builtin_prefetch((const void *)(_side + 64),
+		                   0 /* prepare for read */,
+		                   0 /* no locality */);
+		// prefetch tjside too
 		_fw = _sideNum & 1;   // odd-numbered sides are forward
-		__builtin_prefetch((const void *)(_side + (_fw? -128 : 128)),
+		__builtin_prefetch((const void *)(_side + (_fw? -64 : 128)),
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
 		_by = _charOff >> 2; // byte within side

@@ -78,6 +78,13 @@ public:
 		_5depth(__1revOff),
 		_3depth(__2revOff),
 		_nameDefault("default"),
+		_hiDepth(0),
+		_numBts(0),
+		_totNumBts(0),
+		_maxBts(100),
+		_precalcedSideLocus(false),
+		_preLtop(),
+		_preLbot(),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{
@@ -218,6 +225,26 @@ public:
 		_2revOff = twoRevOff;
 		return tmp;
 	}
+	
+	/// Reset greatest observed stack depth to 0
+	void resetHighStackDepth() {
+		_hiDepth = 0;
+	}
+	
+	/// Return greatest observed stack depth since last reset
+	uint32_t highStackDepth() {
+		return _hiDepth;
+	}
+
+	/// Reset number of backtracks to 0
+	void resetNumBacktracks() {
+		_totNumBts = 0;
+	}
+	
+	/// Return number of backtracks since last reset
+	uint32_t numBacktracks() {
+		return _totNumBts;
+	}
 
 	/**
 	 * Set _qlen according to parameter, except don't let it fall below
@@ -226,6 +253,12 @@ public:
 	void setQlen(uint32_t qlen) {
 		assert(_qry != NULL);
 		_qlen = min(length(*_qry), qlen);
+	}
+	
+	/// Return the maximum number of allowed backtracks in a given call
+	/// to backtrack()
+	uint32_t maxBacktracks() {
+		return _maxBts;
 	}
 
 	/**
@@ -322,7 +355,7 @@ public:
 		// with a stack depth of 0 (no backtracks so far)
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff,
 		                     top, bot, iham, iham, _pairs, _elims);
-
+		
 		// Remainder of this function is sanity checking
 		
 		if(ret) {
@@ -336,7 +369,11 @@ public:
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
 		// TODO: also check seedling hits
-		if(_os != NULL && (*_os).size() > 0 && _reportSeedlings == 0) {
+		if(_os != NULL &&
+		   (*_os).size() > 0 &&
+		   _reportSeedlings == 0 && // ignore seedling hits
+		   _numBts < _maxBts)       // ignore excessive-backrtacking copouts
+		{
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
@@ -404,6 +441,9 @@ public:
 				assert_lt(i, oracleHits.size()); // assert we found a matchup
 			}
 		}
+		_totNumBts += _numBts;
+		_numBts = 0;
+		_precalcedSideLocus = false;
 		return ret;
 	}
 
@@ -463,7 +503,24 @@ public:
 			}
 			cout << "\"" << endl;
 		}
-		
+		// Do this early on so that we can clear _precalcedSideLocus
+		// before we have too many opportunities to bail and leave it
+		// 'true'
+		SideLocus ltop, lbot;
+		if(_precalcedSideLocus) {
+			ltop = _preLtop;
+			lbot = _preLbot;
+			_precalcedSideLocus = false;
+		} else if(top != 0 || bot != 0) {
+			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
+		}
+		if(_numBts == _maxBts) {
+			return false;
+		}
+		if(_halfAndHalf) _numBts++;
+		if(stackDepth > _hiDepth) {
+			_hiDepth = stackDepth;
+		}
 		// If we're searching for a half-and-half solution (exactly one
 		// mismatch in both the 5' and the 3' half of the seed), then
 		// enforce the half-and-half constraint here
@@ -500,16 +557,21 @@ public:
 		// Total distance between all lowest-quality "alternative"
 		// arrow pairs that haven't yet been eliminated
 		uint32_t eligibleSz = 0;
+		// If there is just one eligible slot at the moment (a common
+		// case), these are its parameters 
+		uint32_t eli = 0;
+		bool     elignore = true; // ignore the el values because they didn't come from a recent override
+		uint32_t eltop = 0;
+		uint32_t elbot = 0;
+		uint32_t elham = ham;
+		char     elchar = 0;
+		int      elcint = 0;
 		// The lowest quality value associated with any alternative
 		// arrow pairs; all alternative pairs with this quality are
 		// eligible
 		uint8_t lowAltQual = 0xff;
 		uint32_t d = depth;
 		uint32_t cur = _qlen - d - 1; // current offset into _qry
-		SideLocus ltop, lbot;
-		if(top != 0 || bot != 0) {
-			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
-		}
 		while(cur < _qlen) {
 			// Try to advance further given that 
 			if(_verbose) {
@@ -596,6 +658,7 @@ public:
 				// Given the just-calculated quartet of arrow pairs, update
 				// elims, altNum, eligibleNum, eligibleSz
 				for(int i = 0; i < 4; i++) {
+					if(i == c) continue;
 					assert_leq(PAIR_TOP(d, i), PAIR_BOT(d, i));
 					uint32_t spread = PAIR_SPREAD(d, i);
 					if(spread == 0) {
@@ -615,6 +678,17 @@ public:
 								eligibleNum = 0;
 								eligibleSz = 0;
 								curOverridesEligible = false;
+								// Remember these parameters in case
+								// this turns out to be the only
+								// eligible target
+								eli = d;
+								eltop = PAIR_TOP(d, i);
+								elbot = PAIR_BOT(d, i);
+								assert_eq(elbot-eltop, spread);
+								elham = q;
+								elchar = "acgt"[i];
+								elcint = i;
+								elignore = false;
 							}
 							eligibleSz += spread;
 							eligibleNum++;
@@ -692,8 +766,7 @@ public:
 				}
 			}
 			// Mismatch with alternatives
-			while((top == bot && altNum > 0) || backtrackDespiteMatch) {
-				backtrackDespiteMatch = false;
+			while((top == bot || backtrackDespiteMatch) && altNum > 0) {
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -709,60 +782,83 @@ public:
 				// for backtracking
 				// TODO: optimize for (relatively common) case where
 				// eligibleSz == 1
-				uint32_t r = _rand.nextU32() % eligibleSz;
-				bool foundTarget = false;
 				uint32_t cumSz = 0;
 				ASSERT_ONLY(uint32_t eligiblesVisited = 0);
 				size_t i = depth, j = 0;
 				uint32_t bttop = 0;
 				uint32_t btbot = 0;
 				uint32_t btham = ham;
-				char btchar = 0;
-				int btcint = 0;
+				char     btchar = 0;
+				int      btcint = 0;
 				uint32_t icur = 0;
-				for(; i <= d; i++) {
-					if(i < unrevOff) {
-						// i is an unrevisitable position, so don't consider it
-						continue;
-					}
-					icur = _qlen - i - 1; // current offset into _qry
-					uint8_t qi = QUAL(icur);
-					assert_lt(elims[i], 16);
-					assert_gt(elims[i], 0);
-					if(qi == lowAltQual && elims[i] != 15) {
-						// This is an eligible position with at least
-						// one remaining backtrack target
-						for(j = 0; j < 4; j++) {
-							if((elims[i] & (1 << j)) == 0) {
-								// This pair has not been eliminated
-								assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
-								cumSz += PAIR_SPREAD(i, j);
-								ASSERT_ONLY(eligiblesVisited++);
-								if(r < cumSz) {
-									// This is our randomly-selected 
-									// backtrack target
-									foundTarget = true;
-									bttop = PAIR_TOP(i, j);
-									btbot = PAIR_BOT(i, j);
-									btham += qi;
-									btcint = j;
-									btchar = "acgt"[j];
-									assert_leq(btham, _qualThresh);
-									break;
+				// The common case is that eligibleSz == 1
+				if(eligibleNum > 1 || elignore) {
+					bool foundTarget = false;
+					uint32_t r = _rand.nextU32() % eligibleSz;
+					for(; i <= d; i++) {
+						if(i < unrevOff) {
+							// i is an unrevisitable position, so don't consider it
+							continue;
+						}
+						icur = _qlen - i - 1; // current offset into _qry
+						uint8_t qi = QUAL(icur);
+						assert_lt(elims[i], 16);
+						assert_gt(elims[i], 0);
+						if(qi == lowAltQual && elims[i] != 15) {
+							// This is an eligible position with at least
+							// one remaining backtrack target
+							for(j = 0; j < 4; j++) {
+								if((elims[i] & (1 << j)) == 0) {
+									// This pair has not been eliminated
+									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
+									cumSz += PAIR_SPREAD(i, j);
+									ASSERT_ONLY(eligiblesVisited++);
+									if(r < cumSz) {
+										// This is our randomly-selected 
+										// backtrack target
+										foundTarget = true;
+										bttop = PAIR_TOP(i, j);
+										btbot = PAIR_BOT(i, j);
+										btham += qi;
+										btcint = j;
+										btchar = "acgt"[j];
+										assert_leq(btham, _qualThresh);
+										break;
+									}
 								}
 							}
+							if(foundTarget) break;
 						}
-						if(foundTarget) break;
 					}
+					assert_leq(cumSz, eligibleSz);
+					assert_leq(i, d);
+					assert_lt(j, 4);
+					assert_leq(eligiblesVisited, eligibleNum);
+					assert(foundTarget);
+					assert_neq(0, btchar);
+					assert_gt(btbot, bttop);
+					assert_leq(btbot-bttop, eligibleSz);
+				} else {
+					// There was only one eligible target; we can just
+					// copy its parameters
+					assert_eq(1, eligibleNum);
+					assert(!elignore);
+					i = eli;
+					bttop = eltop;
+					btbot = elbot;
+					btham += elham;
+					j = btcint = elcint;
+					btchar = elchar;
+					assert_neq(0, btchar);
+					assert_gt(btbot, bttop);
+					assert_leq(btbot-bttop, eligibleSz);
 				}
-				assert_leq(eligiblesVisited, eligibleNum);
-				assert_leq(i, d);
-				assert_lt(j, 4);
-				assert_neq(0, btchar);
-				assert_leq(cumSz, eligibleSz);
-				assert(foundTarget);
-				assert_gt(btbot, bttop);
-				assert_leq(btbot-bttop, eligibleSz);
+				// This is the earliest that we know what the next top/
+				// bot combo is going to be
+				SideLocus::initFromTopBot(bttop, btbot,
+				                          _ebwt._eh, _ebwt._ebwt,
+				                          _preLtop, _preLbot);
+				icur = _qlen - i - 1; // current offset into _qry
 				// Slide over to the next backtacking frame within
 				// pairs and elims; won't interfere with our frame or
 				// any of our parents' frames
@@ -814,6 +910,7 @@ public:
 				if(i+1 == _qlen) {
 					ret = report(stackDepth+1, bttop, btbot);
 				} else {
+					_precalcedSideLocus = true;
 					ret = backtrack(stackDepth+1,
 				                    i+1,
 				                    btUnrevOff,  // new unrevisitable boundary
@@ -831,6 +928,9 @@ public:
 					if(_os != NULL && (*_os).size() > 0) confirmHit(iham);
 					return true; // return, signaling that we've reported
 				}
+				if(_numBts >= _maxBts) {
+					return false;
+				}
 				assert_eq(_params.sink().numHits(), numHits);
 				// No hit was reported; update elims[], eligibleSz,
 				// eligibleNum, altNum
@@ -841,6 +941,7 @@ public:
 				assert_gt(elims[i], oldElim);
 				eligibleSz -= (btbot-bttop);
 				eligibleNum--;
+				elignore = true;
 				assert_geq(eligibleNum, 0);
 				altNum--;
 				assert_geq(altNum, 0);
@@ -867,6 +968,9 @@ public:
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
 							if(kq < lowAltQual) {
+								// This target is more eligible than
+								// any targets that came before, so we
+								// set it to supplant/override them
 								kCurOverridesEligible = true;
 							}
 							if(kq <= lowAltQual) {
@@ -874,16 +978,30 @@ public:
 								for(int l = 0; l < 4; l++) {
 									if((elims[k] & (1 << l)) == 0) {
 										// Not yet eliminated
+										uint32_t spread = PAIR_SPREAD(k, l);
 										if(kCurOverridesEligible) {
 											// Clear previous eligible results;
 											// this one's better
 											lowAltQual = kq;
 											kCurOverridesEligible = false;
+											// Keep these parameters in
+											// case this target turns
+											// out to be the only
+											// eligible target and we
+											// can avoid having to
+											// recalculate them
 											eligibleNum = 0;
 											eligibleSz = 0;
+											eli = k;
+											eltop = PAIR_TOP(k, l);
+											elbot = PAIR_BOT(k, l);
+											assert_eq(elbot-eltop, spread);
+											elham = kq;
+											elchar = "acgt"[l];
+											elcint = l;
+											elignore = false;
 										}
 										eligibleNum++;
-										uint32_t spread = PAIR_SPREAD(k, l);
 										assert_gt(spread, 0);
 										eligibleSz += spread;
 									}
@@ -1159,9 +1277,11 @@ protected:
 			if(_muts != NULL) {
 				assert_neq(tmp, (*_qry));
 				size_t numMuts = length(*_muts);
+				assert_leq(numMuts, _qlen);
 				for(size_t i = 0; i < numMuts; i++) {
 					// Entries in _mms[] are in terms of offset into
 					// _qry - not in terms of offset from 3' or 5' end
+					assert_lt(stackDepth + i, DEFAULT_SPREAD);
 					_mms[stackDepth + i] = (*_muts)[i].pos;
 				}
 				hit = reportHit(stackDepth+numMuts, top, bot);
@@ -1441,6 +1561,19 @@ protected:
 	String<char>        _nameDefault; // default name, for when it's
 	                             // not specified by caller
 	String<char>        _qualDefault; // default quals
+	uint32_t            _hiDepth;// greatest stack depth seen since
+	                             // last reset
+	uint32_t            _numBts; // number of backtracks in last call
+	                             // to backtrack
+	uint32_t            _totNumBts;// number of backtracks since last
+	                             // reset
+	uint32_t            _maxBts; // max # of backtracks to allow before
+	                             // giving up
+	bool    _precalcedSideLocus; // whether we precalcualted the Ebwt
+	                             // locus information for the next top/
+	                             // bot pair
+	SideLocus           _preLtop;// precalculated top locus
+	SideLocus           _preLbot;// precalculated bot locus
 	RandomSource        _rand;   // Source of pseudo-random numbers
 	bool                _verbose;// be talkative
 };
