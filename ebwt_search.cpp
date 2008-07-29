@@ -254,7 +254,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(maqLike && !oneHit) {
 		// No support for -a in Maq mode (yet)
-		cerr << "Cannot combine -a/--allhits with Maq-like (default) mode
+		cerr << "Cannot combine -a/--allhits with Maq-like (default) mode"
 		     << endl
 		     << "Either omit -a/--allhits or also specify -0 or -1 for end-to-end mode"
 		     << endl;
