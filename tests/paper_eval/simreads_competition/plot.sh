@@ -2,6 +2,12 @@
 
 WORKSTATION=1
 echo "Don't forget to set WORKSTATION appropriately...";
+echo -n "Currently set to: "
+if [ "$WORKSTATION" = "1" ] ; then
+	echo Workstation
+else
+	echo Server
+fi
 
 dir=`pwd`
 while [ $# -ge 1 ]; do

@@ -105,8 +105,8 @@ for(my $i = 0; $i <= $#names; $i++) {
 		if($j < $#runnames) { print RUNTIME "& "; }
 	}
 	print RUNTIME " \\\\";
-	print RUNTIME " \\midrule " if ($i < 4);
-	print RUNTIME "[2pt] \\bottomrule \\\\ " if ($i == 4 && $all1);
+	print RUNTIME " \\midrule " if ($i < $#names);
+	print RUNTIME "[2pt] \\bottomrule \\\\ " if ($i == $#names && $all1);
 	print RUNTIME "\n";
 }
 
@@ -119,7 +119,7 @@ if(!$all1) {
 		"reads against human chromosomes 22 and 2 and the whole human ".
 		"genome on a single CPU of a ";
 	if($workstation) {
-		print RUNTIME "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+		print RUNTIME "workstation with a 2.4 GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
 	} else {
 		print RUNTIME "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 	}
@@ -180,7 +180,7 @@ for(my $i = 0; $i <= $#names; $i++) {
 		if($j < $#runnames) { print MEMORY "& "; }
 	}
 	print MEMORY " \\\\ ";
-	print MEMORY "\\midrule " if $i < 4;
+	print MEMORY "\\midrule " if $i < $#names;
 	print MEMORY "\n";
 }
 
@@ -194,7 +194,7 @@ print MEMORY
 	"reads against human chromosomes 22 and 2 and the whole human ".
 	"genome on a single CPU of a ";
 	if($workstation) {
-		print RUNTIME "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+		print RUNTIME "workstation with a 2.4 GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
 	} else {
 		print RUNTIME "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 	}
