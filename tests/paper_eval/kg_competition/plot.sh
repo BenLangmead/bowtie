@@ -66,6 +66,8 @@ tmp=`head -4 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
 echo -n "$tmp," >> $NAME.results.maq.txt
 head -5 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.maq.txt
 
+# For a server:
+
 if [ "$WORKSTATION" = "0" ] ; then
 	# SOAP -v 1
 	echo -n "SOAP -v 1," > $NAME.results.soap.v1.txt
@@ -82,7 +84,7 @@ if [ "$WORKSTATION" = "0" ] ; then
 	tmp=`head -6 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
 	echo -n "$tmp," >> $NAME.results.soap.txt
 	head -7 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.soap.txt
-	perl plot.pl bowtie.n1 bowtie maq.n1 maq soap.v1 soap
+	perl plot.pl bowtie.n1 maq.n1 soap.v1 bowtie maq soap
 else 
-	perl plot.pl bowtie.n1 bowtie maq.n1 maq
+	perl plot.pl bowtie.n1 maq.n1 bowtie maq
 fi
