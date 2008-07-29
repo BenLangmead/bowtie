@@ -1,5 +1,8 @@
 #!/bin/sh
 
+WORKSTATION=1
+echo "Don't forget to set WORKSTATION appropriately...";
+
 dir=`pwd`
 while [ $# -ge 1 ]; do
 	name=`echo $1 | sed 's/_.*//'`
@@ -18,4 +21,10 @@ while [ $# -ge 1 ]; do
 	shift
 done
 
-perl plot.pl chr22 chr2 whole
+if [ "$WORKSTATION" = "1" ] ; then
+	perl plot.pl -w chr22 chr2 whole
+else
+	perl plot.pl chr22 chr2 whole
+fi
+
+echo Done

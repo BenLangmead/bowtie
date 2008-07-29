@@ -58,11 +58,8 @@ sub commaize {
 	return $t;
 }
 
-my @names = ("Bowtie -n 1",
-             "Bowtie",
-             "Maq -n 1",
+my @names = ("Bowtie",
              "Maq",
-             "Soap -v 1",
              "Soap");
 
 my @bowtieResults = (0, 0, 0);
