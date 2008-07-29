@@ -63,6 +63,7 @@ for my $t (@trims) {
     } # while(<STATS>)
     {
 	    my $hits = `wc -l ebwt.$t.maq.n1.tfr.hits | awk '{print \$1}'`;
+	    chomp($hits);
 		my $foo = $hits * 100.0 / $reads if $asPercent;
 		$foo /= 1000000 unless $asPercent;
 		print MAQ1 "$t\t$foo\n";
@@ -70,6 +71,7 @@ for my $t (@trims) {
     }
     {
 	    my $hits = `wc -l ebwt.$t.maq.tfr.hits | awk '{print \$1}'`;
+	    chomp($hits);
 		my $foo = $hits * 100.0 / $reads if $asPercent;
 		$foo /= 1000000 unless $asPercent;
 		print MAQ2 "$t\t$foo\n";
