@@ -1,0 +1,32 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\usepackage{multirow}
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{cccc}
+\multicolumn{4}{c}{Reads mapped} \\[3pt] 
+By either Maq & By both Maq & By Maq but & By Bowtie   \\ 
+or Bowtie     & and Bowtie  & not Bowtie & but not Maq \\ 
+\toprule
+7,059,673 & 6,416,563 (90.9\%) & 452,715 (6.4\%) & 190,395 (2.7\%) \\ 
+\bottomrule
+\end{tabular}
+\caption{Blah}
+\end{table}
+\end{document}
