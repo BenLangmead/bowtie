@@ -26,16 +26,16 @@ print KG "\\begin{table}[tp]\n";
 print KG "\\scriptsize\n";
 #print KG "\\begin{tabular}{lrrrrrr}";
 print KG "\\begin{tabular}{lrrrrr}\n";
-if($workstation) {
-	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}}\\\\[3pt]\n";
-} else {
-	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}}\\\\[3pt]\n";
-}
+#if($workstation) {
+#	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}}\\\\[3pt]\n";
+#} else {
+#	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}}\\\\[3pt]\n";
+#}
 print KG "\\toprule\n";
 #print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
 #print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
-print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak VM & Reads  \\\\\n";
-print KG " &                            & time       & Speedup & Usage   & mapped \\\\[3pt]\n";
+print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\\\\n";
+print KG " &                            & time       & Speedup & memory usage & mapped \\\\[3pt]\n";
 print KG "\\toprule\n";
 
 my $bowtieSecs = 0;
@@ -92,11 +92,32 @@ if($workstation) {
 } else {
 	print KG "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 }
+print KG "Bowtie speedup is calculated with respect to wall clock time. ";
 print KG
-	"Bowtie speedup is calculated with respect to wall clock time. ".
-	"Reads are originally from the 1000-Genomes project pilot and ".
-	"were downloaded from the NCBI Short Read archive, accession ".
-	"\\#SRR001115, and trimmed to 35bps. ".
+	"Both CPU time and wall clock times are included to demonstrate ".
+	"that no one tool suffers disproportionately from I/O pauses or ".
+	"contention with other processes on the system. ";
+if($workstation) {
+	print KG
+		"Note that Maq indexes the reads as it maps them".
+	    ", whereas Bowtie ".
+	    "requires that an index of the genome be pre-built.  The cost ".
+	    "of building the Bowtie index is not included in these ".
+	    "timings since we expect that in practice that cost will ".
+	    "be rapidly amortized across multiple mapping jobs. ";
+} else {
+	print KG
+		"Note that Maq (resp. Soap) indexes the reads (resp. ".
+		"genome) as it maps, whereas the Bowtie mapper ".
+	    "requires a pre-built index of the genome.  The cost ".
+	    "of building the Bowtie index is not included in these ".
+	    "timings since we expect that in practice that cost will ".
+	    "be rapidly amortized across multiple mapping jobs. ";
+}
+print KG
+	"Reads are taken from the 1000-Genomes project pilot ".
+	"via the NCBI Short Read archive, accession ".
+	"\\#SRR001115 and trimmed to 35bps. ".
 	"Reference sequences were the ".
 	"contigs of Genbank human genome build 36.3. ";
 if($workstation) {

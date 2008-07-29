@@ -203,6 +203,23 @@ print MEMORY
 	} else {
 		print MEMORY "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 	}
+if($workstation) {
+	print MEMORY
+		"Note that Maq indexes the reads as it maps them".
+	    ", whereas Bowtie ".
+	    "requires that an index of the genome be pre-built.  The cost ".
+	    "of building the Bowtie index is not included in the above ".
+	    "timings.  We expect expect that in practice that cost will ".
+	    "be rapidly amortized across multiple mapping jobs.";
+} else {
+	print MEMORY
+		"Note that Maq (resp. Soap) indexes the reads (resp. ".
+		"genome) as it maps, whereas the Bowtie mapper ".
+	    "requires a pre-built index of the genome.  The cost ".
+	    "of building the Bowtie index is not included in the above ".
+	    "timings.  We expect expect that in practice that cost will ".
+	    "be rapidly amortized across multiple mapping jobs.";
+}
 print MEMORY
 	"Simulated reads were ".
 	"extracted only from the relevant region using a read simulator that ".

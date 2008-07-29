@@ -40,8 +40,11 @@ if [ ! -f $NAME.results.txt ] ; then
 	perl summarize_top.pl $NAME.maq.n1.top  maq         | tail -1 >> $NAME.results.txt
 	perl summarize_top.pl $NAME.maq.top     maq         | tail -1 >> $NAME.results.txt
 	if [ "$WORKSTATION" = "0" ] ; then
-		perl summarize_top.pl $NAME.soap.v1.top soap    | tail -1 >> $NAME.results.txt
-		perl summarize_top.pl $NAME.soap.v2.top soap    | tail -1 >> $NAME.results.txt
+		# Up the threshold on the SOAP runs; otherwise our figures
+		# include multiple SOAP processes running in parallel, which
+		# screws up the CPU Time/Wall clock time figures
+		perl summarize_top.pl -t 900 $NAME.soap.v1.top soap | tail -1 >> $NAME.results.txt
+		perl summarize_top.pl -t 900 $NAME.soap.v2.top soap | tail -1 >> $NAME.results.txt
 	fi
 fi
 if [ ! -f $NAME.maps.txt ] ; then
