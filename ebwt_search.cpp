@@ -51,7 +51,7 @@ static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
 static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 24; // seed length (not configurable in maq)
-static int seedMms              = 1;  // # mismatches allowed in seed (maq's -n)
+static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 
 static const char *short_options = "fqbmlcu:rvsat013:5:o:k:d:e:n:";
@@ -64,37 +64,36 @@ static const char *short_options = "fqbmlcu:rvsat013:5:o:k:d:e:n:";
 #define ARG_SOLEXA_QUALS 261
 
 static struct option long_options[] = {
-	/* These options set a flag. */
-	{"verbose", no_argument, 0, 'v'},
-	{"sanity",  no_argument, 0, 's'},
-	{"exact",   no_argument, 0, '0'},
-	{"1mm",     no_argument, 0, '1'},
-	{"pause",   no_argument, &ipause, 1},
-	{"orig",    required_argument, 0, ARG_ORIG},
-	{"allHits", no_argument, 0, 'a'},
-	{"binOut",  no_argument, 0, 'b'},
-	{"concise", no_argument, 0, ARG_CONCISE},
-	{"solexa-quals", no_argument, 0, ARG_SOLEXA_QUALS},
-	{"time",    no_argument, 0, 't'},
-	{"trim3",   required_argument, 0, '3'},
-	{"trim5",   required_argument, 0, '5'},
-	{"seed",    required_argument, 0, ARG_SEED},
-	{"qUpto",   required_argument, 0, 'u'},
-	{"offRate",   required_argument, 0, 'o'},
-	{"skipSearch", no_argument, &skipSearch, 1},
-	{"qSameLen",   no_argument, &qSameLen, 1},
-	{"stats",      no_argument, &printStats, 1},
-	{"reportOpps", no_argument, &reportOpps, 1},
-	{"version",    no_argument, &showVersion, 1},
-	{"maq",        no_argument, &maqLike, 1},
-	{"dumpPats",   required_argument, 0, ARG_DUMP_PATS},
-	{"revcomp",    no_argument, 0, 'r'},
-	{"err",        required_argument, 0, 'e'},
-	{"seedMms",    required_argument, 0, 'n'},
-	{"kmer",         required_argument, 0, 'k'},
-	{"3prime-diffs", required_argument, 0, 'd'},
-	{"arrows",       no_argument, 0, ARG_ARROW},
-	{0, 0, 0, 0}
+	{"verbose",      no_argument,       0,            'v'},
+	{"sanity",       no_argument,       0,            's'},
+	{"exact",        no_argument,       0,            '0'},
+	{"1mm",          no_argument,       0,            '1'},
+	{"pause",        no_argument,       &ipause,      1},
+	{"orig",         required_argument, 0,            ARG_ORIG},
+	{"allhits",      no_argument,       0,            'a'},
+	{"binout",       no_argument,       0,            'b'},
+	{"concise",      no_argument,       0,            ARG_CONCISE},
+	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
+	{"time",         no_argument,       0,            't'},
+	{"trim3",        required_argument, 0,            '3'},
+	{"trim5",        required_argument, 0,            '5'},
+	{"seed",         required_argument, 0,            ARG_SEED},
+	{"qupto",        required_argument, 0,            'u'},
+	{"offrate",      required_argument, 0,            'o'},
+	{"skipsearch",   no_argument,       &skipSearch,  1},
+	{"qsamelen",     no_argument,       &qSameLen,    1},
+	{"stats",        no_argument,       &printStats,  1},
+	{"reportopps",   no_argument,       &reportOpps,  1},
+	{"version",      no_argument,       &showVersion, 1},
+	{"maq",          no_argument,       &maqLike,     1},
+	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
+	{"revcomp",      no_argument,       0,            'r'},
+	{"err",          required_argument, 0,            'e'},
+	{"seedmms",      required_argument, 0,            'n'},
+	{"kmer",         required_argument, 0,            'k'},
+	{"3prime-diffs", required_argument, 0,            'd'},
+	{"arrows",       no_argument,       0,            ARG_ARROW},
+	{0, 0, 0, 0} // terminator
 };
 
 /**
@@ -113,29 +112,29 @@ static void printUsage(ostream& out) {
 	    //<< "  -l                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
 	    << "  -e/--err <int>     max sum of mismatch qualities (default: 70)" << endl
-	    << "  -n/--seedMms <int> max mismatches in 5' 24 bps (0, 1 or 2, default: 2)" << endl
+	    << "  -n/--seedmms <int> max mismatches in 5' 24 bps (0, 1 or 2, default: 2)" << endl
 	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
 	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
-	    << "  -u/--qUpto <int>   stop after the first <int> reads" << endl
+	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    //<< "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
 		//<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
 		//<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
-	    //<< "  -b/--binOut        write hits in binary format (must specify <hit_outfile>)" << endl
+	    //<< "  -b/--binout        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
-	    //<< "  --qSameLen         die with error if queries don't all have the same length" << endl
+	    //<< "  --qsamelen         die with error if queries don't all have the same length" << endl
 	    //<< "  --stats            write statistics after hits" << endl
-	    //<< "  --reportOpps       report # of other potential mapping targets for each hit" << endl
-	    //<< "  -a/--allHits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
+	    //<< "  --reportopps       report # of other potential mapping targets for each hit" << endl
+	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    << "  --concise          write hits in a concise format" << endl
-	    //<< "  --dumpPats <file>  dump all patterns read to a file" << endl
-	    << "  -o/--offRate <int> override offRate of Ebwt; must be <= value in index" << endl
+	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
+	    << "  -o/--offrate <int> override offRate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
@@ -169,8 +168,6 @@ static int parseInt(int lower, const char *errmsg) {
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
-
-    /* getopt_long stores the option index here. */
     int option_index = 0;
 	int next_option;
 	do {
@@ -247,16 +244,29 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
-	// If revomp is enabled, double qUpto to match
-	if(revcomp && qUpto != -1) qUpto <<= 1;
-	if(maqLike) revcomp = true;
+	if(revcomp && qUpto != -1) {
+		// If revomp is enabled, double qUpto to reflect the fact that
+		// it's a cap on reads, not pattermns
+		qUpto <<= 1;
+	}
+	if(maqLike) {
+		revcomp = true;
+	}
+	if(maqLike && !oneHit) {
+		// No support for -a in Maq mode (yet)
+		cerr << "Cannot combine -a/--allhits with Maq-like (default) mode
+		     << endl
+		     << "Either omit -a/--allhits or also specify -0 or -1 for end-to-end mode"
+		     << endl;
+		exit(1);
+	}
 }
 
 static char *argv0 = NULL;
 
 /**
- * Search through a single (forward) Ebwt index for exact query hits.
- * Ebwt (ebwt) is already loaded into memory.
+ * Search through a single (forward) Ebwt index for exact end-to-end
+ * hits.  Assumes that index is already loaded into memory.
  */
 template<typename TStr>
 static void exactSearch(PatternSource<TStr>& patsrc,
@@ -363,9 +373,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 /**
  * Search through a single (forward) Ebwt index for exact query hits in the 
  * 5' end of each read, and then extend that hit by shift-and to allow for 3'
- * mismatches.
- *
- * Ebwt (ebwt) is already loaded into memory.
+ * mismatches.  Assumes that index is already loaded into memory.
  */
 template<typename TStr>
 static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_texts,
@@ -620,8 +628,9 @@ static bool reconcileHits(const TStr1& pat,
 
 /**
  * Search through a pair of Ebwt indexes, one for the forward direction
- * and one for the backward direction, for exact query hits and hits
- * with at most one mismatch.
+ * and one for the backward direction, for exact end-to-end hits and 1-
+ * mismatch end-to-end hits.  In my experience, this is slightly faster
+ * than Maq (default) mode with the -n 1 option.
  * 
  * Forward Ebwt (ebwtFw) is already loaded into memory and backward
  * Ebwt (ebwtBw) is not loaded into memory.
@@ -1176,8 +1185,8 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
  * Search for a good alignments for each read using criteria that
  * correspond somewhat faithfully to Maq's.  Search is aided by a pair
  * of Ebwt indexes, one for the original references, and one for the
- * transpose of all the references.  Neither index should be loaded
- * upon entry.
+ * transpose of the references.  Neither index should be loaded upon
+ * entry to this function.
  * 
  * Like Maq, we treat the first 24 base pairs of the read (those
  * closest to the 5' end) differently from the remainder of the read.
