@@ -5,6 +5,14 @@ NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
 READS=kg_reads.fq
+DO_CVS_UPDATE=0
+
+# Optionally do a cvs update in the Bowtie home
+if [ "$DO_CVS_UPDATE" = "1" ] ; then
+	pushd ${BOWTIE_HOME}
+	cvs update -d
+	popd
+fi
 
 # Make ebwt_search
 make -C ${BOWTIE_HOME} ebwt_search
