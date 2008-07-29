@@ -93,5 +93,3 @@ if [ "$WORKSTATION" = "0" ] ; then
 else 
 	perl plot.pl -w bowtie.n1 maq.n1 - bowtie maq -
 fi
-
-echo Done
