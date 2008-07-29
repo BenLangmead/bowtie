@@ -2,6 +2,11 @@
 
 use strict;
 use warnings;
+use Getopt::Std;
+
+my %options=();
+getopts("w",\%options);
+my $workstation = 0; $workstation = $options{w} if defined($options{w});
 
 defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
@@ -20,6 +25,11 @@ print KG "\\begin{table}[tp]\n";
 print KG "\\scriptsize\n";
 #print KG "\\begin{tabular}{lrrrrr}";
 print KG "\\begin{tabular}{lrrrr}";
+if($workstation) {
+	print KG "\\multicolumn{5}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}\\\\\n";
+} else {
+	print KG "\\multicolumn{5}{c}{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}\\\\\n";
+}
 print KG "\\toprule\n";
 #print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
 #print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
@@ -59,11 +69,16 @@ print KG "\n";
 
 print KG "\\bottomrule\n";
 print KG "\\end{tabular}\n";
-print KG "\\caption{".
-	"CPU time ".
-	"for mapping 8.96M 35bp ".
-	"Illumina/Solexa reads (1 lane's worth) against the whole human ".
-	"genome on a workstation with a 2.40GHz Intel Core 2 Q6600 and 2 GB of RAM. ".
+print KG "\\caption{";
+print KG
+	"CPU time for mapping 8.96M 35bp Illumina/Solexa reads against the whole human ".
+	"genome on a ";
+if($workstation) {
+	print KG "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
+} else {
+	print KG "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
+}
+print KG
 	"Reads were originally extracted as part of the 1000-Genomes project pilot. ".
 	"They were downloaded from the NCBI Short Read archive, accession \\#SRR001115. ".
 	"Reference sequences were the ".
