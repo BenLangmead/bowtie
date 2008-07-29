@@ -16,7 +16,7 @@ my $bothpct = sprintf("%2.1f%%", $inboth * 100.0 / $tot);
 my $ebwtpct = sprintf("%2.1f%%", $inebwt * 100.0 / $tot);
 my $maqpct  = sprintf("%2.1f%%", $inmaq  * 100.0 / $tot);
 
-print "  In either: $tot\n";
-print "    In noth: $inboth ($bothpct)\n";
-print "Bowtie only: $inebwt ($ebwtpct)\n";
-print "   Maq only: $inmaq ($maqpct)\n";
+print "     In either: $tot\n";
+print "       In both: $inboth ($bothpct)\n";
+print "In Bowtie only: $inebwt ($ebwtpct)\n";
+print "   In Maq only: $inmaq ($maqpct)\n";
