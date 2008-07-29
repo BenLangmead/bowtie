@@ -49,8 +49,8 @@ print READS "\\scriptsize\n";
 print READS "\\begin{tabular}{cccc}\n";
 
 print READS "\\multicolumn{4}{c}{Reads mapped} \\\\[3pt] \n";
-print READS "By either Maq & By both Maq & By Maq but & By Bowtie   \\\\ \n";
-print READS "or Bowtie     & and Bowtie  & not Bowtie & but not Maq \\\\ \n";
+print READS "By Maq or      & By both Maq & By Bowtie   & By Maq         \\\\ \n";
+print READS "Bowtie or both & and Bowtie  & but not Maq & but not Bowtie \\\\ \n";
 print READS "\\toprule\n";
 print READS "$totc & $inbothc ($bothpct\\%) & $inebwtc ($ebwtpct\\%) & $inmaqc ($maqpct\\%) \\\\ \n";
 print READS "\\bottomrule\n";
