@@ -82,7 +82,7 @@ if [ "$WORKSTATION" = "0" ] ; then
 	tmp=`head -6 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
 	echo -n "$tmp," >> $NAME.results.soap.txt
 	head -7 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.soap.txt
-	perl plot.pl bowtie maq.n1 maq soap.v1 soap
+	perl plot.pl bowtie.n1 bowtie maq.n1 maq soap.v1 soap
 else 
-	perl plot.pl bowtie maq.n1 maq
+	perl plot.pl bowtie.n1 bowtie maq.n1 maq
 fi
