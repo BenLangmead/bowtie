@@ -20,8 +20,10 @@ print KG "\\begin{table}[tp]\n";
 print KG "\\scriptsize\n";
 print KG "\\begin{tabular}{lrrrrr}";
 print KG "\\toprule\n";
-print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
-print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
+#print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
+#print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
+print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Reads  \\\\\n";
+print KG " &                            & time       & Speedup & mapped \\\\[3pt]\n";
 print KG "\\toprule\n";
 
 my $bowtieSecs = 0;
@@ -34,16 +36,17 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $rt = toMinsSecsHrs($ls[1]);
 	my $wrt = toMinsSecsHrs($ls[2]);
 	my $pct = trim($ls[3]);
-	$bowtieSecs = $ls[2] if $ni == 0;
-	$bowtiePct = $pct if $ni == 0;
-	my $speedup = ($ni == 0 ? "-" : sprintf("%2.1fx", $ls[2] * 1.0 / $bowtieSecs));
-	my $moreReads = ($ni == 0 ? "-" : sprintf("%2.1f\\%%", abs($pct - $bowtiePct) * 100.0 / $bowtiePct));
+	my $isBowtie = ($n =~ /bowtie/i);
+	$bowtieSecs = $ls[2] if $isBowtie;
+	$bowtiePct = $pct if $isBowtie;
+	my $speedup = ($isBowtie ? "-" : sprintf("%2.1fx", $ls[2] * 1.0 / $bowtieSecs));
+	my $moreReads = ($isBowtie ? "-" : sprintf("%2.1f\\%%", abs($pct - $bowtiePct) * 100.0 / $bowtiePct));
 	my $moreReadsSign = ($pct >= $bowtiePct)? "+" : "-";
-	$moreReadsSign = "" if $ni == 0;
+	$moreReadsSign = "" if $isBowtie;
 	print KG "$names[$ni] & $rt & $wrt & $speedup & ";
 	printf KG "%2.1f\\%%", $pct;
-	print KG " & $moreReadsSign$moreReads \\\\";
-	print KG "\\midrule" if $ni < $#runnames;
+	#print KG " & $moreReadsSign$moreReads \\\\";
+	print KG " \\midrule" if $ni < $#runnames;
 	print KG "\n";
 }
 
