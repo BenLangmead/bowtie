@@ -2,9 +2,9 @@
 
 BOWTIE_HOME=$HOME/workspace/bowtie
 KG_READS=/fs/szasmg/langmead/reads/SRR001115/SRR001115/s_7_0000_0255
-BOWTIE_ARGS="-1tfra --concise --arrows"
-BOWTIE_MAQ_N1_ARGS="-n 1 -tfr --concise"
-BOWTIE_MAQ_ARGS="-tfr --concise"
+BOWTIE_ARGS="-1tqra --concise --arrows"
+BOWTIE_MAQ_N1_ARGS="-n 1 -tqr --concise"
+BOWTIE_MAQ_ARGS="-tqr --concise"
 DO_CVS_UPDATE=0
 
 # Optionally do a cvs update in the Bowtie home
@@ -27,19 +27,19 @@ cp ${BOWTIE_HOME}/ebwt_search .
 # gives us the information needed to draw the bottom 4 lines 
 if [ ! -f ebwt.40.1tfra.arrows.hits ] ; then
 	./ebwt_search -3  0 ${BOWTIE_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.40.1tfra.arrows.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.40.1tfra.arrows.hits
 fi
 if [ ! -f ebwt.35.1tfra.arrows.hits ] ; then
 	./ebwt_search -3  5 ${BOWTIE_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.35.1tfra.arrows.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.35.1tfra.arrows.hits
 fi
 if [ ! -f ebwt.30.1tfra.arrows.hits ] ; then
 	./ebwt_search -3 10 ${BOWTIE_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.30.1tfra.arrows.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.30.1tfra.arrows.hits
 fi
 if [ ! -f ebwt.25.1tfra.arrows.hits ] ; then
 	./ebwt_search -3 15 ${BOWTIE_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.25.1tfra.arrows.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.25.1tfra.arrows.hits
 fi
 
 # Process the arrows down to some statistics
@@ -64,35 +64,35 @@ fi
 # gives us the information needed to draw the 5th and 6th lines
 if [ ! -f ebwt.40.maq.n1.tfr.hits ] ; then
 	./ebwt_search -3  0 ${BOWTIE_MAQ_N1_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.40.maq.n1.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.40.maq.n1.tfr.hits
 fi
 if [ ! -f ebwt.35.maq.n1.tfr.hits ] ; then
 	./ebwt_search -3  5 ${BOWTIE_MAQ_N1_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.35.maq.n1.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.35.maq.n1.tfr.hits
 fi
 if [ ! -f ebwt.30.maq.n1.tfr.hits ] ; then
 	./ebwt_search -3 10 ${BOWTIE_MAQ_N1_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.30.maq.n1.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.30.maq.n1.tfr.hits
 fi
 if [ ! -f ebwt.25.maq.n1.tfr.hits ] ; then
 	./ebwt_search -3 15 ${BOWTIE_MAQ_N1_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.25.maq.n1.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.25.maq.n1.tfr.hits
 fi
 
 if [ ! -f ebwt.40.maq.tfr.hits ] ; then
 	./ebwt_search -3  0 ${BOWTIE_MAQ_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.40.maq.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.40.maq.tfr.hits
 fi
 if [ ! -f ebwt.35.maq.tfr.hits ] ; then
 	./ebwt_search -3  5 ${BOWTIE_MAQ_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.35.maq.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.35.maq.tfr.hits
 fi
 if [ ! -f ebwt.30.maq.tfr.hits ] ; then
 	./ebwt_search -3 10 ${BOWTIE_MAQ_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.30.maq.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.30.maq.tfr.hits
 fi
 if [ ! -f ebwt.25.maq.tfr.hits ] ; then
 	./ebwt_search -3 15 ${BOWTIE_MAQ_ARGS} \
-	    ../../whole.t10o5l6 ${KG_READS}.fa ebwt.25.maq.tfr.hits
+	    ../../whole.t10o5l6 ${KG_READS}.fastq ebwt.25.maq.tfr.hits
 fi
     

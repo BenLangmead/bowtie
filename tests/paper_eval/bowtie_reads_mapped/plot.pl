@@ -18,7 +18,8 @@ open(EXACT,    ">exact.dat")    || die "Could not open >exact.dat";
 open(EXACTU,   ">exactu.dat")   || die "Could not open >exactu.dat";
 open(INEXACT,  ">inexact.dat")  || die "Could not open >inexact.dat";
 open(INEXACTU, ">inexactu.dat") || die "Could not open >inexactu.dat";
-open(OTHER,    ">other.dat")    || die "Could not open >other.dat";
+open(MAQ1,     ">maq1.dat")     || die "Could not open >maq1.dat";
+open(MAQ2,     ">maq2.dat")     || die "Could not open >maq2.dat";
 
 for my $t (@trims) {
     open(STATS, "ebwt.$t.1tfra.arrows.stats") || die "Could not open stats ebwt.$t.1tfra.arrows.stats";
@@ -60,15 +61,25 @@ for my $t (@trims) {
 	    print "  1-mismatch hits: $1\n";
 	}
     } # while(<STATS>)
-    my $hits = `wc -l ebwt.$t.maq.tfr.hits | awk '{print \$1}'`;
-	my $foo = $hits * 100.0 / $reads if $asPercent;
-	$foo /= 1000000 unless $asPercent;
-	print OTHER "$t\t$foo\n";
-	print "  Other hits: $hits\n";
+    {
+	    my $hits = `wc -l ebwt.$t.maq.n1.tfr.hits | awk '{print \$1}'`;
+		my $foo = $hits * 100.0 / $reads if $asPercent;
+		$foo /= 1000000 unless $asPercent;
+		print MAQ1 "$t\t$foo\n";
+		print "  Other hits: $hits\n";
+    }
+    {
+	    my $hits = `wc -l ebwt.$t.maq.tfr.hits | awk '{print \$1}'`;
+		my $foo = $hits * 100.0 / $reads if $asPercent;
+		$foo /= 1000000 unless $asPercent;
+		print MAQ2 "$t\t$foo\n";
+		print "  Other hits: $hits\n";
+    }
 }
 
 close(EXACT);
 close(EXACTU);
 close(INEXACT);
 close(INEXACTU);
-close(OTHER);
+close(MAQ1);
+close(MAQ2);
