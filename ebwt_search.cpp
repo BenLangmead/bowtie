@@ -2099,7 +2099,7 @@ static void driver(const char * type,
  * main function.  Parses command-line arguments.
  */
 int main(int argc, char **argv) {
-	string infile;  // read serialized Ebwt from this file
+	string ebwtFile;  // read serialized Ebwt from this file
 	string query;   // read query string(s) from this file
 	vector<string> queries;
 	string outfile; // write query results to this file
@@ -2107,7 +2107,7 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		// TODO: handle versioning better
-		cout << argv0 << " version 0.1 (beta)" << endl;
+		cout << argv0 << " version 0.5" << endl;
 		cout << "Hash: " << EBWT_SEARCH_HASH << endl;
 		return 0;
 	}
@@ -2119,7 +2119,7 @@ int main(int argc, char **argv) {
 		printUsage(cerr);
 		return 1;
 	}
-	infile = argv[optind++];
+	ebwtFile = argv[optind++];
 	
 	// Get query filename
 	if(optind >= argc) {
@@ -2149,7 +2149,7 @@ int main(int argc, char **argv) {
 
 	// Optionally summarize
 	if(verbose) {
-		cout << "Input ebwt file: \"" << infile << "\"" << endl;
+		cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
 		cout << "Query inputs (DNA, " << file_format_names[format] << "):" << endl;
 		for(size_t i = 0; i < queries.size(); i++) {
 			cout << "  " << queries[i] << endl;
@@ -2167,7 +2167,7 @@ int main(int argc, char **argv) {
 		cout << "Press key to continue..." << endl;
 		getchar();
 	}
-	driver<String<Dna, Alloc<> > >("DNA", infile, query, queries, outfile);
+	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
     return 0;
 }
 
