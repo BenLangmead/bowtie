@@ -5,7 +5,8 @@ while [ $# -ge 1 ]; do
 	name=`echo $1 | sed 's/_.*//'`
 	echo "Doing dataset $name in directory ../$1"
 	cd ../$1
-	sh summarize_all_top.sh > $dir/$name.results.txt
+	# Omit all1 results, since we do not expect those to be relevant
+	sh summarize_all_top.sh | grep -v all1 > $dir/$name.results.txt
 	cd $dir
 	awk '{print $1}' $name.results.txt > $name.results.names.txt
 	# Wall clock time

@@ -6,11 +6,11 @@ use warnings;
 defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
 
-my @names = ("Bowtie with -n 1",
+my @names = ("Bowtie -n 1",
              "Bowtie",
-             "Maq with -n 1",
+             "Maq -n 1",
              "Maq",
-             "Soap with -v 1",
+             "Soap -v 1",
              "Soap");
 
 system("cp headerinc.tex kg.tex") == 0 || die ("Must have headerinc.tex");

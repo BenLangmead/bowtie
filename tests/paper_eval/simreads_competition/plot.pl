@@ -53,10 +53,11 @@ sub commaize {
 	return $t;
 }
 
-my @names = ("Bowtie",
-             "Maq with -n 1",
+my @names = ("Bowtie -n 1",
+             "Bowtie",
+             "Maq -n 1",
              "Maq",
-             "Soap with -v 1",
+             "Soap -v 1",
              "Soap");
 
 my @bowtieResults = (0, 0, 0);
@@ -78,7 +79,7 @@ print RUNTIME " & Time & Speedup & Time & Speedup & Time & Speedup \\\\ \n";
 print RUNTIME "\\toprule\n";
 
 # Output 
-for(my $i = 0; $i < 5; $i++) {
+for(my $i = 0; $i <= $#names; $i++) {
 	print RUNTIME "$names[$i] & ";
 	for(my $j = 0; $j <= $#runnames; $j++)  {
 		my $n = $runnames[$j];
