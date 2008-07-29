@@ -28,8 +28,8 @@ my $bowtieSecs = 0;
 my $bowtiePct = 0;
 for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $n = $runnames[$ni];
+	next if $n =~ /^-/;
 	my $l = readfline("whole.results.$n.txt", 0);
-	next if $l =~ /Didn't find/;
 	my @ls = split(/,/, $l);
 	my $rt = toMinsSecsHrs($ls[1]);
 	my $wrt = toMinsSecsHrs($ls[2]);
