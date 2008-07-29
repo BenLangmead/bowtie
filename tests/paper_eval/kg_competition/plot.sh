@@ -56,6 +56,8 @@ tmp=`head -1 $NAME.results.txt | cut -d" " -f 2 | cut -d, -f 1`
 echo -n "$tmp," >> $NAME.results.bowtie.n1.txt 
 tmp=`head -1 $NAME.results.txt | cut -d" " -f 2 | cut -d, -f 2`
 echo -n "$tmp," >> $NAME.results.bowtie.n1.txt
+tmp=`head -1 $NAME.results.txt | cut -d" " -f 2 | cut -d, -f 3`
+echo -n "$tmp," >> $NAME.results.bowtie.n1.txt
 head -2 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.bowtie.n1.txt
 
 # Bowtie
@@ -63,6 +65,8 @@ echo -n "Bowtie," > $NAME.results.bowtie.txt
 tmp=`head -2 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 1`
 echo -n "$tmp," >> $NAME.results.bowtie.txt 
 tmp=`head -2 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
+echo -n "$tmp," >> $NAME.results.bowtie.txt
+tmp=`head -2 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 3`
 echo -n "$tmp," >> $NAME.results.bowtie.txt
 head -3 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.bowtie.txt
 
@@ -72,6 +76,8 @@ tmp=`head -3 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 1`
 echo -n "$tmp," >> $NAME.results.maq.n1.txt
 tmp=`head -3 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
 echo -n "$tmp," >> $NAME.results.maq.n1.txt
+tmp=`head -3 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 3`
+echo -n "$tmp," >> $NAME.results.maq.n1.txt
 head -4 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.maq.n1.txt
 
 # Maq
@@ -79,6 +85,8 @@ echo -n "Maq," > $NAME.results.maq.txt
 tmp=`head -4 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 1`
 echo -n "$tmp," >> $NAME.results.maq.txt
 tmp=`head -4 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
+echo -n "$tmp," >> $NAME.results.maq.txt
+tmp=`head -4 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 3`
 echo -n "$tmp," >> $NAME.results.maq.txt
 head -5 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.maq.txt
 
@@ -91,6 +99,8 @@ if [ "$WORKSTATION" = "0" ] ; then
 	echo -n "$tmp," >> $NAME.results.soap.v1.txt
 	tmp=`head -5 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
 	echo -n "$tmp," >> $NAME.results.soap.v1.txt
+	tmp=`head -5 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 3`
+	echo -n "$tmp," >> $NAME.results.soap.v1.txt
 	head -6 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.soap.v1.txt
 
 	# SOAP -v
@@ -98,6 +108,8 @@ if [ "$WORKSTATION" = "0" ] ; then
 	tmp=`head -6 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 1`
 	echo -n "$tmp," >> $NAME.results.soap.txt
 	tmp=`head -6 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 2`
+	echo -n "$tmp," >> $NAME.results.soap.txt
+	tmp=`head -6 $NAME.results.txt | tail -1 | cut -d" " -f 2 | cut -d, -f 3`
 	echo -n "$tmp," >> $NAME.results.soap.txt
 	head -7 $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.soap.txt
 	perl plot.pl bowtie.n1 maq.n1 soap.v1 bowtie maq soap

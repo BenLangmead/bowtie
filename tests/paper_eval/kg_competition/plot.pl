@@ -10,6 +10,7 @@ my $workstation = 0; $workstation = $options{w} if defined($options{w});
 
 defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
+print "Run names: @runnames\n";
 
 my @names = ("Bowtie -n 1",
              "Maq -n 1",
@@ -23,26 +24,37 @@ open(KG, ">>kg.tex") || die "Could not open >>kg.tex";
 print KG "\\begin{document}\n";
 print KG "\\begin{table}[tp]\n";
 print KG "\\scriptsize\n";
-#print KG "\\begin{tabular}{lrrrrr}";
-print KG "\\begin{tabular}{lrrrr}";
+#print KG "\\begin{tabular}{lrrrrrr}";
+print KG "\\begin{tabular}{lrrrrr}\n";
 if($workstation) {
-	print KG "\\multicolumn{5}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}\\\\\n";
+	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}}\\\\[3pt]\n";
 } else {
-	print KG "\\multicolumn{5}{c}{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}\\\\\n";
+	print KG "\\multicolumn{6}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}}\\\\[3pt]\n";
 }
 print KG "\\toprule\n";
 #print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & \\multicolumn{2}{c}{Reads mapped} \\\\\n";
 #print KG " &                            & time       & Speedup & Overall    & w/r/t Bowtie \\\\[3pt]\n";
-print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Reads  \\\\\n";
-print KG " &                            & time       & Speedup & mapped \\\\[3pt]\n";
+print KG " & \\multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak VM & Reads  \\\\\n";
+print KG " &                            & time       & Speedup & Usage   & mapped \\\\[3pt]\n";
 print KG "\\toprule\n";
 
 my $bowtieSecs = 0;
 my $bowtiePct = 0;
 my $rows = 0;
+my $addedExtraHrule = 0;
 for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $n = $runnames[$ni];
-	next if $n =~ /^-/; # No results for this tool; don't print a row
+	if($n =~ /^-/) {
+		# No results for this tool; don't print a row
+		print "Skipping results for $n due to dash\n";
+		next;
+	}
+	if(!$addedExtraHrule && !($n =~ /1$/)) {
+		# Add an extra horizontal rule separating the -n/-v 1 results
+		# from the standard results
+		print KG "\\midrule\n";
+		$addedExtraHrule = 1;
+	}
 	# Print \midrule before all rows except the first
 	if($rows > 0) {
 		print KG "\\midrule\n";
@@ -52,7 +64,9 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my @ls = split(/,/, $l);
 	my $rt = toMinsSecsHrs($ls[1]);
 	my $wrt = toMinsSecsHrs($ls[2]);
-	my $pct = trim($ls[3]);
+	my $pct = trim($ls[4]);
+	my $vm = int((trim($ls[3]) + 512) / 1024);
+	$vm = commaize($vm);
 	my $isBowtie = ($n =~ /bowtie/i);
 	$bowtieSecs = $ls[2] if $isBowtie;
 	$bowtiePct = $pct if $isBowtie;
@@ -60,7 +74,7 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $moreReads = ($isBowtie ? "-" : sprintf("%2.1f\\%%", abs($pct - $bowtiePct) * 100.0 / $bowtiePct));
 	my $moreReadsSign = ($pct >= $bowtiePct)? "+" : "-";
 	$moreReadsSign = "" if $isBowtie;
-	print KG "$names[$ni] & $rt & $wrt & $speedup & ";
+	print KG "$names[$ni] & $rt & $wrt & $speedup & $vm MB & ";
 	printf KG "%2.1f\\%%", $pct;
 	#print KG " & $moreReadsSign$moreReads \\\\";
 	print KG "\\\\";
@@ -71,24 +85,36 @@ print KG "\\bottomrule\n";
 print KG "\\end{tabular}\n";
 print KG "\\caption{";
 print KG
-	"CPU time for mapping 8.96M 35bp Illumina/Solexa reads against the whole human ".
-	"genome on a ";
+	"Performance measurements for mapping 8.96M 35bp Illumina/Solexa ".
+	"reads against the whole human genome on a single CPU of a ";
 if($workstation) {
 	print KG "workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. ";
 } else {
 	print KG "server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. ";
 }
 print KG
-	"Reads were originally extracted as part of the 1000-Genomes project pilot. ".
-	"They were downloaded from the NCBI Short Read archive, accession \\#SRR001115. ".
+	"Bowtie speedup is calculated with respect to wall clock time. ".
+	"Reads are originally from the 1000-Genomes project pilot and ".
+	"were downloaded from the NCBI Short Read archive, accession ".
+	"\\#SRR001115, and trimmed to 35bps. ".
 	"Reference sequences were the ".
-	"contigs of Genbank human genome build 36.3. ".
-	"Soap was not run against the whole-human reference because its ".
-	"memory footprint exceeds physical RAM. ".  
+	"contigs of Genbank human genome build 36.3. ";
+if($workstation) {
+	print KG
+		"Soap was not run because its ".
+		"memory footprint would have exceeded the physical RAM of the ".
+		"workstation. ";  
+}
+print KG
 	"For the Maq runs, the ".
 	"reads were first divided into chunks of 2M reads each, ".
-	"as per the Maq Manual.".
-	"}\n";
+	"as per the Maq Manual. ";
+if($workstation) {
+	print KG "Maq v0.6.6 was used. ";
+} else {
+	print KG "Soap v1.10 and Maq v0.6.6 were used. ";
+}
+print KG "}\n";
 print KG "\\end{table}\n";
 print KG "\\end{document}\n";
 close(KG);

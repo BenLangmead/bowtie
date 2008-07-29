@@ -19,17 +19,19 @@
 \begin{document}
 \begin{table}[tp]
 \scriptsize
-\begin{tabular}{lrrrr}\multicolumn{5}{c}{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}\\
+\begin{tabular}{lrrrrr}
+\multicolumn{6}{c}{\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}}\\[3pt]
 \toprule
- & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Reads  \\
- &                            & time       & Speedup & mapped \\[3pt]
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak VM & Reads  \\
+ &                            & time       & Speedup & Usage   & mapped \\[3pt]
 \toprule
-Bowtie -n 1 & 8m:15s & 10m:05s & - & 71.6\%\\\midrule
-Maq -n 1 & 6h:36m:57s & 6h:38m:53s & 39.6x & 70.3\%\\\midrule
-Bowtie & 16m:58s & 19m:31s & - & 75.3\%\\\midrule
-Maq & 17h:46m:35s & 17h:53m:07s & 55.0x & 73.8\%\\
+Bowtie -n 1 & 8m:15s & 10m:05s & - & 1,169 MB & 71.6\%\\\midrule
+Maq -n 1 & 6h:36m:57s & 6h:38m:53s & 39.6x & 804 MB & 70.3\%\\\midrule
+\midrule
+Bowtie & 16m:58s & 19m:31s & - & 1,169 MB & 75.3\%\\\midrule
+Maq & 17h:46m:35s & 17h:53m:07s & 55.0x & 804 MB & 73.8\%\\
 \bottomrule
 \end{tabular}
-\caption{CPU time for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. Reads were originally extracted as part of the 1000-Genomes project pilot. They were downloaded from the NCBI Short Read archive, accession \#SRR001115. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run against the whole-human reference because its memory footprint exceeds physical RAM. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual.}
+\caption{Performance measurements for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. Bowtie speedup is calculated with respect to wall clock time. Reads are originally from the 1000-Genomes project pilot and were downloaded from the NCBI Short Read archive, accession \#SRR001115, and trimmed to 35bps. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run because its memory footprint would have exceeded the physical RAM of the workstation. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual. Maq v0.6.6 was used. }
 \end{table}
 \end{document}
