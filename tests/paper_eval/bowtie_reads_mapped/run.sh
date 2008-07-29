@@ -5,7 +5,7 @@ KG_READS=/fs/szasmg/langmead/reads/SRR001115/SRR001115/s_7_0000_0255
 BOWTIE_ARGS="-1tqra --concise --arrows"
 BOWTIE_MAQ_N1_ARGS="-n 1 -tqr --concise"
 BOWTIE_MAQ_ARGS="-tqr --concise"
-EBWT_DIR="../../"
+EBWT_DIR="../../ebwts"
 DO_CVS_UPDATE=0
 
 # Optionally do a cvs update in the Bowtie home
