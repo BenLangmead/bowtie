@@ -7,21 +7,40 @@ BOWTIE_HOME=$HOME/workspace/bowtie
 READS=kg_reads.fq
 
 # Make ebwt_search
+make -C ${BOWTIE_HOME} ebwt_search
 if [ ! -f ${BOWTIE_HOME}/ebwt_search ] ; then
-   make -C ${BOWTIE_HOME} ebwt_search
-   if [ ! -f ${BOWTIE_HOME}/ebwt_search ] ; then
-      echo "Failed to build ebwt_search in ${BOWTIE_HOME}; aborting..."
-      exit 1
-   fi
+   echo "Failed to build ebwt_search in ${BOWTIE_HOME}; aborting..."
+   exit 1
 fi
 
 # Copy ebwt_search to here
 cp ${BOWTIE_HOME}/ebwt_search .
 ./ebwt_search --version
 
-# Run ebwt_search to produce hits
+if [ ! -f ${READS} ] ; then
+	echo "Could not find reads file ${READS}!  Aborting..."
+	exit 1
+fi
+
+if [ ! -f ${NAME}.1.ebwt ] ; then
+	echo "Could not ebwt index file ${NAME}.1.ebwt!  Aborting..."
+	exit 1
+fi
+
+# Run ebwt_search in Maq-like mode to produce hits
 if [ ! -f ${NAME}.ebwt.hits ] ; then
    echo > ${NAME}.ebwt.top
    sh wrap.sh ${NAME}.ebwt \
-     ./ebwt_search --maq -tqr ${NAME} ${READS} ${NAME}.ebwt.hits
+     ./ebwt_search -tqr ${NAME} ${READS} ${NAME}.ebwt.hits
+else
+	echo "${NAME}.ebwt.hits already exists; skipping Maq-mode run"
+fi
+
+# Run ebwt_search in Maq -n 1 mode to produce hits
+if [ ! -f ${NAME}.ebwt.n1.hits ] ; then
+   echo > ${NAME}.ebwt.n1.top
+   sh wrap.sh ${NAME}.ebwt.n1 \
+     ./ebwt_search -n 1 -tqr ${NAME} ${READS} ${NAME}.ebwt.n1.hits
+else
+	echo "${NAME}.ebwt.n1.hits already exists; skipping Maq-mode -n 1 run"
 fi

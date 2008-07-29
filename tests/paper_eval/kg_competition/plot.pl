@@ -6,7 +6,8 @@ use warnings;
 defined($ARGV[0]) || die "Must specify run names";
 my @runnames = @ARGV; # -> column names
 
-my @names = ("Bowtie",
+my @names = ("Bowtie with -n 1",
+             "Bowtie",
              "Maq with -n 1",
              "Maq",
              "Soap with -v 1",
