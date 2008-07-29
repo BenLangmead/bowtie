@@ -66,14 +66,14 @@ for my $t (@trims) {
 		my $foo = $hits * 100.0 / $reads if $asPercent;
 		$foo /= 1000000 unless $asPercent;
 		print MAQ1 "$t\t$foo\n";
-		print "  Other hits: $hits\n";
+		print "  Maq-like 1-mismatch hits: $hits\n";
     }
     {
 	    my $hits = `wc -l ebwt.$t.maq.tfr.hits | awk '{print \$1}'`;
 		my $foo = $hits * 100.0 / $reads if $asPercent;
 		$foo /= 1000000 unless $asPercent;
 		print MAQ2 "$t\t$foo\n";
-		print "  Other hits: $hits\n";
+		print "  Maq-like 2-mismatch hits: $hits\n";
     }
 }
 
