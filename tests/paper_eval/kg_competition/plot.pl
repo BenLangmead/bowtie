@@ -29,9 +29,15 @@ print KG "\\toprule\n";
 
 my $bowtieSecs = 0;
 my $bowtiePct = 0;
+my $rows = 0;
 for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	my $n = $runnames[$ni];
-	next if $n =~ /^-/;
+	next if $n =~ /^-/; # No results for this tool; don't print a row
+	# Print \midrule before all rows except the first
+	if($rows > 0) {
+		print KG "\\midrule\n";
+	}
+	$rows++;
 	my $l = readfline("whole.results.$n.txt", 0);
 	my @ls = split(/,/, $l);
 	my $rt = toMinsSecsHrs($ls[1]);
@@ -48,9 +54,8 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	printf KG "%2.1f\\%%", $pct;
 	#print KG " & $moreReadsSign$moreReads \\\\";
 	print KG "\\\\";
-	print KG " \\midrule" if $ni < $#runnames;
-	print KG "\n";
 }
+print KG "\n";
 
 print KG "\\bottomrule\n";
 print KG "\\end{tabular}\n";
