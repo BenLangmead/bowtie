@@ -47,6 +47,7 @@ for(my $ni = 0; $ni <= $#runnames; $ni++) {
 	print KG "$names[$ni] & $rt & $wrt & $speedup & ";
 	printf KG "%2.1f\\%%", $pct;
 	#print KG " & $moreReadsSign$moreReads \\\\";
+	print KG "\\\\";
 	print KG " \\midrule" if $ni < $#runnames;
 	print KG "\n";
 }
