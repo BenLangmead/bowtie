@@ -20,20 +20,20 @@
 #include "ref_read.h"
 
 // Build parameters
-static int verbose      = 0;     // be talkative
-static int sanityCheck  = 0;     // do slow sanity checks
-static int format       = FASTA; // input sequence format
+static int verbose           = 0;     // be talkative
+static int sanityCheck       = 0;     // do slow sanity checks
+static int format            = FASTA; // input sequence format
 static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
 static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n) 
 static uint32_t bmaxDivN     = 8;     // same, as divisor of n 
-static int dcv          = 1024;  // bwise SA difference-cover sample sz
-static int noDc         = 0;     // disable difference-cover sample
-static int entireSA     = 0;     // 1 = disable blockwise SA
-static int profile      = 0;     // print out profiling info on exit
-static int seed         = 0;     // srandom seed
-static int showVersion  = 0;     // just print version and quit?
-static bool doubleEbwt  = false; // build forward and reverse Ebwts
-static int64_t cutoff   = 0xffffffff; // max # of reference bases
+static int dcv               = 1024;  // bwise SA difference-cover sample sz
+static int noDc              = 0;     // disable difference-cover sample
+static int entireSA          = 0;     // 1 = disable blockwise SA
+static int profile           = 0;     // print out profiling info on exit
+static int seed              = 0;     // srandom seed
+static int showVersion       = 0;     // just print version and quit?
+static bool doubleEbwt       = false; // build forward and reverse Ebwts
+static int64_t cutoff        = 0xffffffff; // max # of reference bases
 //   Ebwt parameters
 static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
@@ -61,17 +61,17 @@ static void printUsage(ostream& out) {
 	    << "    -f                      reference files are Fasta (default)" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
 	    << "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
-	    << "    --entireSA              build whole suffix array at once; huge mem footprint" << endl
+	    << "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
 	    << "    --bmax <int>            max SA bucket sz for blockwise suffix-array builder" << endl
-	    << "    --bmaxMultSqrt <int>    max SA bucket sz as multiple of sqrt(ref len)" << endl
-	    << "    --bmaxDivN <int>        max SA bucket sz as divisor of ref len (default: 8)" << endl
+	    << "    --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)" << endl
+	    << "    --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
-	    << "    --noDc                  disable difference cover (blockwise is quadratic)" << endl
-	    << "    -l/--lineRate <int>     line rate (single line is 2^rate bytes)" << endl
-	    << "    -i/--linesPerSide <int> # lines in a side" << endl
-	    << "    -o/--offRate <int>      SA index is kept every 2^offRate BWT chars" << endl
-	    << "    -t/--ftabChars <int>    # of characters in initial lookup table key" << endl
-	    << "    -h/--chunkRate <int>    # of characters in a text chunk" << endl
+	    << "    --nodc                  disable difference cover (blockwise is quadratic)" << endl
+	    << "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
+	    << "    -i/--linesperside <int> # lines in a side" << endl
+	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
+	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
+	    << "    -h/--chunkrate <int>    # of characters in a text chunk" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --profile               output profile information when finished" << endl
@@ -86,28 +86,27 @@ static void printUsage(ostream& out) {
 static const char *short_options = "vdrpscfl:i:o:t:h:";
 
 static struct option long_options[] = {
-	/* These options set a flag. */
-	{"verbose",      no_argument, 0, 'v'},
-	{"sanity",       no_argument, 0, 's'},
-	{"double",       no_argument, 0, 'd'},
-	{"profile",      no_argument, &profile,   1},
-	{"little",       no_argument, &bigEndian, 0},
-	{"big",          no_argument, &bigEndian, 1},
-	{"bmax",         required_argument, 0, ARG_BMAX},
-	{"bmaxMultSqrt", required_argument, 0, ARG_BMAX_MULT},
-	{"bmaxDivN",     required_argument, 0, ARG_BMAX_DIV},
-	{"dcv",          required_argument, 0, ARG_DCV},
-	{"noDc",         no_argument, &noDc, 1},
-	{"seed",         required_argument, 0, ARG_SEED},
-	{"entireSA",     no_argument,       &entireSA, 1},
+	{"verbose",      no_argument,       0,            'v'},
+	{"sanity",       no_argument,       0,            's'},
+	{"double",       no_argument,       0,            'd'},
+	{"profile",      no_argument,       &profile,     1},
+	{"little",       no_argument,       &bigEndian,   0},
+	{"big",          no_argument,       &bigEndian,   1},
+	{"bmax",         required_argument, 0,            ARG_BMAX},
+	{"bmaxmultsqrt", required_argument, 0,            ARG_BMAX_MULT},
+	{"bmaxdivn",     required_argument, 0,            ARG_BMAX_DIV},
+	{"dcv",          required_argument, 0,            ARG_DCV},
+	{"nodc",         no_argument,       &noDc,        1},
+	{"seed",         required_argument, 0,            ARG_SEED},
+	{"entiresa",     no_argument,       &entireSA,    1},
 	{"version",      no_argument,       &showVersion, 1},
-	{"lineRate",     required_argument, 0, 'l'},
-	{"linesPerSide", required_argument, 0, 'i'},
-	{"offRate",      required_argument, 0, 'o'},
-	{"ftabChars",    required_argument, 0, 't'},
-	{"chunkRate",    required_argument, 0, 'h'},
-	{"cutoff",       required_argument, 0, ARG_CUTOFF},
-	{0, 0, 0, 0}
+	{"linerate",     required_argument, 0,            'l'},
+	{"linesperside", required_argument, 0,            'i'},
+	{"offrate",      required_argument, 0,            'o'},
+	{"ftabchars",    required_argument, 0,            't'},
+	{"chunkrate",    required_argument, 0,            'h'},
+	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
+	{0, 0, 0, 0} // terminator
 };
 
 /**
@@ -137,8 +136,6 @@ static int parseNumber(T lower, const char *errmsg) {
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
-
-    /* getopt_long stores the option index here. */
     int option_index = 0;
 	int next_option;
 	do {
