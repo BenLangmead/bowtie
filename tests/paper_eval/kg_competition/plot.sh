@@ -20,6 +20,9 @@ dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
 WORKSTATION=1
+
+echo "Don't forget to set WORKSTATION=? appropriately in plot.sh"
+
 if [ ! -f $NAME.results.txt ] ; then
 	perl summarize_top.pl $NAME.ebwt.n1.top ebwt_search | tail -1  > $NAME.results.txt
 	perl summarize_top.pl $NAME.ebwt.top    ebwt_search | tail -1 >> $NAME.results.txt
