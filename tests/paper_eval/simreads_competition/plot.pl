@@ -75,9 +75,9 @@ for(my $i = 0; $i <= $#runnames; $i++) {
 }
 print RUNTIME "}\n";
 if($workstation) {
-	print RUNTIME " & \\multicolumn{6}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}} \\\\[3pt] \n";
+	print RUNTIME "\\multicolumn{7}{c}{\\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}} \\\\[3pt] \n";
 } else {
-	print RUNTIME " & \\multicolumn{6}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}} \\\\[3pt] \n";
+	print RUNTIME "\\multicolumn{7}{c}{\\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}} \\\\[3pt] \n";
 }
 print RUNTIME "\\toprule\n";
 print RUNTIME " & \\multicolumn{2}{c}{Chr 22} & \\multicolumn{2}{c}{Chr 2} & \\multicolumn{2}{c}{Whole Genome} \\\\[3pt] \n";
