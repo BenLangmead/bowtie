@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <seqan/sequence.h>
+#include <sstream>
 #include "assert_helpers.h"
 
 using namespace std;
