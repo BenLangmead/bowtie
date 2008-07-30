@@ -1051,7 +1051,7 @@ protected:
 				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
 				_setLength(qualTStr, (*dstLen));
 				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)&rcQual[(*dstLen)]);
+					_setBegin(rcQualTStr, (char*)rcQual);
 					_setLength(rcQualTStr, (*dstLen));
 				}
 			}
