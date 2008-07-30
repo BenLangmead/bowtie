@@ -81,7 +81,7 @@ public:
 		_hiDepth(0),
 		_numBts(0),
 		_totNumBts(0),
-		_maxBts(100),
+		_maxBts(75),
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
