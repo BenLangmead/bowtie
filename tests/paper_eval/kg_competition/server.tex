@@ -20,20 +20,19 @@
 \begin{table}[tp]
 \scriptsize
 \begin{tabular}{lrrrrr}
-\multicolumn{6}{c}{\small{2.4 GHz AMD Opteron 850 server with 32 GB of RAM}}\\[3pt]
 \toprule
- & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak VM & Reads  \\
- &                            & time       & Speedup & Usage   & mapped \\[3pt]
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
+ &                            & time       & Speedup & memory usage & mapped \\[3pt]
 \toprule
-Bowtie -n 1 & 10m:24s & 11m:06s & - & 1,169 MB & 71.6\%\\\midrule
-Maq -n 1 & 10h:52m:00s & 10h:52m:52s & 58.8x & 804 MB & 70.3\%\\\midrule
-Soap -v 1 & 61h:13m:03s & 61h:02m:22s & 329.9x & 13,619 MB & 64.5\%\\\midrule
+Bowtie -n 1 & 9m:05s & 10m:11s & - & 1,169 MB & 71.6\%\\\midrule
+Maq -n 1 & 10h:52m:00s & 10h:52m:52s & 64.1x & 804 MB & 70.3\%\\\midrule
+Soap -v 1 & 60h:49m:26s & 61h:02m:22s & 359.6x & 13,619 MB & 64.5\%\\\midrule
 \midrule
-Bowtie & 20m:48s & 21m:16s & - & 1,169 MB & 75.3\%\\\midrule
-Maq & 32h:56m:53s & 32h:58m:39s & 93.0x & 804 MB & 73.8\%\\\midrule
-Soap & 107h:23m:44s & 107h:12m:28s & 302.5x & 13,619 MB & 70.6\%\\
+Bowtie & 26m:38s & 29m:11s & - & 1,169 MB & 76.7\%\\\midrule
+Maq & 32h:56m:53s & 32h:58m:39s & 67.8x & 804 MB & 73.8\%\\\midrule
+Soap & 106h:57m:37s & 107h:12m:28s & 220.4x & 13,619 MB & 70.6\%\\
 \bottomrule
 \end{tabular}
-\caption{Performance measurements for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a single CPU of a server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. Bowtie speedup is calculated with respect to wall clock time. Reads are originally from the 1000-Genomes project pilot and were downloaded from the NCBI Short Read archive, accession \#SRR001115, and trimmed to 35bps. Reference sequences were the contigs of Genbank human genome build 36.3. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual. Soap v1.10 and Maq v0.6.6 were used.}
+\caption{Performance measurements for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a single CPU of a server with a 2.4 GHz AMD Opteron 850 processor and 32 GB of RAM. Bowtie speedup is calculated with respect to wall clock time. Both CPU time and wall clock times are included to demonstrate that no one tool suffers disproportionately from I/O pauses or contention with other processes on the system. Note that Maq (resp. Soap) indexes the reads (resp. genome) as it maps, whereas the Bowtie mapper requires a pre-built index of the genome.  The cost of building the Bowtie index is not included in these timings since we expect that in practice that cost will be rapidly amortized across multiple mapping jobs. Reads are originally from the 1000-Genomes project pilot and were downloaded from the NCBI Short Read archive, accession \#SRR001115, and trimmed to 35bps. Reference sequences were the contigs of Genbank human genome build 36.3. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual. Soap v1.10 and Maq v0.6.6 were used. }
 \end{table}
 \end{document}
