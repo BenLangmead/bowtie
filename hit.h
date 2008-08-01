@@ -293,9 +293,7 @@ public:
 		
 		out() << "\t" << patQualities;
 		
-		// FIXME: need to replace X with oms when it starts having a 
-		// meaningful value.
-		out() << "\tX";
+		out() << "\t" << oms;
 		out() << "\t";
 		
 		bool firstmiss = true;

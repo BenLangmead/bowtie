@@ -1015,6 +1015,8 @@ protected:
 						{
 							size_t off = qualsRead - this->_trim5;
 							c = (char)(pQ + 33);
+							assert_geq(c, 33);
+							assert_leq(c, 73);
 							qual[off] = c;
 							if (rcQual != NULL) {
 								rcQual[1024 - off - 1] = c;
@@ -1031,6 +1033,8 @@ protected:
 						{
 							size_t off = qualsRead - this->_trim5;
 							c = (char)(pQ + 33);
+							assert_geq(c, 33);
+							assert_leq(c, 73);
 							qual[1024 - off - 1] = c;
 							if (rcQual != NULL) {
 								rcQual[off] = c;
@@ -1109,15 +1113,6 @@ protected:
 			}
 		}
 		
-		// Trim the 3' end of the quality string
-		//qual->resize(qual->length() - this->_trim3);
-		
-		// Now make the reversed qual string if necessary
-		//if (rqual != NULL) {
-		//	rqual->resize(rqual->length() - this->_trim3);
-		//	std::reverse(rqual->begin(), rqual->end());
-		//}
-		
 		if (feof(this->_in))
 			return;
 		else
@@ -1126,71 +1121,7 @@ protected:
 				c = fgetc(this->_in);
 			} while(c != '@' && c >= 0);
 		}
-//		
-//		
-//		while(true) {
-//			if(begin >= length(*dst)|| feof(this->_in)) {
-//				
-//				if (_solexa_quals)
-//				{
-//					// TODO: refactor!
-//					vector<string> s_quals;
-//					tokenize(*qual, " ", s_quals);
-//					qual->clear();
-//					for (unsigned int j = 0; j < s_quals.size(); ++j)
-//					{
-//						int sQ = atoi(s_quals[j].c_str());
-//						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-//						qual->push_back((char)(pQ + 33));
-//					}
-//					s_quals.clear();
-//					if (rqual != NULL)
-//					{
-//						tokenize(*rqual, " ", s_quals);
-//						rqual->clear();
-//						for (unsigned int j = 0; j < s_quals.size(); ++j)
-//						{
-//							int sQ = atoi(s_quals[j].c_str());
-//							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-//							rqual->push_back((char)(pQ + 33));
-//						}
-//					}
-//				}
-//				
-//				qual->resize(qual->length() - this->_trim3);
-//				if (rqual != NULL) {
-//					rqual->resize(rqual->length() - this->_trim3);
-//					std::reverse(rqual->begin(), rqual->end());
-//				}
-//				
-//				// chew up any qualities beyond length(*dst)
-//				//while((c != '\n' && c != '\r'))
-////				{
-////					c = fgetc(this->_in); if(feof(this->_in)) return;
-////				}
-////				
-////				// Skip additional linebreak chars
-////				while(c == '\n' || c == '\r') {
-////					c = fgetc(this->_in); if(feof(this->_in)) return;
-////				}
-//				
-//				// Chew up anything left over until we get to the next read
-//				while(c != '@' && !feof(this->_in))
-//				{
-//					c = fgetc(this->_in); if(feof(this->_in)) return;
-//				}
-//				break;
-//			}
-//			else if (c != '\r' && c != '\n')
-//			{
-//				if (begin++ >= this->_trim5){
-//					qual->push_back(c);
-//					if (rqual != NULL)
-//						rqual->push_back(c);
-//				}	
-//			}
-//			c = fgetc(this->_in); if(feof(this->_in)) return;
-//		}
+
 	}
 	virtual void resetForNextFile() {
 		_first = true;
