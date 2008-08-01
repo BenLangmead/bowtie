@@ -12,6 +12,7 @@
 #include <map>
 #include <stdio.h>
 #include <seqan/sequence.h>
+#include <algorithm>
 #include "maq/maqmap.h"
 #include "maq/algo.hh"
 #include "tokenize.h"
@@ -239,6 +240,9 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 				++three_prime_mismatches;
 			}
 		}
+		
+		// Only have 256 entries in the log_n table, so we need to pin other_occs
+		other_occs = min(other_occs, 255u);
 		
 		m1->c[0] = m1->c[1] = 0;
 		if (three_prime_mismatches + five_prime_mismatches)
