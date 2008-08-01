@@ -38,8 +38,6 @@ static const int max_read_bp = MAX_READLEN;
 
 // Maq's default mapping quality
 static int DEFAULT_QUAL = 25;
-static int FIVE_PRIME_PHRED_QUAL = 'Z' - 33;
-//static int THREE_PRIME_PHRED_QUAL = ';' - 33;
 
 // Number of bases consider "reliable" on the five prime end of each read
 static int MAQ_FIVE_PRIME = 24;
@@ -194,9 +192,6 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			
 		}
 		
-		//const char* default_quals = "EDCCCBAAAA@@@@?>===<;;9:99987776666554444";
-		//int qual_len = sizeof(default_quals);
-		
 		int qual_len = strlen(qualities);
 		
 		if (orientation == '+')
@@ -270,10 +265,6 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		seed_mismatch_quality_sum = ((seed_mismatch_quality_sum <= 0xff) ? 
 									 seed_mismatch_quality_sum : 0xff);
 		m1->info2 = seed_mismatch_quality_sum;
-		
-		// FIXME: this is a bullshit mapping quality, we need to consider
-		// mismatches, etc.
-		// m1->map_qual = m1->seq[MAX_READLEN-1] = m1->alt_qual = DEFAULT_QUAL;
 		
 		m1->map_qual = cal_map_qual(DEFAULT_QUAL, 
 									five_prime_mismatches, 
