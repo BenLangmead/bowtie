@@ -21,10 +21,10 @@
 enum {TEXT_MAP, BIN_MAP};
 
 using namespace std;
-static bool verbose				= false;
-//static int format				= TEXT_MAP;
+static bool verbose	= false;
 
-
+// A lookup table for fast integer logs
+static int log_n[256];
 
 static void print_usage() 
 {
@@ -37,7 +37,7 @@ static const int max_read_name = MAX_NAMELEN;
 static const int max_read_bp = MAX_READLEN;
 
 // Maq's default mapping quality
-static int DEFAULT_QUAL = 84;
+static int DEFAULT_QUAL = 25;
 static int FIVE_PRIME_PHRED_QUAL = 'Z' - 33;
 //static int THREE_PRIME_PHRED_QUAL = ';' - 33;
 
@@ -47,6 +47,22 @@ static int MAQ_FIVE_PRIME = 24;
 static inline int operator < (const maqmap1_t &a, const maqmap1_t &b)
 {
 	return (a.seqid < b.seqid) || (a.seqid == b.seqid && a.pos < b.pos);
+}
+
+// A simple way to compute mapping quality.
+// Reads are ranked in three tiers, 0 seed mismatches, 1 seed mismatches, 
+// 2 seed mismatches.  Within each rank, the quality is reduced by the log of
+// the number of alternative mappings at that level.
+static inline int cal_map_qual(int default_qual, 
+							   unsigned int seed_mismatches,
+							   unsigned int other_occs)
+{
+	if (seed_mismatches == 0) 
+		return 3 * default_qual - log_n[other_occs];
+	if (seed_mismatches == 1)
+		return 2 * default_qual - log_n[other_occs];
+	else
+		return default_qual - log_n[other_occs];
 }
 
 int convert_bwt_to_maq(const string& bwtmap_fname, 
@@ -111,11 +127,11 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		4) text offset
 		5) sequence of hit (i.e. trimmed read)
 	    6) quality values of sequence (trimmed)
-		7) # of other hits in EBWT (ignored for now)
+		7) # of other hits in EBWT 
 		8) mismatch positions - this is a comma-delimited list of positions
 			w.r.t. the 5 prime end of the read.
 	 */
-	char* bwt_fmt_str = "%s %c %d %d %s %s %s %s";
+	char* bwt_fmt_str = "%s %c %d %d %s %s %d %s";
 
 	
 	char orientation;
@@ -123,7 +139,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	unsigned int text_offset;
 	char sequence[buf_size];
 	char qualities[buf_size];
-	char other_occs[buf_size];
+	unsigned int other_occs;
 	char mismatches[buf_size];
 
 	int max = 0;
@@ -143,7 +159,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 						  &text_offset, 
 						  sequence, 
 						  qualities,
-						  other_occs, 
+						  &other_occs, 
 						  mismatches);
 		
 		if (bwtf_ret > 0 && bwtf_ret < 6)
@@ -212,7 +228,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		for (unsigned int i = 0; i < mismatch_tokens.size(); ++i)
 		{
 			mis_positions.push_back(atoi(mismatch_tokens[i].c_str()));
-			if (mis_positions.back() > MAQ_FIVE_PRIME)
+			if (mis_positions.back() < MAQ_FIVE_PRIME)
 				++five_prime_mismatches;
 			else
 				++three_prime_mismatches;
@@ -227,14 +243,21 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		m1->dist = 0;
 		
 		m1->pos = (text_offset)<<1 | (orientation == '+'? 0 : 1);
-		m1->info1 = five_prime_mismatches << 4 | 
+		m1->info1 = (five_prime_mismatches << 4) | 
 			(three_prime_mismatches + five_prime_mismatches);
 		
 		m1->info2 = (five_prime_mismatches) * FIVE_PRIME_PHRED_QUAL;
 		
 		// FIXME: this is a bullshit mapping quality, we need to consider
 		// mismatches, etc.
-		m1->map_qual = m1->seq[MAX_READLEN-1] = m1->alt_qual = DEFAULT_QUAL;
+		// m1->map_qual = m1->seq[MAX_READLEN-1] = m1->alt_qual = DEFAULT_QUAL;
+		
+		m1->map_qual = cal_map_qual(DEFAULT_QUAL, 
+									five_prime_mismatches, 
+									other_occs);
+		
+		m1->seq[MAX_READLEN-1] = m1->alt_qual = m1->map_qual;
+		
 		++mm->n_mapped_reads;
 	}
 	
@@ -260,6 +283,13 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	fclose(bwtf); 
 	gzclose(maqf);
 	return 0;
+}
+
+void init_log_n()
+{
+	log_n[0] = -1;
+	for (int i = 1; i != 256; ++i)
+		log_n[i] = (int)(3.434 * log(i) + 0.5);	
 }
 
 int main(int argc, char **argv) 
@@ -288,16 +318,24 @@ int main(int argc, char **argv)
 		print_usage();
 		return 1;
 	}
+	
+	// The Bowtie output text file to be converted
 	bwtmap_filename = argv[optind++];
 	
 	if(optind >= argc) {
 		print_usage();
 		return 1;
 	}
+	
+	// The name of the binary Maq map to be written
 	maqmap_filename = argv[optind++];
 	
+	// An optional argument:
+	// a two-column text file of [Bowtie ref id, reference name string] pairs
 	if(optind < argc)
 		refnames_filename = new string(argv[optind++]);
+	
+	init_log_n();
 	
 	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, refnames_filename);
 	
