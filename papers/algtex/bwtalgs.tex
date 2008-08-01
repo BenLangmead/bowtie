@@ -1,0 +1,52 @@
+\documentclass{article}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\begin{document}
+
+\algsetup{indent=2em}
+\newcommand{\stepleft}{\ensuremath{\mbox{\sc stepleft}}}
+\newcommand{\recreate}{\ensuremath{\mbox{\sc recreate}}}
+\newcommand{\exactmatch}{\ensuremath{\mbox{\sc exactmatch}}}
+
+\begin{algorithm}[stepleft]
+\caption{$\stepleft(r)$}\label{alg:stepleft} 
+\begin{algorithmic}[1] 
+\REQUIRE $r$ holds a valid row index 
+\medskip
+\RETURN $C[r] + $Occ$(BWT[r], r)$
+\end{algorithmic} 
+\end{algorithm} 
+
+\begin{algorithm}[recreate]
+\caption{$\recreate$}\label{alg:recreate} 
+\begin{algorithmic}[1] 
+\ENSURE $T$ holds the original text 
+\medskip 
+\STATE $r \Leftarrow 1$
+\STATE $T \Leftarrow $ `` ''
+\WHILE {$BWT[r] \neq \$$}
+\STATE $T \Leftarrow $ prepend $BWT[r]$ to $T$
+\STATE $r \Leftarrow $ stepleft$(r)$
+\ENDWHILE
+\end{algorithmic} 
+\end{algorithm} 
+
+\begin{algorithm}[exactmatch]
+\caption{$\exactmatch(P[1,p])$}\label{alg:exactmatch} 
+\begin{algorithmic}[1] 
+\ENSURE $sp$ and $ep$ delimit the range of rows beginning with $P$
+\medskip 
+\STATE $c \Leftarrow P[p]$
+\STATE $i \Leftarrow p$
+\STATE $sp \Leftarrow C[c]+1$
+\STATE $ep \Leftarrow C[c+1]$
+\WHILE {$sp \leq ep$ and $i \geq 2$}
+\STATE $c \Leftarrow P[i-1]$
+\STATE $sp \Leftarrow C[c] + $Occ$(c, sp-1) + 1$
+\STATE $ep \Leftarrow C[c] + $Occ$(c, ep)$
+\STATE $i \Leftarrow i-1$
+\ENDWHILE
+\end{algorithmic} 
+\end{algorithm} 
+
+\end{document}
