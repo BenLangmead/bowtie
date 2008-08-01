@@ -1,0 +1,843 @@
+% ALGORITHMS for LaTeX version 2e
+%
+% Current maintainer: Rogério Brito <rbrito@ime.usp.br>
+% Previous maintainer: Peter Williams <pwil3058@bigpond.net.au>
+%
+% This document file is free software; you can redistribute it and/or
+% modify it under the terms of the GNU Lesser General Public License as
+% published by the Free Software Foundation; either version 2 of the
+% License, or (at your option) any later version.
+%
+% This document file is distributed in the hope that it will be useful, but
+% WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+% General Public License for more details.
+%
+% You should have received a copy of the GNU Lesser General Public License
+% along with this document file; if not, write to the Free Software
+% Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+% USA.
+%
+\documentclass[letterpaper]{article}
+
+\usepackage[latin1]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[pdfstartview={FitH}]{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsthm}
+\usepackage{multicol}
+
+\title{Algorithms}
+\author{Rogério Brito\\
+  \href{mailto:rbrito@ime.usp.br}{rbrito@ime.usp.br}\thanks{Sincere thanks
+    go to the original maintainer of this package, Peter Williams, and for
+    being kind enough to allow me to continue with his quite useful work.}}
+
+\newcommand{\keyword}[1]{\texttt{#1}}
+\newcommand{\filename}[1]{\texttt{#1}}
+
+\setcounter{tocdepth}{2}
+
+\begin{document}
+\addtocontents{toc}{\protect\begin{multicols}{2}}
+\maketitle
+\tableofcontents
+%\listofalgorithms
+
+\section{Introduction}
+
+This package provides two environments, \keyword{algorithmic} and
+\keyword{algorithm}, which are designed to be used together but may,
+depending on the necessities of the author, be used separately.
+
+The \keyword{algorithmic} environment provides an environment for
+describing algorithms and the \keyword{algorithm} environment provides a
+``float'' wrapper for algorithms (implemented using
+\keyword{algorithmic} or some other method at the author's option).  The
+reason that two environments are provided is to allow the author maximum
+flexibility.
+
+This work may be distributed and/or modified under the conditions of the
+GNU Lesser General Public License as published by the Free Software
+Foundation (see the file \filename{COPYING} included in this package).
+Currently, this package consists of three files:
+\filename{algorithm.sty}, \filename{algorithmic.sty} and
+\filename{algorithms.tex} (the source of this document). This is likely
+to change in the near future.
+
+\section[Environment: \keyword{algorithmic}]%
+{The \keyword{algorithmic} Environment}
+\label{sec:algorithmic-envir}
+Within an \keyword{algorithmic} a number of commands for typesetting
+popular algorithmic constructs are available.  In general, the commands
+provided can be arbitrarily nested to describe quite complex algorithms.
+An optional argument to the \verb+\begin{algorithmic}+ statement can be
+  used to turn on line numbering by giving a positive integer indicating
+  the required frequency of line numbering.  For example,
+  \verb+\begin{algorithmic}[5]+ would cause every fifth line to be
+    numbered.
+
+\subsection{The Simple Statement}
+
+The simple statement takes the form
+\begin{verbatim}
+\STATE <text>
+\end{verbatim}
+and is used for simple statements, e.g.
+\begin{verbatim}
+\begin{algorithmic}
+\STATE $S \leftarrow 0$
+\end{algorithmic}
+\end{verbatim}
+would produce
+\begin{algorithmic}
+  \STATE $S \leftarrow 0$
+\end{algorithmic}
+and with line numbering selected for every line using
+\begin{verbatim}
+\begin{algorithmic}[1]
+\STATE $S \leftarrow 0$
+\end{algorithmic}
+\end{verbatim}
+would produce
+\begin{algorithmic}[1]
+  \STATE $S \leftarrow 0$
+\end{algorithmic}
+For users of earlier versions of \keyword{algorithmic} this construct is
+a cause of an incompatibility.  In the earlier version, instead of
+starting simple statements with the \verb+\STATE+ command, simple
+statements were entered as free text and terminated with \verb+\\+
+command.  Unfortunately, this simpler method failed to survive the
+modifications necessary for statement numbering.  However, the \verb+\\+
+command can still be used to force a line break within a simple
+statement.
+
+%\subsection{The \emph{if-then-else} Statement}
+\subsection{The \emph{if-then-else} Construct}
+
+The \emph{if-then-else} construct takes the forms.
+\begin{verbatim}
+\IF{<condition>} <text> \ENDIF
+\IF{<condition>} <text1> \ELSE <text2> \ENDIF
+\IF{<condition1>} <text1> \ELSIF{<condition2>} <text2> \ELSE <text3> \ENDIF
+\end{verbatim}
+In the third of these forms there is no limit placed on the number of
+\verb+\ELSIF{<C>}+ that may be used.  For example,
+\begin{verbatim}
+\begin{algorithmic}
+\IF{some condition is true}
+\STATE do some processing
+\ELSIF{some other condition is true}
+\STATE do some different processing
+\ELSIF{some even more bizarre condition is met}
+\STATE do something else
+\ELSE
+\STATE do the default actions
+\ENDIF
+\end{algorithmic}
+\end{verbatim}
+would produce
+\begin{algorithmic}
+  \IF{some condition is true}
+    \STATE do some processing
+  \ELSIF{some other condition is true}
+    \STATE do some different processing
+  \ELSIF{some even more bizarre condition is met}
+    \STATE do something else
+  \ELSE
+    \STATE do the default actions
+  \ENDIF
+\end{algorithmic}
+with appropriate indentations.
+
+\subsection{The \emph{for} Loop}
+
+The \emph{for} loop takes the forms.
+\begin{verbatim}
+\FOR{<condition>} <text> \ENDFOR
+\FORALL{<condition>} <text> \ENDFOR
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\FOR{$i=0$ to $10$}
+\STATE carry out some processing 
+\ENDFOR
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \FOR{$i=0$ to $10$}
+    \STATE carry out some processing 
+  \ENDFOR
+\end{algorithmic}
+and
+\begin{verbatim}
+\begin{algorithmic}[1]
+\FORALL{$i$ such that $0\leq i\leq 10$}
+\STATE carry out some processing 
+\ENDFOR
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}[1]
+  \FORALL{$i$ such that $0\leq i\leq 10$}
+    \STATE carry out some processing 
+  \ENDFOR
+\end{algorithmic}
+
+\subsection{The \emph{while} Loop}
+
+The \emph{while} loop takes the form.
+\begin{verbatim}
+\WHILE{<condition>} <text> \ENDWHILE
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\WHILE{some condition holds}
+\STATE carry out some processing 
+\ENDWHILE
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \WHILE{some condition holds}
+    \STATE carry out some processing 
+  \ENDWHILE
+\end{algorithmic}
+
+\subsection{The \emph{repeat-until} Loop}
+
+The \emph{repeat-until} loop takes the form.
+\begin{verbatim}
+\REPEAT <text> \UNTIL{<condition>}
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\REPEAT
+\STATE carry out some processing 
+\UNTIL{some condition is met}
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \REPEAT
+    \STATE carry out some processing 
+  \UNTIL{some condition is met}
+\end{algorithmic}
+
+\subsection{The Infinite Loop}
+
+The infinite loop takes the form.
+\begin{verbatim}
+\LOOP <text> \ENDLOOP
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\LOOP
+\STATE this processing will be repeated forever
+\ENDLOOP
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \LOOP
+    \STATE this processing will be repeated forever
+  \ENDLOOP
+\end{algorithmic}
+
+\subsection{The Precondition}
+
+The precondition (that must be met if an algorithm is to correctly
+execute) takes the form:
+\begin{verbatim}
+\REQUIRE <text>
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\REQUIRE $x \neq 0$ and $n \geq 0$
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \REQUIRE $x \neq 0$ and $n \geq 0$
+\end{algorithmic}
+
+\subsection{The Postcondition}
+
+The postcondition (that must be met after an algorithm has correctly
+executed) takes the form:
+\begin{verbatim}
+\ENSURE <text>
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\ENSURE $x \neq 0$ and $n \geq 0$
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \ENSURE $x \neq 0$ and $n \geq 0$
+\end{algorithmic}
+
+\subsection{Returning Values}
+
+The \keyword{algorithmic} environment offers a special statement for
+explicitly returning values in algorithms. It has the syntax:
+\begin{verbatim}
+\RETURN <text>
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\RETURN $(x+y)/2$
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \RETURN $(x+y)/2$
+\end{algorithmic}
+
+
+\subsubsection{The ``true'' and ``false'' Values}
+
+Since many algorithms have the necessity of returning \emph{true} or
+\emph{false} values, \keyword{algorithms}, starting with version
+2006-06-02, includes the keywords \verb+\TRUE+ and \verb+\FALSE+,
+which are intented to print the values in a standard fashion, like the
+following snippet of an algorithm to decide if an integer $n$ is even or
+odd:
+\begin{verbatim}
+\begin{algorithmic}
+  \IF{$n$ is odd}
+     \RETURN \TRUE
+  \ELSE
+     \RETURN \FALSE
+  \ENDIF
+\end{algorithmic}
+\end{verbatim}
+The code above produces the following output:
+\begin{algorithmic}
+  \IF{$n$ is odd}
+     \RETURN \TRUE
+  \ELSE
+     \RETURN \FALSE
+  \ENDIF
+\end{algorithmic}
+
+\subsection{Printing Messages}
+
+Another feature of the \keyword{algorithmic} environment is that it
+currently provides a standard way of printing values (which is an
+operation used enough to merit its own keyword). It has the syntax:
+\begin{verbatim}
+\PRINT <text>
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\PRINT \texttt{``Hello, World!''}
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \PRINT \texttt{``Hello, World!''}
+\end{algorithmic}
+
+\subsection{Comments}
+
+Comments may be inserted at most points in an algorithm using the form:
+\begin{verbatim}
+\COMMENT{<text>}
+\end{verbatim}
+For example,
+\begin{verbatim}
+\begin{algorithmic}
+\STATE do something \COMMENT{this is a comment}
+\end{algorithmic}
+\end{verbatim}
+produces
+\begin{algorithmic}
+  \STATE do something \COMMENT{this is a comment}
+\end{algorithmic}
+Because the mechanisms used to build the various algorithmic structures
+make it difficult to use the above mechanism for placing comments at the
+end of the first line of a construct, the commands \verb+\IF+,
+\verb+\ELSIF+, \verb+\ELSE+, \verb+\WHILE+, \verb+\FOR+, \verb+\FORALL+,
+\verb+\REPEAT+ and \verb+\LOOP+ all take an optional argument which will
+be treated as a comment to be placed at the end of the line on which
+they appear.  For example,
+\begin{algorithmic}
+  \REPEAT[this is comment number one]
+    \IF[this is comment number two]{condition one is met}
+  \STATE do something
+    \ELSIF[this is comment number three]{condition two is met}
+  \STATE do something else
+    \ELSE[this is comment number four]
+  \STATE do nothing
+    \ENDIF
+  \UNTIL{hell freezes over}
+\end{algorithmic}
+
+\subsection{An Example}
+
+The following example demonstrates the use of the \keyword{algorithmic}
+environment to describe a complete algorithm.  The following input
+\begin{verbatim}
+\begin{algorithmic}
+\REQUIRE $n \geq 0$
+\ENSURE $y = x^n$
+\STATE $y \Leftarrow 1$
+\STATE $X \Leftarrow x$
+\STATE $N \Leftarrow n$
+\WHILE{$N \neq 0$}
+\IF{$N$ is even}
+\STATE $X \Leftarrow X \times X$
+\STATE $N \Leftarrow N / 2$
+\ELSE[$N$ is odd]
+\STATE $y \Leftarrow y \times X$
+\STATE $N \Leftarrow N - 1$
+\ENDIF
+\ENDWHILE
+\end{algorithmic}
+\end{verbatim}
+will produce
+\begin{algorithmic}
+  \REQUIRE $n \geq 0$
+  \ENSURE $y = x^n$
+
+  \STATE $y \Leftarrow 1$
+  \STATE $X \Leftarrow x$
+  \STATE $N \Leftarrow n$
+  \WHILE{$N \neq 0$}
+    \IF{$N$ is even}
+      \STATE $X \Leftarrow X \times X$
+      \STATE $N \Leftarrow N / 2$
+    \ELSE[$N$ is odd]
+      \STATE $y \Leftarrow y \times X$
+      \STATE $N \Leftarrow N - 1$
+    \ENDIF
+  \ENDWHILE
+\end{algorithmic}
+which is an algorithm for finding the value of a number taken to a
+non-negative power.
+
+\subsection[Options/Customization]%
+{Options and Customization}
+
+There is a single option, \keyword{noend}\label{kwd:noend} that may be
+invoked when the \texttt{algorithmic} package is loaded.  With this
+option invoked the \emph{end} statements are omitted in the output.
+This allows space to be saved in the output document when this is an
+issue.
+
+\subsubsection{Changing Indentation}
+\label{sec:changing-indentation}
+In the spirit of saving vertical space (which is especially important
+when submitting a paper for a journal, where space is frequently limited
+for authors), the \keyword{algorithmic} environment offers, beginning
+with the version released in 2005-05-08, a way to control the amount of
+indentation that is used by a given algorithm.
+
+The amount of indentation to be used is given by the command
+\begin{verbatim}
+\algsetup{indent=lenght}
+\end{verbatim}
+where \emph{length} is any valid length used by \TeX. The default value
+of the indentation used by the \keyword{algorithmic} environment is $1$
+em (for ``backward compatibility reasons''), but a value of $2$ em or
+more is recommended, depending on the publication. For example, the
+snippet
+\begin{verbatim}
+\algsetup{indent=2em}
+\begin{algorithmic}[1]
+  \STATE $a \Leftarrow 1$
+  \IF{$a$ is even}
+  \PRINT ``$a$ is even''
+  \ELSE
+  \PRINT ``$a$ is odd''
+\end{algorithmic}
+\end{verbatim}
+produces
+\algsetup{indent=2em}
+\begin{algorithmic}[1]
+  \STATE $a \Leftarrow 1$
+  \IF{$a$ is even}
+    \PRINT ``$a$ is even''
+  \ELSE
+    \PRINT ``$a$ is odd''
+  \ENDIF
+\end{algorithmic}
+while
+\begin{verbatim}
+\algsetup{indent=5em}
+\begin{algorithmic}[1]
+  \STATE $a \Leftarrow 1$
+  \IF{$a$ is even}
+  \PRINT ``$a$ is even''
+  \ELSE
+  \PRINT ``$a$ is odd''
+\end{algorithmic}
+\end{verbatim}
+would produce
+\algsetup{indent=5em}
+\begin{algorithmic}[1]
+  \STATE $a \Leftarrow 1$
+  \IF{$a$ is even}
+    \PRINT ``$a$ is even''
+  \ELSE
+    \PRINT ``$a$ is odd''
+  \ENDIF
+\end{algorithmic}
+\algsetup{indent=1em}
+
+The intended use of this option is to allow the author to omit the
+\emph{end} (see Section~\ref{kwd:noend} for details) statements without
+loosing readability, by increasing the amount of indentation to a
+suitable level.
+
+\subsubsection{Changing Line Numbering}
+
+As mentioned in Section~\ref{sec:algorithmic-envir} and illustrated in
+Section~\ref{sec:changing-indentation}, \keyword{algorithms} already
+provides you with the possibility of numbering lines.
+
+Starting with the version released in 2005-07-05, you can now change two
+aspects of line numbering: the size of the line numbers (which, by
+default, is \verb+\footnotesize+) and the delimiter used to separate the
+line number from the code (which, by default, is \verb+:+, i.e., a
+colon).
+
+You can change the size of the line numbers using the command:
+\begin{verbatim}
+\algsetup{linenosize=size}
+\end{verbatim}
+where \emph{size} is any of the various commands provided by \LaTeX\ to
+change the size of the font to be used. Among others, useful values are
+\verb+\tiny+, \verb+\scriptsize+, \verb+\footnotesize+ and
+\verb+\small+.  Please see the complete list of sizes in your \LaTeX\
+documentation.
+
+As another frequently requested feature, you can change the delimiter
+used with the line numbers by issuing the command:
+\begin{verbatim}
+\algsetup{linenodelimiter=delimiter}
+\end{verbatim}
+where \emph{delimiter} is any ``well-formed'' string, including the
+empty string. With this command, you can change the colon to a period
+(\verb+.+) by issuing the command
+\begin{verbatim}
+\algsetup{linenodelimiter=.}
+\end{verbatim}
+or even omit the delimiter, by specifying the empty string or a space
+(\verb+\ +), whatever seems best for your document.
+
+As an example of such commands, the code produced by
+\begin{verbatim}
+\algsetup{
+   linenosize=\small,
+   linenodelimiter=.
+}
+\begin{algorithmic}[1]
+   \STATE $i \leftarrow 10$
+   \RETURN $i$ 
+\end{algorithmic}
+\end{verbatim}
+would be something like
+
+\algsetup{
+  linenosize=\small,
+  linenodelimiter=.
+}
+\begin{algorithmic}[1]
+   \STATE $i \leftarrow 10$
+   \RETURN $i$
+\end{algorithmic}
+\algsetup{linenosize=\footnotesize,
+          linenodelimiter=:}
+
+\subsubsection{Customization}
+
+In order to facilitate the use of this package with foreign languages,
+all of the words in the output are produced via redefinable macro
+commands.  The default definitions of these macros are:
+\begin{verbatim}
+\newcommand{\algorithmicrequire}{\textbf{Require:}}
+\newcommand{\algorithmicensure}{\textbf{Ensure:}}
+\newcommand{\algorithmicend}{\textbf{end}}
+\newcommand{\algorithmicif}{\textbf{if}}
+\newcommand{\algorithmicthen}{\textbf{then}}
+\newcommand{\algorithmicelse}{\textbf{else}}
+\newcommand{\algorithmicelsif}{\algorithmicelse\ \algorithmicif}
+\newcommand{\algorithmicendif}{\algorithmicend\ \algorithmicif}
+\newcommand{\algorithmicfor}{\textbf{for}}
+\newcommand{\algorithmicforall}{\textbf{for all}}
+\newcommand{\algorithmicdo}{\textbf{do}}
+\newcommand{\algorithmicendfor}{\algorithmicend\ \algorithmicfor}
+\newcommand{\algorithmicwhile}{\textbf{while}}
+\newcommand{\algorithmicendwhile}{\algorithmicend\ \algorithmicwhile}
+\newcommand{\algorithmicloop}{\textbf{loop}}
+\newcommand{\algorithmicendloop}{\algorithmicend\ \algorithmicloop}
+\newcommand{\algorithmicrepeat}{\textbf{repeat}}
+\newcommand{\algorithmicuntil}{\textbf{until}}
+\newcommand{\algorithmicprint}{\textbf{print}}
+\newcommand{\algorithmicreturn}{\textbf{return}}
+\newcommand{\algorithmictrue}{\textbf{true}}
+\newcommand{\algorithmicfalse}{\textbf{false}}
+\end{verbatim}
+
+If you would like to change the definition of these commands to another
+content, then you should use, in your own document, the standard
+\LaTeX{} command \keyword{renewcommand}, with an usage like this:
+\begin{verbatim}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\end{verbatim}
+
+\paragraph{About the Way Comments Are Formatted}
+
+The formatting of comments is implemented via a single argument command
+macro which may also be redefined.  The default definition is
+\begin{verbatim}
+\newcommand{\algorithmiccomment}[1]{\{#1\}}
+\end{verbatim}
+and another option that may be interesting for users familiar with
+C-like languages is to redefine the comments to be
+\begin{verbatim}
+\renewcommand{\algorithmiccomment}[1]{// #1}
+\end{verbatim}
+Comments produced this way would be like this:
+\renewcommand{\algorithmiccomment}[1]{// #1}
+\begin{algorithmic}
+  \STATE $i \leftarrow i +1$ \COMMENT{Increments $i$}
+\end{algorithmic}
+This second way to present comments may become the default in a future
+version of this package.
+
+\section[Environment: \keyword{algorithm}]%
+{The \keyword{algorithm} Environment}
+
+\subsection{General}
+
+When placed within the text without being encapsulated in a floating
+environment \texttt{algorithmic} environments may be split over a page
+boundary, greatly detracting from their appearance.\footnote{This is the
+  expected behaviour for floats in \LaTeX. If you don't care about
+  having your algorithm split between pages, then one option that you
+  have is to ignore the \texttt{algorithm} environment.} In addition, it
+is useful to have algorithms numbered for reference and for lists of
+algorithms to be appended to the list of contents.  The
+\texttt{algorithm} environment is meant to address these concerns by
+providing a floating environment for algorithms.
+
+\subsection{An Example}
+To illustrate the use of the \texttt{algorithm} environment, the
+following text
+\begin{verbatim}
+\begin{algorithm}
+\caption{Calculate $y = x^n$}
+\label{alg1}
+\begin{algorithmic}
+\REQUIRE $n \geq 0 \vee x \neq 0$
+\ENSURE $y = x^n$
+\STATE $y \Leftarrow 1$
+\IF{$n < 0$}
+\STATE $X \Leftarrow 1 / x$
+\STATE $N \Leftarrow -n$
+\ELSE
+\STATE $X \Leftarrow x$
+\STATE $N \Leftarrow n$
+\ENDIF
+\WHILE{$N \neq 0$}
+\IF{$N$ is even}
+\STATE $X \Leftarrow X \times X$
+\STATE $N \Leftarrow N / 2$
+\ELSE[$N$ is odd]
+\STATE $y \Leftarrow y \times X$
+\STATE $N \Leftarrow N - 1$
+\ENDIF
+\ENDWHILE
+\end{algorithmic}
+\end{algorithm}
+\end{verbatim}
+produces Algorithm~\ref{alg1} which is a slightly modified version of
+the earlier algorithm for determining the value of a number taken to an
+integer power.  In this case, provided the power may be negative
+provided the number is not zero.
+
+\begin{algorithm}[H]
+  \caption{Calculate $y = x^n$}
+  \label{alg1}
+  \begin{algorithmic}
+    \REQUIRE $n \geq 0 \vee x \neq 0$
+    \ENSURE $y = x^n$
+
+    \STATE $y \Leftarrow 1$
+    \IF{$n < 0$}
+       \STATE $X \Leftarrow 1 / x$
+       \STATE $N \Leftarrow -n$
+    \ELSE
+       \STATE $X \Leftarrow x$
+       \STATE $N \Leftarrow n$
+    \ENDIF
+
+    \WHILE{$N \neq 0$}
+      \IF{$N$ is even}
+        \STATE $X \Leftarrow X \times X$
+        \STATE $N \Leftarrow N / 2$
+      \ELSE[$N$ is odd]
+        \STATE $y \Leftarrow y \times X$
+        \STATE $N \Leftarrow N - 1$
+      \ENDIF
+    \ENDWHILE
+  \end{algorithmic}
+\end{algorithm}
+
+The command \verb+\listofalgorithms+ may be used to produce a list of
+algorithms as part of the table contents as shown at the beginning of
+this document.  An auxiliary file with a suffix of \texttt{.loa} is
+produced when this feature is used.
+
+\subsection{Options}
+
+The appearance of the typeset algorithm may be changed by use of the
+options: \texttt{plain}, \texttt{boxed} or \texttt{ruled} during the
+loading of the \texttt{algorithm} package.  The default option is
+\texttt{ruled}.
+
+The numbering of algorithms can be influenced by providing the name of
+the document component within which numbering should be recommenced.
+The legal values for this option are: \texttt{part}, \texttt{chapter},
+\texttt{section}, \texttt{subsection}, \texttt{subsubsection} or
+\texttt{nothing}.  The default value is \texttt{nothing} which causes
+algorithms to be numbered sequentially throughout the document.
+
+\subsection{Customization}
+
+In order to facilitate the use of this package with foreign languages,
+methods have been provided to facilitate the necessary modifications.
+
+The title used in the caption within \texttt{algorithm} environment can
+be set by use of the standard \verb+\floatname+ command which is
+provided as part of the \texttt{float} package which was used to
+implement this package.  For example,
+\begin{verbatim}
+\floatname{algorithm}{Procedure}
+\end{verbatim}
+would cause \textbf{Procedure} to be used instead of \textbf{Algorithm}
+within the caption of algorithms.
+
+In a manner analogous to that available for the built in floating
+environments, the heading used for the list of algorithms may be changed
+by redefining the command \verb+listalgorithmname+.  The default
+definition for this command is
+\begin{verbatim}
+\newcommand{\listalgorithmname}{List of Algorithms}
+\end{verbatim}
+
+\subsubsection{Placement of Algorithms}
+
+One important fact that many users may not have noticed is that the
+\texttt{algorithm} environment is actually built with the \texttt{float}
+package and \texttt{float}, in turn, uses David Carlisle's \textsf{here}
+style option. This means that the floats generated by the
+\texttt{algorithm} environment accept a special option, namely,
+\textbf{[H]}, with a capital `H', instead of the usual `h' offered by
+plain \LaTeX.
+
+This option works as a stronger request of ``please put the float
+here'': instead of just a suggestion for \LaTeX, it actually means ``put
+this float HERE'', which is something desired by many. The two
+algorithms typeset in this document use this option.
+
+\theoremstyle{definition}
+\newtheorem*{warning*}{Warning}
+
+\medskip
+\begin{warning*}
+  You \emph{can't} use the `H' positioning option together with the
+  usual `h' (for ``here''), `b' (for ``bottom'') etc. This is a
+  limitation (as far as I know) of the \texttt{float.sty} package.
+\end{warning*}
+
+\section[References in Algorithms]%
+{Labels and References in Algorithms}
+
+With the release of 2005-07-05, now \keyword{algorithmic} accepts labels
+and references to specific lines of a given algorithm, so you don't have
+to hardcode the line numbers yourself when trying to explain what the
+code does in your texts.  Thanks to Arnaud Legrand for the suggestion
+and patch for this highly missed feature.
+
+An example of its use is shown in Algorithm~\ref{alg2}.
+\begin{algorithm}[H]
+  \caption{Calculate $y = x^n$}
+  \label{alg2}
+  \begin{algorithmic}[1]
+    \REQUIRE $n \geq 0 \vee x \neq 0$
+    \ENSURE $y = x^n$
+    \STATE $y \Leftarrow 1$
+    \IF{$n < 0$}
+    \STATE $X \Leftarrow 1 / x$
+    \STATE $N \Leftarrow -n$
+    \ELSE
+    \STATE $X \Leftarrow x$
+    \STATE $N \Leftarrow n$
+    \ENDIF
+    \WHILE{$N \neq 0$}
+    \IF{$N$ is even}\label{alg:n-is-even}
+    \STATE $X \Leftarrow X \times X$
+    \STATE $N \Leftarrow N / 2$
+    \ELSE\label{alg:n-is-odd}
+    \STATE $y \Leftarrow y \times X$
+    \STATE $N \Leftarrow N - 1$
+    \ENDIF
+    \ENDWHILE
+  \end{algorithmic}
+\end{algorithm}
+See that, in line~\ref{alg:n-is-even}, we deal with the case of $N$
+being even, while, in line~\ref{alg:n-is-odd}, we give treatment to the
+case of $N$ being odd. The numbers you see on this document were
+generated automatically from the source document.
+
+
+\section[Known Issues]{Issues Between \texttt{algorithms} and
+  \href{http://www.ctan.org/tex-archive/help/Catalogue/entries/tocbibind.html}{\texttt{tocbibind}}
+  or \href{http://www.ctan.org/tex-archive/help/Catalogue/entries/memoir.html}{\texttt{memoir}}}
+
+It
+\href{http://groups.google.com/group/comp.text.tex/browse_thread/thread/4094e0c4f4fbd83e/a80a3f4666c794f0?fwc=1}{has
+  been discussed} in late 2005 that \texttt{algorithms} may have bad
+interactions with the
+\href{http://www.ctan.org/tex-archive/help/Catalogue/entries/tocbibind.html}{\texttt{tocbibind}}
+or the
+\href{http://www.ctan.org/tex-archive/help/Catalogue/entries/memoir.html}{\texttt{memoir}}
+package (which includes \texttt{tocbibind}).
+
+A workaround has been suggested for the problem. After including
+something like
+\begin{verbatim}
+\usepackage[nottoc]{tocbibind}
+\end{verbatim}
+in the preamble of your document, you can put, after
+\verb+\begin{document}+, the following snippet of code:
+\begin{verbatim}
+\renewcommand{\listofalgorithms}{\begingroup
+  \tocfile{List of Algorithms}{loa}
+\endgroup}
+
+\makeatletter
+\let\l@algorithm\l@figure
+\makeatother
+\end{verbatim}
+which should make the command \verb+\listofalgorithms+ work as expected.
+
+\addtocontents{toc}{\protect\end{multicols}}
+\end{document}
