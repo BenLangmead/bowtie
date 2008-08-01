@@ -225,28 +225,51 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		vector<int> mis_positions;
 		int five_prime_mismatches = 0;
 		int three_prime_mismatches = 0;
+		int seed_mismatch_quality_sum = 0;
 		for (unsigned int i = 0; i < mismatch_tokens.size(); ++i)
 		{
 			mis_positions.push_back(atoi(mismatch_tokens[i].c_str()));
-			if (mis_positions.back() < MAQ_FIVE_PRIME)
+			int pos = mis_positions.back();
+			if (pos < MAQ_FIVE_PRIME)
+			{
+				// Mismatch positions are always with respect to the 5' end of 
+				// the read, regardless of whether the read mapping is antisense
+				if (orientation == '+')
+					seed_mismatch_quality_sum += qualities[pos] - 33;
+				else
+					seed_mismatch_quality_sum += qualities[m1->size - pos - 1] - 33;
+				
 				++five_prime_mismatches;
+			}
 			else
+			{
+				// Maq doesn't care about qualities of mismatching bases beyond
+				// the seed
 				++three_prime_mismatches;
+			}
 		}
 		
 		m1->c[0] = m1->c[1] = 0;
 		if (three_prime_mismatches + five_prime_mismatches)
-			m1->c[1] = 1;
+			m1->c[1] = other_occs + 1; //need to include this mapping as well!
 		else
-			m1->c[0] = 1;
+			m1->c[0] = other_occs + 1; //need to include this mapping as well!
+		
+		// Unused paired-end data
 		m1->flag = 0;
 		m1->dist = 0;
 		
-		m1->pos = (text_offset)<<1 | (orientation == '+'? 0 : 1);
+		m1->pos = (text_offset << 1) | (orientation == '+'? 0 : 1);
+		
+		// info1's high 4 bits are the # of seed mismatches/
+		// the low 4 store the total # of mismatches
 		m1->info1 = (five_prime_mismatches << 4) | 
 			(three_prime_mismatches + five_prime_mismatches);
 		
-		m1->info2 = (five_prime_mismatches) * FIVE_PRIME_PHRED_QUAL;
+		// Sum of qualities in seed mismatches
+		seed_mismatch_quality_sum = ((seed_mismatch_quality_sum <= 0xff) ? 
+									 seed_mismatch_quality_sum : 0xff);
+		m1->info2 = seed_mismatch_quality_sum;
 		
 		// FIXME: this is a bullshit mapping quality, we need to consider
 		// mismatches, etc.
