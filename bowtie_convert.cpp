@@ -202,15 +202,9 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		{
 			int tmp = nst_nt4_table[(int)sequence[i]];
 			m1->seq[i] = (tmp > 3)? 0 : 
-			(tmp <<6 | (i < qual_len ? qualities[i] - 33 : 0));
+			(tmp <<6 | (i < qual_len ? (qualities[i] - 33) & 0x3f : 0));
 		}
 		
-		if (orientation == '-')
-		{
-			for (int i = m1->size - 1; i >= 0; --i)
-				tmp_seq[m1->size-i-1] = (m1->seq[i] == 0)? 0 : (0xc0 - (m1->seq[i]&0xc0)) | (m1->seq[i]&0x3f);
-			memcpy(m1->seq, tmp_seq, m1->size);
-		}
 		vector<string> mismatch_tokens;
 		tokenize(mismatches, ",", mismatch_tokens);
 		
