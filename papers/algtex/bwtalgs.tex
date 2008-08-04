@@ -32,13 +32,13 @@
 \caption{$\exactmatch(P[1,p])$}\label{alg:exactmatch} 
 \begin{algorithmic}[1] 
 \STATE $c \Leftarrow P[p]$
-\STATE $i \Leftarrow p$
 \STATE $sp \Leftarrow C[c]+1$
-\STATE $ep \Leftarrow C[c+1]$
-\WHILE {$sp \leq ep$ and $i \geq 2$}
-\STATE $c \Leftarrow P[i-1]$
-\STATE $sp \Leftarrow C[c] + $Occ$(c, sp-1) + 1$
-\STATE $ep \Leftarrow C[c] + $Occ$(c, ep)$
+\STATE $ep \Leftarrow C[c+1]+1$
+\STATE $i \Leftarrow p - 1$
+\WHILE {$sp < ep$ and $i \geq 1$}
+\STATE $c \Leftarrow P[i]$
+\STATE $sp \Leftarrow C[c]$ + Occ$(c, sp) + 1$
+\STATE $ep \Leftarrow C[c]$ + Occ$(c, ep) + 1$
 \STATE $i \Leftarrow i-1$
 \ENDWHILE
 \RETURN $sp, ep$
