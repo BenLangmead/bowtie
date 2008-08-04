@@ -8,28 +8,28 @@ KG_READS=/fs/szasmg/langmead/reads/SRR001115/s_7_0000_0255
 GENOMES_DIR=/fs/szasmg/langmead
 
 # Make link for FASTA sequence
-ln -s -f ${GENOMES_DIR}/hs_ref_${NAME}.mfa hs_ref_${NAME}.mfa
+if [ ! -f hs_ref_${NAME}.mfa ] ; then
+	ln -s -f ${GENOMES_DIR}/hs_ref_${NAME}.mfa hs_ref_${NAME}.mfa
+fi
+
+# Check that link isn't broken
 if ! wc -c hs_ref_${NAME}.mfa 2> /dev/null > /dev/null ; then
     echo "Broken link for hs_ref_${NAME}.mfa; aborting..."
     exit 1
 fi
 
-# Build and copy ebwt_build to here
+# Build and copy ebwt_build and ebwt_build_packed to here
+make -C ${BOWTIE_HOME} ebwt_build
+cp ${BOWTIE_HOME}/ebwt_build .
 if [ ! -f ebwt_build ] ; then
-	make -C ${BOWTIE_HOME} ebwt_build
-	cp ${BOWTIE_HOME}/ebwt_build .
-	if [ ! -f ebwt_build ] ; then
-		echo "Could not build ebwt_build; aborting..."
-		exit 1
-	fi
+	echo "Could not build ebwt_build; aborting..."
+	exit 1
 fi
+make -C ${BOWTIE_HOME} ebwt_build_packed
+cp ${BOWTIE_HOME}/ebwt_build_packed .
 if [ ! -f ebwt_build_packed ] ; then
-	make -C ${BOWTIE_HOME} ebwt_build_packed
-	cp ${BOWTIE_HOME}/ebwt_build_packed .
-	if [ ! -f ebwt_build_packed ] ; then
-		echo "Could not build ebwt_build_packed; aborting..."
-		exit 1
-	fi
+	echo "Could not build ebwt_build_packed; aborting..."
+	exit 1
 fi
 
 # Copy analysis scripts from bowtie dir

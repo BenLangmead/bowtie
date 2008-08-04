@@ -3,19 +3,11 @@
 dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
-DO_SMALL_FOOTPRINT=0
+DO_SMALL_FOOTPRINT=1
 
 ./ebwt_build --version
 ./ebwt_build_packed --version
 
-# This wasn't such a useful data point - it craps out on whole-human anyway
-# ./ebwt_build -d --entireSA
-#if [ ! -f ${NAME}.esa.1.ebwt ] ; then
-#	echo > ${NAME}.ebwt_build.esa.top
-#	sh wrap.sh ${NAME}.ebwt_build.esa \
-#	    ./ebwt_build -d --entireSA -v hs_ref_${NAME}.mfa ${NAME}.esa \
-#	    2>&1 | tee ${NAME}.ebwt_build.esa.out
-#fi
 # Probably the fastest configuration that fits in a 16GB memory budget
 # ./ebwt_build -d --dcv 256 --bmax 3000000000
 if [ ! -f ${NAME}.blf.1.ebwt ] ; then
@@ -26,20 +18,12 @@ if [ ! -f ${NAME}.blf.1.ebwt ] ; then
 fi
 # Probably the fastest configuration that fits in a 8GB memory budget
 # ./ebwt_build --d --bmaxDivN 7
-if [ ! -f ${NAME}.bl7.1.ebwt ] ; then
-	echo > ${NAME}.ebwt_build.bl7.top
-	sh wrap.sh ${NAME}.ebwt_build.bl7 \
-	    ./ebwt_build -d --bmaxDivN 7 -v hs_ref_${NAME}.mfa ${NAME}.bl7 \
-	    2>&1 | tee ${NAME}.ebwt_build.bl7.out
+if [ ! -f ${NAME}.bl4.1.ebwt ] ; then
+	echo > ${NAME}.ebwt_build.bl4.top
+	sh wrap.sh ${NAME}.ebwt_build.bl4 \
+	    ./ebwt_build -d --bmaxDivN 4 -v hs_ref_${NAME}.mfa ${NAME}.bl4 \
+	    2>&1 | tee ${NAME}.ebwt_build.bl4.out
 fi
-# This wasn't such a useful data point
-# ./ebwt_build_packed -d --dcv 256 --bmax 3000000000
-#if [ ! -f ${NAME}.pkf.1.ebwt ] ; then
-#	echo > ${NAME}.ebwt_build.pkf.top
-#	sh wrap.sh ${NAME}.ebwt_build.pkf \
-#	    ./ebwt_build_packed -d --dcv 256 --bmax 3000000000 -v hs_ref_${NAME}.mfa ${NAME}.pkf \
-#	    2>&1 | tee ${NAME}.ebwt_build.pkf.out
-#fi
 # ./ebwt_build_packed -d --bmaxDivN 25 --dcv 4096
 if [ "$DO_SMALL_FOOTPRINT" = "1" ] ; then
 	# Probably the fastest configuration that fits in a 4GB memory budget
