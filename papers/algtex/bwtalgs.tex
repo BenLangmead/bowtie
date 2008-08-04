@@ -11,8 +11,6 @@
 \begin{algorithm}[stepleft]
 \caption{$\stepleft(r)$}\label{alg:stepleft} 
 \begin{algorithmic}[1] 
-\REQUIRE $r$ holds a valid row index 
-\medskip
 \RETURN $C[r] + $Occ$(BWT[r], r)$
 \end{algorithmic} 
 \end{algorithm} 
@@ -20,22 +18,19 @@
 \begin{algorithm}[unpermute]
 \caption{$\unpermute$}\label{alg:unpermute} 
 \begin{algorithmic}[1] 
-\ENSURE $T$ holds the original text 
-\medskip 
 \STATE $r \Leftarrow 1$
 \STATE $T \Leftarrow $ `` ''
 \WHILE {$BWT[r] \neq \$$}
 \STATE $T \Leftarrow $ prepend $BWT[r]$ to $T$
 \STATE $r \Leftarrow $ {\sc stepleft}$(r)$
 \ENDWHILE
+\RETURN $T$
 \end{algorithmic} 
 \end{algorithm} 
 
 \begin{algorithm}[exactmatch]
 \caption{$\exactmatch(P[1,p])$}\label{alg:exactmatch} 
 \begin{algorithmic}[1] 
-\ENSURE $sp$ and $ep$ delimit the range of rows beginning with $P$
-\medskip 
 \STATE $c \Leftarrow P[p]$
 \STATE $i \Leftarrow p$
 \STATE $sp \Leftarrow C[c]+1$
@@ -46,6 +41,7 @@
 \STATE $ep \Leftarrow C[c] + $Occ$(c, ep)$
 \STATE $i \Leftarrow i-1$
 \ENDWHILE
+\RETURN $sp, ep$
 \end{algorithmic} 
 \end{algorithm} 
 
