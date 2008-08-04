@@ -104,7 +104,10 @@ if($workstation) {
 	    "requires that an index of the genome be pre-built.  The cost ".
 	    "of building the Bowtie index is not included in these ".
 	    "timings since we expect that in practice that cost will ".
-	    "be rapidly amortized across multiple mapping jobs. ";
+	    "be rapidly amortized across multiple mapping jobs, or ".
+	    "that the researcher will simply download a pre-built ".
+	    "index from a shared repository in much less time than is ".
+	    "required to build from scratch. "
 } else {
 	print KG
 		"Note that Maq (resp. Soap) indexes the reads (resp. ".
@@ -112,7 +115,10 @@ if($workstation) {
 	    "requires a pre-built index of the genome.  The cost ".
 	    "of building the Bowtie index is not included in these ".
 	    "timings since we expect that in practice that cost will ".
-	    "be rapidly amortized across multiple mapping jobs. ";
+	    "be rapidly amortized across multiple mapping jobs, or ".
+	    "that the researcher will simply download a pre-built ".
+	    "index from a shared repository in much less time than is ".
+	    "required to build from scratch. "
 }
 print KG
 	"Reads are taken from the 1000-Genomes project pilot ".

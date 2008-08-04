@@ -20,18 +20,17 @@
 \begin{table}[tp]
 \scriptsize
 \begin{tabular}{lrrrrr}
-\multicolumn{6}{c}{\small{2.4 GHz Intel Core 2 workstation with 2 GB of RAM}}\\[3pt]
 \toprule
- & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak VM & Reads  \\
- &                            & time       & Speedup & Usage   & mapped \\[3pt]
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
+ &                            & time       & Speedup & memory usage & mapped \\[3pt]
 \toprule
-Bowtie -n 1 & 8m:15s & 10m:05s & - & 1,169 MB & 71.6\%\\\midrule
-Maq -n 1 & 6h:36m:57s & 6h:38m:53s & 39.6x & 804 MB & 70.3\%\\\midrule
+Bowtie -n 1 & 9m:07s & 11m:21s & - & 1,169 MB & 71.6\%\\\midrule
+Maq -n 1 & 6h:36m:57s & 6h:38m:53s & 35.1x & 804 MB & 70.3\%\\\midrule
 \midrule
-Bowtie & 16m:58s & 19m:31s & - & 1,169 MB & 75.3\%\\\midrule
-Maq & 17h:46m:35s & 17h:53m:07s & 55.0x & 804 MB & 73.8\%\\
+Bowtie & 25m:11s & 27m:17s & - & 1,169 MB & 76.5\%\\\midrule
+Maq & 17h:46m:35s & 17h:53m:07s & 39.3x & 804 MB & 73.8\%\\
 \bottomrule
 \end{tabular}
-\caption{Performance measurements for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a single CPU of a workstation with a 2.40GHz Intel Core 2 Q6600 processor and 2 GB of RAM. Bowtie speedup is calculated with respect to wall clock time. Reads are originally from the 1000-Genomes project pilot and were downloaded from the NCBI Short Read archive, accession \#SRR001115, and trimmed to 35bps. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run because its memory footprint would have exceeded the physical RAM of the workstation. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual. Maq v0.6.6 was used. }
+\caption{Performance measurements for mapping 8.96M 35bp Illumina/Solexa reads against the whole human genome on a single CPU of a workstation with a 2.4 GHz Intel Core 2 Q6600 processor with 2 GB of RAM, and on a 2.4 GHz AMD Opteron 850 processor with 32 GB of RAM. Bowtie speedup is calculated with respect to wall clock time. Both CPU time and wall clock times are included to demonstrate that no one tool suffers disproportionately from I/O pauses or contention with other processes on the system. Note that Maq indexes the reads as it maps them, whereas Bowtie requires that an index of the genome be pre-built.  The cost of building the Bowtie index is not included in these timings since we expect that in practice that cost will be rapidly amortized across multiple mapping jobs. Reads are taken from the 1000-Genomes project pilot via the NCBI Short Read archive, accession \#SRR001115 and trimmed to 35bps. Reference sequences were the contigs of Genbank human genome build 36.3. Soap was not run because its memory footprint would have exceeded the physical RAM of the workstation. For the Maq runs, the reads were first divided into chunks of 2M reads each, as per the Maq Manual. Maq v0.6.6 was used. }
 \end{table}
 \end{document}
