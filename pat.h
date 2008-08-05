@@ -94,6 +94,13 @@ public:
 		String<char> *tmp3;
 		nextPattern(&tmp1, &tmp2, &tmp3);
 	}
+	virtual void skipToNextRead() {
+		skipPattern();
+		if(nextIsReverseComplement()) {
+			skipPattern();
+		}
+		assert(!nextIsReverseComplement());
+	}
 	virtual void nextPatternImpl(TStr**, String<char>**, String<char>**) = 0;
 	virtual bool hasMorePatterns() = 0;
 	virtual bool nextIsReverseComplement() = 0;
@@ -227,6 +234,17 @@ public:
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
+	}
+	virtual void skipPattern() {
+		assert(hasMorePatterns());
+		_cur++;
+	}
+	virtual void skipToNextRead() {
+		skipPattern();
+		if(nextIsReverseComplement()) {
+			skipPattern();
+		}
+		assert(!nextIsReverseComplement());
 	}
 private:
 	bool _revcomp;
@@ -384,20 +402,6 @@ protected:
 	                  char* name,     // destination buf for read name
 	                  String<char>& nameStr, // destination String for name
 	                  size_t* nameLen) = 0; // length of name
-	/// Skip to the end of the current line; return the first character
-	/// of the next line
-	int skipToEnd() {
-		while(true) {
-			int c = fgetc(this->_in); if(feof(this->_in)) return -1;
-			if(c == '\n' || c == '\r') {
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(feof(this->_in)) return -1;
-				}
-				// c now holds first character of next line
-				return c;
-			}
-		}
-	}
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() = 0;
 	/// Swap "current" status between _a/_aRc and _b/_bRc
@@ -891,6 +895,20 @@ public:
 		_reverse = __reverse;
 	}
 protected:
+	/// Skip to the end of the current line; return the first character
+	/// of the next line
+	int skipToEnd() {
+		while(true) {
+			int c = fgetc(this->_in); if(c < 0) return -1;
+			if(c == '\n' || c == '\r') {
+				while(c == '\n' || c == '\r') {
+					c = fgetc(this->_in); if(c < 0) return -1;
+				}
+				// c now holds first character of next line
+				return c;
+			}
+		}
+	}
 	/// Read another pattern from a FASTQ input file
 	virtual void read(char* dst,
 	                  TStr& dstTStr,
