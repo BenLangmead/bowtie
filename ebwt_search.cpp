@@ -1240,9 +1240,10 @@ static void seededQualCutoffSearch(
 		                          &os);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
-		params.setFw(false);  // we'll only look at reverse complements this round
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 > doneMask.capacity()) {
 	    		// Expand doneMask
@@ -1254,10 +1255,23 @@ static void seededQualCutoffSearch(
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
 			}
+			// Do an exact-match search on the forward pattern, just in
+			// case we can pick it off early here
+			uint64_t numHits = sink.numHits();
+			params.setPatId(patid);
+	    	s.newQuery(patFw, nameFw, qualFw);
+		    ebwtFw.search(s, params);
+			if(sink.numHits() > numHits) {
+				assert_eq(numHits+1, sink.numHits());
+				doneMask[patid>>1] = true;
+				patid += 2;
+				continue;
+			}
 			// Set up backtracker with reverse complement
+			params.setFw(false);
 			bt.setQuery(patRc, qualRc, nameRc);
 			params.setPatId(patid+1);
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			ASSERT_ONLY(numHits = sink.numHits());
 			bool hit = bt.backtrack();
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
@@ -1271,6 +1285,7 @@ static void seededQualCutoffSearch(
 				// examination
 			}
 			patid += 2;
+			params.setFw(true);
 	    }
 	    numPats = patid;
 	    assert_leq(numPats>>1, doneMask.size());
