@@ -27,11 +27,18 @@ echo Using NAME: ${NAME}
 
 # This is version 0.6.6
 MAQ=/fs/sz-user-supported/Linux-x86_64/bin/maq
-MAQ_ARGS="-n 1 -C 513"
+MAQ_ARGS="-n 1 -C 513 -s 1"
 EXTRA_EXT=".n1"
 REF=hs_ref_${NAME}.bfa
 READ_BASE=kg_reads
 WORKSTATION=0
+USE_FILTERED_READS=0
+
+# Possibly switch to filtered read set
+if [ "$USE_FILTERED_READS" = "1" ] ; then
+	READ_BASE=kg_reads_filt
+	echo "Using filtered reads; READ_BASE is $READ_BASE"
+fi
 
 # Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
 if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map ] ; then

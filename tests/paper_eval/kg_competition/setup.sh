@@ -60,11 +60,15 @@ fi
 
 # Make link to 1000-Genomes reads
 if [ "$LINK_READS" = "1" ] ; then
-	ln -s -f ${KG_READS}.fastq kg_reads.fq
-	ln -s -f ${KG_READS}.fa kg_reads.fa
+	ln -s -f ${KG_READS}.fastq      kg_reads.fq
+	ln -s -f ${KG_READS}.fa         kg_reads.fa
+	ln -s -f ${KG_READS}.filt.fastq kg_reads_filt.fq
+	ln -s -f ${KG_READS}.filt.fa    kg_reads_filt.fa
 else
-	if [ ! -f kg_reads.fq ] ; then cp ${KG_READS}.fastq kg_reads.fq ; fi
-	if [ ! -f kg_reads.fa ] ; then cp ${KG_READS}.fa kg_reads.fa ; fi
+	if [ ! -f kg_reads.fq ]      ; then cp ${KG_READS}.fastq      kg_reads.fq      ; fi
+	if [ ! -f kg_reads.fa ]      ; then cp ${KG_READS}.fa         kg_reads.fa      ; fi
+	if [ ! -f kg_reads.filt.fq ] ; then cp ${KG_READS}.filt.fastq kg_reads_filt.fq ; fi
+	if [ ! -f kg_reads.filt.fa ] ; then cp ${KG_READS}.filt.fa    kg_reads_filt.fa ; fi
 fi
 
 # Convert fq file to a set of bfq files with 2M reads each
@@ -72,9 +76,9 @@ if [ ! -f kg_reads@6000001.bfq ] ; then
     maq fastq2bfq -n 2000000 kg_reads.fq kg_reads.bfq
 fi
 
-# Convert fq to one big bfq file
-if [ ! -f kg_reads.bfq ] ; then
-    maq fastq2bfq kg_reads.fq kg_reads.bfq
+# Convert filtered fq file to a set of bfq files with 2M reads each
+if [ ! -f kg_reads_filt@6000001.bfq ] ; then
+    maq fastq2bfq -n 2000000 kg_reads_filt.fq kg_reads_filt.bfq
 fi
 
 # Copy analysis scripts from bowtie dir
