@@ -9,7 +9,7 @@ LINK_GENOMES=1
 LINK_EBWTS=1
 LINK_READS=1
 GENOME_DIR=../..
-EBWTS_DIR=../..
+EBWTS_DIR=../../ebwts
 
 if [ "$LINK_GENOMES" = "1" ] ; then
 	# Make link for FASTA sequence
