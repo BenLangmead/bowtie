@@ -1223,7 +1223,7 @@ static void seededQualCutoffSearch(
 	uint32_t s5 = (seedLen >> 1) + (s & 1); // length of 5' half of seed
 	{
 		// Phase 1: Consider cases 1R and 2R
-		Timer _t(cout, "Time for seeded quality search Phase 1 of 4: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
 		BacktrackManager<TStr> bt(ebwtFw, params,
 		                          (seedMms > 0)?  s5 : s,// unrevOff, 
 		                          (seedMms == 2)? s5 : s,// 1revOff
@@ -1297,7 +1297,7 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
-		Timer _t(cout, "Time for seeded quality search Phase 2 of 4: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 2: ", timing);
 		// BacktrackManager to search for hits for cases 1F, 2F, 3F
 		BacktrackManager<TStr> btf(ebwtBw, params,
                                    (seedMms > 0)?  s5 : s,// unrevOff
@@ -1426,7 +1426,7 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
-		Timer _t(cout, "Time for seeded quality search Phase 3 of 4: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 3: ", timing);
 		// BacktrackManager to search for seedlings for case 4F
 		BacktrackManager<TStr> btf(ebwtFw, params,
                                    s3,                    // unrevOff
@@ -1620,6 +1620,7 @@ static void seededQualCutoffSearch(
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
 	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
+//	    	if(sanityCheck && os.size() > 0 && seedMms < 2) {
 				vector<Hit> hits;
 				uint32_t twoRevOff = s;
 				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
@@ -1708,7 +1709,7 @@ static void seededQualCutoffSearch(
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
-		Timer _t(cout, "Time for seeded quality search Phase 4 of 4: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 4: ", timing);
 		// BacktrackManager to search for hits for case 4F; default
 		// parameters are appropriate when searching with 1 mismatch
 		// allowed in the entire seed.  If 2 mismatches are allowed,
@@ -1858,9 +1859,9 @@ static void seededQualCutoffSearch(
 	    	}
 
 	    	// If we're in two-mismatch mode, then now is the time to
-	    	// try the final case that might apply to the reverse
-	    	// complement pattern: 1 mismatch in each of the 3' and 5'
-	    	// halves of the seed.
+	    	// try the final case that might apply to the forward
+	    	// pattern: 1 mismatch in each of the 3' and 5' halves of
+	    	// the seed.
 	    	bool gaveUp = false;
 	    	if(seedMms == 2) {
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
@@ -1936,6 +1937,124 @@ static void seededQualCutoffSearch(
 	    } // while(patsrc.hasMorePatterns()...
 	    assert_eq(seedlingId, seedlingsFwLen);
 	} // end of Phase 4
+#if 0
+	// Optional mode whereby case 4R is handled in a fifth phase; this
+	// was found not to be somewhat slower than the scheme that handles
+	// 4R in Phase 3
+	if(seedMms == 2) {
+		// Unload transposed index and load forward index
+		SWITCH_TO_FW_INDEX();
+		// Phase 5: Consider case 4R
+		Timer _t(cout, "Seeded quality search Phase 5 of 5: ", timing);
+		BacktrackManager<TStr> btr(ebwtFw, params,
+		                           0,       // unrevOff
+		                           s5,      // 1revOff
+		                           s,       // 2revOff
+		                           0, 0,    // itop, ibot
+		                           qualCutoff, // qualThresh
+		                           0,       // qualWobble
+		                           0,       // reportSeedlings (don't)
+		                           NULL,    // seedlings
+			                       NULL,    // mutations
+		                           verbose, // verbose
+		                           true,    // oneHit
+			                       seed+8,  // seed
+			                       &os,
+			                       true);   // halfAndHalf
+		uint32_t patid = 0;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		params.setFw(false);  // looking at reverse-comp strand
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			params.setPatId(patid+1);
+			btr.setQuery(patRc, qualRc, nameRc);
+
+	    	// If we're in two-mismatch mode, then now is the time to
+	    	// try the final case that might apply to the reverse
+	    	// complement pattern: 1 mismatch in each of the 3' and 5'
+	    	// halves of the seed.
+	    	bool gaveUp = false;
+			btr.setQuery(patRc, qualRc, nameRc);
+			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			bool hit = btr.backtrack();
+//				cout << "Time: "
+//			         << ", hit: " << hit
+//				     << ", numBts: " << btr.numBacktracks()
+//				     << ", hiDepth: " << btr.highStackDepth()
+//				     << endl;
+//				cout << "  " << (*patRc) << "  " << (*qualRc) << endl;
+//				btr.resetHighStackDepth();
+			if(btr.numBacktracks() == btr.maxBacktracks()) {
+				gaveUp = true;
+			}
+			btr.resetNumBacktracks();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			if(hit) {
+				doneMask[patid>>1] = true;
+	    		patid += 2;
+				continue;
+			}
+	    	
+#ifndef NDEBUG
+			// The reverse-complement version of the read doesn't hit
+	    	// at all!  Check with the oracle to make sure it agrees.
+	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
+				vector<Hit> hits;
+				uint32_t twoRevOff = s;
+				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
+				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
+				bool newName = false;
+				if(nameRc == NULL) {
+					nameRc = new String<char>("no_name");
+					newName = true;
+				}
+				BacktrackManager<TStr>::naiveOracle(
+				        os,
+						*patRc,
+						length(*patRc),
+				        *qualRc,
+				        *nameRc,
+				        patid+1,    // patid
+				        hits,
+				        qualCutoff, 
+				        unrevOff,
+				        oneRevOff,
+				        twoRevOff,
+				        false,      // fw
+				        true);      // ebwtFw
+				if(hits.size() > 0) {
+					// Print offending hit obtained by oracle
+					BacktrackManager<TStr>::printHit(
+						os,
+						hits[0],
+						*patRc,
+						length(*patRc),
+					    unrevOff,
+					    oneRevOff,
+					    twoRevOff,
+					    true);      // ebwtFw
+				}
+				if(newName) {
+					delete nameRc;
+				}
+				assert_eq(0, hits.size());
+	    	}
+#endif
+			patid += 2;
+	    }
+	    assert(numPats == patid || numPats+2 == patid);
+	}
+#endif /*0*/
 	return;
 }
 
