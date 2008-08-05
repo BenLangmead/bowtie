@@ -38,17 +38,13 @@ if [ "$LINK_EBWTS" = "1" ] ; then
 	# Make links for ebwt files
 	ln -s -f ${EBWTS_DIR}/${NAME}.1.ebwt ${NAME}.1.ebwt
 	ln -s -f ${EBWTS_DIR}/${NAME}.2.ebwt ${NAME}.2.ebwt
-	ln -s -f ${EBWTS_DIR}/${NAME}.3.ebwt ${NAME}.3.ebwt
 	ln -s -f ${EBWTS_DIR}/${NAME}.rev.1.ebwt ${NAME}.rev.1.ebwt
 	ln -s -f ${EBWTS_DIR}/${NAME}.rev.2.ebwt ${NAME}.rev.2.ebwt
-	ln -s -f ${EBWTS_DIR}/${NAME}.rev.3.ebwt ${NAME}.rev.3.ebwt
 else
 	cp ${EBWTS_DIR}/${NAME}.1.ebwt .
 	cp ${EBWTS_DIR}/${NAME}.2.ebwt .
-	cp ${EBWTS_DIR}/${NAME}.3.ebwt .
 	cp ${EBWTS_DIR}/${NAME}.rev.1.ebwt .
 	cp ${EBWTS_DIR}/${NAME}.rev.2.ebwt .
-	cp ${EBWTS_DIR}/${NAME}.rev.3.ebwt .
 fi
 
 err=0
@@ -56,7 +52,6 @@ if ! wc -c ${NAME}.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.2.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.rev.1.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
 if ! wc -c ${NAME}.rev.2.ebwt 2> /dev/null > /dev/null ; then err=1 ; fi
-# (allow the .3.ebwt files to be absent for now)
 
 if [ "$err" != "0" ] ; then
     echo "One more more ebwt links are invalid; aborting..."
