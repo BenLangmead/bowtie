@@ -39,7 +39,7 @@ begin:
 # Possibly switch to filtered read set
 if [ "$USE_FILTERED_READS" = "1" ] ; then
 	READS=kg_reads_filt.fq
-	EXTRA_EXT=_filt
+	EXTRA_EXT="filt."
 	echo "Using filtered reads; READ_BASE is $READ_BASE"
 else
 	READS=kg_reads.fq
