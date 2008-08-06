@@ -32,9 +32,9 @@ for my $q (@ARGV) {
 }
 close(FQ);
 
-system("maq fasta2bfa .tmp.fa .tmp.bfa 2>&1 > /dev/null") == 0 || die "maq fasta2bfa failed";
-system("maq fastq2bfq .tmp.fq .tmp.bfq 2>&1 > /dev/null") == 0 || die "maq fastq2bfq failed";
-system("maq map $mapfile $bfafile $bfqfile 2>&1 > /dev/null") == 0 || die "maq map failed";
+system("maq fasta2bfa .tmp.fa .tmp.bfa 2> /dev/null") == 0 || die "maq fasta2bfa failed";
+system("maq fastq2bfq .tmp.fq .tmp.bfq 2> /dev/null") == 0 || die "maq fastq2bfq failed";
+system("maq map $mapfile $bfafile $bfqfile 2> /dev/null") == 0 || die "maq map failed";
 
 # fprintf(fpout, "%s\t%s\t%d\t%c\t%d\t%u\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
 #       m1->name,               // read name
