@@ -65,7 +65,7 @@ if [ ! -f ${NAME}.ebwt.n1.${EXTRA_EXT}hits ] ; then
    sh wrap.sh ${NAME}.ebwt.n1${EXTRA_EXT} \
      ./ebwt_search -n 1 -tqr ${NAME} ${READS} ${NAME}.ebwt.n1.${EXTRA_EXT}hits
 else
-	echo "${NAME}.ebwt.n1.hits already exists; skipping Maq-mode -n 1 run"
+	echo "${NAME}.ebwt.n1.${EXTRA_EXT}hits already exists; skipping Maq-mode -n 1 run"
 fi
 
 # Don't need to do the SOAP-comparable runs in filtered mode
@@ -76,7 +76,7 @@ if [ "$USE_FILTERED_READS" = "0" ] ; then
 	   sh wrap.sh ${NAME}.ebwt.1${EXTRA_EXT} \
 	     ./ebwt_search -1 -t ${NAME} ${READS} ${NAME}.ebwt.1.${EXTRA_EXT}hits
 	else
-		echo "${NAME}.ebwt.1.hits already exists; skipping end-to-end 1 mismatch"
+		echo "${NAME}.ebwt.1.${EXTRA_EXT}hits already exists; skipping end-to-end 1 mismatch"
 	fi
 	
 	# Run ebwt_search in end-to-end 2-mismatch mode to produce hits
@@ -85,7 +85,7 @@ if [ "$USE_FILTERED_READS" = "0" ] ; then
 	   sh wrap.sh ${NAME}.ebwt.2${EXTRA_EXT} \
 	     ./ebwt_search -2 -t ${NAME} ${READS} ${NAME}.ebwt.2.${EXTRA_EXT}hits
 	else
-		echo "${NAME}.ebwt.2.hits already exists; skipping end-to-end 2 mismatch"
+		echo "${NAME}.ebwt.2.${EXTRA_EXT}hits already exists; skipping end-to-end 2 mismatch"
 	fi
 fi
 

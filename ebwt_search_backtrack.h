@@ -38,6 +38,7 @@ public:
 	                 uint32_t __ibot,
 	                 uint32_t __qualThresh,
 	                 uint32_t __qualWobble,
+	                 uint32_t __maxBts = 75,
 	                 uint32_t __reportSeedlings = 0,
 	                 String<uint8_t>* __seedlings = NULL,
 	                 String<QueryMutation>* __muts = NULL,
@@ -81,7 +82,7 @@ public:
 		_hiDepth(0),
 		_numBts(0),
 		_totNumBts(0),
-		_maxBts(75),
+		_maxBts(__maxBts),
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
@@ -217,12 +218,18 @@ public:
 	uint32_t set1RevOff(uint32_t oneRevOff) {
 		uint32_t tmp = _1revOff;
 		_1revOff = oneRevOff;
+		if(_halfAndHalf) {
+			_5depth = oneRevOff;
+		}
 		return tmp;
 	}
 
 	uint32_t set2RevOff(uint32_t twoRevOff) {
 		uint32_t tmp = _2revOff;
 		_2revOff = twoRevOff;
+		if(_halfAndHalf) {
+			_3depth = twoRevOff;
+		}
 		return tmp;
 	}
 	

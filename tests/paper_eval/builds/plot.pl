@@ -40,10 +40,11 @@ print BUILD "\\end{tabular}\n";
 print BUILD "\\caption{".
 	"Maximum virtual memory footprint and wall-clock running times ".
 	"for various configurations of the Bowtie index-building tool ".
-	"run on a single CPU of a server with a 1.8 Ghz AMD Opteron 875 ".
+	"run on a single CPU of a server with a 2.4 GHz AMD Opteron 850 ".
 	"processor and 32 GB of RAM. ".
+	"Reference sequences were the ".
+	"contigs of Genbank human genome build 36.3. ".
 	"In all cases, the index produced is about 2.2 GB on disk. ".
-	"TODO: RECALCULATE ON PRIVET OR LARCH FOR CONSISTENCY.".
 	"}\n";
 print BUILD "\\end{table}\n";
 print BUILD "\\end{document}\n";

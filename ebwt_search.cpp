@@ -53,8 +53,9 @@ static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
+static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 
-static const char *short_options = "fqbmxcu:rvsat013:5:o:k:d:e:n:l:";
+static const char *short_options = "fqbmxcu:rvsat0123:5:o:k:d:e:n:l:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -62,12 +63,14 @@ static const char *short_options = "fqbmxcu:rvsat013:5:o:k:d:e:n:l:";
 #define ARG_ARROW 259
 #define ARG_CONCISE 260
 #define ARG_SOLEXA_QUALS 261
+#define ARG_MAXBTS 262
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            'v'},
 	{"sanity",       no_argument,       0,            's'},
 	{"exact",        no_argument,       0,            '0'},
 	{"1mm",          no_argument,       0,            '1'},
+	{"2mm",          no_argument,       0,            '2'},
 	{"pause",        no_argument,       &ipause,      1},
 	{"orig",         required_argument, 0,            ARG_ORIG},
 	{"allhits",      no_argument,       0,            'a'},
@@ -94,6 +97,7 @@ static struct option long_options[] = {
 	{"kmer",         required_argument, 0,            'k'},
 	{"3prime-diffs", required_argument, 0,            'd'},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
+	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -117,6 +121,7 @@ static void printUsage(ostream& out) {
 	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
 	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
 	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
+	    << "  -2/--2mm           report end-to-end 2-mismatch hits; ignore quals, -e, -n" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
@@ -135,6 +140,7 @@ static void printUsage(ostream& out) {
 	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    << "  --concise          write hits in a concise format" << endl
+	    //<< "  --maxbts <int>     maximum number of backtracks allowed (75)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offRate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
@@ -182,6 +188,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'c': format = CMDLINE; break;
 	   		case '0': maqLike = 0; mismatches = 0; break;
 	   		case '1': maqLike = 0; mismatches = 1; break;
+	   		case '2': maqLike = 0; mismatches = 2; break;
 	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
@@ -220,6 +227,10 @@ static void parseOptions(int argc, char **argv) {
 					kmer = parseInt(1, "-k/--kmer must be at least 1");
 				else
 					kmer = 22;
+				break;
+			case ARG_MAXBTS:
+				if (optarg != NULL)
+					maxBts = parseInt(1, "--maxbts must be at least 1");
 				break;
 			case 'd': 
 				if (optarg)
@@ -261,9 +272,12 @@ static void parseOptions(int argc, char **argv) {
 		// No support for -a in Maq mode (yet)
 		cerr << "Cannot combine -a/--allhits with Maq-like (default) mode"
 		     << endl
-		     << "Either omit -a/--allhits or also specify -0 or -1 for end-to-end mode"
+		     << "Either omit -a/--allhits or also specify -0, -1, or -2 for end-to-end mode"
 		     << endl;
 		exit(1);
+	}
+	if(!maqLike) {
+		maxBts = 999999;
 	}
 }
 
@@ -1185,6 +1199,365 @@ static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_
 	assert(patsrc.nextIsReverseComplement()); \
 }
 
+template<typename TStr>
+static void twoMismatchSearch(
+        PatternSource<TStr>& patsrc,    /// pattern source
+        HitSink& sink,                  /// hit sink
+        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
+        EbwtSearchParams<TStr>& params, /// search parameters
+        Ebwt<TStr>& ebwtFw,             /// index of original text
+        Ebwt<TStr>& ebwtBw,             /// index of transposed text
+        vector<TStr>& os)    /// text strings, if available (empty otherwise)
+{
+	typedef typename Value<TStr>::Type TVal;
+	uint32_t numPats;
+	assert(revcomp);
+	// Assume forward index is loaded
+	assert(ebwtFw.isInMemory());
+	uint32_t numQs = ((qUpto == -1) ? 10 * 1024 * 1024 : qUpto);
+	vector<bool> doneMask(numQs, false);
+	{
+		// Phase 1: Consider cases 1R and 2R
+		Timer _t(cout, "End-to-end 2-mismatch Phase 1: ", timing);
+		BacktrackManager<TStr> btr(ebwtFw, params,
+		                          0,                     // unrevOff 
+		                          0,                     // 1revOff
+		                          0,                     // 2revOff
+		                          0, 0,                  // itop, ibot
+		                          0xffffffff,            // qualThresh
+		                          0,                     // qualWobble
+		                          maxBts,                // max backtracks
+		                          0,                     // reportSeedlings (don't)
+		                          NULL,                  // seedlings
+		                          NULL,                  // mutations
+		                          verbose,               // verbose
+		                          true,                  // oneHit
+		                          seed,                  // seed
+		                          &os);
+		uint32_t patid = 0;
+		uint32_t lastLen = 0; // for checking if all reads have same length
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		params.setFw(true);
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	if(patid>>1 > doneMask.capacity()) {
+	    		// Expand doneMask
+	    		doneMask.resize(doneMask.capacity()*2, 0);
+	    	}
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			size_t plen = length(*patFw);
+			if(qSameLen) {
+				if(lastLen == 0) lastLen = plen;
+				else assert_eq(lastLen, plen);
+			}
+			// Do an exact-match search on the forward pattern, just in
+			// case we can pick it off early here
+			uint64_t numHits = sink.numHits();
+			params.setPatId(patid);
+	    	s.newQuery(patFw, nameFw, qualFw);
+		    ebwtFw.search(s, params);
+			if(sink.numHits() > numHits) {
+				assert_eq(numHits+1, sink.numHits());
+				doneMask[patid>>1] = true;
+				patid += 2;
+				continue;
+			}
+			// Set up backtracker with reverse complement
+			params.setFw(false);
+			btr.setQuery(patRc, qualRc, nameRc);
+			// Calculate the halves
+			uint32_t s = plen;
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			// Set up the revisitability of the halves
+			btr.set2RevOff(s);   // left half 2-revisitable
+			btr.set1RevOff(s5);  // right half unrevisitable
+			btr.setUnrevOff(s5);
+			params.setPatId(patid+1);
+			ASSERT_ONLY(numHits = sink.numHits());
+			bool hit = btr.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			doneMask[patid>>1] = hit;
+			patid += 2;
+			params.setFw(true);
+	    }
+	    numPats = patid;
+	    assert_leq(numPats>>1, doneMask.size());
+	}
+	// Unload forward index and load transposed index
+	SWITCH_TO_BW_INDEX();
+	{
+		Timer _t(cout, "End-to-end 2-mismatch Phase 2: ", timing);
+		BacktrackManager<TStr> bt(ebwtBw, params,
+                                  0,                     // unrevOff
+                                  0,                     // 1revOff
+                                  0,                     // 2revOff
+		                          0, 0,                  // itop, ibot
+		                          0xffffffff,            // qualThresh
+		                          0,                     // qualWobble
+		                          maxBts,                // max backtracks
+		                          0,                     // reportSeedlings (no)
+		                          NULL,                  // seedlings
+			                      NULL,                  // mutations
+		                          verbose,               // verbose
+		                          true,                  // oneHit
+			                      seed+1,                // seed
+			                      &os);
+		uint32_t patid = 0;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		params.setFw(true);  // looking at forward strand
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			size_t plen = length(*patFw);
+			bt.setQuery(patFw, qualFw, nameFw);
+			// Calculate the halves
+			uint32_t s = plen;
+			uint32_t s3 = s >> 1; // length of 3' half of seed
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			// Set up the revisitability of the halves
+			bt.set2RevOff(s);   // 3' half 2-revisitable
+			bt.set1RevOff(s5);  // 5' half unrevisitable
+			bt.setUnrevOff(s5);
+			params.setPatId(patid);
+			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			bool hit = bt.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			doneMask[patid>>1] = hit;
+			if(hit) {
+				patid += 2;
+				continue;
+			}
+			
+			// Try 2 backtracks in the 3' half of the reverse complement read
+			params.setFw(false);  // looking at reverse complement
+			bt.setQuery(patRc, qualRc, nameRc);
+			// Set up the revisitability of the halves
+			bt.set2RevOff(s);   // 3' half 2-revisitable
+			bt.set1RevOff(s3);  // 5' half unrevisitable
+			bt.setUnrevOff(s3);
+			params.setPatId(patid+1);
+			ASSERT_ONLY(numHits = sink.numHits());
+			hit = bt.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			doneMask[patid>>1] = hit;
+			params.setFw(true);  // looking at forward strand
+			patid += 2;
+	    }
+	    assert_eq(numPats, patid);
+	}
+	SWITCH_TO_FW_INDEX();
+	{
+		// Phase 3: Consider cases 3R and 4R and generate seedlings for
+		// case 4F
+		Timer _t(cout, "End-to-end 2-mismatch Phase 3: ", timing);
+		// BacktrackManager to search for seedlings for case 4F
+		BacktrackManager<TStr> bt(ebwtFw, params,
+                                  0,                     // unrevOff
+                                  0,                     // 1revOff
+                                  0,                     // 2revOff
+		                          0, 0,                  // itop, ibot
+		                          0xffffffff,            // qualThresh (none)
+		                          0,                     // qualWobble
+		                          maxBts,                // max backtracks
+		                          0,                     // reportSeedlings (don't)
+		                          NULL,                  // seedlings
+			                      NULL,                  // mutations
+		                          verbose,               // verbose
+		                          true,                  // oneHit
+			                      seed+3,                // seed
+			                      &os);
+		BacktrackManager<TStr> bthh(ebwtFw, params,
+		                           0,       // unrevOff
+		                           0,       // 1revOff
+		                           0,       // 2revOff
+		                           0, 0,    // itop, ibot
+		                           0xffffffff, // qualThresh
+		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
+		                           0,       // reportSeedlings (don't)
+		                           NULL,    // seedlings
+			                       NULL,    // mutations
+		                           verbose, // verbose
+		                           true,    // oneHit
+			                       seed+5,  // seed
+			                       &os,
+			                       true);   // halfAndHalf
+		uint32_t patid = 0;
+		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		params.setFw(true);
+	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
+	    	assert_lt((patid>>1), doneMask.capacity());
+	    	assert_lt((patid>>1), doneMask.size());
+	    	if(doneMask[patid>>1]) {
+				patsrc.skipPattern();
+				patsrc.skipPattern();
+	    		patid += 2;
+	    		continue;
+	    	}
+	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			uint32_t plen = length(*patFw);
+			// Calculate the halves
+			uint32_t s = plen;
+			uint32_t s3 = s >> 1; // length of 3' half of seed
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			params.setPatId(patid);
+			bt.setQuery(patFw, qualFw, nameFw);
+			// Set up the revisitability of the halves
+			bt.set2RevOff(s);   // 3' half 2-revisitable
+			bt.set1RevOff(s3);  // 5' half unrevisitable
+			bt.setUnrevOff(s3);
+			params.setPatId(patid);
+			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			bool hit = bt.backtrack();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			if(hit) {
+				patid += 2;
+				continue;
+			}
+			
+			// Try a half-and-half on the forward read
+			bool gaveUp = false;
+			bthh.setQuery(patFw, qualFw, nameFw);
+			bthh.set2RevOff(s);
+			bthh.set1RevOff(s5);
+			bthh.setUnrevOff(0);
+			ASSERT_ONLY(numHits = sink.numHits());
+			hit = bthh.backtrack();
+			if(bthh.numBacktracks() == bthh.maxBacktracks()) {
+				gaveUp = true;
+			}
+			bthh.resetNumBacktracks();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			if(hit) {
+	    		patid += 2;
+				continue;
+			}
+	    	
+#ifndef NDEBUG
+			// The reverse-complement version of the read doesn't hit
+	    	// at all!  Check with the oracle to make sure it agrees.
+	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
+				vector<Hit> hits;
+				bool newName = false;
+				if(nameFw == NULL) {
+					nameFw = new String<char>("no_name");
+					newName = true;
+				}
+				BacktrackManager<TStr>::naiveOracle(
+				        os,
+						*patFw,
+						plen,
+				        *qualFw,
+				        *nameFw,
+				        patid,     // patid
+				        hits,
+				        0xffffffff, 
+				        0,
+				        0,
+				        s,
+				        true,       // fw
+				        true);      // ebwtFw
+				if(hits.size() > 0) {
+					// Print offending hit obtained by oracle
+					BacktrackManager<TStr>::printHit(
+						os,
+						hits[0],
+						*patFw,
+						plen,
+					    0,
+					    0,
+					    s,
+					    true);      // ebwtFw
+				}
+				if(newName) {
+					delete nameFw;
+				}
+				assert_eq(0, hits.size());
+	    	}
+#endif
+	    	
+			// Try a half-and-half on the reverse complement read
+	    	gaveUp = false;
+			params.setFw(false);
+			params.setPatId(patid+1);
+			bthh.setQuery(patRc, qualRc, nameRc);
+			ASSERT_ONLY(numHits = sink.numHits());
+			hit = bthh.backtrack();
+			if(bthh.numBacktracks() == bthh.maxBacktracks()) {
+				gaveUp = true;
+			}
+			bthh.resetNumBacktracks();
+			assert(hit  || numHits == sink.numHits());
+			assert(!hit || numHits <  sink.numHits());
+			params.setFw(true);
+			if(hit) {
+	    		patid += 2;
+				continue;
+			}
+
+#ifndef NDEBUG
+			// The reverse-complement version of the read doesn't hit
+	    	// at all!  Check with the oracle to make sure it agrees.
+	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
+				vector<Hit> hits;
+				bool newName = false;
+				if(nameRc == NULL) {
+					nameRc = new String<char>("no_name");
+					newName = true;
+				}
+				BacktrackManager<TStr>::naiveOracle(
+				        os,
+						*patRc,
+						plen,
+				        *qualRc,
+				        *nameRc,
+				        patid+1,    // patid
+				        hits,
+				        0xffffffff, 
+				        0,
+				        0,
+				        s,
+				        false,      // fw
+				        true);      // ebwtFw
+				if(hits.size() > 0) {
+					// Print offending hit obtained by oracle
+					BacktrackManager<TStr>::printHit(
+						os,
+						hits[0],
+						*patRc,
+						plen,
+					    0,
+					    0,
+					    s,
+					    true);      // ebwtFw
+				}
+				if(newName) {
+					delete nameRc;
+				}
+				assert_eq(0, hits.size());
+	    	}
+#endif
+			patid += 2;
+	    }
+	    assert(numPats == patid || numPats+2 == patid);
+	}
+	return;
+}
 
 /**
  * Search for a good alignments for each read using criteria that
@@ -1216,7 +1589,6 @@ static void seededQualCutoffSearch(
         vector<TStr>& os)    /// text strings, if available (empty otherwise)
 {
 	typedef typename Value<TStr>::Type TVal;
-	vector<Hit> sanityHits;
 	uint32_t numPats;
 	assert(revcomp);
 	// Load forward index
@@ -1236,6 +1608,7 @@ static void seededQualCutoffSearch(
 		                          0, 0,                  // itop, ibot
 		                          qualCutoff,            // qualThresh
 		                          0,                     // qualWobble
+		                          maxBts,                // max backtracks
 		                          0,                     // reportSeedlings (don't)
 		                          NULL,                  // seedlings
 		                          NULL,                  // mutations
@@ -1311,6 +1684,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh
 		                           0,                     // qualWobble
+		                           maxBts,                // max backtracks
 		                           0,                     // reportSeedlings (no)
 		                           NULL,                  // seedlings
 			                       NULL,                  // mutations
@@ -1326,6 +1700,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh (none)
 		                           0,                     // qualWobble
+		                           maxBts,                // max backtracks
 		                           seedMms,               // reportSeedlings (yes)
 		                           &seedlingsRc,          // seedlings
 			                       NULL,                  // mutations
@@ -1440,6 +1815,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh (none)
 		                           0,                     // qualWobble
+		                           maxBts,                // max backtracks
 		                           seedMms,               // reportSeedlings (do)
 		                           &seedlingsFw,          // seedlings
 			                       NULL,                  // mutations
@@ -1459,6 +1835,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
@@ -1473,6 +1850,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
@@ -1727,6 +2105,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
@@ -1741,6 +2120,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
@@ -1958,6 +2338,7 @@ static void seededQualCutoffSearch(
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
 		                           0,       // qualWobble
+		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
 			                       NULL,    // mutations
@@ -2151,7 +2532,14 @@ static void driver(const char * type,
 	if(!maqLike && sanityCheck && !os.empty()) {
 		TStr rs; ebwt.restore(rs);
 		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
-		assert_eq(joinedo, rs);
+		assert_leq(length(rs), length(joinedo));
+		assert_geq(length(rs) + ebwt.eh().chunkLen(), length(joinedo));
+		for(size_t i = 0; i < length(rs); i++) {
+			if(rs[i] != joinedo[i]) {
+				cout << "At character " << i << " of " << length(rs) << endl;
+			}
+			assert_eq(rs[i], joinedo[i]);
+		}
 	}
 	{
 		Timer _t(cout, "Time searching: ", timing);
@@ -2215,7 +2603,13 @@ static void driver(const char * type,
 			}
 			else
 			{
-				mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+				if(mismatches == 1) {
+					mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+				} else if(mismatches == 2) {
+					twoMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+				} else {
+					throw runtime_error("Bad number of mismatches!");
+				}
 			}
 			
 		} else {
@@ -2333,103 +2727,5 @@ int main(int argc, char **argv) {
 	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
     return 0;
 }
-
-#if 0
-template<typename TStr>
-static void prioritySearch(PatternSource<TStr>& patsrc,
-						   Ebwt<TStr>& ebwt,
-						   vector<String<Dna, Packed<> > >* ss,
-						   bool revcomp)
-
-{
-	uint32_t patid = 0;
-	assert(patsrc.hasMorePatterns());
-	
-	list<SearchPolicy<TStr>*> search_heirarchy;
-	
-	
-	// ExactSearchWithLowQualityThreePrime uses Landau Vishkin extension,
-	// which assumes that a 5 prime hit has a difference on the 3 prime end.
-	// Exact end to end matches will screw it up.  This is easy to change, but
-	// I haven't done so yet for performance reasons.  For now, prioritySearch
-	// screens out all exact matches first.
-	
-	search_heirarchy.push_back(new ExactSearch<TStr>());
-	search_heirarchy.push_back(new ExactSearchWithLowQualityThreePrime<TStr>(*ss));
-	
-	HitSink hit_sink(cout, true);
-	
-	// Since I'm manually accumulating hits against both strands for a given
-	// policy, I don't want the hit_sink to >> my patId for me.  I'll manage
-	// the ids and corresponding hits myself.
-	PrettyHitSink report_sink(cout, false, false);
-	
-	EbwtSearchStats<TStr> stats;
-	EbwtSearchParams<TStr> params(hit_sink,
-								  stats,
-								  MHP_PICK_1_RANDOM,
-								  false);
-	
-    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) 
-	{
-		
-		// Grab a pattern...
-		const TStr& pat = patsrc.nextPattern();
-		assert(!empty(pat));
-		
-		TStr pat_rc;
-		
-		// ...and if we are doing RC, it's RC pattern from the pattern source.
-		if (revcomp)
-		{
-			assert (patsrc.hasMorePatterns() && 
-					patsrc.nextIsReverseComplement());
-			pat_rc = patsrc.nextPattern();
-			assert(!empty(pat_rc));
-			//cerr << "\tfwd: " << pat << endl;
-			//cerr << "\trev: " << pat_rc << endl;
-		}
-		
-		params.setPatId(patid++);
-		
-		// Search for hits, stopping at the first (i.e. highest priority) 
-		// matching policy for which there is at least one hit.
-		for (typename list<SearchPolicy<TStr>*>::iterator pol_itr = search_heirarchy.begin();
-			 pol_itr != search_heirarchy.end(); 
-			 ++pol_itr)
-		{
-			SearchPolicy<TStr>* policy = *pol_itr;
-			params.setFw(true);
-			policy->search(ebwt, stats, params, pat, hit_sink);
-			if (revcomp)
-			{
-				params.setFw(false);
-				policy->search(ebwt, stats, params, pat_rc, hit_sink);
-			}
-			
-			vector<Hit>& hits = hit_sink.retainedHits();
-			if (hits.size())
-			{
-				// FIXME: this is a bullshit reporting policy.  We need a real 
-				// one.
-				Hit& hit = hits[0];
-				report_sink.reportHit(hit.h, hit.patId, hit.patSeq, hit.fw, hit.mms, hit.oms);
-				break;
-			}
-		}
-		
-		hit_sink.clearRetainedHits();
-	}
-	
-	report_sink.finish();
-	
-	for (typename list<SearchPolicy<TStr>*>::iterator pol_itr = search_heirarchy.begin();
-		 pol_itr != search_heirarchy.end(); 
-		 ++pol_itr)
-	{
-		delete *pol_itr;
-	}
-}
-#endif
 
 #endif
