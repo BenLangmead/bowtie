@@ -32,9 +32,7 @@ if [ ! -f ${NAME}.1.ebwt ] ; then
 	exit 1
 fi
 
-
-begin:
-
+while 1 ; do
 
 # Possibly switch to filtered read set
 if [ "$USE_FILTERED_READS" = "1" ] ; then
@@ -89,7 +87,11 @@ else
 fi
 
 # Possibly switch to filtered read set
-if [ "$USE_FILTERED_READS" = "1" ] ; then
+if [ "$USE_FILTERED_READS" = "0" ] ; then
+	break
+else
 	USE_FILTERED_READS=0
 	goto begin
 fi
+
+done
