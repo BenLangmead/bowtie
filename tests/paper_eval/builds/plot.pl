@@ -22,8 +22,8 @@ for(my $ni = 0; $ni <= $#names; $ni++) {
 	my $n = $names[$ni];
 	my $l = readfline("whole.results.txt", $ni);
 	my @ls = split(/,/, $l);
-	my $rt = toMinsHrs($ls[0]);
-	my $gb = $ls[1] / 1024 / 1024;
+	my $rt = toMinsHrs($ls[1]);
+	my $gb = $ls[2] / 1024 / 1024;
 	$gb = sprintf("%.2f", $gb);
 	my $blocksFw = `grep 'Getting block' whole.ebwt_build.$exts[$ni].out | head -1 | sed 's/.* of //'`;
 	# Not showing the fw and bw block counts separately because it's
