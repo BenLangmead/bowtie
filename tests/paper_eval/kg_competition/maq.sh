@@ -27,7 +27,7 @@ echo Using NAME: ${NAME}
 
 # This is version 0.6.6
 MAQ=/fs/sz-user-supported/Linux-x86_64/bin/maq
-MAQ_ARGS="-C 513 -s 1"
+MAQ_ARGS="-s 1"
 EXTRA_EXT=""
 REF=hs_ref_${NAME}.bfa
 READ_BASE=kg_reads
