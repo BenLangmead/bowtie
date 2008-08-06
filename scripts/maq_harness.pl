@@ -32,9 +32,9 @@ for my $q (@ARGV) {
 }
 close(FQ);
 
-system("maq fasta2bfa .tmp.fa .tmp.bfa > /dev/null") == 0 || die "maq fasta2bfa failed";
-system("maq fastq2bfq .tmp.fq .tmp.bfq > /dev/null") == 0 || die "maq fastq2bfq failed";
-system("maq map $mapfile $bfafile $bfqfile > /dev/null") == 0 || die "maq map failed";
+system("maq fasta2bfa .tmp.fa .tmp.bfa 2>&1 > /dev/null") == 0 || die "maq fasta2bfa failed";
+system("maq fastq2bfq .tmp.fq .tmp.bfq 2>&1 > /dev/null") == 0 || die "maq fastq2bfq failed";
+system("maq map $mapfile $bfafile $bfqfile 2>&1 > /dev/null") == 0 || die "maq map failed";
 
 # fprintf(fpout, "%s\t%s\t%d\t%c\t%d\t%u\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
 #       m1->name,               // read name
@@ -52,5 +52,5 @@ system("maq map $mapfile $bfafile $bfqfile > /dev/null") == 0 || die "maq map fa
 #		m1->c[1],               // # of 1-mismatch hits
 #		m1->size);              // length of alignment
 
-print "read_nm\tref_nm\trefoff\torient\tmate_off\tpair_stat\n";
+print "read_nm\tref_nm\trefoff\torient\tmat_off\tpair_st\tmapqual\tse_qual\tlw_qual\t#mm\terrsum\t0mmhit\t1mmhit\tlen\n";
 system("maq mapview $mapfile");
