@@ -32,7 +32,25 @@ for my $q (@ARGV) {
 }
 close(FQ);
 
-system("maq fasta2bfa .tmp.fa .tmp.bfa") == 0 || die "maq fasta2bfa failed";
-system("maq fastq2bfq .tmp.fq .tmp.bfq") == 0 || die "maq fastq2bfq failed";
-system("maq map $mapfile $bfafile $bfqfile") == 0 || die "maq map failed";
+system("maq fasta2bfa .tmp.fa .tmp.bfa > /dev/null") == 0 || die "maq fasta2bfa failed";
+system("maq fastq2bfq .tmp.fq .tmp.bfq > /dev/null") == 0 || die "maq fastq2bfq failed";
+system("maq map $mapfile $bfafile $bfqfile > /dev/null") == 0 || die "maq map failed";
+
+# fprintf(fpout, "%s\t%s\t%d\t%c\t%d\t%u\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d",
+#       m1->name,               // read name
+#		m->ref_name[m1->seqid], // reference name
+#		(m1->pos>>1) + 1,       // reference offset
+#		(m1->pos&1)? '-' : '+', // orientation of alignment
+#		m1->dist,               // offset of mate
+#		m1->flag,               // status of pair
+#		m1->map_qual,           // "final mapping quality"
+#		(signed char)m1->seq[MAX_READLEN-1], // single-end mapping quality
+#		m1->alt_qual,           // the lower quality of the two ends
+#		m1->info1&0xf,          // # mismatches (in the best hit?)
+#		m1->info2,              // sum of errors of best hit
+#		m1->c[0],               // # of exact hits
+#		m1->c[1],               // # of 1-mismatch hits
+#		m1->size);              // length of alignment
+
+print "read_nm\tref_nm\trefoff\torient\tmate_off\tpair_stat\n";
 system("maq mapview $mapfile");
