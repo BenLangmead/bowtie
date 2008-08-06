@@ -54,7 +54,7 @@ static int seedLen              = 24; // seed length (not configurable in maq)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 
-static const char *short_options = "fqbmlcu:rvsat013:5:o:k:d:e:n:";
+static const char *short_options = "fqbmxcu:rvsat013:5:o:k:d:e:n:l:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -89,6 +89,7 @@ static struct option long_options[] = {
 	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{"revcomp",      no_argument,       0,            'r'},
 	{"err",          required_argument, 0,            'e'},
+	{"seedlen",      required_argument, 0,            'l'},
 	{"seedmms",      required_argument, 0,            'n'},
 	{"kmer",         required_argument, 0,            'k'},
 	{"3prime-diffs", required_argument, 0,            'd'},
@@ -109,10 +110,11 @@ static void printUsage(ostream& out) {
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    //<< "  -m                 query input files are Maq .bfq" << endl
-	    //<< "  -l                 query input files are Solexa _seq.txt" << endl
+	    //<< "  -x                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
 	    << "  -e/--err <int>     max sum of mismatch qualities (default: 70)" << endl
-	    << "  -n/--seedmms <int> max mismatches in 5' 24 bps (0, 1 or 2, default: 2)" << endl
+	    << "  -l/--seedlen <int> seed length (default: 24)" << endl
+	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
 	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
 	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
@@ -176,7 +178,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'f': format = FASTA; break;
 	   		case 'q': format = FASTQ; break;
 	   		case 'm': format = BFQ; break;
-	   		case 'l': format = SOLEXA; break;
+	   		case 'x': format = SOLEXA; break;
 	   		case 'c': format = CMDLINE; break;
 	   		case '0': maqLike = 0; mismatches = 0; break;
 	   		case '1': maqLike = 0; mismatches = 1; break;
@@ -188,7 +190,7 @@ static void parseOptions(int argc, char **argv) {
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
 	   		case 'u':
-	   			qUpto = parseInt(1, "-u/--qUpto arg must be at least 1");
+	   			qUpto = parseInt(1, "-u/--qupto arg must be at least 1");
 	   			break;
 	   		case '3':
 	   			trim3 = parseInt(0, "-3/--trim3 arg must be at least 0");
@@ -197,13 +199,16 @@ static void parseOptions(int argc, char **argv) {
 	   			trim5 = parseInt(0, "-5/--trim5 arg must be at least 0");
 	   			break;
 	   		case 'o':
-	   			offRate = parseInt(1, "-o/--offRate arg must be at least 1");
+	   			offRate = parseInt(1, "-o/--offrate arg must be at least 1");
 	   			break;
 	   		case 'e':
 	   			qualThresh = parseInt(1, "-e/--err arg must be at least 1");
 	   			break;
 	   		case 'n':
-	   			seedMms = parseInt(0, "-n/--seedMms arg must be at least 0");
+	   			seedMms = parseInt(0, "-n/--seedmms arg must be at least 0");
+	   			break;
+	   		case 'l':
+	   			seedLen = parseInt(20, "-l/--seedlen arg must be at least 20");
 	   			break;
 	   		case 'a': oneHit = false; break;
 	   		case 'v': verbose = true; break;
@@ -1668,7 +1673,7 @@ static void seededQualCutoffSearch(
 			params.setFw(true);  // looking at forward strand
 			params.setPatId(patid);
 			btf.setQuery(patFw, qualFw, nameFw);
-			btf.setQlen(24); // just look at the seed
+			btf.setQlen(seedLen); // just look at the seed
 			ASSERT_ONLY(uint32_t numSeedlings = length(seedlingsFw));
 			// Do a 12/24 seedling backtrack on the forward read
 			// using the normal index.  This will find seedlings
