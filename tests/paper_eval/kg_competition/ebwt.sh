@@ -6,6 +6,13 @@ echo Using NAME: ${NAME}
 BOWTIE_HOME=$HOME/workspace/bowtie
 READS=kg_reads.fq
 DO_CVS_UPDATE=0
+USE_FILTERED_READS=0
+
+# Possibly switch to filtered read set
+if [ "$USE_FILTERED_READS" = "1" ] ; then
+        READS=kg_reads_filt.fq
+        echo "Using filtered reads; READ_BASE is $READ_BASE"
+fi
 
 # Optionally do a cvs update in the Bowtie home
 if [ "$DO_CVS_UPDATE" = "1" ] ; then
