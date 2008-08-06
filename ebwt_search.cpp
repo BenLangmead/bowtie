@@ -113,7 +113,7 @@ static void printUsage(ostream& out) {
 	    //<< "  -x                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
 	    << "  -e/--err <int>     max sum of mismatch qualities (default: 70)" << endl
-	    << "  -l/--seedlen <int> seed length (default: 24)" << endl
+	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
 	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
 	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
