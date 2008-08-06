@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 my @names  = ("16 GB", "8 GB", "4 GB", "2 GB");
-my @exts   = ("blf", "bl7", "pkl", "pkt");
+my @exts   = ("blf", "bl4", "pkl", "pkt");
 my @packed = ("no", "no", "no", "yes");  # TODO: get this automatically
 
 system("cp headerinc.tex builds.tex") == 0 || die ("Must have headerinc.tex");
