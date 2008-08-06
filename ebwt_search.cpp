@@ -50,7 +50,7 @@ static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
 static int maqLike				= 1; // do maq-like searching
-static int seedLen              = 24; // seed length (not configurable in maq)
+static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 
@@ -2270,7 +2270,7 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		// TODO: handle versioning better
-		cout << argv0 << " version 0.5" << endl;
+		cout << argv0 << " version 0.6" << endl;
 		cout << "Hash: " << EBWT_SEARCH_HASH << endl;
 		return 0;
 	}
