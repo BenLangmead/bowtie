@@ -31,14 +31,15 @@ MAQ_ARGS="-n 1 -s 1"
 EXTRA_EXT=".n1"
 REF=hs_ref_${NAME}.bfa
 READ_BASE=kg_reads
-WORKSTATION=0
-USE_FILTERED_READS=0
+USE_FILTERED_READS=1
 
 # Possibly switch to filtered read set
 if [ "$USE_FILTERED_READS" = "1" ] ; then
 	READ_BASE=kg_reads_filt
+	EXTRA_EXT="${EXTRA_EXT}.filt"
 	echo "Using filtered reads; READ_BASE is $READ_BASE"
 fi
+
 
 # Maq on split-up read set where each unit has 2M reads, as per Heng Li's suggestion
 if [ ! -f ${NAME}.maq.1${EXTRA_EXT}.map ] ; then
@@ -106,22 +107,4 @@ if [ ! -f ${NAME}.maq${EXTRA_EXT}.map ] ; then
                   ${NAME}.maq.3${EXTRA_EXT}.map \
                   ${NAME}.maq.4${EXTRA_EXT}.map \
                   ${NAME}.maq.5${EXTRA_EXT}.map
-fi
-
-if [ "$WORKSTATION" = "1" ] ; then
-	exit 0
-fi
-
-# Maq, all reads in 1 shot, default parameters (2 mm allowed in first 24 bases)
-if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map ] ; then
-   echo > ${NAME}.maq.all1bfq${EXTRA_EXT}.top
-   sh wrap.sh ${NAME}.maq.all1bfq${EXTRA_EXT} \
-      $MAQ map $MAQ_ARGS \
-         ${NAME}.maq.all1bfq${EXTRA_EXT}.map \
-         ${REF} \
-         ${READ_BASE}.bfq
-   if [ ! -f ${NAME}.maq.all1bfq${EXTRA_EXT}.map ] ; then
-      echo "Failed to create legitimate map file: ${NAME}.maq.all1bfq${EXTRA_EXT}.map; aborting..."
-      exit 1
-   fi
 fi
