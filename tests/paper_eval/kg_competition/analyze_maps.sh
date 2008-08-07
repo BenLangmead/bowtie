@@ -2,7 +2,7 @@
 
 dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
-echo Using NAME: ${NAME}
+#echo Using NAME: ${NAME}
 export TOT_READS=8839010
 export TOT_FILT_READS=8400865
 
@@ -46,7 +46,7 @@ if [ 0 -gt 1 ] ; then
 	do_one "Bowtie -n 1" "${NAME}.ebwt.n1" "hits" "${TOT_READS}" "0"
 fi
 do_one "Bowtie" "${NAME}.ebwt" "hits" "${TOT_READS}" "0"
-do_one "Bowtie" "${NAME}.filt.ebwt" "hits" "${TOT_FILT_READS}" "0"
+do_one "Bowtie filtered" "${NAME}.filt.ebwt" "hits" "${TOT_FILT_READS}" "0"
 do_one "Bowtie -v 2" "${NAME}.ebwt.2" "hits" "${TOT_READS}" "0"
 
 # Maq
@@ -55,9 +55,9 @@ if [ 0 -gt 1 ] ; then
 fi
 do_one "Maq" "${NAME}.maq" "map" "${TOT_READS}" "1"
 if [ 0 -gt 1 ] ; then
-	do_one "Maq -n 1" "${NAME}.maq.n1.filt" "map" "${TOT_FILT_READS}" "1"
+	do_one "Maq -n 1 filtered" "${NAME}.maq.n1.filt" "map" "${TOT_FILT_READS}" "1"
 fi
-do_one "Maq" "${NAME}.maq.filt" "map" "${TOT_FILT_READS}" "1"
+do_one "Maq filtered" "${NAME}.maq.filt" "map" "${TOT_FILT_READS}" "1"
 
 # Soap
 if [ 0 -gt 1 ] ; then
