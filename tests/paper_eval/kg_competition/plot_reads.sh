@@ -1,16 +1,43 @@
 #!/bin/sh
 
-if [ ! -f whole.numreads.both ] ; then
-	comm -1 -2 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.both
+WORKSTATION=1
+if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
 fi
-if [ ! -f whole.numreads.ebwt ] ; then
-	comm -2 -3 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.ebwt
-fi
-if [ ! -f whole.numreads.maq ] ; then
-	comm -1 -3 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.maq
+if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
 fi
 
-inboth=`cat whole.numreads.both`
-inebwt=`cat whole.numreads.ebwt`
-inmaq=`cat whole.numreads.maq`
-perl plot_reads.pl $inboth $inebwt $inmaq
+if [ ! -f whole.numreads.em.both ] ; then
+	comm -1 -2 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.em.both
+fi
+if [ ! -f whole.numreads.em.ebwt ] ; then
+	comm -2 -3 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.em.ebwt
+fi
+if [ ! -f whole.numreads.em.maq ] ; then
+	comm -1 -3 whole.ebwt.reads.mapped.uniq whole.maq.reads.mapped.uniq | wc -l > whole.numreads.em.maq
+fi
+
+# Do the Bowtie/Maq comparison
+inboth=`cat whole.numreads.em.both`
+inebwt=`cat whole.numreads.em.ebwt`
+inmaq=`cat whole.numreads.em.maq`
+perl plot_reads.pl Maq maq_reads $inboth $inebwt $inmaq
+
+if [ "$WORKSTATION" = "0" ] ; then
+	if [ ! -f whole.numreads.es.both ] ; then
+		comm -1 -2 whole.ebwt.2.reads.mapped.uniq whole.soap.v2.reads.mapped.uniq | wc -l > whole.numreads.es.both
+	fi
+	if [ ! -f whole.numreads.es.ebwt ] ; then
+		comm -2 -3 whole.ebwt.2.reads.mapped.uniq whole.soap.v2.reads.mapped.uniq | wc -l > whole.numreads.es.ebwt
+	fi
+	if [ ! -f whole.numreads.es.soap ] ; then
+		comm -1 -3 whole.ebwt.2.reads.mapped.uniq whole.soap.v2.reads.mapped.uniq | wc -l > whole.numreads.es.soap
+	fi
+	
+	# Do the Bowtie/SOAP comparison
+	inboth=`cat whole.numreads.es.both`
+	inebwt=`cat whole.numreads.es.ebwt`
+	insoap=`cat whole.numreads.es.soap`
+	perl plot_reads.pl Soap soap_reads $inboth $inebwt $insoap
+fi
