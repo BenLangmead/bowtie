@@ -20,7 +20,7 @@
 \begin{table}[tp]
 \scriptsize
 \begin{tabular}{lrrrrr}
-\multicolumn{6}{c}{\small{Workstation}} \\[3pt]
+\multicolumn{6}{c}{\small{Mapping time: workstation}} \\[3pt]
 \toprule
  & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
  &                            & time       & Speedup & memory usage & mapped \\[3pt]
@@ -28,17 +28,26 @@
 Bowtie & 21m:32s & 23m:27s & - & 1,169 MB & 76.5\%\\\midrule
 Maq & 17h:46m:35s & 17h:53m:07s & 45.8x & 804 MB & 73.8\%\\
 \toprule\\[1pt]
-\multicolumn{6}{c}{\small{Server}} \\[3pt]
+\multicolumn{6}{c}{\small{Mapping time: server}} \\[3pt]
 \toprule
  & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
  &                            & time       & Speedup & memory usage & mapped \\[3pt]
 \toprule
 Bowtie & 24m:28s & 25m:26s & - & 1,169 MB & 76.5\%\\\midrule
 Maq & 32h:56m:53s & 32h:58m:39s & 77.8x & 804 MB & 73.8\%\\
+\bottomrule\\[1pt]
+\end{tabular}
+\begin{tabular}{rrrr}
+\multicolumn{4}{c}{\small{Reads mapped}} \\[3pt]
+\toprule 
+By Maq or      & By both Maq & By Bowtie   & By Maq         \\ 
+Bowtie or both & and Bowtie  & but not Maq & but not Bowtie \\ 
+\toprule
+7,053,875 & 6,404,715 (90.8\%) & 446,917 (6.3\%) & 202,243 (2.9\%) \\ 
 \bottomrule
 \end{tabular}
-\caption{Performance measurements for mapping an unfiltered set of 8.96M 35bp
-Illumina/Solexa reads
+\caption{Performance and sensitivity measurements for mapping an unfiltered
+set of 8.96M 35bp Illumina/Solexa reads
 against the whole human genome on a single CPU of a workstation with a 2.4 GHz
 Intel Core 2 Q6600 processor and 2 GB of RAM, and on a server with a 2.4 GHz
 AMD Opteron 850 processor and 32 GB of RAM. Bowtie speedup is calculated with
