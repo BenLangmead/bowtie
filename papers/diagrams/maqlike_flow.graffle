@@ -31,7 +31,7 @@
 	<array>
 		<dict>
 			<key>Bounds</key>
-			<string>{{42.5205, 545.458}, {121, 17}}</string>
+			<string>{{42.5205, 538.842}, {121, 17}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -82,7 +82,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{42.896, 526.459}, {99, 17}}</string>
+			<string>{{42.896, 519.843}, {99, 17}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -138,8 +138,8 @@
 			<integer>394</integer>
 			<key>Points</key>
 			<array>
-				<string>{52.0829, 545.599}</string>
-				<string>{573.727, 545.599}</string>
+				<string>{52.0829, 538.983}</string>
+				<string>{573.727, 538.983}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -5591,7 +5591,7 @@
 		</dict>
 	</array>
 	<key>ModificationDate</key>
-	<string>2008-08-06 23:37:01 -0400</string>
+	<string>2008-08-06 23:39:17 -0400</string>
 	<key>Modifier</key>
 	<string>Benjamin Langmead</string>
 	<key>NotesVisible</key>
@@ -5664,7 +5664,7 @@
 		<key>ShowStatusBar</key>
 		<true/>
 		<key>VisibleRegion</key>
-		<string>{{25.865, 269.478}, {558.805, 498.053}}</string>
+		<string>{{23.459, 197.296}, {558.805, 498.053}}</string>
 		<key>Zoom</key>
 		<string>1.662475</string>
 	</dict>
