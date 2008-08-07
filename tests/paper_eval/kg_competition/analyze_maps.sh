@@ -5,6 +5,20 @@ NAME=`basename $dir | sed 's/_.*//'`
 #echo Using NAME: ${NAME}
 export TOT_READS=8839010
 export TOT_FILT_READS=8400865
+WORKSTATION=1
+if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+echo "Don't forget to set WORKSTATION=? appropriately in plot.sh"
+echo -n "Currently set to: "
+if [ "$WORKSTATION" = "1" ] ; then
+	echo Workstation
+else
+	echo Server
+fi
 
 do_one()
 {
@@ -18,7 +32,7 @@ do_one()
 	RMAPU="${MAP_BASE}.reads.mapped.uniq"
 	if [ -f "${MAPFILE}" ] ; then
 		if [ ! -f ${MAP_BASE}.reads.mapped ] ; then
-			if [ "${IS_MAQ}" = "1" ] ; then
+			if [ "${ISMAQ}" = "1" ] ; then
 				maq mapview ${MAPFILE} | awk '{print $1}' > ${RMAP}
 			else
 				awk '{print $1}' ${MAPFILE} > ${RMAP}
@@ -60,7 +74,9 @@ fi
 do_one "Maq filtered" "${NAME}.maq.filt" "map" "${TOT_FILT_READS}" "1"
 
 # Soap
-if [ 0 -gt 1 ] ; then
-	do_one "Soap -v 1" "${NAME}.soap.v1" "map" "${TOT_READS}" "0"
+if [ "$WORKSTATION" = "0" ] ; then
+	if [ 0 -gt 1 ] ; then
+		do_one "Soap -v 1" "${NAME}.soap.v1" "map" "${TOT_READS}" "0"
+	fi
+	do_one "Soap" "${NAME}.soap.v2" "map" "${TOT_READS}" "0"
 fi
-do_one "Soap" "${NAME}.soap.v2" "map" "${TOT_READS}" "0"
