@@ -9,6 +9,14 @@ EXTRA_EXT=
 DO_CVS_UPDATE=0
 USE_FILTERED_READS=1
 
+WORKSTATION=1
+if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
+	WORKSTATION=0
+fi
+
 # Optionally do a cvs update in the Bowtie home
 if [ "$DO_CVS_UPDATE" = "1" ] ; then
 	pushd ${BOWTIE_HOME}
@@ -38,11 +46,11 @@ while true ; do
 if [ "$USE_FILTERED_READS" = "1" ] ; then
 	READS=kg_reads_filt.fq
 	EXTRA_EXT=".filt"
-	echo "Using filtered reads; READ_BASE is $READ_BASE"
+	echo "Using filtered reads; READS is $READS"
 else
 	READS=kg_reads.fq
 	EXTRA_EXT=
-	echo "Using unfiltered reads; READ_BASE is $READ_BASE"
+	echo "Using unfiltered reads; READS is $READS"
 fi
 
 if [ ! -f ${READS} ] ; then
@@ -68,8 +76,8 @@ else
 	echo "${NAME}.ebwt.n1${EXTRA_EXT}.hits already exists; skipping Maq-mode -n 1 run"
 fi
 
-# Don't need to do the SOAP-comparable runs in filtered mode
-if [ "$USE_FILTERED_READS" = "0" ] ; then
+# Don't need to do the SOAP-comparable runs on a workstation
+if [ "$WORKSTATION" = "0" ] ; then
 	# Run ebwt_search in end-to-end 1-mismatch mode to produce hits
 	if [ ! -f ${NAME}.ebwt.1${EXTRA_EXT}.hits ] ; then
 	   echo > ${NAME}.ebwt.1${EXTRA_EXT}.top
