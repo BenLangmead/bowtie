@@ -3,11 +3,11 @@
 dir=`pwd`
 NAME=`basename $dir | sed 's/_.*//'`
 echo Using NAME: ${NAME}
-BOWTIE_HOME=$HOME/workspace/bowtie
+BOWTIE_HOME=$HOME/research/bowtie
 READS=kg_reads.fq
 EXTRA_EXT=
 DO_CVS_UPDATE=0
-USE_FILTERED_READS=0
+USE_FILTERED_READS=1
 
 # Optionally do a cvs update in the Bowtie home
 if [ "$DO_CVS_UPDATE" = "1" ] ; then
@@ -37,7 +37,7 @@ while true ; do
 # Possibly switch to filtered read set
 if [ "$USE_FILTERED_READS" = "1" ] ; then
 	READS=kg_reads_filt.fq
-	EXTRA_EXT="filt."
+	EXTRA_EXT=".filt"
 	echo "Using filtered reads; READ_BASE is $READ_BASE"
 else
 	READS=kg_reads.fq
@@ -51,41 +51,41 @@ if [ ! -f ${READS} ] ; then
 fi
 
 # Run ebwt_search in Maq-like mode to produce hits
-if [ ! -f ${NAME}.ebwt.${EXTRA_EXT}hits ] ; then
-   echo > ${NAME}.ebwt.${EXTRA_EXT}top
+if [ ! -f ${NAME}.ebwt${EXTRA_EXT}.hits ] ; then
+   echo > ${NAME}.ebwt${EXTRA_EXT}.top
    sh wrap.sh ${NAME}.ebwt${EXTRA_EXT} \
-     ./ebwt_search -tqr ${NAME} ${READS} ${NAME}.ebwt.${EXTRA_EXT}hits
+     ./ebwt_search -tqr ${NAME} ${READS} ${NAME}.ebwt${EXTRA_EXT}.hits
 else
-	echo "${NAME}.ebwt.${EXTRA_EXT}hits already exists; skipping Maq-mode run"
+	echo "${NAME}.ebwt${EXTRA_EXT}.hits already exists; skipping Maq-mode run"
 fi
 
 # Run ebwt_search in Maq -n 1 mode to produce hits
-if [ ! -f ${NAME}.ebwt.n1.${EXTRA_EXT}hits ] ; then
-   echo > ${NAME}.ebwt.n1.${EXTRA_EXT}top
+if [ ! -f ${NAME}.ebwt.n1${EXTRA_EXT}.hits ] ; then
+   echo > ${NAME}.ebwt.n1${EXTRA_EXT}.top
    sh wrap.sh ${NAME}.ebwt.n1${EXTRA_EXT} \
-     ./ebwt_search -n 1 -tqr ${NAME} ${READS} ${NAME}.ebwt.n1.${EXTRA_EXT}hits
+     ./ebwt_search -n 1 -tqr ${NAME} ${READS} ${NAME}.ebwt.n1${EXTRA_EXT}.hits
 else
-	echo "${NAME}.ebwt.n1.${EXTRA_EXT}hits already exists; skipping Maq-mode -n 1 run"
+	echo "${NAME}.ebwt.n1${EXTRA_EXT}.hits already exists; skipping Maq-mode -n 1 run"
 fi
 
 # Don't need to do the SOAP-comparable runs in filtered mode
 if [ "$USE_FILTERED_READS" = "0" ] ; then
 	# Run ebwt_search in end-to-end 1-mismatch mode to produce hits
-	if [ ! -f ${NAME}.ebwt.1.${EXTRA_EXT}hits ] ; then
-	   echo > ${NAME}.ebwt.1.${EXTRA_EXT}top
+	if [ ! -f ${NAME}.ebwt.1${EXTRA_EXT}.hits ] ; then
+	   echo > ${NAME}.ebwt.1${EXTRA_EXT}.top
 	   sh wrap.sh ${NAME}.ebwt.1${EXTRA_EXT} \
-	     ./ebwt_search -1 -t ${NAME} ${READS} ${NAME}.ebwt.1.${EXTRA_EXT}hits
+	     ./ebwt_search -1 -t ${NAME} ${READS} ${NAME}.ebwt.1${EXTRA_EXT}.hits
 	else
-		echo "${NAME}.ebwt.1.${EXTRA_EXT}hits already exists; skipping end-to-end 1 mismatch"
+		echo "${NAME}.ebwt.1${EXTRA_EXT}.hits already exists; skipping end-to-end 1 mismatch"
 	fi
 	
 	# Run ebwt_search in end-to-end 2-mismatch mode to produce hits
-	if [ ! -f ${NAME}.ebwt.2.${EXTRA_EXT}hits ] ; then
-	   echo > ${NAME}.ebwt.2.${EXTRA_EXT}top
+	if [ ! -f ${NAME}.ebwt.2${EXTRA_EXT}.hits ] ; then
+	   echo > ${NAME}.ebwt.2${EXTRA_EXT}.top
 	   sh wrap.sh ${NAME}.ebwt.2${EXTRA_EXT} \
-	     ./ebwt_search -2 -t ${NAME} ${READS} ${NAME}.ebwt.2.${EXTRA_EXT}hits
+	     ./ebwt_search -2 -t ${NAME} ${READS} ${NAME}.ebwt.2${EXTRA_EXT}.hits
 	else
-		echo "${NAME}.ebwt.2.${EXTRA_EXT}hits already exists; skipping end-to-end 2 mismatch"
+		echo "${NAME}.ebwt.2${EXTRA_EXT}.hits already exists; skipping end-to-end 2 mismatch"
 	fi
 fi
 
