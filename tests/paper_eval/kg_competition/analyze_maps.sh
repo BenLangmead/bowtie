@@ -8,20 +8,20 @@ export TOT_FILT_READS=8400865
 
 do_one()
 {
-	NAME=$1
+	RNAME=$1
 	MAP_BASE=$2
 	MAP_EXT=$3
 	NREADS=$4
 	ISMAQ=$5
-	MAP="${MAP_BASE}.${MAP_EXT}"
+	MAPFILE="${MAP_BASE}.${MAP_EXT}"
 	RMAP="${MAP_BASE}.reads.mapped"
 	RMAPU="${MAP_BASE}.reads.mapped.uniq"
-	if [ -f ${MAP} ] ; then
+	if [ -f "${MAPFILE}" ] ; then
 		if [ ! -f ${MAP_BASE}.reads.mapped ] ; then
-			if [ "$IS_MAQ" = "1" ] ; then
-				awk '{print $1}' ${MAP} > ${RMAP}
+			if [ "${IS_MAQ}" = "1" ] ; then
+				maq mapview ${MAPFILE} | awk '{print $1}' > ${RMAP}
 			else
-				maq mapview ${MAP} | awk '{print $1}' > ${RMAP}
+				awk '{print $1}' ${MAPFILE} > ${RMAP}
 			fi
 		fi
 		if [ ! -f ${RMAPU} ] ; then
@@ -30,14 +30,14 @@ do_one()
 		num=`wc -l ${RMAP} | cut -d" " -f1`
 		numuniq=`wc -l ${RMAPU} | cut -d" " -f1`
 		if [ $num -ne $numuniq ] ; then
-			echo "${NAME}: Num hits: $num, num unique hits: $numuniq!"
+			echo "${RNAME}: Num hits: $num, num unique hits: $numuniq!"
 			echo "  Will use $numuniq for % reads mapped calculation"
 		fi
-		echo -n "${NAME}: % reads mapped: "
+		echo -n "${RNAME}: % reads mapped: "
 		perl -e "print $numuniq * 100.0 / ${NREADS}"
 		echo
 	else
-		echo "Didn't find ${MAP}"
+		echo "Didn't find ${MAPFILE}"
 	fi
 }
 
@@ -46,7 +46,7 @@ if [ 0 -gt 1 ] ; then
 	do_one "Bowtie -n 1" "${NAME}.ebwt.n1" "hits" "${TOT_READS}" "0"
 fi
 do_one "Bowtie" "${NAME}.ebwt" "hits" "${TOT_READS}" "0"
-do_one "Bowtie filtered" "${NAME}.filt.ebwt" "hits" "${TOT_FILT_READS}" "0"
+do_one "Bowtie filtered" "${NAME}.ebwt.filt" "hits" "${TOT_FILT_READS}" "0"
 do_one "Bowtie -v 2" "${NAME}.ebwt.2" "hits" "${TOT_READS}" "0"
 
 # Maq
