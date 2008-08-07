@@ -15,6 +15,7 @@ print "Run names: @runnames\n";
 my @names = ("Bowtie -n 1",
              "Bowtie",
              "Bowtie filtered",
+             "Bowtie -v 1",
              "Bowtie -v 2",
              "Maq -n 1",
              "Maq -n 1 filtered",

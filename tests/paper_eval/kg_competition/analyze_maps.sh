@@ -12,13 +12,13 @@ fi
 if [ `hostname` = "larch.umiacs.umd.edu" ] ; then
 	WORKSTATION=0
 fi
-echo "Don't forget to set WORKSTATION=? appropriately in plot.sh"
-echo -n "Currently set to: "
-if [ "$WORKSTATION" = "1" ] ; then
-	echo Workstation
-else
-	echo Server
-fi
+#echo "Don't forget to set WORKSTATION=? appropriately in plot.sh"
+#echo -n "Currently set to: "
+#if [ "$WORKSTATION" = "1" ] ; then
+#	echo Workstation
+#else
+#	echo Server
+#fi
 
 do_one()
 {
@@ -61,7 +61,12 @@ if [ 0 -gt 1 ] ; then
 fi
 do_one "Bowtie" "${NAME}.ebwt" "hits" "${TOT_READS}" "0"
 do_one "Bowtie filtered" "${NAME}.ebwt.filt" "hits" "${TOT_FILT_READS}" "0"
-do_one "Bowtie -v 2" "${NAME}.ebwt.2" "hits" "${TOT_READS}" "0"
+if [ "$WORKSTATION" = "0" ] ; then
+	if [ 0 -gt 1 ] ; then
+		do_one "Bowtie -v 1" "${NAME}.ebwt.1" "hits" "${TOT_READS}" "0"
+	fi
+	do_one "Bowtie -v 2" "${NAME}.ebwt.2" "hits" "${TOT_READS}" "0"
+fi
 
 # Maq
 if [ 0 -gt 1 ] ; then

@@ -94,6 +94,7 @@ while(<TOP>) {
 	}
 	if(/^top/) {
 		my @s = split;
+		$s[2] =~ /[0-9]+:[0-9]+:[0-9]+/ || die "Malformed time: $s[2]";
 		my $toptime = minSecHrToSeconds($s[2]);
 		$timeTurnovers++ if $toptime < $lastTopTime;
 		$lastTopTime = $toptime;
@@ -206,8 +207,12 @@ if($max_rsmaxM > 0) {
 }
 
 # Overall wall-clock time
-my $walli = minSecHrToSeconds(trim(`egrep '^top' $topFile | head -1 | cut -d' ' -f 3`));
-my $wallf = minSecHrToSeconds(trim(`egrep '^top' $topFile | tail -1 | cut -d' ' -f 3`));
+my $wallipre = trim(`egrep '^top' $topFile | head -1 | cut -d' ' -f 3`);
+$wallipre =~ /[0-9]+:[0-9]+:[0-9]+/ || die "Malformed time: $wallipre; topFile: $topFile";
+my $wallfpre = trim(`egrep '^top' $topFile | tail -1 | cut -d' ' -f 3`);
+$wallfpre =~ /[0-9]+:[0-9]+:[0-9]+/ || die "Malformed time: $wallfpre; topFile: $topFile";
+my $walli = minSecHrToSeconds($wallipre);
+my $wallf = minSecHrToSeconds($wallfpre);
 $wallf += ($timeTurnovers * 24 * 60 * 60);
 $walli >= 0 || die "Bad initial wall-clock time: $walli";
 $wallf >= 0 || die "Bad final wall-clock time: $wallf";

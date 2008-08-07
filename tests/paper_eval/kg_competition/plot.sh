@@ -39,8 +39,10 @@ if [ ! -f $NAME.results.txt ] ; then
 		perl summarize_top.pl $NAME.ebwt.top         ebwt_search | tail -1 >> $NAME.results.txt
 		perl summarize_top.pl $NAME.ebwt.n1.filt.top ebwt_search | tail -1  > $NAME.results.txt
 		perl summarize_top.pl $NAME.ebwt.filt.top    ebwt_search | tail -1 >> $NAME.results.txt
-		perl summarize_top.pl $NAME.ebwt.1.top       ebwt_search | tail -1 >> $NAME.results.txt
-		perl summarize_top.pl $NAME.ebwt.2.top       ebwt_search | tail -1 >> $NAME.results.txt
+		if [ "$WORKSTATION" = "0" ] ; then
+			perl summarize_top.pl $NAME.ebwt.1.top       ebwt_search | tail -1 >> $NAME.results.txt
+			perl summarize_top.pl $NAME.ebwt.2.top       ebwt_search | tail -1 >> $NAME.results.txt
+		fi
 		perl summarize_top.pl $NAME.maq.n1.top       maq         | tail -1 >> $NAME.results.txt
 		perl summarize_top.pl $NAME.maq.top          maq         | tail -1 >> $NAME.results.txt
 		perl summarize_top.pl $NAME.maq.n1.filt.top  maq         | tail -1 >> $NAME.results.txt
@@ -55,7 +57,9 @@ if [ ! -f $NAME.results.txt ] ; then
 	else
 		perl summarize_top.pl $NAME.ebwt.top         ebwt_search | tail -1 >> $NAME.results.txt
 		perl summarize_top.pl $NAME.ebwt.filt.top    ebwt_search | tail -1 >> $NAME.results.txt
-		perl summarize_top.pl $NAME.ebwt.2.top       ebwt_search | tail -1 >> $NAME.results.txt
+		if [ "$WORKSTATION" = "0" ] ; then
+			perl summarize_top.pl $NAME.ebwt.2.top       ebwt_search | tail -1 >> $NAME.results.txt
+		fi
 		perl summarize_top.pl $NAME.maq.top          maq         | tail -1 >> $NAME.results.txt
 		perl summarize_top.pl $NAME.maq.filt.top     maq         | tail -1 >> $NAME.results.txt
 		if [ "$WORKSTATION" = "0" ] ; then
@@ -75,40 +79,52 @@ if [ 0 -gt 1 ] ; then
 	do_one "Bowtie -n1" "1" "bowtie.n1" 
 	do_one "Bowtie" "2" "bowtie"
 	do_one "Bowtie filtered" "3" "bowtie.filt"
-	do_one "Bowtie -v 2" "4" "bowtie.v2"
-	# Maq
-	do_one "Maq -n 1" "5" "maq.n1"
-	do_one "Maq -n 1 filtered" "6" "maq.n1.filt"
-	do_one "Maq" "7" "maq"
-	do_one "Maq filtered" "8" "maq.filt"
-	# Soap
 	if [ "$WORKSTATION" = "0" ] ; then
-		do_one "Soap -v 1" "9" "soap.v1"
-		do_one "Soap" "10" "soap.v2"
+		do_one "Bowtie -v 1" "4" "bowtie.v1"
+		do_one "Bowtie -v 2" "5" "bowtie.v2"
+		# Maq
+		do_one "Maq -n 1" "6" "maq.n1"
+		do_one "Maq -n 1 filtered" "7" "maq.n1.filt"
+		do_one "Maq" "8" "maq"
+		do_one "Maq filtered" "9" "maq.filt"
+		# Soap
+		do_one "Soap -v 1" "10" "soap.v1"
+		do_one "Soap" "11" "soap.v2"
 		perl plot.pl bowtie.n1 bowtie bowtie.filt bowtie.v2 \
 		             maq.n1 maq.n1.filt maq maq.filt \
 		             soap.v1 soap.v2
 	else
-		perl plot.pl bowtie.n1 bowtie bowtie.filt bowtie.v2 \
+		# Maq
+		do_one "Maq -n 1" "4" "maq.n1"
+		do_one "Maq -n 1 filtered" "5" "maq.n1.filt"
+		do_one "Maq" "6" "maq"
+		do_one "Maq filtered" "7" "maq.filt"
+		# Soap
+		perl plot.pl bowtie.n1 bowtie bowtie.filt - \
 		             maq.n1 maq.n1.filt maq maq.filt \
 		             - -
 	fi
 else
+	# No 1-mm
+
 	# Bowtie
 	do_one "Bowtie" "1" "bowtie"
 	do_one "Bowtie" "2" "bowtie.filt"
-	do_one "Bowtie -v 2" "3" "bowtie.v2"
-	# Maq
-	do_one "Maq" "4" "maq"
-	do_one "Maq" "5" "maq.filt"
-	# Soap
 	if [ "$WORKSTATION" = "0" ] ; then
+		do_one "Bowtie -v 2" "3" "bowtie.v2"
+		# Maq
+		do_one "Maq" "4" "maq"
+		do_one "Maq" "5" "maq.filt"
+		# Soap
 		do_one "Soap" "6" "soap.v2"
 		perl plot.pl - bowtie bowtie.filt bowtie.v2 \
 		             - - maq maq.filt \
 		             - soap.v2
 	else
-		perl plot.pl - bowtie bowtie.filt bowtie.v2 \
+		# Maq
+		do_one "Maq" "3" "maq"
+		do_one "Maq" "4" "maq.filt"
+		perl plot.pl - bowtie bowtie.filt - \
 		             - - maq maq.filt \
 		             - -
 	fi
