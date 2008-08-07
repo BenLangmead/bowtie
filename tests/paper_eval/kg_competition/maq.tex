@@ -1,0 +1,58 @@
+\documentclass[letterpaper]{article}
+\usepackage{booktabs}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{6pt}
+% Different font in captions
+\newcommand{\captionfonts}{\footnotesize}
+\makeatletter  % Allow the use of @ in command names
+\long\def\@makecaption#1#2{%
+  \vskip\abovecaptionskip
+  \sbox\@tempboxa{{\captionfonts #1: #2}}%
+  \ifdim \wd\@tempboxa >\hsize
+    {\captionfonts #1: #2\par}
+  \else
+    \hbox to\hsize{\hfil\box\@tempboxa\hfil}%
+  \fi
+  \vskip\belowcaptionskip}
+\makeatother   % Cancel the effect of \makeatletter
+\usepackage{multirow}
+\begin{document}
+\begin{table}[tp]
+\scriptsize
+\begin{tabular}{lrrrrr}
+\multicolumn{6}{c}{\small{Workstation}} \\[3pt]
+\toprule
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
+ &                            & time       & Speedup & memory usage & mapped \\[3pt]
+\toprule
+Bowtie & 21m:32s & 23m:27s & - & 1,169 MB & 76.5\%\\\midrule
+Maq & 17h:46m:35s & 17h:53m:07s & 45.8x & 804 MB & 73.8\%\\
+\toprule\\[1pt]
+\multicolumn{6}{c}{\small{Server}} \\[3pt]
+\toprule
+ & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
+ &                            & time       & Speedup & memory usage & mapped \\[3pt]
+\toprule
+Bowtie & 24m:28s & 25m:26s & - & 1,169 MB & 76.5\%\\\midrule
+Maq & 32h:56m:53s & 32h:58m:39s & 77.8x & 804 MB & 73.8\%\\
+\bottomrule
+\end{tabular}
+\caption{Performance measurements for mapping an unfiltered set of 8.96M 35bp
+Illumina/Solexa reads
+against the whole human genome on a single CPU of a workstation with a 2.4 GHz
+Intel Core 2 Q6600 processor and 2 GB of RAM, and on a server with a 2.4 GHz
+AMD Opteron 850 processor and 32 GB of RAM. Bowtie speedup is calculated with
+respect to wall clock time. Both CPU time and wall clock times are included to
+demonstrate that no one tool suffers disproportionately from I/O pauses or
+contention with other processes. Maq and Soap create their indexes
+while mapping, whereas Bowtie is provided with a pre-built index of the
+genome.  The cost of building the Bowtie index is not included in these timings
+since we expect that in practice that cost will be rapidly amortized across
+multiple mapping jobs. Reads are taken from the 1000-Genomes project pilot via
+the NCBI Short Read archive, accession \#SRR001115 and trimmed to 35bps.
+Reference sequences were the contigs of Genbank human genome build 36.3. For
+the Maq runs, the reads were first
+divided into chunks of 2M reads each, as per the Maq Manual. Maq
+v0.6.6 was used. }
+\end{table}
+\end{document}
