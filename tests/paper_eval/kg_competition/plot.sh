@@ -90,7 +90,7 @@ if [ 0 -gt 1 ] ; then
 		# Soap
 		do_one "Soap -v 1" "10" "soap.v1"
 		do_one "Soap" "11" "soap.v2"
-		perl plot.pl bowtie.n1 bowtie bowtie.filt bowtie.v2 \
+		perl plot.pl bowtie.n1 bowtie bowtie.filt bowtie.v1 bowtie.v2 \
 		             maq.n1 maq.n1.filt maq maq.filt \
 		             soap.v1 soap.v2
 	else
@@ -100,7 +100,7 @@ if [ 0 -gt 1 ] ; then
 		do_one "Maq" "6" "maq"
 		do_one "Maq filtered" "7" "maq.filt"
 		# Soap
-		perl plot.pl bowtie.n1 bowtie bowtie.filt - \
+		perl plot.pl bowtie.n1 bowtie bowtie.filt - - \
 		             maq.n1 maq.n1.filt maq maq.filt \
 		             - -
 	fi
@@ -109,22 +109,22 @@ else
 
 	# Bowtie
 	do_one "Bowtie" "1" "bowtie"
-	do_one "Bowtie" "2" "bowtie.filt"
+	do_one "Bowtie filtered" "2" "bowtie.filt"
 	if [ "$WORKSTATION" = "0" ] ; then
 		do_one "Bowtie -v 2" "3" "bowtie.v2"
 		# Maq
 		do_one "Maq" "4" "maq"
-		do_one "Maq" "5" "maq.filt"
+		do_one "Maq filtered" "5" "maq.filt"
 		# Soap
 		do_one "Soap" "6" "soap.v2"
-		perl plot.pl - bowtie bowtie.filt bowtie.v2 \
+		perl plot.pl - bowtie bowtie.filt - bowtie.v2 \
 		             - - maq maq.filt \
 		             - soap.v2
 	else
 		# Maq
 		do_one "Maq" "3" "maq"
-		do_one "Maq" "4" "maq.filt"
-		perl plot.pl - bowtie bowtie.filt - \
+		do_one "Maq filtered" "4" "maq.filt"
+		perl plot.pl - bowtie bowtie.filt - - \
 		             - - maq maq.filt \
 		             - -
 	fi
