@@ -1,5 +1,7 @@
 #!/bin/sh
 
+DO_FILTERED=1
+
 WORKSTATION=1
 if [ `hostname` = "privet.umiacs.umd.edu" ] ; then
 	WORKSTATION=0
@@ -23,6 +25,24 @@ inboth=`cat whole.numreads.em.both`
 inebwt=`cat whole.numreads.em.ebwt`
 inmaq=`cat whole.numreads.em.maq`
 perl plot_reads.pl Maq maq_reads $inboth $inebwt $inmaq
+
+if [ "$DO_FILTERED" = "1" ] ; then
+	if [ ! -f whole.numreads.emf.both ] ; then
+		comm -1 -2 whole.ebwt.filt.reads.mapped.uniq whole.maq.filt.reads.mapped.uniq | wc -l > whole.numreads.emf.both
+	fi
+	if [ ! -f whole.numreads.emf.ebwt ] ; then
+		comm -2 -3 whole.ebwt.filt.reads.mapped.uniq whole.maq.filt.reads.mapped.uniq | wc -l > whole.numreads.emf.ebwt
+	fi
+	if [ ! -f whole.numreads.emf.maq ] ; then
+		comm -1 -3 whole.ebwt.filt.reads.mapped.uniq whole.maq.filt.reads.mapped.uniq | wc -l > whole.numreads.emf.maq
+	fi
+	
+	# Do the Bowtie/SOAP comparison
+	inboth=`cat whole.numreads.emf.both`
+	inebwt=`cat whole.numreads.emf.ebwt`
+	insoap=`cat whole.numreads.emf.soap`
+	perl plot_reads.pl Maq maq_reads_filt $inboth $inebwt $insoap
+fi
 
 if [ "$WORKSTATION" = "0" ] ; then
 	if [ ! -f whole.numreads.es.both ] ; then
