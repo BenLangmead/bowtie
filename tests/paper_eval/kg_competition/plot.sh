@@ -35,10 +35,10 @@ do_one()
 
 if [ ! -f $NAME.results.txt ] ; then
 	if [ 0 -gt 1 ] ; then
-		perl summarize_top.pl $NAME.ebwt.n1.top      ebwt_search | tail -1  > $NAME.results.txt
 		perl summarize_top.pl $NAME.ebwt.top         ebwt_search | tail -1 >> $NAME.results.txt
-		perl summarize_top.pl $NAME.ebwt.n1.filt.top ebwt_search | tail -1  > $NAME.results.txt
 		perl summarize_top.pl $NAME.ebwt.filt.top    ebwt_search | tail -1 >> $NAME.results.txt
+		perl summarize_top.pl $NAME.ebwt.n1.top      ebwt_search | tail -1  > $NAME.results.txt
+		perl summarize_top.pl $NAME.ebwt.n1.filt.top ebwt_search | tail -1  > $NAME.results.txt
 		if [ "$WORKSTATION" = "0" ] ; then
 			perl summarize_top.pl $NAME.ebwt.1.top       ebwt_search | tail -1 >> $NAME.results.txt
 			perl summarize_top.pl $NAME.ebwt.2.top       ebwt_search | tail -1 >> $NAME.results.txt
@@ -70,40 +70,49 @@ if [ ! -f $NAME.results.txt ] ; then
 		fi
 	fi
 fi
+
 if [ ! -f $NAME.maps.txt ] ; then
 	sh analyze_maps.sh > $NAME.maps.txt
 fi
 
 if [ 0 -gt 1 ] ; then
 	# Bowtie
-	do_one "Bowtie -n1" "1" "bowtie.n1" 
-	do_one "Bowtie" "2" "bowtie"
-	do_one "Bowtie filtered" "3" "bowtie.filt"
+	do_one "Bowtie" "1" "bowtie"
+	do_one "Bowtie filtered" "2" "bowtie.filt"
+	do_one "Bowtie -n1" "3" "bowtie.n1" 
+	do_one "Bowtie -n1 filtered" "4" "bowtie.n1.filt" 
 	if [ "$WORKSTATION" = "0" ] ; then
-		do_one "Bowtie -v 1" "4" "bowtie.v1"
-		do_one "Bowtie -v 2" "5" "bowtie.v2"
+		do_one "Bowtie -v 1" "5" "bowtie.v1"
+		do_one "Bowtie -v 2" "6" "bowtie.v2"
 		# Maq
-		do_one "Maq -n 1" "6" "maq.n1"
-		do_one "Maq -n 1 filtered" "7" "maq.n1.filt"
-		do_one "Maq" "8" "maq"
-		do_one "Maq filtered" "9" "maq.filt"
+		do_one "Maq -n 1" "7" "maq.n1"
+		do_one "Maq -n 1 filtered" "8" "maq.n1.filt"
+		do_one "Maq" "9" "maq"
+		do_one "Maq filtered" "10" "maq.filt"
 		# Soap
-		do_one "Soap -v 1" "10" "soap.v1"
-		do_one "Soap" "11" "soap.v2"
-		perl plot.pl bowtie.n1 bowtie bowtie.filt bowtie.v1 bowtie.v2 \
-		             maq.n1 maq.n1.filt maq maq.filt \
-		             soap.v1 soap.v2
+		do_one "Soap -v 1" "11" "soap.v1"
+		do_one "Soap" "12" "soap.v2"
+		perl plot.pl bowtie.n1 maq.n1 \
+		             bowtie maq \
+		             bowtie.n1.filt maq.n1.filt \
+		             bowtie.filt maq.filt \
+		             bowtie.v1 soap.v1 \
+		             bowtie.v2 soap.v2
 	else
 		# Maq
-		do_one "Maq -n 1" "4" "maq.n1"
-		do_one "Maq -n 1 filtered" "5" "maq.n1.filt"
-		do_one "Maq" "6" "maq"
-		do_one "Maq filtered" "7" "maq.filt"
+		do_one "Maq -n 1" "5" "maq.n1"
+		do_one "Maq -n 1 filtered" "6" "maq.n1.filt"
+		do_one "Maq" "7" "maq"
+		do_one "Maq filtered" "8" "maq.filt"
 		# Soap
-		perl plot.pl bowtie.n1 bowtie bowtie.filt - - \
-		             maq.n1 maq.n1.filt maq maq.filt \
+		perl plot.pl bowtie.n1 maq.n1 \
+		             bowtie maq \
+		             bowtie.n1.filt maq.n1.filt \
+		             bowtie.filt maq.filt \
+		             - - \
 		             - -
 	fi
+
 else
 	# No 1-mm
 
@@ -117,15 +126,21 @@ else
 		do_one "Maq filtered" "5" "maq.filt"
 		# Soap
 		do_one "Soap" "6" "soap.v2"
-		perl plot.pl - bowtie bowtie.filt - bowtie.v2 \
-		             - - maq maq.filt \
-		             - soap.v2
+		perl plot.pl - - \
+		             bowtie maq \
+		             - - \
+		             bowtie.filt maq.filt \
+		             - - \
+		             bowtie.v2 soap.v2
 	else
 		# Maq
 		do_one "Maq" "3" "maq"
 		do_one "Maq filtered" "4" "maq.filt"
-		perl plot.pl - bowtie bowtie.filt - - \
-		             - - maq maq.filt \
+		perl plot.pl - - \
+		             bowtie maq \
+		             - - \
+		             bowtie.filt maq.filt \
+		             - - \
 		             - -
 	fi
 fi
