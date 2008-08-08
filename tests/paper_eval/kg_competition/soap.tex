@@ -19,24 +19,24 @@
 \begin{document}
 \begin{table}[tp]
 \scriptsize
-\begin{tabular}{lrrrrr}
+\begin{tabular*}{1.00\textwidth}{@{\extracolsep{\fill}} lrrrrr}
 \multicolumn{6}{c}{\small{Mapping time: server}} \\[3pt]
 \toprule
  & \multirow{2}{*}{CPU Time} & Wall clock & Bowtie  & Peak virtual & Reads  \\
  &                            & time       & Speedup & memory usage & mapped \\[3pt]
 \toprule
-Bowtie -v 2 & 23m:11s & 24m:02s & - & 1,149 MB & 70.1\%\\\midrule
-Soap & 106h:57m:37s & 107h:12m:28s & 267.6x & 13,619 MB & 70.6\%\\
+Bowtie -v 2 & 23m:11s & 24m:02s & - & 1,149 MB & 71.0\%\\\midrule
+Soap & 106h:57m:37s & 107h:12m:28s & 267.6x & 13,619 MB & 71.6\%\\
 \bottomrule\\[1pt]
-\end{tabular}
-\begin{tabular}{rrrr}
+\end{tabular*}
+\begin{tabular*}{1.00\textwidth}{@{\extracolsep{\fill}} rrrr}
 \multicolumn{4}{c}{\small{Reads mapped}} \\[3pt] 
 By Soap or     & By both Soap & By Bowtie    & By Soap         \\ 
 Bowtie or both & and Bowtie   & but not Soap & but not Bowtie \\ 
 \toprule
 6,332,570 & 6,268,551 (99.0\%) & 6,957 (0.1\%) & 57,062 (0.9\%) \\ 
 \bottomrule
-\end{tabular}
+\end{tabular*}
 \caption{Performance and sensitivity measurements for mapping an unfiltered
 set of 8.96M 35bp Illumina/Solexa reads
 against the whole human genome on a single CPU of a workstation with a 2.4 GHz
