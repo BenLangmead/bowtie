@@ -184,9 +184,9 @@ sub readfline {
 
 sub toMinsSecsHrs {
 	my $s = shift;
-	my $hrs  = int($s / 60 / 60);
-	my $mins = int(($s / 60) % 60);
-	my $secs = int($s % 60);
+	my $hrs  = int($s) / 60 / 60;
+	my $mins = ((int($s) / 60) % 60);
+	my $secs = int($s) % 60;
 	while(length($secs) < 2) { $secs = "0".$secs; }
 	if($hrs > 0) {
 		while(length($mins) < 2) { $mins = "0".$mins; }
