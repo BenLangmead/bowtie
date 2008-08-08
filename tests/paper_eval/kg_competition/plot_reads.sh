@@ -40,8 +40,8 @@ if [ "$DO_FILTERED" = "1" ] ; then
 	# Do the Bowtie/SOAP comparison
 	inboth=`cat whole.numreads.emf.both`
 	inebwt=`cat whole.numreads.emf.ebwt`
-	insoap=`cat whole.numreads.emf.soap`
-	perl plot_reads.pl Maq maq_reads_filt $inboth $inebwt $insoap
+	inmaq=`cat whole.numreads.emf.maq`
+	perl plot_reads.pl Maq maq_reads_filt $inboth $inebwt $inmaq
 fi
 
 if [ "$WORKSTATION" = "0" ] ; then
