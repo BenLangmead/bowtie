@@ -24,11 +24,11 @@ do_one()
 	LINE=$2
 	RESULTS=$3
 	echo -n "${RNAME}," > ${NAME}.results.${RESULTS}.txt
-	tmp=`head ${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 1`
+	tmp=`head -${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 1`
 	echo -n "$tmp," >> ${NAME}.results.${RESULTS}.txt 
-	tmp=`head ${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 2`
+	tmp=`head -${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 2`
 	echo -n "$tmp," >> ${NAME}.results.${RESULTS}.txt
-	tmp=`head ${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 3`
+	tmp=`head -${LINE} ${NAME}.results.txt | cut -d" " -f 2 | cut -d, -f 3`
 	echo -n "$tmp," >> ${NAME}.results.${RESULTS}.txt
 	head -${LINE} $NAME.maps.txt | tail -1 | cut -d":" -f 3 >> $NAME.results.${RESULTS}.txt
 }
