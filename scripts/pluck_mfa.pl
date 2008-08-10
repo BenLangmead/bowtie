@@ -17,6 +17,7 @@ $qid  = $ARGV[1] if defined($ARGV[1]);
 $qoff = $ARGV[2] if defined($ARGV[2]);
 $qlen = $ARGV[3] if defined($ARGV[3]);
 
+my $qid_is_idx = ($qid =~ /^[0-9]+$/);
 my $l = -1;  # line number within fasta file
 my $id = -1; # index off fasta entry
 my $off = 0; # offset within fasta entry
@@ -28,7 +29,11 @@ while(<FASTA>) {
 	$l++;
 	if(/^>/) {
 		$off = 0;
-		$id++;
+		if($qid_is_idx) {
+			$id++;
+		} elsif(/$qid/) {
+			$qid = $id;
+		}
 		next;
 	}
 	# If this is the query entry... 
