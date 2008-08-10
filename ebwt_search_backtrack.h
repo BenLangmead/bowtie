@@ -143,8 +143,10 @@ public:
 	#define PAIR_TOP(d, c)    (pairs[d*8 + c + 0])
 	#define PAIR_BOT(d, c)    (pairs[d*8 + c + 4])
 	#define PAIR_SPREAD(d, c) (PAIR_BOT(d, c) - PAIR_TOP(d, c))
-	#define QUAL(k)           ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
-	#define QUAL2(q, k)       ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
+	#define PHRED_QUAL(k)     ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
+	#define PHRED_QUAL2(q, k) ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
+	#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
+	#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
 	
 	void setQuery(TStr* __qry,
 	              String<char>* __qual,
@@ -1343,7 +1345,7 @@ protected:
 		for(size_t i = 0; i < stackDepth; i++) {
 			assert_lt(_mms[i], _qlen);
 			append((*_seedlings), (uint8_t)_mms[i]); // pos
-			ASSERT_ONLY(qualTot += ((*_qual)[_mms[i]] - 33));
+			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[i]] - 33)]);
 			uint32_t ci = _qlen - _mms[i] - 1;
 			// _chars[] is index in terms of RHS-relative depth
 			int c = (int)(Dna)_chars[ci];
@@ -1478,7 +1480,7 @@ protected:
 		}
 		assert_lt(i, oracleHits.size()); // assert we found a matchup
 	}
-	
+
 	/**
 	 * Naively search for hits for the current pattern under the
 	 * current backtracking strategy and store hits in hits vector.

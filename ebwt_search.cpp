@@ -19,6 +19,7 @@
 #include "hit.h"
 #include "pat.h"
 #include "inexact_extend.h"
+#include "quals.h"
 
 using namespace std;
 using namespace seqan;
@@ -91,7 +92,7 @@ static struct option long_options[] = {
 	{"maq",          no_argument,       &maqLike,     1},
 	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{"revcomp",      no_argument,       0,            'r'},
-	{"err",          required_argument, 0,            'e'},
+	{"maqerr",       required_argument, 0,            'e'},
 	{"seedlen",      required_argument, 0,            'l'},
 	{"seedmms",      required_argument, 0,            'n'},
 	{"kmer",         required_argument, 0,            'k'},
@@ -116,7 +117,7 @@ static void printUsage(ostream& out) {
 	    //<< "  -m                 query input files are Maq .bfq" << endl
 	    //<< "  -x                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
-	    << "  -e/--err <int>     max sum of mismatch qualities (default: 70)" << endl
+	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
 	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
@@ -209,7 +210,7 @@ static void parseOptions(int argc, char **argv) {
 	   			offRate = parseInt(1, "-o/--offrate arg must be at least 1");
 	   			break;
 	   		case 'e':
-	   			qualThresh = parseInt(1, "-e/--err arg must be at least 1");
+	   			qualThresh = int(parseInt(1, "-e/--err arg must be at least 1") / 10.0 + 0.5);
 	   			break;
 	   		case 'n':
 	   			seedMms = parseInt(0, "-n/--seedmms arg must be at least 0");
@@ -1779,9 +1780,9 @@ static void seededQualCutoffSearch(
 					uint8_t oldChar = (uint8_t)(*patRc)[pos];
 					uint8_t oldQual = (uint8_t)(*qualRc)[pos]-33;
 					assert_leq(oldQual, 40);
-					if(seedMms < 2) {
-						assert_geq(oldQual, lastQual);
-					}
+					//if(seedMms < 2) {
+					//	assert_geq(oldQual, lastQual);
+					//}
 					lastQual = oldQual;
 					assert_neq(oldChar, chr);
 					if(seedlingsRc[id2] == 0xfe) {
@@ -1901,9 +1902,9 @@ static void seededQualCutoffSearch(
 						uint8_t oldChar = (uint8_t)(*patRc)[plen-1-pos];
 						uint8_t oldQual = (uint8_t)(*qualRc)[plen-1-pos]-33;
 						assert_leq(oldQual, 40);
-						if(seedMms < 2) {
-							assert_geq((*qualRc)[plen-1-pos], lastQual);
-						}
+						//if(seedMms < 2) {
+						//	assert_geq((*qualRc)[plen-1-pos], lastQual);
+						//}
 						lastQual = (*qualRc)[plen-1-pos];
 						assert_neq(oldChar, chr);
 						if(seedlingsRc[id2] == 0xfe) {
@@ -1930,8 +1931,8 @@ static void seededQualCutoffSearch(
 						// Get the character to mutate it to
 						uint8_t chr = seedlingsRc[seedlingId++];
 						uint8_t oldChar = (uint8_t)(*patRc)[tpos];
-						oldQuals += ((uint8_t)(*qualRc)[tpos]-33);
-						assert_leq(oldQuals, qualCutoff);
+						oldQuals += qualRounds[((*qualRc)[tpos]-33)];
+						//assert_leq(oldQuals, qualCutoff);
 						append(muts, QueryMutation(tpos, oldChar, chr));
 					} while(seedlingsRc[seedlingId++] == 0xfe);
 					seedlingId--; // point to that non-0xfe character
@@ -2070,11 +2071,11 @@ static void seededQualCutoffSearch(
 					uint8_t chr = seedlingsFw[id2++];
 					assert_lt(chr, 4);
 					uint8_t oldChar = (uint8_t)(*patFw)[pos];
-					uint8_t oldQual = (uint8_t)(*qualFw)[pos]-33;
+					uint8_t oldQual = qualRounds[(*qualFw)[pos]-33];
 					assert_leq(oldQual, 40);
-					if(seedMms < 2) {
-						assert_geq((*qualFw)[pos], lastQual);
-					}
+					//if(seedMms < 2) {
+					//	assert_geq((*qualFw)[pos], lastQual);
+					//}
 					lastQual = (*qualFw)[pos];
 					assert_neq(oldChar, chr);
 					if(seedlingsFw[id2] == 0xfe) {
@@ -2174,9 +2175,9 @@ static void seededQualCutoffSearch(
 						uint8_t oldChar = (uint8_t)(*patFw)[tpos];
 						uint8_t oldQual = (uint8_t)(*qualFw)[tpos]-33;
 						assert_leq(oldQual, 40);
-						if(seedMms < 2) {
-							assert_geq(oldQual, lastQual);
-						}
+						//if(seedMms < 2) {
+						//	assert_geq(oldQual, lastQual);
+						//}
 						lastQual = oldQual;
 						assert_neq(oldChar, chr);
 						if(seedlingsFw[id2] == 0xfe) {
@@ -2203,7 +2204,7 @@ static void seededQualCutoffSearch(
 						// Get the character to mutate it to
 						uint8_t chr = seedlingsFw[seedlingId++];
 						uint8_t oldChar = (uint8_t)(*patFw)[tpos];
-						oldQuals += ((uint8_t)(*qualFw)[tpos]-33);
+						oldQuals += qualRounds[(*qualFw)[tpos]-33];
 						assert_leq(oldQuals, qualCutoff);
 						append(muts, QueryMutation(tpos, oldChar, chr));
 					} while(seedlingsFw[seedlingId++] == 0xfe);

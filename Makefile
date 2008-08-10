@@ -14,7 +14,8 @@ OTHER_CPPS = endian.cpp \
              rusage.cpp \
              diff_sample.cpp \
              hit.cpp \
-             ref_read.cpp
+             ref_read.cpp \
+             quals.cpp
 
 MAQ_HEADERS = maq/maqmap.h \
               maq/const.h
