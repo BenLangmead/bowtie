@@ -10,7 +10,7 @@
 #include <vector>
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "endian.h"
+#include "endian_swap.h"
 #include "packed_io.h"
 #include "ebwt.h"
 #include "params.h"

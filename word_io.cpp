@@ -2,7 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include "assert_helpers.h"
-#include "endian.h"
+#include "endian_swap.h"
 
 /**
  * Write a 32-bit unsigned to an output stream being careful to

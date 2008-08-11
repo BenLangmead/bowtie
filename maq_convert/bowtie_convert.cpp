@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <seqan/sequence.h>
 #include <algorithm>
-#include "maq/maqmap.h"
-#include "maq/algo.hh"
+#include "maqmap.h"
+#include "algo.hh"
 #include "tokenize.h"
 #include "params.h"
 #include "pat.h"
@@ -134,8 +134,6 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	unsigned int text_id;
 	unsigned int text_offset;
 	char sequence[buf_size];
-	
-	bit8_t tmp_seq[MAX_READLEN];
 	
 	char qualities[buf_size];
 	unsigned int other_occs;

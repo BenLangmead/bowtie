@@ -1,7 +1,7 @@
 All code in this directory was either borrowed from or derived from
-v0.6.6 of Maq, a tool written by Heng Li at the Sanger Institute.  This
-code underlies the bowtie_convert tool that converts Bowtie output to
-the output format used by the Maq mapper.  Maq is distributed under the
-GNU GENERAL PUBLIC LICENSE v2, so all code in this subdirectory is
-distributed with that license and with no warranty.  See file "COPYING"
-in this directory for the exact terms.
+v0.6.6 of Maq (http://maq.sourceforge.net), a tool written by Heng Li
+of the Sanger Institute.  This code underlies the bowtie_convert tool
+that converts Bowtie output to the output format used by the Maq
+mapper.  Maq is distributed under the GNU GENERAL PUBLIC LICENSE v2, so
+all code in this subdirectory is distributed with that license and with
+no warranty.  See file "COPYING" in this directory for the exact terms.

@@ -6,7 +6,7 @@
 #include <fstream>
 #include <seqan/sequence.h>
 #include <seqan/file.h>
-#include "endian.h"
+#include "endian_swap.h"
 
 using namespace std;
 using namespace seqan;

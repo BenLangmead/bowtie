@@ -1,6 +1,8 @@
 #ifndef ENDIAN_H
 #define ENDIAN_H
 
+#include <stdint.h>
+
 bool currentlyBigEndian();
 uint32_t endianSwapU32(uint32_t u);
 uint64_t endianSwapU64(uint64_t u);

@@ -12,7 +12,7 @@
 #include "assert_helpers.h"
 #include "bitpack.h"
 #include "blockwise_sa.h"
-#include "endian.h"
+#include "endian_swap.h"
 #include "word_io.h"
 #include "ccnt_lut.h"
 #include "random_source.h"

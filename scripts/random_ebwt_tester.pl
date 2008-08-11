@@ -95,7 +95,7 @@ sub build {
 	my $ret = 0;
 	
 	# Do unpacked version
-	my $cmd = "./ebwt_build-with-asserts -d -s -c --lineRate $lineRate --linesPerSide $linesPerSide --offRate $offRate --ftabChars $ftabChars --chunkRate $chunkRate $endian $t .tmp";
+	my $cmd = "./ebwt_build-with-asserts -d -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
 	if($out eq "") {
@@ -110,7 +110,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 5) {
-		$cmd = "./ebwt_build_packed-with-asserts -d -s -c --lineRate $lineRate --linesPerSide $linesPerSide --offRate $offRate --ftabChars $ftabChars --chunkRate $chunkRate $endian $t .tmp.packed";
+		$cmd = "./ebwt_build_packed-with-asserts -d -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
