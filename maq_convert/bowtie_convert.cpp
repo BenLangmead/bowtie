@@ -1,10 +1,7 @@
 /*
- *  bowtie_convert.cpp
- *  Bowtie
- *
- *  Created by Cole Trapnell on 6/30/08.
- * 
- *
+ * This source file is derived from Maq v0.6.6.  It is distributed
+ * under the GNU GENERAL PUBLIC LICENSE v2 with no warranty.  See file
+ * "COPYING" in this directory for the terms.
  */
 
 #include <string>
