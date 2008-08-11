@@ -17,7 +17,12 @@ $qid  = $ARGV[1] if defined($ARGV[1]);
 $qoff = $ARGV[2] if defined($ARGV[2]);
 $qlen = $ARGV[3] if defined($ARGV[3]);
 
+my $qstr = "";
 my $qid_is_idx = ($qid =~ /^[0-9]+$/);
+if(!$qid_is_idx) {
+	$qstr = $qid;
+	$qid = -2;
+}
 my $l = -1;  # line number within fasta file
 my $id = -1; # index off fasta entry
 my $off = 0; # offset within fasta entry
@@ -29,9 +34,8 @@ while(<FASTA>) {
 	$l++;
 	if(/^>/) {
 		$off = 0;
-		if($qid_is_idx) {
-			$id++;
-		} elsif(/$qid/) {
+		$id++;
+		if((!$qid_is_idx) && (index($_, $qstr) != -1)) {
 			$qid = $id;
 		}
 		next;
@@ -53,7 +57,7 @@ while(<FASTA>) {
 		if($qlen == 0) {
 			print "\n"; last;
 		}
-	} elsif($id > $qid) {
+	} elsif($qid_is_idx && $id > $qid) {
 		last;
 	}
 }
