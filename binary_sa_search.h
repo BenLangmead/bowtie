@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <iostream>
-#include <vector>
 #include <seqan/sequence.h>
 #include "assert_helpers.h"
 
@@ -11,9 +10,9 @@
  * Do a binary search using the suffix of 'host' beginning at offset
  * 'qry' as the query and 'sa' as an already-lexicographically-sorted
  * list of suffixes of host.  'sa' may be all suffixes of host or just
- * a subset.  Returns the index of the suffix to the right of where qry
- * falls in the sorted array.  Such results are in the range 0 through
- * length(sa) inclusive. 
+ * a subset.  Returns the index in sa of the smallest suffix of host
+ * that is larger than qry, or length(sa) if all suffixes of host are
+ * less than qry.
  * 
  * We use the Manber and Myers optimization of maintaining a pair of
  * counters for the longest lcp observed so far on the left- and right-
@@ -21,11 +20,6 @@
  * characters at the beginning of a new round.
  * 
  * Returns 0xffffffff if the query suffix matches an element of sa.
- * 
- * TODO: This functionality is sufficient for blockwise_sa, but it's
- * not terribly general.  Consider handling queries/texts where the
- * query is not a suffix of the text, and consider a more general way
- * of dealing with queries that are already in sa. 
  */
 template<typename TStr, typename TSufElt> inline
 uint32_t binarySASearch(const TStr& host,
