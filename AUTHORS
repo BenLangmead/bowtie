@@ -2,9 +2,9 @@ Bowtie authors
 Primary contact <langmead@umd.edu>
 
 Ben Langmead and Cole Trapnell contributed to the source-base of Bowtie.
-The SeqAn-1.0 library is used by Bowtie.  The authors of that software
-are Andreas Döring, David Weese, Tobias Rausch, and Knut Reinert. Parts
-of Maq v0.6.6 are also used by Bowtie (see maq_convert subdirectory).
-Maq's author is Heng Li of the Sanger Institute, U.K.
+The SeqAn-1.0 library is used by Bowtie; its authors are Andreas Döring,
+David Weese, Tobias Rausch, and Knut Reinert.  Parts of Maq v0.6.6 are
+also used in Bowtie (see maq_convert subdirectory).  Maq's author is
+Heng Li of the Sanger Institute, U.K.
 
 August 2008
