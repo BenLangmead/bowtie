@@ -17,7 +17,7 @@ public:
 	Timer(ostream& out = cout, const char *msg = "", bool verbose = true) :
 		_t(time(0)), _out(out), _msg(msg), _verbose(verbose) { }
 
-	/// Destroy timer object and optionally print message
+	/// Optionally print message
 	~Timer() {
 		if(_verbose) write(_out);
 	}

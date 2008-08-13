@@ -30,11 +30,11 @@ struct RefReadInParams {
 };
 
 extern size_t fastaRefReadSize(istream& in,
-                               RefReadInParams& refparams, 
+                               const RefReadInParams& refparams, 
                                bool first);
 extern size_t fastaRefReadSizes(vector<istream*>& in,
                                 vector<uint32_t>& szs,
-                                RefReadInParams& refparams);
+                                const RefReadInParams& refparams);
 
 /**
  * For given filehandle, read to the end of the current line and return
@@ -55,7 +55,7 @@ static inline int skipLine(istream& in) {
 }
 
 /**
- * Reads the next sequence from the given FASTA FILE* and appends it to
+ * Reads the next sequence from the given FASTA file and appends it to
  * the end of dst, optionally reversing it.
  */
 template <typename TStr>

@@ -11,22 +11,17 @@
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian_swap.h"
-#include "packed_io.h"
 #include "ebwt.h"
-#include "params.h"
+#include "formats.h"
 #include "sequence_io.h"
 #include "tokenize.h"
 #include "hit.h"
 #include "pat.h"
-#include "inexact_extend.h"
-#include "quals.h"
 
 using namespace std;
 using namespace seqan;
 
 static int verbose				= 0; // be talkative
-static int allowed_diffs		= -1; // 3' difference budget for extension mode
-static int kmer					= -1; // 5' kmer length for extension mode
 static int sanityCheck			= 0;  // enable expensive sanity checks
 static int format				= FASTQ; // default read format is FASTQ
 static string origString		= ""; // reference text, or filename(s)
@@ -56,7 +51,7 @@ static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 
-static const char *short_options = "fqbmxcu:rvsat0123:5:o:k:d:e:n:l:";
+static const char *short_options = "fqbcu:rvsat0123:5:o:e:n:l:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -95,8 +90,6 @@ static struct option long_options[] = {
 	{"maqerr",       required_argument, 0,            'e'},
 	{"seedlen",      required_argument, 0,            'l'},
 	{"seedmms",      required_argument, 0,            'n'},
-	{"kmer",         required_argument, 0,            'k'},
-	{"3prime-diffs", required_argument, 0,            'd'},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{0, 0, 0, 0} // terminator
@@ -106,7 +99,7 @@ static struct option long_options[] = {
  * Print a detailed usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: ebwt_search [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
+	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
 	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
 	    << "  <query_in>         comma-separated list of files containing query reads" << endl
 	    << "                     (or the sequences themselves, if -c is specified)" << endl
@@ -128,8 +121,6 @@ static void printUsage(ostream& out) {
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    //<< "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
-		//<< "  -k/--kmer [int]    match on the 5' #-mer and then extend hits with a more sensitive alignment (default: 22bp)" << endl
-		//<< "  -d/--3prime-diffs  # of differences in the 3' end, when used with -k above (default: 4)" << endl
 	    //<< "  -b/--binout        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
@@ -143,7 +134,7 @@ static void printUsage(ostream& out) {
 	    << "  --concise          write hits in a concise format" << endl
 	    //<< "  --maxbts <int>     maximum number of backtracks allowed (75)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
-	    << "  -o/--offrate <int> override offRate of Ebwt; must be <= value in index" << endl
+	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
@@ -184,8 +175,8 @@ static void parseOptions(int argc, char **argv) {
 		switch (next_option) {
 	   		case 'f': format = FASTA; break;
 	   		case 'q': format = FASTQ; break;
-	   		case 'm': format = BFQ; break;
-	   		case 'x': format = SOLEXA; break;
+	   		//case 'm': format = BFQ; break;
+	   		//case 'x': format = SOLEXA; break;
 	   		case 'c': format = CMDLINE; break;
 	   		case '0': maqLike = 0; mismatches = 0; break;
 	   		case '1': maqLike = 0; mismatches = 1; break;
@@ -223,21 +214,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 's': sanityCheck = true; break;
 	   		case 't': timing = true; break;
 	   		case 'b': binOut = true; break;
-			case 'k': 
-				if (optarg != NULL)
-					kmer = parseInt(1, "-k/--kmer must be at least 1");
-				else
-					kmer = 22;
-				break;
 			case ARG_MAXBTS:
 				if (optarg != NULL)
 					maxBts = parseInt(1, "--maxbts must be at least 1");
-				break;
-			case 'd': 
-				if (optarg)
-					allowed_diffs = parseInt(0, "-d/--3prime-diffs must be at least 0");
-				else
-					allowed_diffs = 4;
 				break;
 	   		case ARG_DUMP_PATS:
 	   			patDumpfile = optarg;
@@ -387,84 +366,6 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	}
     }
 }
-
-
-
-/**
- * Search through a single (forward) Ebwt index for exact query hits in the 
- * 5' end of each read, and then extend that hit by shift-and to allow for 3'
- * mismatches.  Assumes that index is already loaded into memory.
- */
-template<typename TStr>
-static void exactSearchWithExtension(vector<String<Dna, Packed<> > >& packed_texts,
-									 PatternSource<TStr>& patsrc,
-									 HitSink& sink,
-									 EbwtSearchStats<TStr>& stats,
-									 EbwtSearchParams<TStr>& params,
-									 Ebwt<TStr>& ebwt,
-									 vector<TStr>& os)
-{
-	uint32_t patid = 0;
-	uint64_t lastHits= 0llu;
-	uint32_t lastLen = 0;
-	assert(patsrc.hasMorePatterns());
-	
-	if (allowed_diffs == -1)
-		allowed_diffs = default_allowed_diffs;
-	
-	ExactSearchWithLowQualityThreePrime<TStr> extend_policy(packed_texts, 
-															false, 
-															kmer,/* global, override */ 
-															allowed_diffs /*global, override*/);
-	
-    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-    	params.setFw(!revcomp || !patsrc.nextIsReverseComplement());
-    	params.setPatId(patid++);
-    	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
-    	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat;
-		String<char>* qual;
-		String<char>* name;
-		patsrc.nextPattern(&pat, &qual, &name);
-    	assert(!empty(*pat));
-    	if(lastLen == 0) lastLen = length(*pat);
-    	if(qSameLen && length(*pat) != lastLen) {
-    		throw runtime_error("All reads must be the same length");
-    	}
-		
-    	// FIXME: not accumulating stats for search with extension
-    	//params.stats().incRead(s, pat);
-	    extend_policy.search(ebwt, stats, params, *pat, *name, *qual, sink);
-		
-	    // If the forward direction matched exactly, ignore the
-	    // reverse complement
-	    if(oneHit && revcomp && sink.numHits() > lastHits) {
-	    	lastHits = sink.numHits();
-	    	if(params.fw()) {
-	    		assert(patsrc.nextIsReverseComplement());
-	    		assert(patsrc.hasMorePatterns());
-	    		// Ignore this pattern (the reverse complement of
-	    		// the one we just matched)
-				
-		    	TStr* pat2;
-				String<char>* qual2;
-				String<char>* name2;
-				patsrc.nextPattern(&pat2, &qual2, &name2);
-		    	assert(!empty(*pat2));
-		    	patid++;
-		    	if(qSameLen && length(*pat2) != lastLen) {
-		    		throw runtime_error("All reads must be the same length");
-		    	}
-		    	params.setFw(false);
-				
-				//FIXME:
-		    	//params.stats().incRead(s, pat2);
-	    		assert(!patsrc.nextIsReverseComplement());
-	    	}
-	    }
-    }
-}
-
 
 /**
  * Given a pattern, a list of reference texts, and some other state,
@@ -929,225 +830,6 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	}
     	lastHits = sink.numHits();
     }
-	}
-}
-
-/**
- * Search through a pair of Ebwt indexes, one for the forward direction
- * and one for the backward direction, for exact query hits and hits
- * with at most one mismatch.
- * 
- * Forward Ebwt (ebwtFw) is already loaded into memory and backward
- * Ebwt (ebwtBw) is not loaded into memory.
- */
-
-template<typename TStr>
-static void mismatchSearchWithExtension(vector<String<Dna, Packed<> > >& packed_texts,
-										PatternSource<TStr>& patsrc,
-										HitSink& sink,
-										EbwtSearchStats<TStr>& stats,
-										EbwtSearchParams<TStr>& params,
-										Ebwt<TStr>& ebwtFw,
-										Ebwt<TStr>& ebwtBw,
-										vector<TStr>& os)
-{
-	typedef typename Value<TStr>::Type TVal;
-	assert(ebwtFw.isInMemory());
-	assert(!ebwtBw.isInMemory());
-	assert(patsrc.hasMorePatterns());
-    patsrc.setReverse(false); // reverse patterns
-    params.setEbwtFw(true); // let search parameters reflect the forward index
-	
-	uint32_t patid = 0;
-	uint64_t lastHits = 0llu;
-	uint32_t lastLen = 0; // for checking if all reads have same length
-	String<uint8_t> doneMask;
-    params.setEbwtFw(true);
-	uint32_t numQs = ((qUpto == -1) ? 4 * 1024 * 1024 : qUpto);
-	
-	if (allowed_diffs == -1)
-		allowed_diffs = default_allowed_diffs;
-	
-	ExactSearchWithLowQualityThreePrime<TStr> extend_exact(packed_texts, 
-														   false, 
-														   kmer,/* global, override */ 
-														   allowed_diffs /*global, override*/,
-														   revcomp /*global, override*/);
-	
-	OneMismatchSearchWithLowQualityThreePrime<TStr> extend_one_mismatch(packed_texts, 
-																		false, 
-																		kmer,/* global, override */ 
-																		allowed_diffs /*global, override*/,
-																		revcomp /*global, override*/);
-	
-	fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
-	{
-		Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
-		// Create state for a search on in the forward index
-		EbwtSearchState<TStr> s(ebwtFw, params, seed);
-		while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-			bool exactOnly = false;
-			bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
-			params.setFw(sfw);
-			uint32_t spatid = patid;
-			params.setPatId(spatid);
-			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
-			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-	    	TStr* pat = NULL;
-			String<char>* qual = NULL;
-			String<char>* name = NULL;
-			patsrc.nextPattern(&pat, &qual, &name);
-			assert(!empty(*pat));
-			if(lastLen == 0) lastLen = length(*pat);
-			if(qSameLen && length(*pat) != lastLen) {
-				throw runtime_error("All reads must be the same length");
-			}
-			s.newQuery(pat, qual, name);
-			params.stats().incRead(s, *pat);
-			// Are there provisional hits?
-			if(sink.numProvisionalHits() > 0) {
-				// Shouldn't be any provisional hits unless we're doing
-				// pick-one and this is a reverse complement
-				assert(oneHit);
-				assert(!params.fw());
-				exactOnly = true;
-				// There is a provisional inexact match for the forward
-				// orientation of this pattern, so just try exact
-
-				extend_exact.search(ebwtFw, stats, params, *pat, *name, *qual, sink);
-				
-				if(sink.numHits() > lastHits) {
-					// Got one or more exact hits from the reverse
-					// complement; reject provisional hits
-					sink.rejectProvisionalHits();
-				} else {
-					// No exact hits from reverse complement; accept
-					// provisional hits, thus avoiding doing an inexact
-					// match on the reverse complement.
-					ASSERT_ONLY(size_t numRetained = sink.retainedHits().size());
-					sink.acceptProvisionalHits();
-					assert_eq(sink.retainedHits().size(), numRetained);
-					assert_gt(sink.numHits(), lastHits);
-				}
-				assert_eq(0, sink.numProvisionalHits());
-			} else {
-				//ebwtFw.search1MismatchOrBetter(s, params);
-				extend_one_mismatch.search(ebwtFw, stats, params, *pat, *name, *qual, sink);
-			}
-			bool gotHits = sink.numHits() > lastHits;
-			// Set a bit indicating this pattern is done and needn't be
-			// considered by the 1-mismatch loop
-			if(oneHit && gotHits) {
-				assert_eq(0, sink.numProvisionalHits());
-				uint32_t mElt = patid >> 3;
-				if(mElt > length(doneMask)) {
-					// Add 50% more elements, initialized to 0
-					fill(doneMask, mElt + patid>>4, 0);
-				}
-				
-				// Set a bit indicating this pattern is done and needn't be
-				// considered by the 1-mismatch loop
-				doneMask[mElt] |= (1 << (patid & 7));
-				if(revcomp && params.fw()) {
-					assert(patsrc.hasMorePatterns());
-					assert(patsrc.nextIsReverseComplement());
-					// Ignore this pattern (the reverse complement of
-					// the one we just matched)
-					TStr* pat2;
-					String<char>* qual2;
-					String<char>* name2;
-					patsrc.nextPattern(&pat2, &qual2, &name2);
-					assert(!empty(*pat2));
-					patid++;
-					// Set a bit indicating this pattern is done
-					doneMask[patid >> 3] |= (1 << (patid & 7));
-					if(qSameLen && length(*pat2) != lastLen) {
-						throw runtime_error("All reads must be the same length");
-					}
-					params.setFw(false);
-					params.stats().incRead(s, *pat2);
-					assert(!patsrc.nextIsReverseComplement());
-				} else if(revcomp) {
-					// The reverse-complement version hit, so retroactively
-					// declare the forward version done
-					uint32_t mElt = (patid-1) >> 3;
-					if(mElt > length(doneMask)) {
-						// Add 50% more elements, initialized to 0
-						fill(doneMask, mElt + patid>>4, 0);
-					}
-					doneMask[mElt] |= (1 << ((patid-1) & 7));
-				}
-			}
-			patid++;
-			lastHits = sink.numHits();
-		}
-	}
-	// Release most of the memory associated with the forward Ebwt
-    ebwtFw.evictFromMemory();
-	{
-		// Load the rest of (vast majority of) the backward Ebwt into
-		// memory
-		Timer _t(cout, "Time loading Backward Ebwt: ", timing);
-		ebwtBw.loadIntoMemory();
-	}
-    patsrc.reset();          // reset pattern source to 1st pattern
-    patsrc.setReverse(true); // reverse patterns
-    params.setEbwtFw(false); // let search parameters reflect the reverse index
-	
-	assert(patsrc.hasMorePatterns());
-	assert(!patsrc.nextIsReverseComplement());
-	patid = 0;       // start again from id 0
-	//lastHits = 0llu; // start again from 0 hits
-	{
-		Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
-		EbwtSearchState<TStr> s(ebwtBw, params, seed);
-		while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-			bool sfw = !revcomp || !patsrc.nextIsReverseComplement();
-			params.setFw(sfw);
-			uint32_t spatid = patid;
-			params.setPatId(spatid);
-			assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
-			assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-	    	TStr* pat = NULL;
-			String<char>* qual = NULL;
-			String<char>* name = NULL;
-			patsrc.nextPattern(&pat, &qual, &name);
-			assert(!empty(*pat));
-			s.newQuery(pat, name, qual);
-			params.stats().incRead(s, *pat);
-			// Skip if previous phase determined this read is "done"; this
-			// should only happen in oneHit mode
-			if((doneMask[patid >> 3] & (1 << (patid & 7))) != 0) {
-				assert(oneHit);
-				patid++;
-				continue;
-			}
-			patid++;
-			// Try to match with one mismatch while suppressing exact hits
-			//ebwtBw.search1MismatchOrBetter(s, params, false /* suppress exact */);
-			extend_one_mismatch.suppressExact(true);
-			extend_one_mismatch.search(ebwtBw, stats, params, *pat, *name, *qual, sink);
-						
-			sink.acceptProvisionalHits(); // automatically approve provisional hits
-			// If the forward direction matched with one mismatch, ignore
-			// the reverse complement
-			if(oneHit && revcomp && sink.numHits() > lastHits && params.fw()) {
-				assert(patsrc.nextIsReverseComplement());
-				assert(patsrc.hasMorePatterns());
-				// Ignore this pattern (the reverse complement of
-				// the one we just matched)
-				TStr* pat2;
-				String<char>* qual2;
-				String<char>* name2;
-				patsrc.nextPattern(&pat2, &qual2, &name2);
-				assert(!empty(*pat2));
-				patid++;
-				params.setFw(false);
-				params.stats().incRead(s, *pat2);
-				assert(!patsrc.nextIsReverseComplement());
-			}
-			lastHits = sink.numHits();
-		}
 	}
 }
 
@@ -2323,126 +2005,6 @@ static void seededQualCutoffSearch(
 	    } // while(patsrc.hasMorePatterns()...
 	    assert_eq(seedlingId, seedlingsFwLen);
 	} // end of Phase 4
-#if 0
-	// Optional mode whereby case 4R is handled in a fifth phase; this
-	// was found not to be somewhat slower than the scheme that handles
-	// 4R in Phase 3
-	if(seedMms == 2) {
-		// Unload transposed index and load forward index
-		SWITCH_TO_FW_INDEX();
-		// Phase 5: Consider case 4R
-		Timer _t(cout, "Seeded quality search Phase 5 of 5: ", timing);
-		BacktrackManager<TStr> btr(ebwtFw, params,
-		                           0,       // unrevOff
-		                           s5,      // 1revOff
-		                           s,       // 2revOff
-		                           0, 0,    // itop, ibot
-		                           qualCutoff, // qualThresh
-		                           0,       // qualWobble
-		                           maxBts,  // max backtracks
-		                           0,       // reportSeedlings (don't)
-		                           NULL,    // seedlings
-			                       NULL,    // mutations
-		                           verbose, // verbose
-		                           true,    // oneHit
-			                       seed+8,  // seed
-			                       &os,
-			                       true);   // halfAndHalf
-		uint32_t patid = 0;
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
-		params.setFw(false);  // looking at reverse-comp strand
-	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-	    	assert_lt((patid>>1), doneMask.capacity());
-	    	assert_lt((patid>>1), doneMask.size());
-	    	if(doneMask[patid>>1]) {
-				patsrc.skipPattern();
-				patsrc.skipPattern();
-	    		patid += 2;
-	    		continue;
-	    	}
-	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
-			params.setPatId(patid+1);
-			btr.setQuery(patRc, qualRc, nameRc);
-
-	    	// If we're in two-mismatch mode, then now is the time to
-	    	// try the final case that might apply to the reverse
-	    	// complement pattern: 1 mismatch in each of the 3' and 5'
-	    	// halves of the seed.
-	    	bool gaveUp = false;
-			btr.setQuery(patRc, qualRc, nameRc);
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			bool hit = btr.backtrack();
-//				cout << "Time: "
-//			         << ", hit: " << hit
-//				     << ", numBts: " << btr.numBacktracks()
-//				     << ", hiDepth: " << btr.highStackDepth()
-//				     << endl;
-//				cout << "  " << (*patRc) << "  " << (*qualRc) << endl;
-//				btr.resetHighStackDepth();
-			if(btr.numBacktracks() == btr.maxBacktracks()) {
-				gaveUp = true;
-			}
-			btr.resetNumBacktracks();
-			assert(hit  || numHits == sink.numHits());
-			assert(!hit || numHits <  sink.numHits());
-			if(hit) {
-				doneMask[patid>>1] = true;
-	    		patid += 2;
-				continue;
-			}
-	    	
-#ifndef NDEBUG
-			// The reverse-complement version of the read doesn't hit
-	    	// at all!  Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-				vector<Hit> hits;
-				uint32_t twoRevOff = s;
-				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
-				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
-				bool newName = false;
-				if(nameRc == NULL) {
-					nameRc = new String<char>("no_name");
-					newName = true;
-				}
-				BacktrackManager<TStr>::naiveOracle(
-				        os,
-						*patRc,
-						length(*patRc),
-				        *qualRc,
-				        *nameRc,
-				        patid+1,    // patid
-				        hits,
-				        qualCutoff, 
-				        unrevOff,
-				        oneRevOff,
-				        twoRevOff,
-				        false,      // fw
-				        true);      // ebwtFw
-				if(hits.size() > 0) {
-					// Print offending hit obtained by oracle
-					BacktrackManager<TStr>::printHit(
-						os,
-						hits[0],
-						*patRc,
-						length(*patRc),
-					    unrevOff,
-					    oneRevOff,
-					    twoRevOff,
-					    true);      // ebwtFw
-				}
-				if(newName) {
-					delete nameRc;
-				}
-				assert_eq(0, hits.size());
-	    	}
-#endif
-			patid += 2;
-	    }
-	    assert(numPats == patid || numPats+2 == patid);
-	}
-#endif /*0*/
-	return;
 }
 
 template<typename TStr>
@@ -2593,40 +2155,17 @@ static void driver(const char * type,
 			                       *ebwtBw, // transposed index (not optional)
 			                       os);     // references, if available
 		}
-		else if(mismatches > 0) 
-		{
-			// Search with mismatches
-			if (kmer != -1 || allowed_diffs != -1)
-			{
-				vector<String<Dna, Packed<> > > ss;
-				unpack(infile + ".3.ebwt", ss, NULL);
-				mismatchSearchWithExtension(ss, *patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+		else if(mismatches > 0) {
+			if(mismatches == 1) {
+				mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+			} else if(mismatches == 2) {
+				twoMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+			} else {
+				throw runtime_error("Bad number of mismatches!");
 			}
-			else
-			{
-				if(mismatches == 1) {
-					mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
-				} else if(mismatches == 2) {
-					twoMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
-				} else {
-					throw runtime_error("Bad number of mismatches!");
-				}
-			}
-			
 		} else {
-			if (kmer != -1)
-			{
-				vector<String<Dna, Packed<> > > ss;
-				unpack(infile + ".3.ebwt", ss, NULL);
-				// Search for hits on the 5' end, and then try to extend them
-				// with a dynamic programming algorithm
-				exactSearchWithExtension(ss, *patsrc, *sink, stats, params, ebwt, os);
-			}
-			else
-			{
-				// Search without mismatches
-				exactSearch(*patsrc, *sink, stats, params, ebwt, os);
-			}
+			// Search without mismatches
+			exactSearch(*patsrc, *sink, stats, params, ebwt, os);
 		}
 	    sink->finish(); // end the hits section of the hit file
 	    if(printStats) {

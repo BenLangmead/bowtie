@@ -31,6 +31,4 @@ static inline int unpack_2b_from_32b(const uint32_t thirty2, const int off) {
 	return ((thirty2 >> (off*2)) & 0x3);
 }
 
-#endif /*BITPACK_MACROS*/
-
 #endif /*BITPACK_H_*/

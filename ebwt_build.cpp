@@ -10,12 +10,10 @@
 #include <getopt.h>
 #include "assert_helpers.h"
 #include "endian_swap.h"
-#include "packed_io.h"
 #include "ebwt.h"
-#include "params.h"
+#include "formats.h"
 #include "sequence_io.h"
 #include "tokenize.h"
-#include "rusage.h"
 #include "timer.h"
 #include "ref_read.h"
 
@@ -29,17 +27,16 @@ static uint32_t bmaxDivN     = 8;     // same, as divisor of n
 static int dcv               = 1024;  // bwise SA difference-cover sample sz
 static int noDc              = 0;     // disable difference-cover sample
 static int entireSA          = 0;     // 1 = disable blockwise SA
-static int profile           = 0;     // print out profiling info on exit
 static int seed              = 0;     // srandom seed
 static int showVersion       = 0;     // just print version and quit?
-static bool doubleEbwt       = false; // build forward and reverse Ebwts
+static bool doubleEbwt       = true;  // build forward and reverse Ebwts
 static int64_t cutoff        = 0xffffffff; // max # of reference bases
 //   Ebwt parameters
 static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
-static int32_t chunkRate     = 11; // 1 out of 32
+static int32_t chunkRate     = 11; // each chunk is 2K
 static int32_t bigEndian     = 0;  // little endian
 
 // Argument constants for getopts
@@ -54,13 +51,13 @@ static const int ARG_CUTOFF    = 261;
  * Print a detailed usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: ebwt_build [options]* <reference_in> <ebwt_outfile_base>" << endl
+	out << "Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>" << endl
 	    << "    reference_in            comma-separated list of files with ref sequences" << endl
 	    << "    ebwt_outfile_base       write Ebwt data to files with this dir/basename" << endl
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
-	    << "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
+	    //<< "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
 	    << "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
 	    << "    --bmax <int>            max SA bucket sz for blockwise suffix-array builder" << endl
 	    << "    --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)" << endl
@@ -74,7 +71,6 @@ static void printUsage(ostream& out) {
 	    << "    -h/--chunkrate <int>    # of characters in a text chunk" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
-	    << "    --profile               output profile information when finished" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -v/--verbose            verbose output (for debugging)" << endl
@@ -83,13 +79,12 @@ static void printUsage(ostream& out) {
 	    ;
 }
 
-static const char *short_options = "vdrpscfl:i:o:t:h:";
+static const char *short_options = "vrpscfl:i:o:t:h:";
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            'v'},
 	{"sanity",       no_argument,       0,            's'},
-	{"double",       no_argument,       0,            'd'},
-	{"profile",      no_argument,       &profile,     1},
+	//{"double",       no_argument,       0,            'd'},
 	{"little",       no_argument,       &bigEndian,   0},
 	{"big",          no_argument,       &bigEndian,   1},
 	{"bmax",         required_argument, 0,            ARG_BMAX},
@@ -143,7 +138,7 @@ static void parseOptions(int argc, char **argv) {
 		switch (next_option) {
 	   		case 'f': format = FASTA; break;
 	   		case 'c': format = CMDLINE; break;
-	   		case 'd': doubleEbwt = true; break;
+	   		//case 'd': doubleEbwt = true; break;
 	   		case 'l':
    				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
 	   			break;
@@ -381,9 +376,6 @@ int main(int argc, char **argv) {
 		#else
 		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
 		#endif
-	}
-	if(profile) {
-		printResourceUsage(cout, verbose);
 	}
 	return 0;
 }

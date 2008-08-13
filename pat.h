@@ -8,7 +8,7 @@
 #include <string>
 #include <cstring>
 #include <ctype.h>
-#include <zlib.h>
+//#include <zlib.h>
 #include <fstream>
 #include <seqan/sequence.h>
 #include "alphabet.h"
@@ -18,7 +18,7 @@
 using namespace std;
 using namespace seqan;
 
-/// Reverse a string
+/// Reverse a string in-place
 template <typename TStr>
 static inline void reverse(TStr& s) {
 	typedef typename Value<TStr>::Type TVal;
@@ -279,7 +279,7 @@ public:
 		_aCur(true),
 		_fw(true),
 		_in(NULL),
-		_gzin(),
+		//_gzin(),
 		_aLen(0),
 		_aTStr(),
 		_aRcTStr(),
@@ -317,6 +317,7 @@ public:
 		_tmpRcQual(_rcQualBuf3),
 		_tmpName(_nameBuf3)
 	{
+		assert(!_gz); // omit support for gzipped formats for now
 		_setBegin(_aTStr, (Dna*)_a); _setLength(_aTStr, 0);
 		_setBegin(_aRcTStr, (Dna*)_aRc); _setLength(_aRcTStr, 0);
 		_setBegin(_aQualStr, (char*)_aQual); _setLength(_aQualStr, 0);
@@ -336,8 +337,10 @@ public:
 		open(); _filecur++;
 	}
 	virtual ~BufferedFilePatternSource() {
-		if(_gz) gzclose(_gzin);
-		else fclose(_in);
+		//if(_gz)
+		//	gzclose(_gzin);
+		//else
+			fclose(_in);
 	}
 	/// Return the next pattern from the file
 	virtual void nextPatternImpl(TStr** s,
@@ -374,8 +377,10 @@ public:
 	virtual void reset() {
 		TrimmingPatternSource<TStr>::reset();
 		// Close current file
-		if(_gz) gzclose(_gzin);
-		else fclose(_in);
+		//if(_gz)
+		//	gzclose(_gzin);
+		//else
+			fclose(_in);
 		_filecur = 0,
 		_fw = true; // dish forward next
 		_aCur = true; // currently dishing a
@@ -571,8 +576,10 @@ protected:
 		if(seqan::empty(**s) && _filecur < _infiles.size()) {
 			assert(_fw);
 			// Close current file
-			if(_gz) gzclose(_gzin);
-			else fclose(_in);
+			//if(_gz)
+			//	gzclose(_gzin);
+			//else
+				fclose(_in);
 			// Open next file
 			open(); _filecur++;
 			this->resetForNextFile(); // reset state to handle a fresh file
@@ -588,12 +595,12 @@ protected:
 		return;
 	}
 	void open() {
-		if(_gz) {
-			// Open gzipped input file
-			if((_gzin = gzopen(_infiles[_filecur].c_str(), "r")) == NULL) {
-				throw runtime_error("Could not open gzipped sequence file");
-			}
-		} else {
+		//if(_gz) {
+		//	// Open gzipped input file
+		//	if((_gzin = gzopen(_infiles[_filecur].c_str(), "r")) == NULL) {
+		//		throw runtime_error("Could not open gzipped sequence file");
+		//	}
+		//} else {
 			// Open input file
 			if((_in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
 				throw runtime_error("Could not open sequence file");
@@ -602,7 +609,7 @@ protected:
 			if(setvbuf(_in, _buf, _IOFBF, 256 * 1024) != 0) {
 				throw runtime_error("Could not create input buffer for sequence file");
 			}
-		}
+		//}
 	}
 	const vector<string>& _infiles; // input filenames
 	bool _gz;     // whether input file/files are gzipped
@@ -615,7 +622,7 @@ protected:
 
 	bool _fw;     // whether reverse complement should be returned next
 	FILE *_in;    // file to read patterns from
-	gzFile _gzin; // file to read patterns from
+	//gzFile _gzin; // file to read patterns from
 
 	// Pattern a
 	size_t _aLen;
@@ -1157,123 +1164,5 @@ private:
 	bool _solexa_quals;
 	int _table[128];
 };
-
-/**
- * 
- */
-//template <typename TStr>
-//class SolexaPatternSource : public BufferedFilePatternSource<TStr> {
-//public:
-//	typedef typename Value<TStr>::Type TVal;
-//	SolexaPatternSource(const vector<string>& infiles,
-//	                    bool __revcomp = true,
-//	                    bool __reverse = false,
-//	                    const char * __dumpfile = NULL,
-//	                    int __trim3 = 0,
-//	                    int __trim5 = 0) :
-//		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, __reverse, __dumpfile, __trim3, __trim5),
-//		_savedC(-1)
-//	{
-//		assert(this->hasMorePatterns());
-//	}
-//	virtual void reset() {
-//		_savedC = -1;
-//		BufferedFilePatternSource<TStr>::reset();
-//	}
-//protected:
-//	//TODO: stick default quals in qual, rqual
-//	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-//		assert(dst != NULL);
-//		assert(empty(*dst)); // caller should have cleared this
-//		int c = (_savedC == -1) ? fgetc(this->_in) : _savedC;  
-//		if(feof(this->_in)) return;
-//		int begin = 0;
-//		while(c != '\n' && c != '\r') {
-//			if(isalpha(c)) {
-//				if(begin++ >= this->_trim5) {
-//					appendChar(dst, rcDst, (char)c);
-//					assert_lt((int)(*dst)[length(*dst)-1], 4);
-//				}
-//			}
-//			c = fgetc(this->_in);
-//			if(feof(this->_in)) break;
-//		}
-//		// Trim dst, rcDst; reverse rcDst
-//		resize(*dst, length(*dst) - this->_trim3);
-//		if(rcDst != NULL) {
-//			resize(*rcDst, length(*rcDst) - this->_trim3);
-//			::reverse(*rcDst);
-//		}
-//		// Skip to next line
-//		while(c == '\n' || c == '\r') {
-//			c = fgetc(this->_in); if(feof(this->_in)) return;
-//		}
-//		_savedC = c;
-//	}
-//	virtual void resetForNextFile() {
-//		_savedC = -1;
-//	}
-//private:
-//	int _savedC;
-//};
-
-/**
- * 
- */
-//template <typename TStr>
-//class BfqPatternSource : public BufferedFilePatternSource<TStr> {
-//public:
-//	typedef typename Value<TStr>::Type TVal;
-//	BfqPatternSource(const vector<string>& infiles,
-//	                 bool __revcomp = true,
-//	                 bool __reverse = false,
-//	                 const char *__dumpfile = NULL,
-//	                 int __trim3 = 0,
-//	                 int __trim5 = 0) :
-//	BufferedFilePatternSource<TStr>(infiles, true, __revcomp, __reverse, __dumpfile, __trim3, __trim5)
-//	{
-//		assert(this->hasMorePatterns());
-//	}
-//	virtual void reset() {
-//		BufferedFilePatternSource<TStr>::reset();
-//	}
-//protected:
-//	/// Read another pattern from a FASTA input file
-//	virtual void read(TStr *dst, TStr *rcDst, string* qual, string* rqual, string* name) {
-//		typedef typename seqan::Value<TStr>::Type TVal;
-//		assert(dst != NULL);
-//		static char _name[2048]; // buffer for .bfq read names
-//		static unsigned char seq[2048];  // buffer 
-//		int len;
-//		assert(empty(*dst));
-//		// Read name length
-//		if(gzread(this->_gzin, &len, sizeof(int)) != sizeof(int)) return;
-//		if(len > 2047) {
-//			throw std::runtime_error(
-//				"One or more .bfq read names are longer than 2047 characters");
-//		}
-//		// Read name
-//		if(gzread(this->_gzin, _name, len) != len) return;
-//		_name[len] = '\0'; // TODO: do something with name (we just ignore it)
-//		*name = _name;
-//		// Read sequence length
-//		if(gzread(this->_gzin, &len, 4) != 4) return;
-//		if(len > 2048) {
-//			throw std::runtime_error(
-//				"One or more .bfq read sequences are longer than 2048 bases");
-//		}
-//		uint32_t tlen = len - this->_trim5 - this->_trim3;
-//		resize(*dst, tlen, Exact());
-//		if(rcDst != NULL) {
-//			resize(*rcDst, tlen, Exact());
-//		}
-//		if(gzread(this->_gzin, seq, len) != len) return;
-//		for(int i = this->_trim5; i < len - this->_trim3; i++) {
-//			char c = (char)(seq[i] >> 6);
-//			appendCharResized(dst, rcDst, i - this->_trim5, tlen, c);
-//		}
-//	}
-//	virtual void resetForNextFile() { }
-//};
 
 #endif /*PAT_H_*/

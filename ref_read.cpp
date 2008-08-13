@@ -1,13 +1,12 @@
 #include "ref_read.h"
 
 /**
- * Reads past the next sequence from the given FASTA FILE* and returns
+ * Reads past the next sequence from the given FASTA file and returns
  * the size of the passed sequence.  Does not do anything with the
  * sequence characters themselves; this is purely for counting lengths.
- * Does not mutate refparams.
  */
 size_t fastaRefReadSize(istream& in,
-                        RefReadInParams& refparams, 
+                        const RefReadInParams& refparams, 
                         bool first = false)
 {
 	int c;
@@ -46,11 +45,10 @@ size_t fastaRefReadSize(istream& in,
  * Calculate a vector containing the sizes of all of the patterns in
  * all of the given input files, in order.  Returns the total size of
  * all references combined.  Rewinds each istream before returning.
- * Does not mutate refparams.
  */
 size_t fastaRefReadSizes(vector<istream*>& in,
                          vector<uint32_t>& szs,
-                         RefReadInParams& refparams)
+                         const RefReadInParams& refparams)
 {
 	size_t tot = 0;
 	RefReadInParams rpcp = refparams;

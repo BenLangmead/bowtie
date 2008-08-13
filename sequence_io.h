@@ -9,9 +9,6 @@
 #include <seqan/sequence.h>
 #include <seqan/file.h>
 #include "assert_helpers.h"
-#include "packed_io.h"
-#include "maq/read_bfq.h"
-#include "solexa.h"
 #include "pat.h"
 
 /**

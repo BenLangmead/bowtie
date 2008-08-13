@@ -2,7 +2,7 @@
 #define BLOCKWISE_SA_H_
 
 #include <stdint.h>
-#include <stdlib.h> // for rand
+#include <stdlib.h>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -17,10 +17,11 @@
 #include "zbox.h"
 #include "alphabet.h"
 #include "timer.h"
-#include "seqan_helpers.h"
 
 using namespace std;
 using namespace seqan;
+
+// Helpers for printing verbose messages
 
 #ifndef VMSG_NL
 #define VMSG_NL(args...) { \
@@ -44,9 +45,6 @@ using namespace seqan;
 template<typename TStr>
 class BlockwiseSA {
 public:
-	/**
-	 * Constructor: initialize base class stuff.
-	 */
 	BlockwiseSA(const TStr& __text,
 	            uint32_t __bucketSz,
 	            bool __sanityCheck = false,
@@ -62,14 +60,10 @@ public:
 	_logger(__logger)
 	{ }
 	
-	/**
-	 * Destructor (must be virtual because class is abstract)
-	 */
-	virtual ~BlockwiseSA() {
-	}
+	virtual ~BlockwiseSA() { }
 	
 	/**
-	 * Get the next suffix, computing the next bucket if necessary.
+	 * Get the next suffix; compute the next bucket if necessary.
 	 */
 	uint32_t nextSuffix() {
 		if(_itrPushedBackSuffix != 0xffffffff) {
@@ -131,7 +125,7 @@ public:
 	bool sanityCheck()  const { return _sanityCheck; }
 	bool verbose()      const { return _verbose; }
 	ostream& log()      const { return _logger; }
-	uint32_t size()     const { return length(_text)+1; }// +1 for 0-len suffix
+	uint32_t size()     const { return length(_text)+1; }
 	
 protected:
 	/// Reset back to the first block
@@ -141,14 +135,12 @@ protected:
 
 	/**
 	 * Grab the next block of sorted suffixes.  The block is guaranteed
-	 * to have at most _bucketSz elements.  It is also guaranteed to
-	 * have at least ceil(_bucketSz/2) elements, unless it is the last
-	 * bucket, in which case it may be shorter.
+	 * to have at most _bucketSz elements.
 	 */
 	virtual const void nextBlock() = 0;
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() = 0;
-
+	/// Optionally output a verbose message
 	void verbose(const string& s) const {
 		if(this->verbose()) {
 			this->log() << s;
@@ -167,15 +159,12 @@ protected:
 };
 
 /**
- * Abstract parent class for a blockwise suffix array that is
- * guaranteed to dole out blocks in lexicographical order. 
+ * Abstract parent class for a blockwise suffix array builder that
+ * always doles out blocks in lexicographical order. 
  */
 template<typename TStr>
 class InorderBlockwiseSA : public BlockwiseSA<TStr> {
 public:
-	/**
-	 * Constructor: just pass everything along to parent.
-	 */
 	InorderBlockwiseSA(const TStr& __text,
 	                   uint32_t __bucketSz,
 	                   bool __sanityCheck = false,
@@ -186,15 +175,12 @@ public:
 };
 
 /**
- * Build the entire SA at once, then simply dole it out one bucket at a
- * time, in order.
+ * Build the entire SA at once, then dole it out one bucket at a time,
+ * in order.
  */
 template<typename TStr>
 class SillyBlockwiseDnaSA : public InorderBlockwiseSA<TStr> {
 public:
-	/**
-	 * Constructor
-	 */
 	SillyBlockwiseDnaSA(TStr& __text,
 	                    uint32_t __bucketSz,
 	                    bool __sanityCheck = false,
@@ -230,6 +216,7 @@ protected:
 				VMSG_NL("SillyBlockwiseDnaSA: Allocating suffix array string");
 				resize(_sa, length(text5));
 				VMSG_NL("SillyBlockwiseDnaSA: Building suffix array");
+				// Use SeqAn's implementation of Karakkainen's Skew7
 				createSuffixArray(_sa, text5, Skew7());
 			} catch(bad_alloc& e) {
 				cerr << "Out of memory creating suffix array in "
@@ -243,15 +230,15 @@ protected:
 		_cur = 0;
 	}
 
-	/// Return true iff we're about to dish out the first bucket
+	/// Return true iff we're about to dole out the first bucket
 	virtual bool isReset() {
 		return _cur == 0;
 	}
 
 private:
-	String<uint32_t> _sa;
-	uint32_t _cur;
-	bool _built;
+	String<uint32_t> _sa; // the suffix array
+	uint32_t _cur;        // the index of the current bucket
+	bool _built;          // true iff the suffix array has been built
 };
 
 /**
@@ -261,12 +248,8 @@ private:
 template<typename TStr>
 class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 public:
-	// Typedefs
 	typedef DifferenceCoverSample<TStr> TDC;
 	
-	/**
-	 * Construct KarkkainenBlockwiseSA from parameters.
-	 */
 	KarkkainenBlockwiseSA(const TStr& __text,
 	                      uint32_t __bucketSz,
 	                      uint32_t __dcV,
@@ -278,9 +261,6 @@ public:
 	_sampleSuffs(), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _randomSrc(__seed)
 	{ reset(); }
 
-	/**
-	 * Destructor; clear/delete all non-primitive members.
-	 */
 	~KarkkainenBlockwiseSA() {
 		VMSG_NL("Entering ~KarkkainenBlockwiseSA()");
 		if(!empty(_sampleSuffs)) destroy(_sampleSuffs);
@@ -314,7 +294,7 @@ protected:
 		_cur = 0;
 	}
 
-	/// Return true iff we're about to dish out the first bucket
+	/// Return true iff we're about to dole out the first bucket
 	virtual bool isReset() {
 		return _cur == 0;
 	}
@@ -347,6 +327,8 @@ private:
 	 * Calculate the lcp between two suffixes using the difference
 	 * cover as a tie-breaker.  If the tie-breaker is employed, then
 	 * the calculated lcp may be an underestimate.
+	 * 
+	 * Defined in blockwise_sa.cpp
 	 */
 	inline bool tieBreakingLcp(uint32_t aOff,
 	                           uint32_t bOff,
@@ -397,7 +379,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	// monster buckets.
 	VMSG_NL("Generating random suffixes");
 	for(size_t i = 0; i < numSamples; i++) {
-		appendValueNE(_sampleSuffs, _randomSrc.nextU32() % len);
+		appendValue(_sampleSuffs, _randomSrc.nextU32() % len);
 	}
 	// Remove duplicates; very important to do this before the call to
 	// mkeyQSortSuf so that it doesn't try to calculate lexicographical
@@ -745,7 +727,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 		if(capacity(bucket) < this->bucketSz()) {
 			reserve(bucket, len+1, Exact());
 		}
-		for(uint32_t i = 0; i < len; i++) appendNE(bucket, i);
+		for(uint32_t i = 0; i < len; i++) append(bucket, i);
 	} else {
 		VMSG_NL("  Reserving size (" << this->bucketSz() << ") for bucket");
 		if(capacity(bucket) < this->bucketSz()) {
@@ -809,7 +791,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				}
 				// In the bucket! - add it
 				assert_lt(i, len);
-				appendNE(bucket, i);
+				append(bucket, i);
 				assert_lt(length(bucket), this->bucketSz());
 			}
 			} // end loop over all suffixes of t
@@ -843,10 +825,10 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	}
 	if(hi != 0xffffffff) {
 		// Not the final bucket; throw in the sample on the RHS
-		appendValueNE(bucket, hi);
+		appendValue(bucket, hi);
 	} else {
 		// Final bucket; throw in $ suffix
-		appendValueNE(bucket, len);
+		appendValue(bucket, len);
 	}
 	VMSG_NL("Returning block of " << length(bucket));
 	_cur++; // advance to next bucket

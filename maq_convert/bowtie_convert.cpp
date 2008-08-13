@@ -13,7 +13,7 @@
 #include "maqmap.h"
 #include "algo.hh"
 #include "tokenize.h"
-#include "params.h"
+#include "formats.h"
 #include "pat.h"
 
 enum {TEXT_MAP, BIN_MAP};

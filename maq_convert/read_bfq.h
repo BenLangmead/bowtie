@@ -9,7 +9,6 @@
 #include <vector>
 #include <stdexcept>
 #include <seqan/sequence.h>
-#include "../seqan_helpers.h"
 
 /**
  * Load one named sequence from a gzipped file.  At this point,
@@ -46,7 +45,7 @@ static bool ma_load_1read(gzFile fp, TStr& ret) {
 	seqan::reserve(ret, len, seqan::Exact());
 	gzread(fp, seq, sizeof(char) * len);
 	for(int i = 0; i < len; i++) {
-		appendValueNE(ret, (TVal)((int)seq[i] >> 6));
+		appendValue(ret, (TVal)((int)seq[i] >> 6));
 	}
 	return true;
 }

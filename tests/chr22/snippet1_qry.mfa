@@ -1,8 +1,0 @@
-# ebwt_search args: -1fra
-# vmatch args: -d -p -h 1 -complete -noevalue -noscore
->0+:<0,0,1>,<0,26,1>,<0,52,1>,<0,78,1>,<0,104,1>,<0,130,0>,<0,156,0>
-ACTTTGGGAGCCTGAGGTAGAAGTTG
-#         ^ 
->1-:<0,0,1>,<0,26,1>,<0,52,1>,<0,78,1>,<0,104,1>,<0,130,0>,<0,156,0>
-CAACTTCTACCTCAGGCTCCCAAAGT
-#              ^ 

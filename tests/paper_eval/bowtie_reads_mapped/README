@@ -1,9 +1,0 @@
-bowtie_reads_mapped
--------------------
-
-Runs bowtie against whole-human against 1000-Genomes reads that have
-been trimmed to various lengths (40, 35, 30, and 25 base pairs) and
-collects statistics about how many mappings were possible for each 
-major bowtie mode (i.e. exact end-to-end, 1-mismatch end-to-end, and
-Maq mode).  That information is distilled down to a set of .stats
-files, which are parsed and sent to gplot/gnuplot to produce an .eps.

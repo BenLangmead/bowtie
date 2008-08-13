@@ -11,73 +11,23 @@ using namespace std;
 using namespace seqan;
 
 /**
- * Exception to throw when a Fasta file is malformed.
- */
-class AlphabetException : public runtime_error {
-public:
-	AlphabetException(const string& msg = "") : runtime_error(msg) {}
-};
-
-/**
- * Convert an int to an 'A', 'C', 'G' or 'T'
- */
-static inline char toDna(int i) {
-	switch(i) {
-		case 0: return 'A';
-		case 1: return 'C';
-		case 2: return 'G';
-		case 3: return 'T';
-		default: {
-			stringstream ss; ss << "No such DNA character: " << i;
-			throw AlphabetException(ss.str());
-		}
-	}
-	throw;
-}
-
-/**
- * Convert an int to an 'A', 'C', 'G', 'T' or '$'
- */
-static inline char toDna5(int i) {
-	switch(i) {
-		case 0: return 'A';
-		case 1: return 'C';
-		case 2: return 'G';
-		case 3: return 'T';
-		case 4: return '$';
-		default: {
-			stringstream ss; ss << "No such DNA+$ character: " << i;
-			throw AlphabetException(ss.str());
-		}
-	}
-	throw;
-}
-
-/**
  * Helper function to print a uint32_t as a DNA string where each 2-bit
  * stretch is a character and more significiant bits appear to the left
  * of less singificant bits. 
  */
-static inline char * u32ToDna(uint32_t a, int len) {
-	static char buf[17]; // TODO: return a new string; by value I guess
+static inline std::string u32ToDna(uint32_t a, int len) {
+	char buf[17]; // TODO: return a new string; by value I guess
 	assert_leq(len, 16);
 	for(int i = 0; i < len; i++) {
-		buf[len-i-1] = toDna(a & 3);
+		buf[len-i-1] = "ACGT"[a & 3];
 		a >>= 2;
 	}
 	buf[len] = '\0';
-	return buf;
+	return std::string(buf);
 }
 
 /**
- * Return the complement of Dna (or Rna) char c.
- */
-static inline int complement(int c) {
-	return (c < 4)? c ^ 3 : c;
-}
-
-/**
- * Return the reverse-complement of s.
+ * Return a new TStr containing the reverse-complement of s.
  */
 template<typename TStr>
 static inline TStr reverseComplement(const TStr& s) {
@@ -86,7 +36,7 @@ static inline TStr reverseComplement(const TStr& s) {
 	size_t slen = length(s);
 	resize(s_rc, slen);
 	for(size_t i = 0; i < slen; i++) {
-		s_rc[i] = (TVal)complement((int)s[slen-i-1]);
+		s_rc[i] = (TVal)((int)s[slen-i-1] ^ 3);
 	}
 	return s_rc;
 }

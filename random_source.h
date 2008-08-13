@@ -1,6 +1,9 @@
 #ifndef RANDOM_GEN_H_
 #define RANDOM_GEN_H_
 
+/**
+ * Simple linear congruential generator, a la Numerical Recipes.
+ */
 class RandomSource {
 public:
 	RandomSource(uint32_t seed = 0) : a(1664525), c(1013904223), last(seed) { }
