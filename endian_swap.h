@@ -1,5 +1,5 @@
-#ifndef ENDIAN_H
-#define ENDIAN_H
+#ifndef ENDIAN_SWAP_H
+#define ENDIAN_SWAP_H
 
 #include <stdint.h>
 #include <inttypes.h>

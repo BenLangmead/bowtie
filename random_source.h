@@ -2,7 +2,8 @@
 #define RANDOM_GEN_H_
 
 /**
- * Simple linear congruential generator, a la Numerical Recipes.
+ * Simple pseudo-random linear congruential generator, a la Numerical
+ * Recipes.
  */
 class RandomSource {
 public:

@@ -20,7 +20,6 @@ size_t fastaRefReadSize(istream& in,
 	}
 	// Skip to the end of the id line; if the next line is either
 	// another id line or a comment line, keep skipping
-	// TODO: grab name here, stick in *name
 	do {
 		if((c = skipLine(in)) == -1) return seqCharsRead;
 	} while (c == '>' || c == '#');

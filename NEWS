@@ -1,0 +1,18 @@
+Bowtie: an Ultrafast, Lightweight Short Read Aligner
+
+Bowtie NEWS
+===========
+
+   The first release of the Bowtie is now available for download.
+Version 1.0.0 is the first version to be released under the OSI
+Artistic License (see `COPYING') and freely available to the public
+for download.  The Bowtie project is still in its early development
+stages, and everyone interested in improving this project is strongly
+encouraged to contact us. See the project website for more details.
+
+Version Release History
+=======================
+
+Version 1.0.0 - August 2008
+
+     * First official release of the Bowtie distribution.

@@ -1,5 +1,5 @@
-#ifndef PARAMS_H_
-#define PARAMS_H_
+#ifndef FORMATS_H_
+#define FORMATS_H_
 
 /**
  * File-format constants and names
@@ -18,4 +18,4 @@ static const std::string file_format_names[] = {
 	"Command line"
 };
 
-#endif /*PARAMS_H_*/
+#endif /*FORMATS_H_*/
