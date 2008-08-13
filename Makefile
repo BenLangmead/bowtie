@@ -13,14 +13,11 @@ CPP = ${PREFIX}g++
 CXX = ${CPP}
 HEADERS = $(wildcard *.h)
 LIBS =
-OTHER_CPPS = ccnt_lut.cpp \
-             hit.cpp \
-             ref_read.cpp
-
-MAQ_HEADERS = $(wildcard maq_convert/*.h)
-MAQ_CPPS	= maq_convert/maqmap.c \
-              maq_convert/const.c
-MAQ_LIBS    = -lz
+OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp
+MAQ_H   = $(wildcard maq_convert/*.h)
+MAQ_CPP	= maq_convert/maqmap.c \
+          maq_convert/const.c
+MAQ_LIB = -lz
 
 DEBUG_FLAGS = -O0 -g3
 RELEASE_FLAGS = -O3 
@@ -74,8 +71,8 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` -DEBWT_SEARCH_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
-bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_HEADERS) $(MAQ_CPPS)
-	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIBS) $(INC) -I . -o $@ $< $(MAQ_CPPS)
+bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
+	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIB) $(INC) -I . -o $@ $< $(MAQ_CPP)
 
 bowtie.tar.gz: $(PKG_LIST)
 	tar zcvf $@ $(PKG_LIST)
