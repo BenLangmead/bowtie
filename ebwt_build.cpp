@@ -1,5 +1,3 @@
-#ifdef EBWT_BUILD_MAIN
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -16,6 +14,10 @@
 #include "tokenize.h"
 #include "timer.h"
 #include "ref_read.h"
+
+/**
+ * \file Driver for the bowtie-build indexing tool. 
+ */
 
 // Build parameters
 static int verbose           = 0;     // be talkative
@@ -379,5 +381,3 @@ int main(int argc, char **argv) {
 	}
 	return 0;
 }
-
-#endif
