@@ -3556,7 +3556,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{210.461, 644.156}, {53.5299, 27}}</string>
+			<string>{{210.644, 644.156}, {53.347, 27}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -3686,7 +3686,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{210.461, 590.157}, {53.5299, 27}}</string>
+			<string>{{210.644, 590.157}, {53.347, 27}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -6038,7 +6038,7 @@
 			<array>
 				<string>{294.801, 238.785}</string>
 				<string>{282.437, 246.094}</string>
-				<string>{264.282, 242.232}</string>
+				<string>{264.282, 242.22}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -6143,7 +6143,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{210.418, 222.95}, {53.3753, 27}}</string>
+			<string>{{210.696, 222.95}, {53.0972, 27}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -6208,7 +6208,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{210.454, 195.95}, {53.537, 27}}</string>
+			<string>{{210.642, 195.95}, {53.3492, 27}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -6807,7 +6807,7 @@
 		</dict>
 	</array>
 	<key>ModificationDate</key>
-	<string>2008-08-13 01:15:14 -0400</string>
+	<string>2008-08-13 10:08:54 -0400</string>
 	<key>Modifier</key>
 	<string>Benjamin Langmead</string>
 	<key>NotesVisible</key>
@@ -6880,9 +6880,9 @@
 		<key>ShowStatusBar</key>
 		<true/>
 		<key>VisibleRegion</key>
-		<string>{{0, 21.1343}, {755.323, 746.134}}</string>
+		<string>{{105.825, 563.391}, {207.114, 204.595}}</string>
 		<key>Zoom</key>
-		<string>1.088276</string>
+		<string>3.968822</string>
 	</dict>
 </dict>
 </plist>
