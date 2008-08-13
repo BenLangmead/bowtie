@@ -2,9 +2,11 @@
 #define EBWT_H_
 
 #include <stdint.h>
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <set>
 #include <sstream>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
@@ -2636,7 +2638,7 @@ inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
 {	
 	assert(!s.params().arrowMode());
 	assert_gt(s.spread(), NUM_SAMPLES);
-	set<uint32_t> sampled_hits;
+	std::set<uint32_t> sampled_hits;
 	bool reported = false;
 	while (sampled_hits.size() < NUM_SAMPLES)
 	{

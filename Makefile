@@ -3,7 +3,7 @@
 # SEQAN_INC variable to point to your SeqAn installation.
 #
 
-SEQAN_INC = -I../SeqAn-1.0
+SEQAN_INC = -I../SeqAn-1.1
 INC = $(SEQAN_INC)
 PREFIX = /usr/bin/
 CC = ${PREFIX}gcc
@@ -30,6 +30,21 @@ BIN_LIST = bowtie-build \
            bowtie \
            bowtie-debug \
            bowtie-convert
+
+PKG_LIST = $(wildcard *.h) \
+           $(wildcard *.hh) \
+           $(wildcard *.c) \
+           $(wildcard *.cpp) \
+           $(wildcard maq_convert/*.h) \
+           $(wildcard maq_convert/*.hh) \
+           $(wildcard maq_convert/*.c) \
+           $(wildcard maq_convert/*.cpp) \
+           AUTHORS \
+           bowtie.doxyfile \
+           COPYING \
+           Makefile \
+           NEWS \
+           VERSION
 
 all: $(BIN_LIST)
 
@@ -59,6 +74,9 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
 
 bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_HEADERS) $(MAQ_CPPS)
 	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIBS) $(INC) -I . -o $@ $< $(MAQ_CPPS)
+
+bowtie.tar.gz: $(PKG_LIST)
+	tar zcvf $@ $(PKG_LIST)
 
 .PHONY: clean
 clean:

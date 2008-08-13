@@ -144,7 +144,7 @@ public:
  				_name = &_nameDefault;
  			}
  			assert_leq(_spread, DEFAULT_SPREAD);
- 	 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 3 + 1;
+ 	 		_maxStackDepth = length(*_qry) - min<uint32_t>(_unrevOff, length(*_qry)) + 3 + 1;
  	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
  			if(_muts != NULL) {
@@ -212,7 +212,7 @@ public:
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}
- 		_maxStackDepth = length(*_qry) - min(_unrevOff, length(*_qry)) + 3 + 1;
+ 		_maxStackDepth = length(*_qry) - min<uint32_t>(_unrevOff, length(*_qry)) + 3 + 1;
  		if(_pairs == NULL) {
  			_pairs = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  		}
@@ -294,7 +294,7 @@ public:
 	 */
 	void setQlen(uint32_t qlen) {
 		assert(_qry != NULL);
-		_qlen = min(length(*_qry), qlen);
+		_qlen = min<uint32_t>(length(*_qry), qlen);
 	}
 	
 	/// Return the maximum number of allowed backtracks in a given call

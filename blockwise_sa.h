@@ -263,7 +263,6 @@ public:
 
 	~KarkkainenBlockwiseSA() {
 		VMSG_NL("Entering ~KarkkainenBlockwiseSA()");
-		if(!empty(_sampleSuffs)) destroy(_sampleSuffs);
 		if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
 		VMSG_NL("Leaving ~KarkkainenBlockwiseSA()");
 	}

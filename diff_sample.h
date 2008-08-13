@@ -753,49 +753,51 @@ void DifferenceCoverSample<TStr>::build() {
 	buildSPrime(sPrime);
 	assert_gt(length(sPrime), 0);
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
-	String<uint32_t> sPrimeOrder;
-	reserve(sPrimeOrder, length(sPrime)+1, Exact()); // reserve extra slot for LS
-	resize(sPrimeOrder, length(sPrime), Exact());
-	for(size_t i = 0; i < length(sPrimeOrder); i++) {
-		sPrimeOrder[i] = i;
-	}
-	// sPrime now holds suffix-offsets for DC samples.  sPrimeOrder
-	// contains the intial ordering and is passed in as a "double-swap"
-	// partner of sPrime so that we can reconstruct how the qsort
-	// permuted sPrime.
-	{
-		Timer timer(cout, "  V-Sorting samples time: ", this->verbose());
-		VMSG_NL("  V-Sorting samples");
-		uint32_t *sPrimeArr = (uint32_t*)begin(sPrime);
-		size_t slen = length(sPrime);
-		assert_eq(sPrimeArr[0], sPrime[0]);
-		assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
-		uint32_t *sPrimeOrderArr = (uint32_t*)begin(sPrimeOrder);
-		assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
-		assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
-		mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, ValueSize<TAlphabet>::VALUE,
-		              this->verbose(), this->sanityCheck(), v);
-		assert_eq(sPrimeArr[0], sPrime[0]);
-		assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
-		assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
-		assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
-	}
-	// Now assign the ranking implied by the sorted sPrime/sPrimeOrder
-	// arrays back into sPrime.
 	uint32_t nextRank = 0;
-	reserve(_isaPrime, length(sPrime)+1, Exact());
-	fill(_isaPrime, length(sPrime), 0xffffffff, Exact());
-	VMSG_NL("  Ranking v-sort output");
-	for(size_t i = 0; i < length(sPrime)-1; i++) {
-		// Place the appropriate ranking in 
-		_isaPrime[sPrimeOrder[i]] = nextRank;
-		// If sPrime[i] and sPrime[i+1] are identical up to v, then we
-		// should give the next suffix the same rank
-		if(!suffixSameUpTo(t, sPrime[i], sPrime[i+1], v)) nextRank++;
+	{
+		String<uint32_t> sPrimeOrder;
+		reserve(sPrimeOrder, length(sPrime)+1, Exact()); // reserve extra slot for LS
+		resize(sPrimeOrder, length(sPrime), Exact());
+		for(size_t i = 0; i < length(sPrimeOrder); i++) {
+			sPrimeOrder[i] = i;
+		}
+		// sPrime now holds suffix-offsets for DC samples.  sPrimeOrder
+		// contains the intial ordering and is passed in as a "double-swap"
+		// partner of sPrime so that we can reconstruct how the qsort
+		// permuted sPrime.
+		{
+			Timer timer(cout, "  V-Sorting samples time: ", this->verbose());
+			VMSG_NL("  V-Sorting samples");
+			uint32_t *sPrimeArr = (uint32_t*)begin(sPrime);
+			size_t slen = length(sPrime);
+			assert_eq(sPrimeArr[0], sPrime[0]);
+			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+			uint32_t *sPrimeOrderArr = (uint32_t*)begin(sPrimeOrder);
+			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
+			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+			mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, ValueSize<TAlphabet>::VALUE,
+			              this->verbose(), this->sanityCheck(), v);
+			assert_eq(sPrimeArr[0], sPrime[0]);
+			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
+			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+		}
+		// Now assign the ranking implied by the sorted sPrime/sPrimeOrder
+		// arrays back into sPrime.
+		reserve(_isaPrime, length(sPrime)+1, Exact());
+		fill(_isaPrime, length(sPrime), 0xffffffff, Exact());
+		VMSG_NL("  Ranking v-sort output");
+		for(size_t i = 0; i < length(sPrime)-1; i++) {
+			// Place the appropriate ranking in 
+			_isaPrime[sPrimeOrder[i]] = nextRank;
+			// If sPrime[i] and sPrime[i+1] are identical up to v, then we
+			// should give the next suffix the same rank
+			if(!suffixSameUpTo(t, sPrime[i], sPrime[i+1], v)) nextRank++;
+		}
+		_isaPrime[sPrimeOrder[length(sPrime)-1]] = nextRank; // finish off
+		// sPrimeOrder is destroyed
+		// All the information we need is now in _isaPrime
 	}
-	_isaPrime[sPrimeOrder[length(sPrime)-1]] = nextRank; // finish off
-	// All the information we need is now in _isaPrime
-	destroy(sPrimeOrder);
 	#ifndef NDEBUG
 	// Check that all ranks are sane
 	for(size_t i = 0; i < length(_isaPrime); i++) {
