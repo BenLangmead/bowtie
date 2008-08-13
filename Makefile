@@ -7,9 +7,9 @@
 SEQAN_DIR = ../SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
-PREFIX = /usr/bin/
-CC = ${PREFIX}gcc
-CPP = ${PREFIX}g++
+GCC_PREFIX = $(shell dirname `which gcc`)
+CC = ${GCC_PREFIX}/gcc
+CPP = ${GCC_PREFIX}/g++
 CXX = ${CPP}
 HEADERS = $(wildcard *.h)
 LIBS =

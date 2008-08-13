@@ -192,9 +192,9 @@ public:
 
 	/// Retrieve the next block of sorted suffix-array elements
 	virtual const void nextBlock() {
-		size_t sz = min(this->bucketSz(), length(_sa)-_cur);
+		size_t sz = min<uint32_t>(this->bucketSz(), length(_sa)-_cur);
 		_cur += sz;
-		this->_itrBucket = infixWithLength(_sa, _cur-sz, sz); 
+		this->_itrBucket = infix(_sa, _cur-sz, _cur-1); 
 	}
 	
 	/// Return true iff there are more blocks to retrieve
