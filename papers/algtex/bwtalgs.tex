@@ -11,7 +11,8 @@
 \begin{algorithm}[stepleft]
 \caption{$\stepleft(r)$}\label{alg:stepleft} 
 \begin{algorithmic}[1] 
-\RETURN $C[BWT[r]] + 1 $ + Occ$(BWT[r], r)$
+\STATE $c \Leftarrow BWT[r]$
+\RETURN $C[c] $ + Occ$(c, r) + 1$
 \end{algorithmic} 
 \end{algorithm} 
 
