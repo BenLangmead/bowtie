@@ -25,6 +25,20 @@ unless(defined $options{n}) {
 my $maq = 0;
 $maq = $options{m} if defined $options{m};
 
+my @policies = (
+	"-n 2",
+	"-n 1",
+	"-n 0",
+	"-2",
+	"-1",
+	"-0"
+);
+
+sub pickPolicy {
+	my $r = rand() % ($#policies + 1);
+	return $policies[$r];
+}
+
 my $seed = 0;
 $seed = int $ARGV[0] if defined($ARGV[0]);
 srand $seed;
@@ -142,7 +156,7 @@ sub build {
 
 # Search for a pattern in an existing Ebwt
 sub search {
-	my($t, $p, $revcomp, $mismatches, $oneHit, $requireResult) = @_;
+	my($t, $p, $mismatches, $oneHit, $requireResult) = @_;
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
@@ -158,7 +172,7 @@ sub search {
 	} else {
 		$maq = "";
 	}
-	my $cmd = "./bowtie-debug $maq $revcomp $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
+	my $cmd = "./bowtie-debug $maq $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
@@ -226,17 +240,11 @@ for(; $outer > 0; $outer--) {
 	my $ftabChars = 1 + int(rand(8));    # Must be >= 1
 	my $chunkRate = 1 + int(rand(10));   # Must be >= 1
 	my $big = int(rand(2));
-	my $revcomp = int(rand(2)) || $maq;
 	my $endian = '';
 	if($big) {
 		$endian = "--big";
 	} else {
 		$endian = "--little";
-	}
-	if($revcomp) {
-		$revcomp = "-r";
-	} else {
-		$revcomp = "";
 	}
 
 	# Generate random text(s)
@@ -275,10 +283,10 @@ for(; $outer > 0; $outer--) {
 				my $rpad = randDna(max(0, int(rand(20)) - 10));
 				$p = $lpad . $p . $rpad;
 			}
-			if($revcomp && (int(rand(2)) == 0)) {
+			if((int(rand(2)) == 0)) {
 				$p = reverseComp($p);
 			}
-			$p = addQual($p) if $maq;
+			$p = addQual($p);
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
@@ -288,7 +296,7 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $mismatches = !(int(rand(3)) == 0);
-		$pass += search($t, $pfinal, $revcomp, $mismatches, $oneHit, 1); # require 1 or more results
+		$pass += search($t, $pfinal, $mismatches, $oneHit, 1); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -300,7 +308,7 @@ for(; $outer > 0; $outer--) {
 		for(my $i = 0; $i < $np; $i++) {
 			my $plen = int(rand($prand)) + $pbase;
 			my $p = randDna($plen);
-			if($revcomp && int(rand(2)) == 0) {
+			if(int(rand(2)) == 0) {
 				$p = reverseComp($p);
 			}
 			$p = addQual($p) if $maq;
@@ -312,7 +320,7 @@ for(; $outer > 0; $outer--) {
 
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
-		$pass += search($t, $pfinal, $revcomp, $oneHit, 0); # do not require any results
+		$pass += search($t, $pfinal, $oneHit, 0); # do not require any results
 		last if(++$tests > $limit);
 	}
 
