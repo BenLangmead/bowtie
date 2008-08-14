@@ -1277,8 +1277,8 @@ static void seededQualCutoffSearch(
 	uint32_t numQs = ((qUpto == -1) ? 10 * 1024 * 1024 : qUpto);
 	vector<bool> doneMask(numQs, false);
 	uint32_t s = seedLen;
-	uint32_t s3 = seedLen >> 1; // length of 3' half of seed
-	uint32_t s5 = (seedLen >> 1) + (s & 1); // length of 5' half of seed
+	uint32_t s3 = s >> 1; // length of 3' half of seed
+	uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
@@ -1301,7 +1301,7 @@ static void seededQualCutoffSearch(
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
-		EbwtSearchState<TStr> s(ebwtFw, params, seed);
+		EbwtSearchState<TStr> st(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 > doneMask.capacity()) {
@@ -1318,8 +1318,8 @@ static void seededQualCutoffSearch(
 			// case we can pick it off early here
 			uint64_t numHits = sink.numHits();
 			params.setPatId(patid);
-	    	s.newQuery(patFw, nameFw, qualFw);
-		    ebwtFw.search(s, params);
+	    	st.newQuery(patFw, nameFw, qualFw);
+		    ebwtFw.search(st, params);
 			if(sink.numHits() > numHits) {
 				assert_eq(numHits+1, sink.numHits());
 				doneMask[patid>>1] = true;
@@ -1328,10 +1328,24 @@ static void seededQualCutoffSearch(
 			}
 			// Set up backtracker with reverse complement
 			params.setFw(false);
-			bt.setQuery(patRc, qualRc, nameRc);
+			uint32_t qs = min<uint32_t>(plen, s);
+			// Set up special seed bounds
+			if(qs < s) {
+				uint32_t qs5 = (qs >> 1) + (qs & 1);
+				bt.setUnrevOff((seedMms > 0)? qs5 : qs);
+				bt.set1RevOff ((seedMms > 1)? qs5 : qs);
+				bt.set2RevOff(qs);
+			}
 			params.setPatId(patid+1);
+			bt.setQuery(patRc, qualRc, nameRc);
 			ASSERT_ONLY(numHits = sink.numHits());
 			bool hit = bt.backtrack();
+			// Restore default seed bounds
+			if(qs < s) {
+				bt.setUnrevOff((seedMms > 0)? s5 : s);
+				bt.set1RevOff ((seedMms > 1)? s5 : s);
+				bt.set2RevOff (s);
+			}
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1407,14 +1421,28 @@ static void seededQualCutoffSearch(
 	    	// 3F...
 			params.setFw(true);  // looking at forward strand
 	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
+			size_t plen = length(*patFw);
 			btf.setQuery(patFw, qualFw, nameFw);
 			params.setPatId(patid);
+			uint32_t qs = min<uint32_t>(plen, s);
+			// Set up special seed bounds
+			if(qs < s) {
+				uint32_t qs5 = (qs >> 1) + (qs & 1); // length of 5' half of seed
+				btf.setUnrevOff((seedMms > 0)? qs5 : qs);
+				btf.set1RevOff ((seedMms > 1)? qs5 : qs);
+				btf.set2RevOff (qs);
+			}
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			
 			// Do a 12/24 backtrack on the forward-strand read using
 			// the transposed index.  This will find all case 1F, 2F
 			// and 3F hits.
 			bool hit = btf.backtrack();
+			// Restore default seed bounds
+			if(qs < s) {
+				btf.setUnrevOff((seedMms > 0)? s5 : s);
+				btf.set1RevOff ((seedMms > 1)? s5 : s);
+				btf.set2RevOff (s);
+			}
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
@@ -1436,6 +1464,14 @@ static void seededQualCutoffSearch(
 			// (the cases with 1 mismatch in the 5' half of the seed)
 			params.setFw(false);  // looking at reverse-comp strand
 			params.setPatId(patid+1);
+			qs = min<uint32_t>(plen, s);
+			// Set up special seed bounds
+			if(qs < s) {
+				uint32_t qs3 = qs >> 1;
+				btr.setUnrevOff(qs3);
+				btr.set1RevOff ((seedMms > 1)? qs3 : qs);
+				btr.set2RevOff (qs);
+			}
 			btr.setQuery(patRc, qualRc, nameRc);
 			btr.setQlen(s); // just look at the seed
 			uint32_t numSeedlings = length(seedlingsRc);
@@ -1443,6 +1479,12 @@ static void seededQualCutoffSearch(
 			// using the transposed index.  This will find seedlings
 			// for case 4R
 			btr.backtrack();
+			// Restore default seed bounds
+			if(qs < s) {
+				btr.setUnrevOff(s3);
+				btr.set1RevOff ((seedMms > 1)? s3 : s);
+				btr.set2RevOff (s);
+			}
 			hit = length(seedlingsRc) > numSeedlings;
 			append(seedlingsRc, 0xff);
 #ifndef NDEBUG
@@ -1562,6 +1604,9 @@ static void seededQualCutoffSearch(
 			// Given the seedlines generated in phase 2, check for hits
 			// for case 4R
 			uint32_t plen = length(*patRc);
+			uint32_t qs = min<uint32_t>(plen, s);
+			uint32_t qs3 = qs >> 1;
+			uint32_t qs5 = (qs >> 1) + (qs & 1);
 			if(seedlingsRc[seedlingId++] != 0xff) {
 				assert_lt(seedlingId, seedlingsRcLen);
 				seedlingId--;
@@ -1597,6 +1642,12 @@ static void seededQualCutoffSearch(
 					assert_eq((patid>>1) & 0xff, seedlingsRc[id2]);
 				}
 #endif
+				// Set up special seed bounds
+				if(qs < s) {
+					btr.setUnrevOff(qs);
+					btr.set1RevOff (qs);
+					btr.set2RevOff (qs);
+				}
 				while(seedlingsRc[seedlingId++] != 0xff) {
 					seedlingId--; // point to that non-0xff character
 					String<QueryMutation> muts;
@@ -1637,6 +1688,12 @@ static void seededQualCutoffSearch(
 						break;
 					}
 				}
+				// Restore usual seed bounds
+				if(qs < s) {
+					btr.setUnrevOff(s);
+					btr.set1RevOff (s);
+					btr.set2RevOff (s);
+				}
 				assert_leq(seedlingId, seedlingsRcLen);
 				assert_eq(0xff, seedlingsRc[seedlingId-1]);
 			}
@@ -1659,7 +1716,19 @@ static void seededQualCutoffSearch(
 	    	if(seedMms == 2) {
 				btr2.setQuery(patRc, qualRc, nameRc);
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
+				// Set up special seed bounds
+				if(qs < s) {
+					btr2.setUnrevOff(0);
+					btr2.set1RevOff (qs5);
+					btr2.set2RevOff (qs);
+				}
 				bool hit = btr2.backtrack();
+				// Restore usual seed bounds
+				if(qs < s) {
+					btr2.setUnrevOff(0);
+					btr2.set1RevOff (s5);
+					btr2.set2RevOff (s);
+				}
 //				cout << "Time: "
 //			         << ", hit: " << hit
 //				     << ", numBts: " << btr2.numBacktracks()
@@ -1734,10 +1803,22 @@ static void seededQualCutoffSearch(
 			btf.setQuery(patFw, qualFw, nameFw);
 			btf.setQlen(seedLen); // just look at the seed
 			ASSERT_ONLY(uint32_t numSeedlings = length(seedlingsFw));
+			// Set up special seed bounds
+			if(qs < s) {
+				btf.setUnrevOff(qs3);
+				btf.set1RevOff ((seedMms > 1)? qs3 : qs);
+				btf.set2RevOff (qs);
+			}
 			// Do a 12/24 seedling backtrack on the forward read
 			// using the normal index.  This will find seedlings
 			// for case 4F
 			btf.backtrack();
+			// Set up special seed bounds
+			if(qs < s) {
+				btf.setUnrevOff(s3);
+				btf.set1RevOff ((seedMms > 1)? s3 : s);
+				btf.set2RevOff (s);
+			}
 			append(seedlingsFw, 0xff);
 #ifndef NDEBUG
 			append(seedlingsFw, (patid>>1));
@@ -1834,6 +1915,8 @@ static void seededQualCutoffSearch(
 			// Given the seedlines generated in phase 3, check for hits
 			// for case 4F
 			uint32_t plen = length(*patFw);
+			uint32_t qs = min<uint32_t>(plen, s);
+			uint32_t qs5 = (qs >> 1) + (qs & 1);
 			if(seedlingsFw[seedlingId++] != 0xff) {
 				assert_lt(seedlingId, seedlingsFwLen);
 				seedlingId--;
@@ -1870,6 +1953,12 @@ static void seededQualCutoffSearch(
 					assert_eq((patid>>1) & 0xff, seedlingsFw[id2]);
 				}
 #endif
+				// Set special seed bounds
+				if(qs < s) {
+					btf.setUnrevOff(qs);
+					btf.set1RevOff (qs);
+					btf.set2RevOff (qs);
+				}
 				while(seedlingsFw[seedlingId++] != 0xff) {
 					seedlingId--; // point to that non-0xff character
 					String<QueryMutation> muts;
@@ -1907,6 +1996,12 @@ static void seededQualCutoffSearch(
 						break;
 					}
 				}
+				// Restore usual seed bounds
+				if(qs < s) {
+					btf.setUnrevOff(s);
+					btf.set1RevOff (s);
+					btf.set2RevOff (s);
+				}
 				assert_leq(seedlingId, seedlingsFwLen);
 				if(seedlingId == seedlingsFwLen) {
 					break; // break out of the pattern loop
@@ -1932,7 +2027,19 @@ static void seededQualCutoffSearch(
 	    	if(seedMms == 2) {
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
 				btf2.setQuery(patFw, qualFw, nameFw);
+				// Set special seed bounds
+				if(qs < s) {
+					btf2.setUnrevOff(0);
+					btf2.set1RevOff (qs5);
+					btf2.set2RevOff (qs);
+				}
 				bool hit = btf2.backtrack();
+				// Restore usual seed bounds
+				if(qs < s) {
+					btf2.setUnrevOff(0);
+					btf2.set1RevOff (s5);
+					btf2.set2RevOff (s);
+				}
 //				cout << "Time: "
 //			         << ", hit: " << hit
 //				     << ", numBts: " << btf2.numBacktracks()
