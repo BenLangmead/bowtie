@@ -1,22 +1,23 @@
 #
 # Makefile for bowtie, bowtie-build, and bowtie-convert.  Adjust the
 # SEQAN_INC variable to point to your SeqAn installation.  E.g.:
-#   make SEQAN_DIR="/usr/local/SeqAn-1.0" bowtie
+#   make SEQAN_DIR="/usr/local/SeqAn-1.1" bowtie
 #
 
 SEQAN_DIR = ../SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
 GCC_PREFIX = $(shell dirname `which gcc`)
-CC = ${GCC_PREFIX}/gcc
-CPP = ${GCC_PREFIX}/g++
-CXX = ${CPP}
+CC = $(GCC_PREFIX)/gcc
+CPP = $(GCC_PREFIX)/g++
+CXX = $(CPP)
 HEADERS = $(wildcard *.h)
 LIBS =
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/maqmap.c \
           maq_convert/const.c
+# bowtie-convert requires zlib because maq's format is compressed
 MAQ_LIB = -lz
 
 DEBUG_FLAGS = -O0 -g3
