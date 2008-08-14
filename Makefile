@@ -54,27 +54,27 @@ allall: $(BIN_LIST) $(BIN_LIST_AUX)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DEBWT_BUILD_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DEBWT_BUILD_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 bowtie-build-packed: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DEBWT_BUILD_MAIN -DPACKED_STRINGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" -DPACKED_STRINGS $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 bowtie-build-packed-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DEBWT_BUILD_MAIN -DPACKED_STRINGS -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" -DPACKED_STRINGS -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS)
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` -DEBWT_SEARCH_MAIN $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
+	$(CXX) $(RELEASE_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" $(NOASSERT_FLAGS) -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) 
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` -DEBWT_SEARCH_MAIN -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
+	$(CXX) $(DEBUG_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` -DBOWTIE_VERSION="\"`cat VERSION`\"" -Wall $(INC) $(LIBS) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS)
 
 bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIB) $(INC) -I . -o $@ $< $(MAQ_CPP)

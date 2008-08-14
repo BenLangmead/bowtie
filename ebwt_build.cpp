@@ -289,9 +289,8 @@ int main(int argc, char **argv) {
 	parseOptions(argc, argv);
 	argv0 = argv[0];
 	if(showVersion) {
-		// TODO: handle versioning better
-		cout << argv0 << " version 0.1 (beta)" << endl;
-		cout << "Hash: " << EBWT_BUILD_HASH << endl;
+		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		cout << "Source hash: " << EBWT_BUILD_HASH << endl;
 		return 0;
 	}
 
