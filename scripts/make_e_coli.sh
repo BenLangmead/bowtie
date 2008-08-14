@@ -18,7 +18,19 @@ if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 fi
 
 if [ ! -f NC_008253.fna ] ; then
-	wget ${GENOMES_MIRROR}/Bacteria/Escherichia_coli_536/NC_008253.fna
+	#if ! which wget > /dev/null ; then
+	if true ; then
+		echo wget not found, looking for curl...
+		if ! which curl > /dev/null ; then
+			echo curl not found either, aborting...
+		else
+			# Use curl
+			curl ${GENOMES_MIRROR}/Bacteria/Escherichia_coli_536/NC_008253.fna -o NC_008253.fna
+		fi
+	else
+		# Use wget
+		wget ${GENOMES_MIRROR}/Bacteria/Escherichia_coli_536/NC_008253.fna
+	fi
 fi
 
 if [ ! -f NC_008253.fna ] ; then
