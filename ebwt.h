@@ -336,11 +336,11 @@ public:
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
-		string file3 = file + ".3.ebwt";
+		//string file3 = file + ".3.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
-		ofstream fout3(file3.c_str(), ios::binary);
+		//ofstream fout3(file3.c_str(), ios::binary);
 		// Build
 		initFromVector(is,
 		               szs,
@@ -348,7 +348,7 @@ public:
 		               refparams,
 		               fout1,
 		               fout2,
-		               fout3,
+		               //fout3,
 		               useBlockwise,
 		               bmax,
 		               bmaxSqrtMult,
@@ -407,7 +407,7 @@ public:
 	                    const RefReadInParams& refparams,
 	                    ofstream& out1,
 	                    ofstream& out2,
-	                    ofstream& out3,
+	                    //ofstream& out3,
 	                    bool useBlockwise,
 	                    uint32_t bmax,
 	                    uint32_t bmaxSqrtMult,
@@ -436,11 +436,11 @@ public:
 			VMSG_NL("Joining reference sequences");
 			{
 				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
-				joinToDisk(is, szs, sztot, refparams, s, out1, out2, out3, seed);
+				joinToDisk(is, szs, sztot, refparams, s, out1, out2, /*out3,*/ seed);
 			}
-			out3.flush();
-			VMSG_NL("Wrote " << out3.tellp() << " bytes to tertiary EBWT file");
-			out3.close();
+			//out3.flush();
+			//VMSG_NL("Wrote " << out3.tellp() << " bytes to tertiary EBWT file");
+			//out3.close();
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory creating joined string in "
 			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
@@ -743,7 +743,7 @@ public:
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
 	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
-	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, ostream& out3, uint32_t seed);
+	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, /*ostream& out3,*/ uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -3536,7 +3536,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
                             TStr& ret,
                             ostream& out1,
                             ostream& out2,
-                            ostream& out3,
+                            //ostream& out3,
                             uint32_t seed = 0)
 {
 	RandomSource rand(seed); // reproducible given same seed
