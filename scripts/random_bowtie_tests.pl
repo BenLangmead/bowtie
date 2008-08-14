@@ -22,9 +22,6 @@ unless(defined $options{n}) {
 	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug");
 }
 
-my $maq = 0;
-$maq = $options{m} if defined $options{m};
-
 my @policies = (
 	"-n 2",
 	"-n 1",
@@ -35,7 +32,7 @@ my @policies = (
 );
 
 sub pickPolicy {
-	my $r = rand() % ($#policies + 1);
+	my $r = int(rand($#policies + 1));
 	return $policies[$r];
 }
 
@@ -43,16 +40,16 @@ my $seed = 0;
 $seed = int $ARGV[0] if defined($ARGV[0]);
 srand $seed;
 
-my $outer = 10000;
+my $outer = 1000;
 $outer = int $ARGV[1] if defined($ARGV[1]);
 my $limit = $outer;
 
-my $inner = 10;
+my $inner = 100;
 $inner = int $ARGV[2] if defined($ARGV[2]);
 
-my $tbase = 10;
+my $tbase = 100;
 $tbase = int $ARGV[3] if defined($ARGV[3]);
-my $trand = 30;
+my $trand = 300;
 $trand = int $ARGV[4] if defined($ARGV[4]);
 
 my $pbase = 10;
@@ -156,23 +153,13 @@ sub build {
 
 # Search for a pattern in an existing Ebwt
 sub search {
-	my($t, $p, $mismatches, $oneHit, $requireResult) = @_;
+	my($t, $p, $policy, $oneHit, $requireResult) = @_;
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
 		$oneHit = "-a";
 	}
-	if($mismatches) {
-		$mismatches = "-1";
-	} else {
-		$mismatches = "";
-	}
-	if($maq) {
-		$maq = "--maq";
-	} else {
-		$maq = "";
-	}
-	my $cmd = "./bowtie-debug $maq $mismatches --concise --orig $t $oneHit -s -c .tmp $p";
+	my $cmd = "./bowtie-debug $policy --concise --orig $t $oneHit -s -c .tmp $p";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
@@ -295,8 +282,8 @@ for(; $outer > 0; $outer--) {
 		
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
-		my $mismatches = !(int(rand(3)) == 0);
-		$pass += search($t, $pfinal, $mismatches, $oneHit, 1); # require 1 or more results
+		my $policy = pickPolicy();
+		$pass += search($t, $pfinal, $policy, $oneHit, 1); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -311,7 +298,7 @@ for(; $outer > 0; $outer--) {
 			if(int(rand(2)) == 0) {
 				$p = reverseComp($p);
 			}
-			$p = addQual($p) if $maq;
+			$p = addQual($p);
 			$pfinal .= $p;
 			if($i < $np-1) {
 				$pfinal .= ","
@@ -320,7 +307,8 @@ for(; $outer > 0; $outer--) {
 
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
-		$pass += search($t, $pfinal, $oneHit, 0); # do not require any results
+		my $policy = pickPolicy();
+		$pass += search($t, $pfinal, $policy, $oneHit, 0); # do not require any results
 		last if(++$tests > $limit);
 	}
 

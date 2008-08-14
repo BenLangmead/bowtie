@@ -215,6 +215,7 @@ public:
 	virtual ~VectorPatternSource() { }
 	virtual void nextPatternImpl(TStr** s, String<char>** qual, String<char>** name) {
 		assert(hasMorePatterns());
+		assert(*name == NULL);
 		if(!_reverse) {
 			(*s) = &(_v[_cur]);
 			(*qual) = &(_quals[_cur]);

@@ -304,9 +304,9 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.hasMorePatterns());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-	        	TStr* pat2;
-	    		String<char>* qual2;
-	    		String<char>* name2;
+	        	TStr* pat2 = NULL;
+	    		String<char>* qual2 = NULL;
+	    		String<char>* name2 = NULL;
 				patsrc.nextPattern(&pat2, &qual2, &name2);
 		    	assert(!empty(*pat2));
 		    	patid++;
@@ -646,9 +646,9 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.nextIsReverseComplement());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-		    	TStr* pat2;
-				String<char>* qual2;
-				String<char>* name2;
+		    	TStr* pat2 = NULL;
+				String<char>* qual2 = NULL;
+				String<char>* name2 = NULL;
 				patsrc.nextPattern(&pat2, &qual2, &name2);
 		    	assert(!empty(*pat2));
 		    	patid++;
@@ -786,9 +786,9 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		assert(patsrc.hasMorePatterns());
     		// Ignore this pattern (the reverse complement of
     		// the one we just matched)
-	    	TStr* pat2;
-			String<char>* qual2;
-			String<char>* name2;
+	    	TStr* pat2 = NULL;
+			String<char>* qual2 = NULL;
+			String<char>* name2 = NULL;
 			patsrc.nextPattern(&pat2, &qual2, &name2);
 
 	    	assert(!empty(*pat2));
@@ -1167,6 +1167,7 @@ static void twoMismatchSearch(
 				}
 				if(newName) {
 					delete nameFw;
+					nameFw = NULL;
 				}
 				assert_eq(0, hits.size());
 	    	}
@@ -1229,6 +1230,7 @@ static void twoMismatchSearch(
 				}
 				if(newName) {
 					delete nameRc;
+					nameRc = NULL;
 				}
 				assert_eq(0, hits.size());
 	    	}
@@ -1791,6 +1793,7 @@ static void seededQualCutoffSearch(
 				}
 				if(newName) {
 					delete nameRc;
+					nameRc = NULL;
 				}
 				assert_eq(0, hits.size());
 	    	}
@@ -2102,6 +2105,7 @@ static void seededQualCutoffSearch(
 				}
 				if(newName) {
 					delete nameFw;
+					nameFw = NULL;
 				}
 				assert_eq(0, hits.size());
 			}
