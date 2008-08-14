@@ -1,7 +1,9 @@
 #!/bin/sh
 
 #
-# Downloads sequence for a S_cerevisiae from wormbase
+# Downloads sequence for a S. cerevisiae from CYGD.  This script
+# was used to build the Bowtie index for S. cerevisiae on August 14,
+# 2008.
 #
 
 GENOMES_MIRROR=ftp://ftpmips.gsf.de/yeast/sequences 
