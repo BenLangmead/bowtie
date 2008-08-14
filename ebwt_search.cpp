@@ -2017,6 +2017,7 @@ static void driver(const char * type,
 	// Read original string(s) from command-line if given (for sanity checking)
 	if(sanityCheck && !origString.empty()) {
 		if(origString.substr(origString.length()-4) == ".mfa" ||
+		   origString.substr(origString.length()-4) == ".fna" ||
 		   origString.substr(origString.length()-3) == ".fa")
 		{
 			vector<string> origFiles;
