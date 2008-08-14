@@ -67,6 +67,7 @@ public:
 	                 uint32_t __unrevOff, // size of unrevisitable chunk
 	                 uint32_t __1revOff,  // size of 1-revisitable chunk
 	                 uint32_t __2revOff,  // size of 2-revisitable chunk
+	                 //uint32_t __3revOff,  // size of 3-revisitable chunk
 	                 uint32_t __itop,
 	                 uint32_t __ibot,
 	                 uint32_t __qualThresh,
@@ -92,6 +93,7 @@ public:
 		_unrevOff(__unrevOff),
 		_1revOff(__1revOff),
 		_2revOff(__2revOff),
+		//_3revOff(__3revOff),
 		_itop(__itop),
 		_ibot(__ibot),
 		_spread(DEFAULT_SPREAD),
@@ -127,6 +129,7 @@ public:
 	    // occupy 40 * 40 = 1,600 bytes
 	    assert_geq(__1revOff, __unrevOff);
 	    assert_geq(__2revOff, __unrevOff);
+	    //assert_geq(__3revOff, __unrevOff);
 	    fill(_qualDefault, DEFAULT_SPREAD, (char)(40+33));
  		if(_qry != NULL) {
  			_qlen = length(*_qry);
@@ -267,7 +270,7 @@ public:
 		}
 		return tmp;
 	}
-	
+
 	/// Reset greatest observed stack depth to 0
 	void resetHighStackDepth() {
 		_hiDepth = 0;
@@ -822,9 +825,7 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Pick out the arrow pair we selected and target it
 				// for backtracking
-				// TODO: optimize for (relatively common) case where
-				// eligibleSz == 1
-				uint32_t cumSz = 0;
+				//uint32_t cumSz = 0;
 				ASSERT_ONLY(uint32_t eligiblesVisited = 0);
 				size_t i = depth, j = 0;
 				uint32_t bttop = 0;
@@ -836,7 +837,7 @@ public:
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
 					bool foundTarget = false;
-					uint32_t r = _rand.nextU32() % eligibleSz;
+					//uint32_t r = _rand.nextU32() % eligibleSz;
 					for(; i <= d; i++) {
 						if(i < unrevOff) {
 							// i is an unrevisitable position, so don't consider it
@@ -849,13 +850,21 @@ public:
 						if(qi == lowAltQual && elims[i] != 15) {
 							// This is an eligible position with at least
 							// one remaining backtrack target
+							uint32_t posSz = 0;
+							for(j = 0; j < 4; j++) {
+								if((elims[i] & (1 << j)) == 0) {
+									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
+									posSz += PAIR_SPREAD(i, j);
+								}
+							}
+							uint32_t r = _rand.nextU32() % posSz;
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
 									// This pair has not been eliminated
-									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
-									cumSz += PAIR_SPREAD(i, j);
+									//cumSz += PAIR_SPREAD(i, j);
 									ASSERT_ONLY(eligiblesVisited++);
-									if(r < cumSz) {
+									uint32_t spread = PAIR_SPREAD(i, j);
+									if(r < spread) {
 										// This is our randomly-selected 
 										// backtrack target
 										foundTarget = true;
@@ -867,12 +876,15 @@ public:
 										assert_leq(btham, _qualThresh);
 										break;
 									}
+									r -= spread;
 								}
 							}
-							if(foundTarget) break;
+							//if(foundTarget) break;
+							assert(foundTarget);
+							break;
 						}
 					}
-					assert_leq(cumSz, eligibleSz);
+					//assert_leq(cumSz, eligibleSz);
 					assert_leq(i, d);
 					assert_lt(j, 4);
 					assert_leq(eligiblesVisited, eligibleNum);
@@ -951,6 +963,44 @@ public:
 				bool ret;
 				if(i+1 == _qlen) {
 					ret = report(stackDepth+1, bttop, btbot);
+				} else if(_halfAndHalf &&
+				          i+1 < (uint32_t)_ebwt._eh._ftabChars &&
+				          (uint32_t)_ebwt._eh._ftabChars <= _5depth)
+				{
+					// The ftab doesn't extend past the unrevisitable portion,
+					// so we can go ahead and use it
+					// Rightmost char gets least significant bit-pairs
+					int ftabChars = _ebwt._eh._ftabChars;
+					uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+					assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
+					for(int j = ftabChars - 1; j > 0; j--) {
+						ftabOff <<= 2;
+						if(_qlen-j == icur) {
+							ftabOff |= btcint;
+						} else {
+							ftabOff |= (uint32_t)(*_qry)[_qlen-j];
+						}
+						assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
+					}
+					assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
+					uint32_t ftabTop = _ebwt.ftabHi(ftabOff);
+					uint32_t ftabBot = _ebwt.ftabLo(ftabOff+1);
+					assert_geq(ftabBot, ftabTop);
+					if(ftabTop == ftabBot) {
+						ret = false;
+					} else {
+						ret = backtrack(stackDepth+1,
+						                _ebwt._eh._ftabChars,
+					                    btUnrevOff,  // new unrevisitable boundary
+					                    btOneRevOff, // new 1-revisitable boundary
+					                    btTwoRevOff, // new 2-revisitable boundary
+					                    ftabTop,  // top arrow in pair prior to 'depth'
+					                    ftabBot,  // bottom arrow in pair prior to 'depth'
+					                    btham,  // weighted hamming distance so far
+					                    iham,   // initial weighted hamming distance
+					                    newPairs,
+					                    newElims);
+					}
 				} else {
 					_precalcedSideLocus = true;
 					ret = backtrack(stackDepth+1,
