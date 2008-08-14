@@ -2127,8 +2127,9 @@ static void driver(const char * type,
 	vector<TStr> os;
 	// Read original string(s) from command-line if given (for sanity checking)
 	if(sanityCheck && !origString.empty()) {
-		if(origString.substr(origString.length()-4) == ".mfa" ||
-		   origString.substr(origString.length()-4) == ".fna" ||
+		if(origString.substr(origString.length()-6) == ".fasta" ||
+		   origString.substr(origString.length()-4) == ".mfa"   ||
+		   origString.substr(origString.length()-4) == ".fna"   ||
 		   origString.substr(origString.length()-3) == ".fa")
 		{
 			vector<string> origFiles;

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Downloads the contigs for a strain of e. coli from NCBI and builds a
+# Downloads the sequence for a strain of e. coli from NCBI and builds a
 # Bowtie index for it
 #
 
@@ -18,8 +18,7 @@ if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 fi
 
 if [ ! -f NC_008253.fna ] ; then
-	#if ! which wget > /dev/null ; then
-	if true ; then
+	if ! which wget > /dev/null ; then
 		echo wget not found, looking for curl...
 		if ! which curl > /dev/null ; then
 			echo curl not found either, aborting...
