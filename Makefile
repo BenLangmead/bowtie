@@ -1,7 +1,7 @@
 #
 # Makefile for bowtie, bowtie-build, and bowtie-convert.  Adjust the
 # SEQAN_INC variable to point to your SeqAn installation.  E.g.:
-#   make SEQAN_DIR="/usr/local/SeqAn-1.1" bowtie
+#   make SEQAN_DIR="/usr/local/SeqAn-1.0" bowtie
 #
 
 SEQAN_DIR = ../SeqAn-1.1
