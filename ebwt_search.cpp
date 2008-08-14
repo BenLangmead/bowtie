@@ -2315,6 +2315,8 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		cout << "Built on " << BUILD_HOST << endl;
+		cout << BUILD_TIME << endl;
 		cout << "Source hash: " << EBWT_SEARCH_HASH << endl;
 		return 0;
 	}
