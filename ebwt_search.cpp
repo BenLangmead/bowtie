@@ -49,7 +49,7 @@ static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 
-static const char *short_options = "fqbcu:rvsat0123:5:o:e:n:l:";
+static const char *short_options = "fqbcu:rv:sat0123:5:o:e:n:l:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -58,9 +58,10 @@ static const char *short_options = "fqbcu:rvsat0123:5:o:e:n:l:";
 #define ARG_CONCISE 260
 #define ARG_SOLEXA_QUALS 261
 #define ARG_MAXBTS 262
+#define ARG_VERBOSE 263
 
 static struct option long_options[] = {
-	{"verbose",      no_argument,       0,            'v'},
+	{"verbose",      no_argument,       0,            ARG_VERBOSE},
 	{"sanity",       no_argument,       0,            's'},
 	{"exact",        no_argument,       0,            '0'},
 	{"1mm",          no_argument,       0,            '1'},
@@ -111,9 +112,7 @@ static void printUsage(ostream& out) {
 	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
-	    << "  -0/--exact         report end-to-end exact hits; ignore quals, -e, -n" << endl
-	    << "  -1/--1mm           report end-to-end 1-mismatch hits; ignore quals, -e, -n" << endl
-	    << "  -2/--2mm           report end-to-end 2-mismatch hits; ignore quals, -e, -n" << endl
+	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
@@ -134,7 +133,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
-	    << "  -v/--verbose       verbose output (for debugging)" << endl
+	    << "  --verbose          verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
 }
@@ -189,6 +188,14 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'u':
 	   			qUpto = parseInt(1, "-u/--qupto arg must be at least 1");
 	   			break;
+	   		case 'v':
+	   			maqLike = 0;
+	   			mismatches = parseInt(0, "-v arg must be at least 0");
+	   			if(mismatches > 2) {
+	   				cerr << "-v arg must be at most 2" << endl;
+	   				exit(1);
+	   			}
+	   			break;
 	   		case '3':
 	   			trim3 = parseInt(0, "-3/--trim3 arg must be at least 0");
 	   			break;
@@ -208,7 +215,7 @@ static void parseOptions(int argc, char **argv) {
 	   			seedLen = parseInt(20, "-l/--seedlen arg must be at least 20");
 	   			break;
 	   		case 'a': oneHit = false; break;
-	   		case 'v': verbose = true; break;
+	   		case ARG_VERBOSE: verbose = true; break;
 	   		case 's': sanityCheck = true; break;
 	   		case 't': timing = true; break;
 	   		case 'b': binOut = true; break;
