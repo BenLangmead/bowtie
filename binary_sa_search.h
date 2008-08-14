@@ -45,7 +45,7 @@ uint32_t binarySASearch(const TStr& host,
 		assert_eq(prefix(suffix(host, qry), lcp), prefix(suffix(host, suf), lcp));
 		// Keep advancing lcp, but stop when query mismatches host or
 		// when the counter falls off either the query or the suffix
-		while(host[suf+lcp] == host[qry+lcp] && suf+lcp < hostLen && qry+lcp < hostLen) {
+		while(suf+lcp < hostLen && qry+lcp < hostLen && host[suf+lcp] == host[qry+lcp]) {
 			lcp++;
 		}
 		// Fell off the end of either the query or the sa elt?
