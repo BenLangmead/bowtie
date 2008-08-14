@@ -24,12 +24,12 @@ DEBUG_FLAGS = -O0 -g3
 RELEASE_FLAGS = -O3 
 NOASSERT_FLAGS = -DNDEBUG
 BIN_LIST = bowtie-build \
-           bowtie-build-debug \
            bowtie-build-packed \
-           bowtie-build-packed-debug \
            bowtie \
-           bowtie-debug \
            bowtie-convert
+BIN_LIST_AUX = bowtie-build-debug \
+               bowtie-build-packed-debug \
+               bowtie-debug
 
 PKG_LIST = $(wildcard *.h) \
            $(wildcard *.hh) \
@@ -49,6 +49,8 @@ PKG_LIST = $(wildcard *.h) \
            reads
 
 all: $(BIN_LIST)
+
+allall: $(BIN_LIST) $(BIN_LIST_AUX)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

@@ -2979,7 +2979,7 @@ void Ebwt<TStr>::restore(TStr& s) const {
 	SideLocus l(i, this->_eh, this->_ebwt);
 	while(i != _zOff) {
 		assert_lt(jumps, this->_eh._len);
-		if(_verbose) cout << "restore: i: " << i << endl;
+		//if(_verbose) cout << "restore: i: " << i << endl;
 		// Not a marked row; go back a char in the original string
 		uint32_t newi = mapLF(l);
 		assert_neq(newi, i);
