@@ -1,5 +1,10 @@
 #!/bin/sh
 
+#
+# Downloads the contigs for a strain of e. coli from NCBI and builds a
+# Bowtie index for it
+#
+
 GENOMES_MIRROR=ftp://ftp.ncbi.nlm.nih.gov/genomes
 
 BOWTIE_BUILD_EXE=./bowtie-build

@@ -40,7 +40,7 @@ my $seed = 0;
 $seed = int $ARGV[0] if defined($ARGV[0]);
 srand $seed;
 
-my $outer = 1000;
+my $outer = 5000;
 $outer = int $ARGV[1] if defined($ARGV[1]);
 my $limit = $outer;
 
