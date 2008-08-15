@@ -2130,9 +2130,54 @@ static void seededQualCutoffSearch(
 	} // end of Phase 4
 }
 
+/**
+ * Try to find the Bowtie index specified by the user.  First try the
+ * exact path given by the user.  Then try the user-provided string
+ * appended onto the path of the "indexes" subdirectory below this
+ * executable, then try the provided string appended onto
+ * "$BOWTIE_INDEXES/".
+ */
+static string adjustEbwtBase(const string& ebwtFileBase) {
+	string str = ebwtFileBase;
+	ifstream in;
+	if(verbose) cout << "Trying " << str << endl;
+	in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	if(!in.is_open()) {
+		if(verbose) cout << "  didn't work" << endl;
+		in.close();
+		str = argv0;
+		size_t st = str.find_last_of("/\\");
+		if(st != string::npos) {
+			str.erase(st+1);
+		}
+		str += "indexes/";
+		str += ebwtFileBase;
+		if(verbose) cout << "Trying " << str << endl;
+		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+		if(!in.is_open()) {
+			if(verbose) cout << "  didn't work" << endl;
+			in.close();
+			if(getenv("BOWTIE_INDEXES") != NULL) {
+				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
+				if(verbose) cout << "Trying " << str << endl;
+				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+				if(!in.is_open()) {
+					if(verbose) cout << "  didn't work" << endl;
+					in.close();
+				}
+			}
+		}
+	}
+	if(!in.is_open()) {
+		cerr << "Could not locate a Bowtie index corresponding to basename \"" << ebwtFileBase << "\"" << endl;
+		exit(1);
+	}
+	return str;
+}
+
 template<typename TStr>
 static void driver(const char * type,
-                   const string& infile,
+                   const string& ebwtFileBase,
                    const string& query,
                    const vector<string>& queries,
                    const string& outfile)
@@ -2153,6 +2198,8 @@ static void driver(const char * type,
 			readSequenceString(origString, os);
 		}
 	}
+	// Adjust 
+	string adjustedEbwtFileBase = adjustEbwtBase(ebwtFileBase);
 	// Seed random number generator
 	srandom(seed);
 	// Create a pattern source for the queries
@@ -2177,12 +2224,12 @@ static void driver(const char * type,
 		fout = &cout;
 	}
 	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(infile, /* overriding: */ offRate, verbose, sanityCheck);
+    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, verbose, sanityCheck);
     assert_geq(ebwt.eh().offRate(), offRate);
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the transposed index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
-    	ebwtBw = new Ebwt<TStr>(infile + ".rev", /* overriding: */ offRate, verbose, sanityCheck);
+    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, verbose, sanityCheck);
     }
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt
@@ -2296,7 +2343,7 @@ static void driver(const char * type,
 	    	// to the hit file
 		    sink->out() << "Binary name: " << argv0 << endl;
 		    sink->out() << "  Checksum: " << (uint64_t)(EBWT_SEARCH_HASH) << endl;
-		    sink->out() << "Ebwt file base: " << infile << endl;
+		    sink->out() << "Ebwt file base: " << adjustedEbwtFileBase << endl;
 			sink->out() << "Sanity checking: " << (sanityCheck? "on":"off") << endl;
 			sink->out() << "Verbose: " << (verbose? "on":"off") << endl;
 		    sink->out() << "Queries: " << endl;
