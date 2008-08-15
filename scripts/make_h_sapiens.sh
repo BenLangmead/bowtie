@@ -1,9 +1,13 @@
 #!/bin/sh
 #
 # Downloads sequence for H. sapiens (human) from NCBI.  This script was
-# used to build the Bowtie index for H. sapiens on August 14, 2008.
+# used to build the Bowtie index for H. sapiens on August 15, 2008.
 #
 # From README_CURRENT_BUILD:
+#  Organism: Homo sapiens (human)
+#  NCBI Build Number: 36    
+#  Version: 3
+#  Release date: 24 March 2008
 #
 
 GENOMES_MIRROR=ftp://ftp.ncbi.nih.gov/genomes
