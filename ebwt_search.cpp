@@ -1745,13 +1745,6 @@ static void seededQualCutoffSearch(
 					btr2.set1RevOff (s5);
 					btr2.set2RevOff (s);
 				}
-//				cout << "Time: "
-//			         << ", hit: " << hit
-//				     << ", numBts: " << btr2.numBacktracks()
-//				     << ", hiDepth: " << btr2.highStackDepth()
-//				     << endl;
-//				cout << "  " << (*patRc) << "  " << (*qualRc) << endl;
-//				btr2.resetHighStackDepth();
 				if(btr2.numBacktracks() == btr2.maxBacktracks()) {
 					gaveUp = true;
 				}
@@ -2057,13 +2050,6 @@ static void seededQualCutoffSearch(
 					btf2.set1RevOff (s5);
 					btf2.set2RevOff (s);
 				}
-//				cout << "Time: "
-//			         << ", hit: " << hit
-//				     << ", numBts: " << btf2.numBacktracks()
-//				     << ", hiDepth: " << btf2.highStackDepth()
-//				     << endl;
-//				cout << "  " << (*patFw) << "  " << (*qualFw) << endl;
-//				btf2.resetHighStackDepth();
 				if(btf2.numBacktracks() == btf2.maxBacktracks()) {
 					gaveUp = true;
 				}
