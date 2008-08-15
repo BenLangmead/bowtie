@@ -48,6 +48,7 @@ static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
+static int maxNs                = 9999; // max # Ns allowed in read
 
 static const char *short_options = "fqbcu:rv:sat0123:5:o:e:n:l:";
 
@@ -59,6 +60,7 @@ static const char *short_options = "fqbcu:rv:sat0123:5:o:e:n:l:";
 #define ARG_SOLEXA_QUALS 261
 #define ARG_MAXBTS 262
 #define ARG_VERBOSE 263
+#define ARG_MAXNS 264
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -91,6 +93,7 @@ static struct option long_options[] = {
 	{"seedmms",      required_argument, 0,            'n'},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
+	{"maxns",        required_argument, 0,            ARG_MAXNS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -130,6 +133,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    << "  --concise          write hits in a concise format" << endl
 	    //<< "  --maxbts <int>     maximum number of backtracks allowed (75)" << endl
+	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
@@ -213,6 +217,9 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'l':
 	   			seedLen = parseInt(20, "-l/--seedlen arg must be at least 20");
+	   			break;
+	   		case ARG_MAXNS:
+	   			maxNs = parseInt(0, "--maxns arg must be at least 0");
 	   			break;
 	   		case 'a': oneHit = false; break;
 	   		case ARG_VERBOSE: verbose = true; break;
@@ -2151,11 +2158,9 @@ static void driver(const char * type,
 	// Create a pattern source for the queries
 	PatternSource<TStr> *patsrc = NULL;
 	switch(format) {
-		case FASTA:   patsrc = new FastaPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5); break;
-		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, solexa_quals); break;
-	    //case BFQ:     patsrc = new BfqPatternSource<TStr>   (queries, revcomp, false, patDumpfile, trim3, trim5); break;
-	    //case SOLEXA:  patsrc = new SolexaPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
-		case CMDLINE: patsrc = new VectorPatternSource<TStr>(queries, revcomp, false, patDumpfile, trim3, trim5); break;
+		case FASTA:   patsrc = new FastaPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, maxNs); break;
+		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, solexa_quals, maxNs); break;
+		case CMDLINE: patsrc = new VectorPatternSource<TStr>(queries, revcomp, false, patDumpfile, 0, trim3, trim5, maxNs); break;
 		default: assert(false);
 	}
 	// Check that input is non-empty
