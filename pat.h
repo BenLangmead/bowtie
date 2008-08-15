@@ -161,10 +161,11 @@ public:
 	                    const char *__dumpfile = NULL,
 	                    size_t cur = 0,
 	                    int __trim3 = 0,
-	                    int __trim5 = 0) :
+	                    int __trim5 = 0,
+	                    int __maxNs = 9999) :
 		TrimmingPatternSource<TStr>(false, __dumpfile, __trim3, __trim5),
-		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _v(),
-		_quals(), _vrev(), _qualsrev()
+		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _maxNs(__maxNs),
+		_v(), _quals(), _vrev(), _qualsrev()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
@@ -173,14 +174,21 @@ public:
 			assert_leq(ss.size(), 2);
 			// Initialize s
 			string s = ss[0];
+			int ns = 0;
+			for(size_t j = 0; j < s.length(); j++) {
+				if(s[j] == 'N' || s[j] == 'n') ns++;
+			}
+			if(ns > _maxNs) continue;
 			//  Initialize vq
 			string vq;
 			if(ss.size() == 2) {
 				vq = ss[1];
 			}
+			// Pad quals with Is if necessary
 			while(vq.length() < length(s)) {
 				vq.push_back('I');
 			}
+			// Truncate quals to match length of read if necessary
 			if(vq.length() > length(s)) {
 				vq.erase(length(s));
 			}
@@ -251,6 +259,7 @@ private:
 	bool _revcomp;
 	bool _reverse;
 	size_t _cur;
+	int _maxNs;
 	vector<TStr>          _v;        // forward/rev-comp sequences
 	vector<String<char> > _quals;    // quality values parallel to _v
 	vector<TStr>          _vrev;     // reversed forward and rev-comp sequences 
@@ -745,10 +754,10 @@ public:
 	                   bool __reverse = false,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
-	                   int __trim5 = 0) :
+	                   int __trim5 = 0,
+	                   int __maxNs = 9999) :
 		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
-		_first(true),
-		_reverse(__reverse)
+		_first(true), _reverse(__reverse), _maxNs(__maxNs)
 	{
 		assert(this->hasMorePatterns());
 	}
@@ -783,75 +792,85 @@ protected:
 		assert(name != NULL);
 		assert(nameLen != NULL);
 		
-		int c;
-		*dstLen = 0;
-		*nameLen = 0;
-		
-		// Pick off the first carat
-		if(_first) {
-			c = fgetc(this->_in); if(c < 0) return;
-			assert(c == '>' || c == '#');
-			_first = false;
-		}
-		
-		// Read to the end of the id line, sticking everything after the '>'
-		// into *name
-		while(true) {
-			c = fgetc(this->_in); if(c < 0) return;
-			if(c == '\n' || c == '\r') {
-				// Break at end of line, after consuming all \r's, \n's
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(c < 0) return;
+		int ns;
+		do {
+			int c;
+			ns = 0;
+			*dstLen = 0;
+			*nameLen = 0;
+			
+			// Pick off the first carat
+			if(_first) {
+				c = fgetc(this->_in); if(c < 0) return;
+				assert(c == '>' || c == '#');
+				_first = false;
+			}
+			
+			// Read to the end of the id line, sticking everything after the '>'
+			// into *name
+			while(true) {
+				c = fgetc(this->_in); if(c < 0) return;
+				if(c == '\n' || c == '\r') {
+					// Break at end of line, after consuming all \r's, \n's
+					while(c == '\n' || c == '\r') {
+						c = fgetc(this->_in); if(c < 0) return;
+					}
+					break;
 				}
-				break;
+				name[(*nameLen)++] = c;
 			}
-			name[(*nameLen)++] = c;
-		}
-		_setBegin(nameStr, (char*)name);
-		_setLength(nameStr, *nameLen);
-		
-		// _in now points just past the first character of a sequence
-		// line, and c holds the first character
-		int begin = 0;
-		if(!_reverse) {
-			while(c != '>' && c != '#') {
-				// Note: can't have a comment in the middle of a sequence,
-				// though a comment can end a sequence
-				if(isalpha(c) && begin++ >= this->_trim5) {
-					if(c == 'N' || c == 'n') c = 'A';
-					dst[(*dstLen)] = charToDna[c];
-					rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
-					(*dstLen)++;
+			_setBegin(nameStr, (char*)name);
+			_setLength(nameStr, *nameLen);
+			
+			// _in now points just past the first character of a sequence
+			// line, and c holds the first character
+			int begin = 0;
+			if(!_reverse) {
+				while(c != '>' && c != '#') {
+					// Note: can't have a comment in the middle of a sequence,
+					// though a comment can end a sequence
+					if(isalpha(c) && begin++ >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							ns++;
+							c = 'A';
+						}
+						dst[(*dstLen)] = charToDna[c];
+						rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+						(*dstLen)++;
+					}
+					if((c = fgetc(this->_in)) < 0) break;
 				}
-				if((c = fgetc(this->_in)) < 0) break;
-			}
-			(*dstLen) -= this->_trim3;
-			_setBegin(dstTStr, (Dna*)dst);
-			_setLength(dstTStr, (*dstLen));
-			if(rcDst != NULL) {
-				_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
-				_setLength(rcDstTStr, (*dstLen));
-			}
-		} else {
-			while(c != '>' && c != '#') {
-				// Note: can't have a comment in the middle of a sequence,
-				// though a comment can end a sequence
-				if(isalpha(c) && begin++ >= this->_trim5) {
-					if(c == 'N' || c == 'n') c = 'A';
-					dst[1024-(*dstLen)-1] = charToDna[c];
-					rcDst[(*dstLen)] = rcCharToDna[c];
-					(*dstLen)++;
+				(*dstLen) -= this->_trim3;
+				_setBegin(dstTStr, (Dna*)dst);
+				_setLength(dstTStr, (*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+					_setLength(rcDstTStr, (*dstLen));
 				}
-				if((c = fgetc(this->_in)) < 0) break;
+			} else {
+				while(c != '>' && c != '#') {
+					// Note: can't have a comment in the middle of a sequence,
+					// though a comment can end a sequence
+					if(isalpha(c) && begin++ >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							ns++;
+							c = 'A';
+						}
+						dst[1024-(*dstLen)-1] = charToDna[c];
+						rcDst[(*dstLen)] = rcCharToDna[c];
+						(*dstLen)++;
+					}
+					if((c = fgetc(this->_in)) < 0) break;
+				}
+				(*dstLen) -= this->_trim3;
+				_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+				_setLength(dstTStr, (*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna*)rcDst);
+					_setLength(rcDstTStr, (*dstLen));
+				}
 			}
-			(*dstLen) -= this->_trim3;
-			_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
-			_setLength(dstTStr, (*dstLen));
-			if(rcDst != NULL) {
-				_setBegin(rcDstTStr, (Dna*)rcDst);
-				_setLength(rcDstTStr, (*dstLen));
-			}
-		}
+		} while(ns > _maxNs);
 	}
 	virtual void resetForNextFile() {
 		_first = true;
@@ -866,6 +885,7 @@ protected:
 private:
 	bool _first;
 	bool _reverse;
+	int _maxNs;
 };
 
 /**
@@ -882,9 +902,10 @@ public:
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
-					   bool solexa_quals = false) :
+					   bool solexa_quals = false,
+					   int __maxNs = 9999) :
 		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals)
+		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals), _maxNs(__maxNs)
 	{
 		assert(this->hasMorePatterns());
 		
@@ -937,217 +958,226 @@ protected:
 		assert(name != NULL);
 		assert(nameLen != NULL);
 
-		int c;
-		*dstLen = 0;
-		*nameLen = 0;
-		
-		// Pick off the first at
-		if(_first) {
-			c = fgetc(this->_in); if(c < 0) return;
-			assert_eq('@', c);
-			_first = false;
-		}
-		
-		// Read to the end of the id line, sticking everything after the '@'
-		// into *name
-		while(true) {
-			c = fgetc(this->_in); if(c < 0) return;
-			if(c == '\n' || c == '\r') {
-				// Break at end of line, after consuming all \r's, \n's
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(c < 0) return;
+		int ns;
+		do {
+			int c;
+			ns = 0;
+			*dstLen = 0;
+			*nameLen = 0;
+			
+			// Pick off the first at
+			if(_first) {
+				c = fgetc(this->_in); if(c < 0) return;
+				assert_eq('@', c);
+				_first = false;
+			}
+			
+			// Read to the end of the id line, sticking everything after the '@'
+			// into *name
+			while(true) {
+				c = fgetc(this->_in); if(c < 0) return;
+				if(c == '\n' || c == '\r') {
+					// Break at end of line, after consuming all \r's, \n's
+					while(c == '\n' || c == '\r') {
+						c = fgetc(this->_in); if(c < 0) return;
+					}
+					break;
 				}
-				break;
+				name[(*nameLen)++] = c;
 			}
-			name[(*nameLen)++] = c;
-		}
-		_setBegin(nameStr, (char*)name);
-		_setLength(nameStr, *nameLen);
-		
-		// _in now points just past the first character of a sequence
-		// line, and c holds the first character
-		int charsRead = 0;
-		if(!_reverse) {
-			while(c != '+') {
-				if(isalpha(c) && charsRead >= this->_trim5) {
-					if(c == 'N' || c == 'n') c = 'A';
-					dst[(*dstLen)] = charToDna[c];
-					rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
-					charsRead++; (*dstLen)++;
-				}
-				c = fgetc(this->_in);
-				if(c < 0) break;
-			}
-			(*dstLen) -= this->_trim3;
-			_setBegin(dstTStr, (Dna*)dst);
-			_setLength(dstTStr, (*dstLen));
-			if(rcDst != NULL) {
-				_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
-				_setLength(rcDstTStr, (*dstLen));
-			}
-		} else {
-			while(c != '+') {
-				if(isalpha(c) && charsRead >= this->_trim5) {
-					if(c == 'N' || c == 'n') c = 'A';
-					dst[1024-(*dstLen)-1] = charToDna[c];
-					rcDst[(*dstLen)] = rcCharToDna[c];
-					charsRead++; (*dstLen)++;
-				}
-				c = fgetc(this->_in);
-				if(c < 0) break;
-			}
-			(*dstLen) -= this->_trim3;
-			_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
-			_setLength(dstTStr, (*dstLen));
-			if(rcDst != NULL) {
-				_setBegin(rcDstTStr, (Dna*)rcDst);
-				_setLength(rcDstTStr, (*dstLen));
-			}
-		}
-		
-		// Chew up the optional name on the '+' line
-		while(c == '+' || (c != '\n' && c != '\r'))
-		{
-			c = fgetc(this->_in); if(c < 0) return;
-		}
-
-		// Now read the qualities
-		size_t qualsRead = 0;
-		
-		//Move to the line after the + line, which has the qualities
-//		while(c == '\n' && c == '\r'){
-//			c = fgetc(this->_in); if(feof(this->_in)) return;
-//		} 
-		
-		//qual->clear();
-		if (_solexa_quals)
-		{
-			char buf[1024];
-				
-			while (fgets(buf, sizeof(buf), this->_in) && qualsRead < (*dstLen) + this->_trim5)
-			{
-				char* nl = strrchr(buf, '\n');
-				if (nl) *nl = 0;
-				
-				vector<string> s_quals;
-				tokenize(string(buf), " ", s_quals);
-				
-				if(!_reverse) {
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
-					{
-						int sQ = atoi(s_quals[j].c_str());
-						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-						if (qualsRead >= (size_t)this->_trim5)
-						{
-							size_t off = qualsRead - this->_trim5;
-							c = (char)(pQ + 33);
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							qual[off] = c;
-							if (rcQual != NULL) {
-								rcQual[1024 - off - 1] = c;
-							}
+			_setBegin(nameStr, (char*)name);
+			_setLength(nameStr, *nameLen);
+			
+			// _in now points just past the first character of a sequence
+			// line, and c holds the first character
+			int charsRead = 0;
+			if(!_reverse) {
+				while(c != '+') {
+					if(isalpha(c) && charsRead >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							ns++;
+							c = 'A';
 						}
-						++qualsRead;
+						dst[(*dstLen)] = charToDna[c];
+						rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+						charsRead++; (*dstLen)++;
+					}
+					c = fgetc(this->_in);
+					if(c < 0) break;
+				}
+				(*dstLen) -= this->_trim3;
+				_setBegin(dstTStr, (Dna*)dst);
+				_setLength(dstTStr, (*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+					_setLength(rcDstTStr, (*dstLen));
+				}
+			} else {
+				while(c != '+') {
+					if(isalpha(c) && charsRead >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							ns++;
+							c = 'A';
+						}
+						dst[1024-(*dstLen)-1] = charToDna[c];
+						rcDst[(*dstLen)] = rcCharToDna[c];
+						charsRead++; (*dstLen)++;
+					}
+					c = fgetc(this->_in);
+					if(c < 0) break;
+				}
+				(*dstLen) -= this->_trim3;
+				_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+				_setLength(dstTStr, (*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna*)rcDst);
+					_setLength(rcDstTStr, (*dstLen));
+				}
+			}
+			
+			// Chew up the optional name on the '+' line
+			while(c == '+' || (c != '\n' && c != '\r'))
+			{
+				c = fgetc(this->_in); if(c < 0) return;
+			}
+	
+			// Now read the qualities
+			size_t qualsRead = 0;
+			
+			//Move to the line after the + line, which has the qualities
+	//		while(c == '\n' && c == '\r'){
+	//			c = fgetc(this->_in); if(feof(this->_in)) return;
+	//		} 
+			
+			//qual->clear();
+			if (_solexa_quals)
+			{
+				char buf[1024];
+					
+				while (fgets(buf, sizeof(buf), this->_in) && qualsRead < (*dstLen) + this->_trim5)
+				{
+					char* nl = strrchr(buf, '\n');
+					if (nl) *nl = 0;
+					
+					vector<string> s_quals;
+					tokenize(string(buf), " ", s_quals);
+					
+					if(!_reverse) {
+						for (unsigned int j = 0; j < s_quals.size(); ++j)
+						{
+							int sQ = atoi(s_quals[j].c_str());
+							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+							if (qualsRead >= (size_t)this->_trim5)
+							{
+								size_t off = qualsRead - this->_trim5;
+								c = (char)(pQ + 33);
+								assert_geq(c, 33);
+								assert_leq(c, 73);
+								qual[off] = c;
+								if (rcQual != NULL) {
+									rcQual[1024 - off - 1] = c;
+								}
+							}
+							++qualsRead;
+						}
+					} else {
+						for (unsigned int j = 0; j < s_quals.size(); ++j)
+						{
+							int sQ = atoi(s_quals[j].c_str());
+							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+							if (qualsRead >= (size_t)this->_trim5)
+							{
+								size_t off = qualsRead - this->_trim5;
+								c = (char)(pQ + 33);
+								assert_geq(c, 33);
+								assert_leq(c, 73);
+								qual[1024 - off - 1] = c;
+								if (rcQual != NULL) {
+									rcQual[off] = c;
+								}
+							}
+							++qualsRead;
+						}
+					}
+				} // done reading Solexa quality lines
+				if(!_reverse) {
+					_setBegin(qualTStr, (char*)qual);
+					_setLength(qualTStr, (*dstLen));
+					if(rcQual != NULL) {
+						_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
+						_setLength(rcQualTStr, (*dstLen));
 					}
 				} else {
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
-					{
-						int sQ = atoi(s_quals[j].c_str());
-						int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-						if (qualsRead >= (size_t)this->_trim5)
+					_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
+					_setLength(qualTStr, (*dstLen));
+					if(rcQual != NULL) {
+						_setBegin(rcQualTStr, (char*)rcQual);
+						_setLength(rcQualTStr, (*dstLen));
+					}
+				}
+			}
+			else
+			{
+				if(!_reverse) {
+					while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
+						c = fgetc(this->_in);
+						if (c != '\r' && c != '\n')
 						{
-							size_t off = qualsRead - this->_trim5;
-							c = (char)(pQ + 33);
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							qual[1024 - off - 1] = c;
-							if (rcQual != NULL) {
-								rcQual[off] = c;
-							}
+							if (qualsRead >= (size_t)this->_trim5) {
+								size_t off = qualsRead - this->_trim5;
+								assert_geq(c, 33);
+								assert_leq(c, 73);
+								qual[off] = c;
+								if (rcQual != NULL) {
+									rcQual[1024 - off - 1] = c;
+								}
+								qualsRead++;
+							}	
 						}
-						++qualsRead;
 					}
-				}
-			} // done reading Solexa quality lines
-			if(!_reverse) {
-				_setBegin(qualTStr, (char*)qual);
-				_setLength(qualTStr, (*dstLen));
-				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
-					_setLength(rcQualTStr, (*dstLen));
-				}
-			} else {
-				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
-				_setLength(qualTStr, (*dstLen));
-				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)rcQual);
-					_setLength(rcQualTStr, (*dstLen));
+					assert_eq(qualsRead, (*dstLen) + this->_trim5);
+					_setBegin(qualTStr, (char*)qual);
+					_setLength(qualTStr, (*dstLen));
+					if(rcQual != NULL) {
+						_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
+						_setLength(rcQualTStr, (*dstLen));
+					}
+				} else {
+					while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
+						c = fgetc(this->_in);
+						if (c != '\r' && c != '\n')
+						{
+							if (qualsRead >= (size_t)this->_trim5) {
+								size_t off = qualsRead - this->_trim5;
+								assert_geq(c, 33);
+								assert_leq(c, 73);
+								qual[1024 - off - 1] = c;
+								if (rcQual != NULL) {
+									rcQual[off] = c;
+								}
+								qualsRead++;
+							}	
+						}
+					}
+					assert_eq(qualsRead, (*dstLen) + this->_trim5);
+					_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
+					_setLength(qualTStr, (*dstLen));
+					if(rcQual != NULL) {
+						_setBegin(rcQualTStr, (char*)rcQual);
+						_setLength(rcQualTStr, (*dstLen));
+					}
 				}
 			}
-		}
-		else
-		{
-			if(!_reverse) {
-				while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
+			
+			if (feof(this->_in))
+				return;
+			else
+			{
+				do {
 					c = fgetc(this->_in);
-					if (c != '\r' && c != '\n')
-					{
-						if (qualsRead >= (size_t)this->_trim5) {
-							size_t off = qualsRead - this->_trim5;
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							qual[off] = c;
-							if (rcQual != NULL) {
-								rcQual[1024 - off - 1] = c;
-							}
-							qualsRead++;
-						}	
-					}
-				}
-				assert_eq(qualsRead, (*dstLen) + this->_trim5);
-				_setBegin(qualTStr, (char*)qual);
-				_setLength(qualTStr, (*dstLen));
-				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
-					_setLength(rcQualTStr, (*dstLen));
-				}
-			} else {
-				while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
-					c = fgetc(this->_in);
-					if (c != '\r' && c != '\n')
-					{
-						if (qualsRead >= (size_t)this->_trim5) {
-							size_t off = qualsRead - this->_trim5;
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							qual[1024 - off - 1] = c;
-							if (rcQual != NULL) {
-								rcQual[off] = c;
-							}
-							qualsRead++;
-						}	
-					}
-				}
-				assert_eq(qualsRead, (*dstLen) + this->_trim5);
-				_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
-				_setLength(qualTStr, (*dstLen));
-				if(rcQual != NULL) {
-					_setBegin(rcQualTStr, (char*)rcQual);
-					_setLength(rcQualTStr, (*dstLen));
-				}
+				} while(c != '@' && c >= 0);
 			}
-		}
-		
-		if (feof(this->_in))
-			return;
-		else
-		{
-			do {
-				c = fgetc(this->_in);
-			} while(c != '@' && c >= 0);
-		}
-
+		} while(ns > _maxNs);
 	}
 	virtual void resetForNextFile() {
 		_first = true;
@@ -1163,6 +1193,7 @@ private:
 	bool _first;
 	bool _reverse;
 	bool _solexa_quals;
+	int _maxNs;
 	int _table[128];
 };
 
