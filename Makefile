@@ -39,15 +39,16 @@ PKG_LIST = $(wildcard *.h) \
            $(wildcard maq_convert/*.hh) \
            $(wildcard maq_convert/*.c) \
            $(wildcard maq_convert/*.cpp) \
+           $(wildcard scripts/*.sh) \
+           $(wildcard scripts/*.pl) \
+           $(wildcard indexes/e_coli*) \
+           $(wildcard genomes/NC_008253.fna) \
+           $(wildcard reads/e_coli*) \
            AUTHORS \
            COPYING \
            Makefile \
            NEWS \
-           VERSION \
-           indexes \
-           genomes \
-           scripts \
-           reads
+           VERSION
 
 all: $(BIN_LIST)
 
@@ -83,7 +84,7 @@ bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIB) $(INC) -I . -o $@ $< $(MAQ_CPP)
 
 bowtie.tar.gz: $(PKG_LIST)
-	tar zcvf --exclude '*CVS*' $@ $(PKG_LIST)
+	tar zcvf $@ $(PKG_LIST)
 
 .PHONY: clean
 clean:
