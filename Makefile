@@ -87,4 +87,4 @@ bowtie.tar.gz: $(PKG_LIST)
 
 .PHONY: clean
 clean:
-	rm -f $(BIN_LIST)
+	rm -f $(BIN_LIST) $(BIN_LIST_AUX)
