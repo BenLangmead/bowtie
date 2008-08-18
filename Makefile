@@ -83,7 +83,7 @@ bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) -Wall $(LIBS) $(MAQ_LIB) $(INC) -I . -o $@ $< $(MAQ_CPP)
 
 bowtie.tar.gz: $(PKG_LIST)
-	tar --exclude CVS zcvf $@ $(PKG_LIST)
+	tar zcvf --exclude '*CVS*' $@ $(PKG_LIST)
 
 .PHONY: clean
 clean:
