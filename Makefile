@@ -40,12 +40,13 @@ PKG_LIST = $(wildcard *.h) \
            $(wildcard maq_convert/*.c) \
            $(wildcard maq_convert/*.cpp) \
            AUTHORS \
-           bowtie.doxyfile \
            COPYING \
            Makefile \
            NEWS \
            VERSION \
            indexes \
+           genomes \
+           scripts \
            reads
 
 all: $(BIN_LIST)
