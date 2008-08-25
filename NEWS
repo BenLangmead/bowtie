@@ -3,16 +3,29 @@ Bowtie: an Ultrafast, Lightweight Short Read Aligner
 Bowtie NEWS
 ===========
 
-   The first release of the Bowtie is now available for download.
-Version 1.0.0 is the first version to be released under the OSI
-Artistic License (see `COPYING') and freely available to the public
-for download.  The Bowtie project is still in its early development
-stages, and everyone interested in improving this project is strongly
-encouraged to contact us. See the project website for more details.
+   Bowtie is now available for download.  0.9.0 is the first version to
+be released under the OSI Artistic License (see `COPYING') and freely
+available to the public for download.  The current version is 0.9.1.
+The Bowtie project is still in its earlystages, and everyone interested
+in improving this project is strongly encouraged to contact us. See the
+project website (http://bowtie-bio.sf.net) for more details.  Please
+report any issues using the Sourceforge bug tracker ().
 
 Version Release History
 =======================
 
-Version 1.0.0 - August 2008
+Version 0.9.1 - August 2008
+     * Integrated relevant SeqAn-1.1 sources into Bowtie source release
+     * Now builds on Windows under MinGW (needs pthreads and zlib)
 
-     * First official release of the Bowtie distribution.
+Version 0.9.0 - August 2008
+     * First stable release of Bowtie.
+     * Includes the three core Bowtie tools: the indexer 'bowtie-build',
+       the read aligner 'bowtie' and the converter from Bowtie's to
+       Maq's mapping output format, 'bowtie-convert'.
+     * Compatible pre-built indexes for many model organisms are
+       available from http://bowtie-bio.sf.net.
+     * FASTA, FASTQ inputs supported; tested with Solexa FASTQ
+     * Supports Maq alignment policy (-n and -e behave as in Maq)
+     * Supports X-mismatch policy (-v option behaves as in SOAP)
+     * -n and -v options accept 0, 1, or 2
