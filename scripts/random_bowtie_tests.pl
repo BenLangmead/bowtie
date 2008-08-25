@@ -198,9 +198,11 @@ sub search {
 	# Parse output to see if any of it is bad
 	my @outlines = split('\n', $out);
 	foreach(@outlines) {
+		chomp;
 		print "$_\n";
-		# Result should look like "0:<4,231>,<7,111>,<7,112>,<4,234>"
-		if(! /^[0-9]+[-+]?:(<[0-9]+,[0-9]+,[0-9]+>[,]?)+$/) {
+		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
+		unless(m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) {
+			print "Results malformed\n";
 			print "$out\n";
 			if($exitOnFail) {
 				print "Stdout:\n$out\nStderr:\n$err\n";
