@@ -239,7 +239,7 @@ void calcColbournAndLingDCs(bool verbose = false, bool sanityCheck = false) {
 		T numsamp = 6*r + 4;
 		clDCs[r].maxV = maxv;
 		clDCs[r].numSamples = numsamp;
-		bzero(clDCs[r].samples, 4 * 128);
+		memset(clDCs[r].samples, 0, 4 * 128);
 		T i;
 		// clDCs[r].samples[0] = 0;
 		// Fill in the 1^r part of the B series

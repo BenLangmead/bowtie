@@ -678,7 +678,7 @@ public:
 				top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c);
 			} else if(curIsAlternative) {
 				// Clear pairs
-				bzero(&pairs[d*8], 8 * 4);
+				memset(&pairs[d*8], 0, 8 * 4);
 				// Calculate next quartet of pairs
 				_ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
 				// Update top and bot

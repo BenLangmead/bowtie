@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -2187,7 +2188,7 @@ static void driver(const char * type,
 	// Adjust 
 	string adjustedEbwtFileBase = adjustEbwtBase(ebwtFileBase);
 	// Seed random number generator
-	srandom(seed);
+	srand(seed);
 	// Create a pattern source for the queries
 	PatternSource<TStr> *patsrc = NULL;
 	switch(format) {

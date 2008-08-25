@@ -192,7 +192,7 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 	/* Note: rand() didn't really cut it here; it seemed to run out of */ \
 	/* randomness and, after a time, returned the same thing over and */  \
 	/* over again */                                                      \
-	a = (random() % n) + begin; /* choose pivot between begin and end */  \
+	a = (rand() % n) + begin; /* choose pivot between begin and end */  \
 	assert_lt(a, end); assert_geq(a, begin);                              \
 	sw(s, s2, begin, a); /* move pivot to beginning */                    \
 }
@@ -884,7 +884,7 @@ void qsortSufDc(const T& host,
 	// Note: rand() didn't really cut it here; it seemed to run out of
 	// randomness and, after a time, returned the same thing over and
 	// over again
-	size_t a = (random() % n) + begin; // choose pivot between begin and end
+	size_t a = (rand() % n) + begin; // choose pivot between begin and end
 	assert_lt(a, end);
 	assert_geq(a, begin);
 	SWAP(s, end-1, a); // move pivot to end
@@ -1093,7 +1093,7 @@ void qsortSufDcU8(const T1& seqanHost,
 	// Note: rand() didn't really cut it here; it seemed to run out of
 	// randomness and, after a time, returned the same thing over and
 	// over again
-	size_t a = (random() % n) + begin; // choose pivot between begin and end
+	size_t a = (rand() % n) + begin; // choose pivot between begin and end
 	assert_lt(a, end);
 	assert_geq(a, begin);
 	SWAP(s, end-1, a); // move pivot to end

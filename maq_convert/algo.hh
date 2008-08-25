@@ -101,6 +101,7 @@ TYPE algo_ksmall(size_t n, TYPE array[], size_t k)
 	}
 }
 
+/*
 template<class TYPE>
 void algo_shuffle(int n, TYPE *array)
 {
@@ -111,6 +112,7 @@ void algo_shuffle(int n, TYPE *array)
 		tmp = array[i]; array[i] = array[rand_ind]; array[rand_ind] = tmp;
 	}
 }
+*/
 
 // Heap related functions (binary heap)
 

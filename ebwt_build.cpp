@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
 		}
 	}
 	// Seed random number generator
-	srandom(seed);
+	srand(seed);
 	int64_t origCutoff = cutoff; // save cutoff since it gets modified
 	{
 		Timer timer(cout, "Total time for call to driver(): ", verbose);
@@ -372,7 +372,7 @@ int main(int argc, char **argv) {
 	}
 	cutoff = origCutoff; // reset cutoff for backward Ebwt
 	if(doubleEbwt) {
-		srandom(seed);
+		srand(seed);
 		Timer timer(cout, "Total time for backward call to driver(): ", verbose);
 		#ifdef PACKED_STRINGS
 		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);

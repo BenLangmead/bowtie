@@ -51,7 +51,7 @@ public:
 	            bool __verbose = false,
 	            ostream& __logger = cout) :
 	_text(__text),
-	_bucketSz(max(__bucketSz, 2u)),
+	_bucketSz(max<uint32_t>(__bucketSz, 2u)),
 	_sanityCheck(__sanityCheck),
 	_verbose(__verbose),
 	_itrBucket(),

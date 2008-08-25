@@ -2,6 +2,7 @@
 #define EBWT_H_
 
 #include <stdint.h>
+#include <string.h>
 #include <algorithm>
 #include <iostream>
 #include <fstream>
@@ -927,11 +928,11 @@ struct EbwtSearchStats {
 		pushthroughsSingle(0), pushthroughsSingleChase(0),
 		pushthroughsSingleMatch(0), stops(0)
 	{
-		bzero(narrowingBackHalfAdvance, 64 * sizeof(uint64_t));
-		bzero(backHalfAdvance,          64 * sizeof(uint64_t));
-		bzero(stopsAtDepth,             64 * sizeof(uint64_t));
-		bzero(stopsAtDepthFw,           64 * sizeof(uint64_t));
-		bzero(stopsAtDepthRc,           64 * sizeof(uint64_t));
+		memset(narrowingBackHalfAdvance, 0, 64 * sizeof(uint64_t));
+		memset(backHalfAdvance,          0, 64 * sizeof(uint64_t));
+		memset(stopsAtDepth,             0, 64 * sizeof(uint64_t));
+		memset(stopsAtDepthFw,           0, 64 * sizeof(uint64_t));
+		memset(stopsAtDepthRc,           0, 64 * sizeof(uint64_t));
 	}
 	void incRead(const EbwtSearchState<TStr>& state, const TStr& pat) {
 		read++;
@@ -1915,7 +1916,7 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		cerr << "Out of memory allocating seen[] at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
-	bzero(seen, 4 * seenLen);
+	memset(seen, 0, 4 * seenLen);
 	uint32_t offsLen = eh._offsLen;
 	for(uint32_t i = 0; i < offsLen; i++) {
 		assert_lt(this->_offs[i], eh._bwtLen);
@@ -3718,9 +3719,9 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	try {
 		VMSG_NL("Allocating ftab, absorbFtab");
 		ftab = new uint32_t[ftabLen];
-		bzero(ftab, 4 * ftabLen);
+		memset(ftab, 0, 4 * ftabLen);
 		absorbFtab = new uint8_t[ftabLen];
-		bzero(absorbFtab, ftabLen);
+		memset(absorbFtab, 0, ftabLen);
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating ftab[] or absorbFtab[] "
 		     << "in Ebwt::buildToDisk() at " << __FILE__ << ":"
@@ -3958,7 +3959,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	uint32_t *eftab = NULL;
 	try {
 		eftab = new uint32_t[eftabLen];
-		bzero(eftab, 4 * eftabLen);
+		memset(eftab, 0, 4 * eftabLen);
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating eftab[] "
 		     << "in Ebwt::buildToDisk() at " << __FILE__ << ":"
