@@ -52,7 +52,7 @@ SRC_PKG_LIST = $(wildcard *.h) \
                Makefile \
                $(GENERAL_LIST)
 
-BIN_PKG_LIST = $(BIN_LIST) $(BIN_LIST_AUX) $(GENERAL_LIST)
+BIN_PKG_LIST = $(GENERAL_LIST)
 
 all: $(BIN_LIST)
 
@@ -90,10 +90,14 @@ bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 bowtie-src.zip: $(SRC_PKG_LIST)
 	zip $@ $(SRC_PKG_LIST)
 
-bowtie-bin.zip: $(BIN_LIST) $(BIN_LIST_AUX) $(BIN_PKG_LIST)
-	zip $@ $(BIN_PKG_LIST)
+bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
+	if [ -f bowtie.exe ] ; then \
+		zip $@ $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
+	else \
+		zip $@ $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
+	fi
 
 .PHONY: clean
 clean:
 	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
-	$(addsuffix .exe,$(BIN_LIST)) $(addsuffix .exe,$(BIN_LIST_AUX))
+	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX))
