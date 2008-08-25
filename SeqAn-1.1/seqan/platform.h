@@ -19,8 +19,9 @@
 #define finline __inline__
 
 // default 64bit type
-//typedef int64_t __int64;
-
+#ifndef __int64
+typedef int64_t __int64;
+#endif
 
 //define SEQAN_SWITCH_USE_FORWARDS to use generated forwards 
 #define SEQAN_SWITCH_USE_FORWARDS
