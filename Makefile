@@ -1,7 +1,5 @@
 #
-# Makefile for bowtie, bowtie-build, and bowtie-convert.  Adjust the
-# SEQAN_INC variable to point to your SeqAn installation.  E.g.:
-#   make SEQAN_DIR="/usr/local/SeqAn-1.1" bowtie
+# Makefile for bowtie, bowtie-build, and bowtie-convert
 #
 
 SEQAN_DIR = SeqAn-1.1
@@ -31,24 +29,30 @@ BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
                bowtie-debug
 
-PKG_LIST = $(wildcard *.h) \
-           $(wildcard *.hh) \
-           $(wildcard *.c) \
-           $(wildcard *.cpp) \
-           $(wildcard maq_convert/*.h) \
-           $(wildcard maq_convert/*.hh) \
-           $(wildcard maq_convert/*.c) \
-           $(wildcard maq_convert/*.cpp) \
-           $(wildcard scripts/*.sh) \
-           $(wildcard scripts/*.pl) \
-           $(wildcard indexes/e_coli*) \
-           $(wildcard genomes/NC_008253.fna) \
-           $(wildcard reads/e_coli*) \
-           AUTHORS \
-           COPYING \
-           Makefile \
-           NEWS \
-           VERSION
+GENERAL_LIST = $(wildcard scripts/*.sh) \
+               $(wildcard scripts/*.pl) \
+               $(wildcard indexes/e_coli*) \
+               $(wildcard genomes/NC_008253.fna) \
+               $(wildcard reads/e_coli*) \
+               AUTHORS \
+               COPYING \
+               NEWS \
+               VERSION
+
+SRC_PKG_LIST = $(wildcard *.h) \
+               $(wildcard *.hh) \
+               $(wildcard *.c) \
+               $(wildcard *.cpp) \
+               $(wildcard maq_convert/*.h) \
+               $(wildcard maq_convert/*.hh) \
+               $(wildcard maq_convert/*.c) \
+               $(wildcard maq_convert/*.cpp) \
+               $(shell find SeqAn-1.1 -name '*.h') \
+               $(shell find SeqAn-1.1 -name '*.txt') \
+               Makefile \
+               $(GENERAL_LIST)
+
+BIN_PKG_LIST = $(BIN_LIST) $(BIN_LIST_AUX) $(GENERAL_LIST)
 
 all: $(BIN_LIST)
 
@@ -83,8 +87,11 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
 bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
-bowtie.tar.gz: $(PKG_LIST)
-	tar zcvf $@ $(PKG_LIST)
+bowtie-src.zip: $(SRC_PKG_LIST)
+	zip $@ $(SRC_PKG_LIST)
+
+bowtie-bin.zip: $(BIN_LIST) $(BIN_LIST_AUX) $(BIN_PKG_LIST)
+	zip $@ $(BIN_PKG_LIST)
 
 .PHONY: clean
 clean:
