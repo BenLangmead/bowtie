@@ -29,7 +29,7 @@ Bowtie Manual
  download additional sources.
  
  Obtain Bowtie sources from the Download section of the Sourceforge
- project site.
+ project site:
  
  https://sourceforge.net/project/showfiles.php?group_id=236897&package_id=288231
  
@@ -55,8 +55,8 @@ Bowtie Manual
  
   The policy has two criteria:
  
-  1. Alignments may have no more than 2 mismatches in the first 28 bases
-     on the high-quality end of the read.
+  1. Alignments may have no more than 2 mismatches in the first 28
+     bases on the high-quality end of the read.
 
   2. The sum of the quality values at all mismatched positions may not
      exceed 70 (where each position has a quality value on a phred-like
@@ -76,6 +76,12 @@ Bowtie Manual
   The policy has one criterion: Alignments may have no more than 2
   mismatches.  Quality values are ignored.  The number of mismatches
   permitted is configurable.  Permitting indels is future work.
+  
+  Command Line
+  ------------
+
+  The following is a detailed description of the options used to control
+  the 'bowtie' aligner:
 
  Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]
 
@@ -170,6 +176,23 @@ Bowtie Manual
   --verbose          Print verbose output (for debugging).
 
   --version          Print version information and quit.
+
+  Output
+  ------
+ 
+  The 'bowtie' aligner outputs each alignment on a separate line.  Each
+  line is a collection of 8 fields separated by tabs; from left to
+  right, the fields are:
+  
+   1. Read name
+   2. Read orientation ('-' or '+')
+   3. Index of reference sequence aligned to
+   4. Offset into reference sequence of alignment
+   5. Read sequence (reverse-complemented if orientation is '-')
+   6. Read qualities (reversed if orientation is '-')
+   7. Reserved
+   8. Comma-separated list of mismatch positions, as offsets from high-
+      quality end
  
  Using the 'bowtie-build' Indexer
  --------------------------------
