@@ -41,41 +41,122 @@ Bowtie Manual
  Using the 'bowtie' Aligner
  --------------------------
  
+ The 'bowtie' aligner takes an index and a set of reads and prints a
+ list of alignments.
+
  Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]
-  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt
-  <query_in>         comma-separated list of files containing query reads
-                     (or the sequences themselves, if -c is specified)
-  <hit_outfile>      file to write hits to (default: stdout)
+
+  <ebwt_base>        The basename of the index to be searched.  The
+                     basename is the name of any of the four index
+                     files up to but not including the first period.
+                     bowtie first looks in the current directory for
+                     the index files, then looks in the 'index'
+                     subdirectory under the directory where the
+                     currently-running 'bowtie' executable is located,
+                     then looks in the directory specified in the
+                     BOWTIE_INDEXES environment variable.
+
+  <query_in>         A comma-separated list of files containing the
+                     reads to be aligned, or, if -c is specified, the
+                     sequences themselves. E.g., this might be
+                     "lane1.fq,lane2.fq,lane3.fq,lane4.fq", or, if -c
+                     is specified, this might be "GGTCATCCT,ACGGGTCGT"
+
+  <hit_outfile>      File to write alignments to.  By default,
+                     alignments are written to stdout (the console).
+
  Options:
-  -q                 query input files are FASTQ .fq/.fastq (default)
-  -f                 query input files are (multi-)FASTA .fa/.mfa
-  -c                 query sequences given on command line (as <query_in>)
-  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)
-  -l/--seedlen <int> seed length (default: 28)
-  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)
-  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities
-  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads
-  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads
-  -u/--qupto <int>   stop after the first <int> reads
-  -t/--time          print wall-clock time taken by search phases
-  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred
-  --concise          write hits in a concise format
-  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)
-  -o/--offrate <int> override offrate of Ebwt; must be <= value in index
-  --seed <int>       seed for random number generator
-  --verbose          verbose output (for debugging)
-  --version          print version information and quit
+
+  -q                 The query input files (specified as <query_in>)
+                     are FASTQ files (usually having extension .fq or
+                     .fastq).  This is the default.  See also:
+                     --solexa-quals.
+
+  -f                 The query input files (specified as <query_in>)
+                     are FASTA files (usually having extension .fa,
+                     .mfa, .fna or similar).  All quality values are
+                     assumed to be 40.
+
+  -c                 The query sequences are given on command line.
+                     I.e. <query_in> is a comma-separated list of
+                     reads rather than a list of read files.
+
+  -e/--maqerr <int>  The maximum permitted total of quality values at
+                     mismatched read positions.  This total is also
+                     called the "quality-weighted hamming distance" or
+                     "Q-distance."  This is analogous to the -e option
+                     for "maq map".  The default is 70.  Note that,
+                     like Maq, Bowtie rounds quality values to the
+                     nearest 10 and saturates at 30.
+  
+  -l/--seedlen <int> The "seed length"; i.e., the number of bases on
+                     the high-quality end of the read to which the -n
+                     ceiling applies.  The default is 28.
+
+  -n/--seedmms <int> The maximum number of mismatches permitted in the
+                     seed.  This may be 0, 1 or 2 and the default is 2.
+
+  -v <int>           Forego the Maq-like alignment policy and use a
+                     SOAP-like alignment policy.  I.e., report end-to-
+                     end alignments with at most <int> mismatches.  If
+                     -v is specified, quality values and the -e, -l and
+                     -n options are ignored. 
+  
+  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
+                     each read before alignment.  Default: 0.
+
+  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
+                     each read before alignment.  Default: 0.
+
+  -u/--qupto <int>   Only align the first <int> reads from the
+                     specified read set.  Default: no limit.
+  
+  -t/--time          Print the amount of wall-clock time taken by each
+                     search phase and index turnover.
+  
+  --solexa-quals     Convert FASTQ qualities from solexa-scaled to
+                     phred-scaled.  Used with -q.  Default: off.
+  
+  --concise          Print alignments in a concise format; in this
+                     mode, each line is a separate.
+  
+  --maxns <int>      Skip reads with more than <int> N's (no-confidence
+                     bases) in their sequence.  Default: no limit.
+  
+  -o/--offrate <int> Override the offrate of the index with <int>.  If
+                     <int> is greater than the offrate used to build
+                     the index, then some row markings are discarded
+                     when the index is read into memory.  This reduces
+                     the memory footprint of the aligner but requires
+                     more time to calculate text offsets.  <int> must
+                     be greater than the value used to build the index.
+
+  --seed <int>       Use <int> as the seed for pseudo-random number
+                     generator.
+
+  --verbose          Print verbose output (for debugging).
+
+  --version          Print version information and quit.
  
  Using the 'bowtie-build' Indexer
  --------------------------------
  
  Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>
-    reference_in            comma-separated list of files with ref sequences
-    ebwt_outfile_base       write Ebwt data to files with this dir/basename
+ 
+    <reference_in>          A comma-separated list of files containing
+                            the reference sequences to be aligned to,
+                            or, if -c is specified, the sequences
+                            themselves. E.g., this might be
+                            "chr1.fa,chr2.fa,chrX.fa,chrY.fa", or, if
+                            -c is specified, this might be
+                            "GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA".
+
+    <ebwt_outfile_base>     The basename of the index files to write.
+
  Options:
+
     -f                      reference files are Fasta (default)
     -c                      reference sequences given on cmd line (as <seq_in>)
-    --entiresa              build whole suffix array at once; huge mem footprint
     --bmax <int>            max SA bucket sz for blockwise suffix-array builder
     --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)
     --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)

@@ -60,7 +60,7 @@ static void printUsage(ostream& out) {
 	    << "    -f                      reference files are Fasta (default)" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
 	    //<< "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
-	    << "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
+	    //<< "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
 	    << "    --bmax <int>            max SA bucket sz for blockwise suffix-array builder" << endl
 	    << "    --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)" << endl
