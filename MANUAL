@@ -1,0 +1,99 @@
+Bowtie: an Ultrafast, Lightweight Short Read Aligner
+
+Bowtie Manual
+=============
+
+ Obtaining Bowtie Binaries
+ -------------------------
+ 
+ Obtain Bowtie binaries for your platform from the Download section of
+ the Sourceforge project site.  Binaries are currently available for
+ Linux, Windows, and Mac OS X.
+ 
+ https://sourceforge.net/project/showfiles.php?group_id=236897&package_id=288231
+ 
+ Obtaining and Building Bowtie Sources
+ -------------------------------------
+ 
+ Building Bowtie requires a GNU-like environment that includes GCC, GNU
+ Make and other basics.  It should be possible to build Bowtie on
+ a vanilla Linux or Mac installation.  Bowtie can also be built on
+ Windows using Cygwin or MinGW (recommended).  If building with MinGW,
+ first install MinGW, MSYS, the zlib library
+ (http://cygwin.com/packages/mingw-zlib/), and the pthreads library
+ (http://sourceware.org/pthreads-win32/).
+ 
+ Bowtie depends on code from Maq v0.6.6 (http://maq.sf.net) and from
+ the SeqAn library v1.1 (http://www.seqan.de).  However, all supporting
+ code is included in the Bowtie source archive, so there is no need to
+ download additional sources.
+ 
+ Obtain Bowtie sources from the Download section of the Sourceforge
+ project site.
+ 
+ https://sourceforge.net/project/showfiles.php?group_id=236897&package_id=288231
+ 
+ Extract the sources, change to the directory where they were
+ extracted, and build the Bowtie tools by running GNU make (usually
+ with the command 'make', but sometimes with 'gmake').  If building
+ with MinGW, issue the 'make' command from the MSYS prompt.
+
+ Using the 'bowtie' Aligner
+ --------------------------
+ 
+ Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]
+  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt
+  <query_in>         comma-separated list of files containing query reads
+                     (or the sequences themselves, if -c is specified)
+  <hit_outfile>      file to write hits to (default: stdout)
+ Options:
+  -q                 query input files are FASTQ .fq/.fastq (default)
+  -f                 query input files are (multi-)FASTA .fa/.mfa
+  -c                 query sequences given on command line (as <query_in>)
+  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)
+  -l/--seedlen <int> seed length (default: 28)
+  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)
+  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities
+  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads
+  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads
+  -u/--qupto <int>   stop after the first <int> reads
+  -t/--time          print wall-clock time taken by search phases
+  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred
+  --concise          write hits in a concise format
+  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)
+  -o/--offrate <int> override offrate of Ebwt; must be <= value in index
+  --seed <int>       seed for random number generator
+  --verbose          verbose output (for debugging)
+  --version          print version information and quit
+ 
+ Using the 'bowtie-build' Indexer
+ --------------------------------
+ 
+ Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>
+    reference_in            comma-separated list of files with ref sequences
+    ebwt_outfile_base       write Ebwt data to files with this dir/basename
+ Options:
+    -f                      reference files are Fasta (default)
+    -c                      reference sequences given on cmd line (as <seq_in>)
+    --entiresa              build whole suffix array at once; huge mem footprint
+    --bmax <int>            max SA bucket sz for blockwise suffix-array builder
+    --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)
+    --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)
+    --dcv <int>             diff-cover period for blockwise (default: 1024)
+    --nodc                  disable difference cover (blockwise is quadratic)
+    -l/--linerate <int>     line rate (single line is 2^rate bytes)
+    -i/--linesperside <int> # lines in a side
+    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars
+    -t/--ftabchars <int>    # of characters in initial lookup table key
+    -h/--chunkrate <int>    # of characters in a text chunk
+    --big --little          endianness (default: little, this host: little)
+    --seed <int>            seed for random number generator
+    --cutoff <int>          truncate reference at prefix of <int> bases
+    -v/--verbose            verbose output (for debugging)
+    --version               print version information and quit
+ 
+ Using the 'bowtie-convert' Maq Map Converter
+ --------------------------------------------
+ 
+ Usage: bowtie_convert <in.bwtmap> <out.map> [refnames]
+    -v     verbose output
