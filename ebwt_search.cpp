@@ -847,12 +847,12 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 }
 
 #define SWITCH_TO_FW_INDEX() { \
-	/* Evict the transposed index from memory if necessary */ \
+	/* Evict the mirror index from memory if necessary */ \
 	if(ebwtBw.isInMemory()) ebwtBw.evictFromMemory(); \
 	assert(!ebwtBw.isInMemory()); \
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
-		Timer _t(cout, "Time loading forward Bowtie Index: ", timing); \
+		Timer _t(cout, "Time loading forward index: ", timing); \
 		ebwtFw.loadIntoMemory(); \
 	} \
 	assert(ebwtFw.isInMemory()); \
@@ -868,14 +868,14 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	assert(!ebwtFw.isInMemory()); \
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
-		Timer _t(cout, "Time loading transposed Bowtie Index: ", timing); \
+		Timer _t(cout, "Time loading mirror index: ", timing); \
 		ebwtBw.loadIntoMemory(); \
 	} \
 	assert(ebwtBw.isInMemory()); \
 	patsrc.reset(); /* rewind pattern source to first pattern */ \
 	assert(patsrc.hasMorePatterns()); \
 	patsrc.setReverse(true); /* tell pattern source to reverse patterns */ \
-	params.setEbwtFw(false); /* tell search params that we're in the transposed domain */ \
+	params.setEbwtFw(false); /* tell search params that we're in the mirror domain */ \
 }
 
 #define GET_BOTH_PATTERNS(pf, qf, nf, pr, qr, nr) { \
@@ -902,7 +902,7 @@ static void twoMismatchSearch(
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
         Ebwt<TStr>& ebwtFw,             /// index of original text
-        Ebwt<TStr>& ebwtBw,             /// index of transposed text
+        Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<TStr>& os)    /// text strings, if available (empty otherwise)
 {
 	typedef typename Value<TStr>::Type TVal;
@@ -981,7 +981,7 @@ static void twoMismatchSearch(
 	    numPats = patid;
 	    assert_leq(numPats>>1, doneMask.size());
 	}
-	// Unload forward index and load transposed index
+	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	{
 		Timer _t(cout, "End-to-end 2-mismatch Phase 2: ", timing);
@@ -1283,7 +1283,7 @@ static void seededQualCutoffSearch(
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
         Ebwt<TStr>& ebwtFw,             /// index of original text
-        Ebwt<TStr>& ebwtBw,             /// index of transposed text
+        Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<TStr>& os)    /// text strings, if available (empty otherwise)
 {
 	typedef typename Value<TStr>::Type TVal;
@@ -1380,7 +1380,7 @@ static void seededQualCutoffSearch(
 	    numPats = patid;
 	    assert_leq(numPats>>1, doneMask.size());
 	}
-	// Unload forward index and load transposed index
+	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	String<uint8_t> seedlingsRc;
 	reserve(seedlingsRc, 10 * 1024 * 1024, Exact());
@@ -1451,7 +1451,7 @@ static void seededQualCutoffSearch(
 			}
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
 			// Do a 12/24 backtrack on the forward-strand read using
-			// the transposed index.  This will find all case 1F, 2F
+			// the mirror index.  This will find all case 1F, 2F
 			// and 3F hits.
 			bool hit = btf.backtrack();
 			// Restore default seed bounds
@@ -1493,7 +1493,7 @@ static void seededQualCutoffSearch(
 			btr.setQlen(s); // just look at the seed
 			uint32_t numSeedlings = length(seedlingsRc);
 			// Do a 12/24 seedling backtrack on the reverse-comp read
-			// using the transposed index.  This will find seedlings
+			// using the mirror index.  This will find seedlings
 			// for case 4R
 			btr.backtrack();
 			// Restore default seed bounds
@@ -1539,7 +1539,7 @@ static void seededQualCutoffSearch(
 		// is no need to continue to phases 3 and 4
 		return;
 	}
-	// Unload transposed index and load forward index
+	// Unload mirror index and load forward index
 	SWITCH_TO_FW_INDEX();
 	String<uint8_t> seedlingsFw;
 	reserve(seedlingsFw, 10 * 1024 * 1024, Exact());
@@ -1861,7 +1861,7 @@ static void seededQualCutoffSearch(
 	    assert_eq(seedlingId, seedlingsRcLen);
 	    assert(numPats == patid || numPats+2 == patid);
 	}
-	// Unload forward index and load transposed index
+	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
@@ -2216,7 +2216,7 @@ static void driver(const char * type,
     Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, verbose, sanityCheck);
     assert_geq(ebwt.eh().offRate(), offRate);
     Ebwt<TStr>* ebwtBw = NULL;
-    // We need the transposed index if mismatches are allowed
+    // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
     	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, verbose, sanityCheck);
     }
@@ -2311,7 +2311,7 @@ static void driver(const char * type,
 			                       stats,
 			                       params,
 			                       ebwt,    // forward index
-			                       *ebwtBw, // transposed index (not optional)
+			                       *ebwtBw, // mirror index (not optional)
 			                       os);     // references, if available
 		}
 		else if(mismatches > 0) {
