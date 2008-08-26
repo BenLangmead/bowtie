@@ -59,7 +59,10 @@ all: $(BIN_LIST)
 
 allall: $(BIN_LIST) $(BIN_LIST_AUX)
 
-DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" -DBUILD_HOST="\"`hostname`\"" -DBUILD_TIME="\"`date`\""
+DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
+     -DBUILD_HOST="\"`hostname`\"" \
+     -DBUILD_TIME="\"`date`\"" \
+     -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\""
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

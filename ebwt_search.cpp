@@ -246,8 +246,8 @@ static void parseOptions(int argc, char **argv) {
 			case -1: break; /* Done with options. */
 			case 0:
 				if (long_options[option_index].flag != 0)
-					break;	
-			default: 
+					break;
+			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
 				exit(1);
@@ -335,7 +335,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    }
     	// Optionally sanity-check results by confirming with a
     	// different matcher that the pattern occurs in exactly
-    	// those locations reported.  
+    	// those locations reported.
     	if(sanityCheck && !oneHit && !arrowMode && !os.empty()) {
     	    vector<Hit>& results = sink.retainedHits();
 		    vector<U32Pair> results2;
@@ -382,7 +382,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 
 /**
  * Given a pattern, a list of reference texts, and some other state,
- * find all hits for that pattern in all texts using a naive seed- 
+ * find all hits for that pattern in all texts using a naive seed-
  * and-extend algorithm where seeds are found using Horspool.
  */
 template<typename TStr1, typename TStr2>
@@ -453,12 +453,12 @@ static bool findSanityHits(const TStr1& pat,
 				// A hit followed by a transpose can sometimes fall
 				// off the beginning of the text
 				if(off < (0xffffffff - length(pat))) {
-					Hit h(make_pair(i, off), 
-						  patid, 
+					Hit h(make_pair(i, off),
+						  patid,
 						  "",
-						  pat, 
-						  "" /*no need for qualities*/, 
-						  fw, 
+						  pat,
+						  "" /*no need for qualities*/,
+						  fw,
 						  diffs);
 					sanityHits.push_back(h);
 				}
@@ -555,7 +555,7 @@ static bool reconcileHits(const TStr1& pat,
         		cout << "  " << itr->h.first << " (" << itr->h.second << ")" << endl;
         	}
     	}
-    	assert(found); 
+    	assert(found);
     }
     return true;
 }
@@ -565,7 +565,7 @@ static bool reconcileHits(const TStr1& pat,
  * and one for the backward direction, for exact end-to-end hits and 1-
  * mismatch end-to-end hits.  In my experience, this is slightly faster
  * than Maq (default) mode with the -n 1 option.
- * 
+ *
  * Forward Ebwt (ebwtFw) is already loaded into memory and backward
  * Ebwt (ebwtBw) is not loaded into memory.
  */
@@ -652,7 +652,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		// Add 50% more elements, initialized to 0
 	    		fill(doneMask, mElt + patid>>4, 0);
 	    	}
-			
+
 			// Set a bit indicating this pattern is done and needn't be
 			// considered by the 1-mismatch loop
 	    	doneMask[mElt] |= (1 << (patid & 7));
@@ -716,7 +716,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		}
     		if(oneHit) {
     			// Ignore the rest of the oracle hits
-    			sanityHits.clear(); 
+    			sanityHits.clear();
     		} else {
     			// If in allHit mode, check that we covered *all* the
     			// hits produced by the oracle
@@ -827,7 +827,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		}
     		if(oneHit) {
     			// Ignore the rest of the oracle hits
-    			sanityHits.clear(); 
+    			sanityHits.clear();
     		} else {
     			// If in allHit mode, check that we covered *all* the
     			// hits produced by the oracle
@@ -916,7 +916,7 @@ static void twoMismatchSearch(
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "End-to-end 2-mismatch Phase 1: ", timing);
 		BacktrackManager<TStr> btr(ebwtFw, params,
-		                          0,                     // unrevOff 
+		                          0,                     // unrevOff
 		                          0,                     // 1revOff
 		                          0,                     // 2revOff
 		                          0, 0,                  // itop, ibot
@@ -1034,7 +1034,7 @@ static void twoMismatchSearch(
 				patid += 2;
 				continue;
 			}
-			
+
 			// Try 2 backtracks in the 3' half of the reverse complement read
 			params.setFw(false);  // looking at reverse complement
 			bt.setQuery(patRc, qualRc, nameRc);
@@ -1124,7 +1124,7 @@ static void twoMismatchSearch(
 				patid += 2;
 				continue;
 			}
-			
+
 			// Try a half-and-half on the forward read
 			bool gaveUp = false;
 			bthh.setQuery(patFw, qualFw, nameFw);
@@ -1143,7 +1143,7 @@ static void twoMismatchSearch(
 	    		patid += 2;
 				continue;
 			}
-	    	
+
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
@@ -1162,7 +1162,7 @@ static void twoMismatchSearch(
 				        *nameFw,
 				        patid,     // patid
 				        hits,
-				        0xffffffff, 
+				        0xffffffff,
 				        0,
 				        0,
 				        s,
@@ -1187,7 +1187,7 @@ static void twoMismatchSearch(
 				assert_eq(0, hits.size());
 	    	}
 #endif
-	    	
+
 			// Try a half-and-half on the reverse complement read
 	    	gaveUp = false;
 			params.setFw(false);
@@ -1225,7 +1225,7 @@ static void twoMismatchSearch(
 				        *nameRc,
 				        patid+1,    // patid
 				        hits,
-				        0xffffffff, 
+				        0xffffffff,
 				        0,
 				        0,
 				        s,
@@ -1263,10 +1263,10 @@ static void twoMismatchSearch(
  * of Ebwt indexes, one for the original references, and one for the
  * transpose of the references.  Neither index should be loaded upon
  * entry to this function.
- * 
+ *
  * Like Maq, we treat the first 24 base pairs of the read (those
  * closest to the 5' end) differently from the remainder of the read.
- * We call the first 24 base pairs the "seed."  
+ * We call the first 24 base pairs the "seed."
  */
 template<typename TStr>
 static void seededQualCutoffSearch(
@@ -1300,7 +1300,7 @@ static void seededQualCutoffSearch(
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
 		BacktrackManager<TStr> bt(ebwtFw, params,
-		                          (seedMms > 0)?  s5 : s,// unrevOff, 
+		                          (seedMms > 0)?  s5 : s,// unrevOff,
 		                          (seedMms == 2)? s5 : s,// 1revOff
 		                          s,                     // 2revOff
 		                          0, 0,                  // itop, ibot
@@ -1432,7 +1432,7 @@ static void seededQualCutoffSearch(
 	    		patid += 2;
 	    		continue;
 	    	}
-	    	
+
 			// If we reach here, then cases 1R, 2R, and 3R have been
 	    	// eliminated.  The next most likely cases are 1F, 2F and
 	    	// 3F...
@@ -1475,7 +1475,7 @@ static void seededQualCutoffSearch(
 				patid += 2;
 				continue;
 			}
-			
+
 			// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
 			// have been eliminated, leaving us with cases 4F and 4R
 			// (the cases with 1 mismatch in the 5' half of the seed)
@@ -1717,14 +1717,14 @@ static void seededQualCutoffSearch(
 			assert_eq(0xff, seedlingsRc[seedlingId-1]);
 			assert_eq((patid>>1) & 0xff, seedlingsRc[seedlingId]);
 			ASSERT_ONLY(seedlingId++); // skip patid sanity marker
-			
+
 			// Case 4R yielded a hit; mark this pattern as done and
 			// continue to next pattern
 	    	if(doneMask[patid>>1]) {
 	    		patid += 2;
 	    		continue;
 	    	}
-	    	
+
 	    	// If we're in two-mismatch mode, then now is the time to
 	    	// try the final case that might apply to the reverse
 	    	// complement pattern: 1 mismatch in each of the 3' and 5'
@@ -1758,7 +1758,7 @@ static void seededQualCutoffSearch(
 					continue;
 				}
 	    	}
-	    	
+
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
@@ -1781,7 +1781,7 @@ static void seededQualCutoffSearch(
 				        *nameRc,
 				        patid+1,    // patid
 				        hits,
-				        qualCutoff, 
+				        qualCutoff,
 				        unrevOff,
 				        oneRevOff,
 				        twoRevOff,
@@ -2065,7 +2065,7 @@ static void seededQualCutoffSearch(
 	    	}
 
 #ifndef NDEBUG
-	    	
+
 			// The forward version of the read doesn't hit at all!
 			// Check with the oracle to make sure it agrees.
 	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
@@ -2086,7 +2086,7 @@ static void seededQualCutoffSearch(
 				        *nameFw,
 				        patid,      // patid
 				        hits,
-				        qualCutoff, 
+				        qualCutoff,
 				        unrevOff,
 				        oneRevOff,
 				        twoRevOff,
@@ -2185,7 +2185,7 @@ static void driver(const char * type,
 			readSequenceString(origString, os);
 		}
 	}
-	// Adjust 
+	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(ebwtFileBase);
 	// Seed random number generator
 	srand(seed);
@@ -2363,6 +2363,10 @@ int main(int argc, char **argv) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
+		cout << "Compiler version: " << COMPILER_VERSION << endl;
+		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		     << ", " << sizeof(long) << ", " << sizeof(long long)
+		     << ", " << sizeof(void *) << "}" << endl;
 		cout << "Source hash: " << EBWT_SEARCH_HASH << endl;
 		return 0;
 	}
@@ -2375,7 +2379,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	ebwtFile = argv[optind++];
-	
+
 	// Get query filename
 	if(optind >= argc) {
 		cerr << "No query or output file specified!" << endl;

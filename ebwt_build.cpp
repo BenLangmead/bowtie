@@ -16,7 +16,7 @@
 #include "ref_read.h"
 
 /**
- * \file Driver for the bowtie-build indexing tool. 
+ * \file Driver for the bowtie-build indexing tool.
  */
 
 // Build parameters
@@ -24,8 +24,8 @@ static int verbose           = 0;     // be talkative
 static int sanityCheck       = 0;     // do slow sanity checks
 static int format            = FASTA; // input sequence format
 static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
-static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n) 
-static uint32_t bmaxDivN     = 8;     // same, as divisor of n 
+static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
+static uint32_t bmaxDivN     = 8;     // same, as divisor of n
 static int dcv               = 1024;  // bwise SA difference-cover sample sz
 static int noDc              = 0;     // disable difference-cover sample
 static int entireSA          = 0;     // 1 = disable blockwise SA
@@ -182,8 +182,8 @@ static void parseOptions(int argc, char **argv) {
 				break;
 			case 0:
 				if (long_options[option_index].flag != 0)
-					break;	
-			default: 
+					break;
+			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
 				exit(1);
@@ -232,7 +232,7 @@ static void driver(const char * type,
 	                linesPerSide,
 	                offRate,      // suffix-array sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
-	                chunkRate,    // alignment 
+	                chunkRate,    // alignment
 	                outfile,      // basename for .?.ebwt files
 	                !entireSA,    // useBlockwise
 	                bmax,         // block size for blockwise SA builder
@@ -246,7 +246,7 @@ static void driver(const char * type,
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
 	                verbose,      // be talkative
-	                sanityCheck); // verify results and internal consistency 
+	                sanityCheck); // verify results and internal consistency
 	// Note that the Ebwt is *not* resident in memory at this time.  To
 	// load it into memory, call ebwt.loadIntoMemory()
 	if(verbose) {
@@ -281,17 +281,21 @@ static char *argv0 = NULL;
  * main function.  Parses command-line arguments.
  */
 int main(int argc, char **argv) {
-	
+
 	string infile;
 	vector<string> infiles;
 	string outfile;
-	
+
 	parseOptions(argc, argv);
 	argv0 = argv[0];
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
+		cout << "Compiler version: " << COMPILER_VERSION << endl;
+		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		     << ", " << sizeof(long) << ", " << sizeof(long long)
+		     << ", " << sizeof(void *) << "}" << endl;
 		cout << "Source hash: " << EBWT_BUILD_HASH << endl;
 		return 0;
 	}
@@ -311,14 +315,14 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	outfile = argv[optind++];
-	
+
 	tokenize(infile, ",", infiles);
 	if(infiles.size() < 1) {
 		cerr << "Tokenized input file list was empty!" << endl;
 		printUsage(cerr);
 		return 1;
 	}
-	
+
 	// Optionally summarize
 	if(verbose) {
 		cout << "Settings:" << endl
