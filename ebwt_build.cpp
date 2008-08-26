@@ -292,7 +292,8 @@ int main(int argc, char **argv) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
-		cout << "Compiler version: " << COMPILER_VERSION << endl;
+		cout << "Compiler: " << COMPILER_VERSION << endl;
+		cout << "Options: " << COMPILER_OPTIONS << endl;
 		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *) << "}" << endl;
