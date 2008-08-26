@@ -19,7 +19,7 @@ Bowtie Manual
  Make and other basics.  It should be possible to build Bowtie on
  a vanilla Linux or Mac installation.  Bowtie can also be built on
  Windows using Cygwin or MinGW (recommended).  If building with MinGW,
- first install MinGW, MSYS, the zlib library
+ first install MinGW and MSYS (http://www.mingw.org/), the zlib library
  (http://cygwin.com/packages/mingw-zlib/), and the pthreads library
  (http://sourceware.org/pthreads-win32/).
  
@@ -35,14 +35,47 @@ Bowtie Manual
  
  Extract the sources, change to the directory where they were
  extracted, and build the Bowtie tools by running GNU make (usually
- with the command 'make', but sometimes with 'gmake').  If building
- with MinGW, issue the 'make' command from the MSYS prompt.
+ with the command 'make', but sometimes with 'gmake') with no
+ arguments.  If building with MinGW, run GNU make from the MSYS
+ environment.
 
  Using the 'bowtie' Aligner
  --------------------------
  
- The 'bowtie' aligner takes an index and a set of reads and prints a
- list of alignments.
+ The 'bowtie' aligner takes an index and a set of reads as input and
+ outputs a list of alignments.  At most one alignment is output per
+ read.  Alignments are selected according to an 'alignment policy' that
+ states which alignments are legal.  By default, Bowtie utilizes a
+ policy that is equivalent to Maq's quality-aware policy
+ (http://maq.sf.net), but it can also be made to enforce an end-to-end
+ k-difference policy closer to SOAP's (http://soap.genomics.org.cn/).
+ 
+  Maq-like Policy
+  ---------------
+ 
+  The policy has two criteria:
+ 
+  1. Alignments may have no more than 2 mismatches in the first 28 bases
+     on the high-quality end of the read.
+
+  2. The sum of the quality values at all mismatched positions may not
+     exceed 70 (where each position has a quality value on a phred-like
+     scale of 0-40).
+ 
+  The numbers stated above are configurable using Bowtie's -n, -e and
+  -l options.
+ 
+  If there are many possible alignments that satisfy both criteria,
+  Bowtie will give preference to alignments with where the sum from
+  criterion 2 is smaller.  Bowtie will not necessarily report the the
+  minimal-sum alignment in this case.  
+ 
+  End-to-end k-difference Policy
+  ------------------------------
+  
+  The policy has one criterion: Alignments may have no more than 2
+  mismatches.  Quality values are ignored.  The number of mismatches
+  permitted is configurable.  Permitting indels is future work.
 
  Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]
 
