@@ -1,0 +1,116 @@
+Bowtie: an Ultrafast, Lightweight Short Read Aligner
+
+Bowtie Getting Started Guide
+============================
+
+ Download and extract the appropriate Bowtie binary release from
+ http://bowtie-bio.sf.net into a fresh directory. Change to that
+ directory.
+
+ Performing alignments
+ ---------------------
+
+ The Bowtie source and binary packages come with a pre-built index of
+ the E. coli genome, and a set of 1,000 35-bp reads simulated from that
+ genome. To use Bowtie to align those reads, issue this command:
+
+    bowtie e_coli reads/e_coli_1000.fq
+
+ Depending on your computer, the run might take a few seconds up to
+ about a minute. You will see bowtie print many lines of output. Each
+ line is an alignment for a read. The name of the aligned read appears
+ in the leftmost column.
+
+ The first argument to bowtie is the basename of the index for the
+ genome to be searched. The second argument is the name of a FASTQ file
+ containing the reads.
+
+ Next, issue this command:
+
+    bowtie -t e_coli reads/e_coli_1000.fq e_coli.map
+
+ This run calculates the same alignments as the previous run, but the
+ alignments are written to e_coli.map (the final argument) rather than
+ to the screen. Also, the -t option instructs Bowtie to print timing
+ statistics, which will look something like this (times will obviously
+ differ):
+
+    Time loading forward index: 00:00:00
+    Seeded quality search Phase 1: 00:00:00
+    Time loading mirror index: 00:00:00
+    Seeded quality search Phase 2: 00:00:00
+    Time loading forward index: 00:00:00
+    Seeded quality search Phase 3: 00:00:00
+    Time loading mirror index: 00:00:00
+    Seeded quality search Phase 4: 00:00:00
+    Time searching: 00:00:00
+    Overall time: 00:00:00
+
+ Installing a pre-built index
+ ----------------------------
+
+ Download the pre-built S. cerevisiae genome package from the Bowtie
+ FTP site:
+ 
+    ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/s_cerevisiae.ebwt.zip
+    
+ All pre-built indexes are packaged as .zip archives, and the S.
+ cerevisiae archive is named s_cerevisiae.ebwt.zip. When it has
+ finished downloading, extract the archive into the Bowtie 'indexes'
+ subdirectory using your preferred unzip tool. The index is now
+ installed.
+
+ To test that the index is properly installed, issue this command from
+ the Bowtie install directory:
+
+    bowtie -c s_cerevisiae ATTGTAGTTCGAGTAAGTAATGTGGGTTTG
+
+ This command searches the S. cerevisiae index with a single read. The
+ -c argument instructs Bowtie to obtain read sequences directory from
+ the command line rather than from a file. If the index is installed
+ properly, this command should print a single alignment and then exit.
+
+ If you would rather install pre-built indexes somewhere other than the
+ 'indexes' subdirectory of the Bowtie install directory, simply set the
+ BOWTIE_INDEXES environment variable to point to your preferred
+ directory and extract indexes there instead.
+
+ Building a new index
+ --------------------
+
+ The pre-built E. coli index included with Bowtie is built from the
+ sequence for strain 536, known to cause urinary tract infections. We
+ will create a new index from the sequence of E. coli strain O157:H7, a
+ strain known to cause food poisoning. Download the sequence file by
+ right-clicking this link and selecting "Save Link As..." or "Save
+ Target As...". The sequence file is named NC_002127.fna. When the
+ sequence file is finished downloading, move it to the Bowtie install
+ directory and issue this command:
+
+    bowtie-build NC_002127.fna e_coli_O157_H7
+
+ The command should complete quickly without printing anything. When
+ the command has completed, note that the current directory contains
+ four new files named e_coli_O157_H7.1.ebwt, e_coli_O157_H7.2.ebwt,
+ e_coli_O157_H7.rev.1.ebwt, and e_coli_O157_H7.rev.2.ebwt. These files
+ constitute the index. Move these files to the indexes subdirectory to
+ install it.
+
+ To test that the index is properly installed, issue this command:
+
+    bowtie -c e_coli_O157_H7 GCGTGAGCTATGAGAAAGCGCCACGCTTCC
+
+ If the index is installed properly, this command should print a single
+ alignment and then exit.
+
+ Finding variations with Maq
+ ---------------------------
+
+ Maq (http://maq.sf.net), by Heng Li at the Wellcome Trust Sanger
+ Institute, is a pipeline for identifying mapping reads and finding
+ variations with respect to a reference sequence. The output from
+ Bowtie can be converted to the same format as is output by Maq's
+ short read aligner, allowing Bowtie users to leverage the rest of
+ the Maq pipeline to identify variations.
+
+ (More coming soon)
