@@ -2135,9 +2135,11 @@ static string adjustEbwtBase(const string& ebwtFileBase) {
 		str = argv0;
 		size_t st = str.find_last_of("/\\");
 		if(st != string::npos) {
-			str.erase(st+1);
+			str.erase(st);
+			str += "/indexes/";
+		} else {
+			str = "indexes/";
 		}
-		str += "indexes/";
 		str += ebwtFileBase;
 		if(verbose) cout << "Trying " << str << endl;
 		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
