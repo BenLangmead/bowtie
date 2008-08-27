@@ -89,7 +89,7 @@ Bowtie Manual
                      basename is the name of any of the four index
                      files up to but not including the first period.
                      bowtie first looks in the current directory for
-                     the index files, then looks in the 'index'
+                     the index files, then looks in the 'indexes'
                      subdirectory under the directory where the
                      currently-running 'bowtie' executable is located,
                      then looks in the directory specified in the

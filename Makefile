@@ -40,6 +40,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                AUTHORS \
                COPYING \
                NEWS \
+               MANUAL \
                TUTORIAL \
                VERSION
 
