@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index_skew7.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: index_skew7.h,v 1.2 2008/08/27 00:27:57 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_SKEW7_H
@@ -547,7 +547,8 @@ namespace SEQAN_NAMESPACE_MAIN
 		{
 			TSize ofs[7] = {0, _n24, _n[4], 0, 0, 0, 0};
 			bool differ = true;
-			TValue c0 = TValue(), c1 = TValue(), c2 = TValue(), c3 = TValue(), c4 = TValue(), c5 = TValue(), c6 = TValue();
+			//TValue c0 = TValue(), c1 = TValue(), c2 = TValue(), c3 = TValue(), c4 = TValue(), c5 = TValue(), c6 = TValue();
+			TValue c0 = 0, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0;
 			for (TSize i = 0, clip = n - 6, l;  i < _n124;  i++) {
 				if ((l = SA124[i]) < clip) {
 					if (differ || s[l] != c0 || s[l+1] != c1 || s[l+2] != c2 || s[l+3] != c3 ||
