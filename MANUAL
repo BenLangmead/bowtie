@@ -156,8 +156,14 @@ Bowtie Manual
   --solexa-quals     Convert FASTQ qualities from solexa-scaled to
                      phred-scaled.  Used with -q.  Default: off.
   
-  --concise          Print alignments in a concise format; in this
-                     mode, each line is a separate.
+  --concise          Print alignments in a concise format. Each line
+                     has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',
+                     where read_idx is the index of the read mapped,
+                     {-|+} is the orientation of the read, ref_idx is
+                     the index of the reference sequence aligned to,
+                     ref_off is the offset into the reference sequence,
+                     and mms is the number of mismatches in the
+                     alignment. 
   
   --maxns <int>      Skip reads with more than <int> N's (no-confidence
                      bases) in their sequence.  Default: no limit.
