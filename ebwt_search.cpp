@@ -47,7 +47,7 @@ static bool solexa_quals		= false; //quality strings are solexa qualities, inste
 static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
-static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
+static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 9999; // max # Ns allowed in read
 
