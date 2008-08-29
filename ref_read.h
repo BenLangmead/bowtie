@@ -62,30 +62,60 @@ template <typename TStr>
 static size_t fastaRefReadAppend(istream& in,
                                  TStr& dst,
                                  RefReadInParams& refparams, 
-                                 bool first = false)
+                                 //bool first = false,
+								 string* name = NULL)
 {
 	typedef typename Value<TStr>::Type TVal;
 	int c;
+
 	assert_neq(refparams.baseCutoff, 0);
 	assert_neq(refparams.numSeqCutoff, 0);
 	size_t seqCharsRead = 0;
 	size_t ilen = length(dst);
+	bool found_space_in_name = false;
 	// Pick off the first carat
-	if(first) {
-		c = in.get(); if(in.eof()) goto bail;
-		assert(c == '>' || c == '#');
-	}
-	// Skip to the end of the id line; if the next line is either
-	// another id line or a comment line, keep skipping
-	// TODO: grab name here, stick in *name
+	
+	c = in.get(); if(in.eof()) goto bail;
+	assert(c == '>' || c == '#');
+	
+	// Chew up the id line; if the next line is either
+	// another id line or a comment line, keep chewing
 	do {
-		if((c = skipLine(in)) == -1) goto bail;
+		if (c == '#')
+			if((c = skipLine(in)) == -1) goto bail;
+		
+		while(true) {
+			c = in.get(); if(in.eof()) goto bail;
+			if (name)
+			{
+				if (isspace(c))
+				{
+					if (name->length())
+						found_space_in_name = true;
+				}
+				else if (!found_space_in_name)
+				{
+					name->push_back(c);
+				}
+			}
+				
+			if(c == '\n' || c == '\r') {
+				while(c == '\n' || c == '\r') {
+					c = in.get(); if(in.eof()) goto bail;
+				}
+				// c now holds first character of next line
+				break;
+			}
+		}
+		//if((c = skipLine(in)) == -1) goto bail;
 	} while (c == '>' || c == '#');
+	
 	// in now points just past the first character of a sequence
 	// line, and c holds the first character
 	while(c != '>' && c != '#') {
 		// Note: can't have a comment in the middle of a sequence,
 		// though a comment can end a sequence
+		
 		if(isalpha(c)) {
 			appendValue(dst, (Dna)(char)c);
 			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
@@ -94,9 +124,12 @@ static size_t fastaRefReadAppend(istream& in,
 				return seqCharsRead;
 			}
 		}
+		if (in.peek() == '>' || in.peek() == '#')
+			break;
 		c = in.get();
 		if(in.eof()) break;
 	}
+	
   bail:
 	// Optionally reverse the portion that we just appended
 	if(refparams.reverse) {

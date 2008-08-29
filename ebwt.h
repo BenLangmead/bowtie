@@ -337,11 +337,14 @@ public:
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
+		string file3 = file + ".seq_names";
+		
 		//string file3 = file + ".3.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
-		//ofstream fout3(file3.c_str(), ios::binary);
+		ofstream fout3(file3.c_str());
+		
 		// Build
 		initFromVector(is,
 		               szs,
@@ -349,7 +352,7 @@ public:
 		               refparams,
 		               fout1,
 		               fout2,
-		               //fout3,
+		               fout3,
 		               useBlockwise,
 		               bmax,
 		               bmaxSqrtMult,
@@ -363,6 +366,8 @@ public:
 		fout2.flush();
 		VMSG_NL("Wrote " << fout2.tellp() << " bytes to secondary EBWT file: " << file2);
 		fout2.close();
+		VMSG_NL("Wrote " << fout3.tellp() << " bytes to ID-name EBWT file: " << file2);
+		fout3.close();
 		// Reopen as input streams
 		VMSG_NL("Re-opening _in1 and _in2 as input streams");
 		_in1.open(file1.c_str(), ios_base::in | ios::binary);
@@ -408,7 +413,7 @@ public:
 	                    const RefReadInParams& refparams,
 	                    ofstream& out1,
 	                    ofstream& out2,
-	                    //ofstream& out3,
+	                    ofstream& out3,
 	                    bool useBlockwise,
 	                    uint32_t bmax,
 	                    uint32_t bmaxSqrtMult,
@@ -437,7 +442,7 @@ public:
 			VMSG_NL("Joining reference sequences");
 			{
 				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
-				joinToDisk(is, szs, sztot, refparams, s, out1, out2, /*out3,*/ seed);
+				joinToDisk(is, szs, sztot, refparams, s, out1, out2, out3, seed);
 			}
 			//out3.flush();
 			//VMSG_NL("Wrote " << out3.tellp() << " bytes to tertiary EBWT file");
@@ -744,7 +749,7 @@ public:
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
 	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
-	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, /*ostream& out3,*/ uint32_t seed);
+	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, ostream& out3, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -3475,11 +3480,10 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 		assert(l[i]->good());
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-		bool first = true;
+		
 		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
-			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, first);
+			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp);
 			if(bases == 0) continue;
-			first = false;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
@@ -3534,7 +3538,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
                             TStr& ret,
                             ostream& out1,
                             ostream& out2,
-                            //ostream& out3,
+                            ostream& out3,
                             uint32_t seed = 0)
 {
 	RandomSource rand(seed); // reproducible given same seed
@@ -3566,48 +3570,20 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		streampos pos = l[i]->tellg();
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-		bool first = true;
+		
 		// For each sequence we can pull out of istream l[i]...
 		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
-			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, first);
+			string name;
+			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, &name);
 			if(bases == 0) continue;
-			first = false;
+			out3 << seqsRead << " " << name << endl;
 			assert_eq(bases, this->_plen[seqsRead]);
 			seqsRead++;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
-			// The #if 0-ed out code here was only relevant for the old
-			// "extension mode" that was displaced by the backtracking
-			// aligner.
-#if 0
-			// Write reference bases (but not padding) to .3.ebwt index
-			{
-				size_t ilen = length(ret);
-				size_t nlen = length(ret);
-				String<Dna, Packed<> > pchunk;
-				reserve(pchunk, 4096 + 32);
-				writePackedLen(out3, bases, _verbose);
-				for(size_t j = 0; j < bases; j += 4096) {
-					clear(pchunk);
-					size_t upper = min<size_t>(ilen + j + 4096, nlen);
-					append(pchunk, infix(ret, ilen + j, upper));
-					size_t len = length(pchunk);
-					assert_gt(len, 0);
-					assert_leq(len, 4096);
-					if(upper == nlen) {
-						// Add a bunch of 0s on the end, clobbering the
-						// existing random junk - this ensures the
-						// content of the .3.ebwt file is deterministic 
-						for(size_t j = 0; j < 31; j++) {
-							appendValue(pchunk, (Dna)0);
-						}
-					}
-					writePacked(out3, pchunk, len, false, _verbose);
-				}
-			}
-#endif
+
 		    // insert padding
 			uint32_t diff = 0;
 			uint32_t rlen = length(ret);
