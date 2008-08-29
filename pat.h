@@ -58,25 +58,25 @@ public:
 		if(_reverse) {
 			size_t len = length(**s);
 			resize(_revtmp, len, Exact());
-			if(*qual != NULL) {
+			if(*qual != NULL && !empty(*qual)) {
 				resize(_revqual, len);
 			}
 			// tmp = reverse of s
 			for(size_t i = 0; i < len; i++)
 			{
 				_revtmp[i] = (**s)[len-i-1];
-				if(*qual != NULL) {
+				if(*qual != NULL && !empty(*qual)) {
 					_revqual[i] = (**qual)[len-i-1];
 				}
 			}
 			// Output it, if desired
 			if(_dumpfile != NULL) {
 				dump(_out, _revtmp,
-				     ((*qual) == NULL) ? String<char>("NULL") : _revqual,
+				     ((*qual) == NULL || empty(*qual)) ? String<char>("NULL") : _revqual,
 				     ((*name) == NULL) ? String<char>("NULL") : (**name));
 			}
 			(*s) = &_revtmp;
-			if(*qual != NULL) {
+			if(*qual != NULL && !empty(*qual)) {
 				(*qual) = &_revqual;
 			}
 			return;
@@ -84,7 +84,7 @@ public:
 		// Output it, if desired
 		if(_dumpfile != NULL) {
 			dump(_out, (**s),
-			     ((*qual) == NULL) ? String<char>("NULL") : (**qual),
+			     ((*qual) == NULL || empty(*qual)) ? String<char>("NULL") : (**qual),
 			     ((*name) == NULL) ? String<char>("NULL") : (**name));
 		}
 	}
@@ -742,6 +742,8 @@ static uint8_t rcCharToDna[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
+
 /**
  * 
  */
@@ -843,9 +845,13 @@ protected:
 				(*dstLen) -= this->_trim3;
 				_setBegin(dstTStr, (Dna*)dst);
 				_setLength(dstTStr, (*dstLen));
+				_setBegin(qualTStr,qualDefault);
+				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
 					_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
 					_setLength(rcDstTStr, (*dstLen));
+					_setBegin(rcQualTStr,qualDefault);
+					_setLength(rcQualTStr,(*dstLen));
 				}
 			} else {
 				while(c != '>' && c != '#') {
@@ -865,9 +871,13 @@ protected:
 				(*dstLen) -= this->_trim3;
 				_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
+				_setBegin(qualTStr,qualDefault);
+				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
 					_setBegin(rcDstTStr, (Dna*)rcDst);
 					_setLength(rcDstTStr, (*dstLen));
+					_setBegin(rcQualTStr,qualDefault);
+					_setLength(rcQualTStr,(*dstLen));
 				}
 			}
 		} while(ns > _maxNs);

@@ -38,7 +38,7 @@ static const int max_read_bp = MAX_READLEN;
 static int DEFAULT_QUAL = 25;
 
 // Number of bases consider "reliable" on the five prime end of each read
-static int MAQ_FIVE_PRIME = 24;
+static int MAQ_FIVE_PRIME = 28;
 
 static inline int operator < (const maqmap1_t &a, const maqmap1_t &b)
 {

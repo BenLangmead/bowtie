@@ -2,7 +2,7 @@
 #define EBWT_SEARCH_BACKTRACK_H_
 
 #define DEFAULT_SPREAD 64
-
+#include "pat.h"
 /// Encapsulates a change made to a query base, i.e. "the 3rd base from
 /// the 5' end was changed from an A to a T".  Useful when using
 /// for matching seeded by "seedlings".
@@ -130,8 +130,11 @@ public:
 	    assert_geq(__1revOff, __unrevOff);
 	    assert_geq(__2revOff, __unrevOff);
 	    //assert_geq(__3revOff, __unrevOff);
-	    fill(_qualDefault, DEFAULT_SPREAD, (char)(40+33));
- 		if(_qry != NULL) {
+	    
+		assert_geq(strlen(qualDefault), DEFAULT_SPREAD);
+ 		_qualDefault = qualDefault;
+		
+		if(_qry != NULL) {
  			_qlen = length(*_qry);
  			_spread = length(*_qry);
  			if(_qual == NULL || length(*_qual) == 0) {
@@ -204,14 +207,17 @@ public:
 		_qlen = length(*_qry);
 		_spread = _qlen;
 		assert_leq(_spread, DEFAULT_SPREAD);
-		if(_qual == NULL || length(*_qual) == 0) {
+		
+		if(_qual == NULL || empty(*_qual)) {
 			_qual = &_qualDefault;
 		}
 		assert_geq(length(*_qual), _qlen);
 		for(size_t i = 0; i < length(*_qual); i++) {
+		
 			assert_geq((*_qual)[i], 33);
 			assert_leq((*_qual)[i], 73);
 		}
+		
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}

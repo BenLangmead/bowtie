@@ -937,9 +937,9 @@ static void twoMismatchSearch(
 		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-	    	if(patid>>1 > doneMask.capacity()) {
+	    	if(patid>>1 >= doneMask.size()) {
 	    		// Expand doneMask
-	    		doneMask.resize(doneMask.capacity()*2, 0);
+	    		doneMask.resize(doneMask.size()*2, 0);
 	    	}
 	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			size_t plen = length(*patFw);
@@ -1321,9 +1321,9 @@ static void seededQualCutoffSearch(
 		EbwtSearchState<TStr> st(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
-	    	if(patid>>1 > doneMask.capacity()) {
+	    	if(patid>>1 >= doneMask.size()) {
 	    		// Expand doneMask
-	    		doneMask.resize(doneMask.capacity()*2, 0);
+	    		doneMask.resize(doneMask.size()*2, 0);
 	    	}
 	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			size_t plen = length(*patFw);
