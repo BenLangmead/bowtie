@@ -64,23 +64,25 @@ class BacktrackManager {
 public:
 	BacktrackManager(const Ebwt<TStr>& __ebwt,
 	                 const EbwtSearchParams<TStr>& __params,
-	                 uint32_t __unrevOff, // size of unrevisitable chunk
-	                 uint32_t __1revOff,  // size of 1-revisitable chunk
-	                 uint32_t __2revOff,  // size of 2-revisitable chunk
-	                 //uint32_t __3revOff,  // size of 3-revisitable chunk
-	                 uint32_t __itop,
-	                 uint32_t __ibot,
-	                 uint32_t __qualThresh,
-	                 uint32_t __qualWobble,
-	                 uint32_t __maxBts = 75,
-	                 uint32_t __reportSeedlings = 0,
+	                 uint32_t __5depth,   /// size of hi-half
+	                 uint32_t __3depth,   /// size of lo-half
+	                 uint32_t __unrevOff, /// size of unrevisitable chunk
+	                 uint32_t __1revOff,  /// size of 1-revisitable chunk
+	                 uint32_t __2revOff,  /// size of 2-revisitable chunk
+	                 uint32_t __3revOff,  /// size of 3-revisitable chunk
+	                 uint32_t __itop,     /// initial top-of-range
+	                 uint32_t __ibot,     /// initial bottom-of-range
+	                 uint32_t __qualThresh,  /// max acceptable q-distance
+	                 uint32_t __maxBts = 75, /// maximum # backtracks allowed
+	                 uint32_t __reportPartials = 0,
 	                 String<uint8_t>* __seedlings = NULL,
 	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
 	                 vector<TStr>* __os = NULL,
-	                 bool __halfAndHalf = false, // hacky way of supporting separate 1-revisitable regions
+	                 bool __considerQuals = true, // whether to consider quality values when making backtracking decisions
+	                 bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
 	                 TStr* __qry = NULL,
 	                 String<char>* __qual = NULL,
 	                 String<char>* __name = NULL) :
@@ -93,26 +95,26 @@ public:
 		_unrevOff(__unrevOff),
 		_1revOff(__1revOff),
 		_2revOff(__2revOff),
-		//_3revOff(__3revOff),
+		_3revOff(__3revOff),
 		_itop(__itop),
 		_ibot(__ibot),
 		_spread(DEFAULT_SPREAD),
 		_maxStackDepth(DEFAULT_SPREAD),
 		_qualThresh(__qualThresh),
-		_qualWobble(__qualWobble),
 		_oneHit(__oneHit),
 		_reportOnHit(true),
 		_pairs(NULL),
 		_elims(NULL),
 		_mms(NULL),
 		_chars(NULL),
-		_reportSeedlings(__reportSeedlings),
+		_reportPartials(__reportPartials),
 		_seedlings(__seedlings),
 		_muts(__muts),
 		_os(__os),
+		_considerQuals(__considerQuals),
 		_halfAndHalf(__halfAndHalf),
-		_5depth(__1revOff),
-		_3depth(__2revOff),
+		_5depth(__5depth),
+		_3depth(__3depth),
 		_nameDefault("default"),
 		_hiDepth(0),
 		_numBts(0),
@@ -122,19 +124,21 @@ public:
 		_preLtop(),
 		_preLbot(),
 		_rand(RandomSource(seed)),
-		_verbose(__verbose)
+		_verbose(__verbose),
+		_hiHalfStackDepth(0)
 	{
 	    // For a 40-bp query range, the _pairs array occupies
 	    // 40 * 40 * 8 * 4 = 51,200 bytes, and _elims
 	    // occupy 40 * 40 = 1,600 bytes
 	    assert_geq(__1revOff, __unrevOff);
+	    assert_geq(__2revOff, __1revOff);
 	    assert_geq(__2revOff, __unrevOff);
-	    //assert_geq(__3revOff, __unrevOff);
-	    
+	    assert_geq(__3revOff, __2revOff);
+	    assert_geq(__3revOff, __1revOff);
+	    assert_geq(__3revOff, __unrevOff);
 		assert_geq(strlen(qualDefault), DEFAULT_SPREAD);
  		_qualDefault = qualDefault;
-		
-		if(_qry != NULL) {
+ 		if(_qry != NULL) {
  			_qlen = length(*_qry);
  			_spread = length(*_qry);
  			if(_qual == NULL || length(*_qual) == 0) {
@@ -213,11 +217,9 @@ public:
 		}
 		assert_geq(length(*_qual), _qlen);
 		for(size_t i = 0; i < length(*_qual); i++) {
-		
 			assert_geq((*_qual)[i], 33);
 			assert_leq((*_qual)[i], 73);
 		}
-		
 		if(_name == NULL || length(*_name) == 0) {
 			_name = &_nameDefault;
 		}
@@ -250,6 +252,22 @@ public:
 		}
 	}
 	
+	void setOffs(uint32_t __5depth,
+	             uint32_t __3depth,
+	             uint32_t __unrevOff,
+	             uint32_t __1revOff,
+	             uint32_t __2revOff,
+	             uint32_t __3revOff)
+	{
+		_5depth   = __5depth;
+		_3depth   = __3depth;
+		assert_geq(_3depth, _5depth);
+		_unrevOff = __unrevOff;
+		_1revOff  = __1revOff;
+		_2revOff  = __2revOff;
+		_3revOff  = __3revOff;
+	}
+	
 	/**
 	 * Set the depth before which no backtracks are allowed.
 	 */
@@ -262,18 +280,24 @@ public:
 	uint32_t set1RevOff(uint32_t oneRevOff) {
 		uint32_t tmp = _1revOff;
 		_1revOff = oneRevOff;
-		if(_halfAndHalf) {
-			_5depth = oneRevOff;
-		}
+		return tmp;
+	}
+	
+	uint32_t set3Depth(uint32_t __3depth) {
+		uint32_t tmp = _3depth;
+		_3depth = __3depth;
+		return tmp;
+	}
+
+	uint32_t set5Depth(uint32_t __5depth) {
+		uint32_t tmp = _5depth;
+		_5depth = __5depth;
 		return tmp;
 	}
 
 	uint32_t set2RevOff(uint32_t twoRevOff) {
 		uint32_t tmp = _2revOff;
 		_2revOff = twoRevOff;
-		if(_halfAndHalf) {
-			_3depth = twoRevOff;
-		}
 		return tmp;
 	}
 
@@ -341,7 +365,7 @@ public:
 			uint32_t bot = _ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
 				// We have a match!
-				if(_reportSeedlings > 0) {
+				if(_reportPartials > 0) {
 					// Oops - we're trying to find seedlings, so we've
 					// gone too far; start again
 					return backtrack(0,   // depth
@@ -404,7 +428,7 @@ public:
 		
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff,
+		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                     top, bot, iham, iham, _pairs, _elims);
 		
 		// Remainder of this function is sanity checking
@@ -422,7 +446,7 @@ public:
 		// TODO: also check seedling hits
 		if(_os != NULL &&
 		   (*_os).size() > 0 &&
-		   _reportSeedlings == 0 && // ignore seedling hits
+		   _reportPartials == 0 && // ignore seedling hits
 		   _numBts < _maxBts)       // ignore excessive-backrtacking copouts
 		{
 			vector<Hit> oracleHits;
@@ -466,6 +490,7 @@ public:
 						if     (i < (int)_unrevOff) cout << "0";
 						else if(i < (int)_1revOff)  cout << "1";
 						else if(i < (int)_2revOff)  cout << "2";
+						else if(i < (int)_3revOff)  cout << "3";
 						else cout << "X";
 					}
 					cout << endl;
@@ -511,6 +536,7 @@ public:
 	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
 	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable 
 	               uint32_t  twoRevOff,// depths < twoRevOff are 2-revisitable 
+	               uint32_t  threeRevOff,// depths < threeRevOff are 3-revisitable 
 	               uint32_t  top,      // top arrow in pair prior to 'depth'
 	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
 	               uint32_t  ham,      // weighted hamming distance so far
@@ -534,10 +560,10 @@ public:
 		assert(elims != NULL);
 		assert_leq(stackDepth, _maxStackDepth);
 		if(_halfAndHalf) {
-			assert_eq(0, _reportSeedlings);
+			assert_eq(0, _reportPartials);
 			assert_gt(_3depth, _5depth);
 		}
-		if(_reportSeedlings) {
+		if(_reportPartials) {
 			assert(!_halfAndHalf);
 		}
 		if(_verbose) {
@@ -572,25 +598,56 @@ public:
 		if(stackDepth > _hiDepth) {
 			_hiDepth = stackDepth;
 		}
-		// If we're searching for a half-and-half solution (exactly one
-		// mismatch in both the 5' and the 3' half of the seed), then
-		// enforce the half-and-half constraint here
+		// If we're searching for a half-and-half solution, then
+		// enforce the boundary-crossing constraints here
 		if(_halfAndHalf) {
-			assert_eq(0, _reportSeedlings);
+			assert_eq(0, _reportPartials);
+			// Crossing from the hi-half into the lo-half
 			if(depth == _5depth) {
-				// The backtracking logic should have prevented us from
-				// backtracking more than once into this region
-				assert_leq(stackDepth, 1);
-				// Must have encountered a mismatch by this point
-				if(stackDepth < 1) return false;
+				if(_3revOff == _2revOff) {
+					// 1 and 1
+					
+					// The backtracking logic should have prevented us from
+					// backtracking more than once into this region
+					assert_leq(stackDepth, 1);
+					// Reject if we haven't encountered mismatch by this point
+					if(stackDepth < 1) return false;
+				} else {
+					// 1 and 1,2
+					
+					// The backtracking logic should have prevented us from
+					// backtracking more than twice into this region
+					assert_leq(stackDepth, 2);
+					// Reject if we haven't encountered mismatch by this point
+					if(stackDepth < 1) return false;
+					_hiHalfStackDepth = stackDepth;
+				}
 			}
 			else if(depth == _3depth) {
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice within this region
-				assert_leq(stackDepth, 2);
-				// Must have encountered two mismatches by this point
-				if(stackDepth < 2) return false;
+				if(_3revOff == _2revOff) {
+					// 1 and 1
+
+					// The backtracking logic should have prevented us from
+					// backtracking more than twice within this region
+					assert_leq(stackDepth, 2);
+					// Must have encountered two mismatches by this point
+					if(stackDepth < 2) return false;
+				} else {
+					// 1 and 1,2
+
+					assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
+					assert_geq(stackDepth, _hiHalfStackDepth);
+					if(stackDepth == _hiHalfStackDepth) {
+						// Didn't encounter any mismatches in the lo-half
+						return false;
+					}
+					assert_geq(stackDepth, 2);
+					// The backtracking logic should have prevented us from
+					// backtracking more than twice within this region
+					assert_leq(stackDepth, 3);
+				}
 			}
+			// In-between sanity checks
 			if(depth >= _5depth) {
 				assert_geq(stackDepth, 1);
 			} else if(depth >= _3depth) {
@@ -642,20 +699,28 @@ public:
 			int c = (int)(*_qry)[cur];
 			uint8_t q = QUAL(cur);
 			assert_lt((uint32_t)q, 100);
-			bool curIsAlternative = (d >= unrevOff) && (ham + q <= _qualThresh);
+			// The current query position is a legit alternative if it a) is
+			// not in the unrevisitable region, and b) there is a quality
+			// ceiling and its selection would cause the ceiling to be exceeded
+			bool curIsAlternative = (d >= unrevOff) &&
+			                        (!_considerQuals || (ham + q <= _qualThresh));
 			if(curIsAlternative) {
-				// q is low enough to make this position an alternative,
-				// but is it the best alternative?
-				if(q < lowAltQual) {
-					// Arrow pairs at this depth in this backtracking frame
-					// are eligible, unless we learn otherwise.  Arrow
-					// pairs previously thought to be eligible are not any
-					// longer.
-					curIsEligible = true;
-					curOverridesEligible = true;
-				} else if(q == lowAltQual) {
-					// Arrow pairs at this depth in this backtracking frame
-					// are eligible, unless we learn otherwise
+				if(_considerQuals) {
+					// Is it the best alternative?
+					if(q < lowAltQual) {
+						// Ranges at this depth in this backtracking frame are
+						// eligible, unless we learn otherwise.  Ranges previously
+						// thought to be eligible are not any longer.
+						curIsEligible = true;
+						curOverridesEligible = true;
+					} else if(q == lowAltQual) {
+						// Ranges at this depth in this backtracking frame
+						// are eligible, unless we learn otherwise
+						curIsEligible = true;
+					}
+				} else {
+					// When quality values are not considered, all positions
+					// are eligible
 					curIsEligible = true;
 				}
 			}
@@ -671,6 +736,7 @@ public:
 				if(curOverridesEligible) cout << "(overrides)";
 				cout << endl;
 			}
+			// Calculate the ranges for this position
 			if(top == 0 && bot == 0) {
 				// Calculate first quartet of pairs using the _fchr[]
 				// array
@@ -706,7 +772,7 @@ public:
 			assert_lt(elims[d], 16);
 			assert_gt(elims[d], 0);
 			if(curIsAlternative) {
-				// Given the just-calculated quartet of arrow pairs, update
+				// Given the just-calculated range quartet, update
 				// elims, altNum, eligibleNum, eligibleSz
 				for(int i = 0; i < 4; i++) {
 					if(i == c) continue;
@@ -762,8 +828,8 @@ public:
 			bool backtrackDespiteMatch = false;
 			if(cur == 0 &&  // we've consumed the entire pattern
 			   top < bot && // there's a hit to report
-			   stackDepth < _reportSeedlings && // not yet used up our mismatches
-			   _reportSeedlings > 0)  // there are still legel backtracking targets
+			   stackDepth < _reportPartials && // not yet used up our mismatches
+			   _reportPartials > 0)  // there are still legel backtracking targets
 			{
 				assert(!_halfAndHalf);
 				if(altNum > 0) backtrackDespiteMatch = true;
@@ -779,13 +845,14 @@ public:
 			// helpful in half-and-half mode.
 			bool mustBacktrack = false;
 			if(_halfAndHalf) {
+				uint32_t lim = (_3revOff == _2revOff)? 2 : 3;
 				if((d == (_5depth-1)) && top < bot) {
 					// About to transition into the 3' half of the seed;
 					// we should induce a mismatch if we haven't mismatched
 					// yet, so that we don't waste time pursuing a match
 					// that was covered by a previous phase
-					assert_eq(0, _reportSeedlings);
-					assert_leq(stackDepth, 1);
+					assert_eq(0, _reportPartials);
+					assert_leq(stackDepth, lim-1);
 					if(stackDepth == 0 && altNum > 0) {
 						backtrackDespiteMatch = true;
 						mustBacktrack = true;
@@ -798,8 +865,8 @@ public:
 					// we should induce a mismatch if we haven't mismatched
 					// yet, so that we don't waste time pursuing a match
 					// that was covered by a previous phase
-					assert_eq(0, _reportSeedlings);
-					assert_leq(stackDepth, 2);
+					assert_eq(0, _reportPartials);
+					assert_leq(stackDepth, lim);
 					assert_gt(stackDepth, 0);
 					if(stackDepth < 2 && altNum > 0) {
 						backtrackDespiteMatch = true;
@@ -809,11 +876,11 @@ public:
 					}
 				}
 				if(d < _5depth-1) {
-					assert_leq(stackDepth, 1);
+					assert_leq(stackDepth, lim-1);
 				}
 				else if(d >= _5depth && d < _3depth-1) {
 					assert_gt(stackDepth, 0);
-					assert_leq(stackDepth, 2);
+					assert_leq(stackDepth, lim);
 				}
 			}
 			// Mismatch with alternatives
@@ -831,7 +898,6 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Pick out the arrow pair we selected and target it
 				// for backtracking
-				//uint32_t cumSz = 0;
 				ASSERT_ONLY(uint32_t eligiblesVisited = 0);
 				size_t i = depth, j = 0;
 				uint32_t bttop = 0;
@@ -843,7 +909,6 @@ public:
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
 					bool foundTarget = false;
-					//uint32_t r = _rand.nextU32() % eligibleSz;
 					for(; i <= d; i++) {
 						if(i < unrevOff) {
 							// i is an unrevisitable position, so don't consider it
@@ -853,21 +918,23 @@ public:
 						uint8_t qi = QUAL(icur);
 						assert_lt(elims[i], 16);
 						assert_gt(elims[i], 0);
-						if(qi == lowAltQual && elims[i] != 15) {
-							// This is an eligible position with at least
-							// one remaining backtrack target
+						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
+							// This is the leftmost eligible position with at
+							// least one remaining backtrack target
 							uint32_t posSz = 0;
+							// Add up the spreads for A, C, G, T
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
 									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
 									posSz += PAIR_SPREAD(i, j);
 								}
 							}
+							// Generate a random number
+							assert_gt(posSz, 0);
 							uint32_t r = _rand.nextU32() % posSz;
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
-									// This pair has not been eliminated
-									//cumSz += PAIR_SPREAD(i, j);
+									// This range has not been eliminated
 									ASSERT_ONLY(eligiblesVisited++);
 									uint32_t spread = PAIR_SPREAD(i, j);
 									if(r < spread) {
@@ -880,12 +947,11 @@ public:
 										btcint = j;
 										btchar = "acgt"[j];
 										assert_leq(btham, _qualThresh);
-										break;
+										break; // found our target; we can stop
 									}
 									r -= spread;
 								}
 							}
-							//if(foundTarget) break;
 							assert(foundTarget);
 							break;
 						}
@@ -932,32 +998,34 @@ public:
 				uint32_t btUnrevOff  = unrevOff;
 				uint32_t btOneRevOff = oneRevOff;
 				uint32_t btTwoRevOff = twoRevOff;
+				uint32_t btThreeRevOff = threeRevOff;
 				assert_geq(i, unrevOff);
+				assert_geq(oneRevOff, unrevOff);
+				assert_geq(twoRevOff, oneRevOff);
+				assert_geq(threeRevOff, twoRevOff);
 				if(i < oneRevOff) {
-					assert_geq(oneRevOff, unrevOff);
-					assert_geq(twoRevOff, oneRevOff);
 					// Extend unrevisitable region to include former 1-
 					// revisitable region
 					btUnrevOff = oneRevOff;
 					// Extend 1-revisitable region to include former 2-
 					// revisitable region
-					btOneRevOff = _2revOff;
+					btOneRevOff = twoRevOff;
+					// Extend 2-revisitable region to include former 3-
+					// revisitable region
+					btTwoRevOff = threeRevOff;
 				}
 				else if(i < twoRevOff) {
-					assert_geq(oneRevOff, unrevOff);
-					assert_geq(twoRevOff, oneRevOff);
 					// Extend 1-revisitable region to include former 2-
-					// revisitable region; note: this only works
-					if(!_halfAndHalf) {
-						btOneRevOff = twoRevOff;
-					} else {
-						// A hacky way of supporting two distinct 1-
-						// mismatch areas in the two halves of the seed;
-						// the default policy (_halfAndHalf == true)
-						// would allow multiple backtracks into the 3'
-						// half of the seed
-						btTwoRevOff = oneRevOff;
-					}
+					// revisitable region
+					btOneRevOff = twoRevOff;
+					// Extend 2-revisitable region to include former 3-
+					// revisitable region
+					btTwoRevOff = threeRevOff;
+				}
+				else if(i < threeRevOff) {
+					// Extend 2-revisitable region to include former 3-
+					// revisitable region
+					btTwoRevOff = threeRevOff;
 				}
 				// Note the character that we're backtracking on in the
 				// mm array:
@@ -970,6 +1038,7 @@ public:
 				if(i+1 == _qlen) {
 					ret = report(stackDepth+1, bttop, btbot);
 				} else if(_halfAndHalf &&
+				          _2revOff == _3revOff &&
 				          i+1 < (uint32_t)_ebwt._eh._ftabChars &&
 				          (uint32_t)_ebwt._eh._ftabChars <= _5depth)
 				{
@@ -1000,6 +1069,7 @@ public:
 					                    btUnrevOff,  // new unrevisitable boundary
 					                    btOneRevOff, // new 1-revisitable boundary
 					                    btTwoRevOff, // new 2-revisitable boundary
+					                    btThreeRevOff, // new 3-revisitable boundary
 					                    ftabTop,  // top arrow in pair prior to 'depth'
 					                    ftabBot,  // bottom arrow in pair prior to 'depth'
 					                    btham,  // weighted hamming distance so far
@@ -1014,6 +1084,7 @@ public:
 				                    btUnrevOff,  // new unrevisitable boundary
 				                    btOneRevOff, // new 1-revisitable boundary
 				                    btTwoRevOff, // new 2-revisitable boundary
+				                    btThreeRevOff, // new 3-revisitable boundary
 				                    bttop,  // top arrow in pair prior to 'depth'
 				                    btbot,  // bottom arrow in pair prior to 'depth'
 				                    btham,  // weighted hamming distance so far
@@ -1054,7 +1125,7 @@ public:
 					}
 					return false;
 				}
-				else if(eligibleNum == 0) {
+				else if(eligibleNum == 0 && _considerQuals) {
 					// Find the next set of eligible backtrack points
 					// by re-scanning this backtracking frame (from
 					// 'depth' up to 'd')
@@ -1134,11 +1205,11 @@ public:
 		} // while(cur < _qlen)
 		assert_eq(0xffffffff, cur);
 		assert_gt(bot, top);
-		if(_reportSeedlings > 0) {
+		if(_reportPartials > 0) {
 			// Stack depth should not exceed given hamming distance
-			assert_leq(stackDepth, _reportSeedlings);
+			assert_leq(stackDepth, _reportPartials);
 		}
-		if(stackDepth >= _reportSeedlings) {
+		if(stackDepth >= _reportPartials) {
 			bool ret = report(stackDepth, top, bot);
 			if(!ret && stackDepth == 0) {
 				if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
@@ -1166,6 +1237,7 @@ public:
 	                     uint32_t unrevOff,
 	                     uint32_t oneRevOff,
 	                     uint32_t twoRevOff,
+	                     uint32_t threeRevOff,
 	                     bool ebwtFw)
 	{
 		// Print pattern sequence
@@ -1187,6 +1259,7 @@ public:
 			if     (i < (int)unrevOff) cout << "0";
 			else if(i < (int)oneRevOff)  cout << "1";
 			else if(i < (int)twoRevOff)  cout << "2";
+			else if(i < (int)threeRevOff)  cout << "3";
 			else cout << "X";
 		}
 		cout << endl;
@@ -1205,6 +1278,7 @@ public:
 	                        uint32_t unrevOff,
 	                        uint32_t oneRevOff,
 	                        uint32_t twoRevOff,
+	                        uint32_t threeRevOff,
 	                        bool fw,
 	                        bool ebwtFw,
 	                        uint32_t iham = 0,
@@ -1225,6 +1299,7 @@ public:
 			for(size_t j = 0; j <= olen - plen; j++) {
 				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
 				size_t rev2mm  = 0; // mismatches observed in the 2-revisitable region
+				size_t rev3mm  = 0; // mismatches observed in the 3-revisitable region
 				uint32_t ham = iham; // weighted hamming distance so far
 				bitset<max_read_bp> diffs = 0; // mismatch bitvector
 				// For each alignment column, from right to left
@@ -1256,7 +1331,7 @@ public:
 							break;
 						} else if(kr < oneRevOff) {
 							rev1mm++;
-							if(rev1mm > 1 && !halfAndHalf) {
+							if(rev1mm > 1) {
 								// Alignment is invalid because it
 								// contains more than 1 mismatch in the
 								// 1-revisitable region
@@ -1265,20 +1340,43 @@ public:
 							}
 						} else if(kr < twoRevOff) {
 							rev2mm++;
-							if(rev2mm > 2 && !halfAndHalf) {
+							if(rev2mm > 2) {
 								// Alignment is invalid because it
 								// contains more than 2 mismatches in the
 								// 2-revisitable region
 								success = false;
 								break;
 							}
+						} else if(kr < threeRevOff) {
+							rev3mm++;
+							if(rev3mm > 3) {
+								// Alignment is invalid because it
+								// contains more than 3 mismatches in the
+								// 3-revisitable region
+								success = false;
+								break;
+							}
 						}
-						if(halfAndHalf && (rev1mm > 1 || rev2mm > 1)) {
-							// Half-and-half alignment is invalid
-							// because it contains more than 1 mismatch
-							// in either one or the other half
-							success = false;
-							break;
+						if(halfAndHalf) {
+							if(twoRevOff == threeRevOff) {
+								// 1 and 1
+								assert_eq(0, rev3mm);
+								if(rev1mm > 1 || rev2mm > 1) {
+									// Half-and-half alignment is invalid
+									// because it contains more than 1 mismatch
+									// in either one or the other half
+									success = false;
+									break;
+								}
+							} else {
+								// 1 and 1,2
+								assert_eq(unrevOff, oneRevOff);
+								assert_eq(0, rev1mm);
+								if(rev2mm > 2 || rev3mm > 2) {
+									success = false;
+									break;
+								}
+							}
 						}
 						if(fivePrimeOnLeft) {
 							diffs.set(k);
@@ -1292,8 +1390,19 @@ public:
 					}
 					ok += okInc;
 				}
-				if(halfAndHalf && success && (rev1mm != 1 || rev2mm != 1)) {
-					success = false;
+				if(halfAndHalf) {
+					if(twoRevOff == threeRevOff) {
+						if(rev1mm != 1 || rev2mm != 1) {
+							success = false;
+						}
+					} else {
+						if(rev2mm == 0 || rev3mm == 0 ||
+						   rev2mm + rev3mm < 2 ||
+						   rev2mm + rev3mm > 3)
+						{
+							success = false;
+						}
+					}
 				}
 				if(success) {
 					// It's a hit
@@ -1363,8 +1472,8 @@ protected:
 	}
 	
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
-		if(_reportSeedlings) {
-			assert_leq(stackDepth, _reportSeedlings);
+		if(_reportPartials) {
+			assert_leq(stackDepth, _reportPartials);
 			reportSeedling(stackDepth);
 			return false; // keep going
 		} else {
@@ -1428,7 +1537,7 @@ protected:
 	 */
 	bool reportSeedling(uint32_t stackDepth) {
 		// Possibly report
-		assert_gt(_reportSeedlings, 0);
+		assert_gt(_reportPartials, 0);
 		assert(_seedlings != NULL);
 		ASSERT_ONLY(uint32_t qualTot = 0);
 		for(size_t i = 0; i < stackDepth; i++) {
@@ -1473,7 +1582,7 @@ protected:
 			uint8_t qi = QUAL(icur);
 			assert_lt(elims[i], 16);
 			assert_gt(elims[i], 0);
-			if(qi == lowAltQual && elims[i] != 15) {
+			if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 				// This is an eligible position with at least
 				// one remaining backtrack target
 				for(j = 0; j < 4; j++) {
@@ -1496,7 +1605,7 @@ protected:
 	 */
 	void confirmNoHit(uint32_t iham) {
 		// Not smart enough to deal with seedling hits yet
-		if(_os == NULL || (*_os).size() == 0 || _reportSeedlings > 0) return;
+		if(_os == NULL || (*_os).size() == 0 || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
@@ -1533,6 +1642,7 @@ protected:
 				if     (i < (int)_unrevOff) cout << "0";
 				else if(i < (int)_1revOff)  cout << "1";
 				else if(i < (int)_2revOff)  cout << "2";
+				else if(i < (int)_3revOff)  cout << "3";
 				else cout << "X";
 			}
 			cout << endl;
@@ -1545,7 +1655,7 @@ protected:
 	 */
 	void confirmHit(uint32_t iham) {
 		// Not smart enough to deal with seedling hits yet
-		if(_os == NULL || (*_os).size() == 0 || _reportSeedlings > 0) return;
+		if(_os == NULL || (*_os).size() == 0 || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
@@ -1578,12 +1688,14 @@ protected:
 	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
-	                 uint32_t twoRevOff = 0xffffffff)
+	                 uint32_t twoRevOff = 0xffffffff,
+	                 uint32_t threeRevOff = 0xffffffff)
 	{
 		typedef typename Value<TStr>::Type TVal;
 		if(unrevOff  == 0xffffffff) unrevOff  = _unrevOff;
 		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
 		if(twoRevOff == 0xffffffff) twoRevOff = _2revOff;
+		if(threeRevOff == 0xffffffff) threeRevOff = _3revOff;
 		bool ebwtFw = _params.ebwtFw();
 		bool fw = _params.fw();
 		uint32_t patid = _params.patId();
@@ -1599,6 +1711,7 @@ protected:
 		            unrevOff,
 		            oneRevOff,
 		            twoRevOff,
+		            threeRevOff,
 		            fw,    // transpose
 		            ebwtFw,
 		            iham,
@@ -1616,6 +1729,7 @@ protected:
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _2revOff;  // 2-revisitable chunk
+	uint32_t            _3revOff;  // 3-revisitable chunk
 	uint32_t            _itop;   // initial top arrow, or 0xffffffff if
 	                             // we're starting from the beginning
 	                             // of the query
@@ -1627,9 +1741,6 @@ protected:
 	uint32_t            _maxStackDepth;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
-	uint32_t            _qualWobble; // hits within _qualWobble weighted
-	                             // hamming distance of each other are
-	                             // considered equally good
 	bool                _oneHit; // stop backtracking after finding 1
 	                             // legit hit?  (doesn't really work -
 	                             // we always operate in _oneHit mode)
@@ -1647,12 +1758,13 @@ protected:
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
-	uint32_t            _reportSeedlings; // if > 0, report seedling
+	uint32_t            _reportPartials; // if > 0, report seedling
 	                             // hits up to this many mismatches
 	String<uint8_t>    *_seedlings; // append seedling hits here
 	String<QueryMutation> *_muts;// set of mutations that apply for a
 	                             // seedling
 	vector<TStr>*       _os;     // reference texts
+	bool                _considerQuals;
 	bool                _halfAndHalf;
 	uint32_t            _5depth; // depth of 5'-seed-half border
 	uint32_t            _3depth; // depth of 3'-seed-half border
@@ -1674,6 +1786,9 @@ protected:
 	SideLocus           _preLbot;// precalculated bot locus
 	RandomSource        _rand;   // Source of pseudo-random numbers
 	bool                _verbose;// be talkative
+	uint32_t            _hiHalfStackDepth; // temporary holder for # mms
+	                             // observed in hi-half for half-and-
+	                             // half backtracks
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

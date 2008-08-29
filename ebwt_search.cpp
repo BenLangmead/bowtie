@@ -51,7 +51,7 @@ static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 9999; // max # Ns allowed in read
 
-static const char *short_options = "fqbcu:rv:sat0123:5:o:e:n:l:";
+static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -115,7 +115,7 @@ static void printUsage(ostream& out) {
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
 	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
-	    << "  -n/--seedmms <int> max mismatches in seed (0, 1 or 2, default: 2)" << endl
+	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: 2)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
@@ -180,9 +180,6 @@ static void parseOptions(int argc, char **argv) {
 	   		//case 'm': format = BFQ; break;
 	   		//case 'x': format = SOLEXA; break;
 	   		case 'c': format = CMDLINE; break;
-	   		case '0': maqLike = 0; mismatches = 0; break;
-	   		case '1': maqLike = 0; mismatches = 1; break;
-	   		case '2': maqLike = 0; mismatches = 2; break;
 	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
@@ -196,8 +193,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'v':
 	   			maqLike = 0;
 	   			mismatches = parseInt(0, "-v arg must be at least 0");
-	   			if(mismatches > 2) {
-	   				cerr << "-v arg must be at most 2" << endl;
+	   			if(mismatches > 3) {
+	   				cerr << "-v arg must be at most 3" << endl;
 	   				exit(1);
 	   			}
 	   			break;
@@ -896,14 +893,15 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 }
 
 template<typename TStr>
-static void twoMismatchSearch(
+static void twoOrThreeMismatchSearch(
         PatternSource<TStr>& patsrc,    /// pattern source
         HitSink& sink,                  /// hit sink
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<TStr>& os)    /// text strings, if available (empty otherwise)
+        vector<TStr>& os,               /// text strings, if available (empty otherwise)
+        bool two = true)                /// true -> 2, false -> 3
 {
 	typedef typename Value<TStr>::Type TVal;
 	uint32_t numPats;
@@ -916,20 +914,22 @@ static void twoMismatchSearch(
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "End-to-end 2-mismatch Phase 1: ", timing);
 		BacktrackManager<TStr> btr(ebwtFw, params,
-		                          0,                     // unrevOff
-		                          0,                     // 1revOff
-		                          0,                     // 2revOff
-		                          0, 0,                  // itop, ibot
-		                          0xffffffff,            // qualThresh
-		                          0,                     // qualWobble
-		                          maxBts,                // max backtracks
-		                          0,                     // reportSeedlings (don't)
-		                          NULL,                  // seedlings
-		                          NULL,                  // mutations
-		                          verbose,               // verbose
-		                          true,                  // oneHit
-		                          seed,                  // seed
-		                          &os);
+		                           0, 0,                  // 5, 3depth
+		                           0,                     // unrevOff
+		                           0,                     // 1revOff
+		                           0,                     // 2revOff
+		                           0,                     // 3revOff
+		                           0, 0,                  // itop, ibot
+		                           0xffffffff,            // qualThresh
+		                           maxBts,                // max backtracks
+		                           0,                     // reportSeedlings (don't)
+		                           NULL,                  // seedlings
+		                           NULL,                  // mutations
+		                           verbose,               // verbose
+		                           true,                  // oneHit
+		                           seed,                  // seed
+		                           &os,
+		                           false);                // considerQuals
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
@@ -966,9 +966,7 @@ static void twoMismatchSearch(
 			uint32_t s = plen;
 			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 			// Set up the revisitability of the halves
-			btr.set2RevOff(s);   // left half 2-revisitable
-			btr.set1RevOff(s5);  // right half unrevisitable
-			btr.setUnrevOff(s5);
+			btr.setOffs(0, 0, s5, s5, two ? s : s5, s);
 			params.setPatId(patid+1);
 			ASSERT_ONLY(numHits = sink.numHits());
 			bool hit = btr.backtrack();
@@ -985,13 +983,15 @@ static void twoMismatchSearch(
 	SWITCH_TO_BW_INDEX();
 	{
 		Timer _t(cout, "End-to-end 2-mismatch Phase 2: ", timing);
+		
 		BacktrackManager<TStr> bt(ebwtBw, params,
-                                  0,                     // unrevOff
-                                  0,                     // 1revOff
-                                  0,                     // 2revOff
+		                          0, 0,                  // 5, 3depth
+		                          0,                     // unrevOff
+		                          0,                     // 1revOff
+		                          0,                     // 2revOff
+		                          0,                     // 3revOff
 		                          0, 0,                  // itop, ibot
 		                          0xffffffff,            // qualThresh
-		                          0,                     // qualWobble
 		                          maxBts,                // max backtracks
 		                          0,                     // reportSeedlings (no)
 		                          NULL,                  // seedlings
@@ -999,7 +999,8 @@ static void twoMismatchSearch(
 		                          verbose,               // verbose
 		                          true,                  // oneHit
 			                      seed+1,                // seed
-			                      &os);
+			                      &os,
+			                      false);                // considerQuals
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
@@ -1021,9 +1022,7 @@ static void twoMismatchSearch(
 			uint32_t s3 = s >> 1; // length of 3' half of seed
 			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 			// Set up the revisitability of the halves
-			bt.set2RevOff(s);   // 3' half 2-revisitable
-			bt.set1RevOff(s5);  // 5' half unrevisitable
-			bt.setUnrevOff(s5);
+			bt.setOffs(0, 0, s5, s5, two? s : s5, s);
 			params.setPatId(patid);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
 			bool hit = bt.backtrack();
@@ -1039,9 +1038,7 @@ static void twoMismatchSearch(
 			params.setFw(false);  // looking at reverse complement
 			bt.setQuery(patRc, qualRc, nameRc);
 			// Set up the revisitability of the halves
-			bt.set2RevOff(s);   // 3' half 2-revisitable
-			bt.set1RevOff(s3);  // 5' half unrevisitable
-			bt.setUnrevOff(s3);
+			bt.setOffs(0, 0, s3, s3, two? s : s3, s);
 			params.setPatId(patid+1);
 			ASSERT_ONLY(numHits = sink.numHits());
 			hit = bt.backtrack();
@@ -1060,12 +1057,13 @@ static void twoMismatchSearch(
 		Timer _t(cout, "End-to-end 2-mismatch Phase 3: ", timing);
 		// BacktrackManager to search for seedlings for case 4F
 		BacktrackManager<TStr> bt(ebwtFw, params,
+		                          0, 0,                  // 3, 5depth
                                   0,                     // unrevOff
                                   0,                     // 1revOff
                                   0,                     // 2revOff
+                                  0,                     // 3revOff
 		                          0, 0,                  // itop, ibot
 		                          0xffffffff,            // qualThresh (none)
-		                          0,                     // qualWobble
 		                          maxBts,                // max backtracks
 		                          0,                     // reportSeedlings (don't)
 		                          NULL,                  // seedlings
@@ -1073,14 +1071,16 @@ static void twoMismatchSearch(
 		                          verbose,               // verbose
 		                          true,                  // oneHit
 			                      seed+3,                // seed
-			                      &os);
+			                      &os,
+			                      false);                // considerQuals
 		BacktrackManager<TStr> bthh(ebwtFw, params,
+		                           0, 0,    // 3, 5depth
 		                           0,       // unrevOff
 		                           0,       // 1revOff
 		                           0,       // 2revOff
+		                           0,       // 3revOff
 		                           0, 0,    // itop, ibot
 		                           0xffffffff, // qualThresh
-		                           0,       // qualWobble
 		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1089,6 +1089,7 @@ static void twoMismatchSearch(
 		                           true,    // oneHit
 			                       seed+5,  // seed
 			                       &os,
+			                       false,   // considerQuals
 			                       true);   // halfAndHalf
 		uint32_t patid = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
@@ -1108,13 +1109,15 @@ static void twoMismatchSearch(
 			// Calculate the halves
 			uint32_t s = plen;
 			uint32_t s3 = s >> 1; // length of 3' half of seed
-			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			//uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 			params.setPatId(patid);
 			bt.setQuery(patFw, qualFw, nameFw);
 			// Set up the revisitability of the halves
-			bt.set2RevOff(s);   // 3' half 2-revisitable
-			bt.set1RevOff(s3);  // 5' half unrevisitable
-			bt.setUnrevOff(s3);
+			bt.setOffs(0, 0,
+			           s3,
+			           s3,
+			           two? s : s3,
+			           s);
 			params.setPatId(patid);
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
 			bool hit = bt.backtrack();
@@ -1128,9 +1131,11 @@ static void twoMismatchSearch(
 			// Try a half-and-half on the forward read
 			bool gaveUp = false;
 			bthh.setQuery(patFw, qualFw, nameFw);
-			bthh.set2RevOff(s);
-			bthh.set1RevOff(s5);
-			bthh.setUnrevOff(0);
+			bthh.setOffs(s3, s,
+			             0,
+			             two ? s3 : 0,
+			             two ? s  : s3,
+			             s);
 			ASSERT_ONLY(numHits = sink.numHits());
 			hit = bthh.backtrack();
 			if(bthh.numBacktracks() == bthh.maxBacktracks()) {
@@ -1160,12 +1165,13 @@ static void twoMismatchSearch(
 						plen,
 				        *qualFw,
 				        *nameFw,
-				        patid,     // patid
-				        hits,
-				        0xffffffff,
-				        0,
-				        0,
-				        s,
+				        patid,      // patid
+				        hits,       // hits
+				        0xffffffff, // qualThresh
+				        0,          // unrevOff
+				        0,          // 1revOff
+				        two ? s : 0,// 2revOff
+				        s,          // 3revOff
 				        true,       // fw
 				        true);      // ebwtFw
 				if(hits.size() > 0) {
@@ -1175,9 +1181,10 @@ static void twoMismatchSearch(
 						hits[0],
 						*patFw,
 						plen,
-					    0,
-					    0,
-					    s,
+					    0,          // unrevOff
+					    0,          // 1revOff
+				        two ? s : 0,// 2revOff
+				        s,          // 3revOff
 					    true);      // ebwtFw
 				}
 				if(newName) {
@@ -1224,11 +1231,12 @@ static void twoMismatchSearch(
 				        *qualRc,
 				        *nameRc,
 				        patid+1,    // patid
-				        hits,
-				        0xffffffff,
-				        0,
-				        0,
-				        s,
+				        hits,       // hits
+				        0xffffffff, // qualThresh
+				        0,          // unrevOff
+				        0,          // 1revOff
+				        two ? s : 0,// 2revOff
+				        s,          // 3revOff
 				        false,      // fw
 				        true);      // ebwtFw
 				if(hits.size() > 0) {
@@ -1238,9 +1246,10 @@ static void twoMismatchSearch(
 						hits[0],
 						*patRc,
 						plen,
-					    0,
-					    0,
-					    s,
+				        0,          // unrevOff
+				        0,          // 1revOff
+				        two ? s : 0,// 2revOff
+				        s,          // 3revOff
 					    true);      // ebwtFw
 				}
 				if(newName) {
@@ -1274,7 +1283,6 @@ static void seededQualCutoffSearch(
         int qualCutoff,                 /// maximum sum of mismatch qualities
                                         /// like maq map's -e option
                                         /// default: 70
-        int qualWobble,                 /// currently unused
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
@@ -1289,6 +1297,7 @@ static void seededQualCutoffSearch(
 	typedef typename Value<TStr>::Type TVal;
 	uint32_t numPats;
 	assert(revcomp);
+	assert_leq(seedMms, 3);
 	// Load forward index
 	SWITCH_TO_FW_INDEX();
 	uint32_t numQs = ((qUpto == -1) ? 10 * 1024 * 1024 : qUpto);
@@ -1300,12 +1309,13 @@ static void seededQualCutoffSearch(
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
 		BacktrackManager<TStr> bt(ebwtFw, params,
-		                          (seedMms > 0)?  s5 : s,// unrevOff,
-		                          (seedMms == 2)? s5 : s,// 1revOff
-		                          s,                     // 2revOff
+		                          0, 0,                  // 5, 3depth
+		                          (seedMms > 0)? s5 : s, // unrevOff,
+		                          (seedMms > 1)? s5 : s, // 1revOff
+		                          (seedMms > 2)? s5 : s, // 2revOff
+		                          (seedMms > 3)? s5 : s, // 3revOff
 		                          0, 0,                  // itop, ibot
 		                          qualCutoff,            // qualThresh
-		                          0,                     // qualWobble
 		                          maxBts,                // max backtracks
 		                          0,                     // reportSeedlings (don't)
 		                          NULL,                  // seedlings
@@ -1349,9 +1359,10 @@ static void seededQualCutoffSearch(
 			// Set up special seed bounds
 			if(qs < s) {
 				uint32_t qs5 = (qs >> 1) + (qs & 1);
-				bt.setUnrevOff((seedMms > 0)? qs5 : qs);
-				bt.set1RevOff ((seedMms > 1)? qs5 : qs);
-				bt.set2RevOff(qs);
+				bt.setOffs(0, 0, (seedMms > 0)? qs5 : qs,
+				                 (seedMms > 1)? qs5 : qs,
+				                 (seedMms > 2)? qs5 : qs,
+				                 (seedMms > 3)? qs5 : qs);
 			}
 			params.setPatId(patid+1);
 			bt.setQuery(patRc, qualRc, nameRc);
@@ -1359,9 +1370,10 @@ static void seededQualCutoffSearch(
 			bool hit = bt.backtrack();
 			// Restore default seed bounds
 			if(qs < s) {
-				bt.setUnrevOff((seedMms > 0)? s5 : s);
-				bt.set1RevOff ((seedMms > 1)? s5 : s);
-				bt.set2RevOff (s);
+				bt.setOffs(0, 0, (seedMms > 0)? s5 : s,
+				                 (seedMms > 1)? s5 : s,
+				                 (seedMms > 2)? s5 : s,
+				                 (seedMms > 3)? s5 : s);
 			}
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
@@ -1390,12 +1402,13 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 2: ", timing);
 		// BacktrackManager to search for hits for cases 1F, 2F, 3F
 		BacktrackManager<TStr> btf(ebwtBw, params,
-                                   (seedMms > 0)?  s5 : s,// unrevOff
-                                   (seedMms == 2)? s5 : s,// 1revOff
-                                   s,                     // 2revOff
+		                           0, 0,                  // 5, 3depth
+                                   (seedMms > 0)? s5 : s, // unrevOff
+                                   (seedMms > 1)? s5 : s, // 1revOff
+                                   (seedMms > 2)? s5 : s, // 2revOff
+                                   (seedMms > 3)? s5 : s, // 3revOff
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh
-		                           0,                     // qualWobble
 		                           maxBts,                // max backtracks
 		                           0,                     // reportSeedlings (no)
 		                           NULL,                  // seedlings
@@ -1404,14 +1417,15 @@ static void seededQualCutoffSearch(
 		                           true,                  // oneHit
 			                       seed+1,                // seed
 			                       &os);
-		// BacktrackManager to search for seedlings for case 4R
+		// BacktrackManager to search for partial alignments for case 4R
 		BacktrackManager<TStr> btr(ebwtBw, params,
+		                           0, 0,                  // 5, 3depth
 		                           s3,                    // unrevOff
-		                           (seedMms == 2)? s3 : s,// 1revOff
-		                           s,                     // 2revOff
+		                           (seedMms > 1)? s3 : s, // 1revOff
+				                   (seedMms > 2)? s3 : s, // 2revOff
+				                   (seedMms > 3)? s3 : s, // 3revOff
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh (none)
-		                           0,                     // qualWobble
 		                           maxBts,                // max backtracks
 		                           seedMms,               // reportSeedlings (yes)
 		                           &seedlingsRc,          // seedlings
@@ -1445,9 +1459,11 @@ static void seededQualCutoffSearch(
 			// Set up special seed bounds
 			if(qs < s) {
 				uint32_t qs5 = (qs >> 1) + (qs & 1); // length of 5' half of seed
-				btf.setUnrevOff((seedMms > 0)? qs5 : qs);
-				btf.set1RevOff ((seedMms > 1)? qs5 : qs);
-				btf.set2RevOff (qs);
+				btf.setOffs(0, 0,
+				            (seedMms > 0)? qs5 : qs,
+				            (seedMms > 1)? qs5 : qs,
+				            (seedMms > 2)? qs5 : qs,
+				            (seedMms > 3)? qs5 : qs);
 			}
 			ASSERT_ONLY(uint64_t numHits = sink.numHits());
 			// Do a 12/24 backtrack on the forward-strand read using
@@ -1456,9 +1472,11 @@ static void seededQualCutoffSearch(
 			bool hit = btf.backtrack();
 			// Restore default seed bounds
 			if(qs < s) {
-				btf.setUnrevOff((seedMms > 0)? s5 : s);
-				btf.set1RevOff ((seedMms > 1)? s5 : s);
-				btf.set2RevOff (s);
+				btf.setOffs(0, 0,
+				            (seedMms > 0)? s5 : s,
+				            (seedMms > 1)? s5 : s,
+				            (seedMms > 2)? s5 : s,
+				            (seedMms > 3)? s5 : s);
 			}
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
@@ -1485,9 +1503,11 @@ static void seededQualCutoffSearch(
 			// Set up special seed bounds
 			if(qs < s) {
 				uint32_t qs3 = qs >> 1;
-				btr.setUnrevOff(qs3);
-				btr.set1RevOff ((seedMms > 1)? qs3 : qs);
-				btr.set2RevOff (qs);
+				btr.setOffs(0, 0,
+				            qs3,
+				            (seedMms > 1)? qs3 : qs,
+				            (seedMms > 2)? qs3 : qs,
+				            (seedMms > 3)? qs3 : qs);
 			}
 			btr.setQuery(patRc, qualRc, nameRc);
 			btr.setQlen(s); // just look at the seed
@@ -1498,9 +1518,11 @@ static void seededQualCutoffSearch(
 			btr.backtrack();
 			// Restore default seed bounds
 			if(qs < s) {
-				btr.setUnrevOff(s3);
-				btr.set1RevOff ((seedMms > 1)? s3 : s);
-				btr.set2RevOff (s);
+				btr.setOffs(0, 0,
+				            s3,
+				            (seedMms > 1)? s3 : s,
+				            (seedMms > 2)? s3 : s,
+				            (seedMms > 3)? s3 : s);
 			}
 			hit = length(seedlingsRc) > numSeedlings;
 			append(seedlingsRc, 0xff);
@@ -1549,12 +1571,13 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 3: ", timing);
 		// BacktrackManager to search for seedlings for case 4F
 		BacktrackManager<TStr> btf(ebwtFw, params,
+		                           0, 0,                  // 5, 3depth
                                    s3,                    // unrevOff
-                                   (seedMms == 2)? s3 : s,// 1revOff
-                                   s,                     // 2revOff
+                                   (seedMms > 1)? s3 : s, // 1revOff
+                                   (seedMms > 2)? s3 : s, // 2revOff
+                                   (seedMms > 3)? s3 : s, // 3revOff
 		                           0, 0,                  // itop, ibot
 		                           qualCutoff,            // qualThresh (none)
-		                           0,                     // qualWobble
 		                           maxBts,                // max backtracks
 		                           seedMms,               // reportSeedlings (do)
 		                           &seedlingsFw,          // seedlings
@@ -1563,18 +1586,16 @@ static void seededQualCutoffSearch(
 		                           true,                  // oneHit
 			                       seed+3,                // seed
 			                       &os);
-		// BacktrackManager to search for hits for case 4R; default
-		// parameters are appropriate when searching with 1 mismatch
-		// allowed in the entire seed.  If 2 mismatches are allowed,
-		// then, depending on whether the seedling has 1 or 2
-		// mismatches, we may need to move unrevOff up to s2.
+		// BacktrackManager to search for hits for case 4R by extending
+		// the partial alignments found in Phase 2
 		BacktrackManager<TStr> btr(ebwtFw, params,
+		                           0, 0,    // 5, 3depth
 		                           s,       // unrevOff
 		                           s,       // 1revOff
 		                           s,       // 2revOff
+		                           s,       // 3revOff
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
-		                           0,       // qualWobble
 		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1583,22 +1604,25 @@ static void seededQualCutoffSearch(
 		                           true,    // oneHit
 			                       seed+4,  // seed
 			                       &os);
+		// The half-and-half BacktrackManager
 		BacktrackManager<TStr> btr2(ebwtFw, params,
-		                           0,       // unrevOff
-		                           s5,      // 1revOff
-		                           s,       // 2revOff
-		                           0, 0,    // itop, ibot
-		                           qualCutoff, // qualThresh
-		                           0,       // qualWobble
-		                           maxBts,  // max backtracks
-		                           0,       // reportSeedlings (don't)
-		                           NULL,    // seedlings
-			                       NULL,    // mutations
-		                           verbose, // verbose
-		                           true,    // oneHit
-			                       seed+5,  // seed
-			                       &os,
-			                       true);   // halfAndHalf
+		                            s5, s,
+		                            0,                      // unrevOff
+		                            (seedMms <= 2)? s5 : 0, // 1revOff
+		                            (seedMms < 3) ? s : s5, // 2revOff
+		                            s,                      // 3revOff
+		                            0, 0,    // itop, ibot
+		                            qualCutoff, // qualThresh
+		                            maxBts,  // max backtracks
+		                            0,       // reportSeedlings (don't)
+		                            NULL,    // seedlings
+			                        NULL,    // mutations
+		                            verbose, // verbose
+		                            true,    // oneHit
+			                        seed+5,  // seed
+			                        &os,
+			                        true,    // considerQuals
+			                        true);   // halfAndHalf
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
 		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
@@ -1618,8 +1642,8 @@ static void seededQualCutoffSearch(
 			params.setPatId(patid+1);
 			btr.setQuery(patRc, qualRc, nameRc);
 
-			// Given the seedlines generated in phase 2, check for hits
-			// for case 4R
+			// Given the partial alignments generated in phase 2, check
+			// for hits for case 4R
 			uint32_t plen = length(*patRc);
 			uint32_t qs = min<uint32_t>(plen, s);
 			uint32_t qs3 = qs >> 1;
@@ -1661,9 +1685,7 @@ static void seededQualCutoffSearch(
 #endif
 				// Set up special seed bounds
 				if(qs < s) {
-					btr.setUnrevOff(qs);
-					btr.set1RevOff (qs);
-					btr.set2RevOff (qs);
+					btr.setOffs(0, 0, qs, qs, qs, qs);
 				}
 				while(seedlingsRc[seedlingId++] != 0xff) {
 					seedlingId--; // point to that non-0xff character
@@ -1707,9 +1729,7 @@ static void seededQualCutoffSearch(
 				}
 				// Restore usual seed bounds
 				if(qs < s) {
-					btr.setUnrevOff(s);
-					btr.set1RevOff (s);
-					btr.set2RevOff (s);
+					btr.setOffs(0, 0, s, s, s, s);
 				}
 				assert_leq(seedlingId, seedlingsRcLen);
 				assert_eq(0xff, seedlingsRc[seedlingId-1]);
@@ -1730,21 +1750,25 @@ static void seededQualCutoffSearch(
 	    	// complement pattern: 1 mismatch in each of the 3' and 5'
 	    	// halves of the seed.
 	    	bool gaveUp = false;
-	    	if(seedMms == 2) {
+	    	if(seedMms >= 2) {
 				btr2.setQuery(patRc, qualRc, nameRc);
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
 				// Set up special seed bounds
 				if(qs < s) {
-					btr2.setUnrevOff(0);
-					btr2.set1RevOff (qs5);
-					btr2.set2RevOff (qs);
+					btr2.setOffs(qs5, qs,
+					             0,                         // unrevOff
+					             (seedMms <= 2)? qs5 : 0,   // 1revOff
+					             (seedMms < 3 )? qs  : qs5, // 2revOff
+					             qs);                       // 3revOff
 				}
 				bool hit = btr2.backtrack();
 				// Restore usual seed bounds
 				if(qs < s) {
-					btr2.setUnrevOff(0);
-					btr2.set1RevOff (s5);
-					btr2.set2RevOff (s);
+					btr2.setOffs(s5, s,
+					             0,                         // unrevOff
+					             (seedMms <= 2)? s5 : 0,    // 1revOff
+					             (seedMms < 3 )? s  : s5,   // 2revOff
+					             s);                        // 3revOff
 				}
 				if(btr2.numBacktracks() == btr2.maxBacktracks()) {
 					gaveUp = true;
@@ -1763,11 +1787,11 @@ static void seededQualCutoffSearch(
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
 	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-//	    	if(sanityCheck && os.size() > 0 && seedMms < 2) {
 				vector<Hit> hits;
-				uint32_t twoRevOff = s;
-				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
-				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
+				uint32_t threeRevOff = (seedMms <= 3) ? s : 0;
+				uint32_t twoRevOff   = (seedMms <= 2) ? s : 0;
+				uint32_t oneRevOff   = (seedMms <= 1) ? s : 0;
+				uint32_t unrevOff    = (seedMms == 0) ? s : 0;
 				bool newName = false;
 				if(nameRc == NULL) {
 					nameRc = new String<char>("no_name");
@@ -1779,14 +1803,15 @@ static void seededQualCutoffSearch(
 						plen,
 				        *qualRc,
 				        *nameRc,
-				        patid+1,    // patid
+				        patid+1,     // patid
 				        hits,
 				        qualCutoff,
 				        unrevOff,
 				        oneRevOff,
 				        twoRevOff,
-				        false,      // fw
-				        true);      // ebwtFw
+				        threeRevOff,
+				        false,       // fw
+				        true);       // ebwtFw
 				if(hits.size() > 0) {
 					// Print offending hit obtained by oracle
 					BacktrackManager<TStr>::printHit(
@@ -1797,6 +1822,7 @@ static void seededQualCutoffSearch(
 					    unrevOff,
 					    oneRevOff,
 					    twoRevOff,
+					    threeRevOff,
 					    true);      // ebwtFw
 				}
 				if(newName) {
@@ -1816,9 +1842,11 @@ static void seededQualCutoffSearch(
 			ASSERT_ONLY(uint32_t numSeedlings = length(seedlingsFw));
 			// Set up special seed bounds
 			if(qs < s) {
-				btf.setUnrevOff(qs3);
-				btf.set1RevOff ((seedMms > 1)? qs3 : qs);
-				btf.set2RevOff (qs);
+				btf.setOffs(0, 0,
+				            qs3,
+				            (seedMms > 1)? qs3 : qs,
+				            (seedMms > 2)? qs3 : qs,
+				            (seedMms > 3)? qs3 : qs);
 			}
 			// Do a 12/24 seedling backtrack on the forward read
 			// using the normal index.  This will find seedlings
@@ -1826,9 +1854,11 @@ static void seededQualCutoffSearch(
 			btf.backtrack();
 			// Set up special seed bounds
 			if(qs < s) {
-				btf.setUnrevOff(s3);
-				btf.set1RevOff ((seedMms > 1)? s3 : s);
-				btf.set2RevOff (s);
+				btf.setOffs(0, 0,
+				            s3,
+				            (seedMms > 1)? s3 : s,
+				            (seedMms > 2)? s3 : s,
+				            (seedMms > 3)? s3 : s);
 			}
 			append(seedlingsFw, 0xff);
 #ifndef NDEBUG
@@ -1866,18 +1896,16 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 4: Consider case 4F
 		Timer _t(cout, "Seeded quality search Phase 4: ", timing);
-		// BacktrackManager to search for hits for case 4F; default
-		// parameters are appropriate when searching with 1 mismatch
-		// allowed in the entire seed.  If 2 mismatches are allowed,
-		// then, depending on whether the seedling has 1 or 2
-		// mismatches, we may need to move unrevOff up to s2.
+		// BacktrackManager to search for hits for case 4F by extending
+		// the partial alignments found in Phase 3
 		BacktrackManager<TStr> btf(ebwtBw, params,
+		                           0, 0,    // 5, 3depth
                                    s,       // unrevOff
                                    s,       // 1revOff
                                    s,       // 2revOff
+                                   s,       // 3revOff
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
-		                           0,       // qualWobble
 		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1886,13 +1914,15 @@ static void seededQualCutoffSearch(
 		                           true,    // oneHit
 		                           seed+6,  // seed
 		                           &os);
+		// Half-and-half BacktrackManager for forward read
 		BacktrackManager<TStr> btf2(ebwtBw, params,
-                                   0,       // unrevOff
-                                   s5,      // 1revOff
-                                   s,       // 2revOff
+		                           s5, s,   // 5, 3depth
+		                           0,                      // unrevOff
+		                           (seedMms <= 2)? s5 : 0, // 1revOff
+		                           (seedMms <  3)? s : s5, // 2revOff
+		                           s,                      // 3revOff
 		                           0, 0,    // itop, ibot
 		                           qualCutoff, // qualThresh
-		                           0,       // qualWobble
 		                           maxBts,  // max backtracks
 		                           0,       // reportSeedlings (don't)
 		                           NULL,    // seedlings
@@ -1901,6 +1931,7 @@ static void seededQualCutoffSearch(
 		                           true,    // oneHit
 		                           seed+7,  // seed
 		                           &os,
+		                           true,    // considerQuals
 		                           true);   // halfAndHalf
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
@@ -1966,9 +1997,7 @@ static void seededQualCutoffSearch(
 #endif
 				// Set special seed bounds
 				if(qs < s) {
-					btf.setUnrevOff(qs);
-					btf.set1RevOff (qs);
-					btf.set2RevOff (qs);
+					btf.setOffs(0, 0, qs, qs, qs, qs);
 				}
 				while(seedlingsFw[seedlingId++] != 0xff) {
 					seedlingId--; // point to that non-0xff character
@@ -2009,9 +2038,7 @@ static void seededQualCutoffSearch(
 				}
 				// Restore usual seed bounds
 				if(qs < s) {
-					btf.setUnrevOff(s);
-					btf.set1RevOff (s);
-					btf.set2RevOff (s);
+					btf.setOffs(0, 0, s, s, s, s);
 				}
 				assert_leq(seedlingId, seedlingsFwLen);
 				if(seedlingId == seedlingsFwLen) {
@@ -2035,21 +2062,25 @@ static void seededQualCutoffSearch(
 	    	// pattern: 1 mismatch in each of the 3' and 5' halves of
 	    	// the seed.
 	    	bool gaveUp = false;
-	    	if(seedMms == 2) {
+	    	if(seedMms >= 2) {
 				ASSERT_ONLY(uint64_t numHits = sink.numHits());
 				btf2.setQuery(patFw, qualFw, nameFw);
 				// Set special seed bounds
 				if(qs < s) {
-					btf2.setUnrevOff(0);
-					btf2.set1RevOff (qs5);
-					btf2.set2RevOff (qs);
+					btf2.setOffs(qs5, qs,
+					             0,                        // unrevOff
+					             (seedMms <= 2)? qs5 : 0,  // 1revOff
+					             (seedMms < 3)? qs : qs5,  // 2revOff
+					             qs);                      // 3revOff
 				}
 				bool hit = btf2.backtrack();
 				// Restore usual seed bounds
 				if(qs < s) {
-					btf2.setUnrevOff(0);
-					btf2.set1RevOff (s5);
-					btf2.set2RevOff (s);
+					btf2.setOffs(s5, s,
+					             0,                        // unrevOff
+					             (seedMms <= 2)? s5 : 0,   // 1revOff
+					             (seedMms < 3)? s : s5,    // 2revOff
+					             s);                       // 3revOff
 				}
 				if(btf2.numBacktracks() == btf2.maxBacktracks()) {
 					gaveUp = true;
@@ -2070,9 +2101,10 @@ static void seededQualCutoffSearch(
 			// Check with the oracle to make sure it agrees.
 	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
 				vector<Hit> hits;
-				uint32_t twoRevOff = s;
-				uint32_t oneRevOff = (seedMms <= 1) ? s : 0;
-				uint32_t unrevOff   = (seedMms == 0) ? s : 0;
+				uint32_t threeRevOff = (seedMms <= 3) ? s : 0;
+				uint32_t twoRevOff   = (seedMms <= 2) ? s : 0;
+				uint32_t oneRevOff   = (seedMms <= 1) ? s : 0;
+				uint32_t unrevOff    = (seedMms == 0) ? s : 0;
 				bool newName = false;
 				if(nameFw == NULL) {
 					nameFw = new String<char>("no_name");
@@ -2090,6 +2122,7 @@ static void seededQualCutoffSearch(
 				        unrevOff,
 				        oneRevOff,
 				        twoRevOff,
+				        threeRevOff,
 				        true,       // fw
 				        false);     // ebwtFw
 				if(hits.size() > 0) {
@@ -2102,6 +2135,7 @@ static void seededQualCutoffSearch(
 					    unrevOff,
 					    oneRevOff,
 					    twoRevOff,
+					    threeRevOff,
 					    false);     // ebwtFw
 				}
 				if(newName) {
@@ -2304,7 +2338,6 @@ static void driver(const char * type,
 		if(maqLike) {
 			seededQualCutoffSearch(seedLen,
 			                       qualThresh,
-			                       15,      // qualWobble
 			                       seedMms,
 			                       *patsrc,
 			                       *sink,
@@ -2317,8 +2350,8 @@ static void driver(const char * type,
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
 				mismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
-			} else if(mismatches == 2) {
-				twoMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os);
+			} else if(mismatches == 2 || mismatches == 3) {
+				twoOrThreeMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os, mismatches == 2);
 			} else {
 				throw runtime_error("Bad number of mismatches!");
 			}
