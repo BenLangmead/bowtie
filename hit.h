@@ -12,7 +12,6 @@ using namespace std;
 using namespace seqan;
 
 typedef pair<uint32_t,uint32_t> U32Pair;
-typedef String<Dna, Packed<> > hit_pat_t;
 // For now, we support reads up to 63 bp long, which is the same as Maq, as 
 // of 0.6.7
 static const int max_read_bp = 63;
@@ -26,7 +25,7 @@ struct Hit {
 	Hit(U32Pair _h, 
 		uint32_t _patId,
 		const String<char>& _patName,
-		const hit_pat_t& _patSeq,
+		const String<Dna5>& _patSeq,
 		const String<char>& _patQualities,
 		bool _fw, 
 		const bitset<max_read_bp>& _mms,
@@ -42,7 +41,7 @@ struct Hit {
 	U32Pair  h;
 	uint32_t patId;
 	String<char> patName;
-	String< Dna, Packed<> > patSeq;
+	String<Dna5> patSeq;
 	String<char> patQualities;
 	bitset<max_read_bp> mms;
 	uint32_t oms;   // # of other possible mappings; 0 -> this is unique
@@ -80,7 +79,7 @@ public:
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
 						   const String<char>& patName,
-						   const hit_pat_t& patSeq,
+						   const String<Dna5>& patSeq,
 						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
@@ -93,7 +92,7 @@ public:
 			const U32Pair& h,
 			uint32_t patId,
 		    const String<char>& patName,
-			const hit_pat_t& patSeq,
+			const String<Dna5>& patSeq,
 			const String<char>& patQualities,
             bool fw,
             const bitset<max_read_bp>& mms,
@@ -141,7 +140,7 @@ public:
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
 						   const String<char>& patName,
-						   const hit_pat_t& patSeq,
+						   const String<Dna5>& patSeq,
 						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
@@ -154,7 +153,7 @@ public:
 	virtual void reportProvisionalHit(const U32Pair& h,
 									  uint32_t patId,
 									  const String<char>& patName,
-									  const hit_pat_t& patSeq,
+									  const String<Dna5>& patSeq,
 									  const String<char>& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
@@ -187,7 +186,7 @@ public:
 			const U32Pair& h,
 			uint32_t patId,
 			const String<char>& patName,
-			const hit_pat_t& patSeq,
+			const String<Dna5>& patSeq,
 		    const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
@@ -225,7 +224,7 @@ public:
 			const U32Pair& h,
 			uint32_t patId,
 			const String<char>& patName,
-			const hit_pat_t& patSeq,
+			const String<Dna5>& patSeq,
 			const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
@@ -271,7 +270,7 @@ public:
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
 						   const String<char>& patName,
-						   const hit_pat_t& patSeq,
+						   const String<Dna5>& patSeq,
 						   const String<char>& patQualities,
 						   bool fw,
 						   const bitset<max_read_bp>& mms,
@@ -322,7 +321,7 @@ public:
 									  const U32Pair& h,
 									  uint32_t patId,
 									  const String<char>& patName,
-									  const hit_pat_t& patSeq,
+									  const String<Dna5>& patSeq,
 									  const String<char>& patQualities,
 									  bool fw,
 									  const bitset<max_read_bp>& mms,
@@ -370,7 +369,7 @@ public:
 			const U32Pair& h,
 			uint32_t patId,
 			const String<char>& patName,
-			const hit_pat_t& patSeq,
+			const String<Dna5>& patSeq,
 		    const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,
@@ -415,7 +414,7 @@ public:
 			const U32Pair& h,
 			uint32_t patId,
 			const String<char>& patName,
-			const hit_pat_t& patSeq,
+			const String<Dna5>& patSeq,
 			const String<char>& patQualities,
 			bool fw,
 			const bitset<max_read_bp>& mms,

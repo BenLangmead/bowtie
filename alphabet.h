@@ -59,15 +59,18 @@ static inline TStr reverse(const TStr& s) {
 /**
  * Return the reverse-complement of s.
  */
-static inline bool isReverseComplement(const String<Dna>& s1,
-                                       const String<Dna>& s2)
+static inline bool isReverseComplement(const String<Dna5>& s1,
+                                       const String<Dna5>& s2)
 {
 	if(length(s1) != length(s2)) return false;
 	size_t slen = length(s1);
 	for(size_t i = 0; i < slen; i++) {
 		int i1 = (int)s1[i];
 		int i2 = (int)s2[slen - i - 1];
-		if(i1 != (i2 ^ 3)) return false;
+		if(i1 == 4) {
+			if(i2 != 4) return false;
+		}
+		else if(i1 != (i2 ^ 3)) return false;
 	}
 	return true;
 }

@@ -83,7 +83,7 @@ public:
 	                 vector<TStr>* __os = NULL,
 	                 bool __considerQuals = true, // whether to consider quality values when making backtracking decisions
 	                 bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
-	                 TStr* __qry = NULL,
+	                 String<Dna5>* __qry = NULL,
 	                 String<char>* __qual = NULL,
 	                 String<char>* __name = NULL) :
 		_qry(__qry),
@@ -191,7 +191,7 @@ public:
 	#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
 	#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
 	
-	void setQuery(TStr* __qry,
+	void setQuery(String<Dna5>* __qry,
 	              String<char>* __qual,
 	              String<char>* __name,
 	              String<QueryMutation>* __muts = NULL)
@@ -348,7 +348,34 @@ public:
 		assert_geq(length(*_qual), length(*_qry));
 		int ftabChars = _ebwt._eh._ftabChars;
 		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
-		if(m >= (uint32_t)ftabChars) {
+		int nsInSeed = 0;
+		int nsInFtab = 0;
+		// Count Ns
+		for(size_t i = 0; i < _3revOff; i++) {
+			if((int)(*_qry)[_qlen-i-1] == 4) {
+				nsInSeed++;
+				if(nsInSeed == 1) {
+					if(i < _unrevOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 2) {
+					if(i < _1revOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 3) {
+					if(i < _2revOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else {
+					assert_gt(nsInSeed, 3);
+					return false;     // Exceeded mm budget on Ns alone
+				}
+			}
+			if(i < _ebwt._eh._ftabLen) {
+				nsInFtab++;
+			}
+		}
+		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
 			// The ftab doesn't extend past the unrevisitable portion,
 			// so we can go ahead and use it
 			// Rightmost char gets least significant bit-pair
@@ -371,7 +398,8 @@ public:
 					return backtrack(0,   // depth
 					                 0,   // top
 					                 0,   // bot
-					                 ham);
+					                 ham,
+					                 nsInFtab > 1);
 				} else {
 					// We have a match!
 					return report(0, top, bot);
@@ -381,7 +409,8 @@ public:
 				return backtrack(ftabChars, // depth
 				                 top,       // top
 				                 bot,       // bot
-				                 ham);
+				                 ham,
+				                 nsInFtab > 1);
 			}
 			// The arrows are already closed; give up
 			return false;
@@ -392,7 +421,8 @@ public:
 			return backtrack(0,   // depth
 			                 0,   // top
 			                 0,   // bot
-			                 ham);
+			                 ham,
+			                 nsInFtab > 1);
 		}
 	}
 
@@ -406,7 +436,8 @@ public:
 	bool backtrack(uint32_t depth,
 	               uint32_t top,
 	               uint32_t bot,
-	               uint32_t iham = 0)
+	               uint32_t iham = 0,
+	               bool disableFtab = false)
 	{
 		// Initial sanity checking
 		assert_gt(length(*_qry), 0);
@@ -429,7 +460,7 @@ public:
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
-		                     top, bot, iham, iham, _pairs, _elims);
+		                     top, bot, iham, iham, _pairs, _elims, disableFtab);
 		
 		// Remainder of this function is sanity checking
 		
@@ -542,7 +573,8 @@ public:
 	               uint32_t  ham,      // weighted hamming distance so far
 	               uint32_t  iham,     // initial weighted hamming distance
 	               uint32_t* pairs,    // portion of pairs array to be used for this backtrack frame
-	               uint8_t*  elims)    // portion of elims array to be used for this backtrack frame
+	               uint8_t*  elims,    // portion of elims array to be used for this backtrack frame
+	               bool disableFtab = false)
 	{
 		// Can't have already exceeded weighted hamming distance threshold
 		assert_leq(stackDepth, depth);
@@ -689,7 +721,6 @@ public:
 				}
 				cout << "\"";
 			}
-			assert_lt((int)(*_qry)[cur], 4);
 			bool curIsEligible = false;
 			// Reset eligibleNum and eligibleSz if there are any
 			// eligible pairs discovered at this spot
@@ -697,6 +728,7 @@ public:
 			// Determine whether arrow pairs at this location are
 			// candidates for backtracking
 			int c = (int)(*_qry)[cur];
+			assert_leq(c, 4);
 			uint8_t q = QUAL(cur);
 			assert_lt((uint32_t)q, 100);
 			// The current query position is a legit alternative if it a) is
@@ -736,31 +768,32 @@ public:
 				if(curOverridesEligible) cout << "(overrides)";
 				cout << endl;
 			}
+			// If c is 'N', then it's a mismatch
+			if(c < 4 && d > 0) top = bot = 1;
 			// Calculate the ranges for this position
 			if(top == 0 && bot == 0) {
 				// Calculate first quartet of pairs using the _fchr[]
 				// array
-				assert_eq(0, d);
 				PAIR_TOP(0, 0)                  = _ebwt._fchr[0];
 				PAIR_BOT(0, 0) = PAIR_TOP(0, 1) = _ebwt._fchr[1];
 				PAIR_BOT(0, 1) = PAIR_TOP(0, 2) = _ebwt._fchr[2];
 				PAIR_BOT(0, 2) = PAIR_TOP(0, 3) = _ebwt._fchr[3];
 				PAIR_BOT(0, 3)                  = _ebwt._fchr[4];
 				// Update top and bot
-				top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c);
+				if(c < 4) { top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c); }
 			} else if(curIsAlternative) {
 				// Clear pairs
 				memset(&pairs[d*8], 0, 8 * 4);
 				// Calculate next quartet of pairs
 				_ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
 				// Update top and bot
-				top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c);
+				if(c < 4) { top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c); }
 			} else {
 				// This query character is not even a legitimate
 				// alternative (because backtracking here would blow
 				// our mismatch quality budget), so no need to do the
 				// bookkeeping for the entire quartet, just do c
-				top = _ebwt.mapLF(ltop, c); bot = _ebwt.mapLF(lbot, c);
+				if(c < 4) { top = _ebwt.mapLF(ltop, c); bot = _ebwt.mapLF(lbot, c); }
 			}
 			if(top != bot) {
 				// Calculate loci from row indices; do it now so that
@@ -768,9 +801,12 @@ public:
 				SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
 			}
 			// Update the elim array
-			elims[d] = (1 << c);
+			if(c < 4) {
+				elims[d] = (1 << c);
+				assert_gt(elims[d], 0);
+			}
 			assert_lt(elims[d], 16);
-			assert_gt(elims[d], 0);
+
 			if(curIsAlternative) {
 				// Given the just-calculated range quartet, update
 				// elims, altNum, eligibleNum, eligibleSz
@@ -1038,6 +1074,7 @@ public:
 				if(i+1 == _qlen) {
 					ret = report(stackDepth+1, bttop, btbot);
 				} else if(_halfAndHalf &&
+				          !disableFtab &&
 				          _2revOff == _3revOff &&
 				          i+1 < (uint32_t)_ebwt._eh._ftabChars &&
 				          (uint32_t)_ebwt._eh._ftabChars <= _5depth)
@@ -1047,12 +1084,14 @@ public:
 					// Rightmost char gets least significant bit-pairs
 					int ftabChars = _ebwt._eh._ftabChars;
 					uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+					assert_lt(ftabOff, 4);
 					assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
 					for(int j = ftabChars - 1; j > 0; j--) {
 						ftabOff <<= 2;
 						if(_qlen-j == icur) {
 							ftabOff |= btcint;
 						} else {
+							assert_lt((uint32_t)(*_qry)[_qlen-j], 4);
 							ftabOff |= (uint32_t)(*_qry)[_qlen-j];
 						}
 						assert_lt(ftabOff, _ebwt._eh._ftabLen-1);
@@ -1451,7 +1490,7 @@ protected:
 			assert_lt(m.newBase, 4);
 			assert_neq(m.oldBase, m.newBase);
 			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.oldBase);
-			(*_qry)[m.pos] = (Dna)(int)m.newBase; // apply it
+			(*_qry)[m.pos] = (Dna5)(int)m.newBase; // apply it
 		}
 	}
 	
@@ -1467,7 +1506,7 @@ protected:
 			assert_lt(m.newBase, 4);
 			assert_neq(m.oldBase, m.newBase);
 			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.newBase);
-			(*_qry)[m.pos] = (Dna)(int)m.oldBase; // undo it
+			(*_qry)[m.pos] = (Dna5)(int)m.oldBase; // undo it
 		}
 	}
 	
@@ -1478,7 +1517,7 @@ protected:
 			return false; // keep going
 		} else {
 			// Undo all the mutations
-			ASSERT_ONLY(TStr tmp = (*_qry));
+			ASSERT_ONLY(String<Dna5> tmp = (*_qry));
 			undoMutations();
 			bool hit;
 			if(_muts != NULL) {
@@ -1546,7 +1585,7 @@ protected:
 			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[i]] - 33)]);
 			uint32_t ci = _qlen - _mms[i] - 1;
 			// _chars[] is index in terms of RHS-relative depth
-			int c = (int)(Dna)_chars[ci];
+			int c = (int)(Dna5)_chars[ci];
 			assert_lt(c, 4);
 			assert_neq(c, (int)(*_qry)[_mms[i]]);
 			append((*_seedlings), (uint8_t)c); // chr
@@ -1719,7 +1758,7 @@ protected:
 		            _halfAndHalf);
 	}
 	
-	TStr*               _qry;    // query (read) sequence
+	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry
 	String<char>*       _name;   // name of _qry

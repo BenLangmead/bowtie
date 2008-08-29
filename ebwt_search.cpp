@@ -278,7 +278,7 @@ static char *argv0 = NULL;
  * hits.  Assumes that index is already loaded into memory.
  */
 template<typename TStr>
-static void exactSearch(PatternSource<TStr>& patsrc,
+static void exactSearch(PatternSource& patsrc,
                         HitSink& sink,
                         EbwtSearchStats<TStr>& stats,
                         EbwtSearchParams<TStr>& params,
@@ -295,7 +295,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(patid++);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat = NULL;
+    	String<Dna5>* pat = NULL;
 		String<char>* qual = NULL;
 		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
@@ -316,7 +316,7 @@ static void exactSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.hasMorePatterns());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-	        	TStr* pat2 = NULL;
+	        	String<Dna5>* pat2 = NULL;
 	    		String<char>* qual2 = NULL;
 	    		String<char>* name2 = NULL;
 				patsrc.nextPattern(&pat2, &qual2, &name2);
@@ -382,21 +382,20 @@ static void exactSearch(PatternSource<TStr>& patsrc,
  * find all hits for that pattern in all texts using a naive seed-
  * and-extend algorithm where seeds are found using Horspool.
  */
-template<typename TStr1, typename TStr2>
-static bool findSanityHits(const TStr1& pat,
+template<typename TStr>
+static bool findSanityHits(const String<Dna5>& pat,
                            uint32_t patid,
                            bool fw,
-                           vector<TStr2>& os,
+                           vector<TStr>& os,
                            vector<Hit>& sanityHits,
                            bool allowExact,
                            bool transpose)
 {
-	typedef TStr1 TStr;
 	typedef typename Value<TStr>::Type TVal;
 	bool ebwtFw = !transpose;
 	bool fivePrimeOnLeft = (ebwtFw == fw);
     uint32_t plen = length(pat);
-	TStr half;
+	String<Dna5> half;
 	reserve(half, plen);
 	uint32_t bump = 0;
 	if(!transpose) bump = 1;
@@ -408,9 +407,9 @@ static bool findSanityHits(const TStr1& pat,
     assert_leq(hlen, plen);
     uint32_t ohlen = plen - hlen; // length of other (left) half
     assert_leq(ohlen, plen);
-	Pattern<TStr, Horspool> pattern(half);
+	Pattern<String<Dna5>, Horspool> pattern(half);
 	for(size_t i = 0; i < os.size(); i++) {
-		TStr2 o = os[i];
+		TStr o = os[i];
 		if(transpose) {
 			for(size_t j = 0; j < length(o)>>1; j++) {
 				TVal tmp = o[j];
@@ -418,7 +417,7 @@ static bool findSanityHits(const TStr1& pat,
 				o[length(o)-j-1] = tmp;
 			}
 		}
-		Finder<TStr> finder(o);
+		Finder<String<Dna> > finder(o);
 		while (find(finder, pattern)) {
 			uint32_t pos = position(finder);
 			bitset<max_read_bp> diffs = 0;
@@ -470,8 +469,7 @@ static bool findSanityHits(const TStr1& pat,
  * after having been reconciled against actual hits with
  * reconcileHits().  Only used in allHits mode.
  */
-template<typename TStr>
-static bool checkSanityExhausted(const TStr& pat,
+static bool checkSanityExhausted(const String<Dna5>& pat,
                                  uint32_t patid,
                                  bool fw,
                                  vector<Hit>& sanityHits,
@@ -501,18 +499,16 @@ static bool checkSanityExhausted(const TStr& pat,
  * Assert that every hit in the hits array also occurs in the
  * sanityHits array.
  */
-template<typename TStr1, typename TStr2>
-static bool reconcileHits(const TStr1& pat,
+template<typename TStr>
+static bool reconcileHits(const String<Dna5>& pat,
                           uint32_t patid,
                           bool fw,
-                          vector<TStr2>& os,
+                          vector<TStr>& os,
                           vector<Hit>& hits,
                           vector<Hit>& sanityHits,
                           bool allowExact,
                           bool transpose)
 {
-	typedef TStr1 TStr;
-	typedef typename Value<TStr>::Type TVal;
     // Sanity-check each result by checking whether it occurs
 	// in the sanityHits array-of-vectors
     for(size_t i = 0; i < hits.size(); i++) {
@@ -567,7 +563,7 @@ static bool reconcileHits(const TStr1& pat,
  * Ebwt (ebwtBw) is not loaded into memory.
  */
 template<typename TStr>
-static void mismatchSearch(PatternSource<TStr>& patsrc,
+static void mismatchSearch(PatternSource& patsrc,
                            HitSink& sink,
                            EbwtSearchStats<TStr>& stats,
                            EbwtSearchParams<TStr>& params,
@@ -600,7 +596,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat = NULL;
+    	String<Dna5>* pat = NULL;
 		String<char>* qual = NULL;
 		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
@@ -658,7 +654,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 	    		assert(patsrc.nextIsReverseComplement());
 	    		// Ignore this pattern (the reverse complement of
 	    		// the one we just matched)
-		    	TStr* pat2 = NULL;
+	    		String<Dna5>* pat2 = NULL;
 				String<char>* qual2 = NULL;
 				String<char>* name2 = NULL;
 				patsrc.nextPattern(&pat2, &qual2, &name2);
@@ -772,7 +768,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     	params.setPatId(spatid);
     	assert(!revcomp || (params.patId() & 1) == 0 || !params.fw());
     	assert(!revcomp || (params.patId() & 1) == 1 ||  params.fw());
-    	TStr* pat = NULL;
+    	String<Dna5>* pat = NULL;
 		String<char>* qual = NULL;
 		String<char>* name = NULL;
 		patsrc.nextPattern(&pat, &qual, &name);
@@ -798,7 +794,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
     		assert(patsrc.hasMorePatterns());
     		// Ignore this pattern (the reverse complement of
     		// the one we just matched)
-	    	TStr* pat2 = NULL;
+    		String<Dna5>* pat2 = NULL;
 			String<char>* qual2 = NULL;
 			String<char>* name2 = NULL;
 			patsrc.nextPattern(&pat2, &qual2, &name2);
@@ -894,7 +890,7 @@ static void mismatchSearch(PatternSource<TStr>& patsrc,
 
 template<typename TStr>
 static void twoOrThreeMismatchSearch(
-        PatternSource<TStr>& patsrc,    /// pattern source
+        PatternSource& patsrc,    /// pattern source
         HitSink& sink,                  /// hit sink
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
@@ -932,8 +928,8 @@ static void twoOrThreeMismatchSearch(
 		                           false);                // considerQuals
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 		EbwtSearchState<TStr> s(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1002,8 +998,8 @@ static void twoOrThreeMismatchSearch(
 			                      &os,
 			                      false);                // considerQuals
 		uint32_t patid = 0;
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 		params.setFw(true);  // looking at forward strand
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
@@ -1092,8 +1088,8 @@ static void twoOrThreeMismatchSearch(
 			                       false,   // considerQuals
 			                       true);   // halfAndHalf
 		uint32_t patid = 0;
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
@@ -1286,7 +1282,7 @@ static void seededQualCutoffSearch(
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
-        PatternSource<TStr>& patsrc,    /// pattern source
+        PatternSource& patsrc,    /// pattern source
         HitSink& sink,                  /// hit sink
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
@@ -1326,8 +1322,8 @@ static void seededQualCutoffSearch(
 		                          &os);
 		uint32_t patid = 0;
 		uint32_t lastLen = 0; // for checking if all reads have same length
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 		EbwtSearchState<TStr> st(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
@@ -1435,8 +1431,8 @@ static void seededQualCutoffSearch(
 			                       seed+2,                // seed
 			                       &os);
 		uint32_t patid = 0;
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
@@ -1625,8 +1621,8 @@ static void seededQualCutoffSearch(
 			                        true);   // halfAndHalf
 		uint32_t patid = 0;
 		uint32_t seedlingId = 0;
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
-		TStr* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
 		ASSERT_ONLY(uint32_t seedlingsRcLen = length(seedlingsRc));
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
@@ -1937,7 +1933,7 @@ static void seededQualCutoffSearch(
 		uint32_t seedlingId = 0;
 		uint32_t seedlingsFwLen = length(seedlingsFw);
 		params.setFw(true);  // looking only at forward strand
-		TStr* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
+		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	assert_lt((patid>>1), doneMask.capacity());
 	    	assert_lt((patid>>1), doneMask.size());
@@ -2226,11 +2222,11 @@ static void driver(const char * type,
 	// Seed random number generator
 	srand(seed);
 	// Create a pattern source for the queries
-	PatternSource<TStr> *patsrc = NULL;
+	PatternSource *patsrc = NULL;
 	switch(format) {
-		case FASTA:   patsrc = new FastaPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, maxNs); break;
-		case FASTQ:   patsrc = new FastqPatternSource<TStr> (queries, revcomp, false, patDumpfile, trim3, trim5, solexa_quals, maxNs); break;
-		case CMDLINE: patsrc = new VectorPatternSource<TStr>(queries, revcomp, false, patDumpfile, 0, trim3, trim5, maxNs); break;
+		case FASTA:   patsrc = new FastaPatternSource (queries, revcomp, false, patDumpfile, trim3, trim5, NS_TO_AS, maxNs); break;
+		case FASTQ:   patsrc = new FastqPatternSource (queries, revcomp, false, patDumpfile, trim3, trim5, NS_TO_AS, solexa_quals, maxNs); break;
+		case CMDLINE: patsrc = new VectorPatternSource(queries, revcomp, false, patDumpfile, 0, trim3, trim5, NS_TO_AS, maxNs); break;
 		default: assert(false);
 	}
 	// Check that input is non-empty

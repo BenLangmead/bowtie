@@ -764,9 +764,9 @@ public:
 	
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
-	inline bool report(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l = NULL) const;
-	inline bool reportChaseOne(const TStr& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
@@ -1104,7 +1104,7 @@ public:
 	/**
 	 * Report a hit 
 	 */
-	void reportHit(const TStr& query,         // read sequence
+	void reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
 	               const uint32_t *mmui32,   // mismatch list
@@ -1118,7 +1118,7 @@ public:
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
 		bitset<max_read_bp> mm = 0;
-		hit_pat_t pat;
+		String<Dna5> pat;
 		uint32_t qlen = length(query);
 		reserve(pat, qlen);
 		String<char> patQuals;
@@ -1391,7 +1391,7 @@ public:
 	typedef typename Value<TStr>::Type TVal;
 
 	EbwtSearchState(const Ebwt<TStr>& __ebwt,
-	                TStr* __query,
+	                String<Dna5>* __query,
 					String<char>* __query_name,
 					String<char>* __query_quals,
 	                const EbwtSearchParams<TStr>& __params,
@@ -1449,7 +1449,7 @@ public:
 		_mism(0xffffffff)
 	{ }
 	
-	void newQuery(TStr* __query,
+	void newQuery(String<Dna5>* __query,
 	              String<char>* __query_name,
 	              String<char>* __query_quals)
 	{
@@ -1475,7 +1475,7 @@ public:
 	
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
-	const TStr& query() const                    { return *_query;  }
+	const String<Dna5>& query() const            { return *_query;  }
 	String<char>* query_quals() 		         { return _query_quals; }
 	String<char>* query_name()       	    	 { return _query_name; }
 	uint32_t top() const                         { return _top;    }
@@ -1533,8 +1533,8 @@ public:
 	/// Get char at a query position
 	int chr(uint32_t qidx) const {
 		assert(!qExhausted());
-		int c = (TVal)(*_query)[qidx];
-		assert_lt(c, 4);  // for sanity
+		int c = (Dna5)(*_query)[qidx];
+		assert_leq(c, 4);  // for sanity
 		assert_geq(c, 0); // for sanity
 		return c;
 	}
@@ -1583,13 +1583,17 @@ public:
 	 */
 	bool mapLF(const Ebwt<TStr>& ebwt, int c = -1) {
 		if(c == -1) c = chr();
-		assert_lt(c, 4);
+		assert_leq(c, 4);
 		assert_geq(c, 0);
 		uint32_t oldTop = _top;
 		uint32_t oldBot = _bot;
 		uint32_t diff = _bot - _top;
-		uint32_t top = ebwt.mapLF(_topSideLocus, c);
-		uint32_t bot = ebwt.mapLF(_botSideLocus, c);
+		uint32_t top = 0;
+		uint32_t bot = 0;
+		if(c < 4) {
+			top = ebwt.mapLF(_topSideLocus, c);
+			bot = ebwt.mapLF(_botSideLocus, c);
+		}
 		assert_geq(bot, top);
 		if(bot == top) {
 			if(!_params.backtracking() && inNarrowHalf()) {
@@ -1734,13 +1738,6 @@ public:
 		// query position and the one "after" (to the left of) it
 		assert_gt(_remainders[_firstNzRemainder], 0);
 		assert_gt(_bots[_firstNzRemainder], _tops[_firstNzRemainder]);
-		#ifndef NDEBUG
-		// It can't be the case that arrows narrowed after any query
-		// position "after" (to the left of) _firstNzRemainder
-		//for(int i = 0; i < _firstNzRemainder; i++) {
-		//	assert_eq(0, _remainders[i]);
-		//}
-		#endif
 		for(uint32_t i = _firstNzRemainder; i < _narrowHalfLen; i++) {
 			if(_remainders[i] == 0) {
 				continue;
@@ -1770,7 +1767,7 @@ private:
 	RandomSource _rand;   // random source for picking a random hit
 	uint32_t _top;        // top index
 	uint32_t _bot;        // bot index
-	TStr*   _query;       // query string
+	String<Dna5>* _query;       // query string
 	String<char>* _query_name;  // query name
 	String<char>* _query_quals; // query qualities string
 	String<uint32_t> _remainders; // space left to explore
@@ -2491,7 +2488,7 @@ inline bool Ebwt<TStr>::report(uint32_t off,
  * fall partially within the padding that separates texts.
  */
 template<typename TStr>
-inline bool Ebwt<TStr>::report(const TStr& query,
+inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
                                const uint32_t *mmui32,
@@ -2579,7 +2576,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
  * array.
  */
 template<typename TStr>
-inline bool Ebwt<TStr>::reportChaseOne(const TStr& query,
+inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
                                        const uint32_t *mmui32,

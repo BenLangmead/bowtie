@@ -14,17 +14,23 @@
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "tokenize.h"
+#include "random_source.h"
 
 using namespace std;
 using namespace seqan;
 
+/// Wildcard policies
+enum {
+	NS_TO_NS    = 1, // Ns stay Ns and don't match anything
+	NS_TO_AS    = 2, // Ns become As
+	NS_TO_RANDS = 3  // Ns become random characters
+};
+
 /// Reverse a string in-place
-template <typename TStr>
-static inline void reverse(TStr& s) {
-	typedef typename Value<TStr>::Type TVal;
+static inline void reverse(String<Dna5>& s) {
 	size_t len = length(s);
 	for(size_t i = 0; i < (len>>1); i++) {
-		TVal tmp = s[i];
+		Dna5 tmp = s[i];
 		s[i] = s[len-i-1];
 		s[len-i-1] = tmp;
 	}
@@ -35,7 +41,6 @@ static inline void reverse(TStr& s) {
  * patterns to a logfile (useful for debugging) and optionally
  * reversing them before returning them.
  */
-template <typename TStr>
 class PatternSource {
 public:
 	PatternSource(bool __reverse = false, const char *__dumpfile = NULL) :
@@ -52,7 +57,7 @@ public:
 		}
 	}
 	virtual ~PatternSource() { }
-	virtual void nextPattern(TStr** s, String<char>** qual, String<char>** name) {
+	virtual void nextPattern(String<Dna5>** s, String<char>** qual, String<char>** name) {
 		nextPatternImpl(s, qual, name);
 		// Reverse it, if desired
 		if(_reverse) {
@@ -89,7 +94,7 @@ public:
 		}
 	}
 	virtual void skipPattern() {
-		TStr         *tmp1;
+		String<Dna5> *tmp1;
 		String<char> *tmp2;
 		String<char> *tmp3;
 		nextPattern(&tmp1, &tmp2, &tmp3);
@@ -101,7 +106,7 @@ public:
 		}
 		assert(!nextIsReverseComplement());
 	}
-	virtual void nextPatternImpl(TStr**, String<char>**, String<char>**) = 0;
+	virtual void nextPatternImpl(String<Dna5>**, String<char>**, String<char>**) = 0;
 	virtual bool hasMorePatterns() = 0;
 	virtual bool nextIsReverseComplement() = 0;
 	virtual void reset() { }
@@ -112,7 +117,7 @@ public:
 	}
 protected:
 	virtual void dump(ostream& out,
-	                  const TStr& seq,
+	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
 	                  const String<char>& name)
 	{
@@ -120,7 +125,7 @@ protected:
 	}
 private:
 	bool _reverse;         // reverse patterns before returning them
-	TStr _revtmp;          // temporary buffer for reversed patterns
+	String<Dna5> _revtmp;  // temporary buffer for reversed patterns
 	String<char> _revqual;
 	const string _def_qual;
 	const string _def_rqual;
@@ -134,14 +139,13 @@ private:
  * implement the actual trimming - that's up to the concrete
  * descendants.
  */
-template <typename TStr>
-class TrimmingPatternSource : public PatternSource<TStr> {
+class TrimmingPatternSource : public PatternSource {
 public:
 	TrimmingPatternSource(bool __reverse = false,
 	                      const char *__dumpfile = NULL,
 	                      int __trim3 = 0,
 	                      int __trim5 = 0) :
-		PatternSource<TStr>(__reverse, __dumpfile),
+		PatternSource(__reverse, __dumpfile),
 		_trim3(__trim3),
 		_trim5(__trim5) { }
 protected:
@@ -152,8 +156,7 @@ protected:
 /**
  * Encapsualtes a source of patterns which is an in-memory vector. 
  */
-template <typename TStr>
-class VectorPatternSource : public TrimmingPatternSource<TStr> {
+class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(const vector<string>& v,
 	                    bool __revcomp = true,
@@ -162,10 +165,12 @@ public:
 	                    size_t cur = 0,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0,
-	                    int __maxNs = 9999) :
-		TrimmingPatternSource<TStr>(false, __dumpfile, __trim3, __trim5),
+		                int __policy = NS_TO_NS,
+	                    int __maxNs = 9999,
+	                    uint32_t seed = 0) :
+		TrimmingPatternSource(false, __dumpfile, __trim3, __trim5),
 		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _maxNs(__maxNs),
-		_v(), _quals(), _vrev(), _qualsrev()
+		_v(), _quals(), _vrev(), _qualsrev(), _rand(seed)
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
@@ -176,7 +181,23 @@ public:
 			string s = ss[0];
 			int ns = 0;
 			for(size_t j = 0; j < s.length(); j++) {
-				if(s[j] == 'N' || s[j] == 'n') ns++;
+				if(s[j] == 'N' || s[j] == 'n') {
+					ns++;
+					if(__policy == NS_TO_NS) {
+						// Leave c = 'N'
+					} else if(__policy == NS_TO_RANDS) {
+						switch(_rand.nextU32() & 3) {
+							case 0: s[j] = 'A'; break;
+							case 1: s[j] = 'C'; break;
+							case 2: s[j] = 'G'; break;
+							case 3: s[j] = 'T'; break;
+							default: throw;
+						}
+					} else {
+						assert_eq(NS_TO_AS, __policy);
+						s[j] = 'A';
+					}
+				}
 			}
 			if(ns > _maxNs) continue;
 			//  Initialize vq
@@ -202,11 +223,11 @@ public:
 				::reverse(_qualsrev.back());
 			}
 			if(_revcomp) {
-				_v.push_back(reverseComplement(TStr(s)));
+				_v.push_back(reverseComplement(String<Dna5>(s)));
 				_quals.push_back(vq);
 				::reverse(_quals.back());
 				{
-					_vrev.push_back(reverseComplement(TStr(s)));
+					_vrev.push_back(reverseComplement(String<Dna5>(s)));
 					::reverse(_vrev.back());
 					_qualsrev.push_back(vq);
 				}
@@ -221,7 +242,7 @@ public:
 		return _revcomp && (_cur & 1) == 1;
 	}
 	virtual ~VectorPatternSource() { }
-	virtual void nextPatternImpl(TStr** s, String<char>** qual, String<char>** name) {
+	virtual void nextPatternImpl(String<Dna5>** s, String<char>** qual, String<char>** name) {
 		assert(hasMorePatterns());
 		assert(*name == NULL);
 		if(!_reverse) {
@@ -237,7 +258,7 @@ public:
 		return _cur < _v.size();
 	}
 	virtual void reset() {
-		TrimmingPatternSource<TStr>::reset();
+		TrimmingPatternSource::reset();
 		_cur = 0;
 	}
 	virtual bool reverse() const { return _reverse; }
@@ -260,10 +281,11 @@ private:
 	bool _reverse;
 	size_t _cur;
 	int _maxNs;
-	vector<TStr>          _v;        // forward/rev-comp sequences
+	vector<String<Dna5> > _v;        // forward/rev-comp sequences
 	vector<String<char> > _quals;    // quality values parallel to _v
-	vector<TStr>          _vrev;     // reversed forward and rev-comp sequences 
+	vector<String<Dna5> > _vrev;     // reversed forward and rev-comp sequences 
 	vector<String<char> > _qualsrev; // quality values parallel to _vrev
+	RandomSource _rand;
 };
 
 /**
@@ -271,8 +293,7 @@ private:
  * returning reverse complements interspersed with forward versions of
  * patterns.
  */
-template <typename TStr>
-class BufferedFilePatternSource : public TrimmingPatternSource<TStr> {
+class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
 	BufferedFilePatternSource(const vector<string>& infiles,
 	                          bool __gz = false,
@@ -281,7 +302,7 @@ public:
 	                          const char *__dumpfile = NULL,
 	                          int __trim3 = 0,
 	                          int __trim5 = 0) :
-		TrimmingPatternSource<TStr>(__reverse, __dumpfile, __trim3, __trim5),
+		TrimmingPatternSource(__reverse, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
 		_gz(__gz),
 		_revcomp(__revcomp),
@@ -328,18 +349,18 @@ public:
 		_tmpName(_nameBuf3)
 	{
 		assert(!_gz); // omit support for gzipped formats for now
-		_setBegin(_aTStr, (Dna*)_a); _setLength(_aTStr, 0);
-		_setBegin(_aRcTStr, (Dna*)_aRc); _setLength(_aRcTStr, 0);
+		_setBegin(_aTStr, (Dna5*)_a); _setLength(_aTStr, 0);
+		_setBegin(_aRcTStr, (Dna5*)_aRc); _setLength(_aRcTStr, 0);
 		_setBegin(_aQualStr, (char*)_aQual); _setLength(_aQualStr, 0);
 		_setBegin(_aRcQualStr, (char*)_aRcQual); _setLength(_aRcQualStr, 0);
 		_setBegin(_aNameStr, (char*)_aName); _setLength(_aNameStr, 0);
-		_setBegin(_bTStr, (Dna*)_b); _setLength(_bTStr, 0);
-		_setBegin(_bRcTStr, (Dna*)_bRc); _setLength(_bRcTStr, 0);
+		_setBegin(_bTStr, (Dna5*)_b); _setLength(_bTStr, 0);
+		_setBegin(_bRcTStr, (Dna5*)_bRc); _setLength(_bRcTStr, 0);
 		_setBegin(_bQualStr, (char*)_bQual); _setLength(_bQualStr, 0);
 		_setBegin(_bRcQualStr, (char*)_bRcQual); _setLength(_bRcQualStr, 0);
 		_setBegin(_bNameStr, (char*)_bName); _setLength(_bNameStr, 0);
-		_setBegin(_tmpTStr, (Dna*)_tmp); _setLength(_tmpTStr, 0);
-		_setBegin(_tmpRcTStr, (Dna*)_tmpRc); _setLength(_tmpRcTStr, 0);
+		_setBegin(_tmpTStr, (Dna5*)_tmp); _setLength(_tmpTStr, 0);
+		_setBegin(_tmpRcTStr, (Dna5*)_tmpRc); _setLength(_tmpRcTStr, 0);
 		_setBegin(_tmpQualStr, (char*)_tmpQual); _setLength(_tmpQualStr, 0);
 		_setBegin(_tmpRcQualStr, (char*)_tmpRcQual); _setLength(_tmpRcQualStr, 0);
 		_setBegin(_tmpNameStr, (char*)_tmpName); _setLength(_tmpNameStr, 0);
@@ -353,7 +374,7 @@ public:
 			fclose(_in);
 	}
 	/// Return the next pattern from the file
-	virtual void nextPatternImpl(TStr** s,
+	virtual void nextPatternImpl(String<Dna5>** s,
 	                             String<char>** qual,
 	                             String<char>** name)
 	{
@@ -385,7 +406,7 @@ public:
 	/// Reset state so that we read start reading again from the
 	/// beginning of the first file
 	virtual void reset() {
-		TrimmingPatternSource<TStr>::reset();
+		TrimmingPatternSource::reset();
 		// Close current file
 		//if(_gz)
 		//	gzclose(_gzin);
@@ -406,9 +427,9 @@ protected:
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
 	virtual void read(char* dst,      // destination buf for sequence
-	                  TStr& dstTStr,  // destination TStr for sequence
+	                  String<Dna5>& dstTStr,  // destination TStr for sequence
 	                  char* rcDst,    // destination buf for reverse-comp of dst
-	                  TStr& rcDstTStr,// destination TStr for reverse-comp of dst
+	                  String<Dna5>& rcDstTStr,// destination TStr for reverse-comp of dst
 	                  char* qual,     // destination buf for qualities
 	                  String<char>& qualStr, // destination String for qualities
 	                  char* rcQual,   // destination buf for reverse-comp qualities
@@ -436,8 +457,8 @@ protected:
 			tmpQual   = _aQual;
 			tmpRcQual = _aRcQual;
 			tmpName   = _aName; 
-			_a       = _tmp;       _setBegin(_aTStr,      (Dna*)begin(_tmpTStr));
-			_aRc     = _tmpRc;     _setBegin(_aRcTStr,    (Dna*)begin(_tmpRcTStr));
+			_a       = _tmp;       _setBegin(_aTStr,      (Dna5*)begin(_tmpTStr));
+			_aRc     = _tmpRc;     _setBegin(_aRcTStr,    (Dna5*)begin(_tmpRcTStr));
 			_aQual   = _tmpQual;   _setBegin(_aQualStr,   (char*)begin(_tmpQualStr));
 			_aRcQual = _tmpRcQual; _setBegin(_aRcQualStr, (char*)begin(_tmpRcQualStr));
 			_aName   = _tmpName;   _setBegin(_aNameStr,   (char*)begin(_tmpNameStr));
@@ -454,8 +475,8 @@ protected:
 			tmpQual   = _bQual;
 			tmpRcQual = _bRcQual;
 			tmpName   = _bName;
-			_b       = _tmp;       _setBegin(_bTStr,      (Dna*)begin(_tmpTStr));
-			_bRc     = _tmpRc;     _setBegin(_bRcTStr,    (Dna*)begin(_tmpRcTStr));
+			_b       = _tmp;       _setBegin(_bTStr,      (Dna5*)begin(_tmpTStr));
+			_bRc     = _tmpRc;     _setBegin(_bRcTStr,    (Dna5*)begin(_tmpRcTStr));
 			_bQual   = _tmpQual;   _setBegin(_bQualStr,   (char*)begin(_tmpQualStr));
 			_bRcQual = _tmpRcQual; _setBegin(_bRcQualStr, (char*)begin(_tmpRcQualStr));
 			_bName   = _tmpName;   _setBegin(_bNameStr,   (char*)begin(_tmpNameStr));
@@ -467,12 +488,7 @@ protected:
 			_bNameLen = _tmpNameLen;
 			_setLength(_bNameStr, _bNameLen);
 		}
-		//_tmp = tmp; _setBegin(_tmpTStr, (Dna*)_tmp);
-		//_tmpRc = tmpRc; _setBegin(_tmpRcTStr, (Dna*)_tmpRc);
-		//_tmpQual = tmpQual; _setBegin(_tmpQualStr, (char*)_tmpQual);
-		//_tmpRcQual = tmpRcQual; _setBegin(_tmpRcQualStr, (char*)_tmpRcQual);
 		_tmpLen = 0; // clear
-		//_tmpName = tmpName; _setBegin(_tmpNameStr, (char*)_tmpName);
 		_tmpNameLen = 0; // clear
 	}
 	
@@ -480,7 +496,7 @@ protected:
 	char *cur() {
 		return _aCur? _a : _b;
 	}
-	TStr *curStr() {
+	String<Dna5> *curStr() {
 		return _aCur? &_aTStr : &_bTStr;
 	}
 	/// Return "current" reverse-complemented pattern
@@ -491,7 +507,7 @@ protected:
 			return NULL;
 		}
 	}
-	TStr *curRcStr() {
+	String<Dna5> *curRcStr() {
 		if(_revcomp) {
 			return _aCur? &_aRcTStr : &_bRcTStr;
 		} else {
@@ -556,7 +572,7 @@ protected:
 		}
 	}
 	/// Read in next pattern
-	virtual void readNext(TStr** s, String<char>** qual, String<char>** name) {
+	virtual void readNext(String<Dna5>** s, String<char>** qual, String<char>** name) {
 		(*s)    = curStr();
 		(*qual) = curQualStr();
 		(*name) = curNameStr();
@@ -636,8 +652,8 @@ protected:
 
 	// Pattern a
 	size_t _aLen;
-	TStr   _aTStr;         // host is set to _a
-	TStr   _aRcTStr;       // host is set to _aRc
+	String<Dna5>   _aTStr;         // host is set to _a
+	String<Dna5>   _aRcTStr;       // host is set to _aRc
 	String<char> _aQualStr;
 	String<char> _aRcQualStr;
 	size_t       _aNameLen;      // length of read name
@@ -645,8 +661,8 @@ protected:
 	
 	// Pattern b
 	size_t _bLen;
-	TStr   _bTStr;         // host is set to _b
-	TStr   _bRcTStr;       // host is set to _bRc
+	String<Dna5>   _bTStr;         // host is set to _b
+	String<Dna5>   _bRcTStr;       // host is set to _bRc
 	String<char> _bQualStr;
 	String<char> _bRcQualStr;
 	size_t       _bNameLen;      // length of read name
@@ -654,8 +670,8 @@ protected:
 	
 	// Pattern tmp (for hasMorePatterns())
 	size_t _tmpLen;
-	TStr   _tmpTStr;
-	TStr   _tmpRcTStr;
+	String<Dna5>   _tmpTStr;
+	String<Dna5>   _tmpRcTStr;
 	String<char> _tmpQualStr;
 	String<char> _tmpRcQualStr;
 	size_t _tmpNameLen;
@@ -699,14 +715,13 @@ private:
 	char _buf[256 * 1024]; // (large) input buffer
 };
 
-
-static uint8_t charToDna[] = {
+static uint8_t charToDna5[] = {
 	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  64 */ 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0,
-	       /*    A     C           G */              
+	/*  64 */ 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0,
+	       /*    A     C           G                    N */
 	/*  80 */ 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	       /*             T */
 	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -721,13 +736,13 @@ static uint8_t charToDna[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-static uint8_t rcCharToDna[] = {
+static uint8_t rcCharToDna5[] = {
 	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  64 */ 0, 3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-	       /*    A     C           G */              
+	/*  64 */ 0, 3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 4, 0,
+	       /*    A     C           G                    N */
 	/*  80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	       /*             T */
 	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -747,25 +762,25 @@ char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 /**
  * 
  */
-template <typename TStr>
-class FastaPatternSource : public BufferedFilePatternSource<TStr> {
+class FastaPatternSource : public BufferedFilePatternSource {
 public:
-	typedef typename Value<TStr>::Type TVal;
 	FastaPatternSource(const vector<string>& infiles,
 	                   bool __revcomp = true,
 	                   bool __reverse = false,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
-	                   int __maxNs = 9999) :
-		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _maxNs(__maxNs)
+	                   int __policy = NS_TO_NS,
+	                   int __maxNs = 9999,
+	                   uint32_t seed = 0) :
+		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{
 		assert(this->hasMorePatterns());
 	}
 	virtual void reset() {
 		_first = true;
-		BufferedFilePatternSource<TStr>::reset();
+		BufferedFilePatternSource::reset();
 	}
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
@@ -776,9 +791,9 @@ protected:
 	/// Read another pattern from a FASTA input file
 	// TODO: store default qualities in qual
 	virtual void read(char* dst,
-	                  TStr& dstTStr,
+	                  String<Dna5>& dstTStr,
 	                  char *rcDst,
-	                  TStr& rcDstTStr,
+	                  String<Dna5>& rcDstTStr,
 	                  char* qual,
 	                  String<char>& qualTStr,
 	                  char* rcQual,
@@ -834,21 +849,34 @@ protected:
 					if(isalpha(c) && begin++ >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							ns++;
-							c = 'A';
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								switch(_rand.nextU32() & 3) {
+									case 0: c = 'A'; break;
+									case 1: c = 'C'; break;
+									case 2: c = 'G'; break;
+									case 3: c = 'T'; break;
+									default: throw;
+								}
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
 						}
-						dst[(*dstLen)] = charToDna[c];
-						rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+						dst[(*dstLen)] = charToDna5[c];
+						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
 						(*dstLen)++;
 					}
 					if((c = fgetc(this->_in)) < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
-				_setBegin(dstTStr, (Dna*)dst);
+				_setBegin(dstTStr, (Dna5*)dst);
 				_setLength(dstTStr, (*dstLen));
 				_setBegin(qualTStr,qualDefault);
 				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
 					_setLength(rcDstTStr, (*dstLen));
 					_setBegin(rcQualTStr,qualDefault);
 					_setLength(rcQualTStr,(*dstLen));
@@ -860,21 +888,34 @@ protected:
 					if(isalpha(c) && begin++ >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							ns++;
-							c = 'A';
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								switch(_rand.nextU32() & 3) {
+									case 0: c = 'A'; break;
+									case 1: c = 'C'; break;
+									case 2: c = 'G'; break;
+									case 3: c = 'T'; break;
+									default: throw;
+								}
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
 						}
-						dst[1024-(*dstLen)-1] = charToDna[c];
-						rcDst[(*dstLen)] = rcCharToDna[c];
+						dst[1024-(*dstLen)-1] = charToDna5[c];
+						rcDst[(*dstLen)] = rcCharToDna5[c];
 						(*dstLen)++;
 					}
 					if((c = fgetc(this->_in)) < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
-				_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
 				_setBegin(qualTStr,qualDefault);
 				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna*)rcDst);
+					_setBegin(rcDstTStr, (Dna5*)rcDst);
 					_setLength(rcDstTStr, (*dstLen));
 					_setBegin(rcQualTStr,qualDefault);
 					_setLength(rcQualTStr,(*dstLen));
@@ -886,7 +927,7 @@ protected:
 		_first = true;
 	}
 	virtual void dump(ostream& out,
-	                  const TStr& seq,
+	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
 	                  const String<char>& name)
 	{
@@ -895,27 +936,30 @@ protected:
 private:
 	bool _first;
 	bool _reverse;
+	int _policy;
 	int _maxNs;
+	RandomSource _rand;
 };
 
 /**
  * Read a FASTQ-format file.
  * See: http://maq.sourceforge.net/fastq.shtml
  */
-template <typename TStr>
-class FastqPatternSource : public BufferedFilePatternSource<TStr> {
+class FastqPatternSource : public BufferedFilePatternSource {
 public:
-	typedef typename Value<TStr>::Type TVal;
 	FastqPatternSource(const vector<string>& infiles,
 	                   bool __revcomp = true,
 	                   bool __reverse = false,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
+	                   int __policy = NS_TO_NS,
 					   bool solexa_quals = false,
-					   int __maxNs = 9999) :
-		BufferedFilePatternSource<TStr>(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals), _maxNs(__maxNs)
+					   int __maxNs = 9999,
+	                   uint32_t seed = 0) :
+		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals),
+		_policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{
 		assert(this->hasMorePatterns());
 		
@@ -927,7 +971,7 @@ public:
 	}
 	virtual void reset() {
 		_first = true;
-		BufferedFilePatternSource<TStr>::reset();
+		BufferedFilePatternSource::reset();
 	}
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
@@ -950,9 +994,9 @@ protected:
 	}
 	/// Read another pattern from a FASTQ input file
 	virtual void read(char* dst,
-	                  TStr& dstTStr,
+	                  String<Dna5>& dstTStr,
 	                  char *rcDst,
-	                  TStr& rcDstTStr,
+	                  String<Dna5>& rcDstTStr,
 	                  char* qual,
 	                  String<char>& qualTStr,
 	                  char* rcQual,
@@ -1006,20 +1050,33 @@ protected:
 					if(isalpha(c) && charsRead >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							ns++;
-							c = 'A';
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								switch(_rand.nextU32() & 3) {
+									case 0: c = 'A'; break;
+									case 1: c = 'C'; break;
+									case 2: c = 'G'; break;
+									case 3: c = 'T'; break;
+									default: throw;
+								}
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
 						}
-						dst[(*dstLen)] = charToDna[c];
-						rcDst[1024-(*dstLen)-1] = rcCharToDna[c];
+						dst[(*dstLen)] = charToDna5[c];
+						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
 						charsRead++; (*dstLen)++;
 					}
 					c = fgetc(this->_in);
 					if(c < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
-				_setBegin(dstTStr, (Dna*)dst);
+				_setBegin(dstTStr, (Dna5*)dst);
 				_setLength(dstTStr, (*dstLen));
 				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna*)&rcDst[1024-(*dstLen)]);
+					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
 					_setLength(rcDstTStr, (*dstLen));
 				}
 			} else {
@@ -1027,20 +1084,33 @@ protected:
 					if(isalpha(c) && charsRead >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							ns++;
-							c = 'A';
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								switch(_rand.nextU32() & 3) {
+									case 0: c = 'A'; break;
+									case 1: c = 'C'; break;
+									case 2: c = 'G'; break;
+									case 3: c = 'T'; break;
+									default: throw;
+								}
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
 						}
-						dst[1024-(*dstLen)-1] = charToDna[c];
-						rcDst[(*dstLen)] = rcCharToDna[c];
+						dst[1024-(*dstLen)-1] = charToDna5[c];
+						rcDst[(*dstLen)] = rcCharToDna5[c];
 						charsRead++; (*dstLen)++;
 					}
 					c = fgetc(this->_in);
 					if(c < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
-				_setBegin(dstTStr, (Dna*)&dst[1024-(*dstLen)]);
+				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
 				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna*)rcDst);
+					_setBegin(rcDstTStr, (Dna5*)rcDst);
 					_setLength(rcDstTStr, (*dstLen));
 				}
 			}
@@ -1053,11 +1123,6 @@ protected:
 	
 			// Now read the qualities
 			size_t qualsRead = 0;
-			
-			//Move to the line after the + line, which has the qualities
-	//		while(c == '\n' && c == '\r'){
-	//			c = fgetc(this->_in); if(feof(this->_in)) return;
-	//		} 
 			
 			//qual->clear();
 			if (_solexa_quals)
@@ -1193,7 +1258,7 @@ protected:
 		_first = true;
 	}
 	virtual void dump(ostream& out,
-	                  const TStr& seq,
+	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
 	                  const String<char>& name)
 	{
@@ -1203,8 +1268,10 @@ private:
 	bool _first;
 	bool _reverse;
 	bool _solexa_quals;
+	int _policy;
 	int _maxNs;
 	int _table[128];
+	RandomSource _rand;
 };
 
 #endif /*PAT_H_*/
