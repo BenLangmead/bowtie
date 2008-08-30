@@ -1540,7 +1540,7 @@ public:
 	/// Get char at a query position
 	int chr(uint32_t qidx) const {
 		assert(!qExhausted());
-		int c = (Dna5)(*_query)[qidx];
+		int c = (int)(*_query)[qidx];
 		assert_leq(c, 4);  // for sanity
 		assert_geq(c, 0); // for sanity
 		return c;
@@ -2432,7 +2432,7 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
                                    ASSERT_ONLY(, bool overrideSanity)) const
 {
 	uint32_t ret;
-	if(unpack_2b_from_8b(l._side[l._by], l._bp) != c) { // L2 miss?
+	if(c == 4 || unpack_2b_from_8b(l._side[l._by], l._bp) != c) { // L2 miss?
 		return 0xffffffff;
 	}
 	assert_lt(c, 4);
@@ -2854,10 +2854,17 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 	int ftabChars = this->_eh._ftabChars;
 	assert_geq(s.qlen(), (unsigned int)ftabChars);
 	// Rightmost char gets least significant bit-pair
-	const TStr& qry = s.query();
+	const String<Dna5>& qry = s.query();
+#ifndef NDEBUG
+	for(int i = 0; i < ftabChars; i++) {
+		assert_neq(4, (int)(Dna5)qry[s.qlen()-i]);
+	}
+#endif
 	uint32_t ftabOff = qry[s.qlen() - ftabChars];
+	assert_lt(ftabOff, 4);
 	for(int i = ftabChars - 1; i > 0; i--) {
 		ftabOff <<= 2;
+		assert_lt((int)(TVal)qry[s.qlen()-i], 4);
 		ftabOff |= (int)(TVal)qry[s.qlen()-i];
 	}
 	assert_lt(ftabOff, this->_eh._ftabLen-1);
@@ -2897,7 +2904,18 @@ void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
 	   (!inexact ||
 	    (unsigned int)this->_eh._ftabChars <= (s.qlen()>>1)))
 	{
-		searchWithFtab(s);
+		bool useFtab = true;
+		for(int i = 0; i < this->_eh._ftabChars; i++) {
+			if(((int)(Dna5)s.query()[s.qlen()-i]) == 4) {
+				useFtab = false;
+				break;
+			}
+		}
+		if(useFtab) {
+			searchWithFtab(s);
+		} else {
+			searchWithFchr(s);
+		}
 	} else {
 		searchWithFchr(s);
 	}

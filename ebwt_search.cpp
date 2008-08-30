@@ -391,7 +391,6 @@ static bool findSanityHits(const String<Dna5>& pat,
                            bool allowExact,
                            bool transpose)
 {
-	typedef typename Value<TStr>::Type TVal;
 	bool ebwtFw = !transpose;
 	bool fivePrimeOnLeft = (ebwtFw == fw);
     uint32_t plen = length(pat);
@@ -401,7 +400,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 	if(!transpose) bump = 1;
 	// Grab the unrevisitable region of pat
 	for(size_t i = ((plen+bump)>>1); i < plen; i++) {
-		appendValue(half, (TVal)pat[i]);
+		appendValue(half, (Dna5)pat[i]);
 	}
     uint32_t hlen = length(half); // length of seed (right) half
     assert_leq(hlen, plen);
@@ -412,7 +411,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 		String<Dna5> o = os[i];
 		if(transpose) {
 			for(size_t j = 0; j < length(o)>>1; j++) {
-				TVal tmp = o[j];
+				Dna5 tmp = o[j];
 				o[j] = o[length(o)-j-1];
 				o[length(o)-j-1] = tmp;
 			}
@@ -425,7 +424,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 				// Extend toward the left end of the pattern, counting
 				// mismatches
 				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
-					if(o[pos-j-1] != pat[ohlen-j-1]) {
+					if((int)o[pos-j-1] != (int)pat[ohlen-j-1]) {
 						uint32_t off = ohlen-j-1;
 						if(fivePrimeOnLeft) {
 							diffs.set(off);
