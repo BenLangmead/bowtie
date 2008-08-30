@@ -56,7 +56,7 @@ static inline void swap(TVal* s, size_t slen, TPos a, TPos b) {
  * two different seqan::Strings s and s2.  This is a helpful variant
  * if, for example, the caller would like to see how their input was
  * permuted by the sort routine (in that case, the caller would let s2
- * be an array s2[] where s2 is the same length as s and s2[i] = i). 
+ * be an array s2[] where s2 is the same length as s and s2[i] = i).
  */
 #define SWAP2(s, s2, a, b) { \
 	SWAP(s, a, b); \
@@ -363,7 +363,7 @@ void mkeyQSort(TStr& s, int hi, size_t begin, size_t end, size_t depth) {
 	r = b-a; // r <- # of <'s
 	MQS_RECURSE(begin, begin + r, depth); // recurse on <'s
 	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted 
+	// they're already fully sorted
 	if(v != hi) {
 		MQS_RECURSE(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
 	}
@@ -557,60 +557,11 @@ void sanityCheckOrderedSufs(const T& host,
 }
 
 /**
- * Toplevel function for multikey quicksort over suffixes.
- */
-template<typename T>
-void mkeyQSortSuf(const T& host,
-                  uint32_t *s,
-                  size_t slen,
-                  int hi,
-                  bool verbose = false,
-                  bool sanityCheck = false,
-                  size_t upto = 0xffffffff)
-{
-	size_t hlen = length(host);
-	assert(!empty(s));
-	if(sanityCheck) sanityCheckInputSufs(s, slen);
-	mkeyQSortSuf(host, hlen, s, slen, hi, 0, slen, 0, upto);
-	if(sanityCheck) sanityCheckOrderedSufs(host, hlen, s, slen, upto);
-}
-
-/**
- * Toplevel function for multikey quicksort over suffixes with double
- * swapping.
- */
-template<typename T>
-void mkeyQSortSuf2(const T& host,
-                   uint32_t *s,
-                   size_t slen,
-                   uint32_t *s2,
-                   int hi,
-                   bool verbose = false,
-                   bool sanityCheck = false,
-                   size_t upto = 0xffffffff)
-{
-	size_t hlen = length(host);
-	if(sanityCheck) sanityCheckInputSufs(s, slen);
-	uint32_t *sOrig = NULL;
-	if(sanityCheck) {
-		sOrig = new uint32_t[slen];
-		memcpy(sOrig, s, 4 * slen);
-	}
-	mkeyQSortSuf2(host, hlen, s, slen, s2, hi, 0, slen, 0, upto);
-	if(sanityCheck) {
-		sanityCheckOrderedSufs(host, hlen, s, slen, upto);
-		for(size_t i = 0; i < slen; i++) {
-			assert_eq(s[i], sOrig[s2[i]]);
-		}
-	}
-}
-
-/**
  * Main multikey quicksort function for suffixes.  Based on Bentley &
  * Sedgewick's algorithm on p.5 of their paper "Fast Algorithms for
  * Sorting and Searching Strings".  That algorithm has been extended in
- * three ways: 
- * 
+ * three ways:
+ *
  *  1. Deal with keys of different lengths by checking bounds and
  *     considering off-the-end values to be 'hi' (b/c our goal is the
  *     BWT transform, we're biased toward considring prefixes as
@@ -623,7 +574,7 @@ void mkeyQSortSuf2(const T& host,
  *     information for each string.
  *  3. Sorting functions take an extra "upto" parameter that upper-
  *     bounds the depth to which the function sorts.
- * 
+ *
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
@@ -706,7 +657,7 @@ void mkeyQSortSuf(const T& host,
 		MQS_RECURSE_SUF(begin, begin + r, depth); // recurse on <'s
 	}
 	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted 
+	// they're already fully sorted
 	if(v != hi) {
 		MQS_RECURSE_SUF(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
 	}
@@ -717,11 +668,30 @@ void mkeyQSortSuf(const T& host,
 }
 
 /**
+ * Toplevel function for multikey quicksort over suffixes.
+ */
+template<typename T>
+void mkeyQSortSuf(const T& host,
+                  uint32_t *s,
+                  size_t slen,
+                  int hi,
+                  bool verbose = false,
+                  bool sanityCheck = false,
+                  size_t upto = 0xffffffff)
+{
+	size_t hlen = length(host);
+	assert(!empty(s));
+	if(sanityCheck) sanityCheckInputSufs(s, slen);
+	mkeyQSortSuf(host, hlen, s, slen, hi, (size_t)0, slen, (size_t)0, upto);
+	if(sanityCheck) sanityCheckOrderedSufs(host, hlen, s, slen, upto);
+}
+
+/**
  * Just like mkeyQSortSuf but all swaps are applied to s2 as well as s.
  * This is a helpful variant if, for example, the caller would like to
  * see how their input was permuted by the sort routine (in that case,
  * the caller would let s2 be an array s2[] where s2 is the same length
- * as s and s2[i] = i). 
+ * as s and s2[i] = i).
  */
 template<typename T>
 void mkeyQSortSuf2(const T& host,
@@ -804,13 +774,43 @@ void mkeyQSortSuf2(const T& host,
 		MQS_RECURSE_SUF_DS(begin, begin + r, depth); // recurse on <'s
 	}
 	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted 
+	// they're already fully sorted
 	if(v != hi) {
 		MQS_RECURSE_SUF_DS(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
 	}
 	r = d-c;   // r <- # of >'s excluding those exhausted
 	if(r > 0 && v < hi-1) {
 		MQS_RECURSE_SUF_DS(end-r, end, depth); // recurse on >'s
+	}
+}
+
+/**
+ * Toplevel function for multikey quicksort over suffixes with double
+ * swapping.
+ */
+template<typename T>
+void mkeyQSortSuf2(const T& host,
+                   uint32_t *s,
+                   size_t slen,
+                   uint32_t *s2,
+                   int hi,
+                   bool verbose = false,
+                   bool sanityCheck = false,
+                   size_t upto = 0xffffffff)
+{
+	size_t hlen = length(host);
+	if(sanityCheck) sanityCheckInputSufs(s, slen);
+	uint32_t *sOrig = NULL;
+	if(sanityCheck) {
+		sOrig = new uint32_t[slen];
+		memcpy(sOrig, s, 4 * slen);
+	}
+	mkeyQSortSuf2(host, hlen, s, slen, s2, hi, (size_t)0, slen, (size_t)0, upto);
+	if(sanityCheck) {
+		sanityCheckOrderedSufs(host, hlen, s, slen, upto);
+		for(size_t i = 0; i < slen; i++) {
+			assert_eq(s[i], sOrig[s2[i]]);
+		}
 	}
 }
 
@@ -909,8 +909,8 @@ void qsortSufDc(const T& host,
  * Main multikey quicksort function for suffixes.  Based on Bentley &
  * Sedgewick's algorithm on p.5 of their paper "Fast Algorithms for
  * Sorting and Searching Strings".  That algorithm has been extended in
- * three ways: 
- * 
+ * three ways:
+ *
  *  1. Deal with keys of different lengths by checking bounds and
  *     considering off-the-end values to be 'hi' (b/c our goal is the
  *     BWT transform, we're biased toward considring prefixes as
@@ -923,7 +923,7 @@ void qsortSufDc(const T& host,
  *     information for each string.
  *  3. Sorting functions take an extra "upto" parameter that upper-
  *     bounds the depth to which the function sorts.
- * 
+ *
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
@@ -1009,7 +1009,7 @@ void mkeyQSortSufDc(const T& host,
 		MQS_RECURSE_SUF_DC(begin, begin + r, depth); // recurse on <'s
 	}
 	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted 
+	// they're already fully sorted
 	if(v != hi) {
 		MQS_RECURSE_SUF_DC(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
 	}
@@ -1223,7 +1223,7 @@ static void selectionSortSufDcU8(
 			}
 			// The jth suffix was equal to the current smallest suffix
 			// up to the difference-cover period, so disambiguate with
-			// difference cover 
+			// difference cover
 			if(k == lim+1) {
 				assert_neq(j, targ);
 				if(sufDcLtU8(seqanHost, host, hlen, s[j], s[targ], dc, sanityCheck)) {
@@ -1362,8 +1362,8 @@ static void bucketSortSufDcU8(
  * Main multikey quicksort function for suffixes.  Based on Bentley &
  * Sedgewick's algorithm on p.5 of their paper "Fast Algorithms for
  * Sorting and Searching Strings".  That algorithm has been extended in
- * three ways: 
- * 
+ * three ways:
+ *
  *  1. Deal with keys of different lengths by checking bounds and
  *     considering off-the-end values to be 'hi' (b/c our goal is the
  *     BWT transform, we're biased toward considring prefixes as
@@ -1376,7 +1376,7 @@ static void bucketSortSufDcU8(
  *     information for each string.
  *  3. Sorting functions take an extra "upto" parameter that upper-
  *     bounds the depth to which the function sorts.
- * 
+ *
  * TODO: Consult a tie-breaker (like a difference cover sample) if two
  * keys share a long prefix.
  */
@@ -1458,7 +1458,7 @@ void mkeyQSortSufDcU8(const T1& seqanHost,
 				SWAP(s, c, d); d--;
 			}
 			else if(hiLatch && cc == hi) {
-				
+
 			}
 			c--;
 		}
@@ -1479,7 +1479,7 @@ void mkeyQSortSufDcU8(const T1& seqanHost,
 		MQS_RECURSE_SUF_DC_U8(begin, begin + r, depth); // recurse on <'s
 	}
 	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted 
+	// they're already fully sorted
 	if(v != hi) {
 		MQS_RECURSE_SUF_DC_U8(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
 	}
