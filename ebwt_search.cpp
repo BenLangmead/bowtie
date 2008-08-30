@@ -52,7 +52,7 @@ static int maxBts               = 75; // max # backtracks allowed in half-and-ha
 static int maxNs                = 9999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 
-static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:";
+static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:w:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -88,6 +88,7 @@ static struct option long_options[] = {
 	{"reportopps",   no_argument,       &reportOpps,  1},
 	{"version",      no_argument,       &showVersion, 1},
 	{"maq",          no_argument,       &maqLike,     1},
+	{"ntoa",         no_argument,       &nsPolicy,    NS_TO_AS},
 	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{"revcomp",      no_argument,       0,            'r'},
 	{"maqerr",       required_argument, 0,            'e'},
@@ -126,6 +127,7 @@ static void printUsage(ostream& out) {
 	    //<< "  -b/--binout        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
+		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
 	    //<< "  --qsamelen         die with error if queries don't all have the same length" << endl
@@ -1302,7 +1304,7 @@ static void seededQualCutoffSearch(
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
-        PatternSource& patsrc,    /// pattern source
+        PatternSource& patsrc,          /// pattern source
         HitSink& sink,                  /// hit sink
         EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         EbwtSearchParams<TStr>& params, /// search parameters
