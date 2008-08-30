@@ -50,6 +50,7 @@ static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 75; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 9999; // max # Ns allowed in read
+static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 
 static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:";
 
@@ -1336,6 +1337,26 @@ static void seededQualCutoffSearch(
 				if(lastLen == 0) lastLen = plen;
 				else assert_eq(lastLen, plen);
 			}
+	    	// Check and see if the distribution of Ns disqualifies
+	    	// this read right off the bat
+			if(nsPolicy == NS_TO_NS) {
+				size_t slen = min<size_t>(plen, seedLen);
+				int ns = 0;
+				bool done = false;
+				for(size_t i = 0; i < slen; i++) {
+					if((int)(Dna5)(*patFw)[slen-i-1] == 4) {
+						if(++ns > seedMms) {
+							done = true;
+							break;
+						}
+					}
+				}
+				if(done) {
+					doneMask[patid>>1] = true;
+					patid += 2;
+					continue;
+				}
+			}
 			// Do an exact-match search on the forward pattern, just in
 			// case we can pick it off early here
 			uint64_t numHits = sink.numHits();
@@ -2222,22 +2243,25 @@ static void driver(const char * type,
 	srand(seed);
 	// Create a pattern source for the queries
 	PatternSource *patsrc = NULL;
+	if(nsPolicy == NS_TO_NS && !maqLike) {
+		maxNs = min<int>(maxNs, mismatches);
+	}
 	switch(format) {
 		case FASTA:
 			patsrc = new FastaPatternSource (queries, revcomp, false,
 			                                 patDumpfile, trim3, trim5,
-			                                 NS_TO_NS, maxNs);
+			                                 nsPolicy, maxNs);
 			break;
 		case FASTQ:
 			patsrc = new FastqPatternSource (queries, revcomp, false,
 			                                 patDumpfile, trim3, trim5,
-			                                 NS_TO_NS, solexa_quals,
+			                                 nsPolicy, solexa_quals,
 			                                 maxNs);
 			break;
 		case CMDLINE:
 			patsrc = new VectorPatternSource(queries, revcomp, false,
 			                                 patDumpfile, 0, trim3,
-			                                 trim5, NS_TO_NS, maxNs);
+			                                 trim5, nsPolicy, maxNs);
 			break;
 		default: assert(false);
 	}
