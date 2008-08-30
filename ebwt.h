@@ -2860,7 +2860,7 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 	const String<Dna5>& qry = s.query();
 #ifndef NDEBUG
 	for(int i = 0; i < ftabChars; i++) {
-		assert_neq(4, (int)(Dna5)qry[s.qlen()-i]);
+		assert_neq(4, (int)(Dna5)qry[s.qlen()-i-1]);
 	}
 #endif
 	uint32_t ftabOff = qry[s.qlen() - ftabChars];
@@ -2913,7 +2913,7 @@ void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
 	{
 		bool useFtab = true;
 		for(int i = 0; i < this->_eh._ftabChars; i++) {
-			if(((int)(Dna5)s.query()[s.qlen()-i]) == 4) {
+			if(((int)(Dna5)s.query()[s.qlen()-i-1]) == 4) {
 				useFtab = false;
 				break;
 			}
