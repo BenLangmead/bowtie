@@ -979,7 +979,7 @@ static void twoOrThreeMismatchSearch(
 	SWITCH_TO_BW_INDEX();
 	{
 		Timer _t(cout, "End-to-end 2-mismatch Phase 2: ", timing);
-		
+
 		BacktrackManager<TStr> bt(ebwtBw, params,
 		                          0, 0,                  // 5, 3depth
 		                          0,                     // unrevOff
@@ -2224,9 +2224,22 @@ static void driver(const char * type,
 	// Create a pattern source for the queries
 	PatternSource *patsrc = NULL;
 	switch(format) {
-		case FASTA:   patsrc = new FastaPatternSource (queries, revcomp, false, patDumpfile, trim3, trim5, NS_TO_AS, maxNs); break;
-		case FASTQ:   patsrc = new FastqPatternSource (queries, revcomp, false, patDumpfile, trim3, trim5, NS_TO_AS, solexa_quals, maxNs); break;
-		case CMDLINE: patsrc = new VectorPatternSource(queries, revcomp, false, patDumpfile, 0, trim3, trim5, NS_TO_AS, maxNs); break;
+		case FASTA:
+			patsrc = new FastaPatternSource (queries, revcomp, false,
+			                                 patDumpfile, trim3, trim5,
+			                                 NS_TO_NS, maxNs);
+			break;
+		case FASTQ:
+			patsrc = new FastqPatternSource (queries, revcomp, false,
+			                                 patDumpfile, trim3, trim5,
+			                                 NS_TO_NS, solexa_quals,
+			                                 maxNs);
+			break;
+		case CMDLINE:
+			patsrc = new VectorPatternSource(queries, revcomp, false,
+			                                 patDumpfile, 0, trim3,
+			                                 trim5, NS_TO_NS, maxNs);
+			break;
 		default: assert(false);
 	}
 	// Check that input is non-empty

@@ -11,7 +11,7 @@ struct QueryMutation {
 		pos(_pos), oldBase(_oldBase), newBase(_newBase)
 	{
 		assert_neq(oldBase, newBase);
-		assert_lt(oldBase, 4);
+		assert_leq(oldBase, 4);
 		assert_lt(newBase, 4);
 	}
 	uint8_t pos;
@@ -55,7 +55,7 @@ static unsigned char qualRounds[] = {
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
  * some range of a read sequence.
- * 
+ *
  * The creator can configure the BacktrackManager to treat different
  * stretches of the read differently.
  */
@@ -157,6 +157,7 @@ public:
  	 		_maxStackDepth = length(*_qry) - min<uint32_t>(_unrevOff, length(*_qry)) + 3 + 1;
  	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
  	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
+ 	 		memset(_elims, 0, DEFAULT_SPREAD*_maxStackDepth);
  			if(_muts != NULL) {
  				applyMutations();
  			}
@@ -190,7 +191,7 @@ public:
 	#define PHRED_QUAL2(q, k) ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
 	#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
 	#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
-	
+
 	void setQuery(String<Dna5>* __qry,
 	              String<char>* __qual,
 	              String<char>* __name,
@@ -211,7 +212,7 @@ public:
 		_qlen = length(*_qry);
 		_spread = _qlen;
 		assert_leq(_spread, DEFAULT_SPREAD);
-		
+
 		if(_qual == NULL || empty(*_qual)) {
 			_qual = &_qualDefault;
 		}
@@ -229,6 +230,7 @@ public:
  		}
  		if(_elims == NULL) {
  			_elims = new uint8_t[DEFAULT_SPREAD*_maxStackDepth];
+ 			memset(_elims, 0, DEFAULT_SPREAD*_maxStackDepth);
  		}
 		if(_verbose) {
 			String<char> qual = (*_qual);
@@ -238,7 +240,7 @@ public:
 			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << qual << ")" << endl;
 		}
 	}
-	
+
 	void setMuts(String<QueryMutation>* __muts) {
 		if(_muts != NULL) {
 			// Undo previous mutations
@@ -251,7 +253,7 @@ public:
 			applyMutations();
 		}
 	}
-	
+
 	void setOffs(uint32_t __5depth,
 	             uint32_t __3depth,
 	             uint32_t __unrevOff,
@@ -267,7 +269,7 @@ public:
 		_2revOff  = __2revOff;
 		_3revOff  = __3revOff;
 	}
-	
+
 	/**
 	 * Set the depth before which no backtracks are allowed.
 	 */
@@ -282,7 +284,7 @@ public:
 		_1revOff = oneRevOff;
 		return tmp;
 	}
-	
+
 	uint32_t set3Depth(uint32_t __3depth) {
 		uint32_t tmp = _3depth;
 		_3depth = __3depth;
@@ -305,7 +307,7 @@ public:
 	void resetHighStackDepth() {
 		_hiDepth = 0;
 	}
-	
+
 	/// Return greatest observed stack depth since last reset
 	uint32_t highStackDepth() {
 		return _hiDepth;
@@ -315,7 +317,7 @@ public:
 	void resetNumBacktracks() {
 		_totNumBts = 0;
 	}
-	
+
 	/// Return number of backtracks since last reset
 	uint32_t numBacktracks() {
 		return _totNumBts;
@@ -329,7 +331,7 @@ public:
 		assert(_qry != NULL);
 		_qlen = min<uint32_t>(length(*_qry), qlen);
 	}
-	
+
 	/// Return the maximum number of allowed backtracks in a given call
 	/// to backtrack()
 	uint32_t maxBacktracks() {
@@ -422,16 +424,18 @@ public:
 			                 0,   // top
 			                 0,   // bot
 			                 ham,
+			                 // disable ftab jumping if there is more
+			                 // than 1 N in it
 			                 nsInFtab > 1);
 		}
 	}
 
 	/**
 	 * Starting at the given "depth" relative to the 5' end, and the
-	 * given top and bot arrows (where top=0 and bot=0 means it's up to
-	 * us to calculate the initial arrow pair), and initial weighted
+	 * given top and bot indexes (where top=0 and bot=0 means it's up
+	 * to us to calculate the initial range), and initial weighted
 	 * hamming distance iham, find a hit using randomized, quality-
-	 * aware backtracking. 
+	 * aware backtracking.
 	 */
 	bool backtrack(uint32_t depth,
 	               uint32_t top,
@@ -456,14 +460,14 @@ public:
 			_params.sink().setRetainHits(true);
 		}
 		ASSERT_ONLY(uint64_t nhits = _params.sink().numHits());
-		
+
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                     top, bot, iham, iham, _pairs, _elims, disableFtab);
-		
+
 		// Remainder of this function is sanity checking
-		
+
 		if(ret) {
 			// Return value of true implies there should be a fresh hit
 			assert_eq(_params.sink().numHits(), nhits+1);
@@ -564,10 +568,10 @@ public:
 	 */
 	bool backtrack(uint32_t  stackDepth, // depth of the recursion stack; = # mismatches so far
 	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
-	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable 
-	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable 
-	               uint32_t  twoRevOff,// depths < twoRevOff are 2-revisitable 
-	               uint32_t  threeRevOff,// depths < threeRevOff are 3-revisitable 
+	               uint32_t  unrevOff, // depths < unrevOff are unrevisitable
+	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable
+	               uint32_t  twoRevOff,// depths < twoRevOff are 2-revisitable
+	               uint32_t  threeRevOff,// depths < threeRevOff are 3-revisitable
 	               uint32_t  top,      // top arrow in pair prior to 'depth'
 	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
 	               uint32_t  ham,      // weighted hamming distance so far
@@ -638,7 +642,7 @@ public:
 			if(depth == _5depth) {
 				if(_3revOff == _2revOff) {
 					// 1 and 1
-					
+
 					// The backtracking logic should have prevented us from
 					// backtracking more than once into this region
 					assert_leq(stackDepth, 1);
@@ -646,7 +650,7 @@ public:
 					if(stackDepth < 1) return false;
 				} else {
 					// 1 and 1,2
-					
+
 					// The backtracking logic should have prevented us from
 					// backtracking more than twice into this region
 					assert_leq(stackDepth, 2);
@@ -686,7 +690,7 @@ public:
 				assert_geq(stackDepth, 2);
 			}
 		}
-		
+
 		// The total number of arrow pairs that are acceptable
 		// backtracking targets ("alternative" arrow pairs)
 		uint32_t altNum = 0;
@@ -698,7 +702,7 @@ public:
 		// arrow pairs that haven't yet been eliminated
 		uint32_t eligibleSz = 0;
 		// If there is just one eligible slot at the moment (a common
-		// case), these are its parameters 
+		// case), these are its parameters
 		uint32_t eli = 0;
 		bool     elignore = true; // ignore the el values because they didn't come from a recent override
 		uint32_t eltop = 0;
@@ -713,7 +717,7 @@ public:
 		uint32_t d = depth;
 		uint32_t cur = _qlen - d - 1; // current offset into _qry
 		while(cur < _qlen) {
-			// Try to advance further given that 
+			// Try to advance further given that
 			if(_verbose) {
 				cout << "    cur=" << cur << " \"";
 				for(int i = (int)d - 1; i >= 0; i--) {
@@ -769,7 +773,12 @@ public:
 				cout << endl;
 			}
 			// If c is 'N', then it's a mismatch
-			if(c < 4 && d > 0) top = bot = 1;
+			if(c == 4 && d > 0) {
+				top = bot = 1;
+			} else if(c == 4) {
+				assert_eq(0, top);
+				assert_eq(0, bot);
+			}
 			// Calculate the ranges for this position
 			if(top == 0 && bot == 0) {
 				// Calculate first quartet of pairs using the _fchr[]
@@ -804,6 +813,9 @@ public:
 			if(c < 4) {
 				elims[d] = (1 << c);
 				assert_gt(elims[d], 0);
+				assert_lt(elims[d], 16);
+			} else {
+				elims[d] = 0;
 			}
 			assert_lt(elims[d], 16);
 
@@ -817,10 +829,12 @@ public:
 					if(spread == 0) {
 						// Indicate this char at this position is
 						// eliminated as far as this backtracking frame is
-						// concerned, since its arrow pair is closed
+						// concerned, since its range is empty
 						elims[d] |= (1 << i);
+						assert_lt(elims[d], 16);
 					}
-					if(i != c && spread > 0 && ((elims[d] & (1 << i)) == 0)) {
+					if(spread > 0 && ((elims[d] & (1 << i)) == 0)) {
+						// This char at this position is an alternative
 						if(curIsEligible) {
 							if(curOverridesEligible) {
 								// Only now that we know there is at least
@@ -881,7 +895,7 @@ public:
 			// helpful in half-and-half mode.
 			bool mustBacktrack = false;
 			if(_halfAndHalf) {
-				uint32_t lim = (_3revOff == _2revOff)? 2 : 3;
+				ASSERT_ONLY(uint32_t lim = (_3revOff == _2revOff)? 2 : 3);
 				if((d == (_5depth-1)) && top < bot) {
 					// About to transition into the 3' half of the seed;
 					// we should induce a mismatch if we haven't mismatched
@@ -935,7 +949,8 @@ public:
 				// Pick out the arrow pair we selected and target it
 				// for backtracking
 				ASSERT_ONLY(uint32_t eligiblesVisited = 0);
-				size_t i = depth, j = 0;
+				size_t i = d, j = 0;
+				assert_geq(i, depth);
 				uint32_t bttop = 0;
 				uint32_t btbot = 0;
 				uint32_t btham = ham;
@@ -945,15 +960,12 @@ public:
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
 					bool foundTarget = false;
-					for(; i <= d; i++) {
-						if(i < unrevOff) {
-							// i is an unrevisitable position, so don't consider it
-							continue;
-						}
+					// Walk from left to right
+					for(; i >= depth; i--) {
+						assert_geq(i, unrevOff);
 						icur = _qlen - i - 1; // current offset into _qry
 						uint8_t qi = QUAL(icur);
 						assert_lt(elims[i], 16);
-						assert_gt(elims[i], 0);
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 							// This is the leftmost eligible position with at
 							// least one remaining backtrack target
@@ -974,7 +986,7 @@ public:
 									ASSERT_ONLY(eligiblesVisited++);
 									uint32_t spread = PAIR_SPREAD(i, j);
 									if(r < spread) {
-										// This is our randomly-selected 
+										// This is our randomly-selected
 										// backtrack target
 										foundTarget = true;
 										bttop = PAIR_TOP(i, j);
@@ -992,7 +1004,6 @@ public:
 							break;
 						}
 					}
-					//assert_leq(cumSz, eligibleSz);
 					assert_leq(i, d);
 					assert_lt(j, 4);
 					assert_leq(eligiblesVisited, eligibleNum);
@@ -1146,6 +1157,7 @@ public:
 				assert_neq(15, elims[i]);
 				ASSERT_ONLY(uint8_t oldElim = elims[i]);
 				elims[i] |= (1 << j);
+				assert_lt(elims[i], 16);
 				assert_gt(elims[i], oldElim);
 				eligibleSz -= (btbot-bttop);
 				eligibleNum--;
@@ -1264,7 +1276,7 @@ public:
 			return false;
 		}
 	}
-	
+
 	/**
 	 * Print a hit along with information about the backtracking
 	 * regions constraining the hit.
@@ -1304,10 +1316,10 @@ public:
 		cout << endl;
 	}
 	/**
-	 * Naively search for the same hits that should be found by 
+	 * Naively search for the same hits that should be found by
 	 */
 	static void naiveOracle(const vector<TStr>& os,
-	                        const TStr& qry,
+	                        const String<Dna5>& qry,
 	                        uint32_t qlen,
 	                        const String<char>& qual,
 	                        const String<char>& name,
@@ -1462,11 +1474,11 @@ public:
 							}
 						}
 					}
-					Hit h(make_pair(i, off), 
+					Hit h(make_pair(i, off),
 						  patid,  // read id
 						  name,   // read name
 						  qry,    // read sequence
-						  qual,   // read qualities 
+						  qual,   // read qualities
 						  fw,     // forward/reverse-comp
 						  diffs); // mismatch bitvector
 					hits.push_back(h);
@@ -1477,7 +1489,7 @@ public:
 
 
 protected:
-	
+
 	void applyMutations() {
 		if(_muts == NULL) {
 			// No mutations to apply
@@ -1486,14 +1498,14 @@ protected:
 		for(size_t i = 0; i < length(*_muts); i++) {
 			const QueryMutation& m = (*_muts)[i];
 			assert_lt(m.pos, _qlen);
-			assert_lt(m.oldBase, 4);
+			assert_leq(m.oldBase, 4);
 			assert_lt(m.newBase, 4);
 			assert_neq(m.oldBase, m.newBase);
 			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.oldBase);
 			(*_qry)[m.pos] = (Dna5)(int)m.newBase; // apply it
 		}
 	}
-	
+
 	void undoMutations() {
 		if(_muts == NULL) {
 			// No mutations to undo
@@ -1502,14 +1514,14 @@ protected:
 		for(size_t i = 0; i < length(*_muts); i++) {
 			const QueryMutation& m = (*_muts)[i];
 			assert_lt(m.pos, _qlen);
-			assert_lt(m.oldBase, 4);
+			assert_leq(m.oldBase, 4);
 			assert_lt(m.newBase, 4);
 			assert_neq(m.oldBase, m.newBase);
 			assert_eq((uint32_t)((*_qry)[m.pos]), (uint32_t)m.newBase);
 			(*_qry)[m.pos] = (Dna5)(int)m.oldBase; // undo it
 		}
 	}
-	
+
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		if(_reportPartials) {
 			assert_leq(stackDepth, _reportPartials);
@@ -1620,7 +1632,6 @@ protected:
 			uint32_t icur = _qlen - i - 1; // current offset into _qry
 			uint8_t qi = QUAL(icur);
 			assert_lt(elims[i], 16);
-			assert_gt(elims[i], 0);
 			if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 				// This is an eligible position with at least
 				// one remaining backtrack target
@@ -1638,9 +1649,9 @@ protected:
 		assert_eq(eligiblesVisited, eligibleNum);
 		return true;
 	}
-	
+
 	/**
-	 * Confirm that no 
+	 * Confirm that no
 	 */
 	void confirmNoHit(uint32_t iham) {
 		// Not smart enough to deal with seedling hits yet
@@ -1688,9 +1699,9 @@ protected:
 		}
 		assert_eq(0, oracleHits.size());
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void confirmHit(uint32_t iham) {
 		// Not smart enough to deal with seedling hits yet
@@ -1738,7 +1749,7 @@ protected:
 		bool ebwtFw = _params.ebwtFw();
 		bool fw = _params.fw();
 		uint32_t patid = _params.patId();
-		
+
 		naiveOracle((*_os),
 		            (*_qry),
 		            _qlen,
@@ -1757,7 +1768,7 @@ protected:
 		            _muts,
 		            _halfAndHalf);
 	}
-	
+
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry

@@ -58,10 +58,10 @@ public:
 	           int32_t __ftabChars,
 	           int32_t __chunkRate) :
 	           _len(__len),        // # characters in the original string
-	           _bwtLen(_len + 1),  // # characters in the BWT string ; extra 1 for $ suffix 
+	           _bwtLen(_len + 1),  // # characters in the BWT string ; extra 1 for $ suffix
 	           _sz((_len+3)/4),    // # bytes needed to hold original string
 	           _bwtSz(_len/4 + 1), // # bytes needed to hold BWT string
-	           _lineRate(__lineRate), 
+	           _lineRate(__lineRate),
 	           _linesPerSide(__linesPerSide),
 	           _origOffRate(__offRate),
 	           _offRate(__offRate),
@@ -89,13 +89,13 @@ public:
 	{
 		assert(repOk());
 	}
-	
+
 	EbwtParams(const EbwtParams& eh) :
 	           _len(eh._len),
-	           _bwtLen(eh._bwtLen), 
+	           _bwtLen(eh._bwtLen),
 	           _sz(eh._sz),
 	           _bwtSz(eh._bwtSz),
-	           _lineRate(eh._lineRate), 
+	           _lineRate(eh._lineRate),
 	           _linesPerSide(eh._linesPerSide),
 	           _origOffRate(eh._origOffRate),
 	           _offRate(eh._offRate),
@@ -260,7 +260,7 @@ template<typename TStr> class EbwtSearchState;
 
 /**
  * Extended Burrows-Wheeler transform data.
- * 
+ *
  * An Ebwt may be transferred to and from RAM with calls to
  * evictFromMemory() and loadIntoMemory().  By default, a newly-created
  * Ebwt is not loaded into memory; if the user would like to use a
@@ -290,7 +290,7 @@ public:
 	    _eftab(NULL), \
 	    _offs(NULL), \
 	    _ebwt(NULL)
-	
+
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
 	     int32_t __overrideOffRate = -1,
@@ -308,7 +308,7 @@ public:
 		}
 		assert(repOk());
 	}
-	
+
 	/// Construct an Ebwt from the given header parameters and string
 	/// vector, optionally using a blockwise suffix sorter with the
 	/// given 'bmax' and 'dcv' parameters.  The string vector is
@@ -338,13 +338,13 @@ public:
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
 		string file3 = file + ".seq_names";
-		
+
 		//string file3 = file + ".3.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
 		ofstream fout3(file3.c_str());
-		
+
 		// Build
 		initFromVector(is,
 		               szs,
@@ -390,7 +390,7 @@ public:
 		}
 		VMSG_NL("Returning from Ebwt constructor");
 	}
-	
+
 	/**
 	 * Helper for the two complete constructors above.  Takes a vector
 	 * of text strings and renders them into a single string with a
@@ -398,12 +398,12 @@ public:
 	 * the suffix array over that string, then calls the main Ebwt
 	 * building routing (buildToDisk()) passing the string and the
 	 * suffix-array builder as input.
-	 * 
+	 *
 	 * Note that the suffix array might be extremely large - in fact,
 	 * it's exactlty 4 bytes per text character.  If the input text is
 	 * the human genome (3 Gbases), the suffix array will be about 12
 	 * GB.
-	 * 
+	 *
 	 * Both the suffix array and the joined string go out of scope at
 	 * the end of this function, causing them both to be freed.
 	 */
@@ -419,7 +419,7 @@ public:
 	                    uint32_t bmaxSqrtMult,
 	                    uint32_t bmaxDivN,
 	                    int dcv,
-	                    uint32_t seed) 
+	                    uint32_t seed)
 	{
 		// Compose text strings into single string; doing so
 		// initializes _plen, _pmap, _nPat
@@ -492,7 +492,7 @@ public:
 		assert(repOk());
 		VMSG_NL("Returning from initFromVector");
 	}
-	
+
 	/// Return the length that the joined string of the given string list will have
 	uint32_t joinedLen(vector<uint32_t>& szs, uint32_t chunkRate) {
 		uint32_t ret = 0;
@@ -520,7 +520,7 @@ public:
 			VMSG_NL("~Ebwt(): Caught an exception while closing streams!");
 		}
 	}
-	
+
 	/// Accessors
 	const EbwtParams& eh() const     { return _eh; }
 	uint32_t    zOff() const         { return _zOff; }
@@ -537,7 +537,7 @@ public:
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
-	
+
 	/// Return true iff the Ebwt is currently in memory
 	bool isInMemory() const {
 		if(_ebwt != NULL) {
@@ -599,13 +599,13 @@ public:
 	uint32_t ftabHi(uint32_t i) const {
 		return Ebwt::ftabHi(_ftab, _eftab, _eh._len, _eh._ftabLen, _eh._eftabLen, i);
 	}
-	
+
 	/**
 	 * Get "high interpretation" of ftab entry at index i.  The high
 	 * interpretation of a regular ftab entry is just the entry
 	 * itself.  The high interpretation of an extended entry is the
 	 * second correpsonding ui32 in the eftab.
-	 * 
+	 *
 	 * It's a static member because it's convenient to ask this
 	 * question before the Ebwt is fully initialized.
 	 */
@@ -638,7 +638,7 @@ public:
 	 * interpretation of a regular ftab entry is just the entry
 	 * itself.  The low interpretation of an extended entry is the
 	 * first correpsonding ui32 in the eftab.
-	 * 
+	 *
 	 * It's a static member because it's convenient to ask this
 	 * question before the Ebwt is fully initialized.
 	 */
@@ -683,7 +683,7 @@ public:
 		_zEbwtByteOff += sideByteOff;
 		assert(repOk(eh)); // Ebwt should be fully initialized now
 	}
-	
+
 	/**
 	 * Pretty-print the Ebwt to the given output stream.
 	 */
@@ -745,7 +745,7 @@ public:
 			out << "non-NULL, [0] = " << _offs[0] << endl;
 		}
 	}
-	
+
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
 	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
@@ -766,7 +766,7 @@ public:
 	void sanityCheckUpToSide(int upToSide) const;
 	void sanityCheckAll() const;
 	void restore(TStr& s) const;
-	
+
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
@@ -796,7 +796,7 @@ public:
 	void search(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool inexact /* = false */) const;
 	bool search1MismatchOrBetter(const TStr& qry, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/, uint32_t seed /* = 0*/) const;
 	bool search1MismatchOrBetter(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/) const;
-	
+
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -813,7 +813,7 @@ public:
 	bool inMemoryRepOk() const {
 		return repOk(_eh);
 	}
-	
+
 	/// Check that Ebwt is internally consistent with respect to given
 	/// EbwtParams; assert if not
 	bool repOk(const EbwtParams& eh) const {
@@ -823,7 +823,7 @@ public:
 		}
 		return true;
 	}
-	
+
 	/// Check that Ebwt is internally consistent; assert if not
 	bool repOk() const {
 		return repOk(_eh);
@@ -859,11 +859,11 @@ public:
 	EbwtParams _eh;
 
 private:
-	
+
 	ostream& log() const {
 		return cout; // TODO: turn this into a parameter
 	}
-	
+
 	/// Print a verbose message and flush (flushing is helpful for
 	/// debugging)
 	void verbose(const string& s) const {
@@ -1107,7 +1107,7 @@ public:
 	bool ebwtFw() const              { return _ebwtFw; }
 	EbwtSearchStats<TStr>& stats() const { return _stats; }
 	/**
-	 * Report a hit 
+	 * Report a hit
 	 */
 	void reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
@@ -1118,7 +1118,7 @@ public:
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
-	               uint32_t oms) const 
+	               uint32_t oms) const
 	{
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
@@ -1142,7 +1142,7 @@ public:
 			// Note: this is re-reversing the pattern back to its
 			// normal orientation; the pattern source reversed it
 			// initially
-			for(size_t i = 0; i < len; i++) 
+			for(size_t i = 0; i < len; i++)
 			{
 				appendValue(pat, query[len-i-1]);
 				if(quals != NULL && length(*quals) > 0) {
@@ -1150,7 +1150,7 @@ public:
 				}
 			}
 		}
-		
+
 		for(size_t i = 0; i < numMms; i++) {
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
@@ -1161,7 +1161,7 @@ public:
 				mm.set(mmui32[i]);
 			}
 		}
-		
+
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
 		if(!_ebwtFw && !_arrowMode) {
 			h.second = tlen - h.second - 1;
@@ -1180,7 +1180,7 @@ public:
 				assert_lt(h.second + i, length(_texts[h.first]));
 				if(_ebwtFw) {
 					// Forward pattern appears at h
-					if(query[i] != _texts[h.first][h.second + i]) {
+					if((int)query[i] != (int)_texts[h.first][h.second + i]) {
 						uint32_t qoff = i;
 						// if _ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
@@ -1191,7 +1191,7 @@ public:
 					}
 				} else {
 					// Reverse of pattern appears at h
-					if(query[len-i-1] != _texts[h.first][h.second + i]) {
+					if((int)query[len-i-1] != (int)_texts[h.first][h.second + i]) {
 						uint32_t qoff = len-i-1;
 						// if _ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
@@ -1203,6 +1203,8 @@ public:
 				}
 			}
 			if(diffs != mm) {
+				// Oops, mismatches were not where we expected them;
+				// print a diagnostic message before asserting
 				cerr << "Expected " << mm << " mismatches, got " << diffs << endl;
 				cerr << "  Pat:  ";
 				for(size_t i = 0; i < len; i++) {
@@ -1231,7 +1233,7 @@ public:
 		}
 		if(provisional) {
 			// Provisional hits may or may not be 'accepted' later on;
-			// this might happen if we find a hit with one mismatch 
+			// this might happen if we find a hit with one mismatch
 			// but haven't yet tried to exact-match the pattern's
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
@@ -1301,7 +1303,7 @@ struct SideLocus {
 	_by(-1),
 	_bp(-1),
 	_side(NULL) { }
-	
+
 	/**
 	 * Construct from row and other relevant information about the Ebwt.
 	 */
@@ -1340,7 +1342,7 @@ struct SideLocus {
 			lbot.initFromRow(bot, ep, ebwt);
 		}
 	}
-	
+
 	/**
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the shape of the Ebwt.
@@ -1373,7 +1375,7 @@ struct SideLocus {
 		_bp = _charOff & 3;  // bit-pair within byte
 		if(!_fw) _bp ^= 3;
 	}
-	
+
     uint32_t _sideByteOff; // offset of top side within ebwt[]
     uint32_t _sideNum;     // index of side
     uint32_t _charOff;     // character offset within side
@@ -1386,7 +1388,7 @@ struct SideLocus {
 /**
  * Data structure that maintains all state associated with a simple
  * single-query search (without any sort of backtracking).
- * 
+ *
  * This state gets passed around and mutated by the various
  * Ebwt<>::search*() functions.
  */
@@ -1453,7 +1455,7 @@ public:
 		_botSideLocus(),
 		_mism(0xffffffff)
 	{ }
-	
+
 	void newQuery(String<Dna5>* __query,
 	              String<char>* __query_name,
 	              String<char>* __query_quals)
@@ -1477,7 +1479,7 @@ public:
 		fill(_tops,       _narrowHalfLen, 0);
 		fill(_bots,       _narrowHalfLen, 0);
 	}
-	
+
 	const EbwtSearchParams<TStr>& params() const { return _params; }
 	RandomSource& rand()                         { return _rand;   }
 	const String<Dna5>& query() const            { return *_query;  }
@@ -1544,7 +1546,7 @@ public:
 		return c;
 	}
 	/**
-	 * 
+	 *
 	 */
 	uint32_t mapLF1(const Ebwt<TStr>& ebwt) {
 		assert_eq(1, spread());
@@ -1577,7 +1579,7 @@ public:
 			_params.stats().incPushthrough(*this);
 			setTopBot(r, r+1);
 		}
-		
+
 		assert(_qidx != 0xffffffff); _qidx--;
 		return r;
 	}
@@ -1747,9 +1749,9 @@ public:
 			if(_remainders[i] == 0) {
 				continue;
 			}
-			
+
 			_mism = i;
-			
+
 			if(backtrack1From(ebwt, i) && oneHit) {
 				// We got one or more 1-mismatch hits; we can stop now
 				return;
@@ -1799,7 +1801,7 @@ private:
 /**
  * Given a range of positions in the EBWT array within the BWT portion
  * of a forward side, print the characters at those positions along
- * with a summary occ[] array. 
+ * with a summary occ[] array.
  */
 template<typename TStr>
 void Ebwt<TStr>::printRangeFw(uint32_t begin, uint32_t end) const {
@@ -1822,7 +1824,7 @@ void Ebwt<TStr>::printRangeFw(uint32_t begin, uint32_t end) const {
 /**
  * Given a range of positions in the EBWT array within the BWT portion
  * of a backward side, print the characters at those positions along
- * with a summary occ[] array. 
+ * with a summary occ[] array.
  */
 template<typename TStr>
 void Ebwt<TStr>::printRangeBw(uint32_t begin, uint32_t end) const {
@@ -1910,7 +1912,7 @@ void Ebwt<TStr>::sanityCheckAll() const {
 	assert_eq(this->ftabHi(eh._ftabLen-1), eh._bwtLen);
 
 	// Check offs
-	int seenLen = (eh._bwtLen + 31) >> 5; 
+	int seenLen = (eh._bwtLen + 31) >> 5;
 	uint32_t *seen;
 	try {
 		seen = new uint32_t[seenLen]; // bitvector marking seen offsets
@@ -1928,10 +1930,10 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		seen[w] |= (1 << r);
 	}
 	delete[] seen;
-	
+
 	// Check nPat
 	assert_gt(this->_nPat, 0);
-	
+
 	// Check plen
 	for(uint32_t i = 0; i < this->_nPat; i++) {
 		assert_gt(this->_plen[i], 0);
@@ -1981,7 +1983,7 @@ inline static int pop(uint64_t x) {
    x = x + (x >> 16);
    x = x + (x >> 32);
    return x & 0x3F;
-} 
+}
 
 /**
  * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
@@ -2028,7 +2030,7 @@ inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
 /**
  * Counts the number of occurrences of character 'c' in the given Ebwt
  * side up to (but not including) the given byte/bitpair (by/bp).
- * 
+ *
  * This is a performance-critical function.  This is the top search-
  * related hit in the time profile.
  */
@@ -2060,7 +2062,7 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 /**
  * Counts the number of occurrences of character 'c' in the given Ebwt
  * side up to (but not including) the given byte/bitpair (by/bp).
- * 
+ *
  * This is a performance-critical function.  This is the top search-
  * related hit in the time profile.
  */
@@ -2431,8 +2433,8 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
  * Like mapLF1, except it returns 0xffffffff if the character int the
  * final column of row i is not c.  This is an optimization for the
  * (hopefully common) case where we're matching and the top and bottom
- * arrows are separated by a single row. 
- * 
+ * arrows are separated by a single row.
+ *
  * Is it because this is the first place to read from the side, thus
  * taking the cache miss?
  */
@@ -2631,14 +2633,14 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 #define NUM_SAMPLES 10
 
 /**
- * Report a randomly-selected sample from a range of hits.  The goal is to 
+ * Report a randomly-selected sample from a range of hits.  The goal is to
  * reduce the time spent enumerating a large range of hits and is predicated
  * on the assumption that the vast majority of those hits have similar
  * extensions.
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
-{	
+{
 	assert(!s.params().arrowMode());
 	assert_gt(s.spread(), NUM_SAMPLES);
 	std::set<uint32_t> sampled_hits;
@@ -2677,8 +2679,8 @@ inline bool Ebwt<TStr>::reportChaseRange(EbwtSearchState<TStr>& s) const
 }
 
 /**
- * Report one result.  
- * 
+ * Report one result.
+ *
  * Returns true if one or more results were reported.  If false is
  * returned, that means that one or more results were spurious becuase
  * they overlapped padding between two text sequences.
@@ -2710,7 +2712,7 @@ inline bool Ebwt<TStr>::reportOne(uint32_t i,
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
-{	
+{
 	VMSG_NL("In reportMultiple");
 	assert_gt(s.spread(), 1);
 	if(s.params().suppressHits()) return true; // return without reporting
@@ -2790,18 +2792,18 @@ inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
 	if(s.params().arrowMode()) {
 		// Just return arrows; we haven't tried to set off and we're
 		// not going to try to chase the result
-		return report(0, s.top(), s.bot(), s.qlen(), s); 
+		return report(0, s.top(), s.bot(), s.qlen(), s);
 	}
 	if(off != 0xffffffff) {
 		// Good luck - we previously made note of a marked row and
-		// need not chase it any further 
+		// need not chase it any further
 		off -= jumps;
 		assert_lt(off, this->_eh._len);
 		assert_lt((unsigned int)jumps, s.qlen());
 		assert_geq(jumps, 0);
 		VMSG_NL("searchFinish1 pre-found off=" << off);
 		s.params().stats().addExactHits(s);
-		return report(off, s.top(), s.bot(), s.qlen(), s); 
+		return report(off, s.top(), s.bot(), s.qlen(), s);
 		assert_leq(s.params().sink().numProvisionalHits(), 1);
 	} else {
 		// Haven't yet encountered a marked row for this result;
@@ -2850,7 +2852,7 @@ inline bool Ebwt<TStr>::searchFinish(EbwtSearchState<TStr>& s) const
 /**
  * Do an ftab lookup to find initial top and bottom then call
  * searchFinish().
- * 
+ *
  * The Ebwt must be in memory.
  */
 template<typename TStr>
@@ -2879,7 +2881,7 @@ inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
 /**
  * Do an fchr lookup to find (coarse) initial top and bottom then call
  * searchFinish().
- * 
+ *
  * The Ebwt must be in memory.
  */
 template<typename TStr>
@@ -2916,7 +2918,7 @@ void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
  * Search the Ebwt; if the query is long enough, start by looking up
  * the initial top and bottom in the ftab.  If the input string is too
  * short for the ftab, get the initial top and bottom from the fchr.
- * 
+ *
  * The Ebwt must be in memory.
  */
 template<typename TStr>
@@ -2935,9 +2937,9 @@ void Ebwt<TStr>::search(const TStr& qry,
  * Search the Ebwt; if the query is long enough, start by looking up
  * the initial top and bottom in the ftab.  If the input string is too
  * short for the ftab, get the initial top and bottom from the fchr.
- * 
+ *
  * Returns true iff one or more exact hits were found
- * 
+ *
  * The Ebwt must be in memory.
  */
 template<typename TStr>
@@ -3061,14 +3063,14 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader) {
 /**
  * Read an Ebwt from an input-stream pair.  The endianness of the data
  * read is installed in the bigEndian out parameter (true=big).  The
- * _in1 and _in2 istreams must already be initialized and open. 
- * 
+ * _in1 and _in2 istreams must already be initialized and open.
+ *
  * The caller is responsible for ensuring that both istreams are set up
  * to point just before the Ebwt records.  In most cases, this means
  * that they will both be completely rewound.
- * 
+ *
  * This function rewinds the streams before returning.
- * 
+ *
  */
 template<typename TStr>
 EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
@@ -3168,7 +3170,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		throw e;
 	}
 
-	// Allocate ebwt (big allocation) 
+	// Allocate ebwt (big allocation)
 	if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ")" << endl;
 	try {
 		this->_ebwt = new uint8_t[eh._ebwtTotLen];
@@ -3184,7 +3186,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// Read zOff from primary stream
 	_zOff = readU32(_in1, be);
 	assert_lt(_zOff, len);
-	
+
 	try {
 		// Read fchr from primary stream
 		if(_verbose) cout << "Reading fchr (5)" << endl;
@@ -3259,12 +3261,12 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// The fact that _ebwt and friends actually point to something
 	// (other than NULL) now signals to other member functions that the
 	// Ebwt is loaded into memory.
-	
+
   done: // Exit hatch for both justHeader and !justHeader
-  
+
 	// Be kind
-	_in1.clear(); _in1.seekg(0, ios::beg); 
-	_in2.clear(); _in2.seekg(0, ios::beg); 
+	_in1.clear(); _in1.seekg(0, ios::beg);
+	_in2.clear(); _in2.seekg(0, ios::beg);
 	assert(_in1.is_open()); assert(_in1.good());
 	assert(_in2.is_open()); assert(_in2.good());
 	return eh;
@@ -3273,7 +3275,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 /**
  * Write an extended Burrows-Wheeler transform to a pair of output
  * streams.
- * 
+ *
  * @param out1 output stream to primary file
  * @param out2 output stream to secondary file
  * @param be   write in big endian?
@@ -3288,10 +3290,10 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	uint32_t be = this->toBe();
 	assert(out1.good());
 	assert(out2.good());
-	
+
 	// When building an Ebwt, these header parameters are known
 	// "up-front", i.e., they can be written to disk immediately,
-	// before we join() or buildToDisk() 
+	// before we join() or buildToDisk()
 	writeI32(out1, 1, be); // endian hint for priamry stream
 	writeI32(out2, 1, be); // endian hint for secondary stream
 	writeU32(out1, eh._len,          be); // length of string (and bwt and suffix array)
@@ -3311,7 +3313,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		writeU32(out1, this->_plen[i], be);
 		for(uint32_t i = 0; i < eh._numChunks*2; i++)
 			writeU32(out1, this->_pmap[i], be);
-	
+
 		// These Ebwt parameters are discovered only as the Ebwt is being
 		// built (in buildToDisk()).  Of these, only 'offs' and 'ebwt' are
 		// terribly large.  'ebwt' is written to the primary file and then
@@ -3322,7 +3324,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		uint32_t offsLen = eh._offsLen;
 		for(uint32_t i = 0; i < offsLen; i++)
 			writeU32(out2, this->_offs[i], be);
-	
+
 		// 'fchr', 'ftab' and 'eftab' are not fully determined until the
 		// loop is finished, so they are written to the primary file after
 		// all of 'ebwt' has already been written and only then discarded
@@ -3340,9 +3342,9 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  * Given a pair of strings representing output filenames, and assuming
  * this Ebwt object is currently in memory, write out this Ebwt to the
  * specified files.
- * 
+ *
  * If sanity-checking is enabled, then once the streams have been
- * fully written and closed, we reopen them and read them into a 
+ * fully written and closed, we reopen them and read them into a
  * (hopefully) exact copy of this Ebwt.  We then assert that the
  * current Ebwt and the copy match in all of their fields.
  */
@@ -3354,7 +3356,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	const EbwtParams& eh = this->_eh;
 	assert(isInMemory());
 	assert(eh.repOk());
-    
+
 	ofstream fout1(out1.c_str(), ios::binary);
 	ofstream fout2(out2.c_str(), ios::binary);
 	writeFromMemory(justHeader, fout1, fout2);
@@ -3408,7 +3410,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 /**
  * Join several text strings together in a way that's compatible with
  * the text-chunking scheme dictated by chunkRate parameter.
- * 
+ *
  * The non-static member Ebwt::join additionally builds auxilliary
  * arrays that maintain a mapping between chunks in the joined string
  * and the original text strings.
@@ -3455,7 +3457,7 @@ TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed) {
 /**
  * Join several text strings together in a way that's compatible with
  * the text-chunking scheme dictated by chunkRate parameter.
- * 
+ *
  * The non-static member Ebwt::join additionally builds auxilliary
  * arrays that maintain a mapping between chunks in the joined string
  * and the original text strings.
@@ -3480,7 +3482,7 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 		assert(l[i]->good());
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-		
+
 		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp);
 			if(bases == 0) continue;
@@ -3520,10 +3522,10 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
  * _nPat and _plen fields are also retained in the Ebwt, but the _pmap
  * field is not.  _pmap is relatively big, so we avoid keeping it in
  * memory unless the user specifically loads the Ebwt.
- * 
+ *
  * It is assumed, but not required, that the header values have already
  * been written to 'out1' before this function is called.
- * 
+ *
  * The static member Ebwt::join just returns a joined version of a
  * list of strings without building any of the auxilliary arrays.
  * Because the pseudo-random number generator is the same, we expect
@@ -3570,7 +3572,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		streampos pos = l[i]->tellg();
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-		
+
 		// For each sequence we can pull out of istream l[i]...
 		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			string name;
@@ -3640,21 +3642,21 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
  * array on demand).  The bulk of the Ebwt, i.e. the ebwt and offs
  * arrays, is written directly to disk.  This is by design: keeping
  * those arrays in memory needlessly increases the footprint of the
- * building process.  Instead, we prefer to build the Ebwt directly 
+ * building process.  Instead, we prefer to build the Ebwt directly
  * "to disk" and then read it back into memory later as necessary.
- * 
+ *
  * It is assumed that the header values and join-related values (nPat,
  * plen, pmap) have already been written to 'out1' before this function
  * is called.  When this function is finished, it will have
  * additionally written ebwt, zOff, fchr, ftab and eftab to the primary
- * file and offs to the secondary file. 
- * 
+ * file and offs to the secondary file.
+ *
  * Assume DNA/RNA/any alphabet with 4 or fewer elements.
  * Assume occ array entries are 32 bits each.
- * 
- * @param sa            the suffix array to convert to a Ebwt 
+ *
+ * @param sa            the suffix array to convert to a Ebwt
  * @param s             the original string
- * @param out           
+ * @param out
  */
 template<typename TStr>
 void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
@@ -3663,14 +3665,14 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
                              ostream& out2)
 {
 	const EbwtParams& eh = this->_eh;
-	
+
 	assert(eh.repOk());
 	assert_eq(length(s)+1, sa.size());
 	assert_eq(length(s), eh._len);
 	assert_gt(eh._lineRate, 3);
 	assert(sa.suffixItrIsReset());
 	assert_leq((int)ValueSize<Dna>::VALUE, 4);
-	
+
 	uint32_t  len = eh._len;
 	uint32_t  ftabLen = eh._ftabLen;
 	uint32_t  sideSz = eh._sideSz;
@@ -3716,7 +3718,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		throw e;
 	}
 	assert(ebwtSide != NULL);
-	
+
 	// Points to the base offset within ebwt for the side currently
 	// being written
 	uint32_t side = 0;
@@ -3726,20 +3728,20 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 
 	// Whether we're assembling a forward or a reverse bucket
 	bool fw = false;
-	
+
 	// Did we just finish writing a forward bucket?  (Must be true when
 	// we exit the loop.)
 	bool wroteFwBucket = false;
-	
+
 	// Have we skipped the '$' in the last column yet?
 	ASSERT_ONLY(bool dollarSkipped = false);
-	
+
 	uint32_t si = 0;   // string offset (chars)
 	ASSERT_ONLY(uint32_t lastSufInt = 0);
 	ASSERT_ONLY(bool inSA = true); // true iff saI still points inside suffix
 	                               // array (as opposed to the padding at the
 	                               // end)
-	// Iterate over packed bwt bytes 
+	// Iterate over packed bwt bytes
 	VMSG_NL("Entering Ebwt loop");
 	ASSERT_ONLY(uint32_t beforeEbwtOff = (uint32_t)out1.tellp());
 	while(side < ebwtTotSz) {
@@ -3748,7 +3750,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		assert_geq(sideCur, 0);
 		assert_lt(sideCur, (int)eh._sideBwtSz);
 		assert_eq(0, side % sideSz); // 'side' must be on side boundary
-		ebwtSide[sideCur] = 0; // clear 
+		ebwtSide[sideCur] = 0; // clear
 		assert_lt(side + sideCur, ebwtTotSz);
 		// Iterate over bit-pairs in the si'th character of the BWT
 		for(int bpi = 0; bpi < 4; bpi++, si++) {
@@ -3785,7 +3787,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					}
 					// Assert that this prefix-of-suffix is greater
 					// than or equal to the last one (true b/c the
-					// suffix array is sorted) 
+					// suffix array is sorted)
 					#ifndef NDEBUG
 					if(lastSufInt > 0) assert_geq(sufInt, lastSufInt);
 					lastSufInt = sufInt;
@@ -3826,7 +3828,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 				#endif
 				// 'A' used for padding; important that padding be
 				// counted in the occ[] array
-				bwtChar = 0; 
+				bwtChar = 0;
 			}
 			if(count) occ[bwtChar]++;
 			// Append BWT char to bwt section of current side
@@ -3890,12 +3892,12 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	assert_eq(((uint32_t)out1.tellp() - beforeEbwtOff), eh._ebwtTotSz);
 	// assert that the last thing we did was write a forward bucket
 	assert(wroteFwBucket);
-	
+
 	//
 	// Write zOff to primary stream
 	//
 	writeU32(out1, zOff, this->toBe());
-	
+
 	//
 	// Finish building fchr
 	//
@@ -3906,7 +3908,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	assert_eq(fchr[3], len);
 	// Shift everybody up by one
 	for(int i = 4; i >= 1; i--) {
-		fchr[i] = fchr[i-1]; 
+		fchr[i] = fchr[i-1];
 	}
 	fchr[0] = 0;
 	if(_verbose) {
@@ -3917,7 +3919,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	for(int i = 0; i < 5; i++) {
 		writeU32(out1, fchr[i], this->toBe());
 	}
-	
+
 	//
 	// Finish building ftab and build eftab
 	//
