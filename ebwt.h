@@ -1551,16 +1551,13 @@ public:
 	uint32_t mapLF1(const Ebwt<TStr>& ebwt) {
 		assert_eq(1, spread());
 		int c = chr();
+		assert_leq(c, 4);
 		uint32_t r = ebwt.mapLF1(_topSideLocus, c);
 		// no need to update _tried
 		if(r == 0xffffffff) {
 			_params.stats().incStopAt(*this);
 			if(!_params.backtracking() && inNarrowHalf()) {
 				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				//assert_eq(0, _remainders[_qidx]);
-				//assert_eq(0, _tried[_qidx]);
-				//assert_eq(0, _tops[_qidx]);
-				//assert_eq(0, _bots[_qidx]);
 				_firstNzRemainder = _qidx;
 				_remainders[_qidx] = 1;
 				_tried[_qidx] = c;
@@ -1607,10 +1604,6 @@ public:
 				// Arrows moved closer together; might want to
 				// backtrack to here
 				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				//assert_eq(0, _remainders[_qidx]);
-				//assert_eq(0, _tried[_qidx]);
-				//assert_eq(0, _tops[_qidx]);
-				//assert_eq(0, _bots[_qidx]);
 				_firstNzRemainder = _qidx;
 				_remainders[_qidx] = diff;
 				_tried[_qidx] = c;
@@ -1632,10 +1625,6 @@ public:
 			// Arrows moved closer together; might want to backtrack
 			// to here
 			assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-			//assert_eq(0, _remainders[_qidx]);
-			//assert_eq(0, _tried[_qidx]);
-			//assert_eq(0, _tops[_qidx]);
-			//assert_eq(0, _bots[_qidx]);
 			_firstNzRemainder = _qidx;
 			_remainders[_qidx] = diffDiff;
 			_tried[_qidx] = c;
@@ -1662,7 +1651,7 @@ public:
 		assert(_params.backtracking());
 		assert_geq(qidx, (uint32_t)_firstNzRemainder);
 		assert_lt(qidx, _narrowHalfLen);
-		assert_lt(_tried[qidx], 4);
+		assert_leq(_tried[qidx], 4);
 		assert_gt(_bots[qidx], _tops[qidx]);
 		bool oneHit = (_params.multiHitPolicy() == MHP_PICK_1_RANDOM);
 		// Restore top and bot from this branch point; also set the top
@@ -1727,7 +1716,7 @@ public:
 		if(oneHit) {
 			assert_eq(0, params().sink().numProvisionalHits());
 		}
-		assert_eq(1, skipped);
+		assert_leq(skipped, 1);
 		return gotHits;
 	}
 	/**

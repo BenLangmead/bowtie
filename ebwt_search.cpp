@@ -409,7 +409,7 @@ static bool findSanityHits(const String<Dna5>& pat,
     assert_leq(ohlen, plen);
 	Pattern<String<Dna5>, Horspool> pattern(half);
 	for(size_t i = 0; i < os.size(); i++) {
-		TStr o = os[i];
+		String<Dna5> o = os[i];
 		if(transpose) {
 			for(size_t j = 0; j < length(o)>>1; j++) {
 				TVal tmp = o[j];
@@ -417,7 +417,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 				o[length(o)-j-1] = tmp;
 			}
 		}
-		Finder<String<Dna> > finder(o);
+		Finder<String<Dna5> > finder(o);
 		while (find(finder, pattern)) {
 			uint32_t pos = position(finder);
 			bitset<max_read_bp> diffs = 0;
