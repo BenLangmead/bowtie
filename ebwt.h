@@ -1354,6 +1354,7 @@ struct SideLocus {
 		_sideNum                  = row / sideBwtLen;
 		_charOff                  = row % sideBwtLen;
 		_sideByteOff              = _sideNum * sideSz;
+		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
 		// prefetch this side
@@ -1490,6 +1491,8 @@ public:
 	void setTopBot(uint32_t __top, uint32_t __bot) {
 		assert_geq(__bot, __top);
 		_top = __top; _bot = __bot;
+		assert_leq(_top, _ebwt._eh._len);
+		assert_leq(_bot, _ebwt._eh._len);
 		if(_bot > _top) {
 			uint32_t diff = _bot - _top;
 			// Calculate top from scratch and (possibly) prefetch
@@ -2886,7 +2889,11 @@ inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const
 	assert(isInMemory());
 	assert(s.qAtBeginning());
 	s.params().stats().incTry(s);
-	s.setTopBot(this->_fchr[s.chr()], this->_fchr[s.chr()+1]);
+	if(s.chr() == 4) {
+		return; // immediate mismatch
+	} else {
+		s.setTopBot(this->_fchr[s.chr()], this->_fchr[s.chr()+1]);
+	}
 	s.decQidx();
 	searchFinish(s);
 }
