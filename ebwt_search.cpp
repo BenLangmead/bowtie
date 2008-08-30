@@ -1344,7 +1344,7 @@ static void seededQualCutoffSearch(
 				int ns = 0;
 				bool done = false;
 				for(size_t i = 0; i < slen; i++) {
-					if((int)(Dna5)(*patFw)[slen-i-1] == 4) {
+					if((int)(Dna5)(*patFw)[i] == 4) {
 						if(++ns > seedMms) {
 							done = true;
 							break;
