@@ -13,7 +13,7 @@ using namespace seqan;
 /**
  * Helper function to print a uint32_t as a DNA string where each 2-bit
  * stretch is a character and more significiant bits appear to the left
- * of less singificant bits. 
+ * of less singificant bits.
  */
 static inline std::string u32ToDna(uint32_t a, int len) {
 	char buf[17]; // TODO: return a new string; by value I guess
@@ -36,7 +36,12 @@ static inline TStr reverseComplement(const TStr& s) {
 	size_t slen = length(s);
 	resize(s_rc, slen);
 	for(size_t i = 0; i < slen; i++) {
-		s_rc[i] = (TVal)((int)s[slen-i-1] ^ 3);
+		int sv = (int)s[slen-i-1];
+		if(sv == 4) {
+			s_rc[i] = (TVal)4;
+		} else {
+			s_rc[i] = (TVal)(sv ^ 3);
+		}
 	}
 	return s_rc;
 }
