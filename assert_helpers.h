@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <cassert>
 
 /**
  * Assertion for release-enabled assertions

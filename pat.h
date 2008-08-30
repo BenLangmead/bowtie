@@ -44,7 +44,7 @@ static inline void reverse(String<Dna5>& s) {
 class PatternSource {
 public:
 	PatternSource(bool __reverse = false, const char *__dumpfile = NULL) :
-		_reverse(__reverse), 
+		_reverse(__reverse),
 		_def_qual("EDCCCBAAAA@@@@?>===<;;9:9998777666655444433333333333333333333"),
 		_def_rqual("333333333333333333334444336666778999:9;;<===>?@@@@AAAABCCCDE"),
 		_dumpfile(__dumpfile), _out()
@@ -154,7 +154,7 @@ protected:
 };
 
 /**
- * Encapsualtes a source of patterns which is an in-memory vector. 
+ * Encapsualtes a source of patterns which is an in-memory vector.
  */
 class VectorPatternSource : public TrimmingPatternSource {
 public:
@@ -283,7 +283,7 @@ private:
 	int _maxNs;
 	vector<String<Dna5> > _v;        // forward/rev-comp sequences
 	vector<String<char> > _quals;    // quality values parallel to _v
-	vector<String<Dna5> > _vrev;     // reversed forward and rev-comp sequences 
+	vector<String<Dna5> > _vrev;     // reversed forward and rev-comp sequences
 	vector<String<char> > _qualsrev; // quality values parallel to _vrev
 	RandomSource _rand;
 };
@@ -456,7 +456,7 @@ protected:
 			tmpRc     = _aRc;
 			tmpQual   = _aQual;
 			tmpRcQual = _aRcQual;
-			tmpName   = _aName; 
+			tmpName   = _aName;
 			_a       = _tmp;       _setBegin(_aTStr,      (Dna5*)begin(_tmpTStr));
 			_aRc     = _tmpRc;     _setBegin(_aRcTStr,    (Dna5*)begin(_tmpRcTStr));
 			_aQual   = _tmpQual;   _setBegin(_aQualStr,   (char*)begin(_tmpQualStr));
@@ -491,7 +491,7 @@ protected:
 		_tmpLen = 0; // clear
 		_tmpNameLen = 0; // clear
 	}
-	
+
 	/// Return "current" forward-oriented pattern
 	char *cur() {
 		return _aCur? _a : _b;
@@ -658,7 +658,7 @@ protected:
 	String<char> _aRcQualStr;
 	size_t       _aNameLen;      // length of read name
 	String<char> _aNameStr;      // if _aName changes, must assign to this
-	
+
 	// Pattern b
 	size_t _bLen;
 	String<Dna5>   _bTStr;         // host is set to _b
@@ -667,7 +667,7 @@ protected:
 	String<char> _bRcQualStr;
 	size_t       _bNameLen;      // length of read name
 	String<char> _bNameStr;
-	
+
 	// Pattern tmp (for hasMorePatterns())
 	size_t _tmpLen;
 	String<Dna5>   _tmpTStr;
@@ -676,14 +676,14 @@ protected:
 	String<char> _tmpRcQualStr;
 	size_t _tmpNameLen;
 	String<char> _tmpNameStr;
-	
+
 private:
 	char* _a;
 	char* _aRc;
 	char* _aQual;   // quality values for forward-strand version
 	char* _aRcQual; // quality values for reverse-comp version
 	char* _aName;   // read name
-	
+
 	char* _b;
 	char* _bRc;
 	char* _bQual;   // quality values for forward-strand version
@@ -757,10 +757,10 @@ static uint8_t rcCharToDna5[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
+const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 
 /**
- * 
+ *
  */
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
@@ -787,7 +787,7 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-	
+
 	/// Read another pattern from a FASTA input file
 	// TODO: store default qualities in qual
 	virtual void read(char* dst,
@@ -808,21 +808,21 @@ protected:
 		assert(dstLen != NULL);
 		assert(name != NULL);
 		assert(nameLen != NULL);
-		
+
 		int ns;
 		do {
 			int c;
 			ns = 0;
 			*dstLen = 0;
 			*nameLen = 0;
-			
+
 			// Pick off the first carat
 			if(_first) {
 				c = fgetc(this->_in); if(c < 0) return;
 				assert(c == '>' || c == '#');
 				_first = false;
 			}
-			
+
 			// Read to the end of the id line, sticking everything after the '>'
 			// into *name
 			while(true) {
@@ -838,7 +838,7 @@ protected:
 			}
 			_setBegin(nameStr, (char*)name);
 			_setLength(nameStr, *nameLen);
-			
+
 			// _in now points just past the first character of a sequence
 			// line, and c holds the first character
 			int begin = 0;
@@ -873,12 +873,12 @@ protected:
 				(*dstLen) -= this->_trim3;
 				_setBegin(dstTStr, (Dna5*)dst);
 				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr,qualDefault);
+				_setBegin(qualTStr, const_cast<char*>(qualDefault));
 				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
 					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
 					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr,qualDefault);
+					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
 					_setLength(rcQualTStr,(*dstLen));
 				}
 			} else {
@@ -912,12 +912,12 @@ protected:
 				(*dstLen) -= this->_trim3;
 				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr,qualDefault);
+				_setBegin(qualTStr, const_cast<char*>(qualDefault));
 				_setLength(qualTStr,(*dstLen));
 				if(rcDst != NULL) {
 					_setBegin(rcDstTStr, (Dna5*)rcDst);
 					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr,qualDefault);
+					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
 					_setLength(rcQualTStr,(*dstLen));
 				}
 			}
@@ -962,7 +962,7 @@ public:
 		_policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{
 		assert(this->hasMorePatterns());
-		
+
 		for (int l = 0; l != 128; ++l) {
 			_table[l] = (int)(10.0 * log(1.0 + pow(10.0, (l - 64) / 10.0)) / log(10.0) + .499);
 			if (_table[l] >= 63) _table[l] = 63;
@@ -1018,14 +1018,14 @@ protected:
 			ns = 0;
 			*dstLen = 0;
 			*nameLen = 0;
-			
+
 			// Pick off the first at
 			if(_first) {
 				c = fgetc(this->_in); if(c < 0) return;
 				assert_eq('@', c);
 				_first = false;
 			}
-			
+
 			// Read to the end of the id line, sticking everything after the '@'
 			// into *name
 			while(true) {
@@ -1041,7 +1041,7 @@ protected:
 			}
 			_setBegin(nameStr, (char*)name);
 			_setLength(nameStr, *nameLen);
-			
+
 			// _in now points just past the first character of a sequence
 			// line, and c holds the first character
 			int charsRead = 0;
@@ -1114,29 +1114,29 @@ protected:
 					_setLength(rcDstTStr, (*dstLen));
 				}
 			}
-			
+
 			// Chew up the optional name on the '+' line
 			while(c == '+' || (c != '\n' && c != '\r'))
 			{
 				c = fgetc(this->_in); if(c < 0) return;
 			}
-	
+
 			// Now read the qualities
 			size_t qualsRead = 0;
-			
+
 			//qual->clear();
 			if (_solexa_quals)
 			{
 				char buf[1024];
-					
+
 				while (fgets(buf, sizeof(buf), this->_in) && qualsRead < (*dstLen) + this->_trim5)
 				{
 					char* nl = strrchr(buf, '\n');
 					if (nl) *nl = 0;
-					
+
 					vector<string> s_quals;
 					tokenize(string(buf), " ", s_quals);
-					
+
 					if(!_reverse) {
 						for (unsigned int j = 0; j < s_quals.size(); ++j)
 						{
@@ -1207,7 +1207,7 @@ protected:
 									rcQual[1024 - off - 1] = c;
 								}
 								qualsRead++;
-							}	
+							}
 						}
 					}
 					assert_eq(qualsRead, (*dstLen) + this->_trim5);
@@ -1231,7 +1231,7 @@ protected:
 									rcQual[off] = c;
 								}
 								qualsRead++;
-							}	
+							}
 						}
 					}
 					assert_eq(qualsRead, (*dstLen) + this->_trim5);
@@ -1243,7 +1243,7 @@ protected:
 					}
 				}
 			}
-			
+
 			if (feof(this->_in))
 				return;
 			else
