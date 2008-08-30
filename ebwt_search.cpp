@@ -888,6 +888,100 @@ static void mismatchSearch(PatternSource& patsrc,
 	assert(patsrc.nextIsReverseComplement()); \
 }
 
+#define ASSERT_NO_HITS_FW(ebwtfw) \
+	if(sanityCheck && os.size() > 0) { \
+		vector<Hit> hits; \
+		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
+		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
+		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
+		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
+		bool newName = false; \
+		if(nameFw == NULL) { \
+			nameFw = new String<char>("no_name"); \
+			newName = true; \
+		} \
+		BacktrackManager<TStr>::naiveOracle( \
+		        os, \
+				*patFw, \
+				plen, \
+		        *qualFw, \
+		        *nameFw, \
+		        patid, \
+		        hits, \
+		        qualCutoff, \
+		        unrevOff, \
+		        oneRevOff, \
+		        twoRevOff, \
+		        threeRevOff, \
+		        true,        /* fw */ \
+		        ebwtfw);     /* ebwtFw */ \
+		if(hits.size() > 0) { \
+			/* Print offending hit obtained by oracle */ \
+			BacktrackManager<TStr>::printHit( \
+				os, \
+				hits[0], \
+				*patFw, \
+				plen, \
+			    unrevOff, \
+			    oneRevOff, \
+			    twoRevOff, \
+			    threeRevOff, \
+			    ebwtfw);  /* ebwtFw */ \
+		} \
+		if(newName) { \
+			delete nameFw; \
+			nameFw = NULL; \
+		} \
+		assert_eq(0, hits.size()); \
+	}
+
+#define ASSERT_NO_HITS_RC(ebwtfw) \
+	if(sanityCheck && os.size() > 0) { \
+		vector<Hit> hits; \
+		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
+		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
+		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
+		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
+		bool newName = false; \
+		if(nameRc == NULL) { \
+			nameRc = new String<char>("no_name"); \
+			newName = true; \
+		} \
+		BacktrackManager<TStr>::naiveOracle( \
+		        os, \
+				*patRc, \
+				plen, \
+		        *qualRc, \
+		        *nameRc, \
+		        patid+1, \
+		        hits, \
+		        qualCutoff, \
+		        unrevOff, \
+		        oneRevOff, \
+		        twoRevOff, \
+		        threeRevOff, \
+		        false,       /* fw */ \
+		        ebwtfw);     /* ebwtFw */ \
+		if(hits.size() > 0) { \
+			/* Print offending hit obtained by oracle */ \
+			BacktrackManager<TStr>::printHit( \
+				os, \
+				hits[0], \
+				*patRc, \
+				plen, \
+			    unrevOff, \
+			    oneRevOff, \
+			    twoRevOff, \
+			    threeRevOff, \
+			    ebwtfw);  /* ebwtFw */ \
+		} \
+		if(newName) { \
+			delete nameRc; \
+			nameRc = NULL; \
+		} \
+		assert_eq(0, hits.size()); \
+	}
+
 template<typename TStr>
 static void twoOrThreeMismatchSearch(
         PatternSource& patsrc,    /// pattern source
@@ -901,6 +995,8 @@ static void twoOrThreeMismatchSearch(
 {
 	typedef typename Value<TStr>::Type TVal;
 	uint32_t numPats;
+	ASSERT_ONLY(int seedMms = two ? 2 : 3);   // dummy; used in macros
+	ASSERT_ONLY(int qualCutoff = 0xffffffff); // dummy; used in macros
 	assert(revcomp);
 	// Assume forward index is loaded
 	assert(ebwtFw.isInMemory());
@@ -1148,46 +1244,8 @@ static void twoOrThreeMismatchSearch(
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-				vector<Hit> hits;
-				bool newName = false;
-				if(nameFw == NULL) {
-					nameFw = new String<char>("no_name");
-					newName = true;
-				}
-				BacktrackManager<TStr>::naiveOracle(
-				        os,
-						*patFw,
-						plen,
-				        *qualFw,
-				        *nameFw,
-				        patid,      // patid
-				        hits,       // hits
-				        0xffffffff, // qualThresh
-				        0,          // unrevOff
-				        0,          // 1revOff
-				        two ? s : 0,// 2revOff
-				        s,          // 3revOff
-				        true,       // fw
-				        true);      // ebwtFw
-				if(hits.size() > 0) {
-					// Print offending hit obtained by oracle
-					BacktrackManager<TStr>::printHit(
-						os,
-						hits[0],
-						*patFw,
-						plen,
-					    0,          // unrevOff
-					    0,          // 1revOff
-				        two ? s : 0,// 2revOff
-				        s,          // 3revOff
-					    true);      // ebwtFw
-				}
-				if(newName) {
-					delete nameFw;
-					nameFw = NULL;
-				}
-				assert_eq(0, hits.size());
+	    	if(!gaveUp) {
+	    		ASSERT_NO_HITS_FW(true);
 	    	}
 #endif
 
@@ -1213,46 +1271,8 @@ static void twoOrThreeMismatchSearch(
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-				vector<Hit> hits;
-				bool newName = false;
-				if(nameRc == NULL) {
-					nameRc = new String<char>("no_name");
-					newName = true;
-				}
-				BacktrackManager<TStr>::naiveOracle(
-				        os,
-						*patRc,
-						plen,
-				        *qualRc,
-				        *nameRc,
-				        patid+1,    // patid
-				        hits,       // hits
-				        0xffffffff, // qualThresh
-				        0,          // unrevOff
-				        0,          // 1revOff
-				        two ? s : 0,// 2revOff
-				        s,          // 3revOff
-				        false,      // fw
-				        true);      // ebwtFw
-				if(hits.size() > 0) {
-					// Print offending hit obtained by oracle
-					BacktrackManager<TStr>::printHit(
-						os,
-						hits[0],
-						*patRc,
-						plen,
-				        0,          // unrevOff
-				        0,          // 1revOff
-				        two ? s : 0,// 2revOff
-				        s,          // 3revOff
-					    true);      // ebwtFw
-				}
-				if(newName) {
-					delete nameRc;
-					nameRc = NULL;
-				}
-				assert_eq(0, hits.size());
+	    	if(!gaveUp) {
+				ASSERT_NO_HITS_RC(true);
 	    	}
 #endif
 			patid += 2;
@@ -1352,6 +1372,8 @@ static void seededQualCutoffSearch(
 					}
 				}
 				if(done) {
+					ASSERT_NO_HITS_FW(true);
+					ASSERT_NO_HITS_RC(true);
 					doneMask[patid>>1] = true;
 					patid += 2;
 					continue;
@@ -1802,50 +1824,8 @@ static void seededQualCutoffSearch(
 #ifndef NDEBUG
 			// The reverse-complement version of the read doesn't hit
 	    	// at all!  Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-				vector<Hit> hits;
-				uint32_t threeRevOff = (seedMms <= 3) ? s : 0;
-				uint32_t twoRevOff   = (seedMms <= 2) ? s : 0;
-				uint32_t oneRevOff   = (seedMms <= 1) ? s : 0;
-				uint32_t unrevOff    = (seedMms == 0) ? s : 0;
-				bool newName = false;
-				if(nameRc == NULL) {
-					nameRc = new String<char>("no_name");
-					newName = true;
-				}
-				BacktrackManager<TStr>::naiveOracle(
-				        os,
-						*patRc,
-						plen,
-				        *qualRc,
-				        *nameRc,
-				        patid+1,     // patid
-				        hits,
-				        qualCutoff,
-				        unrevOff,
-				        oneRevOff,
-				        twoRevOff,
-				        threeRevOff,
-				        false,       // fw
-				        true);       // ebwtFw
-				if(hits.size() > 0) {
-					// Print offending hit obtained by oracle
-					BacktrackManager<TStr>::printHit(
-						os,
-						hits[0],
-						*patRc,
-						plen,
-					    unrevOff,
-					    oneRevOff,
-					    twoRevOff,
-					    threeRevOff,
-					    true);      // ebwtFw
-				}
-				if(newName) {
-					delete nameRc;
-					nameRc = NULL;
-				}
-				assert_eq(0, hits.size());
+	    	if(!gaveUp) {
+	    		ASSERT_NO_HITS_RC(true);
 	    	}
 #endif
 
@@ -2115,50 +2095,8 @@ static void seededQualCutoffSearch(
 
 			// The forward version of the read doesn't hit at all!
 			// Check with the oracle to make sure it agrees.
-	    	if(sanityCheck && os.size() > 0 && !gaveUp) {
-				vector<Hit> hits;
-				uint32_t threeRevOff = (seedMms <= 3) ? s : 0;
-				uint32_t twoRevOff   = (seedMms <= 2) ? s : 0;
-				uint32_t oneRevOff   = (seedMms <= 1) ? s : 0;
-				uint32_t unrevOff    = (seedMms == 0) ? s : 0;
-				bool newName = false;
-				if(nameFw == NULL) {
-					nameFw = new String<char>("no_name");
-					newName = true;
-				}
-				BacktrackManager<TStr>::naiveOracle(
-				        os,
-						*patFw,
-						plen,
-				        *qualFw,
-				        *nameFw,
-				        patid,      // patid
-				        hits,
-				        qualCutoff,
-				        unrevOff,
-				        oneRevOff,
-				        twoRevOff,
-				        threeRevOff,
-				        true,       // fw
-				        false);     // ebwtFw
-				if(hits.size() > 0) {
-					// Print offending hit obtained by oracle
-					BacktrackManager<TStr>::printHit(
-						os,
-						hits[0],
-						*patFw,
-						plen,
-					    unrevOff,
-					    oneRevOff,
-					    twoRevOff,
-					    threeRevOff,
-					    false);     // ebwtFw
-				}
-				if(newName) {
-					delete nameFw;
-					nameFw = NULL;
-				}
-				assert_eq(0, hits.size());
+	    	if(!gaveUp) {
+	    		ASSERT_NO_HITS_FW(false);
 			}
 #endif
 			patid += 2;
