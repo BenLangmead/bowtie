@@ -1186,7 +1186,7 @@ public:
 					for(size_t k = d; k >= depth; k--) {
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
-						assert_geq(k, unrevOff);
+						if(k < unrevOff) break;
 						bool kCurIsAlternative = (ham + kq <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
