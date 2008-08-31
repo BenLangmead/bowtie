@@ -933,7 +933,9 @@ public:
 					assert_leq(stackDepth, lim);
 				}
 			}
+			//
 			// Mismatch with alternatives
+			//
 			while((top == bot || backtrackDespiteMatch) && altNum > 0) {
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
@@ -1181,10 +1183,11 @@ public:
 					// by re-scanning this backtracking frame (from
 					// 'depth' up to 'd')
 					lowAltQual = 0xff;
-					for(size_t k = depth; k <= d; k++) {
+					for(size_t k = d; k >= depth; k--) {
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
-						bool kCurIsAlternative = (k >= unrevOff) && (ham + kq <= _qualThresh);
+						assert_geq(k, unrevOff);
+						bool kCurIsAlternative = (ham + kq <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
 							if(kq < lowAltQual) {
