@@ -1326,6 +1326,25 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
+		// BacktrackManager for finding exact hits for the forward-
+		// oriented read
+		BacktrackManager<TStr> btf(ebwtFw, params,
+		                          0, 0,                  // 5, 3depth
+		                          0,                     // unrevOff,
+		                          0,                     // 1revOff
+		                          0,                     // 2revOff
+		                          0,                     // 3revOff
+		                          0, 0,                  // itop, ibot
+		                          qualCutoff,            // qualThresh
+		                          maxBts,                // max backtracks
+		                          0,                     // reportSeedlings (don't)
+		                          NULL,                  // seedlings
+		                          NULL,                  // mutations
+		                          verbose,               // verbose
+		                          true,                  // oneHit
+		                          seed,                  // seed
+		                          &os,
+		                          false);                // considerQuals
 		BacktrackManager<TStr> bt(ebwtFw, params,
 		                          0, 0,                  // 5, 3depth
 		                          (seedMms > 0)? s5 : s, // unrevOff,
@@ -1346,7 +1365,6 @@ static void seededQualCutoffSearch(
 		uint32_t lastLen = 0; // for checking if all reads have same length
 		String<Dna5>* patFw = NULL; String<char>* qualFw = NULL; String<char>* nameFw = NULL;
 		String<Dna5>* patRc = NULL; String<char>* qualRc = NULL; String<char>* nameRc = NULL;
-		EbwtSearchState<TStr> st(ebwtFw, params, seed);
 		params.setFw(true);
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 >= doneMask.size()) {
@@ -1385,8 +1403,9 @@ static void seededQualCutoffSearch(
 			// case we can pick it off early here
 			uint64_t numHits = sink.numHits();
 			params.setPatId(patid);
-	    	st.newQuery(patFw, nameFw, qualFw);
-		    ebwtFw.search(st, params);
+			btf.setQuery(patFw, nameFw, qualFw);
+	    	btf.setOffs(0, 0, plen, plen, plen, plen);
+	    	btf.backtrack();
 			if(sink.numHits() > numHits) {
 				assert_eq(numHits+1, sink.numHits());
 				doneMask[patid>>1] = true;
