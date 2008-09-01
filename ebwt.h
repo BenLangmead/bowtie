@@ -1967,7 +1967,7 @@ inline int Ebwt<TStr>::rowL(const SideLocus& l) const {
 /**
  * Tricky-bit-bashing population count function for 64-bit argument.
  */
-inline static int pop(uint64_t x) {
+inline static int pop64(uint64_t x) {
    x = x - ((x >> 1) & 0x5555555555555555llu);
    x = (x & 0x3333333333333333llu) + ((x >> 2) & 0x3333333333333333llu);
    x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0Fllu;
@@ -1987,16 +1987,16 @@ inline static int countInU64(int c, uint64_t dw) {
 	int ret;
 	switch(c) {
 	case 0:
-		ret = 32 - pop((dwA >> 1) | dwNA);
+		ret = 32 - pop64((dwA >> 1) | dwNA);
 		break;
 	case 1:
-		ret = pop(~(dwA >> 1) & dwNA);
+		ret = pop64(~(dwA >> 1) & dwNA);
 		break;
 	case 2:
-		ret = pop((dwA >> 1) & ~dwNA);
+		ret = pop64((dwA >> 1) & ~dwNA);
 		break;
 	case 3:
-		ret = pop((dwA >> 1) & dwNA);
+		ret = pop64((dwA >> 1) & dwNA);
 		break;
 	default:
 		throw;
@@ -2013,10 +2013,10 @@ inline static int countInU64(int c, uint64_t dw) {
 inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
 	uint64_t dwA  = dw &  0xAAAAAAAAAAAAAAAAllu;
 	uint64_t dwNA = dw & ~0xAAAAAAAAAAAAAAAAllu;
-	arrs[0] += (32 - pop((dwA >> 1) | dwNA));
-	arrs[1] += pop(~(dwA >> 1) & dwNA);
-	arrs[2] += pop((dwA >> 1) & ~dwNA);
-	arrs[3] += pop((dwA >> 1) & dwNA);
+	arrs[0] += (32 - pop64((dwA >> 1) | dwNA));
+	arrs[1] += pop64(~(dwA >> 1) & dwNA);
+	arrs[2] += pop64((dwA >> 1) & ~dwNA);
+	arrs[3] += pop64((dwA >> 1) & dwNA);
 }
 
 /**
