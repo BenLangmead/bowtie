@@ -112,6 +112,6 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 
 .PHONY: clean
 clean:
-	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
-	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) \
+	rm -f $(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof \
+	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
