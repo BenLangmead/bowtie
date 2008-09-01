@@ -1967,6 +1967,19 @@ inline int Ebwt<TStr>::rowL(const SideLocus& l) const {
 /**
  * Tricky-bit-bashing population count function for 64-bit argument.
  */
+#define POP64(x) \
+   x = x - ((x >> 1) & 0x5555555555555555llu); \
+   x = (x & 0x3333333333333333llu) + ((x >> 2) & 0x3333333333333333llu); \
+   x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0Fllu; \
+   x = x + (x >> 8); \
+   x = x + (x >> 16); \
+   x = x + (x >> 32); \
+   x = (x & 0x3F);
+
+/**
+ * Inline-function version of the above.  This does not always seem to
+ * be inlined
+ */
 inline static int pop64(uint64_t x) {
    x = x - ((x >> 1) & 0x5555555555555555llu);
    x = (x & 0x3333333333333333llu) + ((x >> 2) & 0x3333333333333333llu);
@@ -1984,26 +1997,30 @@ inline static int pop64(uint64_t x) {
 inline static int countInU64(int c, uint64_t dw) {
 	uint64_t dwA  = dw &  0xAAAAAAAAAAAAAAAAllu;
 	uint64_t dwNA = dw & ~0xAAAAAAAAAAAAAAAAllu;
-	int ret;
+	uint64_t tmp;
 	switch(c) {
 	case 0:
-		ret = 32 - pop64((dwA >> 1) | dwNA);
+		tmp = (dwA >> 1) | dwNA;
 		break;
 	case 1:
-		ret = pop64(~(dwA >> 1) & dwNA);
+		tmp = ~(dwA >> 1) & dwNA;
 		break;
 	case 2:
-		ret = pop64((dwA >> 1) & ~dwNA);
+		tmp = (dwA >> 1) & ~dwNA;
 		break;
 	case 3:
-		ret = pop64((dwA >> 1) & dwNA);
+		tmp = (dwA >> 1) & dwNA;
 		break;
 	default:
 		throw;
 	}
-	assert_leq(ret, 32);
-	assert_geq(ret, 0);
-	return ret;
+	POP64(tmp);
+	if(c == 0) {
+		tmp = 32 - tmp;
+	}
+	assert_leq(tmp, 32);
+	assert_geq(tmp, 0);
+	return (int)tmp;
 }
 
 /**
@@ -2037,9 +2054,11 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 	// take up the slack) then runtime does not change noticeably.
 	// Someday the countInU64() and pop() functions should be
 	// vectorized/SSE-ized in case that helps.
+#if 0
 	for(; i+7 < l._by; i += 8) {
 		cCnt += countInU64(c, *(uint64_t*)&l._side[i]);
 	}
+#endif
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
 		cCnt += cCntLUT[c][l._side[i]];
@@ -2068,9 +2087,11 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
 	// take up the slack) then runtime does not change noticeably.
 	// Someday the countInU64() and pop() functions should be
 	// vectorized/SSE-ized in case that helps.
+#if 0
 	for(; i+7 < l._by; i += 8) {
 		countInU64Ex(*(uint64_t*)&l._side[i], arrs);
 	}
+#endif
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
 		arrs[0] += cCntLUT[0][l._side[i]];

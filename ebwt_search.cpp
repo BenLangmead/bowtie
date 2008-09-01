@@ -1403,7 +1403,7 @@ static void seededQualCutoffSearch(
 			// case we can pick it off early here
 			uint64_t numHits = sink.numHits();
 			params.setPatId(patid);
-			btf.setQuery(patFw, nameFw, qualFw);
+			btf.setQuery(patFw, qualFw, nameFw);
 	    	btf.setOffs(0, 0, plen, plen, plen, plen);
 	    	btf.backtrack();
 			if(sink.numHits() > numHits) {
