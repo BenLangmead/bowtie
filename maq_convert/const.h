@@ -10,8 +10,8 @@ typedef unsigned char bit8_t;
 
 extern bit8_t nst_nt4_table[];
 extern bit8_t nst_nt16_table[];
-extern char *nst_nt4_rev_table;
-extern char *nst_nt16_rev_table;
+extern const char *nst_nt4_rev_table;
+extern const char *nst_nt16_rev_table;
 extern bit8_t nst_nt16_nt4_table[];
 extern int nst_nt16_count_table[];
 
