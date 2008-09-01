@@ -1183,7 +1183,7 @@ public:
 					// by re-scanning this backtracking frame (from
 					// 'depth' up to 'd')
 					lowAltQual = 0xff;
-					for(size_t k = d; k >= depth; k--) {
+					for(size_t k = d; k >= depth && k <= _qlen; k--) {
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
 						if(k < unrevOff) break;
