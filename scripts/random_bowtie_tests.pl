@@ -110,7 +110,8 @@ sub build {
 	my $ret = 0;
 	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
+	#my $cmd = "./bowtie-build-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
+	my $cmd = "./bowtie-build-debug -s -c --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
 	if($out eq "") {
@@ -125,7 +126,8 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 5) {
-		$cmd = "./bowtie-build-packed-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
+		#$cmd = "./bowtie-build-packed-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
+		$cmd = "./bowtie-build-packed-debug -s -c --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {

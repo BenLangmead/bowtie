@@ -189,8 +189,10 @@ public:
 	#define PAIR_SPREAD(d, c) (PAIR_BOT(d, c) - PAIR_TOP(d, c))
 	#define PHRED_QUAL(k)     ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
 	#define PHRED_QUAL2(q, k) ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
-	#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
-	#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
+	#define QUAL(k)           PHRED_QUAL(k)
+	#define QUAL2(q, k)       PHRED_QUAL2(q, k)
+//#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
+//#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
 
 	void setQuery(String<Dna5>* __qry,
 	              String<char>* __qual,
@@ -739,7 +741,7 @@ public:
 			// not in the unrevisitable region, and b) there is a quality
 			// ceiling and its selection would cause the ceiling to be exceeded
 			bool curIsAlternative = (d >= unrevOff) &&
-			                        (!_considerQuals || (ham + q <= _qualThresh));
+			                        (!_considerQuals || (ham + qualRounds[q] <= _qualThresh));
 			if(curIsAlternative) {
 				if(_considerQuals) {
 					// Is it the best alternative?
@@ -853,7 +855,7 @@ public:
 								eltop = PAIR_TOP(d, i);
 								elbot = PAIR_BOT(d, i);
 								assert_eq(elbot-eltop, spread);
-								elham = q;
+								elham = qualRounds[q];
 								elchar = "acgt"[i];
 								elcint = i;
 								elignore = false;
@@ -994,7 +996,7 @@ public:
 										foundTarget = true;
 										bttop = PAIR_TOP(i, j);
 										btbot = PAIR_BOT(i, j);
-										btham += qi;
+										btham += qualRounds[qi];
 										btcint = j;
 										btchar = "acgt"[j];
 										assert_leq(btham, _qualThresh);
@@ -1192,7 +1194,7 @@ public:
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
 						if(k < unrevOff) break;
-						bool kCurIsAlternative = (ham + kq <= _qualThresh);
+						bool kCurIsAlternative = (ham + qualRounds[kq] <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
 							if(kq < lowAltQual) {
@@ -1224,7 +1226,7 @@ public:
 											eltop = PAIR_TOP(k, l);
 											elbot = PAIR_BOT(k, l);
 											assert_eq(elbot-eltop, spread);
-											elham = kq;
+											elham = qualRounds[kq];
 											elchar = "acgt"[l];
 											elcint = l;
 											elignore = false;
@@ -1374,7 +1376,7 @@ public:
 				for(int k = (int)plen-1; k >= 0; k--) {
 					size_t kr = plen-1-k;
 					if(pstr[k] != ostr[ok]) {
-						ham += QUAL2(qual, k);
+						ham += qualRounds[QUAL2(qual, k)];
 						if(ham > qualThresh) {
 							// Alignment is invalid because it exceeds
 							// our target weighted hamming distance
