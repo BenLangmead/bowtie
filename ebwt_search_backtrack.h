@@ -806,7 +806,8 @@ public:
 			}
 			if(top != bot) {
 				// Calculate loci from row indices; do it now so that
-				// those prefetches are fired off as soon as possible
+				// those prefetches are fired off as soon as possible.
+				// This eventually calls SideLocus.initfromRow().
 				SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
 			}
 			// Update the elim array
@@ -967,7 +968,7 @@ public:
 						assert_geq(i, unrevOff);
 						icur = _qlen - i - 1; // current offset into _qry
 						uint8_t qi = QUAL(icur);
-						assert_lt(elims[i], 16);
+						assert_lt(elims[i], 16); // 1.26% in profile (next or prev?)
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 							// This is the leftmost eligible position with at
 							// least one remaining backtrack target
@@ -1116,6 +1117,7 @@ public:
 					if(ftabTop == ftabBot) {
 						ret = false;
 					} else {
+						assert(!_precalcedSideLocus);
 						ret = backtrack(stackDepth+1,
 						                _ebwt._eh._ftabChars,
 					                    btUnrevOff,  // new unrevisitable boundary
@@ -1130,9 +1132,12 @@ public:
 					                    newElims);
 					}
 				} else {
+					// We already called initFromTopBot for the range
+					// we're going to continue from
 					_precalcedSideLocus = true;
-					ret = backtrack(stackDepth+1,
-				                    i+1,
+					// Continue from selected alternative range
+					ret = backtrack(stackDepth+1,// added 1 mismatch to alignment
+				                    i+1,         // start from next position after
 				                    btUnrevOff,  // new unrevisitable boundary
 				                    btOneRevOff, // new 1-revisitable boundary
 				                    btTwoRevOff, // new 2-revisitable boundary

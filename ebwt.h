@@ -1351,12 +1351,12 @@ struct SideLocus {
 		const uint32_t sideBwtLen = ep._sideBwtLen;
 		const uint32_t sideBwtSz  = ep._sideBwtSz;
 		const uint32_t sideSz     = ep._sideSz;
-		_sideNum                  = row / sideBwtLen;
+		_sideNum                  = row / sideBwtLen; // 4.56% profile
 		_charOff                  = row % sideBwtLen;
 		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
-		_side = ebwt + _sideByteOff;
+		_side = ebwt + _sideByteOff; // 9.79% profile (prob. due to next line)
 		// prefetch this side
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
@@ -1372,7 +1372,7 @@ struct SideLocus {
 		                   0 /* no locality */);
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)sideBwtSz);
-		if(!_fw) _by = sideBwtSz - _by - 1;
+		if(!_fw) _by = sideBwtSz - _by - 1; // 1.06% profile
 		_bp = _charOff & 3;  // bit-pair within byte
 		if(!_fw) _bp ^= 3;
 	}
@@ -2060,11 +2060,11 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 	}
 #endif
 	// Count occurences of c in the rest of the side (using LUT)
-	for(; i < l._by; i++) {
-		cCnt += cCntLUT[c][l._side[i]];
+	for(; i < l._by; i++) {             // 1.62% + 1.60% + 1.40% + 1.32% =  5.94% in profile
+		cCnt += cCntLUT[c][l._side[i]]; // 3.96% + 2.88% + 2.42% + 2.27% = 11.53% in profile
 	}
 	// Count occurences of c in the rest of the byte
-	for(i = 0; i < l._bp; i++) {
+	for(i = 0; i < l._bp; i++) {        // 0.94% + 0.87% + 0.73% + 0.70% in profile
 		if(unpack_2b_from_8b(l._side[l._by], i) == c) cCnt++;
 	}
 	return cCnt;
@@ -2094,10 +2094,10 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
 #endif
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
-		arrs[0] += cCntLUT[0][l._side[i]];
+		arrs[0] += cCntLUT[0][l._side[i]]; // 0.73% + 0.63% + 0.63% + 0.63% in profile
 		arrs[1] += cCntLUT[1][l._side[i]];
 		arrs[2] += cCntLUT[2][l._side[i]];
-		arrs[3] += cCntLUT[3][l._side[i]];
+		arrs[3] += cCntLUT[3][l._side[i]]; // 0.91% in profile
 	}
 	// Count occurences of c in the rest of the byte
 	for(i = 0; i < l._bp; i++) {
