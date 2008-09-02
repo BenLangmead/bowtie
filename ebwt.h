@@ -1347,12 +1347,12 @@ struct SideLocus {
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the shape of the Ebwt.
 	 */
-	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
-		const uint32_t sideBwtLen = ep._sideBwtLen;
-		const uint32_t sideBwtSz  = ep._sideBwtSz;
+	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) { // 0.10% in profile (call overhead)?
+		//const uint32_t sideBwtLen = ep._sideBwtLen;
+		//const uint32_t sideBwtSz  = ep._sideBwtSz;
 		const uint32_t sideSz     = ep._sideSz;
-		_sideNum                  = row / sideBwtLen; // 4.56% profile
-		_charOff                  = row % sideBwtLen;
+		_sideNum                  = row / 224; // 4.56% profile
+		_charOff                  = row % 224;
 		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
@@ -1371,10 +1371,12 @@ struct SideLocus {
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
 		_by = _charOff >> 2; // byte within side
-		assert_lt(_by, (int)sideBwtSz);
-		if(!_fw) _by = sideBwtSz - _by - 1; // 1.06% profile
+		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte
-		if(!_fw) _bp ^= 3;
+		if(!_fw) {
+			_by = ep._sideBwtSz - _by - 1; // 1.06% profile
+			_bp ^= 3;
+		}
 	}
 
     uint32_t _sideByteOff; // offset of top side within ebwt[]

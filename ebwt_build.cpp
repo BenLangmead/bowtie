@@ -66,8 +66,8 @@ static void printUsage(ostream& out) {
 	    << "    --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable difference cover (blockwise is quadratic)" << endl
-	    << "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
-	    << "    -i/--linesperside <int> # lines in a side" << endl
+	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
+	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
 	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
 	    << "    -h/--chunkrate <int>    # of characters in a text chunk" << endl

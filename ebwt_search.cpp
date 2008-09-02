@@ -48,8 +48,8 @@ static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
-static int maxBts               = 9999; // max # backtracks allowed in half-and-half mode
-static int maxNs                = 9999; // max # Ns allowed in read
+static int maxBts               = 200; // max # backtracks allowed in half-and-half mode
+static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 
 static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:w:";
