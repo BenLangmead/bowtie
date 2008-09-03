@@ -62,7 +62,6 @@ template <typename TStr>
 static size_t fastaRefReadAppend(istream& in,
                                  TStr& dst,
                                  RefReadInParams& refparams, 
-                                 //bool first = false,
 								 string* name = NULL)
 {
 	typedef typename Value<TStr>::Type TVal;

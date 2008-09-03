@@ -8,6 +8,10 @@
 #include <seqan/sequence.h>
 #include "assert_helpers.h"
 
+/**
+ * Classes for dealing with reporting alignments.
+ */
+
 using namespace std;
 using namespace seqan;
 
@@ -69,12 +73,15 @@ bool operator< (const Hit& a, const Hit& b);
  */
 class HitSink {
 public:
-	HitSink(ostream& __out = cout, bool __keep = false) :
+	HitSink(ostream& __out = cout,
+	        bool __keep = false,
+	        vector<string>* __refnames = NULL) :
 		_out(__out),
 		_hits(),
 		_provisionalHits(),
 		_keep(__keep),
-		_numHits(0llu) { }
+		_numHits(0llu),
+		_refnames(__refnames) { }
 	virtual ~HitSink() { }
 	virtual void reportHit(const U32Pair& h,
 						   uint32_t patId,
@@ -131,6 +138,7 @@ protected:
 	vector<Hit> _provisionalHits;
 	bool _keep;
 	uint64_t _numHits;
+	vector<string>* _refnames;
 };
 
 class HitBucket : public HitSink
@@ -174,8 +182,9 @@ public:
 			ostream& __out,
 			bool __revcomp = false,
 			bool __reportOpps = false,
-			bool __keep = false) :
-		HitSink(__out, __keep),
+			bool __keep = false,
+			vector<string>* __refnames = NULL) :
+		HitSink(__out, __keep, __refnames),
 		_revcomp(__revcomp),
 		_reportOpps(__reportOpps),
 		_lastPat(0xffffffff),
@@ -257,11 +266,11 @@ private:
  */
 class VerboseHitSink : public HitSink {
 public:
-	VerboseHitSink(
-				  ostream& __out,
-				  bool __revcomp = false,
-				  bool __keep = false) :
-	HitSink(__out, __keep),
+	VerboseHitSink(ostream& __out,
+				   bool __revcomp = false,
+				   bool __keep = false,
+				   vector<string>* __refnames = NULL) :
+	HitSink(__out, __keep, __refnames),
 	_revcomp(__revcomp),
 	_lastPat(0xffffffff),
 	_lastFw(false),
@@ -286,7 +295,11 @@ public:
 		
     	// .first is text id, .second is offset
 		
-		out() << h.first;
+		if(this->_refnames != NULL && h.first < this->_refnames->size()) {
+			out() << (*this->_refnames)[h.first];
+		} else {
+			out() << h.first;
+		}
 		out() << "\t" << h.second;
 		out() << "\t" << patSeq;
 		
@@ -317,8 +330,7 @@ public:
 	 * A provisional hit is a hit that we might want to report, but we
 	 * aren't sure yet.
 	 */
-	virtual void reportProvisionalHit(
-									  const U32Pair& h,
+	virtual void reportProvisionalHit(const U32Pair& h,
 									  uint32_t patId,
 									  const String<char>& patName,
 									  const String<Dna5>& patSeq,
@@ -359,8 +371,9 @@ public:
 			ostream& __out,
 			bool __revcomp = false,
 			bool __reportOpps = false,
-			bool __keep = false) :
-		HitSink(__out, __keep),
+			bool __keep = false,
+			vector<string>* __refnames = NULL) :
+		HitSink(__out, __keep, __refnames),
 		_revcomp(__revcomp),
 		_reportOpps(__reportOpps),
 		_cur(0) { }

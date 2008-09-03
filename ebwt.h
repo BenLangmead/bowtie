@@ -289,7 +289,8 @@ public:
 	    _ftab(NULL), \
 	    _eftab(NULL), \
 	    _offs(NULL), \
-	    _ebwt(NULL)
+	    _ebwt(NULL), \
+	    _refnames()
 
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
@@ -337,14 +338,9 @@ public:
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
-		string file3 = file + ".seq_names";
-
-		//string file3 = file + ".3.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
 		ofstream fout2(file2.c_str(), ios::binary);
-		ofstream fout3(file3.c_str());
-
 		// Build
 		initFromVector(is,
 		               szs,
@@ -352,7 +348,6 @@ public:
 		               refparams,
 		               fout1,
 		               fout2,
-		               fout3,
 		               useBlockwise,
 		               bmax,
 		               bmaxSqrtMult,
@@ -366,8 +361,6 @@ public:
 		fout2.flush();
 		VMSG_NL("Wrote " << fout2.tellp() << " bytes to secondary EBWT file: " << file2);
 		fout2.close();
-		VMSG_NL("Wrote " << fout3.tellp() << " bytes to ID-name EBWT file: " << file2);
-		fout3.close();
 		// Reopen as input streams
 		VMSG_NL("Re-opening _in1 and _in2 as input streams");
 		_in1.open(file1.c_str(), ios_base::in | ios::binary);
@@ -392,20 +385,14 @@ public:
 	}
 
 	/**
-	 * Helper for the two complete constructors above.  Takes a vector
-	 * of text strings and renders them into a single string with a
-	 * call to join, then appends a 'N' ('$'-equivalent) and constructs
-	 * the suffix array over that string, then calls the main Ebwt
-	 * building routing (buildToDisk()) passing the string and the
-	 * suffix-array builder as input.
-	 *
-	 * Note that the suffix array might be extremely large - in fact,
-	 * it's exactlty 4 bytes per text character.  If the input text is
-	 * the human genome (3 Gbases), the suffix array will be about 12
-	 * GB.
-	 *
-	 * Both the suffix array and the joined string go out of scope at
-	 * the end of this function, causing them both to be freed.
+	 * Helper for the constructors above.  Takes a vector of text
+	 * strings and joins them into a single string with a call to
+	 * joinToDisk, which does a join (with padding) and writes some of
+	 * the resulting data directly to disk rather than keep it in
+	 * memory.  It then constructs a suffix-array producer (what kind
+	 * depends on 'useBlockwise') for the resulting sequence.  The
+	 * suffix-array producer can then be used to obtain chunks of the
+	 * joined string's suffix array. 
 	 */
 	void initFromVector(vector<istream*>& is,
 	                    vector<uint32_t>& szs,
@@ -413,7 +400,6 @@ public:
 	                    const RefReadInParams& refparams,
 	                    ofstream& out1,
 	                    ofstream& out2,
-	                    ofstream& out3,
 	                    bool useBlockwise,
 	                    uint32_t bmax,
 	                    uint32_t bmaxSqrtMult,
@@ -433,20 +419,11 @@ public:
 		try {
 			VMSG_NL("Reserving space for joined string");
 			seqan::reserve(s, jlen, Exact());
-			// FIXME: 7/8/08: Why does seqan::capacity(s) return 0
-			// here, causing the assert to fire?  When I run in a
-			// debugger, seqan::capacity() returns the correct value.
-			// Happens even with optimizations turned off.  Very, very
-			// strange.
-			//assert_gt(cap, seqan::capacity(s));
 			VMSG_NL("Joining reference sequences");
 			{
 				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
-				joinToDisk(is, szs, sztot, refparams, s, out1, out2, out3, seed);
+				joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
 			}
-			//out3.flush();
-			//VMSG_NL("Wrote " << out3.tellp() << " bytes to tertiary EBWT file");
-			//out3.close();
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory creating joined string in "
 			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
@@ -490,6 +467,12 @@ public:
 			buildToDisk(bsa, s, out1, out2);
 		}
 		assert(repOk());
+		// Now write reference sequence names on the end
+		assert_eq(this->_refnames.size(), this->_nPat);
+		for(size_t i = 0; i < this->_refnames.size(); i++) {
+			out1 << this->_refnames[i] << endl;
+		}
+		out1 << '\0';
 		VMSG_NL("Returning from initFromVector");
 	}
 
@@ -537,6 +520,7 @@ public:
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
+	vector<string>& refnames()       { return _refnames; }
 
 	/// Return true iff the Ebwt is currently in memory
 	bool isInMemory() const {
@@ -749,7 +733,7 @@ public:
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
 	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
-	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, ostream& out3, uint32_t seed);
+	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -856,6 +840,7 @@ public:
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
+	vector<string> _refnames;
 	EbwtParams _eh;
 
 private:
@@ -3274,6 +3259,22 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		     << "Ebwt::read()  at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
+	
+	// Read reference sequence names from primary index file
+	while(true) {
+		char c = '\0';
+		_in1.read(&c, 1);
+		if(_in1.eof()) break;
+		if(c == '\0') break;
+		else if(c == '\n') {
+			this->_refnames.push_back("");
+		} else {
+			if(this->_refnames.size() == 0) {
+				this->_refnames.push_back("");
+			}
+			this->_refnames.back().push_back(c);
+		}
+	}
 
 	// Allocate offs (big allocation)
 	try {
@@ -3586,7 +3587,6 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
                             TStr& ret,
                             ostream& out1,
                             ostream& out2,
-                            ostream& out3,
                             uint32_t seed = 0)
 {
 	RandomSource rand(seed); // reproducible given same seed
@@ -3622,9 +3622,19 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		// For each sequence we can pull out of istream l[i]...
 		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			string name;
-			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, &name);
-			if(bases == 0) continue;
-			out3 << seqsRead << " " << name << endl;
+			// Push a new name onto our vector
+			_refnames.push_back("");
+			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, &_refnames.back());
+			// If name was empty, replace with an index
+			if(_refnames.back().length() == 0) {
+				ostringstream stm;
+				stm << seqsRead;
+				_refnames.back() = stm.str();
+			}
+			if(bases == 0) {
+				_refnames.pop_back();
+				continue;
+			}
 			assert_eq(bases, this->_plen[seqsRead]);
 			seqsRead++;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;

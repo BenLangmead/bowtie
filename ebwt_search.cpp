@@ -2300,13 +2300,16 @@ static void driver(const char * type,
 					*fout,
 					revcomp,
 					reportOpps,
-					sanityCheck && !os.empty());
+					sanityCheck && !os.empty(),
+					&ebwt.refnames());
 		}
 		else if(!concise)
 		{
-			sink = new VerboseHitSink(*fout,
-									 revcomp,
-									 sanityCheck && !os.empty());
+			sink = new VerboseHitSink(
+					*fout,
+					revcomp,
+					sanityCheck && !os.empty(),
+					&ebwt.refnames());
 		}
 		else
 		{
@@ -2314,7 +2317,8 @@ static void driver(const char * type,
 					*fout,
 					revcomp,
 					reportOpps,
-					sanityCheck && !os.empty());
+					sanityCheck && !os.empty(),
+					&ebwt.refnames());
 		}
 		EbwtSearchStats<TStr> stats;
 		EbwtSearchParams<TStr> params(*sink,   // HitSink
