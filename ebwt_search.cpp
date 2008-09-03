@@ -48,7 +48,7 @@ static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
-static int maxBts               = 200; // max # backtracks allowed in half-and-half mode
+static int maxBts               = 100; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 
@@ -136,7 +136,7 @@ static void printUsage(ostream& out) {
 	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    << "  --concise          write hits in a concise format" << endl
-	    //<< "  --maxbts <int>     maximum number of backtracks allowed (75)" << endl
+	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 100)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
