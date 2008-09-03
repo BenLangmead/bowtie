@@ -85,6 +85,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	static const int buf_size = 256;
 	char name[buf_size];
 	int bwtf_ret = 0;
+	uint32_t seqid = 0;
 
 	FILE* refnamef = NULL;
 	if (refnames_fname)
@@ -119,7 +120,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	 Fields are:
 		1) name (or for now, Id)
 		2) orientations ('+'/'-')
-		3) text id
+		3) text name
 		4) text offset
 		5) sequence of hit (i.e. trimmed read)
 	    6) quality values of sequence (trimmed)
@@ -127,11 +128,11 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		8) mismatch positions - this is a comma-delimited list of positions
 			w.r.t. the 5 prime end of the read.
 	 */
-	const char* bwt_fmt_str = "%s %c %d %d %s %s %d %s";
+	const char* bwt_fmt_str = "%s %c %s %d %s %s %d %s";
 
 
 	char orientation;
-	unsigned int text_id;
+	char text_name[buf_size];
 	unsigned int text_offset;
 	char sequence[buf_size];
 
@@ -152,13 +153,13 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 						  bwt_fmt_str,
 						  name,
 						  &orientation,
-						  &text_id,
+						  text_name,   // name of reference sequence
 						  &text_offset,
 						  sequence,
 						  qualities,
 						  &other_occs,
 						  mismatches);
-
+		
 		if (bwtf_ret > 0 && bwtf_ret < 6)
 		{
 			fprintf(stderr, "Warning: found malformed record, skipping\n");
@@ -180,15 +181,11 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		memset(m1->seq, 0, max_read_bp);
 		m1->size = strlen(sequence);
 
-		m1->seqid = text_id;
+		m1->seqid = seqid; // 'seqid' is a unique id for alignments
 
-		if (!refnames_fname &&
-			seqid_to_name.find(text_id) == seqid_to_name.end())
-		{
-			char name_buf[1024];
-			sprintf(name_buf, "%d", text_id);
-			seqid_to_name[text_id] = name_buf;
-
+		if (seqid_to_name.find(seqid) == seqid_to_name.end()) {
+			// Map the alignment id to the name of the reference sequence
+			seqid_to_name[seqid] = text_name;
 		}
 
 		int qual_len = strlen(qualities);
@@ -262,6 +259,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		m1->seq[MAX_READLEN-1] = m1->alt_qual = m1->map_qual;
 
 		++mm->n_mapped_reads;
+		seqid++; // increment unique id for reads
 	}
 
 	mm->n_ref = seqid_to_name.size();
