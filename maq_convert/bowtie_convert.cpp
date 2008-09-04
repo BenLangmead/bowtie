@@ -6,6 +6,7 @@
 
 #include <string>
 #include <iostream>
+#include <set>
 #include <map>
 #include <stdio.h>
 #include <seqan/sequence.h>
@@ -80,7 +81,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		exit(1);
 	}
 
-	map<unsigned int, string> seqid_to_name;
+	std::map<string, int> seqid_to_name;
 	char bwt_buf[2048];
 	static const int buf_size = 256;
 	char name[buf_size];
@@ -109,7 +110,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 						"Warning: bad sequence id, name pair, skipping\n");
 				continue;
 			}
-			seqid_to_name[seqid] = name;
+			seqid_to_name[name] = seqid;
 		}
 	}
 
@@ -159,7 +160,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 						  qualities,
 						  &other_occs,
 						  mismatches);
-		
+
 		if (bwtf_ret > 0 && bwtf_ret < 6)
 		{
 			fprintf(stderr, "Warning: found malformed record, skipping\n");
@@ -177,15 +178,19 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		strncpy(m1->name, name, max_read_name-1);
 		m1->name[max_read_name-1] = 0;
 
+		text_name[MAX_NAMELEN-1] = '\0';
+
 		// Convert sequence into Maq's bitpacked format
 		memset(m1->seq, 0, max_read_bp);
 		m1->size = strlen(sequence);
 
-		m1->seqid = seqid; // 'seqid' is a unique id for alignments
 
-		if (seqid_to_name.find(seqid) == seqid_to_name.end()) {
+		if (seqid_to_name.find(text_name) == seqid_to_name.end()) {
 			// Map the alignment id to the name of the reference sequence
-			seqid_to_name[seqid] = text_name;
+			m1->seqid = seqid_to_name.size(); // 'seqid' is a unique id for alignments
+			seqid_to_name[text_name] = m1->seqid;
+		} else {
+			m1->seqid = seqid_to_name[text_name];
 		}
 
 		int qual_len = strlen(qualities);
@@ -265,18 +270,20 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	mm->n_ref = seqid_to_name.size();
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
 	int j = 0;
-	for (map<unsigned int,string>::iterator i = seqid_to_name.begin();
+	for (std::map<string, int>::iterator i = seqid_to_name.begin();
 		 i != seqid_to_name.end(); ++i)
 	{
-		char* name = strdup(i->second.c_str());
+		char* name = strdup(i->first.c_str());
 		if (name)
 			mm->ref_name[j++] = name;
 		//cerr << mm->ref_name[i->first] << endl;
 	}
 
-
 	algo_sort(mm->n_mapped_reads, mm->mapped_reads);
+
+	// Write out the header
 	maqmap_write_header(maqf, mm);
+	// Write out the alignments
 	gzwrite(maqf, mm->mapped_reads, sizeof(maqmap1_t) * mm->n_mapped_reads);
 
 	maq_delete_maqmap(mm);
