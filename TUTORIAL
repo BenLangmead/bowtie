@@ -107,10 +107,48 @@ Bowtie Getting Started Guide
  ---------------------------
 
  Maq (http://maq.sf.net), by Heng Li at the Wellcome Trust Sanger
- Institute, is a pipeline for identifying mapping reads and finding
- variations with respect to a reference sequence. The output from
- Bowtie can be converted to the same format as is output by Maq's
- short read aligner, allowing Bowtie users to leverage the rest of
- the Maq pipeline to identify variations.
+ Institute, is a collection of tools for aligning short reads and
+ finding variations with respect to a reference sequence. The output
+ produced by Bowtie can be converted to the same format as is output
+ by Maq's short read aligner, allowing Bowtie users to leverage Maq's
+ tools for finding variations.
 
- (More coming soon)
+ When running 'bowtie' to align your reads, be sure to provide a
+ filename as the third argument to save the alignments to a file:
+
+    bowtie a_genome experiment1.fq experiment1.map 
+
+ Now run 'bowtie-convert' to convert the Bowtie alignment file to a Maq
+ alignment file:
+
+    bowtie-convert experiment1.map experiment1.maq_map 
+
+ Note that Maq's alignment file format is not readable. Use 'maq
+ mapview' to view its contents:
+
+    maq mapview experiment1.maq_map 
+
+ Next, convert the reference sequence(s) into Maq's .bfa format. These
+ sequences must be the same as those used to build the Bowtie index.
+ Use Maq's 'maq fasta2bfa' command to perform the conversion:
+
+    maq fasta2bfa a_genome.mfa a_genome.bfa 
+
+ To produce a consensus sequence from the alignments, use 'maq
+ assemble'. This will generate the consensus and store it in a .cns
+ file (and print some summary output):
+
+    maq assemble experiment1.cns a_genome.bfa experiment1.maq_map 
+
+ The .cns is not stored in a readable format, but you can print the
+ consensus sequence in FASTQ format using 'maq cns2fq':
+
+    maq cns2fq experiment1.cns 
+
+ To identify ("call") Single Nucleotide Polymorphisms (SNPs) in the
+ consensus sequence, use 'maq cns2snp':
+
+    maq cns2snp experiment1.cns 
+
+ See the Maq manual for details on how to use these and other Maq
+ tools: http://maq.sourceforge.net/maq-man.shtml.
