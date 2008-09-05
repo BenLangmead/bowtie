@@ -20,9 +20,21 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.9.2 - September 2008
+     * Now allows 3-mismatches: -n and -v options accept 3
+     * Output format prints reference name instead of id in third column
+     * Pre-built indexes updated to encode reference names
+     * Ns in reads now match nothing (previously, they matched As/Ts)
+     * Dropped -l/--linerate and -i/--linesperside arguments to bowtie-
+       build
+     * Fixed bug in Maq-like mode that allowed some poor alignments
+     * Minor speed improvements
+
 Version 0.9.1 - August 2008
      * Integrated relevant SeqAn-1.1 sources into Bowtie source release
      * Now builds on Windows under MinGW (needs pthreads and zlib)
+     * Binary releases for Linux (i386, x86_64), Windows (i386) and
+       MacOS X (i386)
 
 Version 0.9.0 - August 2008
      * First stable release of Bowtie.
