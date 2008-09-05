@@ -13,6 +13,7 @@
 #include <algorithm>
 #include "maqmap.h"
 #include "algo.hh"
+#include "bfa.h"
 #include "tokenize.h"
 #include "formats.h"
 #include "pat.h"
@@ -27,7 +28,7 @@ static int log_n[256];
 
 static void print_usage()
 {
-	cout << "Usage: bowtie_convert <in.bwtmap> <out.map> [refnames]" << endl;
+	cout << "Usage: bowtie_convert <in.bwtmap> <out.map> <chr.bfa>" << endl;
 	cout << "    -v     verbose output" << endl;
 }
 
@@ -64,7 +65,7 @@ static inline int cal_map_qual(int default_qual,
 
 int convert_bwt_to_maq(const string& bwtmap_fname,
 					   const string& maqmap_fname,
-					   const string* refnames_fname = NULL)
+					   const map<string, unsigned int>& names_to_ids)
 {
 	FILE* bwtf = fopen(bwtmap_fname.c_str(), "r");
 
@@ -87,32 +88,6 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	char name[buf_size];
 	int bwtf_ret = 0;
 	uint32_t seqid = 0;
-
-	FILE* refnamef = NULL;
-	if (refnames_fname)
-	{
-		refnamef = fopen(refnames_fname->c_str(), "r");
-		if (!refnamef)
-		{
-			fprintf(stderr,
-					"Error: could not open reference names file for reading\n");
-			exit(1);
-		}
-		while (fgets(bwt_buf, 2048, refnamef))
-		{
-			//char* nl = strrchr(bwt_buf, '\n');
-			//if (nl) *nl = 0;
-			int seqid = 0;
-			bwtf_ret = sscanf(bwt_buf, "%d %s\n", &seqid, name);
-			if (bwtf_ret != 2)
-			{
-				fprintf(stderr,
-						"Warning: bad sequence id, name pair, skipping\n");
-				continue;
-			}
-			seqid_to_name[name] = seqid;
-		}
-	}
 
 	// Initialize a new Maq map table
 	maqmap_t *mm = maq_new_maqmap();
@@ -178,20 +153,29 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		strncpy(m1->name, name, max_read_name-1);
 		m1->name[max_read_name-1] = 0;
 
-		text_name[MAX_NAMELEN-1] = '\0';
+		text_name[buf_size-1] = '\0';
 
 		// Convert sequence into Maq's bitpacked format
 		memset(m1->seq, 0, max_read_bp);
 		m1->size = strlen(sequence);
 
-
-		if (seqid_to_name.find(text_name) == seqid_to_name.end()) {
-			// Map the alignment id to the name of the reference sequence
-			m1->seqid = seqid_to_name.size(); // 'seqid' is a unique id for alignments
-			seqid_to_name[text_name] = m1->seqid;
-		} else {
-			m1->seqid = seqid_to_name[text_name];
+		map<string, unsigned int>::const_iterator i_text_id = 
+			names_to_ids.find(text_name);
+		if (i_text_id == names_to_ids.end())
+		{
+			fprintf(stderr, "Warning: read maps to text not in BFA, skipping\n");
+			continue;
 		}
+		
+		m1->seqid = i_text_id->second;
+		
+//		if (seqid_to_name.find(text_name) == seqid_to_name.end()) {
+//			// Map the alignment id to the name of the reference sequence
+//			m1->seqid = seqid_to_name.size(); // 'seqid' is a unique id for alignments
+//			seqid_to_name[text_name] = m1->seqid;
+//		} else {
+//			m1->seqid = seqid_to_name[text_name];
+//		}
 
 		int qual_len = strlen(qualities);
 
@@ -267,15 +251,15 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		seqid++; // increment unique id for reads
 	}
 
-	mm->n_ref = seqid_to_name.size();
+	mm->n_ref = names_to_ids.size();
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
-	int j = 0;
-	for (std::map<string, int>::iterator i = seqid_to_name.begin();
-		 i != seqid_to_name.end(); ++i)
+	
+	for (map<string, unsigned int>::const_iterator i = names_to_ids.begin();
+		 i != names_to_ids.end(); ++i)
 	{
 		char* name = strdup(i->first.c_str());
 		if (name)
-			mm->ref_name[j++] = name;
+			mm->ref_name[i->second] = name;
 		//cerr << mm->ref_name[i->first] << endl;
 	}
 
@@ -300,11 +284,31 @@ void init_log_n()
 		log_n[i] = (int)(3.434 * log(i) + 0.5);
 }
 
+void get_names_from_bfa(const string& bfa_filename, 
+				   map<string, unsigned int>& names_to_ids)
+{
+	FILE* bfaf = fopen(bfa_filename.c_str(), "r");
+	
+	if (!bfaf)
+	{
+		fprintf(stderr, "Error: could not open Binary FASTA file %s for reading\n", bfa_filename.c_str());
+		exit(1);
+	}
+	
+	unsigned int next_id = 0;
+	nst_bfa1_t *l;
+	
+	while ((l = nst_load_bfa1(bfaf)) != 0)
+	{
+		names_to_ids[l->name] = next_id++;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	string bwtmap_filename;
 	string maqmap_filename;
-	string* refnames_filename = NULL;
+	string bfa_filename;
 	const char *short_options = "v";
 	int next_option;
 	do {
@@ -340,13 +344,19 @@ int main(int argc, char **argv)
 
 	// An optional argument:
 	// a two-column text file of [Bowtie ref id, reference name string] pairs
-	if(optind < argc)
-		refnames_filename = new string(argv[optind++]);
+	if(optind >= argc)
+	{
+		print_usage();
+		return 1;
+	}
+	bfa_filename = string(argv[optind++]);
 
 	init_log_n();
 
-	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, refnames_filename);
+	map<string, unsigned int> names_to_ids;
+	get_names_from_bfa(bfa_filename, names_to_ids);
+	
+	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, names_to_ids);
 
-	delete refnames_filename;
 	return ret;
 }
