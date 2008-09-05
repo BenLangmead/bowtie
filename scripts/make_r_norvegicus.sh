@@ -47,7 +47,7 @@ for c in 1 2 3 4 5 6 7 8 9 ; do
 	fi
 done
 
-for c in 10 11 12 13 14 15 16 17 18 19 20 X Y MT ; do
+for c in 10 11 12 13 14 15 16 17 18 19 20 X MT ; do
 	if [ ! -f rn_ref_chr$c.mfa ] ; then
 		if ! which wget > /dev/null ; then
 			echo wget not found, looking for curl...
@@ -70,5 +70,5 @@ for c in 10 11 12 13 14 15 16 17 18 19 20 X Y MT ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa,rn_ref_chrY.mfa r_norvegicus
-${BOWTIE_BUILD_EXE} rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa,rn_ref_chrY.mfa r_norvegicus
+echo Running ${BOWTIE_BUILD_EXE} rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa r_norvegicus
+${BOWTIE_BUILD_EXE} rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa r_norvegicus

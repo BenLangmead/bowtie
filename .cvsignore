@@ -39,3 +39,4 @@ gmon.*
 ebwt_build_packed_prof1
 *.prof
 *.exe
+tmp.*
