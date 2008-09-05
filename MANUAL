@@ -229,11 +229,10 @@ Bowtie Manual
  sequence: about 4 gigabytes for the human genome.
  
  The indexer provides many options pertaining to the "shape" of the
- index, e.g., --linerate and --linesperside govern the size of the
- Ferragina-Manzini buckets, and --offrate governs the number of marked
- rows.  All of these options are potentially profitable trade-offs.
- They have been set to defaults that are reasonable for most cases
- according to our experiments.
+ index, e.g. --offrate governs the number of marked rows.  All of
+ these options are potentially profitable trade-offs.  They have been
+ set to defaults that are reasonable for most cases according to our
+ experiments.
    
   Command Line
   ------------
@@ -286,19 +285,6 @@ Bowtie Manual
     --nodc                  Disable use of the difference-cover sample.
                             Suffix sorting becomes quadratic worst-case
                             time.
-    
-    -l/--linerate <int>     The size of a cache line is considered to
-                            be 2^<int> bytes.  Default: 6 (64 bytes,
-                            as in Intel and AMD architectures).
-    
-    -i/--linesperside <int> Number of cache lines in a "side".  A side
-                            is half a bucket, and buckets correspond 1-
-                            to-1 to cumulative character-occurrence
-                            counts.  Deafult: 1 (bucket is 128 bytes,
-                            16 bytes used for A/C/G/T occurrence counts
-                            up to the bucket's halfway point, 112 bytes
-                            used to hold 448 characters of the Burrows-
-                            Wheeler Transform).
     
     -o/--offrate <int>      To map alignments back to positions on the
                             reference sequences, it's necessary to
@@ -356,4 +342,5 @@ Bowtie Manual
  --------------------------------------------
  
  Usage: bowtie_convert <in.bwtmap> <out.map> [refnames]
+ 
     -v     verbose output
