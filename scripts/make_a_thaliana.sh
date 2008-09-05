@@ -1,9 +1,9 @@
 #!/bin/sh
 
 #
-# Downloads sequence for C. elegans from wormbase.  This script
-# was used to build the Bowtie index for C. elegans on August 14,
-# 2008.
+# Downloads sequence for A. thaliana from TAIR.  This script was used
+# to build the Bowtie index for A. thaliana on September 4, 2008.  The
+# downloaded version was TAIR8.
 #
 
 GENOMES_MIRROR=ftp://ftp.arabidopsis.org/home/tair
@@ -40,5 +40,5 @@ for c in 1 2 3 4 5 C M ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  c_elegans
-${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  c_elegans
+echo Running ${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
+${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
