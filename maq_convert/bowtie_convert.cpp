@@ -28,7 +28,7 @@ static int log_n[256];
 
 static void print_usage()
 {
-	cout << "Usage: bowtie_convert <in.bwtmap> <out.map> <chr.bfa>" << endl;
+	cout << "Usage: bowtie-convert <in.bwtmap> <out.map> <chr.bfa>" << endl;
 	cout << "    -v     verbose output" << endl;
 }
 
@@ -159,16 +159,16 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		memset(m1->seq, 0, max_read_bp);
 		m1->size = strlen(sequence);
 
-		map<string, unsigned int>::const_iterator i_text_id = 
+		map<string, unsigned int>::const_iterator i_text_id =
 			names_to_ids.find(text_name);
 		if (i_text_id == names_to_ids.end())
 		{
 			fprintf(stderr, "Warning: read maps to text not in BFA, skipping\n");
 			continue;
 		}
-		
+
 		m1->seqid = i_text_id->second;
-		
+
 //		if (seqid_to_name.find(text_name) == seqid_to_name.end()) {
 //			// Map the alignment id to the name of the reference sequence
 //			m1->seqid = seqid_to_name.size(); // 'seqid' is a unique id for alignments
@@ -253,7 +253,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 	mm->n_ref = names_to_ids.size();
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
-	
+
 	for (map<string, unsigned int>::const_iterator i = names_to_ids.begin();
 		 i != names_to_ids.end(); ++i)
 	{
@@ -284,20 +284,20 @@ void init_log_n()
 		log_n[i] = (int)(3.434 * log(i) + 0.5);
 }
 
-void get_names_from_bfa(const string& bfa_filename, 
+void get_names_from_bfa(const string& bfa_filename,
 				   map<string, unsigned int>& names_to_ids)
 {
 	FILE* bfaf = fopen(bfa_filename.c_str(), "r");
-	
+
 	if (!bfaf)
 	{
 		fprintf(stderr, "Error: could not open Binary FASTA file %s for reading\n", bfa_filename.c_str());
 		exit(1);
 	}
-	
+
 	unsigned int next_id = 0;
 	nst_bfa1_t *l;
-	
+
 	while ((l = nst_load_bfa1(bfaf)) != 0)
 	{
 		names_to_ids[l->name] = next_id++;
@@ -355,7 +355,7 @@ int main(int argc, char **argv)
 
 	map<string, unsigned int> names_to_ids;
 	get_names_from_bfa(bfa_filename, names_to_ids);
-	
+
 	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, names_to_ids);
 
 	return ret;

@@ -21,7 +21,7 @@ Version Release History
 =======================
 
 Version 0.9.3 - September 6, 2008
-   * Major bug fixes to bowtie-convert
+   * Major reference-name bug fixes to bowtie-convert
 
 Version 0.9.2 - September 4, 2008
    * Now allows 3-mismatches: -n and -v options accept 3
