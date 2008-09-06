@@ -39,7 +39,7 @@ static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 static int32_t chunkRate     = 11; // each chunk is 2K
-static int32_t bigEndian     = 0;  // little endian
+static int     bigEndian     = 0;  // little endian
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -86,7 +86,6 @@ static const char *short_options = "vrpscfl:i:o:t:h:";
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            'v'},
 	{"sanity",       no_argument,       0,            's'},
-	//{"double",       no_argument,       0,            'd'},
 	{"little",       no_argument,       &bigEndian,   0},
 	{"big",          no_argument,       &bigEndian,   1},
 	{"bmax",         required_argument, 0,            ARG_BMAX},
