@@ -3,7 +3,8 @@
 #
 # Downloads sequence for C. elegans from wormbase.  This script
 # was used to build the Bowtie index for C. elegans on September 6,
-# 2008.
+# 2008.  It downloads WormBase release WS190, the latest freeze as of
+# this date.
 #
 
 GENOMES_MIRROR=ftp://ftp.gramene.org/pub/wormbase/genomes
@@ -18,26 +19,26 @@ if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 	fi
 fi
 
-if [ ! -f current.dna.fa ] ; then
+if [ ! -f elegans.WS190.dna.fa ] ; then
 	if ! which wget > /dev/null ; then
 		echo wget not found, looking for curl...
 		if ! which curl > /dev/null ; then
 			echo curl not found either, aborting...
 		else
 			# Use curl
-			curl ${GENOMES_MIRROR}/c_elegans/sequences/dna/current.dna.fa.gz
+			curl ${GENOMES_MIRROR}/c_elegans/sequences/dna/elegans.WS190.dna.fa.gz
 		fi
 	else
 		# Use wget
-		wget ${GENOMES_MIRROR}/c_elegans/sequences/dna/current.dna.fa.gz
+		wget ${GENOMES_MIRROR}/c_elegans/sequences/dna/elegans.WS190.dna.fa.gz
 	fi
-	gunzip current.dna.fa.gz
+	gunzip elegans.WS190.dna.fa.gz
 fi
 
-if [ ! -f current.dna.fa ] ; then
-	echo "Could not find current.dna.fa file!"
+if [ ! -f elegans.WS190.dna.fa ] ; then
+	echo "Could not find elegans.WS190.dna.fa file!"
 	exit 2
 fi
 
-echo Running ${BOWTIE_BUILD_EXE} current.dna.fa c_elegans
-${BOWTIE_BUILD_EXE} current.dna.fa c_elegans
+echo Running ${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
+${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
