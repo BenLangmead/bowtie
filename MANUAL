@@ -3,6 +3,37 @@ Bowtie: an Ultrafast, Lightweight Short Read Aligner
 Bowtie Manual
 =============
 
+ What is Bowtie?
+ ---------------
+
+ Bowtie is an ultrafast, memory-efficient short read aligner geared
+ toward quickly aligning large volumes of short reads to mammalian
+ genomes. It aligns short DNA sequences (reads) to the human genome at
+ a rate of 25 million reads per hour on a typical workstation with 2
+ gigabytes of memory. Bowtie indexes the genome with a Burrows-Wheeler
+ index to keep its memory footprint small: 1.1 GB for the human genome.
+ Unlike tools that use more voluminous indexing schemes, Bowtie can be
+ run efficiently on a typical desktop PC and the index can be saved to
+ disk and reused across alignment runs. Bowtie supports alignment
+ policies equivalent to Maq and SOAP but is much faster: about 35x
+ faster than Maq and over 250x faster than SOAP when aligning to the
+ human genome. Bowtie's output format can be converted to the format
+ used by Maq, allowing users to rapidly align reads with Bowtie, then
+ identify variations with Maq. The Bowtie tools run on the command line
+ under Windows XP, Mac OS X, and Linux. 
+ 
+ What isn't Bowtie?
+ ------------------
+
+ Bowtie is not a general-purpose alignment tool like MUMmer, BLAST or
+ Vmatch. Bowtie will find a single "good" alignment (where "good" is
+ defined by the matching policy) for each input read that has one. If
+ there are multiple alignments that are equally "good" according to the
+ policy, Bowtie will choose and report one such alignment at random.
+ This is the default behavior of other tools like Maq and SOAP. Also,
+ Bowtie works only with short reads (< 64 base pairs) and does not
+ (yet) work in ABI colorspace. 
+ 
  Obtaining Bowtie Binaries
  -------------------------
  
