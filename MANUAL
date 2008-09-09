@@ -29,11 +29,11 @@ Bowtie Manual
  Bowtie is not a general-purpose alignment tool like MUMmer, BLAST or
  Vmatch. Bowtie will find a single "good" alignment (where "good" is
  defined by the matching policy) for each input read that has one. If
- there are multiple alignments that are equally "good" according to the
- policy, Bowtie will choose and report one such alignment at random.
- This is the default behavior of other tools like Maq and SOAP. Also,
- Bowtie works only with short reads (< 64 base pairs) and does not
- (yet) work in ABI colorspace. 
+ there are many alignments that are equally "good" according to the
+ policy, Bowtie will choose and report one at random. This is also the
+ default behavior of other short read alignment tools like Maq and
+ SOAP. Also, Bowtie works only with short reads (< 64 base pairs) and
+ does not (yet) work in ABI color space. 
  
  Obtaining Bowtie Binaries
  -------------------------
