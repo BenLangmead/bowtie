@@ -19,7 +19,7 @@ if(defined $options{h}) {
 }
 
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug");
+	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug") == 0 || die "Error building";
 }
 
 my @policies = (
@@ -59,7 +59,27 @@ $prand = int $ARGV[6] if defined($ARGV[6]);
 
 my $verbose = 0;
 my $exitOnFail = 1;
-my @dnaMap = ('A', 'T', 'C', 'G');
+my @dnaMap = ('A', 'T', 'C', 'G',
+              'N',
+              'M', 'R', 'W', 'S', 'Y', 'K', 'V', 'H', 'D', 'B', 'X');
+
+sub randGap() {
+	my $or = int(rand(4));
+	my $gap = "";
+	if($or == 0) {
+		my $ir = int(rand(100))+1;
+		if(($ir & 1) == 1) {
+			for(my $i = 0; $i < $ir; $i++) {
+				$gap .= 'N';
+			}
+		} else {
+			for(my $i = 0; $i < $ir; $i++) {
+				$gap .= '-';
+			}
+		}
+	}
+	return $gap;
+}
 
 # Utility function generates a random DNA string of the given length
 sub randDna($) {
@@ -67,7 +87,20 @@ sub randDna($) {
 	my $i;
 	my $t = '';
 	for($i = 0; $i < $num; $i++) {
-		$t .= $dnaMap[int(rand(4))];
+		my $or = int(rand(50));
+		if($or == 0) {
+			# Add a random, possibly ambiguous character
+			$t .= $dnaMap[int(rand($#dnaMap+1))];
+		} elsif($or == 1) {
+			# Add a random-length streak of Ns (max: 20)
+			my $streak = int(rand(20))+1;
+			for(my $j = $i; $j < $num && $j < $streak; $j++) {
+				$t .= 'N';
+			}
+		} else {
+			# Add a random non-ambiguous character
+			$t .= $dnaMap[int(rand(4))];
+		}
 	}
 	return $t;
 }
@@ -109,9 +142,27 @@ sub build {
 	my($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $chunkRate, $endian) = @_;
 	my $ret = 0;
 	
+	my $file1 = "-c";
+	my $file2 = "\"$t\"";
+	if(substr($t, 0, 1) eq '-') {
+		# Add backslash to escape first dash
+		$file2 = "\"\\$t\"";
+	}
+	my $fasta = int(rand(2)) == 0;
+	if($fasta) {
+		open FA, ">.randtmp.fa" || die "Could not open temporary fasta file";
+		my @seqs = split(/,/, $t);
+		for(my $i = 0; $i <= $#seqs; $i++) {
+			print FA ">ref$i\n";
+			print FA "$seqs[$i]\n";
+		}
+		close(FA);
+		$file1 = "-f";
+		$file2 = ".randtmp.fa";
+	}
+	
 	# Do unpacked version
-	#my $cmd = "./bowtie-build-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
-	my $cmd = "./bowtie-build-debug -s -c --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp";
+	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $file2 .tmp";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
 	if($out eq "") {
@@ -126,8 +177,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 5) {
-		#$cmd = "./bowtie-build-packed-debug -s -c --linerate $lineRate --linesperside $linesPerSide --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
-		$cmd = "./bowtie-build-packed-debug -s -c --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $t .tmp.packed";
+		$cmd = "./bowtie-build-packed-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $file2 .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
@@ -161,7 +211,7 @@ sub search {
 	} else {
 		$oneHit = "-a";
 	}
-	my $cmd = "./bowtie-debug $policy --concise --orig $t $oneHit -s -c .tmp $p";
+	my $cmd = "./bowtie-debug $policy --concise --orig \"$t\" $oneHit -s -c .tmp \"$p\"";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
@@ -241,12 +291,12 @@ for(; $outer > 0; $outer--) {
 	# Generate random text(s)
 	my $nt = int(rand(10)) + 1;
 	my $t = '';
+	my $tt = '';
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
-		$t .= randDna($tlen);
-		if($i < $nt-1) {
-			$t .= ",";
-		}
+		$tt = randDna($tlen);                # add text meat
+		$t .= (randGap() . $tt . randGap()); # add random padding
+		if($i < $nt-1) { $t .= ","; }        # add comma separator
 	}
 	
 	# Run the command to build the Ebwt from the random text
@@ -259,12 +309,12 @@ for(; $outer > 0; $outer--) {
 		my $pfinal = '';
 		my $np = int(rand(10)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
-			my $pl = int(rand(length($t))) - 10;
+			my $pl = int(rand(length($tt))) - 10;
 			$pl = max($pl, 0);
-			$pl = min($pl, length($t));
+			$pl = min($pl, length($tt));
 			my $plen = int(rand($prand)) + $pbase;
-			my $pr = min($pl + $plen, length($t));
-			my $p = substr $t, $pl, $pr - $pl;
+			my $pr = min($pl + $plen, length($tt));
+			my $p = substr $tt, $pl, $pr - $pl;
 			if(length($p) == 0 || index($p, ",") != -1) {
 				$i--; next;
 			}
@@ -287,7 +337,15 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy();
-		$pass += search($t, $pfinal, $policy, $oneHit, 1); # require 1 or more results
+		my $expectResult = 1;
+		for(my $i = 0; $i < length($pfinal); $i++) {
+			my $c = substr($pfinal, $i, 1);
+			if($c ne 'A' && $c ne 'C' && $c ne 'G' && $c ne 'T') {
+				$expectResult = 0;
+				last;
+			}
+		}
+		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
