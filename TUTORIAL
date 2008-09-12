@@ -66,7 +66,7 @@ Bowtie Getting Started Guide
     bowtie -c s_cerevisiae ATTGTAGTTCGAGTAAGTAATGTGGGTTTG
 
  This command searches the S. cerevisiae index with a single read. The
- -c argument instructs Bowtie to obtain read sequences directory from
+ -c argument instructs Bowtie to obtain read sequences directly from
  the command line rather than from a file. If the index is installed
  properly, this command should print a single alignment and then exit.
 
