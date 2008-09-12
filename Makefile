@@ -105,9 +105,11 @@ bowtie-convert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_C
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
 bowtie-src.zip: $(SRC_PKG_LIST)
+	chmod a+x scripts/*.sh scripts/*.pl
 	zip $@ $(SRC_PKG_LIST)
 
 bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
+	chmod a+x scripts/*.sh scripts/*.pl
 	if [ -f bowtie.exe ] ; then \
 		zip $@ $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
