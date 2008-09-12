@@ -13,6 +13,40 @@
 using namespace std;
 using namespace seqan;
 
+static uint8_t dna4Cat[] = {
+	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0,
+	       /*                                        - */
+	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/*  64 */ 0, 1, 2, 1, 2, 0, 0, 1, 2, 0, 0, 2, 0, 2, 2, 0,
+	       /*    A  B  C  D        G  H        K     M  N */
+	/*  80 */ 0, 0, 2, 2, 1, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0,
+	       /*       R  S  T     V  W  X  Y */
+	/*  96 */ 0, 1, 2, 1, 2, 0, 0, 1, 2, 0, 0, 2, 0, 2, 2, 0,
+           /*    a  b  c  d        g  h        k     m  n */
+	/* 112 */ 0, 0, 2, 2, 1, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0,
+           /*       r  s  t     v  w  x  y */
+	/* 128 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 144 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 160 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 176 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 192 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 208 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 224 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+struct RefRecord {
+	RefRecord(uint32_t _off, uint32_t _len, bool _first) :
+		off(_off), len(_len), first(_first)
+	{
+	}
+	size_t off;
+	size_t len;
+	bool   first;
+};
+
 /**
  * Parameters governing treatment of references as they're read in.
  */
@@ -29,11 +63,11 @@ struct RefReadInParams {
 	bool reverse;
 };
 
-extern size_t fastaRefReadSize(istream& in,
-                               const RefReadInParams& refparams, 
-                               bool first);
+extern RefRecord fastaRefReadSize(istream& in,
+                                  const RefReadInParams& refparams, 
+                                  bool first);
 extern size_t fastaRefReadSizes(vector<istream*>& in,
-                                vector<uint32_t>& szs,
+                                vector<RefRecord>& recs,
                                 const RefReadInParams& refparams);
 
 /**
@@ -59,74 +93,122 @@ static inline int skipLine(istream& in) {
  * the end of dst, optionally reversing it.
  */
 template <typename TStr>
-static size_t fastaRefReadAppend(istream& in,
-                                 TStr& dst,
-                                 RefReadInParams& refparams, 
-								 string* name = NULL)
+static RefRecord fastaRefReadAppend(istream& in,
+                                    bool first,
+                                    TStr& dst,
+                                    RefReadInParams& refparams, 
+                                    string* name = NULL)
 {
 	typedef typename Value<TStr>::Type TVal;
 	int c;
+	static int lastc = '>';
+	if(first) lastc = '>';
+	assert_neq(-1, lastc);
 
 	assert_neq(refparams.baseCutoff, 0);
 	assert_neq(refparams.numSeqCutoff, 0);
+	
+	// RefRecord params
 	size_t seqCharsRead = 0;
+	size_t seqOff = 0;
+	bool seqFirst = true;
+
 	size_t ilen = length(dst);
 	bool found_space_in_name = false;
-	// Pick off the first carat
-	
-	c = in.get(); if(in.eof()) goto bail;
-	assert(c == '>' || c == '#');
 	
 	// Chew up the id line; if the next line is either
 	// another id line or a comment line, keep chewing
-	do {
-		if (c == '#')
-			if((c = skipLine(in)) == -1) goto bail;
-		
-		while(true) {
-			c = in.get(); if(in.eof()) goto bail;
-			if (name)
-			{
-				if (isspace(c))
-				{
-					if (name->length())
-						found_space_in_name = true;
-				}
-				else if (!found_space_in_name)
-				{
-					name->push_back(c);
+	c = lastc;
+	if(c == '>' || c == '#') {
+		do {
+			while (c == '#') {
+				if((c = skipLine(in)) == -1) {
+					lastc = -1;
+					goto bail;
 				}
 			}
-				
-			if(c == '\n' || c == '\r') {
-				while(c == '\n' || c == '\r') {
-					c = in.get(); if(in.eof()) goto bail;
+			assert_eq('>', c);
+			while(true) {
+				c = in.get();
+				if(c == -1) {
+					lastc = -1;
+					goto bail;
 				}
-				// c now holds first character of next line
-				break;
+				if (name)
+				{
+					if (isspace(c))
+					{
+						if (name->length())
+							found_space_in_name = true;
+					}
+					else if (!found_space_in_name)
+					{
+						name->push_back(c);
+					}
+				}
+					
+				if(c == '\n' || c == '\r') {
+					while(c == '\n' || c == '\r') {
+						c = in.get();
+						if(c == -1) {
+							lastc = -1;
+							goto bail;
+						}
+					}
+					// c now holds first character of next line
+					break;
+				}
 			}
-		}
-		//if((c = skipLine(in)) == -1) goto bail;
-	} while (c == '>' || c == '#');
+		} while (c == '>' || c == '#');
+	} else {
+		ASSERT_ONLY(int cc = toupper(c));
+		assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
+		seqFirst = false;
+	}
 	
+	// Skip over gaps
+	while(true) {
+		int cat = dna4Cat[c];
+		if(cat == 1) {
+			// This is a DNA character
+			break; // to read-in loop
+		} else if(cat == 2) {
+			ASSERT_ONLY(int cc = toupper(c));
+			assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
+			seqOff++; // skip it
+		} else if(c == '>') {
+			lastc = '>';
+			goto bail;
+		}
+		c = in.get();
+		if(c == -1) {
+			lastc = -1;
+			goto bail;
+		}
+	}
+	assert_eq(1, dna4Cat[c]);
+
 	// in now points just past the first character of a sequence
 	// line, and c holds the first character
-	while(c != '>' && c != '#') {
+	while(true) {
 		// Note: can't have a comment in the middle of a sequence,
 		// though a comment can end a sequence
-		
-		if(isalpha(c)) {
+		int cat = dna4Cat[c];
+		assert_neq(2, cat);
+		if(cat == 1) {
 			appendValue(dst, (Dna)(char)c);
 			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
 			seqCharsRead++;
 			if((int64_t)seqCharsRead >= refparams.baseCutoff) {
-				return seqCharsRead;
+				lastc = -1;
+				goto bail;
 			}
 		}
-		if (in.peek() == '>' || in.peek() == '#')
-			break;
 		c = in.get();
-		if(in.eof()) break;
+		if (c == -1 || c == '>' || c == '#' || dna4Cat[c] == 2) {
+			lastc = c;
+			break;
+		}
 	}
 	
   bail:
@@ -147,7 +229,7 @@ static size_t fastaRefReadAppend(istream& in,
 			}
 		}
 	}
-	return seqCharsRead;
+	return RefRecord(seqOff, seqCharsRead, seqFirst);
 }
 
 #endif /*ndef REF_READ_H_*/

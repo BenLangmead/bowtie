@@ -38,7 +38,7 @@ static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
-static int32_t chunkRate     = 11; // each chunk is 2K
+static int32_t chunkRate     = 12; // each chunk is 4K
 static int     bigEndian     = 0;  // little endian
 
 // Argument constants for getopts
@@ -217,7 +217,7 @@ static void driver(const char * type,
 			is.push_back(new ifstream(infiles[i].c_str()));
 		}
 	}
-	vector<uint32_t> szs;
+	vector<RefRecord> szs;
 	uint32_t sztot;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;

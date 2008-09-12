@@ -286,12 +286,12 @@ static void exactSearch(PatternSource& patsrc,
                         EbwtSearchStats<TStr>& stats,
                         EbwtSearchParams<TStr>& params,
                         Ebwt<TStr>& ebwt,
-                        vector<TStr>& os)
+                        vector<String<Dna5> >& os)
 {
 	uint32_t patid = 0;
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0;
-	assert(patsrc.hasMorePatterns());
+	//assert(patsrc.hasMorePatterns());
 	EbwtSearchState<TStr> s(ebwt, params, seed);
     while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
     	params.setFw(!revcomp || !patsrc.nextIsReverseComplement());
@@ -342,10 +342,21 @@ static void exactSearch(PatternSource& patsrc,
 		    results2.reserve(256);
 		    for(unsigned int i = 0; i < os.size(); i++) {
 	    		// Forward
-	    		Finder<TStr> finder(os[i]);
-	    		Pattern<TStr, Horspool> pattern(*pat);
+	    		Finder<String<Dna5> > finder(os[i]);
+	    		Pattern<String<Dna5> , Horspool> pattern(*pat);
 	    		while (find(finder, pattern)) {
-	    			results2.push_back(make_pair(i, position(finder)));
+	    			size_t pos = position(finder);
+	    			assert_leq(pos + length(*pat), length(os[i]));
+	    			// Check if there are any 'N's on the reference
+	    			// side of the alignment
+	    			bool reject = false;
+	    			for(size_t j = 0; j < length(*pat); j++) {
+	    				if((int)os[i][j+pos] == 4) {
+	    					reject = true;
+	    					break;
+	    				}
+	    			}
+	    			if(!reject) results2.push_back(make_pair(i, position(finder)));
 	    		}
 		    }
     		sort(results.begin(), results.end());
@@ -385,11 +396,10 @@ static void exactSearch(PatternSource& patsrc,
  * find all hits for that pattern in all texts using a naive seed-
  * and-extend algorithm where seeds are found using Horspool.
  */
-template<typename TStr>
 static bool findSanityHits(const String<Dna5>& pat,
                            uint32_t patid,
                            bool fw,
-                           vector<TStr>& os,
+                           vector< String<Dna5> >& os,
                            vector<Hit>& sanityHits,
                            bool allowExact,
                            bool transpose)
@@ -422,11 +432,26 @@ static bool findSanityHits(const String<Dna5>& pat,
 		Finder<String<Dna5> > finder(o);
 		while (find(finder, pattern)) {
 			uint32_t pos = position(finder);
+			// Check the anchor to see if any characters in the
+			// reference half of the alignment are Ns
+			bool reject = false;
+			for(size_t j = 0; j < length(half); j++) {
+				if((int)o[j + pos] == 4) {
+					// Reject!
+					reject = true;
+				}
+			}
+			if(reject) continue;
 			bitset<max_read_bp> diffs = 0;
 			if(pos >= ohlen) {
 				// Extend toward the left end of the pattern, counting
 				// mismatches
 				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
+					if((int)o[pos-j-1] == 4) {
+						// Reject!
+						reject = true;
+						break;
+					}
 					if((int)o[pos-j-1] != (int)pat[ohlen-j-1]) {
 						uint32_t off = ohlen-j-1;
 						if(fivePrimeOnLeft) {
@@ -440,6 +465,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 						}
 					}
 				}
+				if(reject) continue;
 			}
 			// If the extend yielded 1 or fewer mismatches, keep it
 			if((diffs == 0 && allowExact) || diffs.count() == 1) {
@@ -501,11 +527,9 @@ static bool checkSanityExhausted(const String<Dna5>& pat,
  * Assert that every hit in the hits array also occurs in the
  * sanityHits array.
  */
-template<typename TStr>
 static bool reconcileHits(const String<Dna5>& pat,
                           uint32_t patid,
                           bool fw,
-                          vector<TStr>& os,
                           vector<Hit>& hits,
                           vector<Hit>& sanityHits,
                           bool allowExact,
@@ -571,12 +595,12 @@ static void mismatchSearch(PatternSource& patsrc,
                            EbwtSearchParams<TStr>& params,
                            Ebwt<TStr>& ebwtFw,
                            Ebwt<TStr>& ebwtBw,
-                           vector<TStr>& os)
+                           vector<String<Dna5> >& os)
 {
 	typedef typename Value<TStr>::Type TVal;
 	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
-	assert(patsrc.hasMorePatterns());
+	//assert(patsrc.hasMorePatterns());
     patsrc.setReverse(false); // reverse patterns
     params.setEbwtFw(true); // let search parameters reflect the forward index
 	vector<Hit> sanityHits;
@@ -697,7 +721,7 @@ static void mismatchSearch(PatternSource& patsrc,
     					assert_gt(sanityHits[i].mms.count(), 0);
     				}
     			}
-    			reconcileHits(*pat, spatid, sfw, os, hits, sanityHits, true, false);
+    			reconcileHits(*pat, spatid, sfw, hits, sanityHits, true, false);
     		} else if(!exactOnly) {
     			// If we tried exact and inexact and didn't hit, then
     			// oracle shouldn't have hit
@@ -742,21 +766,9 @@ static void mismatchSearch(PatternSource& patsrc,
     params.setEbwtFw(false); // let search parameters reflect the reverse index
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		TStr rest; ebwtBw.restore(rest);
-		uint32_t restOff = 0;
-		for(size_t i = 0; i < os.size(); i++) {
-			uint32_t olen = length(os[i]);
-			for(size_t j = 0; j < olen; j++) {
-				assert_eq(os[i][olen-j-1], rest[restOff]);
-				restOff++;
-			}
-			uint32_t leftover = (restOff & ~ebwtBw.eh().chunkMask());
-			uint32_t diff = ebwtBw.eh().chunkLen() - leftover;
-			if(leftover != 0) restOff += diff;
-			assert_eq(0, restOff & ~ebwtBw.eh().chunkMask());
-		}
+		ebwtBw.checkOrigs(os, true);
 	}
-	assert(patsrc.hasMorePatterns());
+	//assert(patsrc.hasMorePatterns());
 	assert(!patsrc.nextIsReverseComplement());
 	patid = 0;       // start again from id 0
 	//lastHits = 0llu; // start again from 0 hits
@@ -815,7 +827,7 @@ static void mismatchSearch(PatternSource& patsrc,
     		findSanityHits(*pat, spatid, sfw, os, sanityHits, false, true);
     		if(hits.size() > 0) {
     			// We hit, check that oracle also got our hits
-    			reconcileHits(*pat, spatid, sfw, os, hits, sanityHits, false, true);
+    			reconcileHits(*pat, spatid, sfw, hits, sanityHits, false, true);
     		} else {
     			// If we didn't hit, then oracle shouldn't have hit
         		assert_eq(0, sanityHits.size());
@@ -852,7 +864,7 @@ static void mismatchSearch(PatternSource& patsrc,
 	} \
 	assert(ebwtFw.isInMemory()); \
 	patsrc.reset(); /* rewind pattern source to first pattern */ \
-	assert(patsrc.hasMorePatterns()); \
+	/*assert(patsrc.hasMorePatterns());*/ \
 	patsrc.setReverse(false); /* tell pattern source not to reverse patterns */ \
 	params.setEbwtFw(true); /* tell search params that we're in the forward domain */ \
 }
@@ -868,7 +880,7 @@ static void mismatchSearch(PatternSource& patsrc,
 	} \
 	assert(ebwtBw.isInMemory()); \
 	patsrc.reset(); /* rewind pattern source to first pattern */ \
-	assert(patsrc.hasMorePatterns()); \
+	/* assert(patsrc.hasMorePatterns()); */ \
 	patsrc.setReverse(true); /* tell pattern source to reverse patterns */ \
 	params.setEbwtFw(false); /* tell search params that we're in the mirror domain */ \
 }
@@ -992,7 +1004,7 @@ static void twoOrThreeMismatchSearch(
         EbwtSearchParams<TStr>& params, /// search parameters
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<TStr>& os,               /// text strings, if available (empty otherwise)
+        vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
         bool two = true)                /// true -> 2, false -> 3
 {
 	typedef typename Value<TStr>::Type TVal;
@@ -1203,7 +1215,7 @@ static void twoOrThreeMismatchSearch(
 			// Calculate the halves
 			uint32_t s = plen;
 			uint32_t s3 = s >> 1; // length of 3' half of seed
-			//uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 			params.setPatId(patid);
 			bt.setQuery(patFw, qualFw, nameFw);
 			// Set up the revisitability of the halves
@@ -1225,10 +1237,10 @@ static void twoOrThreeMismatchSearch(
 			// Try a half-and-half on the forward read
 			bool gaveUp = false;
 			bthh.setQuery(patFw, qualFw, nameFw);
-			bthh.setOffs(s3, s,
+			bthh.setOffs(s5, s,
 			             0,
-			             two ? s3 : 0,
-			             two ? s  : s3,
+			             two ? s5 : 0,
+			             two ? s  : s5,
 			             s);
 			ASSERT_ONLY(numHits = sink.numHits());
 			hit = bthh.backtrack();
@@ -1310,7 +1322,7 @@ static void seededQualCutoffSearch(
         EbwtSearchParams<TStr>& params, /// search parameters
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<TStr>& os)    /// text strings, if available (empty otherwise)
+        vector<String<Dna5> >& os)      /// text strings, if available (empty otherwise)
 {
 	typedef typename Value<TStr>::Type TVal;
 	uint32_t numPats;
@@ -2180,19 +2192,23 @@ static void driver(const char * type,
                    const vector<string>& queries,
                    const string& outfile)
 {
-	vector<TStr> ps;
-	vector<TStr> os;
-	// Read original string(s) from command-line if given (for sanity checking)
+	// Vector of the reference sequences; used for sanity-checking
+	vector<String<Dna5> > os;
+	// Read reference sequences from the command-line or from a FASTA file
 	if(sanityCheck && !origString.empty()) {
+		// Determine if it's a file by looking at whether it has a FASTA-like
+		// extension
 		if(origString.substr(origString.length()-6) == ".fasta" ||
 		   origString.substr(origString.length()-4) == ".mfa"   ||
 		   origString.substr(origString.length()-4) == ".fna"   ||
 		   origString.substr(origString.length()-3) == ".fa")
 		{
+			// Read fasta file
 			vector<string> origFiles;
 			tokenize(origString, ",", origFiles);
-			readSequenceFiles<TStr, Fasta>(origFiles, os);
+			readSequenceFiles<String<Dna5>, Fasta>(origFiles, os);
 		} else {
+			// Read sequence
 			readSequenceString(origString, os);
 		}
 	}
@@ -2225,10 +2241,10 @@ static void driver(const char * type,
 		default: assert(false);
 	}
 	// Check that input is non-empty
-	if(!patsrc->hasMorePatterns()) {
-		cerr << "Error: Empty input!  Check that file format is correct." << endl;
-		exit(1);
-	}
+	//if(!patsrc->hasMorePatterns()) {
+	//	cerr << "Error: Empty input!  Check that file format is correct." << endl;
+	//	exit(1);
+	//}
 	if(skipSearch) return;
 	// Open hit output file
 	ostream *fout;
@@ -2259,35 +2275,30 @@ static void driver(const char * type,
 	    ebwt.loadIntoMemory();
 	}
 	// Sanity-check the restored version of the Ebwt
-	if(!maqLike && sanityCheck && !os.empty()) {
-		TStr rest; ebwt.restore(rest);
-		uint32_t restOff = 0;
-		for(size_t i = 0; i < os.size(); i++) {
-			for(size_t j = 0; j < length(os[i]); j++) {
-				assert_eq(os[i][j], rest[restOff]);
-				restOff++;
-			}
-			uint32_t leftover = (restOff & ~ebwt.eh().chunkMask());
-			uint32_t diff = ebwt.eh().chunkLen() - leftover;
-			if(leftover != 0) restOff += diff;
-			assert_eq(0, restOff & ~ebwt.eh().chunkMask());
-		}
+	if(sanityCheck && !os.empty()) {
+		if(maqLike) ebwt.loadIntoMemory();
+		ebwt.checkOrigs(os, false);
+		if(maqLike) ebwt.evictFromMemory();
 	}
     // If sanity-check is enabled and an original text string
     // was specified, sanity-check the Ebwt by confirming that
-    // its detransformation equals the original.
-	if(!maqLike && sanityCheck && !os.empty()) {
-		TStr rs; ebwt.restore(rs);
-		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
-		assert_leq(length(rs), length(joinedo));
-		assert_geq(length(rs) + ebwt.eh().chunkLen(), length(joinedo));
-		for(size_t i = 0; i < length(rs); i++) {
-			if(rs[i] != joinedo[i]) {
-				cout << "At character " << i << " of " << length(rs) << endl;
-			}
-			assert_eq(rs[i], joinedo[i]);
-		}
-	}
+    // the unpermuted version equals the original.
+	// NOTE: Disabled since, with fragments, it's no longer possible to do
+	// this straightforwardly with the os vector.  Rather, we need to either
+	// split each element of the os vector on Ns, or we need to read the
+	// references in differently.  The former seems preferable.
+//	if(!maqLike && sanityCheck && !os.empty()) {
+//		TStr rs; ebwt.restore(rs);
+//		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
+//		assert_leq(length(rs), length(joinedo));
+//		assert_geq(length(rs) + ebwt.eh().chunkLen(), length(joinedo));
+//		for(size_t i = 0; i < length(rs); i++) {
+//			if(rs[i] != joinedo[i]) {
+//				cout << "At character " << i << " of " << length(rs) << endl;
+//			}
+//			assert_eq(rs[i], joinedo[i]);
+//		}
+//	}
 	{
 		Timer _t(cout, "Time searching: ", timing);
 		// Set up hit sink; if sanityCheck && !os.empty() is true,

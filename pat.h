@@ -172,6 +172,7 @@ public:
 		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _maxNs(__maxNs),
 		_v(), _quals(), _vrev(), _qualsrev(), _rand(seed)
 	{
+		int nrejects = 0;
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
 			tokenize(v[i], ":", ss);
@@ -199,7 +200,10 @@ public:
 					}
 				}
 			}
-			if(ns > _maxNs) continue;
+			if(ns > _maxNs) {
+				nrejects++;
+				continue;
+			}
 			//  Initialize vq
 			string vq;
 			if(ss.size() == 2) {
@@ -233,7 +237,7 @@ public:
 				}
 			}
 		}
-		assert(!_v.empty());
+		assert_gt(_v.size() + nrejects, 0);
 		assert_eq(_v.size(), _vrev.size());
 		assert_eq(_v.size(), _quals.size());
 		assert_eq(_v.size(), _qualsrev.size());

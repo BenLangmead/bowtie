@@ -326,7 +326,7 @@ public:
 	     uint32_t bmaxDivN,
 	     int dcv,
 	     vector<istream*>& is,
-	     vector<uint32_t>& szs,
+	     vector<RefRecord>& szs,
 	     uint32_t sztot,
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
@@ -395,7 +395,7 @@ public:
 	 * joined string's suffix array. 
 	 */
 	void initFromVector(vector<istream*>& is,
-	                    vector<uint32_t>& szs,
+	                    vector<RefRecord>& szs,
 	                    uint32_t sztot,
 	                    const RefReadInParams& refparams,
 	                    ofstream& out1,
@@ -476,12 +476,17 @@ public:
 		VMSG_NL("Returning from initFromVector");
 	}
 
-	/// Return the length that the joined string of the given string list will have
-	uint32_t joinedLen(vector<uint32_t>& szs, uint32_t chunkRate) {
+	/**
+	 * Return the length that the joined string of the given string
+	 * list will have.  Note that this is indifferent to how the text
+	 * fragments correspond to input sequences - it just cares about
+	 * the lengths of the fragments.
+	 */
+	uint32_t joinedLen(vector<RefRecord>& szs, uint32_t chunkRate) {
 		uint32_t ret = 0;
 		uint32_t chunkLen = 1 << chunkRate;
 		for(unsigned int i = 0; i < szs.size(); i++) {
-			ret += ((szs[i] + chunkLen - 1) / chunkLen) * chunkLen;
+			ret += ((szs[i].len + chunkLen - 1) / chunkLen) * chunkLen;
 		}
 		return ret;
 	}
@@ -732,8 +737,8 @@ public:
 
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
-	static TStr join(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
-	void joinToDisk(vector<istream*>& l, vector<uint32_t>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
+	static TStr join(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
+	void joinToDisk(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -750,6 +755,7 @@ public:
 	void sanityCheckUpToSide(int upToSide) const;
 	void sanityCheckAll() const;
 	void restore(TStr& s) const;
+	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
 
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
@@ -1064,7 +1070,7 @@ public:
 	EbwtSearchParams(HitSink& __sink,
 	                 EbwtSearchStats<TStr>& __stats,
 	                 MultiHitPolicy __mhp,
-	                 const vector<TStr>& __texts,
+	                 const vector<String<Dna5> >& __texts,
 	                 bool __revcomp = true,
 	                 bool __fw = true,
 	                 bool __ebwtFw = true,
@@ -1101,7 +1107,7 @@ public:
 	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
-	               uint32_t tlen,      // length of text
+	               uint32_t textlen,   // length of fragment we hit in
 	               uint32_t len,       // length of query
 	               uint32_t oms) const
 	{
@@ -1148,21 +1154,21 @@ public:
 		}
 
 		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
-		if(!_ebwtFw && !_arrowMode) {
-			h.second = tlen - h.second - 1;
-			h.second -= (qlen-1);
-		}
+		//if(!_ebwtFw && !_arrowMode) {
+		//	h.second = (textlen - h.second - 1);
+		//	h.second -= (qlen-1);
+		//}
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
-			assert_eq(tlen, length(_texts[h.first]));
 			bitset<max_read_bp> diffs = 0;
 			// This type of check assumes that only mismatches are
 			// possible.  If indels are possible, then we either need
 			// the caller to provide information about indel locations,
 			// or we need to extend this to a more complicated check.
+			assert_leq(h.second + len, length(_texts[h.first]));
 			for(size_t i = 0; i < len; i++) {
-				assert_lt(h.second + i, length(_texts[h.first]));
+				assert_neq(4, (int)_texts[h.first][h.second + i]);
 				if(_ebwtFw) {
 					// Forward pattern appears at h
 					if((int)query[i] != (int)_texts[h.first][h.second + i]) {
@@ -1256,12 +1262,12 @@ public:
 	void setBacktracking(bool __backtracking) {
 		_backtracking = __backtracking;
 	}
-	const vector<TStr>& texts() const { return _texts; }
+	const vector<String<Dna5> >& texts() const { return _texts; }
 private:
 	HitSink& _sink;
 	EbwtSearchStats<TStr>& _stats;
 	MultiHitPolicy _mhp;    // policy for when read hits multiple spots
-    const vector<TStr>& _texts; // original texts, if available (if not
+    const vector<String<Dna5> >& _texts; // original texts, if available (if not
                                 // available, _texts.size() == 0)
 	uint32_t _patid;      // id of current read
 	bool _revcomp;        // whether reverse complements are enabled
@@ -1916,20 +1922,25 @@ void Ebwt<TStr>::sanityCheckAll() const {
 	// Check nPat
 	assert_gt(this->_nPat, 0);
 
-	// Check plen
+	// Check plen, flen
 	for(uint32_t i = 0; i < this->_nPat; i++) {
-		assert_gt(this->_plen[i], 0);
+		assert_geq(this->_plen[i], 0);
 	}
 
 	// Check pmap/plen
-	for(uint32_t i = 0; i < eh._numChunks*2; i += 2) {
-		assert_lt(this->_pmap[i], this->_nPat);             // valid pattern id
-		if(i > 0) { assert_geq(this->_pmap[i], this->_pmap[i-2]); } // pattern id in order
-		assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]); // valid offset into that pattern
-		assert_eq(this->_pmap[i+1] & eh._chunkMask, this->_pmap[i+1]);
-		if(i >= 2 && this->_pmap[i] == this->_pmap[i-2]) {  // same pattern as last entry?
-			assert_eq(this->_pmap[i+1], this->_pmap[i-2+1] + eh._chunkLen)
-		}
+	for(uint32_t i = 0; i < eh._numChunks*4; i += 4) {
+		// valid pattern id
+		assert_lt(this->_pmap[i], this->_nPat);
+		if(i > 0) {
+			// pattern id in order
+			assert_geq(this->_pmap[i], this->_pmap[i-4]);
+		} 
+		// Fragment offset is less than fragment length
+		assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
+		// Fragment offset is less than fragment length
+		assert_lt(this->_pmap[i+2], this->_pmap[i+3]);
+		// Fragment length is less than or equal to sequence length
+		assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
 	}
 
 	// Check ebwt
@@ -2528,41 +2539,82 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				numMms,              // # mismatches
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
-				0,                   // (bogus) tlen
+				0,                   // (bogus) textlen
 				qlen,                // qlen
 				bot-top-1);          // # other hits
 		return true;
 	}
+	
+	//
+	// Sequences are aligned on chunk boundaries.  Chunk size is
+	// configurable with a default of 2K characters.  Sequences are
+	// padded to fill the chunks.  Alignments that overlap any padding
+	// are invalid and should be weeded out. 
+	//
+	// Forward index case:
+	//
+	//                 Sequence 0                      Sequence 1
+	// -------------------------------------------- -----------------
+	// Chunk0   Chunk1   Chunk2   Chunk3   Chunk4   Chunk5   Chunk6
+	// ======== ======== ======== ======== ======== ======== ========
+	// -------- ----     -------- -------- -        --       -------
+	//  Fragment 0  ^^^^      Fragment 1    ^^^^^^^   ^^^^^^
+	//              Padding                    Padding
+	//
+	// To calculate a hit's offset, add the alignment's offset into the
+	// fragment containing it with that fragment's offset from the
+	// beginning of the sequence.
+	//
+	// Mirror index case:
+	//
+	//                 Sequence 0                      Sequence 1
+	// -------------------------------------------- -----------------
+	// Chunk0   Chunk1   Chunk2
+	// ======== ======== ======== ======== ======== ======== ========
+	// -------- ----     -------- -------- -        --       -------
+	//  Fragment 0            Fragment 1       Fragment 2  Fragment 3
+	//
+	
 	// Check whether our match overlaps with the padding between two
 	// texts, in which case the match is spurious
-	uint32_t ptabOff = (off >> this->_eh._chunkRate)*2;
-	uint32_t coff = off & ~(this->_eh._chunkMask); // offset into chunk
-	uint32_t tidx = this->_pmap[ptabOff];           // id of text matched
-	uint32_t toff = this->_pmap[ptabOff+1];         // hit's offset in text
-	uint32_t tlen = this->_plen[tidx];              // length of text
-	assert_lt(toff, tlen);
+	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
+	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
+	uint32_t tidx = this->_pmap[ptabOff];            // id of text matched
+	uint32_t toff = this->_pmap[ptabOff+1];          // offset into sequence
+	uint32_t foff = this->_pmap[ptabOff+2];          // offset into fragment
+	uint32_t flen = this->_pmap[ptabOff+3];          // fragment length
 	assert_lt(tidx, this->_nPat);
-	if(toff + coff + qlen > tlen) {
-		// Spurious result
+	uint32_t tlen = this->_plen[tidx];
+
+	// Reject if the alignment overlaps this fragment's padding or if
+	// it falls off the end of the sequence
+	if(foff + coff + qlen > flen) {
+		// Spurious result - overlaps with padding after fragment
 		return false;
-	} else {
-		// Genuine result
-		if(_verbose) {
-			cout << "report tidx=" << tidx << ", off=" << (toff+coff) << ", absoff=" << off << ", toff=" << toff << endl;
-		}
-		params.reportHit(
-				query,                        // read sequence
-				quals,                        // read quality values
-				name,                         // read name
-				mmui32,                       // mismatch positions
-				numMms,                       // # mismatches
-				make_pair(tidx, toff + coff), // position
-				make_pair(top, bot),          // arrows
-				tlen,                         // tlen
-				qlen,                         // qlen
-				bot-top-1);                   // # other hits
-		return true;
 	}
+	// Genuine result
+	if(_verbose) {
+		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
+	}
+	uint32_t textoff = toff;
+	if(params.ebwtFw()) {
+		textoff += (coff+foff);
+	} else {
+		textoff += (flen - (coff+foff));
+		textoff -= qlen;
+	}
+	params.reportHit(
+			query,                    // read sequence
+			quals,                    // read quality values
+			name,                     // read name
+			mmui32,                   // mismatch positions
+			numMms,                   // # mismatches
+			make_pair(tidx, textoff), // position
+			make_pair(top, bot),      // arrows
+			tlen,                     // textlen
+			qlen,                     // qlen
+			bot-top-1);               // # other hits
+	return true;
 }
 
 template<typename TStr>
@@ -3027,6 +3079,48 @@ void Ebwt<TStr>::restore(TStr& s) const {
 	assert_eq(jumps, this->_eh._len);
 }
 
+template <typename TStr>
+void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
+                            bool mirror) const
+{
+	TStr rest;
+	restore(rest);
+	uint32_t restOff = 0;
+	size_t i = 0, j = 0;
+	if(mirror) {
+		// TODO: FIXME
+		return;
+	}
+	while(i < os.size()) {
+		size_t olen = length(os[i]);
+		for(; j < olen; j++) {
+			size_t joff = j;
+			if(mirror) joff = olen - j - 1;
+			if((int)os[i][joff] == 4) {
+				// Skip over Ns
+				if(!mirror) {
+					while((int)os[i][j] == 4 && j < length(os[i])) j++;
+				} else {
+					while((int)os[i][olen-j-1] == 4 && j < length(os[i])) j++;
+				}
+				break;
+			}
+			assert_eq(os[i][joff], rest[restOff++]);
+		}
+		if(j == length(os[i])) {
+			// Moved to next sequence
+			i++;
+			j = 0;
+		} else {
+			// Just jumped over a gap
+		}
+		uint32_t leftover = (restOff & ~_eh.chunkMask());
+		uint32_t diff = _eh.chunkLen() - leftover;
+		if(leftover != 0) restOff += diff;
+		assert_eq(0, restOff & ~_eh.chunkMask());
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////
 //
 // Functions for reading and writing Ebwts
@@ -3163,7 +3257,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		}
 		for(uint32_t i = 0; i < this->_nPat; i++) {
 			assert_leq(this->_plen[i], len);
-			assert_gt(this->_plen[i], 0);
+			//assert_gt(this->_plen[i], 0);
 		}
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating plen[] in Ebwt::read()"
@@ -3179,21 +3273,25 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 
 	// Read pmap from primary stream
 	try {
-		uint32_t pmapEnts = eh._numChunks*2;
+		uint32_t pmapEnts = eh._numChunks*4;
 		if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
 		this->_pmap = new uint32_t[pmapEnts];
 		if(be) {
-			for(uint32_t i = 0; i < pmapEnts; i += 2) {
+			for(uint32_t i = 0; i < pmapEnts; i += 4) {
 				this->_pmap[i]   = readU32(_in1, be); // pat #
-				this->_pmap[i+1] = readU32(_in1, be); // pat offset
+				this->_pmap[i+1] = readU32(_in1, be); // sequence offset
+				this->_pmap[i+2] = readU32(_in1, be); // fragment offset
+				this->_pmap[i+3] = readU32(_in1, be); // fragment length
 			}
 		} else {
 			_in1.read((char *)this->_pmap, pmapEnts*4);
 			assert_eq(pmapEnts*4, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < pmapEnts; i += 2) {
-			assert_lt(this->_pmap[i], this->_nPat);
-			assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
+		for(uint32_t i = 0; i < pmapEnts; i += 4) {
+			assert_lt (this->_pmap[i],   this->_nPat);
+			assert_lt (this->_pmap[i+1], this->_plen[this->_pmap[i]]);
+			assert_lt (this->_pmap[i+2], this->_pmap[i+3]);
+			assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
 		}
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating pmap[] in Ebwt::read()"
@@ -3358,7 +3456,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		writeU32(out1, this->_nPat,      be);
 		for(uint32_t i = 0; i < this->_nPat; i++)
 		writeU32(out1, this->_plen[i], be);
-		for(uint32_t i = 0; i < eh._numChunks*2; i++)
+		for(uint32_t i = 0; i < eh._numChunks*4; i++)
 			writeU32(out1, this->_pmap[i], be);
 
 		// These Ebwt parameters are discovered only as the Ebwt is being
@@ -3430,7 +3528,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		assert_eq(_nPat,             copy.nPat());
 		for(uint32_t i = 0; i < _nPat; i++)
 			assert_eq(this->_plen[i], copy.plen()[i]);
-		for(uint32_t i = 0; i < eh._numChunks*2; i++)
+		for(uint32_t i = 0; i < eh._numChunks*4; i++)
 			assert_eq(this->_pmap[i], copy.pcap()[i]);
 		for(uint32_t i = 0; i < 5; i++)
 			assert_eq(this->_fchr[i], copy.fchr()[i]);
@@ -3511,7 +3609,7 @@ TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed) {
  */
 template<typename TStr>
 TStr Ebwt<TStr>::join(vector<istream*>& l,
-                      vector<uint32_t>& szs,
+                      vector<RefRecord>& szs,
                       uint32_t sztot,
                       const RefReadInParams& refparams,
                       uint32_t chunkRate,
@@ -3524,14 +3622,21 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 	TStr ret;
 	size_t guessLen = sztot + (szs.size() * chunkLen);
 	reserve(ret, guessLen, Exact());
+	ASSERT_ONLY(size_t szsi = 0);
 	for(size_t i = 0; i < l.size(); i++) {
 		// For each sequence we can pull out of istream l[i]...
 		assert(l[i]->good());
+		bool first = true;
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-
-		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
-			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp);
+		while(l[i]->good() && !l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp);
+			first = false;
+			size_t bases = rec.len;
+			assert_eq(rec.off, szs[szsi].off);
+			assert_eq(rec.len, szs[szsi].len);
+			assert_eq(rec.first, szs[szsi].first);
+			ASSERT_ONLY(szsi++);
 			if(bases == 0) continue;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
@@ -3581,7 +3686,7 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
  */
 template<typename TStr>
 void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
-                            vector<uint32_t>& szs,
+                            vector<RefRecord>& szs,
                             uint32_t sztot,
                             const RefReadInParams& refparams,
                             TStr& ret,
@@ -3593,11 +3698,21 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	const EbwtParams& eh = this->_eh;
 	RefReadInParams rpcp = refparams;
 	assert_gt(szs.size(), 0);
+	assert_gt(l.size(), 0);
 	assert_gt(sztot, 0);
-	this->_nPat = szs.size(); // store this in memory
+	// Not every fragment represents a distinct sequence - many
+	// fragments may correspond to a single sequence.  Count the
+	// number of sequences here by counting the number of "first"
+	// fragments.
+	size_t npats = 0;
+	for(size_t i = 0; i < szs.size(); i++) {
+		if(szs[i].first) npats++;
+	}
+	assert_gt(npats, 0);
+	this->_nPat = npats; // store this in memory
 	this->_pmap = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
-	ASSERT_ONLY(uint32_t pmapEnts = eh._numChunks*2);
+	ASSERT_ONLY(uint32_t pmapEnts = eh._numChunks*4);
 	uint32_t pmapOff = 0;
 	// Allocate plen[]
 	try {
@@ -3608,35 +3723,64 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		throw e;
 	}
 	// For each pattern, set plen
-	for(size_t i = 0; i < this->_nPat; i++) {
-		this->_plen[i] = szs[i];
-		writeU32(out1, this->_plen[i], this->toBe());
+	int npat = -1;
+	for(size_t i = 0; i < szs.size(); i++) {
+		if(szs[i].first) {
+			if(npat >= 0) {
+				writeU32(out1, this->_plen[npat], this->toBe());
+			}
+			npat++;
+			this->_plen[npat] = (szs[i].len + szs[i].off);
+		} else {
+			this->_plen[npat] += (szs[i].len + szs[i].off);
+		}
 	}
+	assert_eq((uint32_t)npat, this->_nPat-1);
+	writeU32(out1, this->_plen[npat], this->toBe());
+	
 	size_t seqsRead = 0;
+	ASSERT_ONLY(uint32_t szsi = 0);
 	for(unsigned int i = 0; i < l.size(); i++) {
 		assert(l[i]->good());
+		bool first = true;
 		streampos pos = l[i]->tellg();
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-
-		// For each sequence we can pull out of istream l[i]...
-		while(l[i]->good() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+		uint32_t patoff = 0;
+		// For each *fragment* (not necessary an entire sequence) we
+		// can pull out of istream l[i]...
+		while(l[i]->good() && !l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			string name;
 			// Push a new name onto our vector
 			_refnames.push_back("");
-			size_t bases = fastaRefReadAppend(*l[i], ret, rpcp, &_refnames.back());
-			// If name was empty, replace with an index
-			if(_refnames.back().length() == 0) {
-				ostringstream stm;
-				stm << seqsRead;
-				_refnames.back() = stm.str();
-			}
-			if(bases == 0) {
+			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp, &_refnames.back());
+			first = false;
+			size_t bases = rec.len;
+			if(rec.first) {
+				if(_refnames.back().length() == 0) {
+					// If name was empty, replace with an index
+					ostringstream stm;
+					stm << seqsRead;
+					_refnames.back() = stm.str();
+				}
+			} else {
+				assert_eq(0, _refnames.back().length());
 				_refnames.pop_back();
-				continue;
 			}
-			assert_eq(bases, this->_plen[seqsRead]);
-			seqsRead++;
+			assert_lt(szsi, szs.size());
+			assert_eq(rec.off, szs[szsi].off);
+			assert_eq(rec.len, szs[szsi].len);
+			assert_eq(rec.first, szs[szsi].first);
+			assert(rec.first || rec.off > 0);
+			szsi++;
+			// Increment seqsRead if this is the first fragment
+			if(rec.first) seqsRead++;
+			if(bases == 0) continue;
+			assert_leq(bases, this->_plen[seqsRead-1]);
+			// Reset the patoff if this is the first fragment
+			if(rec.first) patoff = 0;
+			patoff += rec.off; // add fragment's offset from end of last frag.
+			// Adjust rpcps
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
@@ -3664,12 +3808,17 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 			assert_eq(length(ret), length(ret) & eh._chunkMask);
 			// Initialize elements of the pmap that cover this pattern
 			for(unsigned int j = 0; j < bases; j += eh._chunkLen) {
-				assert_lt(pmapOff+1, pmapEnts);
-				pmapOff += 2;
-				writeU32(out1, seqsRead-1, this->toBe()); // pattern id
-				writeU32(out1, j, this->toBe()); // offset into pattern
+				assert_lt(pmapOff+3, pmapEnts);
+				pmapOff += 4;
+				uint32_t seq = seqsRead-1;
+				writeU32(out1, seq,    this->toBe()); // sequence id
+				writeU32(out1, patoff, this->toBe()); // offset into sequence
+				writeU32(out1, j,      this->toBe()); // offset into fragment
+				writeU32(out1, bases,  this->toBe()); // fragment length
 			}
+			patoff += bases;
 		}
+		assert_gt(szsi, 0);
 		l[i]->clear();
 		l[i]->seekg(pos);
 		assert(!l[i]->bad());

@@ -80,7 +80,7 @@ public:
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
-	                 vector<TStr>* __os = NULL,
+	                 vector<String<Dna5> >* __os = NULL,
 	                 bool __considerQuals = true, // whether to consider quality values when making backtracking decisions
 	                 bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
 	                 String<Dna5>* __qry = NULL,
@@ -191,8 +191,6 @@ public:
 	#define PHRED_QUAL2(q, k) ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
 	#define QUAL(k)           PHRED_QUAL(k)
 	#define QUAL2(q, k)       PHRED_QUAL2(q, k)
-//#define QUAL(k)           qualRounds[PHRED_QUAL(k)]
-//#define QUAL2(q, k)       qualRounds[PHRED_QUAL2(q, k)]
 
 	void setQuery(String<Dna5>* __qry,
 	              String<char>* __qual,
@@ -1291,7 +1289,7 @@ public:
 	 * Print a hit along with information about the backtracking
 	 * regions constraining the hit.
 	 */
-	static void printHit(const vector<TStr>& os,
+	static void printHit(const vector<String<Dna5> >& os,
 	                     const Hit& h,
 	                     const TStr& qry,
 	                     size_t qlen,
@@ -1328,7 +1326,7 @@ public:
 	/**
 	 * Naively search for the same hits that should be found by
 	 */
-	static void naiveOracle(const vector<TStr>& os,
+	static void naiveOracle(const vector<String<Dna5> >& os,
 	                        const String<Dna5>& qry,
 	                        uint32_t qlen,
 	                        const String<char>& qual,
@@ -1373,8 +1371,13 @@ public:
 					ok = olen-(j+((int)plen-1))-1;
 					okInc = 1;
 				}
+				bool rejectN = false;
 				for(int k = (int)plen-1; k >= 0; k--) {
 					size_t kr = plen-1-k;
+					if((int)ostr[ok] == 4) {
+						rejectN = true;
+						break;
+					}
 					if(pstr[k] != ostr[ok]) {
 						ham += qualRounds[QUAL2(qual, k)];
 						if(ham > qualThresh) {
@@ -1450,6 +1453,11 @@ public:
 						}
 					}
 					ok += okInc;
+				}
+				if(rejectN) {
+					// Rejected because the reference half of the
+					// alignment contained one or more Ns
+					continue;
 				}
 				if(halfAndHalf) {
 					if(twoRevOff == threeRevOff) {
@@ -1823,7 +1831,7 @@ protected:
 	String<uint8_t>    *_seedlings; // append seedling hits here
 	String<QueryMutation> *_muts;// set of mutations that apply for a
 	                             // seedling
-	vector<TStr>*       _os;     // reference texts
+	vector<String<Dna5> >* _os;     // reference texts
 	bool                _considerQuals;
 	bool                _halfAndHalf;
 	uint32_t            _5depth; // depth of 5'-seed-half border
