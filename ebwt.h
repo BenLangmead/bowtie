@@ -3778,7 +3778,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 			assert_eq(rec.len, szs[szsi].len);
 			assert_eq(rec.first, szs[szsi].first);
 			assert(rec.first || rec.off > 0);
-			szsi++;
+			ASSERT_ONLY(szsi++);
 			// Increment seqsRead if this is the first fragment
 			if(rec.first) seqsRead++;
 			if(bases == 0) continue;
