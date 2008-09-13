@@ -6,7 +6,7 @@
 #
 
 make bowtie-build-debug
-if ./bowtie-build-debug -s -v genomes/NC_008253.fna .build_test ; then
+if ./bowtie-build-debug -s -v genomes/NC_008253.fna .tmp ; then
 	echo Build test PASSED
 else
 	echo Build test FAILED
