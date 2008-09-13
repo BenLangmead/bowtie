@@ -55,7 +55,7 @@ struct RefReadInParams {
 		baseCutoff(bc), numSeqCutoff(sc), reverse(r) { }
 	// stop reading references once we've finished reading this many
 	// total reference bases
-	int64_t baseCutoff; 
+	int64_t baseCutoff;
 	// stop reading references once we've finished reading this many
 	// distinct sequences
 	int64_t numSeqCutoff;
@@ -64,7 +64,7 @@ struct RefReadInParams {
 };
 
 extern RefRecord fastaRefReadSize(istream& in,
-                                  const RefReadInParams& refparams, 
+                                  const RefReadInParams& refparams,
                                   bool first);
 extern size_t fastaRefReadSizes(vector<istream*>& in,
                                 vector<RefRecord>& recs,
@@ -96,18 +96,25 @@ template <typename TStr>
 static RefRecord fastaRefReadAppend(istream& in,
                                     bool first,
                                     TStr& dst,
-                                    RefReadInParams& refparams, 
+                                    RefReadInParams& refparams,
                                     string* name = NULL)
 {
 	typedef typename Value<TStr>::Type TVal;
 	int c;
 	static int lastc = '>';
-	if(first) lastc = '>';
+	if(first) {
+		c = in.get();
+		if(c != '>') {
+			cerr << "Reference file does not seem to be a FASTA file" << endl;
+			exit(1);
+		}
+		lastc = c;
+	}
 	assert_neq(-1, lastc);
 
 	assert_neq(refparams.baseCutoff, 0);
 	assert_neq(refparams.numSeqCutoff, 0);
-	
+
 	// RefRecord params
 	size_t seqCharsRead = 0;
 	size_t seqOff = 0;
@@ -115,7 +122,7 @@ static RefRecord fastaRefReadAppend(istream& in,
 
 	size_t ilen = length(dst);
 	bool found_space_in_name = false;
-	
+
 	// Chew up the id line; if the next line is either
 	// another id line or a comment line, keep chewing
 	c = lastc;
@@ -146,7 +153,7 @@ static RefRecord fastaRefReadAppend(istream& in,
 						name->push_back(c);
 					}
 				}
-					
+
 				if(c == '\n' || c == '\r') {
 					while(c == '\n' || c == '\r') {
 						c = in.get();
@@ -165,7 +172,7 @@ static RefRecord fastaRefReadAppend(istream& in,
 		assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
 		seqFirst = false;
 	}
-	
+
 	// Skip over gaps
 	while(true) {
 		int cat = dna4Cat[c];
@@ -210,7 +217,7 @@ static RefRecord fastaRefReadAppend(istream& in,
 			break;
 		}
 	}
-	
+
   bail:
 	// Optionally reverse the portion that we just appended
 	if(refparams.reverse) {
