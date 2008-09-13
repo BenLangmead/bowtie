@@ -392,7 +392,7 @@ public:
 	 * memory.  It then constructs a suffix-array producer (what kind
 	 * depends on 'useBlockwise') for the resulting sequence.  The
 	 * suffix-array producer can then be used to obtain chunks of the
-	 * joined string's suffix array. 
+	 * joined string's suffix array.
 	 */
 	void initFromVector(vector<istream*>& is,
 	                    vector<RefRecord>& szs,
@@ -1337,7 +1337,7 @@ struct SideLocus {
 	/**
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the shape of the Ebwt.
-	 * 
+	 *
 	 * Function gets 23.76% in profile
 	 */
 	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
@@ -1934,7 +1934,7 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		if(i > 0) {
 			// pattern id in order
 			assert_geq(this->_pmap[i], this->_pmap[i-4]);
-		} 
+		}
 		// Fragment offset is less than fragment length
 		assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
 		// Fragment offset is less than fragment length
@@ -1980,7 +1980,7 @@ inline int Ebwt<TStr>::rowL(const SideLocus& l) const {
 /**
  * Inline-function version of the above.  This does not always seem to
  * be inlined
- * 
+ *
  * Function gets 3.38% in profile
  */
 inline static int pop64(uint64_t x) {
@@ -1996,7 +1996,7 @@ inline static int pop64(uint64_t x) {
 /**
  * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
  * within a 64-bit argument.
- * 
+ *
  * Function gets 9.26% in profile
  */
 inline static int countInU64(int c, uint64_t dw) {
@@ -2031,7 +2031,7 @@ inline static int countInU64(int c, uint64_t dw) {
 /**
  * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
  * within a 64-bit argument.
- * 
+ *
  * Function gets 2.32% in profile
  */
 inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
@@ -2049,7 +2049,7 @@ inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
  *
  * This is a performance-critical function.  This is the top search-
  * related hit in the time profile.
- * 
+ *
  * Function gets 11.09% in profile
  */
 template<typename TStr>
@@ -2080,7 +2080,7 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 /**
  * Counts the number of occurrences of character 'c' in the given Ebwt
  * side up to (but not including) the given byte/bitpair (by/bp).
- * 
+ *
  * Function gets 5.86% in the profile.
  */
 template<typename TStr>
@@ -2544,12 +2544,12 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				bot-top-1);          // # other hits
 		return true;
 	}
-	
+
 	//
 	// Sequences are aligned on chunk boundaries.  Chunk size is
 	// configurable with a default of 2K characters.  Sequences are
 	// padded to fill the chunks.  Alignments that overlap any padding
-	// are invalid and should be weeded out. 
+	// are invalid and should be weeded out.
 	//
 	// Forward index case:
 	//
@@ -2574,7 +2574,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	// -------- ----     -------- -------- -        --       -------
 	//  Fragment 0            Fragment 1       Fragment 2  Fragment 3
 	//
-	
+
 	// Check whether our match overlaps with the padding between two
 	// texts, in which case the match is spurious
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
@@ -3256,7 +3256,12 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			assert_eq(this->_nPat*4, (uint32_t)_in1.gcount());
 		}
 		for(uint32_t i = 0; i < this->_nPat; i++) {
-			assert_leq(this->_plen[i], len);
+			// Following is not necessarily true because we
+			// intentionally don't count gaps and ambiguous chars on
+			// the end of a sequence towards its plen
+			//assert_leq(this->_plen[i], len);
+			// Following is not necessarily true because we keep
+			// entries around for empty or all-gap sequeneces
 			//assert_gt(this->_plen[i], 0);
 		}
 	} catch(bad_alloc& e) {
@@ -3357,7 +3362,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		     << "Ebwt::read()  at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
-	
+
 	// Read reference sequence names from primary index file
 	while(true) {
 		char c = '\0';
@@ -3724,6 +3729,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	}
 	// For each pattern, set plen
 	int npat = -1;
+	assert(szs[0].first);
 	for(size_t i = 0; i < szs.size(); i++) {
 		if(szs[i].first) {
 			if(npat >= 0) {
@@ -3737,7 +3743,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	}
 	assert_eq((uint32_t)npat, this->_nPat-1);
 	writeU32(out1, this->_plen[npat], this->toBe());
-	
+
 	size_t seqsRead = 0;
 	ASSERT_ONLY(uint32_t szsi = 0);
 	for(unsigned int i = 0; i < l.size(); i++) {
