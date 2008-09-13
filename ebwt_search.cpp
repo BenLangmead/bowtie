@@ -1237,10 +1237,12 @@ static void twoOrThreeMismatchSearch(
 			// Try a half-and-half on the forward read
 			bool gaveUp = false;
 			bthh.setQuery(patFw, qualFw, nameFw);
-			bthh.setOffs(s5, s,
+			// Processing the forward pattern with the forward index;
+			// s3 ("lo") half is on the right
+			bthh.setOffs(s3, s,
 			             0,
-			             two ? s5 : 0,
-			             two ? s  : s5,
+			             two ? s3 : 0,
+			             two ? s  : s3,
 			             s);
 			ASSERT_ONLY(numHits = sink.numHits());
 			hit = bthh.backtrack();
@@ -1268,6 +1270,13 @@ static void twoOrThreeMismatchSearch(
 			params.setFw(false);
 			params.setPatId(patid+1);
 			bthh.setQuery(patRc, qualRc, nameRc);
+			// Processing the forward pattern with the forward index;
+			// s5 ("hi") half is on the right
+			bthh.setOffs(s5, s,
+			             0,
+			             two ? s5 : 0,
+			             two ? s  : s5,
+			             s);
 			ASSERT_ONLY(numHits = sink.numHits());
 			hit = bthh.backtrack();
 			if(bthh.numBacktracks() == bthh.maxBacktracks()) {
