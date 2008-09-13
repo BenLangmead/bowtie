@@ -1682,38 +1682,40 @@ protected:
 			// Oops, the oracle found at least one hit; print
 			// detailed info about the first oracle hit (for
 			// debugging)
-			const Hit& h = oracleHits[0];
-			cout << "Oracle hit " << oracleHits.size()
-			     << " times, but backtracker did not hit" << endl;
-			cout << "First oracle hit: " << endl;
-			if(_muts != NULL) {
-				undoMutations();
-				cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
-				applyMutations();
-			}
-			cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
-			cout << "  Tseg:           ";
-			bool ebwtFw = _params.ebwtFw();
-			if(ebwtFw) {
-				for(size_t i = 0; i < _qlen; i++) {
-					cout << (*_os)[h.h.first][h.h.second + i];
+			for(size_t i = 0; i < oracleHits.size() && i < 3; i++) {
+				const Hit& h = oracleHits[i];
+				cout << "Oracle hit " << oracleHits.size()
+					 << " times, but backtracker did not hit" << endl;
+				cout << "First oracle hit: " << endl;
+				if(_muts != NULL) {
+					undoMutations();
+					cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
+					applyMutations();
 				}
-			} else {
+				cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
+				cout << "  Tseg:           ";
+				bool ebwtFw = _params.ebwtFw();
+				if(ebwtFw) {
+					for(size_t i = 0; i < _qlen; i++) {
+						cout << (*_os)[h.h.first][h.h.second + i];
+					}
+				} else {
+					for(int i = (int)_qlen-1; i >= 0; i--) {
+						cout << (*_os)[h.h.first][h.h.second + i];
+					}
+				}
+				cout << endl;
+				cout << "  Quals:          " << prefix(*_qual, _qlen) << endl;
+				cout << "  Bt:             ";
 				for(int i = (int)_qlen-1; i >= 0; i--) {
-					cout << (*_os)[h.h.first][h.h.second + i];
+					if     (i < (int)_unrevOff) cout << "0";
+					else if(i < (int)_1revOff)  cout << "1";
+					else if(i < (int)_2revOff)  cout << "2";
+					else if(i < (int)_3revOff)  cout << "3";
+					else cout << "X";
 				}
+				cout << endl;
 			}
-			cout << endl;
-			cout << "  Quals:          " << prefix(*_qual, _qlen) << endl;
-			cout << "  Bt:             ";
-			for(int i = (int)_qlen-1; i >= 0; i--) {
-				if     (i < (int)_unrevOff) cout << "0";
-				else if(i < (int)_1revOff)  cout << "1";
-				else if(i < (int)_2revOff)  cout << "2";
-				else if(i < (int)_3revOff)  cout << "3";
-				else cout << "X";
-			}
-			cout << endl;
 		}
 		assert_eq(0, oracleHits.size());
 	}
