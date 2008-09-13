@@ -163,6 +163,7 @@ sub build {
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $file2 .tmp";
+	system("echo \"$cmd\" > .tmp.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
 	if($out eq "") {
