@@ -934,6 +934,21 @@ public:
 					assert_leq(stackDepth, lim);
 				}
 			}
+			// This is necessary for the rare case where we're about
+			// to declare success because bot > top and we've consumed
+			// the final character, but all hits between top and bot
+			// are spurious.  This check ensures that we keep looking
+			// for non-spurious hits in that case.
+			if(cur == 0 && bot > top && !backtrackDespiteMatch && !mustBacktrack) {
+				bool ret = report(stackDepth, top, bot);
+				if(!ret) {
+					top = bot; // enter the backtrack loop
+				}
+				else {
+					if(_os != NULL && (*_os).size() > 0) confirmHit(iham);
+					return true;
+				}
+			}
 			//
 			// Mismatch with alternatives
 			//
@@ -1004,7 +1019,7 @@ public:
 								}
 							}
 							assert(foundTarget);
-							break;
+							break; // escape left-to-right walk
 						}
 					}
 					assert_leq(i, d);
@@ -1191,7 +1206,7 @@ public:
 					for(size_t k = d; k >= depth && k <= _qlen; k--) {
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
-						if(k < unrevOff) break;
+						if(k < unrevOff) break; // already visited all revisitable positions
 						bool kCurIsAlternative = (ham + qualRounds[kq] <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
@@ -1682,11 +1697,11 @@ protected:
 			// Oops, the oracle found at least one hit; print
 			// detailed info about the first oracle hit (for
 			// debugging)
+			cout << "Oracle hit " << oracleHits.size()
+				 << " times, but backtracker did not hit" << endl;
 			for(size_t i = 0; i < oracleHits.size() && i < 3; i++) {
 				const Hit& h = oracleHits[i];
-				cout << "Oracle hit " << oracleHits.size()
-					 << " times, but backtracker did not hit" << endl;
-				cout << "First oracle hit: " << endl;
+				cout << "  Oracle hit " << i << ": " << endl;
 				if(_muts != NULL) {
 					undoMutations();
 					cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
