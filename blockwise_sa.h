@@ -59,9 +59,9 @@ public:
 	_itrPushedBackSuffix(0xffffffff),
 	_logger(__logger)
 	{ }
-	
+
 	virtual ~BlockwiseSA() { }
-	
+
 	/**
 	 * Get the next suffix; compute the next bucket if necessary.
 	 */
@@ -82,7 +82,7 @@ public:
 		}
 		return _itrBucket[_itrBucketPos++];
 	}
-	
+
 	/**
 	 * Return true iff the next call to nextSuffix will succeed.
 	 */
@@ -96,7 +96,7 @@ public:
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Reset the suffix iterator so that the next call to nextSuffix()
 	 * returns the lexicographically-first suffix.
@@ -108,7 +108,7 @@ public:
 		reset();
 		assert(suffixItrIsReset());
 	}
-	
+
 	/**
 	 * Returns true iff the next call to nextSuffix() returns the
 	 * lexicographically-first suffix.
@@ -119,14 +119,14 @@ public:
 		       _itrPushedBackSuffix == 0xffffffff &&
 		       isReset();
 	}
-	
+
 	const TStr& text()  const { return _text; }
 	uint32_t bucketSz() const { return _bucketSz; }
 	bool sanityCheck()  const { return _sanityCheck; }
 	bool verbose()      const { return _verbose; }
 	ostream& log()      const { return _logger; }
 	uint32_t size()     const { return length(_text)+1; }
-	
+
 protected:
 	/// Reset back to the first block
 	virtual void reset() = 0;
@@ -160,7 +160,7 @@ protected:
 
 /**
  * Abstract parent class for a blockwise suffix array builder that
- * always doles out blocks in lexicographical order. 
+ * always doles out blocks in lexicographical order.
  */
 template<typename TStr>
 class InorderBlockwiseSA : public BlockwiseSA<TStr> {
@@ -194,9 +194,9 @@ public:
 	virtual const void nextBlock() {
 		size_t sz = min<uint32_t>(this->bucketSz(), length(_sa)-_cur);
 		_cur += sz;
-		this->_itrBucket = infix(_sa, _cur-sz, _cur-1); 
+		this->_itrBucket = infix(_sa, _cur-sz, _cur-1);
 	}
-	
+
 	/// Return true iff there are more blocks to retrieve
 	virtual bool hasMoreBlocks() {
 		return _cur < length(_sa);
@@ -249,7 +249,7 @@ template<typename TStr>
 class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 public:
 	typedef DifferenceCoverSample<TStr> TDC;
-	
+
 	KarkkainenBlockwiseSA(const TStr& __text,
 	                      uint32_t __bucketSz,
 	                      uint32_t __dcV,
@@ -274,11 +274,11 @@ public:
 	virtual bool hasMoreBlocks() {
 		return _cur <= length(_sampleSuffs);
 	}
-	
+
 	uint32_t dcV() const { return _dcV; }
-	
+
 protected:
-	
+
 	/**
 	 * Initialize the state of the blockwise suffix sort.  If the
 	 * difference cover sample and the sample set have not yet been
@@ -321,12 +321,12 @@ private:
 		}
 		_built = true;
 	}
-	
+
 	/**
 	 * Calculate the lcp between two suffixes using the difference
 	 * cover as a tie-breaker.  If the tie-breaker is employed, then
 	 * the calculated lcp may be an underestimate.
-	 * 
+	 *
 	 * Defined in blockwise_sa.cpp
 	 */
 	inline bool tieBreakingLcp(uint32_t aOff,
@@ -335,7 +335,7 @@ private:
 	                           bool& lcpIsSoft);
 
 	/**
-	 * 
+	 *
 	 */
 	inline bool suffixCmp(uint32_t cmp,
 	                      uint32_t i,
@@ -346,7 +346,7 @@ private:
 
 	// Defined in blockwise_sa.cpp
 	void buildSamples();
-	
+
 	String<uint32_t> _sampleSuffs; // sample suffixes
 	uint32_t         _cur;         // offset to 1st elt of next block
 	const uint32_t   _dcV;         // difference-cover periodicity
@@ -369,7 +369,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	uint32_t len = length(this->text());
 	// Prepare _sampleSuffs array
 	clear(_sampleSuffs);
-	uint32_t numSamples = ((len/bsz)+1)<<1; // ~len/bsz x 2 
+	uint32_t numSamples = ((len/bsz)+1)<<1; // ~len/bsz x 2
 	assert_gt(numSamples, 0);
 	VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
 	reserve(_sampleSuffs, numSamples, Exact());
@@ -420,8 +420,8 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	}
 	// Calculate bucket sizes
 	VMSG_NL("Calculating bucket sizes");
-	uint32_t limit = 20;
-	// Iterate until all buckets are less than 
+	uint32_t limit = 5;
+	// Iterate until all buckets are less than
 	while(--limit != 0) {
 		// Calculate bucket sizes by doing a binary search for each
 		// suffix and noting where it lands
@@ -642,7 +642,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(uint32_t cmp,
 			return ret;
 		}
 	}
-	
+
 	// Z box extends exactly as far as previous match (or there
 	// is neither a Z box nor a previous match)
 	if(i + l == k) {
@@ -666,7 +666,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(uint32_t cmp,
 			assert_eq(l, suffixLcp(t, i, cmp));
 		} else assert_eq(l, suffixLcp(t, i, cmp));
 	}
-	
+
 	// Check that calculated lcp matches actual lcp
 	if(this->sanityCheck()) {
 		if(!kSoft) {
@@ -682,7 +682,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(uint32_t cmp,
 
 	// i and cmp should not be the same suffix
 	assert(l != len-cmp || i+l != len);
-	
+
 	// Now we're ready to do a comparison on the next char
 	if(l+i != len && (
 	   l == len-cmp || // departure from paper algorithm:
@@ -759,7 +759,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
 			}
 		}
-		
+
 		// This is the most critical loop in the algorithm; this is where
 		// we iterate over all suffixes in the text and pick out those that
 		// fall into the current bucket.

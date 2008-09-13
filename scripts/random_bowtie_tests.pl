@@ -161,8 +161,18 @@ sub build {
 		$file2 = ".randtmp.fa";
 	}
 	
+	my $bucketArg = "";
+	my $bucketRand = int(rand(3));
+	if($bucketRand == 0) {
+		$bucketArg = "--bmaxdivn ";
+		$bucketArg .= (int(rand(30))+1);
+	} elsif($bucketRand == 1) {
+		$bucketArg = "--bmaxmultsqrt ";
+		$bucketArg .= (int(rand(50))+10);
+	}
+	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $file2 .tmp";
+	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $bucketArg $endian $file2 .tmp";
 	system("echo \"$cmd\" > .tmp.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
@@ -178,7 +188,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 5) {
-		$cmd = "./bowtie-build-packed-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $endian $file2 .tmp.packed";
+		$cmd = "./bowtie-build-packed-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $bucketArg $endian $file2 .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {

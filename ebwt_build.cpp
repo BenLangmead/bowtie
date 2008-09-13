@@ -23,9 +23,9 @@
 static int verbose           = 0;     // be talkative
 static int sanityCheck       = 0;     // do slow sanity checks
 static int format            = FASTA; // input sequence format
-static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
+static uint32_t bmax         = 0xfffffffe; // max blockwise SA bucket size
 static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
-static uint32_t bmaxDivN     = 8;     // same, as divisor of n
+static uint32_t bmaxDivN     = 0xffffffff; // same, as divisor of n
 static int dcv               = 1024;  // bwise SA difference-cover sample sz
 static int noDc              = 0;     // disable difference-cover sample
 static int entireSA          = 0;     // 1 = disable blockwise SA
@@ -61,9 +61,10 @@ static void printUsage(ostream& out) {
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
 	    //<< "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
 	    //<< "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
-	    << "    --bmax <int>            max SA bucket sz for blockwise suffix-array builder" << endl
-	    << "    --bmaxmultsqrt <int>    max SA bucket sz as multiple of sqrt(ref len)" << endl
-	    << "    --bmaxdivn <int>        max SA bucket sz as divisor of ref len (default: 8)" << endl
+	    //<< "    -n/--noblocks           disable blockwise - faster, uses more memory (default)" << endl
+	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
+	    << "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
+	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable difference cover (blockwise is quadratic)" << endl
 	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
@@ -81,7 +82,7 @@ static void printUsage(ostream& out) {
 	    ;
 }
 
-static const char *short_options = "vrpscfl:i:o:t:h:";
+static const char *short_options = "vrpnscfl:i:o:t:h:";
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            'v'},
@@ -96,6 +97,7 @@ static struct option long_options[] = {
 	{"seed",         required_argument, 0,            ARG_SEED},
 	{"entiresa",     no_argument,       &entireSA,    1},
 	{"version",      no_argument,       &showVersion, 1},
+	{"noblocks",     required_argument, 0,            'n'},
 	{"linerate",     required_argument, 0,            'l'},
 	{"linesperside", required_argument, 0,            'i'},
 	{"offrate",      required_argument, 0,            'o'},
@@ -155,14 +157,24 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'h':
 	   			chunkRate = parseNumber<int>(1, "-h/--chunkRate arg must be at least 1");
 	   			break;
+	   		case 'n':
+	   			// all f-s is used to mean "not set", so put 'e' on end
+	   			bmax = 0xfffffffe;
+	   			break;
 	   		case ARG_BMAX:
 	   			bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
+	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt
+	   			bmaxDivN = 0xffffffff;     // don't use multSqrt
 	   			break;
 	   		case ARG_BMAX_MULT:
 	   			bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxMultSqrt arg must be at least 1");
+	   			bmax = 0xffffffff;     // don't use bmax
+	   			bmaxDivN = 0xffffffff; // don't use multSqrt
 	   			break;
 	   		case ARG_BMAX_DIV:
 	   			bmaxDivN = parseNumber<uint32_t>(1, "--bmaxDivN arg must be at least 1");
+	   			bmax = 0xffffffff;         // don't use bmax
+	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt
 	   			break;
 	   		case ARG_DCV:
 	   			dcv = parseNumber<int>(3, "--dcv arg must be at least 3");
