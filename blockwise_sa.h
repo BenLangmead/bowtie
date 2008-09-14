@@ -509,10 +509,11 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		// split
 		VMSG_NL("Split " << added << ", merged " << merged << "; iterating...");
 	}
-	if(limit == 0) {
-		VMSG_NL("Iterated too many times; trying again...");
-		buildSamples();
-	}
+	// Do *not* force a do-over
+//	if(limit == 0) {
+//		VMSG_NL("Iterated too many times; trying again...");
+//		buildSamples();
+//	}
 	VMSG_NL("Avg bucket size: " << ((float)(len-length(_sampleSuffs)) / (length(_sampleSuffs)+1)) << " (target: " << bsz << ")");
 }
 
@@ -791,6 +792,9 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				// In the bucket! - add it
 				assert_lt(i, len);
 				append(bucket, i);
+				// Not necessarily true; we allow overflowing buckets
+				// since we can't guarantee that a good set of sample
+				// suffixes can be found in a reasonable amount of time
 				assert_lt(length(bucket), this->bucketSz());
 			}
 			} // end loop over all suffixes of t
