@@ -203,7 +203,13 @@ public:
 					if(__policy == NS_TO_NS) {
 						// Leave c = 'N'
 					} else if(__policy == NS_TO_RANDS) {
-						s[j] = "ACGT"[_rand.nextU32() & 3];
+						switch(_rand.nextU32() & 3) {
+							case 0: s[j] = 'A'; break;
+							case 1: s[j] = 'C'; break;
+							case 2: s[j] = 'G'; break;
+							case 3: s[j] = 'T'; break;
+							default: throw;
+						}
 					} else {
 						assert_eq(NS_TO_AS, __policy);
 						s[j] = 'A';
