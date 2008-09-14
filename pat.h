@@ -44,6 +44,7 @@ static inline void reverse(String<Dna5>& s) {
 class PatternSource {
 public:
 	PatternSource(bool __reverse = false, const char *__dumpfile = NULL) :
+		_readCnt(0),
 		_reverse(__reverse),
 		_def_qual("EDCCCBAAAA@@@@?>===<;;9:9998777666655444433333333333333333333"),
 		_def_rqual("333333333333333333334444336666778999:9;;<===>?@@@@AAAABCCCDE"),
@@ -109,7 +110,7 @@ public:
 	virtual void nextPatternImpl(String<Dna5>**, String<char>**, String<char>**) = 0;
 	virtual bool hasMorePatterns() = 0;
 	virtual bool nextIsReverseComplement() = 0;
-	virtual void reset() { }
+	virtual void reset() { _readCnt = 0; }
 	const char *dumpfile() const { return _dumpfile; }
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
@@ -123,6 +124,7 @@ protected:
 	{
 		out << name << ": " << seq << " " << qual << endl;
 	}
+	uint32_t _readCnt;
 private:
 	bool _reverse;         // reverse patterns before returning them
 	String<Dna5> _revtmp;  // temporary buffer for reversed patterns
@@ -201,13 +203,7 @@ public:
 					if(__policy == NS_TO_NS) {
 						// Leave c = 'N'
 					} else if(__policy == NS_TO_RANDS) {
-						switch(_rand.nextU32() & 3) {
-							case 0: s[j] = 'A'; break;
-							case 1: s[j] = 'C'; break;
-							case 2: s[j] = 'G'; break;
-							case 3: s[j] = 'T'; break;
-							default: throw;
-						}
+						s[j] = "ACGT"[_rand.nextU32() & 3];
 					} else {
 						assert_eq(NS_TO_AS, __policy);
 						s[j] = 'A';
@@ -900,13 +896,7 @@ protected:
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
-								switch(_rand.nextU32() & 3) {
-									case 0: c = 'A'; break;
-									case 1: c = 'C'; break;
-									case 2: c = 'G'; break;
-									case 3: c = 'T'; break;
-									default: throw;
-								}
+								c = "ACGT"[_rand.nextU32() & 3];
 							} else {
 								assert_eq(NS_TO_AS, _policy);
 								c = 'A';
@@ -939,13 +929,7 @@ protected:
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
-								switch(_rand.nextU32() & 3) {
-									case 0: c = 'A'; break;
-									case 1: c = 'C'; break;
-									case 2: c = 'G'; break;
-									case 3: c = 'T'; break;
-									default: throw;
-								}
+								c = "ACGT"[_rand.nextU32() & 3];
 							} else {
 								assert_eq(NS_TO_AS, _policy);
 								c = 'A';
@@ -969,6 +953,18 @@ protected:
 					_setLength(rcQualTStr,(*dstLen));
 				}
 			}
+
+			// Set up a default name if one hasn't been set
+			if((*nameLen) == 0) {
+				itoa(_readCnt, name, 10);
+				_setBegin(nameStr, name);
+				size_t nlen = strlen(name);
+				_setLength(nameStr, nlen);
+				(*nameLen) = nlen;
+			}
+			assert_gt((*nameLen), 0);
+			_readCnt++;
+
 		} while(ns > _maxNs);
 	}
 	virtual void resetForNextFile() {
@@ -1108,13 +1104,7 @@ protected:
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
-								switch(_rand.nextU32() & 3) {
-									case 0: c = 'A'; break;
-									case 1: c = 'C'; break;
-									case 2: c = 'G'; break;
-									case 3: c = 'T'; break;
-									default: throw;
-								}
+								c = "ACGT"[_rand.nextU32() & 3];
 							} else {
 								assert_eq(NS_TO_AS, _policy);
 								c = 'A';
@@ -1142,13 +1132,7 @@ protected:
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
-								switch(_rand.nextU32() & 3) {
-									case 0: c = 'A'; break;
-									case 1: c = 'C'; break;
-									case 2: c = 'G'; break;
-									case 3: c = 'T'; break;
-									default: throw;
-								}
+								c = "ACGT"[_rand.nextU32() & 3];
 							} else {
 								assert_eq(NS_TO_AS, _policy);
 								c = 'A';
@@ -1299,6 +1283,17 @@ protected:
 				}
 			}
 
+			// Set up a default name if one hasn't been set
+			if((*nameLen) == 0) {
+				itoa(_readCnt, name, 10);
+				_setBegin(nameStr, name);
+				size_t nlen = strlen(name);
+				_setLength(nameStr, nlen);
+				(*nameLen) = nlen;
+			}
+			assert_gt((*nameLen), 0);
+			_readCnt++;
+
 			if (feof(this->_in))
 				return;
 			else
@@ -1323,6 +1318,202 @@ private:
 	bool _first;
 	bool _reverse;
 	bool _solexa_quals;
+	int _policy;
+	int _maxNs;
+	int _table[128];
+	RandomSource _rand;
+};
+
+/**
+ * Read a Raw-format file (one sequence per line).
+ */
+class RawPatternSource : public BufferedFilePatternSource {
+public:
+	RawPatternSource(const vector<string>& infiles,
+	                 bool __revcomp = true,
+	                 bool __reverse = false,
+	                 const char *__dumpfile = NULL,
+	                 int __trim3 = 0,
+	                 int __trim5 = 0,
+	                 int __policy = NS_TO_NS,
+	                 int __maxNs = 9999,
+	                 uint32_t seed = 0) :
+		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		_first(true), _reverse(__reverse),
+		_policy(__policy), _maxNs(__maxNs), _rand(seed)
+	{
+		assert(this->hasMorePatterns());
+	}
+	virtual void reset() {
+		_first = true;
+		BufferedFilePatternSource::reset();
+	}
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
+		_reverse = __reverse;
+	}
+protected:
+	/// Skip to the end of the current line; return the first character
+	/// of the next line
+	int skipWhitespace() {
+		int c;
+		while(isspace(c = fgetc(this->_in)));
+		return c;
+	}
+	/// Read another pattern from a FASTQ input file
+	virtual void read(char* dst,
+	                  String<Dna5>& dstTStr,
+	                  char *rcDst,
+	                  String<Dna5>& rcDstTStr,
+	                  char* qual,
+	                  String<char>& qualTStr,
+	                  char* rcQual,
+	                  String<char>& rcQualTStr,
+	                  size_t* dstLen,
+	                  char* name,
+	                  String<char>& nameStr,
+	                  size_t* nameLen)
+	{
+		assert(dst != NULL);
+		assert(qual != NULL);
+		assert(dstLen != NULL);
+		assert(name != NULL);
+		assert(nameLen != NULL);
+
+		int ns;
+		do {
+			int c;
+			ns = 0;
+			*dstLen = 0;
+			*nameLen = 0;
+
+			c = skipWhitespace();
+			assert(!isspace(c));
+			if(_first) {
+				if(c != 'a' && c != 'A' && c != 'c' && c != 'C' &&
+				   c != 'g' && c != 'G' && c != 't' && c != 'T')
+				{
+					cerr << "Error: reads file does not look like a Raw file" << endl;
+					if(c == '>') {
+						cerr << "Reads file looks like a FASTA file; please use -f" << endl;
+					}
+					if(c == '@') {
+						cerr << "Reads file looks like a FASTQ file; please use -q" << endl;
+					}
+					exit(1);
+				}
+				_first = false;
+			}
+
+			// _in now points just past the first character of a sequence
+			// line, and c holds the first character
+			int charsRead = 0;
+			if(!_reverse) {
+				while(!isspace(c) && c >= 0) {
+					if(isalpha(c) && charsRead >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								c = "ACGT"[_rand.nextU32() & 3];
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
+						}
+						dst[(*dstLen)] = charToDna5[c];
+						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
+						charsRead++; (*dstLen)++;
+					}
+					c = fgetc(this->_in);
+				}
+				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[i] == 4) ns++;
+				}
+				_setBegin(dstTStr, (Dna5*)dst);
+				_setLength(dstTStr, (*dstLen));
+				_setBegin(qualTStr, const_cast<char*>(qualDefault));
+				_setLength(qualTStr,(*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
+					_setLength(rcDstTStr, (*dstLen));
+					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
+					_setLength(rcQualTStr,(*dstLen));
+				}
+			} else {
+				while(!isspace(c) && c >= 0) {
+					if(isalpha(c) && charsRead >= this->_trim5) {
+						if(c == 'N' || c == 'n') {
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								c = "ACGT"[_rand.nextU32() & 3];
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
+						}
+						dst[1024-(*dstLen)-1] = charToDna5[c];
+						rcDst[(*dstLen)] = rcCharToDna5[c];
+						charsRead++; (*dstLen)++;
+					}
+					c = fgetc(this->_in);
+				}
+				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[1024-i-1] == 4) ns++;
+				}
+				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
+				_setLength(dstTStr, (*dstLen));
+				_setBegin(qualTStr, const_cast<char*>(qualDefault));
+				_setLength(qualTStr,(*dstLen));
+				if(rcDst != NULL) {
+					_setBegin(rcDstTStr, (Dna5*)rcDst);
+					_setLength(rcDstTStr, (*dstLen));
+					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
+					_setLength(rcQualTStr,(*dstLen));
+				}
+			}
+
+			// Set up name
+			itoa(_readCnt, name, 10);
+			_setBegin(nameStr, name);
+			size_t nlen = strlen(name);
+			_setLength(nameStr, nlen);
+			(*nameLen) = nlen;
+			_readCnt++;
+
+			if(c == -1) {
+				if(ns > _maxNs) {
+					// This read violates the Ns constraing and we're
+					// about to return it; make sure that caller
+					// doesn't see this read
+					(*dstLen) = 0;
+					_setLength(dstTStr, 0);
+					_setLength(rcDstTStr, 0);
+				}
+				return;
+			} else {
+				assert(isspace(c));
+			}
+		} while(ns > _maxNs);
+	}
+	virtual void resetForNextFile() {
+		_first = true;
+	}
+	virtual void dump(ostream& out,
+	                  const String<Dna5>& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << seq << endl;
+	}
+private:
+	bool _first;
+	bool _reverse;
 	int _policy;
 	int _maxNs;
 	int _table[128];

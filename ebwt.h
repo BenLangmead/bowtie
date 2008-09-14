@@ -3105,7 +3105,8 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
 				}
 				break;
 			}
-			assert_eq(os[i][joff], rest[restOff++]);
+			assert_eq(os[i][joff], rest[restOff]);
+			restOff++;
 		}
 		if(j == length(os[i])) {
 			// Moved to next sequence

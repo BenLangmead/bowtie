@@ -112,6 +112,7 @@ static void printUsage(ostream& out) {
 	    << "Options:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
+	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    //<< "  -m                 query input files are Maq .bfq" << endl
 	    //<< "  -x                 query input files are Solexa _seq.txt" << endl
 	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
@@ -123,7 +124,6 @@ static void printUsage(ostream& out) {
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
-	    //<< "  -r/--revcomp       also search for rev. comp. of each query (default: off)" << endl
 	    //<< "  -b/--binout        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
@@ -180,10 +180,8 @@ static void parseOptions(int argc, char **argv) {
 		switch (next_option) {
 	   		case 'f': format = FASTA; break;
 	   		case 'q': format = FASTQ; break;
-	   		//case 'm': format = BFQ; break;
-	   		//case 'x': format = SOLEXA; break;
+	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
-	   		case 'r': revcomp = 1; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
@@ -2233,6 +2231,11 @@ static void driver(const char * type,
 	switch(format) {
 		case FASTA:
 			patsrc = new FastaPatternSource (queries, revcomp, false,
+			                                 patDumpfile, trim3, trim5,
+			                                 nsPolicy, maxNs);
+			break;
+		case RAW:
+			patsrc = new RawPatternSource   (queries, revcomp, false,
 			                                 patDumpfile, trim3, trim5,
 			                                 nsPolicy, maxNs);
 			break;
