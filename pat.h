@@ -823,6 +823,16 @@ protected:
 			// Pick off the first carat
 			if(_first) {
 				c = fgetc(this->_in); if(c < 0) return;
+				if(c != '>') {
+					int cc = toupper(c);
+					cerr << "Error: reads file does not look like a FASTA file" << endl;
+					if(c == '@') {
+						cerr << "Reads file looks like a FASTQ file; please use -f" << endl;
+					} else if(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T') {
+						cerr << "Reads file may be a raw file; please use -r" << endl;
+					}
+					exit(1);
+				}
 				assert(c == '>' || c == '#');
 				_first = false;
 			}
@@ -1026,6 +1036,13 @@ protected:
 			// Pick off the first at
 			if(_first) {
 				c = fgetc(this->_in); if(c < 0) return;
+				if(c != '@') {
+					cerr << "Error: reads file does not look like a FASTQ file" << endl;
+					if(c == '>') {
+						cerr << "Reads file looks like a FASTA file; please use -f" << endl;
+					}
+					exit(1);
+				}
 				assert_eq('@', c);
 				_first = false;
 			}
