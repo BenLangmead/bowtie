@@ -37,5 +37,5 @@ if [ ! -f NC_008253.fna ] ; then
 	exit 2
 fi
 
-echo Running ${BOWTIE_BUILD_EXE} NC_008253.fna e_coli
+echo Running ${BOWTIE_BUILD_EXE} -t 8 NC_008253.fna e_coli
 ${BOWTIE_BUILD_EXE} -t 8 NC_008253.fna e_coli
