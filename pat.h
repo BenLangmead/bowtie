@@ -263,7 +263,7 @@ public:
 				}
 			}
 			ostringstream os;
-			os << (_v.size()-1);
+			os << (_names.size());
 			_names.push_back(os.str());
 		}
 		assert_gt(_v.size() + nrejects, 0);
@@ -277,9 +277,11 @@ public:
 	virtual ~VectorPatternSource() { }
 	virtual void nextPatternImpl(String<Dna5>** s, String<char>** qual, String<char>** name) {
 		assert(hasMorePatterns());
-		ostringstream os;
-		os << _cur;
-		(*name) = &(_names[_cur]);
+		if(_revcomp) {
+			(*name) = &(_names[_cur >> 1]);
+		} else {
+			(*name) = &(_names[_cur]);
+		}
 		if(!_reverse) {
 			(*s) = &(_v[_cur]);
 			(*qual) = &(_quals[_cur]);
