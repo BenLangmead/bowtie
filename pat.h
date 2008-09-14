@@ -224,10 +224,7 @@ public:
 				vq = ss[1];
 			}
 			// Trim qualities
-			if(vq.length() <= (size_t)(_trim3 + _trim5)) {
-				// Entire read is trimmed away
-				continue;
-			} else {
+			if(vq.length() > (size_t)(_trim3 + _trim5)) {
 				// Trim on 5' (high-quality) end
 				if(_trim5 > 0) {
 					vq.erase(0, _trim5);
