@@ -2252,11 +2252,6 @@ static void driver(const char * type,
 			break;
 		default: assert(false);
 	}
-	// Check that input is non-empty
-	//if(!patsrc->hasMorePatterns()) {
-	//	cerr << "Error: Empty input!  Check that file format is correct." << endl;
-	//	exit(1);
-	//}
 	if(skipSearch) return;
 	// Open hit output file
 	ostream *fout;
@@ -2371,7 +2366,8 @@ static void driver(const char * type,
 			} else if(mismatches == 2 || mismatches == 3) {
 				twoOrThreeMismatchSearch(*patsrc, *sink, stats, params, ebwt, *ebwtBw, os, mismatches == 2);
 			} else {
-				throw runtime_error("Bad number of mismatches!");
+				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
+				exit(1);
 			}
 		} else {
 			// Search without mismatches

@@ -53,7 +53,8 @@ public:
 		if(_dumpfile != NULL) {
 			_out.open(_dumpfile, ios_base::out);
 			if(!_out.good()) {
-				throw runtime_error("Could not open pattern dump file for writing");
+				cerr << "Could not open pattern dump file \"" << _dumpfile << "\" for writing" << endl;
+				exit(1);
 			}
 		}
 	}
@@ -203,13 +204,7 @@ public:
 					if(__policy == NS_TO_NS) {
 						// Leave c = 'N'
 					} else if(__policy == NS_TO_RANDS) {
-						switch(_rand.nextU32() & 3) {
-							case 0: s[j] = 'A'; break;
-							case 1: s[j] = 'C'; break;
-							case 2: s[j] = 'G'; break;
-							case 3: s[j] = 'T'; break;
-							default: throw;
-						}
+						s[j] = "ACGT"[_rand.nextU32() & 3];
 					} else {
 						assert_eq(NS_TO_AS, __policy);
 						s[j] = 'A';
@@ -408,10 +403,7 @@ public:
 		open(); _filecur++;
 	}
 	virtual ~BufferedFilePatternSource() {
-		//if(_gz)
-		//	gzclose(_gzin);
-		//else
-			fclose(_in);
+		fclose(_in);
 	}
 	/// Return the next pattern from the file
 	virtual void nextPatternImpl(String<Dna5>** s,
@@ -642,10 +634,7 @@ protected:
 		if(seqan::empty(**s) && _filecur < _infiles.size()) {
 			assert(_fw);
 			// Close current file
-			//if(_gz)
-			//	gzclose(_gzin);
-			//else
-				fclose(_in);
+			fclose(_in);
 			// Open next file
 			open(); _filecur++;
 			this->resetForNextFile(); // reset state to handle a fresh file
@@ -661,21 +650,16 @@ protected:
 		return;
 	}
 	void open() {
-		//if(_gz) {
-		//	// Open gzipped input file
-		//	if((_gzin = gzopen(_infiles[_filecur].c_str(), "r")) == NULL) {
-		//		throw runtime_error("Could not open gzipped sequence file");
-		//	}
-		//} else {
-			// Open input file
-			if((_in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
-				throw runtime_error("Could not open sequence file");
-			}
-			// Associate large input buffer with FILE *in
-			if(setvbuf(_in, _buf, _IOFBF, 256 * 1024) != 0) {
-				throw runtime_error("Could not create input buffer for sequence file");
-			}
-		//}
+		// Open input file
+		if((_in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
+			cerr << "Could not open reads file \"" << _infiles[_filecur] << "\"" << endl;
+			exit(1);
+		}
+		// Associate large input buffer with FILE *in
+		if(setvbuf(_in, _buf, _IOFBF, 256 * 1024) != 0) {
+			cerr << "Could not create input buffer for sequence file \"" << _infiles[_filecur] << "\"" << endl;
+			exit(1);
+		}
 	}
 	const vector<string>& _infiles; // input filenames
 	bool _gz;     // whether input file/files are gzipped
