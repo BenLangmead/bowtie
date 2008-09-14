@@ -11,6 +11,7 @@
 //#include <zlib.h>
 #include <fstream>
 #include <seqan/sequence.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
