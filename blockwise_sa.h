@@ -795,7 +795,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				// Not necessarily true; we allow overflowing buckets
 				// since we can't guarantee that a good set of sample
 				// suffixes can be found in a reasonable amount of time
-				assert_lt(length(bucket), this->bucketSz());
+				//assert_lt(length(bucket), this->bucketSz());
 			}
 			} // end loop over all suffixes of t
 			VMSG_NL("  100%");
