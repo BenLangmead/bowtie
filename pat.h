@@ -262,6 +262,9 @@ public:
 					_qualsrev.push_back(vq);
 				}
 			}
+			ostringstream os;
+			os << (_v.size()-1);
+			_names.push_back(os.str());
 		}
 		assert_gt(_v.size() + nrejects, 0);
 		assert_eq(_v.size(), _vrev.size());
@@ -274,7 +277,9 @@ public:
 	virtual ~VectorPatternSource() { }
 	virtual void nextPatternImpl(String<Dna5>** s, String<char>** qual, String<char>** name) {
 		assert(hasMorePatterns());
-		assert(*name == NULL);
+		ostringstream os;
+		os << _cur;
+		(*name) = &(_names[_cur]);
 		if(!_reverse) {
 			(*s) = &(_v[_cur]);
 			(*qual) = &(_quals[_cur]);
@@ -315,6 +320,7 @@ private:
 	vector<String<char> > _quals;    // quality values parallel to _v
 	vector<String<Dna5> > _vrev;     // reversed forward and rev-comp sequences
 	vector<String<char> > _qualsrev; // quality values parallel to _vrev
+	vector<String<char> > _names;    // names
 	RandomSource _rand;
 };
 
