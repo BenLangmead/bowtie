@@ -11,8 +11,6 @@
 //#include <zlib.h>
 #include <fstream>
 #include <seqan/sequence.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "tokenize.h"
@@ -27,6 +25,27 @@ enum {
 	NS_TO_AS    = 2, // Ns become As
 	NS_TO_RANDS = 3  // Ns become random characters
 };
+
+/**
+ * C++ version char* style "itoa":
+ */
+char* itoa10(int value, char* result) {
+	// Check that base is valid
+	char* out = result;
+	int quotient = value;
+	do {
+		*out = "0123456789"[ std::abs( quotient % 10 ) ];
+		++out;
+		quotient /= 10;
+	} while ( quotient );
+
+	// Only apply negative sign for base 10
+	if (value < 0) *out++ = '-';
+	std::reverse( result, out );
+
+	*out = 0; // terminator
+	return result;
+}
 
 /// Reverse a string in-place
 static inline void reverse(String<Dna5>& s) {
@@ -884,7 +903,6 @@ protected:
 					// though a comment can end a sequence
 					if(isalpha(c) && begin++ >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
-							ns++;
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
@@ -901,6 +919,10 @@ protected:
 					if((c = fgetc(this->_in)) < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[i] == 4) ns++;
+				}
 				_setBegin(dstTStr, (Dna5*)dst);
 				_setLength(dstTStr, (*dstLen));
 				_setBegin(qualTStr, const_cast<char*>(qualDefault));
@@ -917,7 +939,6 @@ protected:
 					// though a comment can end a sequence
 					if(isalpha(c) && begin++ >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
-							ns++;
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
@@ -934,6 +955,10 @@ protected:
 					if((c = fgetc(this->_in)) < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[1024-i-1] == 4) ns++;
+				}
 				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
 				_setBegin(qualTStr, const_cast<char*>(qualDefault));
@@ -948,7 +973,7 @@ protected:
 
 			// Set up a default name if one hasn't been set
 			if((*nameLen) == 0) {
-				itoa(_readCnt, name, 10);
+				itoa10(_readCnt, name);
 				_setBegin(nameStr, name);
 				size_t nlen = strlen(name);
 				_setLength(nameStr, nlen);
@@ -1092,7 +1117,6 @@ protected:
 				while(c != '+') {
 					if(isalpha(c) && charsRead >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
-							ns++;
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
@@ -1110,6 +1134,10 @@ protected:
 					if(c < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[i] == 4) ns++;
+				}
 				_setBegin(dstTStr, (Dna5*)dst);
 				_setLength(dstTStr, (*dstLen));
 				if(rcDst != NULL) {
@@ -1120,7 +1148,6 @@ protected:
 				while(c != '+') {
 					if(isalpha(c) && charsRead >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
-							ns++;
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
 							} else if(_policy == NS_TO_RANDS) {
@@ -1138,6 +1165,10 @@ protected:
 					if(c < 0) break;
 				}
 				(*dstLen) -= this->_trim3;
+				// Now that we've trimmed on both ends, count the Ns
+				for(size_t i = 0; i < (*dstLen); i++) {
+					if(dst[1024-i-1] == 4) ns++;
+				}
 				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
 				_setLength(dstTStr, (*dstLen));
 				if(rcDst != NULL) {
@@ -1277,7 +1308,7 @@ protected:
 
 			// Set up a default name if one hasn't been set
 			if((*nameLen) == 0) {
-				itoa(_readCnt, name, 10);
+				itoa10(_readCnt, name);
 				_setBegin(nameStr, name);
 				size_t nlen = strlen(name);
 				_setLength(nameStr, nlen);
@@ -1471,7 +1502,7 @@ protected:
 			}
 
 			// Set up name
-			itoa(_readCnt, name, 10);
+			itoa10(_readCnt, name);
 			_setBegin(nameStr, name);
 			size_t nlen = strlen(name);
 			_setLength(nameStr, nlen);
