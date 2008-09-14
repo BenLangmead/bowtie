@@ -180,6 +180,20 @@ public:
 			assert_leq(ss.size(), 2);
 			// Initialize s
 			string s = ss[0];
+			if(s.length() <= (size_t)(_trim3 + _trim5)) {
+				// Entire read is trimmed away
+				continue;
+			} else {
+				// Trim on 5' (high-quality) end
+				if(_trim5 > 0) {
+					s.erase(0, _trim5);
+				}
+				// Trim on 3' (low-quality) end
+				if(_trim3 > 0) {
+					s.erase(s.length()-_trim3);
+				}
+			}
+			// Count Ns and possibly reject
 			int ns = 0;
 			for(size_t j = 0; j < s.length(); j++) {
 				if(s[j] == 'N' || s[j] == 'n') {
@@ -209,11 +223,26 @@ public:
 			if(ss.size() == 2) {
 				vq = ss[1];
 			}
-			// Pad quals with Is if necessary
+			// Trim qualities
+			if(vq.length() <= (size_t)(_trim3 + _trim5)) {
+				// Entire read is trimmed away
+				continue;
+			} else {
+				// Trim on 5' (high-quality) end
+				if(_trim5 > 0) {
+					vq.erase(0, _trim5);
+				}
+				// Trim on 3' (low-quality) end
+				if(_trim3 > 0) {
+					vq.erase(vq.length()-_trim3);
+				}
+			}
+			// Pad quals with Is if necessary; this shouldn't happen
 			while(vq.length() < length(s)) {
 				vq.push_back('I');
 			}
-			// Truncate quals to match length of read if necessary
+			// Truncate quals to match length of read if necessary;
+			// this shouldn't happen
 			if(vq.length() > length(s)) {
 				vq.erase(length(s));
 			}
