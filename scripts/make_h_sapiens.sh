@@ -1,7 +1,8 @@
 #!/bin/sh
+
 #
 # Downloads sequence for H. sapiens (human) from NCBI.  This script was
-# used to build the Bowtie index for H. sapiens on August 15, 2008.
+# used to build the Bowtie index for H. sapiens.
 #
 # From README_CURRENT_BUILD:
 #  Organism: Homo sapiens (human)

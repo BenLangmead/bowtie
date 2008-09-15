@@ -1,8 +1,8 @@
 #!/bin/sh
+
 #
 # Downloads sequence for C. familiaris (dog) from NCBI.  This script
-# was used to build the Bowtie index for C. familiaris on August 14,
-# 2008.
+# was used to build the Bowtie index for C. familiaris.
 #
 # From README_CURRENT_BUILD:
 #  Organism: Canis familiaris (dog)

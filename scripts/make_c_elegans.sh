@@ -2,9 +2,8 @@
 
 #
 # Downloads sequence for C. elegans from wormbase.  This script
-# was used to build the Bowtie index for C. elegans on September 6,
-# 2008.  It downloads WormBase release WS190, the latest freeze as of
-# this date.
+# was used to build the Bowtie index for C. elegans.  WS190 was the
+# latest freeze as of the build date.
 #
 
 GENOMES_MIRROR=ftp://ftp.gramene.org/pub/wormbase/genomes

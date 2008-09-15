@@ -1,8 +1,8 @@
 #!/bin/sh
+
 #
 # Downloads sequence for P. troglodytes (chimpanzee) from NCBI.  This
-# script was used to build the Bowtie index for P. troglodytes on
-# August 14, 2008.
+# script was used to build the Bowtie index for P. troglodytes.
 #
 # From README_CURRENT_BUILD:
 #  Organism: Pan troglodytes (chimpanzee)

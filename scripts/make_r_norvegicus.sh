@@ -1,7 +1,8 @@
+#!/bin/sh
+
 #
 # Downloads sequence for M. musculus (mouse) from NCBI.  This script
-# was used to build the Bowtie index for M. musculus on August 14,
-# 2008.
+# was used to build the Bowtie index for M. musculus.
 #
 # From README_CURRENT_BUILD:
 #   Organism: Rattus norvegicus (rat)
