@@ -20,6 +20,25 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.9.4 - September 15, 2008
+   * New method for handling gaps and ambiguity codes in the reference.
+     New 'bowtie-build' method handles long stretches of gaps
+     gracefully.  New 'bowtie' rejects alignments that overlap a gap or
+     ambiguous character in the reference.
+   * Due to above change, index file format has been changed.  All
+     pre-built indexes available on this site have been updated to the
+     new format.  To obtain indexes with the old format, contact us.
+   * In 'bowtie' unnamed reads are now given ordinal names (rather than
+     "default") in the alignment output.  Works for all input modes.
+   * New 'bowtie' input mode: Raw, activated with -r.  Expects one read
+     sequence per line; no quality values or names.
+   * Fixed 'bowtie' bug whereby trimming did not work in -c mode.
+   * Changed 'bowtie-build' default to not use blockwise mode.
+   * Changed 'bowtie-build' to avoid certain infinite-loop and very-
+     long-runtime scenarios.
+   * Packaging improvements: archives now explode into subdirectories
+     and scripts are executable.
+
 Version 0.9.3 - September 6, 2008
    * Major reference-name bug fixes to bowtie-convert
 

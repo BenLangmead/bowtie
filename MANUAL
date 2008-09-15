@@ -148,6 +148,10 @@ Bowtie Manual
                      .mfa, .fna or similar).  All quality values are
                      assumed to be 40.
 
+  -r                 The query input files (specified as <query_in>)
+                     are Raw files: one sequence per line, without
+                     quality values or names.
+
   -c                 The query sequences are given on command line.
                      I.e. <query_in> is a comma-separated list of
                      reads rather than a list of read files.
@@ -296,16 +300,16 @@ Bowtie Manual
     --bmax <int>            The maximum number of suffixes allowed in a
                             block.  Allowing more suffixes per block
                             makes indexing faster, but increases memory
-                            overhead.  Default: --bmaxdivn 8 is used.
+                            overhead.  Default: No limit - all suffixes
+                            are sorted as a single block.
     
     --bmaxmultsqrt <int>    The maximum number of suffixes allowed in a
                             block, expressed as a multiple of the
                             square root of the length of the reference.
-                            Default: --bmaxdivn 8 is used.
     
     --bmaxdivn <int>        The maximum number of suffixes allowed in a
                             block, expressed as a fraction of the
-                            length of the reference.  Default: 8.
+                            length of the reference.
     
     --dcv <int>             Use <int> as the period for the difference-
                             cover sample.  A larger period yields less
@@ -352,7 +356,7 @@ Bowtie Manual
                             less annotation overhead but more wasted
                             space due to padding.  If -h is specified,
                             the chunk size is set to 2^<int>.  The
-                            default is 11 (2048-character chunks). 
+                            default is 12 (2048-character chunks). 
     
     --big --little          Endianness to use when serializing integers
                             to the index file.  Default: little-endian
