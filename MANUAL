@@ -344,20 +344,6 @@ Bowtie Manual
                             The ftab has size 4^(<int>+1) bytes.  The
                             default is 10 (ftab is 4MB).
     
-    -h/--chunkrate <int>    Before being indexed, the reference
-                            sequences are concatenated into a sequence
-                            of chunks, where each chunk contains bases
-                            from one of the input sequences (padding is
-                            usually necessary for a sequence's final
-                            chunk).  Each chunk is annotated with the
-                            id of the reference sequence it holds, and
-                            the offset into that sequence of the first
-                            base in the chunk.  Larger chunks yield
-                            less annotation overhead but more wasted
-                            space due to padding.  If -h is specified,
-                            the chunk size is set to 2^<int>.  The
-                            default is 12 (2048-character chunks). 
-    
     --big --little          Endianness to use when serializing integers
                             to the index file.  Default: little-endian
                             (recommended for Intel- and AMD-based
