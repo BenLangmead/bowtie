@@ -186,10 +186,11 @@ public:
 		uint32_t bestpen = 0xffffffff;
 		for(size_t j = 0; j < 12; j++) {
 			uint32_t pen = (ps[j] >> 2);            // BWT contribution (bytes)
-			pen += (((len + ps[j]) >> offRate) * 4);// _offs contribution (bytes)
-			pen += (((len + ps[j]) >> (j+6)) * 16); // chunks contribution (bytes)
+			uint32_t jlen = len + ps[j];
+			pen += ((jlen >> offRate) * 4);// _offs contribution (bytes)
+			pen += ((jlen >> (j+6)) * 16); // chunks contribution (bytes)
 			// cumulative character occurrence counts contribution (2 uint32_ts per side)
-			pen += ((((len + ps[j]) >> 2) >> ((1 << lineRate)*linesPerSide)) * 8);
+			pen += ((jlen / ((1 << lineRate)*linesPerSide)) * 8);
 			if(pen < bestpen) {
 				bestpen = pen;
 				bestj = j;
