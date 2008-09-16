@@ -154,7 +154,8 @@ public:
 	uint32_t chunkMask() const     { return _chunkMask; }
 	uint32_t numChunks() const     { return _numChunks; }
 
-	/// Given
+	/// Given a list of RefRecords and a few Ebwt parameters, calculate
+	/// the chunkRate that minimizes total space taken by the index.
 	static int32_t calcBestChunkRate(const vector<RefRecord>& szs,
 	                                 int32_t offRate,
 	                                 int32_t lineRate,
@@ -168,12 +169,39 @@ public:
 		uint32_t len = 0;
 		for(size_t i = 0; i < szs.size(); i++) {
 			const RefRecord& rec = szs[i];
-			len += rec.off;
-			len += rec.len;
-			for(size_t j = 0; j < 12; j++) {
-				uint32_t masked = (rec.len & ~(0xffffffff << (j+6)));
-				if(masked > 0) {
-					ps[j] += ((1 << (j+6)) - masked);
+			bool error = false;
+			if(len + rec.off < len) {
+				error = true; // overflowed
+			} else {
+				len += rec.off;
+				if(len + rec.len < len) {
+					error = true; // overflowed
+				}
+				else {
+					len += rec.len;
+				}
+			}
+			// If len overflowed, then bail
+			if(error) {
+				cerr << "The reference string is too long (>= 2^32 characters)." << endl;
+				cerr << "Please shorten or subdivide the reference(s)." << endl;
+				exit(1);
+			}
+			if(rec.len > 0) {
+				// Calculate amount of padding needed for a range of
+				// possible chunk rates
+				for(size_t j = 0; j < 12; j++) {
+					uint32_t masked = (rec.len & ~(0xffffffff << (j+6)));
+					if(masked > 0) {
+						// Factor in the padding due to this fragment.
+						uint32_t pad = ((1 << (j+6)) - masked);
+						if((ps[j] + pad) < ps[j]) {
+							// We've saturated ps[j]!
+							ps[j] = 0xffffffff;
+						} else {
+							ps[j] += pad;
+						}
+					}
 				}
 			}
 		}
@@ -185,16 +213,40 @@ public:
 		uint32_t bestj   = 0xffffffff;
 		uint32_t bestpen = 0xffffffff;
 		for(size_t j = 0; j < 12; j++) {
-			uint32_t pen = (ps[j] >> 2);            // BWT contribution (bytes)
-			uint32_t jlen = len + ps[j];
-			pen += ((jlen >> offRate) * 4);// _offs contribution (bytes)
-			pen += ((jlen >> (j+6)) * 16); // chunks contribution (bytes)
+			if(ps[j] == 0xffffffff) {
+				continue; // The padding already overflowed
+			}
+			uint32_t jlen = len + ps[j];   
+			if(jlen < len) {
+				continue; // overflowed!
+			}
+			uint32_t pen = (ps[j] >> 2);             // BWT contribution (bytes)
+			uint32_t offs = ((jlen >> offRate) * 4); // _offs contribution (bytes)
+			if(pen + offs < pen) {
+				continue; // overflowed!
+			}
+			pen += offs;
+			uint32_t chunks = ((jlen >> (j+6)) * 16); // chunks contribution (bytes)
+			if(pen + chunks < pen) {
+				continue; // overflowed!
+			}
+			pen += chunks;
 			// cumulative character occurrence counts contribution (2 uint32_ts per side)
-			pen += ((jlen / ((1 << lineRate)*linesPerSide)) * 8);
+			uint32_t occs = ((jlen / ((1 << lineRate)*linesPerSide)) * 8);
+			if(pen + occs < pen) {
+				continue; // overflowed!
+			}
+			pen += occs;
 			if(pen < bestpen) {
 				bestpen = pen;
 				bestj = j;
 			}
+		}
+		if(bestj == 0xffffffff) {
+			// With padding, the 
+			cerr << "The joined and padded reference string is too long." << endl;
+			cerr << "Please shorten or subdivide the reference(s)." << endl;
+			exit(1);
 		}
 		assert_neq(0xffffffff, bestj);
 		assert_neq(0xffffffff, bestpen);

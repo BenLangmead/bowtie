@@ -346,7 +346,8 @@ int main(int argc, char **argv) {
 		     << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
 		     << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
 		     << "  FTable chars: " << ftabChars << endl
-		     << "  Chunk rate: " << chunkRate << " (chunk is " << (1 << chunkRate) << " bytes)" << endl;
+		     //<< "  Chunk rate: " << chunkRate << " (chunk is " << (1 << chunkRate) << " bytes)" << endl
+		     ;
 		if(bmax == 0xffffffff) {
 			cout << "  Max bucket size: default" << endl;
 		} else {
