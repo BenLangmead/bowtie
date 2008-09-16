@@ -154,6 +154,52 @@ public:
 	uint32_t chunkMask() const     { return _chunkMask; }
 	uint32_t numChunks() const     { return _numChunks; }
 
+	/// Given
+	static uint32_t calcBestChunkRate(const vector<RefRecord>& szs,
+	                                  int32_t offRate,
+	                                  int32_t lineRate,
+	                                  int32_t linesPerSide)
+	{
+		assert_gt(offRate, 0);
+		assert_gt(lineRate, 0);
+		assert_gt(linesPerSide, 0);
+		uint32_t ps[12];
+		memset(ps,  0, sizeof(uint32_t) * 12);
+		uint32_t len = 0;
+		for(size_t i = 0; i < szs.size(); i++) {
+			const RefRecord& rec = szs[i];
+			len += rec.off;
+			len += rec.len;
+			for(size_t j = 0; j < 12; j++) {
+				uint32_t masked = (rec.len & ~(0xffffffff << (j+6)));
+				if(masked > 0) {
+					ps[j] += ((1 << (j+6)) - masked);
+				}
+			}
+		}
+		// Calculate two penalties and add them together.  The first
+		// penalty is the space incurred by the chunk descriptors,
+		// which consist of 4 uint32_ts (16 bytes) per chunk.  The
+		// second penalty is the space taken by the padding needed for
+		// fragments.
+		uint32_t bestj   = 0xffffffff;
+		uint32_t bestpen = 0xffffffff;
+		for(size_t j = 0; j < 12; j++) {
+			uint32_t pen = (ps[j] >> 2);            // BWT contribution (bytes)
+			pen += (((len + ps[j]) >> offRate) * 4);// _offs contribution (bytes)
+			pen += (((len + ps[j]) >> (j+6)) * 16); // chunks contribution (bytes)
+			// cumulative character occurrence counts contribution (2 uint32_ts per side)
+			pen += ((((len + ps[j]) >> 2) >> ((1 << lineRate)*linesPerSide)) * 8);
+			if(pen < bestpen) {
+				bestpen = pen;
+				bestj = j;
+			}
+		}
+		assert_neq(0xffffffff, bestj);
+		assert_neq(0xffffffff, bestpen);
+		return bestj+6;
+	}
+
 	void setOffRate(int __offRate) {
 		_offRate = __offRate;
         _offMask = 0xffffffff << _offRate;
@@ -865,13 +911,10 @@ private:
 	}
 };
 
-#define SAMPLE_THRESH 20
-
 typedef enum {
 	MHP_CHASE_ALL = 0,
 	MHP_MULTICHASE_ALL,
-	MHP_PICK_1_RANDOM,
-	MHP_CHASE_SAMPLE
+	MHP_PICK_1_RANDOM
 } MultiHitPolicy;
 
 /**
@@ -2786,13 +2829,6 @@ inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
 	switch(s.params().multiHitPolicy()) {
 		case MHP_CHASE_ALL: {
 			return reportChaseRange(s);
-			break;
-		}
-		case MHP_CHASE_SAMPLE: {
-			if (s.spread() > SAMPLE_THRESH)
-				return reportChaseSample(s);
-			else
-				return reportChaseRange(s);
 			break;
 		}
 		case MHP_MULTICHASE_ALL: {

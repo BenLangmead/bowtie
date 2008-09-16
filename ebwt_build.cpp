@@ -235,6 +235,8 @@ static void driver(const char * type,
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
 		sztot = fastaRefReadSizes(is, szs, refparams);
+		chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
+		if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
 	}
 	assert_gt(sztot, 0);
 	assert_gt(szs.size(), 0);
