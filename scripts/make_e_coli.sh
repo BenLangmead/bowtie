@@ -39,3 +39,10 @@ fi
 
 echo Running ${BOWTIE_BUILD_EXE} -t 8 NC_008253.fna e_coli
 ${BOWTIE_BUILD_EXE} -t 8 NC_008253.fna e_coli
+if [ "$?" = "0" ] ; then
+	echo "e_coli index built:"
+	echo "   e_coli.1.ebwt e_coli.2.ebwt e_coli.rev.1.ebwt e_coli.rev.2.ebwt"
+	echo "You may remove NC_008253.fna"
+else
+	echo "Index building failed; see error message"
+fi

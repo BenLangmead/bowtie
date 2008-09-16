@@ -93,3 +93,10 @@ fi
 
 echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 mm_ref_chr1.mfa,mm_ref_chr2.mfa,mm_ref_chr3.mfa,mm_ref_chr4.mfa,mm_ref_chr5.mfa,mm_ref_chr6.mfa,mm_ref_chr7.mfa,mm_ref_chr8.mfa,mm_ref_chr9.mfa,mm_ref_chr10.mfa,mm_ref_chr11.mfa,mm_ref_chr12.mfa,mm_ref_chr13.mfa,mm_ref_chr14.mfa,mm_ref_chr15.mfa,mm_ref_chr16.mfa,mm_ref_chr17.mfa,mm_ref_chr18.mfa,mm_ref_chr19.mfa,mm_ref_chrMT.fa,mm_ref_chrX.mfa,mm_ref_chrY.mfa m_musculus
 ${BOWTIE_BUILD_EXE} --bmaxdivn 4 mm_ref_chr1.mfa,mm_ref_chr2.mfa,mm_ref_chr3.mfa,mm_ref_chr4.mfa,mm_ref_chr5.mfa,mm_ref_chr6.mfa,mm_ref_chr7.mfa,mm_ref_chr8.mfa,mm_ref_chr9.mfa,mm_ref_chr10.mfa,mm_ref_chr11.mfa,mm_ref_chr12.mfa,mm_ref_chr13.mfa,mm_ref_chr14.mfa,mm_ref_chr15.mfa,mm_ref_chr16.mfa,mm_ref_chr17.mfa,mm_ref_chr18.mfa,mm_ref_chr19.mfa,mm_ref_chrMT.fa,mm_ref_chrX.mfa,mm_ref_chrY.mfa m_musculus
+if [ "$?" = "0" ] ; then
+	echo "m_musculus index built:"
+	echo "   m_musculus.1.ebwt m_musculus.2.ebwt m_musculus.rev.1.ebwt m_musculus.rev.2.ebwt"
+	echo "You may remove mm_ref_chr*.mfa and mm_ref_chrMT.fa"
+else
+	echo "Index building failed; see error message"
+fi

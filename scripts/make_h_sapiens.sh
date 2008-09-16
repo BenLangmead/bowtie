@@ -71,3 +71,10 @@ done
 
 echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.mfa,hs_ref_chr2.mfa,hs_ref_chr3.mfa,hs_ref_chr4.mfa,hs_ref_chr5.mfa,hs_ref_chr6.mfa,hs_ref_chr7.mfa,hs_ref_chr8.mfa,hs_ref_chr9.mfa,hs_ref_chr10.mfa,hs_ref_chr11.mfa,hs_ref_chr12.mfa,hs_ref_chr13.mfa,hs_ref_chr14.mfa,hs_ref_chr15.mfa,hs_ref_chr16.mfa,hs_ref_chr17.mfa,hs_ref_chr18.mfa,hs_ref_chr19.mfa,hs_ref_chr20.mfa,hs_ref_chr21.mfa,hs_ref_chr22.mfa,hs_ref_chrMT.mfa,hs_ref_chrX.mfa,hs_ref_chrY.mfa h_sapiens
 ${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.mfa,hs_ref_chr2.mfa,hs_ref_chr3.mfa,hs_ref_chr4.mfa,hs_ref_chr5.mfa,hs_ref_chr6.mfa,hs_ref_chr7.mfa,hs_ref_chr8.mfa,hs_ref_chr9.mfa,hs_ref_chr10.mfa,hs_ref_chr11.mfa,hs_ref_chr12.mfa,hs_ref_chr13.mfa,hs_ref_chr14.mfa,hs_ref_chr15.mfa,hs_ref_chr16.mfa,hs_ref_chr17.mfa,hs_ref_chr18.mfa,hs_ref_chr19.mfa,hs_ref_chr20.mfa,hs_ref_chr21.mfa,hs_ref_chr22.mfa,hs_ref_chrMT.mfa,hs_ref_chrX.mfa,hs_ref_chrY.mfa h_sapiens
+if [ "$?" = "0" ] ; then
+	echo "h_sapiens index built:"
+	echo "   h_sapiens.1.ebwt h_sapiens.2.ebwt h_sapiens.rev.1.ebwt h_sapiens.rev.2.ebwt"
+	echo "You may remove hs_ref_chr*.mfa"
+else
+	echo "Index building failed; see error message"
+fi
