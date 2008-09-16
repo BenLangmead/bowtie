@@ -761,13 +761,13 @@ void DifferenceCoverSample<TStr>::build() {
 		for(size_t i = 0; i < length(sPrimeOrder); i++) {
 			sPrimeOrder[i] = i;
 		}
-		// sPrime now holds suffix-offsets for DC samples.  sPrimeOrder
-		// contains the intial ordering and is passed in as a "double-swap"
-		// partner of sPrime so that we can reconstruct how the qsort
-		// permuted sPrime.
+		// sPrime now holds suffix-offsets for DC samples.
 		{
 			Timer timer(cout, "  V-Sorting samples time: ", this->verbose());
 			VMSG_NL("  V-Sorting samples");
+			// Extract backing-store array from sPrime and sPrimeOrder;
+			// the mkeyQSortSuf2 routine works on the array for maximum
+			// efficiency
 			uint32_t *sPrimeArr = (uint32_t*)begin(sPrime);
 			size_t slen = length(sPrime);
 			assert_eq(sPrimeArr[0], sPrime[0]);
@@ -775,8 +775,18 @@ void DifferenceCoverSample<TStr>::build() {
 			uint32_t *sPrimeOrderArr = (uint32_t*)begin(sPrimeOrder);
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
 			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+			// Sort sample suffixes up to the vth character using a
+			// multikey quicksort.  Sort time is proportional to the
+			// number of samples times v.  It isn't quadratic.
+			// sPrimeOrder is passed in as a swapping partner for
+			// sPrimeArr, i.e., every time the multikey qsort swaps
+			// elements in sPrime, it swaps the same elements in
+			// sPrimeOrder too.  This allows us to easily reconstruct
+			// what the sort did.
 			mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, ValueSize<TAlphabet>::VALUE,
 			              this->verbose(), this->sanityCheck(), v);
+			// Make sure sPrime and sPrimeOrder are consistent with
+			// their respective backing-store arrays
 			assert_eq(sPrimeArr[0], sPrime[0]);
 			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
