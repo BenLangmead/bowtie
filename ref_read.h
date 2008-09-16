@@ -37,6 +37,14 @@ static uint8_t dna4Cat[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+/// Skip to the end of the current line; return the first character
+/// of the next line
+static inline int skipWhitespace(istream& in) {
+	int c;
+	while(isspace(c = in.get()));
+	return c;
+}
+
 struct RefRecord {
 	RefRecord(uint32_t _off, uint32_t _len, bool _first) :
 		off(_off), len(_len), first(_first)
@@ -103,7 +111,7 @@ static RefRecord fastaRefReadAppend(istream& in,
 	int c;
 	static int lastc = '>';
 	if(first) {
-		c = in.get();
+		c = skipWhitespace(in);
 		if(c != '>') {
 			cerr << "Reference file does not seem to be a FASTA file" << endl;
 			exit(1);

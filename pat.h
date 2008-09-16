@@ -57,6 +57,14 @@ static inline void reverse(String<Dna5>& s) {
 	}
 }
 
+/// Skip to the end of the current line; return the first character
+/// of the next line
+static inline int skipWhitespace(FILE *in) {
+	int c;
+	while(isspace(c = fgetc(in)));
+	return c;
+}
+
 /**
  * Encapsualtes a source of patterns; usually a file.  Handles dumping
  * patterns to a logfile (useful for debugging) and optionally
@@ -863,7 +871,7 @@ protected:
 
 			// Pick off the first carat
 			if(_first) {
-				c = fgetc(this->_in); if(c < 0) return;
+				c = skipWhitespace(this->_in); if(c < 0) return;
 				if(c != '>') {
 					int cc = toupper(c);
 					cerr << "Error: reads file does not look like a FASTA file" << endl;
@@ -1082,7 +1090,7 @@ protected:
 
 			// Pick off the first at
 			if(_first) {
-				c = fgetc(this->_in); if(c < 0) return;
+				c = skipWhitespace(this->_in); if(c < 0) return;
 				if(c != '@') {
 					cerr << "Error: reads file does not look like a FASTQ file" << endl;
 					if(c == '>') {
@@ -1376,13 +1384,6 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-	/// Skip to the end of the current line; return the first character
-	/// of the next line
-	int skipWhitespace() {
-		int c;
-		while(isspace(c = fgetc(this->_in)));
-		return c;
-	}
 	/// Read another pattern from a FASTQ input file
 	virtual void read(char* dst,
 	                  String<Dna5>& dstTStr,
@@ -1410,7 +1411,7 @@ protected:
 			*dstLen = 0;
 			*nameLen = 0;
 
-			c = skipWhitespace();
+			c = skipWhitespace(this->_in);
 			assert(!isspace(c));
 			if(_first) {
 				if(c != 'a' && c != 'A' && c != 'c' && c != 'C' &&

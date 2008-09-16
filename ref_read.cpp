@@ -22,7 +22,7 @@ RefRecord fastaRefReadSize(istream& in,
 	// Pick off the first carat
 	if(first) {
 		lastc = '>';
-		c = in.get();
+		c = skipWhitespace(in);
 		if(in.eof()) {
 			cerr << "Warning: Empty input file" << endl;
 			lastc = -1;
