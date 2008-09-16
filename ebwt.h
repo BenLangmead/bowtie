@@ -155,10 +155,10 @@ public:
 	uint32_t numChunks() const     { return _numChunks; }
 
 	/// Given
-	static uint32_t calcBestChunkRate(const vector<RefRecord>& szs,
-	                                  int32_t offRate,
-	                                  int32_t lineRate,
-	                                  int32_t linesPerSide)
+	static int32_t calcBestChunkRate(const vector<RefRecord>& szs,
+	                                 int32_t offRate,
+	                                 int32_t lineRate,
+	                                 int32_t linesPerSide)
 	{
 		assert_gt(offRate, 0);
 		assert_gt(lineRate, 0);

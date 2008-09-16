@@ -38,7 +38,7 @@ static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
-static int32_t chunkRate     = 12; // each chunk is 4K
+//static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
 
 // Argument constants for getopts
@@ -71,7 +71,7 @@ static void printUsage(ostream& out) {
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
 	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
-	    << "    -h/--chunkrate <int>    # of characters in a text chunk" << endl
+	    //<< "    -h/--chunkrate <int>    # of characters in a text chunk" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
@@ -102,7 +102,7 @@ static struct option long_options[] = {
 	{"linesperside", required_argument, 0,            'i'},
 	{"offrate",      required_argument, 0,            'o'},
 	{"ftabchars",    required_argument, 0,            't'},
-	{"chunkrate",    required_argument, 0,            'h'},
+	//{"chunkrate",    required_argument, 0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{0, 0, 0, 0} // terminator
 };
@@ -154,9 +154,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 't':
 	   			ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
 	   			break;
-	   		case 'h':
-	   			chunkRate = parseNumber<int>(1, "-h/--chunkRate arg must be at least 1");
-	   			break;
+//	   		case 'h':
+//	   			chunkRate = parseNumber<int>(1, "-h/--chunkRate arg must be at least 1");
+//	   			break;
 	   		case 'n':
 	   			// all f-s is used to mean "not set", so put 'e' on end
 	   			bmax = 0xfffffffe;
@@ -231,6 +231,7 @@ static void driver(const char * type,
 	}
 	vector<RefRecord> szs;
 	uint32_t sztot;
+	int32_t chunkRate = 0;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
