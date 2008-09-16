@@ -244,6 +244,14 @@ Bowtie Manual
  Using the 'bowtie-build' Indexer
  --------------------------------
  
+ Use 'bowtie-build' to build a Bowtie index from a set of DNA
+ sequences.  'bowtie-build' outputs a set of 4 files named
+ NAME.1.ebwt, $NAME.2.ebwt, $NAME.rev.1.ebwt, and $NAME.rev.2.ebwt,
+ where $NAME is <index_basename> supplied by the user on the command
+ line.  These files together constitute the index: they are all that is
+ needed to align reads to the reference sequences.  The sequence files
+ themselves are not needed by Bowtie once the index is built.  
+ 
  The Bowtie index is based on the FM Index of Ferragina and Manzini,
  and the algorithm used to build it is the blockwise algorithm of
  Karkkainen.  For more information on these techniques, see these
@@ -273,7 +281,7 @@ Bowtie Manual
   Command Line
   ------------
  
- Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>
+ Usage: bowtie-build [options]* <reference_in> <index_basename>
  
     <reference_in>          A comma-separated list of files containing
                             the reference sequences to be aligned to,
@@ -283,7 +291,7 @@ Bowtie Manual
                             -c is specified, this might be
                             "GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA".
 
-    <ebwt_outfile_base>     The basename of the index files to write.
+    <index_basename>        The basename of the index files to write.
 
  Options:
 
