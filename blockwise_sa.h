@@ -385,11 +385,14 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	// relationships between very long, identical strings, which takes
 	// an extremely long time in general, and causes the stack to grow
 	// linearly with the size of the input
-	VMSG_NL("QSorting " << length(_sampleSuffs) << " sample offsets");
-	sort(begin(_sampleSuffs), end(_sampleSuffs));
-	for(size_t i = 0; i < length(_sampleSuffs)-1; i++) {
-		if(_sampleSuffs[i] == _sampleSuffs[i+1]) {
-			erase(_sampleSuffs, i--);
+	{
+		Timer timer(cout, "QSorting sample offsets, eliminating duplicates time: ", this->verbose());
+		VMSG_NL("QSorting " << length(_sampleSuffs) << " sample offsets, eliminating duplicates");
+		sort(begin(_sampleSuffs), end(_sampleSuffs));
+		for(size_t i = 0; i < length(_sampleSuffs)-1; i++) {
+			if(_sampleSuffs[i] == _sampleSuffs[i+1]) {
+				erase(_sampleSuffs, i--);
+			}
 		}
 	}
 	// Multikey quicksort the samples
