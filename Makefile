@@ -19,6 +19,7 @@ MAQ_CPP	= maq_convert/maqmap.c \
 		  maq_convert/bfa.c
 # bowtie-convert requires zlib because maq's format is compressed
 MAQ_LIB = -lz
+VERSION = $(shell cat VERSION)
 
 EXTRA_FLAGS =
 DEBUG_FLAGS = -O0 -g3
@@ -106,15 +107,30 @@ bowtie-convert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_C
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
-	zip $@ $(SRC_PKG_LIST)
+	mkdir .src.tmp
+	mkdir .src.tmp/bowtie-$(VERSION)
+	zip tmp.zip $(SRC_PKG_LIST)
+	mv tmp.zip .src.tmp/bowtie-$(VERSION)
+	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)
+	cp .src.tmp/$@ .
+	rm -rf .src.tmp
 
 bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
 	chmod a+x scripts/*.sh scripts/*.pl
+	rm -rf .bin.tmp
+	mkdir .bin.tmp
+	mkdir .bin.tmp/bowtie-$(VERSION)
 	if [ -f bowtie.exe ] ; then \
-		zip $@ $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
+		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
-		zip $@ $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
+		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
 	fi
+	mv tmp.zip .bin.tmp/bowtie-$(VERSION)
+	cd .bin.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
+	cp .bin.tmp/$@ .
+	rm -rf .bin.tmp
 
 .PHONY: clean
 clean:
