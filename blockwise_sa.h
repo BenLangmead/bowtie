@@ -371,14 +371,21 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	clear(_sampleSuffs);
 	uint32_t numSamples = ((len/bsz)+1)<<1; // ~len/bsz x 2
 	assert_gt(numSamples, 0);
-	VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
-	reserve(_sampleSuffs, numSamples, Exact());
-	// Randomly generate samples.  Allow duplicates for now.
-	// Sample much more (4x) than needed to reduce the chances of
-	// monster buckets.
-	VMSG_NL("Generating random suffixes");
-	for(size_t i = 0; i < numSamples; i++) {
-		appendValue(_sampleSuffs, _randomSrc.nextU32() % len);
+	try {
+		VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
+		reserve(_sampleSuffs, numSamples, Exact());
+		// Randomly generate samples.  Allow duplicates for now.
+		// Sample much more (4x) than needed to reduce the chances of
+		// monster buckets.
+		VMSG_NL("Generating random suffixes");
+		for(size_t i = 0; i < numSamples; i++) {
+			appendValue(_sampleSuffs, _randomSrc.nextU32() % len);
+		}
+	} catch(bad_alloc &ba) {
+		cerr << "Could not allocate sample suffix container of " << (numSamples * 4) << " bytes" << endl;
+		cerr << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl <<
+				"--bmaxmultsqrt or a smaller --bmaxdivn" << endl;
+		exit(1);
 	}
 	// Remove duplicates; very important to do this before the call to
 	// mkeyQSortSuf so that it doesn't try to calculate lexicographical
@@ -430,9 +437,18 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		// suffix and noting where it lands
 		uint32_t numBuckets = length(_sampleSuffs)+1;
 		String<uint32_t> bucketSzs; // holds computed bucket sizes
-		fill(bucketSzs, numBuckets, 0, Exact());
 		String<uint32_t> bucketReps; // holds 1 member of each bucket (for splitting)
-		fill(bucketReps, numBuckets, 0xffffffff, Exact());
+		try {
+			// Allocate and initialize containers for holding bucket
+			// sizes and representatives.
+			fill(bucketSzs, numBuckets, 0, Exact());
+			fill(bucketReps, numBuckets, 0xffffffff, Exact());
+		} catch(bad_alloc &ba) {
+			cerr << "Could not allocate sizes, representatives (" << ((numBuckets*8)>>10) << " KB) for blocks" << endl;
+			cerr << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl <<
+					"--bmaxmultsqrt or a smaller --bmaxdivn" << endl;
+			exit(1);
+		}
 		// Iterate through every suffix in the text, determine which
 		// bucket it falls into by doing a binary search across the
 		// sorted list of samples, and increment a counter associated
@@ -727,14 +743,28 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 		// everything
 		VMSG_NL("  No samples; assembling all-inclusive block");
 		assert_eq(0, _cur);
-		if(capacity(bucket) < this->bucketSz()) {
-			reserve(bucket, len+1, Exact());
+		try {
+			if(capacity(bucket) < this->bucketSz()) {
+				reserve(bucket, len+1, Exact());
+			}
+			for(uint32_t i = 0; i < len; i++) append(bucket, i);
+		} catch(bad_alloc &ba) {
+			cerr << "Could not allocate a master suffix-array block of " << ((len+1) * 4) << " bytes" << endl;
+			cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+			     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
+			exit(1);
 		}
-		for(uint32_t i = 0; i < len; i++) append(bucket, i);
 	} else {
-		VMSG_NL("  Reserving size (" << this->bucketSz() << ") for bucket");
-		if(capacity(bucket) < this->bucketSz()) {
-			reserve(bucket, this->bucketSz(), Exact());
+		try {
+			VMSG_NL("  Reserving size (" << this->bucketSz() << ") for bucket");
+			if(capacity(bucket) < this->bucketSz()) {
+				reserve(bucket, this->bucketSz(), Exact());
+			}
+		} catch(bad_alloc &ba) {
+			cerr << "Could not allocate a suffix-array block of " << ((this->bucketSz()+1) * 4) << " bytes" << endl;
+			cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+			     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
+			exit(1);
 		}
 		// Select upper and lower bounds from _sampleSuffs[] and
 		// calculate the Z array up to the difference-cover periodicity
@@ -744,7 +774,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 		assert_leq(_cur, length(_sampleSuffs));
 		bool first = _cur == 0;
 		bool last  = _cur == length(_sampleSuffs);
-		{
+		try {
 			Timer timer(cout, "  Calculating Z arrays time: ", this->verbose());
 			VMSG_NL("  Calculating Z arrays");
 			if(!last) {
@@ -762,6 +792,9 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				assert_eq(zLo[0], 0);
 				calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
 			}
+		} catch(bad_alloc &ba) {
+			cerr << "Could not allocate z-box containers" << endl;
+			exit(1);
 		}
 
 		// This is the most critical loop in the algorithm; this is where
@@ -794,7 +827,15 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				}
 				// In the bucket! - add it
 				assert_lt(i, len);
-				append(bucket, i);
+				try {
+					append(bucket, i);
+					throw bad_alloc();
+				} catch(bad_alloc &ba) {
+					cerr << "Could not append element to block of " << ((length(bucket)) * 4) << " bytes" << endl;
+					cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+					     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
+					exit(1);
+				}
 				// Not necessarily true; we allow overflowing buckets
 				// since we can't guarantee that a good set of sample
 				// suffixes can be found in a reasonable amount of time

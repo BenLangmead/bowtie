@@ -216,7 +216,7 @@ public:
 			if(ps[j] == 0xffffffff) {
 				continue; // The padding already overflowed
 			}
-			uint32_t jlen = len + ps[j];   
+			uint32_t jlen = len + ps[j];
 			if(jlen < len) {
 				continue; // overflowed!
 			}
@@ -243,7 +243,7 @@ public:
 			}
 		}
 		if(bestj == 0xffffffff) {
-			// With padding, the 
+			// With padding, the
 			cerr << "The joined and padded reference string is too long." << endl;
 			cerr << "Please shorten or subdivide the reference(s)." << endl;
 			exit(1);
@@ -527,7 +527,7 @@ public:
 			cerr << "Out of memory creating joined string in "
 			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
 			     << __LINE__ << endl;
-			throw e;
+			exit(1);
 		}
 		assert_geq(length(s), jlen);
 		if(useBlockwise) {
@@ -2647,8 +2647,6 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	// padded to fill the chunks.  Alignments that overlap any padding
 	// are invalid and should be weeded out.
 	//
-	// Forward index case:
-	//
 	//                 Sequence 0                      Sequence 1
 	// -------------------------------------------- -----------------
 	// Chunk0   Chunk1   Chunk2   Chunk3   Chunk4   Chunk5   Chunk6
@@ -2661,18 +2659,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	// fragment containing it with that fragment's offset from the
 	// beginning of the sequence.
 	//
-	// Mirror index case:
-	//
-	//                 Sequence 0                      Sequence 1
-	// -------------------------------------------- -----------------
-	// Chunk0   Chunk1   Chunk2
-	// ======== ======== ======== ======== ======== ======== ========
-	// -------- ----     -------- -------- -        --       -------
-	//  Fragment 0            Fragment 1       Fragment 2  Fragment 3
-	//
 
-	// Check whether our match overlaps with the padding between two
-	// texts, in which case the match is spurious
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
 	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
 	uint32_t tidx = this->_pmap[ptabOff];            // id of text matched

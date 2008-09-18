@@ -608,7 +608,13 @@ static void mismatchSearch(PatternSource& patsrc,
 	String<uint8_t> doneMask;
     params.setEbwtFw(true);
 	uint32_t numQs = ((qUpto == -1) ? 4 * 1024 * 1024 : qUpto);
-	fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
+	try {
+		fill(doneMask, numQs, 0); // 4 MB, masks 32 million reads
+	} catch(bad_alloc& ba) {
+		cerr << "Could not reserve 16MB for doneMask array" << endl;
+		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+		exit(1);
+	}
 	{
 	Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
 	EbwtSearchState<TStr> s(ebwtFw, params, seed);
@@ -666,8 +672,14 @@ static void mismatchSearch(PatternSource& patsrc,
 	    	assert_eq(0, sink.numProvisionalHits());
 	    	uint32_t mElt = patid >> 3;
 	    	if(mElt > length(doneMask)) {
-	    		// Add 50% more elements, initialized to 0
-	    		fill(doneMask, mElt + patid>>4, 0);
+	    		// Add more elements, initialized to 0
+	    		try {
+	    			fill(doneMask, mElt + patid>>4, 0);
+	    		} catch(bad_alloc& ba) {
+	    			cerr << "Could not expand doneMask to " << (mElt + patid>>4) << " bytes" << endl;
+	    			cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+	    			exit(1);
+	    		}
 	    	}
 
 			// Set a bit indicating this pattern is done and needn't be
@@ -697,8 +709,14 @@ static void mismatchSearch(PatternSource& patsrc,
 	    		// declare the forward version done
     	    	uint32_t mElt = (patid-1) >> 3;
     	    	if(mElt > length(doneMask)) {
-    	    		// Add 50% more elements, initialized to 0
-    	    		fill(doneMask, mElt + patid>>4, 0);
+    	    		// Add more elements, initialized to 0
+    	    		try {
+    	    			fill(doneMask, mElt + patid>>4, 0);
+    	    		} catch(bad_alloc& ba) {
+    	    			cerr << "Could not expand doneMask to " << (mElt + patid>>4) << " bytes" << endl;
+    	    			cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+    	    			exit(1);
+    	    		}
     	    	}
     	    	doneMask[mElt] |= (1 << ((patid-1) & 7));
 	    	}
@@ -1043,7 +1061,13 @@ static void twoOrThreeMismatchSearch(
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 >= doneMask.size()) {
 	    		// Expand doneMask
-	    		doneMask.resize(doneMask.size()*2, 0);
+	    		try {
+	    			doneMask.resize(doneMask.size()*2, 0);
+	    		} catch(bad_alloc& ba) {
+	    			cerr << "Could not resize doneMask to new length: " << (doneMask.size()*2) << endl;
+	    			cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+	    			exit(1);
+	    		}
 	    	}
 	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			size_t plen = length(*patFw);
@@ -1388,7 +1412,13 @@ static void seededQualCutoffSearch(
 	    while(patsrc.hasMorePatterns() && patid < (uint32_t)qUpto) {
 	    	if(patid>>1 >= doneMask.size()) {
 	    		// Expand doneMask
-	    		doneMask.resize(doneMask.size()*2, 0);
+	    		try {
+	    			doneMask.resize(doneMask.size()*2, 0);
+	    		} catch(bad_alloc& ba) {
+	    			cerr << "Could not resize doneMask to new length: " << (doneMask.size()*2) << endl;
+	    			cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+	    			exit(1);
+	    		}
 	    	}
 	    	GET_BOTH_PATTERNS(patFw, qualFw, nameFw, patRc, qualRc, nameRc);
 			size_t plen = length(*patFw);
@@ -1473,7 +1503,13 @@ static void seededQualCutoffSearch(
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	String<uint8_t> seedlingsRc;
-	reserve(seedlingsRc, 10 * 1024 * 1024, Exact());
+	try {
+		reserve(seedlingsRc, 10 * 1024 * 1024, Exact());
+	} catch(bad_alloc& ba) {
+		cerr << "Could not reserve 10MB for seedlingsRc array" << endl;
+		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+		exit(1);
+	}
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
@@ -1642,7 +1678,13 @@ static void seededQualCutoffSearch(
 	// Unload mirror index and load forward index
 	SWITCH_TO_FW_INDEX();
 	String<uint8_t> seedlingsFw;
-	reserve(seedlingsFw, 10 * 1024 * 1024, Exact());
+	try {
+		reserve(seedlingsFw, 10 * 1024 * 1024, Exact());
+	} catch(bad_alloc& ba) {
+		cerr << "Could not reserve 10MB for seedlingsRc array" << endl;
+		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
+		exit(1);
+	}
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
