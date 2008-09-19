@@ -139,7 +139,7 @@ sub trim($) {
 
 # Build an Ebwt based on given arguments
 sub build {
-	my($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $chunkRate, $endian) = @_;
+	my($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $endian) = @_;
 	my $ret = 0;
 	
 	my $file1 = "-c";
@@ -172,7 +172,7 @@ sub build {
 	}
 	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $bucketArg $endian $file2 .tmp";
+	my $cmd = "./bowtie-build-debug -s $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp";
 	system("echo \"$cmd\" > .tmp.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
@@ -188,7 +188,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 5) {
-		$cmd = "./bowtie-build-packed-debug -s $file1 --offrate $offRate --ftabchars $ftabChars --chunkrate $chunkRate $bucketArg $endian $file2 .tmp.packed";
+		$cmd = "./bowtie-build-packed-debug -s $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
@@ -290,7 +290,6 @@ for(; $outer > 0; $outer--) {
 	my $linesPerSide = 1 + int(rand(3));
 	my $offRate = int(rand(16));         # Can be anything
 	my $ftabChars = 1 + int(rand(8));    # Must be >= 1
-	my $chunkRate = 1 + int(rand(10));   # Must be >= 1
 	my $big = int(rand(2));
 	my $endian = '';
 	if($big) {
@@ -311,7 +310,7 @@ for(; $outer > 0; $outer--) {
 	}
 	
 	# Run the command to build the Ebwt from the random text
-	$pass += build($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $chunkRate, $endian);
+	$pass += build($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $endian);
 	last if(++$tests > $limit);
 
 	my $in = $inner;
