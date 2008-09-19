@@ -20,6 +20,9 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.9.5 -
+   * Improved error reporting
+
 Version 0.9.4 - September 16, 2008
    * New method for handling gaps and ambiguity codes in the reference.
      New 'bowtie-build' method handles long stretches of gaps

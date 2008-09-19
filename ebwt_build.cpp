@@ -82,7 +82,7 @@ static void printUsage(ostream& out) {
 	    ;
 }
 
-static const char *short_options = "vrpnscfl:i:o:t:h:";
+static const char *short_options = "vrph?nscfl:i:o:t:h:";
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            'v'},
@@ -103,6 +103,7 @@ static struct option long_options[] = {
 	{"offrate",      required_argument, 0,            'o'},
 	{"ftabchars",    required_argument, 0,            't'},
 	//{"chunkrate",    required_argument, 0,            'h'},
+	{"help",         no_argument,       0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{0, 0, 0, 0} // terminator
 };
@@ -161,6 +162,11 @@ static void parseOptions(int argc, char **argv) {
 	   			// all f-s is used to mean "not set", so put 'e' on end
 	   			bmax = 0xfffffffe;
 	   			break;
+	   		case 'h':
+	   		case '?':
+				printUsage(cerr);
+				exit(0);
+				break;
 	   		case ARG_BMAX:
 	   			bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
 	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt

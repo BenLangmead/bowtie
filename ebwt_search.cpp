@@ -52,7 +52,7 @@ static int maxBts               = 100; // max # backtracks allowed in half-and-h
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 
-static const char *short_options = "fqbcu:rv:sat3:5:o:e:n:l:w:";
+static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:";
 
 #define ARG_ORIG 256
 #define ARG_SEED 257
@@ -94,6 +94,7 @@ static struct option long_options[] = {
 	{"maqerr",       required_argument, 0,            'e'},
 	{"seedlen",      required_argument, 0,            'l'},
 	{"seedmms",      required_argument, 0,            'n'},
+	{"help",         no_argument,       0,            'h'},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
@@ -142,6 +143,7 @@ static void printUsage(ostream& out) {
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
+	    << "  -h/-?/--help       print this usage message" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
 }
@@ -217,6 +219,11 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'l':
 	   			seedLen = parseInt(20, "-l/--seedlen arg must be at least 20");
 	   			break;
+	   		case 'h':
+	   		case '?':
+				printUsage(cerr);
+				exit(0);
+				break;
 	   		case ARG_MAXNS:
 	   			maxNs = parseInt(0, "--maxns arg must be at least 0");
 	   			break;
