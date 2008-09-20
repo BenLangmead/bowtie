@@ -11,7 +11,22 @@ CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
 HEADERS = $(wildcard *.h)
-LIBS =
+# Detect Cygwin or MinGW
+WINDOWS = 0
+ifneq (,$(findstring CYGWIN,$(shell uname)))
+WINDOWS = 1
+else
+ifneq (,$(findstring MINGW,$(shell uname)))
+WINDOWS = 1
+endif
+endif
+ifeq (1,$(WINDOWS))
+# pthreads for windows forces us to be specific about the library
+PTHREAD_LIB = -lpthreadGC2
+else
+PTHREAD_LIB = -pthread
+endif
+LIBS = $(PTHREAD_LIB)
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/maqmap.c \
