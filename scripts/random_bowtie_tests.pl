@@ -23,9 +23,11 @@ unless(defined $options{n}) {
 }
 
 my @policies = (
+	"-n 3",
 	"-n 2",
 	"-n 1",
 	"-n 0",
+	"-v 3",
 	"-v 2",
 	"-v 1",
 	"-v 0"
