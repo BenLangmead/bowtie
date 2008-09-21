@@ -305,7 +305,7 @@ for(; $outer > 0; $outer--) {
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
 		my $tt = randDna($tlen);             # add text meat
-		pushd(@tts, $tt);
+		push(@tts, $tt);
 		$t .= (randGap() . $tt . randGap()); # add random padding
 		if($i < $nt-1) { $t .= ","; }        # add comma separator
 	}
