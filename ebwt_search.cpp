@@ -16,6 +16,7 @@
 #include "tokenize.h"
 #include "hit.h"
 #include "pat.h"
+#include "bitset.h"
 #include "threading.h"
 
 using namespace std;
@@ -737,8 +738,7 @@ static EbwtSearchStats<String<Dna> >* mismatchSearch_stats;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         mismatchSearch_os;
-static MUTEX_T*                       mismatchSearch_doneMaskLock;
-static vector<bool>*                  mismatchSearch_doneMask;
+static Bitset*                        mismatchSearch_doneMask;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
 	PatternSource&         _patsrc       = *mismatchSearch_patsrc;
@@ -746,8 +746,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
-	vector<bool>&          doneMask      = *mismatchSearch_doneMask;
-	MUTEX_T&               doneMaskLock  = *mismatchSearch_doneMaskLock;
+	Bitset&                doneMask      = *mismatchSearch_doneMask;
 
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
@@ -770,16 +769,6 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	while(true) {
 		GET_READ(patsrc);
 		assert_eq(0, sink.retainedHits().size());
-		{
-			// Expand doneMask if necessary
-			MUTEX_LOCK(doneMaskLock);
-			if(patid >= doneMask.size()) {
-				// Double size of doneMask
-				doneMask.resize(doneMask.size()*2, false);
-				assert_lt(patid, doneMask.size());
-			}
-			MUTEX_UNLOCK(doneMaskLock);
-		}
 		assert_eq(lastHits, sink.numHits());
 		uint32_t plen = length(patFw);
 		if(plen < 2) {
@@ -799,9 +788,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 		if(hit) lastHits = sink.numHits();
 		if(oneHit && hit) {
 			assert_eq(0, sink.numProvisionalHits());
-			MUTEX_LOCK(doneMaskLock);
-			doneMask[patid] = true;
-			MUTEX_UNLOCK(doneMaskLock);
+			doneMask.set(patid);
 			continue;
 		}
 		params.setFw(true);
@@ -827,9 +814,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 				lastHits = sink.numHits();
 				if(oneHit) {
 					// Update doneMask
-					MUTEX_LOCK(doneMaskLock);
-					doneMask[patid] = true;
-					MUTEX_UNLOCK(doneMaskLock);
+					doneMask.set(patid);
 				}
 			}
 			assert_eq(0, sink.retainedHits().size());
@@ -849,9 +834,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 			if(oneHit && hit) {
 				// Update doneMask
 				assert_eq(0, sink.numProvisionalHits());
-				MUTEX_LOCK(doneMaskLock);
-				doneMask[patid] = true;
-				MUTEX_UNLOCK(doneMaskLock);
+				doneMask.set(patid);
 			}
 		}
 		params.setFw(false);
@@ -870,7 +853,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
-	vector<bool>&          doneMask     = *mismatchSearch_doneMask;
+	Bitset&                doneMask     = *mismatchSearch_doneMask;
 
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
@@ -892,9 +875,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	EbwtSearchState<String<Dna> > s(ebwtBw, params, seed);
 	while(true) {
 		GET_READ(patsrc);
-		// Expand doneMask if necessary
-		bool done = doneMask[patid];
-		if(done) continue;
+		if(doneMask.test(patid)) continue;
 		s.newQuery(&patFw, &name, &qualFw);
 		ebwtBw.search1MismatchOrBetter(s, params,
 									   false,  // no exact hits
@@ -941,9 +922,7 @@ static void mismatchSearch(PatternSource& _patsrc,
                            vector<String<Dna5> >& os)
 {
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
-	MUTEX_T doneMaskLock;
-	MUTEX_INIT(doneMaskLock);
-	vector<bool> doneMask(numQs, false);
+	Bitset doneMask(numQs);
 
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
@@ -951,7 +930,6 @@ static void mismatchSearch(PatternSource& _patsrc,
 	mismatchSearch_ebwtFw       = &ebwtFw;
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = &doneMask;
-	mismatchSearch_doneMaskLock = &doneMaskLock;
 	mismatchSearch_os           = &os;
 
 	assert(ebwtFw.isInMemory());

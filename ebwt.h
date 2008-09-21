@@ -1657,7 +1657,7 @@ public:
 		uint32_t r = ebwt.mapLF1(_topSideLocus, c);
 		// no need to update _tried
 		if(r == 0xffffffff) {
-			_params.stats().incStopAt(*this);
+			//_params.stats().incStopAt(*this);
 			if(!_params.backtracking() && inNarrowHalf()) {
 				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
 				_firstNzRemainder = _qidx;
@@ -1667,15 +1667,15 @@ public:
 				_bots[_qidx] = _bot;
 			}
 		} else if(!_params.backtracking() && inNarrowHalf()) {
-			_params.stats().incPushthrough(*this);
-			if(inNarrowHalf()) _params.stats().incNarrowHalfAdvance(*this);
+			//_params.stats().incPushthrough(*this);
+			//if(inNarrowHalf()) _params.stats().incNarrowHalfAdvance(*this);
 			setTopBot(r, r+1);
 			_remainders[_qidx] = 0;
 			_tried[_qidx] = 0;
 			_tops[_qidx] = 0;
 			_bots[_qidx] = 0;
 		} else {
-			_params.stats().incPushthrough(*this);
+			//_params.stats().incPushthrough(*this);
 			setTopBot(r, r+1);
 		}
 
