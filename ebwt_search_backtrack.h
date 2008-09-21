@@ -804,64 +804,6 @@ public:
 		if(stackDepth > _hiDepth) {
 			_hiDepth = stackDepth;
 		}
-		// If we're searching for a half-and-half solution, then
-		// enforce the boundary-crossing constraints here
-		if(_halfAndHalf) {
-			assert_eq(0, _reportPartials);
-			// Crossing from the hi-half into the lo-half
-			if(depth == _5depth) {
-				if(_3revOff == _2revOff) {
-					// 1 and 1
-
-					// The backtracking logic should have prevented us from
-					// backtracking more than once into this region
-					assert_leq(stackDepth, 1);
-					// Reject if we haven't encountered mismatch by this point
-					if(stackDepth < 1) return false;
-				} else {
-					// 1 and 1,2
-
-					// The backtracking logic should have prevented us from
-					// backtracking more than twice into this region
-					assert_leq(stackDepth, 2);
-					// Reject if we haven't encountered mismatch by this point
-					if(stackDepth < 1) return false;
-					_hiHalfStackDepth = stackDepth;
-				}
-			}
-			else if(depth == _3depth) {
-				if(_3revOff == _2revOff) {
-					// 1 and 1
-
-					// The backtracking logic should have prevented us from
-					// backtracking more than twice within this region
-					assert_leq(stackDepth, 2);
-					// Must have encountered two mismatches by this point
-					if(stackDepth < 2) return false;
-				} else {
-					// 1 and 1,2
-					assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
-					assert_geq(stackDepth, _hiHalfStackDepth);
-					if(stackDepth == _hiHalfStackDepth) {
-						// Didn't encounter any mismatches in the lo-half
-						return false;
-					}
-					assert_geq(stackDepth, 2);
-					// The backtracking logic should have prevented us from
-					// backtracking more than twice within this region
-					assert_leq(stackDepth, 3);
-				}
-			}
-			// In-between sanity checks
-			if(depth >= _5depth) {
-				if(_3revOff != _2revOff) {
-					assert_gt(_hiHalfStackDepth, 0);
-				}
-				assert_geq(stackDepth, 1);
-			} else if(depth >= _3depth) {
-				assert_geq(stackDepth, 2);
-			}
-		}
 
 		// The total number of arrow pairs that are acceptable
 		// backtracking targets ("alternative" arrow pairs)
@@ -896,6 +838,65 @@ public:
 					cout << _chars[i];
 				}
 				cout << "\"";
+			}
+			// If we're searching for a half-and-half solution, then
+			// enforce the boundary-crossing constraints here and
+			// update _hiHalfStackDepth if necesssary.
+			if(_halfAndHalf) {
+				assert_eq(0, _reportPartials);
+				// Crossing from the hi-half into the lo-half
+				if(d == _5depth) {
+					if(_3revOff == _2revOff) {
+						// 1 and 1
+
+						// The backtracking logic should have prevented us from
+						// backtracking more than once into this region
+						assert_leq(stackDepth, 1);
+						// Reject if we haven't encountered mismatch by this point
+						if(stackDepth < 1) return false;
+					} else {
+						// 1 and 1,2
+
+						// The backtracking logic should have prevented us from
+						// backtracking more than twice into this region
+						assert_leq(stackDepth, 2);
+						// Reject if we haven't encountered mismatch by this point
+						if(stackDepth < 1) return false;
+						_hiHalfStackDepth = stackDepth;
+					}
+				}
+				else if(d == _3depth) {
+					if(_3revOff == _2revOff) {
+						// 1 and 1
+
+						// The backtracking logic should have prevented us from
+						// backtracking more than twice within this region
+						assert_leq(stackDepth, 2);
+						// Must have encountered two mismatches by this point
+						if(stackDepth < 2) return false;
+					} else {
+						// 1 and 1,2
+						assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
+						assert_geq(stackDepth, _hiHalfStackDepth);
+						if(stackDepth == _hiHalfStackDepth) {
+							// Didn't encounter any mismatches in the lo-half
+							return false;
+						}
+						assert_geq(stackDepth, 2);
+						// The backtracking logic should have prevented us from
+						// backtracking more than twice within this region
+						assert_leq(stackDepth, 3);
+					}
+				}
+				// In-between sanity checks
+				if(d >= _5depth) {
+					if(_3revOff != _2revOff) {
+						assert_gt(_hiHalfStackDepth, 0);
+					}
+					assert_geq(stackDepth, 1);
+				} else if(d >= _3depth) {
+					assert_geq(stackDepth, 2);
+				}
 			}
 			bool curIsEligible = false;
 			// Reset eligibleNum and eligibleSz if there are any
