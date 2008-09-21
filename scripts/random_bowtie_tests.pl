@@ -318,7 +318,7 @@ for(; $outer > 0; $outer--) {
 	for(; $in >= 0; $in--) {
 		# Generate random pattern(s) based on text
 		my $pfinal = '';
-		my $np = int(rand(10)) + 1;
+		my $np = int(rand(30)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
 			my $tt = $tts[int(rand($#tts))];
 			my $pl = int(rand(length($tt))) - 10;
@@ -327,8 +327,16 @@ for(; $outer > 0; $outer--) {
 			my $plen = int(rand($prand)) + $pbase;
 			my $pr = min($pl + $plen, length($tt));
 			my $p = substr $tt, $pl, $pr - $pl;
+			# Check for empty patter or pattern that spans a comma
 			if(length($p) == 0 || index($p, ",") != -1) {
 				$i--; next;
+			}
+			# Optionally add mutations to pattern (but not the first)
+			if($i > 0) {
+				my $nummms = int(rand(4));
+				for(my $j = 0; $j < $nummms; $j++) {
+					$p = substr($p, int(rand(length($p))), 1, randDna(1));
+				}
 			}
 			if(0) {
 				# Add some random padding on either side
@@ -352,6 +360,7 @@ for(; $outer > 0; $outer--) {
 		my $expectResult = 1;
 		for(my $i = 0; $i < length($pfinal); $i++) {
 			my $c = substr($pfinal, $i, 1);
+			last if($c eq ',');
 			if($c ne 'A' && $c ne 'C' && $c ne 'G' && $c ne 'T') {
 				$expectResult = 0;
 				last;
