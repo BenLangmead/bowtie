@@ -301,10 +301,11 @@ for(; $outer > 0; $outer--) {
 	# Generate random text(s)
 	my $nt = int(rand(10)) + 1;
 	my $t = '';
-	my $tt = '';
+	my @tts;
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
-		$tt = randDna($tlen);                # add text meat
+		my $tt = randDna($tlen);             # add text meat
+		pushd(@tts, $tt);
 		$t .= (randGap() . $tt . randGap()); # add random padding
 		if($i < $nt-1) { $t .= ","; }        # add comma separator
 	}
@@ -319,6 +320,7 @@ for(; $outer > 0; $outer--) {
 		my $pfinal = '';
 		my $np = int(rand(10)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
+			my $tt = $tts[int(rand($#tts))];
 			my $pl = int(rand(length($tt))) - 10;
 			$pl = max($pl, 0);
 			$pl = min($pl, length($tt));
