@@ -632,6 +632,7 @@ public:
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
+		_hiHalfStackDepth = 0;
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                     top, bot, iham, iham, _pairs, _elims, disableFtab);
 
@@ -647,7 +648,7 @@ public:
 		_params.sink().setRetainHits(oldRetain); // restore old value
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
-		// TODO: also check seedling hits
+		// TODO: also check partial alignments
 		if(_os != NULL &&
 		   (*_os).size() > 0 &&
 		   _reportPartials == 0 && // ignore seedling hits
@@ -839,7 +840,6 @@ public:
 					if(stackDepth < 2) return false;
 				} else {
 					// 1 and 1,2
-
 					assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
 					assert_geq(stackDepth, _hiHalfStackDepth);
 					if(stackDepth == _hiHalfStackDepth) {
@@ -854,6 +854,7 @@ public:
 			}
 			// In-between sanity checks
 			if(depth >= _5depth) {
+				assert_gt(_hiHalfStackDepth, 0);
 				assert_geq(stackDepth, 1);
 			} else if(depth >= _3depth) {
 				assert_geq(stackDepth, 2);

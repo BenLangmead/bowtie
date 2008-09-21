@@ -20,6 +20,7 @@
 #include "random_source.h"
 #include "hit.h"
 #include "ref_read.h"
+#include "threading.h"
 
 using namespace std;
 using namespace seqan;
