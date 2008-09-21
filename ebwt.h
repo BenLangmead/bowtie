@@ -2750,19 +2750,18 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	assert(!params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
+	SideLocus myl;
 	const uint32_t offMask = this->_eh._offMask;
 	const uint32_t offRate = this->_eh._offRate;
 	const uint32_t* offs = this->_offs;
-	bool own_locus = false;
 	if(l == NULL) {
-		own_locus = true;
-		l = new SideLocus(i, this->_eh, this->_ebwt);
+		l = &myl;
+		myl.initFromRow(i, this->_eh, this->_ebwt);
 	}
 	assert(l != NULL);
 	// Walk along until we reach the next marked row to the left
 	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
-		//params.stats().incPushthrough(s, true, true);
 		uint32_t newi = mapLF(*l); // calc next row
 		assert_neq(newi, i);
 		i = newi;                                  // update row
@@ -2771,13 +2770,16 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	}
 	// This is a marked row
 	if(i == _zOff) {
+		// Special case: it's the row corresponding to the
+		// lexicographically smallest suffix, which is implicitly
+		// marked 0
 		off = jumps;
 		VMSG_NL("reportChaseOne found zoff off=" << off << " (jumps=" << jumps << ")");
 	} else {
+		// Normal marked row, calculate offset of row i
 		off = offs[i >> offRate] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
-	if (own_locus) delete l;
 	return report(query, quals, name, mmui32, numMms, off, top, bot, qlen, params);
 }
 
