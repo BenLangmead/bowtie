@@ -322,7 +322,7 @@ for(; $outer > 0; $outer--) {
 		for(my $i = 0; $i < $np; $i++) {
 			my $tt = $tts[int(rand($#tts))];
 			my $pl = int(rand(length($tt))) - 10;
-			$pl = max($pl, 0);
+			$pl = max($pl, 4);
 			$pl = min($pl, length($tt));
 			my $plen = int(rand($prand)) + $pbase;
 			my $pr = min($pl + $plen, length($tt));
@@ -335,7 +335,7 @@ for(; $outer > 0; $outer--) {
 			if($i > 0) {
 				my $nummms = int(rand(4));
 				for(my $j = 0; $j < $nummms; $j++) {
-					$p = substr($p, int(rand(length($p))), 1, randDna(1));
+					substr($p, int(rand(length($p))), 1, randDna(1));
 				}
 			}
 			if(0) {
