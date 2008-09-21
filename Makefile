@@ -11,6 +11,7 @@ CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
 HEADERS = $(wildcard *.h)
+
 # Detect Cygwin or MinGW
 WINDOWS = 0
 ifneq (,$(findstring CYGWIN,$(shell uname)))
@@ -20,13 +21,24 @@ ifneq (,$(findstring MINGW,$(shell uname)))
 WINDOWS = 1
 endif
 endif
+
+BOWTIE_PTHREADS = 0
+PTHREAD_PKG =
+PTHREAD_LIB =
+PTHREAD_DEF =
+ifeq (1,$(BOWTIE_PTHREADS))
+PTHREAD_DEF = -DBOWTIE_PTHREADS
 ifeq (1,$(WINDOWS))
 # pthreads for windows forces us to be specific about the library
 PTHREAD_LIB = -lpthreadGC2
+PTHREAD_PKG = pthreadGC2.dll
 else
 PTHREAD_LIB = -pthread
 endif
+endif
+
 LIBS = $(PTHREAD_LIB)
+
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/maqmap.c \
@@ -55,6 +67,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard indexes/e_coli*) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli*) \
+               $(PTHREAD_PKG) \
                AUTHORS \
                COPYING \
                NEWS \
@@ -84,7 +97,8 @@ allall: $(BIN_LIST) $(BIN_LIST_AUX)
 DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DBUILD_HOST="\"`hostname`\"" \
      -DBUILD_TIME="\"`date`\"" \
-     -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\""
+     -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
+     $(PTHREAD_DEF)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

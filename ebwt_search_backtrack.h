@@ -1,23 +1,8 @@
 #ifndef EBWT_SEARCH_BACKTRACK_H_
 #define EBWT_SEARCH_BACKTRACK_H_
 
-#define DEFAULT_SPREAD 64
+#define DEFAULT_SPREAD 128
 #include "pat.h"
-/// Encapsulates a change made to a query base, i.e. "the 3rd base from
-/// the 5' end was changed from an A to a T".  Useful when using
-/// for matching seeded by "seedlings".
-struct QueryMutation {
-	QueryMutation(uint8_t _pos, uint8_t _oldBase, uint8_t _newBase) :
-		pos(_pos), oldBase(_oldBase), newBase(_newBase)
-	{
-		assert_neq(oldBase, newBase);
-		assert_leq(oldBase, 4);
-		assert_lt(newBase, 4);
-	}
-	uint8_t pos;
-	uint8_t oldBase;
-	uint8_t newBase;
-};
 
 /// An array that transforms Phred qualities into their maq-like
 /// equivalents by dividing by ten and rounding to the nearest 1,
@@ -52,6 +37,176 @@ static unsigned char qualRounds[] = {
 	3                             // 255
 };
 
+/// Encapsulates a change made to a query base, i.e. "the 3rd base from
+/// the 5' end was changed from an A to a T".  Useful when using
+/// for matching seeded by "seedlings".
+struct QueryMutation {
+	QueryMutation() : pos(0), oldBase(0), newBase(0) { }
+	QueryMutation(uint8_t _pos, uint8_t _oldBase, uint8_t _newBase) :
+		pos(_pos), oldBase(_oldBase), newBase(_newBase)
+	{
+		assert_neq(oldBase, newBase);
+		assert_leq(oldBase, 4);
+		assert_lt(newBase, 4);
+	}
+	uint8_t pos;
+	uint8_t oldBase;
+	uint8_t newBase;
+};
+
+/**
+ * Encapsulates a partial alignment.  Supports up to 256 positions and
+ * up to 3 substitutions.  The 'type' field of all the alternative
+ * structs tells us whether this entry is a singleton entry, an offset
+ * into the spillover list, a non-tail entry in the spillover list, or
+ * a tail entry in the spillover list.
+ */
+typedef union {
+	struct {
+		uint32_t pos0  : 8; // mismatched pos 1
+		uint32_t pos1  : 8; // mismatched pos 2
+		uint32_t pos2  : 8; // mismatched pos 3
+		uint32_t char0 : 2; // substituted char for pos 1
+		uint32_t char1 : 2; // substituted char for pos 2
+		uint32_t char2 : 2; // substituted char for pos 3
+		uint32_t type  : 2; // type of entry; 0=singleton_entry,
+		                    // 1=list_offset, 2=list_entry,
+		                    // 3=list_tail
+	} entry;
+	struct {
+		uint32_t off   : 30;// offset into list
+		uint32_t type  : 2; // type of entry; 0=singleton,
+                            // 1=list_offset, 2=list_entry,
+                            // 3=list_tail
+	} off; // offset into list
+	struct {
+		uint32_t unk   : 30;// padding
+		uint32_t type  : 2; // type of entry; 0=singleton,
+                            // 1=list_offset, 2=list_entry,
+                            // 3=list_tail
+	} unk;   // unknown
+} PartialAlignment;
+
+/**
+ * A synchronized data structure for storing partial alignments
+ * associated with patids, with particular attention to compactness.
+ */
+class PartialAlignmentManager {
+public:
+	PartialAlignmentManager(size_t listSz = 10 * 1024 * 1024) {
+		MUTEX_INIT(_partialLock);
+		// Reserve space for 10M partialsList entries = 40 MB
+		_partialsList.resize(listSz);
+	}
+	/// Add a set of partial alignments for a particular patid into the
+	/// partial-alignment database
+	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
+		if(ps.size() == 0) return;
+		MUTEX_LOCK(_partialLock);
+		// Assert that the entry doesn't exist yet
+		assert(_partialsMap.find(patid) == _partialsMap.end());
+		if(ps.size() == 1) {
+			_partialsMap[patid] = ps[0];
+			_partialsMap[patid].entry.type = 0; // singleton
+		} else {
+			PartialAlignment al;
+			al.off.off = _partialsList.size();
+			al.off.type = 1; // list offset
+			_partialsMap[patid] = al;
+			assert_gt(ps.size(), 1);
+			for(size_t i = 0; i < ps.size()-1; i++) {
+				_partialsList.push_back(ps[i]);
+				// list entry (non-tail)
+				_partialsList.back().entry.type = 2;
+			}
+			_partialsList.push_back(ps.back());
+			// list tail
+			_partialsList.back().entry.type = 3;
+		}
+		// Assert that we added an entry
+		assert(_partialsMap.find(patid) != _partialsMap.end());
+		MUTEX_UNLOCK(_partialLock);
+	}
+	///
+	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
+		assert_eq(0, ps.size());
+		MUTEX_LOCK(_partialLock);
+		if(_partialsMap.find(patid) == _partialsMap.end()) {
+			MUTEX_UNLOCK(_partialLock);
+			return;
+		}
+		PartialAlignment al = _partialsMap[patid];
+		uint32_t type = al.unk.type;
+		if(type == 0) {
+			// singleton
+			ps.push_back(al);
+		} else {
+			// list
+			assert_eq(1, type);
+			uint32_t off = al.off.off;
+			do {
+				assert_lt(off, _partialsList.size());
+				ASSERT_ONLY(type = _partialsList[off].entry.type);
+				assert(type == 2 || type == 3);
+				ps.push_back(_partialsList[off]);
+			} while(_partialsList[off++].entry.type == 2);
+			assert_eq(3, _partialsList[off-1].entry.type);
+		}
+		MUTEX_UNLOCK(_partialLock);
+		assert_gt(ps.size(), 0);
+	}
+
+	static uint8_t toMutsString(const PartialAlignment& pal,
+	                            const String<Dna5>& seq,
+	                            const String<char>& quals,
+	                            String<QueryMutation>& muts)
+	{
+		reserve(muts, 4);
+		assert_eq(0, length(muts));
+		uint32_t plen = length(seq);
+		assert_gt(plen, 0);
+		assert_neq(1, pal.unk.type);
+		// Do first mutation
+		uint8_t oldQuals = 0;
+		uint32_t pos0 = pal.entry.pos0;
+		uint8_t tpos0 = plen-1-pos0;
+		uint32_t chr0 = pal.entry.char0;
+		uint8_t oldChar = (uint8_t)seq[tpos0];
+		oldQuals += qualRounds[quals[tpos0]-33]; // take quality hit
+		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
+		if(pal.entry.pos1 != 0xff) {
+			// Do second mutation
+			uint32_t pos1 = pal.entry.pos1;
+			uint8_t tpos1 = plen-1-pos1;
+			uint32_t chr1 = pal.entry.char1;
+			oldChar = (uint8_t)seq[tpos1];
+			oldQuals += qualRounds[quals[tpos1]-33]; // take quality hit
+			append(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
+			if(pal.entry.pos2 != 0xff) {
+				// Do second mutation
+				uint32_t pos2 = pal.entry.pos2;
+				uint8_t tpos2 = plen-1-pos2;
+				uint32_t chr2 = pal.entry.char2;
+				oldChar = (uint8_t)seq[tpos2];
+				oldQuals += qualRounds[quals[tpos2]-33]; // take quality hit
+				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation
+			}
+		}
+		assert_gt(length(muts), 0);
+		assert_leq(length(muts), 3);
+		return oldQuals;
+	}
+private:
+	/// Maps patids to partial alignments for that patid
+	map<uint32_t, PartialAlignment> _partialsMap;
+	/// Overflow for when a patid has more than 1 partial alignment
+	vector<PartialAlignment> _partialsList;
+	/// Lock for 'partialsMap' and 'partialsList'; necessary because
+	/// search threads will be reading and writing them
+	MUTEX_T _partialLock;
+};
+
+
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
  * some range of a read sequence.
@@ -75,7 +230,7 @@ public:
 	                 uint32_t __qualThresh,  /// max acceptable q-distance
 	                 uint32_t __maxBts = 75, /// maximum # backtracks allowed
 	                 uint32_t __reportPartials = 0,
-	                 String<uint8_t>* __seedlings = NULL,
+	                 PartialAlignmentManager* __partials = NULL,
 	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
 	                 bool __oneHit = true,
@@ -108,7 +263,7 @@ public:
 		_mms(NULL),
 		_chars(NULL),
 		_reportPartials(__reportPartials),
-		_seedlings(__seedlings),
+		_partials(__partials),
 		_muts(__muts),
 		_os(__os),
 		_considerQuals(__considerQuals),
@@ -377,6 +532,7 @@ public:
 				nsInFtab++;
 			}
 		}
+		bool ret;
 		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
 			// The ftab doesn't extend past the unrevisitable portion,
 			// so we can go ahead and use it
@@ -397,37 +553,50 @@ public:
 				if(_reportPartials > 0) {
 					// Oops - we're trying to find seedlings, so we've
 					// gone too far; start again
-					return backtrack(0,   // depth
-					                 0,   // top
-					                 0,   // bot
-					                 ham,
-					                 nsInFtab > 1);
+					ret = backtrack(0,   // depth
+					                0,   // top
+					                0,   // bot
+					                ham,
+					                nsInFtab > 1);
 				} else {
 					// We have a match!
-					return report(0, top, bot);
+					ret = report(0, top, bot);
 				}
 			} else if (bot > top) {
 				// We have an arrow pair from which we can backtrack
-				return backtrack(ftabChars, // depth
-				                 top,       // top
-				                 bot,       // bot
-				                 ham,
-				                 nsInFtab > 1);
+				ret = backtrack(ftabChars, // depth
+				                top,       // top
+				                bot,       // bot
+				                ham,
+				                nsInFtab > 1);
+			} else {
+				// The arrows are already closed; give up
+				ret = false;
 			}
-			// The arrows are already closed; give up
-			return false;
 		} else {
 			// The ftab *does* extend past the unrevisitable portion;
 			// we can't use it in this case, because we might jump past
 			// a legitimate mismatch
-			return backtrack(0,   // depth
-			                 0,   // top
-			                 0,   // bot
-			                 ham,
-			                 // disable ftab jumping if there is more
-			                 // than 1 N in it
-			                 nsInFtab > 1);
+			ret = backtrack(0,   // depth
+			                0,   // top
+			                0,   // bot
+			                ham,
+			                // disable ftab jumping if there is more
+			                // than 1 N in it
+			                nsInFtab > 1);
 		}
+		if(_reportPartials > 0) {
+			assert(_partials != NULL);
+			if(_partialsBuf.size() > 0) {
+				_partials->addPartials(_params.patId(), _partialsBuf);
+				_partialsBuf.clear();
+				ret = true;
+			} else {
+				assert(!ret);
+			}
+		}
+		assert_eq(0, _partialsBuf.size());
+		return ret;
 	}
 
 	/**
@@ -886,7 +1055,7 @@ public:
 				if(altNum > 0) backtrackDespiteMatch = true;
 				if(stackDepth > 0) {
 					// This is a legit seedling; report it
-					reportSeedling(stackDepth);
+					reportPartial(stackDepth);
 				}
 				// Now continue on to find legitimate seedlings with
 				// more mismatches than this one
@@ -1306,7 +1475,7 @@ public:
 	 */
 	static void printHit(const vector<String<Dna5> >& os,
 	                     const Hit& h,
-	                     const TStr& qry,
+	                     const String<Dna5>& qry,
 	                     size_t qlen,
 	                     uint32_t unrevOff,
 	                     uint32_t oneRevOff,
@@ -1330,10 +1499,10 @@ public:
 		cout << endl;
 		cout << "  Bt:   ";
 		for(int i = (int)qlen-1; i >= 0; i--) {
-			if     (i < (int)unrevOff) cout << "0";
-			else if(i < (int)oneRevOff)  cout << "1";
-			else if(i < (int)twoRevOff)  cout << "2";
-			else if(i < (int)threeRevOff)  cout << "3";
+			if     (i < (int)unrevOff)    cout << "0";
+			else if(i < (int)oneRevOff)   cout << "1";
+			else if(i < (int)twoRevOff)   cout << "2";
+			else if(i < (int)threeRevOff) cout << "3";
 			else cout << "X";
 		}
 		cout << endl;
@@ -1357,9 +1526,9 @@ public:
 	                        bool ebwtFw,
 	                        uint32_t iham = 0,
 	                        String<QueryMutation>* muts = NULL,
-	                        bool halfAndHalf = false)
+	                        bool halfAndHalf = false,
+	                        bool invert = false)
 	{
-		typedef typename Value<TStr>::Type TVal;
 		bool fivePrimeOnLeft = (ebwtFw == fw);
 	    uint32_t plen = qlen;
 		uint8_t *pstr = (uint8_t *)begin(qry, Standard());
@@ -1402,13 +1571,15 @@ public:
 							success = false;
 							break;
 						}
+						size_t koff = kr;
+						if(invert) koff = (size_t)k;
 						// What region does the mm fall into?
-						if(kr < unrevOff) {
+						if(koff < unrevOff) {
 							// Alignment is invalid because it contains
 							// a mismatch in the unrevisitable region
 							success = false;
 							break;
-						} else if(kr < oneRevOff) {
+						} else if(koff < oneRevOff) {
 							rev1mm++;
 							if(rev1mm > 1) {
 								// Alignment is invalid because it
@@ -1417,7 +1588,7 @@ public:
 								success = false;
 								break;
 							}
-						} else if(kr < twoRevOff) {
+						} else if(koff < twoRevOff) {
 							rev2mm++;
 							if(rev2mm > 2) {
 								// Alignment is invalid because it
@@ -1426,7 +1597,7 @@ public:
 								success = false;
 								break;
 							}
-						} else if(kr < threeRevOff) {
+						} else if(koff < threeRevOff) {
 							rev3mm++;
 							if(rev3mm > 3) {
 								// Alignment is invalid because it
@@ -1558,7 +1729,9 @@ protected:
 	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		if(_reportPartials) {
 			assert_leq(stackDepth, _reportPartials);
-			reportSeedling(stackDepth);
+			if(stackDepth > 0) {
+				reportPartial(stackDepth);
+			}
 			return false; // keep going
 		} else {
 			// Undo all the mutations
@@ -1619,26 +1792,64 @@ protected:
 	 * Report a "seedling hit" - i.e. report the mismatches that got us
 	 * here.
 	 */
-	bool reportSeedling(uint32_t stackDepth) {
+	bool reportPartial(uint32_t stackDepth) {
 		// Possibly report
 		assert_gt(_reportPartials, 0);
-		assert(_seedlings != NULL);
+		assert(_partials != NULL);
 		ASSERT_ONLY(uint32_t qualTot = 0);
-		for(size_t i = 0; i < stackDepth; i++) {
-			assert_lt(_mms[i], _qlen);
-			append((*_seedlings), (uint8_t)_mms[i]); // pos
-			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[i]] - 33)]);
-			uint32_t ci = _qlen - _mms[i] - 1;
+		PartialAlignment al;
+		assert_leq(stackDepth, 3);
+		assert_gt(stackDepth, 0);
+
+		// First mismatch
+		assert_lt(_mms[0], _qlen);
+		// First, append the mismatch position in the read
+		al.entry.pos0 = (uint8_t)_mms[0]; // pos
+		ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[0]] - 33)]);
+		uint32_t ci = _qlen - _mms[0] - 1;
+		// _chars[] is index in terms of RHS-relative depth
+		int c = (int)(Dna5)_chars[ci];
+		assert_lt(c, 4);
+		assert_neq(c, (int)(*_qry)[_mms[0]]);
+		// Second, append the substituted character for the position
+		al.entry.char0 = c;
+
+		if(stackDepth > 1) {
+			// Second mismatch
+			assert_lt(_mms[1], _qlen);
+			// First, append the mismatch position in the read
+			al.entry.pos1 = (uint8_t)_mms[1]; // pos
+			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[1]] - 33)]);
+			ci = _qlen - _mms[1] - 1;
 			// _chars[] is index in terms of RHS-relative depth
-			int c = (int)(Dna5)_chars[ci];
+			c = (int)(Dna5)_chars[ci];
 			assert_lt(c, 4);
-			assert_neq(c, (int)(*_qry)[_mms[i]]);
-			append((*_seedlings), (uint8_t)c); // chr
-			if(i < stackDepth - 1) {
-				append((*_seedlings), 0xfe); // minor separator
-			}
+			assert_neq(c, (int)(*_qry)[_mms[1]]);
+			// Second, append the substituted character for the position
+			al.entry.char1 = c;
+		} else {
+			// Signal that the '1' slot is empty
+			al.entry.pos1 = 0xff;
 		}
-		assert_leq(qualTot, _qualThresh);
+
+		if(stackDepth > 2) {
+			// Second mismatch
+			assert_lt(_mms[2], _qlen);
+			// First, append the mismatch position in the read
+			al.entry.pos2 = (uint8_t)_mms[2]; // pos
+			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[2]] - 33)]);
+			ci = _qlen - _mms[2] - 1;
+			// _chars[] is index in terms of RHS-relative depth
+			c = (int)(Dna5)_chars[ci];
+			assert_lt(c, 4);
+			assert_neq(c, (int)(*_qry)[_mms[2]]);
+			// Second, append the substituted character for the position
+			al.entry.char2 = c;
+		} else {
+			// Signal that the '2' slot is empty
+			al.entry.pos2 = 0xff;
+		}
+		_partialsBuf.push_back(al);
 		return true;
 	}
 
@@ -1776,7 +1987,6 @@ protected:
 	                 uint32_t twoRevOff = 0xffffffff,
 	                 uint32_t threeRevOff = 0xffffffff)
 	{
-		typedef typename Value<TStr>::Type TVal;
 		if(unrevOff  == 0xffffffff) unrevOff  = _unrevOff;
 		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
 		if(twoRevOff == 0xffffffff) twoRevOff = _2revOff;
@@ -1843,37 +2053,50 @@ protected:
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
-	uint32_t            _reportPartials; // if > 0, report seedling
-	                             // hits up to this many mismatches
-	String<uint8_t>    *_seedlings; // append seedling hits here
-	String<QueryMutation> *_muts;// set of mutations that apply for a
-	                             // seedling
-	vector<String<Dna5> >* _os;     // reference texts
+	// If > 0, report partial alignments up to this many mismatches
+	uint32_t            _reportPartials;
+	/// Append partial alignments here
+	PartialAlignmentManager *_partials;
+	/// Set of mutations that apply for a partial alignment
+	String<QueryMutation> *_muts;
+	/// Reference texts (NULL if they are unavailable
+	vector<String<Dna5> >*       _os;
+	/// Whether to consider quality values when deciding where to
+	/// backtrack
 	bool                _considerQuals;
 	bool                _halfAndHalf;
-	uint32_t            _5depth; // depth of 5'-seed-half border
-	uint32_t            _3depth; // depth of 3'-seed-half border
-	String<char>        _nameDefault; // default name, for when it's
-	                             // not specified by caller
-	String<char>        _qualDefault; // default quals
-	uint32_t            _hiDepth;// greatest stack depth seen since
-	                             // last reset
-	uint32_t            _numBts; // number of backtracks in last call
-	                             // to backtrack
-	uint32_t            _totNumBts;// number of backtracks since last
-	                             // reset
-	uint32_t            _maxBts; // max # of backtracks to allow before
-	                             // giving up
-	bool    _precalcedSideLocus; // whether we precalcualted the Ebwt
-	                             // locus information for the next top/
-	                             // bot pair
-	SideLocus           _preLtop;// precalculated top locus
-	SideLocus           _preLbot;// precalculated bot locus
-	RandomSource        _rand;   // Source of pseudo-random numbers
-	bool                _verbose;// be talkative
+	/// Depth of 5'-seed-half border
+	uint32_t            _5depth;
+	/// Depth of 3'-seed-half border
+	uint32_t            _3depth;
+	/// Default name, for when it's not specified by caller
+	String<char>        _nameDefault;
+	/// Default quals
+	String<char>        _qualDefault;
+	/// Greatest stack depth seen since last reset
+	uint32_t            _hiDepth;
+	/// Number of backtracks in last call to backtrack()
+	uint32_t            _numBts;
+	/// Number of backtracks since last reset
+	uint32_t            _totNumBts;
+	/// Max # of backtracks to allow before giving up
+	uint32_t            _maxBts;
+	/// Whether we precalcualted the Ebwt locus information for the
+	/// next top/bot pair
+	bool    _precalcedSideLocus;
+	/// Precalculated top locus
+	SideLocus           _preLtop;
+	/// Precalculated bot locus
+	SideLocus           _preLbot;
+	/// Source of pseudo-random numbers
+	RandomSource        _rand;
+	/// Be talkative
+	bool                _verbose;
 	uint32_t            _hiHalfStackDepth; // temporary holder for # mms
 	                             // observed in hi-half for half-and-
 	                             // half backtracks
+	// Holding area for partial alignments
+	vector<PartialAlignment> _partialsBuf;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

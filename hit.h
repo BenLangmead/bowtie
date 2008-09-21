@@ -5,8 +5,11 @@
 #include <stdint.h>
 #include <iostream>
 #include <bitset>
+#include <sstream>
 #include <seqan/sequence.h>
 #include "assert_helpers.h"
+#include "spinlock.h"
+#include "threading.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -16,49 +19,51 @@ using namespace std;
 using namespace seqan;
 
 typedef pair<uint32_t,uint32_t> U32Pair;
-// For now, we support reads up to 63 bp long, which is the same as Maq, as 
+// For now, we support reads up to 63 bp long, which is the same as Maq, as
 // of 0.6.7
-static const int max_read_bp = 63;
+static const int max_read_bp = 1023;
 
 /**
  * Encapsulates a hit, including a text-id/text-offset pair, a pattern
  * id, and a boolean indicating whether it matched as its forward or
  * reverse-complement version.
  */
-struct Hit {	
-	Hit(U32Pair _h, 
+struct Hit {
+	Hit(U32Pair _h,
 		uint32_t _patId,
 		const String<char>& _patName,
 		const String<Dna5>& _patSeq,
-		const String<char>& _patQualities,
-		bool _fw, 
+		const String<char>& _quals,
+		bool _fw,
 		const bitset<max_read_bp>& _mms,
-		uint32_t _oms = 0) : h(_h), 
-							 patId(_patId),
-							 patName(_patName),
-							 patSeq(_patSeq),
-							 patQualities(_patQualities),
-							 mms(_mms),
-							 oms(_oms),
-							 fw(_fw) {}
-	
-	U32Pair  h;
-	uint32_t patId;
-	String<char> patName;
-	String<Dna5> patSeq;
-	String<char> patQualities;
-	bitset<max_read_bp> mms;
-	uint32_t oms;   // # of other possible mappings; 0 -> this is unique
-	bool fw;
+		uint32_t _oms = 0) :
+		h(_h),
+		patId(_patId),
+		patName(_patName),
+		patSeq(_patSeq),
+		quals(_quals),
+		mms(_mms),
+		oms(_oms),
+		fw(_fw) {}
+
+	U32Pair             h;       /// reference index & offset
+	uint32_t            patId;   /// read index
+	String<char>        patName; /// read name
+	String<Dna5>        patSeq;  /// read sequence
+	String<char>        quals;   /// read qualities
+	bitset<max_read_bp> mms;     /// mismatch mask
+	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
+	bool                fw;      /// orientation of read in alignment
+
 	Hit& operator = (const Hit &other) {
-	    this->h = other.h;
-	    this->patId = other.patId;
+	    this->h       = other.h;
+	    this->patId   = other.patId;
 		this->patName = other.patName;
-		this->patSeq = other.patSeq;
-		this->patQualities = other.patQualities;
-	    this->mms = other.mms;
-	    this->oms = other.oms;
-		this->fw  = other.fw;
+		this->patSeq  = other.patSeq;
+		this->quals   = other.quals;
+	    this->mms     = other.mms;
+	    this->oms     = other.oms;
+		this->fw      = other.fw;
 	    return *this;
 	}
 };
@@ -73,397 +78,232 @@ bool operator< (const Hit& a, const Hit& b);
  */
 class HitSink {
 public:
-	HitSink(ostream& __out = cout,
-	        bool __keep = false,
+	HitSink(ostream&        __out = cout,
 	        vector<string>* __refnames = NULL) :
 		_out(__out),
-		_hits(),
-		_provisionalHits(),
+		_refnames(__refnames),
+		_lock()
+	{
+#ifdef USE_SPINLOCK
+		// No initialization
+#else
+   		MUTEX_INIT(_lock);
+#endif
+	}
+	virtual ~HitSink() { }
+
+	/// Implementation of hit-report
+	virtual void reportHit(const Hit& h) = 0;
+
+	/// Called when all alignments are complete
+	virtual void finish()               { }
+	/// Flushes the alignment output stream
+	virtual void flush()                { _out.flush(); }
+	/// Returns the alignment output stream
+	virtual ostream& out()              { return _out; }
+protected:
+	void mylock() {
+#ifdef USE_SPINLOCK
+		_lock.Enter();
+#else
+		MUTEX_LOCK(_lock);
+#endif
+	}
+	void myunlock() {
+#ifdef USE_SPINLOCK
+		_lock.Leave();
+#else
+		MUTEX_UNLOCK(_lock);
+#endif
+	}
+	ostream&        _out;      /// the alignment output stream
+	vector<string>* _refnames; /// map from reference indexes to names
+#ifdef USE_SPINLOCK
+	SpinLock _lock;
+#else
+	MUTEX_T _lock;     /// mutex for locking critical regions
+#endif
+};
+
+/**
+ * A per-thread wrapper for a HitSink.  Incorporates state that a
+ * single search thread cares about, i.e., this thread's provisional
+ * hits and reported-hit count.
+ */
+class HitSinkPerThread {
+public:
+	HitSinkPerThread(HitSink& sink, bool __keep = false) :
+		_sink(sink),
 		_keep(__keep),
 		_numHits(0llu),
-		_refnames(__refnames) { }
-	virtual ~HitSink() { }
-	virtual void reportHit(const U32Pair& h,
-						   uint32_t patId,
-						   const String<char>& patName,
-						   const String<Dna5>& patSeq,
-						   const String<char>& patQualities,
-						   bool fw,
-						   const bitset<max_read_bp>& mms,
-						   uint32_t oms) = 0;
-	/**
-	 * A provisional hit is a hit that we might want to report, but we
-	 * aren't sure yet.
-	 */
-	virtual void reportProvisionalHit(
-			const U32Pair& h,
-			uint32_t patId,
-		    const String<char>& patName,
-			const String<Dna5>& patSeq,
-			const String<char>& patQualities,
-            bool fw,
-            const bitset<max_read_bp>& mms,
-            uint32_t oms) = 0;
+		_hits(),
+		_provHits() { }
+
+	/// Purge all accumulated provisional hits without reporting them
+	void rejectProvisionalHits() {
+		_provHits.clear();
+	}
+
 	/// Report and purge all accumulated provisional hits
-	virtual void acceptProvisionalHits() {
+	void acceptProvisionalHits() {
 		// Save the old _keep and set it to false while we report the
 		// provisional hits; this is because we already retained them
 		// when they were reported provisionally.
 		bool keep = _keep;
 		_keep = false;
-		for(size_t i = 0; i < _provisionalHits.size(); i++) {
-			const Hit& h = _provisionalHits[i];
-			reportHit(h.h, h.patId, h.patName, h.patSeq, h.patQualities, h.fw, h.mms, h.oms);
+		for(size_t i = 0; i < _provHits.size(); i++) {
+			const Hit& h = _provHits[i];
+			reportHit(h);
 		}
 		_keep = keep; // restore _keep
-		_provisionalHits.clear();
+		_provHits.clear();
 	}
-	/// Purge all accumulated provisional hits without reporting them
-	virtual void rejectProvisionalHits() {
-		_provisionalHits.clear();
-	}
-	virtual void finishImpl() { }
-	virtual void finish()               { finishImpl(); }
-	virtual void flush()                { _out.flush(); }
-	virtual void setRetainHits(bool r)  { _keep = r; }
-	virtual bool retainHits()           { return _keep; }
-	virtual void clearRetainedHits()    { _hits.clear(); }
-	virtual vector<Hit>& retainedHits() { return _hits; }
-	virtual ostream& out()              { return _out; }
-	virtual uint64_t numHits()          { return _numHits; } 
-	virtual size_t numProvisionalHits() { return _provisionalHits.size(); } 
-protected:
-	ostream& _out;
-	vector<Hit> _hits;
-	vector<Hit> _provisionalHits;
-	bool _keep;
-	uint64_t _numHits;
-	vector<string>* _refnames;
-};
 
-class HitBucket : public HitSink
-{
-public:
-	HitBucket() : HitSink(cout, true) { }
-	virtual void reportHit(const U32Pair& h,
-						   uint32_t patId,
-						   const String<char>& patName,
-						   const String<Dna5>& patSeq,
-						   const String<char>& patQualities,
-						   bool fw,
-						   const bitset<max_read_bp>& mms,
-						   uint32_t oms) 
-	{
-		_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
+	/// Set whether to retain hits in a vector or not
+	void setRetainHits(bool r)  { _keep = r; }
+	/// Return whether we're retaining hits or not
+	bool retainHits()           { return _keep; }
+	/// Clear all hits in the retained-hits vector
+	void clearRetainedHits()    { _hits.clear(); }
+	/// Return the vector of retained hits
+	vector<Hit>& retainedHits() { return _hits; }
+
+	/**
+	 * Make note of a hit but don't pass it on to the HitSink yet
+	 * because it may be canceled in the future.
+	 */
+	void reportProvisionalHit(const Hit& h)	{
+		if(_keep) _hits.push_back(h);
+		_provHits.push_back(h);
+	}
+
+	/**
+	 * Implementation for hit reporting; update per-thread _hits and
+	 * _numHits variables and call the master HitSink to do the actual
+	 * reporting
+	 */
+	void reportHit(const Hit& h) {
+		_sink.reportHit(h);
+		if(_keep) _hits.push_back(h);
 		_numHits++;
 	}
-	
-	virtual void reportProvisionalHit(const U32Pair& h,
-									  uint32_t patId,
-									  const String<char>& patName,
-									  const String<Dna5>& patSeq,
-									  const String<char>& patQualities,
-									  bool fw,
-									  const bitset<max_read_bp>& mms,
-									  uint32_t oms)
-	{
-		_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-	}
+
+	/// Return the number of hits reported so far
+	uint64_t numHits()          { return _numHits; }
+	/// Return the number of provisional hits stored as of now
+	size_t numProvisionalHits() { return _provHits.size(); }
+
+private:
+	HitSink&    _sink;
+	bool        _keep;
+	uint64_t    _numHits;
+	vector<Hit> _hits;
+	vector<Hit> _provHits;
 };
 
 /**
  * Sink that prints lines like this:
  * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
  */
-class PrettyHitSink : public HitSink {
+class ConciseHitSink : public HitSink {
 public:
-	PrettyHitSink(
-			ostream& __out,
-			bool __revcomp = false,
-			bool __reportOpps = false,
-			bool __keep = false,
+	ConciseHitSink(
+			ostream&        __out,
+			bool            __reportOpps = false,
 			vector<string>* __refnames = NULL) :
-		HitSink(__out, __keep, __refnames),
-		_revcomp(__revcomp),
+		HitSink(__out, __refnames),
 		_reportOpps(__reportOpps),
 		_lastPat(0xffffffff),
 		_lastFw(false),
 		_first(true) { }
 
-	virtual void reportHit(
-			const U32Pair& h,
-			uint32_t patId,
-			const String<char>& patName,
-			const String<Dna5>& patSeq,
-		    const String<char>& patQualities,
-			bool fw,
-			const bitset<max_read_bp>& mms,
-			uint32_t oms)
-	{
-		assert(!_revcomp || (patId & 1) == 0 || !fw);
-		assert(!_revcomp || (patId & 1) == 1 || fw);
-		if(_revcomp) patId >>= 1;
-		if(patId != _lastPat || fw != _lastFw) {
+	/**
+	 * TODO: This output method is inherently non-threadsafe if we're
+	 * ever reporting more than one result per line.  Need more
+	 * buffering logic in that case.
+	 */
+	virtual void reportHit(const Hit& h) {
+		ostringstream ss;
+		if(h.patId != _lastPat || h.fw != _lastFw) {
 			// First hit on a new line
-			_lastPat = patId;
-			_lastFw = fw;
+			_lastPat = h.patId;
+			_lastFw  = h.fw;
 			if(_first) _first = false;
-			else       out() << endl;
-			out() << patId << (fw? "+":"-") << ":";
+			else ss << endl;
+			ss << h.patId << (h.fw? "+" : "-") << ":";
 		} else {
 			// Not the first hit on the line
-			out() << ",";
+			ss << ",";
 		}
 		assert(!_first);
     	// .first is text id, .second is offset
-		out() << "<" << h.first << "," << h.second << "," << mms.count();
-		if(_reportOpps) out() << "," << oms;
-		out() << ">";
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-		}
-		_numHits++;
+		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
+		if(_reportOpps) ss << "," << h.oms;
+		ss << ">";
+		mylock();
+		out() << ss.str();
+		myunlock();
 	}
-	/**
-	 * A provisional hit is a hit that we might want to report, but we
-	 * aren't sure yet.
-	 */
-	virtual void reportProvisionalHit(
-			const U32Pair& h,
-			uint32_t patId,
-			const String<char>& patName,
-			const String<Dna5>& patSeq,
-			const String<char>& patQualities,
-			bool fw,
-			const bitset<max_read_bp>& mms,
-			uint32_t oms)
-	{
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-		}
-		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-	}
-	virtual void finishImpl() {
-		if(_first) {
-			out() << "No results" << endl;
-		} else {
-			out() << endl;
-		}
+
+	virtual void finish() {
+		if(_first) out() << "No results";
+		out() << endl;
 	}
 
 private:
-	bool _revcomp;
-	bool _reportOpps;
+	bool     _reportOpps;
 	uint32_t _lastPat;
-	bool _lastFw;
-	bool _first;
+	bool     _lastFw;
+	bool     _first; /// true -> first hit hasn't yet been reported
 };
 
 /**
  * Sink that prints lines like this:
- * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
+ * pat-name \t [-|+] \t ref-name \t ref-off \t pat \t qual \t #-alt-hits \t mm-list
  */
 class VerboseHitSink : public HitSink {
 public:
-	VerboseHitSink(ostream& __out,
-				   bool __revcomp = false,
-				   bool __keep = false,
+	VerboseHitSink(ostream&        __out,
 				   vector<string>* __refnames = NULL) :
-	HitSink(__out, __keep, __refnames),
-	_revcomp(__revcomp),
-	_lastPat(0xffffffff),
-	_lastFw(false),
+	HitSink(__out, __refnames),
 	_first(true) { }
-	
-	virtual void reportHit(const U32Pair& h,
-						   uint32_t patId,
-						   const String<char>& patName,
-						   const String<Dna5>& patSeq,
-						   const String<char>& patQualities,
-						   bool fw,
-						   const bitset<max_read_bp>& mms,
-						   uint32_t oms)
-	{
-		assert(!_revcomp || (patId & 1) == 0 || !fw);
-		assert(!_revcomp || (patId & 1) == 1 || fw);
-		if(_revcomp) patId >>= 1;
-		
+
+	virtual void reportHit(const Hit& h) {
 		_first = false;
-		
-		out() << patName <<" \t" << (fw? "+":"-") << "\t";
-		
+		ostringstream ss;
+		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
     	// .first is text id, .second is offset
-		
-		if(this->_refnames != NULL && h.first < this->_refnames->size()) {
-			out() << (*this->_refnames)[h.first];
+		if(this->_refnames != NULL && h.h.first < this->_refnames->size()) {
+			ss << (*this->_refnames)[h.h.first];
 		} else {
-			out() << h.first;
+			ss << h.h.first;
 		}
-		out() << "\t" << h.second;
-		out() << "\t" << patSeq;
-		
-		out() << "\t" << patQualities;
-		
-		out() << "\t" << oms;
-		out() << "\t";
-		
+		ss << "\t" << h.h.second;
+		ss << "\t" << h.patSeq;
+		ss << "\t" << h.quals;
+		ss << "\t" << h.oms;
+		ss << "\t";
 		bool firstmiss = true;
-		for (unsigned int i = 0; i < mms.size(); ++ i)
-		{
-			if (mms.test(i))
-			{
-				if (!firstmiss)
-					out() <<",";
-				out() << i;
+		for (unsigned int i = 0; i < h.mms.size(); ++ i) {
+			if (h.mms.test(i)) {
+				if (!firstmiss) ss << ",";
+				ss << i;
 				firstmiss = false;
 			}
 		}
-		
-		out () << endl;
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-		}
-		_numHits++;
+		ss << endl;
+		mylock();
+		out() << ss.str();
+		myunlock();
 	}
-	/**
-	 * A provisional hit is a hit that we might want to report, but we
-	 * aren't sure yet.
-	 */
-	virtual void reportProvisionalHit(const U32Pair& h,
-									  uint32_t patId,
-									  const String<char>& patName,
-									  const String<Dna5>& patSeq,
-									  const String<char>& patQualities,
-									  bool fw,
-									  const bitset<max_read_bp>& mms,
-									  uint32_t oms)
-	{
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-		}
-		_provisionalHits.push_back(Hit(h, patId, patName, patSeq, patQualities, fw, mms, oms));
-	}
-	virtual void finishImpl() {
-		if(_first) {
-			out() << "No results" << endl;
-		} else {
-			//out() << endl;
-		}
-	}
-	
-private:
-	bool _revcomp;
-	bool _reportOpps;
-	uint32_t _lastPat;
-	bool _lastFw;
-	bool _first;
-};
 
-
-/**
- * Sink that writes 16-byte binary records for each hit.  It also
- * buffers those records in 4K _buf.
- */
-class BufferedBinaryHitSink : public HitSink {
-public:
-	BufferedBinaryHitSink(
-			ostream& __out,
-			bool __revcomp = false,
-			bool __reportOpps = false,
-			bool __keep = false,
-			vector<string>* __refnames = NULL) :
-		HitSink(__out, __keep, __refnames),
-		_revcomp(__revcomp),
-		_reportOpps(__reportOpps),
-		_cur(0) { }
-	
-	virtual void reportHit(
-			const U32Pair& h,
-			uint32_t patId,
-			const String<char>& patName,
-			const String<Dna5>& patSeq,
-		    const String<char>& patQualities,
-			bool fw,
-			const bitset<max_read_bp>& mms,
-			uint32_t oms)
-	{
-		//FIXME:
-/*
-		assert((pat & 1) == 0 || !fw);
-		assert((pat & 1) == 1 || fw);
-		if(_revcomp) patId >>= 1;
-		assert_eq(8, sizeof(U32Pair));
-		assert_eq(4, sizeof(uint32_t));
-		*((U32Pair*)&_buf[_cur]) = h;
-		_cur += 8;
-		*((uint32_t*)&_buf[_cur]) = patId; // pattern 
-		_cur += 4;
-		*((uint32_t*)&_buf[_cur]) = fw? 1 : 0; // orientation
-		_cur += 4;
-		*((uint32_t*)&_buf[_cur]) = mms; // # mismatches
-		_cur += 4;
-		if(_reportOpps) {
-			*((uint32_t*)&_buf[_cur]) = oms; // # other mappings
-			_cur += 4;
-		}
-		assert_leq(_cur, BUFSZ);
-		if(_cur + 20 >= BUFSZ) {
-			out().write((const char *)_buf, _cur);
-			assert(!out().bad());
-			_cur = 0;
-		}
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, fw, mms, oms));
-		}
-		_numHits++;
- */
-	}
-	/**
-	 * A provisional hit is a hit that we might want to report, but we
-	 * aren't sure yet.
-	 */
-	virtual void reportProvisionalHit(
-			const U32Pair& h,
-			uint32_t patId,
-			const String<char>& patName,
-			const String<Dna5>& patSeq,
-			const String<char>& patQualities,
-			bool fw,
-			const bitset<max_read_bp>& mms,
-			uint32_t oms)
-	{
-		/*
-		if(_keep) {
-			_hits.push_back(Hit(h, patId, fw, mms, oms));
-		}
-		_provisionalHits.push_back(Hit(h, patId, fw, mms, oms));
-		 */
-	}
 	virtual void finish() {
-		finishImpl();
-		char zeros[] = {0, 0, 0, 0, 0, 0, 0, 0};
-		_out.write((const char *)zeros, 8);
-		// Write a bunch of newlines to make it easier to 'tail' the
-		// hits file
-		for(int i = 0; i < 256; i++) _out << endl;
-		_out.flush();
-	}
-	virtual void finishImpl() {
-		if(_cur > 0) {
-			out().write((const char *)_buf, _cur);
-			assert(!out().bad());
-		}
+		if(_first) out() << "No results" << endl;
 	}
 
 private:
-	static const int BUFSZ = 4096;
-	bool _revcomp;
-	bool _reportOpps;
-	int _cur;
-	char _buf[BUFSZ];
+	bool _first; /// true -> first hit hasn't yet been reported
 };
-
 
 #endif /*HIT_H_*/
 

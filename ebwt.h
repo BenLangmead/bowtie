@@ -161,7 +161,7 @@ public:
 	                                 int32_t lineRate,
 	                                 int32_t linesPerSide)
 	{
-		assert_gt(offRate, 0);
+		assert_geq(offRate, 0);
 		assert_gt(lineRate, 0);
 		assert_gt(linesPerSide, 0);
 		uint32_t ps[12];
@@ -883,9 +883,7 @@ public:
 	inline void searchWithFtab(EbwtSearchState<TStr>& s) const;
 	void search(const TStr& qry, EbwtSearchParams<TStr>& params, uint32_t seed /* = 0 */, bool inexact /* = false */) const;
 	void search(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool inexact /* = false */) const;
-	bool search1MismatchOrBetter(const TStr& qry, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/, uint32_t seed /* = 0*/) const;
-	bool search1MismatchOrBetter(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/) const;
-
+	bool search1MismatchOrBetter(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/, bool doProvisional /*= false*/) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -1163,7 +1161,7 @@ struct EbwtSearchStats {
 template<typename TStr>
 class EbwtSearchParams {
 public:
-	EbwtSearchParams(HitSink& __sink,
+	EbwtSearchParams(HitSinkPerThread& __sink,
 	                 EbwtSearchStats<TStr>& __stats,
 	                 MultiHitPolicy __mhp,
 	                 const vector<String<Dna5> >& __texts,
@@ -1183,9 +1181,10 @@ public:
 		_backtracking(false),
         _arrowMode(__arrowMode),
 		_comprehensiveBacktrack(__comprehensiveBacktrack),
-		_suppress(false) { }
+		_suppress(false),
+		_doProvisional(false) { }
 	MultiHitPolicy multiHitPolicy() const { return _mhp; }
-	HitSink& sink() const            { return _sink; }
+	HitSinkPerThread& sink() const   { return _sink; }
 	void setPatId(uint32_t __patid)  { _patid = __patid; }
 	uint32_t patId() const           { return _patid; }
 	void setFw(bool __fw)            { _fw = __fw; }
@@ -1203,7 +1202,7 @@ public:
 	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
-	               uint32_t textlen,   // length of fragment we hit in
+	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
 	               uint32_t oms) const
 	{
@@ -1249,7 +1248,10 @@ public:
 			}
 		}
 
-		bool provisional = (_backtracking && _mhp == MHP_PICK_1_RANDOM && _fw && _revcomp);
+		bool provisional =
+			_backtracking &&             // this is a 1-mismatch alignment
+		    _mhp == MHP_PICK_1_RANDOM && // report 1 hit (not all)
+		    _doProvisional;
 		//if(!_ebwtFw && !_arrowMode) {
 		//	h.second = (textlen - h.second - 1);
 		//	h.second -= (qlen-1);
@@ -1325,9 +1327,9 @@ public:
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
 			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms);
+			sink().reportProvisionalHit(Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms));
 		} else {
-			sink().reportHit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms);
+			sink().reportHit(Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms));
 		}
 	}
 	void write(ostream& out) const {
@@ -1359,8 +1361,11 @@ public:
 		_backtracking = __backtracking;
 	}
 	const vector<String<Dna5> >& texts() const { return _texts; }
+	void setDoProvisional(bool __provisional) {
+		_doProvisional = __provisional;
+	}
 private:
-	HitSink& _sink;
+	HitSinkPerThread& _sink;
 	EbwtSearchStats<TStr>& _stats;
 	MultiHitPolicy _mhp;    // policy for when read hits multiple spots
     const vector<String<Dna5> >& _texts; // original texts, if available (if not
@@ -1375,6 +1380,7 @@ private:
 	                           // the read's halfway mark (for
 	                           // 1-mismatch)
 	bool _suppress;         // suppress hits?
+	bool _doProvisional;    // inexact hits should be provisional?
 };
 
 /**
@@ -3104,7 +3110,8 @@ void Ebwt<TStr>::search(const TStr& qry,
 template<typename TStr>
 bool Ebwt<TStr>::search1MismatchOrBetter(EbwtSearchState<TStr>& s,
                                          EbwtSearchParams<TStr>& params,
-                                         bool allowExactHits = true) const
+                                         bool allowExactHits = true,
+                                         bool doProvisional = false) const
 {
 	assert(isInMemory());
 	params.setBacktracking(false);
@@ -3124,7 +3131,9 @@ bool Ebwt<TStr>::search1MismatchOrBetter(EbwtSearchState<TStr>& s,
 	}
 	// No exact hits found; try backtracking for 1-mismatch hits
 	params.setBacktracking(true);
+	if(doProvisional) params.setDoProvisional(true);
 	s.backtrack1(*this);
+	if(doProvisional) params.setDoProvisional(false);
 	return false;
 }
 

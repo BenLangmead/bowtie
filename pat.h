@@ -8,13 +8,14 @@
 #include <string>
 #include <cstring>
 #include <ctype.h>
-//#include <zlib.h>
 #include <fstream>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "tokenize.h"
 #include "random_source.h"
+#include "spinlock.h"
+#include "threading.h"
 
 using namespace std;
 using namespace seqan;
@@ -48,22 +49,58 @@ char* itoa10(int value, char* result) {
 }
 
 /// Reverse a string in-place
-static inline void reverse(String<Dna5>& s) {
+template <typename TStr>
+static inline void reverse(TStr& s) {
+	typedef typename Value<TStr>::Type TVal;
 	size_t len = length(s);
 	for(size_t i = 0; i < (len>>1); i++) {
-		Dna5 tmp = s[i];
+		TVal tmp = s[i];
 		s[i] = s[len-i-1];
 		s[len-i-1] = tmp;
 	}
 }
 
-/// Skip to the end of the current line; return the first character
-/// of the next line
-static inline int skipWhitespace(FILE *in) {
-	int c;
-	while(isspace(c = fgetc(in)));
-	return c;
-}
+/**
+ * A buffer for keeping all relevant information about a single read.
+ * Each search thread has one.
+ */
+struct ReadBuf {
+	~ReadBuf() {
+		clearAll(); reset();
+		_setBegin(patFw, NULL);
+		_setBegin(patRc, NULL);
+		_setBegin(qualFw, NULL);
+		_setBegin(qualRc, NULL);
+		_setBegin(name, NULL);
+	}
+	/// Point all Strings to the beginning of their respective buffers
+	/// and set all lengths to 0
+	void reset() {
+		_setBegin(patFw,  (Dna5*)patBufFw);  _setLength(patFw, 0);  _setCapacity(patFw, 1024);
+		_setBegin(patRc,  (Dna5*)patBufRc);  _setLength(patRc, 0);  _setCapacity(patRc, 1024);
+		_setBegin(qualFw, (char*)qualBufFw); _setLength(qualFw, 0); _setCapacity(qualFw, 1024);
+		_setBegin(qualRc, (char*)qualBufRc); _setLength(qualRc, 0); _setCapacity(qualRc, 1024);
+		_setBegin(name,   (char*)nameBuf);   _setLength(name, 0);   _setCapacity(name, 1024);
+	}
+	void clearAll() {
+		seqan::clear(patFw);
+		seqan::clear(patRc);
+		seqan::clear(qualFw);
+		seqan::clear(qualRc);
+		seqan::clear(name);
+	}
+	static const int BUF_SIZE = 1024;
+	String<Dna5>  patFw;               // forward-strand sequence
+	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
+	String<Dna5>  patRc;               // reverse-complement sequence
+	uint8_t       patBufRc[BUF_SIZE];  // reverse-complement sequence buffer
+	String<char>  qualFw;              // quality values
+	char          qualBufFw[BUF_SIZE]; // quality value buffer
+	String<char>  qualRc;              // reverse quality values
+	char          qualBufRc[BUF_SIZE]; // reverse quality value buffer
+	String<char>  name;                // read name
+	char          nameBuf[BUF_SIZE];   // read name buffer
+};
 
 /**
  * Encapsualtes a source of patterns; usually a file.  Handles dumping
@@ -72,13 +109,14 @@ static inline int skipWhitespace(FILE *in) {
  */
 class PatternSource {
 public:
-	PatternSource(bool __reverse = false, const char *__dumpfile = NULL) :
-		_readCnt(0),
-		_reverse(__reverse),
-		_def_qual("EDCCCBAAAA@@@@?>===<;;9:9998777666655444433333333333333333333"),
-		_def_rqual("333333333333333333334444336666778999:9;;<===>?@@@@AAAABCCCDE"),
-		_dumpfile(__dumpfile), _out()
+	PatternSource(bool __reverse = false,
+	              const char *__dumpfile = NULL) :
+	    _readCnt(0),
+	    _reverse(__reverse),
+		_dumpfile(__dumpfile),
+		_lock()
 	{
+		// Open dumpfile, if specified
 		if(_dumpfile != NULL) {
 			_out.open(_dumpfile, ios_base::out);
 			if(!_out.good()) {
@@ -86,66 +124,57 @@ public:
 				exit(1);
 			}
 		}
+#ifdef USE_SPINLOCK
+		// No initialization
+#else
+		MUTEX_INIT(_lock);
+#endif
 	}
 	virtual ~PatternSource() { }
-	virtual void nextPattern(String<Dna5>** s, String<char>** qual, String<char>** name) {
-		nextPatternImpl(s, qual, name);
-		// Reverse it, if desired
+	/**
+	 * The main member function for dispensing patterns.
+	 */
+	virtual void nextRead(ReadBuf& r, uint32_t& patid) {
+		// nextPatternImpl does the reading from the ultimate source;
+		// it is implemented in concrete subclasses
+		nextReadImpl(r, patid);
+		// If it's this class's responsibility to reverse the pattern,
+		// do so here.  Usually it's the responsibility of one of the
+		// concrete subclasses, since they can usually do it more
+		// efficiently.
 		if(_reverse) {
-			size_t len = length(**s);
-			resize(_revtmp, len, Exact());
-			if(*qual != NULL && !empty(*qual)) {
-				resize(_revqual, len);
-			}
-			// tmp = reverse of s
-			for(size_t i = 0; i < len; i++)
-			{
-				_revtmp[i] = (**s)[len-i-1];
-				if(*qual != NULL && !empty(*qual)) {
-					_revqual[i] = (**qual)[len-i-1];
-				}
-			}
-			// Output it, if desired
-			if(_dumpfile != NULL) {
-				dump(_out, _revtmp,
-				     ((*qual) == NULL || empty(*qual)) ? String<char>("NULL") : _revqual,
-				     ((*name) == NULL) ? String<char>("NULL") : (**name));
-			}
-			(*s) = &_revtmp;
-			if(*qual != NULL && !empty(*qual)) {
-				(*qual) = &_revqual;
-			}
-			return;
+			::reverse(r.patFw);
+			::reverse(r.patRc);
+			::reverse(r.qualFw);
+			::reverse(r.qualRc);
 		}
 		// Output it, if desired
 		if(_dumpfile != NULL) {
-			dump(_out, (**s),
-			     ((*qual) == NULL || empty(*qual)) ? String<char>("NULL") : (**qual),
-			     ((*name) == NULL) ? String<char>("NULL") : (**name));
+			dump(_out, r.patFw,
+			     empty(r.qualFw) ? String<char>("(empty)") : r.qualFw,
+			     empty(r.name)   ? String<char>("(empty)") : r.name);
+			dump(_out, r.patRc,
+			     empty(r.qualRc) ? String<char>("(empty)") : r.qualRc,
+			     empty(r.name)   ? String<char>("(empty)") : r.name);
 		}
 	}
-	virtual void skipPattern() {
-		String<Dna5> *tmp1;
-		String<char> *tmp2;
-		String<char> *tmp3;
-		nextPattern(&tmp1, &tmp2, &tmp3);
-	}
-	virtual void skipToNextRead() {
-		skipPattern();
-		if(nextIsReverseComplement()) {
-			skipPattern();
-		}
-		assert(!nextIsReverseComplement());
-	}
-	virtual void nextPatternImpl(String<Dna5>**, String<char>**, String<char>**) = 0;
-	virtual bool hasMorePatterns() = 0;
-	virtual bool nextIsReverseComplement() = 0;
+	/// Implementation to be provided by concrete subclasses
+	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) = 0;
+	/// Reset state to start over again with the first read
 	virtual void reset() { _readCnt = 0; }
-	const char *dumpfile() const { return _dumpfile; }
+	/**
+	 * Whether to reverse reads as they're read in (useful when using
+	 * the mirror index)
+	 */
 	virtual bool reverse() const { return _reverse; }
+	/**
+	 * Set whether to reverse reads as they're read in (useful when
+	 * using the mirror index.
+	 */
 	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
 	}
+	uint32_t patid() { return _readCnt; }
 protected:
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
@@ -155,14 +184,70 @@ protected:
 		out << name << ": " << seq << " " << qual << endl;
 	}
 	uint32_t _readCnt;
+	/**
+	 * Concrete subclasses call lock() to enter a critical region.
+	 * What constitutes a critical region depends on the subclass.
+	 */
+	void mylock() {
+#ifdef USE_SPINLOCK
+		_lock.Enter();
+#else
+		MUTEX_LOCK(_lock);
+#endif
+	}
+	/**
+	 * Concrete subclasses call unlock() to exit a critical region
+	 * What constitutes a critical region depends on the subclass.
+	 */
+	void myunlock() {
+#ifdef USE_SPINLOCK
+		_lock.Leave();
+#else
+		MUTEX_UNLOCK(_lock);
+#endif
+	}
 private:
-	bool _reverse;         // reverse patterns before returning them
-	String<Dna5> _revtmp;  // temporary buffer for reversed patterns
-	String<char> _revqual;
-	const string _def_qual;
-	const string _def_rqual;
-	const char *_dumpfile; // dump patterns to this file before returning them
-	ofstream _out;         // output stream for dumpfile
+	bool _reverse;         /// reverse patterns before returning them
+	const char *_dumpfile; /// dump patterns to this file before returning them
+	ofstream _out;         /// output stream for dumpfile
+#ifdef USE_SPINLOCK
+	SpinLock _lock;
+#else
+	MUTEX_T _lock; /// mutex for locking critical regions
+#endif
+};
+
+/**
+ * Encapsulates a single thread's interaction with the PatternSource.
+ * Most notably, this class holds the buffers into which the
+ * PatterSource will write sequences.  This class is *not* threadsafe
+ * - it doesn't need to be since there's one per thread.  PatternSource
+ * is thread-safe.
+ */
+class PatternSourcePerThread {
+public:
+	PatternSourcePerThread(PatternSource& __patsrc) :
+		_patsrc(__patsrc), _buf(), _patid(0xffffffff) { }
+
+	void nextRead() {
+		ASSERT_ONLY(uint32_t lastPatid = _patid);
+		_buf.clearAll();
+		_patsrc.nextRead(_buf, _patid);
+		assert(empty() || _patid != lastPatid);
+	}
+
+	String<Dna5>& patFw()  { return _buf.patFw;               }
+	String<Dna5>& patRc()  { return _buf.patRc;               }
+	String<char>& qualFw() { return _buf.qualFw;              }
+	String<char>& qualRc() { return _buf.qualRc;              }
+	String<char>& name()   { return _buf.name;                }
+	uint32_t      patid()  { return _patid;                   }
+	bool          empty()  { return seqan::empty(_buf.patFw); }
+	void          reset()  { _patid = 0xffffffff;             }
+private:
+	PatternSource& _patsrc;
+	ReadBuf  _buf;   // read buffer
+	uint32_t _patid; // index of read just read
 };
 
 /**
@@ -185,24 +270,133 @@ protected:
 	int _trim5;
 };
 
+
+class FileBuf {
+public:
+	FileBuf(FILE *__in) : _in(__in), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+		assert(_in != NULL);
+	}
+
+	int get() {
+		assert(_in != NULL);
+		int c = peek();
+		if(c != -1) _cur++;
+		return c;
+	}
+
+	int peek() {
+		assert(_in != NULL);
+		assert_leq(_cur, _buf_sz);
+		if(_cur == _buf_sz) {
+			if(_done) { return -1; }
+			else {
+				// Get the next chunk
+				_buf_sz = fread(_buf, 1, BUF_SZ, _in);
+				_cur = 0;
+				if(_buf_sz == 0) {
+					_done = true;
+					return -1;
+				} else if(_buf_sz < BUF_SZ) {
+					_done = true;
+				}
+			}
+		}
+		return (int)_buf[_cur];
+	}
+
+	size_t gets(char *buf, size_t len) {
+		size_t stored = 0;
+		while(true) {
+			int c = get();
+			if(c == -1) {
+				buf[stored] = '\0';
+				return stored;
+			}
+			if(stored == len-1 || c == '\n' || c == '\r') {
+				buf[stored] = '\0';
+				return stored;
+			}
+			buf[stored++] = (char)c;
+		}
+	}
+private:
+	static const size_t BUF_SZ = 256 * 1024;
+	FILE   *_in;
+	size_t  _cur;
+	size_t  _buf_sz;
+	bool    _done;
+	char    _buf[BUF_SZ]; // (large) input buffer
+};
+
+/// Skip to the end of the current string of newline chars and return
+/// the first character after the newline chars, or -1 for EOF
+static inline int getOverNewline(FileBuf *in) {
+	int c;
+	while(isspace(c = in->get()));
+	return c;
+}
+
+/// Skip to the end of the current string of newline chars such that
+/// the next call to get() returns the first character after the
+/// whitespace
+static inline void peekOverNewline(FileBuf *in) {
+	while(true) {
+		int c = in->peek();
+		if(c != '\r' && c != '\n') {
+			return;
+		}
+		in->get();
+	}
+}
+
+/// Skip to the end of the current line; return the first character
+/// of the next line or -1 for EOF
+static inline int getToEndOfLine(FileBuf *in) {
+	while(true) {
+		int c = in->get(); if(c < 0) return -1;
+		if(c == '\n' || c == '\r') {
+			while(c == '\n' || c == '\r') {
+				c = in->get(); if(c < 0) return -1;
+			}
+			// c now holds first character of next line
+			return c;
+		}
+	}
+}
+
+/// Skip to the end of the current line such that the next call to
+/// get() returns the first character on the next line
+static inline void peekToEndOfLine(FileBuf *in) {
+	while(true) {
+		int c = in->get(); if(c < 0) return;
+		if(c == '\n' || c == '\r') {
+			c = in->peek();
+			while(c == '\n' || c == '\r') {
+				in->get(); if(c < 0) return; // consume \r or \n
+				c = in->peek();
+			}
+			// next get() gets first character of next line
+			return;
+		}
+	}
+}
+
 /**
  * Encapsualtes a source of patterns which is an in-memory vector.
  */
 class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(const vector<string>& v,
-	                    bool __revcomp = true,
 	                    bool __reverse = false,
 	                    const char *__dumpfile = NULL,
-	                    size_t cur = 0,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0,
 		                int __policy = NS_TO_NS,
 	                    int __maxNs = 9999,
 	                    uint32_t seed = 0) :
 		TrimmingPatternSource(false, __dumpfile, __trim3, __trim5),
-		_revcomp(__revcomp), _reverse(__reverse), _cur(cur), _maxNs(__maxNs),
-		_v(), _quals(), _vrev(), _qualsrev(), _rand(seed)
+		_reverse(__reverse), _cur(0), _maxNs(__maxNs),
+		_v(), _vrev(), _vrc(), _vrcrev(), _quals(), _qualsrev(), _rand(seed)
 	{
 		int nrejects = 0;
 		for(size_t i = 0; i < v.size(); i++) {
@@ -231,7 +425,7 @@ public:
 				if(s[j] == 'N' || s[j] == 'n') {
 					ns++;
 					if(__policy == NS_TO_NS) {
-						// Leave c = 'N'
+						// Leave s[j] == 'N'
 					} else if(__policy == NS_TO_RANDS) {
 						s[j] = "ACGT"[_rand.nextU32() & 3];
 					} else {
@@ -240,6 +434,8 @@ public:
 					}
 				}
 			}
+			// Enforce upper limit on Ns; note that this limit is in
+			// effect even if the N policy is not NS_TO_NS
 			if(ns > _maxNs) {
 				nrejects++;
 				continue;
@@ -278,15 +474,10 @@ public:
 				_qualsrev.push_back(vq);
 				::reverse(_qualsrev.back());
 			}
-			if(_revcomp) {
-				_v.push_back(reverseComplement(String<Dna5>(s)));
-				_quals.push_back(vq);
-				::reverse(_quals.back());
-				{
-					_vrev.push_back(reverseComplement(String<Dna5>(s)));
-					::reverse(_vrev.back());
-					_qualsrev.push_back(vq);
-				}
+			_vrc.push_back(reverseComplement(String<Dna5>(s)));
+			{
+				_vrcrev.push_back(reverseComplement(String<Dna5>(s)));
+				::reverse(_vrcrev.back());
 			}
 			ostringstream os;
 			os << (_names.size());
@@ -297,28 +488,43 @@ public:
 		assert_eq(_v.size(), _quals.size());
 		assert_eq(_v.size(), _qualsrev.size());
 	}
-	virtual bool nextIsReverseComplement() {
-		return _revcomp && (_cur & 1) == 1;
-	}
 	virtual ~VectorPatternSource() { }
-	virtual void nextPatternImpl(String<Dna5>** s, String<char>** qual, String<char>** name) {
-		assert(hasMorePatterns());
-		if(_revcomp) {
-			(*name) = &(_names[_cur >> 1]);
-		} else {
-			(*name) = &(_names[_cur]);
+	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+		// Let Strings begin at the beginning of the respective bufs
+		r.reset();
+		mylock();
+		if(_cur >= _v.size()) {
+			myunlock();
+			// Clear all the Strings, as a signal to the caller that
+			// we're out of reads
+			clear(r.patFw);
+			clear(r.patRc);
+			clear(r.qualFw);
+			clear(r.qualRc);
+			clear(r.name);
+			return;
 		}
+		// Copy _v*, _quals* strings into the respective Strings
 		if(!_reverse) {
-			(*s) = &(_v[_cur]);
-			(*qual) = &(_quals[_cur]);
+			// not reversed
+			r.patFw  = _v[_cur];
+			r.patRc  = _vrc[_cur];
+			r.qualFw = _quals[_cur];
+			r.qualRc = _qualsrev[_cur];
 		} else {
-			(*s) = &(_vrev[_cur]);
-			(*qual) = &(_qualsrev[_cur]);
+			// reversed
+			r.patFw  = _vrev[_cur];
+			r.patRc  = _vrcrev[_cur];
+			r.qualFw = _qualsrev[_cur];
+			r.qualRc = _quals[_cur];
 		}
+		ostringstream os;
+		os << _cur;
+		r.name = os.str();
 		_cur++;
-	}
-	virtual bool hasMorePatterns() {
-		return _cur < _v.size();
+		_readCnt++;
+		patid = _readCnt;
+		myunlock();
 	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
@@ -328,27 +534,17 @@ public:
 	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
 	}
-	virtual void skipPattern() {
-		assert(hasMorePatterns());
-		_cur++;
-	}
-	virtual void skipToNextRead() {
-		skipPattern();
-		if(nextIsReverseComplement()) {
-			skipPattern();
-		}
-		assert(!nextIsReverseComplement());
-	}
 private:
-	bool _revcomp;
-	bool _reverse;
+	bool   _reverse;
 	size_t _cur;
-	int _maxNs;
-	vector<String<Dna5> > _v;        // forward/rev-comp sequences
-	vector<String<char> > _quals;    // quality values parallel to _v
-	vector<String<Dna5> > _vrev;     // reversed forward and rev-comp sequences
-	vector<String<char> > _qualsrev; // quality values parallel to _vrev
-	vector<String<char> > _names;    // names
+	int    _maxNs;
+	vector<String<Dna5> > _v;        /// forward sequences
+	vector<String<Dna5> > _vrev;     /// reversed forward sequences
+	vector<String<Dna5> > _vrc;      /// rev-comp sequences
+	vector<String<Dna5> > _vrcrev;   /// reversed rev-comp sequences
+	vector<String<char> > _quals;    /// quality values parallel to _v
+	vector<String<char> > _qualsrev; /// quality values parallel to _vrev
+	vector<String<char> > _names;    /// names
 	RandomSource _rand;
 };
 
@@ -360,414 +556,103 @@ private:
 class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
 	BufferedFilePatternSource(const vector<string>& infiles,
-	                          bool __gz = false,
-	                          bool __revcomp = true,
 	                          bool __reverse = false,
 	                          const char *__dumpfile = NULL,
 	                          int __trim3 = 0,
 	                          int __trim5 = 0) :
 		TrimmingPatternSource(__reverse, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
-		_gz(__gz),
-		_revcomp(__revcomp),
 		_filecur(0),
-		_aCur(true),
-		_fw(true),
-		_in(NULL),
-		//_gzin(),
-		_aLen(0),
-		_aTStr(),
-		_aRcTStr(),
-		_aQualStr(),
-		_aRcQualStr(),
-		_aNameLen(0),
-		_aNameStr(),
-		_bLen(0),
-		_bTStr(),
-		_bRcTStr(),
-		_bQualStr(),
-		_bRcQualStr(),
-		_bNameLen(0),
-		_bNameStr(),
-		_tmpLen(0),
-		_tmpTStr(),
-		_tmpRcTStr(),
-		_tmpQualStr(),
-		_tmpRcQualStr(),
-		_tmpNameLen(0),
-		_tmpNameStr(),
-		_a(_buf1),
-		_aRc(_rcBuf1),
-		_aQual(_qualBuf1),
-		_aRcQual(_rcQualBuf1),
-		_aName(_nameBuf1),
-		_b(_buf2),
-		_bRc(_rcBuf2),
-		_bQual(_qualBuf2),
-		_bRcQual(_rcQualBuf2),
-		_bName(_nameBuf2),
-		_tmp(_buf3),
-		_tmpRc(_rcBuf3),
-		_tmpQual(_qualBuf3),
-		_tmpRcQual(_rcQualBuf3),
-		_tmpName(_nameBuf3)
+		_filebuf(NULL),
+		_first(true)
 	{
-		assert(!_gz); // omit support for gzipped formats for now
-		_setBegin(_aTStr, (Dna5*)_a); _setLength(_aTStr, 0);
-		_setBegin(_aRcTStr, (Dna5*)_aRc); _setLength(_aRcTStr, 0);
-		_setBegin(_aQualStr, (char*)_aQual); _setLength(_aQualStr, 0);
-		_setBegin(_aRcQualStr, (char*)_aRcQual); _setLength(_aRcQualStr, 0);
-		_setBegin(_aNameStr, (char*)_aName); _setLength(_aNameStr, 0);
-		_setBegin(_bTStr, (Dna5*)_b); _setLength(_bTStr, 0);
-		_setBegin(_bRcTStr, (Dna5*)_bRc); _setLength(_bRcTStr, 0);
-		_setBegin(_bQualStr, (char*)_bQual); _setLength(_bQualStr, 0);
-		_setBegin(_bRcQualStr, (char*)_bRcQual); _setLength(_bRcQualStr, 0);
-		_setBegin(_bNameStr, (char*)_bName); _setLength(_bNameStr, 0);
-		_setBegin(_tmpTStr, (Dna5*)_tmp); _setLength(_tmpTStr, 0);
-		_setBegin(_tmpRcTStr, (Dna5*)_tmpRc); _setLength(_tmpRcTStr, 0);
-		_setBegin(_tmpQualStr, (char*)_tmpQual); _setLength(_tmpQualStr, 0);
-		_setBegin(_tmpRcQualStr, (char*)_tmpRcQual); _setLength(_tmpRcQualStr, 0);
-		_setBegin(_tmpNameStr, (char*)_tmpName); _setLength(_tmpNameStr, 0);
 		assert_gt(infiles.size(), 0);
-		open(); _filecur++;
+		open();
+		_filecur++;
 	}
 	virtual ~BufferedFilePatternSource() {
-		fclose(_in);
+		// close currently-open file
+		if(_filebuf != NULL) {
+			delete _filebuf;
+			_filebuf = NULL;
+		}
 	}
-	/// Return the next pattern from the file
-	virtual void nextPatternImpl(String<Dna5>** s,
-	                             String<char>** qual,
-	                             String<char>** name)
-	{
-		assert(hasMorePatterns());
-		readNext(s, qual, name);
+	/**
+	 * Fill ReadBuf with the sequence, quality and name for the next
+	 * read in the list of read files.  This function gets called by
+	 * all the search threads, so we must handle synchronization.
+	 */
+	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+		// We are entering a critical region, because we're
+		// manipulating our file handle and _filecur state
+		mylock();
+		read(r, patid);
+		if(_first && seqan::empty(r.patFw)) {
+			// No reads could be extracted from the first _infile
+			cerr << "Warning: Could not find any reads in \"" << _infiles[0] << "\"" << endl;
+		}
+		_first = false;
+		while(seqan::empty(r.patFw) && _filecur < _infiles.size()) {
+			// Close current file
+			assert(_filebuf != NULL);
+			delete _filebuf;
+			_filebuf = NULL;
+			// Open next file
+			open();
+			resetForNextFile(); // reset state to handle a fresh file
+			read(r, patid);
+			if(seqan::empty(r.patFw)) {
+				// No reads could be extracted from this _infile
+				cerr << "Warning: Could not find any reads in \"" << _infiles[_filecur] << "\"" << endl;
+			}
+			_filecur++;
+		}
+		// Leaving critical region
+		myunlock();
+		// If r.patFw is empty, then the caller knows that we are
+		// finished with the reads
 	}
-	/// Return true iff the next call to nextPattern() will succeed
-	virtual bool hasMorePatterns() {
-		if(_revcomp && !_fw) return true; // still a reverse comp to dish out
-		if(_tmpLen > 0) return true;    // still another pattern to dish out
-		this->read(_tmp,
-		           _tmpTStr,
-				   _tmpRc,
-				   _tmpRcTStr,
-				   _tmpQual,
-				   _tmpQualStr,
-				   _tmpRcQual,
-				   _tmpRcQualStr,
-				   &_tmpLen,
-				   _tmpName,
-				   _tmpNameStr,
-				   &_tmpNameLen);
-		return _tmpLen > 0 || _filecur < _infiles.size(); // still another pattern to dish out
-	}
-	/// Return true iff the next will be a reverse complement
-	virtual bool nextIsReverseComplement() {
-		return _revcomp && !_fw;
-	}
-	/// Reset state so that we read start reading again from the
-	/// beginning of the first file
+	/**
+	 * Reset state so that we read start reading again from the
+	 * beginning of the first file.  Should only be called by the
+	 * master thread.
+	 */
 	virtual void reset() {
 		TrimmingPatternSource::reset();
-		// Close current file
-		//if(_gz)
-		//	gzclose(_gzin);
-		//else
-			fclose(_in);
+		delete _filebuf;
+		_filebuf = NULL;
 		_filecur = 0,
-		_fw = true; // dish forward next
-		_aCur = true; // currently dishing a
-		_aLen = 0;
-		_aNameLen = 0;
-		_bLen = 0;
-		_bNameLen = 0;
-		_tmpLen = 0;
-		_tmpNameLen = 0;
-		open(); _filecur++;
+		open();
+		_filecur++;
 	}
 protected:
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
-	virtual void read(char* dst,      // destination buf for sequence
-	                  String<Dna5>& dstTStr,  // destination TStr for sequence
-	                  char* rcDst,    // destination buf for reverse-comp of dst
-	                  String<Dna5>& rcDstTStr,// destination TStr for reverse-comp of dst
-	                  char* qual,     // destination buf for qualities
-	                  String<char>& qualStr, // destination String for qualities
-	                  char* rcQual,   // destination buf for reverse-comp qualities
-	                  String<char>& rcQualStr, // destination String for reverse-comp quals
-	                  size_t* dstLen, // length of sequence installed in dst
-	                  char* name,     // destination buf for read name
-	                  String<char>& nameStr, // destination String for name
-	                  size_t* nameLen) = 0; // length of name
+	virtual void read(ReadBuf& r, uint32_t& patid) = 0; // length of name
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() = 0;
-	/// Swap "current" status between _a/_aRc and _b/_bRc
-	void swap() {
-		_aCur = !_aCur;
-	}
-	/// Swap "current" with tmp
-	void swapCur() {
-		char   *tmp;
-		char   *tmpRc;
-		char   *tmpQual;
-		char   *tmpRcQual;
-		char   *tmpName;
-		if(_aCur) {
-			tmp       = _a;
-			tmpRc     = _aRc;
-			tmpQual   = _aQual;
-			tmpRcQual = _aRcQual;
-			tmpName   = _aName;
-			_a       = _tmp;       _setBegin(_aTStr,      (Dna5*)begin(_tmpTStr));
-			_aRc     = _tmpRc;     _setBegin(_aRcTStr,    (Dna5*)begin(_tmpRcTStr));
-			_aQual   = _tmpQual;   _setBegin(_aQualStr,   (char*)begin(_tmpQualStr));
-			_aRcQual = _tmpRcQual; _setBegin(_aRcQualStr, (char*)begin(_tmpRcQualStr));
-			_aName   = _tmpName;   _setBegin(_aNameStr,   (char*)begin(_tmpNameStr));
-			_aLen = _tmpLen;
-			_setLength(_aTStr, _aLen);
-			_setLength(_aRcTStr, _aLen);
-			_setLength(_aQualStr, _aLen);
-			_setLength(_aRcQualStr, _aLen);
-			_aNameLen = _tmpNameLen;
-			_setLength(_aNameStr, _aNameLen);
-		} else {
-			tmp       = _b;
-			tmpRc     = _bRc;
-			tmpQual   = _bQual;
-			tmpRcQual = _bRcQual;
-			tmpName   = _bName;
-			_b       = _tmp;       _setBegin(_bTStr,      (Dna5*)begin(_tmpTStr));
-			_bRc     = _tmpRc;     _setBegin(_bRcTStr,    (Dna5*)begin(_tmpRcTStr));
-			_bQual   = _tmpQual;   _setBegin(_bQualStr,   (char*)begin(_tmpQualStr));
-			_bRcQual = _tmpRcQual; _setBegin(_bRcQualStr, (char*)begin(_tmpRcQualStr));
-			_bName   = _tmpName;   _setBegin(_bNameStr,   (char*)begin(_tmpNameStr));
-			_bLen = _tmpLen;
-			_setLength(_bTStr, _bLen);
-			_setLength(_bRcTStr, _bLen);
-			_setLength(_bQualStr, _bLen);
-			_setLength(_bRcQualStr, _bLen);
-			_bNameLen = _tmpNameLen;
-			_setLength(_bNameStr, _bNameLen);
-		}
-		_tmpLen = 0; // clear
-		_tmpNameLen = 0; // clear
-	}
-
-	/// Return "current" forward-oriented pattern
-	char *cur() {
-		return _aCur? _a : _b;
-	}
-	String<Dna5> *curStr() {
-		return _aCur? &_aTStr : &_bTStr;
-	}
-	/// Return "current" reverse-complemented pattern
-	char *curRc() {
-		if(_revcomp) {
-			return _aCur? _aRc : _bRc;
-		} else {
-			return NULL;
-		}
-	}
-	String<Dna5> *curRcStr() {
-		if(_revcomp) {
-			return _aCur? &_aRcTStr : &_bRcTStr;
-		} else {
-			return NULL;
-		}
-	}
-	char *curQual() {
-		return _aCur? _aQual: _bQual;
-	}
-	String<char> *curQualStr() {
-		return _aCur? &_aQualStr: &_bQualStr;
-	}
-	char *curRcQual() {
-		if(_revcomp) {
-			return _aCur? _aRcQual: _bRcQual;
-		} else {
-			return NULL;
-		}
-	}
-	String<char> *curRcQualStr() {
-		return _aCur? &_aRcQualStr: &_bRcQualStr;
-	}
-	size_t *curLen() {
-		return _aCur? &_aLen : &_bLen;
-	}
-	char *curName() {
-		return _aCur? _aName : _bName;
-	}
-	String<char> *curNameStr() {
-		return _aCur? &_aNameStr : &_bNameStr;
-	}
-	size_t *curNameLen() {
-		return _aCur? &_aNameLen : &_bNameLen;
-	}
-	void readCur() {
-		if(_aCur) {
-			this->read(_a,
-			           _aTStr,
-			           _aRc,
-			           _aRcTStr,
-			           _aQual,
-			           _aQualStr,
-			           _aRcQual,
-			           _aRcQualStr,
-			           &_aLen,
-			           _aName,
-			           _aNameStr,
-			           &_aNameLen);
-		} else {
-			this->read(_b,
-			           _bTStr,
-			           _bRc,
-			           _bRcTStr,
-			           _bQual,
-			           _bQualStr,
-			           _bRcQual,
-			           _bRcQualStr,
-			           &_bLen,
-			           _bName,
-			           _bNameStr,
-			           &_bNameLen);
-		}
-	}
-	/// Read in next pattern
-	virtual void readNext(String<Dna5>** s, String<char>** qual, String<char>** name) {
-		(*s)    = curStr();
-		(*qual) = curQualStr();
-		(*name) = curNameStr();
-		if(_fw) {
-			if(_tmpLen > 0) {
-				// Just swap
-				swapCur();
-				(*s)    = curStr();
-				(*qual) = curQualStr();
-				(*name) = curNameStr();
-			} else {
-				// Read in a fresh pair
-				readCur();
-			}
-		} else {
-			assert(curRc() != NULL);
-			(*s)    = curRcStr();
-			(*qual) = curRcQualStr();
-			(*name) = curNameStr();
-			assert(!empty(**s));
-			swap();
-		}
-		assert_eq(0, _tmpLen);
-		// If we exhausted all of the patterns in this file, go on to
-		// the next one
-		assert(!seqan::empty(**s) || _fw);
-		if(seqan::empty(**s) && _filecur < _infiles.size()) {
-			assert(_fw);
-			// Close current file
-			fclose(_in);
-			// Open next file
-			open(); _filecur++;
-			this->resetForNextFile(); // reset state to handle a fresh file
-			// Read in a fresh pair
-			readCur();
-			(*s)    = curStr();
-			(*qual) = curQualStr();
-			(*name) = curNameStr();
-			assert(!empty(**s));
-		}
-		// if !_revcomp, _fw always remains true
-		if(_revcomp) _fw = !_fw;
-		return;
-	}
 	void open() {
-		// Open input file
-		if((_in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
-			cerr << "Could not open reads file \"" << _infiles[_filecur] << "\"" << endl;
-			exit(1);
-		}
-		// Associate large input buffer with FILE *in
-		if(setvbuf(_in, _buf, _IOFBF, 256 * 1024) != 0) {
-			cerr << "Could not create input buffer for sequence file \"" << _infiles[_filecur] << "\"" << endl;
-			exit(1);
+		assert(_filebuf == NULL);
+		while(true) {
+			// Open read
+			FILE *in;
+			if((in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
+				cerr << "Warning: Could not open file \"" << _infiles[_filecur] << "\" for reading" << endl;
+				_filecur++;
+				continue;
+			}
+			_filebuf = new FileBuf(in);
+			break;
 		}
 	}
-	const vector<string>& _infiles; // input filenames
-	bool _gz;     // whether input file/files are gzipped
-	bool _revcomp;   // whether to calculate reverse complements
-	size_t _filecur; // index into _infiles of next file to read
-	bool _aCur;   // true iff _a is the "current" pattern (one that an
-	              // outsider might hold a reference to); otherwise _b
-	              // is the current pattern and _a will be the target
-	              // of the next read()
-
-	bool _fw;     // whether reverse complement should be returned next
-	FILE *_in;    // file to read patterns from
-	//gzFile _gzin; // file to read patterns from
-
-	// Pattern a
-	size_t _aLen;
-	String<Dna5>   _aTStr;         // host is set to _a
-	String<Dna5>   _aRcTStr;       // host is set to _aRc
-	String<char> _aQualStr;
-	String<char> _aRcQualStr;
-	size_t       _aNameLen;      // length of read name
-	String<char> _aNameStr;      // if _aName changes, must assign to this
-
-	// Pattern b
-	size_t _bLen;
-	String<Dna5>   _bTStr;         // host is set to _b
-	String<Dna5>   _bRcTStr;       // host is set to _bRc
-	String<char> _bQualStr;
-	String<char> _bRcQualStr;
-	size_t       _bNameLen;      // length of read name
-	String<char> _bNameStr;
-
-	// Pattern tmp (for hasMorePatterns())
-	size_t _tmpLen;
-	String<Dna5>   _tmpTStr;
-	String<Dna5>   _tmpRcTStr;
-	String<char> _tmpQualStr;
-	String<char> _tmpRcQualStr;
-	size_t _tmpNameLen;
-	String<char> _tmpNameStr;
-
-private:
-	char* _a;
-	char* _aRc;
-	char* _aQual;   // quality values for forward-strand version
-	char* _aRcQual; // quality values for reverse-comp version
-	char* _aName;   // read name
-
-	char* _b;
-	char* _bRc;
-	char* _bQual;   // quality values for forward-strand version
-	char* _bRcQual; // quality values for reverse-comp version
-	char* _bName;   // read name
-
-	char* _tmp;
-	char* _tmpRc;
-	char* _tmpQual;   // next-up buffer (qualities)
-	char* _tmpRcQual; // next-up buffer (reversed qualities)
-	char* _tmpName;
-
-	char _buf1[1024];
-	char _buf2[1024];
-	char _buf3[1024];
-	char _rcBuf1[1024];
-	char _rcBuf2[1024];
-	char _rcBuf3[1024];
-	char _qualBuf1[1024];
-	char _qualBuf2[1024];
-	char _qualBuf3[1024];
-	char _rcQualBuf1[1024];
-	char _rcQualBuf2[1024];
-	char _rcQualBuf3[1024];
-	char _nameBuf1[1024];
-	char _nameBuf2[1024];
-	char _nameBuf3[1024];
-
-	char _buf[256 * 1024]; // (large) input buffer
+	const vector<string>& _infiles; // filenames for read files
+	size_t _filecur;   // index into _infiles of next file to read
+	FileBuf *_filebuf; // read file currently being read from
+	bool _first;
 };
 
+/// For converting from ASCII to the Dna5 code where A=0, C=1, G=2,
+/// T=3, N=4
 static uint8_t charToDna5[] = {
 	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -789,6 +674,8 @@ static uint8_t charToDna5[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
+/// For converting from ASCII to the reverse-complement Dna5 code where
+/// A=3, C=2, G=1, T=0, N=4
 static uint8_t rcCharToDna5[] = {
 	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -810,7 +697,8 @@ static uint8_t rcCharToDna5[] = {
 	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
-const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
+/// Default quality values for use with the FASTA pattern source
+const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 
 /**
  *
@@ -818,7 +706,6 @@ const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
 	FastaPatternSource(const vector<string>& infiles,
-	                   bool __revcomp = true,
 	                   bool __reverse = false,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
@@ -826,11 +713,9 @@ public:
 	                   int __policy = NS_TO_NS,
 	                   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
-	{
-		assert(this->hasMorePatterns());
-	}
+	{ }
 	virtual void reset() {
 		_first = true;
 		BufferedFilePatternSource::reset();
@@ -842,36 +727,19 @@ public:
 protected:
 
 	/// Read another pattern from a FASTA input file
-	// TODO: store default qualities in qual
-	virtual void read(char* dst,
-	                  String<Dna5>& dstTStr,
-	                  char *rcDst,
-	                  String<Dna5>& rcDstTStr,
-	                  char* qual,
-	                  String<char>& qualTStr,
-	                  char* rcQual,
-	                  String<char>& rcQualTStr,
-	                  size_t* dstLen,
-	                  char* name,
-	                  String<char>& nameStr,
-	                  size_t* nameLen)
-	{
-		assert(dst != NULL);
-		assert(qual != NULL);
-		assert(dstLen != NULL);
-		assert(name != NULL);
-		assert(nameLen != NULL);
-
+	virtual void read(ReadBuf& r, uint32_t& patid) {
+		const int bufSz = ReadBuf::BUF_SIZE;
 		int ns;
 		do {
 			int c;
-			ns = 0;
-			*dstLen = 0;
-			*nameLen = 0;
-
+			int dstLen = 0;
+			int nameLen = 0;
+			ns = 0; // reset 'N' count
 			// Pick off the first carat
 			if(_first) {
-				c = skipWhitespace(this->_in); if(c < 0) return;
+				c = getOverNewline(_filebuf); if(c < 0) {
+					r.clearAll(); return;
+				}
 				if(c != '>') {
 					int cc = toupper(c);
 					cerr << "Error: reads file does not look like a FASTA file" << endl;
@@ -889,18 +757,22 @@ protected:
 			// Read to the end of the id line, sticking everything after the '>'
 			// into *name
 			while(true) {
-				c = fgetc(this->_in); if(c < 0) return;
+				c = _filebuf->get(); if(c < 0) {
+					r.clearAll(); return;
+				}
 				if(c == '\n' || c == '\r') {
 					// Break at end of line, after consuming all \r's, \n's
 					while(c == '\n' || c == '\r') {
-						c = fgetc(this->_in); if(c < 0) return;
+						c = _filebuf->get(); if(c < 0) {
+							r.clearAll(); return;
+						}
 					}
 					break;
 				}
-				name[(*nameLen)++] = c;
+				r.nameBuf[nameLen++] = c;
 			}
-			_setBegin(nameStr, (char*)name);
-			_setLength(nameStr, *nameLen);
+			_setBegin(r.name, r.nameBuf);
+			_setLength(r.name, nameLen);
 
 			// _in now points just past the first character of a sequence
 			// line, and c holds the first character
@@ -920,27 +792,25 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[(*dstLen)] = charToDna5[c];
-						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
-						(*dstLen)++;
+						r.patBufFw[dstLen] = charToDna5[c];
+						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						dstLen++;
 					}
-					if((c = fgetc(this->_in)) < 0) break;
+					if((c = _filebuf->get()) < 0) break;
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[i] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[i] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)dst);
-				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr, const_cast<char*>(qualDefault));
-				_setLength(qualTStr,(*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
-					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
-					_setLength(rcQualTStr,(*dstLen));
-				}
+				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+				_setLength(r.patFw,  dstLen);
+				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
+				_setLength(r.patRc,  dstLen);
+				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setLength(r.qualRc, dstLen);
 			} else {
 				while(c != '>' && c != '#') {
 					// Note: can't have a comment in the middle of a sequence,
@@ -956,41 +826,39 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[1024-(*dstLen)-1] = charToDna5[c];
-						rcDst[(*dstLen)] = rcCharToDna5[c];
-						(*dstLen)++;
+						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
+						r.patBufRc[dstLen] = rcCharToDna5[c];
+						dstLen++;
 					}
-					if((c = fgetc(this->_in)) < 0) break;
+					if((c = _filebuf->get()) < 0) break;
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[1024-i-1] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[bufSz-i-1] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
-				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr, const_cast<char*>(qualDefault));
-				_setLength(qualTStr,(*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)rcDst);
-					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
-					_setLength(rcQualTStr,(*dstLen));
-				}
+				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
+				_setLength(r.patFw,  dstLen);
+				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
+				_setLength(r.patRc,  dstLen);
+				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setLength(r.qualRc, dstLen);
 			}
 
 			// Set up a default name if one hasn't been set
-			if((*nameLen) == 0) {
-				itoa10(_readCnt, name);
-				_setBegin(nameStr, name);
-				size_t nlen = strlen(name);
-				_setLength(nameStr, nlen);
-				(*nameLen) = nlen;
+			if(nameLen == 0) {
+				itoa10(_readCnt, r.nameBuf);
+				_setBegin(r.name, r.nameBuf);
+				nameLen = strlen(r.nameBuf);
+				_setLength(r.name, nameLen);
 			}
-			assert_gt((*nameLen), 0);
+			assert_gt(nameLen, 0);
 			_readCnt++;
 
 		} while(ns > _maxNs);
+		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {
 		_first = true;
@@ -1017,7 +885,6 @@ private:
 class FastqPatternSource : public BufferedFilePatternSource {
 public:
 	FastqPatternSource(const vector<string>& infiles,
-	                   bool __revcomp = true,
 	                   bool __reverse = false,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
@@ -1026,12 +893,10 @@ public:
 					   bool solexa_quals = false,
 					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals),
 		_policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{
-		assert(this->hasMorePatterns());
-
 		for (int l = 0; l != 128; ++l) {
 			_table[l] = (int)(10.0 * log(1.0 + pow(10.0, (l - 64) / 10.0)) / log(10.0) + .499);
 			if (_table[l] >= 63) _table[l] = 63;
@@ -1047,50 +912,22 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-	/// Skip to the end of the current line; return the first character
-	/// of the next line
-	int skipToEnd() {
-		while(true) {
-			int c = fgetc(this->_in); if(c < 0) return -1;
-			if(c == '\n' || c == '\r') {
-				while(c == '\n' || c == '\r') {
-					c = fgetc(this->_in); if(c < 0) return -1;
-				}
-				// c now holds first character of next line
-				return c;
-			}
-		}
-	}
 	/// Read another pattern from a FASTQ input file
-	virtual void read(char* dst,
-	                  String<Dna5>& dstTStr,
-	                  char *rcDst,
-	                  String<Dna5>& rcDstTStr,
-	                  char* qual,
-	                  String<char>& qualTStr,
-	                  char* rcQual,
-	                  String<char>& rcQualTStr,
-	                  size_t* dstLen,
-	                  char* name,
-	                  String<char>& nameStr,
-	                  size_t* nameLen)
-	{
-		assert(dst != NULL);
-		assert(qual != NULL);
-		assert(dstLen != NULL);
-		assert(name != NULL);
-		assert(nameLen != NULL);
-
+	virtual void read(ReadBuf& r, uint32_t& patid) {
 		int ns;
+		const int bufSz = ReadBuf::BUF_SIZE;
 		do {
 			int c;
 			ns = 0;
-			*dstLen = 0;
-			*nameLen = 0;
+			int dstLen = 0;
+			int nameLen = 0;
 
 			// Pick off the first at
 			if(_first) {
-				c = skipWhitespace(this->_in); if(c < 0) return;
+				c = getOverNewline(_filebuf); if(c < 0) {
+					seqan::clear(r.patFw);
+					return;
+				}
 				if(c != '@') {
 					cerr << "Error: reads file does not look like a FASTQ file" << endl;
 					if(c == '>') {
@@ -1105,25 +942,33 @@ protected:
 			// Read to the end of the id line, sticking everything after the '@'
 			// into *name
 			while(true) {
-				c = fgetc(this->_in); if(c < 0) return;
+				c = _filebuf->get(); if(c < 0) {
+					seqan::clear(r.patFw);
+					return;
+				}
 				if(c == '\n' || c == '\r') {
 					// Break at end of line, after consuming all \r's, \n's
 					while(c == '\n' || c == '\r') {
-						c = fgetc(this->_in); if(c < 0) return;
+						c = _filebuf->get();
+						if(c < 0) {
+							seqan::clear(r.patFw);
+							return;
+						}
 					}
 					break;
 				}
-				name[(*nameLen)++] = c;
+				r.nameBuf[nameLen++] = c;
 			}
-			_setBegin(nameStr, (char*)name);
-			_setLength(nameStr, *nameLen);
+			_setBegin(r.name, r.nameBuf);
+			_setLength(r.name, nameLen);
+			// c now holds the first character on the line after the
+			// @name line
 
-			// _in now points just past the first character of a sequence
-			// line, and c holds the first character
-			int charsRead = 0;
+			// _filebuf now points just past the first character of a
+			// sequence line, and c holds the first character
 			if(!_reverse) {
 				while(c != '+') {
-					if(isalpha(c) && charsRead >= this->_trim5) {
+					if(isalpha(c) && dstLen >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1134,27 +979,25 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[(*dstLen)] = charToDna5[c];
-						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
-						charsRead++; (*dstLen)++;
+						r.patBufFw[dstLen] = charToDna5[c];
+						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						dstLen++;
 					}
-					c = fgetc(this->_in);
+					c = _filebuf->get();
 					if(c < 0) break;
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[i] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[i] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)dst);
-				_setLength(dstTStr, (*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
-					_setLength(rcDstTStr, (*dstLen));
-				}
+				_setBegin(r.patFw, (Dna5*)r.patBufFw);
+				_setLength(r.patFw, dstLen);
+				_setBegin(r.patRc, (Dna5*)&r.patBufRc[bufSz-dstLen]);
+				_setLength(r.patRc, dstLen);
 			} else {
 				while(c != '+') {
-					if(isalpha(c) && charsRead >= this->_trim5) {
+					if(isalpha(c) && dstLen >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1165,41 +1008,33 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[1024-(*dstLen)-1] = charToDna5[c];
-						rcDst[(*dstLen)] = rcCharToDna5[c];
-						charsRead++; (*dstLen)++;
+						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
+						r.patBufRc[dstLen] = rcCharToDna5[c];
+						dstLen++;
 					}
-					c = fgetc(this->_in);
+					c = _filebuf->get();
 					if(c < 0) break;
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[1024-i-1] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[bufSz-i-1] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
-				_setLength(dstTStr, (*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)rcDst);
-					_setLength(rcDstTStr, (*dstLen));
-				}
+				_setBegin(r.patFw, (Dna5*)&r.patBufFw[bufSz-dstLen]);
+				_setLength(r.patFw, dstLen);
+				_setBegin(r.patRc, (Dna5*)r.patBufRc);
+				_setLength(r.patRc, dstLen);
 			}
+			assert_eq('+', c);
 
 			// Chew up the optional name on the '+' line
-			while(c == '+' || (c != '\n' && c != '\r'))
-			{
-				c = fgetc(this->_in); if(c < 0) return;
-			}
+			peekToEndOfLine(_filebuf);
 
 			// Now read the qualities
-			size_t qualsRead = 0;
-
-			//qual->clear();
-			if (_solexa_quals)
-			{
+			int qualsRead = 0;
+			if (_solexa_quals) {
 				char buf[1024];
-
-				while (fgets(buf, sizeof(buf), this->_in) && qualsRead < (*dstLen) + this->_trim5)
+				while (_filebuf->gets(buf, sizeof(buf)) && qualsRead < dstLen + this->_trim5)
 				{
 					char* nl = strrchr(buf, '\n');
 					if (nl) *nl = 0;
@@ -1212,16 +1047,14 @@ protected:
 						{
 							int sQ = atoi(s_quals[j].c_str());
 							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-							if (qualsRead >= (size_t)this->_trim5)
+							if (qualsRead >= _trim5)
 							{
-								size_t off = qualsRead - this->_trim5;
+								size_t off = qualsRead - _trim5;
 								c = (char)(pQ + 33);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
-								qual[off] = c;
-								if (rcQual != NULL) {
-									rcQual[1024 - off - 1] = c;
-								}
+								r.qualBufFw[off] = c;
+								r.qualBufRc[bufSz - off - 1] = c;
 							}
 							++qualsRead;
 						}
@@ -1230,110 +1063,97 @@ protected:
 						{
 							int sQ = atoi(s_quals[j].c_str());
 							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
-							if (qualsRead >= (size_t)this->_trim5)
+							if (qualsRead >= _trim5)
 							{
-								size_t off = qualsRead - this->_trim5;
+								size_t off = qualsRead - _trim5;
 								c = (char)(pQ + 33);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
-								qual[1024 - off - 1] = c;
-								if (rcQual != NULL) {
-									rcQual[off] = c;
-								}
+								r.qualBufFw[bufSz - off - 1] = c;
+								r.qualBufRc[off] = c;
 							}
 							++qualsRead;
 						}
 					}
 				} // done reading Solexa quality lines
 				if(!_reverse) {
-					_setBegin(qualTStr, (char*)qual);
-					_setLength(qualTStr, (*dstLen));
-					if(rcQual != NULL) {
-						_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
-						_setLength(rcQualTStr, (*dstLen));
-					}
+					_setBegin(r.qualFw, (char*)r.qualBufFw);
+					_setLength(r.qualFw, dstLen);
+					_setBegin(r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
+					_setLength(r.qualRc, dstLen);
 				} else {
-					_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
-					_setLength(qualTStr, (*dstLen));
-					if(rcQual != NULL) {
-						_setBegin(rcQualTStr, (char*)rcQual);
-						_setLength(rcQualTStr, (*dstLen));
-					}
+					_setBegin(r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
+					_setLength(r.qualFw, dstLen);
+					_setBegin(r.qualRc, (char*)r.qualBufRc);
+					_setLength(r.qualRc, dstLen);
 				}
+				c = getOverNewline(_filebuf);
 			}
 			else
 			{
+				// Non-solexa qualities
 				if(!_reverse) {
-					while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
-						c = fgetc(this->_in);
-						if (c != '\r' && c != '\n')
-						{
-							if (qualsRead >= (size_t)this->_trim5) {
-								size_t off = qualsRead - this->_trim5;
+					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
+						c = _filebuf->get();
+						if (c != '\r' && c != '\n') {
+							if (qualsRead >= _trim5) {
+								size_t off = qualsRead - _trim5;
 								assert_geq(c, 33);
 								assert_leq(c, 73);
-								qual[off] = c;
-								if (rcQual != NULL) {
-									rcQual[1024 - off - 1] = c;
-								}
-								qualsRead++;
+								r.qualBufFw[off] = c;
+								r.qualBufRc[bufSz - off - 1] = c;
 							}
+							qualsRead++;
+						} else {
+							break;
 						}
 					}
-					assert_eq(qualsRead, (*dstLen) + this->_trim5);
-					_setBegin(qualTStr, (char*)qual);
-					_setLength(qualTStr, (*dstLen));
-					if(rcQual != NULL) {
-						_setBegin(rcQualTStr, (char*)&rcQual[1024-(*dstLen)]);
-						_setLength(rcQualTStr, (*dstLen));
-					}
+					assert_eq(qualsRead, dstLen + this->_trim5);
+					_setBegin (r.qualFw, (char*)r.qualBufFw);
+					_setLength(r.qualFw, dstLen);
+					_setBegin (r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
+					_setLength(r.qualRc, dstLen);
 				} else {
-					while(qualsRead < (*dstLen) + this->_trim5 && c >= 0) {
-						c = fgetc(this->_in);
-						if (c != '\r' && c != '\n')
-						{
-							if (qualsRead >= (size_t)this->_trim5) {
-								size_t off = qualsRead - this->_trim5;
+					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
+						c = _filebuf->get();
+						if (c != '\r' && c != '\n') {
+							if (qualsRead >= _trim5) {
+								size_t off = qualsRead - _trim5;
 								assert_geq(c, 33);
 								assert_leq(c, 73);
-								qual[1024 - off - 1] = c;
-								if (rcQual != NULL) {
-									rcQual[off] = c;
-								}
-								qualsRead++;
+								r.qualBufFw[bufSz - off - 1] = c;
+								r.qualBufRc[off] = c;
 							}
+							qualsRead++;
+						} else {
+							break;
 						}
 					}
-					assert_eq(qualsRead, (*dstLen) + this->_trim5);
-					_setBegin(qualTStr, (char*)&qual[1024-(*dstLen)]);
-					_setLength(qualTStr, (*dstLen));
-					if(rcQual != NULL) {
-						_setBegin(rcQualTStr, (char*)rcQual);
-						_setLength(rcQualTStr, (*dstLen));
-					}
+					assert_eq(qualsRead, dstLen + this->_trim5);
+					_setBegin (r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
+					_setLength(r.qualFw, dstLen);
+					_setBegin (r.qualRc, (char*)r.qualBufRc);
+					_setLength(r.qualRc, dstLen);
+				}
+				if(c == '\r' || c == '\n') {
+					c = getOverNewline(_filebuf);
+				} else {
+					c = getToEndOfLine(_filebuf);
 				}
 			}
+			assert(c == -1 || c == '@');
 
 			// Set up a default name if one hasn't been set
-			if((*nameLen) == 0) {
-				itoa10(_readCnt, name);
-				_setBegin(nameStr, name);
-				size_t nlen = strlen(name);
-				_setLength(nameStr, nlen);
-				(*nameLen) = nlen;
+			if(nameLen == 0) {
+				itoa10(_readCnt, r.nameBuf);
+				_setBegin(r.name, r.nameBuf);
+				nameLen = strlen(r.nameBuf);
+				_setLength(r.name, nameLen);
 			}
-			assert_gt((*nameLen), 0);
+			assert_gt(nameLen, 0);
 			_readCnt++;
-
-			if (feof(this->_in))
-				return;
-			else
-			{
-				do {
-					c = fgetc(this->_in);
-				} while(c != '@' && c >= 0);
-			}
 		} while(ns > _maxNs);
+		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {
 		_first = true;
@@ -1361,7 +1181,6 @@ private:
 class RawPatternSource : public BufferedFilePatternSource {
 public:
 	RawPatternSource(const vector<string>& infiles,
-	                 bool __revcomp = true,
 	                 bool __reverse = false,
 	                 const char *__dumpfile = NULL,
 	                 int __trim3 = 0,
@@ -1369,12 +1188,9 @@ public:
 	                 int __policy = NS_TO_NS,
 	                 int __maxNs = 9999,
 	                 uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __revcomp, false, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse),
-		_policy(__policy), _maxNs(__maxNs), _rand(seed)
-	{
-		assert(this->hasMorePatterns());
-	}
+		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
+		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
+	{ }
 	virtual void reset() {
 		_first = true;
 		BufferedFilePatternSource::reset();
@@ -1384,39 +1200,20 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-	/// Read another pattern from a FASTQ input file
-	virtual void read(char* dst,
-	                  String<Dna5>& dstTStr,
-	                  char *rcDst,
-	                  String<Dna5>& rcDstTStr,
-	                  char* qual,
-	                  String<char>& qualTStr,
-	                  char* rcQual,
-	                  String<char>& rcQualTStr,
-	                  size_t* dstLen,
-	                  char* name,
-	                  String<char>& nameStr,
-	                  size_t* nameLen)
-	{
-		assert(dst != NULL);
-		assert(qual != NULL);
-		assert(dstLen != NULL);
-		assert(name != NULL);
-		assert(nameLen != NULL);
-
+	/// Read another pattern from a Raw input file
+	virtual void read(ReadBuf& r, uint32_t& patid) {
+		const int bufSz = ReadBuf::BUF_SIZE;
 		int ns;
 		do {
 			int c;
-			ns = 0;
-			*dstLen = 0;
-			*nameLen = 0;
-
-			c = skipWhitespace(this->_in);
+			int dstLen = 0;
+			int nameLen = 0;
+			ns = 0; // reset 'N' count
+			c = getOverNewline(this->_filebuf);
 			assert(!isspace(c));
 			if(_first) {
-				if(c != 'a' && c != 'A' && c != 'c' && c != 'C' &&
-				   c != 'g' && c != 'G' && c != 't' && c != 'T')
-				{
+				int cc = toupper(c);
+				if(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T') {
 					cerr << "Error: reads file does not look like a Raw file" << endl;
 					if(c == '>') {
 						cerr << "Reads file looks like a FASTA file; please use -f" << endl;
@@ -1431,10 +1228,9 @@ protected:
 
 			// _in now points just past the first character of a sequence
 			// line, and c holds the first character
-			int charsRead = 0;
 			if(!_reverse) {
 				while(!isspace(c) && c >= 0) {
-					if(isalpha(c) && charsRead >= this->_trim5) {
+					if(isalpha(c) && dstLen >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1445,30 +1241,28 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[(*dstLen)] = charToDna5[c];
-						rcDst[1024-(*dstLen)-1] = rcCharToDna5[c];
-						charsRead++; (*dstLen)++;
+						r.patBufFw[dstLen] = charToDna5[c];
+						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						dstLen++;
 					}
-					c = fgetc(this->_in);
+					c = _filebuf->get();
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[i] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[i] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)dst);
-				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr, const_cast<char*>(qualDefault));
-				_setLength(qualTStr,(*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)&rcDst[1024-(*dstLen)]);
-					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
-					_setLength(rcQualTStr,(*dstLen));
-				}
+				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+				_setLength(r.patFw,  dstLen);
+				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
+				_setLength(r.patRc,  dstLen);
+				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setLength(r.qualRc, dstLen);
 			} else {
 				while(!isspace(c) && c >= 0) {
-					if(isalpha(c) && charsRead >= this->_trim5) {
+					if(isalpha(c) && dstLen >= this->_trim5) {
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1479,51 +1273,47 @@ protected:
 								c = 'A';
 							}
 						}
-						dst[1024-(*dstLen)-1] = charToDna5[c];
-						rcDst[(*dstLen)] = rcCharToDna5[c];
-						charsRead++; (*dstLen)++;
+						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
+						r.patBufRc[dstLen] = rcCharToDna5[c];
+						dstLen++;
 					}
-					c = fgetc(this->_in);
+					c = _filebuf->get();
 				}
-				(*dstLen) -= this->_trim3;
+				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
-				for(size_t i = 0; i < (*dstLen); i++) {
-					if(dst[1024-i-1] == 4) ns++;
+				for(int i = 0; i < dstLen; i++) {
+					if(r.patBufFw[bufSz-i-1] == 4) ns++;
 				}
-				_setBegin(dstTStr, (Dna5*)&dst[1024-(*dstLen)]);
-				_setLength(dstTStr, (*dstLen));
-				_setBegin(qualTStr, const_cast<char*>(qualDefault));
-				_setLength(qualTStr,(*dstLen));
-				if(rcDst != NULL) {
-					_setBegin(rcDstTStr, (Dna5*)rcDst);
-					_setLength(rcDstTStr, (*dstLen));
-					_setBegin(rcQualTStr, const_cast<char*>(qualDefault));
-					_setLength(rcQualTStr,(*dstLen));
-				}
+				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
+				_setLength(r.patFw,  dstLen);
+				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
+				_setLength(r.patRc,  dstLen);
+				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setLength(r.qualRc, dstLen);
 			}
 
 			// Set up name
-			itoa10(_readCnt, name);
-			_setBegin(nameStr, name);
-			size_t nlen = strlen(name);
-			_setLength(nameStr, nlen);
-			(*nameLen) = nlen;
+			itoa10(_readCnt, r.nameBuf);
+			_setBegin(r.name, r.nameBuf);
+			nameLen = strlen(r.nameBuf);
+			_setLength(r.name, nameLen);
 			_readCnt++;
 
 			if(c == -1) {
 				if(ns > _maxNs) {
-					// This read violates the Ns constraing and we're
+					// This read violates the Ns constraint and we're
 					// about to return it; make sure that caller
 					// doesn't see this read
-					(*dstLen) = 0;
-					_setLength(dstTStr, 0);
-					_setLength(rcDstTStr, 0);
+					r.clearAll();
 				}
 				return;
 			} else {
 				assert(isspace(c));
 			}
 		} while(ns > _maxNs);
+		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {
 		_first = true;
@@ -1540,7 +1330,6 @@ private:
 	bool _reverse;
 	int _policy;
 	int _maxNs;
-	int _table[128];
 	RandomSource _rand;
 };
 
