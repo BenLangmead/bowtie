@@ -854,7 +854,9 @@ public:
 			}
 			// In-between sanity checks
 			if(depth >= _5depth) {
-				assert_gt(_hiHalfStackDepth, 0);
+				if(_3revOff != _2revOff) {
+					assert_gt(_hiHalfStackDepth, 0);
+				}
 				assert_geq(stackDepth, 1);
 			} else if(depth >= _3depth) {
 				assert_geq(stackDepth, 2);
