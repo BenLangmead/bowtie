@@ -714,7 +714,7 @@ public:
 					const Hit& h = oracleHits[i];
 		    		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
 		    			assert_eq(h.fw, rhit.fw);
-		    			assert_eq(h.mms, rhit.mms);
+		    			assert(h.mms == rhit.mms);
 		    			// It's a match - hit confirmed
 		    			break;
 		    		}
@@ -1548,7 +1548,7 @@ public:
 				size_t rev2mm  = 0; // mismatches observed in the 2-revisitable region
 				size_t rev3mm  = 0; // mismatches observed in the 3-revisitable region
 				uint32_t ham = iham; // weighted hamming distance so far
-				bitset<max_read_bp> diffs = 0; // mismatch bitvector
+				FixedBitset<max_read_bp> diffs; // mismatch bitvector
 				// For each alignment column, from right to left
 				bool success = true;
 				int ok, okInc;
@@ -1972,7 +1972,7 @@ protected:
 			const Hit& h = oracleHits[i];
     		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
     			assert_eq(h.fw, rhit.fw);
-    			assert_eq(h.mms, rhit.mms);
+    			assert(h.mms == rhit.mms);
     			// It's a match - hit confirmed
     			break;
     		}

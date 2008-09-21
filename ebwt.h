@@ -21,6 +21,7 @@
 #include "hit.h"
 #include "ref_read.h"
 #include "threading.h"
+#include "bitset.h"
 
 using namespace std;
 using namespace seqan;
@@ -1209,7 +1210,7 @@ public:
 	{
 		// The search functions should not have allowed us to get here
 		assert(!_suppress);
-		bitset<max_read_bp> mm = 0;
+		FixedBitset<max_read_bp> mm;
 		String<Dna5> pat;
 		uint32_t qlen = length(query);
 		reserve(pat, qlen);
@@ -1260,7 +1261,7 @@ public:
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
-			bitset<max_read_bp> diffs = 0;
+			FixedBitset<max_read_bp> diffs;
 			// This type of check assumes that only mismatches are
 			// possible.  If indels are possible, then we either need
 			// the caller to provide information about indel locations,
@@ -1295,7 +1296,7 @@ public:
 			if(diffs != mm) {
 				// Oops, mismatches were not where we expected them;
 				// print a diagnostic message before asserting
-				cerr << "Expected " << mm << " mismatches, got " << diffs << endl;
+				cerr << "Expected " << mm.str() << " mismatches, got " << diffs.str() << endl;
 				cerr << "  Pat:  ";
 				for(size_t i = 0; i < len; i++) {
 					if(_ebwtFw) cerr << query[i];
@@ -1319,7 +1320,7 @@ public:
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
 				cerr << "  Provisional: " << provisional << endl;
 			}
-			assert_eq(diffs, mm);
+			if(diffs != mm) assert(false);
 		}
 		if(provisional) {
 			// Provisional hits may or may not be 'accepted' later on;

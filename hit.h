@@ -4,12 +4,12 @@
 #include <vector>
 #include <stdint.h>
 #include <iostream>
-#include <bitset>
 #include <sstream>
 #include <seqan/sequence.h>
 #include "assert_helpers.h"
 #include "spinlock.h"
 #include "threading.h"
+#include "bitset.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -35,7 +35,7 @@ struct Hit {
 		const String<Dna5>& _patSeq,
 		const String<char>& _quals,
 		bool _fw,
-		const bitset<max_read_bp>& _mms,
+		const FixedBitset<max_read_bp>& _mms,
 		uint32_t _oms = 0) :
 		h(_h),
 		patId(_patId),
@@ -51,7 +51,7 @@ struct Hit {
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence
 	String<char>        quals;   /// read qualities
-	bitset<max_read_bp> mms;     /// mismatch mask
+	FixedBitset<max_read_bp> mms;     /// mismatch mask
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
 

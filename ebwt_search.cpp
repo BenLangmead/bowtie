@@ -529,7 +529,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 				}
 			}
 			if(reject) continue;
-			bitset<max_read_bp> diffs = 0;
+			FixedBitset<max_read_bp> diffs;
 			if(pos >= ohlen) {
 				// Extend toward the left end of the pattern, counting
 				// mismatches
@@ -555,7 +555,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 				if(reject) continue;
 			}
 			// If the extend yielded 1 or fewer mismatches, keep it
-			if((diffs == 0 && allowExact) || diffs.count() == 1) {
+			if((diffs.count() == 0 && allowExact) || diffs.count() == 1) {
 				uint32_t off = pos - ohlen;
 				if(transpose) {
 					off = length(o) - off;
@@ -602,7 +602,7 @@ static bool checkSanityExhausted(const String<Dna5>& pat,
 		     << (patid>>revcomp) << (fw? "+":"-")
 		     << ":<" << sanityHits[j].h.first << ","
 		     << sanityHits[j].h.second << ","
-		     << sanityHits[j].mms << ">" << endl;
+		     << sanityHits[j].mms.str() << ">" << endl;
 		cout << "  transpose: " << transpose << endl;
 		unfoundHits++;
 	}
@@ -641,7 +641,7 @@ static bool reconcileHits(const String<Dna5>& pat,
     				cout << "sanity hit: fw=" << itr->fw << endl;
     			}
     			assert_eq(h.fw, itr->fw);
-    			assert_eq(h.mms, itr->mms);
+    			assert(h.mms == itr->mms);
     			found = true;
     			sanityHits.erase(itr); // Retire this sanity hit
     			break;
@@ -738,7 +738,7 @@ static EbwtSearchStats<String<Dna> >* mismatchSearch_stats;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         mismatchSearch_os;
-static Bitset*                        mismatchSearch_doneMask;
+static SyncBitset*                    mismatchSearch_doneMask;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
 	PatternSource&         _patsrc       = *mismatchSearch_patsrc;
@@ -746,7 +746,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
-	Bitset&                doneMask      = *mismatchSearch_doneMask;
+	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
 
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
@@ -853,7 +853,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
-	Bitset&                doneMask     = *mismatchSearch_doneMask;
+	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
 
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
@@ -922,7 +922,10 @@ static void mismatchSearch(PatternSource& _patsrc,
                            vector<String<Dna5> >& os)
 {
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
-	Bitset doneMask(numQs);
+	SyncBitset doneMask(numQs,
+		// Error message for if an allocation fails
+		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
+		"run bowtie separately on each subset.\n");
 
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
