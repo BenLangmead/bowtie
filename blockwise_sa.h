@@ -829,7 +829,6 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				assert_lt(i, len);
 				try {
 					append(bucket, i);
-					throw bad_alloc();
 				} catch(bad_alloc &ba) {
 					cerr << "Could not append element to block of " << ((length(bucket)) * 4) << " bytes" << endl;
 					cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
