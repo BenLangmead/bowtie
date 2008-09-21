@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "assert_helpers.h"
 #include "threading.h"
 
 /**
@@ -45,7 +44,7 @@ public:
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(size_t oldsz = _sz);
+			size_t oldsz = _sz;
 			expand();
 			assert_eq(_sz, oldsz);
 		}
