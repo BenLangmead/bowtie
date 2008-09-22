@@ -103,9 +103,12 @@ struct ReadBuf {
 };
 
 /**
- * Encapsualtes a source of patterns; usually a file.  Handles dumping
- * patterns to a logfile (useful for debugging) and optionally
- * reversing them before returning them.
+ * Encapsualtes a synchronized source of patterns; usually a file.
+ * Handles dumping patterns to a logfile (useful for debugging).  Also
+ * optionally reverses reads and quality strings before returning them,
+ * though that is usually more efficiently done by the concrete
+ * subclass.  Concrete subclasses should delimit critical sections with
+ * calls to lock() and unlock().
  */
 class PatternSource {
 public:
@@ -188,7 +191,7 @@ protected:
 	 * Concrete subclasses call lock() to enter a critical region.
 	 * What constitutes a critical region depends on the subclass.
 	 */
-	void mylock() {
+	void lock() {
 #ifdef USE_SPINLOCK
 		_lock.Enter();
 #else
@@ -199,7 +202,7 @@ protected:
 	 * Concrete subclasses call unlock() to exit a critical region
 	 * What constitutes a critical region depends on the subclass.
 	 */
-	void myunlock() {
+	void unlock() {
 #ifdef USE_SPINLOCK
 		_lock.Leave();
 #else
@@ -226,15 +229,10 @@ private:
  */
 class PatternSourcePerThread {
 public:
-	PatternSourcePerThread(PatternSource& __patsrc) :
-		_patsrc(__patsrc), _buf(), _patid(0xffffffff) { }
-
-	void nextRead() {
-		ASSERT_ONLY(uint32_t lastPatid = _patid);
-		_buf.clearAll();
-		_patsrc.nextRead(_buf, _patid);
-		assert(empty() || _patid != lastPatid);
-	}
+	PatternSourcePerThread() : _buf(), _patid(0xffffffff) { }
+	virtual ~PatternSourcePerThread() { }
+	
+	virtual void nextRead()  = 0;
 
 	String<Dna5>& patFw()  { return _buf.patFw;               }
 	String<Dna5>& patRc()  { return _buf.patRc;               }
@@ -243,12 +241,27 @@ public:
 	String<char>& name()   { return _buf.name;                }
 	uint32_t      patid()  { return _patid;                   }
 	bool          empty()  { return seqan::empty(_buf.patFw); }
-	void          reset()  { _patid = 0xffffffff;             }
-private:
-	PatternSource& _patsrc;
+	virtual void  reset()  { _patid = 0xffffffff;             }
+protected:
 	ReadBuf  _buf;   // read buffer
 	uint32_t _patid; // index of read just read
 };
+
+class WrappedPatternSourcePerThread : public PatternSourcePerThread {
+public:
+	WrappedPatternSourcePerThread(PatternSource& __patsrc) :
+		_patsrc(__patsrc) { }
+
+	virtual void nextRead() {
+		ASSERT_ONLY(uint32_t lastPatid = _patid);
+		_buf.clearAll();
+		_patsrc.nextRead(_buf, _patid);
+		assert(empty() || _patid != lastPatid);
+	}
+private:
+	PatternSource& _patsrc;
+};
+
 
 /**
  * Encapsualtes a source of patterns where each raw pattern is trimmed
@@ -270,6 +283,11 @@ protected:
 	int _trim5;
 };
 
+/**
+ * A synchronized pattern source that simply returns random reads
+ * without reading from the disk or storing lists of reads in memory.
+ * Reads are generated with a RandomSource.
+ */
 class RandomPatternSource : public PatternSource {
 public:
 	RandomPatternSource(uint32_t numReads = 2000000,
@@ -283,66 +301,132 @@ public:
 		_rand(seed),
 		_reverse(false) { }
 
-	/// Implementation to be provided by concrete subclasses
+	/** Get the next random read and set patid */
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
-		mylock();
+		// Begin critical section
+		lock();
 		if(_readCnt >= _numReads) {
 			r.clearAll();
-			myunlock();
+			unlock();
 			return;
 		}
-		uint32_t ra = _rand.nextU32() & 3;
+		uint32_t ra = _rand.nextU32();
 		patid = _readCnt;
 		_readCnt++;
-		myunlock();
-		if(!_reverse) {
-			for(int i = 0; i < _length; i++) {
-				ra = RandomSource::nextU32(ra) & 3;
-				r.patBufFw[i]            = ra;
-				r.patBufRc[_length-i-1]  = ra ^ 3;
-				char c                   = 'I' - ((ra >> 2) & 31);
-				r.qualBufFw[i]           = c;
-				r.qualBufRc[_length-i-1] = c;
+		unlock();
+		fillRandomRead(r, ra, _length, patid, _reverse);
+	}
+	/** */
+	static void fillRandomRead(ReadBuf& r,
+	                           uint32_t ra,
+	                           int length,
+	                           uint32_t patid,
+	                           bool reverse)
+	{
+		// End critical section
+		if(!reverse) {
+			for(int i = 0; i < length; i++) {
+				ra = RandomSource::nextU32(ra) >> 8;
+				r.patBufFw[i]           = (ra & 3);
+				r.patBufRc[length-i-1]  = (ra & 3) ^ 3;
+				char c                  = 'I' - ((ra >> 2) & 31);
+				r.qualBufFw[i]          = c;
+				r.qualBufRc[length-i-1] = c;
 			}
 		} else {
-			for(int i = 0; i < _length; i++) {
-				ra = RandomSource::nextU32(ra) & 3;
-				r.patBufFw[_length-i-1]  = ra;
-				r.patBufRc[i]            = ra ^ 3;
-				char c                   = 'I' - ((ra >> 2) & 31);
-				r.qualBufFw[_length-i-1] = c;
-				r.qualBufRc[i]           = c;
+			for(int i = 0; i < length; i++) {
+				ra = RandomSource::nextU32(ra) >> 8;
+				r.patBufFw[length-i-1]  = (ra & 3);
+				r.patBufRc[i]           = (ra & 3) ^ 3;
+				char c                  = 'I' - ((ra >> 2) & 31);
+				r.qualBufFw[length-i-1] = c;
+				r.qualBufRc[i]          = c;
 			}
 		}
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
-		_setLength(r.patFw, _length);
+		_setLength(r.patFw, length);
 		_setBegin (r.patRc, (Dna5*)r.patBufRc);
-		_setLength(r.patRc, _length);
+		_setLength(r.patRc, length);
 		_setBegin (r.qualFw, r.qualBufFw);
-		_setLength(r.qualFw, _length);
+		_setLength(r.qualFw, length);
 		_setBegin (r.qualRc, r.qualBufRc);
-		_setLength(r.qualRc, _length);
-
+		_setLength(r.qualRc, length);
 		itoa10(patid, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, strlen(r.nameBuf));
 	}
+	
+	/** Reset the pattern source to the beginning */
 	virtual void reset() {
 		PatternSource::reset();
-		_rand.init(_seed);
+		// reset pseudo-random generator; next string of calls to
+		// nextU32() will return same pseudo-randoms as the last
+		_rand.init(_seed);  
 	}
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
 	}
 private:
-	uint32_t _numReads;
-	int _length;
-	uint32_t _seed;
-	RandomSource _rand;
-	bool _reverse;
+	uint32_t     _numReads; /// number of reads to dish out
+	int          _length;   /// length of reads
+	uint32_t     _seed;     /// seed for pseudo-randoms
+	RandomSource _rand;     /// pseudo-random generator
+	bool         _reverse;  /// whether to reverse reads
 };
 
+/**
+ * A version of PatternSourcePerThread that dishes out random patterns
+ * without any synchronization.
+ */
+class RandomPatternSourcePerThread : public PatternSourcePerThread {
+public:
+	RandomPatternSourcePerThread(uint32_t __numreads,
+	                             int __length,
+	                             int __numthreads,
+	                             int thread,
+	                             bool __reverse) :
+		PatternSourcePerThread(),
+		_numreads(__numreads),
+		_length(__length),
+		_numthreads(__numthreads),
+		_thread(thread),
+		_reverse(__reverse),
+		_rand(_thread)
+	{ _patid = _thread; }
+
+	virtual void nextRead() {
+		if(_patid >= _numreads) {
+			_buf.clearAll();
+			return;
+		}
+		RandomPatternSource::fillRandomRead(
+			_buf, _rand.nextU32(), _length, _patid, _reverse);
+		_patid += _numthreads;
+	}
+
+	virtual void reset() {
+		PatternSourcePerThread::reset();
+		_patid = _thread;
+		_rand.init(_thread);
+	}
+
+private:
+	uint32_t     _numreads;
+	int          _length;
+	int          _numthreads;
+	int          _thread;
+	bool         _reverse;
+	RandomSource _rand;
+};
+
+/**
+ * Simple wrapper for a FILE* that reads it in chunks (with fread) and
+ * keeps those chunks in a buffer.  It also services calls to get(),
+ * peek() and gets() from the buffer, reading in additional chunks when
+ * necessary.  TODO: Implement asynchronous I/O.  Obstacle: neither
+ * Cygwin nor MinGW seem to support POSIX aio.
+ */
 class FileBuf {
 public:
 	FileBuf(FILE *__in) : _in(__in), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
@@ -564,9 +648,9 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
-		mylock();
+		lock();
 		if(_cur >= _v.size()) {
-			myunlock();
+			unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
 			clear(r.patFw);
@@ -596,7 +680,7 @@ public:
 		_cur++;
 		_readCnt++;
 		patid = _readCnt;
-		myunlock();
+		unlock();
 	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
@@ -657,7 +741,7 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and _filecur state
-		mylock();
+		lock();
 		read(r, patid);
 		if(_first && seqan::empty(r.patFw)) {
 			// No reads could be extracted from the first _infile
@@ -680,7 +764,7 @@ public:
 			_filecur++;
 		}
 		// Leaving critical region
-		myunlock();
+		unlock();
 		// If r.patFw is empty, then the caller knows that we are
 		// finished with the reads
 	}

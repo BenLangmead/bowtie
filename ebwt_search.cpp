@@ -53,20 +53,24 @@ static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;
 static output_types outType		= FULL; // report hits in id+/-:<x,y,z> format
+static bool randReadsNoSync     = false;
+static int numRandomReads       = 2000000;
+static int lenRandomReads       = 35;
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
-#define ARG_ORIG         256
-#define ARG_SEED         257
-#define ARG_DUMP_PATS    258
-#define ARG_ARROW        259
-#define ARG_CONCISE      260
-#define ARG_SOLEXA_QUALS 261
-#define ARG_MAXBTS       262
-#define ARG_VERBOSE      263
-#define ARG_MAXNS        264
-#define ARG_RANDOM_READS 265
-#define ARG_NOOUT        266
+#define ARG_ORIG                256
+#define ARG_SEED                257
+#define ARG_DUMP_PATS           258
+#define ARG_ARROW               259
+#define ARG_CONCISE             260
+#define ARG_SOLEXA_QUALS        261
+#define ARG_MAXBTS              262
+#define ARG_VERBOSE             263
+#define ARG_MAXNS               264
+#define ARG_RANDOM_READS        265
+#define ARG_RANDOM_READS_NOSYNC 266
+#define ARG_NOOUT               267
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -103,7 +107,8 @@ static struct option long_options[] = {
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
-	{"randomreads",  no_argument,       0,            ARG_RANDOM_READS},
+	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
+	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -192,6 +197,10 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
 	   		case ARG_RANDOM_READS: format = RANDOM; break;
+	   		case ARG_RANDOM_READS_NOSYNC:
+	   			format = RANDOM;
+	   			randReadsNoSync = true;
+	   			break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case ARG_NOOUT: outType = NONE; break;
@@ -338,16 +347,17 @@ static void sanityCheckExact(
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
-	p.nextRead(); \
-	if(p.empty() || p.patid() >= qUpto) break; \
-	params.setPatId(p.patid()); \
-	assert(!empty(p.patFw())); \
-	String<Dna5>& patFw  = p.patFw();  \
-	String<Dna5>& patRc  = p.patRc();  \
-	String<char>& qualFw = p.qualFw(); \
-	String<char>& qualRc = p.qualRc(); \
-	String<char>& name   = p.name(); \
-	uint32_t      patid  = p.patid(); \
+	p->nextRead(); \
+	if(p->empty() || p->patid() >= qUpto) { /* cout << "done" << endl; */ break; } \
+	params.setPatId(p->patid()); \
+	assert(!empty(p->patFw())); \
+	String<Dna5>& patFw  = p->patFw();  \
+	String<Dna5>& patRc  = p->patRc();  \
+	String<char>& qualFw = p->qualFw(); \
+	String<char>& qualRc = p->qualRc(); \
+	String<char>& name   = p->name(); \
+	uint32_t      patid  = p->patid(); \
+	/* cout << name << ": " << patFw << ":" << qualFw << endl; */ \
 	if(lastLen == 0) lastLen = length(patFw); \
 	if(qSameLen && length(patFw) != lastLen) { \
 		throw runtime_error("All reads must be the same length"); \
@@ -358,14 +368,14 @@ static void sanityCheckExact(
 /// patid exceeds the limit, and marshaling the read into convenient
 /// variables.
 #define GET_READ_FW(p) \
-	p.nextRead(); \
-	if(p.empty() || p.patid() >= qUpto) break; \
-	params.setPatId(p.patid()); \
-	assert(!empty(p.patFw())); \
-	String<Dna5>& patFw  = p.patFw();  \
-	String<char>& qualFw = p.qualFw(); \
-	String<char>& name   = p.name(); \
-	uint32_t      patid  = p.patid(); \
+	p->nextRead(); \
+	if(p->empty() || p->patid() >= qUpto) break; \
+	params.setPatId(p->patid()); \
+	assert(!empty(p->patFw())); \
+	String<Dna5>& patFw  = p->patFw();  \
+	String<char>& qualFw = p->qualFw(); \
+	String<char>& name   = p->name(); \
+	uint32_t      patid  = p->patid(); \
 	if(lastLen == 0) lastLen = length(patFw); \
 	if(qSameLen && length(patFw) != lastLen) { \
 		throw runtime_error("All reads must be the same length"); \
@@ -393,7 +403,12 @@ static void *exactSearchWorker(void *vp) {
 	// Per-thread initialization
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0;
-	PatternSourcePerThread patsrc(_patsrc);
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
 	HitSinkPerThread sink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			sink,       // HitSink
@@ -755,7 +770,12 @@ static void* mismatchSearchWorkerPhase1(void *vp){
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-    PatternSourcePerThread patsrc(_patsrc);
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
     HitSinkPerThread sink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			sink,       // HitSinkPerThread
@@ -862,7 +882,12 @@ static void* mismatchSearchWorkerPhase2(void *vp){
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-    PatternSourcePerThread patsrc(_patsrc);
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, true);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
     HitSinkPerThread sink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			sink,       // HitSinkPerThread
@@ -1132,7 +1157,12 @@ static void twoOrThreeMismatchSearch(
 	// Per-thread initialization
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	uint32_t numPats;
-	PatternSourcePerThread patsrc(_patsrc);
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)1, false);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
 	HitSinkPerThread sink(_sink);
 	EbwtSearchParams<TStr> params(
 			sink,        // HitSink
@@ -1236,7 +1266,7 @@ static void twoOrThreeMismatchSearch(
 	}
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
-	patsrc.reset();
+	patsrc->reset();
 	params.setEbwtFw(false);
 	{
 		Timer _t(cout, "End-to-end 2-mismatch Phase 2: ", timing);
@@ -1307,7 +1337,7 @@ static void twoOrThreeMismatchSearch(
 	    assert_eq(numPats, _patsrc.patid());
 	}
 	SWITCH_TO_FW_INDEX();
-	patsrc.reset();
+	patsrc->reset();
 	params.setEbwtFw(true);
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
@@ -1484,7 +1514,12 @@ static void seededQualCutoffSearch(
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; // length of 3' half of seed
 	uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-	PatternSourcePerThread patsrc(_patsrc);
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)(0L), false);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
 	HitSinkPerThread sink(_sink);
 	EbwtSearchParams<TStr> params(
 			sink,        // HitSink
@@ -1656,7 +1691,7 @@ static void seededQualCutoffSearch(
 	}
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
-	patsrc.reset();
+	patsrc->reset();
 	params.setEbwtFw(false);
 	PartialAlignmentManager *pamRc = NULL;
 	if(seedMms > 0) pamRc = new PartialAlignmentManager();
@@ -1817,7 +1852,7 @@ static void seededQualCutoffSearch(
 	// Unload mirror index and load forward index
 	SWITCH_TO_FW_INDEX();
 	params.setEbwtFw(true);
-	patsrc.reset();
+	patsrc->reset();
 	PartialAlignmentManager *pamFw = NULL;
 	try {
 		if(seedMms > 0) pamFw = new PartialAlignmentManager();
@@ -2064,7 +2099,7 @@ static void seededQualCutoffSearch(
 	}
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
-	patsrc.reset();
+	patsrc->reset();
 	params.setEbwtFw(false);
 	{
 		// Phase 4: Consider case 4F
@@ -2341,7 +2376,7 @@ static void driver(const char * type,
 			                                 trim5, nsPolicy, maxNs);
 			break;
 		case RANDOM:
-			patsrc = new RandomPatternSource(2000000, 35, patDumpfile, seed);
+			patsrc = new RandomPatternSource(2000000, lenRandomReads, patDumpfile, seed);
 			break;
 		default: assert(false);
 	}
