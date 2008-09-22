@@ -13,9 +13,13 @@ public:
 		last = seed;
 	}
 
-	uint32_t nextU32() {     // 0.97% in profile
-		last = a * last + c; // 0.95% in profile
+	uint32_t nextU32() {
+		last = a * last + c;
 		return last;
+	}
+
+	static uint32_t nextU32(uint32_t in) {
+		return 1664525 * in + 1013904223;
 	}
 
 private:

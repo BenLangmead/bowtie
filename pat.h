@@ -289,9 +289,14 @@ public:
 			r.clearAll();
 			return;
 		}
+		mylock();
+		uint32_t ra = _rand.nextU32() & 3;
+		patid = _readCnt;
+		_readCnt++;
+		myunlock();
 		if(!_reverse) {
 			for(int i = 0; i < _length; i++) {
-				uint32_t ra = _rand.nextU32() & 3;
+				ra = RandomSource::nextU32(ra) & 3;
 				r.patBufFw[i]            = ra;
 				r.patBufRc[_length-i-1]  = ra ^ 3;
 				char c                   = 'I' - ((ra >> 2) & 31);
@@ -300,7 +305,7 @@ public:
 			}
 		} else {
 			for(int i = 0; i < _length; i++) {
-				uint32_t ra = _rand.nextU32() & 3;
+				ra = RandomSource::nextU32(ra) & 3;
 				r.patBufFw[_length-i-1]  = ra;
 				r.patBufRc[i]            = ra ^ 3;
 				char c                   = 'I' - ((ra >> 2) & 31);
@@ -317,13 +322,10 @@ public:
 		_setBegin(r.qualRc, r.qualBufRc);
 		_setLength(r.qualRc, _length);
 
-		itoa10(_readCnt, r.nameBuf);
+		itoa10(patid, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
 		size_t nameLen = strlen(r.nameBuf);
 		_setLength(r.name, nameLen);
-
-		patid = _readCnt;
-		_readCnt++;
 	}
 	virtual void reset() {
 		PatternSource::reset();
