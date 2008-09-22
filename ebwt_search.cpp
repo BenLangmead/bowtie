@@ -54,7 +54,7 @@ static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence
 static int nthreads             = 1;
 static output_types outType		= FULL; // report hits in id+/-:<x,y,z> format
 static bool randReadsNoSync     = false;
-static int numRandomReads       = 2000000;
+static int numRandomReads       = 50000000;
 static int lenRandomReads       = 35;
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";

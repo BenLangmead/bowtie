@@ -30,7 +30,8 @@ using namespace seqan;
 extern uint8_t cCntLUT_4[4][4][256];
 
 #ifndef VMSG_NL
-#define VMSG_NL(args...) { \
+#define VMSG_NL(args...) \
+if(this->verbose()) { \
 	stringstream tmp; \
 	tmp << args << endl; \
 	this->verbose(tmp.str()); \
@@ -38,7 +39,8 @@ extern uint8_t cCntLUT_4[4][4][256];
 #endif
 
 #ifndef VMSG
-#define VMSG(args...) { \
+#define VMSG(args...) \
+if(this->verbose()) { \
 	stringstream tmp; \
 	tmp << args; \
 	this->verbose(tmp.str()); \

@@ -12,7 +12,8 @@ using namespace std;
 using namespace seqan;
 
 #ifndef VMSG_NL
-#define VMSG_NL(args...) { \
+#define VMSG_NL(args...) \
+if(this->verbose()) { \
 	stringstream tmp; \
 	tmp << args << endl; \
 	this->verbose(tmp.str()); \
@@ -20,7 +21,8 @@ using namespace seqan;
 #endif
 
 #ifndef VMSG
-#define VMSG(args...) { \
+#define VMSG(args...) \
+if(this->verbose()) { \
 	stringstream tmp; \
 	tmp << args; \
 	this->verbose(tmp.str()); \
