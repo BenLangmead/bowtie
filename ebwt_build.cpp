@@ -380,7 +380,7 @@ int main(int argc, char **argv) {
 #endif
 		cout << "  Random seed: " << seed << endl;
 		cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << endl;
-		cout << "Input files (Dna), " << file_format_names[format] << "):" << endl;
+		cout << "Input files Dna, " << file_format_names[format] << ":" << endl;
 		for(size_t i = 0; i < infiles.size(); i++) {
 			cout << "  " << infiles[i] << endl;
 		}
