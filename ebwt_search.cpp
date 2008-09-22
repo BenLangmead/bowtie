@@ -57,15 +57,16 @@ static int nthreads             = 1;
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
-#define ARG_ORIG 256
-#define ARG_SEED 257
-#define ARG_DUMP_PATS 258
-#define ARG_ARROW 259
-#define ARG_CONCISE 260
+#define ARG_ORIG         256
+#define ARG_SEED         257
+#define ARG_DUMP_PATS    258
+#define ARG_ARROW        259
+#define ARG_CONCISE      260
 #define ARG_SOLEXA_QUALS 261
-#define ARG_MAXBTS 262
-#define ARG_VERBOSE 263
-#define ARG_MAXNS 264
+#define ARG_MAXBTS       262
+#define ARG_VERBOSE      263
+#define ARG_MAXNS        264
+#define ARG_RANDOM_READS 265
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -102,6 +103,7 @@ static struct option long_options[] = {
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
+	{"randomReads",  no_argument,       0,            ARG_RANDOM_READS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -141,6 +143,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --reportopps       report # of other potential mapping targets for each hit" << endl
 	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
+	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r and <query_in>" << endl
 	    << "  --concise          write hits in a concise format" << endl
 	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 100)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
@@ -189,6 +192,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
+	   		case ARG_RANDOM_READS: format = RANDOM; break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: concise = true; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
@@ -2336,6 +2340,9 @@ static void driver(const char * type,
 			patsrc = new VectorPatternSource(queries, false,
 			                                 patDumpfile, trim3,
 			                                 trim5, nsPolicy, maxNs);
+			break;
+		case RANDOM:
+			patsrc = new RandomPatternSource(2000000, 35, patDumpfile, seed);
 			break;
 		default: assert(false);
 	}

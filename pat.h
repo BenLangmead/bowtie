@@ -270,6 +270,76 @@ protected:
 	int _trim5;
 };
 
+class RandomPatternSource : public PatternSource {
+public:
+	RandomPatternSource(uint32_t numReads = 2000000,
+	                    int length = 35,
+	                    const char *__dumpfile = NULL,
+	                    uint32_t seed = 0) :
+		PatternSource(false, __dumpfile),
+		_numReads(numReads),
+		_length(length),
+		_seed(seed),
+		_rand(seed),
+		_reverse(false) { }
+
+	/// Implementation to be provided by concrete subclasses
+	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+		if(_readCnt >= _numReads) {
+			r.clearAll();
+			return;
+		}
+		if(!_reverse) {
+			for(int i = 0; i < _length; i++) {
+				uint32_t ra = _rand.nextU32() & 3;
+				r.patBufFw[i]            = ra;
+				r.patBufRc[_length-i-1]  = ra ^ 3;
+				char c                   = 'I' - ((ra >> 2) & 31);
+				r.qualBufFw[i]           = c;
+				r.qualBufRc[_length-i-1] = c;
+			}
+		} else {
+			for(int i = 0; i < _length; i++) {
+				uint32_t ra = _rand.nextU32() & 3;
+				r.patBufFw[_length-i-1]  = ra;
+				r.patBufRc[i]            = ra ^ 3;
+				char c                   = 'I' - ((ra >> 2) & 31);
+				r.qualBufFw[_length-i-1] = c;
+				r.qualBufRc[i]           = c;
+			}
+		}
+		_setBegin(r.patFw, (Dna5*)r.patBufFw);
+		_setLength(r.patFw, _length);
+		_setBegin(r.patRc, (Dna5*)r.patBufFw);
+		_setLength(r.patRc, _length);
+		_setBegin(r.qualFw, r.qualBufFw);
+		_setLength(r.qualFw, _length);
+		_setBegin(r.qualRc, r.qualBufRc);
+		_setLength(r.qualRc, _length);
+
+		itoa10(_readCnt, r.nameBuf);
+		_setBegin(r.name, r.nameBuf);
+		size_t nameLen = strlen(r.nameBuf);
+		_setLength(r.name, nameLen);
+
+		patid = _readCnt;
+		_readCnt++;
+	}
+	virtual void reset() {
+		PatternSource::reset();
+		_rand.init(_seed);
+	}
+	virtual bool reverse() const { return _reverse; }
+	virtual void setReverse(bool __reverse) {
+		_reverse = __reverse;
+	}
+private:
+	uint32_t _numReads;
+	int _length;
+	uint32_t _seed;
+	RandomSource _rand;
+	bool _reverse;
+};
 
 class FileBuf {
 public:

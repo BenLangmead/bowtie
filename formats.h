@@ -9,7 +9,8 @@ typedef enum file_format {
 	FASTA = 1,
 	FASTQ,
 	RAW,
-	CMDLINE
+	CMDLINE,
+	RANDOM
 };
 
 static const std::string file_format_names[] = {
@@ -17,6 +18,7 @@ static const std::string file_format_names[] = {
 	"FASTA",
 	"FASTQ",
 	"Raw",
+	"Random",
 	"Command line"
 };
 
