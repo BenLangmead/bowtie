@@ -285,11 +285,11 @@ public:
 
 	/// Implementation to be provided by concrete subclasses
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+		mylock();
 		if(_readCnt >= _numReads) {
 			r.clearAll();
 			return;
 		}
-		mylock();
 		uint32_t ra = _rand.nextU32() & 3;
 		patid = _readCnt;
 		_readCnt++;
@@ -313,19 +313,18 @@ public:
 				r.qualBufRc[i]           = c;
 			}
 		}
-		_setBegin(r.patFw, (Dna5*)r.patBufFw);
+		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, _length);
-		_setBegin(r.patRc, (Dna5*)r.patBufFw);
+		_setBegin (r.patRc, (Dna5*)r.patBufRc);
 		_setLength(r.patRc, _length);
-		_setBegin(r.qualFw, r.qualBufFw);
+		_setBegin (r.qualFw, r.qualBufFw);
 		_setLength(r.qualFw, _length);
-		_setBegin(r.qualRc, r.qualBufRc);
+		_setBegin (r.qualRc, r.qualBufRc);
 		_setLength(r.qualRc, _length);
 
 		itoa10(patid, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
-		size_t nameLen = strlen(r.nameBuf);
-		_setLength(r.name, nameLen);
+		_setLength(r.name, strlen(r.nameBuf));
 	}
 	virtual void reset() {
 		PatternSource::reset();
