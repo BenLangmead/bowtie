@@ -18,6 +18,19 @@
 using namespace std;
 using namespace seqan;
 
+typedef enum output_types {
+	FULL = 1,
+	CONCISE,
+	NONE
+};
+
+static const std::string output_type_names[] = {
+	"Invalid!",
+	"Full",
+	"Concise",
+	"None"
+};
+
 typedef pair<uint32_t,uint32_t> U32Pair;
 // For now, we support reads up to 63 bp long, which is the same as Maq, as
 // of 0.6.7
@@ -303,6 +316,16 @@ public:
 
 private:
 	bool _first; /// true -> first hit hasn't yet been reported
+};
+
+/**
+ * Sink that does nothing:
+ */
+class StubHitSink : public HitSink {
+public:
+	StubHitSink() : HitSink(cout, NULL) { }
+	virtual void reportHit(const Hit& h) { }
+	virtual void finish() {	}
 };
 
 #endif /*HIT_H_*/

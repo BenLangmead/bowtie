@@ -30,11 +30,9 @@ static int revcomp				= 1; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
 static bool oneHit				= true;  // for multihits, report just one
-static bool concise				= false; // report hits in id+/-:<x,y,z> format
 static bool arrowMode			= false; // report SA arrows instead of locs
 static int showVersion			= 0; // just print version and quit?
 static int ipause				= 0; // pause before maching?
-static int binOut				= 0; // write hits in binary
 static uint32_t qUpto			= 0xffffffff; // max # of queries to read
 static int skipSearch			= 0; // abort before searching
 static int qSameLen				= 0; // abort before searching
@@ -54,6 +52,7 @@ static int maxBts               = 100; // max # backtracks allowed in half-and-h
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;
+static output_types outType		= FULL; // report hits in id+/-:<x,y,z> format
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
@@ -67,6 +66,7 @@ static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 #define ARG_VERBOSE      263
 #define ARG_MAXNS        264
 #define ARG_RANDOM_READS 265
+#define ARG_NOOUT        266
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -77,8 +77,8 @@ static struct option long_options[] = {
 	{"pause",        no_argument,       &ipause,      1},
 	{"orig",         required_argument, 0,            ARG_ORIG},
 	{"allhits",      no_argument,       0,            'a'},
-	{"binout",       no_argument,       0,            'b'},
 	{"concise",      no_argument,       0,            ARG_CONCISE},
+	{"noout",        no_argument,       0,            ARG_NOOUT},
 	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{"time",         no_argument,       0,            't'},
 	{"trim3",        required_argument, 0,            '3'},
@@ -103,7 +103,7 @@ static struct option long_options[] = {
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
-	{"randomReads",  no_argument,       0,            ARG_RANDOM_READS},
+	{"randomreads",  no_argument,       0,            ARG_RANDOM_READS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -132,7 +132,6 @@ static void printUsage(ostream& out) {
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
-	    //<< "  -b/--binout        write hits in binary format (must specify <hit_outfile>)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
@@ -194,7 +193,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'c': format = CMDLINE; break;
 	   		case ARG_RANDOM_READS: format = RANDOM; break;
 	   		case ARG_ARROW: arrowMode = true; break;
-	   		case ARG_CONCISE: concise = true; break;
+	   		case ARG_CONCISE: outType = CONCISE; break;
+	   		case ARG_NOOUT: outType = NONE; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
@@ -243,7 +243,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_VERBOSE: verbose = true; break;
 	   		case 's': sanityCheck = true; break;
 	   		case 't': timing = true; break;
-	   		case 'b': binOut = true; break;
 			case ARG_MAXBTS:
 				if (optarg != NULL)
 					maxBts = parseInt(1, "--maxbts must be at least 1");
@@ -2406,18 +2405,24 @@ static void driver(const char * type,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
-		if(!concise)
-		{
-			sink = new VerboseHitSink(
-					*fout,
-					&ebwt.refnames());
-		}
-		else
-		{
-			sink = new ConciseHitSink(
-					*fout,
-					reportOpps,
-					&ebwt.refnames());
+		switch(outType) {
+			case FULL:
+				sink = new VerboseHitSink(
+						*fout,
+						&ebwt.refnames());
+				break;
+			case CONCISE:
+				sink = new ConciseHitSink(
+						*fout,
+						reportOpps,
+						&ebwt.refnames());
+				break;
+			case NONE:
+				sink = new StubHitSink();
+				break;
+			default:
+				cerr << "Invalid output type: " << outType << endl;
+				exit(1);
 		}
 		EbwtSearchStats<TStr> stats;
 		if(maqLike) {
@@ -2520,11 +2525,6 @@ int main(int argc, char **argv) {
 	// Get output filename
 	if(optind < argc) {
 		outfile = argv[optind++];
-	}
-	if(outfile.empty() && binOut) {
-		cerr << "When --binOut is specified, an output file must also be specified" << endl;
-		printUsage(cerr);
-		return 1;
 	}
 
 	// Optionally summarize
