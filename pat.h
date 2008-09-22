@@ -288,6 +288,7 @@ public:
 		mylock();
 		if(_readCnt >= _numReads) {
 			r.clearAll();
+			myunlock();
 			return;
 		}
 		uint32_t ra = _rand.nextU32() & 3;
