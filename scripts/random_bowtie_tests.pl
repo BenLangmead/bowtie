@@ -218,13 +218,17 @@ sub build {
 
 # Search for a pattern in an existing Ebwt
 sub search {
-	my($t, $p, $policy, $oneHit, $requireResult) = @_;
+	my($t, $p, $policy, $oneHit, $requireResult, $offRate) = @_;
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
 		$oneHit = "-a";
 	}
-	my $cmd = "./bowtie-debug $policy --concise --orig \"$t\" $oneHit -s -c .tmp \"$p\"";
+	my $offRateStr = "";
+	if(int(rand(3)) == 0) {
+		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
+	}
+	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $oneHit -s -c .tmp \"$p\"";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
@@ -368,7 +372,7 @@ for(; $outer > 0; $outer--) {
 				last;
 			}
 		}
-		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult); # require 1 or more results
+		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -393,7 +397,7 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy();
-		$pass += search($t, $pfinal, $policy, $oneHit, 0); # do not require any results
+		$pass += search($t, $pfinal, $policy, $oneHit, 0, $offRate); # do not require any results
 		last if(++$tests > $limit);
 	}
 

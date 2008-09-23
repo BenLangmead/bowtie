@@ -3331,7 +3331,12 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	if(_overrideOffRate > offRate) {
 		offRateDiff = _overrideOffRate - offRate;
 	}
-	offsLenSampled >>= offRateDiff;
+	if(offRateDiff > 0) {
+		offsLenSampled >>= offRateDiff;
+		if((offsLen & ~(0xffffffff << offRateDiff)) != 0) {
+			offsLenSampled++;
+		}
+	}
 
 	// Read nPat from primary stream
 	this->_nPat = readI32(_in1, be);
@@ -3486,9 +3491,13 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 				char tmp[4];
 				_in2.read(tmp, 4);
 			} else {
-				this->_offs[i >> offRateDiff] = readU32(_in2, be);
+				uint32_t idx = i >> offRateDiff;
+				assert_lt(idx, offsLenSampled);
+				this->_offs[idx] = readU32(_in2, be);
 			}
 		}
+		//eh._offRate = _overrideOffRate;
+		//eh._offMask = (0xffffffff << _overrideOffRate);
 	} else {
 		_in2.read((char *)this->_offs, offsLen*4);
 		assert_eq(offsLen*4, (uint32_t)_in2.gcount());
