@@ -231,15 +231,19 @@ Bowtie Manual
   line is a collection of 8 fields separated by tabs; from left to
   right, the fields are:
   
-   1. Read name
-   2. Read orientation ('-' or '+')
-   3. Index of reference sequence aligned to
-   4. Offset into reference sequence of alignment
+   1. Name of read that aligned
+   2. Orientation of read in the alignment, '-' for reverse complement,
+      '+' otherwise
+   3. Name of reference sequence where alignment occurs, or ordinal ID
+      if no name was provided
+   3. 0-based offset into the reference sequence where leftmost
+      character of the alignment occurs
    5. Read sequence (reverse-complemented if orientation is '-')
    6. Read qualities (reversed if orientation is '-')
    7. Reserved
-   8. Comma-separated list of mismatch positions, as offsets from high-
-      quality end
+   8. Comma-separated list of mismatch positions, as 0-based offsets
+      from the high-quality end of the read.  If there are no
+      mismatches in the alignment, this field is empty.
  
  Using the 'bowtie-build' Indexer
  --------------------------------
