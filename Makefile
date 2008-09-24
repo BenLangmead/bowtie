@@ -41,7 +41,7 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
-OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp
+OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/maqmap.c \
           maq_convert/const.c \

@@ -470,6 +470,13 @@ public:
 			}
 			if(stored == len-1 || c == '\n' || c == '\r') {
 				buf[stored] = '\0';
+				// Skip over all end-of-line characters
+				int pc = peek();
+				while(pc == '\n' || pc == '\r') {
+					get();
+					pc = peek();
+				}
+				// Next get() will be after all newline characters
 				return stored;
 			}
 			buf[stored++] = (char)c;
@@ -807,52 +814,6 @@ protected:
 	bool _first;
 };
 
-/// For converting from ASCII to the Dna5 code where A=0, C=1, G=2,
-/// T=3, N=4
-static uint8_t charToDna5[] = {
-	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  64 */ 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 4, 0,
-	       /*    A     C           G                    N */
-	/*  80 */ 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	       /*             T */
-	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 112 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 128 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 144 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 160 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 176 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 192 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 208 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 224 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-/// For converting from ASCII to the reverse-complement Dna5 code where
-/// A=3, C=2, G=1, T=0, N=4
-static uint8_t rcCharToDna5[] = {
-	/*   0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  16 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  32 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  48 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/*  64 */ 0, 3, 0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 4, 0,
-	       /*    A     C           G                    N */
-	/*  80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	       /*             T */
-	/*  96 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 112 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 128 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 144 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 160 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 176 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 192 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 208 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 224 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	/* 240 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-};
-
 /// Default quality values for use with the FASTA pattern source
 const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 
@@ -1122,60 +1083,75 @@ protected:
 
 			// _filebuf now points just past the first character of a
 			// sequence line, and c holds the first character
+			int charsRead = 0;
 			if(!_reverse) {
 				while(c != '+') {
-					if(isalpha(c) && dstLen >= this->_trim5) {
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
+					if(isalpha(c)) {
+						// If it's past the 5'-end trim point
+						if(charsRead >= this->_trim5) {
+							// Add it to the read buffer
+							if(c == 'N' || c == 'n') {
+								if(_policy == NS_TO_NS) {
+									// Leave c = 'N'
+								} else if(_policy == NS_TO_RANDS) {
+									c = "ACGT"[_rand.nextU32() & 3];
+								} else {
+									assert_eq(NS_TO_AS, _policy);
+									c = 'A';
+								}
 							}
+							r.patBufFw[dstLen] = charToDna5[c];
+							r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+							dstLen++;
 						}
-						r.patBufFw[dstLen] = charToDna5[c];
-						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
-						dstLen++;
+						charsRead++;
 					}
 					c = _filebuf->get();
 					if(c < 0) break;
 				}
+				// Trim from 3' end
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
 				for(int i = 0; i < dstLen; i++) {
 					if(r.patBufFw[i] == 4) ns++;
 				}
+				// Set trimmed bounds of buffers
 				_setBegin(r.patFw, (Dna5*)r.patBufFw);
 				_setLength(r.patFw, dstLen);
 				_setBegin(r.patRc, (Dna5*)&r.patBufRc[bufSz-dstLen]);
 				_setLength(r.patRc, dstLen);
 			} else {
 				while(c != '+') {
-					if(isalpha(c) && dstLen >= this->_trim5) {
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
+					if(isalpha(c)) {
+						// If it's past the 5'-end trim point
+						if(charsRead >= this->_trim5) {
+							// Add it to the read buffer
+							if(c == 'N' || c == 'n') {
+								if(_policy == NS_TO_NS) {
+									// Leave c = 'N'
+								} else if(_policy == NS_TO_RANDS) {
+									c = "ACGT"[_rand.nextU32() & 3];
+								} else {
+									assert_eq(NS_TO_AS, _policy);
+									c = 'A';
+								}
 							}
+							r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
+							r.patBufRc[dstLen] = rcCharToDna5[c];
+							dstLen++;
 						}
-						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
-						r.patBufRc[dstLen] = rcCharToDna5[c];
-						dstLen++;
+						charsRead++;
 					}
 					c = _filebuf->get();
 					if(c < 0) break;
 				}
+				// Trim from 3' end
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
 				for(int i = 0; i < dstLen; i++) {
 					if(r.patBufFw[bufSz-i-1] == 4) ns++;
 				}
+				// Set trimmed bounds of buffers
 				_setBegin(r.patFw, (Dna5*)&r.patBufFw[bufSz-dstLen]);
 				_setLength(r.patFw, dstLen);
 				_setBegin(r.patRc, (Dna5*)r.patBufRc);
@@ -1189,15 +1165,13 @@ protected:
 			// Now read the qualities
 			int qualsRead = 0;
 			if (_solexa_quals) {
-				char buf[1024];
-				while (_filebuf->gets(buf, sizeof(buf)) && qualsRead < dstLen + this->_trim5)
-				{
-					char* nl = strrchr(buf, '\n');
-					if (nl) *nl = 0;
-
+				char buf[2048];
+				while (qualsRead < charsRead) {
+					size_t rd = _filebuf->gets(buf, sizeof(buf));
+					if(rd == 0) break;
+					assert(NULL == strrchr(buf, '\n'));
 					vector<string> s_quals;
 					tokenize(string(buf), " ", s_quals);
-
 					if(!_reverse) {
 						for (unsigned int j = 0; j < s_quals.size(); ++j)
 						{
@@ -1232,6 +1206,7 @@ protected:
 						}
 					}
 				} // done reading Solexa quality lines
+				assert_eq(charsRead, qualsRead);
 				if(!_reverse) {
 					_setBegin(r.qualFw, (char*)r.qualBufFw);
 					_setLength(r.qualFw, dstLen);
@@ -1243,7 +1218,7 @@ protected:
 					_setBegin(r.qualRc, (char*)r.qualBufRc);
 					_setLength(r.qualRc, dstLen);
 				}
-				c = getOverNewline(_filebuf);
+				c = _filebuf->get();
 			}
 			else
 			{
@@ -1368,8 +1343,7 @@ protected:
 			c = getOverNewline(this->_filebuf);
 			assert(!isspace(c));
 			if(_first) {
-				int cc = toupper(c);
-				if(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T') {
+				if(dna4Cat[c] == 0) {
 					cerr << "Error: reads file does not look like a Raw file" << endl;
 					if(c == '>') {
 						cerr << "Reads file looks like a FASTA file; please use -f" << endl;

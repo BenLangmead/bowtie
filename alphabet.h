@@ -104,4 +104,9 @@ dollarGt(const TStr& l, const TStr& r) {
 	return !dollarLt(l, r);
 }
 
+
+extern uint8_t dna4Cat[];
+extern uint8_t charToDna5[];
+extern uint8_t rcCharToDna5[];
+
 #endif /*ALPHABETS_H_*/

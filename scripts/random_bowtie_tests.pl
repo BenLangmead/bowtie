@@ -123,8 +123,8 @@ sub addQual($) {
 	$r .= ":";
 	for(my $i = 0; $i < $len; $i++) {
 		my $c = "-";
-		while(not $c =~ /[0-9A-Z]/) {
-			$c = chr(33 + int(rand(40)));
+		while(not $c =~ /[0-9A-Z!\/=@%]/) {
+			$c = chr(33 + int(rand(41)));
 		}
 		$r .= $c;
 	}
@@ -219,6 +219,62 @@ sub build {
 # Search for a pattern in an existing Ebwt
 sub search {
 	my($t, $p, $policy, $oneHit, $requireResult, $offRate) = @_;
+	
+	my $patarg = "-c";
+	my $patstr = "\"$p\"";
+	my $format = int(rand(5));
+	if($format == 0) {
+		# FASTA
+		open FA, ">.randread.fa" || die "Could not open temporary fasta file";
+		my @cs = split /[,]/, $p;
+		foreach my $c (@cs) {
+			my @cms = split /[:]/, $c;
+			print FA ">\n$cms[0]\n";
+		}
+		close FA;
+		$patarg = "-f";
+		$patstr = ".randread.fa";
+	} elsif($format == 1) {
+		# FASTQ with Sanger-like qualities
+		open FQ, ">.randread.fq" || die "Could not open temporary fastq file";
+		my @cs = split /[,]/, $p;
+		foreach my $c (@cs) {
+			my @cms = split /[:]/, $c;
+			print FQ "@\n$cms[0]\n+\n$cms[1]\n";
+		}
+		close FQ;
+		$patarg = "-q";
+		$patstr = ".randread.fq";
+	} elsif($format == 2) {
+		# FASTQ with Solexa-like qualities
+		open FQ, ">.randread.solexa.fq" || die "Could not open temporary solexa fastq file";
+		my @cs = split /[,]/, $p;
+		foreach my $c (@cs) {
+			my @cms = split /[:]/, $c;
+			print FQ "@\n$cms[0]\n+\n";
+			for(my $i = 0; $i < length($cms[1]); $i++) {
+				my $q = substr($cms[1], $i, 1);
+				$q = ord($q) - 33;
+				print FQ "$q ";
+			}
+			print FQ "\n";
+		}
+		close FQ;
+		$patarg = "-q --solexa-quals";
+		$patstr = ".randread.solexa.fq";
+	} elsif($format == 3) {
+		# Raw
+		open RAW, ">.randread.raw" || die "Could not open temporary raw file";
+		my @cs = split /[,]/, $p;
+		foreach my $c (@cs) {
+			my @cms = split /[:]/, $c;
+			print RAW "$cms[0]\n";
+		}
+		close RAW;
+		$patarg = "-r";
+		$patstr = ".randread.raw";
+	}
+	
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
@@ -228,7 +284,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $oneHit -s -c .tmp \"$p\"";
+	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $oneHit -s $patarg .tmp $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
