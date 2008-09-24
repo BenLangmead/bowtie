@@ -401,7 +401,6 @@ static EbwtSearchStats<String<Dna> >* exactSearch_stats;
 static Ebwt<String<Dna> >*            exactSearch_ebwt;
 static vector<String<Dna5> >*         exactSearch_os;
 static void *exactSearchWorker(void *vp) {
-	Timer *_t = new Timer(cout, "  Thread time: ", timing);
 	PatternSource& _patsrc               = *exactSearch_patsrc;
 	HitSink& _sink                       = *exactSearch_sink;
 	EbwtSearchStats<String<Dna> >& stats = *exactSearch_stats;
@@ -465,7 +464,6 @@ static void *exactSearchWorker(void *vp) {
 	    lastHits = sink.numHits();
 		params.setFw(true);
     }
-    delete _t;
     WORKER_EXIT();
 }
 
@@ -489,14 +487,18 @@ static void exactSearch(PatternSource& _patsrc,
 	pthread_attr_init(&pthread_custom_attr);
 	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
-	for(int i = 0; i < nthreads-1; i++) {
-		pthread_create(&threads[i], &pthread_custom_attr, exactSearchWorker, (void *)(long)(i+1));
-	}
+
+	{
+		Timer _t(cout, "Time for 0-mismatch search: ", timing);
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_create(&threads[i], &pthread_custom_attr, exactSearchWorker, (void *)(long)(i+1));
+		}
 #endif
-	exactSearchWorker((void*)0L);
+		exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
-	for(int i = 0; i < nthreads-1; i++) {
-		pthread_join(threads[i], NULL);
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_join(threads[i], NULL);
+		}
 	}
 #endif
 }
@@ -972,7 +974,7 @@ static void mismatchSearch(PatternSource& _patsrc,
 
 	// Phase 1
     {
-		Timer _t(cout, "Time for 1-mismatch forward search: ", timing);
+		Timer _t(cout, "Time for 1-mismatch Phase 1 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerPhase1, (void *)(long)(i+1));
@@ -1003,7 +1005,7 @@ static void mismatchSearch(PatternSource& _patsrc,
 
 	// Phase 2
 	{
-		Timer _t(cout, "Time for 1-mismatch backward search: ", timing);
+		Timer _t(cout, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerPhase2, (void *)(long)(i+1));
@@ -1169,7 +1171,7 @@ static bool                           twoOrThreeMismatchSearch_two;
 
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
-	Ebwt<String<Dna> >&            ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	BacktrackManager<String<Dna> > btr(
 			ebwtFw, params,
 	        0, 0,           // 5, 3depth
@@ -1235,7 +1237,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 
 static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	TWOTHREE_WORKER_SETUP();
-	Ebwt<String<Dna> >&            ebwtBw   = *twoOrThreeMismatchSearch_ebwtBw;
+	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	BacktrackManager<String<Dna> > bt(
 			ebwtBw, params,
 	        0, 0,           // 5, 3depth
@@ -1430,15 +1432,15 @@ static void twoOrThreeMismatchSearch(
 	assert(revcomp);
 	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
-	
+
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
 	SyncBitset doneMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
-	
+
 	uint32_t numPats = 0;
-	
+
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
 	twoOrThreeMismatchSearch_stats    = &stats;
@@ -1456,7 +1458,7 @@ static void twoOrThreeMismatchSearch(
 #endif
 
     { // Phase 1
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1: ", timing);
+		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)(long)(i+1));
@@ -1474,7 +1476,7 @@ static void twoOrThreeMismatchSearch(
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	{ // Phase 2
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 2: ", timing);
+		Timer _t(cout, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)(long)(i+1));
@@ -1491,7 +1493,7 @@ static void twoOrThreeMismatchSearch(
 	}
 	SWITCH_TO_FW_INDEX();
 	{ // Phase 3
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 3: ", timing);
+		Timer _t(cout, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)(long)(i+1));
@@ -2244,7 +2246,7 @@ static void seededQualCutoffSearch(
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	uint32_t numPats;
-	
+
 	seededQualSearch_patsrc   = &_patsrc;
 	seededQualSearch_sink     = &_sink;
 	seededQualSearch_stats    = &stats;
@@ -2266,7 +2268,7 @@ static void seededQualCutoffSearch(
 	SWITCH_TO_FW_INDEX();
 	{
 		// Phase 1: Consider cases 1R and 2R
-		Timer _t(cout, "Seeded quality search Phase 1: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 1 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase1, (void *)(long)(i+1));
@@ -2295,7 +2297,7 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
-		Timer _t(cout, "Seeded quality search Phase 2: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 2 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase2, (void *)(long)(i+1));
@@ -2330,7 +2332,7 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
-		Timer _t(cout, "Seeded quality search Phase 3: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase3, (void *)(long)(i+1));
@@ -2355,7 +2357,7 @@ static void seededQualCutoffSearch(
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
-		Timer _t(cout, "Seeded quality search Phase 4: ", timing);
+		Timer _t(cout, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase4, (void *)(long)(i+1));
