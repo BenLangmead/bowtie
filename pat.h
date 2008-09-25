@@ -89,6 +89,12 @@ struct ReadBuf {
 		seqan::clear(qualRc);
 		seqan::clear(name);
 	}
+	void reverseAll() {
+		::reverse(patFw);
+		::reverse(patRc);
+		::reverse(qualFw);
+		::reverse(qualRc);
+	}
 	static const int BUF_SIZE = 1024;
 	String<Dna5>  patFw;               // forward-strand sequence
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
@@ -242,6 +248,7 @@ public:
 	uint32_t      patid()  { return _patid;                   }
 	bool          empty()  { return seqan::empty(_buf.patFw); }
 	virtual void  reset()  { _patid = 0xffffffff;             }
+	void    reverseRead()  { _buf.reverseAll();               }
 protected:
 	ReadBuf  _buf;   // read buffer
 	uint32_t _patid; // index of read just read
@@ -909,8 +916,10 @@ protected:
 								c = 'A';
 							}
 						}
-						r.patBufFw[dstLen] = charToDna5[c];
-						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						r.patBufFw [dstLen] = charToDna5[c];
+						r.qualBufFw[dstLen] = 'I';
+						r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
+						r.qualBufRc[bufSz-dstLen-1] = 'I';
 						dstLen++;
 					}
 					if((c = _filebuf->get()) < 0) break;
@@ -922,11 +931,11 @@ protected:
 				}
 				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setBegin (r.qualFw, r.qualBufFw);
 				_setLength(r.qualFw, dstLen);
 				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
 				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
 				_setLength(r.qualRc, dstLen);
 			} else {
 				while(c != '>' && c != '#') {
@@ -943,8 +952,10 @@ protected:
 								c = 'A';
 							}
 						}
-						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
-						r.patBufRc[dstLen] = rcCharToDna5[c];
+						r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
+						r.qualBufFw[bufSz-dstLen-1] = 'I';
+						r.patBufRc [dstLen] = rcCharToDna5[c];
+						r.qualBufRc[dstLen] = 'I';
 						dstLen++;
 					}
 					if((c = _filebuf->get()) < 0) break;
@@ -956,11 +967,11 @@ protected:
 				}
 				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
 				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
 				_setLength(r.qualFw, dstLen);
 				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
 				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setBegin (r.qualRc, r.qualBufRc);
 				_setLength(r.qualRc, dstLen);
 			}
 
@@ -1371,8 +1382,10 @@ protected:
 								c = 'A';
 							}
 						}
-						r.patBufFw[dstLen] = charToDna5[c];
-						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						r.patBufFw [dstLen] = charToDna5[c];
+						r.qualBufFw[dstLen] = 'I';
+						r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
+						r.qualBufRc[bufSz-dstLen-1] = 'I';
 						dstLen++;
 					}
 					c = _filebuf->get();
@@ -1384,11 +1397,11 @@ protected:
 				}
 				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setBegin (r.qualFw, r.qualBufFw);
 				_setLength(r.qualFw, dstLen);
 				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
 				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
 				_setLength(r.qualRc, dstLen);
 			} else {
 				while(!isspace(c) && c >= 0) {
@@ -1403,8 +1416,10 @@ protected:
 								c = 'A';
 							}
 						}
-						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
-						r.patBufRc[dstLen] = rcCharToDna5[c];
+						r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
+						r.qualBufFw[bufSz-dstLen-1] = 'I';
+						r.patBufRc [dstLen] = rcCharToDna5[c];
+						r.qualBufRc[dstLen] = 'I';
 						dstLen++;
 					}
 					c = _filebuf->get();
@@ -1416,11 +1431,11 @@ protected:
 				}
 				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
 				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, const_cast<char*>(qualDefault));
+				_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
 				_setLength(r.qualFw, dstLen);
 				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
 				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, const_cast<char*>(qualDefault));
+				_setBegin (r.qualRc, r.qualBufRc);
 				_setLength(r.qualRc, dstLen);
 			}
 

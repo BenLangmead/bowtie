@@ -42,6 +42,7 @@ SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
+SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/maqmap.c \
           maq_convert/const.c \
@@ -118,19 +119,19 @@ bowtie-build-packed-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -DPACKED_STRINGS -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
-bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
+bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
-bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
+bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
-bowtie_prof0: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS)
+bowtie_prof0: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) -fno-inline $(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
-bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) 
+bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 

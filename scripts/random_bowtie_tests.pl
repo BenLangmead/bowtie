@@ -275,6 +275,11 @@ sub search {
 		$patstr = ".randread.raw";
 	}
 	
+	my $fast = "";
+	if(int(rand(2)) == 0) {
+		$fast = "--fast";
+	}
+	
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
@@ -284,7 +289,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $oneHit -s $patarg .tmp $patstr";
+	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $fast $oneHit -s $patarg .tmp $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	

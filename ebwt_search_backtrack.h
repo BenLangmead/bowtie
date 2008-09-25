@@ -98,8 +98,13 @@ public:
 		// Reserve space for 10M partialsList entries = 40 MB
 		_partialsList.resize(listSz);
 	}
-	/// Add a set of partial alignments for a particular patid into the
-	/// partial-alignment database
+	
+	/**
+	 * Add a set of partial alignments for a particular patid into the
+	 * partial-alignment database.  This version locks the database,
+	 * and so is safe to call if there are potential readers or
+	 * writers currently running.
+	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
 		MUTEX_LOCK(_partialLock);
@@ -127,12 +132,28 @@ public:
 		assert(_partialsMap.find(patid) != _partialsMap.end());
 		MUTEX_UNLOCK(_partialLock);
 	}
-	///
+	
+	/**
+	 * Get a set of partial alignments for a particular patid out of
+	 * the partial-alignment database.
+	 */
 	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
 		MUTEX_LOCK(_partialLock);
+		getPartialsUnsync(patid, ps);
+		MUTEX_UNLOCK(_partialLock);
+	}
+
+	/**
+	 * Get a set of partial alignments for a particular patid out of
+	 * the partial-alignment database.  This version does not attempt to
+	 * lock the database.  This is more efficient than the synchronized
+	 * version, but is unsafe if there are other threads that may be
+	 * writing to the database.
+	 */
+	void getPartialsUnsync(uint32_t patid, vector<PartialAlignment>& ps) {
+		assert_eq(0, ps.size());
 		if(_partialsMap.find(patid) == _partialsMap.end()) {
-			MUTEX_UNLOCK(_partialLock);
 			return;
 		}
 		PartialAlignment al = _partialsMap[patid];
@@ -152,10 +173,12 @@ public:
 			} while(_partialsList[off++].entry.type == 2);
 			assert_eq(3, _partialsList[off-1].entry.type);
 		}
-		MUTEX_UNLOCK(_partialLock);
 		assert_gt(ps.size(), 0);
 	}
-
+	
+	/**
+	 * Convert a partial alignment into a QueryMutation string.
+	 */
 	static uint8_t toMutsString(const PartialAlignment& pal,
 	                            const String<Dna5>& seq,
 	                            const String<char>& quals,
@@ -504,6 +527,8 @@ public:
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
 		int ftabChars = _ebwt._eh._ftabChars;
+		// m = depth beyond which ftab must not extend or else we might
+		// miss some legitimate paths
 		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
 		int nsInSeed = 0;
 		int nsInFtab = 0;
@@ -528,9 +553,9 @@ public:
 					return false;     // Exceeded mm budget on Ns alone
 				}
 			}
-			if(i < _ebwt._eh._ftabLen) {
-				nsInFtab++;
-			}
+		}
+		for(size_t i = 0; i < _ebwt._eh._ftabLen && i < _qlen; i++) {
+			if((int)(*_qry)[_qlen-i-1] == 4) nsInFtab++;
 		}
 		bool ret;
 		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
@@ -557,7 +582,7 @@ public:
 					                0,   // top
 					                0,   // bot
 					                ham,
-					                nsInFtab > 1);
+					                nsInFtab > 0);
 				} else {
 					// We have a match!
 					ret = report(0, top, bot);
@@ -568,7 +593,7 @@ public:
 				                top,       // top
 				                bot,       // bot
 				                ham,
-				                nsInFtab > 1);
+				                nsInFtab > 0);
 			} else {
 				// The arrows are already closed; give up
 				ret = false;
@@ -583,7 +608,7 @@ public:
 			                ham,
 			                // disable ftab jumping if there is more
 			                // than 1 N in it
-			                nsInFtab > 1);
+			                nsInFtab > 0);
 		}
 		if(_reportPartials > 0) {
 			assert(_partials != NULL);

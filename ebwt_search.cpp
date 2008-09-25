@@ -52,10 +52,11 @@ static int maxBts               = 100; // max # backtracks allowed in half-and-h
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;
-static output_types outType		= FULL; // report hits in id+/-:<x,y,z> format
+static output_types outType		= FULL;
 static bool randReadsNoSync     = false;
 static int numRandomReads       = 50000000;
 static int lenRandomReads       = 35;
+static bool fullIndex           = false; // load halves one at a time and proceed in phases
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
@@ -71,6 +72,7 @@ static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 #define ARG_RANDOM_READS        265
 #define ARG_RANDOM_READS_NOSYNC 266
 #define ARG_NOOUT               267
+#define ARG_FAST                268
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -109,6 +111,7 @@ static struct option long_options[] = {
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
+	{"fast",         no_argument,       0,            ARG_FAST},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -138,6 +141,7 @@ static void printUsage(ostream& out) {
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
+		<< "  --fast             load both index halves at once; faster, uses more memory" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
@@ -205,6 +209,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
+			case ARG_FAST: fullIndex = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -771,7 +776,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
-	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
+	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
 
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
@@ -795,79 +800,12 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        true,       // index is forward
 	        arrowMode); // arrow mode
 	// Phase 1
-	EbwtSearchState<String<Dna> > s(ebwtFw, params, seed);
+	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
 	while(true) {
 		GET_READ(patsrc);
-		assert_eq(0, sink.retainedHits().size());
-		assert_eq(lastHits, sink.numHits());
-		uint32_t plen = length(patFw);
-		if(plen < 2) {
-			cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
-			exit(1);
-		}
-		// Create state for a search in the forward index
-		s.newQuery(&patRc, &name, &qualRc);
-		ebwtFw.search1MismatchOrBetter(s, params,
-									   true,  // allow exact hits,
-									   true); // inexact hits provisional
-		bool hit = sink.numHits() > lastHits;
-		// Set a bit indicating this pattern is done and needn't be
-		// considered by the 1-mismatch loop
-		if(sanity) sanityCheckHits(patRc, sink, patid, false, os, true, false);
-		assert_eq(0, sink.retainedHits().size());
-		if(hit) lastHits = sink.numHits();
-		if(oneHit && hit) {
-			assert_eq(0, sink.numProvisionalHits());
-			doneMask.set(patid);
-			continue;
-		}
-		params.setFw(true);
-		s.newQuery(&patFw, &name, &qualFw);
-		if(sink.numProvisionalHits() > 0) {
-			// There is a provisional inexact match for the
-			// reverse-complement read, so just try exact on the
-			// forward-oriented read
-			ebwtFw.search(s, params);
-			if(sink.numHits() > lastHits) {
-				// Got one or more exact hits from the reverse
-				// complement; reject provisional hits
-				sink.rejectProvisionalHits();
-				if(sanity) sanityCheckHits(patFw, sink, patid, true, os, true, false);
-			} else {
-				// No exact hits from reverse complement; accept
-				// provisional hits and finish with this read
-				sink.acceptProvisionalHits();
-				assert_gt(sink.numHits(), lastHits);
-			}
-			assert_eq(0, sink.numProvisionalHits());
-			if(sink.numHits() > lastHits) {
-				lastHits = sink.numHits();
-				if(oneHit) {
-					// Update doneMask
-					doneMask.set(patid);
-				}
-			}
-			assert_eq(0, sink.retainedHits().size());
-		} else {
-			// There is no provisional inexact match for the
-			// reverse-complement read, so try inexact on the
-			// forward-oriented read
-			ebwtFw.search1MismatchOrBetter(s, params,
-										   true,   // allow exact hits
-										   false); // no provisional hits
-			bool hit = sink.numHits() > lastHits;
-			// Set a bit indicating this pattern is done and needn't be
-			// considered by the 1-mismatch loop
-			if(sanity) sanityCheckHits(patFw, sink, patid, true, os, true, false);
-			assert_eq(0, sink.retainedHits().size());
-			if(hit) lastHits = sink.numHits();
-			if(oneHit && hit) {
-				// Update doneMask
-				assert_eq(0, sink.numProvisionalHits());
-				doneMask.set(patid);
-			}
-		}
-		params.setFw(false);
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_1mm_phase1.c"
+		#undef DONEMASK_SET
 	} // End read loop
     WORKER_EXIT();
 }
@@ -902,35 +840,13 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
 	// Phase 2
-	EbwtSearchState<String<Dna> > s(ebwtBw, params, seed);
+	EbwtSearchState<String<Dna> > sbw(ebwtBw, params, seed);
 	while(true) {
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
-		s.newQuery(&patFw, &name, &qualFw);
-		ebwtBw.search1MismatchOrBetter(s, params,
-									   false,  // no exact hits
-									   false); // no provisional hits
-		// Check all hits against a naive oracle
-		assert_eq(0, sink.numProvisionalHits());
-		if(sanity) sanityCheckHits(patFw, sink, patid, true, os, false, true);
-		assert_eq(0, sink.retainedHits().size());
-		// If the forward direction matched with one mismatch, ignore
-		// the reverse complement
-		if(oneHit && revcomp && sink.numHits() > lastHits) {
-			lastHits = sink.numHits();
-			continue;
-		}
-		if(!revcomp) continue;
-		params.setFw(false);
-		s.newQuery(&patRc, &name, &qualRc);
-		ebwtBw.search1MismatchOrBetter(s, params,
-									   false,  // no exact hits
-									   false); // no provisional hits
-		assert_eq(0, sink.numProvisionalHits());
-		if(sanity) sanityCheckHits(patRc, sink, patid, false, os, false, true);
-		assert_eq(0, sink.retainedHits().size());
-		params.setFw(true);
-		lastHits = sink.numHits();
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_1mm_phase2.c"
+		#undef DONEMASK_SET
 	} // End read loop
     WORKER_EXIT();
 }
@@ -993,7 +909,7 @@ static void mismatchSearch(PatternSource& _patsrc,
 	{
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
-		Timer _t(cout, "Time loading Mirror Ebwt: ", timing);
+		Timer _t(cout, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
     _patsrc.reset();          // reset pattern source to 1st pattern
@@ -1018,6 +934,105 @@ static void mismatchSearch(PatternSource& _patsrc,
 		}
 #endif
 	}
+	delete[] threads;
+}
+
+static void* mismatchSearchWorkerFull(void *vp){
+	PatternSource&         _patsrc      = *mismatchSearch_patsrc;
+	HitSink&               _sink        = *mismatchSearch_sink;
+	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
+	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
+	vector<String<Dna5> >& os           = *mismatchSearch_os;
+
+    // Per-thread initialization
+    bool sanity = sanityCheck && !os.empty() && !arrowMode;
+	uint64_t lastHits = 0llu;
+	uint32_t lastLen = 0; // for checking if all reads have same length
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, true);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
+    HitSinkPerThread sink(_sink, sanity);
+	EbwtSearchParams<String<Dna> > params(
+			sink,       // HitSinkPerThread
+	        stats,      // EbwtSearchStats
+	        // Policy for how to resolve multiple hits
+	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
+	        os,         // reference sequences
+	        revcomp,    // forward AND reverse complement?
+	        true,       // read is forward
+	        false,      // index is mirror index
+	        arrowMode); // arrow mode
+	// Phase 2
+	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
+	EbwtSearchState<String<Dna> > sbw(ebwtBw, params, seed);
+	while(true) {
+		GET_READ(patsrc);
+		// Run phase 1 and phase 2 consecutively
+		#define DONEMASK_SET(p)
+		#include "search_1mm_phase1.c"
+		patsrc->reverseRead();
+		#include "search_1mm_phase2.c"
+		#undef DONEMASK_SET
+	} // End read loop
+    WORKER_EXIT();
+}
+
+/**
+ * Search through a single (forward) Ebwt index for exact end-to-end
+ * hits.  Assumes that index is already loaded into memory.
+ */
+static void mismatchSearchFull(PatternSource& _patsrc,
+                               HitSink& _sink,
+                               EbwtSearchStats<String<Dna> >& stats,
+                               Ebwt<String<Dna> >& ebwtFw,
+                               Ebwt<String<Dna> >& ebwtBw,
+                               vector<String<Dna5> >& os)
+{
+	mismatchSearch_patsrc       = &_patsrc;
+	mismatchSearch_sink         = &_sink;
+	mismatchSearch_stats        = &stats;
+	mismatchSearch_ebwtFw       = &ebwtFw;
+	mismatchSearch_ebwtBw       = &ebwtBw;
+	mismatchSearch_doneMask     = NULL;
+	mismatchSearch_os           = &os;
+	
+	assert(ebwtFw.isInMemory());
+	assert(!ebwtBw.isInMemory());
+	{
+		// Load the other half of the index into memory
+		Timer _t(cout, "Time loading mirror index: ", timing);
+		ebwtBw.loadIntoMemory();
+	}
+
+#ifdef BOWTIE_PTHREADS
+	// Allocate structures for threads
+	pthread_attr_t pthread_custom_attr;
+	pthread_attr_init(&pthread_custom_attr);
+	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_t *threads = new pthread_t[nthreads-1];
+#endif
+
+    _patsrc.setReverse(false); // don't reverse patterns
+    {
+		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
+		}
+#endif
+		// Go to town
+		mismatchSearchWorkerFull((void*)0L);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_join(threads[i], NULL);
+		}
+#endif
+    }
+
 	delete[] threads;
 }
 
@@ -1147,7 +1162,6 @@ static bool                           twoOrThreeMismatchSearch_two;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
 	EbwtSearchStats<String<Dna> >& stats    = *twoOrThreeMismatchSearch_stats;    \
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
-	SyncBitset&                    doneMask = *twoOrThreeMismatchSearch_doneMask; \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
 	uint32_t lastLen = 0; \
 	PatternSourcePerThread *patsrc; \
@@ -1171,8 +1185,9 @@ static bool                           twoOrThreeMismatchSearch_two;
 
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
+	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
-	BacktrackManager<String<Dna> > btr(
+	BacktrackManager<String<Dna> > btr1(
 			ebwtFw, params,
 	        0, 0,           // 5, 3depth
 	        0,              // unrevOff
@@ -1190,46 +1205,17 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
-	EbwtSearchState<String<Dna> > s(ebwtFw, params, seed);
-	params.setFw(true);
-	params.setEbwtFw(true);
+	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
     while(true) { // Read read-in loop
 		GET_READ(patsrc);
 		// If requested, check that this read has the same length
 		// as all the previous ones
 		size_t plen = length(patFw);
-		if(plen < 3 && two) {
-			cerr << "Error: Read (" << name << ") is less than 3 characters long" << endl;
-			exit(1);
-		}
-		else if(plen < 4) {
-			cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
-			exit(1);
-		}
-		// Do an exact-match search on the forward pattern, just in
-		// case we can pick it off early here
-		uint64_t numHits = sink.numHits();
-    	s.newQuery(&patFw, &name, &qualFw);
-	    ebwtFw.search(s, params);
-		if(sink.numHits() > numHits) {
-			assert_eq(numHits+1, sink.numHits());
-			doneMask.set(patid);
-			continue;
-		}
-		// Set up backtracker with reverse complement
-		params.setFw(false);
-		btr.setQuery(&patRc, &qualRc, &name);
-		// Calculate the halves
 		uint32_t s = plen;
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		// Set up the revisitability of the halves
-		btr.setOffs(0, 0, s5, s5, two ? s : s5, s);
-		ASSERT_ONLY(numHits = sink.numHits());
-		bool hit = btr.backtrack();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) doneMask.set(patid);
-		params.setFw(true);
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_23mm_phase1.c"
+		#undef DONEMASK_SET
     }
     // Threads join at end of Phase 1
 	WORKER_EXIT();
@@ -1237,8 +1223,9 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 
 static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	TWOTHREE_WORKER_SETUP();
+	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	BacktrackManager<String<Dna> > bt(
+	BacktrackManager<String<Dna> > bt2(
 			ebwtBw, params,
 	        0, 0,           // 5, 3depth
 	        0,              // unrevOff
@@ -1256,49 +1243,29 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
-	params.setFw(true);  // looking at forward strand
-	params.setEbwtFw(false);
     while(true) {
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
 		size_t plen = length(patFw);
-		bt.setQuery(&patFw, &qualFw, &name);
-		// Calculate the halves
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		// Set up the revisitability of the halves
-		bt.setOffs(0, 0, s5, s5, two? s : s5, s);
-		ASSERT_ONLY(uint64_t numHits = sink.numHits());
-		bool hit = bt.backtrack();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) {
-			doneMask.set(patid);
-			continue;
-		}
-		// Try 2 backtracks in the 3' half of the reverse complement read
-		params.setFw(false);  // looking at reverse complement
-		bt.setQuery(&patRc, &qualRc, &name);
-		// Set up the revisitability of the halves
-		bt.setOffs(0, 0, s3, s3, two? s : s3, s);
-		ASSERT_ONLY(numHits = sink.numHits());
-		hit = bt.backtrack();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) doneMask.set(patid);
-		params.setFw(true);  // looking at forward strand
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_23mm_phase2.c"
+		#undef DONEMASK_SET
+
     }
 	WORKER_EXIT();
 }
 
 static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	TWOTHREE_WORKER_SETUP();
-	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */ \
-	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */ \
-	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
+	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
+	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */
+	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */
+	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
 	// BacktrackManager to search for seedlings for case 4F
-	BacktrackManager<String<Dna> > bt(
+	BacktrackManager<String<Dna> > bt3(
 			ebwtFw, params,
 	        0, 0,           // 3, 5depth
             0,              // unrevOff
@@ -1316,7 +1283,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
-	BacktrackManager<String<Dna> > bthh(
+	BacktrackManager<String<Dna> > bthh3(
 			ebwtFw, params,
 	        0, 0,           // 3, 5depth
 	        0,              // unrevOff
@@ -1335,85 +1302,16 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
-	params.setFw(true);
-	params.setEbwtFw(true);
     while(true) {
 		GET_READ(patsrc);
 		if(doneMask.testUnsync(patid)) continue;
 		uint32_t plen = length(patFw);
-		// Calculate the halves
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		bt.setQuery(&patFw, &qualFw, &name);
-		// Set up the revisitability of the halves
-		bt.setOffs(0, 0,
-		           s3,
-		           s3,
-		           two? s : s3,
-		           s);
-		ASSERT_ONLY(uint64_t numHits = sink.numHits());
-		bool hit = bt.backtrack();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) continue;
-
-		// Try a half-and-half on the forward read
-		bool gaveUp = false;
-		bthh.setQuery(&patFw, &qualFw, &name);
-		// Processing the forward pattern with the forward index;
-		// s3 ("lo") half is on the right
-		bthh.setOffs(s3, s,
-		             0,
-		             two ? s3 : 0,
-		             two ? s  : s3,
-		             s);
-		ASSERT_ONLY(numHits = sink.numHits());
-		hit = bthh.backtrack();
-		if(bthh.numBacktracks() == bthh.maxBacktracks()) {
-			gaveUp = true;
-		}
-		bthh.resetNumBacktracks();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) continue;
-
-#ifndef NDEBUG
-		// The forward version of the read doesn't hit
-    	// at all!  Check with the oracle to make sure it agrees.
-    	if(!gaveUp) {
-    		ASSERT_NO_HITS_FW(true);
-    	}
-#endif
-		// Try a half-and-half on the reverse complement read
-    	gaveUp = false;
-		params.setFw(false);
-		bthh.setQuery(&patRc, &qualRc, &name);
-		// Processing the forward pattern with the forward index;
-		// s5 ("hi") half is on the right
-		bthh.setOffs(s5, s,
-		             0,
-		             two ? s5 : 0,
-		             two ? s  : s5,
-		             s);
-		ASSERT_ONLY(numHits = sink.numHits());
-		hit = bthh.backtrack();
-		if(bthh.numBacktracks() == bthh.maxBacktracks()) {
-			gaveUp = true;
-		}
-		bthh.resetNumBacktracks();
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		params.setFw(true);
-		if(hit) continue;
-
-#ifndef NDEBUG
-		// The reverse-complement version of the read doesn't hit
-    	// at all!  Check with the oracle to make sure it agrees.
-    	if(!gaveUp) {
-			ASSERT_NO_HITS_RC(true);
-    	}
-#endif
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_23mm_phase3.c"
+		#undef DONEMASK_SET
     }
 	WORKER_EXIT();
 }
@@ -1508,6 +1406,158 @@ static void twoOrThreeMismatchSearch(
 	    // Threads join at end of Phase 3
 	    assert_eq(numPats, _patsrc.patid());
 	}
+	delete[] threads;
+	return;
+}
+
+static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
+	TWOTHREE_WORKER_SETUP();
+	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
+	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */ \
+	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */ \
+	BacktrackManager<String<Dna> > btr1(
+			ebwtFw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        maxBts,         // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
+	BacktrackManager<String<Dna> > bt2(
+			ebwtBw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        maxBts,         // max backtracks
+	        0,              // reportSeedlings (no)
+	        NULL,           // seedlings
+		    NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+		    seed+1,         // seed
+		    &os,
+		    false);         // considerQuals
+	BacktrackManager<String<Dna> > bt3(
+			ebwtFw, params,
+	        0, 0,           // 3, 5depth
+            0,              // unrevOff
+            0,              // 1revOff
+            0,              // 2revOff
+            0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh (none)
+	        maxBts,         // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+		    NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+		    seed+3,         // seed
+		    &os,
+		    false);         // considerQuals
+	BacktrackManager<String<Dna> > bthh3(
+			ebwtFw, params,
+	        0, 0,           // 3, 5depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        maxBts,         // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+		    NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+		    seed+5,         // seed
+		    &os,
+		    false,          // considerQuals
+		    true);          // halfAndHalf
+	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
+    while(true) { // Read read-in loop
+		GET_READ(patsrc);
+		patid += 0; // kill unused variable warning
+		uint32_t plen = length(patFw);
+		uint32_t s = plen;
+		uint32_t s3 = s >> 1; // length of 3' half of seed
+		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+		#define DONEMASK_SET(p)
+		#include "search_23mm_phase1.c"
+		patsrc->reverseRead();
+		#include "search_23mm_phase2.c"
+		patsrc->reverseRead();
+		#include "search_23mm_phase3.c"
+		#undef DONEMASK_SET
+    }
+    // Threads join at end of Phase 1
+	WORKER_EXIT();
+}
+
+template<typename TStr>
+static void twoOrThreeMismatchSearchFull(
+        PatternSource& _patsrc,         /// pattern source
+        HitSink& _sink,                 /// hit sink
+        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
+        Ebwt<TStr>& ebwtFw,             /// index of original text
+        Ebwt<TStr>& ebwtBw,             /// index of mirror text
+        vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
+        bool two = true)                /// true -> 2, false -> 3
+{
+	// Global initialization
+	assert(revcomp);
+	assert(ebwtFw.isInMemory());
+	assert(!ebwtBw.isInMemory());
+	{
+		// Load the other half of the index into memory
+		Timer _t(cout, "Time loading mirror index: ", timing);
+		ebwtBw.loadIntoMemory();
+	}
+	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
+	twoOrThreeMismatchSearch_sink     = &_sink;
+	twoOrThreeMismatchSearch_stats    = &stats;
+	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
+	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
+	twoOrThreeMismatchSearch_os       = &os;
+	twoOrThreeMismatchSearch_doneMask = NULL;
+	twoOrThreeMismatchSearch_two      = two;
+
+#ifdef BOWTIE_PTHREADS
+	pthread_attr_t pthread_custom_attr;
+	pthread_attr_init(&pthread_custom_attr);
+	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_t *threads = new pthread_t[nthreads-1];
+#endif
+
+    {
+		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
+		}
+#endif
+		twoOrThreeMismatchSearchWorkerFull((void*)0L);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_join(threads[i], NULL);
+		}
+#endif
+    }
 	delete[] threads;
 	return;
 }
@@ -1909,7 +1959,9 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		// complement
 		pals.clear();
 		if(pamRc != NULL) {
-			pamRc->getPartials(patid, pals);
+			// We can get away with an unsynchronized call because there
+			// are no writers for pamRc in this phase
+			pamRc->getPartialsUnsync(patid, pals);
 		}
 		bool hit = false;
 		if(pals.size() > 0) {
@@ -2118,7 +2170,9 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		// complement
 		pals.clear();
 		if(pamFw != NULL) {
-			pamFw->getPartials(patid, pals);
+			// We can get away with an unsynchronized call because there
+			// are no writers for pamFw in this phase
+			pamFw->getPartialsUnsync(patid, pals);
 		}
 		bool hit = false;
 		if(pals.size() > 0) {
@@ -2512,7 +2566,7 @@ static void driver(const char * type,
 	}
     // Load rest of (vast majority of) Ebwt into memory
 	if(!maqLike) {
-		Timer _t(cout, "Time loading Ebwt: ", timing);
+		Timer _t(cout, "Time loading forward index: ", timing);
 	    ebwt.loadIntoMemory();
 	}
 	// Sanity-check the restored version of the Ebwt
@@ -2579,16 +2633,33 @@ static void driver(const char * type,
 		}
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
-				mismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os);
+				if(!fullIndex) {
+					mismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os);
+				} else {
+					mismatchSearchFull(*patsrc, *sink, stats, ebwt, *ebwtBw, os);
+				}
 			} else if(mismatches == 2 || mismatches == 3) {
-				twoOrThreeMismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os, mismatches == 2);
+				if(!fullIndex) {
+					twoOrThreeMismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os, mismatches == 2);
+				} else {
+					twoOrThreeMismatchSearchFull(*patsrc, *sink, stats, ebwt, *ebwtBw, os, mismatches == 2);
+				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
 				exit(1);
 			}
 		} else {
 			// Search without mismatches
+			// Note that --fast doesn't make a difference here because
+			// we're only loading half of the index anyway
 			exactSearch(*patsrc, *sink, stats, ebwt, os);
+		}
+		// Evict any loaded indexes from memory
+		if(ebwt.isInMemory()) {
+			ebwt.evictFromMemory();
+		}
+		if(ebwtBw != NULL && ebwtBw->isInMemory()) {
+			ebwtBw->evictFromMemory();
 		}
 	    sink->finish(); // end the hits section of the hit file
 	    if(printStats) {
