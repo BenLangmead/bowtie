@@ -188,6 +188,7 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 #define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)(Dna)host[off+s[si]] : (hi))
 #endif
 
+// Note that CHOOSE_AND_SWAP_RANDOM_PIVOT is unused
 #define CHOOSE_AND_SWAP_RANDOM_PIVOT(sw, ch) {                            \
 	/* Note: rand() didn't really cut it here; it seemed to run out of */ \
 	/* randomness and, after a time, returned the same thing over and */  \
@@ -203,233 +204,25 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
  * possible, since they'll split things more evenly than a 0 or 4.  We
  * also avoid swapping in the event that we choose the first element.
  */
-#define CHOOSE_AND_SWAP_SMART_PIVOT(sw, ch) {                                  \
-	a = begin; /* choose first elt */                                          \
-	/* now try to find a better elt */                                         \
-	if(n >= 5) {                                                               \
+#define CHOOSE_AND_SWAP_SMART_PIVOT(sw, ch) {                                    \
+	a = begin; /* choose first elt */                                            \
+	/* now try to find a better elt */                                           \
+	if(n >= 5) { /* n is the difference between begin and end */                 \
 		if     (ch(begin+1, depth) == 1 || ch(begin+1, depth) == 2) a = begin+1; \
 		else if(ch(begin+2, depth) == 1 || ch(begin+2, depth) == 2) a = begin+2; \
 		else if(ch(begin+3, depth) == 1 || ch(begin+3, depth) == 2) a = begin+3; \
 		else if(ch(begin+4, depth) == 1 || ch(begin+4, depth) == 2) a = begin+4; \
-		if(a != begin) sw(s, s2, begin, a); /* move pivot to beginning */      \
-	}                                                                          \
+		if(a != begin) sw(s, s2, begin, a); /* move pivot to beginning */        \
+	}                                                                            \
+	/* the element at [begin] now holds the pivot value */                       \
 }
 
 #define CHOOSE_AND_SWAP_PIVOT CHOOSE_AND_SWAP_SMART_PIVOT
 
 #ifndef NDEBUG
+
 /**
  * Assert that the range of chars at depth 'depth' in strings 'begin'
- * to 'end' in string-of-strings s is parititioned properly according
- * to the ternary paritioning strategy of Bentley and McIlroy (*prior
- * to* swapping the = regions to the center)
- */
-template<typename TStr>
-bool assertPartitioned(TStr& s, int hi, int pivot, size_t begin, size_t end, size_t depth) {
-	int state = 0; // 0 -> 1st = section, 1 -> < section, 2 -> > section, 3 -> 2nd = section
-	for(size_t i = begin; i < end; i++) {
-		switch(state) {
-		case 0:
-			if       (CHAR_AT(i, depth) < pivot)  { state = 1; break; }
-			else if  (CHAR_AT(i, depth) > pivot)  { state = 2; break; }
-			assert_eq(CHAR_AT(i, depth), pivot);  break;
-		case 1:
-			if       (CHAR_AT(i, depth) > pivot)  { state = 2; break; }
-			else if  (CHAR_AT(i, depth) == pivot) { state = 3; break; }
-			assert_lt(CHAR_AT(i, depth), pivot);  break;
-		case 2:
-			if       (CHAR_AT(i, depth) == pivot) { state = 3; break; }
-			assert_gt(CHAR_AT(i, depth), pivot);	 break;
-		case 3:
-			assert_eq(CHAR_AT(i, depth), pivot);	 break;
-		}
-	}
-	return true;
-}
-
-/**
- * Assert that the range of chars at depth 'depth'�in strings 'begin'
- * to 'end' in string-of-strings s is parititioned properly according
- * to the ternary paritioning strategy of Bentley and McIlroy (*after*
- * swapping the = regions to the center)
- */
-template<typename TStr>
-bool assertPartitioned2(TStr& s, int hi, int pivot, size_t begin, size_t end, size_t depth) {
-	int state = 0; // 0 -> < section, 1 -> = section, 2 -> > section
-	for(size_t i = begin; i < end; i++) {
-		switch(state) {
-		case 0:
-			if       (CHAR_AT(i, depth) == pivot) { state = 1; break; }
-			else if  (CHAR_AT(i, depth) > pivot)  { state = 2; break; }
-			assert_lt(CHAR_AT(i, depth), pivot);  break;
-		case 1:
-			if       (CHAR_AT(i, depth) > pivot)  { state = 2; break; }
-			assert_eq(CHAR_AT(i, depth), pivot);  break;
-		case 2:
-			assert_gt(CHAR_AT(i, depth), pivot);  break;
-		}
-	}
-	return true;
-}
-#endif
-
-/**
- * Simple helper to print a list of Strings.
- */
-template <typename T>
-void printStringList(const T& ss, ostream& out) {
-	for(size_t i = 0; i < length(ss); i++) {
-		out << "  " << ss[i] << endl;
-	}
-}
-
-/**
- * Driver for the 4-arg version of multikey_qsort.  Optionally sanity-
- * checks the sorted result before returning.
- */
-template<typename TStr>
-void mkeyQSort(TStr& s, int hi, bool verbose = false, bool sanityCheck = false) {
-	mkeyQSort(s, hi, 0, length(s), 0);
-	if(sanityCheck) {
-		for(size_t i = 0; i < length(s)-1; i++) {
-			if(s[i] > s[i+1]) {
-				// operator > treats shorter strings as
-				// lexicographically smaller, but we want to opposite
-				assert(isPrefix(s[i+1], s[i]));
-			}
-		}
-	}
-}
-
-/**
- * Main multikey quicksort function.  Based on Bentley & Sedgewick's
- * algorithm on p.5 of their paper "Fast Algorithms for Sorting and
- * Searching Strings".
- */
-template<typename TStr>
-void mkeyQSort(TStr& s, int hi, size_t begin, size_t end, size_t depth) {
-	size_t slen = length(s);
-	typedef typename Value<TStr>::Type TAlphabet;
-	// Helper for making the recursive call; sanity-checks arguments to
-	// make sure that the problem actually got smaller.
-	#define MQS_RECURSE(nbegin, nend, ndepth) { \
-		assert(nbegin > begin || nend < end || ndepth > depth); \
-		mkeyQSort(s, hi, nbegin, nend, ndepth); \
-	}
-	assert_leq(begin, slen);
-	assert_leq(end, slen);
-	size_t a, b, c, d, e, r;
-	size_t n = end - begin;
-	if(n <= 1) return;                // 1-element list already sorted
-	// Note: rand() didn't really cut it here; it seemed to run out of
-	// randomness and, after a time, returned the same thing over and
-	// over again
-	CHOOSE_AND_SWAP_PIVOT(SWAP1, CHAR_AT);
-	int v = CHAR_AT(begin, depth); // v <- randomly-selected pivot value
-	a = b = begin;
-	c = d = e = end-1;
-	while(true) {
-		// Invariant: everything before a is = pivot, everything
-		// between a and b is <
-		int bc;
-		while(b <= c && v >= (bc = CHAR_AT(b, depth))) {
-			if(v == bc) {
-				SWAP(s, a, b); a++;
-			}
-			b++;
-		}
-		// Invariant: everything after d is = pivot, everything
-		// between c and d is >
-		int cc;
-		while(b <= c && v <= (cc = CHAR_AT(c, depth))) {
-			if(v == cc) {
-				SWAP(s, c, d); d--; e--;
-			}
-			else if(c == e && v == hi) e--;
-			c--;
-		}
-		if(b > c) break;
-		SWAP(s, b, c);
-		b++;
-		c--;
-	}
-	assert(a > begin || c < end-1);                      // there was at least one =s
-	assert_lt(e-c, n); // they can't all have been > pivot
-	assert_lt(b-a, n); // they can't all have been < pivot
-	assert(assertPartitioned(s, hi, v, begin, end, depth));  // check pre-=-swap invariant
-	r = min(a-begin, b-a); VECSWAP(s, begin, b-r,   r);  // swap left = to center
-	r = min(d-c, end-d-1); VECSWAP(s, b,     end-r, r);  // swap right = to center
-	assert(assertPartitioned2(s, hi, v, begin, end, depth)); // check post-=-swap invariant
-	r = b-a; // r <- # of <'s
-	MQS_RECURSE(begin, begin + r, depth); // recurse on <'s
-	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted
-	if(v != hi) {
-		MQS_RECURSE(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
-	}
-	r = e-c;                        // r <- # of >'s excluding those exhausted
-	MQS_RECURSE(end-r, end, depth); // recurse on >'s
-}
-
-/**
- * Simple helper to print a list of suffixes with indices.
- */
-template<typename THost, typename TElt1, typename TElt2>
-void printSuffixList(const THost& host,
-                     const String<TElt1> s,
-                     const String<TElt2> idxs,
-                     ostream& out)
-{
-	for(size_t i = 0; i < length(s); i++) {
-		out << "  " << suffix(host, s[i]) << " (" << idxs[i] << ")" << endl;
-	}
-}
-
-/**
- * Simple helper to print a list of suffixes with indices.
- */
-template<typename THost>
-void printSuffixList(const THost& host,
-                     uint32_t *s,
-                     size_t slen,
-                     uint32_t *idxs,
-                     ostream& out)
-{
-	for(size_t i = 0; i < slen; i++) {
-		out << "  " << suffix(host, s[i]) << " (" << idxs[i] << ")" << endl;
-	}
-}
-
-/**
- * Simple helper to print a list of suffixes.
- */
-template<typename THost, typename TElt1>
-void printSuffixList(const THost& host,
-                     const String<TElt1> s,
-                     ostream& out)
-{
-	for(size_t i = 0; i < length(s); i++) {
-		out << "  " << suffix(host, s[i]) << endl;
-	}
-}
-
-/**
- * Simple helper to print a list of suffixes.
- */
-template<typename THost>
-void printSuffixList(const THost& host,
-                     uint32_t *s,
-                     size_t slen,
-                     ostream& out)
-{
-	for(size_t i = 0; i < slen; i++) {
-		out << "  " << suffix(host, s[i]) << endl;
-	}
-}
-
-#ifndef NDEBUG
-/**
- * Assert that the range of chars at depth 'depth'�in strings 'begin'
  * to 'end' in string-of-suffix-offsets s is parititioned properly
  * according to the ternary paritioning strategy of Bentley and McIlroy
  * (*prior to* swapping the = regions to the center)
@@ -467,7 +260,7 @@ bool assertPartitionedSuf(const THost& host,
 }
 
 /**
- * Assert that the range of chars at depth 'depth'�in strings 'begin'
+ * Assert that the range of chars at depth 'depth' in strings 'begin'
  * to 'end' in string-of-suffix-offsets s is parititioned properly
  * according to the ternary paritioning strategy of Bentley and McIlroy
  * (*after* swapping the = regions to the center)
@@ -539,17 +332,11 @@ void sanityCheckOrderedSufs(const T& host,
 		// convenient for some callers
 		if(s[i+1] >= hlen) continue;
 		if(upto == 0xffffffff) {
-			if(!(dollarLt(suffix(host, s[i]), suffix(host, s[i+1])))) {
-				assert(false);
-			}
+			assert(dollarLt(suffix(host, s[i]), suffix(host, s[i+1])));
 		} else {
 			if(prefix(suffix(host, s[i]), upto) > prefix(suffix(host, s[i+1]), upto)) {
 				// operator > treats shorter strings as
 				// lexicographically smaller, but we want to opposite
-				if(!isPrefix(suffix(host, s[i+1]), suffix(host, s[i]))) {
-					//cout << "  " << suffix(host, s[i]) << endl;
-					//cout << "  " << suffix(host, s[i+1]) << endl;
-				}
 				assert(isPrefix(suffix(host, s[i+1]), suffix(host, s[i])));
 			}
 		}
@@ -602,10 +389,7 @@ void mkeyQSortSuf(const T& host,
 	size_t a, b, c, d, /*e,*/ r;
 	size_t n = end - begin;
 	if(n <= 1) return;                 // 1-element list already sorted
-	// Note: rand() didn't really cut it here; it seemed to run out of
-	// randomness and, after a time, returned the same thing over and
-	// over again
-	CHOOSE_AND_SWAP_PIVOT(SWAP1, CHAR_AT_SUF);
+	CHOOSE_AND_SWAP_PIVOT(SWAP1, CHAR_AT_SUF); // pick pivot, swap it into [begin]
 	int v = CHAR_AT_SUF(begin, depth); // v <- randomly-selected pivot value
 	#ifndef NDEBUG
 	{
@@ -718,10 +502,7 @@ void mkeyQSortSuf2(const T& host,
 	size_t a, b, c, d, /*e,*/ r;
 	size_t n = end - begin;
 	if(n <= 1) return;                 // 1-element list already sorted
-	// Note: rand() didn't really cut it here; it seemed to run out of
-	// randomness and, after a time, returned the same thing over and
-	// over again
-	CHOOSE_AND_SWAP_PIVOT(SWAP2, CHAR_AT_SUF);
+	CHOOSE_AND_SWAP_PIVOT(SWAP2, CHAR_AT_SUF); // pick pivot, swap it into [begin]
 	int v = CHAR_AT_SUF(begin, depth); // v <- randomly-selected pivot value
 	#ifndef NDEBUG
 	{
@@ -820,24 +601,6 @@ template <typename T>
 class DifferenceCoverSample;
 
 /**
- * Toplevel function for multikey quicksort over suffixes.
- */
-template<typename T>
-void mkeyQSortSufDc(const T& host,
-                    uint32_t* s,
-                    size_t slen,
-                    const DifferenceCoverSample<T>& dc,
-                    int hi,
-                    bool verbose = false,
-                    bool sanityCheck = false)
-{
-	size_t hlen = length(host);
-	if(sanityCheck) sanityCheckInputSufs(s, slen);
-	mkeyQSortSufDc(host, hlen, s, slen, dc, hi, 0, slen, 0, sanityCheck);
-	if(sanityCheck) sanityCheckOrderedSufs(host, hlen, s, slen, 0xffffffff);
-}
-
-/**
  * Constant time
  */
 template<typename T1, typename T2> inline
@@ -903,120 +666,6 @@ void qsortSufDc(const T& host,
 	SWAP(s, end-1, begin+cur);
 	if(begin+cur > begin) qsortSufDc(host, hlen, s, slen, dc, begin, begin+cur);
 	if(end > begin+cur+1) qsortSufDc(host, hlen, s, slen, dc, begin+cur+1, end);
-}
-
-/**
- * Main multikey quicksort function for suffixes.  Based on Bentley &
- * Sedgewick's algorithm on p.5 of their paper "Fast Algorithms for
- * Sorting and Searching Strings".  That algorithm has been extended in
- * three ways:
- *
- *  1. Deal with keys of different lengths by checking bounds and
- *     considering off-the-end values to be 'hi' (b/c our goal is the
- *     BWT transform, we're biased toward considring prefixes as
- *     lexicographically *greater* than their extensions).
- *  2. The multikey_qsort_suffixes version takes a single host string
- *     and a list of suffix offsets as input.  This reduces memory
- *     footprint compared to an approach that treats its input
- *     generically as a set of strings (not necessarily suffixes), thus
- *     requiring that we store at least two integers worth of
- *     information for each string.
- *  3. Sorting functions take an extra "upto" parameter that upper-
- *     bounds the depth to which the function sorts.
- *
- * TODO: Consult a tie-breaker (like a difference cover sample) if two
- * keys share a long prefix.
- */
-template<typename T>
-void mkeyQSortSufDc(const T& host,
-                    size_t hlen,
-                    uint32_t* s,
-                    size_t slen,
-                    const DifferenceCoverSample<T>& dc,
-                    int hi,
-                    size_t begin,
-                    size_t end,
-                    size_t depth,
-                    bool sanityCheck = false)
-{
-	// Helper for making the recursive call; sanity-checks arguments to
-	// make sure that the problem actually got smaller.
-	#define MQS_RECURSE_SUF_DC(nbegin, nend, ndepth) { \
-		assert(nbegin > begin || nend < end || ndepth > depth); \
-		mkeyQSortSufDc(host, hlen, s, slen, dc, hi, nbegin, nend, ndepth, sanityCheck); \
-	}
-	assert_leq(begin, slen);
-	assert_leq(end, slen);
-	size_t n = end - begin;
-	if(n <= 1) return; // 1-element list already sorted
-	if(depth > dc.v()) {
-		// Quicksort the remaining suffixes using difference cover
-		// for constant-time comparisons; this is O(k*log(k)) where
-		// k=(end-begin)
-		qsortSufDc<T>(host, hlen, s, slen, dc, begin, end, sanityCheck);
-		return;
-	}
-	size_t a, b, c, d, r;
-	CHOOSE_AND_SWAP_PIVOT(SWAP1, CHAR_AT_SUF); // choose pivot, swap to begin
-	int v = CHAR_AT_SUF(begin, depth); // v <- pivot value
-	#ifndef NDEBUG
-	{
-		bool stillInBounds = false;
-		for(size_t i = begin; i < end; i++) {
-			if(depth < (hlen-s[i])) {
-				stillInBounds = true;
-				break;
-			} else { /* already fell off this suffix */ }
-		}
-		assert(stillInBounds); // >=1 suffix must still be in bounds
-	}
-	#endif
-	a = b = begin;
-	c = d = end-1;
-	while(true) {
-		// Invariant: everything before a is = pivot, everything
-		// between a and b is <
-		int bc = 0; // shouldn't have to init but gcc on Mac complains
-		while(b <= c && v >= (bc = CHAR_AT_SUF(b, depth))) {
-			if(v == bc) {
-				SWAP(s, a, b); a++;
-			}
-			b++;
-		}
-		// Invariant: everything after d is = pivot, everything
-		// between c and d is >
-		int cc = 0; // shouldn't have to init but gcc on Mac complains
-		while(b <= c && v <= (cc = CHAR_AT_SUF(c, depth))) {
-			if(v == cc) {
-				SWAP(s, c, d); d--;
-			}
-			c--;
-		}
-		if(b > c) break;
-		SWAP(s, b, c);
-		b++;
-		c--;
-	}
-	assert(a > begin || c < end-1);                      // there was at least one =s
-	assert_lt(d-c, n); // they can't all have been > pivot
-	assert_lt(b-a, n); // they can't all have been < pivot
-	assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
-	r = min(a-begin, b-a); VECSWAP(s, begin, b-r,   r);  // swap left = to center
-	r = min(d-c, end-d-1); VECSWAP(s, b,     end-r, r);  // swap right = to center
-	assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
-	r = b-a; // r <- # of <'s
-	if(r > 0) {
-		MQS_RECURSE_SUF_DC(begin, begin + r, depth); // recurse on <'s
-	}
-	// Do not recurse on ='s if the pivot was the off-the-end value;
-	// they're already fully sorted
-	if(v != hi) {
-		MQS_RECURSE_SUF_DC(begin + r, begin + r + (a-begin) + (end-d-1), depth+1); // recurse on ='s
-	}
-	r = d-c; // r <- # of >'s excluding those exhausted
-	if(r > 0 && v < hi-1) {
-		MQS_RECURSE_SUF_DC(end-r, end, depth); // recurse on >'s
-	}
 }
 
 /**

@@ -785,7 +785,8 @@ void DifferenceCoverSample<TStr>::build() {
 			// elements in sPrime, it swaps the same elements in
 			// sPrimeOrder too.  This allows us to easily reconstruct
 			// what the sort did.
-			mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, ValueSize<TAlphabet>::VALUE,
+			mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr,
+			              ValueSize<TAlphabet>::VALUE,
 			              this->verbose(), this->sanityCheck(), v);
 			// Make sure sPrime and sPrimeOrder are consistent with
 			// their respective backing-store arrays
@@ -798,6 +799,7 @@ void DifferenceCoverSample<TStr>::build() {
 		// arrays back into sPrime.
 		reserve(_isaPrime, length(sPrime)+1, Exact());
 		fill(_isaPrime, length(sPrime), 0xffffffff, Exact());
+		assert_gt(length(_isaPrime), 0);
 		{
 			Timer timer(cout, "  Ranking v-sort output time: ", this->verbose());
 			VMSG_NL("  Ranking v-sort output");
@@ -820,9 +822,7 @@ void DifferenceCoverSample<TStr>::build() {
 		assert_lt(_isaPrime[i], length(_isaPrime));
 	}
 	#endif
-	// Now pass the sPrimeRanks[] array to LarssonSadakane.  We must
-	// be careful to observe the proper interface; here's what the
-	// comment says in seqan/index/index_sa_lss.h:
+	// Now pass the sPrimeRanks[] array to LarssonSadakane (in SeqAn).
 	append(_isaPrime, length(_isaPrime));
 	append(sPrime, length(sPrime));
 	{
