@@ -33,6 +33,13 @@ public:
 		delete[] _words;
 	}
 
+	bool testUnsync(size_t i) {
+		if(i < _sz) {
+			return ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+		}
+		return false;
+	}
+
 	bool test(size_t i) {
 		bool ret = false;
 		MUTEX_LOCK(_lock);

@@ -1296,7 +1296,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */ \
 	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */ \
-	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > bt(
 			ebwtFw, params,
@@ -1339,7 +1339,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	params.setEbwtFw(true);
     while(true) {
 		GET_READ(patsrc);
-		if(doneMask.test(patid)) continue;
+		if(doneMask.testUnsync(patid)) continue;
 		uint32_t plen = length(patFw);
 		// Calculate the halves
 		uint32_t s = plen;
@@ -2104,7 +2104,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	params.setEbwtFw(false);
     while(true) {
 		GET_READ_FW(patsrc);
-		if(doneMask.test(patid)) continue;
+		if(doneMask.testUnsync(patid)) continue;
 		params.setFw(true);
 		btf.setQuery(&patFw, &qualFw, &name);
 
@@ -2145,9 +2145,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 				assert(hit  || numHits == sink.numHits());
 				assert(!hit || numHits <  sink.numHits());
 				if(hit) {
-					// The reverse complement hit, so we're done with this
-					// read
-					doneMask.set(patid);
 					// Got a hit; stop processing partial
 					// alignments
 					break;
@@ -2159,8 +2156,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 			}
 		}
 
-		// Case 4F yielded a hit; mark this pattern as done and
-		// continue to next pattern
+		// Case 4F yielded a hit; continue to next pattern
     	if(hit) continue;
 
     	// If we're in two-mismatch mode, then now is the time to
@@ -2195,7 +2191,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 			assert(hit  || numHits == sink.numHits());
 			assert(!hit || numHits <  sink.numHits());
 			if(hit) {
-				doneMask.set(patid);
 				continue;
 			}
     	}
