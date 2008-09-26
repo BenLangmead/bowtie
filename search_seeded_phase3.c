@@ -21,6 +21,7 @@
 			assert_eq(0, pamRc->size());
 		}
 	}
+	assert(pamRc == NULL || pamRc->size() == 0);
 	bool hit = false;
 	if(pals.size() > 0) {
 		// Partial alignments exist - extend them
