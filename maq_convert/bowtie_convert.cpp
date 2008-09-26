@@ -198,9 +198,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			// Chop off everything from after the number on
 			for(size_t j = 0; j < mismatch_tokens[i].length(); j++) {
 				if(!isdigit(mismatch_tokens[i][j])) {
-					cout << mismatch_tokens[i] << ", ";
 					mismatch_tokens[i].erase(j);
-					cout << mismatch_tokens[i] << endl;
 					break;
 				}
 			}
