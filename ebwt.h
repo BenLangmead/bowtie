@@ -1219,16 +1219,13 @@ public:
 		String<char> patQuals;
 		String<char> patName;
 		if(name != NULL) assign(patName, *name);
-		if (_ebwtFw)
-		{
+		if (_ebwtFw) {
 			pat = query;
 			if(quals != NULL) {
 				reserve(patQuals, length(quals));
 				patQuals = *quals;
 			}
-		}
-		else
-		{
+		} else {
 			// Note: this is re-reversing the pattern back to its
 			// normal orientation; the pattern source reversed it
 			// initially
@@ -1240,7 +1237,14 @@ public:
 				}
 			}
 		}
-
+#ifndef NDEBUG
+		// Check that no two elements of the mms array are the same
+		for(size_t i = 0; i < numMms; i++) {
+			for(size_t j = i+1; j < numMms; j++) {
+				assert_neq(mmui32[i], mmui32[j]);
+			}
+		}
+#endif
 		for(size_t i = 0; i < numMms; i++) {
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
@@ -1251,7 +1255,6 @@ public:
 				mm.set(mmui32[i]);
 			}
 		}
-
 		bool provisional =
 			_backtracking &&             // this is a 1-mismatch alignment
 		    _mhp == MHP_PICK_1_RANDOM && // report 1 hit (not all)

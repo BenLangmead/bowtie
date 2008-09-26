@@ -21,13 +21,14 @@
 			assert_eq(0, pamFw->size());
 		}
 	}
-	assert(pamFw == NULL || pamFw->size() == 0);
 	bool hit = false;
 	if(pals.size() > 0) {
 		// Partial alignments exist - extend them
-		// Set up special seed bounds
+		// Set up seed bounds
 		if(qs < s) {
 			btf4.setOffs(0, 0, qs, qs, qs, qs);
+		} else {
+			btf4.setOffs(0, 0, s, s, s, s);
 		}
 		for(size_t i = 0; i < pals.size(); i++) {
 			String<QueryMutation> muts;
@@ -52,10 +53,6 @@
 				break;
 			}
 		} // Loop over partial alignments
-		// Restore usual seed bounds
-		if(qs < s) {
-			btf4.setOffs(0, 0, s, s, s, s);
-		}
 	}
 
 	// Case 4F yielded a hit; continue to next pattern

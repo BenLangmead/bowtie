@@ -609,7 +609,7 @@ public:
 					                nsInFtab > 0);
 				} else {
 					// We have a match!
-					ret = report(0, top, bot);
+					ret = reportAlignment(0, top, bot);
 				}
 			} else if (bot > top) {
 				// We have an arrow pair from which we can backtrack
@@ -1162,7 +1162,7 @@ public:
 			// are spurious.  This check ensures that we keep looking
 			// for non-spurious hits in that case.
 			if(cur == 0 && bot > top && !backtrackDespiteMatch && !mustBacktrack) {
-				bool ret = report(stackDepth, top, bot);
+				bool ret = reportAlignment(stackDepth, top, bot);
 				if(!ret) {
 					top = bot; // enter the backtrack loop
 				}
@@ -1328,7 +1328,7 @@ public:
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
-					ret = report(stackDepth+1, bttop, btbot);
+					ret = reportAlignment(stackDepth+1, bttop, btbot);
 				} else if(_halfAndHalf &&
 				          !disableFtab &&
 				          _2revOff == _3revOff &&
@@ -1511,7 +1511,7 @@ public:
 			assert_leq(stackDepth, _reportPartials);
 		}
 		if(stackDepth >= _reportPartials) {
-			bool ret = report(stackDepth, top, bot);
+			bool ret = reportAlignment(stackDepth, top, bot);
 			if(!ret && stackDepth == 0) {
 				if(_os != NULL && (*_os).size() > 0) confirmNoHit(iham);
 			}
@@ -1565,8 +1565,11 @@ public:
 		}
 		cout << endl;
 	}
+	
 	/**
-	 * Naively search for the same hits that should be found by
+	 * Naively search for the same hits that should be found by the
+	 * backtracking search.  This is used only if --orig and -s have
+	 * been specified for bowtie-debug.
 	 */
 	static void naiveOracle(const vector<String<Dna5> >& os,
 	                        const String<Dna5>& qry,
@@ -1752,6 +1755,10 @@ public:
 
 protected:
 
+	/**
+	 * Mutate the _qry string according to the contents of the _muts
+	 * array, which represents a partial alignment. 
+	 */
 	void applyMutations() {
 		if(_muts == NULL) {
 			// No mutations to apply
@@ -1768,6 +1775,10 @@ protected:
 		}
 	}
 
+	/**
+	 * Undo mutations to the _qry string, returning it to the original
+	 * read. 
+	 */
 	void undoMutations() {
 		if(_muts == NULL) {
 			// No mutations to undo
@@ -1784,19 +1795,40 @@ protected:
 		}
 	}
 
-	bool report(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+	/**
+	 * Report a range of alignments with # mismatches = stackDepth and
+	 * with the mutations (also mismatches) contained in _muts.  The
+	 * range is delimited by top and bot.  Returns true iff one or more
+	 * full alignments were successfully reported and the caller can 
+	 * stop searching.
+	 */
+	bool reportAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+#ifndef NDEBUG
+		// No two elements of _mms[] should be the same
+		for(size_t i = 0; i < stackDepth; i++) {
+			for(size_t j = i+1; j < stackDepth; j++) {
+				assert_neq(_mms[j], _mms[i]);
+			}
+			// All elements of _mms[] should fall within bounds
+			assert_lt(_mms[i], _qlen);
+		}
+#endif
 		if(_reportPartials) {
 			assert_leq(stackDepth, _reportPartials);
 			if(stackDepth > 0) {
+				// Report this partial alignment.  A partial alignment
+				// is defined purely by its mismatches; top and bot are
+				// ignored.
 				reportPartial(stackDepth);
 			}
-			return false; // keep going
+			return false; // keep going - we want to find all partial alignments
 		} else {
-			// Undo all the mutations
+			// Undo mutations 
 			ASSERT_ONLY(String<Dna5> tmp = (*_qry));
 			undoMutations();
 			bool hit;
 			if(_muts != NULL) {
+				// Add the mutations to the _mms[] array
 				assert_neq(tmp, (*_qry));
 				size_t numMuts = length(*_muts);
 				assert_leq(numMuts, _qlen);
@@ -1804,12 +1836,26 @@ protected:
 					// Entries in _mms[] are in terms of offset into
 					// _qry - not in terms of offset from 3' or 5' end
 					assert_lt(stackDepth + i, DEFAULT_SPREAD);
+					// All partial-alignment mutations should fall
+					// within bounds
+					assert_lt((*_muts)[i].pos, _qlen);
+					// All partial-alignment mutations should fall
+					// within unrevisitable region
+					assert_lt(_qlen - (*_muts)[i].pos - 1, _unrevOff);
+#ifndef NDEBUG
+					for(size_t j = 0; j < stackDepth + i; j++) {
+						assert_neq(_mms[j], (uint32_t)(*_muts)[i].pos);
+					}
+#endif
 					_mms[stackDepth + i] = (*_muts)[i].pos;
 				}
-				hit = reportHit(stackDepth+numMuts, top, bot);
+				// Report the range of full alignments
+				hit = reportFullAlignment(stackDepth+numMuts, top, bot);
 			} else {
-				hit = reportHit(stackDepth, top, bot);
+				// Report the range of full alignments
+				hit = reportFullAlignment(stackDepth, top, bot);
 			}
+			// Re-apply mutations
 			applyMutations();
 			assert_eq(tmp, (*_qry));
 			return hit;
@@ -1817,13 +1863,17 @@ protected:
 	}
 
 	/**
-	 * Report a hit with # mismatches = stackDepth, at rows delimited
-	 * by top and bot
+	 * Report a range of full alignments with # mismatches = stackDepth.
+	 * The range is delimited by top and bot.  Returns true if one or
+	 * more alignments were successfully reported.  Returns true iff
+	 * one or more full alignments were successfully reported and the
+	 * caller can stop searching.
 	 */
-	bool reportHit(uint32_t stackDepth, uint32_t top, uint32_t bot) {
-		// Possibly report
+	bool reportFullAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+		assert_gt(bot, top);
 		if(_oneHit) {
 			uint32_t spread = bot - top;
+			// Pick a random spot in the range to report
 			uint32_t r = top + (_rand.nextU32() % spread);
 			for(uint32_t i = 0; i < spread; i++) {
 				uint32_t ri = r + i;
@@ -1837,18 +1887,25 @@ protected:
 				{
 					return true;
 				}
+				// If that spot turned out to be a spurious alignment
+				// (usually because it overlapped some padding), then
+				// try the next element in the range
 			}
+			// All range elements were spurious; return false to
+			// indicate that the caller should keep looking
 			return false;
 		} else {
 			// Not yet smart enough to report all hits
 			assert(false);
+			// Return false to indicate that the caller should keep
+			// looking
 			return false;
 		}
 	}
 
 	/**
-	 * Report a "seedling hit" - i.e. report the mismatches that got us
-	 * here.
+	 * Report the partial alignment represented by the current stack
+	 * state (_mms[] and stackDepth).
 	 */
 	bool reportPartial(uint32_t stackDepth) {
 		// Possibly report
