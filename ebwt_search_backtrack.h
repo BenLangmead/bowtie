@@ -219,7 +219,7 @@ public:
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
 			oldQuals += qualRounds[quals[tpos1]-33]; // take quality hit
-			append(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
+			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
 			if(pal.entry.pos2 != 0xff) {
 				// Do second mutation
 				uint32_t pos2 = pal.entry.pos2;
@@ -1308,6 +1308,11 @@ public:
 				// Note the character that we're backtracking on in the
 				// mm array:
 				_mms[stackDepth] = icur;
+#ifndef NDEBUG
+				for(int j = 0; j < stackDepth; j++) {
+					assert_neq(_mms[j], icur)
+				}
+#endif
 				_chars[i] = btchar;
 				// Now backtrack to target
 				ASSERT_ONLY(uint64_t numHits = _params.sink().numHits());
