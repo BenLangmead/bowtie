@@ -172,6 +172,9 @@ public:
 				ASSERT_ONLY(type = _partialsList[off].entry.type);
 				assert(type == 2 || type == 3);
 				ps.push_back(_partialsList[off]);
+				assert_neq(ps.last().entry.pos0, ps.last().entry.pos1);
+				assert_neq(ps.last().entry.pos0, ps.last().entry.pos2);
+				assert_neq(ps.last().entry.pos1, ps.last().entry.pos2);
 			} while(_partialsList[off++].entry.type == 2);
 			assert_eq(3, _partialsList[off-1].entry.type);
 		}
@@ -219,6 +222,7 @@ public:
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
 			oldQuals += qualRounds[quals[tpos1]-33]; // take quality hit
+			assert_neq(tpos1, tpos0);
 			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
 			if(pal.entry.pos2 != 0xff) {
 				// Do second mutation
@@ -227,6 +231,8 @@ public:
 				uint32_t chr2 = pal.entry.char2;
 				oldChar = (uint8_t)seq[tpos2];
 				oldQuals += qualRounds[quals[tpos2]-33]; // take quality hit
+				assert_neq(tpos2, tpos0);
+				assert_neq(tpos2, tpos1);
 				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation
 			}
 		}
