@@ -999,7 +999,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = NULL;
 	mismatchSearch_os           = &os;
-	
+
 	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 	{
@@ -1414,8 +1414,8 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */ \
-	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */ \
+	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */
+	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */
 	BacktrackManager<String<Dna> > btr1(
 			ebwtFw, params,
 	        0, 0,           // 5, 3depth
@@ -1578,7 +1578,6 @@ static int                            seededQualSearch_qualCutoff;
 	HitSink&                       _sink    = *seededQualSearch_sink;     \
 	EbwtSearchStats<String<Dna> >& stats    = *seededQualSearch_stats;    \
 	vector<String<Dna5> >&         os       = *seededQualSearch_os;       \
-	SyncBitset&                    doneMask = *seededQualSearch_doneMask; \
 	int                          qualCutoff = seededQualSearch_qualCutoff; \
 	uint32_t lastLen = 0; \
 	PatternSourcePerThread *patsrc; \
@@ -1602,12 +1601,13 @@ static int                            seededQualSearch_qualCutoff;
 
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
+	SyncBitset& doneMask = *seededQualSearch_doneMask;
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	// BacktrackManager for finding exact hits for the forward-
 	// oriented read
-	BacktrackManager<String<Dna> > btf(
+	BacktrackManager<String<Dna> > btf1(
 			ebwtFw, params,
 	        0, 0,                  // 5, 3depth
 	        0,                     // unrevOff,
@@ -1625,7 +1625,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
-	BacktrackManager<String<Dna> > bt(
+	BacktrackManager<String<Dna> > bt1(
 			ebwtFw, params,
 	        0, 0,                  // 5, 3depth
 	        (seedMms > 0)? s5 : s, // unrevOff,
@@ -1642,101 +1642,28 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        true,                  // oneHit
 	        seed,                  // seed
 	        &os);
-	params.setFw(true);
-	params.setEbwtFw(true);
     while(true) {
     	GET_READ(patsrc);
 		size_t plen = length(patFw);
-		if(plen < 2 && seedMms >= 1) {
-			cerr << "Error: Read (" << name << ") is less than 2 characters long" << endl;
-			exit(1);
-		}
-		else if(plen < 3 && seedMms >= 2) {
-			cerr << "Error: Read (" << name << ") is less than 3 characters long" << endl;
-			exit(1);
-		}
-		else if(plen < 4 && seedMms >= 3) {
-			cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
-			exit(1);
-		}
-    	// Check and see if the distribution of Ns disqualifies
-    	// this read right off the bat
-		if(nsPolicy == NS_TO_NS) {
-			size_t slen = min<size_t>(plen, seedLen);
-			int ns = 0;
-			bool done = false;
-			for(size_t i = 0; i < slen; i++) {
-				if((int)(Dna5)patFw[i] == 4) {
-					if(++ns > seedMms) {
-						done = true;
-						break;
-					}
-				}
-			}
-			if(done) {
-				ASSERT_NO_HITS_FW(true);
-				ASSERT_NO_HITS_RC(true);
-				doneMask.set(patid);
-				continue;
-			}
-		}
-		// Do an exact-match search on the forward pattern, just in
-		// case we can pick it off early here
-		uint64_t numHits = sink.numHits();
-		btf.setQuery(&patFw, &qualFw, &name);
-    	btf.setOffs(0, 0, plen, plen, plen, plen);
-    	btf.backtrack();
-		if(sink.numHits() > numHits) {
-			assert_eq(numHits+1, sink.numHits());
-			doneMask.set(patid);
-			continue;
-		}
-		// Set up backtracker with reverse complement
-		params.setFw(false);
 		uint32_t qs = min<uint32_t>(plen, s);
-		// Set up special seed bounds
-		if(qs < s) {
-			uint32_t qs5 = (qs >> 1) + (qs & 1);
-			bt.setOffs(0, 0, (seedMms > 0)? qs5 : qs,
-			                 (seedMms > 1)? qs5 : qs,
-			                 (seedMms > 2)? qs5 : qs,
-			                 (seedMms > 3)? qs5 : qs);
-		}
-		bt.setQuery(&patRc, &qualRc, &name);
-		ASSERT_ONLY(numHits = sink.numHits());
-		bool hit = bt.backtrack();
-		// Restore default seed bounds
-		if(qs < s) {
-			bt.setOffs(0, 0, (seedMms > 0)? s5 : s,
-			                 (seedMms > 1)? s5 : s,
-			                 (seedMms > 2)? s5 : s,
-			                 (seedMms > 3)? s5 : s);
-		}
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) {
-			// If we reach here, then we obtained a hit for case
-			// 1R, 2R or 3R and can stop considering this read
-			doneMask.set(patid);
-		} else {
-			// If we reach here, then cases 1R, 2R, and 3R have
-			// been eliminated and the read needs further
-			// examination
-		}
-		params.setFw(true);
+		uint32_t qs5 = (qs >> 1) + (qs & 1);
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_seeded_phase1.c"
+		#undef DONEMASK_SET
     }
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase2(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
+	SyncBitset& doneMask = *seededQualSearch_doneMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
 	// BacktrackManager to search for hits for cases 1F, 2F, 3F
-	BacktrackManager<String<Dna> > btf(
+	BacktrackManager<String<Dna> > btf2(
 			ebwtBw, params,
 	        0, 0,                  // 5, 3depth
             (seedMms > 0)? s5 : s, // unrevOff
@@ -1754,7 +1681,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		    seed+1,                // seed
 		    &os);                  // reference sequences
 	// BacktrackManager to search for partial alignments for case 4R
-	BacktrackManager<String<Dna> > btr(
+	BacktrackManager<String<Dna> > btr2(
 			ebwtBw, params,
 	        0, 0,                  // 5, 3depth
 	        s3,                    // unrevOff
@@ -1771,111 +1698,23 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        true,                  // oneHit
 		    seed+2,                // seed
 		    &os);                  // reference sequences
-	params.setFw(true);
-	params.setEbwtFw(false);
     while(true) {
 		GET_READ(patsrc);
-		if(doneMask.test(patid)) continue;
-		// If we reach here, then cases 1R, 2R, and 3R have been
-    	// eliminated.  The next most likely cases are 1F, 2F and
-    	// 3F...
-		params.setFw(true);  // looking at forward strand
 		size_t plen = length(patFw);
-		btf.setQuery(&patFw, &qualFw, &name);
 		uint32_t qs = min<uint32_t>(plen, s);
-		// Set up special seed bounds
-		if(qs < s) {
-			uint32_t qs5 = (qs >> 1) + (qs & 1); // length of 5' half of seed
-			btf.setOffs(0, 0,
-			            (seedMms > 0)? qs5 : qs,
-			            (seedMms > 1)? qs5 : qs,
-			            (seedMms > 2)? qs5 : qs,
-			            (seedMms > 3)? qs5 : qs);
-		}
-		ASSERT_ONLY(uint64_t numHits = sink.numHits());
-		// Do a 12/24 backtrack on the forward-strand read using
-		// the mirror index.  This will find all case 1F, 2F
-		// and 3F hits.
-		bool hit = btf.backtrack();
-		// Restore default seed bounds
-		if(qs < s) {
-			btf.setOffs(0, 0,
-			            (seedMms > 0)? s5 : s,
-			            (seedMms > 1)? s5 : s,
-			            (seedMms > 2)? s5 : s,
-			            (seedMms > 3)? s5 : s);
-		}
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
-		if(hit) {
-			// The reverse complement hit, so we're done with this
-			// read
-			doneMask.set(patid);
-			continue;
-		}
-		// No need to collect partial alignments if we're not
-		// allowing mismatches in the 5' seed half
-		if(seedMms == 0) continue;
-
-		// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
-		// have been eliminated, leaving us with cases 4F and 4R
-		// (the cases with 1 mismatch in the 5' half of the seed)
-		params.setFw(false);  // looking at reverse-comp strand
-		qs = min<uint32_t>(plen, s);
-		// Set up special seed bounds
-		if(qs < s) {
-			uint32_t qs3 = qs >> 1;
-			btr.setOffs(0, 0,
-			            qs3,
-			            (seedMms > 1)? qs3 : qs,
-			            (seedMms > 2)? qs3 : qs,
-			            (seedMms > 3)? qs3 : qs);
-		}
-		btr.setQuery(&patRc, &qualRc, &name);
-		btr.setQlen(s); // just look at the seed
-		// Find partial alignments for case 4R
-		hit = btr.backtrack();
-		// Restore default seed bounds
-		if(qs < s) {
-			btr.setOffs(0, 0,
-			            s3,
-			            (seedMms > 1)? s3 : s,
-			            (seedMms > 2)? s3 : s,
-			            (seedMms > 3)? s3 : s);
-		}
-#ifndef NDEBUG
-		if(seedMms > 0) {
-			vector<PartialAlignment> partials;
-			assert(pamRc != NULL);
-			pamRc->getPartials(patid, partials);
-			if(hit) assert_gt(partials.size(), 0);
-			for(size_t i = 0; i < partials.size(); i++) {
-				uint32_t pos0 = partials[i].entry.pos0;
-				assert_lt(pos0, s5);
-				uint8_t oldChar = (uint8_t)patRc[pos0];
-				assert_neq(oldChar, partials[i].entry.char0);
-				if(partials[i].entry.pos1 != 0xff) {
-					uint32_t pos1 = partials[i].entry.pos1;
-					assert_lt(pos1, s5);
-					oldChar = (uint8_t)patRc[pos1];
-					assert_neq(oldChar, partials[i].entry.char1);
-					if(partials[i].entry.pos2 != 0xff) {
-						uint32_t pos2 = partials[i].entry.pos2;
-						assert_lt(pos2, s5);
-						oldChar = (uint8_t)patRc[pos2];
-						assert_neq(oldChar, partials[i].entry.char2);
-					}
-				}
-			}
-		}
-#endif
+		uint32_t qs3 = (qs >> 1);
+		uint32_t qs5 = (qs >> 1) + (qs & 1);
+		if(doneMask.test(patid)) continue;
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_seeded_phase2.c"
+		#undef DONEMASK_SET
     }
-    // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase3(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
+	SyncBitset& doneMask = *seededQualSearch_doneMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -1883,7 +1722,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	PartialAlignmentManager* pamFw    = seededQualSearch_pamFw;
 	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
 	// BacktrackManager to search for seedlings for case 4F
-	BacktrackManager<String<Dna> > btf(
+	BacktrackManager<String<Dna> > btf3(
 			ebwtFw, params,
 	        0, 0,                  // 5, 3depth
             s3,                    // unrevOff
@@ -1902,7 +1741,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    &os);
 	// BacktrackManager to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
-	BacktrackManager<String<Dna> > btr(
+	BacktrackManager<String<Dna> > btr3(
 			ebwtFw, params,
 	        0, 0,    // 5, 3depth
 	        s,       // unrevOff
@@ -1920,7 +1759,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    seed+4,  // seed
 		    &os);
 	// The half-and-half BacktrackManager
-	BacktrackManager<String<Dna> > btr2(
+	BacktrackManager<String<Dna> > btr23(
 			ebwtFw, params,
 	        s5, s,
 	        0,                      // unrevOff
@@ -1940,180 +1779,30 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    true,    // considerQuals
 		    true);   // halfAndHalf
 	vector<PartialAlignment> pals;
-	params.setFw(false);
-	params.setEbwtFw(true);
     while(true) {
 		GET_READ(patsrc);
-		if(doneMask.test(patid)) continue;
-		params.setFw(false);  // looking at reverse-comp strand
-		btr.setQuery(&patRc, &qualRc, &name);
-
-		// Given the partial alignments generated in phase 2, check
-		// for hits for case 4R
-		uint32_t plen = length(patRc);
+		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs3 = qs >> 1;
+		uint32_t qs3 = (qs >> 1);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
-
-		// Get all partial alignments for this read's reverse
-		// complement
-		pals.clear();
-		if(pamRc != NULL) {
-			// We can get away with an unsynchronized call because there
-			// are no writers for pamRc in this phase
-			pamRc->getPartialsUnsync(patid, pals);
-		}
-		bool hit = false;
-		if(pals.size() > 0) {
-			// Partial alignments exist - extend them
-			// Set up special seed bounds
-			if(qs < s) {
-				btr.setOffs(0, 0, qs, qs, qs, qs);
-			}
-			for(size_t i = 0; i < pals.size(); i++) {
-				String<QueryMutation> muts;
-				uint8_t oldQuals =
-					PartialAlignmentManager::toMutsString(
-							pals[i], patRc, qualRc, muts);
-
-				// Set the backtracking thresholds appropriately
-				// Now begin the backtracking, treating the first
-				// 24 bases as unrevisitable
-				ASSERT_ONLY(uint64_t numHits = sink.numHits());
-				ASSERT_ONLY(String<Dna5> tmp = patRc);
-				btr.setMuts(&muts);
-				hit = btr.backtrack(oldQuals);
-				btr.setMuts(NULL);
-				assert_eq(tmp, patRc); // assert mutations were undone
-				assert(hit  || numHits == sink.numHits());
-				assert(!hit || numHits <  sink.numHits());
-				if(hit) {
-					// The reverse complement hit, so we're done with this
-					// read
-					doneMask.set(patid);
-					// Got a hit; stop processing partial
-					// alignments
-					break;
-				}
-			} // Loop over partial alignments
-			// Restore usual seed bounds
-			if(qs < s) {
-				btr.setOffs(0, 0, s, s, s, s);
-			}
-		}
-
-		// Case 4R yielded a hit; mark this pattern as done and
-		// continue to next pattern
-    	if(hit) continue;
-
-    	// If we're in two-mismatch mode, then now is the time to
-    	// try the final case that might apply to the reverse
-    	// complement pattern: 1 mismatch in each of the 3' and 5'
-    	// halves of the seed.
-    	bool gaveUp = false;
-    	if(seedMms >= 2) {
-			btr2.setQuery(&patRc, &qualRc, &name);
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			// Set up special seed bounds
-			if(qs < s) {
-				btr2.setOffs(qs5, qs,
-				             0,                         // unrevOff
-				             (seedMms <= 2)? qs5 : 0,   // 1revOff
-				             (seedMms < 3 )? qs  : qs5, // 2revOff
-				             qs);                       // 3revOff
-			}
-			bool hit = btr2.backtrack();
-			// Restore usual seed bounds
-			if(qs < s) {
-				btr2.setOffs(s5, s,
-				             0,                         // unrevOff
-				             (seedMms <= 2)? s5 : 0,    // 1revOff
-				             (seedMms < 3 )? s  : s5,   // 2revOff
-				             s);                        // 3revOff
-			}
-			if(btr2.numBacktracks() == btr2.maxBacktracks()) {
-				gaveUp = true;
-			}
-			btr2.resetNumBacktracks();
-			assert(hit  || numHits == sink.numHits());
-			assert(!hit || numHits <  sink.numHits());
-			if(hit) {
-				doneMask.set(patid);
-				continue;
-			}
-    	}
-
-#ifndef NDEBUG
-		// The reverse-complement version of the read doesn't hit
-    	// at all!  Check with the oracle to make sure it agrees.
-    	if(!gaveUp) {
-    		ASSERT_NO_HITS_RC(true);
-    	}
-#endif
-
-		// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, 3R and
-		// 4R have been eliminated leaving only 4F.
-		params.setFw(true);  // looking at forward strand
-		btf.setQuery(&patFw, &qualFw, &name);
-		btf.setQlen(seedLen); // just look at the seed
-		// Set up special seed bounds
-		if(qs < s) {
-			btf.setOffs(0, 0,
-			            qs3,
-			            (seedMms > 1)? qs3 : qs,
-			            (seedMms > 2)? qs3 : qs,
-			            (seedMms > 3)? qs3 : qs);
-		}
-		// Do a 12/24 seedling backtrack on the forward read
-		// using the normal index.  This will find seedlings
-		// for case 4F
-		btf.backtrack();
-		// Set up special seed bounds
-		if(qs < s) {
-			btf.setOffs(0, 0,
-			            s3,
-			            (seedMms > 1)? s3 : s,
-			            (seedMms > 2)? s3 : s,
-			            (seedMms > 3)? s3 : s);
-		}
-#ifndef NDEBUG
-		if(seedMms > 0) {
-			vector<PartialAlignment> partials;
-			pamFw->getPartials(patid, partials);
-			if(hit) assert_gt(partials.size(), 0);
-			for(size_t i = 0; i < partials.size(); i++) {
-				uint32_t pos0 = partials[i].entry.pos0;
-				assert_lt(pos0, s5);
-				uint8_t oldChar = (uint8_t)patFw[pos0];
-				assert_neq(oldChar, partials[i].entry.char0);
-				if(partials[i].entry.pos1 != 0xff) {
-					uint32_t pos1 = partials[i].entry.pos1;
-					assert_lt(pos1, s5);
-					oldChar = (uint8_t)patFw[pos1];
-					assert_neq(oldChar, partials[i].entry.char1);
-					if(partials[i].entry.pos2 != 0xff) {
-						uint32_t pos2 = partials[i].entry.pos2;
-						assert_lt(pos2, s5);
-						oldChar = (uint8_t)patFw[pos2];
-						assert_neq(oldChar, partials[i].entry.char2);
-					}
-				}
-			}
-		}
-#endif
+		if(doneMask.test(patid)) continue;
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_seeded_phase3.c"
+		#undef DONEMASK_SET
     }
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase4(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
+	SyncBitset& doneMask = *seededQualSearch_doneMask;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamFw = seededQualSearch_pamFw;
 	// BacktrackManager to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
-	BacktrackManager<String<Dna> > btf(
+	BacktrackManager<String<Dna> > btf4(
 			ebwtBw, params,
 	        0, 0,    // 5, 3depth
             s,       // unrevOff
@@ -2131,7 +1820,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        seed+6,  // seed
 	        &os);
 	// Half-and-half BacktrackManager for forward read
-	BacktrackManager<String<Dna> > btf2(
+	BacktrackManager<String<Dna> > btf24(
 			ebwtBw, params,
 	        s5, s,   // 5, 3depth
 	        0,                      // unrevOff
@@ -2150,114 +1839,222 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        &os,
 	        true,    // considerQuals
 	        true);   // halfAndHalf
-	params.setFw(true);  // looking only at forward strand
 	vector<PartialAlignment> pals;
-	params.setFw(true);
-	params.setEbwtFw(false);
     while(true) {
 		GET_READ_FW(patsrc);
-		if(doneMask.testUnsync(patid)) continue;
-		params.setFw(true);
-		btf.setQuery(&patFw, &qualFw, &name);
-
-		// Given the seedlines generated in phase 3, check for hits
-		// for case 4F
-		uint32_t plen = length(patFw);
+		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
-
-		// Get all partial alignments for this read's reverse
-		// complement
-		pals.clear();
-		if(pamFw != NULL) {
-			// We can get away with an unsynchronized call because there
-			// are no writers for pamFw in this phase
-			pamFw->getPartialsUnsync(patid, pals);
-		}
-		bool hit = false;
-		if(pals.size() > 0) {
-			// Partial alignments exist - extend them
-			// Set up special seed bounds
-			if(qs < s) {
-				btf.setOffs(0, 0, qs, qs, qs, qs);
-			}
-			for(size_t i = 0; i < pals.size(); i++) {
-				String<QueryMutation> muts;
-				uint8_t oldQuals =
-					PartialAlignmentManager::toMutsString(
-							pals[i], patFw, qualFw, muts);
-
-				// Set the backtracking thresholds appropriately
-				// Now begin the backtracking, treating the first
-				// 24 bases as unrevisitable
-				ASSERT_ONLY(uint64_t numHits = sink.numHits());
-				ASSERT_ONLY(String<Dna5> tmp = patFw);
-				btf.setMuts(&muts);
-				hit = btf.backtrack(oldQuals);
-				btf.setMuts(NULL);
-				assert_eq(tmp, patFw); // assert mutations were undone
-				assert(hit  || numHits == sink.numHits());
-				assert(!hit || numHits <  sink.numHits());
-				if(hit) {
-					// Got a hit; stop processing partial
-					// alignments
-					break;
-				}
-			} // Loop over partial alignments
-			// Restore usual seed bounds
-			if(qs < s) {
-				btf.setOffs(0, 0, s, s, s, s);
-			}
-		}
-
-		// Case 4F yielded a hit; continue to next pattern
-    	if(hit) continue;
-
-    	// If we're in two-mismatch mode, then now is the time to
-    	// try the final case that might apply to the forward
-    	// pattern: 1 mismatch in each of the 3' and 5' halves of
-    	// the seed.
-    	bool gaveUp = false;
-    	if(seedMms >= 2) {
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
-			btf2.setQuery(&patFw, &qualFw, &name);
-			// Set special seed bounds
-			if(qs < s) {
-				btf2.setOffs(qs5, qs,
-				             0,                        // unrevOff
-				             (seedMms <= 2)? qs5 : 0,  // 1revOff
-				             (seedMms < 3)? qs : qs5,  // 2revOff
-				             qs);                      // 3revOff
-			}
-			bool hit = btf2.backtrack();
-			// Restore usual seed bounds
-			if(qs < s) {
-				btf2.setOffs(s5, s,
-				             0,                        // unrevOff
-				             (seedMms <= 2)? s5 : 0,   // 1revOff
-				             (seedMms < 3)? s : s5,    // 2revOff
-				             s);                       // 3revOff
-			}
-			if(btf2.numBacktracks() == btf2.maxBacktracks()) {
-				gaveUp = true;
-			}
-			btf2.resetNumBacktracks();
-			assert(hit  || numHits == sink.numHits());
-			assert(!hit || numHits <  sink.numHits());
-			if(hit) {
-				continue;
-			}
-    	}
-#ifndef NDEBUG
-		// The forward version of the read doesn't hit at all!
-		// Check with the oracle to make sure it agrees.
-    	if(!gaveUp) {
-    		ASSERT_NO_HITS_FW(false);
-		}
-#endif
-    } // while(patsrc.hasMorePatterns()...
+		if(doneMask.test(patid)) continue;
+		#define DONEMASK_SET(p) doneMask.set(p)
+		#include "search_seeded_phase4.c"
+		#undef DONEMASK_SET
+    }
 	WORKER_EXIT();
 }
+
+static void* seededQualSearchWorkerFull(void *vp) {
+	SEEDEDQUAL_WORKER_SETUP();
+	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
+	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
+	PartialAlignmentManager * pamRc = NULL;
+	PartialAlignmentManager * pamFw = NULL;
+	if(seedMms > 0) {
+		pamRc = new PartialAlignmentManager(64);
+		pamFw = new PartialAlignmentManager(64);
+	}
+	vector<PartialAlignment> pals;
+	// BacktrackManager for finding exact hits for the forward-
+	// oriented read
+	BacktrackManager<String<Dna> > btf1(
+			ebwtFw, params,
+	        0, 0,                  // 5, 3depth
+	        0,                     // unrevOff,
+	        0,                     // 1revOff
+	        0,                     // 2revOff
+	        0,                     // 3revOff
+	        0, 0,                  // itop, ibot
+	        qualCutoff,            // qualThresh
+	        maxBts,                // max backtracks
+	        0,                     // reportSeedlings (don't)
+	        NULL,                  // seedlings
+	        NULL,                  // mutations
+	        verbose,               // verbose
+	        true,                  // oneHit
+	        seed,                  // seed
+	        &os,
+	        false);                // considerQuals
+	BacktrackManager<String<Dna> > bt1(
+			ebwtFw, params,
+	        0, 0,                  // 5, 3depth
+	        0,                     // unrevOff,
+	        0,                     // 1revOff
+	        0,                     // 2revOff
+	        0,                     // 3revOff
+	        0, 0,                  // itop, ibot
+	        qualCutoff,            // qualThresh
+	        maxBts,                // max backtracks
+	        0,                     // reportSeedlings (don't)
+	        NULL,                  // seedlings
+	        NULL,                  // mutations
+	        verbose,               // verbose
+	        true,                  // oneHit
+	        seed,                  // seed
+	        &os);
+	// BacktrackManager to search for hits for cases 1F, 2F, 3F
+	BacktrackManager<String<Dna> > btf2(
+			ebwtBw, params,
+	        0, 0,                  // 5, 3depth
+            0, // unrevOff
+            0, // 1revOff
+            0, // 2revOff
+            0, // 3revOff
+	        0, 0,                  // itop, ibot
+	        qualCutoff,            // qualThresh
+	        maxBts,                // max backtracks
+	        0,                     // reportSeedlings (no)
+	        NULL,                  // partial alignment manager
+		    NULL,                  // mutations
+	        verbose,               // verbose
+	        true,                  // oneHit
+		    seed+1,                // seed
+		    &os);                  // reference sequences
+	// BacktrackManager to search for partial alignments for case 4R
+	BacktrackManager<String<Dna> > btr2(
+			ebwtBw, params,
+	        0, 0,                  // 5, 3depth
+	        0,                    // unrevOff
+	        0, // 1revOff
+			0, // 2revOff
+			0, // 3revOff
+	        0, 0,                  // itop, ibot
+	        qualCutoff,            // qualThresh (none)
+	        maxBts,                // max backtracks
+	        seedMms,               // report partials (up to seedMms mms)
+	        pamRc,                 // partial alignment manager
+		    NULL,                  // mutations
+	        verbose,               // verbose
+	        true,                  // oneHit
+		    seed+2,                // seed
+		    &os);                  // reference sequences
+	// BacktrackManager to search for seedlings for case 4F
+	BacktrackManager<String<Dna> > btf3(
+			ebwtFw, params,
+	        0, 0,                  // 5, 3depth
+            0,                    // unrevOff
+            0, // 1revOff
+            0, // 2revOff
+            0, // 3revOff
+	        0, 0,                  // itop, ibot
+	        qualCutoff,            // qualThresh (none)
+	        maxBts,                // max backtracks
+	        seedMms,               // reportSeedlings (do)
+	        pamFw,                 // seedlings
+		    NULL,                  // mutations
+	        verbose,               // verbose
+	        true,                  // oneHit
+		    seed+3,                // seed
+		    &os);
+	// BacktrackManager to search for hits for case 4R by extending
+	// the partial alignments found in Phase 2
+	BacktrackManager<String<Dna> > btr3(
+			ebwtFw, params,
+	        0, 0,    // 5, 3depth
+	        0,       // unrevOff
+	        0,       // 1revOff
+	        0,       // 2revOff
+	        0,       // 3revOff
+	        0, 0,    // itop, ibot
+	        qualCutoff, // qualThresh
+	        maxBts,  // max backtracks
+	        0,       // reportSeedlings (don't)
+	        NULL,    // seedlings
+		    NULL,    // mutations
+	        verbose, // verbose
+	        true,    // oneHit
+		    seed+4,  // seed
+		    &os);
+	// The half-and-half BacktrackManager
+	BacktrackManager<String<Dna> > btr23(
+			ebwtFw, params,
+	        0, 0,
+	        0,                      // unrevOff
+	        0, // 1revOff
+	        0, // 2revOff
+	        0,                      // 3revOff
+	        0, 0,    // itop, ibot
+	        qualCutoff, // qualThresh
+	        maxBts,  // max backtracks
+	        0,       // reportSeedlings (don't)
+	        NULL,    // seedlings
+		    NULL,    // mutations
+	        verbose, // verbose
+	        true,    // oneHit
+		    seed+5,  // seed
+		    &os,
+		    true,    // considerQuals
+		    true);   // halfAndHalf
+	// BacktrackManager to search for hits for case 4F by extending
+	// the partial alignments found in Phase 3
+	BacktrackManager<String<Dna> > btf4(
+			ebwtBw, params,
+	        0, 0,    // 5, 3depth
+            0,       // unrevOff
+            0,       // 1revOff
+            0,       // 2revOff
+            0,       // 3revOff
+	        0, 0,    // itop, ibot
+	        qualCutoff, // qualThresh
+	        maxBts,  // max backtracks
+	        0,       // reportSeedlings (don't)
+	        NULL,    // seedlings
+		    NULL,    // mutations
+	        verbose, // verbose
+	        true,    // oneHit
+	        seed+6,  // seed
+	        &os);
+	// Half-and-half BacktrackManager for forward read
+	BacktrackManager<String<Dna> > btf24(
+			ebwtBw, params,
+	        0, 0,   // 5, 3depth
+	        0,                      // unrevOff
+	        0, // 1revOff
+	        0, // 2revOff
+	        0,                      // 3revOff
+	        0, 0,    // itop, ibot
+	        qualCutoff, // qualThresh
+	        maxBts,  // max backtracks
+	        0,       // reportSeedlings (don't)
+	        NULL,    // seedlings
+		    NULL,    // mutations
+	        verbose, // verbose
+	        true,    // oneHit
+	        seed+7,  // seed
+	        &os,
+	        true,    // considerQuals
+	        true);   // halfAndHalf
+    while(true) {
+    	GET_READ(patsrc);
+		size_t plen = length(patFw);
+		uint32_t s = seedLen;
+		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
+		uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
+		uint32_t qs = min<uint32_t>(plen, s);
+		uint32_t qs3 = qs >> 1;
+		uint32_t qs5 = (qs >> 1) + (qs & 1);
+		#define DONEMASK_SET(p)
+		#include "search_seeded_phase1.c"
+		patsrc->reverseRead();
+		#include "search_seeded_phase2.c"
+		patsrc->reverseRead();
+		#include "search_seeded_phase3.c"
+		patsrc->reverseRead();
+		#include "search_seeded_phase4.c"
+		#undef DONEMASK_SET
+    }
+	WORKER_EXIT();
+}
+
 
 /**
  * Search for a good alignments for each read using criteria that
@@ -2429,6 +2226,80 @@ static void seededQualCutoffSearch(
 	delete[] threads;
 }
 
+/**
+ * Search for a good alignments for each read using criteria that
+ * correspond somewhat faithfully to Maq's.  Search is aided by a pair
+ * of Ebwt indexes, one for the original references, and one for the
+ * transpose of the references.  Neither index should be loaded upon
+ * entry to this function.
+ *
+ * Like Maq, we treat the first 24 base pairs of the read (those
+ * closest to the 5' end) differently from the remainder of the read.
+ * We call the first 24 base pairs the "seed."
+ */
+template<typename TStr>
+static void seededQualCutoffSearchFull(
+		int seedLen,                    /// length of seed (not a maq option)
+        int qualCutoff,                 /// maximum sum of mismatch qualities
+                                        /// like maq map's -e option
+                                        /// default: 70
+        int seedMms,                    /// max # mismatches allowed in seed
+                                        /// (like maq map's -n option)
+                                        /// Can only be 1 or 2, default: 1
+        PatternSource& _patsrc,         /// pattern source
+        HitSink& _sink,                 /// hit sink
+        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
+        Ebwt<TStr>& ebwtFw,             /// index of original text
+        Ebwt<TStr>& ebwtBw,             /// index of mirror text
+        vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
+{
+	// Global intialization
+	assert(revcomp);
+	assert_leq(seedMms, 3);
+
+	seededQualSearch_patsrc   = &_patsrc;
+	seededQualSearch_sink     = &_sink;
+	seededQualSearch_stats    = &stats;
+	seededQualSearch_ebwtFw   = &ebwtFw;
+	seededQualSearch_ebwtBw   = &ebwtBw;
+	seededQualSearch_os       = &os;
+	seededQualSearch_doneMask = NULL;
+	seededQualSearch_pamFw    = NULL;
+	seededQualSearch_pamRc    = NULL;
+	seededQualSearch_qualCutoff = qualCutoff;
+
+#ifdef BOWTIE_PTHREADS
+	pthread_attr_t pthread_custom_attr;
+	pthread_attr_init(&pthread_custom_attr);
+	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_t *threads = new pthread_t[nthreads-1];
+#endif
+
+	SWITCH_TO_FW_INDEX();
+	assert(ebwtFw.isInMemory());
+	assert(!ebwtBw.isInMemory());
+	{
+		// Load the other half of the index into memory
+		Timer _t(cout, "Time loading mirror index: ", timing);
+		ebwtBw.loadIntoMemory();
+	}
+	{
+		// Phase 1: Consider cases 1R and 2R
+		Timer _t(cout, "Seeded quality full-index search: ", timing);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerFull, (void *)(long)(i+1));
+		}
+#endif
+		seededQualSearchWorkerFull((void*)0L);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_join(threads[i], NULL);
+		}
+#endif
+	}
+	delete[] threads;
+}
 /**
  * Try to find the Bowtie index specified by the user.  First try the
  * exact path given by the user.  Then try the user-provided string
@@ -2621,15 +2492,27 @@ static void driver(const char * type,
 		}
 		EbwtSearchStats<TStr> stats;
 		if(maqLike) {
-			seededQualCutoffSearch(seedLen,
-			                       qualThresh,
-			                       seedMms,
-			                       *patsrc,
-			                       *sink,
-			                       stats,
-			                       ebwt,    // forward index
-			                       *ebwtBw, // mirror index (not optional)
-			                       os);     // references, if available
+			if(!fullIndex) {
+				seededQualCutoffSearch(seedLen,
+									   qualThresh,
+									   seedMms,
+									   *patsrc,
+									   *sink,
+									   stats,
+									   ebwt,    // forward index
+									   *ebwtBw, // mirror index (not optional)
+									   os);     // references, if available
+			} else {
+				seededQualCutoffSearchFull(seedLen,
+				                           qualThresh,
+				                           seedMms,
+				                           *patsrc,
+				                           *sink,
+				                           stats,
+				                           ebwt,    // forward index
+				                           *ebwtBw, // mirror index (not optional)
+				                           os);     // references, if available
+			}
 		}
 		else if(mismatches > 0) {
 			if(mismatches == 1) {

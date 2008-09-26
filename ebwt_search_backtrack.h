@@ -96,9 +96,11 @@ public:
 	PartialAlignmentManager(size_t listSz = 10 * 1024 * 1024) {
 		MUTEX_INIT(_partialLock);
 		// Reserve space for 10M partialsList entries = 40 MB
-		_partialsList.resize(listSz);
+		_partialsList.reserve(listSz);
 	}
-	
+
+	~PartialAlignmentManager() { }
+
 	/**
 	 * Add a set of partial alignments for a particular patid into the
 	 * partial-alignment database.  This version locks the database,
@@ -132,7 +134,7 @@ public:
 		assert(_partialsMap.find(patid) != _partialsMap.end());
 		MUTEX_UNLOCK(_partialLock);
 	}
-	
+
 	/**
 	 * Get a set of partial alignments for a particular patid out of
 	 * the partial-alignment database.
@@ -175,7 +177,20 @@ public:
 		}
 		assert_gt(ps.size(), 0);
 	}
-	
+
+	/// Call to clear the database when there is only one element in it
+	void clear(uint32_t patid) {
+		assert_eq(1, _partialsMap.count(patid));
+		assert_eq(1, _partialsMap.size());
+		_partialsMap.erase(patid);
+		assert_eq(0, _partialsMap.size());
+		_partialsList.clear();
+	}
+
+	size_t size() {
+		return _partialsMap.size();
+	}
+
 	/**
 	 * Convert a partial alignment into a QueryMutation string.
 	 */
