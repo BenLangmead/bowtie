@@ -2114,7 +2114,11 @@ static void seededQualCutoffSearch(
 	SWITCH_TO_FW_INDEX();
 	{
 		// Phase 1: Consider cases 1R and 2R
-		Timer _t(cout, "Seeded quality search Phase 1 of 4: ", timing);
+		const char * msg = "Seeded quality search Phase 1 of 4: ";
+		if(seedMms == 0) {
+			msg = "Seeded quality search Phase 1 of 2: ";
+		}
+		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase1, (void *)(long)(i+1));
@@ -2143,7 +2147,11 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
 		// for case 4R
-		Timer _t(cout, "Seeded quality search Phase 2 of 4: ", timing);
+		const char * msg = "Seeded quality search Phase 2 of 4: ";
+		if(seedMms == 0) {
+			msg = "Seeded quality search Phase 2 of 2: ";
+		}
+		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase2, (void *)(long)(i+1));
