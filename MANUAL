@@ -190,6 +190,13 @@ Bowtie Manual
   -t/--time          Print the amount of wall-clock time taken by each
                      search phase and index turnover.
   
+  --fast             Load both the forward and mirror indexes into
+                     memory at once.  This obviates the need for
+                     multiple matching phases and read file read-ins.
+                     'bowtie' is somewhat faster in this mode and
+                     scales better to multiple threads, at the cost of
+                     double the memory footprint.
+  
   --solexa-quals     Convert FASTQ qualities from solexa-scaled to
                      phred-scaled.  Used with -q.  Default: off.
   
@@ -221,6 +228,8 @@ Bowtie Manual
                      generator.
 
   --verbose          Print verbose output (for debugging).
+  
+  -h/-?/--help       Print usage information and quit.
 
   --version          Print version information and quit.
 

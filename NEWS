@@ -20,7 +20,24 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.5 -
+Version 0.9.5 - September 26, 2008
+   * Last column of output now additionally reports the reference and
+     query bases (in that order) for mismatches.  E.g., old: "30,32",
+     new: "30:C>A,32:C>T".
+   * Eliminated spurious trailing space in first column of output.
+   * Minor performance and sensitivity improvements
+   * New option '-p' spawns a user-specified number of pthreads for
+     parallel processing of reads.  For example, use '-p 4' to run
+     'bowtie' on 4 processor cores simultaneously.
+   * Due to the new '-p' option, 'bowtie' needs pthreads to compile and
+     run.  To compile 'bowtie' without pthreads support (which disables
+     the '-p' option), use 'make BOWTIE_PTHREADS=0'.
+   * New option '--fast' causes Bowtie to load both the "forward" and
+     "mirror" halves of the index at once, which eliminates the need
+     for multiple phases and speeds up matching at the cost of using
+     about twice as much memory.  '--fast' also causes 'bowtie' to
+     scale better when used in combination with '-p'.
+   * Fixed crashing bug with -o/--offrate in 'bowtie'.
    * Improved error reporting
 
 Version 0.9.4 - September 16, 2008

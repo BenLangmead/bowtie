@@ -71,13 +71,14 @@ static void printUsage(ostream& out) {
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
 	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
-	    //<< "    -h/--chunkrate <int>    # of characters in a text chunk" << endl
+	    //<< "    --chunkrate <int>       # of characters in a text chunk" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -v/--verbose            verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
+	    << "    -h/-?/--help            print this usage message" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
 }
