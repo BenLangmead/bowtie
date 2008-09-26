@@ -862,9 +862,9 @@ public:
 
 	// Searching and reporting
 	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l = NULL) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
 	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
 	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
@@ -1202,7 +1202,8 @@ public:
 	void reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
-	               const uint32_t *mmui32,   // mismatch list
+	               const uint32_t *mmui32, // mismatch list
+	               const char *refcs,  // reference characters
 	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
@@ -1218,6 +1219,8 @@ public:
 		reserve(pat, qlen);
 		String<char> patQuals;
 		String<char> patName;
+		vector<char> refc;
+		refc.resize(qlen, 0);
 		if(name != NULL) assign(patName, *name);
 		if (_ebwtFw) {
 			pat = query;
@@ -1250,19 +1253,17 @@ public:
 				// The 3' end is on the left but the mm vector encodes
 				// mismatches w/r/t the 5' end, so we flip
 				mm.set(len - mmui32[i] - 1);
+				refc[len - mmui32[i] - 1] = refcs[i];
 			}
 			else {
 				mm.set(mmui32[i]);
+				refc[mmui32[i]] = refcs[i];
 			}
 		}
 		bool provisional =
 			_backtracking &&             // this is a 1-mismatch alignment
 		    _mhp == MHP_PICK_1_RANDOM && // report 1 hit (not all)
 		    _doProvisional;
-		//if(!_ebwtFw && !_arrowMode) {
-		//	h.second = (textlen - h.second - 1);
-		//	h.second -= (qlen-1);
-		//}
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
@@ -1334,9 +1335,11 @@ public:
 			// reverse complement.  If the reverse complement does
 			// eventually match, then we'll reject this provisional
 			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms));
+			sink().reportProvisionalHit(
+				Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
 		} else {
-			sink().reportHit(Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, oms));
+			sink().reportHit(
+				Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
 		}
 	}
 	void write(ostream& out) const {
@@ -1526,7 +1529,8 @@ public:
 		_qidx(length(*_query)-1),
 		_topSideLocus(),
 		_botSideLocus(),
-		_mism(0xffffffff)
+		_mism(0xffffffff),
+		_refc('N')
 	{
 		assert(_query != NULL); // name and quals are allowed to be NULL
 		_narrowHalfLen = _qlen;
@@ -1559,7 +1563,8 @@ public:
 		_qidx(0),
 		_topSideLocus(),
 		_botSideLocus(),
-		_mism(0xffffffff)
+		_mism(0xffffffff),
+		_refc('N')
 	{ }
 
 	void newQuery(String<Dna5>* __query,
@@ -1630,7 +1635,8 @@ public:
 	uint32_t  qlen() const          { return _qlen; }
 	uint32_t  qidx() const          { return _qidx; }
 	uint32_t  mismatch() const      { return _mism; }
-	const uint32_t *mismatchPtr() const   { return &_mism; }
+	const uint32_t *mismatchPtr() const { return &_mism; }
+	const char *refcPtr() const { return &_refc; }
 	uint32_t  numMismatches() const { if(_mism == 0xffffffff) return 0; return 1; }
 	/// Return true iff we're currently matching in the "back half" of the read
 	bool inNarrowHalf() const {
@@ -1780,6 +1786,7 @@ public:
 				ASSERT_ONLY(skipped++);
 				continue;
 			}
+			_refc = "ACGT"[imod];
 			// Haven't tried this character from this position yet;
 			// proceed one step with this character
 			ASSERT_ONLY(int savedNz = _firstNzRemainder);
@@ -1846,9 +1853,7 @@ public:
 			if(_remainders[i] == 0) {
 				continue;
 			}
-
 			_mism = i;
-
 			if(backtrack1From(ebwt, i) && oneHit) {
 				// We got one or more 1-mismatch hits; we can stop now
 				return;
@@ -1885,6 +1890,7 @@ private:
     SideLocus _botSideLocus; // bot EBWT side coordinates
     uint32_t _narrowHalfLen; // length of the "revisitable" region
 	uint32_t _mism;          // mismatch vector (LSB=extreme 5' end)
+	char _refc;     // reference character vector
 };
 
 #include "ebwt_search_backtrack.h"
@@ -2610,6 +2616,7 @@ inline bool Ebwt<TStr>::report(uint32_t off,
 	        s.query_quals(),
 	        s.query_name(),
 	        s.mismatchPtr(),
+	        s.refcPtr(),
 	        s.numMismatches(),
 	        off,
 	        top,
@@ -2628,6 +2635,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
                                const uint32_t *mmui32,
+                               const char *refcs,
                                size_t numMms,
                                uint32_t off,
                                uint32_t top,
@@ -2645,6 +2653,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				quals,               // read quality values
 				name,                // read name
 				mmui32,              // mismatch positions
+				refcs,               // reference characters for mms
 				numMms,              // # mismatches
 				make_pair(0, 0),     // (bogus) position
 				make_pair(top, bot), // arrows
@@ -2704,6 +2713,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			quals,                    // read quality values
 			name,                     // read name
 			mmui32,                   // mismatch positions
+			refcs,                    // reference characters for mms
 			numMms,                   // # mismatches
 			make_pair(tidx, textoff), // position
 			make_pair(top, bot),      // arrows
@@ -2723,6 +2733,7 @@ inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
 	        s.query_quals(),
 	        s.query_name(),
 	        s.mismatchPtr(),
+	        s.refcPtr(),
 	        s.numMismatches(),
 	        i,
 	        s.top(),
@@ -2744,6 +2755,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
                                        const uint32_t *mmui32,
+                                       const char* refcs,
                                        size_t numMms,
                                        uint32_t i,
                                        uint32_t top,
@@ -2786,7 +2798,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		off = offs[i >> offRate] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
-	return report(query, quals, name, mmui32, numMms, off, top, bot, qlen, params);
+	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, params);
 }
 
 #define NUM_SAMPLES 10

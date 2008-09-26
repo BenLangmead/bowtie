@@ -49,6 +49,7 @@ struct Hit {
 		const String<char>& _quals,
 		bool _fw,
 		const FixedBitset<max_read_bp>& _mms,
+		const vector<char>& _refcs,
 		uint32_t _oms = 0) :
 		h(_h),
 		patId(_patId),
@@ -56,6 +57,7 @@ struct Hit {
 		patSeq(_patSeq),
 		quals(_quals),
 		mms(_mms),
+		refcs(_refcs),
 		oms(_oms),
 		fw(_fw) {}
 
@@ -65,6 +67,7 @@ struct Hit {
 	String<Dna5>        patSeq;  /// read sequence
 	String<char>        quals;   /// read qualities
 	FixedBitset<max_read_bp> mms;     /// mismatch mask
+	vector<char>        refcs;   /// reference characters for mms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
 
@@ -75,6 +78,7 @@ struct Hit {
 		this->patSeq  = other.patSeq;
 		this->quals   = other.quals;
 	    this->mms     = other.mms;
+	    this->refcs   = other.refcs;
 	    this->oms     = other.oms;
 		this->fw      = other.fw;
 	    return *this;
@@ -297,11 +301,22 @@ public:
 		ss << "\t" << h.oms;
 		ss << "\t";
 		bool firstmiss = true;
+		size_t c = 0;
 		for (unsigned int i = 0; i < h.mms.size(); ++ i) {
 			if (h.mms.test(i)) {
 				if (!firstmiss) ss << ",";
 				ss << i;
+				if(h.refcs.size() > 0) {
+					assert_gt(h.refcs.size(), c);
+					ASSERT_ONLY(char cc = toupper(h.refcs[i]));
+					assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
+					char refChar = toupper(h.refcs[i]);
+					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					assert_neq(refChar, qryChar);
+					ss << ":" << refChar << ">" << qryChar;
+				}
 				firstmiss = false;
+				c++;
 			}
 		}
 		ss << endl;

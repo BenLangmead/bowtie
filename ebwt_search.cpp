@@ -560,6 +560,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 			}
 			if(reject) continue;
 			FixedBitset<max_read_bp> diffs;
+			vector<char> refcs;
 			if(pos >= ohlen) {
 				// Extend toward the left end of the pattern, counting
 				// mismatches
@@ -600,7 +601,8 @@ static bool findSanityHits(const String<Dna5>& pat,
 						  pat,
 						  "" /*no need for qualities*/,
 						  fw,
-						  diffs);
+						  diffs,
+						  refcs);
 					sanityHits.push_back(h);
 				}
 			}

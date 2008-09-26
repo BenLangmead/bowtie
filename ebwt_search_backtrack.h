@@ -50,8 +50,8 @@ struct QueryMutation {
 		assert_lt(newBase, 4);
 	}
 	uint8_t pos;
-	uint8_t oldBase;
-	uint8_t newBase;
+	uint8_t oldBase; // original base from the read
+	uint8_t newBase; // mutated to fit the reference in at least one place
 };
 
 /**
@@ -308,6 +308,7 @@ public:
 		_pairs(NULL),
 		_elims(NULL),
 		_mms(NULL),
+		_refcs(NULL),
 		_chars(NULL),
 		_reportPartials(__reportPartials),
 		_partials(__partials),
@@ -368,6 +369,7 @@ public:
 			assert_lt(_itop, _ibot);
 		}
 		_mms = new uint32_t[DEFAULT_SPREAD];
+		_refcs = new char[DEFAULT_SPREAD];
 		_chars = new char[DEFAULT_SPREAD];
 	}
 
@@ -380,6 +382,9 @@ public:
 		}
 		if(_mms != NULL) {
 			delete[] _mms; _mms = NULL;
+		}
+		if(_refcs != NULL) {
+			delete[] _refcs; _refcs = NULL;
 		}
 		if(_chars != NULL) {
 			delete[] _chars; _chars = NULL;
@@ -1317,6 +1322,7 @@ public:
 				// Note the character that we're backtracking on in the
 				// mm array:
 				_mms[stackDepth] = icur;
+				_refcs[stackDepth] = btchar;
 #ifndef NDEBUG
 				for(int j = 0; j < (int)stackDepth; j++) {
 					assert_neq(_mms[j], icur)
@@ -1606,6 +1612,8 @@ public:
 				size_t rev3mm  = 0; // mismatches observed in the 3-revisitable region
 				uint32_t ham = iham; // weighted hamming distance so far
 				FixedBitset<max_read_bp> diffs; // mismatch bitvector
+				vector<char> refcs; // reference characters for mms
+				refcs.resize(qlen, 0);
 				// For each alignment column, from right to left
 				bool success = true;
 				int ok, okInc;
@@ -1691,12 +1699,14 @@ public:
 						}
 						if(fivePrimeOnLeft) {
 							diffs.set(k);
+							refcs[k] = (char)ostr[ok];
 						} else {
 							// The 3' end is on on the left end of the
 							// pattern, but the diffs vector should
 							// encode mismatches w/r/t the 5' end, so
 							// we flip
 							diffs.set(plen-k-1);
+							refcs[plen-k-1] = (char)ostr[ok];
 						}
 					}
 					ok += okInc;
@@ -1734,8 +1744,10 @@ public:
 							// _qry - not in terms of offset from 3' or 5' end
 							if(fivePrimeOnLeft) {
 								diffs.set((*muts)[i].pos);
+								refcs[(*muts)[i].pos] = (*muts)[i].newBase;
 							} else {
 								diffs.set(plen - (*muts)[i].pos - 1);
+								refcs[plen - (*muts)[i].pos - 1] = (*muts)[i].newBase;
 							}
 						}
 					}
@@ -1745,7 +1757,8 @@ public:
 						  qry,    // read sequence
 						  qual,   // read qualities
 						  fw,     // forward/reverse-comp
-						  diffs); // mismatch bitvector
+						  diffs,  // mismatch bitvector
+						  refcs);
 					hits.push_back(h);
 				} // For each pattern character
 			} // For each alignment over current text
@@ -1848,6 +1861,7 @@ protected:
 					}
 #endif
 					_mms[stackDepth + i] = (*_muts)[i].pos;
+					_refcs[stackDepth + i] = "ACGT"[(*_muts)[i].newBase];
 				}
 				// Report the range of full alignments
 				hit = reportFullAlignment(stackDepth+numMuts, top, bot);
@@ -1882,7 +1896,7 @@ protected:
 				// their indices into the query string; not in terms
 				// of their offset from the 3' or 5' end.
 				if(_ebwt.reportChaseOne((*_qry), _qual, _name,
-				                        _mms, stackDepth, ri,
+				                        _mms, _refcs, stackDepth, ri,
 				                        top, bot, _qlen, _params))
 				{
 					return true;
@@ -2165,6 +2179,7 @@ protected:
 	uint8_t            *_bts;    // how many backtracks remain in each
 	                             // equivalence class
 	uint32_t           *_mms;    // array for holding mismatches
+	char               *_refcs;  // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
