@@ -32,6 +32,10 @@ Version 0.9.5 - September 26, 2008
    * Due to the new '-p' option, 'bowtie' needs pthreads to compile and
      run.  To compile 'bowtie' without pthreads support (which disables
      the '-p' option), use 'make BOWTIE_PTHREADS=0'.
+   * Also due to '-p' option, the Windows version of Bowtie now comes
+     with the pthreadGC2.dll file from the pthreads for Win32 project
+     (http://sourceware.org/pthreads-win32).  This library is released
+     under the LGPL license.
    * New option '--fast' causes Bowtie to load both the "forward" and
      "mirror" halves of the index at once, which eliminates the need
      for multiple phases and speeds up matching at the cost of using

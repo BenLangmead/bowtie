@@ -250,9 +250,11 @@ Bowtie Manual
    5. Read sequence (reverse-complemented if orientation is '-')
    6. Read qualities (reversed if orientation is '-')
    7. Reserved
-   8. Comma-separated list of mismatch positions, as 0-based offsets
-      from the high-quality end of the read.  If there are no
-      mismatches in the alignment, this field is empty.
+   8. Comma-separated list of mismatch descriptors.  If there are no
+      mismatches in the alignment, this field is empty.  A single
+      descriptor has the format offset:reference-base>read-base.  The
+      offset is expressed as a 0-based offset from the high-quality
+      (5') end of the read. 
  
  Using the 'bowtie-build' Indexer
  --------------------------------
