@@ -172,9 +172,12 @@ public:
 				ASSERT_ONLY(type = _partialsList[off].entry.type);
 				assert(type == 2 || type == 3);
 				ps.push_back(_partialsList[off]);
-				assert_neq(ps.back().entry.pos0, ps.back().entry.pos1);
-				assert_neq(ps.back().entry.pos0, ps.back().entry.pos2);
-				assert_neq(ps.back().entry.pos1, ps.back().entry.pos2);
+				ASSERT_ONLY(uint32_t pos0 = ps.back().entry.pos0);
+				ASSERT_ONLY(uint32_t pos1 = ps.back().entry.pos1);
+				ASSERT_ONLY(uint32_t pos2 = ps.back().entry.pos2);
+				assert(pos1 == 0xff || pos0 != pos1);
+				assert(pos2 == 0xff || pos0 != pos2);
+				assert(pos2 == 0xff || pos1 != pos2);
 			} while(_partialsList[off++].entry.type == 2);
 			assert_eq(3, _partialsList[off-1].entry.type);
 		}
