@@ -1309,7 +1309,7 @@ public:
 				// mm array:
 				_mms[stackDepth] = icur;
 #ifndef NDEBUG
-				for(int j = 0; j < stackDepth; j++) {
+				for(int j = 0; j < (int)stackDepth; j++) {
 					assert_neq(_mms[j], icur)
 				}
 #endif
