@@ -137,7 +137,9 @@ static void printUsage(ostream& out) {
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
+#ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
+#endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
@@ -156,7 +158,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 100)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
-	    << "  -o/--offrate <int> override offrate of Ebwt; must be <= value in index" << endl
+	    << "  -o/--offrate <int> override offrate of Ebwt; must be >= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
 	    << "  -h/-?/--help       print this usage message" << endl
@@ -217,6 +219,10 @@ static void parseOptions(int argc, char **argv) {
 	   			qUpto = (uint32_t)parseInt(1, "-u/--qupto arg must be at least 1");
 	   			break;
 	   		case 'p':
+#ifndef BOWTIE_PTHREADS
+	   			cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
+	   			exit(1);
+#endif
 	   			nthreads = parseInt(1, "-p/--threads arg must be at least 1");
 	   			break;
 	   		case 'v':
@@ -936,7 +942,9 @@ static void mismatchSearch(PatternSource& _patsrc,
 		}
 #endif
 	}
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 }
 
 static void* mismatchSearchWorkerFull(void *vp){
@@ -1034,8 +1042,9 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		}
 #endif
     }
-
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 }
 
 #define SWITCH_TO_FW_INDEX() { \
@@ -1408,7 +1417,9 @@ static void twoOrThreeMismatchSearch(
 	    // Threads join at end of Phase 3
 	    assert_eq(numPats, _patsrc.patid());
 	}
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 	return;
 }
 
@@ -1560,7 +1571,9 @@ static void twoOrThreeMismatchSearchFull(
 		}
 #endif
     }
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 	return;
 }
 
@@ -2233,7 +2246,9 @@ static void seededQualCutoffSearch(
 		pamFw = NULL;
 		seededQualSearch_pamFw = NULL;
 	}
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 }
 
 /**
@@ -2308,7 +2323,9 @@ static void seededQualCutoffSearchFull(
 		}
 #endif
 	}
+#ifdef BOWTIE_PTHREADS
 	delete[] threads;
+#endif
 }
 /**
  * Try to find the Bowtie index specified by the user.  First try the
