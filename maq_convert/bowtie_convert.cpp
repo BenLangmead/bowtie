@@ -195,6 +195,15 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		int seed_mismatch_quality_sum = 0;
 		for (unsigned int i = 0; i < mismatch_tokens.size(); ++i)
 		{
+			// Chop off everything from after the number on
+			for(size_t j = 0; j < mismatch_tokens[i].length(); j++) {
+				if(!isdigit(mismatch_tokens[i][j])) {
+					cout << mismatch_tokens[i] << ", ";
+					mismatch_tokens[i].erase(j);
+					cout << mismatch_tokens[i] << endl;
+					break;
+				}
+			}
 			mis_positions.push_back(atoi(mismatch_tokens[i].c_str()));
 			int pos = mis_positions.back();
 			if (pos < MAQ_FIVE_PRIME)
