@@ -36,13 +36,13 @@ Bowtie Getting Started Guide
  differ):
 
     Time loading forward index: 00:00:00
-    Seeded quality search Phase 1: 00:00:00
+    Seeded quality search Phase 1 of 4: 00:00:00
     Time loading mirror index: 00:00:00
-    Seeded quality search Phase 2: 00:00:00
+    Seeded quality search Phase 2 of 4: 00:00:00
     Time loading forward index: 00:00:00
-    Seeded quality search Phase 3: 00:00:00
+    Seeded quality search Phase 3 of 4: 00:00:00
     Time loading mirror index: 00:00:00
-    Seeded quality search Phase 4: 00:00:00
+    Seeded quality search Phase 4 of 4: 00:00:00
     Time searching: 00:00:00
     Overall time: 00:00:00
 
@@ -118,24 +118,24 @@ Bowtie Getting Started Guide
 
     bowtie a_genome experiment1.fq experiment1.map 
 
+ Next, convert the reference sequence(s) into Maq's .bfa format.  These
+ sequences must be the same as those used to build the Bowtie index.
+ Use 'maq fasta2bfa' to perform the conversion:
+ 
+    maq fasta2bfa a_genome.mfa a_genome.bfa
+
  Now run 'bowtie-convert' to convert the Bowtie alignment file to a Maq
  alignment file:
 
-    bowtie-convert experiment1.map experiment1.maq_map 
+    bowtie-convert experiment1.map experiment1.maq_map a_genome.bfa 
 
  Note that Maq's alignment file format is not readable. Use 'maq
  mapview' to view its contents:
 
     maq mapview experiment1.maq_map 
 
- Next, convert the reference sequence(s) into Maq's .bfa format. These
- sequences must be the same as those used to build the Bowtie index.
- Use Maq's 'maq fasta2bfa' command to perform the conversion:
-
-    maq fasta2bfa a_genome.mfa a_genome.bfa 
-
  To produce a consensus sequence from the alignments, use 'maq
- assemble'. This will generate the consensus and store it in a .cns
+ assemble'.  This will generate the consensus and store it in a .cns
  file (and print some summary output):
 
     maq assemble experiment1.cns a_genome.bfa experiment1.maq_map 
