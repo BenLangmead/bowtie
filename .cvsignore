@@ -31,3 +31,5 @@ ebwt_build_packed_prof1
 *.prof
 *.exe
 tmp.*
+.randread*
+.gdb_history*
