@@ -33,7 +33,8 @@ ifeq (1,$(WINDOWS))
 PTHREAD_LIB = -lpthreadGC2
 PTHREAD_PKG = pthreadGC2.dll
 else
-PTHREAD_LIB = -pthread
+# There's also -pthread, but that only seems to work on Linux
+PTHREAD_LIB = -lpthread
 endif
 endif
 
