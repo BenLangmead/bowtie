@@ -58,6 +58,8 @@ static int numRandomReads       = 50000000;
 static int lenRandomReads       = 35;
 static bool fullIndex           = false; // load halves one at a time and proceed in phases
 static bool noRefNames          = false;
+static ofstream *dumpNoHits     = NULL;
+static ofstream *dumpHHHits     = NULL;
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
@@ -76,6 +78,8 @@ static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 #define ARG_FAST                268
 #define ARG_REFIDX              269
 #define ARG_BINOUT              270
+#define ARG_DUMP_NOHIT          271
+#define ARG_DUMP_HHHIT          272
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -117,6 +121,8 @@ static struct option long_options[] = {
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{"fast",         no_argument,       0,            ARG_FAST},
+	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
+	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -218,6 +224,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case ARG_BINOUT: outType = BINARY; break;
 	   		case ARG_NOOUT: outType = NONE; break;
+	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
+	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_FAST: fullIndex = true; break;
 			case ARG_REFIDX: noRefNames = true; break;
@@ -2605,6 +2613,8 @@ static void driver(const char * type,
 		if(!outfile.empty()) {
 			((ofstream*)fout)->close();
 		}
+		if(dumpHHHits != NULL) dumpHHHits->close();
+		if(dumpNoHits != NULL) dumpNoHits->close();
 		delete sink;
 	}
 }

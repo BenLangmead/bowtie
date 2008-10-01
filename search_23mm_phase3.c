@@ -39,7 +39,12 @@
 	bthh3.resetNumBacktracks();
 	assert(hit  || numHits == sink.numHits());
 	assert(!hit || numHits <  sink.numHits());
-	if(hit) continue;
+	if(hit) {
+		if(dumpHHHits != NULL) {
+			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
+		}
+		continue;
+	}
 
 #ifndef NDEBUG
 	// The forward version of the read doesn't hit
@@ -67,13 +72,21 @@
 	bthh3.resetNumBacktracks();
 	assert(hit  || numHits == sink.numHits());
 	assert(!hit || numHits <  sink.numHits());
-	if(hit) continue;
+	if(hit) {
+		if(dumpHHHits != NULL) {
+			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
+		}
+		continue;
+	}
 
 #ifndef NDEBUG
 	// The reverse-complement version of the read doesn't hit
 	// at all!  Check with the oracle to make sure it agrees.
 	if(!gaveUp) {
 		ASSERT_NO_HITS_RC(true);
+		if(dumpNoHits != NULL) {
+			(*dumpNoHits) << patFw << endl << qualFw << endl << "---" << endl;
+		}
 	}
 #endif
 }

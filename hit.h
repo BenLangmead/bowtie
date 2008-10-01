@@ -362,8 +362,7 @@ private:
 };
 
 /**
- * Sink that prints lines like this:
- * pat-name \t [-|+] \t ref-name \t ref-off \t pat \t qual \t #-alt-hits \t mm-list
+ * Sink for binary output:
  */
 class BinaryHitSink : public HitSink {
 public:

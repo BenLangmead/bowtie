@@ -1463,6 +1463,7 @@ struct SideLocus {
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
+#ifndef NO_PREFETCH
 		// prefetch this side
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
@@ -1471,11 +1472,14 @@ struct SideLocus {
 		__builtin_prefetch((const void *)(_side + 64),
 		                   0 /* prepare for read */,
 		                   0 /* no locality */);
+#endif
 		// prefetch tjside too
 		_fw = _sideNum & 1;   // odd-numbered sides are forward
+#ifndef NO_PREFETCH
 		__builtin_prefetch((const void *)(_side + (_fw? -64 : 128)),
 		                   0 /* prepare for read */,
 		                   0 /* no locality */); // 8.95% in profile
+#endif
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte

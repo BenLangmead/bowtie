@@ -85,13 +85,17 @@
 		if(btr23.numBacktracks() == btr23.maxBacktracks()) {
 			gaveUp = true;
 		}
-		btr23.resetNumBacktracks();
 		assert(hit  || numHits == sink.numHits());
 		assert(!hit || numHits <  sink.numHits());
 		if(hit) {
+			if(dumpHHHits != NULL) {
+				(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;
+			}
 			DONEMASK_SET(patid);
+			btr23.resetNumBacktracks();
 			continue;
 		}
+		btr23.resetNumBacktracks();
 	}
 
 #ifndef NDEBUG

@@ -50,7 +50,7 @@ static inline TStr reverseComplement(const TStr& s) {
  * Return the reverse-complement of s.
  */
 template<typename TStr>
-static inline TStr reverse(const TStr& s) {
+static inline TStr reverseCopy(const TStr& s) {
 	typedef typename Value<TStr>::Type TVal;
 	TStr s_rc;
 	size_t slen = length(s);

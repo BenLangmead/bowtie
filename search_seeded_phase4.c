@@ -84,18 +84,29 @@
 		if(btf24.numBacktracks() == btf24.maxBacktracks()) {
 			gaveUp = true;
 		}
-		btf24.resetNumBacktracks();
 		assert(hit  || numHits == sink.numHits());
 		assert(!hit || numHits <  sink.numHits());
 		if(hit) {
+			if(dumpHHHits != NULL) {
+				(*dumpHHHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;
+			}
+			btf24.resetNumBacktracks();
 			continue;
+		} else {
+			if(dumpNoHits != NULL) {
+				(*dumpNoHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;
+			}
 		}
+		btf24.resetNumBacktracks();
 	}
 #ifndef NDEBUG
 	// The forward version of the read doesn't hit at all!
 	// Check with the oracle to make sure it agrees.
 	if(!gaveUp) {
 		ASSERT_NO_HITS_FW(false);
+		if(dumpNoHits != NULL) {
+			(*dumpNoHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << "---" << endl;
+		}
 	}
 #endif
 }
