@@ -57,6 +57,7 @@ static bool randReadsNoSync     = false;
 static int numRandomReads       = 50000000;
 static int lenRandomReads       = 35;
 static bool fullIndex           = false; // load halves one at a time and proceed in phases
+static bool noRefNames          = false;
 
 static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 
@@ -73,6 +74,8 @@ static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 #define ARG_RANDOM_READS_NOSYNC 266
 #define ARG_NOOUT               267
 #define ARG_FAST                268
+#define ARG_REFIDX              269
+#define ARG_BINOUT              270
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -84,6 +87,7 @@ static struct option long_options[] = {
 	{"orig",         required_argument, 0,            ARG_ORIG},
 	{"allhits",      no_argument,       0,            'a'},
 	{"concise",      no_argument,       0,            ARG_CONCISE},
+	{"binout",       no_argument,       0,            ARG_BINOUT},
 	{"noout",        no_argument,       0,            ARG_NOOUT},
 	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{"time",         no_argument,       0,            't'},
@@ -106,6 +110,7 @@ static struct option long_options[] = {
 	{"seedmms",      required_argument, 0,            'n'},
 	{"help",         no_argument,       0,            'h'},
 	{"threads",      required_argument, 0,            'p'},
+	{"refidx",       no_argument,       0,            ARG_REFIDX},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
@@ -154,7 +159,9 @@ static void printUsage(ostream& out) {
 	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r and <query_in>" << endl
-	    << "  --concise          write hits in a concise format" << endl
+	    << "  --concise          write hits in concise format" << endl
+	    << "  --binout           write hits in binary format (<hit_outfile> not optional)" << endl
+	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 100)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
@@ -209,9 +216,11 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: outType = CONCISE; break;
+	   		case ARG_BINOUT: outType = BINARY; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_FAST: fullIndex = true; break;
+			case ARG_REFIDX: noRefNames = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -2444,6 +2453,10 @@ static void driver(const char * type,
 	if(!outfile.empty()) {
 		fout = new ofstream(outfile.c_str(), ios::binary);
 	} else {
+		if(outType == BINARY) {
+			cerr << "Errpr: Must specify an output file when output mode is binary" << endl;
+			exit(1);
+		}
 		fout = &cout;
 	}
 	// Initialize Ebwt object and read in header
@@ -2498,17 +2511,17 @@ static void driver(const char * type,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
+		vector<string>* refnames = &ebwt.refnames();
+		if(noRefNames) refnames = NULL;
 		switch(outType) {
 			case FULL:
-				sink = new VerboseHitSink(
-						*fout,
-						&ebwt.refnames());
+				sink = new VerboseHitSink(*fout, refnames);
 				break;
 			case CONCISE:
-				sink = new ConciseHitSink(
-						*fout,
-						reportOpps,
-						&ebwt.refnames());
+				sink = new ConciseHitSink(*fout, reportOpps, refnames);
+				break;
+			case BINARY:
+				sink = new BinaryHitSink(*fout, refnames);
 				break;
 			case NONE:
 				sink = new StubHitSink();

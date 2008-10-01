@@ -1322,6 +1322,7 @@ public:
 				// Note the character that we're backtracking on in the
 				// mm array:
 				_mms[stackDepth] = icur;
+				assert_eq(1, dna4Cat[(int)btchar]);
 				_refcs[stackDepth] = btchar;
 #ifndef NDEBUG
 				for(int j = 0; j < (int)stackDepth; j++) {

@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <seqan/sequence.h>
+#include "alphabet.h"
 #include "assert_helpers.h"
 #include "spinlock.h"
 #include "threading.h"
@@ -21,6 +22,7 @@ using namespace seqan;
 typedef enum output_types {
 	FULL = 1,
 	CONCISE,
+	BINARY,
 	NONE
 };
 
@@ -28,6 +30,7 @@ static const std::string output_type_names[] = {
 	"Invalid!",
 	"Full",
 	"Concise",
+	"Binary",
 	"None"
 };
 
@@ -59,7 +62,31 @@ struct Hit {
 		mms(_mms),
 		refcs(_refcs),
 		oms(_oms),
-		fw(_fw) {}
+		fw(_fw)
+	{
+		// Enforce the constraints imposed by the binary output format
+		if(length(patName) > 0xffff) {
+			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
+			     << "read names and re-run bowtie." << endl;
+			exit(1);
+		}
+		if(mms.count() > 0xff) {
+			cerr << "Error: The alignment contains 256 or more mismatches.  bowtie cannot handle" << endl
+			     << "alignments with this many alignments.  Please provide smaller reads or consider" << endl
+			     << "using a different tool." << endl;
+			exit(1);
+		}
+		if(length(quals) > 0xffff) {
+			cerr << "Error: One or more quality strings are 2^16 characters or longer.  Please" << endl
+			     << "truncate reads and re-run bowtie." << endl;
+			exit(1);
+		}
+		if(length(patSeq) > 0xffff) {
+			cerr << "Error: One or more read sequences are 2^16 characters or longer.  Please" << endl
+			     << "truncate reads and re-run bowtie." << endl;
+			exit(1);
+		}
+	}
 
 	U32Pair             h;       /// reference index & offset
 	uint32_t            patId;   /// read index
@@ -119,14 +146,14 @@ public:
 	/// Returns the alignment output stream
 	virtual ostream& out()              { return _out; }
 protected:
-	void mylock() {
+	void lock() {
 #ifdef USE_SPINLOCK
 		_lock.Enter();
 #else
 		MUTEX_LOCK(_lock);
 #endif
 	}
-	void myunlock() {
+	void unlock() {
 #ifdef USE_SPINLOCK
 		_lock.Leave();
 #else
@@ -245,21 +272,20 @@ public:
 			// First hit on a new line
 			_lastPat = h.patId;
 			_lastFw  = h.fw;
-			if(_first) _first = false;
-			else ss << endl;
+			ss << endl;
 			ss << h.patId << (h.fw? "+" : "-") << ":";
 		} else {
 			// Not the first hit on the line
 			ss << ",";
 		}
-		assert(!_first);
     	// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
 		if(_reportOpps) ss << "," << h.oms;
 		ss << ">";
-		mylock();
+		lock();
+		_first = false;
 		out() << ss.str();
-		myunlock();
+		unlock();
 	}
 
 	virtual void finish() {
@@ -286,7 +312,6 @@ public:
 	_first(true) { }
 
 	virtual void reportHit(const Hit& h) {
-		_first = false;
 		ostringstream ss;
 		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
     	// .first is text id, .second is offset
@@ -300,6 +325,7 @@ public:
 		ss << "\t" << h.quals;
 		ss << "\t" << h.oms;
 		ss << "\t";
+		// Output mismatch column
 		bool firstmiss = true;
 		size_t c = 0;
 		for (unsigned int i = 0; i < h.mms.size(); ++ i) {
@@ -307,7 +333,7 @@ public:
 				if (!firstmiss) ss << ",";
 				ss << i;
 				if(h.refcs.size() > 0) {
-					assert_gt(h.refcs.size(), c);
+					assert_gt(h.refcs.size(), i);
 					ASSERT_ONLY(char cc = toupper(h.refcs[i]));
 					assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
 					char refChar = toupper(h.refcs[i]);
@@ -320,9 +346,11 @@ public:
 			}
 		}
 		ss << endl;
-		mylock();
+		// Make sure to grab lock before writing to output stream
+		lock();
+		_first = false;
 		out() << ss.str();
-		myunlock();
+		unlock();
 	}
 
 	virtual void finish() {
@@ -331,6 +359,81 @@ public:
 
 private:
 	bool _first; /// true -> first hit hasn't yet been reported
+};
+
+/**
+ * Sink that prints lines like this:
+ * pat-name \t [-|+] \t ref-name \t ref-off \t pat \t qual \t #-alt-hits \t mm-list
+ */
+class BinaryHitSink : public HitSink {
+public:
+	BinaryHitSink(ostream&        __out,
+				  vector<string>* __refnames = NULL) :
+	HitSink(__out, __refnames) { }
+
+	virtual void reportHit(const Hit& h) {
+		lock();
+		// true iff we're going to print the reference sequence name
+		bool refName = this->_refnames != NULL &&
+		                h.h.first < this->_refnames->size();
+		uint16_t pnamelen = (uint16_t)length(h.patName);
+		// Write read name
+		_out.write((const char *)&pnamelen, 2);
+		_out.write(begin(h.patName), pnamelen);
+		// Write fw/refname flags
+		uint8_t flags = (h.fw ? 1 : 0) | (refName? 2 : 0);
+		_out.write((const char *)&flags, 1);
+		if(refName) {
+			// Write reference name as string
+			uint16_t rnamelen = (uint16_t)(*this->_refnames)[h.h.first].length();
+			_out.write((const char *)&rnamelen, 2);
+			_out.write((*this->_refnames)[h.h.first].c_str(), rnamelen);
+		} else {
+			// Write reference name as index into global reference name
+			// list
+			_out.write((const char *)&h.h.first, 4);
+		}
+		// Write reference offset
+		_out.write((const char *)&h.h.second, 4);
+		// Write pattern sequence
+		uint16_t plen = (uint16_t)length(h.patSeq);
+		for(size_t i = 0; i < plen; i += 2) {
+			uint8_t twoChrs = (uint8_t)h.patSeq[i];
+			if(i+1 < plen) {
+				twoChrs |= ((uint8_t)h.patSeq[i+1] << 4);
+			}
+			_out.write((const char *)&twoChrs, 1);
+		}
+		// Write quals sequence
+		uint16_t qlen = (uint16_t)length(h.quals);
+		_out.write(begin(h.quals), qlen);
+		// Write oms
+		_out.write((const char *)&h.oms, 4);
+		// Write # mismatches
+		uint8_t numMms = h.mms.count();
+		_out.write((const char *)&numMms, 1);
+		// Output mismatches
+		size_t c = 0;
+		for (uint8_t i = 0; i < h.mms.size(); ++ i) {
+			if (h.mms.test(i)) {
+				_out.write((const char *)&i, 1);
+				assert_gt(h.refcs.size(), i);
+				assert_eq(1, dna4Cat[(int)h.refcs[i]]);
+				uint8_t refChar = charToDna5[(int)h.refcs[i]];
+				assert_leq(refChar, 4);
+				uint8_t qryChar = (h.fw ? (int)h.patSeq[i] :
+				                          (int)h.patSeq[length(h.patSeq)-i-1]);
+				assert_leq(refChar, 4);
+				assert_neq(refChar, qryChar);
+				uint8_t both = refChar | (qryChar << 4);
+				_out.write((const char *)&both, 1);
+				c++;
+			}
+		}
+		unlock();
+	}
+
+	virtual void finish() { }
 };
 
 /**
