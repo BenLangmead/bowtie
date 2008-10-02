@@ -276,6 +276,8 @@ public:
 	                 uint32_t __ibot,     /// initial bottom-of-range
 	                 uint32_t __qualThresh,  /// max acceptable q-distance
 	                 uint32_t __maxBts = 75, /// maximum # backtracks allowed
+	                 //uint32_t __maxBts0 = 28, /// maximum # backtracks allowed
+	                 //uint32_t __maxBts1 = 14, /// maximum # backtracks allowed
 	                 uint32_t __reportPartials = 0,
 	                 PartialAlignmentManager* __partials = NULL,
 	                 String<QueryMutation>* __muts = NULL,
@@ -326,6 +328,12 @@ public:
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
+		_btsAtDepths(NULL),
+		_totBtsAtDepths(NULL),
+		_maxBts0(28),
+		_maxBts1(14),
+		//_maxBts0(__maxBts0),
+		//_maxBts1(__maxBts1),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose),
 		_hiHalfStackDepth(0)
@@ -370,6 +378,8 @@ public:
 		}
 		_mms = new uint32_t[DEFAULT_SPREAD];
 		_refcs = new char[DEFAULT_SPREAD];
+		_btsAtDepths = new uint32_t[DEFAULT_SPREAD];
+		_totBtsAtDepths = new uint32_t[DEFAULT_SPREAD];
 		_chars = new char[DEFAULT_SPREAD];
 	}
 
@@ -385,6 +395,12 @@ public:
 		}
 		if(_refcs != NULL) {
 			delete[] _refcs; _refcs = NULL;
+		}
+		if(_btsAtDepths != NULL) {
+			delete[] _btsAtDepths; _btsAtDepths = NULL;
+		}
+		if(_totBtsAtDepths != NULL) {
+			delete[] _totBtsAtDepths; _totBtsAtDepths = NULL;
 		}
 		if(_chars != NULL) {
 			delete[] _chars; _chars = NULL;
@@ -508,16 +524,6 @@ public:
 		uint32_t tmp = _2revOff;
 		_2revOff = twoRevOff;
 		return tmp;
-	}
-
-	/// Reset greatest observed stack depth to 0
-	void resetHighStackDepth() {
-		_hiDepth = 0;
-	}
-
-	/// Return greatest observed stack depth since last reset
-	uint32_t highStackDepth() {
-		return _hiDepth;
 	}
 
 	/// Reset number of backtracks to 0
@@ -686,7 +692,9 @@ public:
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		_hiHalfStackDepth = 0;
+		memset(_btsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
+		memset(_totBtsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
+		_hiHalfStackDepth = 0; _hiDepth = 0;
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                     top, bot, iham, iham, _pairs, _elims, disableFtab);
 
@@ -698,6 +706,15 @@ public:
 		} else {
 			// Return value of false implies no new hits
 			assert_eq(_params.sink().numHits(), nhits);
+			/*
+			if(_halfAndHalf && _hiDepth > 0) {
+				cout << "No hit:      ";
+				for(uint32_t i = 0; i < _hiDepth; i++) {
+					cout << _totBtsAtDepths[i] << " ";
+				}
+				cout << endl << "===" << endl;
+			}
+			*/
 		}
 		_params.sink().setRetainHits(oldRetain); // restore old value
 		// If we have the original texts, then we double-check the
@@ -706,7 +723,7 @@ public:
 		if(_os != NULL &&
 		   (*_os).size() > 0 &&
 		   _reportPartials == 0 && // ignore seedling hits
-		   _numBts < _maxBts)       // ignore excessive-backrtacking copouts
+		   _bailedOnBacktracks)    // ignore excessive-backtracking copouts
 		{
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
@@ -779,6 +796,7 @@ public:
 		_totNumBts += _numBts;
 		_numBts = 0;
 		_precalcedSideLocus = false;
+		_bailedOnBacktracks = false;
 		return ret;
 	}
 
@@ -851,14 +869,32 @@ public:
 		} else if(top != 0 || bot != 0) {
 			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
 		}
-		if(_numBts == _maxBts) {
-			return false;
+		assert(ltop != NULL);
+		assert(lbot != NULL);
+		// Check whether we've exceeded any backtracking limit
+		if(_halfAndHalf) {
+			if(_numBts == _maxBts) {
+				_bailedOnBacktracks = true;
+				return false;
+			}
+			_numBts++;
+			//if(stackDepth == 1) {
+			//	if(_btsAtDepths[0] >= _maxBts0) {
+			//		_bailedOnBacktracks = true;
+			//		return false;
+			//	}
+			//}
+			//else if(stackDepth == 2) {
+			//	if(_btsAtDepths[1] >= _maxBts1) {
+			//		_bailedOnBacktracks = true;
+			//		return false;
+			//	}
+			//}
 		}
-		if(_halfAndHalf) _numBts++;
+		// Update stack-depth high water mark
 		if(stackDepth > _hiDepth) {
 			_hiDepth = stackDepth;
 		}
-
 		// The total number of arrow pairs that are acceptable
 		// backtracking targets ("alternative" arrow pairs)
 		uint32_t altNum = 0;
@@ -1180,6 +1216,8 @@ public:
 			// Mismatch with alternatives
 			//
 			while((top == bot || backtrackDespiteMatch) && altNum > 0) {
+				//SideLocus toploci[4];
+				//SideLocus botloci[4];
 				if(_verbose) cout << "    top (" << top << ") == bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -1201,6 +1239,8 @@ public:
 				uint32_t btham = ham;
 				char     btchar = 0;
 				int      btcint = 0;
+				//SideLocus *btltop = NULL;
+				//SideLocus *btlbot = NULL;
 				uint32_t icur = 0;
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
@@ -1219,7 +1259,17 @@ public:
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
 									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
+									assert_gt(PAIR_SPREAD(i, j), 0);
 									posSz += PAIR_SPREAD(i, j);
+									// Calculate BWT locus and prefetch
+									// appropriate cache lines
+									//SideLocus::initFromTopBot(
+									//	PAIR_TOP(i, j),
+									//	PAIR_BOT(i, j),
+									//	_ebwt._eh,
+									//	_ebwt._ebwt,
+									//	toploci[j],
+									//	botloci[j]);
 								}
 							}
 							// Generate a random number
@@ -1236,6 +1286,15 @@ public:
 										foundTarget = true;
 										bttop = PAIR_TOP(i, j);
 										btbot = PAIR_BOT(i, j);
+										//SideLocus::initFromTopBot(
+										//	bttop,
+										//	btbot,
+										//	_ebwt._eh,
+										//	_ebwt._ebwt,
+										//	toploci[j],
+										//	botloci[j]);
+										//btltop = &toploci[j];
+										//btlbot = &botloci[j];
 										btham += qualRounds[qi];
 										btcint = j;
 										btchar = "acgt"[j];
@@ -1331,6 +1390,8 @@ public:
 #endif
 				_chars[i] = btchar;
 				// Now backtrack to target
+				_btsAtDepths[stackDepth]++;
+				_totBtsAtDepths[stackDepth]++;
 				ASSERT_ONLY(uint64_t numHits = _params.sink().numHits());
 				assert_leq(i+1, _qlen);
 				bool ret;
@@ -1403,6 +1464,7 @@ public:
 					if(_os != NULL && (*_os).size() > 0) confirmHit(iham);
 					return true; // return, signaling that we've reported
 				}
+				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
 				if(_numBts >= _maxBts) {
 					return false;
 				}
@@ -1572,7 +1634,7 @@ public:
 		}
 		cout << endl;
 	}
-	
+
 	/**
 	 * Naively search for the same hits that should be found by the
 	 * backtracking search.  This is used only if --orig and -s have
@@ -1771,7 +1833,7 @@ protected:
 
 	/**
 	 * Mutate the _qry string according to the contents of the _muts
-	 * array, which represents a partial alignment. 
+	 * array, which represents a partial alignment.
 	 */
 	void applyMutations() {
 		if(_muts == NULL) {
@@ -1791,7 +1853,7 @@ protected:
 
 	/**
 	 * Undo mutations to the _qry string, returning it to the original
-	 * read. 
+	 * read.
 	 */
 	void undoMutations() {
 		if(_muts == NULL) {
@@ -1813,7 +1875,7 @@ protected:
 	 * Report a range of alignments with # mismatches = stackDepth and
 	 * with the mutations (also mismatches) contained in _muts.  The
 	 * range is delimited by top and bot.  Returns true iff one or more
-	 * full alignments were successfully reported and the caller can 
+	 * full alignments were successfully reported and the caller can
 	 * stop searching.
 	 */
 	bool reportAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
@@ -1837,7 +1899,7 @@ protected:
 			}
 			return false; // keep going - we want to find all partial alignments
 		} else {
-			// Undo mutations 
+			// Undo mutations
 			ASSERT_ONLY(String<Dna5> tmp = (*_qry));
 			undoMutations();
 			bool hit;
@@ -1886,6 +1948,20 @@ protected:
 	 */
 	bool reportFullAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 		assert_gt(bot, top);
+		/*
+		if(_halfAndHalf) {
+			cout << "To get here: ";
+			for(uint32_t i = 0; i < stackDepth; i++) {
+				cout << _btsAtDepths[i] << " ";
+			}
+			cout << endl;
+			cout << "Total:       ";
+			for(uint32_t i = 0; i < stackDepth; i++) {
+				cout << _totBtsAtDepths[i] << " ";
+			}
+			cout << endl << "===" << endl;
+		}
+		*/
 		if(_oneHit) {
 			uint32_t spread = bot - top;
 			// Pick a random spot in the range to report
@@ -2219,6 +2295,20 @@ protected:
 	SideLocus           _preLtop;
 	/// Precalculated bot locus
 	SideLocus           _preLbot;
+	/// Keep track of # backtracks at various stack depths, but not
+	/// cumulatively (just "in order to get where I am now")
+	uint32_t*           _btsAtDepths;
+	/// Keep track of # backtracks at various stack depths cumulatively
+	uint32_t*           _totBtsAtDepths;
+	/// Number of backtracks permitted w/ stackDepth 0 before giving up
+	/// in halfAndHalf mode
+	uint32_t            _maxBts0;
+	/// Number of backtracks permitted w/ stackDepth 1 before giving up
+	/// in halfAndHalf mode
+	uint32_t            _maxBts1;
+	/// Flag to record whether a 'false' return from backtracker is due
+	/// to having exceeded one or more backrtacking limits
+	bool                _bailedOnBacktracks;
 	/// Source of pseudo-random numbers
 	RandomSource        _rand;
 	/// Be talkative
