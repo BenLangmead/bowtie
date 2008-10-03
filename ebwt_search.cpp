@@ -457,35 +457,46 @@ static void *exactSearchWorker(void *vp) {
 	        true,       // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
-	EbwtSearchState<String<Dna> > s(ebwt, params, seed);
+	BacktrackManager<String<Dna> > bt(
+			ebwt, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        99999,          // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
     while(true) {
     	GET_READ(patsrc);
-    	if(patid >= qUpto) break;
-    	params.setPatId(patid);
-    	patid++;
-
-    	if(lastLen == 0) lastLen = length(patFw);
-    	if(qSameLen && length(patFw) != lastLen) {
-    		throw runtime_error("All reads must be the same length");
-    	}
+    	uint32_t plen = length(patFw);
     	// Process forward-oriented read
-    	s.newQuery(&patFw, &name, &qualFw);
-	    ebwt.search(s, params);
+    	bt.setOffs(0, 0, plen, plen, plen, plen);
+    	bt.setQuery(&patFw, &qualFw, &name);
+    	bool hit = bt.backtrack();
 	    // Optionally sanity-check the result
 	    if(sanity && !oneHit && !arrowMode) {
 	    	sanityCheckExact(os, sink, patFw, patid);
 	    }
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
-	    if(sink.numHits() > lastHits) {
+	    if(hit) {
 	    	lastHits = sink.numHits();
 	    	if(oneHit) continue;
 	    }
 	    if(!revcomp) continue;
 	    // Process reverse-complement read
 		params.setFw(false);
-    	s.newQuery(&patRc, &name, &qualRc);
-	    ebwt.search(s, params);
+		bt.setQuery(&patRc, &qualRc, &name);
+	    bt.backtrack();
 	    if(sanity && !oneHit && !arrowMode) {
 	    	sanityCheckExact(os, sink, patRc, patid);
 	    }
@@ -550,7 +561,7 @@ static bool findSanityHits(const String<Dna5>& pat,
 	String<Dna5> half;
 	reserve(half, plen);
 	uint32_t bump = 0;
-	if(!transpose) bump = 1;
+	if(transpose) bump = 1; // forward index can have 1 more unrevisitable char
 	// Grab the unrevisitable region of pat
 	for(size_t i = ((plen+bump)>>1); i < plen; i++) {
 		appendValue(half, (Dna5)pat[i]);
@@ -801,11 +812,8 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
-	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
-
-    // Per-thread initialization
+	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
-	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread *patsrc;
 	if(randReadsNoSync) {
@@ -824,10 +832,30 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        false,      // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
-	// Phase 1
+	BacktrackManager<String<Dna> > bt1(
+			ebwtFw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        99999,          // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
 	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
 	while(true) {
 		GET_READ(patsrc);
+		uint32_t plen = length(patFw);
+		uint32_t s = plen;
+		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_1mm_phase1.c"
 		#undef DONEMASK_SET
@@ -842,10 +870,8 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
 	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
-
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
-	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread *patsrc;
 	if(randReadsNoSync) {
@@ -864,14 +890,31 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	// Phase 2
-	EbwtSearchState<String<Dna> > sbw(ebwtBw, params, seed);
+	BacktrackManager<String<Dna> > bt2(
+			ebwtBw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        99999,          // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
 	while(true) {
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
-		#define DONEMASK_SET(p) doneMask.set(p)
+		uint32_t plen = length(patFw);
+		uint32_t s = plen;
+		uint32_t s3 = s >> 1; // length of 3' half of seed
 		#include "search_1mm_phase2.c"
-		#undef DONEMASK_SET
 	} // End read loop
     WORKER_EXIT();
 }
@@ -971,10 +1014,8 @@ static void* mismatchSearchWorkerFull(void *vp){
 	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
-
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
-	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread *patsrc;
 	if(randReadsNoSync) {
@@ -993,12 +1034,48 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	// Phase 2
-	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
-	EbwtSearchState<String<Dna> > sbw(ebwtBw, params, seed);
+	BacktrackManager<String<Dna> > bt1(
+			ebwtFw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        99999,          // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
+	BacktrackManager<String<Dna> > bt2(
+			ebwtBw, params,
+	        0, 0,           // 5, 3depth
+	        0,              // unrevOff
+	        0,              // 1revOff
+	        0,              // 2revOff
+	        0,              // 3revOff
+	        0, 0,           // itop, ibot
+	        0xffffffff,     // qualThresh
+	        99999,          // max backtracks
+	        0,              // reportSeedlings (don't)
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        true,           // oneHit
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
 	while(true) {
 		GET_READ(patsrc);
-		// Run phase 1 and phase 2 consecutively
+		uint32_t plen = length(patFw);
+		uint32_t s = plen;
+		uint32_t s3 = s >> 1; // length of 3' half of seed
+		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 		#define DONEMASK_SET(p)
 		#include "search_1mm_phase1.c"
 		patsrc->reverseRead();

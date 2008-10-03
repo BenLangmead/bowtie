@@ -18,12 +18,16 @@
 		cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
 		exit(1);
 	}
+	bool hit;
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	uint64_t numHits = sink.numHits();
-	sfw.newQuery(&patFw, &name, &qualFw);
-	ebwtFw.search(sfw, params);
-	if(sink.numHits() > numHits) {
+	ASSERT_ONLY(uint64_t numHits = sink.numHits());
+	btr1.setQuery(&patFw, &qualFw, &name);
+	btr1.setOffs(0, 0, plen, plen, plen, plen);
+	hit = btr1.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
 		assert_eq(numHits+1, sink.numHits());
 		DONEMASK_SET(patid);
 		continue;
@@ -34,7 +38,7 @@
 	// Set up the revisitability of the halves
 	btr1.setOffs(0, 0, s5, s5, two ? s : s5, s);
 	ASSERT_ONLY(numHits = sink.numHits());
-	bool hit = btr1.backtrack();
+	hit = btr1.backtrack();
 	assert(hit  || numHits == sink.numHits());
 	assert(!hit || numHits <  sink.numHits());
 	if(hit) {

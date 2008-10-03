@@ -5,75 +5,73 @@
  * reused in both the half-index-in-memory and full-index-in-memory
  * situations.
  */
-params.setFw(false);
-params.setEbwtFw(true);
-assert_eq(0, sink.retainedHits().size());
-assert_eq(lastHits, sink.numHits());
-uint32_t plen = length(patFw);
-if(plen < 2) {
-	cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
-	exit(1);
-}
-// Create state for a search in the forward index
-sfw.newQuery(&patRc, &name, &qualRc);
-ebwtFw.search1MismatchOrBetter(sfw, params,
-							   true,  // allow exact hits,
-							   true); // inexact hits provisional
-bool hit = sink.numHits() > lastHits;
-// Set a bit indicating this pattern is done and needn't be
-// considered by the 1-mismatch loop
-if(sanity) sanityCheckHits(patRc, sink, patid, false, os, true, false);
-assert_eq(0, sink.retainedHits().size());
-if(hit) lastHits = sink.numHits();
-if(oneHit && hit) {
-	assert_eq(0, sink.numProvisionalHits());
-	DONEMASK_SET(patid);
-	continue;
-}
-params.setFw(true);
-sfw.newQuery(&patFw, &name, &qualFw);
-if(sink.numProvisionalHits() > 0) {
-	// There is a provisional inexact match for the
-	// reverse-complement read, so just try exact on the
-	// forward-oriented read
-	ebwtFw.search(sfw, params);
-	if(sink.numHits() > lastHits) {
-		// Got one or more exact hits from the reverse
-		// complement; reject provisional hits
-		sink.rejectProvisionalHits();
-		if(sanity) sanityCheckHits(patFw, sink, patid, true, os, true, false);
-	} else {
-		// No exact hits from reverse complement; accept
-		// provisional hits and finish with this read
-		sink.acceptProvisionalHits();
-		assert_gt(sink.numHits(), lastHits);
-	}
-	assert_eq(0, sink.numProvisionalHits());
-	if(sink.numHits() > lastHits) {
-		lastHits = sink.numHits();
-		if(oneHit) {
-			// Update doneMask
-			DONEMASK_SET(patid);
-			continue;
-		}
-	}
+{
+	params.setFw(true);
+	params.setEbwtFw(true);
+
 	assert_eq(0, sink.retainedHits().size());
-} else {
-	// There is no provisional inexact match for the
-	// reverse-complement read, so try inexact on the
-	// forward-oriented read
-	ebwtFw.search1MismatchOrBetter(sfw, params,
-								   true,   // allow exact hits
-								   false); // no provisional hits
-	bool hit = sink.numHits() > lastHits;
-	// Set a bit indicating this pattern is done and needn't be
-	// considered by the 1-mismatch loop
-	if(sanity) sanityCheckHits(patFw, sink, patid, true, os, true, false);
-	assert_eq(0, sink.retainedHits().size());
-	if(hit) lastHits = sink.numHits();
-	if(oneHit && hit) {
-		// Update doneMask
-		assert_eq(0, sink.numProvisionalHits());
+	if(plen < 2) {
+		cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
+		exit(1);
+	}
+	bool hit;
+	ASSERT_ONLY(uint64_t numHits);
+
+	// First, try exact hits for the forward-oriented read
+	ASSERT_ONLY(numHits = sink.numHits());
+	bt1.setQuery(&patFw, &qualFw, &name);
+	bt1.setOffs(0, 0, s, s, s, s);
+	hit = bt1.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckExact(os, sink, patFw, patid);
+		DONEMASK_SET(patid);
+		continue;
+	}
+
+	params.setFw(false);
+
+	// Next, try exact hits for the reverse-complement read
+	bt1.setQuery(&patRc, &qualRc, &name);
+	bt1.setOffs(0, 0, s, s, s, s);
+	hit = bt1.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckExact(os, sink, patRc, patid);
+		DONEMASK_SET(patid);
+		continue;
+	}
+
+	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+	bt1.setQuery(&patRc, &qualRc, &name);
+	bt1.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
+	hit = bt1.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckHits(patRc, sink, patid, false /*fw*/, os,
+		                false /*allowExact*/, false /*transpose*/);
+		DONEMASK_SET(patid);
+		continue;
+	}
+
+	params.setFw(true);
+
+	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+	bt1.setQuery(&patFw, &qualFw, &name);
+	bt1.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
+	hit = bt1.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckHits(patFw, sink, patid, true /*fw*/, os,
+		                false /*allowExact*/, false /*transpose*/);
 		DONEMASK_SET(patid);
 		continue;
 	}

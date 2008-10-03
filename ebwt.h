@@ -888,11 +888,6 @@ public:
 	inline uint32_t mapLF1(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline bool searchFinish(EbwtSearchState<TStr>& s) const;
 	inline bool searchFinish1(EbwtSearchState<TStr>& s) const;
-	inline void searchWithFchr(EbwtSearchState<TStr>& s) const;
-	inline void searchWithFtab(EbwtSearchState<TStr>& s) const;
-	void search(const TStr& qry, EbwtSearchParams<TStr>& params, uint32_t seed /* = 0 */, bool inexact /* = false */) const;
-	void search(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool inexact /* = false */) const;
-	bool search1MismatchOrBetter(EbwtSearchState<TStr>& s, EbwtSearchParams<TStr>& params, bool allowExactHits /* = true*/, bool doProvisional /*= false*/) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -1177,8 +1172,7 @@ public:
 	                 bool __revcomp = true,
 	                 bool __fw = true,
 	                 bool __ebwtFw = true,
-	                 bool __arrowMode = false,
-	                 bool __comprehensiveBacktrack = false) :
+	                 bool __arrowMode = false) :
 		_sink(__sink),
 		_stats(__stats),
 		_mhp(__mhp),
@@ -1188,10 +1182,7 @@ public:
 		_fw(__fw),
 		_ebwtFw(__ebwtFw),
 		_backtracking(false),
-        _arrowMode(__arrowMode),
-		_comprehensiveBacktrack(__comprehensiveBacktrack),
-		_suppress(false),
-		_doProvisional(false) { }
+        _arrowMode(__arrowMode) { }
 	MultiHitPolicy multiHitPolicy() const { return _mhp; }
 	HitSinkPerThread& sink() const   { return _sink; }
 	void setPatId(uint32_t __patid)  { _patid = __patid; }
@@ -1217,7 +1208,6 @@ public:
 	               uint32_t oms) const
 	{
 		// The search functions should not have allowed us to get here
-		assert(!_suppress);
 		FixedBitset<max_read_bp> mm;
 		String<Dna5> pat;
 		uint32_t qlen = length(query);
@@ -1266,9 +1256,8 @@ public:
 			}
 		}
 		bool provisional =
-			_backtracking &&             // this is a 1-mismatch alignment
-		    _mhp == MHP_PICK_1_RANDOM && // report 1 hit (not all)
-		    _doProvisional;
+			_backtracking &&           // this is a 1-mismatch alignment
+		    _mhp == MHP_PICK_1_RANDOM; // report 1 hit (not all)
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
@@ -1358,16 +1347,6 @@ public:
 	bool arrowMode() const {
 		return _arrowMode;
 	}
-	bool comprehensiveBacktrack() const {
-		return _comprehensiveBacktrack;
-	}
-	void setComprehensiveBacktrack(bool __comprehensiveBacktrack) {
-		_comprehensiveBacktrack = __comprehensiveBacktrack;
-	}
-	void setSuppressHits(bool __suppress) {
-		_suppress = __suppress;
-	}
-	bool suppressHits() const { return _suppress; }
 	/// Return true iff we're in backtracking mode
 	bool backtracking() const { return _backtracking; }
 	/// Set whether we're in backtracking mode; when in backtracking
@@ -1376,9 +1355,6 @@ public:
 		_backtracking = __backtracking;
 	}
 	const vector<String<Dna5> >& texts() const { return _texts; }
-	void setDoProvisional(bool __provisional) {
-		_doProvisional = __provisional;
-	}
 private:
 	HitSinkPerThread& _sink;
 	EbwtSearchStats<TStr>& _stats;
@@ -1391,11 +1367,6 @@ private:
 	bool _ebwtFw;         // current Ebwt is forward-oriented
 	bool _backtracking;   // we're currently backtracking
 	bool _arrowMode;      // report arrows
-	bool _comprehensiveBacktrack; // Allow backtracking to points after
-	                           // the read's halfway mark (for
-	                           // 1-mismatch)
-	bool _suppress;         // suppress hits?
-	bool _doProvisional;    // inexact hits should be provisional?
 };
 
 /**
@@ -1529,28 +1500,11 @@ public:
 		_query(__query),
 		_query_name(__query_name),
 		_query_quals(__query_quals),
-		_remainders(),
-		_tried(),
-		_tops(),
-		_bots(),
-		_firstNzRemainder(-1),
 		_qlen(length(*__query)),
 		_qidx(length(*_query)-1),
 		_topSideLocus(),
-		_botSideLocus(),
-		_mism(0xffffffff),
-		_refc('N')
-	{
-		assert(_query != NULL); // name and quals are allowed to be NULL
-		_narrowHalfLen = _qlen;
-		// Let the forward Ebwt take the middle character
-		if(_params.ebwtFw()) _narrowHalfLen++;
-		_narrowHalfLen >>= 1;
-		fill(_remainders, _narrowHalfLen, 0);
-		fill(_tried,      _narrowHalfLen, 0);
-		fill(_tops,       _narrowHalfLen, 0);
-		fill(_bots,       _narrowHalfLen, 0);
-	}
+		_botSideLocus()
+	{ }
 
 	EbwtSearchState(const Ebwt<TStr>& __ebwt,
 	                const EbwtSearchParams<TStr>& __params,
@@ -1563,17 +1517,10 @@ public:
 		_query(NULL),
 		_query_name(NULL),
 		_query_quals(NULL),
-		_remainders(),
-		_tried(),
-		_tops(),
-		_bots(),
-		_firstNzRemainder(-1),
 		_qlen(0),
 		_qidx(0),
 		_topSideLocus(),
-		_botSideLocus(),
-		_mism(0xffffffff),
-		_refc('N')
+		_botSideLocus()
 	{ }
 
 	void newQuery(String<Dna5>* __query,
@@ -1584,20 +1531,6 @@ public:
 		_query = __query;
 		_query_name = __query_name; // might be NULL
 		_query_quals = __query_quals; // might be NULL
-		_firstNzRemainder = -1;
-		_mism = 0xffffffff;
-		if(length(*_query) != _qlen) {
-			_qlen = length(*_query);
-			_narrowHalfLen = _qlen;
-			// Let the forward Ebwt take the middle character
-			if(_params.ebwtFw()) _narrowHalfLen++;
-			_narrowHalfLen >>= 1;
-		}
-		_qidx = _qlen-1;
-		fill(_remainders, _narrowHalfLen, 0);
-		fill(_tried,      _narrowHalfLen, 0);
-		fill(_tops,       _narrowHalfLen, 0);
-		fill(_bots,       _narrowHalfLen, 0);
 	}
 
 	const EbwtSearchParams<TStr>& params() const { return _params; }
@@ -1643,19 +1576,9 @@ public:
 	}
 	uint32_t  qlen() const          { return _qlen; }
 	uint32_t  qidx() const          { return _qidx; }
-	uint32_t  mismatch() const      { return _mism; }
-	const uint32_t *mismatchPtr() const { return &_mism; }
-	const char *refcPtr() const { return &_refc; }
-	uint32_t  numMismatches() const { if(_mism == 0xffffffff) return 0; return 1; }
-	/// Return true iff we're currently matching in the "back half" of the read
-	bool inNarrowHalf() const {
-		return _qidx < _narrowHalfLen;
-	}
 	bool closed() const         { return _bot == _top; }
 	bool qAtBeginning() const   { return _qidx == _qlen-1; }
 	bool qExhausted() const     { return _qidx == 0xffffffff; }
-	void decQidx()              { assert(_qidx != 0xffffffff); _qidx--; }
-	void subQidx(uint32_t s)    { assert_leq(s-1, _qidx); _qidx -= s; }
 	/// Get char at the current query position
 	int chr() const {
 		return chr(_qidx);
@@ -1677,29 +1600,9 @@ public:
 		assert_leq(c, 4);
 		uint32_t r = ebwt.mapLF1(_topSideLocus, c);
 		// no need to update _tried
-		if(r == 0xffffffff) {
-			//_params.stats().incStopAt(*this);
-			if(!_params.backtracking() && inNarrowHalf()) {
-				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				_firstNzRemainder = _qidx;
-				_remainders[_qidx] = 1;
-				_tried[_qidx] = c;
-				_tops[_qidx] = _top;
-				_bots[_qidx] = _bot;
-			}
-		} else if(!_params.backtracking() && inNarrowHalf()) {
-			//_params.stats().incPushthrough(*this);
-			//if(inNarrowHalf()) _params.stats().incNarrowHalfAdvance(*this);
-			setTopBot(r, r+1);
-			_remainders[_qidx] = 0;
-			_tried[_qidx] = 0;
-			_tops[_qidx] = 0;
-			_bots[_qidx] = 0;
-		} else {
-			//_params.stats().incPushthrough(*this);
+		if(r != 0xffffffff) {
 			setTopBot(r, r+1);
 		}
-
 		assert(_qidx != 0xffffffff); _qidx--;
 		return r;
 	}
@@ -1712,9 +1615,6 @@ public:
 		if(c == -1) c = chr();
 		assert_leq(c, 4);
 		assert_geq(c, 0);
-		uint32_t oldTop = _top;
-		uint32_t oldBot = _bot;
-		uint32_t diff = _bot - _top;
 		uint32_t top = 0;
 		uint32_t bot = 0;
 		if(c < 4) {
@@ -1723,16 +1623,6 @@ public:
 		}
 		assert_geq(bot, top);
 		if(bot == top) {
-			if(!_params.backtracking() && inNarrowHalf()) {
-				// Arrows moved closer together; might want to
-				// backtrack to here
-				assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-				_firstNzRemainder = _qidx;
-				_remainders[_qidx] = diff;
-				_tried[_qidx] = c;
-				_tops[_qidx] = oldTop;
-				_bots[_qidx] = oldBot;
-			}
 			// Set _top and _bot but don't calculate their side loci
 			// (that's a waste of time - no one cares).  Just leave the
 			// loci as-is.
@@ -1742,135 +1632,8 @@ public:
 		}
 		setTopBot(top, bot);
 		// Calculate old difference minus new difference
-		uint32_t diffDiff = diff - (_bot - _top);
-		assert_leq(diffDiff, diff);
-		if(!_params.backtracking() && inNarrowHalf() && diffDiff > 0) {
-			// Arrows moved closer together; might want to backtrack
-			// to here
-			assert(_firstNzRemainder == -1 || _firstNzRemainder > (int)_qidx);
-			_firstNzRemainder = _qidx;
-			_remainders[_qidx] = diffDiff;
-			_tried[_qidx] = c;
-			_tops[_qidx] = oldTop;
-			_bots[_qidx] = oldBot;
-		} else if(!_params.backtracking() && inNarrowHalf()) {
-			_remainders[_qidx] = 0;
-			_tried[_qidx] = 0;
-			_tops[_qidx] = 0;
-			_bots[_qidx] = 0;
-		}
-		if(inNarrowHalf()) {
-			_params.stats().incNarrowHalfAdvance(*this, diffDiff > 0);
-		}
 		assert(_qidx != 0xffffffff); _qidx--;
 		return true;
-	}
-	/**
-	 * Try all as-yet-untaken branches at query position qidx; return
-	 * true iff one or more 1-mismatch hits were found.
-	 */
-	bool backtrack1From(const Ebwt<TStr>& ebwt, uint32_t qidx) {
-		typedef typename Value<TStr>::Type TVal;
-		assert(_params.backtracking());
-		assert_geq(qidx, (uint32_t)_firstNzRemainder);
-		assert_lt(qidx, _narrowHalfLen);
-		assert_leq(_tried[qidx], 4);
-		assert_gt(_bots[qidx], _tops[qidx]);
-		bool oneHit = (_params.multiHitPolicy() == MHP_PICK_1_RANDOM);
-		// Restore top and bot from this branch point; also set the top
-		// and bot loci
-		setTopBot(_tops[qidx], _bots[qidx]);
-		bool gotHits = false;
-		assert_lt(qidx, _qlen);
-		_qidx = qidx; // Restore qidx
-		// Randomly select a character
-		unsigned int st = _rand.nextU32();
-		ASSERT_ONLY(int skipped = 0);
-		// For each character starting with the randomly-selected one
-		for(uint32_t i = 0; i < 4; i++) {
-			unsigned int imod = (i + st) & 3;
-			// Have I tried this one yet?
-			if(_tried[qidx] == imod) {
-				// Yes...
-				ASSERT_ONLY(skipped++);
-				continue;
-			}
-			_refc = "ACGT"[imod];
-			// Haven't tried this character from this position yet;
-			// proceed one step with this character
-			ASSERT_ONLY(int savedNz = _firstNzRemainder);
-			// Save loci, since the calls to mapLF and searchFinish
-			// may mutate them
-		    SideLocus savedTopSideLocus = _topSideLocus;
-		    SideLocus savedBotSideLocus = _botSideLocus;
-			if(!mapLF(ebwt, imod)) {
-				// Top/bot loci should not have changed, so there is no
-				// need to restore them
-				_top = _tops[qidx];
-				_bot = _bots[qidx];
-				_qidx = qidx;
-				assert_eq(savedNz, _firstNzRemainder);
-				continue;
-			}
-			assert_eq(savedNz, _firstNzRemainder);
-			assert_eq(0, params().sink().numProvisionalHits());
-			// Now finish off the search
-			bool ret;
-			if(_bot == _top + 1) {
-				ret = ebwt.searchFinish1(*this);
-			} else {
-				ret = ebwt.searchFinish(*this);
-			}
-			// Did the call to searchFinish generate one or more hits?
-			if(ret || params().sink().numProvisionalHits() > 0) {
-				// Yes...
-				if(oneHit) {
-					// Got one 1-mismatch hit; stop now
-					return true;
-				}
-				gotHits = true;
-			}
-			// Return state to the backtrack point
-			_top = _tops[qidx];
-			_bot = _bots[qidx];
-			_qidx = qidx;
-			_topSideLocus = savedTopSideLocus;
-			_botSideLocus = savedBotSideLocus;
-		}
-		if(oneHit) {
-			assert_eq(0, params().sink().numProvisionalHits());
-		}
-		assert_leq(skipped, 1);
-		return gotHits;
-	}
-	/**
-	 * Try all as-yet-untaken branches at all "narrow-half" query
-	 * positions after which the arrows narrowed.
-	 */
-	void backtrack1(const Ebwt<TStr>& ebwt) {
-		bool oneHit = (_params.multiHitPolicy() == MHP_PICK_1_RANDOM);
-		assert(_params.backtracking());
-		if(_firstNzRemainder == -1) {
-			// No backtracking opportunities
-			return;
-		}
-		// It must be the case that the arrows narrowed between this
-		// query position and the one "after" (to the left of) it
-		assert_gt(_remainders[_firstNzRemainder], 0);
-		assert_gt(_bots[_firstNzRemainder], _tops[_firstNzRemainder]);
-		for(uint32_t i = _firstNzRemainder; i < _narrowHalfLen; i++) {
-			if(_remainders[i] == 0) {
-				continue;
-			}
-			_mism = i;
-			if(backtrack1From(ebwt, i) && oneHit) {
-				// We got one or more 1-mismatch hits; we can stop now
-				return;
-			}
-		}
-		// no hits
-		assert(!oneHit || params().sink().numProvisionalHits() == 0);
-		return;
 	}
 	const SideLocus& topSideLocus() const { return _topSideLocus; }
 	const SideLocus& botSideLocus() const { return _botSideLocus; }
@@ -1888,18 +1651,10 @@ private:
 	String<Dna5>* _query;       // query string
 	String<char>* _query_name;  // query name
 	String<char>* _query_quals; // query qualities string
-	String<uint32_t> _remainders; // space left to explore
-	String<uint8_t> _tried; // denotes characters originally tried at each pos
-	String<uint32_t> _tops; // tops we might want to backtrack to
-	String<uint32_t> _bots; // bots we might want to backtrack to
-	int _firstNzRemainder; // index of first non-zero element in _remainders
 	uint32_t _qlen;     // length of query string
     uint32_t _qidx;     // offset into query (moves from high to low offsets)
     SideLocus _topSideLocus; // top EBWT side coordinates
     SideLocus _botSideLocus; // bot EBWT side coordinates
-    uint32_t _narrowHalfLen; // length of the "revisitable" region
-	uint32_t _mism;          // mismatch vector (LSB=extreme 5' end)
-	char _refc;     // reference character vector
 };
 
 #include "ebwt_search_backtrack.h"
@@ -2610,32 +2365,6 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
 
 /**
  * Report a potential match at offset 'off' with pattern length
- * 'qlen'.  This version adapts the EbwtSearchState into the arguments
- * expected by the major report() member (below).
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::report(uint32_t off,
-                               uint32_t top,
-                               uint32_t bot,
-                               uint32_t qlen,
-                               EbwtSearchState<TStr>& s) const
-{
-	return report(
-			s.query(),
-	        s.query_quals(),
-	        s.query_name(),
-	        s.mismatchPtr(),
-	        s.refcPtr(),
-	        s.numMismatches(),
-	        off,
-	        top,
-	        bot,
-	        qlen,
-	        s.params());
-}
-
-/**
- * Report a potential match at offset 'off' with pattern length
  * 'qlen'.  We must be careful to filter out spurious matches that
  * fall partially within the padding that separates texts.
  */
@@ -2808,363 +2537,6 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
 	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, params);
-}
-
-#define NUM_SAMPLES 10
-
-/**
- * Report a randomly-selected sample from a range of hits.  The goal is to
- * reduce the time spent enumerating a large range of hits and is predicated
- * on the assumption that the vast majority of those hits have similar
- * extensions.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::reportChaseSample(EbwtSearchState<TStr>& s) const
-{
-	assert(!s.params().arrowMode());
-	assert_gt(s.spread(), NUM_SAMPLES);
-	std::set<uint32_t> sampled_hits;
-	bool reported = false;
-	while (sampled_hits.size() < NUM_SAMPLES)
-	{
-		uint32_t r = s.top() + (s.rand().nextU32() % s.spread());
-		if (sampled_hits.find(r) == sampled_hits.end())
-		{
-			sampled_hits.insert(r);
-			if(_verbose) cout << "reportChaseRange r: " << r << endl;
-			// TODO: Could calculate i's locus here, as an offset from
-			// s.top()'s locus
-			if (reportChaseOne(r, s)) reported = true;
-		}
-	}
-	return reported;
-}
-
-/**
- * Report a range of results by chasing down each one individually.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::reportChaseRange(EbwtSearchState<TStr>& s) const
-{
-	assert(!s.params().arrowMode());
-	assert_gt(s.spread(), 1);
-	bool reported = false;
-	for(uint32_t i = s.top(); i < s.bot(); i++)  {
-		if(_verbose) cout << "reportChaseRange i: " << i << endl;
-		// TODO: Could calculate i's locus here, as an offset from
-		// s.top()'s locus
-		if(reportChaseOne(i, s)) reported = true;
-	}
-	return reported;
-}
-
-/**
- * Report one result.
- *
- * Returns true if one or more results were reported.  If false is
- * returned, that means that one or more results were spurious becuase
- * they overlapped padding between two text sequences.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::reportOne(uint32_t i,
-                                  EbwtSearchState<TStr>& s,
-                                  SideLocus *l = NULL) const
-{
-	VMSG_NL("In reportOne");
-	assert_eq(1, s.spread());
-	if(s.params().suppressHits()) return true; // return without reporting
-	s.params().stats().addExactHits(s);
-	if(s.params().arrowMode()) {
-		// Don't chase anything; just report arrows and bail
-		report(i, s.top(), s.bot(), s.qlen(), s);
-		return true;
-	}
-	return reportChaseOne(i, s, l);
-}
-
-/**
- * Given that our search is finished and there are multiple results
- * between top and bot, decide how to report them.  One option is to
- * report all the results by chasing each one down 1-by-1, using
- * reportChaseRange().  Another option is to report all using a
- * "multichase" (iterative 4-way push-throughs).  Another option is
- * to report a single hit chosen at random.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::reportMultiple(EbwtSearchState<TStr>& s) const
-{
-	VMSG_NL("In reportMultiple");
-	assert_gt(s.spread(), 1);
-	if(s.params().suppressHits()) return true; // return without reporting
-	s.params().stats().addExactHits(s);
-	if(s.params().arrowMode()) {
-		// Don't chase anything; just report arrows and bail
-		report(0, s.top(), s.bot(), s.qlen(), s);
-		return true;
-	}
-	switch(s.params().multiHitPolicy()) {
-		case MHP_CHASE_ALL: {
-			return reportChaseRange(s);
-			break;
-		}
-		case MHP_MULTICHASE_ALL: {
-			throw runtime_error("MHP_MULTICHASE_ALL not yet implemented");
-			return false;
-		}
-		case MHP_PICK_1_RANDOM: {
-			uint32_t r = s.top() + (s.rand().nextU32() % s.spread());
-			for(uint32_t i = 0; i < s.spread(); i++) {
-				uint32_t ri = r + i;
-				if(ri >= s.bot()) ri -= s.spread();
-				// TODO: Could calculate r's locus here, as an offset
-				// from s.top()'s locus
-				if(reportChaseOne(ri, s)) return true;
-			}
-			return false;
-		}
-		default: {
-			throw runtime_error("Bad multi-hit policy");
-			return false;
-		}
-	}
-}
-
-/**
- * Search the Ebwt starting with the given row.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::searchFinish1(EbwtSearchState<TStr>& s) const
-{
-	VMSG_NL("In searchFinish1");
-	assert_eq(1, s.spread());
-	int jumps = 0;
-	uint32_t off = 0xffffffff;
-	assert_lt(s.top(), this->_eh._len);
-	if(s.top() == _zOff && !s.qExhausted()) return false; // can't wrap around - no match
-	while(!s.closed() && !s.qExhausted()) {
-		VMSG_NL("searchFinish1: qidx: " << s.qidx() << ", top: " << s.top());
-		uint32_t r = s.mapLF1(*this);
-		if(r == _zOff && !s.qExhausted()) return false; // can't wrap around - no match
-		if(r == 0xffffffff) return false; // no match
-		// Did we stumble into a row with a known offset?  If so, make
-		// note so that don't have to chase it later.
-		if(!s.params().arrowMode()) {
-			if(off == 0xffffffff && ((r & this->_eh._offMask) == r || r == _zOff)) {
-				off = ((r == _zOff) ? 0 : this->_offs[r >> this->_eh._offRate]);
-				assert_lt(off, this->_eh._len);
-				jumps = 0; // reset
-			} else {
-				jumps++;
-			}
-		}
-	}
-	assert(!s.closed());
-	assert_neq(s.top(), 0xffffffff);
-	assert_geq(jumps, 0);
-	if(s.params().suppressHits()) return true; // return without reporting
-	if(s.params().arrowMode()) {
-		// Just return arrows; we haven't tried to set off and we're
-		// not going to try to chase the result
-		return report(0, s.top(), s.bot(), s.qlen(), s);
-	}
-	if(off != 0xffffffff) {
-		// Good luck - we previously made note of a marked row and
-		// need not chase it any further
-		off -= jumps;
-		assert_lt(off, this->_eh._len);
-		assert_lt((unsigned int)jumps, s.qlen());
-		assert_geq(jumps, 0);
-		VMSG_NL("searchFinish1 pre-found off=" << off);
-		s.params().stats().addExactHits(s);
-		return report(off, s.top(), s.bot(), s.qlen(), s);
-		assert_leq(s.params().sink().numProvisionalHits(), 1);
-	} else {
-		// Haven't yet encountered a marked row for this result;
-		// chase it
-		return reportOne(s.top(), s, s.topSideLocusPtr());
-	}
-}
-
-/**
- * Search the Ebwt starting with the given bounds of top/bot.  If and
- * when the difference between top and bot shrinks to 1, hand control
- * to searchFinish1, which is optimized for that (hopefully common)
- * case.  If the entire pattern is consumed and there is bot is still
- * greater top, then that range represents a set of potential matches
- * and we hand it off to reportChaseRange.
- */
-template<typename TStr>
-inline bool Ebwt<TStr>::searchFinish(EbwtSearchState<TStr>& s) const
-{
-	VMSG_NL("In searchFinish");
-	assert(s.repOk());
-	while(!s.closed() && !s.qExhausted()) {
-		s.params().stats().incPushthrough(s);
-		s.mapLF(*this);
-		assert(s.repOk());
-		if(s.spread() == 1) {
-			// Switch to searching loop specialized for the case where
-			// one potential result remains
-			return searchFinish1(s);
-		}
-	}
-	if(!s.closed()) {
-		// Multiple potential results to report
-		if(s.spread() == 1) {
-			s.params().stats().addExactHits(s);
-			return reportOne(s.top(), s, s.topSideLocusPtr());
-		} else {
-			return reportMultiple(s);
-		}
-	} else {
-		s.params().stats().incStopAt(s);
-		return false;
-	}
-}
-
-/**
- * Do an ftab lookup to find initial top and bottom then call
- * searchFinish().
- *
- * The Ebwt must be in memory.
- */
-template<typename TStr>
-inline void Ebwt<TStr>::searchWithFtab(EbwtSearchState<TStr>& s) const
-{
-	typedef typename Value<TStr>::Type TVal;
-	assert(isInMemory());
-	assert(s.qAtBeginning());
-	s.params().stats().incTry(s);
-	int ftabChars = this->_eh._ftabChars;
-	assert_geq(s.qlen(), (unsigned int)ftabChars);
-	// Rightmost char gets least significant bit-pair
-	const String<Dna5>& qry = s.query();
-#ifndef NDEBUG
-	for(int i = 0; i < ftabChars; i++) {
-		assert_neq(4, (int)(Dna5)qry[s.qlen()-i-1]);
-	}
-#endif
-	uint32_t ftabOff = qry[s.qlen() - ftabChars];
-	assert_lt(ftabOff, 4);
-	for(int i = ftabChars - 1; i > 0; i--) {
-		ftabOff <<= 2;
-		assert_lt((int)(TVal)qry[s.qlen()-i], 4);
-		ftabOff |= (int)(TVal)qry[s.qlen()-i];
-	}
-	assert_lt(ftabOff, this->_eh._ftabLen-1);
-	if(_verbose) cout << "Looking up in ftab with: " << u32ToDna(ftabOff, ftabChars) << endl;
-	s.setTopBot(ftabHi(ftabOff), ftabLo(ftabOff+1));
-	s.subQidx(ftabChars);
-	searchFinish(s);
-}
-
-/**
- * Do an fchr lookup to find (coarse) initial top and bottom then call
- * searchFinish().
- *
- * The Ebwt must be in memory.
- */
-template<typename TStr>
-inline void Ebwt<TStr>::searchWithFchr(EbwtSearchState<TStr>& s) const
-{
-	assert(isInMemory());
-	assert(s.qAtBeginning());
-	s.params().stats().incTry(s);
-	if(s.chr() == 4) {
-		return; // immediate mismatch
-	} else {
-		s.setTopBot(this->_fchr[s.chr()], this->_fchr[s.chr()+1]);
-	}
-	s.decQidx();
-	searchFinish(s);
-}
-
-template<typename TStr>
-void Ebwt<TStr>::search(EbwtSearchState<TStr>& s,
-                        EbwtSearchParams<TStr>& params,
-                        bool inexact = false) const
-{
-	assert(isInMemory());
-	params.setBacktracking(false);
-	if(s.qlen() >= (unsigned int)this->_eh._ftabChars &&
-	   // If we're backtracking, don't let ftab skip over any of the
-	   // revisitable region
-	   (!inexact ||
-	    (unsigned int)this->_eh._ftabChars <= (s.qlen()>>1)))
-	{
-		bool useFtab = true;
-		for(int i = 0; i < this->_eh._ftabChars; i++) {
-			if(((int)(Dna5)s.query()[s.qlen()-i-1]) == 4) {
-				useFtab = false;
-				break;
-			}
-		}
-		if(useFtab) {
-			searchWithFtab(s);
-		} else {
-			searchWithFchr(s);
-		}
-	} else {
-		searchWithFchr(s);
-	}
-}
-
-/**
- * Search the Ebwt; if the query is long enough, start by looking up
- * the initial top and bottom in the ftab.  If the input string is too
- * short for the ftab, get the initial top and bottom from the fchr.
- *
- * The Ebwt must be in memory.
- */
-template<typename TStr>
-void Ebwt<TStr>::search(const TStr& qry,
-                        EbwtSearchParams<TStr>& params,
-                        uint32_t seed = 0,
-                        bool inexact = false) const
-{
-	assert(isInMemory());
-	assert(!empty(qry));
-	EbwtSearchState<TStr> s(*this, qry, params, seed);
-	search(s, params, inexact);
-}
-
-/**
- * Search the Ebwt; if the query is long enough, start by looking up
- * the initial top and bottom in the ftab.  If the input string is too
- * short for the ftab, get the initial top and bottom from the fchr.
- *
- * Returns true iff one or more exact hits were found
- *
- * The Ebwt must be in memory.
- */
-template<typename TStr>
-bool Ebwt<TStr>::search1MismatchOrBetter(EbwtSearchState<TStr>& s,
-                                         EbwtSearchParams<TStr>& params,
-                                         bool allowExactHits = true,
-                                         bool doProvisional = false) const
-{
-	assert(isInMemory());
-	params.setBacktracking(false);
-	uint64_t hits = s.params().sink().numHits();
-	bool oneHit = (params.multiHitPolicy() == MHP_PICK_1_RANDOM);
-	// If exact hits are not allowed, then suppress hits here; the call
-	// to search() will still fill the EbwtSearchState with the
-	// appropriate backtrack points
-	params.setSuppressHits(!allowExactHits);
-	search(s, params, true);
-	// Un-suppress hits
-	params.setSuppressHits(false);
-	assert(s.params().sink().numHits() == hits || allowExactHits);
-	if(s.params().sink().numHits() > hits && oneHit) {
-		// One or more exact hits found
-		return true;
-	}
-	// No exact hits found; try backtracking for 1-mismatch hits
-	params.setBacktracking(true);
-	if(doProvisional) params.setDoProvisional(true);
-	s.backtrack1(*this);
-	if(doProvisional) params.setDoProvisional(false);
-	return false;
 }
 
 /**

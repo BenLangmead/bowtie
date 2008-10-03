@@ -5,30 +5,47 @@
  * reused in both the half-index-in-memory and full-index-in-memory
  * situations.
  */
-params.setFw(true);
-params.setEbwtFw(false);
-sbw.newQuery(&patFw, &name, &qualFw);
-ebwtBw.search1MismatchOrBetter(sbw, params,
-							   false,  // no exact hits
-							   false); // no provisional hits
-// Check all hits against a naive oracle
-assert_eq(0, sink.numProvisionalHits());
-if(sanity) sanityCheckHits(patFw, sink, patid, true, os, false, true);
-assert_eq(0, sink.retainedHits().size());
-// If the forward direction matched with one mismatch, ignore
-// the reverse complement
-if(oneHit && revcomp && sink.numHits() > lastHits) {
-	lastHits = sink.numHits();
-	continue;
+{
+	params.setFw(false);
+	params.setEbwtFw(false);
+	bool hit;
+	ASSERT_ONLY(uint64_t numHits);
+
+	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+	ASSERT_ONLY(numHits = sink.numHits());
+	bt2.setQuery(&patRc, &qualRc, &name);
+	bt2.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
+	hit = bt2.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckHits(patRc, sink, patid, false /*fw*/, os,
+		                false /*allowExact*/, true /*transpose*/);
+		continue;
+	} else {
+		// No hits
+		sanityCheckHits(patRc, sink, patid, false /*fw*/, os,
+		                false /*allowExact*/, true /*transpose*/);
+	}
+
+	params.setFw(true);
+
+	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+	ASSERT_ONLY(numHits = sink.numHits());
+	bt2.setQuery(&patFw, &qualFw, &name);
+	bt2.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
+	hit = bt2.backtrack();
+	assert(hit  || numHits == sink.numHits());
+	assert(!hit || numHits <  sink.numHits());
+	if(hit) {
+		assert_eq(numHits+1, sink.numHits());
+		sanityCheckHits(patFw, sink, patid, true /*fw*/, os,
+		                false /*allowExact*/, true /*transpose*/);
+		continue;
+	} else {
+		// No hits
+		sanityCheckHits(patFw, sink, patid, true /*fw*/, os,
+		                false /*allowExact*/, true /*transpose*/);
+	}
 }
-if(!revcomp) continue;
-params.setFw(false);
-sbw.newQuery(&patRc, &name, &qualRc);
-ebwtBw.search1MismatchOrBetter(sbw, params,
-							   false,  // no exact hits
-							   false); // no provisional hits
-assert_eq(0, sink.numProvisionalHits());
-if(sanity) sanityCheckHits(patRc, sink, patid, false, os, false, true);
-assert_eq(0, sink.retainedHits().size());
-params.setFw(true);
-lastHits = sink.numHits();

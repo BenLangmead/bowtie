@@ -694,7 +694,7 @@ public:
 		// with a stack depth of 0 (no backtracks so far)
 		memset(_btsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
 		memset(_totBtsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
-		_hiHalfStackDepth = 0; _hiDepth = 0;
+		_hiHalfStackDepth = 0; _hiDepth = 0; _bailedOnBacktracks = false;
 		bool ret = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                     top, bot, iham, iham, _pairs, _elims, disableFtab);
 
@@ -723,7 +723,7 @@ public:
 		if(_os != NULL &&
 		   (*_os).size() > 0 &&
 		   _reportPartials == 0 && // ignore seedling hits
-		   _bailedOnBacktracks)    // ignore excessive-backtracking copouts
+		   !_bailedOnBacktracks)    // ignore excessive-backtracking copouts
 		{
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
@@ -869,8 +869,6 @@ public:
 		} else if(top != 0 || bot != 0) {
 			SideLocus::initFromTopBot(top, bot, _ebwt._eh, _ebwt._ebwt, ltop, lbot);
 		}
-		assert(ltop != NULL);
-		assert(lbot != NULL);
 		// Check whether we've exceeded any backtracking limit
 		if(_halfAndHalf) {
 			if(_numBts == _maxBts) {
@@ -1466,6 +1464,7 @@ public:
 				}
 				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
 				if(_numBts >= _maxBts) {
+					_bailedOnBacktracks = true;
 					return false;
 				}
 				assert_eq(_params.sink().numHits(), numHits);
