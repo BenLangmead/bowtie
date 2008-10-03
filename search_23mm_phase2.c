@@ -11,10 +11,10 @@
 	bt2.setQuery(&patFw, &qualFw, &name);
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s5, s5, two? s : s5, s);
-	ASSERT_ONLY(uint64_t numHits = sink.numHits());
+	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	bool hit = bt2.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		DONEMASK_SET(patid);
 		continue;
@@ -24,10 +24,10 @@
 	bt2.setQuery(&patRc, &qualRc, &name);
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s3, s3, two? s : s3, s);
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	hit = bt2.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		DONEMASK_SET(patid);
 		continue;

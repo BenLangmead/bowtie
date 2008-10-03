@@ -1181,7 +1181,6 @@ public:
 		_revcomp(__revcomp),
 		_fw(__fw),
 		_ebwtFw(__ebwtFw),
-		_backtracking(false),
         _arrowMode(__arrowMode) { }
 	MultiHitPolicy multiHitPolicy() const { return _mhp; }
 	HitSinkPerThread& sink() const   { return _sink; }
@@ -1255,9 +1254,6 @@ public:
 				refc[mmui32[i]] = refcs[i];
 			}
 		}
-		bool provisional =
-			_backtracking &&           // this is a 1-mismatch alignment
-		    _mhp == MHP_PICK_1_RANDOM; // report 1 hit (not all)
 		// Check the hit against the original text, if it's available
 		if(_texts.size() > 0 && !_arrowMode) {
 			assert_lt(h.first, _texts.size());
@@ -1318,23 +1314,11 @@ public:
 				cerr << endl;
 				cerr << "  FW: " << _fw << endl;
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
-				cerr << "  Provisional: " << provisional << endl;
 			}
 			if(diffs != mm) assert(false);
 		}
-		if(provisional) {
-			// Provisional hits may or may not be 'accepted' later on;
-			// this might happen if we find a hit with one mismatch
-			// but haven't yet tried to exact-match the pattern's
-			// reverse complement.  If the reverse complement does
-			// eventually match, then we'll reject this provisional
-			// 1-mismatch hit.  Otherwise we'll accept it.
-			sink().reportProvisionalHit(
-				Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
-		} else {
-			sink().reportHit(
-				Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
-		}
+		sink().reportHit(
+			Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
 	}
 	void write(ostream& out) const {
 		const char *mhpToStr[] = {
@@ -1347,13 +1331,6 @@ public:
 	bool arrowMode() const {
 		return _arrowMode;
 	}
-	/// Return true iff we're in backtracking mode
-	bool backtracking() const { return _backtracking; }
-	/// Set whether we're in backtracking mode; when in backtracking
-	/// mode, we don't change the backtracking state at all
-	void setBacktracking(bool __backtracking) {
-		_backtracking = __backtracking;
-	}
 	const vector<String<Dna5> >& texts() const { return _texts; }
 private:
 	HitSinkPerThread& _sink;
@@ -1365,7 +1342,6 @@ private:
 	bool _revcomp;        // whether reverse complements are enabled
 	bool _fw;             // current read is forward-oriented
 	bool _ebwtFw;         // current Ebwt is forward-oriented
-	bool _backtracking;   // we're currently backtracking
 	bool _arrowMode;      // report arrows
 };
 

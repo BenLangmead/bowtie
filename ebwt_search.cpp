@@ -375,6 +375,7 @@ static void sanityCheckExact(
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
+	sink->finishRead(); \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) { /* cout << "done" << endl; */ break; } \
 	params.setPatId(p->patid()); \
@@ -396,6 +397,7 @@ static void sanityCheckExact(
 /// patid exceeds the limit, and marshaling the read into convenient
 /// variables.
 #define GET_READ_FW(p) \
+	sink->finishRead(); \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) break; \
 	params.setPatId(p->patid()); \
@@ -419,6 +421,31 @@ static void sanityCheckExact(
 #define WORKER_EXIT() return NULL;
 #endif
 
+
+/// Create a PatternSourcePerThread for the current thread according
+/// to the global params and return a pointer to it
+static PatternSourcePerThread* createPatSrc(PatternSource& _patsrc, int tid) {
+	PatternSourcePerThread *patsrc;
+	if(randReadsNoSync) {
+		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, tid, false);
+	} else {
+		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+	}
+    assert(patsrc != NULL);
+    return patsrc;
+}
+
+/// Create a HitSinkPerThread according to the global params and return
+/// a pointer to it
+static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
+    HitSinkPerThread *sink = NULL;
+    if(1) {
+    	sink = new FirstNGoodHitSinkPerThread(_sink, 1, sanity);
+    }
+    assert(sink != NULL);
+    return sink;
+}
+
 /**
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
@@ -440,15 +467,10 @@ static void *exactSearchWorker(void *vp) {
 	// Per-thread initialization
 	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0;
-	PatternSourcePerThread *patsrc;
-	if(randReadsNoSync) {
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false);
-	} else {
-		patsrc = new WrappedPatternSourcePerThread(_patsrc);
-	}
-	HitSinkPerThread sink(_sink, sanity);
+	PatternSourcePerThread *patsrc = createPatSrc(_patsrc, (int)(long)vp);
+	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
-			sink,       // HitSink
+			*sink,      // HitSink
 	        stats,      // EbwtSearchStats
 	        // Policy for how to resolve multiple hits
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
@@ -471,7 +493,6 @@ static void *exactSearchWorker(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -484,12 +505,12 @@ static void *exactSearchWorker(void *vp) {
     	bool hit = bt.backtrack();
 	    // Optionally sanity-check the result
 	    if(sanity && !oneHit && !arrowMode) {
-	    	sanityCheckExact(os, sink, patFw, patid);
+	    	sanityCheckExact(os, *sink, patFw, patid);
 	    }
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
 	    if(hit) {
-	    	lastHits = sink.numHits();
+	    	lastHits = sink->numHits();
 	    	if(oneHit) continue;
 	    }
 	    if(!revcomp) continue;
@@ -498,9 +519,9 @@ static void *exactSearchWorker(void *vp) {
 		bt.setQuery(&patRc, &qualRc, &name);
 	    bt.backtrack();
 	    if(sanity && !oneHit && !arrowMode) {
-	    	sanityCheckExact(os, sink, patRc, patid);
+	    	sanityCheckExact(os, *sink, patRc, patid);
 	    }
-	    lastHits = sink.numHits();
+	    lastHits = sink->numHits();
 		params.setFw(true);
     }
     WORKER_EXIT();
@@ -815,15 +836,10 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread *patsrc;
-	if(randReadsNoSync) {
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false);
-	} else {
-		patsrc = new WrappedPatternSourcePerThread(_patsrc);
-	}
-    HitSinkPerThread sink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
+	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
-			sink,       // HitSinkPerThread
+			*sink,      // HitSinkPerThread
 	        stats,      // EbwtSearchStats
 	        // Policy for how to resolve multiple hits
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
@@ -846,7 +862,6 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -873,15 +888,10 @@ static void* mismatchSearchWorkerPhase2(void *vp){
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread *patsrc;
-	if(randReadsNoSync) {
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, true);
-	} else {
-		patsrc = new WrappedPatternSourcePerThread(_patsrc);
-	}
-    HitSinkPerThread sink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
+	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
-			sink,       // HitSinkPerThread
+			*sink,      // HitSinkPerThread
 	        stats,      // EbwtSearchStats
 	        // Policy for how to resolve multiple hits
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
@@ -904,7 +914,6 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -1017,15 +1026,10 @@ static void* mismatchSearchWorkerFull(void *vp){
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread *patsrc;
-	if(randReadsNoSync) {
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, true);
-	} else {
-		patsrc = new WrappedPatternSourcePerThread(_patsrc);
-	}
-    HitSinkPerThread sink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
+	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
-			sink,       // HitSinkPerThread
+			*sink,      // HitSinkPerThread
 	        stats,      // EbwtSearchStats
 	        // Policy for how to resolve multiple hits
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
@@ -1048,7 +1052,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -1066,7 +1069,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -1269,16 +1271,11 @@ static bool                           twoOrThreeMismatchSearch_two;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
 	uint32_t lastLen = 0; \
-	PatternSourcePerThread *patsrc; \
-	if(randReadsNoSync) { \
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false); \
-	} else { \
-		patsrc = new WrappedPatternSourcePerThread(_patsrc); \
-	} \
-	HitSinkPerThread sink(_sink); \
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
+	HitSinkPerThread* sink = createSink(_sink, false); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
-			sink,        /* HitSink */ \
+			*sink,       /* HitSink */ \
 	        stats,       /* EbwtSearchStats */ \
 	        /* Policy for how to resolve multiple hits */ \
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL), \
@@ -1306,7 +1303,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -1344,7 +1340,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
@@ -1384,7 +1379,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
@@ -1402,7 +1396,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+5,         // seed
 		    &os,
 		    false,          // considerQuals
@@ -1537,7 +1530,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
@@ -1555,7 +1547,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
@@ -1573,7 +1564,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
@@ -1591,7 +1581,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-	        true,           // oneHit
 		    seed+5,         // seed
 		    &os,
 		    false,          // considerQuals
@@ -1689,16 +1678,11 @@ static int                            seededQualSearch_qualCutoff;
 	vector<String<Dna5> >&         os       = *seededQualSearch_os;       \
 	int                          qualCutoff = seededQualSearch_qualCutoff; \
 	uint32_t lastLen = 0; \
-	PatternSourcePerThread *patsrc; \
-	if(randReadsNoSync) { \
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, (int)(long)vp, false); \
-	} else { \
-		patsrc = new WrappedPatternSourcePerThread(_patsrc); \
-	} \
-	HitSinkPerThread sink(_sink); \
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
+	HitSinkPerThread* sink = createSink(_sink, false); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
-			sink,        /* HitSink */ \
+			*sink,       /* HitSink */ \
 	        stats,       /* EbwtSearchStats */ \
 	        /* Policy for how to resolve multiple hits */ \
 	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL), \
@@ -1730,7 +1714,6 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
@@ -1748,7 +1731,6 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 	        seed,                  // seed
 	        &os);
     while(true) {
@@ -1786,7 +1768,6 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+1,                // seed
 		    &os);                  // reference sequences
 	// BacktrackManager to search for partial alignments for case 4R
@@ -1804,7 +1785,6 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+2,                // seed
 		    &os);                  // reference sequences
     while(true) {
@@ -1845,7 +1825,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+3,                // seed
 		    &os);
 	// BacktrackManager to search for hits for case 4R by extending
@@ -1864,7 +1843,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 		    seed+4,  // seed
 		    &os);
 	// The half-and-half BacktrackManager
@@ -1882,7 +1860,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
@@ -1925,7 +1902,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 	        seed+6,  // seed
 	        &os);
 	// Half-and-half BacktrackManager for forward read
@@ -1943,7 +1919,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals
@@ -1989,7 +1964,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
@@ -2007,7 +1981,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 	        seed,                  // seed
 	        &os);
 	// BacktrackManager to search for hits for cases 1F, 2F, 3F
@@ -2025,7 +1998,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+1,                // seed
 		    &os);                  // reference sequences
 	// BacktrackManager to search for partial alignments for case 4R
@@ -2043,7 +2015,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+2,                // seed
 		    &os);                  // reference sequences
 	// BacktrackManager to search for seedlings for case 4F
@@ -2061,7 +2032,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
-	        true,                  // oneHit
 		    seed+3,                // seed
 		    &os);
 	// BacktrackManager to search for hits for case 4R by extending
@@ -2080,7 +2050,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 		    seed+4,  // seed
 		    &os);
 	// The half-and-half BacktrackManager
@@ -2098,7 +2067,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
@@ -2119,7 +2087,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 	        seed+6,  // seed
 	        &os);
 	// Half-and-half BacktrackManager for forward read
@@ -2137,7 +2104,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        true,    // oneHit
 	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals

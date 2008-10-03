@@ -282,7 +282,6 @@ public:
 	                 PartialAlignmentManager* __partials = NULL,
 	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
-	                 bool __oneHit = true,
 	                 uint32_t seed = 0,
 	                 vector<String<Dna5> >* __os = NULL,
 	                 bool __considerQuals = true, // whether to consider quality values when making backtracking decisions
@@ -305,7 +304,6 @@ public:
 		_spread(DEFAULT_SPREAD),
 		_maxStackDepth(DEFAULT_SPREAD),
 		_qualThresh(__qualThresh),
-		_oneHit(__oneHit),
 		_reportOnHit(true),
 		_pairs(NULL),
 		_elims(NULL),
@@ -1961,36 +1959,28 @@ protected:
 			cout << endl << "===" << endl;
 		}
 		*/
-		if(_oneHit) {
-			uint32_t spread = bot - top;
-			// Pick a random spot in the range to report
-			uint32_t r = top + (_rand.nextU32() % spread);
-			for(uint32_t i = 0; i < spread; i++) {
-				uint32_t ri = r + i;
-				if(ri >= bot) ri -= spread;
-				// reportChaseOne takes ths _mms[] list in terms of
-				// their indices into the query string; not in terms
-				// of their offset from the 3' or 5' end.
-				if(_ebwt.reportChaseOne((*_qry), _qual, _name,
-				                        _mms, _refcs, stackDepth, ri,
-				                        top, bot, _qlen, _params))
-				{
-					return true;
-				}
-				// If that spot turned out to be a spurious alignment
-				// (usually because it overlapped some padding), then
-				// try the next element in the range
+		uint32_t spread = bot - top;
+		// Pick a random spot in the range to report
+		uint32_t r = top + (_rand.nextU32() % spread);
+		for(uint32_t i = 0; i < spread; i++) {
+			uint32_t ri = r + i;
+			if(ri >= bot) ri -= spread;
+			// reportChaseOne takes ths _mms[] list in terms of
+			// their indices into the query string; not in terms
+			// of their offset from the 3' or 5' end.
+			if(_ebwt.reportChaseOne((*_qry), _qual, _name,
+			                        _mms, _refcs, stackDepth, ri,
+			                        top, bot, _qlen, _params))
+			{
+				return true;
 			}
-			// All range elements were spurious; return false to
-			// indicate that the caller should keep looking
-			return false;
-		} else {
-			// Not yet smart enough to report all hits
-			assert(false);
-			// Return false to indicate that the caller should keep
-			// looking
-			return false;
+			// If that spot turned out to be a spurious alignment
+			// (usually because it overlapped some padding), then
+			// try the next element in the range
 		}
+		// All range elements were spurious; return false to
+		// indicate that the caller should keep looking
+		return false;
 	}
 
 	/**
@@ -2241,9 +2231,6 @@ protected:
 	uint32_t            _maxStackDepth;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
-	bool                _oneHit; // stop backtracking after finding 1
-	                             // legit hit?  (doesn't really work -
-	                             // we always operate in _oneHit mode)
 	bool                _reportOnHit; // report as soon as we find a
 	                             // hit? (as opposed to leaving it up
 	                             // to the caller whether to report)

@@ -15,10 +15,10 @@
 	            s3,
 	            two? s : s3,
 	            s);
-	ASSERT_ONLY(uint64_t numHits = sink.numHits());
+	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	bool hit = bt3.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) continue;
 
 	// Try a half-and-half on the forward read
@@ -31,14 +31,14 @@
 	              two ? s3 : 0,
 	              two ? s  : s3,
 	              s);
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	hit = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
 	}
 	bthh3.resetNumBacktracks();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		if(dumpHHHits != NULL) {
 			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
@@ -64,14 +64,14 @@
 	              two ? s5 : 0,
 	              two ? s  : s5,
 	              s);
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	hit = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
 	}
 	bthh3.resetNumBacktracks();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		if(dumpHHHits != NULL) {
 			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;

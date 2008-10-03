@@ -43,12 +43,12 @@
 	}
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	uint64_t numHits = sink.numHits();
+	uint64_t numHits = sink->numHits();
 	btf1.setQuery(&patFw, &qualFw, &name);
 	btf1.setOffs(0, 0, plen, plen, plen, plen);
 	btf1.backtrack();
-	if(sink.numHits() > numHits) {
-		assert_eq(numHits+1, sink.numHits());
+	if(sink->numHits() > numHits) {
+		assert_eq(numHits+1, sink->numHits());
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -67,10 +67,10 @@
 						  (seedMms > 3)? s5 : s);
 	}
 	bt1.setQuery(&patRc, &qualRc, &name);
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	bool hit = bt1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		// If we reach here, then we obtained a hit for case
 		// 1R, 2R or 3R and can stop considering this read

@@ -9,7 +9,7 @@
 	params.setFw(true);
 	params.setEbwtFw(true);
 
-	assert_eq(0, sink.retainedHits().size());
+	assert_eq(0, sink->retainedHits().size());
 	if(plen < 2) {
 		cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
 		exit(1);
@@ -18,15 +18,15 @@
 	ASSERT_ONLY(uint64_t numHits);
 
 	// First, try exact hits for the forward-oriented read
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	bt1.setQuery(&patFw, &qualFw, &name);
 	bt1.setOffs(0, 0, s, s, s, s);
 	hit = bt1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
-		assert_eq(numHits+1, sink.numHits());
-		sanityCheckExact(os, sink, patFw, patid);
+		assert_eq(numHits+1, sink->numHits());
+		sanityCheckExact(os, *sink, patFw, patid);
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -37,11 +37,11 @@
 	bt1.setQuery(&patRc, &qualRc, &name);
 	bt1.setOffs(0, 0, s, s, s, s);
 	hit = bt1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
-		assert_eq(numHits+1, sink.numHits());
-		sanityCheckExact(os, sink, patRc, patid);
+		assert_eq(numHits+1, sink->numHits());
+		sanityCheckExact(os, *sink, patRc, patid);
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -50,11 +50,11 @@
 	bt1.setQuery(&patRc, &qualRc, &name);
 	bt1.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	hit = bt1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
-		assert_eq(numHits+1, sink.numHits());
-		sanityCheckHits(patRc, sink, patid, false /*fw*/, os,
+		assert_eq(numHits+1, sink->numHits());
+		sanityCheckHits(patRc, *sink, patid, false /*fw*/, os,
 		                false /*allowExact*/, false /*transpose*/);
 		DONEMASK_SET(patid);
 		continue;
@@ -66,11 +66,11 @@
 	bt1.setQuery(&patFw, &qualFw, &name);
 	bt1.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	hit = bt1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
-		assert_eq(numHits+1, sink.numHits());
-		sanityCheckHits(patFw, sink, patid, true /*fw*/, os,
+		assert_eq(numHits+1, sink->numHits());
+		sanityCheckHits(patFw, *sink, patid, true /*fw*/, os,
 		                false /*allowExact*/, false /*transpose*/);
 		DONEMASK_SET(patid);
 		continue;

@@ -39,14 +39,14 @@
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			ASSERT_ONLY(uint64_t numHits = sink->numHits());
 			ASSERT_ONLY(String<Dna5> tmp = patFw);
 			btf4.setMuts(&muts);
 			hit = btf4.backtrack(oldQuals);
 			btf4.setMuts(NULL);
 			assert_eq(tmp, patFw); // assert mutations were undone
-			assert(hit  || numHits == sink.numHits());
-			assert(!hit || numHits <  sink.numHits());
+			assert(hit  || numHits == sink->numHits());
+			assert(!hit || numHits <  sink->numHits());
 			if(hit) {
 				// Got a hit; stop processing partial
 				// alignments
@@ -64,7 +64,7 @@
 	// the seed.
 	bool gaveUp = false;
 	if(seedMms >= 2) {
-		ASSERT_ONLY(uint64_t numHits = sink.numHits());
+		ASSERT_ONLY(uint64_t numHits = sink->numHits());
 		btf24.setQuery(&patFw, &qualFw, &name);
 		// Set up seed bounds
 		if(qs < s) {
@@ -84,8 +84,8 @@
 		if(btf24.numBacktracks() == btf24.maxBacktracks()) {
 			gaveUp = true;
 		}
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
+		assert(hit  || numHits == sink->numHits());
+		assert(!hit || numHits <  sink->numHits());
 		if(hit) {
 			if(dumpHHHits != NULL) {
 				(*dumpHHHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;

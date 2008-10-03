@@ -39,14 +39,14 @@
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable
-			ASSERT_ONLY(uint64_t numHits = sink.numHits());
+			ASSERT_ONLY(uint64_t numHits = sink->numHits());
 			ASSERT_ONLY(String<Dna5> tmp = patRc);
 			btr3.setMuts(&muts);
 			hit = btr3.backtrack(oldQuals);
 			btr3.setMuts(NULL);
 			assert_eq(tmp, patRc); // assert mutations were undone
-			assert(hit  || numHits == sink.numHits());
-			assert(!hit || numHits <  sink.numHits());
+			assert(hit  || numHits == sink->numHits());
+			assert(!hit || numHits <  sink->numHits());
 			if(hit) {
 				// The reverse complement hit, so we're done with this
 				// read
@@ -66,7 +66,7 @@
 	bool gaveUp = false;
 	if(seedMms >= 2) {
 		btr23.setQuery(&patRc, &qualRc, &name);
-		ASSERT_ONLY(uint64_t numHits = sink.numHits());
+		ASSERT_ONLY(uint64_t numHits = sink->numHits());
 		// Set up special seed bounds
 		if(qs < s) {
 			btr23.setOffs(qs5, qs,
@@ -85,8 +85,8 @@
 		if(btr23.numBacktracks() == btr23.maxBacktracks()) {
 			gaveUp = true;
 		}
-		assert(hit  || numHits == sink.numHits());
-		assert(!hit || numHits <  sink.numHits());
+		assert(hit  || numHits == sink->numHits());
+		assert(!hit || numHits <  sink->numHits());
 		if(hit) {
 			if(dumpHHHits != NULL) {
 				(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;

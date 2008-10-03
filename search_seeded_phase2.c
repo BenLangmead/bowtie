@@ -26,13 +26,13 @@
 					(seedMms > 2)? s5 : s,
 					(seedMms > 3)? s5 : s);
 	}
-	ASSERT_ONLY(uint64_t numHits = sink.numHits());
+	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	// Do a 12/24 backtrack on the forward-strand read using
 	// the mirror index.  This will find all case 1F, 2F
 	// and 3F hits.
 	bool hit = btf2.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		// The reverse complement hit, so we're done with this
 		// read

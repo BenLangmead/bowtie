@@ -171,37 +171,18 @@ protected:
 
 /**
  * A per-thread wrapper for a HitSink.  Incorporates state that a
- * single search thread cares about, i.e., this thread's provisional
- * hits and reported-hit count.
+ * single search thread cares about.
  */
 class HitSinkPerThread {
 public:
 	HitSinkPerThread(HitSink& sink, bool __keep = false) :
 		_sink(sink),
-		_keep(__keep),
+		_bestRemainingStratum(0),
 		_numHits(0llu),
-		_hits(),
-		_provHits() { }
-
-	/// Purge all accumulated provisional hits without reporting them
-	void rejectProvisionalHits() {
-		_provHits.clear();
-	}
-
-	/// Report and purge all accumulated provisional hits
-	void acceptProvisionalHits() {
-		// Save the old _keep and set it to false while we report the
-		// provisional hits; this is because we already retained them
-		// when they were reported provisionally.
-		bool keep = _keep;
-		_keep = false;
-		for(size_t i = 0; i < _provHits.size(); i++) {
-			const Hit& h = _provHits[i];
-			reportHit(h);
-		}
-		_keep = keep; // restore _keep
-		_provHits.clear();
-	}
+		_keep(__keep),
+		_hits() { }
+	
+	virtual ~HitSinkPerThread() { }
 
 	/// Set whether to retain hits in a vector or not
 	void setRetainHits(bool r)  { _keep = r; }
@@ -211,38 +192,175 @@ public:
 	void clearRetainedHits()    { _hits.clear(); }
 	/// Return the vector of retained hits
 	vector<Hit>& retainedHits() { return _hits; }
-
-	/**
-	 * Make note of a hit but don't pass it on to the HitSink yet
-	 * because it may be canceled in the future.
-	 */
-	void reportProvisionalHit(const Hit& h)	{
-		if(_keep) _hits.push_back(h);
-		_provHits.push_back(h);
-	}
+	
+	/// Finalize current read
+	virtual void finishRead() = 0;
 
 	/**
 	 * Implementation for hit reporting; update per-thread _hits and
 	 * _numHits variables and call the master HitSink to do the actual
 	 * reporting
 	 */
-	void reportHit(const Hit& h) {
-		_sink.reportHit(h);
+	bool reportHit(const Hit& h) {
 		if(_keep) _hits.push_back(h);
 		_numHits++;
+		return reportHitImpl(h);
 	}
+	
+	/**
+	 * Concrete subclasses override this to (possibly) report a hit and
+	 * return true iff the caller should continue to report more hits. 
+	 */
+	virtual bool reportHitImpl(const Hit& h) = 0;
 
 	/// Return the number of hits reported so far
 	uint64_t numHits()          { return _numHits; }
-	/// Return the number of provisional hits stored as of now
-	size_t numProvisionalHits() { return _provHits.size(); }
+	
+	/**
+	 * The search routine is informing us that it will not be reporting
+	 * any more hits at the given stratum.
+	 */
+	void finishedWithStratum(int stratum) {
+		assert_eq(_bestRemainingStratum, stratum);
+		_bestRemainingStratum++;
+		finishedWithStratumImpl(stratum);
+	}
+	
+	/**
+	 * Concrete subclasses override this to determine whether the
+	 * search routine should keep searching after having finished
+	 * reporting all alignments at the given stratum.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) = 0;
+	
+protected:
+	HitSink&    _sink; /// Ultimate destination of reported hits
+	/// Least # mismatches in alignments that will be reported in the
+	/// future.  Updated by the search routine.
+	int         _bestRemainingStratum;
+	/// # hits reported to this HitSink so far (not all of which were
+	/// necesssary reported to _sink)
+	uint64_t    _numHits;
+private:
+	bool        _keep; /// Whether to retain all reported hits in _hits
+	vector<Hit> _hits; /// Repository for retained hits
+};
+
+/**
+ * Report first N good alignments encountered; trust search routine
+ * to try alignments in something approximating a best-first order.
+ * Best used in combination with a stringent alignment policy.
+ */
+class FirstNGoodHitSinkPerThread : public HitSinkPerThread {
+
+public:
+	FirstNGoodHitSinkPerThread(
+			HitSink& sink,
+	        int __n,
+	        bool __keep = false) : 
+	        HitSinkPerThread(sink, __keep),
+	        _hitsForThisRead(0),
+	        _n(__n)
+	{
+		assert_gt(_n, 0);
+	}
+
+	/// Finalize current read
+	virtual void finishRead() {
+		_hitsForThisRead = 0;
+	}
+
+	/**
+	 * Report and then return false if we've already reported N.
+	 */
+	virtual bool reportHitImpl(const Hit& h) {
+		_sink.reportHit(h);
+		_hitsForThisRead++;
+		assert_leq(_hitsForThisRead, _n);
+		if(_hitsForThisRead == _n) {
+			return false; // already reported N good hits; stop!
+		}
+		return true; // not at N yet; keep going
+	}
+
+	/**
+	 * Always return true; search routine should only stop if it's
+	 * already reported N hits. 
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) { return true; }
 
 private:
-	HitSink&    _sink;
-	bool        _keep;
-	uint64_t    _numHits;
-	vector<Hit> _hits;
-	vector<Hit> _provHits;
+	int _hitsForThisRead; /// # hits for this read so far
+	int _n;               /// max # hits to report per read
+};
+
+/**
+ * Report the first N best alignments encountered.  Aggregator and
+ * search routine collaborate to ensure that there exists no
+ * alignment that's better than the ones reported.
+ */
+class FirstNBestHitSinkPerThread : public HitSinkPerThread {
+
+public:
+	FirstNBestHitSinkPerThread(
+			HitSink& sink,
+	        int __n,
+	        bool __keep = false) : 
+	        HitSinkPerThread(sink, __keep),
+	        _n(__n)
+	{
+		assert_gt(_n, 0);
+	}
+
+private:
+	int _n; // max # hits to report
+};
+
+/**
+ * Report the first N best alignments encountered in a single
+ * alignment stratum (i.e., the best stratum in which there were
+ * any hits).  Aggregator and search routine collaborate to ensure
+ * that there exists no alignment that's better than the ones
+ * reported.
+ */
+class FirstNBestStratifiedHitSinkPerThread : public HitSinkPerThread {
+
+public:
+	FirstNBestStratifiedHitSinkPerThread(
+			HitSink& sink,
+	        int __n,
+	        bool __keep = false) : 
+	        HitSinkPerThread(sink, __keep),
+	        _n(__n)
+	{
+		assert_gt(_n, 0);
+	}
+
+private:
+	int _n; // max # hits to report
+};
+
+/**
+ * Report all valid alignments.
+ */
+class AllHitSinkPerThread : public HitSinkPerThread {
+public:
+	AllHitSinkPerThread(
+			HitSink& sink,
+	        bool __keep = false) : 
+	        HitSinkPerThread(sink, __keep) { }
+};
+
+/**
+ * Report all alignments encountered in the best alignment stratum
+ * for which there were any alignments.
+ */
+class AllStratifiedHitSinkPerThread : public HitSinkPerThread {
+public:
+	AllStratifiedHitSinkPerThread(
+			HitSink& sink,
+	        bool __keep = false) : 
+	        HitSinkPerThread(sink, __keep) { }
 };
 
 /**

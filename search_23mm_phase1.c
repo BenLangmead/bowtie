@@ -21,14 +21,14 @@
 	bool hit;
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	ASSERT_ONLY(uint64_t numHits = sink.numHits());
+	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	btr1.setQuery(&patFw, &qualFw, &name);
 	btr1.setOffs(0, 0, plen, plen, plen, plen);
 	hit = btr1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
-		assert_eq(numHits+1, sink.numHits());
+		assert_eq(numHits+1, sink->numHits());
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -37,10 +37,10 @@
 	btr1.setQuery(&patRc, &qualRc, &name);
 	// Set up the revisitability of the halves
 	btr1.setOffs(0, 0, s5, s5, two ? s : s5, s);
-	ASSERT_ONLY(numHits = sink.numHits());
+	ASSERT_ONLY(numHits = sink->numHits());
 	hit = btr1.backtrack();
-	assert(hit  || numHits == sink.numHits());
-	assert(!hit || numHits <  sink.numHits());
+	assert(hit  || numHits == sink->numHits());
+	assert(!hit || numHits <  sink->numHits());
 	if(hit) {
 		DONEMASK_SET(patid);
 		continue;
