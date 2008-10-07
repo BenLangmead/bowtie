@@ -709,8 +709,8 @@ public:
 					   h.h.second == rhit.h.second)
 					{
 						assert_eq(h.fw, rhit.fw);
-						assert_eq(retainedStrata[j], oracleStrata[i]);
 						assert(h.mms == rhit.mms);
+						assert_eq(retainedStrata[j], oracleStrata[i]);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
 						if(lastStratum == -1) {
@@ -1839,6 +1839,7 @@ public:
 								diffs.set(plen - (*muts)[i].pos - 1);
 								refcs[plen - (*muts)[i].pos - 1] = (*muts)[i].newBase;
 							}
+							stratum++;
 						}
 					}
 					Hit h(make_pair(i, off),
