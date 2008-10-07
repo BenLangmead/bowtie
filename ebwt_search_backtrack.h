@@ -1158,7 +1158,7 @@ public:
 						else if(d < _3depth) loHalfMms++;
 						else assert(false);
 					}
-					assert_leq(loHalfMms + hiHalfMms, lim);
+					assert_leq(loHalfMms + hiHalfMms, (uint32_t)lim);
 					invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
 					if(stackDepth < 2 && altNum > 0) {
 						// We backtracked fewer times than necessary;
