@@ -1447,9 +1447,6 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
-					if(stackDepth == 0) {
-						if(_sanity) confirmNoHit(iham);
-					}
 					return false;
 				}
 				else if(eligibleNum == 0 && _considerQuals) {
