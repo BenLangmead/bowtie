@@ -896,7 +896,7 @@ public:
 				else if(d == _3depth) {
 					if(_3revOff == _2revOff) {
 						// 1 and 1
-
+						assert_eq(1, _hiHalfStackDepth);
 						// The backtracking logic should have prevented us from
 						// backtracking more than twice within this region
 						assert_leq(stackDepth, 2);
@@ -1128,6 +1128,7 @@ public:
 					assert_eq(0, _reportPartials);
 					assert_leq(stackDepth, lim);
 					assert_gt(stackDepth, 0);
+					assert_gt(_hiHalfStackDepth, 0);
 					invalidHalfAndHalf = (stackDepth == _hiHalfStackDepth);
 					if(stackDepth < 2 && altNum > 0) {
 						// We backtracked fewer times than necessary;
