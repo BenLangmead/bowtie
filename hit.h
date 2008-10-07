@@ -189,9 +189,12 @@ public:
 	/// Return whether we're retaining hits or not
 	bool retainHits()           { return _keep; }
 	/// Clear all hits in the retained-hits vector
-	void clearRetainedHits()    { _hits.clear(); }
+	void clearRetainedHits() {
+		_hits.clear(); _strata.clear();
+	}
 	/// Return the vector of retained hits
-	vector<Hit>& retainedHits() { return _hits; }
+	vector<Hit>& retainedHits()   { return _hits; }
+	vector<int>& retainedStrata() { return _strata; }
 
 	/// Finalize current read
 	virtual void finishRead() {
@@ -207,7 +210,10 @@ public:
 	 * reporting
 	 */
 	bool reportHit(const Hit& h, int stratum) {
-		if(_keep) _hits.push_back(h);
+		if(_keep) {
+			_hits.push_back(h);
+			_strata.push_back(stratum);
+		}
 		_numHits++;
 		return reportHitImpl(h, stratum);
 	}
@@ -243,6 +249,9 @@ public:
 	/// Return whether we span strata
 	virtual bool spanStrata() = 0;
 
+	/// Return whether we report only the best possible hits
+	virtual bool best() = 0;
+
 protected:
 	HitSink&    _sink; /// Ultimate destination of reported hits
 	/// Least # mismatches in alignments that will be reported in the
@@ -254,6 +263,7 @@ protected:
 private:
 	bool        _keep; /// Whether to retain all reported hits in _hits
 	vector<Hit> _hits; /// Repository for retained hits
+	vector<Hit> _strata; /// Repository for retained strata
 };
 
 /**
@@ -279,6 +289,10 @@ public:
 
 	virtual bool spanStrata() {
 		return true; // we span strata
+	}
+
+	virtual bool best() {
+		return false; // we settle for "good" hits
 	}
 
 	/// Finalize current read
@@ -335,6 +349,10 @@ public:
 
 	virtual bool spanStrata() {
 		return true; // we span strata
+	}
+
+	virtual bool best() {
+		return true; // we report "best" hits
 	}
 
 	/**
@@ -439,6 +457,10 @@ public:
 
 	virtual bool spanStrata() {
 		return false; // we do not span strata
+	}
+
+	virtual bool best() {
+		return true; // we report "best" hits
 	}
 
 	/**
@@ -562,6 +584,10 @@ public:
 		return true; // we span strata
 	}
 
+	virtual bool best() {
+		return true; // we report "best" hits
+	}
+
 	/**
 	 * Report and always return true; we're finiding all hits so that
 	 * search routine should always continue.
@@ -600,6 +626,10 @@ public:
 
 	virtual bool spanStrata() {
 		return false; // we do not span strata
+	}
+
+	virtual bool best() {
+		return true; // we report "best" hits
 	}
 
 	/**

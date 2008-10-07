@@ -678,7 +678,9 @@ public:
 		{
 			uint32_t maxHitsAllowed = sink.maxHits();
 			vector<Hit>& retainedHits = sink.retainedHits();
+			vector<int>& retainedStrata = sink.retainedStrata();
 			assert_leq(retainedHits.size() - oldRetainSz, maxHitsAllowed);
+			assert_eq(retainedHits.size(), retainedStrata.size());
 			vector<Hit> oracleHits;
 			vector<int> oracleStrata;
 			// Invoke the naive oracle, which will place all qualifying
@@ -689,9 +691,15 @@ public:
 			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
 			int lastStratum = -1;
+			int worstStratum = -1;
 			// Get the hit reported by the backtracker
 			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
+				if(worstStratum == -1) {
+					worstSrtatum = retainedStrata[i];
+				} else if(retainedStrata[i] > worstStratum) {
+					worstStratum = retainedStrata[i];
+				}
 				// Go through oracleHits and look for a match
 				size_t i;
 				bool found = false;
@@ -701,6 +709,7 @@ public:
 					   h.h.second == rhit.h.second)
 					{
 						assert_eq(h.fw, rhit.fw);
+						assert_eq(retainedStrata[j], oracleStrata[i]);
 						assert(h.mms == rhit.mms);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
@@ -717,6 +726,7 @@ public:
 				assert(found); // assert we found a matchup
 			}
 			assert_neq(-1, lastStratum);
+			assert_neq(-1, worstStratum);
 			assert_eq(oracleHits.size(), oracleStrata.size());
 			if(maxHitsAllowed == 0xffffffff) {
 				if(sink.spanStrata()) {
@@ -728,6 +738,14 @@ public:
 					for(size_t i = 0; i < oracleStrata.size(); i++) {
 						assert_gt(oracleStrata[i], lastStratum);
 					}
+				}
+			}
+			if(sink.best()) {
+				// Ensure that all oracle hits have a stratum at least
+				// as bad as the worst stratum observed in the retained
+				// hits
+				for(size_t i = 0; i < oracleStrata.size(); i++) {
+					assert_geq(oracleStrata[i], worstStratum);
 				}
 			}
 		}
