@@ -648,9 +648,11 @@ public:
 		                 << "_pairs" << _pairs << ", "
 		                 << "_elims=" << (void*)_elims << ")" << endl;
 		bool oldRetain = sink.retainHits();
+		size_t oldRetainSz;
 		if(_sanity) {
 			// Save some info about hits retained at this point
-			_params.sink().setRetainHits(true);
+			sink.setRetainHits(true);
+			oldRetainSz = sink.retainedHits().size();
 		}
 		uint64_t nhits = sink.numHits();
 
@@ -676,7 +678,7 @@ public:
 		{
 			uint32_t maxHitsAllowed = sink.maxHits();
 			vector<Hit>& retainedHits = sink.retainedHits();
-			assert_leq(retainedHits.size(), maxHitsAllowed);
+			assert_leq(retainedHits.size() - oldRetainSz, maxHitsAllowed);
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
@@ -685,7 +687,7 @@ public:
 			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
 			// Get the hit reported by the backtracker
-			for(size_t j = 0; j < retainedHits.size(); j++) {
+			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
 				// Go through oracleHits and look for a match
 				size_t i;
