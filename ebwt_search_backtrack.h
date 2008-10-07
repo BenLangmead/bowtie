@@ -1514,7 +1514,7 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Try again
 			} // while(top == bot && altNum > 0)
-			if(mustBacktrack) return false;
+			if(mustBacktrack || invalidHalfAndHalf || invalidExact) return false;
 			// Mismatch with no alternatives
 			if(top == bot && altNum == 0) {
 				assert_eq(0, altNum);
