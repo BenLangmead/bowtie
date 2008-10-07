@@ -1517,11 +1517,6 @@ public:
 				assert_eq(0, altNum);
 				assert_eq(0, eligibleSz);
 				assert_eq(0, eligibleNum);
-				// Mismatched with no backtracking opportunities;
-				// return failure
-				if(stackDepth == 0) {
-					if(_sanity) confirmNoHit(iham);
-				}
 				return false;
 			}
 			// Match!
@@ -1538,17 +1533,11 @@ public:
 			uint64_t hits = _params.sink().numHits();
 			bool ret = reportAlignment(stackDepth, top, bot);
 			bool reported = _params.sink().numHits() > hits;
-			if(_sanity && !reported && stackDepth == 0) {
-				confirmNoHit(iham);
-			}
 			if(_sanity && reported) {
 				confirmHit(iham);
 			}
 			return ret;
 		} else {
-			if(stackDepth == 0) {
-				if(_sanity) confirmNoHit(iham);
-			}
 			return false;
 		}
 	}
