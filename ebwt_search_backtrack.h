@@ -684,9 +684,11 @@ public:
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
 			naiveOracle(oracleHits, oracleStrata, iham);
+			assert_eq(oracleHits.size(), oracleStrata.size());
 			// If we found a hit, it had better be one of the ones
 			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
+			int lastStratum = -1;
 			// Get the hit reported by the backtracker
 			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
@@ -702,12 +704,20 @@ public:
 						assert(h.mms == rhit.mms);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
+						if(lastStratum == -1) {
+							lastStratum = oracleStrata[i];
+						} else if(!sink.spanStrata()) {
+							assert_eq(lastStratum, oracleStrata[i]);
+						}
+						oracleStrata.erase(oracleStrata.begin() + i);
 						found = true;
 						break;
 					}
 				}
 				assert(found); // assert we found a matchup
 			}
+			assert_neq(-1, lastStratum);
+			assert_eq(oracleHits.size(), oracleStrata.size());
 			if(maxHitsAllowed == 0xffffffff) {
 				if(sink.spanStrata()) {
 					// Must have matched every oracle hit
@@ -715,6 +725,9 @@ public:
 				} else {
 					// Must have matched all oracle hits at the best
 					// stratum
+					for(size_t i = 0; i < oracleStrata.size(); i++) {
+						assert_gt(oracleStrata[i], lastStratum);
+					}
 				}
 			}
 		}
