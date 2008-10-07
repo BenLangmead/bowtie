@@ -685,7 +685,7 @@ public:
 			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
 			// Get the hit reported by the backtracker
-			for(size_t j = 0; j < oracleHits.size(); j++) {
+			for(size_t j = 0; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
 				// Go through oracleHits and look for a match
 				size_t i;
@@ -698,7 +698,7 @@ public:
 						assert(h.mms == rhit.mms);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
-						i--;
+						break;
 					}
 				}
 				assert_lt(i, oracleHits.size()); // assert we found a matchup
