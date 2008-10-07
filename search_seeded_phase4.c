@@ -8,6 +8,9 @@
 {
 	params.setFw(true);
 	params.setEbwtFw(false);
+	btf4.setReportExacts(true);
+
+	ASSERT_ONLY(uint64_t numHitsForFw = sink->numHits());
 	btf4.setQuery(&patFw, &qualFw, &name);
 	// Get all partial alignments for this read's reverse
 	// complement
@@ -21,7 +24,7 @@
 			assert_eq(0, pamFw->size());
 		}
 	}
-	bool hit = false;
+	bool done = false;
 	if(pals.size() > 0) {
 		// Partial alignments exist - extend them
 		// Set up seed bounds
@@ -39,15 +42,12 @@
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable
-			ASSERT_ONLY(uint64_t numHits = sink->numHits());
 			ASSERT_ONLY(String<Dna5> tmp = patFw);
 			btf4.setMuts(&muts);
-			hit = btf4.backtrack(oldQuals);
+			done = btf4.backtrack(oldQuals);
 			btf4.setMuts(NULL);
 			assert_eq(tmp, patFw); // assert mutations were undone
-			assert(hit  || numHits == sink->numHits());
-			assert(!hit || numHits <  sink->numHits());
-			if(hit) {
+			if(done) {
 				// Got a hit; stop processing partial
 				// alignments
 				break;
@@ -56,7 +56,9 @@
 	}
 
 	// Case 4F yielded a hit; continue to next pattern
-	if(hit) continue;
+	if(done) continue;
+
+	sink->finishedWithStratum(1); // no more exact hits are possible
 
 	// If we're in two-mismatch mode, then now is the time to
 	// try the final case that might apply to the forward
@@ -64,7 +66,6 @@
 	// the seed.
 	bool gaveUp = false;
 	if(seedMms >= 2) {
-		ASSERT_ONLY(uint64_t numHits = sink->numHits());
 		btf24.setQuery(&patFw, &qualFw, &name);
 		// Set up seed bounds
 		if(qs < s) {
@@ -80,13 +81,11 @@
 			              (seedMms < 3)?  s : s5,  // 2revOff
 			              s);                      // 3revOff
 		}
-		hit = btf24.backtrack();
+		done = btf24.backtrack();
 		if(btf24.numBacktracks() == btf24.maxBacktracks()) {
 			gaveUp = true;
 		}
-		assert(hit  || numHits == sink->numHits());
-		assert(!hit || numHits <  sink->numHits());
-		if(hit) {
+		if(done) {
 			if(dumpHHHits != NULL) {
 				(*dumpHHHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;
 			}
@@ -102,7 +101,7 @@
 #ifndef NDEBUG
 	// The forward version of the read doesn't hit at all!
 	// Check with the oracle to make sure it agrees.
-	if(!gaveUp) {
+	if(!gaveUp && numHitsForFw < sink->numHits()) {
 		ASSERT_NO_HITS_FW(false);
 		if(dumpNoHits != NULL) {
 			(*dumpNoHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << "---" << endl;

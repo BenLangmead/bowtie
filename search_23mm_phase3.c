@@ -8,18 +8,21 @@
 {
 	params.setFw(true);
 	params.setEbwtFw(true);
+	bt3.setReportExacts(false);
+
+	// Try 2/3 backtracks in the 3' half of the forward read
 	bt3.setQuery(&patFw, &qualFw, &name);
-	// Set up the revisitability of the halves
 	bt3.setOffs(0, 0,
 	            s3,
 	            s3,
 	            two? s : s3,
 	            s);
 	ASSERT_ONLY(uint64_t numHits = sink->numHits());
-	bool hit = bt3.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) continue;
+	bool done = bt3.backtrack();
+	if(done) continue;
+
+	// no more 1-mismatch hits are possible after this point
+	sink->finishedWithStratum(1);
 
 	// Try a half-and-half on the forward read
 	bool gaveUp = false;
@@ -32,14 +35,12 @@
 	              two ? s  : s3,
 	              s);
 	ASSERT_ONLY(numHits = sink->numHits());
-	hit = bthh3.backtrack();
+	done = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
 	}
 	bthh3.resetNumBacktracks();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(done) {
 		if(dumpHHHits != NULL) {
 			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
 		}
@@ -65,14 +66,12 @@
 	              two ? s  : s5,
 	              s);
 	ASSERT_ONLY(numHits = sink->numHits());
-	hit = bthh3.backtrack();
+	done = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
 	}
 	bthh3.resetNumBacktracks();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(done) {
 		if(dumpHHHits != NULL) {
 			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
 		}

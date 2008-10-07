@@ -181,7 +181,7 @@ public:
 		_numHits(0llu),
 		_keep(__keep),
 		_hits() { }
-	
+
 	virtual ~HitSinkPerThread() { }
 
 	/// Set whether to retain hits in a vector or not
@@ -192,47 +192,51 @@ public:
 	void clearRetainedHits()    { _hits.clear(); }
 	/// Return the vector of retained hits
 	vector<Hit>& retainedHits() { return _hits; }
-	
+
 	/// Finalize current read
-	virtual void finishRead() = 0;
+	virtual void finishRead() {
+		_bestRemainingStratum = 0;
+		finishReadImpl();
+	}
+
+	virtual void finishReadImpl() = 0;
 
 	/**
 	 * Implementation for hit reporting; update per-thread _hits and
 	 * _numHits variables and call the master HitSink to do the actual
 	 * reporting
 	 */
-	bool reportHit(const Hit& h) {
+	bool reportHit(const Hit& h, int stratum) {
 		if(_keep) _hits.push_back(h);
 		_numHits++;
-		return reportHitImpl(h);
+		return reportHitImpl(h, stratum);
 	}
-	
+
 	/**
 	 * Concrete subclasses override this to (possibly) report a hit and
-	 * return true iff the caller should continue to report more hits. 
+	 * return true iff the caller should continue to report more hits.
 	 */
-	virtual bool reportHitImpl(const Hit& h) = 0;
+	virtual bool reportHitImpl(const Hit& h, int stratum) = 0;
 
 	/// Return the number of hits reported so far
 	uint64_t numHits()          { return _numHits; }
-	
+
 	/**
 	 * The search routine is informing us that it will not be reporting
 	 * any more hits at the given stratum.
 	 */
 	void finishedWithStratum(int stratum) {
-		assert_eq(_bestRemainingStratum, stratum);
-		_bestRemainingStratum++;
+		_bestRemainingStratum = stratum+1;
 		finishedWithStratumImpl(stratum);
 	}
-	
+
 	/**
 	 * Concrete subclasses override this to determine whether the
 	 * search routine should keep searching after having finished
 	 * reporting all alignments at the given stratum.
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) = 0;
-	
+
 protected:
 	HitSink&    _sink; /// Ultimate destination of reported hits
 	/// Least # mismatches in alignments that will be reported in the
@@ -257,7 +261,7 @@ public:
 	FirstNGoodHitSinkPerThread(
 			HitSink& sink,
 	        int __n,
-	        bool __keep = false) : 
+	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
 	        _hitsForThisRead(0),
 	        _n(__n)
@@ -266,28 +270,30 @@ public:
 	}
 
 	/// Finalize current read
-	virtual void finishRead() {
+	virtual void finishReadImpl() {
 		_hitsForThisRead = 0;
 	}
 
 	/**
-	 * Report and then return false if we've already reported N.
+	 * Report and then return true if we've already reported N good
+	 * hits.  Ignore the stratum - it's not relevant for finding "good"
+	 * hits.
 	 */
-	virtual bool reportHitImpl(const Hit& h) {
+	virtual bool reportHitImpl(const Hit& h, int stratum) {
 		_sink.reportHit(h);
 		_hitsForThisRead++;
 		assert_leq(_hitsForThisRead, _n);
 		if(_hitsForThisRead == _n) {
-			return false; // already reported N good hits; stop!
+			return true; // already reported N good hits; stop!
 		}
-		return true; // not at N yet; keep going
+		return false; // not at N yet; keep going
 	}
 
 	/**
 	 * Always return true; search routine should only stop if it's
-	 * already reported N hits. 
+	 * already reported N hits.
 	 */
-	virtual bool finishedWithStratumImpl(int stratum) { return true; }
+	virtual bool finishedWithStratumImpl(int stratum) { return false; }
 
 private:
 	int _hitsForThisRead; /// # hits for this read so far
@@ -305,15 +311,88 @@ public:
 	FirstNBestHitSinkPerThread(
 			HitSink& sink,
 	        int __n,
-	        bool __keep = false) : 
+	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
+	        _hitsForThisRead(0),
 	        _n(__n)
 	{
 		assert_gt(_n, 0);
 	}
 
+	/**
+	 * Report and then return false if we've already reported N.
+	 */
+	virtual bool reportHitImpl(const Hit& h, int stratum) {
+		assert_geq(stratum, _bestRemainingStratum);
+		if(stratum == _bestRemainingStratum) {
+			// This hit is within th best possible remaining stratum,
+			// so it should definitely count
+			_sink.reportHit(h);
+			_hitsForThisRead++;
+			assert_leq(_hitsForThisRead, _n);
+			if(_hitsForThisRead == _n) {
+				return true; // already reported N good hits; stop!
+			}
+		} else {
+			// The alignment is not guaranteed to be in the best
+			// stratum, but it might be, so save it for possible
+			// future reporting
+			_hitStrata[stratum].push_back(h);
+		}
+		return false; // not at N yet; keep going
+	}
+
+	/**
+	 * Finalize current read by reporting any buffered hits from best
+	 * to worst until they're all reported or until we've reported all
+	 * N
+	 */
+	virtual void finishReadImpl() {
+		for(int j = 0; j < 4; j++) {
+			for(size_t i = 0; i < _hitStrata[j].size(); i++) {
+				// This hit is within th best possible remaining stratum,
+				// so it should definitely count
+				_sink.reportHit(_hitStrata[j][i]);
+				_hitsForThisRead++;
+				assert_leq(_hitsForThisRead, _n);
+				if(_hitsForThisRead == _n) {
+					_hitsForThisRead = 0;
+					return; // already reported N good hits; stop!
+				}
+			}
+		}
+		_hitsForThisRead = 0;
+	}
+
+	/**
+	 * Always return true; search routine should only stop if it's
+	 * already reported N hits.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) {
+#ifndef NDEBUG
+		for(int j = 0; j < stratum; j++) {
+			assert_eq(0, _hitStrata[j].size());
+		}
+#endif
+		for(int j = stratum; j <= stratum+1; j++) {
+			for(size_t i = 0; i < _hitStrata[j].size(); i++) {
+				// This hit is within the best possible remaining stratum,
+				// so it should definitely count
+				_sink.reportHit(_hitStrata[j][i]);
+				_hitsForThisRead++;
+				assert_leq(_hitsForThisRead, _n);
+				if(_hitsForThisRead == _n) {
+					return true; // already reported N good hits; stop!
+				}
+			}
+		}
+		return false; // keep going
+	}
+
 private:
-	int _n; // max # hits to report
+	int _hitsForThisRead;      /// # hits for this read so far
+	int _n;                    /// max # hits to report
+	vector<Hit> _hitStrata[4]; /// lower numbered strata are better
 };
 
 /**
@@ -329,26 +408,148 @@ public:
 	FirstNBestStratifiedHitSinkPerThread(
 			HitSink& sink,
 	        int __n,
-	        bool __keep = false) : 
+	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
-	        _n(__n)
+	        _hitsForThisRead(0),
+	        _n(__n),
+	        _bestStratumReported(999)
 	{
 		assert_gt(_n, 0);
 	}
 
+	/**
+	 * Report and then return false if we've already reported N.
+	 */
+	virtual bool reportHitImpl(const Hit& h, int stratum) {
+		assert_geq(stratum, _bestRemainingStratum);
+		if(stratum == _bestRemainingStratum &&
+		   stratum <= _bestStratumReported)
+		{
+			// This hit is within th best possible remaining stratum,
+			// so it should definitely count
+			_sink.reportHit(h);
+			_hitsForThisRead++;
+			_bestStratumReported = stratum;
+			assert_leq(_hitsForThisRead, _n);
+			if(_hitsForThisRead == _n) {
+				return true; // already reported N good hits; stop!
+			}
+		} else if(stratum <= _bestStratumReported) {
+			_hitStrata[stratum].push_back(h);
+			_bestStratumReported = stratum;
+		} else {
+			// No need to buffer the hit because we're guaranteed not
+			// to report it
+		}
+		return false; // not at N yet; keep going
+	}
+
+	/**
+	 * Finalize current read by reporting any buffered hits from best
+	 * to worst until they're all reported or until we've reported all
+	 * N
+	 */
+	virtual void finishReadImpl() {
+		if(_bestStratumReported < 999) {
+			assert_leq(_bestStratumReported, 3);
+#ifndef NDEBUG
+			// All better strata should be empty
+			for(int j = 0; j < _bestStratumReported; j++) {
+				assert_eq(0, _hitStrata[j].size());
+			}
+#endif
+			for(size_t i = 0; i < _hitStrata[_bestStratumReported].size(); i++) {
+				// This hit is within th best possible remaining stratum,
+				// so it should definitely count
+				_sink.reportHit(_hitStrata[_bestStratumReported][i]);
+				_hitsForThisRead++;
+				assert_leq(_hitsForThisRead, _n);
+				if(_hitsForThisRead == _n) {
+					break; // already reported N good hits; stop!
+				}
+			}
+		} else {
+#ifndef NDEBUG
+			// All strata should be empty
+			for(int j = 0; j < 4; j++) {
+				assert_eq(0, _hitStrata[j].size());
+			}
+#endif
+		}
+		reset();
+	}
+
+	/**
+	 * Always return true; search routine should only stop if it's
+	 * already reported N hits.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) {
+		for(size_t i = 0; i < _hitStrata[stratum].size(); i++) {
+			// This hit is within the best possible remaining stratum,
+			// so it should definitely count
+			_sink.reportHit(_hitStrata[stratum][i]);
+			_hitsForThisRead++;
+			assert_leq(_hitsForThisRead, _n);
+			if(_hitsForThisRead == _n) {
+				return true; // already reported N good hits; stop!
+			}
+		}
+		// reported at least once in this stratum; do not move to the
+		// next stratum
+		if(_hitsForThisRead > 0) return true;
+		// didn't report; move to next stratum
+		return false;
+	}
+
 private:
-	int _n; // max # hits to report
+
+	void reset() {
+		clearAll();
+		_hitsForThisRead = 0;
+		_bestStratumReported = 999;
+	}
+
+	void clearAll() {
+		for(int j = 0; j < 4; j++) {
+			_hitStrata[j].clear();
+		}
+	}
+
+	int _hitsForThisRead;      /// # hits for this read so far
+	int _n;                    /// max # hits to report
+	int _bestStratumReported;          /// stratum of best reported hit thus far
+	vector<Hit> _hitStrata[4];
 };
 
 /**
  * Report all valid alignments.
  */
 class AllHitSinkPerThread : public HitSinkPerThread {
+
 public:
 	AllHitSinkPerThread(
 			HitSink& sink,
-	        bool __keep = false) : 
-	        HitSinkPerThread(sink, __keep) { }
+	        bool __keep = false) :
+		    HitSinkPerThread(sink, __keep) { }
+
+	/**
+	 * Report and always return true; we're finiding all hits so that
+	 * search routine should always continue.
+	 */
+	virtual bool reportHitImpl(const Hit& h, int stratum) {
+		_sink.reportHit(h);
+		return false; // reporting all; always keep going
+	}
+
+	/**
+	 * Finalize; do nothing because we haven't buffered anything
+	 */
+	virtual void finishReadImpl() { }
+
+	/**
+	 * Always return true; search routine should not stop.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) { return false; }
 };
 
 /**
@@ -356,11 +557,108 @@ public:
  * for which there were any alignments.
  */
 class AllStratifiedHitSinkPerThread : public HitSinkPerThread {
+
 public:
 	AllStratifiedHitSinkPerThread(
 			HitSink& sink,
-	        bool __keep = false) : 
-	        HitSinkPerThread(sink, __keep) { }
+	        bool __keep = false) :
+	        HitSinkPerThread(sink, __keep),
+	        _bestStratumReported(999),
+	        _reported(false) { }
+
+	/**
+	 * Report and then return false if we've already reported N.
+	 */
+	virtual bool reportHitImpl(const Hit& h, int stratum) {
+		assert_geq(stratum, _bestRemainingStratum);
+		if(stratum == _bestRemainingStratum &&
+		   stratum <= _bestStratumReported)
+		{
+			// This hit is within the best possible remaining stratum,
+			// so it should definitely be reported
+			_sink.reportHit(h);
+			_reported = true;
+			_bestStratumReported = stratum;
+		} else if(stratum <= _bestStratumReported) {
+			_hitStrata[stratum].push_back(h);
+			_bestStratumReported = stratum;
+		} else {
+			// No need to buffer the hit because we're guaranteed not
+			// to report it
+		}
+		return false; // keep going
+	}
+
+	/**
+	 * Finalize current read by reporting any buffered hits from best
+	 * to worst until they're all reported or until we've reported all
+	 * N
+	 */
+	virtual void finishReadImpl() {
+		if(_bestStratumReported < 999) {
+#ifndef NDEBUG
+			// All better strata should be empty
+			for(int j = 0; j < _bestStratumReported; j++) {
+				assert_eq(0, _hitStrata[j].size());
+			}
+#endif
+			for(size_t i = 0; i < _hitStrata[_bestStratumReported].size(); i++) {
+				// This hit is within th best possible remaining stratum,
+				// so it should definitely count
+				_sink.reportHit(_hitStrata[_bestStratumReported][i]);
+			}
+		} else {
+#ifndef NDEBUG
+			// All strata should be empty
+			for(int j = 0; j < 4; j++) {
+				assert_eq(0, _hitStrata[j].size());
+			}
+#endif
+		}
+		reset();
+	}
+
+	/**
+	 * Always return true; search routine should only stop if it's
+	 * already reported N hits.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) {
+#ifndef NDEBUG
+		// All better strata should be empty
+		for(int j = 0; j < stratum; j++) {
+			assert_eq(0, _hitStrata[j].size());
+		}
+#endif
+		for(size_t i = 0; i < _hitStrata[stratum].size(); i++) {
+			// This hit is within the best possible remaining stratum,
+			// so it should definitely count
+			_sink.reportHit(_hitStrata[stratum][i]);
+			_reported = true;
+		}
+		// reported at least once in this stratum; do not move to the
+		// next stratum
+		if(_reported) return true; // stop
+		// didn't report; move to next stratum
+		return false;
+	}
+
+private:
+
+	void reset() {
+		clearAll();
+		_reported = false;
+		_bestStratumReported = 999;
+	}
+
+	void clearAll() {
+		for(int j = 0; j < 4; j++) {
+			_hitStrata[j].clear();
+		}
+	}
+
+	int _bestStratumReported;          /// stratum of best reported hit thus far
+	bool _reported;
+	vector<Hit> _hitStrata[4];
 };
 
 /**

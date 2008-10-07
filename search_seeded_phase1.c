@@ -8,6 +8,9 @@
 {
 	params.setFw(true);
 	params.setEbwtFw(true);
+	btf1.setReportExacts(true);
+	bt1.setReportExacts(true);
+
 	if(plen < 2 && seedMms >= 1) {
 		cerr << "Error: Read (" << name << ") is less than 2 characters long" << endl;
 		exit(1);
@@ -43,15 +46,13 @@
 	}
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	uint64_t numHits = sink->numHits();
 	btf1.setQuery(&patFw, &qualFw, &name);
 	btf1.setOffs(0, 0, plen, plen, plen, plen);
-	btf1.backtrack();
-	if(sink->numHits() > numHits) {
-		assert_eq(numHits+1, sink->numHits());
+	if(btf1.backtrack()) {
 		DONEMASK_SET(patid);
 		continue;
 	}
+
 	// Set up backtracker with reverse complement
 	params.setFw(false);
 	// Set up special seed bounds
@@ -67,11 +68,7 @@
 						  (seedMms > 3)? s5 : s);
 	}
 	bt1.setQuery(&patRc, &qualRc, &name);
-	ASSERT_ONLY(numHits = sink->numHits());
-	bool hit = bt1.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(bt1.backtrack()) {
 		// If we reach here, then we obtained a hit for case
 		// 1R, 2R or 3R and can stop considering this read
 		DONEMASK_SET(patid);

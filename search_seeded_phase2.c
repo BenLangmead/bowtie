@@ -11,6 +11,9 @@
 	// 3F...
 	params.setFw(true);  // looking at forward strand
 	params.setEbwtFw(false);
+	btf2.setReportExacts(false);
+	btr2.setReportExacts(false);
+
 	btf2.setQuery(&patFw, &qualFw, &name);
 	// Set up seed bounds
 	if(qs < s) {
@@ -26,14 +29,10 @@
 					(seedMms > 2)? s5 : s,
 					(seedMms > 3)? s5 : s);
 	}
-	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	// Do a 12/24 backtrack on the forward-strand read using
 	// the mirror index.  This will find all case 1F, 2F
 	// and 3F hits.
-	bool hit = btf2.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(btf2.backtrack()) {
 		// The reverse complement hit, so we're done with this
 		// read
 		DONEMASK_SET(patid);
@@ -42,6 +41,8 @@
 	// No need to collect partial alignments if we're not
 	// allowing mismatches in the 5' seed half
 	if(seedMms == 0) continue;
+
+	sink->finishedWithStratum(0); // no more exact hits are possible
 
 	// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
 	// have been eliminated, leaving us with cases 4F and 4R
@@ -64,12 +65,12 @@
 	btr2.setQuery(&patRc, &qualRc, &name);
 	btr2.setQlen(s); // just look at the seed
 	// Find partial alignments for case 4R
-	hit = btr2.backtrack();
+	bool done = btr2.backtrack();
 #ifndef NDEBUG
 	vector<PartialAlignment> partials;
 	assert(pamRc != NULL);
 	pamRc->getPartials(patid, partials);
-	if(hit) assert_gt(partials.size(), 0);
+	if(done) assert_gt(partials.size(), 0);
 	for(size_t i = 0; i < partials.size(); i++) {
 		uint32_t pos0 = partials[i].entry.pos0;
 		assert_lt(pos0, s5);

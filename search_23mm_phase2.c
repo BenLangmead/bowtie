@@ -8,27 +8,24 @@
 {
 	params.setEbwtFw(false);
 	params.setFw(true);
+	bt2.setReportExacts(false);
+
 	bt2.setQuery(&patFw, &qualFw, &name);
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s5, s5, two? s : s5, s);
-	ASSERT_ONLY(uint64_t numHits = sink->numHits());
-	bool hit = bt2.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(bt2.backtrack()) {
 		DONEMASK_SET(patid);
 		continue;
 	}
-	// Try 2 backtracks in the 3' half of the reverse complement read
+
+	sink->finishedWithStratum(0); // no more exact hits are possible
+
+	// Try 2/3 backtracks in the 3' half of the reverse complement read
 	params.setFw(false);  // looking at reverse complement
 	bt2.setQuery(&patRc, &qualRc, &name);
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s3, s3, two? s : s3, s);
-	ASSERT_ONLY(numHits = sink->numHits());
-	hit = bt2.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
+	if(bt2.backtrack()) {
 		DONEMASK_SET(patid);
 		continue;
 	}

@@ -29,7 +29,7 @@ static string origString		= ""; // reference text, or filename(s)
 static int revcomp				= 1; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
-static bool oneHit				= true;  // for multihits, report just one
+static bool allHits				= false; // for multihits, report just one
 static bool arrowMode			= false; // report SA arrows instead of locs
 static int showVersion			= 0; // just print version and quit?
 static int ipause				= 0; // pause before maching?
@@ -38,7 +38,6 @@ static int skipSearch			= 0; // abort before searching
 static int qSameLen				= 0; // abort before searching
 static int trim5				= 0; // amount to trim from 5' end
 static int trim3				= 0; // amount to trim from 3' end
-static int printStats			= 0; // whether to print statistics
 static int reportOpps			= 0; // whether to report # of other mappings
 static int offRate				= -1; // keep default offRate
 static int mismatches			= 0; // allow 0 mismatches by default
@@ -60,8 +59,11 @@ static bool fullIndex           = false; // load halves one at a time and procee
 static bool noRefNames          = false;
 static ofstream *dumpNoHits     = NULL;
 static ofstream *dumpHHHits     = NULL;
+static int khits                = 1;
+static bool onlyBest			= false;
+static bool spanStrata			= false;
 
-static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
+static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
 #define ARG_ORIG                256
 #define ARG_SEED                257
@@ -77,21 +79,23 @@ static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:";
 #define ARG_NOOUT               267
 #define ARG_FAST                268
 #define ARG_REFIDX              269
-#define ARG_BINOUT              270
-#define ARG_DUMP_NOHIT          271
-#define ARG_DUMP_HHHIT          272
+#define ARG_DUMP_NOHIT          270
+#define ARG_DUMP_HHHIT          271
+#define ARG_SANITY              272
+#define ARG_BEST                273
+#define ARG_SPANSTRATA          274
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
-	{"sanity",       no_argument,       0,            's'},
+	{"sanity",       no_argument,       0,            ARG_SANITY},
 	{"exact",        no_argument,       0,            '0'},
 	{"1mm",          no_argument,       0,            '1'},
 	{"2mm",          no_argument,       0,            '2'},
 	{"pause",        no_argument,       &ipause,      1},
 	{"orig",         required_argument, 0,            ARG_ORIG},
-	{"allhits",      no_argument,       0,            'a'},
+	{"all",          no_argument,       0,            'a'},
 	{"concise",      no_argument,       0,            ARG_CONCISE},
-	{"binout",       no_argument,       0,            ARG_BINOUT},
+	{"binout",       no_argument,       0,            'b'},
 	{"noout",        no_argument,       0,            ARG_NOOUT},
 	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{"time",         no_argument,       0,            't'},
@@ -102,7 +106,6 @@ static struct option long_options[] = {
 	{"offrate",      required_argument, 0,            'o'},
 	{"skipsearch",   no_argument,       &skipSearch,  1},
 	{"qsamelen",     no_argument,       &qSameLen,    1},
-	{"stats",        no_argument,       &printStats,  1},
 	{"reportopps",   no_argument,       &reportOpps,  1},
 	{"version",      no_argument,       &showVersion, 1},
 	{"maq",          no_argument,       &maqLike,     1},
@@ -114,6 +117,9 @@ static struct option long_options[] = {
 	{"seedmms",      required_argument, 0,            'n'},
 	{"help",         no_argument,       0,            'h'},
 	{"threads",      required_argument, 0,            'p'},
+	{"khits",        required_argument, 0,            'k'},
+	{"best",         no_argument,       0,            ARG_BEST},
+	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
@@ -146,29 +152,30 @@ static void printUsage(ostream& out) {
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: 2)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
+	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
+	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
+	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
+	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
 #ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
-	    //<< "  --maq              maq-like matching (forces -r, -k 24)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  --fast             load both index halves at once; faster, uses more memory" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
-	    //<< "  -s/--sanity        enable sanity checks (increases runtime and mem usage!)" << endl
+	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
 	    //<< "  --qsamelen         die with error if queries don't all have the same length" << endl
-	    //<< "  --stats            write statistics after hits" << endl
 	    //<< "  --reportopps       report # of other potential mapping targets for each hit" << endl
-	    //<< "  -a/--allhits       if query has >1 hit, give all hits (default: 1 random hit)" << endl
 	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
 	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r and <query_in>" << endl
 	    << "  --concise          write hits in concise format" << endl
-	    << "  --binout           write hits in binary format (<hit_outfile> not optional)" << endl
+	    << "  -b/--binout        write hits in binary format (<hit_outfile> not optional)" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
-	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 100)" << endl
+	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 125)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be >= value in index" << endl
@@ -222,7 +229,7 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: outType = CONCISE; break;
-	   		case ARG_BINOUT: outType = BINARY; break;
+	   		case 'b': outType = BINARY; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -234,6 +241,9 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'u':
 	   			qUpto = (uint32_t)parseInt(1, "-u/--qupto arg must be at least 1");
+	   			break;
+	   		case 'k':
+	   			khits = (uint32_t)parseInt(1, "-k/--khits arg must be at least 1");
 	   			break;
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
@@ -276,9 +286,11 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_MAXNS:
 	   			maxNs = parseInt(0, "--maxns arg must be at least 0");
 	   			break;
-	   		case 'a': oneHit = false; break;
+	   		case 'a': allHits = true; break;
+	   		case ARG_BEST: onlyBest = true; break;
+	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
-	   		case 's': sanityCheck = true; break;
+	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case 't': timing = true; break;
 			case ARG_MAXBTS:
 				if (optarg != NULL)
@@ -309,14 +321,6 @@ static void parseOptions(int argc, char **argv) {
 	if(maqLike) {
 		revcomp = true;
 	}
-	if(maqLike && !oneHit) {
-		// No support for -a in Maq mode (yet)
-		cerr << "Cannot combine -a/--allhits with Maq-like (default) mode"
-		     << endl
-		     << "Either omit -a/--allhits or also specify -0, -1, or -2 for end-to-end mode"
-		     << endl;
-		exit(1);
-	}
 	if(!maqLike) {
 		maxBts = 999999;
 	}
@@ -342,7 +346,7 @@ static void sanityCheckExact(
 		}
 	}
 	sort(results.begin(), results.end());
-	if(oneHit) { // isn't this guard redundant?
+	if(!allHits) { // isn't this guard redundant?
 		assert_leq(results.size(), results2.size());
 		for(int i = 0; i < (int)results.size(); i++) {
 			bool foundMatch = false;
@@ -439,8 +443,32 @@ static PatternSourcePerThread* createPatSrc(PatternSource& _patsrc, int tid) {
 /// a pointer to it
 static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
     HitSinkPerThread *sink = NULL;
-    if(1) {
-    	sink = new FirstNGoodHitSinkPerThread(_sink, 1, sanity);
+    if(spanStrata) {
+		if(!allHits) {
+			if(onlyBest) {
+				// First N best, spanning strata
+				sink = new FirstNBestHitSinkPerThread(_sink, khits, sanity);
+			} else {
+				// First N good; "good" inherently ignores strata
+				sink = new FirstNGoodHitSinkPerThread(_sink, khits, sanity);
+			}
+		} else {
+			// All hits, spanning strata
+			sink = new AllHitSinkPerThread(_sink, sanity);
+		}
+    } else {
+		if(!allHits) {
+			if(onlyBest) {
+				// First N best, not spanning strata
+				sink = new FirstNBestStratifiedHitSinkPerThread(_sink, khits, sanity);
+			} else {
+				// First N good; "good" inherently ignores strata
+				sink = new FirstNGoodHitSinkPerThread(_sink, khits, sanity);
+			}
+		} else {
+			// All hits, not spanning strata
+			sink = new AllStratifiedHitSinkPerThread(_sink, sanity);
+		}
     }
     assert(sink != NULL);
     return sink;
@@ -452,13 +480,11 @@ static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
  */
 static PatternSource*                 exactSearch_patsrc;
 static HitSink*                       exactSearch_sink;
-static EbwtSearchStats<String<Dna> >* exactSearch_stats;
 static Ebwt<String<Dna> >*            exactSearch_ebwt;
 static vector<String<Dna5> >*         exactSearch_os;
 static void *exactSearchWorker(void *vp) {
 	PatternSource& _patsrc               = *exactSearch_patsrc;
 	HitSink& _sink                       = *exactSearch_sink;
-	EbwtSearchStats<String<Dna> >& stats = *exactSearch_stats;
 	Ebwt<String<Dna> >& ebwt             = *exactSearch_ebwt;
 	vector<String<Dna5> >& os            = *exactSearch_os;
 
@@ -471,25 +497,17 @@ static void *exactSearchWorker(void *vp) {
 	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSink
-	        stats,      // EbwtSearchStats
-	        // Policy for how to resolve multiple hits
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
 	        os,         // reference sequences
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
 	BacktrackManager<String<Dna> > bt(
-			ebwt, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwt, params,
 	        0xffffffff,     // qualThresh
 	        99999,          // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -504,21 +522,21 @@ static void *exactSearchWorker(void *vp) {
     	bt.setQuery(&patFw, &qualFw, &name);
     	bool hit = bt.backtrack();
 	    // Optionally sanity-check the result
-	    if(sanity && !oneHit && !arrowMode) {
+	    if(sanity && !allHits && !arrowMode) {
 	    	sanityCheckExact(os, *sink, patFw, patid);
 	    }
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
 	    if(hit) {
 	    	lastHits = sink->numHits();
-	    	if(oneHit) continue;
+	    	continue;
 	    }
 	    if(!revcomp) continue;
 	    // Process reverse-complement read
 		params.setFw(false);
 		bt.setQuery(&patRc, &qualRc, &name);
 	    bt.backtrack();
-	    if(sanity && !oneHit && !arrowMode) {
+	    if(sanity && !allHits && !arrowMode) {
 	    	sanityCheckExact(os, *sink, patRc, patid);
 	    }
 	    lastHits = sink->numHits();
@@ -533,13 +551,11 @@ static void *exactSearchWorker(void *vp) {
  */
 static void exactSearch(PatternSource& _patsrc,
                         HitSink& _sink,
-                        EbwtSearchStats<String<Dna> >& stats,
                         Ebwt<String<Dna> >& ebwt,
                         vector<String<Dna5> >& os)
 {
 	exactSearch_patsrc = &_patsrc;
 	exactSearch_sink   = &_sink;
-	exactSearch_stats  = &stats;
 	exactSearch_ebwt   = &ebwt;
 	exactSearch_os     = &os;
 #ifdef BOWTIE_PTHREADS
@@ -773,8 +789,8 @@ static void sanityCheckHits(
 	findSanityHits(pat, patid, fw, os, sanityHits, allowExact, transpose);
 	if(hits.size() > 0) {
 		// We hit, check that oracle also got our hits
-	    assert(!oneHit || hits.size() == 1);
-		if(oneHit && hits[0].mms.count() > 0) {
+	    assert(allHits || khits > 1 || hits.size() == 1);
+		if(!allHits && hits[0].mms.count() > 0) {
 			// If our oneHit hit is inexact, then there had
 			// better be no exact sanity hits
 			for(size_t i = 0; i < sanityHits.size(); i++) {
@@ -793,7 +809,7 @@ static void sanityCheckHits(
 			assert_gt(sanityHits[i].mms.count(), 0);
 		}
 	}
-	if(oneHit) {
+	if(!allHits) {
 		// Ignore the rest of the oracle hits
 		sanityHits.clear();
 	} else {
@@ -821,7 +837,6 @@ static void sanityCheckHits(
  */
 static PatternSource*                 mismatchSearch_patsrc;
 static HitSink*                       mismatchSearch_sink;
-static EbwtSearchStats<String<Dna> >* mismatchSearch_stats;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         mismatchSearch_os;
@@ -830,7 +845,6 @@ static SyncBitset*                    mismatchSearch_doneMask;
 static void* mismatchSearchWorkerPhase1(void *vp){
 	PatternSource&         _patsrc       = *mismatchSearch_patsrc;
 	HitSink&               _sink         = *mismatchSearch_sink;
-	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
@@ -840,32 +854,23 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
-	        stats,      // EbwtSearchStats
-	        // Policy for how to resolve multiple hits
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
 	        os,         // reference sequences
 	        revcomp,    // forward AND reverse complement?
 	        false,      // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt1(
-			ebwtFw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+	BacktrackManager<String<Dna> > bt(
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        99999,          // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
-	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
 	while(true) {
 		GET_READ(patsrc);
 		uint32_t plen = length(patFw);
@@ -881,7 +886,6 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 static void* mismatchSearchWorkerPhase2(void *vp){
 	PatternSource&         _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
-	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
 	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
@@ -892,25 +896,17 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
-	        stats,      // EbwtSearchStats
-	        // Policy for how to resolve multiple hits
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
 	        os,         // reference sequences
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt2(
-			ebwtBw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+	BacktrackManager<String<Dna> > bt(
+			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        99999,          // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -934,7 +930,6 @@ static void* mismatchSearchWorkerPhase2(void *vp){
  */
 static void mismatchSearch(PatternSource& _patsrc,
                            HitSink& _sink,
-                           EbwtSearchStats<String<Dna> >& stats,
                            Ebwt<String<Dna> >& ebwtFw,
                            Ebwt<String<Dna> >& ebwtBw,
                            vector<String<Dna5> >& os)
@@ -947,7 +942,6 @@ static void mismatchSearch(PatternSource& _patsrc,
 
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
-	mismatchSearch_stats        = &stats;
 	mismatchSearch_ebwtFw       = &ebwtFw;
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = &doneMask;
@@ -1019,7 +1013,6 @@ static void mismatchSearch(PatternSource& _patsrc,
 static void* mismatchSearchWorkerFull(void *vp){
 	PatternSource&         _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
-	EbwtSearchStats<String<Dna> >& stats = *mismatchSearch_stats;
 	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
@@ -1030,42 +1023,17 @@ static void* mismatchSearchWorkerFull(void *vp){
 	HitSinkPerThread* sink = createSink(_sink, sanity);
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
-	        stats,      // EbwtSearchStats
-	        // Policy for how to resolve multiple hits
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL),
 	        os,         // reference sequences
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt1(
-			ebwtFw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+	BacktrackManager<String<Dna> > bt(
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        99999,          // max backtracks
-	        0,              // reportSeedlings (don't)
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        seed,           // seed
-	        &os,
-	        false);         // considerQuals
-	BacktrackManager<String<Dna> > bt2(
-			ebwtBw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
-	        0xffffffff,     // qualThresh
-	        99999,          // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1093,14 +1061,12 @@ static void* mismatchSearchWorkerFull(void *vp){
  */
 static void mismatchSearchFull(PatternSource& _patsrc,
                                HitSink& _sink,
-                               EbwtSearchStats<String<Dna> >& stats,
                                Ebwt<String<Dna> >& ebwtFw,
                                Ebwt<String<Dna> >& ebwtBw,
                                vector<String<Dna5> >& os)
 {
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
-	mismatchSearch_stats        = &stats;
 	mismatchSearch_ebwtFw       = &ebwtFw;
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = NULL;
@@ -1257,7 +1223,6 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 
 static PatternSource*                 twoOrThreeMismatchSearch_patsrc;
 static HitSink*                       twoOrThreeMismatchSearch_sink;
-static EbwtSearchStats<String<Dna> >* twoOrThreeMismatchSearch_stats;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         twoOrThreeMismatchSearch_os;
@@ -1267,7 +1232,6 @@ static bool                           twoOrThreeMismatchSearch_two;
 #define TWOTHREE_WORKER_SETUP() \
 	PatternSource&                 _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
-	EbwtSearchStats<String<Dna> >& stats    = *twoOrThreeMismatchSearch_stats;    \
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
 	uint32_t lastLen = 0; \
@@ -1276,9 +1240,6 @@ static bool                           twoOrThreeMismatchSearch_two;
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
-	        stats,       /* EbwtSearchStats */ \
-	        /* Policy for how to resolve multiple hits */ \
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL), \
 	        os,          /* reference sequences */ \
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
@@ -1290,23 +1251,17 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	BacktrackManager<String<Dna> > btr1(
-			ebwtFw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
-	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
     while(true) { // Read read-in loop
 		GET_READ(patsrc);
 		// If requested, check that this read has the same length
@@ -1327,16 +1282,11 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	BacktrackManager<String<Dna> > bt2(
-			ebwtBw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (no)
+	        0,              // reportPartials (no)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1366,16 +1316,11 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > bt3(
-			ebwtFw, params,
-	        0, 0,           // 3, 5depth
-            0,              // unrevOff
-            0,              // 1revOff
-            0,              // 2revOff
-            0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1383,16 +1328,11 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    &os,
 		    false);         // considerQuals
 	BacktrackManager<String<Dna> > bthh3(
-			ebwtFw, params,
-	        0, 0,           // 3, 5depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1418,7 +1358,6 @@ template<typename TStr>
 static void twoOrThreeMismatchSearch(
         PatternSource& _patsrc,         /// pattern source
         HitSink& _sink,                 /// hit sink
-        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
@@ -1439,7 +1378,6 @@ static void twoOrThreeMismatchSearch(
 
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
-	twoOrThreeMismatchSearch_stats    = &stats;
 	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
 	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
 	twoOrThreeMismatchSearch_os       = &os;
@@ -1517,16 +1455,11 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */
 	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */
 	BacktrackManager<String<Dna> > btr1(
-			ebwtFw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1534,16 +1467,11 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        &os,
 	        false);         // considerQuals
 	BacktrackManager<String<Dna> > bt2(
-			ebwtBw, params,
-	        0, 0,           // 5, 3depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (no)
+	        0,              // reportPartials (no)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1551,16 +1479,11 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    &os,
 		    false);         // considerQuals
 	BacktrackManager<String<Dna> > bt3(
-			ebwtFw, params,
-	        0, 0,           // 3, 5depth
-            0,              // unrevOff
-            0,              // 1revOff
-            0,              // 2revOff
-            0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1568,16 +1491,11 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    &os,
 		    false);         // considerQuals
 	BacktrackManager<String<Dna> > bthh3(
-			ebwtFw, params,
-	        0, 0,           // 3, 5depth
-	        0,              // unrevOff
-	        0,              // 1revOff
-	        0,              // 2revOff
-	        0,              // 3revOff
-	        0, 0,           // itop, ibot
+			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        maxBts,         // max backtracks
-	        0,              // reportSeedlings (don't)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1585,7 +1503,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
-	EbwtSearchState<String<Dna> > sfw(ebwtFw, params, seed);
     while(true) { // Read read-in loop
 		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
@@ -1609,7 +1526,6 @@ template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
         PatternSource& _patsrc,         /// pattern source
         HitSink& _sink,                 /// hit sink
-        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
@@ -1626,7 +1542,6 @@ static void twoOrThreeMismatchSearchFull(
 	}
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
-	twoOrThreeMismatchSearch_stats    = &stats;
 	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
 	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
 	twoOrThreeMismatchSearch_os       = &os;
@@ -1662,7 +1577,6 @@ static void twoOrThreeMismatchSearchFull(
 
 static PatternSource*                 seededQualSearch_patsrc;
 static HitSink*                       seededQualSearch_sink;
-static EbwtSearchStats<String<Dna> >* seededQualSearch_stats;
 static Ebwt<String<Dna> >*            seededQualSearch_ebwtFw;
 static Ebwt<String<Dna> >*            seededQualSearch_ebwtBw;
 static vector<String<Dna5> >*         seededQualSearch_os;
@@ -1674,7 +1588,6 @@ static int                            seededQualSearch_qualCutoff;
 #define SEEDEDQUAL_WORKER_SETUP() \
 	PatternSource&                 _patsrc  = *seededQualSearch_patsrc;   \
 	HitSink&                       _sink    = *seededQualSearch_sink;     \
-	EbwtSearchStats<String<Dna> >& stats    = *seededQualSearch_stats;    \
 	vector<String<Dna5> >&         os       = *seededQualSearch_os;       \
 	int                          qualCutoff = seededQualSearch_qualCutoff; \
 	uint32_t lastLen = 0; \
@@ -1683,9 +1596,6 @@ static int                            seededQualSearch_qualCutoff;
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
-	        stats,       /* EbwtSearchStats */ \
-	        /* Policy for how to resolve multiple hits */ \
-	        (oneHit? MHP_PICK_1_RANDOM : MHP_CHASE_ALL), \
 	        os,          /* reference sequences */ \
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
@@ -1701,16 +1611,11 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	// BacktrackManager for finding exact hits for the forward-
 	// oriented read
 	BacktrackManager<String<Dna> > btf1(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-	        0,                     // unrevOff,
-	        0,                     // 1revOff
-	        0,                     // 2revOff
-	        0,                     // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (don't)
+	        0,                     // reportPartials (don't)
+	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -1718,16 +1623,11 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        &os,
 	        false);                // considerQuals
 	BacktrackManager<String<Dna> > bt1(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-	        (seedMms > 0)? s5 : s, // unrevOff,
-	        (seedMms > 1)? s5 : s, // 1revOff
-	        (seedMms > 2)? s5 : s, // 2revOff
-	        (seedMms > 3)? s5 : s, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (don't)
+	        0,                     // reportPartials (don't)
+	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -1755,16 +1655,11 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
 	// BacktrackManager to search for hits for cases 1F, 2F, 3F
 	BacktrackManager<String<Dna> > btf2(
-			ebwtBw, params,
-	        0, 0,                  // 5, 3depth
-            (seedMms > 0)? s5 : s, // unrevOff
-            (seedMms > 1)? s5 : s, // 1revOff
-            (seedMms > 2)? s5 : s, // 2revOff
-            (seedMms > 3)? s5 : s, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (no)
+	        0,                     // reportPartials (no)
+	        0,                     // minStratumToReport
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -1772,16 +1667,11 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		    &os);                  // reference sequences
 	// BacktrackManager to search for partial alignments for case 4R
 	BacktrackManager<String<Dna> > btr2(
-			ebwtBw, params,
-	        0, 0,                  // 5, 3depth
-	        s3,                    // unrevOff
-	        (seedMms > 1)? s3 : s, // 1revOff
-			(seedMms > 2)? s3 : s, // 2revOff
-			(seedMms > 3)? s3 : s, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBts,                // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
+	        0,                     // minStratumToReport
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -1812,16 +1702,11 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > btf3(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-            s3,                    // unrevOff
-            (seedMms > 1)? s3 : s, // 1revOff
-            (seedMms > 2)? s3 : s, // 2revOff
-            (seedMms > 3)? s3 : s, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBts,                // max backtracks
-	        seedMms,               // reportSeedlings (do)
+	        seedMms,               // reportPartials (do)
+	        0,                     // minStratumToReport
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -1830,16 +1715,11 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	// BacktrackManager to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	BacktrackManager<String<Dna> > btr3(
-			ebwtFw, params,
-	        0, 0,    // 5, 3depth
-	        s,       // unrevOff
-	        s,       // 1revOff
-	        s,       // 2revOff
-	        s,       // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -1847,16 +1727,11 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    &os);
 	// The half-and-half BacktrackManager
 	BacktrackManager<String<Dna> > btr23(
-			ebwtFw, params,
-	        s5, s,
-	        0,                      // unrevOff
-	        (seedMms <= 2)? s5 : 0, // 1revOff
-	        (seedMms < 3) ? s : s5, // 2revOff
-	        s,                      // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -1889,16 +1764,11 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	// BacktrackManager to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	BacktrackManager<String<Dna> > btf4(
-			ebwtBw, params,
-	        0, 0,    // 5, 3depth
-            s,       // unrevOff
-            s,       // 1revOff
-            s,       // 2revOff
-            s,       // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -1906,16 +1776,11 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        &os);
 	// Half-and-half BacktrackManager for forward read
 	BacktrackManager<String<Dna> > btf24(
-			ebwtBw, params,
-	        s5, s,   // 5, 3depth
-	        0,                      // unrevOff
-	        (seedMms <= 2)? s5 : 0, // 1revOff
-	        (seedMms <  3)? s : s5, // 2revOff
-	        s,                      // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -1951,16 +1816,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// BacktrackManager for finding exact hits for the forward-
 	// oriented read
 	BacktrackManager<String<Dna> > btf1(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-	        0,                     // unrevOff,
-	        0,                     // 1revOff
-	        0,                     // 2revOff
-	        0,                     // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (don't)
+	        0,                     // reportPartials (don't)
+	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -1968,16 +1828,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,
 	        false);                // considerQuals
 	BacktrackManager<String<Dna> > bt1(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-	        0,                     // unrevOff,
-	        0,                     // 1revOff
-	        0,                     // 2revOff
-	        0,                     // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (don't)
+	        0,                     // reportPartials (don't)
+	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -1985,16 +1840,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os);
 	// BacktrackManager to search for hits for cases 1F, 2F, 3F
 	BacktrackManager<String<Dna> > btf2(
-			ebwtBw, params,
-	        0, 0,                  // 5, 3depth
-            0, // unrevOff
-            0, // 1revOff
-            0, // 2revOff
-            0, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        maxBts,                // max backtracks
-	        0,                     // reportSeedlings (no)
+	        0,                     // reportPartials (no)
+	        0,                     // minStratumToReport
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2002,16 +1852,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    &os);                  // reference sequences
 	// BacktrackManager to search for partial alignments for case 4R
 	BacktrackManager<String<Dna> > btr2(
-			ebwtBw, params,
-	        0, 0,                  // 5, 3depth
-	        0,                    // unrevOff
-	        0, // 1revOff
-			0, // 2revOff
-			0, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBts,                // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
+	        0,                     // minStratumToReport
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2019,16 +1864,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    &os);                  // reference sequences
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > btf3(
-			ebwtFw, params,
-	        0, 0,                  // 5, 3depth
-            0,                    // unrevOff
-            0, // 1revOff
-            0, // 2revOff
-            0, // 3revOff
-	        0, 0,                  // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBts,                // max backtracks
-	        seedMms,               // reportSeedlings (do)
+	        seedMms,               // reportPartials (do)
+	        0,                     // minStratumToReport
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2037,16 +1877,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// BacktrackManager to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	BacktrackManager<String<Dna> > btr3(
-			ebwtFw, params,
-	        0, 0,    // 5, 3depth
-	        0,       // unrevOff
-	        0,       // 1revOff
-	        0,       // 2revOff
-	        0,       // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2054,16 +1889,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    &os);
 	// The half-and-half BacktrackManager
 	BacktrackManager<String<Dna> > btr23(
-			ebwtFw, params,
-	        0, 0,
-	        0,                      // unrevOff
-	        0, // 1revOff
-	        0, // 2revOff
-	        0,                      // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2074,16 +1904,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// BacktrackManager to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	BacktrackManager<String<Dna> > btf4(
-			ebwtBw, params,
-	        0, 0,    // 5, 3depth
-            0,       // unrevOff
-            0,       // 1revOff
-            0,       // 2revOff
-            0,       // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2091,16 +1916,11 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os);
 	// Half-and-half BacktrackManager for forward read
 	BacktrackManager<String<Dna> > btf24(
-			ebwtBw, params,
-	        0, 0,   // 5, 3depth
-	        0,                      // unrevOff
-	        0, // 1revOff
-	        0, // 2revOff
-	        0,                      // 3revOff
-	        0, 0,    // itop, ibot
+			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBts,  // max backtracks
-	        0,       // reportSeedlings (don't)
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2153,7 +1973,6 @@ static void seededQualCutoffSearch(
                                         /// Can only be 1 or 2, default: 1
         PatternSource& _patsrc,         /// pattern source
         HitSink& _sink,                 /// hit sink
-        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
@@ -2170,7 +1989,6 @@ static void seededQualCutoffSearch(
 
 	seededQualSearch_patsrc   = &_patsrc;
 	seededQualSearch_sink     = &_sink;
-	seededQualSearch_stats    = &stats;
 	seededQualSearch_ebwtFw   = &ebwtFw;
 	seededQualSearch_ebwtBw   = &ebwtBw;
 	seededQualSearch_os       = &os;
@@ -2333,7 +2151,6 @@ static void seededQualCutoffSearchFull(
                                         /// Can only be 1 or 2, default: 1
         PatternSource& _patsrc,         /// pattern source
         HitSink& _sink,                 /// hit sink
-        EbwtSearchStats<TStr>& stats,   /// statistics (mostly unused)
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
         vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
@@ -2344,7 +2161,6 @@ static void seededQualCutoffSearchFull(
 
 	seededQualSearch_patsrc   = &_patsrc;
 	seededQualSearch_sink     = &_sink;
-	seededQualSearch_stats    = &stats;
 	seededQualSearch_ebwtFw   = &ebwtFw;
 	seededQualSearch_ebwtBw   = &ebwtBw;
 	seededQualSearch_os       = &os;
@@ -2581,7 +2397,6 @@ static void driver(const char * type,
 				cerr << "Invalid output type: " << outType << endl;
 				exit(1);
 		}
-		EbwtSearchStats<TStr> stats;
 		if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
@@ -2589,7 +2404,6 @@ static void driver(const char * type,
 									   seedMms,
 									   *patsrc,
 									   *sink,
-									   stats,
 									   ebwt,    // forward index
 									   *ebwtBw, // mirror index (not optional)
 									   os);     // references, if available
@@ -2599,7 +2413,6 @@ static void driver(const char * type,
 				                           seedMms,
 				                           *patsrc,
 				                           *sink,
-				                           stats,
 				                           ebwt,    // forward index
 				                           *ebwtBw, // mirror index (not optional)
 				                           os);     // references, if available
@@ -2608,15 +2421,15 @@ static void driver(const char * type,
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
 				if(!fullIndex) {
-					mismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os);
+					mismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os);
 				} else {
-					mismatchSearchFull(*patsrc, *sink, stats, ebwt, *ebwtBw, os);
+					mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
 				}
 			} else if(mismatches == 2 || mismatches == 3) {
 				if(!fullIndex) {
-					twoOrThreeMismatchSearch(*patsrc, *sink, stats, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				} else {
-					twoOrThreeMismatchSearchFull(*patsrc, *sink, stats, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
@@ -2626,7 +2439,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(*patsrc, *sink, stats, ebwt, os);
+			exactSearch(*patsrc, *sink, ebwt, os);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
@@ -2636,22 +2449,6 @@ static void driver(const char * type,
 			ebwtBw->evictFromMemory();
 		}
 	    sink->finish(); // end the hits section of the hit file
-	    if(printStats) {
-		    // Write some high-level searching parameters and inputs
-	    	// to the hit file
-		    sink->out() << "Binary name: " << argv0 << endl;
-		    sink->out() << "  Checksum: " << (uint64_t)(EBWT_SEARCH_HASH) << endl;
-		    sink->out() << "Ebwt file base: " << adjustedEbwtFileBase << endl;
-			sink->out() << "Sanity checking: " << (sanityCheck? "on":"off") << endl;
-			sink->out() << "Verbose: " << (verbose? "on":"off") << endl;
-		    sink->out() << "Queries: " << endl;
-		    for(size_t i = 0; i < queries.size(); i++) {
-		    	sink->out() << "  " << queries[i] << endl;
-		    }
-		    //params.write(sink->out()); // write searching parameters
-		    stats.write(sink->out());  // write searching statistics
-		    _t.write(sink->out());     // write timing info
-	    }
 	    sink->flush();
 		if(!outfile.empty()) {
 			((ofstream*)fout)->close();

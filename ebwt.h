@@ -364,7 +364,6 @@ public:
 // Forward declarations for Ebwt class
 class SideLocus;
 template<typename TStr> class EbwtSearchParams;
-template<typename TStr> class EbwtSearchState;
 
 /**
  * Extended Burrows-Wheeler transform data.
@@ -866,14 +865,8 @@ public:
 	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
 
 	// Searching and reporting
-	inline bool report(uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, EbwtSearchState<TStr>& s) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l = NULL) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
-	inline bool reportChaseRange(EbwtSearchState<TStr>& s) const;
-	inline bool reportChaseSample(EbwtSearchState<TStr>& s) const;
-	inline bool reportMultiple(EbwtSearchState<TStr>& s) const;
-	inline bool reportOne(uint32_t i, EbwtSearchState<TStr>& s, SideLocus *l /* = NULL */) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, uint32_t* pairs) const;
@@ -886,8 +879,6 @@ public:
 	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline uint32_t mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline uint32_t mapLF1(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline bool searchFinish(EbwtSearchState<TStr>& s) const;
-	inline bool searchFinish1(EbwtSearchState<TStr>& s) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -947,7 +938,7 @@ public:
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
-	vector<string> _refnames;
+	vector<string> _refnames; /// names of the reference sequences
 	EbwtParams _eh;
 
 private:
@@ -966,198 +957,6 @@ private:
 	}
 };
 
-typedef enum {
-	MHP_CHASE_ALL = 0,
-	MHP_MULTICHASE_ALL,
-	MHP_PICK_1_RANDOM
-} MultiHitPolicy;
-
-/**
- * Keeps some statistics about how many patterns were tried and placed
- * (or not).
- */
-template<typename TStr>
-struct EbwtSearchStats {
-	uint32_t read;                 // patterns read
-	uint64_t readLenTot;           // patterns read
-	uint32_t fwRead;               // forward patterns read
-	uint32_t rcRead;               // reverse-complement patterns read
-	uint32_t tries;                // total "tries" of any kind
-	uint32_t exactTries;           // total exact-match "tries"
-	uint32_t fwTries;              // forward "tries" of any kind
-	uint32_t fwExactTries;         // forward-pattern exact-match "tries"
-	uint32_t rcTries;              // reverse-complement "tries" of any kind
-	uint32_t rcExactTries;         // reverse-complement exact-match "tries"
-	uint64_t exactHitTotalCnt;     // # total hits from all tries
-	uint32_t exactHitOneOrMore;    // # tried patterns w/ 1 or more hits
-	uint32_t exactHitOneOrMoreFw;  // # tried fw pats w/ 1 or more hits
-	uint32_t exactHitOneOrMoreRc;  // # tried rw pats w/ 1 or more hits
-	// # pushthroughs (a double-pushthrough counts as 1) while exact matching
-	uint64_t pushthroughs;
-	// # double pushthroughs (of top and bottom) while exact matching
-	uint64_t pushthroughsDouble;
-	// # exact double pushthroughs where both original arrows pointed into the
-	// same line
-	uint64_t pushthroughsDoubleSingleLine;
-	// # exact double pushthroughs where both original arrows pointed into
-	// distinct lines
-	uint64_t pushthroughsDoubleDoubleLine;
-	// # exact single pushthroughs (where just one candidate remains, and
-	// therefore bot == top+1)
-	uint64_t pushthroughsSingle;
-	uint64_t pushthroughsSingleChase;
-	uint64_t pushthroughsSingleMatch;
-	uint64_t stops;
-	uint64_t narrowingBackHalfAdvance[64];
-	uint64_t backHalfAdvance[64];
-	uint64_t stopsAtDepth[64];
-	uint64_t stopsAtDepthFw[64];
-	uint64_t stopsAtDepthRc[64];
-	EbwtSearchStats() :
-		read(0), readLenTot(0), fwRead(0), rcRead(0), tries(0), exactTries(0),
-		fwTries(0), fwExactTries(0), rcTries(0), rcExactTries(0),
-		exactHitTotalCnt(0), exactHitOneOrMore(0), exactHitOneOrMoreFw(0),
-		exactHitOneOrMoreRc(0), pushthroughs(0), pushthroughsDouble(0),
-		pushthroughsDoubleSingleLine(0), pushthroughsDoubleDoubleLine(0),
-		pushthroughsSingle(0), pushthroughsSingleChase(0),
-		pushthroughsSingleMatch(0), stops(0)
-	{
-		memset(narrowingBackHalfAdvance, 0, 64 * sizeof(uint64_t));
-		memset(backHalfAdvance,          0, 64 * sizeof(uint64_t));
-		memset(stopsAtDepth,             0, 64 * sizeof(uint64_t));
-		memset(stopsAtDepthFw,           0, 64 * sizeof(uint64_t));
-		memset(stopsAtDepthRc,           0, 64 * sizeof(uint64_t));
-	}
-	void incRead(const EbwtSearchState<TStr>& state, const TStr& pat) {
-		read++;
-		readLenTot += length(pat);
-		if(state.params().fw()) fwRead++;
-		else rcRead++;
-	}
-	void incTry(const EbwtSearchState<TStr>& state) {
-		tries++;
-		exactTries++;
-		if(state.params().fw()) { fwTries++; fwExactTries++; }
-		else { rcTries++; rcExactTries++; }
-	}
-	void addExactHits(const EbwtSearchState<TStr>& state) {
-		exactHitTotalCnt += state.spread();
-		exactHitOneOrMore++;
-		if(state.params().fw()) exactHitOneOrMoreFw++;
-		else exactHitOneOrMoreRc++;
-	}
-	void incPushthrough(const EbwtSearchState<TStr>& state,
-	                    bool chase = false,
-	                    bool singleOverride = false)
-	{
-		pushthroughs++;
-		if(state.spread() > 1 && !singleOverride) {
-			pushthroughsDouble++;
-		} else {
-			pushthroughsSingle++;
-			if(chase) {
-				pushthroughsSingleChase++;
-			} else {
-				pushthroughsSingleMatch++;
-			}
-		}
-	}
-	void incStopAt(const EbwtSearchState<TStr>& state) {
-		int i = (int)(state.qlen() - state.qidx() - 1);
-		assert_lt(i, 64);
-		assert_geq(i, 0);
-		stops++;
-		stopsAtDepth[i]++;
-		if(state.params().fw()) stopsAtDepthFw[i]++;
-		else stopsAtDepthRc[i]++;
-	}
-	void incNarrowHalfAdvance(const EbwtSearchState<TStr>& state, bool narrowing = false) {
-		int i = (int)(state.qlen() - state.qidx() - 1);
-		assert_lt(i, 64);
-		assert_geq(i, 0);
-		backHalfAdvance[i]++;
-		if(narrowing) narrowingBackHalfAdvance[i]++;
-	}
-	/// Write statistics to given output stream.
-	void write(ostream& out) const {
-		#define FLOAT_OUT(f) setprecision(1) << fixed << (f)
-		out << "Statistics:" << endl;
-		out << "  Patterns read: " << read << endl;
-		out << "    Forward patterns read: " << fwRead << endl;
-		out << "    Reverse-complement patterns read: " << rcRead << endl;
-		out << "  Average pattern length: " << FLOAT_OUT((double)readLenTot/read) << endl;
-		out << "  Tries: " << tries << endl;
-		out << "    Exact tries: " << exactTries << endl;
-		out << "  Tries: " << tries << endl;
-		out << "    Forward tries: " << fwTries
-			<< " (" << FLOAT_OUT(fwTries*100.0/tries) << "% of tries)" << endl;
-		out << "      Forward exact tries: " << fwExactTries << endl;
-		out << "    Reverse-complement tries: " << rcTries
-			<< " (" << FLOAT_OUT(rcTries*100.0/tries) << "% of tries)" << endl;
-		out << "      Reverse-complement exact tries: " << rcExactTries << endl;
-		// Stops
-		out << "  Stops: " << stops << endl;
-		out << "    At depth: " << endl;
-		out << "      Both          Just fw       Just rc" << endl;
-		for(int i = 0; i < 64; i++) {
-			if(stopsAtDepth[i] > 0) {
-				stringstream ss;
-				out << "      ";
-				ss << i << ":" << stopsAtDepth[i];
-				while(ss.str().length() < 14) {
-					ss << " ";
-				}
-				ss << i << ":" << stopsAtDepthFw[i];
-				while(ss.str().length() < 28) {
-					ss << " ";
-				}
-				ss << i << ":" << stopsAtDepthRc[i];
-				while(ss.str().length() < 42) {
-					ss << " ";
-				}
-				out << ss.str() << endl;
-			}
-		}
-		// Back-half advances
-		out << "  Back-half advances:" << endl;
-		out << "    At depth: " << endl;
-		out << "      All           Just narrowing" << endl;
-		for(int i = 0; i < 64; i++) {
-			if(backHalfAdvance[i] > 0) {
-				stringstream ss;
-				out << "      ";
-				ss << i << ":" << backHalfAdvance[i];
-				while(ss.str().length() < 14) {
-					ss << " ";
-				}
-				ss << i << ":" << narrowingBackHalfAdvance[i] << " (";
-				ss << FLOAT_OUT(narrowingBackHalfAdvance[i]*100.0/backHalfAdvance[i]) << "%)";
-				out << ss.str() << endl;
-			}
-		}
-		out << "  Total # of exact hits: " << exactHitTotalCnt
-		    << " (" << FLOAT_OUT((float)exactHitTotalCnt/exactTries) << " per exact try)" << endl;
-		out << "  Exact tries w/ >=1 hits: " << exactHitOneOrMore
-		    << " (" << FLOAT_OUT(exactHitOneOrMore*100.0/exactTries) << "% of exact tries)"
-		    << " (" << FLOAT_OUT(exactHitOneOrMore*100.0/read) << "% of patterns)" << endl;
-		out << "    Exact fw tries w/ >=1 hits: " << exactHitOneOrMoreFw
-		    << " (" << FLOAT_OUT(exactHitOneOrMoreFw*100.0/fwExactTries) << "% of exact fw tries) " << endl;
-		out << "    Exact rc tries w/ >=1 hits: " << exactHitOneOrMoreRc
-		    << " (" << FLOAT_OUT(exactHitOneOrMoreRc*100.0/rcExactTries) << "% of exact rc tries) " << endl;
-		out << "  Exact pushthroughs: " << pushthroughs << endl;
-		out << "    Exact single-pushthroughs: " << pushthroughsSingle
-		    << " (" << FLOAT_OUT(pushthroughsSingle*100.0/pushthroughs) << "%)" << endl;
-		out << "      Exact single-pushthroughs for matching: " << pushthroughsSingleMatch
-		    << " (" << FLOAT_OUT(pushthroughsSingleMatch*100.0/pushthroughsSingle) << "% of single pushthroughs)" << endl;
-		out << "      Exact single-pushthroughs for chasing results: " << pushthroughsSingleChase
-		    << " (" << FLOAT_OUT(pushthroughsSingleChase*100.0/pushthroughsSingle) << "% of single pushthroughs)" << endl;
-		out << "    Exact double-pushthroughs: " << pushthroughsDouble
-		    << " (" << FLOAT_OUT(pushthroughsDouble*100.0/pushthroughs) << "%)" << endl;
-		out << "      Exact single-line double-pushthroughs: " << pushthroughsDoubleSingleLine << endl;
-		out << "      Exact double-line double-pushthroughs: " << pushthroughsDoubleDoubleLine << endl;
-	}
-};
-
 /**
  * Structure encapsulating search parameters, such as whether and how
  * to backtrack and how to deal with multiple equally-good hits.
@@ -1166,23 +965,18 @@ template<typename TStr>
 class EbwtSearchParams {
 public:
 	EbwtSearchParams(HitSinkPerThread& __sink,
-	                 EbwtSearchStats<TStr>& __stats,
-	                 MultiHitPolicy __mhp,
 	                 const vector<String<Dna5> >& __texts,
 	                 bool __revcomp = true,
 	                 bool __fw = true,
 	                 bool __ebwtFw = true,
 	                 bool __arrowMode = false) :
 		_sink(__sink),
-		_stats(__stats),
-		_mhp(__mhp),
 		_texts(__texts),
 		_patid(0xffffffff),
 		_revcomp(__revcomp),
 		_fw(__fw),
 		_ebwtFw(__ebwtFw),
         _arrowMode(__arrowMode) { }
-	MultiHitPolicy multiHitPolicy() const { return _mhp; }
 	HitSinkPerThread& sink() const   { return _sink; }
 	void setPatId(uint32_t __patid)  { _patid = __patid; }
 	uint32_t patId() const           { return _patid; }
@@ -1190,11 +984,10 @@ public:
 	bool fw() const                  { return _fw; }
 	void setEbwtFw(bool __ebwtFw)    { _ebwtFw = __ebwtFw; }
 	bool ebwtFw() const              { return _ebwtFw; }
-	EbwtSearchStats<TStr>& stats() const { return _stats; }
 	/**
-	 * Report a hit
+	 * Report a hit.  Returns true iff caller can call off the search.
 	 */
-	void reportHit(const String<Dna5>& query, // read sequence
+	bool reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
 	               const uint32_t *mmui32, // mismatch list
@@ -1204,6 +997,7 @@ public:
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
+	               int stratum,        // alignment stratum
 	               uint32_t oms) const
 	{
 		// The search functions should not have allowed us to get here
@@ -1214,18 +1008,20 @@ public:
 		String<char> patQuals;
 		String<char> patName;
 		vector<char> refc;
-		refc.resize(qlen, 0);
+		// Make a copy of the read name
 		if(name != NULL) assign(patName, *name);
 		if (_ebwtFw) {
+			// Let 'pat' and 'patQuals' become copies of 'query' and
+			// '*quals'
 			pat = query;
 			if(quals != NULL) {
 				reserve(patQuals, length(quals));
 				patQuals = *quals;
 			}
 		} else {
-			// Note: this is re-reversing the pattern back to its
-			// normal orientation; the pattern source reversed it
-			// initially
+			// Note: this is re-reversing the pattern and the quals
+			// string back to their normal orientation; the pattern
+			// source reversed it initially
 			for(size_t i = 0; i < len; i++)
 			{
 				appendValue(pat, query[len-i-1]);
@@ -1242,6 +1038,9 @@ public:
 			}
 		}
 #endif
+		// Turn the mmui32 and refcs arrays into the mm FixedBitset and
+		// the refc vector
+		refc.resize(qlen, 0);
 		for(size_t i = 0; i < numMms; i++) {
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
@@ -1317,16 +1116,17 @@ public:
 			}
 			if(diffs != mm) assert(false);
 		}
-		sink().reportHit(
-			Hit(_arrowMode? a : h, _patid, patName, pat, patQuals, _fw, mm, refc, oms));
-	}
-	void write(ostream& out) const {
-		const char *mhpToStr[] = {
-			"Chase all",
-			"Multichase all",
-			"Random pick 1"
-		};
-		out << "Multi-hit policy: " << mhpToStr[_mhp] << endl;
+		// Report it using the HitSinkPerThread
+		return sink().reportHit(
+			Hit(_arrowMode? a : h,
+			    _patid,
+			    patName,
+			    pat,
+			    patQuals,
+			    _fw,
+			    mm,
+			    refc,
+			    oms), stratum);
 	}
 	bool arrowMode() const {
 		return _arrowMode;
@@ -1334,8 +1134,6 @@ public:
 	const vector<String<Dna5> >& texts() const { return _texts; }
 private:
 	HitSinkPerThread& _sink;
-	EbwtSearchStats<TStr>& _stats;
-	MultiHitPolicy _mhp;    // policy for when read hits multiple spots
     const vector<String<Dna5> >& _texts; // original texts, if available (if not
                                 // available, _texts.size() == 0)
 	uint32_t _patid;      // id of current read
@@ -1448,189 +1246,6 @@ struct SideLocus {
     int _by;               // byte within side (not adjusted for bw sides)
     int _bp;               // bitpair within byte (not adjusted for bw sides)
     uint8_t *_side;        // ptr to beginning of top side
-};
-
-/**
- * Data structure that maintains all state associated with a simple
- * single-query search (without any sort of backtracking).
- *
- * This state gets passed around and mutated by the various
- * Ebwt<>::search*() functions.
- */
-template<typename TStr>
-class EbwtSearchState {
-public:
-	typedef typename Value<TStr>::Type TVal;
-
-	EbwtSearchState(const Ebwt<TStr>& __ebwt,
-	                String<Dna5>* __query,
-					String<char>* __query_name,
-					String<char>* __query_quals,
-	                const EbwtSearchParams<TStr>& __params,
-	                uint32_t seed = 0) :
-	    _ebwt(__ebwt),
-		_params(__params),
-		_rand(seed),
-		_top(0xffffffff),
-		_bot(0xffffffff),
-		_query(__query),
-		_query_name(__query_name),
-		_query_quals(__query_quals),
-		_qlen(length(*__query)),
-		_qidx(length(*_query)-1),
-		_topSideLocus(),
-		_botSideLocus()
-	{ }
-
-	EbwtSearchState(const Ebwt<TStr>& __ebwt,
-	                const EbwtSearchParams<TStr>& __params,
-	                uint32_t seed = 0) :
-	    _ebwt(__ebwt),
-		_params(__params),
-		_rand(seed),
-		_top(0xffffffff),
-		_bot(0xffffffff),
-		_query(NULL),
-		_query_name(NULL),
-		_query_quals(NULL),
-		_qlen(0),
-		_qidx(0),
-		_topSideLocus(),
-		_botSideLocus()
-	{ }
-
-	void newQuery(String<Dna5>* __query,
-	              String<char>* __query_name,
-	              String<char>* __query_quals)
-	{
-		assert(__query != NULL);
-		_query = __query;
-		_query_name = __query_name; // might be NULL
-		_query_quals = __query_quals; // might be NULL
-	}
-
-	const EbwtSearchParams<TStr>& params() const { return _params; }
-	RandomSource& rand()                         { return _rand;   }
-	const String<Dna5>& query() const            { return *_query;  }
-	String<char>* query_quals() 		         { return _query_quals; }
-	String<char>* query_name()       	    	 { return _query_name; }
-	uint32_t top() const                         { return _top;    }
-	uint32_t bot() const                         { return _bot;    }
-	void setTopBot(uint32_t __top, uint32_t __bot) {
-		assert_geq(__bot, __top);
-		_top = __top; _bot = __bot;
-		assert_leq(_top, _ebwt._eh._len);
-		assert_leq(_bot, _ebwt._eh._len);
-		if(_bot > _top) {
-			uint32_t diff = _bot - _top;
-			// Calculate top from scratch and (possibly) prefetch
-			_topSideLocus.initFromRow(_top, _ebwt._eh, _ebwt._ebwt);
-			// Is bot within the same side?
-			if(_topSideLocus._charOff + diff < _ebwt._eh._sideBwtLen) {
-				// Yes; copy most of top's info; don't prefetch a 2nd time
-				SideLocus& tsl = _topSideLocus;
-				SideLocus& bsl = _botSideLocus;
-				bsl._charOff     = tsl._charOff + diff;
-				bsl._sideByteOff = tsl._sideByteOff;
-				assert_leq(bsl._sideByteOff + _ebwt._eh._sideSz, _ebwt._eh._ebwtTotSz);
-				bsl._side        = tsl._side;
-				bsl._fw          = tsl._fw;
-				bsl._by          = bsl._charOff >> 2; // byte within side
-				if(!bsl._fw) bsl._by = _ebwt._eh._sideBwtSz - bsl._by - 1;
-				bsl._bp          = bsl._charOff & 3;  // bit-pair within byte
-				if(!bsl._fw) bsl._bp ^= 3;
-			} else {
-				// No; calculate bot from scratch and (possibly) prefetch
-				_botSideLocus.initFromRow(_bot, _ebwt._eh, _ebwt._ebwt);
-			}
-		}
-	}
-	uint32_t spread() const     { return _bot - _top; }
-	bool repOk() const {
-		assert_geq(_bot, _top);
-		return true;
-	}
-	uint32_t  qlen() const          { return _qlen; }
-	uint32_t  qidx() const          { return _qidx; }
-	bool closed() const         { return _bot == _top; }
-	bool qAtBeginning() const   { return _qidx == _qlen-1; }
-	bool qExhausted() const     { return _qidx == 0xffffffff; }
-	/// Get char at the current query position
-	int chr() const {
-		return chr(_qidx);
-	}
-	/// Get char at a query position
-	int chr(uint32_t qidx) const {
-		assert(!qExhausted());
-		int c = (int)(*_query)[qidx];
-		assert_leq(c, 4);  // for sanity
-		assert_geq(c, 0); // for sanity
-		return c;
-	}
-	/**
-	 *
-	 */
-	uint32_t mapLF1(const Ebwt<TStr>& ebwt) {
-		assert_eq(1, spread());
-		int c = chr();
-		assert_leq(c, 4);
-		uint32_t r = ebwt.mapLF1(_topSideLocus, c);
-		// no need to update _tried
-		if(r != 0xffffffff) {
-			setTopBot(r, r+1);
-		}
-		assert(_qidx != 0xffffffff); _qidx--;
-		return r;
-	}
-	/**
-	 * Advance top and bottom arrows according to the next character in
-	 * the pattern.  Return true iff there are match candidates
-	 * remaining (i.e., iff bot > top).
-	 */
-	bool mapLF(const Ebwt<TStr>& ebwt, int c = -1) {
-		if(c == -1) c = chr();
-		assert_leq(c, 4);
-		assert_geq(c, 0);
-		uint32_t top = 0;
-		uint32_t bot = 0;
-		if(c < 4) {
-			top = ebwt.mapLF(_topSideLocus, c);
-			bot = ebwt.mapLF(_botSideLocus, c);
-		}
-		assert_geq(bot, top);
-		if(bot == top) {
-			// Set _top and _bot but don't calculate their side loci
-			// (that's a waste of time - no one cares).  Just leave the
-			// loci as-is.
-			_bot = bot; _top = top;
-			assert(_qidx != 0xffffffff); _qidx--;
-			return false;
-		}
-		setTopBot(top, bot);
-		// Calculate old difference minus new difference
-		assert(_qidx != 0xffffffff); _qidx--;
-		return true;
-	}
-	const SideLocus& topSideLocus() const { return _topSideLocus; }
-	const SideLocus& botSideLocus() const { return _botSideLocus; }
-	/// Next two accessors break encapsulation for _top/_botSideLocus;
-	/// might be worth fixing
-	SideLocus* topSideLocusPtr() { return &_topSideLocus; }
-	SideLocus* botSideLocusPtr() { return &_botSideLocus; }
-
-private:
-	const Ebwt<TStr>& _ebwt; // EBWT
-	const EbwtSearchParams<TStr>& _params; // search params
-	RandomSource _rand;   // random source for picking a random hit
-	uint32_t _top;        // top index
-	uint32_t _bot;        // bot index
-	String<Dna5>* _query;       // query string
-	String<char>* _query_name;  // query name
-	String<char>* _query_quals; // query qualities string
-	uint32_t _qlen;     // length of query string
-    uint32_t _qidx;     // offset into query (moves from high to low offsets)
-    SideLocus _topSideLocus; // top EBWT side coordinates
-    SideLocus _botSideLocus; // bot EBWT side coordinates
 };
 
 #include "ebwt_search_backtrack.h"
@@ -2355,6 +1970,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                uint32_t top,
                                uint32_t bot,
                                uint32_t qlen,
+                               int stratum,
                                const EbwtSearchParams<TStr>& params) const
 {
 	VMSG_NL("In report");
@@ -2362,7 +1978,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	if(params.arrowMode()) {
 		// Call reportHit with a bogus genome position; in this mode,
 		// all we care about are the top and bottom arrows
-		params.reportHit(
+		return params.reportHit(
 				query,               // read sequence
 				quals,               // read quality values
 				name,                // read name
@@ -2373,8 +1989,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) textlen
 				qlen,                // qlen
+				stratum,             // alignment stratum
 				bot-top-1);          // # other hits
-		return true;
 	}
 
 	//
@@ -2422,7 +2038,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 		textoff += (flen - (coff+foff));
 		textoff -= qlen;
 	}
-	params.reportHit(
+	return params.reportHit(
 			query,                    // read sequence
 			quals,                    // read quality values
 			name,                     // read name
@@ -2433,28 +2049,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			make_pair(top, bot),      // arrows
 			tlen,                     // textlen
 			qlen,                     // qlen
+			stratum,                  // alignment stratum
 			bot-top-1);               // # other hits
-	return true;
-}
-
-template<typename TStr>
-inline bool Ebwt<TStr>::reportChaseOne(uint32_t i,
-                                       EbwtSearchState<TStr>& s,
-                                       SideLocus *l) const
-{
-	return reportChaseOne(
-			s.query(),
-	        s.query_quals(),
-	        s.query_name(),
-	        s.mismatchPtr(),
-	        s.refcPtr(),
-	        s.numMismatches(),
-	        i,
-	        s.top(),
-	        s.bot(),
-	        s.qlen(),
-	        s.params(),
-	        l);
 }
 
 /**
@@ -2475,6 +2071,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        uint32_t top,
                                        uint32_t bot,
                                        uint32_t qlen,
+                                       int stratum,
                                        const EbwtSearchParams<TStr>& params,
                                        SideLocus *l) const
 {
@@ -2512,7 +2109,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		off = offs[i >> offRate] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
-	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, params);
+	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, stratum, params);
 }
 
 /**
@@ -2542,6 +2139,10 @@ void Ebwt<TStr>::restore(TStr& s) const {
 	assert_eq(jumps, this->_eh._len);
 }
 
+/**
+ * Check that this Ebwt, when restored via restore(), matches up with
+ * the given array of reference sequences.  For sanity checking.
+ */
 template <typename TStr>
 void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
                             bool mirror) const

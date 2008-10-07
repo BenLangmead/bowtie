@@ -8,6 +8,9 @@
 {
 	params.setFw(false);
 	params.setEbwtFw(true);
+	btr3.setReportExacts(true);
+
+	ASSERT_ONLY(uint64_t numHitsForRc = sink->numHits());
 	btr3.setQuery(&patRc, &qualRc, &name);
 	// Get all partial alignments for this read's reverse
 	// complement
@@ -21,7 +24,7 @@
 			assert_eq(0, pamRc->size());
 		}
 	}
-	bool hit = false;
+	bool done = false;
 	if(pals.size() > 0) {
 		// Partial alignments exist - extend them
 		// Set up seed bounds
@@ -39,15 +42,12 @@
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable
-			ASSERT_ONLY(uint64_t numHits = sink->numHits());
 			ASSERT_ONLY(String<Dna5> tmp = patRc);
 			btr3.setMuts(&muts);
-			hit = btr3.backtrack(oldQuals);
 			btr3.setMuts(NULL);
 			assert_eq(tmp, patRc); // assert mutations were undone
-			assert(hit  || numHits == sink->numHits());
-			assert(!hit || numHits <  sink->numHits());
-			if(hit) {
+			done = btr3.backtrack(oldQuals);
+			if(done) {
 				// The reverse complement hit, so we're done with this
 				// read
 				DONEMASK_SET(patid);
@@ -58,7 +58,7 @@
 		} // Loop over partial alignments
 	}
 	// Case 4R yielded a hit continue to next pattern
-	if(hit) continue;
+	if(done) continue;
 	// If we're in two-mismatch mode, then now is the time to
 	// try the final case that might apply to the reverse
 	// complement pattern: 1 mismatch in each of the 3' and 5'
@@ -66,7 +66,6 @@
 	bool gaveUp = false;
 	if(seedMms >= 2) {
 		btr23.setQuery(&patRc, &qualRc, &name);
-		ASSERT_ONLY(uint64_t numHits = sink->numHits());
 		// Set up special seed bounds
 		if(qs < s) {
 			btr23.setOffs(qs5, qs,
@@ -81,13 +80,11 @@
 						  (seedMms < 3 )? s  : s5, // 2revOff
 						  s);                      // 3revOff
 		}
-		hit = btr23.backtrack();
+		done = btr23.backtrack();
 		if(btr23.numBacktracks() == btr23.maxBacktracks()) {
 			gaveUp = true;
 		}
-		assert(hit  || numHits == sink->numHits());
-		assert(!hit || numHits <  sink->numHits());
-		if(hit) {
+		if(done) {
 			if(dumpHHHits != NULL) {
 				(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;
 			}
@@ -101,7 +98,7 @@
 #ifndef NDEBUG
 	// The reverse-complement version of the read doesn't hit
 	// at all!  Check with the oracle to make sure it agrees.
-	if(!gaveUp) {
+	if(!gaveUp && numHitsForRc < sink->numHits()) {
 		ASSERT_NO_HITS_RC(true);
 	}
 #endif
@@ -132,7 +129,7 @@
 #ifndef NDEBUG
 	vector<PartialAlignment> partials;
 	pamFw->getPartials(patid, partials);
-	if(hit) assert_gt(partials.size(), 0);
+	if(done) assert_gt(partials.size(), 0);
 	for(size_t i = 0; i < partials.size(); i++) {
 		uint32_t pos0 = partials[i].entry.pos0;
 		assert_lt(pos0, s5);

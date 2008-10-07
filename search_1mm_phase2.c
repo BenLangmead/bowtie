@@ -8,18 +8,13 @@
 {
 	params.setFw(false);
 	params.setEbwtFw(false);
-	bool hit;
-	ASSERT_ONLY(uint64_t numHits);
+	bt.setEbwt(&ebwtBw);
+	bt.setReportExacts(false);
 
 	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	ASSERT_ONLY(numHits = sink->numHits());
-	bt2.setQuery(&patRc, &qualRc, &name);
-	bt2.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
-	hit = bt2.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
-		assert_eq(numHits+1, sink->numHits());
+	bt.setQuery(&patRc, &qualRc, &name);
+	bt.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
+	if(bt.backtrack()) {
 		sanityCheckHits(patRc, *sink, patid, false /*fw*/, os,
 		                false /*allowExact*/, true /*transpose*/);
 		continue;
@@ -32,14 +27,9 @@
 	params.setFw(true);
 
 	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	ASSERT_ONLY(numHits = sink->numHits());
-	bt2.setQuery(&patFw, &qualFw, &name);
-	bt2.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
-	hit = bt2.backtrack();
-	assert(hit  || numHits == sink->numHits());
-	assert(!hit || numHits <  sink->numHits());
-	if(hit) {
-		assert_eq(numHits+1, sink->numHits());
+	bt.setQuery(&patFw, &qualFw, &name);
+	bt.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
+	if(bt.backtrack()) {
 		sanityCheckHits(patFw, *sink, patid, true /*fw*/, os,
 		                false /*allowExact*/, true /*transpose*/);
 		continue;
