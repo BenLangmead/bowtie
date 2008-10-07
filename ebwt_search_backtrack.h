@@ -696,9 +696,9 @@ public:
 			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
 				if(worstStratum == -1) {
-					worstSrtatum = retainedStrata[i];
-				} else if(retainedStrata[i] > worstStratum) {
-					worstStratum = retainedStrata[i];
+					worstStratum = retainedStrata[j];
+				} else if(retainedStrata[j] > worstStratum) {
+					worstStratum = retainedStrata[j];
 				}
 				// Go through oracleHits and look for a match
 				size_t i;

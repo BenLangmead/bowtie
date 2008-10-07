@@ -263,7 +263,7 @@ protected:
 private:
 	bool        _keep; /// Whether to retain all reported hits in _hits
 	vector<Hit> _hits; /// Repository for retained hits
-	vector<Hit> _strata; /// Repository for retained strata
+	vector<int> _strata; /// Repository for retained strata
 };
 
 /**
