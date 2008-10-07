@@ -788,6 +788,7 @@ public:
 		assert(elims != NULL);
 		assert_leq(stackDepth, _maxStackDepth);
 		const Ebwt<TStr>& ebwt = *_ebwt;
+		uint64_t prehits = _params.sink().numHits();
 		if(_halfAndHalf) {
 			assert_eq(0, _reportPartials);
 			assert_gt(_3depth, _5depth);
@@ -880,7 +881,12 @@ public:
 						// backtracking more than once into this region
 						assert_leq(stackDepth, 1);
 						// Reject if we haven't encountered mismatch by this point
-						if(stackDepth < 1) return false;
+						if(stackDepth < 1) {
+							if(_params.sink().numHits() == prehits) {
+								confirmNoHit(iham);
+							}
+							return false;
+						}
 						_hiHalfStackDepth = 1;
 					} else {
 						// 1 and 1,2
@@ -889,7 +895,12 @@ public:
 						// backtracking more than twice into this region
 						assert_leq(stackDepth, 2);
 						// Reject if we haven't encountered mismatch by this point
-						if(stackDepth < 1) return false;
+						if(stackDepth < 1) {
+							if(_params.sink().numHits() == prehits) {
+								confirmNoHit(iham);
+							}
+							return false;
+						}
 						_hiHalfStackDepth = stackDepth;
 					}
 				}
@@ -901,13 +912,21 @@ public:
 						// backtracking more than twice within this region
 						assert_leq(stackDepth, 2);
 						// Must have encountered two mismatches by this point
-						if(stackDepth < 2) return false;
+						if(stackDepth < 2) {
+							if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+								confirmNoHit(iham);
+							}
+							return false;
+						}
 					} else {
 						// 1 and 1,2
 						assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
 						assert_geq(stackDepth, _hiHalfStackDepth);
 						if(stackDepth == _hiHalfStackDepth) {
 							// Didn't encounter any mismatches in the lo-half
+							if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+								confirmNoHit(iham);
+							}
 							return false;
 						}
 						assert_geq(stackDepth, 2);
@@ -1119,6 +1138,9 @@ public:
 						backtrackDespiteMatch = true;
 						mustBacktrack = true;
 					} else if(stackDepth == 0) {
+						if(_params.sink().numHits() == prehits) {
+							confirmNoHit(iham);
+						}
 						return false;
 					}
 				}
@@ -1136,6 +1158,9 @@ public:
 						mustBacktrack = true;
 						backtrackDespiteMatch = true;
 					} else if(stackDepth < 2) {
+						if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+							confirmNoHit(iham);
+						}
 						return false;
 					}
 				}
@@ -1449,6 +1474,9 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
+					if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+						confirmNoHit(iham);
+					}
 					return false;
 				}
 				else if(eligibleNum == 0 && _considerQuals) {
@@ -1513,12 +1541,20 @@ public:
 				assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 				// Try again
 			} // while(top == bot && altNum > 0)
-			if(mustBacktrack || invalidHalfAndHalf || invalidExact) return false;
+			if(mustBacktrack || invalidHalfAndHalf || invalidExact) {
+				if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+					confirmNoHit(iham);
+				}
+				return false;
+			}
 			// Mismatch with no alternatives
 			if(top == bot && altNum == 0) {
 				assert_eq(0, altNum);
 				assert_eq(0, eligibleSz);
 				assert_eq(0, eligibleNum);
+				if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+					confirmNoHit(iham);
+				}
 				return false;
 			}
 			// Match!
@@ -1540,6 +1576,9 @@ public:
 			}
 			return ret;
 		} else {
+			if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+				confirmNoHit(iham);
+			}
 			return false;
 		}
 	}
