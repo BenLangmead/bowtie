@@ -324,8 +324,7 @@ public:
 		//_maxBts0(__maxBts0),
 		//_maxBts1(__maxBts1),
 		_rand(RandomSource(seed)),
-		_verbose(__verbose),
-		_hiHalfStackDepth(0)
+		_verbose(__verbose)
 	{
 	    // For a 40-bp query range, the _pairs array occupies
 	    // 40 * 40 * 8 * 4 = 51,200 bytes, and _elims
@@ -660,7 +659,7 @@ public:
 		// with a stack depth of 0 (no backtracks so far)
 		memset(_btsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
 		memset(_totBtsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
-		_hiHalfStackDepth = 0; _hiDepth = 0; _bailedOnBacktracks = false;
+		_hiDepth = 0; _bailedOnBacktracks = false;
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
 		bool hits = _params.sink().numHits() > nhits;
@@ -868,8 +867,7 @@ public:
 				cout << "\"";
 			}
 			// If we're searching for a half-and-half solution, then
-			// enforce the boundary-crossing constraints here and
-			// update _hiHalfStackDepth if necesssary.
+			// enforce the boundary-crossing constraints here
 			if(_halfAndHalf) {
 				assert_eq(0, _reportPartials);
 				// Crossing from the hi-half into the lo-half
@@ -887,7 +885,6 @@ public:
 							}
 							return false;
 						}
-						_hiHalfStackDepth = 1;
 					} else {
 						// 1 and 1,2
 
@@ -901,13 +898,11 @@ public:
 							}
 							return false;
 						}
-						_hiHalfStackDepth = stackDepth;
 					}
 				}
 				else if(d == _3depth) {
 					if(_3revOff == _2revOff) {
 						// 1 and 1
-						assert_eq(1, _hiHalfStackDepth);
 						// The backtracking logic should have prevented us from
 						// backtracking more than twice within this region
 						assert_leq(stackDepth, 2);
@@ -920,9 +915,17 @@ public:
 						}
 					} else {
 						// 1 and 1,2
-						assert(_hiHalfStackDepth == 1 || _hiHalfStackDepth == 2);
-						assert_geq(stackDepth, _hiHalfStackDepth);
-						if(stackDepth == _hiHalfStackDepth) {
+						// Count the mismatches in the lo and hi halves
+						int loHalfMms = 0, hiHalfMms = 0;
+						for(size_t i = 0; i < stackDepth; i++) {
+							uint32_t d = _qlen - _mms[i] - 1;
+							if     (d < _5depth) hiHalfMms++;
+							else if(d < _3depth) loHalfMms++;
+							else assert(false);
+						}
+						assert_leq(loHalfMms+hiHalfMms, 3);
+						assert_gt(hiHalfMms, 0);
+						if(loHalfMms == 0) {
 							// Didn't encounter any mismatches in the lo-half
 							if(stackDepth == 0 && _params.sink().numHits() == prehits) {
 								confirmNoHit(iham);
@@ -937,9 +940,6 @@ public:
 				}
 				// In-between sanity checks
 				if(d >= _5depth) {
-					if(_3revOff != _2revOff) {
-						assert_gt(_hiHalfStackDepth, 0);
-					}
 					assert_geq(stackDepth, 1);
 				} else if(d >= _3depth) {
 					assert_geq(stackDepth, 2);
@@ -1150,8 +1150,16 @@ public:
 					assert_eq(0, _reportPartials);
 					assert_leq(stackDepth, lim);
 					assert_gt(stackDepth, 0);
-					assert_gt(_hiHalfStackDepth, 0);
-					invalidHalfAndHalf = (stackDepth == _hiHalfStackDepth);
+					// Count the mismatches in the lo and hi halves
+					int loHalfMms = 0, hiHalfMms = 0;
+					for(size_t i = 0; i < stackDepth; i++) {
+						uint32_t d = _qlen - _mms[i] - 1;
+						if     (d < _5depth) hiHalfMms++;
+						else if(d < _3depth) loHalfMms++;
+						else assert(false);
+					}
+					assert_leq(loHalfMms + hiHalfMms, lim);
+					invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
 					if(stackDepth < 2 && altNum > 0) {
 						// We backtracked fewer times than necessary;
 						// force a backtrack
@@ -2308,9 +2316,6 @@ protected:
 	RandomSource        _rand;
 	/// Be talkative
 	bool                _verbose;
-	uint32_t            _hiHalfStackDepth; // temporary holder for # mms
-	                             // observed in hi-half for half-and-
-	                             // half backtracks
 	// Holding area for partial alignments
 	vector<PartialAlignment> _partialsBuf;
 };
