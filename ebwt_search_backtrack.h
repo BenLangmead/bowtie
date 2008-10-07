@@ -881,6 +881,7 @@ public:
 						assert_leq(stackDepth, 1);
 						// Reject if we haven't encountered mismatch by this point
 						if(stackDepth < 1) return false;
+						_hiHalfStackDepth = 1;
 					} else {
 						// 1 and 1,2
 
