@@ -637,6 +637,7 @@ public:
 	               uint32_t iham = 0,
 	               bool disableFtab = false)
 	{
+		HitSinkPerThread& sink = _params.sink();
 		// Initial sanity checking
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
@@ -646,14 +647,12 @@ public:
 		                 << "iham=" << iham << ", "
 		                 << "_pairs" << _pairs << ", "
 		                 << "_elims=" << (void*)_elims << ")" << endl;
-		bool oldRetain = _params.sink().retainHits();
-		size_t oldRetainSz = 0;
+		bool oldRetain = sink.retainHits();
 		if(_sanity) {
 			// Save some info about hits retained at this point
-			oldRetainSz = _params.sink().retainedHits().size();
 			_params.sink().setRetainHits(true);
 		}
-		uint64_t nhits = _params.sink().numHits();
+		uint64_t nhits = sink.numHits();
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
@@ -662,84 +661,50 @@ public:
 		_hiDepth = 0; _bailedOnBacktracks = false;
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
-		bool hits = _params.sink().numHits() > nhits;
+		bool hits = sink.numHits() > nhits;
 
 		// Remainder of this function is sanity checking
-		_params.sink().setRetainHits(oldRetain); // restore old value
+		sink.setRetainHits(oldRetain); // restore old value
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
 		// TODO: also check partial alignments
 		if(_sanity &&
+		   hits && // no-hit results are confirmed as part of the call to backtrack()
 		   // ignore partial alignments; we'll check full alignments downstream
 		   _reportPartials == 0 &&
 		   !_bailedOnBacktracks)   // ignore excessive-backtracking copouts
 		{
+			uint32_t maxHitsAllowed = sink.maxHits();
+			vector<Hit>& retainedHits = sink.retainedHits();
+			assert_leq(retainedHits.size(), maxHitsAllowed);
 			vector<Hit> oracleHits;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
 			naiveOracle(oracleHits, iham);
-			vector<Hit>& retainedHits = _params.sink().retainedHits();
-			if(hits == false) {
-				// If we didn't find any hits, then the oracle had
-				// better not have found any either
-				assert_eq(oldRetainSz, retainedHits.size());
-				if(oracleHits.size() > 0) {
-					// Oops, the oracle found at least one hit; print
-					// detailed info about the first oracle hit (for
-					// debugging)
-					const Hit& h = oracleHits[0];
-					cout << "Oracle hit " << oracleHits.size()
-					     << " times, but backtracker did not hit" << endl;
-					cout << "First oracle hit: " << endl;
-					if(_muts != NULL) {
-						undoMutations();
-						cout << "  Unmutated Pat:  " << (*_qry) << endl;
-						applyMutations();
-					}
-					cout << "  Pat:            " << (*_qry) << endl;
-					cout << "  Tseg:           ";
-					bool ebwtFw = _params.ebwtFw();
-					if(ebwtFw) {
-						for(size_t i = 0; i < _qlen; i++) {
-							cout << (*_os)[h.h.first][h.h.second + i];
-						}
-					} else {
-						for(int i = (int)_qlen-1; i >= 0; i--) {
-							cout << (*_os)[h.h.first][h.h.second + i];
-						}
-					}
-					cout << endl;
-					cout << "  Quals:          " << (*_qual) << endl;
-					cout << "  Bt:             ";
-					for(int i = (int)_qlen-1; i >= 0; i--) {
-						if     (i < (int)_unrevOff) cout << "0";
-						else if(i < (int)_1revOff)  cout << "1";
-						else if(i < (int)_2revOff)  cout << "2";
-						else if(i < (int)_3revOff)  cout << "3";
-						else cout << "X";
-					}
-					cout << endl;
-				}
-				assert_eq(0, oracleHits.size());
-			} else {
-				// If we found a hit, it had better be one of the ones
-				// that the oracle found
-				assert_gt(oracleHits.size(), 0);
-				assert_eq(oldRetainSz+1, retainedHits.size());
-				// Get the hit reported by the backtracker
-				Hit& rhit = retainedHits.back();
+			// If we found a hit, it had better be one of the ones
+			// that the oracle found
+			assert_gt(oracleHits.size(), 0);
+			// Get the hit reported by the backtracker
+			for(size_t j = 0; j < oracleHits.size(); j++) {
+				Hit& rhit = retainedHits[j];
 				// Go through oracleHits and look for a match
-				size_t i;
-				for(i = 0; i < oracleHits.size(); i++) {
+				for(size_t i = 0; i < oracleHits.size(); i++) {
 					const Hit& h = oracleHits[i];
-		    		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
-		    			assert_eq(h.fw, rhit.fw);
-		    			assert(h.mms == rhit.mms);
-		    			// It's a match - hit confirmed
-		    			break;
-		    		}
+					if(h.h.first == rhit.h.first &&
+					   h.h.second == rhit.h.second)
+					{
+						assert_eq(h.fw, rhit.fw);
+						assert(h.mms == rhit.mms);
+						// Erase the element in the oracle vector
+						oracleHits.erase(oracleHits.begin() + i);
+						i--;
+					}
 				}
 				assert_lt(i, oracleHits.size()); // assert we found a matchup
+			}
+			if(maxHitsAllowed == 0xffffffff) {
+				// Must have matched every oracle hit
+				assert_eq(0, oracleHits.size());
 			}
 		}
 		_totNumBts += _numBts;
@@ -1167,14 +1132,14 @@ public:
 					assert_leq(stackDepth, lim);
 					assert_gt(stackDepth, 0);
 					// Count the mismatches in the lo and hi halves
-					int loHalfMms = 0, hiHalfMms = 0;
+					uint32_t loHalfMms = 0, hiHalfMms = 0;
 					for(size_t i = 0; i < stackDepth; i++) {
 						uint32_t d = _qlen - _mms[i] - 1;
 						if     (d < _5depth) hiHalfMms++;
 						else if(d < _3depth) loHalfMms++;
 						else assert(false);
 					}
-					assert_leq(loHalfMms + hiHalfMms, (uint32_t)lim);
+					assert_leq(loHalfMms + hiHalfMms, lim);
 					invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
 					if(stackDepth < 2 && altNum > 0) {
 						// We backtracked fewer times than necessary;
@@ -1604,17 +1569,14 @@ public:
 			// Stack depth should not exceed given hamming distance
 			assert_leq(stackDepth, _reportPartials);
 		}
+		bool ret = false;
 		if(stackDepth >= _reportPartials) {
-			uint64_t hits = sink.numHits();
-			bool ret = reportAlignment(stackDepth, top, bot);
-			bool reported = sink.numHits() > hits;
-			return ret;
-		} else {
-			if(stackDepth == 0 && sink.numHits() == prehits) {
-				confirmNoHit(iham);
-			}
-			return false;
+			ret = reportAlignment(stackDepth, top, bot);
 		}
+		if(!ret && stackDepth == 0 && sink.numHits() == prehits) {
+			confirmNoHit(iham);
+		}
+		return ret;
 	}
 
 	/**
