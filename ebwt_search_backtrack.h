@@ -1127,8 +1127,8 @@ public:
 					assert_eq(0, _reportPartials);
 					assert_leq(stackDepth, lim);
 					assert_gt(stackDepth, 0);
-					invalidHalfAndHalf = (stackDepth < lim);
-					if(stackDepth < lim && altNum > 0) {
+					invalidHalfAndHalf = (stackDepth < 2);
+					if(stackDepth < 2 && altNum > 0) {
 						// We backtracked fewer times than necessary;
 						// force a backtrack
 						mustBacktrack = true;
