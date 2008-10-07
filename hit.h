@@ -237,6 +237,8 @@ public:
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) = 0;
 
+	virtual uint32_t maxHits() = 0;
+
 protected:
 	HitSink&    _sink; /// Ultimate destination of reported hits
 	/// Least # mismatches in alignments that will be reported in the
@@ -260,7 +262,7 @@ class FirstNGoodHitSinkPerThread : public HitSinkPerThread {
 public:
 	FirstNGoodHitSinkPerThread(
 			HitSink& sink,
-	        int __n,
+	        uint32_t __n,
 	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
 	        _hitsForThisRead(0),
@@ -268,6 +270,8 @@ public:
 	{
 		assert_gt(_n, 0);
 	}
+
+	virtual uint32_t maxHits() { return _n; }
 
 	/// Finalize current read
 	virtual void finishReadImpl() {
@@ -296,8 +300,8 @@ public:
 	virtual bool finishedWithStratumImpl(int stratum) { return false; }
 
 private:
-	int _hitsForThisRead; /// # hits for this read so far
-	int _n;               /// max # hits to report per read
+	uint32_t _hitsForThisRead; /// # hits for this read so far
+	uint32_t _n;               /// max # hits to report per read
 };
 
 /**
@@ -310,7 +314,7 @@ class FirstNBestHitSinkPerThread : public HitSinkPerThread {
 public:
 	FirstNBestHitSinkPerThread(
 			HitSink& sink,
-	        int __n,
+	        uint32_t __n,
 	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
 	        _hitsForThisRead(0),
@@ -318,6 +322,8 @@ public:
 	{
 		assert_gt(_n, 0);
 	}
+
+	virtual uint32_t maxHits() { return _n; }
 
 	/**
 	 * Report and then return false if we've already reported N.
@@ -390,8 +396,8 @@ public:
 	}
 
 private:
-	int _hitsForThisRead;      /// # hits for this read so far
-	int _n;                    /// max # hits to report
+	uint32_t _hitsForThisRead; /// # hits for this read so far
+	uint32_t _n;               /// max # hits to report
 	vector<Hit> _hitStrata[4]; /// lower numbered strata are better
 };
 
@@ -407,7 +413,7 @@ class FirstNBestStratifiedHitSinkPerThread : public HitSinkPerThread {
 public:
 	FirstNBestStratifiedHitSinkPerThread(
 			HitSink& sink,
-	        int __n,
+	        uint32_t __n,
 	        bool __keep = false) :
 	        HitSinkPerThread(sink, __keep),
 	        _hitsForThisRead(0),
@@ -416,6 +422,8 @@ public:
 	{
 		assert_gt(_n, 0);
 	}
+
+	virtual uint32_t maxHits() { return _n; }
 
 	/**
 	 * Report and then return false if we've already reported N.
@@ -515,9 +523,9 @@ private:
 		}
 	}
 
-	int _hitsForThisRead;      /// # hits for this read so far
-	int _n;                    /// max # hits to report
-	int _bestStratumReported;          /// stratum of best reported hit thus far
+	uint32_t _hitsForThisRead;      /// # hits for this read so far
+	uint32_t _n;                    /// max # hits to report
+	int _bestStratumReported;       /// stratum of best reported hit thus far
 	vector<Hit> _hitStrata[4];
 };
 
@@ -531,6 +539,8 @@ public:
 			HitSink& sink,
 	        bool __keep = false) :
 		    HitSinkPerThread(sink, __keep) { }
+
+	virtual uint32_t maxHits() { return 0xffffffff; }
 
 	/**
 	 * Report and always return true; we're finiding all hits so that
@@ -565,6 +575,8 @@ public:
 	        HitSinkPerThread(sink, __keep),
 	        _bestStratumReported(999),
 	        _reported(false) { }
+
+	virtual uint32_t maxHits() { return 0xffffffff; }
 
 	/**
 	 * Report and then return false if we've already reported N.

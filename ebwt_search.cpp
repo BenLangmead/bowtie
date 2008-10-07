@@ -59,7 +59,7 @@ static bool fullIndex           = false; // load halves one at a time and procee
 static bool noRefNames          = false;
 static ofstream *dumpNoHits     = NULL;
 static ofstream *dumpHHHits     = NULL;
-static int khits                = 1;
+static uint32_t khits           = 1;
 static bool onlyBest			= false;
 static bool spanStrata			= false;
 

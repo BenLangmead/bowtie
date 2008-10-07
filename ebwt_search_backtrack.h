@@ -688,7 +688,8 @@ public:
 			for(size_t j = 0; j < oracleHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
 				// Go through oracleHits and look for a match
-				for(size_t i = 0; i < oracleHits.size(); i++) {
+				size_t i;
+				for(i = 0; i < oracleHits.size(); i++) {
 					const Hit& h = oracleHits[i];
 					if(h.h.first == rhit.h.first &&
 					   h.h.second == rhit.h.second)
