@@ -237,7 +237,11 @@ public:
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) = 0;
 
+	/// Return the maximum number of hits allowed per read
 	virtual uint32_t maxHits() = 0;
+
+	/// Return whether we span strata
+	virtual bool spanStrata() = 0;
 
 protected:
 	HitSink&    _sink; /// Ultimate destination of reported hits
@@ -272,6 +276,10 @@ public:
 	}
 
 	virtual uint32_t maxHits() { return _n; }
+
+	virtual bool spanStrata() {
+		return true; // we span strata
+	}
 
 	/// Finalize current read
 	virtual void finishReadImpl() {
@@ -324,6 +332,10 @@ public:
 	}
 
 	virtual uint32_t maxHits() { return _n; }
+
+	virtual bool spanStrata() {
+		return true; // we span strata
+	}
 
 	/**
 	 * Report and then return false if we've already reported N.
@@ -424,6 +436,10 @@ public:
 	}
 
 	virtual uint32_t maxHits() { return _n; }
+
+	virtual bool spanStrata() {
+		return false; // we do not span strata
+	}
 
 	/**
 	 * Report and then return false if we've already reported N.
@@ -542,6 +558,10 @@ public:
 
 	virtual uint32_t maxHits() { return 0xffffffff; }
 
+	virtual bool spanStrata() {
+		return true; // we span strata
+	}
+
 	/**
 	 * Report and always return true; we're finiding all hits so that
 	 * search routine should always continue.
@@ -577,6 +597,10 @@ public:
 	        _reported(false) { }
 
 	virtual uint32_t maxHits() { return 0xffffffff; }
+
+	virtual bool spanStrata() {
+		return false; // we do not span strata
+	}
 
 	/**
 	 * Report and then return false if we've already reported N.

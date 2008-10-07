@@ -1140,6 +1140,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 #define ASSERT_NO_HITS_FW(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
 		vector<Hit> hits; \
+		vector<int> strata; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -1152,6 +1153,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        name, \
 		        patid, \
 		        hits, \
+		        strata, \
 		        qualCutoff, \
 		        unrevOff, \
 		        oneRevOff, \
@@ -1182,6 +1184,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 #define ASSERT_NO_HITS_RC(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
 		vector<Hit> hits; \
+		vector<int> strata; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -1194,6 +1197,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        name, \
 		        patid, \
 		        hits, \
+		        strata, \
 		        qualCutoff, \
 		        unrevOff, \
 		        oneRevOff, \

@@ -680,9 +680,10 @@ public:
 			vector<Hit>& retainedHits = sink.retainedHits();
 			assert_leq(retainedHits.size() - oldRetainSz, maxHitsAllowed);
 			vector<Hit> oracleHits;
+			vector<int> oracleStrata;
 			// Invoke the naive oracle, which will place all qualifying
 			// hits in the 'oracleHits' vector
-			naiveOracle(oracleHits, iham);
+			naiveOracle(oracleHits, oracleStrata, iham);
 			// If we found a hit, it had better be one of the ones
 			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
@@ -708,8 +709,13 @@ public:
 				assert(found); // assert we found a matchup
 			}
 			if(maxHitsAllowed == 0xffffffff) {
-				// Must have matched every oracle hit
-				assert_eq(0, oracleHits.size());
+				if(sink.spanStrata()) {
+					// Must have matched every oracle hit
+					assert_eq(0, oracleHits.size());
+				} else {
+					// Must have matched all oracle hits at the best
+					// stratum
+				}
 			}
 		}
 		_totNumBts += _numBts;
@@ -1635,6 +1641,7 @@ public:
 	                        const String<char>& name,
 	                        uint32_t patid,
 	                        vector<Hit>& hits,
+	                        vector<int>& strata,
 	                        uint32_t qualThresh,
 	                        uint32_t unrevOff,
 	                        uint32_t oneRevOff,
@@ -1784,6 +1791,7 @@ public:
 				if(success) {
 					// It's a hit
 					uint32_t off = j;
+					int stratum = (int)(rev1mm + rev2mm + rev3mm);
 					if(!ebwtFw) {
 						off = olen - off;
 						off -= plen;
@@ -1811,6 +1819,7 @@ public:
 						  diffs,  // mismatch bitvector
 						  refcs);
 					hits.push_back(h);
+					strata.push_back(stratum);
 				} // For each pattern character
 			} // For each alignment over current text
 		} // For each text
@@ -2100,9 +2109,10 @@ protected:
 		// Not smart enough to deal with seedling hits yet
 		if(!_sanity || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
+		vector<int> oracleStrata;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, iham);
+		naiveOracle(oracleHits, oracleStrata, iham);
 		if(oracleHits.size() > 0) {
 			// Oops, the oracle found at least one hit; print
 			// detailed info about the first oracle hit (for
@@ -2152,9 +2162,10 @@ protected:
 		// Not smart enough to deal with seedling hits yet
 		if(!_sanity || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
+		vector<int> oracleStrata;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, iham);
+		naiveOracle(oracleHits, oracleStrata, iham);
 		vector<Hit>& retainedHits = _params.sink().retainedHits();
 		assert_gt(retainedHits.size(), 0);
 		if(oracleHits.size() == 0) {
@@ -2186,6 +2197,7 @@ protected:
 	 * current backtracking strategy and store hits in hits vector.
 	 */
 	void naiveOracle(vector<Hit>& hits,
+	                 vector<int>& strata,
 	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
@@ -2207,6 +2219,7 @@ protected:
 		            (*_name),
 		            patid,
 		            hits,
+		            strata,
 		            _qualThresh,
 		            unrevOff,
 		            oneRevOff,
