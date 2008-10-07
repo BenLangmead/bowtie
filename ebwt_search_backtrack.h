@@ -787,7 +787,8 @@ public:
 		assert(elims != NULL);
 		assert_leq(stackDepth, _maxStackDepth);
 		const Ebwt<TStr>& ebwt = *_ebwt;
-		uint64_t prehits = _params.sink().numHits();
+		HitSinkPerThread& sink = _params.sink();
+		uint64_t prehits = sink.numHits();
 		if(_halfAndHalf) {
 			assert_eq(0, _reportPartials);
 			assert_gt(_3depth, _5depth);
@@ -879,8 +880,11 @@ public:
 						// backtracking more than once into this region
 						assert_leq(stackDepth, 1);
 						// Reject if we haven't encountered mismatch by this point
-						if(stackDepth < 1) {
-							if(_params.sink().numHits() == prehits) {
+						if(stackDepth == 0) {
+							if(sink.numHits() == prehits) {
+								// We're returning from the bottommost frame
+								// without having reported any hits; let's
+								// sanity-check that there really aren't any
 								confirmNoHit(iham);
 							}
 							return false;
@@ -893,7 +897,10 @@ public:
 						assert_leq(stackDepth, 2);
 						// Reject if we haven't encountered mismatch by this point
 						if(stackDepth < 1) {
-							if(_params.sink().numHits() == prehits) {
+							if(sink.numHits() == prehits) {
+								// We're returning from the bottommost frame
+								// without having found any hits; let's
+								// sanity-check that there really aren't any
 								confirmNoHit(iham);
 							}
 							return false;
@@ -908,9 +915,12 @@ public:
 						assert_leq(stackDepth, 2);
 						// Must have encountered two mismatches by this point
 						if(stackDepth < 2) {
-							if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+							if(stackDepth == 0 && sink.numHits() == prehits) {
 								confirmNoHit(iham);
 							}
+							// We're returning from the bottommost frame
+							// without having found any hits; let's
+							// sanity-check that there really aren't any
 							return false;
 						}
 					} else {
@@ -927,9 +937,12 @@ public:
 						assert_gt(hiHalfMms, 0);
 						if(loHalfMms == 0) {
 							// Didn't encounter any mismatches in the lo-half
-							if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+							if(stackDepth == 0 && sink.numHits() == prehits) {
 								confirmNoHit(iham);
 							}
+							// We're returning from the bottommost frame
+							// without having found any hits; let's
+							// sanity-check that there really aren't any
 							return false;
 						}
 						assert_geq(stackDepth, 2);
@@ -1138,9 +1151,12 @@ public:
 						backtrackDespiteMatch = true;
 						mustBacktrack = true;
 					} else if(stackDepth == 0) {
-						if(_params.sink().numHits() == prehits) {
+						if(sink.numHits() == prehits) {
 							confirmNoHit(iham);
 						}
+						// We're returning from the bottommost frame
+						// without having found any hits; let's
+						// sanity-check that there really aren't any
 						return false;
 					}
 				}
@@ -1166,7 +1182,10 @@ public:
 						mustBacktrack = true;
 						backtrackDespiteMatch = true;
 					} else if(stackDepth < 2) {
-						if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+						if(stackDepth == 0 && sink.numHits() == prehits) {
+							// We're returning from the bottommost frame
+							// without having found any hits; let's
+							// sanity-check that there really aren't any
 							confirmNoHit(iham);
 						}
 						return false;
@@ -1190,9 +1209,9 @@ public:
 			   !invalidHalfAndHalf && // alignment isn't disqualified by half-and-half requirement
 			   !invalidExact)         // alignment isn't disqualified by no-exact-hits setting
 			{
-				uint64_t hits = _params.sink().numHits();
+				uint64_t hits = sink.numHits();
 				bool ret = reportAlignment(stackDepth, top, bot);
-				if(_sanity && _params.sink().numHits() > hits) {
+				if(_sanity && sink.numHits() > hits) {
 					confirmHit(iham);
 				}
 				if(!ret) {
@@ -1384,7 +1403,6 @@ public:
 				// Now backtrack to target
 				_btsAtDepths[stackDepth]++;
 				_totBtsAtDepths[stackDepth]++;
-				ASSERT_ONLY(uint64_t numHits = _params.sink().numHits());
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
@@ -1452,16 +1470,15 @@ public:
 				                    newElims);
 				}
 				if(ret) {
-					assert_gt(_params.sink().numHits(), numHits);
+					assert_gt(sink.numHits(), prehits);
 					if(_sanity) confirmHit(iham);
-					return true; // return, signaling that we've reported
+					return true; // return, signaling that we're done
 				}
 				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
 				if(_numBts >= _maxBts) {
 					_bailedOnBacktracks = true;
 					return false;
 				}
-				//assert_eq(_params.sink().numHits(), numHits);
 				// No hit was reported; update elims[], eligibleSz,
 				// eligibleNum, altNum
 				_chars[i] = (*_qry)[icur];
@@ -1482,7 +1499,10 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
-					if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+					if(stackDepth == 0 && sink.numHits() == prehits) {
+						// We're returning from the bottommost frame
+						// without having found any hits; let's
+						// sanity-check that there really aren't any
 						confirmNoHit(iham);
 					}
 					return false;
@@ -1550,7 +1570,13 @@ public:
 				// Try again
 			} // while(top == bot && altNum > 0)
 			if(mustBacktrack || invalidHalfAndHalf || invalidExact) {
-				if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+				// This full alignment was rejected for one of the above
+				// reasons - return false to indicate we should keep
+				// searching
+				if(stackDepth == 0 && sink.numHits() == prehits) {
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
 					confirmNoHit(iham);
 				}
 				return false;
@@ -1560,7 +1586,10 @@ public:
 				assert_eq(0, altNum);
 				assert_eq(0, eligibleSz);
 				assert_eq(0, eligibleNum);
-				if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+				if(stackDepth == 0 && sink.numHits() == prehits) {
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
 					confirmNoHit(iham);
 				}
 				return false;
@@ -1576,15 +1605,12 @@ public:
 			assert_leq(stackDepth, _reportPartials);
 		}
 		if(stackDepth >= _reportPartials) {
-			uint64_t hits = _params.sink().numHits();
+			uint64_t hits = sink.numHits();
 			bool ret = reportAlignment(stackDepth, top, bot);
-			bool reported = _params.sink().numHits() > hits;
-			if(_sanity && reported) {
-				confirmHit(iham);
-			}
+			bool reported = sink.numHits() > hits;
 			return ret;
 		} else {
-			if(stackDepth == 0 && _params.sink().numHits() == prehits) {
+			if(stackDepth == 0 && sink.numHits() == prehits) {
 				confirmNoHit(iham);
 			}
 			return false;
