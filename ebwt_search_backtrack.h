@@ -689,6 +689,7 @@ public:
 				Hit& rhit = retainedHits[j];
 				// Go through oracleHits and look for a match
 				size_t i;
+				bool found = false;
 				for(i = 0; i < oracleHits.size(); i++) {
 					const Hit& h = oracleHits[i];
 					if(h.h.first == rhit.h.first &&
@@ -698,10 +699,11 @@ public:
 						assert(h.mms == rhit.mms);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
+						found = true;
 						break;
 					}
 				}
-				assert_lt(i, oracleHits.size()); // assert we found a matchup
+				assert(found); // assert we found a matchup
 			}
 			if(maxHitsAllowed == 0xffffffff) {
 				// Must have matched every oracle hit
