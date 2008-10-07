@@ -1538,12 +1538,14 @@ public:
 			assert_leq(stackDepth, _reportPartials);
 		}
 		if(stackDepth >= _reportPartials) {
+			uint64_t hits = _params.sink().numHits();
 			bool ret = reportAlignment(stackDepth, top, bot);
-			if(!ret && stackDepth == 0) {
-				if(_sanity) confirmNoHit(iham);
+			bool reported = _params.sink().numHits() > hits;
+			if(_sanity && !reported && stackDepth == 0) {
+				confirmNoHit(iham);
 			}
-			if(ret) {
-				if(_sanity) confirmHit(iham);
+			if(_sanity && reported) {
+				confirmHit(iham);
 			}
 			return ret;
 		} else {
