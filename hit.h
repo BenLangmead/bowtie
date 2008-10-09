@@ -213,6 +213,26 @@ public:
 	virtual void reportHitImpl(const Hit& h, int stratum) {
 		_numReportedHits++;
 		if(_keep) {
+#ifndef NDEBUG
+			// Check whether any of the previous 256 hits are identical
+			// to this one.  Really, we should check them all but that
+			// would be too slow for long runs.
+			size_t len = _hits.size();
+			size_t lookBack = 256;
+			if(lookBack > len) lookBack = len;
+			for(size_t i = 0; i < lookBack; i++) {
+				if(h.patId    == _hits[len-i-1].patId &&
+				   h.h.first  == _hits[len-i-1].h.first &&
+				   h.h.second == _hits[len-i-1].h.second &&
+				   h.fw       == _hits[len-i-1].fw)
+				{
+					cerr << "Repeat hit: " << h.patId << (h.fw? "+":"-")
+					     << ":<" << h.h.first << "," << h.h.second << ","
+					     << h.mms.count() << ">" << endl;
+					assert(false); // same!
+				}
+			}
+#endif
 			_hits.push_back(h);
 			_strata.push_back(stratum);
 		}
@@ -396,7 +416,7 @@ public:
 	 */
 	virtual void finishReadImpl() {
 		if(_hitsForThisRead == _n) {
-			_hitsForThisRead = 0;
+			reset();
 			return; // already reported N good hits; stop!
 		}
 		for(int j = 0; j < 4; j++) {
@@ -407,12 +427,13 @@ public:
 				_hitsForThisRead++;
 				assert_leq(_hitsForThisRead, _n);
 				if(_hitsForThisRead == _n) {
-					_hitsForThisRead = 0;
+					reset();
 					return; // already reported N good hits; stop!
 				}
 			}
+			_hitStrata[j].clear();
 		}
-		_hitsForThisRead = 0;
+		reset();
 	}
 
 	/**
@@ -436,14 +457,27 @@ public:
 				_hitsForThisRead++;
 				assert_leq(_hitsForThisRead, _n);
 				if(_hitsForThisRead == _n) {
+					_hitStrata[j].clear();
 					return true; // already reported N good hits; stop!
 				}
 			}
+			_hitStrata[j].clear();
 		}
 		return false; // keep going
 	}
 
 private:
+	void reset() {
+		clearAll();
+		_hitsForThisRead = 0;
+	}
+
+	void clearAll() {
+		for(int j = 0; j < 4; j++) {
+			_hitStrata[j].clear();
+		}
+	}
+
 	uint32_t _hitsForThisRead; /// # hits for this read so far
 	uint32_t _n;               /// max # hits to report
 	vector<Hit> _hitStrata[4]; /// lower numbered strata are better
@@ -530,9 +564,11 @@ public:
 				_hitsForThisRead++;
 				assert_leq(_hitsForThisRead, _n);
 				if(_hitsForThisRead == _n) {
+					_hitStrata[_bestStratumReported].clear();
 					break; // already reported N good hits; stop!
 				}
 			}
+			_hitStrata[_bestStratumReported].clear();
 		} else if(_bestStratumReported == 999) {
 #ifndef NDEBUG
 			// All strata should be empty
@@ -559,9 +595,11 @@ public:
 			_hitsForThisRead++;
 			assert_leq(_hitsForThisRead, _n);
 			if(_hitsForThisRead == _n) {
+				_hitStrata[stratum].clear();
 				return true; // already reported N good hits; stop!
 			}
 		}
+		_hitStrata[stratum].clear();
 		// reported at least once in this stratum; do not move to the
 		// next stratum
 		if(_hitsForThisRead > 0) return true;
@@ -725,6 +763,7 @@ public:
 			reportHitImpl(_hitStrata[stratum][i], stratum);
 			_reported = true;
 		}
+		_hitStrata[stratum].clear();
 		// reported at least once in this stratum; do not move to the
 		// next stratum
 		if(_reported) return true; // stop

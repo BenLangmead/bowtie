@@ -346,9 +346,12 @@ sub search {
 	
 	# Parse output to see if any of it is bad
 	my @outlines = split('\n', $out);
+	my %outhash = ();
 	foreach(@outlines) {
 		chomp;
 		print "$_\n";
+		!defined($outhash{$_}) || die "Result $_ appears in output twice";
+		$outhash{$_} = 1;
 		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
 		unless(m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) {
 			print "Results malformed\n";

@@ -87,6 +87,44 @@ typedef union {
 	} unk;   // unknown
 } PartialAlignment;
 
+static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
+	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
+	if(pa1.entry.pos0 != 0xff) {
+		if       (pa1.entry.pos0 == pa2.entry.pos0) {
+			if(pa1.entry.char0 != pa2.entry.char0) return false;
+		} else if(pa1.entry.pos0 == pa2.entry.pos1) {
+			if(pa1.entry.char0 != pa2.entry.char1) return false;
+		} else if(pa1.entry.pos0 == pa2.entry.pos2) {
+			if(pa1.entry.char0 != pa2.entry.char2) return false;
+		} else {
+			return false;
+		}
+	}
+	if(pa1.entry.pos1 != 0xff) {
+		if       (pa1.entry.pos1 == pa2.entry.pos0) {
+			if(pa1.entry.char1 != pa2.entry.char0) return false;
+		} else if(pa1.entry.pos1 == pa2.entry.pos1) {
+			if(pa1.entry.char1 != pa2.entry.char1) return false;
+		} else if(pa1.entry.pos1 == pa2.entry.pos2) {
+			if(pa1.entry.char1 != pa2.entry.char2) return false;
+		} else {
+			return false;
+		}
+	}
+	if(pa1.entry.pos2 != 0xff) {
+		if       (pa1.entry.pos2 == pa2.entry.pos0) {
+			if(pa1.entry.char2 != pa2.entry.char0) return false;
+		} else if(pa1.entry.pos2 == pa2.entry.pos1) {
+			if(pa1.entry.char2 != pa2.entry.char1) return false;
+		} else if(pa1.entry.pos2 == pa2.entry.pos2) {
+			if(pa1.entry.char2 != pa2.entry.char2) return false;
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
 /**
  * A synchronized data structure for storing partial alignments
  * associated with patids, with particular attention to compactness.
@@ -129,6 +167,14 @@ public:
 			_partialsList.push_back(ps.back());
 			// list tail
 			_partialsList.back().entry.type = 3;
+#ifndef NDEBUG
+			// Make sure there are not duplicate entries
+			for(size_t i = 0; i < _partialsList.size(); i++) {
+				for(size_t j = i+1; j < _partialsList.size(); j++) {
+					assert(!samePartialAlignment(ps[i], ps[j]));
+				}
+			}
+#endif
 		}
 		// Assert that we added an entry
 		assert(_partialsMap.find(patid) != _partialsMap.end());
@@ -171,6 +217,12 @@ public:
 				assert_lt(off, _partialsList.size());
 				ASSERT_ONLY(type = _partialsList[off].entry.type);
 				assert(type == 2 || type == 3);
+#ifndef NDEBUG
+				// Make sure this entry isn't equal to any other entry
+				for(size_t i = 0; i < ps.size(); i++) {
+					assert(!samePartialAlignment(ps[i], _partialsList[off]));
+				}
+#endif
 				ps.push_back(_partialsList[off]);
 				ASSERT_ONLY(uint32_t pos0 = ps.back().entry.pos0);
 				ASSERT_ONLY(uint32_t pos1 = ps.back().entry.pos1);
@@ -1133,6 +1185,7 @@ public:
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
 			// Achieved a match, but need to keep going
 			bool backtrackDespiteMatch = false;
+			bool reportedPartial = false;
 			if(cur == 0 &&  // we've consumed the entire pattern
 			   top < bot && // there's a hit to report
 			   stackDepth < _reportPartials && // not yet used up our mismatches
@@ -1143,6 +1196,7 @@ public:
 				if(stackDepth > 0) {
 					// This is a legit seedling; report it
 					reportPartial(stackDepth);
+					reportedPartial = true;
 				}
 				// Now continue on to find legitimate seedlings with
 				// more mismatches than this one
@@ -1230,7 +1284,8 @@ public:
 			if(cur == 0 &&            // we made it to the left-hand-side of the read
 			   bot > top &&           // there are alignments to report
 			   !invalidHalfAndHalf && // alignment isn't disqualified by half-and-half requirement
-			   !invalidExact)         // alignment isn't disqualified by no-exact-hits setting
+			   !invalidExact &&       // alignment isn't disqualified by no-exact-hits setting
+			   !reportedPartial)      // for when it's a partial alignment we've already reported
 			{
 				uint64_t rhits = sink.numReportedHits();
 				bool ret = reportAlignment(stackDepth, top, bot);
@@ -2120,6 +2175,11 @@ protected:
 			// Signal that the '2' slot is empty
 			al.entry.pos2 = 0xff;
 		}
+#ifndef NDEBUG
+		for(size_t i = 0; i < _partialsBuf.size(); i++) {
+			assert(!samePartialAlignment(_partialsBuf[i], al));
+		}
+#endif
 		_partialsBuf.push_back(al);
 		return true;
 	}
