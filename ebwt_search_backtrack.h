@@ -85,6 +85,9 @@ typedef union {
                             // 1=list_offset, 2=list_entry,
                             // 3=list_tail
 	} unk;   // unknown
+	struct {
+		uint32_t u32   : 32;
+	} u32;
 } PartialAlignment;
 
 static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
@@ -155,6 +158,7 @@ public:
 			_partialsMap[patid].entry.type = 0; // singleton
 		} else {
 			PartialAlignment al;
+			al.u32.u32 = 0xffffffff;
 			al.off.off = _partialsList.size();
 			al.off.type = 1; // list offset
 			_partialsMap[patid] = al;
@@ -204,7 +208,8 @@ public:
 		if(_partialsMap.find(patid) == _partialsMap.end()) {
 			return;
 		}
-		PartialAlignment al = _partialsMap[patid];
+		PartialAlignment al;
+		al.u32.u32 = _partialsMap[patid].u32.u32;
 		uint32_t type = al.unk.type;
 		if(type == 0) {
 			// singleton
@@ -2124,6 +2129,7 @@ protected:
 		assert(_partials != NULL);
 		ASSERT_ONLY(uint32_t qualTot = 0);
 		PartialAlignment al;
+		al.u32.u32 = 0xffffffff;
 		assert_leq(stackDepth, 3);
 		assert_gt(stackDepth, 0);
 
