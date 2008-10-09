@@ -1122,6 +1122,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        0,           /* iham */ \
 		        NULL,        /* muts */ \
 		        false,       /* halfAndHalf */ \
+		        true,        /* reportExacts */ \
 		        ebwtfw);     /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \
@@ -1166,6 +1167,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        0,           /* iham */ \
 		        NULL,        /* muts */ \
 		        false,       /* halfAndHalf */ \
+		        true,        /* reportExacts */ \
 		        !ebwtfw);    /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \

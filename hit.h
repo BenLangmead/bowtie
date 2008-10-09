@@ -766,9 +766,6 @@ public:
 		_first(true) { }
 
 	/**
-	 * TODO: This output method is inherently non-threadsafe if we're
-	 * ever reporting more than one result per line.  Need more
-	 * buffering logic in that case.
 	 */
 	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
@@ -784,8 +781,7 @@ public:
 	}
 
 	virtual void finish() {
-		if(_first) out() << "No results";
-		out() << endl;
+		if(_first) out() << "No results" << endl;
 	}
 
 private:
