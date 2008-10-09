@@ -75,39 +75,57 @@ Bowtie Manual
  --------------------------
  
  The 'bowtie' aligner takes an index and a set of reads as input and
- outputs a list of alignments.  At most one alignment is output per
- read.  Alignments are selected according to an 'alignment policy' that
- states which alignments are legal.  By default, Bowtie utilizes a
- policy that is equivalent to Maq's quality-aware policy
- (http://maq.sf.net), but it can also be made to enforce an end-to-end
- k-difference policy closer to SOAP's (http://soap.genomics.org.cn/).
+ outputs a list of alignments.  Alignments are selected according to a
+ combination of the -v/-n/-e/-l options, which define which alignments
+ are legal, and the -k/-a/--best/--nostrata options which define which
+ and how many legal alignments should be reported.
+ 
+ Bowtie is designed to be very fast for read sets where a) most of the
+ reads have at least one good, valid alignment, b) most of the reads
+ are relatively high-quality, c) the number of alignments reported per
+ read is small (close to 1).  These criteria are generally satisfied in
+ the context of mammalian resequencing projects, but you may observe
+ longer running times in other contexts.
+ 
+ By default, Bowtie enforces a policy that is equivalent to Maq's
+ quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it can
+ also be made to enforce an end-to-end k-difference policy equivalent
+ to SOAP's (http://soap.genomics.org.cn/) (-v 2).
+ 
+ Indels and paired-end alignment are not currently supported.
  
   Maq-like Policy
   ---------------
  
-  The policy has two criteria:
+  When the -n option is specified (and it is by default), Bowtie
+  determines which alignments are valid according to the following
+  policy, which is equivalent to Maq's default policy:
  
-  1. Alignments may have no more than 2 mismatches in the first 28
+  1. Alignments may have no more than N mismatches in the first L
      bases on the high-quality end of the read.
 
   2. The sum of the quality values at all mismatched positions may not
-     exceed 70 (where each position has a quality value on a phred-like
-     scale of 0-40).
+     exceed E (where each position has a quality value on a phred-like
+     scale of 0 up to about 40).
  
-  The numbers stated above are configurable using Bowtie's -n, -e and
-  -l options.
+  The N, L and E parameters are configured using Bowtie's -n, -l and
+  -e options.
  
   If there are many possible alignments that satisfy both criteria,
-  Bowtie will give preference to alignments with where the sum from
-  criterion 2 is smaller.  Bowtie will not necessarily report the the
-  minimal-sum alignment in this case.  
+  Bowtie will make an effort to give preference to alignments with
+  where the sum from criterion 2 is smaller.  Bowtie does not guarantee
+  that it will report the minimum-sum alignment.
+  
+  Note that Maq internally rounds base qualities to the nearest 10 and
+  truncates qualities greater than 30 to 30.  To maintain compatibility
+  with Maq, Bowtie does the same.
  
   End-to-end k-difference Policy
   ------------------------------
   
-  The policy has one criterion: Alignments may have no more than 2
+  The policy has one criterion: Alignments may have no more than V
   mismatches.  Quality values are ignored.  The number of mismatches
-  permitted is configurable.  Permitting indels is future work.
+  permitted is configurable with the -V option.
   
   Command Line
   ------------
@@ -137,7 +155,7 @@ Bowtie Manual
                      alignments are written to stdout (the console).
 
  Options:
-
+ 
   -q                 The query input files (specified as <query_in>)
                      are FASTQ files (usually having extension .fq or
                      .fastq).  This is the default.  See also:
@@ -176,13 +194,49 @@ Bowtie Manual
                      SOAP-like alignment policy.  I.e., report end-to-
                      end alignments with at most <int> mismatches.  If
                      -v is specified, quality values and the -e, -l and
-                     -n options are ignored. 
+                     -n options are ignored.
+
+  -k <int>           Report up to <int> valid alignments per read
+                     (default: 1).  Validity of alignments is
+                     determined by the alignment policy (combined
+                     effects of -n, -v, -l, and -e).  If many
+                     alignments are reported, they may be subject to
+                     stratification; see --best, --nostrata.  Bowtie is
+                     designed to be very fast for small -k but BOWTIE
+                     CAN BECOME VERY SLOW AS -k INCREASES.
   
+  -a/--all           Report all valid alignments per read (default:
+                     off).  Validity of alignments is determined by the
+                     alignment policy (combined effects of -n, -v, -l,
+                     and -e).  Reported alignments may be subject to
+                     stratification; see --best, --nostrata.  Bowtie is
+                     designed to be very fast for small -k; BOWTIE CAN
+                     CAN BECOME VERY SLOW IF -a/--all IS SPECIFIED.
+
+  --best             Reported alignments must belong to the best
+                     possible alignment "stratum" (default: off).  A
+                     stratum is a category defined by the number of
+                     mismatches present in the alignment (for -n, the
+                     number of mismatches present in the seed region of
+                     the alignment).  E.g., if --best is not specified,
+                     Bowtie may sometimes report an alignment with 2
+                     mismatches in the seed even though there exists an
+                     unreported alignment with 1 mismatch in the seed.
+                     Use of --best usually incurs a small performance
+                     penalty.
+
+  --nostrata         If many valid alignments exist and are reportable
+                     (according to the --best and -k options) and they
+                     fall into various alignment "strata", report all
+                     of them.  By default, Bowtie only reports those
+                     alignments that fall into the best stratum, i.e.,
+                     the one with fewest mismatches.  
+    
   -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
-                     each read before alignment.  Default: 0.
+                     each read before alignment (default: 0).
 
   -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
-                     each read before alignment.  Default: 0.
+                     each read before alignment (default: 0).
 
   -u/--qupto <int>   Only align the first <int> reads from the
                      specified read set.  Default: no limit.
@@ -190,12 +244,13 @@ Bowtie Manual
   -t/--time          Print the amount of wall-clock time taken by each
                      search phase and index turnover.
   
-  --fast             Load both the forward and mirror indexes into
-                     memory at once.  This obviates the need for
-                     multiple matching phases and read file read-ins.
-                     'bowtie' is somewhat faster in this mode and
-                     scales better to multiple threads, at the cost of
-                     double the memory footprint.
+  -z/--phased        Alternate between using the forward and mirror
+                     indexes in a series of phases.  This uses about
+                     half the amount of memory as the default (which
+                     keeps both forward and mirror indexes resident in
+                     memory at once), but is somewhat slower, scales
+                     worse, and is incompatible with use of --best or
+                     -k greater than 1.
   
   --solexa-quals     Convert FASTQ qualities from solexa-scaled to
                      phred-scaled.  Used with -q.  Default: off.
@@ -211,8 +266,17 @@ Bowtie Manual
                      the index of the reference sequence aligned to,
                      ref_off is the offset into the reference sequence,
                      and mms is the number of mismatches in the
-                     alignment. 
-  
+                     alignment.
+
+  -b/--binout        Outout alignments in a concise binary format.  If
+                     this is specified, <hit_outfile> must also be
+                     specified. 
+                     
+  --refidx           When a reference sequence is referred to in a
+                     reported alignment, refer to it by 0-based index
+                     (its offset into the list of references that were
+                     indexed) rather than by name.
+
   --maxns <int>      Skip reads with more than <int> N's (no-confidence
                      bases) in their sequence.  Default: no limit.
   
@@ -229,7 +293,7 @@ Bowtie Manual
 
   --verbose          Print verbose output (for debugging).
   
-  -h/-?/--help       Print usage information and quit.
+  -h/--help          Print usage information and quit.
 
   --version          Print version information and quit.
 
@@ -241,20 +305,27 @@ Bowtie Manual
   right, the fields are:
   
    1. Name of read that aligned
+   
    2. Orientation of read in the alignment, '-' for reverse complement,
       '+' otherwise
+      
    3. Name of reference sequence where alignment occurs, or ordinal ID
       if no name was provided
+      
    3. 0-based offset into the reference sequence where leftmost
       character of the alignment occurs
+      
    5. Read sequence (reverse-complemented if orientation is '-')
+   
    6. Read qualities (reversed if orientation is '-')
+   
    7. Reserved
-   8. Comma-separated list of mismatch descriptors.  A single
+   
+   8. Comma-separated list of mismatch descriptors.  If there are no
+      mismatches in the alignment, this field is empty.  A single
       descriptor has the format offset:reference-base>read-base.  The
       offset is expressed as a 0-based offset from the high-quality
-      (5') end of the read.  If there are no mismatches in the
-      alignment, this field is empty.
+      (5') end of the read. 
  
  Using the 'bowtie-build' Indexer
  --------------------------------
