@@ -17,12 +17,13 @@
 	            s3,
 	            two? s : s3,
 	            s);
-	ASSERT_ONLY(uint64_t numHits = sink->numHits());
 	bool done = bt3.backtrack();
 	if(done) continue;
 
 	// no more 1-mismatch hits are possible after this point
-	sink->finishedWithStratum(1);
+	if(sink->finishedWithStratum(1)) {
+		continue;
+	}
 
 	// Try a half-and-half on the forward read
 	bool gaveUp = false;
@@ -34,7 +35,6 @@
 	              two ? s3 : 0,
 	              two ? s  : s3,
 	              s);
-	ASSERT_ONLY(numHits = sink->numHits());
 	done = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
@@ -47,13 +47,6 @@
 		continue;
 	}
 
-#ifndef NDEBUG
-	// The forward version of the read doesn't hit
-	// at all!  Check with the oracle to make sure it agrees.
-	if(!gaveUp) {
-		ASSERT_NO_HITS_FW(true);
-	}
-#endif
 	// Try a half-and-half on the reverse complement read
 	gaveUp = false;
 	params.setFw(false);
@@ -65,27 +58,12 @@
 	              two ? s5 : 0,
 	              two ? s  : s5,
 	              s);
-	ASSERT_ONLY(numHits = sink->numHits());
 	done = bthh3.backtrack();
 	if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
 		gaveUp = true;
 	}
 	bthh3.resetNumBacktracks();
 	if(done) {
-		if(dumpHHHits != NULL) {
-			(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
-		}
 		continue;
 	}
-
-#ifndef NDEBUG
-	// The reverse-complement version of the read doesn't hit
-	// at all!  Check with the oracle to make sure it agrees.
-	if(!gaveUp) {
-		ASSERT_NO_HITS_RC(true);
-		if(dumpNoHits != NULL) {
-			(*dumpNoHits) << patFw << endl << qualFw << endl << "---" << endl;
-		}
-	}
-#endif
 }

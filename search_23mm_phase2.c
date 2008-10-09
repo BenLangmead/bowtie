@@ -18,7 +18,10 @@
 		continue;
 	}
 
-	sink->finishedWithStratum(0); // no more exact hits are possible
+	if(sink->finishedWithStratum(0)) { // no more exact hits are possible
+		DONEMASK_SET(patid);
+		continue;
+	}
 
 	// Try 2/3 backtracks in the 3' half of the reverse complement read
 	params.setFw(false);  // looking at reverse complement

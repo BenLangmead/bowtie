@@ -10,7 +10,6 @@
 	params.setEbwtFw(false);
 	btf4.setReportExacts(true);
 
-	ASSERT_ONLY(uint64_t numHitsForFw = sink->numHits());
 	btf4.setQuery(&patFw, &qualFw, &name);
 	// Get all partial alignments for this read's reverse
 	// complement
@@ -58,7 +57,9 @@
 	// Case 4F yielded a hit; continue to next pattern
 	if(done) continue;
 
-	sink->finishedWithStratum(1); // no more exact hits are possible
+	if(sink->finishedWithStratum(1)) { // no more exact hits are possible
+		continue;
+	}
 
 	// If we're in two-mismatch mode, then now is the time to
 	// try the final case that might apply to the forward
@@ -98,14 +99,4 @@
 		}
 		btf24.resetNumBacktracks();
 	}
-#ifndef NDEBUG
-	// The forward version of the read doesn't hit at all!
-	// Check with the oracle to make sure it agrees.
-	if(!gaveUp && numHitsForFw < sink->numHits()) {
-		ASSERT_NO_HITS_FW(false);
-		if(dumpNoHits != NULL) {
-			(*dumpNoHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << "---" << endl;
-		}
-	}
-#endif
 }

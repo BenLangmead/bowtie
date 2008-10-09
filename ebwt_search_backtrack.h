@@ -554,6 +554,8 @@ public:
 				}
 			}
 		}
+		// Calculate the number of Ns there are in the region that
+		// would get jumped over if the ftab were used.
 		for(size_t i = 0; i < ebwt._eh._ftabLen && i < _qlen; i++) {
 			if((int)(*_qry)[_qlen-i-1] == 4) nsInFtab++;
 		}
@@ -611,6 +613,8 @@ public:
 			                nsInFtab > 0);
 		}
 		if(_reportPartials > 0) {
+			// We're in partial alignment mode; take elements of the
+			// _partialBuf and install them in the _partials database
 			assert(_partials != NULL);
 			if(_partialsBuf.size() > 0) {
 				_partials->addPartials(_params.patId(), _partialsBuf);
@@ -654,7 +658,7 @@ public:
 			sink.setRetainHits(true);
 			oldRetainSz = sink.retainedHits().size();
 		}
-		uint64_t nhits = sink.numHits();
+		uint64_t nhits = sink.numReportedHits();
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
@@ -663,13 +667,12 @@ public:
 		_hiDepth = 0; _bailedOnBacktracks = false;
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
-		bool hits = sink.numHits() > nhits;
+		bool hits = sink.numReportedHits() > nhits;
 
 		// Remainder of this function is sanity checking
 		sink.setRetainHits(oldRetain); // restore old value
 		// If we have the original texts, then we double-check the
 		// backtracking result against the naive oracle
-		// TODO: also check partial alignments
 		if(_sanity &&
 		   hits && // no-hit results are confirmed as part of the call to backtrack()
 		   // ignore partial alignments; we'll check full alignments downstream
@@ -677,52 +680,60 @@ public:
 		   !_bailedOnBacktracks)   // ignore excessive-backtracking copouts
 		{
 			uint32_t maxHitsAllowed = sink.maxHits();
+			// Get the 'retained' hits and strata; i.e., all hits and
+			// strata that have been reported up to this point
 			vector<Hit>& retainedHits = sink.retainedHits();
 			vector<int>& retainedStrata = sink.retainedStrata();
 			assert_leq(retainedHits.size() - oldRetainSz, maxHitsAllowed);
 			assert_eq(retainedHits.size(), retainedStrata.size());
-			vector<Hit> oracleHits;
-			vector<int> oracleStrata;
+			vector<Hit> oracleHits; vector<int> oracleStrata;
 			// Invoke the naive oracle, which will place all qualifying
-			// hits in the 'oracleHits' vector
+			// hits and their strata in the 'oracleHits' and
+			// 'oracleStrata' vectors
 			naiveOracle(oracleHits, oracleStrata, iham);
 			assert_eq(oracleHits.size(), oracleStrata.size());
-			// If we found a hit, it had better be one of the ones
-			// that the oracle found
 			assert_gt(oracleHits.size(), 0);
 			int lastStratum = -1;
 			int worstStratum = -1;
-			// Get the hit reported by the backtracker
 			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
+				// Keep a running measure of the "worst" stratum
+				// observed in the retained hits
 				if(worstStratum == -1) {
 					worstStratum = retainedStrata[j];
 				} else if(retainedStrata[j] > worstStratum) {
 					worstStratum = retainedStrata[j];
+				}
+				if(lastStratum == -1) {
+					lastStratum = retainedStrata[j];
+				} else if(!sink.spanStrata()) {
+					// Retained hits are not allowed to "span" strata,
+					// so this hit's stratum had better be the same as
+					// the last hit's
+					assert_eq(lastStratum, retainedStrata[j]);
 				}
 				// Go through oracleHits and look for a match
 				size_t i;
 				bool found = false;
 				for(i = 0; i < oracleHits.size(); i++) {
 					const Hit& h = oracleHits[i];
-					if(h.h.first == rhit.h.first &&
-					   h.h.second == rhit.h.second)
+					if(h.h.first  == rhit.h.first &&
+					   h.h.second == rhit.h.second &&
+					   h.fw == rhit.fw)
 					{
-						assert_eq(h.fw, rhit.fw);
+						// Oracle hit i and retained hit j refer to the
+						// same stretch of reference
 						assert(h.mms == rhit.mms);
 						assert_eq(retainedStrata[j], oracleStrata[i]);
 						// Erase the element in the oracle vector
 						oracleHits.erase(oracleHits.begin() + i);
-						if(lastStratum == -1) {
-							lastStratum = oracleStrata[i];
-						} else if(!sink.spanStrata()) {
-							assert_eq(lastStratum, oracleStrata[i]);
-						}
 						oracleStrata.erase(oracleStrata.begin() + i);
 						found = true;
 						break;
 					}
 				}
+				// If the backtracker found a hit, it had better be one
+				// of the ones that the oracle found
 				assert(found); // assert we found a matchup
 			}
 			assert_neq(-1, lastStratum);
@@ -731,6 +742,11 @@ public:
 			if(maxHitsAllowed == 0xffffffff) {
 				if(sink.spanStrata()) {
 					// Must have matched every oracle hit
+					if(oracleHits.size() > 0) {
+						for(size_t i = 0; i < oracleHits.size(); i++) {
+							printHit(oracleHits[i]);
+						}
+					}
 					assert_eq(0, oracleHits.size());
 				} else {
 					// Must have matched all oracle hits at the best
@@ -795,7 +811,7 @@ public:
 		assert_leq(stackDepth, _maxStackDepth);
 		const Ebwt<TStr>& ebwt = *_ebwt;
 		HitSinkPerThread& sink = _params.sink();
-		uint64_t prehits = sink.numHits();
+		uint64_t prehits = sink.numValidHits();
 		if(_halfAndHalf) {
 			assert_eq(0, _reportPartials);
 			assert_gt(_3depth, _5depth);
@@ -888,7 +904,7 @@ public:
 						assert_leq(stackDepth, 1);
 						// Reject if we haven't encountered mismatch by this point
 						if(stackDepth == 0) {
-							if(sink.numHits() == prehits) {
+							if(sink.numValidHits() == prehits) {
 								// We're returning from the bottommost frame
 								// without having reported any hits; let's
 								// sanity-check that there really aren't any
@@ -904,7 +920,7 @@ public:
 						assert_leq(stackDepth, 2);
 						// Reject if we haven't encountered mismatch by this point
 						if(stackDepth < 1) {
-							if(sink.numHits() == prehits) {
+							if(sink.numValidHits() == prehits) {
 								// We're returning from the bottommost frame
 								// without having found any hits; let's
 								// sanity-check that there really aren't any
@@ -922,7 +938,7 @@ public:
 						assert_leq(stackDepth, 2);
 						// Must have encountered two mismatches by this point
 						if(stackDepth < 2) {
-							if(stackDepth == 0 && sink.numHits() == prehits) {
+							if(stackDepth == 0 && sink.numValidHits() == prehits) {
 								confirmNoHit(iham);
 							}
 							// We're returning from the bottommost frame
@@ -944,7 +960,7 @@ public:
 						assert_gt(hiHalfMms, 0);
 						if(loHalfMms == 0) {
 							// Didn't encounter any mismatches in the lo-half
-							if(stackDepth == 0 && sink.numHits() == prehits) {
+							if(stackDepth == 0 && sink.numValidHits() == prehits) {
 								confirmNoHit(iham);
 							}
 							// We're returning from the bottommost frame
@@ -1158,7 +1174,7 @@ public:
 						backtrackDespiteMatch = true;
 						mustBacktrack = true;
 					} else if(stackDepth == 0) {
-						if(sink.numHits() == prehits) {
+						if(sink.numValidHits() == prehits) {
 							confirmNoHit(iham);
 						}
 						// We're returning from the bottommost frame
@@ -1183,13 +1199,13 @@ public:
 					}
 					assert_leq(loHalfMms + hiHalfMms, lim);
 					invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
-					if(stackDepth < 2 && altNum > 0) {
+					if((stackDepth < 2 || invalidHalfAndHalf) && altNum > 0) {
 						// We backtracked fewer times than necessary;
 						// force a backtrack
 						mustBacktrack = true;
 						backtrackDespiteMatch = true;
 					} else if(stackDepth < 2) {
-						if(stackDepth == 0 && sink.numHits() == prehits) {
+						if(stackDepth == 0 && sink.numValidHits() == prehits) {
 							// We're returning from the bottommost frame
 							// without having found any hits; let's
 							// sanity-check that there really aren't any
@@ -1216,9 +1232,9 @@ public:
 			   !invalidHalfAndHalf && // alignment isn't disqualified by half-and-half requirement
 			   !invalidExact)         // alignment isn't disqualified by no-exact-hits setting
 			{
-				uint64_t hits = sink.numHits();
+				uint64_t rhits = sink.numReportedHits();
 				bool ret = reportAlignment(stackDepth, top, bot);
-				if(_sanity && sink.numHits() > hits) {
+				if(_sanity && sink.numReportedHits() > rhits) {
 					confirmHit(iham);
 				}
 				if(!ret) {
@@ -1236,7 +1252,7 @@ public:
 			while((top == bot || backtrackDespiteMatch) && altNum > 0) {
 				//SideLocus toploci[4];
 				//SideLocus botloci[4];
-				if(_verbose) cout << "    top (" << top << ") == bot ("
+				if(_verbose) cout << "    top (" << top << "), bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
 				                 << eligibleNum << ", " << eligibleSz
@@ -1477,7 +1493,7 @@ public:
 				                    newElims);
 				}
 				if(ret) {
-					assert_gt(sink.numHits(), prehits);
+					assert_gt(sink.numValidHits(), prehits);
 					if(_sanity) confirmHit(iham);
 					return true; // return, signaling that we're done
 				}
@@ -1506,7 +1522,7 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
-					if(stackDepth == 0 && sink.numHits() == prehits) {
+					if(stackDepth == 0 && sink.numValidHits() == prehits) {
 						// We're returning from the bottommost frame
 						// without having found any hits; let's
 						// sanity-check that there really aren't any
@@ -1580,7 +1596,7 @@ public:
 				// This full alignment was rejected for one of the above
 				// reasons - return false to indicate we should keep
 				// searching
-				if(stackDepth == 0 && sink.numHits() == prehits) {
+				if(stackDepth == 0 && sink.numValidHits() == prehits) {
 					// We're returning from the bottommost frame
 					// without having found any hits; let's
 					// sanity-check that there really aren't any
@@ -1593,7 +1609,7 @@ public:
 				assert_eq(0, altNum);
 				assert_eq(0, eligibleSz);
 				assert_eq(0, eligibleNum);
-				if(stackDepth == 0 && sink.numHits() == prehits) {
+				if(stackDepth == 0 && sink.numValidHits() == prehits) {
 					// We're returning from the bottommost frame
 					// without having found any hits; let's
 					// sanity-check that there really aren't any
@@ -1615,10 +1631,14 @@ public:
 		if(stackDepth >= _reportPartials) {
 			ret = reportAlignment(stackDepth, top, bot);
 		}
-		if(!ret && stackDepth == 0 && sink.numHits() == prehits) {
+		if(!ret && stackDepth == 0 && sink.numValidHits() == prehits) {
 			confirmNoHit(iham);
 		}
 		return ret;
+	}
+	
+	void printHit(const Hit& h) {
+		BacktrackManager::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _params.ebwtFw());
 	}
 
 	/**
@@ -1683,6 +1703,7 @@ public:
 	                        uint32_t iham = 0,
 	                        String<QueryMutation>* muts = NULL,
 	                        bool halfAndHalf = false,
+	                        bool reportExacts = true,
 	                        bool invert = false)
 	{
 		bool fivePrimeOnLeft = (ebwtFw == fw);
@@ -1696,6 +1717,7 @@ public:
 			uint8_t *ostr = (uint8_t *)begin(os[i], Standard());
 			// For each possible alignment of pattern against text
 			for(size_t j = 0; j <= olen - plen; j++) {
+				size_t mms = 0; // mismatches observed over the whole thing
 				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
 				size_t rev2mm  = 0; // mismatches observed in the 2-revisitable region
 				size_t rev3mm  = 0; // mismatches observed in the 3-revisitable region
@@ -1721,6 +1743,7 @@ public:
 						break;
 					}
 					if(pstr[k] != ostr[ok]) {
+						mms++;
 						ham += qualRounds[QUAL2(qual, k)];
 						if(ham > qualThresh) {
 							// Alignment is invalid because it exceeds
@@ -1786,6 +1809,8 @@ public:
 								}
 							}
 						}
+						// Update 'diffs' and 'refcs' to reflect this
+						// mismatch
 						if(fivePrimeOnLeft) {
 							diffs.set(k);
 							refcs[k] = (char)ostr[ok];
@@ -1818,6 +1843,12 @@ public:
 							success = false;
 						}
 					}
+				}
+				if(!reportExacts && mms == 0) {
+					// Reject this exact alignment because we've been
+					// instructed to ignore them (usually because a
+					// previous invocation already reported them)
+					success = false;
 				}
 				if(success) {
 					// It's a hit
@@ -2214,8 +2245,10 @@ protected:
 		size_t i;
 		for(i = 0; i < oracleHits.size(); i++) {
 			const Hit& h = oracleHits[i];
-    		if(h.h.first == rhit.h.first && h.h.second == rhit.h.second) {
-    			assert_eq(h.fw, rhit.fw);
+    		if(h.h.first == rhit.h.first &&
+    		   h.h.second == rhit.h.second &&
+    		   h.fw == rhit.fw)
+    		{
     			assert(h.mms == rhit.mms);
     			// It's a match - hit confirmed
     			break;
@@ -2261,7 +2294,8 @@ protected:
 		            ebwtFw,
 		            iham,
 		            _muts,
-		            _halfAndHalf);
+		            _halfAndHalf,
+		            _reportExacts);
 	}
 
 	String<Dna5>*       _qry;    // query (read) sequence

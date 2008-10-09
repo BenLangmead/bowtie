@@ -42,7 +42,10 @@
 	// allowing mismatches in the 5' seed half
 	if(seedMms == 0) continue;
 
-	sink->finishedWithStratum(0); // no more exact hits are possible
+	if(sink->finishedWithStratum(0)) { // no more exact hits are possible
+		DONEMASK_SET(patid);
+		continue;
+	}
 
 	// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, and 3R
 	// have been eliminated, leaving us with cases 4F and 4R

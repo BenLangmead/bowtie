@@ -10,7 +10,6 @@
 	params.setEbwtFw(true);
 	btr3.setReportExacts(true);
 
-	ASSERT_ONLY(uint64_t numHitsForRc = sink->numHits());
 	btr3.setQuery(&patRc, &qualRc, &name);
 	// Get all partial alignments for this read's reverse
 	// complement
@@ -44,9 +43,9 @@
 			// 24 bases as unrevisitable
 			ASSERT_ONLY(String<Dna5> tmp = patRc);
 			btr3.setMuts(&muts);
+			done = btr3.backtrack(oldQuals);
 			btr3.setMuts(NULL);
 			assert_eq(tmp, patRc); // assert mutations were undone
-			done = btr3.backtrack(oldQuals);
 			if(done) {
 				// The reverse complement hit, so we're done with this
 				// read
@@ -94,14 +93,6 @@
 		}
 		btr23.resetNumBacktracks();
 	}
-
-#ifndef NDEBUG
-	// The reverse-complement version of the read doesn't hit
-	// at all!  Check with the oracle to make sure it agrees.
-	if(!gaveUp && numHitsForRc < sink->numHits()) {
-		ASSERT_NO_HITS_RC(true);
-	}
-#endif
 
 	// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, 3R and
 	// 4R have been eliminated leaving only 4F.

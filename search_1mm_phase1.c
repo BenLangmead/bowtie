@@ -11,7 +11,6 @@
 	bt.setEbwt(&ebwtFw);
 	bt.setReportExacts(true);
 
-	assert_eq(0, sink->retainedHits().size());
 	if(plen < 2) {
 		cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
 		exit(1);
@@ -21,7 +20,6 @@
 	bt.setQuery(&patFw, &qualFw, &name);
 	bt.setOffs(0, 0, s, s, s, s);
 	if(bt.backtrack()) {
-		sanityCheckExact(os, *sink, patFw, patid);
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -32,20 +30,20 @@
 	bt.setQuery(&patRc, &qualRc, &name);
 	bt.setOffs(0, 0, s, s, s, s);
 	if(bt.backtrack()) {
-		sanityCheckExact(os, *sink, patRc, patid);
 		DONEMASK_SET(patid);
 		continue;
 	}
 
-	sink->finishedWithStratum(0); // no more exact hits are possible
+	if(sink->finishedWithStratum(0)) { // no more exact hits are possible
+		DONEMASK_SET(patid);
+		continue;
+	}
 	bt.setReportExacts(false);
 
 	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
 	bt.setQuery(&patRc, &qualRc, &name);
 	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
-		sanityCheckHits(patRc, *sink, patid, false /*fw*/, os,
-		                false /*allowExact*/, false /*transpose*/);
 		DONEMASK_SET(patid);
 		continue;
 	}
@@ -56,8 +54,6 @@
 	bt.setQuery(&patFw, &qualFw, &name);
 	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
-		sanityCheckHits(patFw, *sink, patid, true /*fw*/, os,
-		                false /*allowExact*/, false /*transpose*/);
 		DONEMASK_SET(patid);
 		continue;
 	}

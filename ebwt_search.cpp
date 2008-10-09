@@ -55,7 +55,7 @@ static output_types outType		= FULL;
 static bool randReadsNoSync     = false;
 static int numRandomReads       = 50000000;
 static int lenRandomReads       = 35;
-static bool fullIndex           = false; // load halves one at a time and proceed in phases
+static bool fullIndex           = true; // load halves one at a time and proceed in phases
 static bool noRefNames          = false;
 static ofstream *dumpNoHits     = NULL;
 static ofstream *dumpHHHits     = NULL;
@@ -63,7 +63,7 @@ static uint32_t khits           = 1;
 static bool onlyBest			= false;
 static bool spanStrata			= false;
 
-static const char *short_options = "fqbh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
 #define ARG_ORIG                256
 #define ARG_SEED                257
@@ -126,14 +126,14 @@ static struct option long_options[] = {
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
-	{"fast",         no_argument,       0,            ARG_FAST},
+	{"phased",       no_argument,       0,            'z'},
 	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
 	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{0, 0, 0, 0} // terminator
 };
 
 /**
- * Print a detailed usage message to the provided output stream.
+ * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
 	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
@@ -163,7 +163,7 @@ static void printUsage(ostream& out) {
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
-		<< "  --fast             load both index halves at once; faster, uses more memory" << endl
+		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
@@ -181,9 +181,278 @@ static void printUsage(ostream& out) {
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be >= value in index" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
-	    << "  -h/-?/--help       print this usage message" << endl
+	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
+}
+
+/**
+ * Print a detailed usage message to the provided output stream.
+ * 
+ * Manual text converted to C++ string with something like:
+ * cat MANUAL  | head -304 | tail -231 | sed -e 's/\"/\\\"/g' | \
+ *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
+ */
+static void printLongUsage(ostream& out) {
+	out <<
+	"\n"
+	" Using the 'bowtie' Aligner\n"
+	" --------------------------\n"
+	" \n"
+	" The 'bowtie' aligner takes an index and a set of reads as input and\n"
+	" outputs a list of alignments.  Alignments are selected according to a\n"
+	" combination of the -v/-n/-e/-l options, which define which alignments\n"
+	" are legal, and the -k/-a/--best/--nostrata options which define which\n"
+	" and how many legal alignments should be reported.\n"
+	" \n"
+	" Bowtie is designed to be very fast for read sets where a) most of the\n"
+	" reads have at least one good, valid alignment, b) most of the reads\n"
+	" are relatively high-quality, c) the number of alignments reported per\n"
+	" read is small (close to 1).  These criteria are generally satisfied in\n"
+	" the context of mammalian resequencing projects, but you may observe\n"
+	" longer running times in other contexts.\n"
+	" \n"
+	" By default, Bowtie enforces a policy that is equivalent to Maq's\n"
+	" quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it can\n"
+	" also be made to enforce an end-to-end k-difference policy equivalent\n"
+	" to SOAP's (http://soap.genomics.org.cn/) (-v 2).\n"
+	" \n"
+	" Indels and paired-end alignment are not currently supported.\n"
+	" \n"
+	"  Maq-like Policy\n"
+	"  ---------------\n"
+	" \n"
+	"  When the -n option is specified (and it is by default), Bowtie\n"
+	"  determines which alignments are valid according to the following\n"
+	"  policy, which is equivalent to Maq's default policy:\n"
+	" \n"
+	"  1. Alignments may have no more than N mismatches in the first L\n"
+	"     bases on the high-quality end of the read.\n"
+	"\n"
+	"  2. The sum of the quality values at all mismatched positions may not\n"
+	"     exceed E (where each position has a quality value on a phred-like\n"
+	"     scale of 0 up to about 40).\n"
+	" \n"
+	"  The N, L and E parameters are configured using Bowtie's -n, -l and\n"
+	"  -e options.\n"
+	" \n"
+	"  If there are many possible alignments that satisfy both criteria,\n"
+	"  Bowtie will make an effort to give preference to alignments with\n"
+	"  where the sum from criterion 2 is smaller.  Bowtie does not guarantee\n"
+	"  that it will report the minimum-sum alignment.\n"
+	"  \n"
+	"  Note that Maq internally rounds base qualities to the nearest 10 and\n"
+	"  truncates qualities greater than 30 to 30.  To maintain compatibility\n"
+	"  with Maq, Bowtie does the same.\n"
+	" \n"
+	"  End-to-end k-difference Policy\n"
+	"  ------------------------------\n"
+	"  \n"
+	"  The policy has one criterion: Alignments may have no more than V\n"
+	"  mismatches.  Quality values are ignored.  The number of mismatches\n"
+	"  permitted is configurable with the -V option.\n"
+	"  \n"
+	"  Command Line\n"
+	"  ------------\n"
+	"\n"
+	"  The following is a detailed description of the options used to control\n"
+	"  the 'bowtie' aligner:\n"
+	"\n"
+	" Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]\n"
+	"\n"
+	"  <ebwt_base>        The basename of the index to be searched.  The\n"
+	"                     basename is the name of any of the four index\n"
+	"                     files up to but not including the first period.\n"
+	"                     bowtie first looks in the current directory for\n"
+	"                     the index files, then looks in the 'indexes'\n"
+	"                     subdirectory under the directory where the\n"
+	"                     currently-running 'bowtie' executable is located,\n"
+	"                     then looks in the directory specified in the\n"
+	"                     BOWTIE_INDEXES environment variable.\n"
+	"\n"
+	"  <query_in>         A comma-separated list of files containing the\n"
+	"                     reads to be aligned, or, if -c is specified, the\n"
+	"                     sequences themselves. E.g., this might be\n"
+	"                     \"lane1.fq,lane2.fq,lane3.fq,lane4.fq\", or, if -c\n"
+	"                     is specified, this might be \"GGTCATCCT,ACGGGTCGT\"\n"
+	"\n"
+	"  <hit_outfile>      File to write alignments to.  By default,\n"
+	"                     alignments are written to stdout (the console).\n"
+	"\n"
+	" Options:\n"
+	" \n"
+	"  -q                 The query input files (specified as <query_in>)\n"
+	"                     are FASTQ files (usually having extension .fq or\n"
+	"                     .fastq).  This is the default.  See also:\n"
+	"                     --solexa-quals.\n"
+	"\n"
+	"  -f                 The query input files (specified as <query_in>)\n"
+	"                     are FASTA files (usually having extension .fa,\n"
+	"                     .mfa, .fna or similar).  All quality values are\n"
+	"                     assumed to be 40.\n"
+	"\n"
+	"  -r                 The query input files (specified as <query_in>)\n"
+	"                     are Raw files: one sequence per line, without\n"
+	"                     quality values or names.\n"
+	"\n"
+	"  -c                 The query sequences are given on command line.\n"
+	"                     I.e. <query_in> is a comma-separated list of\n"
+	"                     reads rather than a list of read files.\n"
+	"\n"
+	"  -e/--maqerr <int>  The maximum permitted total of quality values at\n"
+	"                     mismatched read positions.  This total is also\n"
+	"                     called the \"quality-weighted hamming distance\" or\n"
+	"                     \"Q-distance.\"  This is analogous to the -e option\n"
+	"                     for \"maq map\".  The default is 70.  Note that,\n"
+	"                     like Maq, Bowtie rounds quality values to the\n"
+	"                     nearest 10 and saturates at 30.\n"
+	"  \n"
+	"  -l/--seedlen <int> The \"seed length\"; i.e., the number of bases on\n"
+	"                     the high-quality end of the read to which the -n\n"
+	"                     ceiling applies.  The default is 28.\n"
+	"\n"
+	"  -n/--seedmms <int> The maximum number of mismatches permitted in the\n"
+	"                     seed.  This may be 0, 1, 2 or 3 and the default is\n"
+	"                     2.\n"
+	"\n"
+	"  -v <int>           Forego the Maq-like alignment policy and use a\n"
+	"                     SOAP-like alignment policy.  I.e., report end-to-\n"
+	"                     end alignments with at most <int> mismatches.  If\n"
+	"                     -v is specified, quality values and the -e, -l and\n"
+	"                     -n options are ignored.\n"
+	"\n"
+	"  -k <int>           Report up to <int> valid alignments per read\n"
+	"                     (default: 1).  Validity of alignments is\n"
+	"                     determined by the alignment policy (combined\n"
+	"                     effects of -n, -v, -l, and -e).  If many\n"
+	"                     alignments are reported, they may be subject to\n"
+	"                     stratification; see --best, --nostrata.  Bowtie is\n"
+	"                     designed to be very fast for small -k but BOWTIE\n"
+	"                     CAN BECOME VERY SLOW AS -k INCREASES.\n"
+	"  \n"
+	"  -a/--all           Report all valid alignments per read (default:\n"
+	"                     off).  Validity of alignments is determined by the\n"
+	"                     alignment policy (combined effects of -n, -v, -l,\n"
+	"                     and -e).  Reported alignments may be subject to\n"
+	"                     stratification; see --best, --nostrata.  Bowtie is\n"
+	"                     designed to be very fast for small -k; BOWTIE CAN\n"
+	"                     CAN BECOME VERY SLOW IF -a/--all IS SPECIFIED.\n"
+	"\n"
+	"  --best             Reported alignments must belong to the best\n"
+	"                     possible alignment \"stratum\" (default: off).  A\n"
+	"                     stratum is a category defined by the number of\n"
+	"                     mismatches present in the alignment (for -n, the\n"
+	"                     number of mismatches present in the seed region of\n"
+	"                     the alignment).  E.g., if --best is not specified,\n"
+	"                     Bowtie may sometimes report an alignment with 2\n"
+	"                     mismatches in the seed even though there exists an\n"
+	"                     unreported alignment with 1 mismatch in the seed.\n"
+	"                     Use of --best usually incurs a small performance\n"
+	"                     penalty.\n"
+	"\n"
+	"  --nostrata         If many valid alignments exist and are reportable\n"
+	"                     (according to the --best and -k options) and they\n"
+	"                     fall into various alignment \"strata\", report all\n"
+	"                     of them.  By default, Bowtie only reports those\n"
+	"                     alignments that fall into the best stratum, i.e.,\n"
+	"                     the one with fewest mismatches.  \n"
+	"    \n"
+	"  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of\n"
+	"                     each read before alignment (default: 0).\n"
+	"\n"
+	"  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of\n"
+	"                     each read before alignment (default: 0).\n"
+	"\n"
+	"  -u/--qupto <int>   Only align the first <int> reads from the\n"
+	"                     specified read set.  Default: no limit.\n"
+	"  \n"
+	"  -t/--time          Print the amount of wall-clock time taken by each\n"
+	"                     search phase and index turnover.\n"
+	"  \n"
+	"  -z/--phased        Alternate between using the forward and mirror\n"
+	"                     indexes in a series of phases.  This uses about\n"
+	"                     half the amount of memory as the default (which\n"
+	"                     keeps both forward and mirror indexes resident in\n"
+	"                     memory at once), but is somewhat slower, scales\n"
+	"                     worse, and is incompatible with use of --best or\n"
+	"                     -k greater than 1.\n"
+	"  \n"
+	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled to\n"
+	"                     phred-scaled.  Used with -q.  Default: off.\n"
+	"  \n"
+	"  --ntoa             No-confidence bases in reads (usually 'N' or '.')\n"
+	"                     are converted to As before alignment.  By default,\n"
+	"                     no-confidence bases do not match any base. \n"
+	"  \n"
+	"  --concise          Print alignments in a concise format. Each line\n"
+	"                     has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',\n"
+	"                     where read_idx is the index of the read mapped,\n"
+	"                     {-|+} is the orientation of the read, ref_idx is\n"
+	"                     the index of the reference sequence aligned to,\n"
+	"                     ref_off is the offset into the reference sequence,\n"
+	"                     and mms is the number of mismatches in the\n"
+	"                     alignment.\n"
+	"\n"
+	"  -b/--binout        Outout alignments in a concise binary format.  If\n"
+	"                     this is specified, <hit_outfile> must also be\n"
+	"                     specified. \n"
+	"                     \n"
+	"  --refidx           When a reference sequence is referred to in a\n"
+	"                     reported alignment, refer to it by 0-based index\n"
+	"                     (its offset into the list of references that were\n"
+	"                     indexed) rather than by name.\n"
+	"\n"
+	"  --maxns <int>      Skip reads with more than <int> N's (no-confidence\n"
+	"                     bases) in their sequence.  Default: no limit.\n"
+	"  \n"
+	"  -o/--offrate <int> Override the offrate of the index with <int>.  If\n"
+	"                     <int> is greater than the offrate used to build\n"
+	"                     the index, then some row markings are discarded\n"
+	"                     when the index is read into memory.  This reduces\n"
+	"                     the memory footprint of the aligner but requires\n"
+	"                     more time to calculate text offsets.  <int> must\n"
+	"                     be greater than the value used to build the index.\n"
+	"\n"
+	"  --seed <int>       Use <int> as the seed for pseudo-random number\n"
+	"                     generator.\n"
+	"\n"
+	"  --verbose          Print verbose output (for debugging).\n"
+	"  \n"
+	"  -h/--help          Print detailed information on tool and its options.\n"
+	"\n"
+	"  --version          Print version information and quit.\n"
+	"\n"
+	"  Output\n"
+	"  ------\n"
+	" \n"
+	"  The 'bowtie' aligner outputs each alignment on a separate line.  Each\n"
+	"  line is a collection of 8 fields separated by tabs; from left to\n"
+	"  right, the fields are:\n"
+	"  \n"
+	"   1. Name of read that aligned\n"
+	"   \n"
+	"   2. Orientation of read in the alignment, '-' for reverse complement,\n"
+	"      '+' otherwise\n"
+	"      \n"
+	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
+	"      if no name was provided\n"
+	"      \n"
+	"   3. 0-based offset into the reference sequence where leftmost\n"
+	"      character of the alignment occurs\n"
+	"      \n"
+	"   5. Read sequence (reverse-complemented if orientation is '-')\n"
+	"   \n"
+	"   6. Read qualities (reversed if orientation is '-')\n"
+	"   \n"
+	"   7. Reserved\n"
+	"   \n"
+	"   8. Comma-separated list of mismatch descriptors.  If there are no\n"
+	"      mismatches in the alignment, this field is empty.  A single\n"
+	"      descriptor has the format offset:reference-base>read-base.  The\n"
+	"      offset is expressed as a 0-based offset from the high-quality\n"
+	"      (5') end of the read. \n"
+	" \n"
+	;
 }
 
 /**
@@ -234,7 +503,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
-			case ARG_FAST: fullIndex = true; break;
+			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
@@ -260,32 +529,15 @@ static void parseOptions(int argc, char **argv) {
 	   				exit(1);
 	   			}
 	   			break;
-	   		case '3':
-	   			trim3 = parseInt(0, "-3/--trim3 arg must be at least 0");
-	   			break;
-	   		case '5':
-	   			trim5 = parseInt(0, "-5/--trim5 arg must be at least 0");
-	   			break;
-	   		case 'o':
-	   			offRate = parseInt(1, "-o/--offrate arg must be at least 1");
-	   			break;
-	   		case 'e':
-	   			qualThresh = int(parseInt(1, "-e/--err arg must be at least 1") / 10.0 + 0.5);
-	   			break;
-	   		case 'n':
-	   			seedMms = parseInt(0, "-n/--seedmms arg must be at least 0");
-	   			break;
-	   		case 'l':
-	   			seedLen = parseInt(20, "-l/--seedlen arg must be at least 20");
-	   			break;
-	   		case 'h':
-	   		case '?':
-				printUsage(cerr);
-				exit(0);
-				break;
-	   		case ARG_MAXNS:
-	   			maxNs = parseInt(0, "--maxns arg must be at least 0");
-	   			break;
+	   		case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
+	   		case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
+	   		case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
+	   		case 'e': qualThresh = int(parseInt(1, "-e/--err arg must be at least 1") / 10.0 + 0.5); break;
+	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); break;
+	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
+	   		case 'h': printLongUsage(cout); exit(0); break;
+	   		case '?': printUsage(cerr); exit(1); break;
+	   		case ARG_MAXNS: maxNs = parseInt(0, "--maxns arg must be at least 0"); break;
 	   		case 'a': allHits = true; break;
 	   		case ARG_BEST: onlyBest = true; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
@@ -296,9 +548,7 @@ static void parseOptions(int argc, char **argv) {
 				if (optarg != NULL)
 					maxBts = parseInt(1, "--maxbts must be at least 1");
 				break;
-	   		case ARG_DUMP_PATS:
-	   			patDumpfile = optarg;
-	   			break;
+	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
 	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
    					cerr << "--orig arg must be followed by a string" << endl;
@@ -324,56 +574,21 @@ static void parseOptions(int argc, char **argv) {
 	if(!maqLike) {
 		maxBts = 999999;
 	}
+	if(!fullIndex) {
+		bool error = false;
+		if(khits > 1) {
+			cerr << "When -z/--phased is used, -k/--khits X for X > 1 is unavailable" << endl;
+			error = true;
+		}
+		if(onlyBest) {
+			cerr << "When -z/--phased is used, --best is unavailable" << endl;
+			error = true;
+		}
+		if(error) exit(1);
+	}
 }
 
 static char *argv0 = NULL;
-
-static void sanityCheckExact(
-		vector<String<Dna5> >& os,
-        HitSinkPerThread& sink,
-        String<Dna5>& pat,
-        uint32_t patid)
-{
-	vector<Hit>& results = sink.retainedHits();
-	vector<U32Pair> results2;
-	results2.reserve(256);
-	for(unsigned int i = 0; i < os.size(); i++) {
-		// Forward
-		Finder<String<Dna5> > finder(os[i]);
-		Pattern<String<Dna5>, Horspool> pattern(pat);
-		while (find(finder, pattern)) {
-			results2.push_back(make_pair(i, position(finder)));
-		}
-	}
-	sort(results.begin(), results.end());
-	if(!allHits) { // isn't this guard redundant?
-		assert_leq(results.size(), results2.size());
-		for(int i = 0; i < (int)results.size(); i++) {
-			bool foundMatch = false;
-			for(int j = i; j < (int)results2.size(); j++) {
-				if(results[i].h.first == results2[j].first &&
-				   results[i].h.second == results2[j].second)
-				{
-					foundMatch = true;
-					break;
-				}
-			}
-			assert(foundMatch);
-		}
-	} else {
-		assert_eq(results.size(), results2.size());
-		for(int i = 0; i < (int)results.size(); i++) {
-			assert_eq(results[i].h.first, results2[i].first);
-			assert_eq(results[i].h.second, results2[i].second);
-		}
-	}
-	if(verbose) {
-		cout << "Passed orig/result sanity-check ("
-			 << results2.size() << " results checked) for pattern "
-			 << patid << endl;
-	}
-	sink.clearRetainedHits();
-}
 
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
@@ -382,7 +597,6 @@ static void sanityCheckExact(
 	sink->finishRead(); \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) { /* cout << "done" << endl; */ break; } \
-	params.setPatId(p->patid()); \
 	assert(!empty(p->patFw())); \
 	String<Dna5>& patFw  = p->patFw();  \
 	String<Dna5>& patRc  = p->patRc();  \
@@ -390,6 +604,7 @@ static void sanityCheckExact(
 	String<char>& qualRc = p->qualRc(); \
 	String<char>& name   = p->name(); \
 	uint32_t      patid  = p->patid(); \
+	params.setPatId(patid); \
 	/* cout << name << ": " << patFw << ":" << qualFw << endl; */ \
 	if(lastLen == 0) lastLen = length(patFw); \
 	if(qSameLen && length(patFw) != lastLen) { \
@@ -491,7 +706,6 @@ static void *exactSearchWorker(void *vp) {
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
 	// Per-thread initialization
-	uint64_t lastHits = 0llu;
 	uint32_t lastLen = 0;
 	PatternSourcePerThread *patsrc = createPatSrc(_patsrc, (int)(long)vp);
 	HitSinkPerThread* sink = createSink(_sink, sanity);
@@ -521,14 +735,9 @@ static void *exactSearchWorker(void *vp) {
     	bt.setOffs(0, 0, plen, plen, plen, plen);
     	bt.setQuery(&patFw, &qualFw, &name);
     	bool hit = bt.backtrack();
-	    // Optionally sanity-check the result
-	    if(sanity && !allHits && !arrowMode) {
-	    	sanityCheckExact(os, *sink, patFw, patid);
-	    }
 	    // If the forward direction matched exactly, ignore the
 	    // reverse complement
 	    if(hit) {
-	    	lastHits = sink->numHits();
 	    	continue;
 	    }
 	    if(!revcomp) continue;
@@ -536,10 +745,6 @@ static void *exactSearchWorker(void *vp) {
 		params.setFw(false);
 		bt.setQuery(&patRc, &qualRc, &name);
 	    bt.backtrack();
-	    if(sanity && !allHits && !arrowMode) {
-	    	sanityCheckExact(os, *sink, patRc, patid);
-	    }
-	    lastHits = sink->numHits();
 		params.setFw(true);
     }
     WORKER_EXIT();
@@ -577,253 +782,6 @@ static void exactSearch(PatternSource& _patsrc,
 		}
 	}
 #endif
-}
-
-/**
- * Given a pattern, a list of reference texts, and some other state,
- * find all hits for that pattern in all texts using a naive seed-
- * and-extend algorithm where seeds are found using Horspool.
- */
-static bool findSanityHits(const String<Dna5>& pat,
-                           uint32_t patid,
-                           bool fw,
-                           vector<String<Dna5> >& os,
-                           vector<Hit>& sanityHits,
-                           bool allowExact,
-                           bool transpose)
-{
-	bool ebwtFw = !transpose;
-	bool fivePrimeOnLeft = (ebwtFw == fw);
-    uint32_t plen = length(pat);
-	String<Dna5> half;
-	reserve(half, plen);
-	uint32_t bump = 0;
-	if(transpose) bump = 1; // forward index can have 1 more unrevisitable char
-	// Grab the unrevisitable region of pat
-	for(size_t i = ((plen+bump)>>1); i < plen; i++) {
-		appendValue(half, (Dna5)pat[i]);
-	}
-    uint32_t hlen = length(half); // length of seed (right) half
-    assert_leq(hlen, plen);
-    uint32_t ohlen = plen - hlen; // length of other (left) half
-    assert_leq(ohlen, plen);
-	Pattern<String<Dna5>, Horspool> pattern(half);
-	for(size_t i = 0; i < os.size(); i++) {
-		String<Dna5> o = os[i];
-		if(transpose) {
-			for(size_t j = 0; j < length(o)>>1; j++) {
-				Dna5 tmp = o[j];
-				o[j] = o[length(o)-j-1];
-				o[length(o)-j-1] = tmp;
-			}
-		}
-		Finder<String<Dna5> > finder(o);
-		while (find(finder, pattern)) {
-			uint32_t pos = position(finder);
-			// Check the anchor to see if any characters in the
-			// reference half of the alignment are Ns
-			bool reject = false;
-			for(size_t j = 0; j < length(half); j++) {
-				if((int)o[j + pos] == 4) {
-					// Reject!
-					reject = true;
-				}
-			}
-			if(reject) continue;
-			FixedBitset<max_read_bp> diffs;
-			vector<char> refcs;
-			if(pos >= ohlen) {
-				// Extend toward the left end of the pattern, counting
-				// mismatches
-				for(uint32_t j = 0; j < ohlen && diffs.count() <= 1; j++) {
-					if((int)o[pos-j-1] == 4) {
-						// Reject!
-						reject = true;
-						break;
-					}
-					if((int)o[pos-j-1] != (int)pat[ohlen-j-1]) {
-						uint32_t off = ohlen-j-1;
-						if(fivePrimeOnLeft) {
-							diffs.set(off);
-						} else {
-							// The 3' end is on on the left end of the
-							// pattern, but the diffs vector should
-							// encode mismatches w/r/t the 5' end, so
-							// we flip
-							diffs.set(plen-off-1);
-						}
-					}
-				}
-				if(reject) continue;
-			}
-			// If the extend yielded 1 or fewer mismatches, keep it
-			if((diffs.count() == 0 && allowExact) || diffs.count() == 1) {
-				uint32_t off = pos - ohlen;
-				if(transpose) {
-					off = length(o) - off;
-					off -= length(pat);
-				}
-				// A hit followed by a transpose can sometimes fall
-				// off the beginning of the text
-				if(off < (0xffffffff - length(pat))) {
-					Hit h(make_pair(i, off),
-						  patid,
-						  "",
-						  pat,
-						  "" /*no need for qualities*/,
-						  fw,
-						  diffs,
-						  refcs);
-					sanityHits.push_back(h);
-				}
-			}
-		}
-	}
-	return true;
-}
-
-/**
- * Assert that the sanityHits array has been exhausted, presumably
- * after having been reconciled against actual hits with
- * reconcileHits().  Only used in allHits mode.
- */
-static bool checkSanityExhausted(const String<Dna5>& pat,
-                                 uint32_t patid,
-                                 bool fw,
-                                 vector<Hit>& sanityHits,
-                                 bool transpose)
-{
-    // If caller specified mustExhaust, then we additionally check
-    // whether every sanityHit has now been matched up with some Ebwt
-    // hit.  If not, that means that Ebwt may have missed a hit, so
-    // we assert.
-    size_t unfoundHits = 0;
-	for(size_t j = 0; j < sanityHits.size(); j++) {
-		uint32_t patid = sanityHits[j].patId;
-		bool fw = sanityHits[j].fw;
-		cout << "Did not find sanity hit: "
-		     << (patid>>revcomp) << (fw? "+":"-")
-		     << ":<" << sanityHits[j].h.first << ","
-		     << sanityHits[j].h.second << ","
-		     << sanityHits[j].mms.str() << ">" << endl;
-		cout << "  transpose: " << transpose << endl;
-		unfoundHits++;
-	}
-	assert_eq(0, unfoundHits); // Ebwt missed a true hit?
-	return true;
-}
-
-/**
- * Assert that every hit in the hits array also occurs in the
- * sanityHits array.
- */
-static bool reconcileHits(const String<Dna5>& pat,
-                          uint32_t patid,
-                          bool fw,
-                          vector<Hit>& hits,
-                          vector<Hit>& sanityHits,
-                          bool allowExact,
-                          bool transpose)
-{
-    // Sanity-check each result by checking whether it occurs
-	// in the sanityHits array-of-vectors
-    for(size_t i = 0; i < hits.size(); i++) {
-    	const Hit& h = hits[i];
-    	vector<Hit>::iterator itr;
-    	bool found = false;
-    	// Scan through the sanityHits vector corresponding to
-    	// this hit text
-    	for(itr = sanityHits.begin(); itr != sanityHits.end(); itr++) {
-    		// If offset into hit text matches
-			assert_gt(sanityHits.size(), 0);
-    		if(h.h.first == itr->h.first && h.h.second == itr->h.second) {
-    			// Assert that number of mismatches matches
-    			if(h.fw != itr->fw || h.mms != itr->mms) {
-    				cout << endl;
-    				cout << "actual hit: fw=" << h.fw << endl;
-    				cout << "sanity hit: fw=" << itr->fw << endl;
-    			}
-    			assert_eq(h.fw, itr->fw);
-    			assert(h.mms == itr->mms);
-    			found = true;
-    			sanityHits.erase(itr); // Retire this sanity hit
-    			break;
-    		}
-    	}
-    	// Assert that the Ebwt hit was covered by a sanity-check hit
-    	if(!found) {
-    		cout << "Bowtie hit not found among " << sanityHits.size() << " sanity-check hits:" << endl
-    		     << "  " << pat << endl;
-    		cout << "  ";
-    		cout << endl;
-    		cout << patid << (fw? "+":"-") << ":<"
-    		     << h.h.first << "," << h.h.second << "," << h.mms.count() << ">" << endl;
-    		cout << "transpose: " << transpose << endl;
-    		cout << "Candidates:" << endl;
-        	for(itr = sanityHits.begin(); itr != sanityHits.end(); itr++) {
-        		cout << "  " << itr->h.first << " (" << itr->h.second << ")" << endl;
-        	}
-    	}
-    	assert(found);
-    }
-    return true;
-}
-
-/**
- * Assert that every hit in the hits array also occurs in the
- * sanityHits array.
- */
-static void sanityCheckHits(
-		const String<Dna5>& pat,
-		HitSinkPerThread& sink,
-        uint32_t patid,
-        bool fw,
-        vector<String<Dna5> >& os,
-        bool allowExact,
-        bool transpose)
-{
-	vector<Hit> sanityHits;
-    vector<Hit>& hits = sink.retainedHits();
-    // Accumulate hits found using a naive seed-and-extend into
-    // sanityHits
-	findSanityHits(pat, patid, fw, os, sanityHits, allowExact, transpose);
-	if(hits.size() > 0) {
-		// We hit, check that oracle also got our hits
-	    assert(allHits || khits > 1 || hits.size() == 1);
-		if(!allHits && hits[0].mms.count() > 0) {
-			// If our oneHit hit is inexact, then there had
-			// better be no exact sanity hits
-			for(size_t i = 0; i < sanityHits.size(); i++) {
-				assert_gt(sanityHits[i].mms.count(), 0);
-			}
-		}
-		reconcileHits(pat, patid, fw, hits, sanityHits, allowExact, transpose);
-	} else if(allowExact) {
-		// If we tried exact and inexact and didn't hit, then
-		// oracle shouldn't have hit
-		assert_eq(0, sanityHits.size());
-	} else {
-		// If we tried exact only and didn't hit, then oracle
-		// shouldn't have any exact
-		for(size_t i = 0; i < sanityHits.size(); i++) {
-			assert_gt(sanityHits[i].mms.count(), 0);
-		}
-	}
-	if(!allHits) {
-		// Ignore the rest of the oracle hits
-		sanityHits.clear();
-	} else {
-		// If in allHit mode, check that we covered *all* the
-		// hits produced by the oracle
-		checkSanityExhausted(pat, patid, fw, sanityHits, transpose);
-	}
-	assert_eq(0, sanityHits.size());
-    // Check that orientation of hits squares with orientation
-    // of the pattern searched
-    for(size_t i = 0; i < hits.size(); i++) {
-    	assert_eq(fw, hits[i].fw);
-    }
-    sink.clearRetainedHits();
 }
 
 /**
@@ -1315,8 +1273,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
-	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */
-	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > bt3(
@@ -1456,8 +1412,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	ASSERT_ONLY(int seedMms = two ? 2 : 3);   /* dummy; used in macros */
-	ASSERT_ONLY(int qualCutoff = 0xffffffff); /* dummy; used in macros */
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh

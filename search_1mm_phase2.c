@@ -15,13 +15,7 @@
 	bt.setQuery(&patRc, &qualRc, &name);
 	bt.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
-		sanityCheckHits(patRc, *sink, patid, false /*fw*/, os,
-		                false /*allowExact*/, true /*transpose*/);
 		continue;
-	} else {
-		// No hits
-		sanityCheckHits(patRc, *sink, patid, false /*fw*/, os,
-		                false /*allowExact*/, true /*transpose*/);
 	}
 
 	params.setFw(true);
@@ -30,12 +24,6 @@
 	bt.setQuery(&patFw, &qualFw, &name);
 	bt.setOffs(0, 0, s3, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
-		sanityCheckHits(patFw, *sink, patid, true /*fw*/, os,
-		                false /*allowExact*/, true /*transpose*/);
 		continue;
-	} else {
-		// No hits
-		sanityCheckHits(patFw, *sink, patid, true /*fw*/, os,
-		                false /*allowExact*/, true /*transpose*/);
 	}
 }
