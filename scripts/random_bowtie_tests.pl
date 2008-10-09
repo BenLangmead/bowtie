@@ -123,7 +123,7 @@ sub addQual($) {
 	$r .= ":";
 	for(my $i = 0; $i < $len; $i++) {
 		my $c = "-";
-		while(not $c =~ /[0-9A-Z!\/=@%]/) {
+		while(not $c =~ /[0-9A-Z\/=@%]/) {
 			$c = chr(33 + int(rand(41)));
 		}
 		$r .= $c;
@@ -275,9 +275,28 @@ sub search {
 		$patstr = ".randread.raw";
 	}
 	
-	my $fast = "";
+	my $phased = "";
 	if(int(rand(2)) == 0) {
-		$fast = "--fast";
+		$phased = "-z";
+	}
+	
+	my $khits = "-k 1";
+	if($phased) {
+		if(int(rand(2)) == 0) {
+			$khits = "-a";
+		}
+	} else {
+		if(int(rand(2)) == 0) {
+			$khits = "-a";
+		} else {
+			$khits = "-k " . (int(rand(20))+2);
+		}
+		if(int(rand(2)) == 0) {
+			$khits .= " --best";
+		}
+		if(int(rand(2)) == 0) {
+			$khits .= " --nostrata";
+		}
 	}
 	
 	if($oneHit || 1) {
@@ -289,7 +308,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy --concise $offRateStr --orig \"$t\" $fast $oneHit --sanity $patarg .tmp $patstr";
+	my $cmd = "./bowtie-debug $policy $khits --concise $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
