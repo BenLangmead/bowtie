@@ -90,18 +90,20 @@ typedef union {
 } PartialAlignment;
 
 #ifndef NDEBUG
-static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
+static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
-	if(pa1.entry.pos0 != 0xff) {
-		if       (pa1.entry.pos0 == pa2.entry.pos0) {
-			if(pa1.entry.char0 != pa2.entry.char0) return false;
-		} else if(pa1.entry.pos0 == pa2.entry.pos1) {
-			if(pa1.entry.char0 != pa2.entry.char1) return false;
-		} else if(pa1.entry.pos0 == pa2.entry.pos2) {
-			if(pa1.entry.char0 != pa2.entry.char2) return false;
-		} else {
-			return false;
-		}
+	assert_neq(0xff, pa1.entry.pos0);
+	assert_neq(0xff, pa2.entry.pos0);
+	
+	// Make sure pa1's pos0 is represented in pa1
+	if(pa1.entry.pos0 == pa2.entry.pos0) {
+		if(pa1.entry.char0 != pa2.entry.char0) return false;
+	} else if(pa1.entry.pos0 == pa2.entry.pos1) {
+		if(pa1.entry.char0 != pa2.entry.char1) return false;
+	} else if(pa1.entry.pos0 == pa2.entry.pos2) {
+		if(pa1.entry.char0 != pa2.entry.char2) return false;
+	} else {
+		return false;
 	}
 	if(pa1.entry.pos1 != 0xff) {
 		if       (pa1.entry.pos1 == pa2.entry.pos0) {
@@ -124,6 +126,27 @@ static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 		} else {
 			return false;
 		}
+	}
+	return true;
+}
+
+static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
+	return sameHalfPartialAlignment(pa1, pa2) && sameHalfPartialAlignment(pa2, pa1);
+}
+
+static bool validPartialAlignment(PartialAlignment pa) {
+	if(pa.entry.pos0 != 0xff) {
+		if(pa.entry.pos0 == pa.entry.pos1) return false;
+		if(pa.entry.pos0 == pa.entry.pos2) return false;
+	} else {
+		if(pa.entry.pos1 != 0xff) return false;
+		if(pa.entry.pos2 != 0xff) return false;
+	}
+
+	if(pa.entry.pos1 != 0xff) {
+		if(pa.entry.pos1 == pa.entry.pos2) return false;
+	} else {
+		if(pa.entry.pos2 != 0xff) return false;
 	}
 	return true;
 }
@@ -165,10 +188,12 @@ public:
 			_partialsMap[patid] = al;
 			assert_gt(ps.size(), 1);
 			for(size_t i = 0; i < ps.size()-1; i++) {
+				assert(validPartialAlignment(ps[i]));
 				_partialsList.push_back(ps[i]);
 				// list entry (non-tail)
 				_partialsList.back().entry.type = 2;
 			}
+			assert(validPartialAlignment(ps.back()));
 			_partialsList.push_back(ps.back());
 			// list tail
 			_partialsList.back().entry.type = 3;
@@ -176,7 +201,7 @@ public:
 			// Make sure there are not duplicate entries
 			for(size_t i = 0; i < _partialsList.size(); i++) {
 				for(size_t j = i+1; j < _partialsList.size(); j++) {
-					assert(!samePartialAlignment(ps[i], ps[j]));
+					assert(!samePartialAlignment(_partialsList[i], _partialsList[j]));
 				}
 			}
 #endif
@@ -226,9 +251,11 @@ public:
 #ifndef NDEBUG
 				// Make sure this entry isn't equal to any other entry
 				for(size_t i = 0; i < ps.size(); i++) {
+					assert(validPartialAlignment(ps[i]));
 					assert(!samePartialAlignment(ps[i], _partialsList[off]));
 				}
 #endif
+				assert(validPartialAlignment(_partialsList[off]));
 				ps.push_back(_partialsList[off]);
 				ASSERT_ONLY(uint32_t pos0 = ps.back().entry.pos0);
 				ASSERT_ONLY(uint32_t pos1 = ps.back().entry.pos1);
@@ -2089,6 +2116,15 @@ protected:
 	 * state (_mms[] and stackDepth).
 	 */
 	bool reportPartial(uint32_t stackDepth) {
+		// Sanity-check stack depth
+		if(_3revOff != _2revOff) {
+			assert_leq(stackDepth, 3);
+		} else if(_2revOff != _1revOff) {
+			assert_leq(stackDepth, 2);
+		} else {
+			assert_leq(stackDepth, 1);
+		}
+		
 		// Possibly report
 		assert_gt(_reportPartials, 0);
 		assert(_partials != NULL);
@@ -2146,8 +2182,10 @@ protected:
 			// Signal that the '2' slot is empty
 			al.entry.pos2 = 0xff;
 		}
+		assert(validPartialAlignment(al));
 #ifndef NDEBUG
 		for(size_t i = 0; i < _partialsBuf.size(); i++) {
+			assert(validPartialAlignment(_partialsBuf[i]));
 			assert(!samePartialAlignment(_partialsBuf[i], al));
 		}
 #endif

@@ -11,29 +11,34 @@ Bowtie Manual
  mammalian genomes. It aligns 35-base-pair reads to the human genome at
  a rate of 25 million reads per hour on a typical workstation with 2
  gigabytes of memory. Bowtie indexes the genome with a Burrows-Wheeler
- index to keep its memory footprint small: 1.1 GB for the human genome.
- Unlike tools using heavier-duty indexing schemes like suffix trees,
- suffix arrays, or spaced seeds, Bowtie can be run efficiently on a
- typical desktop PC and the index can be easily saved to disk and
- reused across alignment runs. Bowtie supports alignment policies
- equivalent to Maq and SOAP but is much faster: about 35x faster than
- Maq and over 250x faster than SOAP when aligning to the human genome.
- Bowtie's output format can be converted to the format used by Maq,
- allowing users to rapidly align reads with Bowtie then identify
- variations with Maq. The Bowtie tools run on the command line under
- Windows XP, Mac OS X, and Linux.
+ index to keep its memory footprint small: as small as 1.1 GB for the
+ human genome (using -z).  Unlike tools using heavier-duty indexing
+ schemes like suffix trees, suffix arrays, or spaced seeds, Bowtie can
+ be run efficiently on a typical desktop PC and the index can be easily
+ saved to disk and reused across alignment runs. Bowtie supports
+ alignment policies equivalent to Maq and SOAP but is much faster:
+ about 35x faster than Maq and over 250x faster than SOAP when aligning
+ to the human genome.  Bowtie's output format can be converted to the
+ format used by Maq, allowing users to rapidly align reads with Bowtie
+ then identify variations with Maq. The Bowtie tools run on the command
+ line under Windows XP, Mac OS X, and Linux.
  
  What isn't Bowtie?
  ------------------
 
  Bowtie is not a general-purpose alignment tool like MUMmer, BLAST or
- Vmatch. Bowtie will find a single "good" alignment (where "good" is
- defined by the matching policy) for each input read that has one. If
- there are many alignments that are equally "good" according to the
- policy, Bowtie will choose and report one at random. This is also the
- default behavior of other short read alignment tools like Maq and
- SOAP. Also, Bowtie works only with short reads (< 64 base pairs) and
- does not (yet) work in ABI color space. 
+ Vmatch. Bowtie works only with short reads (< 64 base pairs) and is
+ designed to be very fast for read sets where a) most of the reads have
+ at least one good, valid alignment, b) most of the reads are
+ relatively high-quality, and c) the number of alignments reported per
+ read is small (close to 1).  These criteria are satisfied in the
+ context of mammalian resequencing projects, but poor running times may
+ be observed in other contexts.
+  
+ Bowtie works only with short reads (< 64 base pairs) and does not yet
+ work in ABI "color space," does not yet report alignments with
+ insertions or deletions, and does not yet handle joint alignment of
+ paired-end reads. 
  
  Obtaining Bowtie Binaries
  -------------------------
