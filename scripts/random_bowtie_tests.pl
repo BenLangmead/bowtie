@@ -88,12 +88,13 @@ sub randDna($) {
 	my $num = shift;
 	my $i;
 	my $t = '';
+	my $noAmbigs = int(rand(3)) == 0;
 	for($i = 0; $i < $num; $i++) {
 		my $or = int(rand(50));
-		if($or == 0) {
+		if($or == 0 && !$noAmbigs) {
 			# Add a random, possibly ambiguous character
 			$t .= $dnaMap[int(rand($#dnaMap+1))];
-		} elsif($or == 1) {
+		} elsif($or == 1 && !$noAmbigs) {
 			# Add a random-length streak of Ns (max: 20)
 			my $streak = int(rand(20))+1;
 			for(my $j = $i; $j < $num && $j < $streak; $j++) {
@@ -174,7 +175,7 @@ sub build {
 	}
 	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp";
+	my $cmd = "./bowtie-build-debug -q --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp";
 	system("echo \"$cmd\" > .tmp.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
@@ -189,8 +190,8 @@ sub build {
 
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
-	if(int(rand(4)) == 5) {
-		$cmd = "./bowtie-build-packed-debug --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp.packed";
+	if(int(rand(5)) == 0) {
+		$cmd = "./bowtie-build-packed-debug -q --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {

@@ -20,7 +20,7 @@
  */
 
 // Build parameters
-static int verbose           = 0;     // be talkative
+static bool verbose          = true;  // be talkative (default)
 static int sanityCheck       = 0;     // do slow sanity checks
 static int format            = FASTA; // input sequence format
 static uint32_t bmax         = 0xfffffffe; // max blockwise SA bucket size
@@ -76,17 +76,17 @@ static void printUsage(ostream& out) {
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
-	    << "    -v/--verbose            verbose output (for debugging)" << endl
+	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/-?/--help            print this usage message" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "vrph?nscfl:i:o:t:h:";
+static const char *short_options = "qrph?nscfl:i:o:t:h:";
 
 static struct option long_options[] = {
-	{"verbose",      no_argument,       0,            'v'},
+	{"quiet",        no_argument,       0,            'q'},
 	{"sanity",       no_argument,       0,            's'},
 	{"little",       no_argument,       &bigEndian,   0},
 	{"big",          no_argument,       &bigEndian,   1},
@@ -193,7 +193,7 @@ static void parseOptions(int argc, char **argv) {
 	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
 	   			break;
 
-	   		case 'v': verbose = true; break;
+	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
 
 			case -1: /* Done with options. */

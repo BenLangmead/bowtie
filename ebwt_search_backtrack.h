@@ -41,14 +41,14 @@ static unsigned char qualRounds[] = {
 /// for matching seeded by "seedlings".
 struct QueryMutation {
 	QueryMutation() : pos(0), oldBase(0), newBase(0) { }
-	QueryMutation(uint8_t _pos, uint8_t _oldBase, uint8_t _newBase) :
+	QueryMutation(uint16_t _pos, uint8_t _oldBase, uint8_t _newBase) :
 		pos(_pos), oldBase(_oldBase), newBase(_newBase)
 	{
 		assert_neq(oldBase, newBase);
 		assert_leq(oldBase, 4);
 		assert_lt(newBase, 4);
 	}
-	uint8_t pos;
+	uint16_t pos;
 	uint8_t oldBase; // original base from the read
 	uint8_t newBase; // mutated to fit the reference in at least one place
 };
@@ -62,31 +62,32 @@ struct QueryMutation {
  */
 typedef union {
 	struct {
-		uint32_t pos0  : 8; // mismatched pos 1
-		uint32_t pos1  : 8; // mismatched pos 2
-		uint32_t pos2  : 8; // mismatched pos 3
-		uint32_t char0 : 2; // substituted char for pos 1
-		uint32_t char1 : 2; // substituted char for pos 2
-		uint32_t char2 : 2; // substituted char for pos 3
-		uint32_t type  : 2; // type of entry; 0=singleton_entry,
-		                    // 1=list_offset, 2=list_entry,
-		                    // 3=list_tail
+		uint64_t pos0  : 16;   // mismatched pos 1
+		uint64_t pos1  : 16;   // mismatched pos 2
+		uint64_t pos2  : 16;   // mismatched pos 3
+		uint64_t char0 : 2;    // substituted char for pos 1
+		uint64_t char1 : 2;    // substituted char for pos 2
+		uint64_t char2 : 2;    // substituted char for pos 3
+		uint64_t reserved : 8; 
+		uint64_t type  : 2;    // type of entry; 0=singleton_entry,
+		                       // 1=list_offset, 2=list_entry,
+		                       // 3=list_tail
 	} entry;
 	struct {
-		uint32_t off   : 30;// offset into list
-		uint32_t type  : 2; // type of entry; 0=singleton,
+		uint64_t off   : 62;// offset into list
+		uint64_t type  : 2; // type of entry; 0=singleton,
                             // 1=list_offset, 2=list_entry,
                             // 3=list_tail
 	} off; // offset into list
 	struct {
-		uint32_t unk   : 30;// padding
-		uint32_t type  : 2; // type of entry; 0=singleton,
+		uint64_t unk   : 62;// padding
+		uint64_t type  : 2; // type of entry; 0=singleton,
                             // 1=list_offset, 2=list_entry,
                             // 3=list_tail
 	} unk;   // unknown
 	struct {
-		uint32_t u32   : 32;
-	} u32;
+		uint64_t u64   : 64;
+	} u64;
 } PartialAlignment;
 
 #ifndef NDEBUG
@@ -174,7 +175,7 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
-		size_t origPlSz = _partialsList.size();
+		ASSERT_ONLY(size_t origPlSz = _partialsList.size());
 		MUTEX_LOCK(_partialLock);
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
@@ -191,7 +192,7 @@ public:
 			}
 #endif
 			PartialAlignment al;
-			al.u32.u32 = 0xffffffff;
+			al.u64.u64 = 0xffffffffffffffffllu;
 			al.off.off = _partialsList.size();
 			al.off.type = 1; // list offset
 			_partialsMap[patid] = al;
@@ -244,7 +245,7 @@ public:
 			return;
 		}
 		PartialAlignment al;
-		al.u32.u32 = _partialsMap[patid].u32.u32;
+		al.u64.u64 = _partialsMap[patid].u64.u64;
 		uint32_t type = al.unk.type;
 		if(type == 0) {
 			// singleton
@@ -307,7 +308,7 @@ public:
 		// Do first mutation
 		uint8_t oldQuals = 0;
 		uint32_t pos0 = pal.entry.pos0;
-		uint8_t tpos0 = plen-1-pos0;
+		uint16_t tpos0 = plen-1-pos0;
 		uint32_t chr0 = pal.entry.char0;
 		uint8_t oldChar = (uint8_t)seq[tpos0];
 		oldQuals += qualRounds[quals[tpos0]-33]; // take quality hit
@@ -315,7 +316,7 @@ public:
 		if(pal.entry.pos1 != 0xff) {
 			// Do second mutation
 			uint32_t pos1 = pal.entry.pos1;
-			uint8_t tpos1 = plen-1-pos1;
+			uint16_t tpos1 = plen-1-pos1;
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
 			oldQuals += qualRounds[quals[tpos1]-33]; // take quality hit
@@ -324,7 +325,7 @@ public:
 			if(pal.entry.pos2 != 0xff) {
 				// Do second mutation
 				uint32_t pos2 = pal.entry.pos2;
-				uint8_t tpos2 = plen-1-pos2;
+				uint16_t tpos2 = plen-1-pos2;
 				uint32_t chr2 = pal.entry.char2;
 				oldChar = (uint8_t)seq[tpos2];
 				oldQuals += qualRounds[quals[tpos2]-33]; // take quality hit
@@ -2139,14 +2140,14 @@ protected:
 		assert(_partials != NULL);
 		ASSERT_ONLY(uint32_t qualTot = 0);
 		PartialAlignment al;
-		al.u32.u32 = 0xffffffff;
+		al.u64.u64 = 0xffffffffffffffffllu;
 		assert_leq(stackDepth, 3);
 		assert_gt(stackDepth, 0);
 
 		// First mismatch
 		assert_lt(_mms[0], _qlen);
 		// First, append the mismatch position in the read
-		al.entry.pos0 = (uint8_t)_mms[0]; // pos
+		al.entry.pos0 = (uint16_t)_mms[0]; // pos
 		ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[0]] - 33)]);
 		uint32_t ci = _qlen - _mms[0] - 1;
 		// _chars[] is index in terms of RHS-relative depth
@@ -2160,7 +2161,7 @@ protected:
 			// Second mismatch
 			assert_lt(_mms[1], _qlen);
 			// First, append the mismatch position in the read
-			al.entry.pos1 = (uint8_t)_mms[1]; // pos
+			al.entry.pos1 = (uint16_t)_mms[1]; // pos
 			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[1]] - 33)]);
 			ci = _qlen - _mms[1] - 1;
 			// _chars[] is index in terms of RHS-relative depth
@@ -2178,7 +2179,7 @@ protected:
 			// Second mismatch
 			assert_lt(_mms[2], _qlen);
 			// First, append the mismatch position in the read
-			al.entry.pos2 = (uint8_t)_mms[2]; // pos
+			al.entry.pos2 = (uint16_t)_mms[2]; // pos
 			ASSERT_ONLY(qualTot += qualRounds[((*_qual)[_mms[2]] - 33)]);
 			ci = _qlen - _mms[2] - 1;
 			// _chars[] is index in terms of RHS-relative depth
@@ -2382,7 +2383,6 @@ protected:
 	String<char>*       _name;   // name of _qry
 	const Ebwt<TStr>*   _ebwt;   // Ebwt to search in
 	const EbwtSearchParams<TStr>& _params;   // Ebwt to search in
-	String<uint8_t>*    _btEquivs; // backtracking equivalence classes
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _2revOff;  // 2-revisitable chunk

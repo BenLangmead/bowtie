@@ -1205,7 +1205,7 @@ protected:
 			// Now read the qualities
 			int qualsRead = 0;
 			if (_solexa_quals) {
-				char buf[2048];
+				char buf[4096];
 				while (qualsRead < charsRead) {
 					size_t rd = _filebuf->gets(buf, sizeof(buf));
 					if(rd == 0) break;
@@ -1285,7 +1285,6 @@ protected:
 									exit(1);
 								}
 								assert_geq(c, 33);
-								assert_leq(c, 73);
 								r.qualBufFw[off] = c;
 								r.qualBufRc[bufSz - off - 1] = c;
 							}
@@ -1311,7 +1310,6 @@ protected:
 									exit(1);
 								}
 								assert_geq(c, 33);
-								assert_leq(c, 73);
 								r.qualBufFw[bufSz - off - 1] = c;
 								r.qualBufRc[off] = c;
 							}
