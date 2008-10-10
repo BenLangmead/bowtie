@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.9.1.
+available to the public for download.  The current version is 0.9.6.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -20,12 +20,28 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.9.6 - October 10, 2008
+   * 'bowtie' now supports a host of options that allow the user to
+     specify which and how many valid alignments to report for read
+     Default is still to report 1 "good" alignment per rad.  See
+     -k/-a/--best/--nostrata options described in the manual. 
+   * 'bowtie' now supports reads up to 1024 bases long.  Of course,
+     user must set matching policy parameters (esp. -e) appropriately
+     for longer reads.
+   * --fast flag eliminated and double-index mode is now the default.
+     Added the -z/--phased flag to revert to phased, half-index mode.
+   * --concise output mode now officially supported.  Now outputs one
+     alignment per line.
+   * Changed 'bowtie-build' default back to --bmaxdivn 4.
+   * -h/--help now prints much more verbose help for 'bowtie' and
+     'bowtie-build' (verbatim from MANUAL file) 
+
 Version 0.9.5 - September 27, 2008
    * Last column of output now additionally reports the reference and
      query bases (in that order) for mismatches.  E.g., old: "30,32",
      new: "30:C>A,32:C>T".
    * Eliminated spurious trailing space in first column of output.
-   * Minor performance and sensitivity improvements
+   * Minor performance and sensitivity improvements.
    * New option '-p' spawns a user-specified number of pthreads for
      parallel processing of reads.  For example, use '-p 4' to run
      'bowtie' on 4 processor cores simultaneously.
@@ -42,7 +58,7 @@ Version 0.9.5 - September 27, 2008
      about twice as much memory.  '--fast' also causes 'bowtie' to
      scale better when used in combination with '-p'.
    * Fixed crashing bug with -o/--offrate in 'bowtie'.
-   * Improved error reporting
+   * Improved error reporting.
 
 Version 0.9.4 - September 16, 2008
    * New method for handling gaps and ambiguity codes in the reference.
