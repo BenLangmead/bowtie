@@ -915,6 +915,11 @@ protected:
 					// Note: can't have a comment in the middle of a sequence,
 					// though a comment can end a sequence
 					if(isalpha(c) && begin++ >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							     << "reads and re-run Bowtie";
+							exit(1);
+						}
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -951,6 +956,11 @@ protected:
 					// Note: can't have a comment in the middle of a sequence,
 					// though a comment can end a sequence
 					if(isalpha(c) && begin++ >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							     << "reads and re-run Bowtie";
+							exit(1);
+						}
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1109,6 +1119,11 @@ protected:
 					if(isalpha(c)) {
 						// If it's past the 5'-end trim point
 						if(charsRead >= this->_trim5) {
+							if(dstLen + 1 > 1024) {
+								cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+								     << "reads and re-run Bowtie";
+								exit(1);
+							}
 							// Add it to the read buffer
 							if(c == 'N' || c == 'n') {
 								if(_policy == NS_TO_NS) {
@@ -1145,6 +1160,11 @@ protected:
 					if(isalpha(c)) {
 						// If it's past the 5'-end trim point
 						if(charsRead >= this->_trim5) {
+							if(dstLen + 1 > 1024) {
+								cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+								     << "reads and re-run Bowtie";
+								exit(1);
+							}
 							// Add it to the read buffer
 							if(c == 'N' || c == 'n') {
 								if(_policy == NS_TO_NS) {
@@ -1200,6 +1220,11 @@ protected:
 							if (qualsRead >= _trim5)
 							{
 								size_t off = qualsRead - _trim5;
+								if(off + 1 > 1024) {
+									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									     << "Please truncate reads and quality values and and re-run Bowtie";
+									exit(1);
+								}
 								c = (char)(pQ + 33);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
@@ -1216,6 +1241,11 @@ protected:
 							if (qualsRead >= _trim5)
 							{
 								size_t off = qualsRead - _trim5;
+								if(off + 1 > 1024) {
+									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									     << "Please truncate reads and quality values and and re-run Bowtie";
+									exit(1);
+								}
 								c = (char)(pQ + 33);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
@@ -1249,6 +1279,11 @@ protected:
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
 								size_t off = qualsRead - _trim5;
+								if(off + 1 > 1024) {
+									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									     << "Please truncate reads and quality values and and re-run Bowtie";
+									exit(1);
+								}
 								assert_geq(c, 33);
 								assert_leq(c, 73);
 								r.qualBufFw[off] = c;
@@ -1270,6 +1305,11 @@ protected:
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
 								size_t off = qualsRead - _trim5;
+								if(off + 1 > 1024) {
+									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									     << "Please truncate reads and quality values and and re-run Bowtie";
+									exit(1);
+								}
 								assert_geq(c, 33);
 								assert_leq(c, 73);
 								r.qualBufFw[bufSz - off - 1] = c;
@@ -1381,6 +1421,11 @@ protected:
 			if(!_reverse) {
 				while(!isspace(c) && c >= 0) {
 					if(isalpha(c) && dstLen >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 characters." << endl
+							     << "Please truncate reads and and re-run Bowtie";
+							exit(1);
+						}
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'
@@ -1415,6 +1460,11 @@ protected:
 			} else {
 				while(!isspace(c) && c >= 0) {
 					if(isalpha(c) && dstLen >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
+							     << "Please truncate reads and and re-run Bowtie";
+							exit(1);
+						}
 						if(c == 'N' || c == 'n') {
 							if(_policy == NS_TO_NS) {
 								// Leave c = 'N'

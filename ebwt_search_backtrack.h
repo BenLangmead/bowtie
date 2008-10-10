@@ -1,7 +1,6 @@
 #ifndef EBWT_SEARCH_BACKTRACK_H_
 #define EBWT_SEARCH_BACKTRACK_H_
 
-#define DEFAULT_SPREAD 128
 #include "pat.h"
 
 /// An array that transforms Phred qualities into their maq-like
@@ -374,13 +373,7 @@ public:
 		_maxBts1(14),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
-	{
-		_mms            = new uint32_t[DEFAULT_SPREAD];
-		_refcs          = new char[DEFAULT_SPREAD];
-		_btsAtDepths    = new uint32_t[DEFAULT_SPREAD];
-		_totBtsAtDepths = new uint32_t[DEFAULT_SPREAD];
-		_chars          = new char[DEFAULT_SPREAD];
-	}
+	{ }
 
 	~BacktrackManager() {
 		if(_pairs != NULL)          delete[] _pairs;
@@ -419,20 +412,52 @@ public:
 			applyMutations();
 		}
 		assert(_qry != NULL);
-		// Reset _qlen
-		_qlen = length(*_qry);
-		assert_leq(_qlen, DEFAULT_SPREAD);
-		assert_geq(length(*_qual), _qlen);
 		for(size_t i = 0; i < length(*_qual); i++) {
 			assert_geq((*_qual)[i], 33);
 		}
- 		if(_pairs == NULL) {
- 			_pairs = new uint32_t[DEFAULT_SPREAD*_qlen*8];
- 		}
- 		if(_elims == NULL) {
- 			_elims = new uint8_t[DEFAULT_SPREAD*_qlen];
- 			memset(_elims, 0, DEFAULT_SPREAD*_qlen);
- 		}
+		// Reset _qlen
+		if(length(*_qry) > _qlen) {
+			_qlen = length(*_qry);
+			// Resize _pairs
+	 		if(_pairs != NULL) { delete[] _pairs; }
+	 		_pairs = new uint32_t[_qlen*_qlen*8];
+	 		// Resize _elims
+	 		if(_elims != NULL) { delete[] _elims; }
+	 		_elims = new uint8_t[_qlen*_qlen];
+	 		memset(_elims, 0, _qlen*_qlen);
+	 		// Resize _mms
+	 		if(_mms != NULL) { delete[] _mms; }
+			_mms = new uint32_t[_qlen];
+			// Resize _refcs
+	 		if(_refcs != NULL) { delete[] _refcs; }
+			_refcs = new char[_qlen];
+			// Resize _btsAtDepths
+	 		if(_btsAtDepths != NULL) { delete[] _btsAtDepths; }
+			_btsAtDepths = new uint32_t[_qlen];
+			// Resize _totBtsAtDepths
+	 		if(_totBtsAtDepths != NULL) { delete[] _totBtsAtDepths; }
+			_totBtsAtDepths = new uint32_t[_qlen];
+			// Resize _chars
+	 		if(_chars != NULL) { delete[] _chars; }
+			_chars = new char[_qlen];
+			assert(_pairs != NULL);
+			assert(_elims != NULL);
+			assert(_mms != NULL);
+			assert(_refcs != NULL);
+			assert(_btsAtDepths != NULL);
+			assert(_totBtsAtDepths != NULL);
+			assert(_chars != NULL);
+		} else {
+			assert(_pairs != NULL);
+			assert(_elims != NULL);
+			assert(_mms != NULL);
+			assert(_refcs != NULL);
+			assert(_btsAtDepths != NULL);
+			assert(_totBtsAtDepths != NULL);
+			assert(_chars != NULL);
+			_qlen = length(*_qry);
+		}
+		assert_geq(length(*_qual), _qlen);
 		if(_verbose) {
 			String<char> qual = (*_qual);
 			if(length(qual) > length(*_qry)) {
@@ -658,8 +683,8 @@ public:
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		memset(_btsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
-		memset(_totBtsAtDepths, 0, DEFAULT_SPREAD * sizeof(uint32_t));
+		memset(_btsAtDepths, 0, _qlen * sizeof(uint32_t));
+		memset(_totBtsAtDepths, 0, _qlen * sizeof(uint32_t));
 		_hiDepth = 0; _bailedOnBacktracks = false;
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
@@ -1981,7 +2006,7 @@ protected:
 				for(size_t i = 0; i < numMuts; i++) {
 					// Entries in _mms[] are in terms of offset into
 					// _qry - not in terms of offset from 3' or 5' end
-					assert_lt(stackDepth + i, DEFAULT_SPREAD);
+					assert_lt(stackDepth + i, _qlen);
 					// All partial-alignment mutations should fall
 					// within bounds
 					assert_lt((*_muts)[i].pos, _qlen);

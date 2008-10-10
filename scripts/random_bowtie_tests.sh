@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# Args: seed, outer, inner, tbase, trand, pbase, prand
+
 echo "Short test emphasizing searching..."
 perl scripts/random_bowtie_tests.pl 77 1000 200 300 200 8 30
 if [ "$?" != "0" ] ; then echo "Error!" ; exit 1 ; fi
