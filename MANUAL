@@ -77,8 +77,8 @@ Bowtie Manual
  arguments.  If building with MinGW, run GNU make from the MSYS
  environment.
  
- Due to the -p option, bowtie needs the pthreads library to compile and
- run. To compile bowtie without pthreads support (which disables the -p
+ Due to the -p option, Bowtie needs the pthreads library to compile and
+ run. To compile Bowtie without pthreads support (which disables the -p
  option), use 'make BOWTIE_PTHREADS=0'.
 
  Using the 'bowtie' Aligner
@@ -251,15 +251,17 @@ Bowtie Manual
                      Bowtie may sometimes report an alignment with 2
                      mismatches in the seed even though there exists an
                      unreported alignment with 1 mismatch in the seed.
-                     Use of --best usually incurs a small performance
-                     penalty.
+                     BOWTIE IS ABOUT 3-5 TIMES SLOWER WHEN --best IS
+                     SPECIFIED.
 
   --nostrata         If many valid alignments exist and are reportable
                      (according to the --best and -k options) and they
                      fall into various alignment "strata", report all
                      of them.  By default, Bowtie only reports those
                      alignments that fall into the best stratum, i.e.,
-                     the one with fewest mismatches.  
+                     the one with fewest mismatches.  BOWTIE CAN BECOME
+                     VERY SLOW WHEN --nostrata IS COMBINED WITH -k OR
+                     -a. 
     
   -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
                      each read before alignment (default: 0).
