@@ -34,7 +34,8 @@ Version 0.9.6 - October 10, 2008
      alignment per line.
    * Changed 'bowtie-build' default back to --bmaxdivn 4.
    * -h/--help now prints much more verbose help for 'bowtie' and
-     'bowtie-build' (verbatim from MANUAL file) 
+     'bowtie-build' (verbatim from MANUAL file)
+   * BWT-searching code streamlined; old code eliminated
 
 Version 0.9.5 - September 27, 2008
    * Last column of output now additionally reports the reference and
