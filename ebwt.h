@@ -520,7 +520,7 @@ public:
 		TStr s; // holds the entire joined reference after call to joinToDisk
 		uint32_t jlen = joinedLen(szs, _eh._chunkRate);
 		assert_geq(jlen, sztot);
-		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " bytes of padding)");
+		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " characters of padding)");
 		VMSG_NL("Writing header");
 		writeFromMemory(true, out1, out2);
 		try {

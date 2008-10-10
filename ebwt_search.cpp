@@ -175,7 +175,7 @@ static void printUsage(ostream& out) {
 	    << "  --concise          write hits in concise format" << endl
 	    << "  -b/--binout        write hits in binary format (<hit_outfile> not optional)" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
-	    //<< "  --maxbts <int>     maximum number of backtracks allowed (default: 125)" << endl
+	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of Ebwt; must be >= value in index" << endl

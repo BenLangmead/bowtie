@@ -27,19 +27,20 @@ Bowtie Manual
  ------------------
 
  Bowtie is not a general-purpose alignment tool like MUMmer, BLAST or
- Vmatch. Bowtie works only with short reads (< 64 base pairs) and is
- designed to be very fast for read sets where a) most of the reads have
- at least one good, valid alignment, b) most of the reads are
- relatively high-quality, and c) the number of alignments reported per
- read is small (close to 1).  These criteria are satisfied in the
- context of mammalian resequencing projects, but poor running times may
- be observed in other contexts.
+ Vmatch. Bowtie works best with short reads (though it supports reads
+ up to 1024 bases in length) and is designed to be extremely fast for
+ read sets where a) many of the reads have at least one good, valid
+ alignment, b) many of the reads are relatively high-quality, and c)
+ the number of alignments reported per read is small (close to 1).
+ These criteria are generally satisfied in the context of mammalian
+ resequencing projects, but poor running times may be observed in other
+ contexts.
   
- Bowtie works only with short reads (< 64 base pairs) and does not yet
- work in ABI "color space," does not yet report alignments with
- insertions or deletions, and does not yet handle joint alignment of
- paired-end reads. 
- 
+ Bowtie does not yet work in ABI "color space," does not yet report
+ alignments with insertions or deletions, and does not yet handle joint
+ alignment of paired-end reads.  All off these are future work, with
+ paired-end alignment as the highest priority.
+  
  Obtaining Bowtie Binaries
  -------------------------
  
@@ -55,10 +56,10 @@ Bowtie Manual
  Building Bowtie requires a GNU-like environment that includes GCC, GNU
  Make and other basics.  It should be possible to build Bowtie on
  a vanilla Linux or Mac installation.  Bowtie can also be built on
- Windows using Cygwin or MinGW (recommended).  If building with MinGW,
- first install MinGW and MSYS (http://www.mingw.org/), the zlib library
- (http://cygwin.com/packages/mingw-zlib/), and the pthreads library
- (http://sourceware.org/pthreads-win32/).
+ Windows using Cygwin or MinGW (MinGW recommended).  If building with
+ MinGW, first install MinGW and MSYS (http://www.mingw.org/), the zlib
+ library (http://cygwin.com/packages/mingw-zlib/), and the pthreads
+ library (http://sourceware.org/pthreads-win32/).
  
  Bowtie depends on code from Maq v0.6.6 (http://maq.sf.net) and from
  the SeqAn library v1.1 (http://www.seqan.de).  However, all supporting
@@ -75,6 +76,10 @@ Bowtie Manual
  with the command 'make', but sometimes with 'gmake') with no
  arguments.  If building with MinGW, run GNU make from the MSYS
  environment.
+ 
+ Due to the -p option, bowtie needs the pthreads library to compile and
+ run. To compile bowtie without pthreads support (which disables the -p
+ option), use 'make BOWTIE_PTHREADS=0'.
 
  Using the 'bowtie' Aligner
  --------------------------
@@ -85,19 +90,28 @@ Bowtie Manual
  are legal, and the -k/-a/--best/--nostrata options which define which
  and how many legal alignments should be reported.
  
- Bowtie is designed to be very fast for read sets where a) most of the
- reads have at least one good, valid alignment, b) most of the reads
+ Bowtie is designed to be very fast for read sets where a) many of the
+ reads have at least one good, valid alignment, b) many of the reads
  are relatively high-quality, c) the number of alignments reported per
  read is small (close to 1).  These criteria are generally satisfied in
  the context of mammalian resequencing projects, but you may observe
  longer running times in other contexts.
  
  By default, Bowtie enforces a policy that is equivalent to Maq's
- quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it can
- also be made to enforce an end-to-end k-difference policy equivalent
- to SOAP's (http://soap.genomics.org.cn/) (-v 2).
+ quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it
+ can also be made to enforce an end-to-end k-difference policy
+ equivalent to SOAP's (http://soap.genomics.org.cn/) (-v 2).
+ 
+ The process by which bowtie chooses an alignment to report is
+ randomized in order to avoid "mapping bias" - the phenomenon whereby
+ an aligner systematically fails to report a particular class of good
+ alignments, causing spurious "holes" in the comparative assembly.
+ Whenever bowtie reports a subset of the valid alignments that exist,
+ it makes an effort to sample them randomly.  Some bias may still
+ exist.
  
  Indels and paired-end alignment are not currently supported.
+ Alignment in ABI "color space" is also not currently supported.
  
   Maq-like Policy
   ---------------
@@ -124,6 +138,16 @@ Bowtie Manual
   Note that Maq internally rounds base qualities to the nearest 10 and
   truncates qualities greater than 30 to 30.  To maintain compatibility
   with Maq, Bowtie does the same.
+ 
+  Also note that bowtie is not fully sensitive in -n 2 and -n 3
+  modes.  In those modes, bowtie imposes a "backtracking limit" to
+  limit the amount of effort spent trying to find valid alignments for
+  low-quality reads that are unlikely have any.  Since the limit is
+  arbitrary, it may cause bowtie to miss some legal 2- and 3-mismatch
+  alignments.  We have set the limit to what we consider a reasonable
+  default (125), but the user may decrease or increase the limit using
+  the --maxbts option.  Setting the limit to a very large number
+  (>10000) guarantees full sensitivity.
  
   End-to-end k-difference Policy
   ------------------------------
@@ -242,6 +266,16 @@ Bowtie Manual
 
   -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
                      each read before alignment (default: 0).
+  
+  -p/--threads <int> Launch <int> parallel search threads (default: 1).
+                     Threads will run on separate processors/cores and
+                     synchronize when grabbing reads and outputting
+                     alignments.  Searching for alignments is almost
+                     totally parallel, and speedup is close to linear.
+                     Speedup suffers somewhat in -z mode.  This option
+                     is only available if bowtie is linked with the
+                     pthreads library (i.e. if BOWTIE_PTHREADS=0 is not
+                     specified at build time).
 
   -u/--qupto <int>   Only align the first <int> reads from the
                      specified read set.  Default: no limit.
@@ -250,12 +284,14 @@ Bowtie Manual
                      search phase and index turnover.
   
   -z/--phased        Alternate between using the forward and mirror
-                     indexes in a series of phases.  This uses about
-                     half the amount of memory as the default (which
-                     keeps both forward and mirror indexes resident in
-                     memory at once), but is somewhat slower, scales
-                     worse, and is incompatible with use of --best or
-                     -k greater than 1.
+                     indexes in a series of phases such that only one
+                     "half" of the index is resident in memory at one
+                     time.  This uses about half the amount of memory
+                     as the default (which keeps both forward and
+                     mirror indexes resident in memory at once), but is
+                     somewhat slower, scales worse (see -p), and is
+                     incompatible with use of --best or -k greater than
+                     1.
   
   --solexa-quals     Convert FASTQ qualities from solexa-scaled to
                      phred-scaled.  Used with -q.  Default: off.
@@ -271,7 +307,8 @@ Bowtie Manual
                      the index of the reference sequence aligned to,
                      ref_off is the offset into the reference sequence,
                      and mms is the number of mismatches in the
-                     alignment.
+                     alignment.  Each alignment appears on a separate
+                     line.
 
   -b/--binout        Outout alignments in a concise binary format.  If
                      this is specified, <hit_outfile> must also be
@@ -281,6 +318,20 @@ Bowtie Manual
                      reported alignment, refer to it by 0-based index
                      (its offset into the list of references that were
                      indexed) rather than by name.
+
+  --maxbts           The maximum number of backtracks permitted when
+                     aligning a read in -n 2 or -n 3 mode (default:
+                     125).  A "backtrack" is the introduction of a
+                     speculative substitution into the alignment.
+                     Without this limit, the default paramters will
+                     sometimes require that 'bowtie' try 100s or 1,000s
+                     of backtracks to align a read, especially if the
+                     read has many low-quality bases and/or has no
+                     valid alignments, slowing bowtie down
+                     significantly.  The drawback of having a limit is
+                     that some valid alignments may be missed.  Higher
+                     limits yield greater sensitivity at the expensive
+                     of longer running times.  
 
   --maxns <int>      Skip reads with more than <int> N's (no-confidence
                      bases) in their sequence.  Default: no limit.
@@ -298,7 +349,8 @@ Bowtie Manual
 
   --verbose          Print verbose output (for debugging).
   
-  -h/--help          Print usage information and quit.
+  -h/--help          Print detailed description of tool and its options
+                     (from MANUAL).
 
   --version          Print version information and quit.
 
@@ -368,6 +420,9 @@ Bowtie Manual
  these options are potentially profitable trade-offs.  They have been
  set to defaults that are reasonable for most cases according to our
  experiments.
+ 
+ If bowtie-build aborts with an out-of-memory error, try re-running it
+ with a larger --bmaxdivn (the default is 4).
    
   Command Line
   ------------
@@ -399,16 +454,23 @@ Bowtie Manual
     --bmax <int>            The maximum number of suffixes allowed in a
                             block.  Allowing more suffixes per block
                             makes indexing faster, but increases memory
-                            overhead.  Default: No limit - all suffixes
-                            are sorted as a single block.
+                            overhead.  Overrides any previous
+                            specification of --bmax, --bmaxmultsqrt or
+                            --bmaxdivn. Default: --bmaxdivn 4.
     
     --bmaxmultsqrt <int>    The maximum number of suffixes allowed in a
                             block, expressed as a multiple of the
                             square root of the length of the reference.
+                            Overrides any previous specification of
+                            --bmax, --bmaxmultsqrt or --bmaxdivn.
+                            Default: --bmaxdivn 4.
     
     --bmaxdivn <int>        The maximum number of suffixes allowed in a
                             block, expressed as a fraction of the
-                            length of the reference.
+                            length of the reference.  Overrides any
+                            previous specification of --bmax,
+                            --bmaxmultsqrt or --bmaxdivn. Default:
+                            --bmaxdivn 4.
     
     --dcv <int>             Use <int> as the period for the difference-
                             cover sample.  A larger period yields less
@@ -455,7 +517,12 @@ Bowtie Manual
                             reference sequences (cumulative across
                             sequences) and ignore the rest.
     
-    -v/--verbose            Verbose output (for debugging).
+    -q/--quiet              ebwt-build is verbose by default.  With
+                            this option ebwt-build will print only
+                            error messages.
+    
+    -h/--help               Print detailed description of tool and its
+                            options (from MANUAL).
     
     --version               Print version information and quit.
  

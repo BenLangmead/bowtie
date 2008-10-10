@@ -23,9 +23,9 @@
 static bool verbose          = true;  // be talkative (default)
 static int sanityCheck       = 0;     // do slow sanity checks
 static int format            = FASTA; // input sequence format
-static uint32_t bmax         = 0xfffffffe; // max blockwise SA bucket size
+static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
 static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
-static uint32_t bmaxDivN     = 0xffffffff; // same, as divisor of n
+static uint32_t bmaxDivN     = 4;          // same, as divisor of n
 static int dcv               = 1024;  // bwise SA difference-cover sample sz
 static int noDc              = 0;     // disable difference-cover sample
 static int entireSA          = 0;     // 1 = disable blockwise SA
@@ -78,7 +78,7 @@ static void printUsage(ostream& out) {
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
-	    << "    -h/-?/--help            print this usage message" << endl
+	    << "    -h/--help               print detailed description of tool and its options" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
 }
@@ -348,12 +348,11 @@ int main(int argc, char **argv) {
 	// Optionally summarize
 	if(verbose) {
 		cout << "Settings:" << endl
-		     << "  Output file: \"" << outfile << "\"" << endl
+		     << "  Output files: \"" << outfile << ".*.ebwt\"" << endl
 		     << "  Line rate: " << lineRate << " (line is " << (1<<lineRate) << " bytes)" << endl
 		     << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
 		     << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
 		     << "  FTable chars: " << ftabChars << endl
-		     //<< "  Chunk rate: " << chunkRate << " (chunk is " << (1 << chunkRate) << " bytes)" << endl
 		     ;
 		if(bmax == 0xffffffff) {
 			cout << "  Max bucket size: default" << endl;
@@ -371,6 +370,9 @@ int main(int argc, char **argv) {
 			cout << "  Max bucket size, len divisor: " << bmaxDivN << endl;
 		}
 		cout << "  Difference-cover sample period: " << dcv << endl;
+		cout << "  Reference base cutoff: ";
+		if(cutoff == 0xffffffff) cout << "none"; else cout << cutoff << " bases";
+		cout << endl;
 		cout << "  Endianness: " << (bigEndian? "big":"little") << endl
 	         << "  Actual local endianness: " << (currentlyBigEndian()? "big":"little") << endl
 		     << "  Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
@@ -381,7 +383,7 @@ int main(int argc, char **argv) {
 #endif
 		cout << "  Random seed: " << seed << endl;
 		cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << endl;
-		cout << "Input files Dna, " << file_format_names[format] << ":" << endl;
+		cout << "Input files DNA, " << file_format_names[format] << ":" << endl;
 		for(size_t i = 0; i < infiles.size(); i++) {
 			cout << "  " << infiles[i] << endl;
 		}
@@ -390,7 +392,7 @@ int main(int argc, char **argv) {
 	srand(seed);
 	int64_t origCutoff = cutoff; // save cutoff since it gets modified
 	{
-		Timer timer(cout, "Total time for call to driver(): ", verbose);
+		Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
 		#ifdef PACKED_STRINGS
 		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
 		#else
@@ -400,7 +402,7 @@ int main(int argc, char **argv) {
 	cutoff = origCutoff; // reset cutoff for backward Ebwt
 	if(doubleEbwt) {
 		srand(seed);
-		Timer timer(cout, "Total time for backward call to driver(): ", verbose);
+		Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
 		#ifdef PACKED_STRINGS
 		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
 		#else
