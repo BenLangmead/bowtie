@@ -89,6 +89,7 @@ typedef union {
 	} u32;
 } PartialAlignment;
 
+#ifndef NDEBUG
 static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
 	if(pa1.entry.pos0 != 0xff) {
@@ -126,6 +127,7 @@ static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 	}
 	return true;
 }
+#endif
 
 /**
  * A synchronized data structure for storing partial alignments
@@ -673,11 +675,10 @@ public:
 		                 << "_pairs" << _pairs << ", "
 		                 << "_elims=" << (void*)_elims << ")" << endl;
 		bool oldRetain = sink.retainHits();
-		size_t oldRetainSz;
+		size_t oldRetainSz = sink.retainedHits().size();
 		if(_sanity) {
 			// Save some info about hits retained at this point
 			sink.setRetainHits(true);
-			oldRetainSz = sink.retainedHits().size();
 		}
 		uint64_t nhits = sink.numReportedHits();
 

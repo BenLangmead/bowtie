@@ -68,7 +68,7 @@
 	btr2.setQuery(&patRc, &qualRc, &name);
 	btr2.setQlen(s); // just look at the seed
 	// Find partial alignments for case 4R
-	bool done = btr2.backtrack();
+	ASSERT_ONLY(bool done =) btr2.backtrack();
 #ifndef NDEBUG
 	vector<PartialAlignment> partials;
 	assert(pamRc != NULL);
