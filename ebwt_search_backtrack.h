@@ -174,6 +174,7 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
+		size_t origPlSz = _partialsList.size();
 		MUTEX_LOCK(_partialLock);
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
@@ -181,6 +182,14 @@ public:
 			_partialsMap[patid] = ps[0];
 			_partialsMap[patid].entry.type = 0; // singleton
 		} else {
+#ifndef NDEBUG
+			// Make sure there are not duplicate entries
+			for(size_t i = 0; i < ps.size()-1; i++) {
+				for(size_t j = i+1; j < ps.size(); j++) {
+					assert(!samePartialAlignment(ps[i], ps[j]));
+				}
+			}
+#endif
 			PartialAlignment al;
 			al.u32.u32 = 0xffffffff;
 			al.off.off = _partialsList.size();
@@ -199,7 +208,7 @@ public:
 			_partialsList.back().entry.type = 3;
 #ifndef NDEBUG
 			// Make sure there are not duplicate entries
-			for(size_t i = 0; i < _partialsList.size(); i++) {
+			for(size_t i = origPlSz; i < _partialsList.size()-1; i++) {
 				for(size_t j = i+1; j < _partialsList.size(); j++) {
 					assert(!samePartialAlignment(_partialsList[i], _partialsList[j]));
 				}
