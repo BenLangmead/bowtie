@@ -332,23 +332,18 @@ public:
 	                 bool __verbose = true,
 	                 uint32_t seed = 0,
 	                 vector<String<Dna5> >* __os = NULL,
-	                 bool __considerQuals = true, // whether to consider quality values when making backtracking decisions
-	                 bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
-	                 String<Dna5>* __qry = NULL,
-	                 String<char>* __qual = NULL,
-	                 String<char>* __name = NULL) :
-		_qry(__qry),
+	                 bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
+	                 bool __halfAndHalf = false) : // hacky way of supporting separate revisitable regions
+		_qry(NULL),
 		_qlen(0),
-		_qual(__qual),
-		_name(__name),
+		_qual(NULL),
+		_name(NULL),
 		_ebwt(__ebwt),
 		_params(__params),
 		_unrevOff(0),
 		_1revOff(0),
 		_2revOff(0),
 		_3revOff(0),
-		_spread(DEFAULT_SPREAD),
-		_maxStackDepth(DEFAULT_SPREAD),
 		_qualThresh(__qualThresh),
 		_reportOnHit(true),
 		_pairs(NULL),
@@ -366,7 +361,6 @@ public:
 		_halfAndHalf(__halfAndHalf),
 		_5depth(0),
 		_3depth(0),
-		_nameDefault("default"),
 		_hiDepth(0),
 		_numBts(0),
 		_totNumBts(0),
@@ -378,41 +372,9 @@ public:
 		_totBtsAtDepths(NULL),
 		_maxBts0(28),
 		_maxBts1(14),
-		//_maxBts0(__maxBts0),
-		//_maxBts1(__maxBts1),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{
-	    // For a 40-bp query range, the _pairs array occupies
-	    // 40 * 40 * 8 * 4 = 51,200 bytes, and _elims
-	    // occupy 40 * 40 = 1,600 bytes
-		assert_geq(strlen(qualDefault), DEFAULT_SPREAD);
- 		_qualDefault = qualDefault;
- 		if(_qry != NULL) {
- 			_qlen = length(*_qry);
- 			_spread = length(*_qry);
- 			if(_qual == NULL || length(*_qual) == 0) {
- 				_qual = &_qualDefault;
- 			}
- 			assert_geq(length(*_qual), _qlen);
- 			for(size_t i = 0; i < length(*_qual); i++) {
- 				assert_geq((*_qual)[i], 33);
- 			}
- 			assert_geq(length(*_qual), _qlen);
- 			if(_name == NULL || length(*_name) == 0) {
- 				_name = &_nameDefault;
- 			}
- 			assert_leq(_spread, DEFAULT_SPREAD);
- 			// TODO: try to make _maxStackDepth a tighter bound to save
- 			// space, especially for _pairs
- 	 		_maxStackDepth = length(*_qry);
- 	 		_pairs  = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
- 	 		_elims  = new uint8_t [DEFAULT_SPREAD*_maxStackDepth];
- 	 		memset(_elims, 0, DEFAULT_SPREAD*_maxStackDepth);
- 			if(_muts != NULL) {
- 				applyMutations();
- 			}
- 		}
 		_mms            = new uint32_t[DEFAULT_SPREAD];
 		_refcs          = new char[DEFAULT_SPREAD];
 		_btsAtDepths    = new uint32_t[DEFAULT_SPREAD];
@@ -421,27 +383,13 @@ public:
 	}
 
 	~BacktrackManager() {
-		if(_pairs != NULL) {
-			delete[] _pairs; _pairs = NULL;
-		}
-		if(_elims != NULL) {
-			delete[] _elims; _elims = NULL;
-		}
-		if(_mms != NULL) {
-			delete[] _mms; _mms = NULL;
-		}
-		if(_refcs != NULL) {
-			delete[] _refcs; _refcs = NULL;
-		}
-		if(_btsAtDepths != NULL) {
-			delete[] _btsAtDepths; _btsAtDepths = NULL;
-		}
-		if(_totBtsAtDepths != NULL) {
-			delete[] _totBtsAtDepths; _totBtsAtDepths = NULL;
-		}
-		if(_chars != NULL) {
-			delete[] _chars; _chars = NULL;
-		}
+		if(_pairs != NULL)          delete[] _pairs;
+		if(_elims != NULL)          delete[] _elims;
+		if(_mms != NULL)            delete[] _mms;
+		if(_refcs != NULL)          delete[] _refcs;
+		if(_btsAtDepths != NULL)    delete[] _btsAtDepths;
+		if(_totBtsAtDepths != NULL) delete[] _totBtsAtDepths;
+		if(_chars != NULL)          delete[] _chars;
 	}
 
 	#define PAIR_TOP(d, c)    (pairs[d*8 + c + 0])
@@ -460,6 +408,9 @@ public:
 		_qry = __qry;
 		_qual = __qual;
 		_name = __name;
+		assert(_qry != NULL);
+		assert(_qual != NULL);
+		assert(_name != NULL);
 		if(_muts != NULL) {
 			undoMutations();
 		}
@@ -470,29 +421,17 @@ public:
 		assert(_qry != NULL);
 		// Reset _qlen
 		_qlen = length(*_qry);
-		_spread = _qlen;
-		assert_leq(_spread, DEFAULT_SPREAD);
-
-		if(_qual == NULL || empty(*_qual)) {
-			_qual = &_qualDefault;
-		}
+		assert_leq(_qlen, DEFAULT_SPREAD);
 		assert_geq(length(*_qual), _qlen);
 		for(size_t i = 0; i < length(*_qual); i++) {
 			assert_geq((*_qual)[i], 33);
-			assert_leq((*_qual)[i], 73);
 		}
-		if(_name == NULL || length(*_name) == 0) {
-			_name = &_nameDefault;
-		}
-		// TODO: try to make _maxStackDepth a tighter bound to save
-		// space, especially for _pairs
- 		_maxStackDepth = length(*_qry);
  		if(_pairs == NULL) {
- 			_pairs = new uint32_t[DEFAULT_SPREAD*_maxStackDepth*8];
+ 			_pairs = new uint32_t[DEFAULT_SPREAD*_qlen*8];
  		}
  		if(_elims == NULL) {
- 			_elims = new uint8_t[DEFAULT_SPREAD*_maxStackDepth];
- 			memset(_elims, 0, DEFAULT_SPREAD*_maxStackDepth);
+ 			_elims = new uint8_t[DEFAULT_SPREAD*_qlen];
+ 			memset(_elims, 0, DEFAULT_SPREAD*_qlen);
  		}
 		if(_verbose) {
 			String<char> qual = (*_qual);
@@ -865,7 +804,7 @@ public:
 		assert_geq(bot, top);    // could be that both are 0
 		assert(pairs != NULL);
 		assert(elims != NULL);
-		assert_leq(stackDepth, _maxStackDepth);
+		assert_leq(stackDepth, _qlen);
 		const Ebwt<TStr>& ebwt = *_ebwt;
 		HitSinkPerThread& sink = _params.sink();
 		uint64_t prehits = sink.numValidHits();
@@ -1433,8 +1372,8 @@ public:
 				// Slide over to the next backtacking frame within
 				// pairs and elims; won't interfere with our frame or
 				// any of our parents' frames
-				uint32_t *newPairs = pairs + (_spread*8);
-				uint8_t  *newElims = elims + (_spread);
+				uint32_t *newPairs = pairs + (_qlen*8);
+				uint8_t  *newElims = elims + (_qlen);
 				// If we've selected a backtracking target that's in
 				// the 1-revisitable region, then we ask the recursive
 				// callee to consider the 1-revisitable region as also
@@ -1696,7 +1635,7 @@ public:
 		}
 		return ret;
 	}
-	
+
 	void printHit(const Hit& h) {
 		BacktrackManager::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _params.ebwtFw());
 	}
@@ -2375,9 +2314,6 @@ protected:
 	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _2revOff;  // 2-revisitable chunk
 	uint32_t            _3revOff;  // 3-revisitable chunk
-	uint32_t            _spread; // size of window within which to
-	                             // backtrack
-	uint32_t            _maxStackDepth;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
 	bool                _reportOnHit; // report as soon as we find a
@@ -2417,8 +2353,6 @@ protected:
 	uint32_t            _5depth;
 	/// Depth of 3'-seed-half border
 	uint32_t            _3depth;
-	/// Default name, for when it's not specified by caller
-	String<char>        _nameDefault;
 	/// Default quals
 	String<char>        _qualDefault;
 	/// Greatest stack depth seen since last reset

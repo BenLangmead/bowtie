@@ -237,7 +237,7 @@ class PatternSourcePerThread {
 public:
 	PatternSourcePerThread() : _buf(), _patid(0xffffffff) { }
 	virtual ~PatternSourcePerThread() { }
-	
+
 	virtual void nextRead()  = 0;
 
 	String<Dna5>& patFw()  { return _buf.patFw;               }
@@ -306,7 +306,13 @@ public:
 		_length(length),
 		_seed(seed),
 		_rand(seed),
-		_reverse(false) { }
+		_reverse(false)
+	{
+		if(_length > 1024) {
+			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << _length << endl;
+			exit(1);
+		}
+	}
 
 	/** Get the next random read and set patid */
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
@@ -362,13 +368,13 @@ public:
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, strlen(r.nameBuf));
 	}
-	
+
 	/** Reset the pattern source to the beginning */
 	virtual void reset() {
 		PatternSource::reset();
 		// reset pseudo-random generator; next string of calls to
 		// nextU32() will return same pseudo-randoms as the last
-		_rand.init(_seed);  
+		_rand.init(_seed);
 	}
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
@@ -400,7 +406,13 @@ public:
 		_thread(thread),
 		_reverse(__reverse),
 		_rand(_thread)
-	{ _patid = _thread; }
+	{
+		_patid = _thread;
+		if(_length > 1024) {
+			cerr << "Read length for RandomPatternSourcePerThread may not exceed 1024; got " << _length << endl;
+			exit(1);
+		}
+	}
 
 	virtual void nextRead() {
 		if(_patid >= _numreads) {
@@ -820,9 +832,6 @@ protected:
 	FileBuf *_filebuf; // read file currently being read from
 	bool _first;
 };
-
-/// Default quality values for use with the FASTA pattern source
-const char* qualDefault = "IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII";
 
 /**
  *
