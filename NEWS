@@ -22,20 +22,21 @@ Version Release History
 
 Version 0.9.6 - October 10, 2008
    * 'bowtie' now supports a host of options that allow the user to
-     specify which and how many valid alignments to report for read
-     Default is still to report 1 "good" alignment per rad.  See
-     -k/-a/--best/--nostrata options described in the manual. 
-   * 'bowtie' now supports reads up to 1024 bases long.  Of course,
-     user must set matching policy parameters (esp. -e) appropriately
-     for longer reads.
-   * --fast flag eliminated and double-index mode is now the default.
+     specify which and how many valid alignments to report per read.
+     The default is still to report 1 "good" alignment, which is by far
+     the fastest mode.  See -k/-a/--best/--nostrata options described
+     in the manual for details.
+   * 'bowtie' now supports reads up to 1024 bases long.  Note that for
+     reads much longer than, say, 35 bases, the user must be careful to
+     set alignment policy parameters (especially -e) appropriately.
+   * --fast flag eliminated, double-index mode is now the default.
      Added the -z/--phased flag to revert to phased, half-index mode.
    * --concise output mode now officially supported.  Now outputs one
      alignment per line.
    * Changed 'bowtie-build' default back to --bmaxdivn 4.
    * -h/--help now prints much more verbose help for 'bowtie' and
      'bowtie-build' (verbatim from MANUAL file)
-   * BWT-searching code streamlined; old code eliminated
+   * BWT-searching code streamlined; much old code eliminated
 
 Version 0.9.5 - September 27, 2008
    * Last column of output now additionally reports the reference and
