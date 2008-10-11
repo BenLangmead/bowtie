@@ -35,16 +35,10 @@ Bowtie Getting Started Guide
  statistics, which will look something like this (times will obviously
  differ):
 
-    Time loading forward index: 00:00:00
-    Seeded quality search Phase 1 of 4: 00:00:00
-    Time loading mirror index: 00:00:00
-    Seeded quality search Phase 2 of 4: 00:00:00
-    Time loading forward index: 00:00:00
-    Seeded quality search Phase 3 of 4: 00:00:00
-    Time loading mirror index: 00:00:00
-    Seeded quality search Phase 4 of 4: 00:00:00
-    Time searching: 00:00:00
-    Overall time: 00:00:00
+   Time loading forward index: 00:00:00
+   Time loading mirror index: 00:00:00
+   Seeded quality full-index search: 00:00:00
+   Time searching: 00:00:00
 
  Installing a pre-built index
  ----------------------------
@@ -89,12 +83,12 @@ Bowtie Getting Started Guide
 
     bowtie-build NC_002127.fna e_coli_O157_H7
 
- The command should complete quickly without printing anything. When
- the command has completed, note that the current directory contains
- four new files named e_coli_O157_H7.1.ebwt, e_coli_O157_H7.2.ebwt,
- e_coli_O157_H7.rev.1.ebwt, and e_coli_O157_H7.rev.2.ebwt. These files
- constitute the index. Move these files to the indexes subdirectory to
- install it.
+ The command should finish quickly, and print several lines of status
+ messages. When the command has completed, note that the current
+ directory contains four new files named e_coli_O157_H7.1.ebwt,
+ e_coli_O157_H7.2.ebwt, e_coli_O157_H7.rev.1.ebwt, and
+ e_coli_O157_H7.rev.2.ebwt. These files constitute the index. Move
+ these files to the indexes subdirectory to install it.
 
  To test that the index is properly installed, issue this command:
 
