@@ -188,7 +188,7 @@ public:
 	/// Flushes the alignment output stream
 	virtual void flush() {
 		for(size_t i = 0; i < _outs.size(); i++) {
-			_outs[i]->flush();
+			if(_outs[i] != NULL) _outs[i]->flush();
 		}
 	}
 	/// Returns the alignment output stream; if the stream needs to be
