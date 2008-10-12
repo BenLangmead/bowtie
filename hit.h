@@ -166,7 +166,7 @@ public:
 	virtual ~HitSink() {
 		if(_deleteOuts) {
 			for(size_t i = 0; i < _outs.size(); i++) {
-				delete _outs[i];
+				if(_outs[i] != NULL) delete _outs[i];
 			}
 		}
 	}
