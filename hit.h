@@ -199,11 +199,11 @@ public:
 			assert(_deleteOuts);
 			ostringstream oss;
 			oss << "ref";
-			if     (i < 10)    oss << "0000";
-			else if(i < 100)   oss << "000";
-			else if(i < 1000)  oss << "00";
-			else if(i < 10000) oss << "0";
-			oss << i << ".map";
+			if     (strIdx < 10)    oss << "0000";
+			else if(strIdx < 100)   oss << "000";
+			else if(strIdx < 1000)  oss << "00";
+			else if(strIdx < 10000) oss << "0";
+			oss << strIdx << ".map";
 			_outs[strIdx] = new ofstream(oss.str().c_str());
 		}
 		assert(_outs[strIdx] != NULL);
