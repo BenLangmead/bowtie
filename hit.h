@@ -179,7 +179,7 @@ public:
 	 * the _outs/_locks array to use when outputting the alignment.
 	 */
 	size_t refIdxToStreamIdx(size_t refIdx) {
-		if(refIdx > _outs.size()) return 0;
+		if(refIdx >= _outs.size()) return 0;
 		return refIdx;
 	}
 
