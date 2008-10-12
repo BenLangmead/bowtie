@@ -153,14 +153,7 @@ public:
 	{
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
-			ostringstream oss;
-			oss << "ref";
-			if     (i < 10)    oss << "0000";
-			else if(i < 100)   oss << "000";
-			else if(i < 1000)  oss << "00";
-			else if(i < 10000) oss << "0";
-			oss << i << ".map";
-			_outs.push_back(new ofstream(oss.str().c_str()));
+			_outs.push_back(NULL); // we open output streams lazily
 			_locks.resize(i+1);
 #ifdef USE_SPINLOCK
 			// No initialization
@@ -198,8 +191,25 @@ public:
 			_outs[i]->flush();
 		}
 	}
-	/// Returns the alignment output stream
-	virtual ostream& out(size_t refIdx) { return *(_outs[refIdxToStreamIdx(refIdx)]); }
+	/// Returns the alignment output stream; if the stream needs to be
+	/// created, create it
+	virtual ostream& out(size_t refIdx) {
+		size_t strIdx = refIdxToStreamIdx(refIdx);
+		if(_outs[strIdx] == NULL) {
+			assert(_deleteOuts);
+			ostringstream oss;
+			oss << "ref";
+			if     (i < 10)    oss << "0000";
+			else if(i < 100)   oss << "000";
+			else if(i < 1000)  oss << "00";
+			else if(i < 10000) oss << "0";
+			oss << i << ".map";
+			_outs[strIdx] = new ofstream(oss.str().c_str());
+		}
+		assert(_outs[strIdx] != NULL);
+		return *(_outs[strIdx]);
+	}
+
 protected:
 	void lock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
