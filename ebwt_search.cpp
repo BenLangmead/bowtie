@@ -50,18 +50,19 @@ static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -
 static int maxBts               = 125; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
-static int nthreads             = 1;
-static output_types outType		= FULL;
-static bool randReadsNoSync     = false;
-static int numRandomReads       = 50000000;
-static int lenRandomReads       = 35;
-static bool fullIndex           = true; // load halves one at a time and proceed in phases
-static bool noRefNames          = false;
-static ofstream *dumpNoHits     = NULL;
-static ofstream *dumpHHHits     = NULL;
-static uint32_t khits           = 1;
-static bool onlyBest			= false;
-static bool spanStrata			= false;
+static int nthreads             = 1;     // number of pthreads operating concurrently
+static output_types outType		= FULL;  // style of output
+static bool randReadsNoSync     = false; // true -> generate reads from per-thread random source
+static int numRandomReads       = 50000000; // # random reads (see Random*PatternSource in pat.h)
+static int lenRandomReads       = 35;    // len of random reads (see Random*PatternSource in pat.h)
+static bool fullIndex           = true;  // load halves one at a time and proceed in phases
+static bool noRefNames          = false; // true -> print reference indexes; not names
+static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
+static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
+static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
+static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
+static bool spanStrata			= false; // true -> don't stop at stratum boundaries
+static bool refOut				= false; // if true, alignments go to per-ref files
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
@@ -84,6 +85,7 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_SANITY              272
 #define ARG_BEST                273
 #define ARG_SPANSTRATA          274
+#define ARG_REFOUT              275
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -129,6 +131,7 @@ static struct option long_options[] = {
 	{"phased",       no_argument,       0,            'z'},
 	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
 	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
+	{"refout",       no_argument,       0,            ARG_REFOUT},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -188,7 +191,7 @@ static void printUsage(ostream& out) {
 
 /**
  * Print a detailed usage message to the provided output stream.
- * 
+ *
  * Manual text converted to C++ string with something like:
  * cat MANUAL  | head -304 | tail -231 | sed -e 's/\"/\\\"/g' | \
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
@@ -548,6 +551,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_ARROW: arrowMode = true; break;
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case 'b': outType = BINARY; break;
+	   		case ARG_REFOUT: refOut = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -2327,7 +2331,12 @@ static void driver(const char * type,
 	// Open hit output file
 	ostream *fout;
 	if(!outfile.empty()) {
-		fout = new ofstream(outfile.c_str(), ios::binary);
+		if(refOut) {
+			fout = NULL;
+			cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
+		} else {
+			fout = new ofstream(outfile.c_str(), ios::binary);
+		}
 	} else {
 		if(outType == BINARY) {
 			cerr << "Errpr: Must specify an output file when output mode is binary" << endl;
@@ -2391,13 +2400,25 @@ static void driver(const char * type,
 		if(noRefNames) refnames = NULL;
 		switch(outType) {
 			case FULL:
-				sink = new VerboseHitSink(*fout, refnames);
+				if(refOut) {
+					sink = new VerboseHitSink(ebwt.nPat(), refnames);
+				} else {
+					sink = new VerboseHitSink(*fout, refnames);
+				}
 				break;
 			case CONCISE:
-				sink = new ConciseHitSink(*fout, reportOpps, refnames);
+				if(refOut) {
+					sink = new ConciseHitSink(ebwt.nPat(), reportOpps, refnames);
+				} else {
+					sink = new ConciseHitSink(*fout, reportOpps, refnames);
+				}
 				break;
 			case BINARY:
-				sink = new BinaryHitSink(*fout, refnames);
+				if(refOut) {
+					sink = new BinaryHitSink(ebwt.nPat(), refnames);
+				} else {
+					sink = new BinaryHitSink(*fout, refnames);
+				}
 				break;
 			case NONE:
 				sink = new StubHitSink();

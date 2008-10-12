@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -124,17 +125,63 @@ class HitSink {
 public:
 	HitSink(ostream&        __out = cout,
 	        vector<string>* __refnames = NULL) :
-		_out(__out),
+		_outs(),
 		_refnames(__refnames),
-		_lock()
+		_locks()
 	{
+	    _outs.push_back(&__out);
+		_locks.resize(1);
 #ifdef USE_SPINLOCK
 		// No initialization
 #else
-   		MUTEX_INIT(_lock);
+   		MUTEX_INIT(_locks[0]);
 #endif
 	}
-	virtual ~HitSink() { }
+
+	/**
+	 * Open a number of output streams; usually one per reference
+	 * sequence.  For now, we give then names refXXXXX.map where XXXXX
+	 * is the 0-padded reference index.  Someday we may want to include
+	 * the name of the reference sequence in the filename somehow.
+	 */
+	HitSink(size_t numOuts, vector<string>* __refnames = NULL) :
+		_outs(),
+		_refnames(__refnames),
+		_locks()
+	{
+		// Open all files for writing and initialize all locks
+		for(size_t i = 0; i < numOuts; i++) {
+			ostringstream oss;
+			oss << "ref";
+			if     (i < 10)    oss << "0000";
+			else if(i < 100)   oss << "000";
+			else if(i < 1000)  oss << "00";
+			else if(i < 10000) oss << "0";
+			oss << i << ".map";
+			_outs.push_back(new ofstream(oss.str().c_str()));
+			_locks.resize(i+1);
+#ifdef USE_SPINLOCK
+			// No initialization
+#else
+			MUTEX_INIT(_locks[i]);
+#endif
+		}
+	}
+
+	virtual ~HitSink() {
+		for(size_t i = 0; i < _outs.size(); i++) {
+			delete _outs[i];
+		}
+	}
+
+	/**
+	 * Called by concrete subclasses to figure out which elements of
+	 * the _outs/_locks array to use when outputting the alignment.
+	 */
+	size_t refIdxToStreamIdx(size_t refIdx) {
+		if(refIdx > _outs.size()) return 0;
+		return refIdx;
+	}
 
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) = 0;
@@ -142,30 +189,36 @@ public:
 	/// Called when all alignments are complete
 	virtual void finish()               { }
 	/// Flushes the alignment output stream
-	virtual void flush()                { _out.flush(); }
+	virtual void flush() {
+		for(size_t i = 0; i < _outs.size(); i++) {
+			_outs[i]->flush();
+		}
+	}
 	/// Returns the alignment output stream
-	virtual ostream& out()              { return _out; }
+	virtual ostream& out(size_t refIdx) { return *(_outs[refIdxToStreamIdx(refIdx)]); }
 protected:
-	void lock() {
+	void lock(size_t refIdx) {
+		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
-		_lock.Enter();
+		_locks[strIdx].Enter();
 #else
-		MUTEX_LOCK(_lock);
+		MUTEX_LOCK(_locks[strIdx]);
 #endif
 	}
-	void unlock() {
+	void unlock(size_t refIdx) {
+		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
-		_lock.Leave();
+		_locks[strIdx].Leave();
 #else
-		MUTEX_UNLOCK(_lock);
+		MUTEX_UNLOCK(_locks[strIdx]);
 #endif
 	}
-	ostream&        _out;      /// the alignment output stream
-	vector<string>* _refnames; /// map from reference indexes to names
+	vector<ostream*> _outs;     /// the alignment output stream(s)
+	vector<string>*  _refnames; /// map from reference indexes to names
 #ifdef USE_SPINLOCK
-	SpinLock _lock;
+	vector<SpinLock> _locks;    /// spinlocks for per-file critical sections
 #else
-	MUTEX_T _lock;     /// mutex for locking critical regions
+	vector<MUTEX_T>  _locks;    /// pthreads mutexes for per-file critical sections
 #endif
 };
 
@@ -251,7 +304,7 @@ public:
 	/// Return the number of valid hits so far (not necessarily
 	/// reported).  It's up to the concrete subclasses
 	uint64_t numValidHits()    { return _numValidHits; }
-	
+
 	/// Return the number of hits reported so far
 	uint64_t numReportedHits() { return _numReportedHits; }
 
@@ -802,9 +855,20 @@ public:
 			vector<string>* __refnames = NULL) :
 		HitSink(__out, __refnames),
 		_reportOpps(__reportOpps),
-		_first(true) { }
+		_first(true),
+		_numReported(0llu) { }
+
+	ConciseHitSink(
+	        size_t          __numOuts,
+			bool            __reportOpps = false,
+			vector<string>* __refnames = NULL) :
+		HitSink(__numOuts, __refnames),
+		_reportOpps(__reportOpps),
+		_first(true),
+		_numReported(0llu) { }
 
 	/**
+	 * Report a concise alignment to the appropriate output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
@@ -813,19 +877,28 @@ public:
 		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
 		if(_reportOpps) ss << "," << h.oms;
 		ss << ">";
-		lock();
+		lock(h.h.first);
 		_first = false;
-		out() << ss.str() << endl;
-		unlock();
+		out(h.h.first) << ss.str() << endl;
+		_numReported++;
+		unlock(h.h.first);
 	}
 
+	/**
+	 * Wrap up and report a short summary.
+	 */
 	virtual void finish() {
-		if(_first) out() << "No results" << endl;
+		if(_first) {
+			assert_eq(0llu, _numReported);
+			cout << "No results" << endl;
+		}
+		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
 	}
 
 private:
 	bool     _reportOpps;
-	bool     _first; /// true -> first hit hasn't yet been reported
+	bool     _first;       /// true -> first hit hasn't yet been reported
+	uint64_t _numReported;
 };
 
 /**
@@ -837,8 +910,18 @@ public:
 	VerboseHitSink(ostream&        __out,
 				   vector<string>* __refnames = NULL) :
 	HitSink(__out, __refnames),
-	_first(true) { }
+	_first(true),
+	_numReported(0llu) { }
 
+	VerboseHitSink(size_t          __numOuts,
+				   vector<string>* __refnames = NULL) :
+	HitSink(__numOuts, __refnames),
+	_first(true),
+	_numReported(0llu) { }
+
+	/**
+	 *
+	 */
 	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
 		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
@@ -875,18 +958,24 @@ public:
 		}
 		ss << endl;
 		// Make sure to grab lock before writing to output stream
-		lock();
+		lock(h.h.first);
 		_first = false;
-		out() << ss.str();
-		unlock();
+		out(h.h.first) << ss.str();
+		_numReported++;
+		unlock(h.h.first);
 	}
 
 	virtual void finish() {
-		if(_first) out() << "No results" << endl;
+		if(_first) {
+			assert_eq(0llu, _numReported);
+			cout << "No results" << endl;
+		}
+		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
 	}
 
 private:
 	bool _first; /// true -> first hit hasn't yet been reported
+	uint64_t _numReported;
 };
 
 /**
@@ -896,32 +985,39 @@ class BinaryHitSink : public HitSink {
 public:
 	BinaryHitSink(ostream&        __out,
 				  vector<string>* __refnames = NULL) :
-	HitSink(__out, __refnames) { }
+	HitSink(__out, __refnames),
+	_first(true), _numReported(0llu) { }
+
+	BinaryHitSink(size_t          __numOuts,
+				  vector<string>* __refnames = NULL) :
+	HitSink(__numOuts, __refnames),
+	_first(true), _numReported(0llu) { }
 
 	virtual void reportHit(const Hit& h) {
-		lock();
+		lock(h.h.first);
+		ostream& o = out(h.h.first);
 		// true iff we're going to print the reference sequence name
 		bool refName = this->_refnames != NULL &&
 		                h.h.first < this->_refnames->size();
 		uint16_t pnamelen = (uint16_t)length(h.patName);
 		// Write read name
-		_out.write((const char *)&pnamelen, 2);
-		_out.write(begin(h.patName), pnamelen);
+		o.write((const char *)&pnamelen, 2);
+		o.write(begin(h.patName), pnamelen);
 		// Write fw/refname flags
 		uint8_t flags = (h.fw ? 1 : 0) | (refName? 2 : 0);
-		_out.write((const char *)&flags, 1);
+		o.write((const char *)&flags, 1);
 		if(refName) {
 			// Write reference name as string
 			uint16_t rnamelen = (uint16_t)(*this->_refnames)[h.h.first].length();
-			_out.write((const char *)&rnamelen, 2);
-			_out.write((*this->_refnames)[h.h.first].c_str(), rnamelen);
+			o.write((const char *)&rnamelen, 2);
+			o.write((*this->_refnames)[h.h.first].c_str(), rnamelen);
 		} else {
 			// Write reference name as index into global reference name
 			// list
-			_out.write((const char *)&h.h.first, 4);
+			o.write((const char *)&h.h.first, 4);
 		}
 		// Write reference offset
-		_out.write((const char *)&h.h.second, 4);
+		o.write((const char *)&h.h.second, 4);
 		// Write pattern sequence
 		uint16_t plen = (uint16_t)length(h.patSeq);
 		for(size_t i = 0; i < plen; i += 2) {
@@ -929,21 +1025,21 @@ public:
 			if(i+1 < plen) {
 				twoChrs |= ((uint8_t)h.patSeq[i+1] << 4);
 			}
-			_out.write((const char *)&twoChrs, 1);
+			o.write((const char *)&twoChrs, 1);
 		}
 		// Write quals sequence
 		uint16_t qlen = (uint16_t)length(h.quals);
-		_out.write(begin(h.quals), qlen);
+		o.write(begin(h.quals), qlen);
 		// Write oms
-		_out.write((const char *)&h.oms, 4);
+		o.write((const char *)&h.oms, 4);
 		// Write # mismatches
 		uint8_t numMms = h.mms.count();
-		_out.write((const char *)&numMms, 1);
+		o.write((const char *)&numMms, 1);
 		// Output mismatches
 		size_t c = 0;
 		for (uint8_t i = 0; i < h.mms.size(); ++ i) {
 			if (h.mms.test(i)) {
-				_out.write((const char *)&i, 1);
+				o.write((const char *)&i, 1);
 				assert_gt(h.refcs.size(), i);
 				assert_eq(1, dna4Cat[(int)h.refcs[i]]);
 				uint8_t refChar = charToDna5[(int)h.refcs[i]];
@@ -953,14 +1049,25 @@ public:
 				assert_leq(refChar, 4);
 				assert_neq(refChar, qryChar);
 				uint8_t both = refChar | (qryChar << 4);
-				_out.write((const char *)&both, 1);
+				o.write((const char *)&both, 1);
 				c++;
 			}
 		}
-		unlock();
+		_first = false;
+		_numReported++;
+		unlock(h.h.first);
 	}
 
-	virtual void finish() { }
+	virtual void finish() {
+		if(_first) {
+			assert_eq(0llu, _numReported);
+			cout << "No results" << endl;
+		}
+		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
+	}
+private:
+	bool _first;
+	uint64_t _numReported;
 };
 
 /**
