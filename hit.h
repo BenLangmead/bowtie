@@ -126,6 +126,7 @@ public:
 	HitSink(ostream&        __out = cout,
 	        vector<string>* __refnames = NULL) :
 		_outs(),
+		_deleteOuts(false),
 		_refnames(__refnames),
 		_locks()
 	{
@@ -146,6 +147,7 @@ public:
 	 */
 	HitSink(size_t numOuts, vector<string>* __refnames = NULL) :
 		_outs(),
+		_deleteOuts(true),
 		_refnames(__refnames),
 		_locks()
 	{
@@ -169,8 +171,10 @@ public:
 	}
 
 	virtual ~HitSink() {
-		for(size_t i = 0; i < _outs.size(); i++) {
-			delete _outs[i];
+		if(_deleteOuts) {
+			for(size_t i = 0; i < _outs.size(); i++) {
+				delete _outs[i];
+			}
 		}
 	}
 
@@ -214,6 +218,7 @@ protected:
 #endif
 	}
 	vector<ostream*> _outs;     /// the alignment output stream(s)
+	bool             _deleteOuts; /// Whether to delete elements of _outs upon exit
 	vector<string>*  _refnames; /// map from reference indexes to names
 #ifdef USE_SPINLOCK
 	vector<SpinLock> _locks;    /// spinlocks for per-file critical sections
