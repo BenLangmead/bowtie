@@ -408,9 +408,9 @@ public:
 		_preLbot(),
 		_btsAtDepths(NULL),
 		_totBtsAtDepths(NULL),
-		_maxBts0(55),
-		_maxBts1(44),
-		_maxBts2(33),
+		_maxBts0(28),
+		_maxBts1(20),
+		_maxBts2(16),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{ }
@@ -1490,15 +1490,15 @@ public:
 				if(_halfAndHalf) {
 					_btsAtDepths[stackDepth]++;
 					_totBtsAtDepths[stackDepth]++;
-				}
-				if(stackDepth < 3) {
-					if(_maxBts > 0 && (
-					   (stackDepth == 0 && _totBtsAtDepths[0] > _maxBts0) ||
-					   (stackDepth == 1 && _totBtsAtDepths[1] > _maxBts1) ||
-					   (stackDepth == 2 && _totBtsAtDepths[2] > _maxBts2)))
-					{
-						_bailedOnBacktracks = true;
-						return false;
+					if(stackDepth < 3) {
+						if(_maxBts > 0 && (
+						   (stackDepth == 0 && _btsAtDepths[0] > _maxBts0) ||
+						   (stackDepth == 1 && _btsAtDepths[1] > _maxBts1) ||
+						   (stackDepth == 2 && _btsAtDepths[2] > _maxBts2)))
+						{
+							_bailedOnBacktracks = true;
+							return false;
+						}
 					}
 				}
 
