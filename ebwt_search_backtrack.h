@@ -1521,7 +1521,6 @@ public:
 						   (stackDepth == 1 && _btsAtDepths[1] > _maxBts1) ||
 						   (stackDepth == 2 && _btsAtDepths[2] > _maxBts2)))
 						{
-							_bailedOnBacktracks = true;
 							return false;
 						}
 					}
