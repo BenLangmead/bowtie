@@ -362,7 +362,7 @@ public:
 	BacktrackManager(const Ebwt<TStr>* __ebwt,
 	                 const EbwtSearchParams<TStr>& __params,
 	                 uint32_t __qualThresh,  /// max acceptable q-distance
-	                 uint32_t __maxBts = 125, /// maximum # backtracks allowed
+	                 uint32_t __maxBts = 0, /// maximum # backtracks allowed
 	                 uint32_t __reportPartials = 0,
 	                 bool __reportExacts = true,
 	                 PartialAlignmentManager* __partials = NULL,
@@ -410,6 +410,7 @@ public:
 		_totBtsAtDepths(NULL),
 		_maxBts0(28),
 		_maxBts1(14),
+		_maxBts2(10),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{ }
@@ -905,7 +906,7 @@ public:
 		}
 		// Check whether we've exceeded any backtracking limit
 		if(_halfAndHalf) {
-			if(_numBts == _maxBts) {
+			if(_maxBts > 0 && _numBts == _maxBts) {
 				_bailedOnBacktracks = true;
 				return false;
 			}
@@ -1488,6 +1489,17 @@ public:
 				// Now backtrack to target
 				_btsAtDepths[stackDepth]++;
 				_totBtsAtDepths[stackDepth]++;
+				if(stackDepth < 3) {
+					if(_maxBts > 0 && (
+					   (stackDepth == 0 && _totBtsAtDepths[0] > _maxBts0) ||
+					   (stackDepth == 1 && _totBtsAtDepths[1] > _maxBts1) ||
+					   (stackDepth == 2 && _totBtsAtDepths[2] > _maxBts2)))
+					{
+						_bailedOnBacktracks = true;
+						return false;
+					}
+				}
+
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
@@ -1560,7 +1572,7 @@ public:
 					return true; // return, signaling that we're done
 				}
 				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
-				if(_numBts >= _maxBts) {
+				if(_bailedOnBacktracks || (_maxBts > 0 && _numBts >= _maxBts)) {
 					_bailedOnBacktracks = true;
 					return false;
 				}
@@ -2454,6 +2466,9 @@ protected:
 	/// Number of backtracks permitted w/ stackDepth 1 before giving up
 	/// in halfAndHalf mode
 	uint32_t            _maxBts1;
+	/// Number of backtracks permitted w/ stackDepth 2 before giving up
+	/// in halfAndHalf mode
+	uint32_t            _maxBts2;
 	/// Flag to record whether a 'false' return from backtracker is due
 	/// to having exceeded one or more backrtacking limits
 	bool                _bailedOnBacktracks;

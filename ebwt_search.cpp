@@ -772,7 +772,7 @@ static void *exactSearchWorker(void *vp) {
 	BacktrackManager<String<Dna> > bt(
 			&ebwt, params,
 	        0xffffffff,     // qualThresh
-	        99999,          // max backtracks
+	        0,              // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -873,7 +873,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        99999,          // max backtracks
+	        0,              // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -915,7 +915,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        99999,          // max backtracks
+	        0,              // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1042,7 +1042,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        99999,          // max backtracks
+	        0,              // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
