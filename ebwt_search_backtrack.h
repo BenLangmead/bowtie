@@ -1487,8 +1487,10 @@ public:
 #endif
 				_chars[i] = btchar;
 				// Now backtrack to target
-				_btsAtDepths[stackDepth]++;
-				_totBtsAtDepths[stackDepth]++;
+				if(_halfAndHalf) {
+					_btsAtDepths[stackDepth]++;
+					_totBtsAtDepths[stackDepth]++;
+				}
 				if(stackDepth < 3) {
 					if(_maxBts > 0 && (
 					   (stackDepth == 0 && _totBtsAtDepths[0] > _maxBts0) ||
