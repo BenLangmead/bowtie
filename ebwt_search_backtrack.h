@@ -1598,7 +1598,9 @@ public:
 					return true; // return, signaling that we're done
 				}
 				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
-				if(_bailedOnBacktracks || (_maxBts > 0 && _numBts >= _maxBts)) {
+				if(_bailedOnBacktracks ||
+				  (_halfAndHalf && (_maxBts > 0) && (_numBts >= _maxBts)))
+				{
 					_bailedOnBacktracks = true;
 					return false;
 				}
