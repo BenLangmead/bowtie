@@ -348,6 +348,31 @@ private:
 	MUTEX_T _partialLock;
 };
 
+struct BacktrackLimits {
+	
+	BacktrackLimits() {
+		maxBts  = 0;
+		maxBts0 = 0;
+		maxBts1 = 0;
+		maxBts2 = 0;
+	}
+
+	BacktrackLimits(uint32_t _maxBts,
+	                uint32_t _maxBts0,
+	                uint32_t _maxBts1,
+	                uint32_t _maxBts2)
+	{
+		maxBts  = _maxBts;
+		maxBts0 = _maxBts0;
+		maxBts1 = _maxBts1;
+		maxBts2 = _maxBts2;
+	}
+	
+	uint32_t maxBts;  // limit on overall number of backtracks per read
+	uint32_t maxBts0; // limit on number of backtracks at depth 0
+	uint32_t maxBts1; // limit on number of backtracks at depth 1
+	uint32_t maxBts2; // limit on number of backtracks at depth 2
+};
 
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
@@ -362,7 +387,7 @@ public:
 	BacktrackManager(const Ebwt<TStr>* __ebwt,
 	                 const EbwtSearchParams<TStr>& __params,
 	                 uint32_t __qualThresh,  /// max acceptable q-distance
-	                 uint32_t __maxBts = 0, /// maximum # backtracks allowed
+	                 const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
 	                 uint32_t __reportPartials = 0,
 	                 bool __reportExacts = true,
 	                 PartialAlignmentManager* __partials = NULL,
@@ -402,15 +427,15 @@ public:
 		_hiDepth(0),
 		_numBts(0),
 		_totNumBts(0),
-		_maxBts(__maxBts),
+		_maxBts(__maxBts.maxBts),
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
 		_btsAtDepths(NULL),
 		_totBtsAtDepths(NULL),
-		_maxBts0(28),
-		_maxBts1(20),
-		_maxBts2(16),
+		_maxBts0(__maxBts.maxBts0),
+		_maxBts1(__maxBts.maxBts1),
+		_maxBts2(__maxBts.maxBts2),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{ }

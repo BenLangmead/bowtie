@@ -48,6 +48,9 @@ static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 125; // max # backtracks allowed in half-and-half mode
+static int maxBts0              = 28; // max # backtracks allowed in half-and-half mode
+static int maxBts1              = 16; // max # backtracks allowed in half-and-half mode
+static int maxBts2              = 12; // max # backtracks allowed in half-and-half mode
 static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;     // number of pthreads operating concurrently
@@ -73,19 +76,22 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_CONCISE             260
 #define ARG_SOLEXA_QUALS        261
 #define ARG_MAXBTS              262
-#define ARG_VERBOSE             263
-#define ARG_MAXNS               264
-#define ARG_RANDOM_READS        265
-#define ARG_RANDOM_READS_NOSYNC 266
-#define ARG_NOOUT               267
-#define ARG_FAST                268
-#define ARG_REFIDX              269
-#define ARG_DUMP_NOHIT          270
-#define ARG_DUMP_HHHIT          271
-#define ARG_SANITY              272
-#define ARG_BEST                273
-#define ARG_SPANSTRATA          274
-#define ARG_REFOUT              275
+#define ARG_MAXBTS0             263
+#define ARG_MAXBTS1             264
+#define ARG_MAXBTS2             265
+#define ARG_VERBOSE             266
+#define ARG_MAXNS               267
+#define ARG_RANDOM_READS        268
+#define ARG_RANDOM_READS_NOSYNC 269
+#define ARG_NOOUT               270
+#define ARG_FAST                271
+#define ARG_REFIDX              272
+#define ARG_DUMP_NOHIT          273
+#define ARG_DUMP_HHHIT          274
+#define ARG_SANITY              275
+#define ARG_BEST                276
+#define ARG_SPANSTRATA          277
+#define ARG_REFOUT              278
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -125,6 +131,9 @@ static struct option long_options[] = {
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
+	{"maxbts0",      required_argument, 0,            ARG_MAXBTS0},
+	{"maxbts1",      required_argument, 0,            ARG_MAXBTS1},
+	{"maxbts2",      required_argument, 0,            ARG_MAXBTS2},
 	{"maxns",        required_argument, 0,            ARG_MAXNS},
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
@@ -597,10 +606,10 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_VERBOSE: verbose = true; break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case 't': timing = true; break;
-			case ARG_MAXBTS:
-				if (optarg != NULL)
-					maxBts = parseInt(1, "--maxbts must be at least 1");
-				break;
+			case ARG_MAXBTS:  maxBts  = parseInt(0, "--maxbts must be positive");  break;
+			case ARG_MAXBTS0: maxBts0 = parseInt(0, "--maxbts0 must be positive"); break;
+			case ARG_MAXBTS1: maxBts1 = parseInt(0, "--maxbts1 must be positive"); break;
+			case ARG_MAXBTS2: maxBts2 = parseInt(0, "--maxbts2 must be positive"); break;
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
 	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
@@ -623,9 +632,6 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 	if(maqLike) {
 		revcomp = true;
-	}
-	if(!maqLike) {
-		maxBts = 999999;
 	}
 	if(!fullIndex) {
 		bool error = false;
@@ -772,7 +778,7 @@ static void *exactSearchWorker(void *vp) {
 	BacktrackManager<String<Dna> > bt(
 			&ebwt, params,
 	        0xffffffff,     // qualThresh
-	        0,              // max backtracks (no max)
+	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -873,7 +879,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        0,              // max backtracks (no max)
+	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -915,7 +921,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        0,              // max backtracks (no max)
+	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1042,7 +1048,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	BacktrackManager<String<Dna> > bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        0,              // max backtracks (no max)
+	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1270,7 +1276,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1301,7 +1307,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	BacktrackManager<String<Dna> > bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1333,7 +1339,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1345,7 +1351,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1470,7 +1476,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1482,7 +1488,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1494,7 +1500,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1506,7 +1512,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        maxBts,         // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        NULL,           // seedlings
@@ -1626,7 +1632,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	BacktrackManager<String<Dna> > btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
@@ -1638,7 +1644,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	BacktrackManager<String<Dna> > bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
@@ -1670,7 +1676,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	BacktrackManager<String<Dna> > btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (no)
 	        0,                     // minStratumToReport
 	        NULL,                  // partial alignment manager
@@ -1682,7 +1688,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	BacktrackManager<String<Dna> > btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        0,                     // minStratumToReport
 	        pamRc,                 // partial alignment manager
@@ -1717,7 +1723,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        0,                     // minStratumToReport
 	        pamFw,                 // seedlings
@@ -1730,7 +1736,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1742,7 +1748,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1779,7 +1785,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	BacktrackManager<String<Dna> > btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1791,7 +1797,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	BacktrackManager<String<Dna> > btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1831,7 +1837,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
@@ -1843,7 +1849,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        0,                     // minStratumToReport
 	        NULL,                  // seedlings
@@ -1855,7 +1861,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (no)
 	        0,                     // minStratumToReport
 	        NULL,                  // partial alignment manager
@@ -1867,7 +1873,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        0,                     // minStratumToReport
 	        pamRc,                 // partial alignment manager
@@ -1879,7 +1885,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        maxBts,                // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        0,                     // minStratumToReport
 	        pamFw,                 // seedlings
@@ -1892,7 +1898,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1904,7 +1910,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1919,7 +1925,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
@@ -1931,7 +1937,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        maxBts,  // max backtracks
+	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
 	        0,       // reportPartials (don't)
 	        0,       // minStratumToReport
 	        NULL,    // seedlings
