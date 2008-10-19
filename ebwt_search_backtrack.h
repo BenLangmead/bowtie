@@ -408,9 +408,9 @@ public:
 		_preLbot(),
 		_btsAtDepths(NULL),
 		_totBtsAtDepths(NULL),
-		_maxBts0(28),
-		_maxBts1(14),
-		_maxBts2(10),
+		_maxBts0(32),
+		_maxBts1(18),
+		_maxBts2(12),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
 	{ }
