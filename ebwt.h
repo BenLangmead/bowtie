@@ -390,8 +390,11 @@ public:
 	    _zEbwtByteOff(0xffffffff), \
 	    _zEbwtBpOff(-1), \
 	    _nPat(0), \
+	    _nFrag(0), \
 	    _plen(NULL), \
+	    _usePmap(__usePmap), \
 	    _pmap(NULL), \
+	    _rstarts(NULL), \
 	    _fchr(NULL), \
 	    _ftab(NULL), \
 	    _eftab(NULL), \
@@ -402,6 +405,7 @@ public:
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
 	     int32_t __overrideOffRate = -1,
+	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
@@ -438,6 +442,7 @@ public:
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
+	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
@@ -591,9 +596,15 @@ public:
 	 */
 	uint32_t joinedLen(vector<RefRecord>& szs, uint32_t chunkRate) {
 		uint32_t ret = 0;
-		uint32_t chunkLen = 1 << chunkRate;
-		for(unsigned int i = 0; i < szs.size(); i++) {
-			ret += ((szs[i].len + chunkLen - 1) / chunkLen) * chunkLen;
+		if(_usePmap) {
+			uint32_t chunkLen = 1 << chunkRate;
+			for(unsigned int i = 0; i < szs.size(); i++) {
+				ret += ((szs[i].len + chunkLen - 1) / chunkLen) * chunkLen;
+			}
+		} else {
+			for(unsigned int i = 0; i < szs.size(); i++) {
+				ret += szs[i].len;
+			}
 		}
 		return ret;
 	}
@@ -601,13 +612,14 @@ public:
 	/// Destruct an Ebwt
 	~Ebwt() {
 		// Delete everything that was allocated in read(false, ...)
-		if(_fchr  != NULL) delete[] _fchr;  _fchr  = NULL;
-		if(_ftab  != NULL) delete[] _ftab;  _ftab  = NULL;
-		if(_eftab != NULL) delete[] _eftab; _eftab = NULL;
-		if(_offs  != NULL) delete[] _offs;  _offs  = NULL;
-		if(_plen  != NULL) delete[] _plen;  _plen  = NULL;
-		if(_pmap  != NULL) delete[] _pmap;  _pmap  = NULL;
-		if(_ebwt  != NULL) delete[] _ebwt;  _ebwt  = NULL;
+		if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
+		if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
+		if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
+		if(_offs    != NULL) delete[] _offs;    _offs    = NULL;
+		if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
+		if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
+		if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
+		if(_ebwt    != NULL) delete[] _ebwt;    _ebwt    = NULL;
 		try {
 			if(_in1.is_open()) _in1.close();
 			if(_in2.is_open()) _in2.close();
@@ -622,12 +634,14 @@ public:
 	uint32_t    zEbwtByteOff() const { return _zEbwtByteOff; }
 	int         zEbwtBpOff() const   { return _zEbwtBpOff; }
 	uint32_t    nPat() const         { return _nPat; }
+	uint32_t    nFrag() const        { return _nFrag; }
 	uint32_t*   fchr() const         { return _fchr; }
 	uint32_t*   ftab() const         { return _ftab; }
 	uint32_t*   eftab() const        { return _eftab; }
 	uint32_t*   offs() const         { return _offs; }
 	uint32_t*   plen() const         { return _plen; }
 	uint32_t*   pmap() const         { return _pmap; }
+	uint32_t*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
@@ -642,7 +656,11 @@ public:
 			assert(_eftab != NULL);
 			assert(_fchr != NULL);
 			assert(_offs != NULL);
-			assert(_pmap != NULL);
+			if(_usePmap) {
+				assert(_pmap != NULL);
+			} else {
+				assert(_rstarts != NULL);
+			}
 			assert_neq(_zEbwtByteOff, 0xffffffff);
 			assert_neq(_zEbwtBpOff, -1);
 			return true;
@@ -651,7 +669,11 @@ public:
 			assert(_eftab == NULL);
 			assert(_fchr == NULL);
 			assert(_offs == NULL);
-			assert(_pmap == NULL);
+			if(_usePmap) {
+				assert(_pmap == NULL);
+			} else {
+				assert(_rstarts == NULL);
+			}
 			assert_eq(_zEbwtByteOff, 0xffffffff);
 			assert_eq(_zEbwtBpOff, -1);
 			return false;
@@ -683,7 +705,11 @@ public:
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
 		//delete[] _plen;  _plen  = NULL;
-		delete[] _pmap;  _pmap  = NULL;
+		if(_usePmap) {
+			delete[] _pmap; _pmap  = NULL;
+		} else {
+			delete[] _rstarts; _rstarts = NULL;
+		}
 		delete[] _ebwt;  _ebwt  = NULL;
 		_zEbwtByteOff = 0xffffffff;
 		_zEbwtBpOff = -1;
@@ -810,6 +836,12 @@ public:
 		} else {
 			out << "non-NULL, [0] = " << _pmap[0] << endl;
 		}
+		out << "    rstarts: ";
+		if(_rstarts == NULL) {
+			out << "NULL" << endl;
+		} else {
+			out << "non-NULL, [0] = " << _rstarts[0] << endl;
+		}
 		out << "    ebwt: ";
 		if(_ebwt == NULL) {
 			out << "NULL" << endl;
@@ -843,8 +875,8 @@ public:
 	}
 
 	// Building
-	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed);
-	static TStr join(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed);
+	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool usePmap);
+	static TStr join(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed, bool usePmap);
 	void joinToDisk(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
@@ -862,10 +894,12 @@ public:
 	void sanityCheckUpToSide(int upToSide) const;
 	void sanityCheckAll() const;
 	void restore(TStr& s) const;
-	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
+	void checkOrigs(const vector<String<Dna5> >& os, bool mirror, bool usePmap) const;
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
+	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
+	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
@@ -888,6 +922,9 @@ public:
 		assert_lt(_zEbwtBpOff, 4);
 		assert_lt(_zEbwtByteOff, eh._ebwtTotSz);
 		assert_lt(_zOff, eh._bwtLen);
+		assert(_usePmap  || _rstarts != NULL);
+		assert(!_usePmap || _pmap != NULL);
+		if(!_usePmap) assert_geq(_nFrag, _nPat);
 		return true;
 	}
 
@@ -921,10 +958,13 @@ public:
 	uint32_t   _zOff;
 	uint32_t   _zEbwtByteOff;
 	int        _zEbwtBpOff;
-	uint32_t   _nPat;
+	uint32_t   _nPat;  /// number of reference texts
+	uint32_t   _nFrag; /// number of fragments
 	uint32_t*  _plen;
 	// _plen ans e
+	bool       _usePmap;
 	uint32_t*  _pmap;
+	uint32_t*  _rstarts; // starting offset of fragments / text indexes
 	// _fchr, _ftab and _eftab are expected to be relatively small
 	// (usually < 1MB, perhaps a few MB if _fchr is particularly large
 	// - like, say, 11).  For this reason, we don't bother with writing
@@ -1398,20 +1438,28 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		assert_geq(this->_plen[i], 0);
 	}
 
-	// Check pmap/plen
-	for(uint32_t i = 0; i < eh._numChunks*4; i += 4) {
-		// valid pattern id
-		assert_lt(this->_pmap[i], this->_nPat);
-		if(i > 0) {
-			// pattern id in order
-			assert_geq(this->_pmap[i], this->_pmap[i-4]);
+	if(this->_usePmap) {
+		// Check pmap/plen
+		for(uint32_t i = 0; i < eh._numChunks*4; i += 4) {
+			// valid pattern id
+			assert_lt(this->_pmap[i], this->_nPat);
+			if(i > 0) {
+				// pattern id in order
+				assert_geq(this->_pmap[i], this->_pmap[i-4]);
+			}
+			// Fragment offset is less than fragment length
+			assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
+			// Fragment offset is less than fragment length
+			assert_lt(this->_pmap[i+2], this->_pmap[i+3]);
+			// Fragment length is less than or equal to sequence length
+			assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
 		}
-		// Fragment offset is less than fragment length
-		assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
-		// Fragment offset is less than fragment length
-		assert_lt(this->_pmap[i+2], this->_pmap[i+3]);
-		// Fragment length is less than or equal to sequence length
-		assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
+	} else {
+		// Check rstarts
+		for(uint32_t i = 0; i < this->_nFrag-1; i++) {
+			assert_gt(this->_rstarts[(i+1)*3], this->_rstarts[i*3]);
+			assert(this->_rstarts[(i*3)+1] <= this->_rstarts[((i+1)*3)+1]);
+		}
 	}
 
 	// Check ebwt
@@ -1955,18 +2003,17 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
 	return ret;
 }
 
-#if 1
 /**
  * Take an offset into the joined text and translate it into the
  * reference of the index it falls on, the offset into the reference,
  * and the length of the reference.
  */
 template<typename TStr>
-void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
-                                 uint32_t& tidx,
-                                 uint32_t& textoff,
-                                 uint32_t& tlen,
-                                 const EbwtSearchParams<TStr>& params) const
+void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
+                                     uint32_t& tidx,
+                                     uint32_t& textoff,
+                                     uint32_t& tlen,
+                                     const EbwtSearchParams<TStr>& params) const
 {
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
 	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
@@ -1996,7 +2043,7 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
 		textoff -= qlen;
 	}
 }
-#else
+
 /**
  * Take an offset into the joined text and translate it into the
  * reference of the index it falls on, the offset into the reference,
@@ -2004,41 +2051,54 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
  * sorted list of reference fragment ranges t
  */
 template<typename TStr>
-void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
-                                 uint32_t& tidx,
-                                 uint32_t& textoff,
-                                 uint32_t& tlen,
-                                 const EbwtSearchParams<TStr>& params) const
+void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
+                                        uint32_t& tidx,
+                                        uint32_t& textoff,
+                                        uint32_t& tlen,
+                                        const EbwtSearchParams<TStr>& params) const
 {
 	uint32_t top = 0;
-	uint32_t bot = _fnum; // 1 greater than largest addressable element
+	uint32_t bot = _nFrag; // 1 greater than largest addressable element
 	uint32_t elt = 0xffffffff;
+	// Begin binary search
 	while(true) {
 		uint32_t oldelt = elt;
-		elt = (bot - top) >> 1;
-		// If these are equal, then we couldn't
-		assert_neq(oldelt, elt);
-		if(_rstarts[elt] <= off) {
-			if(_rstarts[elt+1] > off) {
+		elt = top + ((bot - top) >> 1);
+		assert_neq(oldelt, elt); // must have made progress
+		uint32_t lower = _rstarts[elt*3];
+		uint32_t upper;
+		if(elt == _nFrag-1) {
+			upper = _eh._len;
+		} else {
+			upper = _rstarts[((elt+1)*3)];
+		}
+		assert_gt(upper, lower);
+		uint32_t fraglen = upper - lower;
+		if(lower <= off) {
+			if(upper > off) { // not last element, but it's within
 				// off is in this range; check if it falls off
-				if(off + qlen > _rstarts[elt+1]) {
+				if(off + qlen > upper) {
 					// it falls off; signal no-go and return
 					tidx = 0xffffffff;
+					assert_lt(elt, _nFrag-1);
 					return;
 				}
-				// it doesn't fall off; now calculate textoff
-				textoff = off - _rstarts[elt];
-				uint32_t elti = elt;
-				// If there's room to walk backwards
-				while(elti >= 1) {
-					// If the previous fragment range belongs to the
-					// same text as this fragment range...
-					if(_ftidxs[elti] == _ftidxs[elti-1]) {
-						textoff += (_rstarts[elti] - _rstarts[elti-1]);
-					}
-					elti--;
+				tidx = _rstarts[(elt*3)+1];
+				assert_lt(tidx, this->_nPat);
+				assert_leq(fraglen, this->_plen[tidx]);
+				// it doesn't fall off; now calculate textoff.
+				// Initially it's the number of characters that precede
+				// the alignment in the fragment
+				uint32_t fragoff = off - _rstarts[(elt*3)];
+				if(!params.ebwtFw()) {
+					fragoff = fraglen - fragoff - 1;
+					fragoff -= (qlen-1);
 				}
-				break;
+				// Add the alignment's offset into the fragment
+				// ('fragoff') to the fragment's offset within the text
+				textoff = fragoff + _rstarts[(elt*3)+2];
+				assert_lt(textoff, this->_plen[tidx]);
+				break; // done with binary search
 			} else {
 				// 'off' belongs somewhere in the region between elt
 				// and bot
@@ -2049,10 +2109,27 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
 			// elt
 			bot = elt;
 		}
+		// continue with binary search
 	}
 	tlen = this->_plen[tidx];
 }
-#endif
+
+template<typename TStr>
+void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
+                                 uint32_t& tidx,
+                                 uint32_t& textoff,
+                                 uint32_t& tlen,
+                                 const EbwtSearchParams<TStr>& params) const
+{
+	if(this->_usePmap) {
+		assert(_pmap != NULL);
+		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen, params);
+	} else {
+		assert(_rstarts != NULL);
+		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen, params);
+	}
+}
+
 
 /**
  * Report a potential match at offset 'off' with pattern length
@@ -2225,7 +2302,8 @@ void Ebwt<TStr>::restore(TStr& s) const {
  */
 template <typename TStr>
 void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
-                            bool mirror) const
+                            bool mirror,
+                            bool usePmap) const
 {
 	TStr rest;
 	restore(rest);
@@ -2259,10 +2337,12 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
 		} else {
 			// Just jumped over a gap
 		}
-		uint32_t leftover = (restOff & ~_eh.chunkMask());
-		uint32_t diff = _eh.chunkLen() - leftover;
-		if(leftover != 0) restOff += diff;
-		assert_eq(0, restOff & ~_eh.chunkMask());
+		if(usePmap) {
+			uint32_t leftover = (restOff & ~_eh.chunkMask());
+			uint32_t diff = _eh.chunkLen() - leftover;
+			if(leftover != 0) restOff += diff;
+			assert_eq(0, restOff & ~_eh.chunkMask());
+		}
 	}
 }
 
@@ -2426,32 +2506,51 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// (i.e. everything up to and including join()).
 	if(justHeader) goto done;
 
-	// Read pmap from primary stream
-	try {
-		uint32_t pmapEnts = eh._numChunks*4;
-		if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
-		this->_pmap = new uint32_t[pmapEnts];
-		if(be) {
+	if(this->_usePmap) {
+		// Read pmap from primary stream
+		try {
+			uint32_t pmapEnts = eh._numChunks*4;
+			if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
+			this->_pmap = new uint32_t[pmapEnts];
+			if(be) {
+				for(uint32_t i = 0; i < pmapEnts; i += 4) {
+					this->_pmap[i]   = readU32(_in1, be); // pat #
+					this->_pmap[i+1] = readU32(_in1, be); // sequence offset
+					this->_pmap[i+2] = readU32(_in1, be); // fragment offset
+					this->_pmap[i+3] = readU32(_in1, be); // fragment length
+				}
+			} else {
+				_in1.read((char *)this->_pmap, pmapEnts*4);
+				assert_eq(pmapEnts*4, (uint32_t)_in1.gcount());
+			}
 			for(uint32_t i = 0; i < pmapEnts; i += 4) {
-				this->_pmap[i]   = readU32(_in1, be); // pat #
-				this->_pmap[i+1] = readU32(_in1, be); // sequence offset
-				this->_pmap[i+2] = readU32(_in1, be); // fragment offset
-				this->_pmap[i+3] = readU32(_in1, be); // fragment length
+				assert_lt (this->_pmap[i],   this->_nPat);
+				assert_lt (this->_pmap[i+1], this->_plen[this->_pmap[i]]);
+				assert_lt (this->_pmap[i+2], this->_pmap[i+3]);
+				assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
+			}
+		} catch(bad_alloc& e) {
+			cerr << "Out of memory allocating pmap[] in Ebwt::read()"
+			     << " at " << __FILE__ << ":" << __LINE__ << endl;
+			throw e;
+		}
+	} else {
+		this->_nFrag = readU32(_in1, be);
+		if(_verbose) cout << "Reading rstarts (" << this->_nFrag*3 << ")" << endl;
+		assert_geq(this->_nFrag, this->_nPat);
+		this->_rstarts = new uint32_t[this->_nFrag*3];
+		if(be) {
+			for(uint32_t i = 0; i < this->_nFrag*3; i += 3) {
+				// fragment starting position in joined reference
+				// string, text id, and fragment offset within text
+				this->_rstarts[i]   = readU32(_in1, be);
+				this->_rstarts[i+1] = readU32(_in1, be);
+				this->_rstarts[i+2] = readU32(_in1, be);
 			}
 		} else {
-			_in1.read((char *)this->_pmap, pmapEnts*4);
-			assert_eq(pmapEnts*4, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_rstarts, this->_nFrag*4*3);
+			assert_eq(this->_nFrag*4*3, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < pmapEnts; i += 4) {
-			assert_lt (this->_pmap[i],   this->_nPat);
-			assert_lt (this->_pmap[i+1], this->_plen[this->_pmap[i]]);
-			assert_lt (this->_pmap[i+2], this->_pmap[i+3]);
-			assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
-		}
-	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating pmap[] in Ebwt::read()"
-		     << " at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
 	}
 
 	// Allocate ebwt (big allocation)
@@ -2480,6 +2579,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			assert_leq(this->_fchr[i], len);
 			if(i > 0) assert_geq(this->_fchr[i], this->_fchr[i-1]);
 		}
+		assert_gt(this->_fchr[4], this->_fchr[0]);
 		// Read ftab from primary stream
 		if(_verbose) cout << "Reading ftab (" << eh._ftabLen << ")" << endl;
 		this->_ftab = new uint32_t[eh._ftabLen];
@@ -2615,8 +2715,15 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		writeU32(out1, this->_nPat,      be);
 		for(uint32_t i = 0; i < this->_nPat; i++)
 		writeU32(out1, this->_plen[i], be);
-		for(uint32_t i = 0; i < eh._numChunks*4; i++)
-			writeU32(out1, this->_pmap[i], be);
+		if(this->_usePmap) {
+			for(uint32_t i = 0; i < eh._numChunks*4; i++)
+				writeU32(out1, this->_pmap[i], be);
+		} else {
+			assert_geq(this->_nFrag, this->_nPat);
+			writeU32(out1, this->_nFrag, be);
+			for(uint32_t i = 0; i < this->_nFrag*3; i++)
+				writeU32(out1, this->_rstarts[i], be);
+		}
 
 		// These Ebwt parameters are discovered only as the Ebwt is being
 		// built (in buildToDisk()).  Of these, only 'offs' and 'ebwt' are
@@ -2671,7 +2778,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	if(_sanity) {
 		if(_verbose)
 			cout << "Re-reading \"" << out1 << "\"/\"" << out2 << "\" for sanity check" << endl;
-		Ebwt copy(out1, out2, _verbose, _sanity);
+		Ebwt copy(out1, out2, _usePmap, _verbose, _sanity);
 		assert(!isInMemory());
 		copy.loadIntoMemory();
 		assert(isInMemory());
@@ -2687,8 +2794,15 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		assert_eq(_nPat,             copy.nPat());
 		for(uint32_t i = 0; i < _nPat; i++)
 			assert_eq(this->_plen[i], copy.plen()[i]);
-		for(uint32_t i = 0; i < eh._numChunks*4; i++)
-			assert_eq(this->_pmap[i], copy.pcap()[i]);
+		if(this->_usePmap) {
+			for(uint32_t i = 0; i < eh._numChunks*4; i++)
+				assert_eq(this->_pmap[i], copy.pcap()[i]);
+		} else {
+			assert_eq(this->_nFrag, copy.nFrag());
+			for(uint32_t i = 0; i < this->nFrag*3; i++) {
+				assert_eq(this->_rstarts[i], copy.rstarts()[i]);
+			}
+		}
 		for(uint32_t i = 0; i < 5; i++)
 			assert_eq(this->_fchr[i], copy.fchr()[i]);
 		for(uint32_t i = 0; i < eh._ftabLen; i++)
@@ -2720,20 +2834,22 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed) {
+TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool usePmap) {
 	RandomSource rand(seed); // reproducible given same seed
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
 	size_t guessLen = 0;
 	for(size_t i = 0; i < l.size(); i++) {
-		guessLen += length(l[i]) + chunkLen;
+		guessLen += length(l[i]);
+		if(pmap) guessLen += chunkLen;
 	}
 	reserve(ret, guessLen, Exact());
 	for(size_t i = 0; i < l.size(); i++) {
 		TStr& s = l[i];
 		assert_gt(length(s), 0);
 		append(ret, s);
+		if(!usePmap) continue;
 		// s isn't the last pattern; padding between s and the next
 		// pattern may be necessary
 		uint32_t diff = 0;
@@ -2772,14 +2888,16 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
                       uint32_t sztot,
                       const RefReadInParams& refparams,
                       uint32_t chunkRate,
-                      uint32_t seed)
+                      uint32_t seed,
+                      bool usePmap)
 {
 	RandomSource rand(seed); // reproducible given same seed
 	RefReadInParams rpcp = refparams;
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
-	size_t guessLen = sztot + (szs.size() * chunkLen);
+	size_t guessLen = sztot;
+	if(usePmap) guessLen += (szs.size() * chunkLen);
 	reserve(ret, guessLen, Exact());
 	ASSERT_ONLY(size_t szsi = 0);
 	for(size_t i = 0; i < l.size(); i++) {
@@ -2801,6 +2919,7 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
+			if(!usePmap) continue;
 		    // insert padding
 			uint32_t diff = 0;
 			uint32_t rlen = length(ret);
@@ -2863,13 +2982,16 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	// fragments may correspond to a single sequence.  Count the
 	// number of sequences here by counting the number of "first"
 	// fragments.
-	size_t npats = 0;
+	this->_nPat = 0;
+	this->_nFrag = 0;
 	for(size_t i = 0; i < szs.size(); i++) {
-		if(szs[i].first) npats++;
+		if(szs[i].len > 0) this->_nFrag++;
+		if(szs[i].first) this->_nPat++;
 	}
-	assert_gt(npats, 0);
-	this->_nPat = npats; // store this in memory
+	assert_gt(this->_nPat, 0);
+	assert_geq(this->_nFrag, this->_nPat);
 	this->_pmap = NULL;
+	this->_rstarts = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
 	ASSERT_ONLY(uint32_t pmapEnts = eh._numChunks*4);
 	uint32_t pmapOff = 0;
@@ -2897,9 +3019,13 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	}
 	assert_eq((uint32_t)npat, this->_nPat-1);
 	writeU32(out1, this->_plen[npat], this->toBe());
-
+	if(!_usePmap) {
+		// Write the number of fragments
+		writeU32(out1, this->_nFrag, this->toBe());
+	}
 	size_t seqsRead = 0;
 	ASSERT_ONLY(uint32_t szsi = 0);
+	ASSERT_ONLY(uint32_t entsWritten = 0);
 	for(unsigned int i = 0; i < l.size(); i++) {
 		assert(l[i]->good());
 		bool first = true;
@@ -2913,6 +3039,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 			string name;
 			// Push a new name onto our vector
 			_refnames.push_back("");
+			uint32_t oldRetLen = length(ret);
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp, &_refnames.back());
 			first = false;
 			size_t bases = rec.len;
@@ -2945,36 +3072,42 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
-
-		    // insert padding
-			uint32_t diff = 0;
-			uint32_t rlen = length(ret);
-			uint32_t leftover = rlen & ~(eh._chunkMask);
-			if(leftover > 0) {
-				// The joined string currently ends in the middle of a
-				// chunk, so we have to pad it by 'diff'
-				diff = eh._chunkLen - leftover;
-				assert_gt(diff, 0);
-			}
-			for(uint32_t i = 0; i < diff; i++) {
-				// Append random characters to fill the gap; note that
-				// the randomness is reproducible as long as the 'seed'
-				// argument is the same, which helps us to sanity-check
-				// the result.
-				appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
-				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
-			}
-			// Pattern now ends on a chunk boundary
-			assert_eq(length(ret), length(ret) & eh._chunkMask);
-			// Initialize elements of the pmap that cover this pattern
-			for(unsigned int j = 0; j < bases; j += eh._chunkLen) {
-				assert_lt(pmapOff+3, pmapEnts);
-				pmapOff += 4;
-				uint32_t seq = seqsRead-1;
-				writeU32(out1, seq,    this->toBe()); // sequence id
-				writeU32(out1, patoff, this->toBe()); // offset into sequence
-				writeU32(out1, j,      this->toBe()); // offset into fragment
-				writeU32(out1, bases,  this->toBe()); // fragment length
+			uint32_t seq = seqsRead-1;
+			if(_usePmap) {
+			    // insert padding
+				uint32_t diff = 0;
+				uint32_t rlen = length(ret);
+				uint32_t leftover = rlen & ~(eh._chunkMask);
+				if(leftover > 0) {
+					// The joined string currently ends in the middle of a
+					// chunk, so we have to pad it by 'diff'
+					diff = eh._chunkLen - leftover;
+					assert_gt(diff, 0);
+				}
+				for(uint32_t i = 0; i < diff; i++) {
+					// Append random characters to fill the gap; note that
+					// the randomness is reproducible as long as the 'seed'
+					// argument is the same, which helps us to sanity-check
+					// the result.
+					appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
+					assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
+				}
+				// Pattern now ends on a chunk boundary
+				assert_eq(length(ret), length(ret) & eh._chunkMask);
+				// Initialize elements of the pmap that cover this pattern
+				for(unsigned int j = 0; j < bases; j += eh._chunkLen) {
+					assert_lt(pmapOff+3, pmapEnts);
+					pmapOff += 4;
+					writeU32(out1, seq,    this->toBe()); // sequence id
+					writeU32(out1, patoff, this->toBe()); // offset into sequence
+					writeU32(out1, j,      this->toBe()); // offset into fragment
+					writeU32(out1, bases,  this->toBe()); // fragment length
+				}
+			} else {
+				entsWritten++;
+				writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
+				writeU32(out1, seq,       this->toBe()); // sequence id
+				writeU32(out1, patoff,    this->toBe()); // offset into sequence
 			}
 			patoff += bases;
 		}
@@ -2997,7 +3130,11 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 		assert(!l[i]->eof());
 		#endif
 	}
-	assert_eq(pmapOff, pmapEnts); // initialized every pmap element
+	if(_usePmap) {
+		assert_eq(pmapOff, pmapEnts); // initialized every pmap element
+	} else {
+		assert_eq(entsWritten, this->_nFrag);
+	}
 }
 
 

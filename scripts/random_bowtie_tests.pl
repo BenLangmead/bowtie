@@ -353,6 +353,7 @@ sub search {
 		print "$_\n";
 		!defined($outhash{$_}) || die "Result $_ appears in output twice";
 		$outhash{$_} = 1;
+		next if /^Reported/;
 		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
 		unless(m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) {
 			print "Results malformed\n";

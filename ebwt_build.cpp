@@ -40,6 +40,7 @@ static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 //static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
+static bool    useBsearch    = false;
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -48,6 +49,7 @@ static const int ARG_BMAX_DIV  = 258;
 static const int ARG_DCV       = 259;
 static const int ARG_SEED      = 260;
 static const int ARG_CUTOFF    = 261;
+static const int ARG_BSEARCH   = 262;
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -261,6 +263,7 @@ static struct option long_options[] = {
 	//{"chunkrate",    required_argument, 0,            'h'},
 	{"help",         no_argument,       0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
+	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -350,6 +353,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CUTOFF:
 	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
 	   			break;
+	   		case ARG_BSEARCH:
+	   			useBsearch = true;
+	   			break;
 
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
@@ -424,6 +430,7 @@ static void driver(const char * type,
 	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
+	                !useBsearch,  // use pmap (little faster) or a binary search (less memory)
 	                verbose,      // be talkative
 	                sanityCheck); // verify results and internal consistency
 	// Note that the Ebwt is *not* resident in memory at this time.  To
@@ -440,7 +447,7 @@ static void driver(const char * type,
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed);
+			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed, !useBsearch);
 			assert_eq(length(joinedss), length(s2));
 			assert_eq(joinedss, s2);
 		}

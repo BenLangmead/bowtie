@@ -66,6 +66,7 @@ static uint32_t khits           = 1;     // number of hits per read; >1 is much 
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
+static bool useBsearch			= false; // if true, don't pad and use binary search over frag starts
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
@@ -92,6 +93,7 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_BEST                276
 #define ARG_SPANSTRATA          277
 #define ARG_REFOUT              278
+#define ARG_BSEARCH             279
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -141,6 +143,7 @@ static struct option long_options[] = {
 	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
 	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{"refout",       no_argument,       0,            ARG_REFOUT},
+	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -561,6 +564,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case 'b': outType = BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
+	   		case ARG_BSEARCH: useBsearch = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -1004,7 +1008,7 @@ static void mismatchSearch(PatternSource& _patsrc,
     _patsrc.setReverse(true); // reverse patterns
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwtBw.checkOrigs(os, true);
+		ebwtBw.checkOrigs(os, true, !useBsearch);
 	}
 
 	// Phase 2
@@ -2351,12 +2355,12 @@ static void driver(const char * type,
 		fout = &cout;
 	}
 	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, verbose, sanityCheck);
+    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, !useBsearch, verbose, sanityCheck);
     assert_geq(ebwt.eh().offRate(), offRate);
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
-    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, verbose, sanityCheck);
+    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, !useBsearch, verbose, sanityCheck);
     }
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt
@@ -2374,7 +2378,7 @@ static void driver(const char * type,
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
 		if(maqLike) ebwt.loadIntoMemory();
-		ebwt.checkOrigs(os, false);
+		ebwt.checkOrigs(os, false, !useBsearch);
 		if(maqLike) ebwt.evictFromMemory();
 	}
     // If sanity-check is enabled and an original text string
