@@ -3104,7 +3104,7 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 					writeU32(out1, bases,  this->toBe()); // fragment length
 				}
 			} else {
-				entsWritten++;
+				ASSERT_ONLY(entsWritten++);
 				writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
 				writeU32(out1, seq,       this->toBe()); // sequence id
 				writeU32(out1, patoff,    this->toBe()); // offset into sequence
