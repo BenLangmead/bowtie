@@ -3310,13 +3310,19 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					assert_lt(absorbCnt, 255);
 					absorbCnt++;
 				}
-				// Offset boundary? - update offset array
+				// Suffix array offset boundary? - update offset array
 				if((si & eh._offMask) == si) {
 					assert_lt((si >> eh._offRate), eh._offsLen);
 					// Write offsets directly to the secondary output
 					// stream, thereby avoiding keeping them in memory
 					writeU32(out2, saElt, this->toBe());
 				}
+				// Inverse suffix array offset boundary?
+				// if(doing an inverse suffix array) {
+				//   if(on a however-many-characters boundary) {
+				//     writeU32(out3, si, this->toBe());
+				//   }
+				// }
 			} else {
 				// Strayed off the end of the SA, now we're just
 				// padding out a bucket
