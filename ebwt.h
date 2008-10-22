@@ -865,6 +865,7 @@ public:
 	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
 
 	// Searching and reporting
+	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
@@ -1954,6 +1955,105 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
 	return ret;
 }
 
+#if 1
+/**
+ * Take an offset into the joined text and translate it into the
+ * reference of the index it falls on, the offset into the reference,
+ * and the length of the reference.
+ */
+template<typename TStr>
+void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
+                                 uint32_t& tidx,
+                                 uint32_t& textoff,
+                                 uint32_t& tlen,
+                                 const EbwtSearchParams<TStr>& params) const
+{
+	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
+	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
+	tidx = this->_pmap[ptabOff];                     // id of text matched
+	uint32_t toff = this->_pmap[ptabOff+1];          // offset into sequence
+	uint32_t foff = this->_pmap[ptabOff+2];          // offset into fragment
+	uint32_t flen = this->_pmap[ptabOff+3];          // fragment length
+	assert_lt(tidx, this->_nPat);
+	tlen = this->_plen[tidx];
+
+	// Reject if the alignment overlaps this fragment's padding or if
+	// it falls off the end of the sequence
+	if(foff + coff + qlen > flen) {
+		// Spurious result - overlaps with padding after fragment
+		tidx = 0xffffffff;
+		return;
+	}
+	// Genuine result
+	if(_verbose) {
+		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
+	}
+	textoff = toff;
+	if(params.ebwtFw()) {
+		textoff += (coff+foff);
+	} else {
+		textoff += (flen - (coff+foff));
+		textoff -= qlen;
+	}
+}
+#else
+/**
+ * Take an offset into the joined text and translate it into the
+ * reference of the index it falls on, the offset into the reference,
+ * and the length of the reference.  Use a binary search through the
+ * sorted list of reference fragment ranges t
+ */
+template<typename TStr>
+void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
+                                 uint32_t& tidx,
+                                 uint32_t& textoff,
+                                 uint32_t& tlen,
+                                 const EbwtSearchParams<TStr>& params) const
+{
+	uint32_t top = 0;
+	uint32_t bot = _fnum; // 1 greater than largest addressable element
+	uint32_t elt = 0xffffffff;
+	while(true) {
+		uint32_t oldelt = elt;
+		elt = (bot - top) >> 1;
+		// If these are equal, then we couldn't
+		assert_neq(oldelt, elt);
+		if(_rstarts[elt] <= off) {
+			if(_rstarts[elt+1] > off) {
+				// off is in this range; check if it falls off
+				if(off + qlen > _rstarts[elt+1]) {
+					// it falls off; signal no-go and return
+					tidx = 0xffffffff;
+					return;
+				}
+				// it doesn't fall off; now calculate textoff
+				textoff = off - _rstarts[elt];
+				uint32_t elti = elt;
+				// If there's room to walk backwards
+				while(elti >= 1) {
+					// If the previous fragment range belongs to the
+					// same text as this fragment range...
+					if(_ftidxs[elti] == _ftidxs[elti-1]) {
+						textoff += (_rstarts[elti] - _rstarts[elti-1]);
+					}
+					elti--;
+				}
+				break;
+			} else {
+				// 'off' belongs somewhere in the region between elt
+				// and bot
+				top = elt;
+			}
+		} else {
+			// 'off' belongs somewhere in the region between top and
+			// elt
+			bot = elt;
+		}
+	}
+	tlen = this->_plen[tidx];
+}
+#endif
+
 /**
  * Report a potential match at offset 'off' with pattern length
  * 'qlen'.  We must be careful to filter out spurious matches that
@@ -2011,32 +2111,12 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	// fragment containing it with that fragment's offset from the
 	// beginning of the sequence.
 	//
-
-	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
-	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
-	uint32_t tidx = this->_pmap[ptabOff];            // id of text matched
-	uint32_t toff = this->_pmap[ptabOff+1];          // offset into sequence
-	uint32_t foff = this->_pmap[ptabOff+2];          // offset into fragment
-	uint32_t flen = this->_pmap[ptabOff+3];          // fragment length
-	assert_lt(tidx, this->_nPat);
-	uint32_t tlen = this->_plen[tidx];
-
-	// Reject if the alignment overlaps this fragment's padding or if
-	// it falls off the end of the sequence
-	if(foff + coff + qlen > flen) {
-		// Spurious result - overlaps with padding after fragment
+	uint32_t tidx;
+	uint32_t textoff;
+	uint32_t tlen;
+	joinedToTextOff(qlen, off, tidx, textoff, tlen, params);
+	if(tidx == 0xffffffff) {
 		return false;
-	}
-	// Genuine result
-	if(_verbose) {
-		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
-	}
-	uint32_t textoff = toff;
-	if(params.ebwtFw()) {
-		textoff += (coff+foff);
-	} else {
-		textoff += (flen - (coff+foff));
-		textoff -= qlen;
 	}
 	return params.reportHit(
 			query,                    // read sequence
