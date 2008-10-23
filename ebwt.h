@@ -2062,7 +2062,7 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
 	uint32_t elt = 0xffffffff;
 	// Begin binary search
 	while(true) {
-		uint32_t oldelt = elt;
+		ASSERT_ONLY(uint32_t oldelt = elt);
 		elt = top + ((bot - top) >> 1);
 		assert_neq(oldelt, elt); // must have made progress
 		uint32_t lower = _rstarts[elt*3];
