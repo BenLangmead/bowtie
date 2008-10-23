@@ -68,6 +68,7 @@ static bool onlyBest			= false; // true -> guarantee alignments from best possib
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool useBsearch			= false; // if true, don't pad and use binary search over frag starts
+static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
@@ -96,6 +97,7 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_REFOUT              278
 #define ARG_BSEARCH             279
 #define ARG_ISARATE             280
+#define ARG_SEED_EXTEND         281
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -147,6 +149,7 @@ static struct option long_options[] = {
 	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{"refout",       no_argument,       0,            ARG_REFOUT},
 	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
+	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -568,6 +571,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'b': outType = BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
 	   		case ARG_BSEARCH: useBsearch = true; break;
+	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -2230,6 +2234,116 @@ static void seededQualCutoffSearchFull(
 	delete[] threads;
 #endif
 }
+
+static PatternSource*                 seedAndSWExtendSearch_patsrc;
+static HitSink*                       seedAndSWExtendSearch_sink;
+static Ebwt<String<Dna> >*            seedAndSWExtendSearch_ebwtFw;
+static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
+
+#define SEED_SW_EXTEND_WORKER_SETUP() \
+	PatternSource&                 _patsrc  = *seedAndSWExtendSearch_patsrc;   \
+	HitSink&                       _sink    = *seedAndSWExtendSearch_sink;     \
+	vector<String<Dna5> >&         os       = *seedAndSWExtendSearch_os;       \
+	uint32_t lastLen = 0; \
+	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
+	allHits = false; khits = 0; onlyBest = false; \
+	HitSinkPerThread* sink = createSink(_sink, false); \
+	/* Per-thread initialization */ \
+	EbwtSearchParams<String<Dna> > params( \
+			*sink,       /* HitSink */ \
+	        os,          /* reference sequences */ \
+	        revcomp,     /* forward AND reverse complement? */ \
+	        true,        /* read is forward */ \
+	        true,        /* index is forward */ \
+	        arrowMode);  /* arrow mode (irrelevant here) */
+
+static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
+	SEED_SW_EXTEND_WORKER_SETUP();
+	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
+	
+	// Half-and-half BacktrackManager for forward read
+	BacktrackManager<String<Dna> > bt(
+			&ebwtFw, params,
+	        0xffffffff,        // qualThresh
+	        BacktrackLimits(), // max backtracks
+	        0,       // reportPartials (don't)
+	        0,       // minStratumToReport
+	        NULL,    // seedlings
+		    NULL,    // mutations
+	        verbose, // verbose
+	        seed,    // seed
+	        &os,     // orig strings
+	        false,   // considerQuals
+	        false);  // halfAndHalf
+    while(true) {
+    	GET_READ_FW(patsrc);
+		size_t plen = length(patFw);
+		uint32_t s = min<uint32_t>(plen, s);
+		patid += 0;
+		#define DONEMASK_SET(p)
+		// First, try exact hits for the forward-oriented read
+		bt.setQuery(&patFw, &qualFw, &name);
+		bt.setOffs(0, 0, s, s, s, s);
+		if(bt.backtrack()) {
+			continue;
+		}
+		#undef DONEMASK_SET
+    }
+
+    WORKER_EXIT();
+}
+
+template<typename TStr>
+static void seedAndSWExtendSearch(
+		int seedLen,                /// length of seed (not a maq option)
+        int mms,                    /// max # mismatches allowed in seed
+                                    /// (like maq map's -n option)
+                                    /// Can only be 1 or 2, default: 1
+        PatternSource& _patsrc,     /// pattern source
+        HitSink& _sink,             /// hit sink
+        Ebwt<TStr>& ebwtFw,         /// index of original text
+        vector<String<Dna5> >& os)  /// text strings, if available (empty otherwise)
+{
+	// Global intialization
+	assert_eq(0, mms);
+	uint32_t numPats;
+
+	seedAndSWExtendSearch_patsrc   = &_patsrc;
+	seedAndSWExtendSearch_sink     = &_sink;
+	seedAndSWExtendSearch_ebwtFw   = &ebwtFw;
+	seedAndSWExtendSearch_os       = &os;
+
+#ifdef BOWTIE_PTHREADS
+	pthread_attr_t pthread_custom_attr;
+	pthread_attr_init(&pthread_custom_attr);
+	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_t *threads = new pthread_t[nthreads-1];
+#endif
+
+	{
+		// Phase 1: Consider cases 1R and 2R
+		const char * msg = "Seed-and-SW-extend search Phase 1 of 1: ";
+		Timer _t(cout, msg, timing);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_create(&threads[i], &pthread_custom_attr, seedAndSWExtendSearchWorkerPhase1, (void *)(long)(i+1));
+		}
+#endif
+		seedAndSWExtendSearchWorkerPhase1((void*)0L);
+#ifdef BOWTIE_PTHREADS
+		for(int i = 0; i < nthreads-1; i++) {
+			pthread_join(threads[i], NULL);
+		}
+#endif
+	    // Threads join at end of Phase 1
+	    numPats = _patsrc.patid();
+	}
+
+#ifdef BOWTIE_PTHREADS
+	delete[] threads;
+#endif
+}
+
 /**
  * Try to find the Bowtie index specified by the user.  First try the
  * exact path given by the user.  Then try the user-provided string
@@ -2440,7 +2554,15 @@ static void driver(const char * type,
 				cerr << "Invalid output type: " << outType << endl;
 				exit(1);
 		}
-		if(maqLike) {
+		if(seedAndExtend) {
+			seedAndSWExtendSearch(seedLen,
+			                      seedMms,
+			                      *patsrc,
+			                      *sink,
+			                      ebwt,
+			                      os);
+		}
+		else if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
 									   qualThresh,
