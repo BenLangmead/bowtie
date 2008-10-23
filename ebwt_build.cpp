@@ -37,6 +37,7 @@ static int64_t cutoff        = 0xffffffff; // max # of reference bases
 static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
+static int32_t isaRate       = -1; // sample rate for ISA; default: don't sample
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 //static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
@@ -50,6 +51,7 @@ static const int ARG_DCV       = 259;
 static const int ARG_SEED      = 260;
 static const int ARG_CUTOFF    = 261;
 static const int ARG_BSEARCH   = 262;
+static const int ARG_ISARATE   = 263;
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -259,6 +261,7 @@ static struct option long_options[] = {
 	{"linerate",     required_argument, 0,            'l'},
 	{"linesperside", required_argument, 0,            'i'},
 	{"offrate",      required_argument, 0,            'o'},
+	{"isarate",      required_argument, 0,            ARG_ISARATE},
 	{"ftabchars",    required_argument, 0,            't'},
 	//{"chunkrate",    required_argument, 0,            'h'},
 	{"help",         no_argument,       0,            'h'},
@@ -310,6 +313,9 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'o':
 	   			offRate = parseNumber<int>(0, "-o/--offRate arg must be at least 0");
+	   			break;
+	   		case ARG_ISARATE:
+	   			isaRate = parseNumber<int>(0, "--isaRate arg must be at least 0");
 	   			break;
 	   		case 't':
 	   			ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
@@ -416,6 +422,7 @@ static void driver(const char * type,
 	Ebwt<TStr> ebwt(lineRate,
 	                linesPerSide,
 	                offRate,      // suffix-array sampling rate
+	                isaRate,      // ISA sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
 	                chunkRate,    // alignment
 	                outfile,      // basename for .?.ebwt files
@@ -430,6 +437,7 @@ static void driver(const char * type,
 	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
+	                -1,           // override isaRate
 	                !useBsearch,  // use pmap (little faster) or a binary search (less memory)
 	                verbose,      // be talkative
 	                sanityCheck); // verify results and internal consistency

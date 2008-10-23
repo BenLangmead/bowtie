@@ -142,7 +142,7 @@ sub trim($) {
 
 # Build an Ebwt based on given arguments
 sub build {
-	my($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $endian) = @_;
+	my($t, $lineRate, $linesPerSide, $offRate, $isaRate, $ftabChars, $endian) = @_;
 	my $ret = 0;
 	
 	my $file1 = "-c";
@@ -174,8 +174,15 @@ sub build {
 		$bucketArg .= (int(rand(50))+10);
 	}
 	
+	my $isaArg = "";
+	if($isaRate >= 0) {
+		$isaArg = "--isarate $isaRate";
+	}
+
+	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2";
+	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug -q --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp";
+	my $cmd = "./bowtie-build-debug $args .tmp";
 	system("echo \"$cmd\" > .tmp.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
@@ -191,7 +198,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(5)) == 0) {
-		$cmd = "./bowtie-build-packed-debug -q --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2 .tmp.packed";
+		$cmd = "./bowtie-build-packed-debug $args .tmp.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
@@ -219,7 +226,7 @@ sub build {
 
 # Search for a pattern in an existing Ebwt
 sub search {
-	my($t, $p, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
 	
 	my $patarg = "-c";
 	my $patstr = "\"$p\"";
@@ -276,6 +283,11 @@ sub search {
 		$patstr = ".randread.raw";
 	}
 	
+	my $isaArg = "";
+	if($isaRate >= 0) {
+		$isaArg = "--isarate $isaRate";
+	}
+	
 	my $phased = "";
 	if(int(rand(2)) == 0) {
 		$phased = "-z";
@@ -309,7 +321,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $khits --concise $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp $patstr";
+	my $cmd = "./bowtie-debug $policy $khits --concise $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp.stderr`);
 	
@@ -380,6 +392,7 @@ for(; $outer > 0; $outer--) {
 	my $lineRate = 4 + int(rand(7));     # Must be >= 4
 	my $linesPerSide = 1 + int(rand(3));
 	my $offRate = int(rand(16));         # Can be anything
+	my $isaRate = int(rand(8))-1;        # Can be anything
 	my $ftabChars = 1 + int(rand(8));    # Must be >= 1
 	my $big = int(rand(2));
 	my $endian = '';
@@ -402,7 +415,7 @@ for(; $outer > 0; $outer--) {
 	}
 	
 	# Run the command to build the Ebwt from the random text
-	$pass += build($t, $lineRate, $linesPerSide, $offRate, $ftabChars, $endian);
+	$pass += build($t, $lineRate, $linesPerSide, $offRate, $isaRate, $ftabChars, $endian);
 	last if(++$tests > $limit);
 
 	my $in = $inner;
@@ -457,7 +470,7 @@ for(; $outer > 0; $outer--) {
 				last;
 			}
 		}
-		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
+		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult, $offRate, $isaRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -482,7 +495,7 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy();
-		$pass += search($t, $pfinal, $policy, $oneHit, 0, $offRate); # do not require any results
+		$pass += search($t, $pfinal, $policy, $oneHit, 0, $offRate, $isaRate); # do not require any results
 		last if(++$tests > $limit);
 	}
 

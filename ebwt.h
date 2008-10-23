@@ -64,6 +64,7 @@ public:
 	           int32_t __lineRate,
 	           int32_t __linesPerSide,
 	           int32_t __offRate,
+	           int32_t __isaRate,  // -1 -> don't sample ISA
 	           int32_t __ftabChars,
 	           int32_t __chunkRate) :
 	           _len(__len),        // # characters in the original string
@@ -75,6 +76,8 @@ public:
 	           _origOffRate(__offRate),
 	           _offRate(__offRate),
 	           _offMask(0xffffffff << _offRate),
+	           _isaRate(__isaRate),
+	           _isaMask(0xffffffff << ((_isaRate >= 0) ? _isaRate : 0)),
 	           _ftabChars(__ftabChars),
 	           _eftabLen(_ftabChars*2),
 	           _eftabSz(_eftabLen*4),
@@ -82,6 +85,8 @@ public:
 	           _ftabSz(_ftabLen*4),
 	           _offsLen((_bwtLen + (1 << _offRate) - 1) >> _offRate),
 	           _offsSz(_offsLen*4),
+	           _isaLen((_isaRate == -1)? 0 : ((_bwtLen + (1 << _isaRate) - 1) >> _isaRate)),
+	           _isaSz(_isaLen*4),
 	           _lineSz(1 << _lineRate),
 	           _sideSz(_lineSz * _linesPerSide),
 	           _sideBwtSz(_sideSz - 8),
@@ -109,6 +114,8 @@ public:
 	           _origOffRate(eh._origOffRate),
 	           _offRate(eh._offRate),
 	           _offMask(eh._offMask),
+	           _isaRate(eh._isaRate),
+	           _isaMask(eh._isaMask),
 	           _ftabChars(eh._ftabChars),
 	           _eftabLen(eh._eftabLen),
 	           _eftabSz(eh._eftabSz),
@@ -116,6 +123,8 @@ public:
 	           _ftabSz(eh._ftabSz),
 	           _offsLen(eh._offsLen),
 	           _offsSz(eh._offsSz),
+	           _isaLen(eh._isaLen),
+	           _isaSz(eh._isaSz),
 	           _lineSz(eh._lineSz),
 	           _sideSz(eh._sideSz),
 	           _sideBwtSz(eh._sideBwtSz),
@@ -142,6 +151,8 @@ public:
 	int32_t  origOffRate() const   { return _origOffRate; }
 	int32_t  offRate() const       { return _offRate; }
 	uint32_t offMask() const       { return _offMask; }
+	int32_t  isaRate() const       { return _isaRate; }
+	uint32_t isaMask() const       { return _isaMask; }
 	int32_t  ftabChars() const     { return _ftabChars; }
 	uint32_t eftabLen() const      { return _eftabLen; }
 	uint32_t eftabSz() const       { return _eftabSz; }
@@ -149,6 +160,8 @@ public:
 	uint32_t ftabSz() const        { return _ftabSz; }
 	uint32_t offsLen() const       { return _offsLen; }
 	uint32_t offsSz() const        { return _offsSz; }
+	uint32_t isaLen() const        { return _isaLen; }
+	uint32_t isaSz() const         { return _isaSz; }
 	uint32_t lineSz() const        { return _lineSz; }
 	uint32_t sideSz() const        { return _sideSz; }
 	uint32_t sideBwtSz() const     { return _sideBwtSz; }
@@ -262,11 +275,26 @@ public:
 		return bestj+6;
 	}
 
+	/**
+	 * Set a new suffix-array sampling rate, which involves updating
+	 * rate, mask, sample length, and sample size.
+	 */
 	void setOffRate(int __offRate) {
 		_offRate = __offRate;
         _offMask = 0xffffffff << _offRate;
         _offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
         _offsSz = _offsLen*4;
+	}
+
+	/**
+	 * Set a new inverse suffix-array sampling rate, which involves
+	 * updating rate, mask, sample length, and sample size.
+	 */
+	void setIsaRate(int __isaRate) {
+		_isaRate = __isaRate;
+        _isaMask = 0xffffffff << _isaRate;
+        _isaLen = (_bwtLen + (1 << _isaRate) - 1) >> _isaRate;
+        _isaSz = _isaLen*4;
 	}
 
 	/// Check that this EbwtParams is internally consistent
@@ -298,6 +326,8 @@ public:
 		    << "    linesPerSide: " << _linesPerSide << endl
 		    << "    offRate: "      << _offRate << endl
 		    << "    offMask: 0x"    << hex << _offMask << dec << endl
+		    << "    isaRate: "      << _isaRate << endl
+		    << "    isaMask: 0x"    << hex << _isaMask << dec << endl
 		    << "    ftabChars: "    << _ftabChars << endl
 		    << "    eftabLen: "     << _eftabLen << endl
 		    << "    eftabSz: "      << _eftabSz << endl
@@ -305,6 +335,8 @@ public:
 		    << "    ftabSz: "       << _ftabSz << endl
 		    << "    offsLen: "      << _offsLen << endl
 		    << "    offsSz: "       << _offsSz << endl
+		    << "    isaLen: "       << _isaLen << endl
+		    << "    isaSz: "        << _isaSz << endl
 		    << "    lineSz: "       << _lineSz << endl
 		    << "    sideSz: "       << _sideSz << endl
 		    << "    sideBwtSz: "    << _sideBwtSz << endl
@@ -320,7 +352,6 @@ public:
             << "    numChunks: "    << _numChunks << endl;
 	}
 
-//private:
     uint32_t _len;
     uint32_t _bwtLen;
     uint32_t _sz;
@@ -330,6 +361,8 @@ public:
     int32_t  _origOffRate;
     int32_t  _offRate;
     uint32_t _offMask;
+    int32_t  _isaRate;
+    uint32_t _isaMask;
     int32_t  _ftabChars;
     uint32_t _eftabLen;
     uint32_t _eftabSz;
@@ -337,6 +370,8 @@ public:
     uint32_t _ftabSz;
 	uint32_t _offsLen;
 	uint32_t _offsSz;
+	uint32_t _isaLen;
+	uint32_t _isaSz;
 	uint32_t _lineSz;
 	uint32_t _sideSz;
 	uint32_t _sideBwtSz;
@@ -382,6 +417,7 @@ public:
 	#define Ebwt_INITS \
 	    _toBigEndian(currentlyBigEndian()), \
 	    _overrideOffRate(__overrideOffRate), \
+	    _overrideIsaRate(__overrideIsaRate), \
 	    _verbose(__verbose), \
 	    _sanity(__sanityCheck), \
 	    _in1(), \
@@ -405,18 +441,23 @@ public:
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
 	     int32_t __overrideOffRate = -1,
+	     int32_t __overrideIsaRate = -1,
 	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
 	     _eh(readIntoMemory(true, in + ".1.ebwt", in + ".2.ebwt"))
 	{
-		// Read offs from secondary stream; if the offRate has been
-		// overridden, make sure to sample the offs rather than take them
-		// all
+		// If the offRate has been overridden, reflect that in the
+		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
 			_eh.setOffRate(_overrideOffRate);
 			assert_eq(_overrideOffRate, _eh._offRate);
+		}
+		// Same with isaRate
+		if(_overrideIsaRate > _eh._isaRate) {
+			_eh.setIsaRate(_overrideIsaRate);
+			assert_eq(_overrideIsaRate, _eh._isaRate);
 		}
 		assert(repOk());
 	}
@@ -428,6 +469,7 @@ public:
 	Ebwt(int32_t lineRate,
 	     int32_t linesPerSide,
 	     int32_t offRate,
+	     int32_t isaRate,
 	     int32_t ftabChars,
 	     int32_t chunkRate,
 	     const string& file,   // base filename for EBWT files
@@ -442,11 +484,12 @@ public:
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
+	     int32_t __overrideIsaRate = -1,
 	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
-	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, ftabChars, chunkRate)
+	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate)
 	{
 		string file1 = file + ".1.ebwt";
 		string file2 = file + ".2.ebwt";
@@ -616,6 +659,7 @@ public:
 		if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
 		if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
 		if(_offs    != NULL) delete[] _offs;    _offs    = NULL;
+		if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 		if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
 		if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
 		if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
@@ -639,6 +683,7 @@ public:
 	uint32_t*   ftab() const         { return _ftab; }
 	uint32_t*   eftab() const        { return _eftab; }
 	uint32_t*   offs() const         { return _offs; }
+	uint32_t*   isa() const          { return _isa; }
 	uint32_t*   plen() const         { return _plen; }
 	uint32_t*   pmap() const         { return _pmap; }
 	uint32_t*   rstarts() const      { return _rstarts; }
@@ -656,6 +701,7 @@ public:
 			assert(_eftab != NULL);
 			assert(_fchr != NULL);
 			assert(_offs != NULL);
+			assert(_isa != NULL);
 			if(_usePmap) {
 				assert(_pmap != NULL);
 			} else {
@@ -669,6 +715,8 @@ public:
 			assert(_eftab == NULL);
 			assert(_fchr == NULL);
 			assert(_offs == NULL);
+			// Not necessarily; it's also NULL when there's no ISA
+			//assert(_isa == NULL);
 			if(_usePmap) {
 				assert(_pmap == NULL);
 			} else {
@@ -702,6 +750,7 @@ public:
 		delete[] _ftab;  _ftab  = NULL;
 		delete[] _eftab; _eftab = NULL;
 		delete[] _offs;  _offs  = NULL;
+		delete[] _isa;   _isa   = NULL;
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
 		//delete[] _plen;  _plen  = NULL;
@@ -872,6 +921,12 @@ public:
 		} else {
 			out << "non-NULL, [0] = " << _offs[0] << endl;
 		}
+		out << "    isa: ";
+		if(_isa == NULL) {
+			out << "NULL" << endl;
+		} else {
+			out << "non-NULL, [0] = " << _isa[0] << endl;
+		}
 	}
 
 	// Building
@@ -951,6 +1006,7 @@ public:
 
 	bool       _toBigEndian;
 	int32_t    _overrideOffRate;
+	int32_t    _overrideIsaRate;
 	bool       _verbose;
 	bool       _sanity;
 	ifstream   _in1;
@@ -976,6 +1032,7 @@ public:
 	// offset every 16 rows), the total size of _offs is the same as
 	// the total size of the input sequence
 	uint32_t*  _offs;
+	uint32_t*  _isa;
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
@@ -2452,12 +2509,18 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	int32_t  lineRate     = readI32(_in1, be);
 	int32_t  linesPerSide = readI32(_in1, be);
 	int32_t  offRate      = readI32(_in1, be);
+	// TODO: add isaRate to the actual file format (right now, the
+	// user has to tell us whether there's an ISA sample and what the
+	// sampling rate is.
+	int32_t  isaRate      = _overrideIsaRate;
 	int32_t  ftabChars    = readI32(_in1, be);
 	int32_t  chunkRate    = readI32(_in1, be);
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, ftabChars, chunkRate);
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
 	if(_verbose) eh.print(cout);
+	
+	// Set up overridden suffix-array-sample parameters
 	uint32_t offsLen = eh._offsLen;
 	uint32_t offRateDiff = 0;
 	uint32_t offsLenSampled = offsLen;
@@ -2468,6 +2531,20 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		offsLenSampled >>= offRateDiff;
 		if((offsLen & ~(0xffffffff << offRateDiff)) != 0) {
 			offsLenSampled++;
+		}
+	}
+
+	// Set up overridden inverted-suffix-array-sample parameters
+	uint32_t isaLen = eh._isaLen;
+	uint32_t isaRateDiff = 0;
+	uint32_t isaLenSampled = isaLen;
+	if(_overrideIsaRate > isaRate) {
+		isaRateDiff = _overrideIsaRate - isaRate;
+	}
+	if(isaRateDiff > 0) {
+		isaLenSampled >>= isaRateDiff;
+		if((isaLen & ~(0xffffffff << isaRateDiff)) != 0) {
+			isaLenSampled++;
 		}
 	}
 
@@ -2649,14 +2726,51 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 				this->_offs[idx] = readU32(_in2, be);
 			}
 		}
-		//eh._offRate = _overrideOffRate;
-		//eh._offMask = (0xffffffff << _overrideOffRate);
 	} else {
 		_in2.read((char *)this->_offs, offsLen*4);
 		assert_eq(offsLen*4, (uint32_t)_in2.gcount());
 	}
-	for(uint32_t i = 0; i < offsLenSampled; i++) {
-		assert_leq(this->_offs[i], len);
+	{
+		ASSERT_ONLY(Bitset offsSeen(len+1));
+		for(uint32_t i = 0; i < offsLenSampled; i++) {
+			assert(!offsSeen.test(this->_offs[i]));
+			ASSERT_ONLY(offsSeen.set(this->_offs[i]));
+			assert_leq(this->_offs[i], len);
+		}
+	}
+
+	// Allocate _isa[] (big allocation)
+	try {
+		if(_verbose) cout << "Reading isa (" << isaLenSampled << ")" << endl;
+		this->_isa = new uint32_t[isaLenSampled];
+	} catch(bad_alloc& e) {
+		cerr << "Out of memory allocating isa[] in Ebwt::read()"
+		     << " at " << __FILE__ << ":" << __LINE__ << endl;
+		throw e;
+	}
+	// Read _isa[]
+	if(be || isaRateDiff > 0) {
+		for(uint32_t i = 0; i < isaLen; i++) {
+			if((i & ~(0xffffffff << isaRateDiff)) != 0) {
+				char tmp[4];
+				_in2.read(tmp, 4);
+			} else {
+				uint32_t idx = i >> isaRateDiff;
+				assert_lt(idx, isaLenSampled);
+				this->_isa[idx] = readU32(_in2, be);
+			}
+		}
+	} else {
+		_in2.read((char *)this->_isa, isaLen*4);
+		assert_eq(isaLen*4, (uint32_t)_in2.gcount());
+	}
+	{
+		ASSERT_ONLY(Bitset isasSeen(len+1));
+		for(uint32_t i = 0; i < isaLenSampled; i++) {
+			assert(!isasSeen.test(this->_isa[i]));
+			ASSERT_ONLY(isasSeen.set(this->_isa[i]));
+			assert_leq(this->_isa[i], len);
+		}
 	}
 
 	postReadInit(eh); // Initialize fields of Ebwt not read from file
@@ -2735,6 +2849,9 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		uint32_t offsLen = eh._offsLen;
 		for(uint32_t i = 0; i < offsLen; i++)
 			writeU32(out2, this->_offs[i], be);
+		uint32_t isaLen = eh._isaLen;
+		for(uint32_t i = 0; i < isaLen; i++)
+			writeU32(out2, this->_isa[i], be);
 
 		// 'fchr', 'ftab' and 'eftab' are not fully determined until the
 		// loop is finished, so they are written to the primary file after
@@ -2785,6 +2902,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	    assert_eq(eh._lineRate,     copy.eh()._lineRate);
 	    assert_eq(eh._linesPerSide, copy.eh()._linesPerSide);
 	    assert_eq(eh._offRate,      copy.eh()._offRate);
+	    assert_eq(eh._isaRate,      copy.eh()._isaRate);
 	    assert_eq(eh._ftabChars,    copy.eh()._ftabChars);
 	    assert_eq(eh._len,          copy.eh()._len);
 	    assert_eq(eh._chunkRate,    copy.eh()._chunkRate);
@@ -2811,6 +2929,8 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 			assert_eq(this->eftab()[i], copy.eftab()[i]);
 		for(uint32_t i = 0; i < eh._offsLen; i++)
 			assert_eq(this->_offs[i], copy.offs()[i]);
+		for(uint32_t i = 0; i < eh._isaLen; i++)
+			assert_eq(this->_isa[i], copy.isa()[i]);
 		for(uint32_t i = 0; i < eh._ebwtTotLen; i++)
 			assert_eq(this->ebwt()[i], copy.ebwt()[i]);
 		copy.sanityCheckAll();
@@ -3157,6 +3277,8 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
  * Assume occ array entries are 32 bits each.
  *
  * @param sa            the suffix array to convert to a Ebwt
+ * @param buildISA      whether to output an ISA sample into out2 after
+ *                      the SA sample
  * @param s             the original string
  * @param out
  */
@@ -3221,6 +3343,24 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	}
 	assert(ebwtSide != NULL);
 
+	// Allocate a buffer to hold the ISA sample, which we accumulate in
+	// the loop and then output at the end.  We can't write output the
+	// ISA right away because the order in which we calculate its
+	// elements is based on the suffix array, which we only see bit by
+	// bit
+	uint32_t *isaSample = NULL;
+	if(eh._isaRate >= 0) {
+		try {
+			isaSample = new uint32_t[eh._isaLen];
+		} catch(bad_alloc &e) {
+			cerr << "Out of memory allocating isaSample[] in "
+			     << "Ebwt::buildToDisk() at " << __FILE__ << ":"
+			     << __LINE__ << endl;
+			throw e;
+		}
+		assert(isaSample != NULL);
+	}
+
 	// Points to the base offset within ebwt for the side currently
 	// being written
 	uint32_t side = 0;
@@ -3262,6 +3402,14 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 				// Still in the SA; extract the bwtChar
 				uint32_t saElt = sa.nextSuffix();
 				// (that might have triggered sa to calc next suf block)
+				if(isaSample != NULL && (saElt & eh._isaMask) == saElt) {
+					// This element belongs in the ISA sample.  Add
+					// an entry mapping the text offset to the offset
+					// into the suffix array that holds the suffix
+					// beginning with the character at that text offset
+					assert_lt((saElt >> eh._isaRate), eh._isaLen);
+					isaSample[saElt >> eh._isaRate] = si;
+				}
 				if(saElt == 0) {
 					// Don't add the '$' in the last column to the BWT
 					// transform; we can't encode a $ (only A C T or G)
@@ -3317,12 +3465,6 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					// stream, thereby avoiding keeping them in memory
 					writeU32(out2, saElt, this->toBe());
 				}
-				// Inverse suffix array offset boundary?
-				// if(doing an inverse suffix array) {
-				//   if(on a however-many-characters boundary) {
-				//     writeU32(out3, si, this->toBe());
-				//   }
-				// }
 			} else {
 				// Strayed off the end of the SA, now we're just
 				// padding out a bucket
@@ -3474,6 +3616,18 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// Write eftab to primary file
 	for(uint32_t i = 0; i < eftabLen; i++) {
 		writeU32(out1, eftab[i], this->toBe());
+	}
+	// Write isa to primary file
+	if(isaSample != NULL) {
+		ASSERT_ONLY(Bitset sawISA(eh._len+1));
+		for(uint32_t i = 0; i < eh._isaLen; i++) {
+			uint32_t s = isaSample[i];
+			assert_leq(s, eh._len);
+			assert(!sawISA.test(s));
+			ASSERT_ONLY(sawISA.set(s));
+			writeU32(out2, s, this->toBe());
+		}
+		delete[] isaSample;
 	}
 	delete[] ftab;
 	delete[] eftab;

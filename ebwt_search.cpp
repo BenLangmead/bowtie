@@ -40,6 +40,7 @@ static int trim5				= 0; // amount to trim from 5' end
 static int trim3				= 0; // amount to trim from 3' end
 static int reportOpps			= 0; // whether to report # of other mappings
 static int offRate				= -1; // keep default offRate
+static int isaRate				= -1; // keep default isaRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
@@ -94,6 +95,7 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_SPANSTRATA          277
 #define ARG_REFOUT              278
 #define ARG_BSEARCH             279
+#define ARG_ISARATE             280
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -114,6 +116,7 @@ static struct option long_options[] = {
 	{"seed",         required_argument, 0,            ARG_SEED},
 	{"qupto",        required_argument, 0,            'u'},
 	{"offrate",      required_argument, 0,            'o'},
+	{"isarate",      required_argument, 0,            ARG_ISARATE},
 	{"skipsearch",   no_argument,       &skipSearch,  1},
 	{"qsamelen",     no_argument,       &qSameLen,    1},
 	{"reportopps",   no_argument,       &reportOpps,  1},
@@ -598,6 +601,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
 	   		case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
 	   		case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
+	   		case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
 	   		case 'e': qualThresh = int(parseInt(1, "-e/--err arg must be at least 1") / 10.0 + 0.5); break;
 	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); break;
 	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
@@ -2355,12 +2359,11 @@ static void driver(const char * type,
 		fout = &cout;
 	}
 	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, !useBsearch, verbose, sanityCheck);
-    assert_geq(ebwt.eh().offRate(), offRate);
+    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, /* overriding: */ isaRate, !useBsearch, verbose, sanityCheck);
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
-    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, !useBsearch, verbose, sanityCheck);
+    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, /* overriding: */ isaRate, !useBsearch, verbose, sanityCheck);
     }
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt
