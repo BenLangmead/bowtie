@@ -957,6 +957,7 @@ public:
 	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& buf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, uint32_t* pairs) const;
@@ -2327,6 +2328,124 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 }
 
 /**
+ * Report a result.  Involves walking backwards along the original
+ * string by way of the LF-mapping until we reach a marked SA row or
+ * the row corresponding to the 0th suffix.  A marked row's offset
+ * into the original string can be read directly from the this->_offs[]
+ * array.
+ */
+template<typename TStr>
+inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
+                                          String<char>* quals,
+                                          String<char>* name,
+                                          String<Dna5>& buf,
+                                          const uint32_t *mmui32,
+                                          const char* refcs,
+                                          size_t numMms,
+                                          uint32_t i,
+                                          uint32_t top,
+                                          uint32_t bot,
+                                          uint32_t qlen,
+                                          int stratum,
+                                          const EbwtSearchParams<TStr>& params,
+                                          SideLocus *l) const
+{
+	VMSG_NL("In reportReconstruct");
+	assert_gt(_eh._isaLen, 0); // Must have inverse suffix array to reconstruct
+	assert(!params.arrowMode());
+	uint32_t off;
+	uint32_t jumps = 0;
+	SideLocus myl;
+	const uint32_t offMask = this->_eh._offMask;
+	const uint32_t offRate = this->_eh._offRate;
+	const uint32_t* offs = this->_offs;
+	const uint32_t* isa = this->_isa;
+	assert(isa != NULL);
+	if(l == NULL) {
+		l = &myl;
+		myl.initFromRow(i, this->_eh, this->_ebwt);
+	}
+	assert(l != NULL);
+	// Walk along until we reach the next marked row to the left
+	while(((i & offMask) != i) && i != _zOff) {
+		// Not a marked row; walk left one more char
+		int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
+		appendValue(buf, (Dna5)c);
+		uint32_t newi;
+		assert_lt(c, 4);
+		assert_geq(c, 0);
+		if(l->_fw) newi = countFwSide(*l, c); // Forward side
+		else       newi = countBwSide(*l, c); // Backward side
+		assert_lt(newi, this->_eh._bwtLen);
+		assert_neq(newi, i);
+		i = newi;                                  // update row
+		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+		jumps++;
+	}
+	// This is a marked row
+	if(i == _zOff) {
+		// Special case: it's the row corresponding to the
+		// lexicographically smallest suffix, which is implicitly
+		// marked 0
+		off = jumps;
+		VMSG_NL("reportChaseOne found zoff off=" << off << " (jumps=" << jumps << ")");
+	} else {
+		// Normal marked row, calculate offset of row i
+		off = offs[i >> offRate] + jumps;
+		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
+	}
+	// 'off' now holds the text offset of the first (leftmost) position
+	// involved in the alignment.  Next we call joinedToTextOff to
+	// check whether the seed is valid (i.e., does not straddle a
+	// boundary between two reference seuqences) and to obtain its extents (textoff
+	uint32_t tidx;    // the index (id) of the reference we hit in
+	uint32_t textoff; // the offset of the alignment within the reference
+	uint32_t tlen;    // length of reference seed hit in
+	joinedToTextOff(qlen, off, tidx, textoff, tlen, params);
+	if(tidx == 0xffffffff) {
+		// The seed straddled a reference boundary, and so is spurious.
+		// Return false, indicating that we shouldn't stop.
+		return false;
+	}
+	if(jumps > textoff) {
+		// In our progress toward a marked row, we passed the boundary
+		// between the reference sequence containing the seed and the
+		// reference sequence to the left of it.  That's OK, we just
+		// need to knock off the extra characters we added to 'buf'.
+		erase(buf, textoff);
+		jumps = textoff;
+	} else if(jumps < textoff) {
+		// Keep walking until we reach the end of the reference
+		assert_neq(i, _zOff);
+		for(size_t j = 0; j < (textoff-jumps); j++) {
+			// Not a marked row; walk left one more char
+			int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
+			appendValue(buf, (Dna5)c);
+			uint32_t newi;
+			assert_lt(c, 4);
+			assert_geq(c, 0);
+			if(l->_fw) newi = countFwSide(*l, c); // Forward side
+			else       newi = countBwSide(*l, c); // Backward side
+			assert_lt(newi, this->_eh._bwtLen);
+			assert_neq(newi, i);
+			i = newi;                                  // update row
+			assert_neq(i, _zOff);
+			l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+			jumps++;
+		}
+	}
+	assert_eq(textoff, jumps);
+	assert_eq(textoff, length(buf));
+	cout << "reportReconstruct:" << endl
+	     << "  seed: " << query << endl
+	     << "  buf: " << buf << endl;
+	//
+	//return report(query, quals, name, mmui32, refcs, numMms, off,
+	//              top, bot, qlen, stratum, params);
+	return false;
+}
+
+/**
  * Transform this Ebwt into the original string in linear time by using
  * the LF mapping to walk backwards starting at the row correpsonding
  * to the end of the string.  The result is written to s.  The Ebwt
@@ -2519,7 +2638,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams eh(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
 	if(_verbose) eh.print(cout);
-	
+
 	// Set up overridden suffix-array-sample parameters
 	uint32_t offsLen = eh._offsLen;
 	uint32_t offRateDiff = 0;

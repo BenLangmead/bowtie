@@ -68,7 +68,7 @@ typedef union {
 		uint64_t char0 : 2;    // substituted char for pos 1
 		uint64_t char1 : 2;    // substituted char for pos 2
 		uint64_t char2 : 2;    // substituted char for pos 3
-		uint64_t reserved : 8; 
+		uint64_t reserved : 8;
 		uint64_t type  : 2;    // type of entry; 0=singleton_entry,
 		                       // 1=list_offset, 2=list_entry,
 		                       // 3=list_tail
@@ -95,7 +95,7 @@ static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2)
 	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
 	assert_neq(0xff, pa1.entry.pos0);
 	assert_neq(0xff, pa2.entry.pos0);
-	
+
 	// Make sure pa1's pos0 is represented in pa1
 	if(pa1.entry.pos0 == pa2.entry.pos0) {
 		if(pa1.entry.char0 != pa2.entry.char0) return false;
@@ -349,7 +349,7 @@ private:
 };
 
 struct BacktrackLimits {
-	
+
 	BacktrackLimits() {
 		maxBts  = 0;
 		maxBts0 = 0;
@@ -367,7 +367,7 @@ struct BacktrackLimits {
 		maxBts1 = _maxBts1;
 		maxBts2 = _maxBts2;
 	}
-	
+
 	uint32_t maxBts;  // limit on overall number of backtracks per read
 	uint32_t maxBts0; // limit on number of backtracks at depth 0
 	uint32_t maxBts1; // limit on number of backtracks at depth 1
@@ -390,6 +390,7 @@ public:
 	                 const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
 	                 uint32_t __reportPartials = 0,
 	                 bool __reportExacts = true,
+	                 bool __reportArrows = false,
 	                 PartialAlignmentManager* __partials = NULL,
 	                 String<QueryMutation>* __muts = NULL,
 	                 bool __verbose = true,
@@ -416,6 +417,7 @@ public:
 		_chars(NULL),
 		_reportPartials(__reportPartials),
 		_reportExacts(__reportExacts),
+		_reportArrows(__reportArrows),
 		_partials(__partials),
 		_muts(__muts),
 		_os(__os),
@@ -2133,6 +2135,12 @@ protected:
 			// of the backtracker)
 			return false;
 		}
+		if(_reportArrows) {
+			assert(_params.arrowMode());
+			return _ebwt->report((*_qry), _qual, _name,
+                    _mms, _refcs, stackDepth, 0,
+                    top, bot, _qlen, stratum, _params);
+		}
 		uint32_t spread = bot - top;
 		// Pick a random spot in the range to begin report
 		uint32_t r = top + (_rand.nextU32() % spread);
@@ -2174,7 +2182,7 @@ protected:
 		} else {
 			assert_leq(stackDepth, 1);
 		}
-		
+
 		// Possibly report
 		assert_gt(_reportPartials, 0);
 		assert(_partials != NULL);
@@ -2448,6 +2456,9 @@ protected:
 	uint32_t            _reportPartials;
 	/// Do not report alignments with stratum < this limit
 	bool                _reportExacts;
+	/// When reporting a full alignment, report top/bot; don't chase
+	/// any of the results
+	bool                _reportArrows;
 	/// Append partial alignments here
 	PartialAlignmentManager *_partials;
 	/// Set of mutations that apply for a partial alignment
