@@ -6,19 +6,19 @@
  * sequence characters themselves; this is purely for counting lengths.
  */
 RefRecord fastaRefReadSize(istream& in,
-                           const RefReadInParams& refparams, 
-                           bool first = false)
+                           const RefReadInParams& refparams,
+                           bool first)
 {
 	int c;
 	static int lastc = '>';
 	assert_neq(refparams.baseCutoff, 0);
 	assert_neq(refparams.numSeqCutoff, 0);
-	
+
 	// RefRecord params
 	size_t seqCharsRead = 0;
 	size_t seqOff = 0;
 	bool seqFirst = true;
-	
+
 	// Pick off the first carat
 	if(first) {
 		lastc = '>';
@@ -61,6 +61,9 @@ RefRecord fastaRefReadSize(istream& in,
 	// Now skip to the first DNA character, counting gap characters
 	// as we go
 	while(true) {
+		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			c = 'A';
+		}
 		int cat = dna4Cat[c];
 		ASSERT_ONLY(int cc = toupper(c));
 		if(cat == 1) {
@@ -96,6 +99,9 @@ RefRecord fastaRefReadSize(istream& in,
 	// in now points just past the first character of a sequence
 	// line, and c holds the first character
 	while(c != -1 && c != '>') {
+		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			c = 'A';
+		}
 		// Note: can't have a comment in the middle of a sequence,
 		// though a comment can end a sequence
 		uint8_t cat = dna4Cat[c];

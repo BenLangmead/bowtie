@@ -42,6 +42,7 @@ static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 //static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
 static bool    useBsearch    = false;
+static bool    nsToAs        = false;
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -52,6 +53,7 @@ static const int ARG_SEED      = 260;
 static const int ARG_CUTOFF    = 261;
 static const int ARG_BSEARCH   = 262;
 static const int ARG_ISARATE   = 263;
+static const int ARG_NTOA      = 264;
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -76,6 +78,7 @@ static void printUsage(ostream& out) {
 	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
 	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
 	    //<< "    --chunkrate <int>       # of characters in a text chunk" << endl
+	    << "    --ntoa                  convert Ns in reference to As" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
@@ -89,7 +92,7 @@ static void printUsage(ostream& out) {
 
 /**
  * Print a detailed usage message to the provided output stream.
- * 
+ *
  * Manual text converted to C++ string with something like:
  * cat MANUAL  | head -304 | tail -231 | sed -e 's/\"/\\\"/g' | \
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
@@ -266,6 +269,7 @@ static struct option long_options[] = {
 	//{"chunkrate",    required_argument, 0,            'h'},
 	{"help",         no_argument,       0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
+	{"ntoa",         no_argument,       0,            ARG_NTOA},
 	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
 	{0, 0, 0, 0} // terminator
 };
@@ -359,9 +363,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CUTOFF:
 	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
 	   			break;
-	   		case ARG_BSEARCH:
-	   			useBsearch = true;
-	   			break;
+	   		case ARG_NTOA: nsToAs = true; break;
+	   		case ARG_BSEARCH: useBsearch = true; break;
 
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
@@ -391,7 +394,7 @@ static void driver(const char * type,
                    bool reverse = false)
 {
 	vector<istream*> is;
-	RefReadInParams refparams(cutoff, -1, reverse);
+	RefReadInParams refparams(cutoff, -1, reverse, nsToAs);
 	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
 		for(size_t i = 0; i < infiles.size(); i++) {

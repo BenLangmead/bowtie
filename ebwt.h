@@ -957,7 +957,7 @@ public:
 	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
-	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& buf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, uint32_t* pairs) const;
@@ -2338,7 +2338,8 @@ template<typename TStr>
 inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
                                           String<char>* quals,
                                           String<char>* name,
-                                          String<Dna5>& buf,
+                                          String<Dna5>& lbuf,
+                                          String<Dna5>& rbuf,
                                           const uint32_t *mmui32,
                                           const char* refcs,
                                           size_t numMms,
@@ -2366,11 +2367,12 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		myl.initFromRow(i, this->_eh, this->_ebwt);
 	}
 	assert(l != NULL);
+	clear(lbuf); clear(rbuf);
 	// Walk along until we reach the next marked row to the left
 	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
 		int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
-		appendValue(buf, (Dna5)c);
+		appendValue(lbuf, (Dna5)c);
 		uint32_t newi;
 		assert_lt(c, 4);
 		assert_geq(c, 0);
@@ -2397,7 +2399,8 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	// 'off' now holds the text offset of the first (leftmost) position
 	// involved in the alignment.  Next we call joinedToTextOff to
 	// check whether the seed is valid (i.e., does not straddle a
-	// boundary between two reference seuqences) and to obtain its extents (textoff
+	// boundary between two reference seuqences) and to obtain its
+	// extents
 	uint32_t tidx;    // the index (id) of the reference we hit in
 	uint32_t textoff; // the offset of the alignment within the reference
 	uint32_t tlen;    // length of reference seed hit in
@@ -2411,16 +2414,19 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		// In our progress toward a marked row, we passed the boundary
 		// between the reference sequence containing the seed and the
 		// reference sequence to the left of it.  That's OK, we just
-		// need to knock off the extra characters we added to 'buf'.
-		erase(buf, textoff);
+		// need to knock off the extra characters we added to 'lbuf'.
+		assert_eq(jumps, length(lbuf));
+		_setLength(lbuf, textoff);
 		jumps = textoff;
+		assert_eq(textoff, length(lbuf));
 	} else if(jumps < textoff) {
 		// Keep walking until we reach the end of the reference
 		assert_neq(i, _zOff);
-		for(size_t j = 0; j < (textoff-jumps); j++) {
+		uint32_t diff = textoff-jumps;
+		for(size_t j = 0; j < diff; j++) {
 			// Not a marked row; walk left one more char
 			int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
-			appendValue(buf, (Dna5)c);
+			appendValue(lbuf, (Dna5)c);
 			uint32_t newi;
 			assert_lt(c, 4);
 			assert_geq(c, 0);
@@ -2433,15 +2439,61 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 			l->initFromRow(i, this->_eh, this->_ebwt); // update locus
 			jumps++;
 		}
+		assert_eq(textoff, jumps);
+		assert_eq(textoff, length(lbuf));
 	}
 	assert_eq(textoff, jumps);
-	assert_eq(textoff, length(buf));
-	cout << "reportReconstruct:" << endl
-	     << "  seed: " << query << endl
-	     << "  buf: " << buf << endl;
-	//
-	//return report(query, quals, name, mmui32, refcs, numMms, off,
-	//              top, bot, qlen, stratum, params);
+	assert_eq(textoff, length(lbuf));
+	// Calculate the right-hand extent of the reference
+	uint32_t ref_right = off - textoff + tlen;
+	// Round the right-hand extent to the nearest ISA element that maps
+	// to it or a character to its right
+	uint32_t ref_right_rounded = ref_right;
+	if((ref_right_rounded & _eh._isaMask) != ref_right_rounded) {
+		ref_right_rounded = ((ref_right_rounded >> _eh._isaRate)+1) << _eh._isaRate;
+	}
+	// TODO: handle case where ref_right_rounded is off the end of _isa
+	// Let the current suffix-array elt be determined by the ISA
+	if((ref_right_rounded >> _eh._isaRate) >= _eh._isaLen) {
+		i = _eh._len;
+		ref_right_rounded = _eh._len;
+	} else {
+		i = _isa[ref_right_rounded >> _eh._isaRate];
+	}
+	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
+	uint32_t right_steps = ref_right - (off + qlen);
+	l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+	for(size_t j = 0; j < right_steps_rounded; j++) {
+		// Not a marked row; walk left one more char
+		int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
+		appendValue(rbuf, (Dna5)c);
+		uint32_t newi;
+		assert_lt(c, 4); assert_geq(c, 0);
+		if(l->_fw) newi = countFwSide(*l, c); // Forward side
+		else       newi = countBwSide(*l, c); // Backward side
+		assert_lt(newi, this->_eh._bwtLen);
+		assert_neq(newi, i);
+		i = newi;                                  // update row
+		assert_neq(i, _zOff);
+		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+		jumps++;
+	}
+	if(right_steps_rounded > right_steps) {
+		jumps -= (right_steps_rounded - right_steps);
+		_setLength(rbuf, right_steps);
+	}
+	assert_eq(right_steps, length(rbuf));
+	assert_eq(tlen, jumps + qlen);
+	::reverseInPlace(lbuf);
+	::reverseInPlace(rbuf);
+	{
+		cout << "reportReconstruct:" << endl
+			 << "  " << lbuf << query << rbuf << endl;
+		cout << "  ";
+		for(size_t i = 0; i < length(lbuf); i++) cout << " ";
+		cout << query << endl;
+	}
+	// Now we've reconstructed the
 	return false;
 }
 

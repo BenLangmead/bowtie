@@ -2310,7 +2310,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
     while(true) {
     	GET_READ(patsrc);
 		size_t plen = length(patFw);
-		uint32_t s = min<uint32_t>(plen, s);
+		uint32_t s = min<uint32_t>(plen, seedLen);
 		patid += 0;
 		// First, try exact hits for the forward-oriented read
 		params.setFw(true);
@@ -2318,12 +2318,13 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 		bt.setOffs(0, 0, s, s, s, s);
 		bt.backtrack();
 		for(size_t i = 0; i < hits.size(); i++) {
-			String<Dna5> lhsbuf;
+			String<Dna5> lhsbuf; String<Dna5> rhsbuf;
 			// h.first has 'top' and h.second has 'bot'
 			assert_gt(hits[i].h.second, hits[i].h.first);
 			for(size_t j = hits[i].h.first; j < hits[i].h.second; j++) {
 				ebwtFw.reportReconstruct(patFw, &qualFw, &name,
-				                         lhsbuf,           // buf
+				                         lhsbuf,           // lbuf
+				                         rhsbuf,           // rbuf
 				                         NULL,             // mmui32
 				                         NULL,             // refcs
 				                         0,                // numMms
@@ -2343,12 +2344,13 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 		bt.setOffs(0, 0, s, s, s, s);
 		bt.backtrack();
 		for(size_t i = 0; i < hits.size(); i++) {
-			String<Dna5> lhsbuf;
+			String<Dna5> lhsbuf; String<Dna5> rhsbuf;
 			// h.first has 'top' and h.second has 'bot'
 			assert_gt(hits[i].h.second, hits[i].h.first);
 			for(size_t j = hits[i].h.first; j < hits[i].h.second; j++) {
 				ebwtFw.reportReconstruct(patRc, &qualRc, &name,
-				                         lhsbuf,           // buf
+				                         lhsbuf,           // lbuf
+				                         rhsbuf,           // rbuf
 				                         NULL,             // mmui32
 				                         NULL,             // refcs
 				                         0,                // numMms

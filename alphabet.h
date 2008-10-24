@@ -46,6 +46,18 @@ static inline TStr reverseComplement(const TStr& s) {
 	return s_rc;
 }
 
+/// Reverse a string in-place
+template <typename TStr>
+static inline void reverseInPlace(TStr& s) {
+	typedef typename Value<TStr>::Type TVal;
+	size_t len = length(s);
+	for(size_t i = 0; i < (len>>1); i++) {
+		TVal tmp = s[i];
+		s[i] = s[len-i-1];
+		s[len-i-1] = tmp;
+	}
+}
+
 /**
  * Return the reverse-complement of s.
  */

@@ -36,8 +36,8 @@ struct RefRecord {
  * Parameters governing treatment of references as they're read in.
  */
 struct RefReadInParams {
-	RefReadInParams(int64_t bc, int64_t sc, bool r) :
-		baseCutoff(bc), numSeqCutoff(sc), reverse(r) { }
+	RefReadInParams(int64_t bc, int64_t sc, bool r, bool nsToA) :
+		baseCutoff(bc), numSeqCutoff(sc), reverse(r), nsToAs(nsToA) { }
 	// stop reading references once we've finished reading this many
 	// total reference bases
 	int64_t baseCutoff;
@@ -46,6 +46,8 @@ struct RefReadInParams {
 	int64_t numSeqCutoff;
 	// reverse each reference sequence before passing it along
 	bool reverse;
+	// convert ambiguous characters to As
+	bool nsToAs;
 };
 
 extern RefRecord fastaRefReadSize(istream& in,
@@ -160,6 +162,9 @@ static RefRecord fastaRefReadAppend(istream& in,
 
 	// Skip over gaps
 	while(true) {
+		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			c = 'A';
+		}
 		int cat = dna4Cat[c];
 		if(cat == 1) {
 			// This is a DNA character
@@ -197,6 +202,9 @@ static RefRecord fastaRefReadAppend(istream& in,
 			}
 		}
 		c = in.get();
+		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			c = 'A';
+		}
 		if (c == -1 || c == '>' || c == '#' || dna4Cat[c] == 2) {
 			lastc = c;
 			break;

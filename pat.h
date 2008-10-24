@@ -48,18 +48,6 @@ char* itoa10(int value, char* result) {
 	return result;
 }
 
-/// Reverse a string in-place
-template <typename TStr>
-static inline void reverse(TStr& s) {
-	typedef typename Value<TStr>::Type TVal;
-	size_t len = length(s);
-	for(size_t i = 0; i < (len>>1); i++) {
-		TVal tmp = s[i];
-		s[i] = s[len-i-1];
-		s[len-i-1] = tmp;
-	}
-}
-
 /**
  * A buffer for keeping all relevant information about a single read.
  * Each search thread has one.
@@ -90,10 +78,10 @@ struct ReadBuf {
 		seqan::clear(name);
 	}
 	void reverseAll() {
-		::reverse(patFw);
-		::reverse(patRc);
-		::reverse(qualFw);
-		::reverse(qualRc);
+		::reverseInPlace(patFw);
+		::reverseInPlace(patRc);
+		::reverseInPlace(qualFw);
+		::reverseInPlace(qualRc);
 	}
 	static const int BUF_SIZE = 1024;
 	String<Dna5>  patFw;               // forward-strand sequence
@@ -152,10 +140,10 @@ public:
 		// concrete subclasses, since they can usually do it more
 		// efficiently.
 		if(_reverse) {
-			::reverse(r.patFw);
-			::reverse(r.patRc);
-			::reverse(r.qualFw);
-			::reverse(r.qualRc);
+			::reverseInPlace(r.patFw);
+			::reverseInPlace(r.patRc);
+			::reverseInPlace(r.qualFw);
+			::reverseInPlace(r.qualRc);
 		}
 		// Output it, if desired
 		if(_dumpfile != NULL) {
@@ -652,14 +640,14 @@ public:
 			_quals.push_back(vq);
 			{
 				_vrev.push_back(s);
-				::reverse(_vrev.back());
+				::reverseInPlace(_vrev.back());
 				_qualsrev.push_back(vq);
-				::reverse(_qualsrev.back());
+				::reverseInPlace(_qualsrev.back());
 			}
 			_vrc.push_back(reverseComplement(String<Dna5>(s)));
 			{
 				_vrcrev.push_back(reverseComplement(String<Dna5>(s)));
-				::reverse(_vrcrev.back());
+				::reverseInPlace(_vrcrev.back());
 			}
 			ostringstream os;
 			os << (_names.size());
