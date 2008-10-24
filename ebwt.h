@@ -2352,7 +2352,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 {
 	VMSG_NL("In reportReconstruct");
 	assert_gt(_eh._isaLen, 0); // Must have inverse suffix array to reconstruct
-	assert(!params.arrowMode());
+	assert(params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
 	SideLocus myl;

@@ -2289,7 +2289,7 @@ static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
 
 static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	SEED_SW_EXTEND_WORKER_SETUP();
-	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
+	Ebwt<String<Dna> >& ebwtFw = *seedAndSWExtendSearch_ebwtFw;
 
 	// Half-and-half BacktrackManager for forward read
 	BacktrackManager<String<Dna> > bt(
@@ -2393,6 +2393,14 @@ static void seedAndSWExtendSearch(
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
+	/* Load the forward index into memory if necessary */ \
+	if(!ebwtFw.isInMemory()) {
+		Timer _t(cout, "Time loading forward index: ", timing);
+		ebwtFw.loadIntoMemory();
+	}
+	assert(ebwtFw.isInMemory());
+	_patsrc.reset(); /* rewind pattern source to first pattern */
+	_patsrc.setReverse(false); /* tell pattern source not to reverse patterns */
 	{
 		// Phase 1: Consider cases 1R and 2R
 		const char * msg = "Seed-and-SW-extend search Phase 1 of 1: ";
