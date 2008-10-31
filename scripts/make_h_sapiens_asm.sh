@@ -63,10 +63,10 @@ if [ ! -f hs_ref_chrMT.fa ] ; then
 	gunzip hs_ref_chrMT.fa.gz
 fi
 
-#echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.fa,hs_ref_chr2.fa,hs_ref_chr3.fa,hs_ref_chr4.fa,hs_ref_chr5.fa,hs_ref_chr6.fa,hs_ref_chr7.fa,hs_ref_chr8.fa,hs_ref_chr9.fa,hs_ref_chr10.fa,hs_ref_chr11.fa,hs_ref_chr12.fa,hs_ref_chr13.fa,hs_ref_chr14.fa,hs_ref_chr15.fa,hs_ref_chr16.fa,hs_ref_chr17.fa,hs_ref_chr18.fa,hs_ref_chr19.fa,hs_ref_chr20.fa,hs_ref_chr21.fa,hs_ref_chr22.fa,hs_ref_chrMT.fa,hs_ref_chrX.fa,hs_ref_chrY.fa h_sapiens_asm
-#${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.fa,hs_ref_chr2.fa,hs_ref_chr3.fa,hs_ref_chr4.fa,hs_ref_chr5.fa,hs_ref_chr6.fa,hs_ref_chr7.fa,hs_ref_chr8.fa,hs_ref_chr9.fa,hs_ref_chr10.fa,hs_ref_chr11.fa,hs_ref_chr12.fa,hs_ref_chr13.fa,hs_ref_chr14.fa,hs_ref_chr15.fa,hs_ref_chr16.fa,hs_ref_chr17.fa,hs_ref_chr18.fa,hs_ref_chr19.fa,hs_ref_chr20.fa,hs_ref_chr21.fa,hs_ref_chr22.fa,hs_ref_chrMT.fa,hs_ref_chrX.fa,hs_ref_chrY.fa h_sapiens_asm
-cat hs_ref_chr1.fa hs_ref_chr2.fa hs_ref_chr3.fa hs_ref_chr4.fa hs_ref_chr5.fa hs_ref_chr6.fa hs_ref_chr7.fa hs_ref_chr8.fa hs_ref_chr9.fa hs_ref_chr10.fa hs_ref_chr11.fa hs_ref_chr12.fa hs_ref_chr13.fa hs_ref_chr14.fa hs_ref_chr15.fa hs_ref_chr16.fa hs_ref_chr17.fa hs_ref_chr18.fa hs_ref_chr19.fa hs_ref_chr20.fa hs_ref_chr21.fa hs_ref_chr22.fa hs_ref_chrMT.fa hs_ref_chrX.fa hs_ref_chrY.fa > hs_ref_all.fa
-maq fasta2bfa hs_ref_all.fa h_sapiens_asm.bfa
+echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.fa,hs_ref_chr2.fa,hs_ref_chr3.fa,hs_ref_chr4.fa,hs_ref_chr5.fa,hs_ref_chr6.fa,hs_ref_chr7.fa,hs_ref_chr8.fa,hs_ref_chr9.fa,hs_ref_chr10.fa,hs_ref_chr11.fa,hs_ref_chr12.fa,hs_ref_chr13.fa,hs_ref_chr14.fa,hs_ref_chr15.fa,hs_ref_chr16.fa,hs_ref_chr17.fa,hs_ref_chr18.fa,hs_ref_chr19.fa,hs_ref_chr20.fa,hs_ref_chr21.fa,hs_ref_chr22.fa,hs_ref_chrMT.fa,hs_ref_chrX.fa,hs_ref_chrY.fa h_sapiens_asm
+${BOWTIE_BUILD_EXE} --bmaxdivn 4 hs_ref_chr1.fa,hs_ref_chr2.fa,hs_ref_chr3.fa,hs_ref_chr4.fa,hs_ref_chr5.fa,hs_ref_chr6.fa,hs_ref_chr7.fa,hs_ref_chr8.fa,hs_ref_chr9.fa,hs_ref_chr10.fa,hs_ref_chr11.fa,hs_ref_chr12.fa,hs_ref_chr13.fa,hs_ref_chr14.fa,hs_ref_chr15.fa,hs_ref_chr16.fa,hs_ref_chr17.fa,hs_ref_chr18.fa,hs_ref_chr19.fa,hs_ref_chr20.fa,hs_ref_chr21.fa,hs_ref_chr22.fa,hs_ref_chrMT.fa,hs_ref_chrX.fa,hs_ref_chrY.fa h_sapiens_asm
+#cat hs_ref_chr1.fa hs_ref_chr2.fa hs_ref_chr3.fa hs_ref_chr4.fa hs_ref_chr5.fa hs_ref_chr6.fa hs_ref_chr7.fa hs_ref_chr8.fa hs_ref_chr9.fa hs_ref_chr10.fa hs_ref_chr11.fa hs_ref_chr12.fa hs_ref_chr13.fa hs_ref_chr14.fa hs_ref_chr15.fa hs_ref_chr16.fa hs_ref_chr17.fa hs_ref_chr18.fa hs_ref_chr19.fa hs_ref_chr20.fa hs_ref_chr21.fa hs_ref_chr22.fa hs_ref_chrMT.fa hs_ref_chrX.fa hs_ref_chrY.fa > hs_ref_all.fa
+#maq fasta2bfa hs_ref_all.fa h_sapiens_asm.bfa
 if [ "$?" = "0" ] ; then
 	echo "h_sapiens index built:"
 	echo "   h_sapiens_asm.1.ebwt h_sapiens_asm.2.ebwt h_sapiens_asm.rev.1.ebwt h_sapiens_asm.rev.2.ebwt"
