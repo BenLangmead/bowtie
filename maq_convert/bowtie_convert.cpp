@@ -22,6 +22,9 @@ enum {TEXT_MAP, BIN_MAP};
 
 using namespace std;
 static bool verbose	= false;
+static bool short_map_format = false;
+static const int short_read_len = 64;
+static const int long_read_len = 128;
 
 // A lookup table for fast integer logs
 static int log_n[256];
@@ -30,11 +33,12 @@ static void print_usage()
 {
 	cout << "Usage: bowtie-convert <in.bwtmap> <out.map> <chr.bfa>" << endl;
 	cout << "    -v     verbose output" << endl;
+	cout << "    -o     output Maq map in old (pre Maq 0.7.0) format" << endl;
 }
 
 // Some of these limits come from Maq headers, beware...
 static const int max_read_name = MAX_NAMELEN;
-static const int max_read_bp = MAX_READLEN;
+//static const int max_read_bp = MAX_READLEN;
 
 // Maq's default mapping quality
 static int DEFAULT_QUAL = 25;
@@ -42,7 +46,8 @@ static int DEFAULT_QUAL = 25;
 // Number of bases consider "reliable" on the five prime end of each read
 static int MAQ_FIVE_PRIME = 28;
 
-static inline int operator < (const maqmap1_t &a, const maqmap1_t &b)
+template<int MAXLEN>
+static inline int operator < (const aln_t<MAXLEN>a, const aln_t<MAXLEN>& b)
 {
 	return (a.seqid < b.seqid) || (a.seqid == b.seqid && a.pos < b.pos);
 }
@@ -63,6 +68,12 @@ static inline int cal_map_qual(int default_qual,
 		return default_qual - log_n[other_occs];
 }
 
+/** This function, and the types aln_t and header_t, are parameterized by an 
+ *  integer specifying the maximum read length supported by the Maq map to be
+ *  written
+ */
+
+template<int MAXLEN>
 int convert_bwt_to_maq(const string& bwtmap_fname,
 					   const string& maqmap_fname,
 					   const map<string, unsigned int>& names_to_ids)
@@ -90,7 +101,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	uint32_t seqid = 0;
 
 	// Initialize a new Maq map table
-	maqmap_t *mm = maq_new_maqmap();
+	header_t<MAXLEN> *mm = maq_init_header<MAXLEN>();
 
 	/**
 	 Fields are:
@@ -105,7 +116,6 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			w.r.t. the 5 prime end of the read.
 	 */
 	const char* bwt_fmt_str = "%s %c %s %d %s %s %d %s";
-
 
 	char orientation;
 	char text_name[buf_size];
@@ -145,37 +155,30 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		if (mm->n_mapped_reads == (bit64_t)max)
 		{
 			max += 0x100000;
-			mm->mapped_reads = (maqmap1_t*)realloc(mm->mapped_reads,
-												   sizeof(maqmap1_t) * (max));
+			  
+			mm->mapped_reads = (aln_t<MAXLEN>*)realloc(mm->mapped_reads,
+												   sizeof(aln_t<MAXLEN>) * (max));
 		}
 
-		maqmap1_t *m1 = mm->mapped_reads + mm->n_mapped_reads;
+		aln_t<MAXLEN> *m1 = mm->mapped_reads + mm->n_mapped_reads;
 		strncpy(m1->name, name, max_read_name-1);
 		m1->name[max_read_name-1] = 0;
 
 		text_name[buf_size-1] = '\0';
 
 		// Convert sequence into Maq's bitpacked format
-		memset(m1->seq, 0, max_read_bp);
+		memset(m1->seq, 0, MAXLEN);
 		m1->size = strlen(sequence);
 
 		map<string, unsigned int>::const_iterator i_text_id =
 			names_to_ids.find(text_name);
 		if (i_text_id == names_to_ids.end())
 		{
-			fprintf(stderr, "Warning: read maps to text not in BFA, skipping\n");
+			fprintf(stderr, "Warning: read maps to text %s, which is not in BFA, skipping\n", text_name);
 			continue;
 		}
 
 		m1->seqid = i_text_id->second;
-
-//		if (seqid_to_name.find(text_name) == seqid_to_name.end()) {
-//			// Map the alignment id to the name of the reference sequence
-//			m1->seqid = seqid_to_name.size(); // 'seqid' is a unique id for alignments
-//			seqid_to_name[text_name] = m1->seqid;
-//		} else {
-//			m1->seqid = seqid_to_name[text_name];
-//		}
 
 		int qual_len = strlen(qualities);
 
@@ -252,7 +255,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 									five_prime_mismatches,
 									other_occs);
 
-		m1->seq[MAX_READLEN-1] = m1->alt_qual = m1->map_qual;
+		m1->seq[MAXLEN-1] = m1->alt_qual = m1->map_qual;
 
 		++mm->n_mapped_reads;
 		seqid++; // increment unique id for reads
@@ -267,17 +270,16 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		char* name = strdup(i->first.c_str());
 		if (name)
 			mm->ref_name[i->second] = name;
-		//cerr << mm->ref_name[i->first] << endl;
 	}
 
 	algo_sort(mm->n_mapped_reads, mm->mapped_reads);
 
 	// Write out the header
-	maqmap_write_header(maqf, mm);
+	maq_write_header(maqf, mm);
 	// Write out the alignments
-	gzwrite(maqf, mm->mapped_reads, sizeof(maqmap1_t) * mm->n_mapped_reads);
+	gzwrite(maqf, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * mm->n_mapped_reads);
 
-	maq_delete_maqmap(mm);
+	maq_destroy_header(mm);
 
 	fclose(bwtf);
 	gzclose(maqf);
@@ -308,6 +310,10 @@ void get_names_from_bfa(const string& bfa_filename,
 	while ((l = nst_load_bfa1(bfaf)) != 0)
 	{
 		names_to_ids[l->name] = next_id++;
+		if (verbose)
+		{
+			fprintf(stderr, "Reading record for %s from .bfa\n", l->name);
+		}
 	}
 }
 
@@ -316,7 +322,7 @@ int main(int argc, char **argv)
 	string bwtmap_filename;
 	string maqmap_filename;
 	string bfa_filename;
-	const char *short_options = "v";
+	const char *short_options = "vo";
 	int next_option;
 	do {
 		next_option = getopt(argc, argv, short_options);
@@ -324,7 +330,9 @@ int main(int argc, char **argv)
 	   		case 'v': /* verbose */
 				verbose = true;
 				break;
-
+			case 'o':
+				short_map_format = true;
+				break;
 			case -1: /* Done with options. */
 				break;
 			default:
@@ -363,7 +371,19 @@ int main(int argc, char **argv)
 	map<string, unsigned int> names_to_ids;
 	get_names_from_bfa(bfa_filename, names_to_ids);
 
-	int ret = convert_bwt_to_maq(bwtmap_filename, maqmap_filename, names_to_ids);
+	int ret;
+	if (short_map_format)
+	{
+		ret = convert_bwt_to_maq<64>(bwtmap_filename, 
+									 maqmap_filename, 
+									 names_to_ids);
+	}
+	else
+	{
+		ret = convert_bwt_to_maq<128>(bwtmap_filename, 
+									 maqmap_filename, 
+									 names_to_ids);
+	}
 
 	return ret;
 }
