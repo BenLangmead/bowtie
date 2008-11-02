@@ -44,6 +44,7 @@ static int isaRate				= -1; // keep default isaRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
 static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
+static bool integer_quals		= false; //quality strings are space-separated strings of integers, instead of ASCII
 static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
@@ -100,6 +101,8 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_ISARATE             280
 #define ARG_SEED_EXTEND         281
 #define ARG_PARTITION           282
+#define ARG_INTEGER_QUALS        283
+
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -114,6 +117,8 @@ static struct option long_options[] = {
 	{"binout",       no_argument,       0,            'b'},
 	{"noout",        no_argument,       0,            ARG_NOOUT},
 	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
+	{"integer-quals", no_argument,       0,            ARG_INTEGER_QUALS},
+
 	{"time",         no_argument,       0,            't'},
 	{"trim3",        required_argument, 0,            '3'},
 	{"trim5",        required_argument, 0,            '5'},
@@ -437,6 +442,9 @@ static void printLongUsage(ostream& out) {
 	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled to\n"
 	"                     phred-scaled.  Used with -q.  Default: off.\n"
 	"  \n"
+	"  --integer-quals    Read qualities as a space-separated list of integer\n" 
+	"					  values. Used with -q.  Default: off.\n"
+	"  \n"
 	"  --ntoa             No-confidence bases in reads (usually 'N' or '.')\n"
 	"                     are converted to As before alignment.  By default,\n"
 	"                     no-confidence bases do not match any base. \n"
@@ -579,6 +587,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
+			case ARG_INTEGER_QUALS: integer_quals = true; break;
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 	   		case ARG_SEED:
@@ -2531,7 +2540,7 @@ static void driver(const char * type,
 			patsrc = new FastqPatternSource (queries, false,
 			                                 patDumpfile, trim3, trim5,
 			                                 nsPolicy, solexa_quals,
-			                                 maxNs);
+											 integer_quals, maxNs);
 			break;
 		case CMDLINE:
 			patsrc = new VectorPatternSource(queries, false,

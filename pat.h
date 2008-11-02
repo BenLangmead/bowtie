@@ -1015,6 +1015,26 @@ private:
 	RandomSource _rand;
 };
 
+void wrongQualityScale()
+{
+	cerr << "Encounterd negative quality value, but Phred qualities can't be negative."<<endl
+	<<  "These qualities appear to use the Solexa scale." << endl
+	<< "Please re-run Bowtie with the --solexa-quals option.";
+}
+
+void wrongQualityFormat()
+{
+	cerr << "Encounterd space-separated qualities"<<endl
+	<<  "This appears to be an FASTQ-int file" << endl
+	<< "Please re-run Bowtie with the --integer-quals option.";
+}
+
+void tooFewQualities(const String<char>& read_name)
+{
+	cerr <<"Too few quality values for read: "<< read_name <<endl
+		 <<"\tare you sure this is a FASTQ-int file?" << endl;
+}
+
 /**
  * Read a FASTQ-format file.
  * See: http://maq.sourceforge.net/fastq.shtml
@@ -1028,11 +1048,13 @@ public:
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
 					   bool solexa_quals = false,
+					   bool integer_quals = true,
 					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals),
-		_policy(__policy), _maxNs(__maxNs), _rand(seed)
+		_integer_quals(integer_quals),_policy(__policy), _maxNs(__maxNs), 
+		_rand(seed)
 	{
 		for (int l = 0; l != 128; ++l) {
 			_table[l] = (int)(10.0 * log(1.0 + pow(10.0, (l - 64) / 10.0)) / log(10.0) + .499);
@@ -1194,7 +1216,7 @@ protected:
 
 			// Now read the qualities
 			int qualsRead = 0;
-			if (_solexa_quals) {
+			if (_integer_quals) {
 				char buf[4096];
 				while (qualsRead < charsRead) {
 					size_t rd = _filebuf->gets(buf, sizeof(buf));
@@ -1205,8 +1227,22 @@ protected:
 					if(!_reverse) {
 						for (unsigned int j = 0; j < s_quals.size(); ++j)
 						{
-							int sQ = atoi(s_quals[j].c_str());
-							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+							int iQ = atoi(s_quals[j].c_str());
+							int pQ;
+							if (_solexa_quals)
+							{
+								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+							}
+							else
+							{
+								pQ = (iQ <= 93 ? iQ : 93) + 33;	
+								if (pQ < 33)
+								{
+									wrongQualityScale();
+									exit(1);
+								}
+							}
+							
 							if (qualsRead >= _trim5)
 							{
 								size_t off = qualsRead - _trim5;
@@ -1215,7 +1251,7 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
-								c = (char)(pQ + 33);
+								c = (char)(pQ);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
 								r.qualBufFw[off] = c;
@@ -1226,8 +1262,21 @@ protected:
 					} else {
 						for (unsigned int j = 0; j < s_quals.size(); ++j)
 						{
-							int sQ = atoi(s_quals[j].c_str());
-							int pQ = (int)(10.0 * log(1.0 + pow(10.0, sQ / 10.0)) / log(10.0) + .499);
+							int iQ = atoi(s_quals[j].c_str());
+							int pQ;
+							if (_solexa_quals)
+							{
+								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+							}
+							else
+							{
+								pQ = (iQ <= 93 ? iQ : 93) + 33;
+								if (pQ < 33)
+								{
+									wrongQualityScale();
+									exit(1);
+								}
+							}
 							if (qualsRead >= _trim5)
 							{
 								size_t off = qualsRead - _trim5;
@@ -1236,7 +1285,7 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
-								c = (char)(pQ + 33);
+								c = (char)(pQ);
 								assert_geq(c, 33);
 								assert_leq(c, 73);
 								r.qualBufFw[bufSz - off - 1] = c;
@@ -1245,8 +1294,13 @@ protected:
 							++qualsRead;
 						}
 					}
-				} // done reading Solexa quality lines
-				assert_eq(charsRead, qualsRead);
+				} // done reading integer quality lines
+				//assert_eq(charsRead, qualsRead);
+				if (charsRead > qualsRead)
+				{
+					tooFewQualities(r.name);
+					exit(1);
+				}
 				if(!_reverse) {
 					_setBegin(r.qualFw, (char*)r.qualBufFw);
 					_setLength(r.qualFw, dstLen);
@@ -1262,10 +1316,15 @@ protected:
 			}
 			else
 			{
-				// Non-solexa qualities
+				// Non-integer qualities
 				if(!_reverse) {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
 						c = _filebuf->get();
+						if (c == ' ')
+						{
+							wrongQualityFormat();
+							exit(1);
+						}
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
 								size_t off = qualsRead - _trim5;
@@ -1274,6 +1333,21 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
+								
+								if (_solexa_quals) //Convert solexa-scaled chars to phred
+								{
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+									c = (char)(pQ);
+								}
+								else
+								{
+									if (c < 33)
+									{
+										wrongQualityScale();
+										exit(1);
+									}
+								}
+								
 								assert_geq(c, 33);
 								r.qualBufFw[off] = c;
 								r.qualBufRc[bufSz - off - 1] = c;
@@ -1291,6 +1365,11 @@ protected:
 				} else {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
 						c = _filebuf->get();
+						if (c == ' ')
+						{
+							wrongQualityFormat();
+							exit(1);
+						}
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
 								size_t off = qualsRead - _trim5;
@@ -1299,6 +1378,22 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
+								
+								if (_solexa_quals) //Convert solexa-scaled chars to phred
+								{
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+									c = (char)(pQ);
+								}
+								else
+								{
+									if (c < 33)
+									{
+										wrongQualityScale();
+										exit(1);
+									}
+								}
+								
+								
 								assert_geq(c, 33);
 								r.qualBufFw[bufSz - off - 1] = c;
 								r.qualBufRc[off] = c;
@@ -1348,6 +1443,7 @@ private:
 	bool _first;
 	bool _reverse;
 	bool _solexa_quals;
+	bool _integer_quals;
 	int _policy;
 	int _maxNs;
 	int _table[128];
