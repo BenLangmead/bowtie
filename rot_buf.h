@@ -17,13 +17,13 @@ private:
 };
 
 /**
- * 
+ *
  */
 class SNPColumnCharPairAnalyzer : public ColumnAnalyzer<pair<char, char> > {
 public:
 	SNPColumnCharPairAnalyzer(ostream& out) :
 		ColumnAnalyzer<pair<char, char> >(), out_(out) { }
-	
+
 	virtual void analyze(uint32_t refidx,
 	                     uint32_t refoff,
 	                     const vector<pair<char, char> >& col)
@@ -40,6 +40,7 @@ public:
 					assert_eq(rc, (col[i].first >> 4));
 				}
 				int c = col[i].first & 15; // read
+				if(c == 4) continue;
 				assert_lt(c, 4);
 				assert_lt(rc, 4);
 				assert_neq(c, rc);
@@ -73,7 +74,7 @@ private:
  * User may add more elements to the conceptual right-hand side,
  * "ash" elements off the conceptual left-hand side, and access
  * elements between the sides.
- * 
+ *
  */
 template<typename T, int S>
 class RotatingBuf {
@@ -81,9 +82,9 @@ public:
 	RotatingBuf() : buf_(), refidx_(0), lpos_(0), rpos_(0) {
 		buf_.resize(S);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void extendRhs(uint32_t newRhs) {
 		for(size_t i = rpos_; i < newRhs; i++) {
@@ -92,9 +93,9 @@ public:
 		rpos_ = newRhs;
 		assert_leq(rpos_ - lpos_, S);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void ashUpTo(uint32_t newLhs,
 	             ColumnAnalyzer<T> *analyzer = NULL)
@@ -102,7 +103,7 @@ public:
 		assert_leq(rpos_ - lpos_, S);
 		if(newLhs > lpos_ && analyzer != NULL) {
 			// We've gathered all the data that we're going to for
-			// these columns, so analyze them before 
+			// these columns, so analyze them before
 			for(size_t i = lpos_; i < newLhs; i++) {
 				if(buf_[i % S].size() > 0) {
 					// Analyze this column
@@ -114,9 +115,9 @@ public:
 		lpos_ = newLhs;
 		assert_leq(lpos_, rpos_);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void ashAndExtendRange(uint32_t newLhs,
 	                       uint32_t newRhs,
@@ -132,7 +133,7 @@ public:
 		}
 		if(newLhs > lpos_ && analyzer != NULL) {
 			// We've gathered all the data that we're going to for
-			// these columns, so analyze them before 
+			// these columns, so analyze them before
 			for(size_t i = lpos_; i < newLhs; i++) {
 				if(buf_[i % S].size() > 0) {
 					// Analyze this column
@@ -151,9 +152,9 @@ public:
 		assert_leq(rpos_ - lpos_, S);
 		assert_leq(lpos_, rpos_);
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void add(uint32_t pos, const T& elt) {
 		assert_leq(rpos_ - lpos_, S);
@@ -161,7 +162,7 @@ public:
 		assert_lt(pos, rpos_);
 		buf_[pos % S].push_back(elt);
 	}
-	
+
 	/**
 	 * Return the vector-of-Ts at absolute position 'pos'.
 	 */
@@ -170,9 +171,9 @@ public:
 		assert_lt(pos, rpos_);
 		return buf_[pos % S];
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void finalize(ColumnAnalyzer<T> *analyzer = NULL) {
 		if(analyzer == NULL) {
@@ -187,9 +188,9 @@ public:
 			buf_[i % S].clear();
 		}
 	}
-	
+
 	/**
-	 * 
+	 *
 	 */
 	void reset(uint32_t refidx, ColumnAnalyzer<T> *analyzer = NULL) {
 		finalize(analyzer);
@@ -197,7 +198,7 @@ public:
 		lpos_ = 0;
 		rpos_ = 0;
 	}
-	
+
 private:
 	vector<vector<T> > buf_;
 	uint32_t refidx_;
@@ -219,11 +220,11 @@ public:
 };
 
 /**
- * A concrete consumer of alignments that 
- * 
+ * A concrete consumer of alignments that
+ *
  * Assumes that alignments are coming in sorted by left-hand position
  * of alignments as they occur in the forward strand of the reference.
- * 
+ *
  * We instantiate the RotatingBuf template with pair<char> on the
  * assumption that analyses consuming the alignments will only care
  * about keeping each character along with its quality value.  This
@@ -239,7 +240,7 @@ public:
 		lastRefOff_(0),
 		lastLeft_(0),
 		furthestRight_(0) { }
-	
+
 	/**
 	 * Add a new alignment to the rotating buffer.
 	 */
@@ -273,14 +274,14 @@ public:
 			buf_.add(h.h.second + i, make_pair(c, q));
 		}
 	}
-	
+
 	/**
 	 * Analyze any remaining columns in the current buffer.
 	 */
 	virtual void finalize(ColumnAnalyzer<pair<char, char> > *analyzer = NULL) {
 		buf_.finalize(analyzer);
 	}
-	
+
 	/**
 	 * Reset the rotating buffer to deal with a new reference sequence.
 	 * May involve analyzing any remaining columns in the current
