@@ -69,6 +69,7 @@ static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool useBsearch			= false; // if true, don't pad and use binary search over frag starts
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
+static int partitionSz          = 0;     // output a partitioning key in first field
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 
@@ -98,6 +99,7 @@ static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
 #define ARG_BSEARCH             279
 #define ARG_ISARATE             280
 #define ARG_SEED_EXTEND         281
+#define ARG_PARTITION           282
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -150,6 +152,7 @@ static struct option long_options[] = {
 	{"refout",       no_argument,       0,            ARG_REFOUT},
 	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
 	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
+	{"partition",    required_argument, 0,            ARG_PARTITION},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -623,6 +626,7 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_MAXBTS1: maxBts1 = parseInt(0, "--maxbts1 must be positive"); break;
 			case ARG_MAXBTS2: maxBts2 = parseInt(0, "--maxbts2 must be positive"); break;
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
+	   		case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
 	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
    					cerr << "--orig arg must be followed by a string" << endl;
@@ -2487,11 +2491,12 @@ static void driver(const char * type,
 	if(sanityCheck && !origString.empty()) {
 		// Determine if it's a file by looking at whether it has a FASTA-like
 		// extension
-		if(origString.substr(origString.length()-6) == ".fasta" ||
-		   origString.substr(origString.length()-4) == ".mfa"   ||
-		   origString.substr(origString.length()-4) == ".fas"   ||
-		   origString.substr(origString.length()-4) == ".fna"   ||
-		   origString.substr(origString.length()-3) == ".fa")
+		size_t len = origString.length();
+		if(len >= 6 && origString.substr(len-6) == ".fasta" ||
+		   len >= 4 && origString.substr(len-4) == ".mfa"   ||
+		   len >= 4 && origString.substr(len-4) == ".fas"   ||
+		   len >= 4 && origString.substr(len-4) == ".fna"   ||
+		   len >= 3 && origString.substr(len-3) == ".fa")
 		{
 			// Read fasta file
 			vector<string> origFiles;
@@ -2611,9 +2616,9 @@ static void driver(const char * type,
 		switch(outType) {
 			case FULL:
 				if(refOut) {
-					sink = new VerboseHitSink(ebwt.nPat(), refnames);
+					sink = new VerboseHitSink(ebwt.nPat(), refnames, partitionSz);
 				} else {
-					sink = new VerboseHitSink(*fout, refnames);
+					sink = new VerboseHitSink(*fout, refnames, partitionSz);
 				}
 				break;
 			case CONCISE:

@@ -806,7 +806,9 @@ protected:
 		while(true) {
 			// Open read
 			FILE *in;
-			if((in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
+			if(_infiles[_filecur] == "-") {
+				in = stdin;
+			} else if((in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
 				cerr << "Warning: Could not open file \"" << _infiles[_filecur] << "\" for reading" << endl;
 				_filecur++;
 				continue;

@@ -12,6 +12,7 @@
 #include "spinlock.h"
 #include "threading.h"
 #include "bitset.h"
+#include "tokenize.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -66,7 +67,7 @@ struct Hit {
 		fw(_fw)
 	{
 		// Enforce the constraints imposed by the binary output format
-		if(length(patName) > 0xffff) {
+		if(seqan::length(patName) > 0xffff) {
 			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
 			     << "read names and re-run bowtie." << endl;
 			exit(1);
@@ -77,12 +78,12 @@ struct Hit {
 			     << "using a different tool." << endl;
 			exit(1);
 		}
-		if(length(quals) > 0xffff) {
+		if(seqan::length(quals) > 0xffff) {
 			cerr << "Error: One or more quality strings are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
 			exit(1);
 		}
-		if(length(patSeq) > 0xffff) {
+		if(seqan::length(patSeq) > 0xffff) {
 			cerr << "Error: One or more read sequences are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
 			exit(1);
@@ -94,11 +95,13 @@ struct Hit {
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence
 	String<char>        quals;   /// read qualities
-	FixedBitset<max_read_bp> mms;     /// mismatch mask
+	FixedBitset<max_read_bp> mms;/// mismatch mask
 	vector<char>        refcs;   /// reference characters for mms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
 
+	size_t length() const { return seqan::length(patSeq); }
+	
 	Hit& operator = (const Hit &other) {
 	    this->h       = other.h;
 	    this->patId   = other.patId;
@@ -923,22 +926,118 @@ private:
 class VerboseHitSink : public HitSink {
 public:
 	VerboseHitSink(ostream&        __out,
-				   vector<string>* __refnames = NULL) :
+				   vector<string>* __refnames = NULL,
+				   int             __partition = 0) :
 	HitSink(__out, __refnames),
 	_first(true),
-	_numReported(0llu) { }
+	_numReported(0llu),
+	_partition(__partition) { }
 
 	VerboseHitSink(size_t          __numOuts,
-				   vector<string>* __refnames = NULL) :
+				   vector<string>* __refnames = NULL,
+				   int             __partition = 0) :
 	HitSink(__numOuts, __refnames),
 	_first(true),
-	_numReported(0llu) { }
+	_numReported(0llu),
+	_partition(__partition) { }
+
+	/**
+	 * Given a line of output from the VerboseHitSink, parse it into a
+	 * Hit object and return the object (by value).  If the reference
+	 * and/or read are identified in the output by name, then the patid
+	 * and/or h.first fields may be invalid.  TODO: load the id/name
+	 * mapping from the .ebwt file so that we can handle either case.
+	 */
+	static Hit parseHit(const string& line, bool verbose = false) {
+		vector<string> toks;
+		tokenize(line, "\t", toks);
+		if(toks[0].find_first_of(" ", 0) != string::npos) {
+			if(verbose) cout << "Erased partition string" << endl;
+			toks.erase(toks.begin());
+		}
+		if(verbose) {
+			for(size_t i = 0; i < toks.size(); i++) {
+				cout << toks[i] << ", ";
+			}
+			cout << endl;
+		}
+		const string& readName    = toks[0];
+		bool orientation = (toks[1] == "+");
+		// Parse reference sequence id
+		istringstream refIdxSs(toks[2]);
+		uint32_t refIdx; refIdxSs >> refIdx;
+		// Parse reference sequence offset
+		istringstream refOffSs(toks[3]);
+		uint32_t refOff; refOffSs >> refOff;
+		const string& readSeq = toks[4];
+		const string& readQual = toks[5];
+		assert_eq(readSeq.length(), readQual.length());
+		// Parse the # other hits at this stratum estimate
+		istringstream omsSs(toks[6]);
+		uint32_t oms; omsSs >> oms;
+		vector<char> refcs;
+		refcs.resize(readSeq.length(), 0);
+		FixedBitset<max_read_bp> mms;
+		if(toks.size() == 8) {
+			vector<string> mmStrs;
+			tokenize(toks[7], ",", mmStrs);
+			for(size_t i = 0; i < mmStrs.size(); i++) {
+				vector<string> cs;
+				tokenize(mmStrs[i], ":", cs);
+				assert_eq(2, cs.size());
+				// first character of the "A>C" string is the reference
+				// character
+				istringstream offSs(cs[0]);
+				uint32_t off; offSs >> off;
+				assert_lt(off, readSeq.length());
+				// 'off' is an offset from the 5' end of the read.  We
+				// want to translate it into an offset from the left
+				// end of the read as it aligns to the forward strand
+				// of the reference.  This means that we need to invert
+				// it if the 5' end is on the right (i.e., if the
+				// orientation is "-")
+				size_t noff = off;
+				if(!orientation) {
+					// read is reversed; invert offset
+					noff = readSeq.length() - off - 1;
+				}
+				mms.set(noff);
+				refcs[noff] = cs[1][0]; // reference char is before the >
+				assert_eq(readSeq[noff], cs[1][2]);
+				if(verbose) {
+					cout << "  Set mm at offset " << noff << " to "
+					     << refcs[noff] << endl;
+				}
+			}
+			if(verbose) cout << "Parsing mismatches" << endl;
+		}
+		return Hit(make_pair<uint32_t>(refIdx, refOff),
+		           (uint32_t)0, // patid
+		           String<char>(readName),
+		           String<Dna5>(readSeq),
+		           String<char>(readQual),
+		           orientation, // fw
+		           mms,    // mms
+		           refcs,  // refcs
+		           oms);   // oms
+	}
 
 	/**
 	 *
 	 */
 	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
+		if(_partition > 0) {
+			// Output a partitioning key
+			ss << h.h.first;
+			ostringstream ss2; ss2 << (h.h.second / _partition);
+			string s2 = ss2.str();
+			while(s2.length() < 10) {
+				s2 = "0" + s2;
+			}
+			assert_eq(10, s2.length());
+			ss << " " << s2.c_str() << "\t";
+		}
 		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
     	// .first is text id, .second is offset
 		if(this->_refnames != NULL && h.h.first < this->_refnames->size()) {
@@ -989,8 +1088,9 @@ public:
 	}
 
 private:
-	bool _first; /// true -> first hit hasn't yet been reported
+	bool     _first; /// true -> first hit hasn't yet been reported
 	uint64_t _numReported;
+	int      _partition;
 };
 
 /**
