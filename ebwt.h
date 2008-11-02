@@ -2458,7 +2458,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		i = _eh._len;
 		ref_right_rounded = _eh._len;
 	} else {
-		i = _isa[ref_right_rounded >> _eh._isaRate];
+		i = isa[ref_right_rounded >> _eh._isaRate];
 	}
 	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
 	uint32_t right_steps = ref_right - (off + qlen);
