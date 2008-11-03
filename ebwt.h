@@ -435,6 +435,7 @@ public:
 	    _ftab(NULL), \
 	    _eftab(NULL), \
 	    _offs(NULL), \
+	    _isa(NULL), \
 	    _ebwt(NULL), \
 	    _refnames()
 
