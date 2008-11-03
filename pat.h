@@ -1031,8 +1031,12 @@ void wrongQualityFormat()
 
 void tooFewQualities(const String<char>& read_name)
 {
-	cerr <<"Too few quality values for read: "<< read_name <<endl
-		 <<"\tare you sure this is a FASTQ-int file?" << endl;
+	string s;
+	for(size_t i = 0; i < seqan::length(read_name); i++) {
+		s.push_back(read_name[i]);
+	}
+	cerr << "Too few quality values for read: " << s << endl
+		 << "\tare you sure this is a FASTQ-int file?" << endl;
 }
 
 /**
@@ -1347,8 +1351,8 @@ protected:
 								if (_solexa_quals) 
 								{
 									// Convert solexa-scaled chars to phred
-									// http://maq.sourceforge.net/qual.shtml
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 33) / 10.0)) / log(10.0) + .499) + 33;
+									// http://maq.sourceforge.net/fastq.shtml
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
 									c = (char)(pQ);
 								}
 								else
@@ -1395,8 +1399,8 @@ protected:
 								if (_solexa_quals)
 								{
 									// Convert solexa-scaled chars to phred
-									// http://maq.sourceforge.net/qual.shtml
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 33) / 10.0)) / log(10.0) + .499) + 33;
+									// http://maq.sourceforge.net/fastq.shtml
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
 									c = (char)(pQ);
 								}
 								else
