@@ -20,6 +20,12 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.9.7 - November ??, 2008
+   * Separated the quality-conversion and parsing aspects of the old
+     --solexa-quals argument into separate arguments: --solexa-quals
+     (quality conversion) and --integer-quals (parsing).
+   *
+
 Version 0.9.6 - October 10, 2008
    * 'bowtie' now supports a host of options that allow the user to
      specify which and how many valid alignments to report per read.
