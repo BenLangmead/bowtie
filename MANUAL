@@ -295,8 +295,16 @@ Bowtie Manual
                      incompatible with use of --best or -k greater than
                      1.
   
-  --solexa-quals     Convert FASTQ qualities from solexa-scaled to
-                     phred-scaled.  Used with -q.  Default: off.
+  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which
+                     can be negative) to phred-scaled (which can't).
+                     The formula for conversion is phred-qual =
+                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).
+                     Used with -q.  Default: off.
+
+  --integer-quals    Quality values are represented in the FASTQ file
+                     as space-separated ASCII integers, e.g.,
+                     "40 40 30 40...", rather than ASCII characters,
+                     e.g., "II?I...".  Used with -q.  Default: off.
   
   --ntoa             No-confidence bases in reads (usually 'N' or '.')
                      are converted to As before alignment.  By default,

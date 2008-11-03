@@ -117,8 +117,7 @@ static struct option long_options[] = {
 	{"binout",       no_argument,       0,            'b'},
 	{"noout",        no_argument,       0,            ARG_NOOUT},
 	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
-	{"integer-quals", no_argument,       0,            ARG_INTEGER_QUALS},
-
+	{"integer-quals",no_argument,       0,            ARG_INTEGER_QUALS},
 	{"time",         no_argument,       0,            't'},
 	{"trim3",        required_argument, 0,            '3'},
 	{"trim5",        required_argument, 0,            '5'},
@@ -193,7 +192,8 @@ static void printUsage(ostream& out) {
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
-		<< "  --solexa-quals     convert FASTQ qualities from solexa-scaled to phred" << endl
+		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
+		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
@@ -207,7 +207,7 @@ static void printUsage(ostream& out) {
 	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
-	    << "  -o/--offrate <int> override offrate of Ebwt; must be >= value in index" << endl
+	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
 	    << "  -h/--help          print detailed description of tool and its options" << endl
@@ -224,7 +224,7 @@ static void printUsage(ostream& out) {
  */
 static void printLongUsage(ostream& out) {
 	out <<
-	" \n"
+	"\n"
 	" Using the 'bowtie' Aligner\n"
 	" --------------------------\n"
 	" \n"
@@ -439,11 +439,16 @@ static void printLongUsage(ostream& out) {
 	"                     incompatible with use of --best or -k greater than\n"
 	"                     1.\n"
 	"  \n"
-	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled to\n"
-	"                     phred-scaled.  Used with -q.  Default: off.\n"
-	"  \n"
-	"  --integer-quals    Read qualities as a space-separated list of integer\n" 
-	"					  values. Used with -q.  Default: off.\n"
+	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which\n"
+	"                     can be negative) to phred-scaled (which can't).\n"
+	"                     The formula for conversion is phred-qual =\n"
+	"                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).\n"
+	"                     Used with -q.  Default: off.\n"
+	"\n"
+	"  --integer-quals    Quality values are represented in the FASTQ file\n"
+	"                     as space-separated ASCII integers, e.g.,\n"
+	"                     \"40 40 30 40...\", rather than ASCII characters,\n"
+	"                     e.g., \"II?I...\".  Used with -q.  Default: off.\n"
 	"  \n"
 	"  --ntoa             No-confidence bases in reads (usually 'N' or '.')\n"
 	"                     are converted to As before alignment.  By default,\n"
@@ -501,38 +506,6 @@ static void printLongUsage(ostream& out) {
 	"  -h/--help          Print detailed description of tool and its options\n"
 	"                     (from MANUAL).\n"
 	"\n"
-	"  --version          Print version information and quit.\n"
-	"\n"
-	"  Output\n"
-	"  ------\n"
-	" \n"
-	"  The 'bowtie' aligner outputs each alignment on a separate line.  Each\n"
-	"  line is a collection of 8 fields separated by tabs; from left to\n"
-	"  right, the fields are:\n"
-	"  \n"
-	"   1. Name of read that aligned\n"
-	"   \n"
-	"   2. Orientation of read in the alignment, '-' for reverse complement,\n"
-	"      '+' otherwise\n"
-	"      \n"
-	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
-	"      if no name was provided\n"
-	"      \n"
-	"   3. 0-based offset into the reference sequence where leftmost\n"
-	"      character of the alignment occurs\n"
-	"      \n"
-	"   5. Read sequence (reverse-complemented if orientation is '-')\n"
-	"   \n"
-	"   6. Read qualities (reversed if orientation is '-')\n"
-	"   \n"
-	"   7. Reserved\n"
-	"   \n"
-	"   8. Comma-separated list of mismatch descriptors.  If there are no\n"
-	"      mismatches in the alignment, this field is empty.  A single\n"
-	"      descriptor has the format offset:reference-base>read-base.  The\n"
-	"      offset is expressed as a 0-based offset from the high-quality\n"
-	"      (5') end of the read. \n"
-	" \n"
 	;
 }
 

@@ -1231,10 +1231,15 @@ protected:
 							int pQ;
 							if (_solexa_quals)
 							{
+								// Convert from solexa quality to phred
+								// quality and translate to ASCII
+								// http://maq.sourceforge.net/qual.shtml
 								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
 							}
 							else
 							{
+								// Keep the phred quality and translate
+								// to ASCII
 								pQ = (iQ <= 93 ? iQ : 93) + 33;	
 								if (pQ < 33)
 								{
@@ -1266,10 +1271,15 @@ protected:
 							int pQ;
 							if (_solexa_quals)
 							{
+								// Convert from solexa quality to phred
+								// quality and translate to ASCII
+								// http://maq.sourceforge.net/qual.shtml
 								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
 							}
 							else
 							{
+								// Keep the phred quality and translate
+								// to ASCII
 								pQ = (iQ <= 93 ? iQ : 93) + 33;
 								if (pQ < 33)
 								{
@@ -1334,13 +1344,16 @@ protected:
 									exit(1);
 								}
 								
-								if (_solexa_quals) //Convert solexa-scaled chars to phred
+								if (_solexa_quals) 
 								{
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+									// Convert solexa-scaled chars to phred
+									// http://maq.sourceforge.net/qual.shtml
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 33) / 10.0)) / log(10.0) + .499) + 33;
 									c = (char)(pQ);
 								}
 								else
 								{
+									// Keep the phred quality
 									if (c < 33)
 									{
 										wrongQualityScale();
@@ -1379,13 +1392,16 @@ protected:
 									exit(1);
 								}
 								
-								if (_solexa_quals) //Convert solexa-scaled chars to phred
+								if (_solexa_quals)
 								{
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+									// Convert solexa-scaled chars to phred
+									// http://maq.sourceforge.net/qual.shtml
+									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 33) / 10.0)) / log(10.0) + .499) + 33;
 									c = (char)(pQ);
 								}
 								else
 								{
+									// Keep the phred quality
 									if (c < 33)
 									{
 										wrongQualityScale();
