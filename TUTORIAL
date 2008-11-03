@@ -12,18 +12,21 @@ Bowtie Getting Started Guide
 
  The Bowtie source and binary packages come with a pre-built index of
  the E. coli genome, and a set of 1,000 35-bp reads simulated from that
- genome. To use Bowtie to align those reads, issue this command:
-
+ genome. To use Bowtie to align those reads, issue the following
+ command.  If you get an error message "command not found", try adding
+ a "./" before the "bowtie".
+ 
     bowtie e_coli reads/e_coli_1000.fq
-
- Depending on your computer, the run might take a few seconds up to
- about a minute. You will see bowtie print many lines of output. Each
- line is an alignment for a read. The name of the aligned read appears
- in the leftmost column.
 
  The first argument to bowtie is the basename of the index for the
  genome to be searched. The second argument is the name of a FASTQ file
  containing the reads.
+
+ Depending on your computer, the run might take a few seconds up to
+ about a minute. You will see bowtie print many lines of output. Each
+ line is an alignment for a read. The name of the aligned read appears
+ in the leftmost column. The final line should say "Reported 698
+ alignments to 1 output stream(s)" or something similar. 
 
  Next, issue this command:
 
@@ -35,10 +38,12 @@ Bowtie Getting Started Guide
  statistics, which will look something like this (times will obviously
  differ):
 
-   Time loading forward index: 00:00:00
-   Time loading mirror index: 00:00:00
-   Seeded quality full-index search: 00:00:00
-   Time searching: 00:00:00
+    Time loading forward index: 00:00:00
+    Time loading mirror index: 00:00:00
+    Seeded quality full-index search: 00:00:00
+    Reported 698 alignments to 1 output stream(s)
+    Time searching: 00:00:00
+    Overall time: 00:00:00
 
  Installing a pre-built index
  ----------------------------
@@ -75,11 +80,12 @@ Bowtie Getting Started Guide
  The pre-built E. coli index included with Bowtie is built from the
  sequence for strain 536, known to cause urinary tract infections. We
  will create a new index from the sequence of E. coli strain O157:H7, a
- strain known to cause food poisoning. Download the sequence file by
- right-clicking this link and selecting "Save Link As..." or "Save
- Target As...". The sequence file is named NC_002127.fna. When the
- sequence file is finished downloading, move it to the Bowtie install
- directory and issue this command:
+ strain known to cause food poisoning. Download the sequence file from:
+ 
+    ftp://ftp.ncbi.nlm.nih.gov/genomes/Bacteria/Escherichia_coli_O157H7/NC_002127.fna
+    
+ When the sequence file is finished downloading, move it to the Bowtie
+ install directory and issue this command:
 
     bowtie-build NC_002127.fna e_coli_O157_H7
 
@@ -105,7 +111,10 @@ Bowtie Getting Started Guide
  finding variations with respect to a reference sequence. The output
  produced by Bowtie can be converted to the same format as is output
  by Maq's short read aligner, allowing Bowtie users to leverage Maq's
- tools for finding variations.
+ tools for finding variations.  Note that versions of Maq prior to
+ 0.7.0 restrict reads to 63 bases or less.  Maq versions 0.7.0 and
+ later restrict reads to 127 bases or less.  Both are more restrictive
+ than Bowtie, which allows reads of up to 1024 bases.
 
  When running 'bowtie' to align your reads, be sure to provide a
  filename as the third argument to save the alignments to a file:
@@ -119,12 +128,17 @@ Bowtie Getting Started Guide
     maq fasta2bfa a_genome.mfa a_genome.bfa
 
  Now run 'bowtie-convert' to convert the Bowtie alignment file to a Maq
- alignment file:
+ alignment file. 
 
     bowtie-convert experiment1.map experiment1.maq_map a_genome.bfa 
 
- Note that Maq's alignment file format is not readable. Use 'maq
- mapview' to view its contents:
+ Note that the Maq file format changed starting with Maq version 0.7.0
+ in order to accommodate reads of up to 127 base pairs in length.  To
+ generate a Maq alignment file compatible with older versions of Maq,
+ run the same command as above but add the "-o" option.
+ 
+ Maq's alignment file format is not human-readable, but you can use
+ 'maq mapview' to view its contents:
 
     maq mapview experiment1.maq_map 
 

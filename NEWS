@@ -24,7 +24,10 @@ Version 0.9.7 - November ??, 2008
    * Separated the quality-conversion and parsing aspects of the old
      --solexa-quals argument into separate arguments: --solexa-quals
      (quality conversion) and --integer-quals (parsing).
-   *
+   * 'bowtie-convert' now handles the new (post-0.7.0) Maq alignment
+     format.  The new format allows Maq tools to handle reads up to
+     127 bases, whereas the old format was limited to 63 bases.  Also
+     added a '-o' option to opt for the old Maq format. 
 
 Version 0.9.6 - October 10, 2008
    * 'bowtie' now supports a host of options that allow the user to
