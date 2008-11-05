@@ -243,7 +243,7 @@ sub search {
 		$patarg = "-f";
 		$patstr = ".randread.fa";
 	} elsif($format == 1) {
-		# FASTQ with Sanger-like qualities
+		# FASTQ with ASCII qualities
 		open FQ, ">.randread.fq" || die "Could not open temporary fastq file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
@@ -254,8 +254,8 @@ sub search {
 		$patarg = "-q";
 		$patstr = ".randread.fq";
 	} elsif($format == 2) {
-		# FASTQ with Solexa-like qualities
-		open FQ, ">.randread.solexa.fq" || die "Could not open temporary solexa fastq file";
+		# FASTQ with integer qualities
+		open FQ, ">.randread.integer.fq" || die "Could not open temporary solexa fastq file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -268,8 +268,8 @@ sub search {
 			print FQ "\n";
 		}
 		close FQ;
-		$patarg = "-q --solexa-quals";
-		$patstr = ".randread.solexa.fq";
+		$patarg = "-q --integer-quals";
+		$patstr = ".randread.integer.fq";
 	} elsif($format == 3) {
 		# Raw
 		open RAW, ">.randread.raw" || die "Could not open temporary raw file";
