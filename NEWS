@@ -28,6 +28,8 @@ Version 0.9.7 - November ??, 2008
      format.  The new format allows Maq tools to handle reads up to
      127 bases, whereas the old format was limited to 63 bases.  Also
      added a '-o' option to opt for the old Maq format. 
+   * Improved tutorial to use a simple simulated read set (included)
+     to do SNP calls with Maq.
 
 Version 0.9.6 - October 10, 2008
    * 'bowtie' now supports a host of options that allow the user to
