@@ -154,8 +154,8 @@ Bowtie Getting Started Guide
 
     maq assemble ec_snp.cns genomes/NC_008253.bfa ec_snp.maq_map 
 
- The .cns is not stored in a readable format, but you can print the
- consensus sequence in FASTQ format using 'maq cns2fq':
+ The .cns file is not human-readable, but you can print the consensus
+ sequence in FASTQ format using 'maq cns2fq':
 
     maq cns2fq ec_snp.cns
  
@@ -163,8 +163,7 @@ Bowtie Getting Started Guide
  consensus is all 'n's after the first 10,000 bases.  This is because
  reads were simulated only from the first 10,000 bases.
 
- To identify ("call") Single Nucleotide Polymorphisms (SNPs) in the
- consensus sequence, use 'maq cns2snp':
+ To call SNPs in the consensus sequence, use 'maq cns2snp':
 
     maq cns2snp ec_snp.cns 
 
