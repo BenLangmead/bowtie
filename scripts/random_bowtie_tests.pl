@@ -294,15 +294,21 @@ sub search {
 	}
 	
 	my $khits = "-k 1";
-	if($phased) {
+	if($phased eq "-z") {
+		# A phased search may optionally be a non-stratified all-hits
+		# search
 		if(int(rand(2)) == 0) {
-			$khits = "-a";
+			$khits = "-a --nostrata";
 		}
 	} else {
 		if(int(rand(2)) == 0) {
 			$khits = "-a";
 		} else {
 			$khits = "-k " . (int(rand(20))+2);
+		}
+		if(int(rand(2)) == 0) {
+			$requireResult = 0;
+			$khits .= (" -m " . (int(rand(20))+2));
 		}
 		if(int(rand(2)) == 0) {
 			$khits .= " --best";

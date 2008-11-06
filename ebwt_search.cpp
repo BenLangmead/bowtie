@@ -65,6 +65,7 @@ static bool noRefNames          = false; // true -> print reference indexes; not
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
+static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
@@ -72,7 +73,7 @@ static bool useBsearch			= false; // if true, don't pad and use binary search ov
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
 
 #define ARG_ORIG                256
 #define ARG_SEED                257
@@ -139,6 +140,7 @@ static struct option long_options[] = {
 	{"help",         no_argument,       0,            'h'},
 	{"threads",      required_argument, 0,            'p'},
 	{"khits",        required_argument, 0,            'k'},
+	{"mhits",        required_argument, 0,            'm'},
 	{"best",         no_argument,       0,            ARG_BEST},
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
@@ -182,6 +184,7 @@ static void printUsage(ostream& out) {
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
+	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
 	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
@@ -570,7 +573,10 @@ static void parseOptions(int argc, char **argv) {
 	   			qUpto = (uint32_t)parseInt(1, "-u/--qupto arg must be at least 1");
 	   			break;
 	   		case 'k':
-	   			khits = (uint32_t)parseInt(1, "-k/--khits arg must be at least 1");
+	   			khits = (uint32_t)parseInt(1, "-k arg must be at least 1");
+	   			break;
+	   		case 'm':
+	   			mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
 	   			break;
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
@@ -634,11 +640,16 @@ static void parseOptions(int argc, char **argv) {
 	if(!fullIndex) {
 		bool error = false;
 		if(khits > 1) {
-			cerr << "When -z/--phased is used, -k/--khits X for X > 1 is unavailable" << endl;
+			cerr << "When -z/--phased is used, -k X for X > 1 is unavailable" << endl;
 			error = true;
 		}
 		if(onlyBest) {
 			cerr << "When -z/--phased is used, --best is unavailable" << endl;
+			error = true;
+		}
+		if(allHits && !spanStrata) {
+			cerr << "When -a/--all and -z/--phased are used, --nostrata must also be used." << endl
+			     << "Stratified all-hits search cannot be combined with phased search." << endl;
 			error = true;
 		}
 		if(error) exit(1);
@@ -719,27 +730,27 @@ static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
 		if(!allHits) {
 			if(onlyBest) {
 				// First N best, spanning strata
-				sink = new FirstNBestHitSinkPerThread(_sink, khits, sanity);
+				sink = new FirstNBestHitSinkPerThread(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThread(_sink, khits, sanity);
+				sink = new FirstNGoodHitSinkPerThread(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, spanning strata
-			sink = new AllHitSinkPerThread(_sink, sanity);
+			sink = new AllHitSinkPerThread(_sink, mhits, sanity);
 		}
     } else {
 		if(!allHits) {
 			if(onlyBest) {
 				// First N best, not spanning strata
-				sink = new FirstNBestStratifiedHitSinkPerThread(_sink, khits, sanity);
+				sink = new FirstNBestStratifiedHitSinkPerThread(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThread(_sink, khits, sanity);
+				sink = new FirstNGoodHitSinkPerThread(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, not spanning strata
-			sink = new AllStratifiedHitSinkPerThread(_sink, sanity);
+			sink = new AllStratifiedHitSinkPerThread(_sink, mhits, sanity);
 		}
     }
     assert(sink != NULL);

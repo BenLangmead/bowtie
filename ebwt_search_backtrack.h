@@ -829,17 +829,29 @@ public:
 			if(maxHitsAllowed == 0xffffffff) {
 				if(sink.spanStrata()) {
 					// Must have matched every oracle hit
-					if(oracleHits.size() > 0) {
+					if(oracleHits.size() > 0 && oracleHits.size() <= sink.overThresh()) {
 						for(size_t i = 0; i < oracleHits.size(); i++) {
 							printHit(oracleHits[i]);
 						}
+						assert_eq(0, oracleHits.size());
 					}
-					assert_eq(0, oracleHits.size());
 				} else {
 					// Must have matched all oracle hits at the best
 					// stratum
+					size_t numLeftovers = 0;
 					for(size_t i = 0; i < oracleStrata.size(); i++) {
-						assert_gt(oracleStrata[i], lastStratum);
+						if(oracleStrata[i] == lastStratum) {
+							numLeftovers++;
+						}
+					}
+					// Must have matched every oracle hit
+					if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
+						for(size_t i = 0; i < oracleHits.size(); i++) {
+							if(oracleStrata[i] == lastStratum) {
+								printHit(oracleHits[i]);
+							}
+						}
+						assert(0);
 					}
 				}
 			}
@@ -847,8 +859,19 @@ public:
 				// Ensure that all oracle hits have a stratum at least
 				// as bad as the worst stratum observed in the retained
 				// hits
+				size_t numLeftovers = 0;
 				for(size_t i = 0; i < oracleStrata.size(); i++) {
-					assert_geq(oracleStrata[i], worstStratum);
+					if(oracleStrata[i] < worstStratum) {
+						numLeftovers++;
+					}
+				}
+				if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
+					for(size_t i = 0; i < oracleHits.size(); i++) {
+						if(oracleStrata[i] < worstStratum) {
+							printHit(oracleHits[i]);
+						}
+					}
+					assert(0);
 				}
 			}
 		}
@@ -1596,7 +1619,11 @@ public:
 				}
 				if(ret) {
 					assert_gt(sink.numValidHits(), prehits);
-					if(_sanity) confirmHit(iham);
+					// Not necessarily true that there is a hit to
+					// confirm; it could be that true was returned
+					// because we just ran up against the max, where
+					// max > k
+					//if(_sanity) confirmHit(iham);
 					return true; // return, signaling that we're done
 				}
 				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
