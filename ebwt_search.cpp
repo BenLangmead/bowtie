@@ -805,6 +805,7 @@ static void *exactSearchWorker(void *vp) {
 	    bt.backtrack();
 		params.setFw(true);
     }
+	sink->finishRead();
     WORKER_EXIT();
 }
 
@@ -897,6 +898,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 		#include "search_1mm_phase1.c"
 		#undef DONEMASK_SET
 	} // End read loop
+	sink->finishRead();
     WORKER_EXIT();
 }
 
@@ -939,6 +941,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		#include "search_1mm_phase2.c"
 	} // End read loop
+	sink->finishRead();
     WORKER_EXIT();
 }
 
@@ -1071,6 +1074,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
+	sink->finishRead();
     WORKER_EXIT();
 }
 
@@ -1299,6 +1303,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 		#include "search_23mm_phase1.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1330,8 +1335,8 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_23mm_phase2.c"
 		#undef DONEMASK_SET
-
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1378,6 +1383,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1547,6 +1553,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1673,6 +1680,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 		#include "search_seeded_phase1.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1721,6 +1729,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1787,6 +1796,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		#include "search_seeded_phase3.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1837,6 +1847,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -1994,6 +2005,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
+	sink->finishRead();
 	WORKER_EXIT();
 }
 
@@ -2351,6 +2363,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 		}
 		hits.clear();
     }
+	sink->finishRead();
     WORKER_EXIT();
 }
 
