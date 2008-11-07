@@ -294,6 +294,7 @@ sub search {
 	}
 	
 	my $khits = "-k 1";
+	my $mhits = 0;
 	if($phased eq "-z") {
 		# A phased search may optionally be a non-stratified all-hits
 		# search
@@ -308,7 +309,7 @@ sub search {
 		}
 		if(int(rand(2)) == 0) {
 			$requireResult = 0;
-			$khits .= (" -m " . (int(rand(20))+2));
+			$mhits = (int(rand(20))+2);
 		}
 		if(int(rand(2)) == 0) {
 			$khits .= " --best";
@@ -316,6 +317,9 @@ sub search {
 		if(int(rand(2)) == 0) {
 			$khits .= " --nostrata";
 		}
+	}
+	if($mhits > 0) {
+		$khits .= " -m $mhits";
 	}
 	
 	if($oneHit || 1) {
@@ -366,6 +370,8 @@ sub search {
 	# Parse output to see if any of it is bad
 	my @outlines = split('\n', $out);
 	my %outhash = ();
+	my %readcount = ();
+	my $lastread = "";
 	foreach(@outlines) {
 		chomp;
 		print "$_\n";
@@ -381,6 +387,17 @@ sub search {
 				exit 1;
 			}
 			return 0;
+		}
+		/^([01-9]+)[+-]?[:]/;
+		my $read = $1;
+		if(($read ne $lastread) && ($phased eq "")) {
+			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
+		}
+		$lastread = $read;
+		$readcount{$read} = 1 unless defined($readcount{$read});
+		$readcount{$read}++ if defined($readcount{$read});
+		if($mhits > 0) {
+			$readcount{$read} <= $mhits || die "Read $read matched more than $mhits times";
 		}
 	}
 	
