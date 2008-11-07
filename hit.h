@@ -188,6 +188,11 @@ public:
 
 	virtual void reportHits(const vector<Hit>& hs) {
 		for(size_t i = 0; i < hs.size(); i++) {
+#ifndef NDEBUG
+			for(size_t j = i+1; j < hs.size(); j++) {
+				assert_eq(hs[i].h.first, hs[j].h.first);
+			}
+#endif
 			reportHit(hs[i]);
 		}
 	}
@@ -1003,12 +1008,37 @@ public:
     	// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
 		if(_reportOpps) ss << "," << h.oms;
-		ss << ">";
+		ss << ">" << endl;
 		lock(h.h.first);
 		_first = false;
-		out(h.h.first) << ss.str() << endl;
+		out(h.h.first) << ss.str();
 		_numReported++;
 		unlock(h.h.first);
+	}
+
+	/**
+	 *
+	 */
+	virtual void reportHits(const vector<Hit>& hs) {
+		ostringstream ss;
+		for(size_t i = 0; i < hs.size(); i++) {
+#ifndef NDEBUG
+			for(size_t j = i+1; j < hs.size(); j++) {
+				assert_eq(hs[i].h.first, hs[j].h.first);
+			}
+#endif
+			const Hit& h = hs[i];
+			ss << h.patId << (h.fw? "+" : "-") << ":";
+	    	// .first is text id, .second is offset
+			ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
+			if(_reportOpps) ss << "," << h.oms;
+			ss << ">" << endl;
+		}
+		lock(hs[0].h.first);
+		_first = false;
+		out(hs[0].h.first) << ss.str();
+		_numReported += hs.size();
+		unlock(hs[0].h.first);
 	}
 
 	/**
@@ -1134,8 +1164,7 @@ public:
 	/**
 	 *
 	 */
-	virtual void reportHit(const Hit& h) {
-		ostringstream ss;
+	void append(ostream& ss, const Hit& h) {
 		if(_partition > 0) {
 			// Output a partitioning key
 			ss << h.h.first;
@@ -1180,6 +1209,14 @@ public:
 			}
 		}
 		ss << endl;
+	}
+
+	/**
+	 *
+	 */
+	virtual void reportHit(const Hit& h) {
+		ostringstream ss;
+		append(ss, h);
 		// Make sure to grab lock before writing to output stream
 		lock(h.h.first);
 		_first = false;
@@ -1188,6 +1225,29 @@ public:
 		unlock(h.h.first);
 	}
 
+	/**
+	 *
+	 */
+	virtual void reportHits(const vector<Hit>& hs) {
+		ostringstream ss;
+		for(size_t i = 0; i < hs.size(); i++) {
+#ifndef NDEBUG
+			for(size_t j = i+1; j < hs.size(); j++) {
+				assert_eq(hs[i].h.first, hs[j].h.first);
+			}
+#endif
+			append(ss, hs[i]);
+		}
+		lock(hs[0].h.first);
+		_first = false;
+		out(hs[0].h.first) << ss.str();
+		_numReported += hs.size();
+		unlock(hs[0].h.first);
+	}
+
+	/**
+	 *
+	 */
 	virtual void finish() {
 		if(_first) {
 			assert_eq(0llu, _numReported);
@@ -1217,9 +1277,10 @@ public:
 	HitSink(__numOuts, __refnames),
 	_first(true), _numReported(0llu) { }
 
-	virtual void reportHit(const Hit& h) {
-		lock(h.h.first);
-		ostream& o = out(h.h.first);
+	/**
+	 *
+	 */
+	void append(ostream& o, const Hit& h) {
 		// true iff we're going to print the reference sequence name
 		bool refName = this->_refnames != NULL &&
 		                h.h.first < this->_refnames->size();
@@ -1277,11 +1338,42 @@ public:
 				c++;
 			}
 		}
+	}
+
+	/**
+	 *
+	 */
+	virtual void reportHit(const Hit& h) {
+		ostream& o = out(h.h.first);
+		lock(h.h.first);
+		append(o, h);
 		_first = false;
 		_numReported++;
 		unlock(h.h.first);
 	}
 
+	/**
+	 *
+	 */
+	virtual void reportHits(const vector<Hit>& hs) {
+		ostream& o = out(hs[0].h.first);
+		lock(hs[0].h.first);
+		for(size_t i = 0; i < hs.size(); i++) {
+#ifndef NDEBUG
+			for(size_t j = i+1; j < hs.size(); j++) {
+				assert_eq(hs[i].h.first, hs[j].h.first);
+			}
+#endif
+			append(o, hs[i]);
+		}
+		_first = false;
+		_numReported += hs.size();
+		unlock(hs[0].h.first);
+	}
+
+	/**
+	 *
+	 */
 	virtual void finish() {
 		if(_first) {
 			assert_eq(0llu, _numReported);
