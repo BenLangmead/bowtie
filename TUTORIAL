@@ -116,12 +116,12 @@ Bowtie Getting Started Guide
  later restrict reads to 127 bases or less.  Both are more restrictive
  than Bowtie, which allows reads of up to 1024 bases.
 
- Let's use Maq to find Single-Nucleotide Polymorphisms (SNPs) in a
- simulated read set included with Bowtie.  The simulated reads cover
- the first 10,000 bases of the included E. coli genome and contain 10
- SNPs throughout. First, we run 'bowtie' to align the reads, being sure
- to provide a filename as the third argument so that alignments are
- saved to a file:
+ Let's use Bowtie and Maq to find Single-Nucleotide Polymorphisms
+ (SNPs) in a simulated read set included with Bowtie.  The simulated
+ reads cover the first 10,000 bases of the included E. coli genome and
+ contain 10 SNPs throughout. First, we run 'bowtie' to align the reads,
+ being sure to provide a filename as the third argument so that
+ alignments are saved to a file:
 
     bowtie e_coli reads/e_coli_10000snp.fq ec_snp.map 
 
