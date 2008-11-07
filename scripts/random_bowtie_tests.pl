@@ -394,8 +394,8 @@ sub search {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
 		$lastread = $read;
-		$readcount{$read} = 1 unless defined($readcount{$read});
 		$readcount{$read}++ if defined($readcount{$read});
+		$readcount{$read} = 1 unless defined($readcount{$read});
 		if($mhits > 0) {
 			$readcount{$read} <= $mhits || die "Read $read matched more than $mhits times";
 		}

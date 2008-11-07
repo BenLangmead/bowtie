@@ -781,6 +781,7 @@ public:
 			assert_eq(oracleHits.size(), oracleStrata.size());
 			assert_gt(oracleHits.size(), 0);
 			int lastStratum = -1;
+			int bestStratum = -1;
 			int worstStratum = -1;
 			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
 				Hit& rhit = retainedHits[j];
@@ -790,6 +791,13 @@ public:
 					worstStratum = retainedStrata[j];
 				} else if(retainedStrata[j] > worstStratum) {
 					worstStratum = retainedStrata[j];
+				}
+				// Keep a running measure of the "best" stratum
+				// observed in the retained hits
+				if(bestStratum == -1) {
+					bestStratum = retainedStrata[j];
+				} else if(retainedStrata[j] < bestStratum) {
+					bestStratum = retainedStrata[j];
 				}
 				if(lastStratum == -1) {
 					lastStratum = retainedStrata[j];
@@ -823,6 +831,8 @@ public:
 				// of the ones that the oracle found
 				assert(found); // assert we found a matchup
 			}
+			// All of the oracle hits that corresponded to a retained
+			// hit have now been eliminated
 			assert_neq(-1, lastStratum);
 			assert_neq(-1, worstStratum);
 			assert_eq(oracleHits.size(), oracleStrata.size());
@@ -840,14 +850,14 @@ public:
 					// stratum
 					size_t numLeftovers = 0;
 					for(size_t i = 0; i < oracleStrata.size(); i++) {
-						if(oracleStrata[i] == lastStratum) {
+						if(oracleStrata[i] == bestStratum) {
 							numLeftovers++;
 						}
 					}
 					// Must have matched every oracle hit
 					if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
 						for(size_t i = 0; i < oracleHits.size(); i++) {
-							if(oracleStrata[i] == lastStratum) {
+							if(oracleStrata[i] == bestStratum) {
 								printHit(oracleHits[i]);
 							}
 						}
@@ -855,23 +865,12 @@ public:
 					}
 				}
 			}
-			if(sink.best()) {
+			if(sink.best() && sink.overThresh() == 0xffffffff) {
 				// Ensure that all oracle hits have a stratum at least
 				// as bad as the worst stratum observed in the retained
 				// hits
-				size_t numLeftovers = 0;
 				for(size_t i = 0; i < oracleStrata.size(); i++) {
-					if(oracleStrata[i] < worstStratum) {
-						numLeftovers++;
-					}
-				}
-				if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
-					for(size_t i = 0; i < oracleHits.size(); i++) {
-						if(oracleStrata[i] < worstStratum) {
-							printHit(oracleHits[i]);
-						}
-					}
-					assert(0);
+					assert_leq(bestStratum, oracleStrata[i]);
 				}
 			}
 		}

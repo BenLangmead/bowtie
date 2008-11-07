@@ -101,7 +101,7 @@ struct Hit {
 	bool                fw;      /// orientation of read in alignment
 
 	size_t length() const { return seqan::length(patSeq); }
-	
+
 	Hit& operator = (const Hit &other) {
 	    this->h       = other.h;
 	    this->patId   = other.patId;
@@ -185,7 +185,7 @@ public:
 
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) = 0;
-	
+
 	virtual void reportHits(const vector<Hit>& hs) {
 		for(size_t i = 0; i < hs.size(); i++) {
 			reportHit(hs[i]);
@@ -366,8 +366,8 @@ public:
 	/// Return the maximum number of hits allowed per read
 	virtual uint32_t maxHits() = 0;
 
-	/// 
-	uint32_t overThresh() { return _max; } 
+	///
+	uint32_t overThresh() { return _max; }
 
 	/// Return whether we span strata
 	virtual bool spanStrata() = 0;
@@ -392,7 +392,7 @@ protected:
 	/// Buffered hits, to be reported and flushed at end of read-phase
 	vector<Hit> _bufferedHits;
 	vector<int> _strata; /// Repository for retained strata
-	
+
 	// Following variables are declared in the parent but maintained in
 	// the concrete subcalsses
 	uint32_t _hitsForThisRead; /// # hits for this read so far
