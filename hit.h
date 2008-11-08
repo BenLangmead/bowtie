@@ -342,6 +342,12 @@ public:
 			_strata.push_back(stratum);
 		}
 		if(_bufferHits) {
+#ifndef NDEBUG
+			// Ensure all buffered hits have the same patid
+			for(size_t i = 1; i < _bufferedHits.size(); i++) {
+				assert_eq(_bufferedHits[0].patId, _bufferedHits[i].patId);
+			}
+#endif
 			_bufferedHits.push_back(h);
 		} else {
 			_sink.reportHit(h);
@@ -1048,14 +1054,14 @@ public:
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		if(hs.size() == 0) return;
-		if(hs.size() > 2) {
+		if(_outs.size() > 1 && hs.size() > 2) {
 			sort(hs.begin(), hs.end());
 		}
 		for(size_t i = 0; i < hs.size(); i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				lock(h.h.first);
-			} else if(hs[i-1].h.first != h.h.first) {
+			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
 				unlock(hs[i-1].h.first);
 				lock(h.h.first);
 			}
@@ -1259,14 +1265,14 @@ public:
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		if(hs.size() == 0) return;
-		if(hs.size() > 2) {
+		if(_outs.size() > 1 && hs.size() > 2) {
 			sort(hs.begin(), hs.end());
 		}
 		for(size_t i = 0; i < hs.size(); i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				lock(h.h.first);
-			} else if(h.h.first != hs[i-1].h.first) {
+			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
 				unlock(hs[i-1].h.first);
 				lock(h.h.first);
 			}
@@ -1392,14 +1398,14 @@ public:
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		if(hs.size() == 0) return;
-		if(hs.size() > 2) {
+		if(_outs.size() > 1 && hs.size() > 2) {
 			sort(hs.begin(), hs.end());
 		}
 		for(size_t i = 0; i < hs.size(); i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				lock(h.h.first);
-			} else if(h.h.first != hs[i-1].h.first) {
+			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
 				unlock(hs[i-1].h.first);
 				lock(h.h.first);
 			}
