@@ -2709,7 +2709,7 @@ static void driver(const char * type,
 		}
 	    sink->finish(); // end the hits section of the hit file
 	    sink->flush();
-		if(!outfile.empty()) {
+		if(fout != NULL) {
 			((ofstream*)fout)->close();
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
