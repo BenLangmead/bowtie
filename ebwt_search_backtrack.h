@@ -841,7 +841,7 @@ public:
 					// All hits remaining must occur more times than the max
 					map<uint32_t,uint32_t> readToCnt;
 					for(size_t i = 0; i < oracleHits.size(); i++) {
-						readToCnt[oracleHits[i].h.first]++;
+						readToCnt[oracleHits[i].patId]++;
 					}
 					map<uint32_t,uint32_t>::iterator it;
 					for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
