@@ -223,7 +223,7 @@ static void printUsage(ostream& out) {
  * Print a detailed usage message to the provided output stream.
  *
  * Manual text converted to C++ string with something like:
- * cat MANUAL  | head -390 | tail -280 | sed -e 's/\"/\\\"/g' | \
+ * cat MANUAL  | head -415 | tail -340 | sed -e 's/\"/\\\"/g' | \
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
  */
 static void printLongUsage(ostream& out) {
@@ -277,16 +277,16 @@ static void printLongUsage(ostream& out) {
 	"\n"
 	"  The N, L and E parameters are configured using Bowtie's -n, -l and\n"
 	"  -e options.\n"
-	"\n"
+	" \n"
 	"  If there are many possible alignments that satisfy both criteria,\n"
 	"  Bowtie will make an effort to give preference to alignments with\n"
 	"  where the sum from criterion 2 is smaller.  Bowtie does not guarantee\n"
 	"  that it will report the minimum-sum alignment.\n"
-	"\n"
+	"  \n"
 	"  Note that Maq internally rounds base qualities to the nearest 10 and\n"
 	"  truncates qualities greater than 30 to 30.  To maintain compatibility\n"
 	"  with Maq, Bowtie does the same.\n"
-	"\n"
+	" \n"
 	"  Also note that bowtie is not fully sensitive in -n 2 and -n 3\n"
 	"  modes.  In those modes, bowtie imposes a \"backtracking limit\" to\n"
 	"  limit the amount of effort spent trying to find valid alignments for\n"
@@ -296,10 +296,10 @@ static void printLongUsage(ostream& out) {
 	"  default (125), but the user may decrease or increase the limit using\n"
 	"  the --maxbts option.  Setting the limit to a very large number\n"
 	"  (>10000) guarantees full sensitivity.\n"
-	"\n"
+	" \n"
 	"  End-to-end k-difference Policy\n"
 	"  ------------------------------\n"
-	"\n"
+	"  \n"
 	"  The policy has one criterion: Alignments may have no more than V\n"
 	"  mismatches.  Quality values are ignored.  The number of mismatches\n"
 	"  permitted is configurable with the -V option.\n"
@@ -535,6 +535,27 @@ static void printLongUsage(ostream& out) {
 	"  right, the fields are:\n"
 	"\n"
 	"   1. Name of read that aligned\n"
+	"\n"
+	"   2. Orientation of read in the alignment, '-' for reverse complement,\n"
+	"      '+' otherwise\n"
+	"\n"
+	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
+	"      if no name was provided\n"
+	"\n"
+	"   4. 0-based offset into the reference sequence where leftmost\n"
+	"      character of the alignment occurs\n"
+	"\n"
+	"   5. Read sequence (reverse-complemented if orientation is '-')\n"
+	"\n"
+	"   6. Read qualities (reversed if orientation is '-')\n"
+	"\n"
+	"   7. Reserved\n"
+	"\n"
+	"   8. Comma-separated list of mismatch descriptors.  If there are no\n"
+	"      mismatches in the alignment, this field is empty.  A single\n"
+	"      descriptor has the format offset:reference-base>read-base.  The\n"
+	"      offset is expressed as a 0-based offset from the high-quality\n"
+	"      (5') end of the read. \n"
 	"\n"
 	;
 }
