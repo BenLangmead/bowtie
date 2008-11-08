@@ -845,7 +845,7 @@ public:
 					}
 					map<uint32_t,uint32_t>::iterator it;
 					for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
-						assert_leq(it->second, sink.overThresh());
+						assert_gt(it->second, sink.overThresh());
 					}
 				} else {
 					// Must have matched all oracle hits at the best

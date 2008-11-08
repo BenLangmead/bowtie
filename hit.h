@@ -186,7 +186,7 @@ public:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) = 0;
 
-	virtual void reportHits(const vector<Hit>& hs) {
+	virtual void reportHits(vector<Hit>& hs) {
 		for(size_t i = 0; i < hs.size(); i++) {
 #ifndef NDEBUG
 			for(size_t j = i+1; j < hs.size(); j++) {
@@ -233,6 +233,13 @@ protected:
 		MUTEX_LOCK(_locks[strIdx]);
 #endif
 	}
+	void mainlock() {
+#ifdef USE_SPINLOCK
+		_mainlock.Enter();
+#else
+		MUTEX_LOCK(_mainlock);
+#endif
+	}
 	void unlock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
@@ -241,13 +248,22 @@ protected:
 		MUTEX_UNLOCK(_locks[strIdx]);
 #endif
 	}
+	void mainunlock() {
+#ifdef USE_SPINLOCK
+		_mainlock.Leave();
+#else
+		MUTEX_UNLOCK(_mainlock);
+#endif
+	}
 	vector<ostream*> _outs;     /// the alignment output stream(s)
 	bool             _deleteOuts; /// Whether to delete elements of _outs upon exit
 	vector<string>*  _refnames; /// map from reference indexes to names
 #ifdef USE_SPINLOCK
 	vector<SpinLock> _locks;    /// spinlocks for per-file critical sections
+	SpinLock         _mainlock; /// spinlocks for fields of this object
 #else
 	vector<MUTEX_T>  _locks;    /// pthreads mutexes for per-file critical sections
+	MUTEX_T          _mainlock; /// pthreads mutexes for fields of this object
 #endif
 };
 
@@ -1000,45 +1016,55 @@ public:
 		_numReported(0llu) { }
 
 	/**
-	 * Report a concise alignment to the appropriate output stream.
+	 *
 	 */
-	virtual void reportHit(const Hit& h) {
-		ostringstream ss;
+	void append(ostream& ss, const Hit& h) {
 		ss << h.patId << (h.fw? "+" : "-") << ":";
     	// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
 		if(_reportOpps) ss << "," << h.oms;
 		ss << ">" << endl;
-		lock(h.h.first);
-		_first = false;
-		out(h.h.first) << ss.str();
-		_numReported++;
-		unlock(h.h.first);
 	}
 
 	/**
-	 *
+	 * Report a concise alignment to the appropriate output stream.
 	 */
-	virtual void reportHits(const vector<Hit>& hs) {
+	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
-		for(size_t i = 0; i < hs.size(); i++) {
-#ifndef NDEBUG
-			for(size_t j = i+1; j < hs.size(); j++) {
-				assert_eq(hs[i].h.first, hs[j].h.first);
-			}
-#endif
-			const Hit& h = hs[i];
-			ss << h.patId << (h.fw? "+" : "-") << ":";
-	    	// .first is text id, .second is offset
-			ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
-			if(_reportOpps) ss << "," << h.oms;
-			ss << ">" << endl;
-		}
-		lock(hs[0].h.first);
+		append(ss, h);
+		lock(h.h.first);
+		out(h.h.first) << ss.str();
+		unlock(h.h.first);
+		mainlock();
 		_first = false;
-		out(hs[0].h.first) << ss.str();
+		_numReported++;
+		mainunlock();
+	}
+
+	/**
+	 * Report a set of hits in one big critical section, so that there
+	 * is no interlacing of hits for different reads.
+	 */
+	virtual void reportHits(vector<Hit>& hs) {
+		if(hs.size() == 0) return;
+		if(hs.size() > 2) {
+			sort(hs.begin(), hs.end());
+		}
+		for(size_t i = 0; i < hs.size(); i++) {
+			const Hit& h = hs[i];
+			if(i == 0) {
+				lock(h.h.first);
+			} else if(hs[i-1].h.first != h.h.first) {
+				unlock(hs[i-1].h.first);
+				lock(h.h.first);
+			}
+			append(out(h.h.first), h);
+		}
+		unlock(hs[hs.size()-1].h.first);
+		mainlock();
+		_first = false;
 		_numReported += hs.size();
-		unlock(hs[0].h.first);
+		mainunlock();
 	}
 
 	/**
@@ -1219,30 +1245,37 @@ public:
 		append(ss, h);
 		// Make sure to grab lock before writing to output stream
 		lock(h.h.first);
-		_first = false;
 		out(h.h.first) << ss.str();
-		_numReported++;
 		unlock(h.h.first);
+		mainlock();
+		_first = false;
+		_numReported++;
+		mainunlock();
 	}
 
 	/**
 	 *
 	 */
-	virtual void reportHits(const vector<Hit>& hs) {
-		ostringstream ss;
-		for(size_t i = 0; i < hs.size(); i++) {
-#ifndef NDEBUG
-			for(size_t j = i+1; j < hs.size(); j++) {
-				assert_eq(hs[i].h.first, hs[j].h.first);
-			}
-#endif
-			append(ss, hs[i]);
+	virtual void reportHits(vector<Hit>& hs) {
+		if(hs.size() == 0) return;
+		if(hs.size() > 2) {
+			sort(hs.begin(), hs.end());
 		}
-		lock(hs[0].h.first);
+		for(size_t i = 0; i < hs.size(); i++) {
+			const Hit& h = hs[i];
+			if(i == 0) {
+				lock(h.h.first);
+			} else if(h.h.first != hs[i-1].h.first) {
+				unlock(hs[i-1].h.first);
+				lock(h.h.first);
+			}
+			append(out(h.h.first), h);
+		}
+		unlock(hs[hs.size()-1].h.first);
+		mainlock();
 		_first = false;
-		out(hs[0].h.first) << ss.str();
 		_numReported += hs.size();
-		unlock(hs[0].h.first);
+		mainunlock();
 	}
 
 	/**
@@ -1344,31 +1377,38 @@ public:
 	 *
 	 */
 	virtual void reportHit(const Hit& h) {
-		ostream& o = out(h.h.first);
 		lock(h.h.first);
-		append(o, h);
+		append(out(h.h.first), h);
+		unlock(h.h.first);
+		mainlock();
 		_first = false;
 		_numReported++;
-		unlock(h.h.first);
+		mainunlock();
 	}
 
 	/**
 	 *
 	 */
-	virtual void reportHits(const vector<Hit>& hs) {
-		ostream& o = out(hs[0].h.first);
-		lock(hs[0].h.first);
-		for(size_t i = 0; i < hs.size(); i++) {
-#ifndef NDEBUG
-			for(size_t j = i+1; j < hs.size(); j++) {
-				assert_eq(hs[i].h.first, hs[j].h.first);
-			}
-#endif
-			append(o, hs[i]);
+	virtual void reportHits(vector<Hit>& hs) {
+		if(hs.size() == 0) return;
+		if(hs.size() > 2) {
+			sort(hs.begin(), hs.end());
 		}
+		for(size_t i = 0; i < hs.size(); i++) {
+			const Hit& h = hs[i];
+			if(i == 0) {
+				lock(h.h.first);
+			} else if(h.h.first != hs[i-1].h.first) {
+				unlock(hs[i-1].h.first);
+				lock(h.h.first);
+			}
+			append(out(h.h.first), h);
+		}
+		unlock(hs[hs.size()-1].h.first);
+		mainlock();
 		_first = false;
 		_numReported += hs.size();
-		unlock(hs[0].h.first);
+		mainunlock();
 	}
 
 	/**
