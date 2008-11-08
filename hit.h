@@ -292,10 +292,7 @@ public:
 	void setRetainHits(bool r)  { _keep = r; }
 	/// Return whether we're retaining hits or not
 	bool retainHits()           { return _keep; }
-	/// Clear all hits in the retained-hits vector
-	void clearRetainedHits() {
-		_hits.clear(); _strata.clear();
-	}
+
 	/// Return the vector of retained hits
 	vector<Hit>& retainedHits()   { return _hits; }
 	vector<int>& retainedStrata() { return _strata; }
@@ -387,8 +384,12 @@ public:
 	/// Return the maximum number of hits allowed per read
 	virtual uint32_t maxHits() = 0;
 
-	///
+	/// The mhits maximum
 	uint32_t overThresh() { return _max; }
+
+	/// Whether this thread, for this read, knows that we have already
+	/// exceeded the mhits maximum
+	bool exceededOverThresh() { return _hitsForThisRead > _max; }
 
 	/// Return whether we span strata
 	virtual bool spanStrata() = 0;

@@ -836,7 +836,7 @@ public:
 			assert_neq(-1, lastStratum);
 			assert_neq(-1, worstStratum);
 			assert_eq(oracleHits.size(), oracleStrata.size());
-			if(maxHitsAllowed == 0xffffffff) {
+			if(maxHitsAllowed == 0xffffffff && !sink.exceededOverThresh()) {
 				if(sink.spanStrata()) {
 					// All hits remaining must occur more times than the max
 					map<uint32_t,uint32_t> readToCnt;
@@ -867,7 +867,7 @@ public:
 					}
 				}
 			}
-			if(sink.best() && sink.overThresh() == 0xffffffff) {
+			if(sink.best() && sink.overThresh() == 0xffffffff && !sink.exceededOverThresh()) {
 				// Ensure that all oracle hits have a stratum at least
 				// as bad as the worst stratum observed in the retained
 				// hits
