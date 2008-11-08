@@ -838,12 +838,14 @@ public:
 			assert_eq(oracleHits.size(), oracleStrata.size());
 			if(maxHitsAllowed == 0xffffffff) {
 				if(sink.spanStrata()) {
-					// Must have matched every oracle hit
-					if(oracleHits.size() > 0 && oracleHits.size() <= sink.overThresh()) {
-						for(size_t i = 0; i < oracleHits.size(); i++) {
-							printHit(oracleHits[i]);
-						}
-						assert_eq(0, oracleHits.size());
+					// All hits remaining must occur more times than the max
+					map<uint32_t,uint32_t> readToCnt;
+					for(size_t i = 0; i < oracleHits.size(); i++) {
+						readToCnt[oracleHits[i].h.first]++;
+					}
+					map<uint32_t,uint32_t>::iterator it;
+					for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
+						assert_leq(it->second, sink.overThresh());
 					}
 				} else {
 					// Must have matched all oracle hits at the best
