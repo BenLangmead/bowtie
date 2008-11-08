@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.7 - November ??, 2008
+Version 0.9.7 - November 8, 2008
    * Separated the quality-conversion and parsing aspects of the old
      --solexa-quals argument into separate arguments: --solexa-quals
      (quality conversion) and --integer-quals (parsing).
@@ -28,6 +28,10 @@ Version 0.9.7 - November ??, 2008
      format.  The new format allows Maq tools to handle reads up to
      127 bases, whereas the old format was limited to 63 bases.  Also
      added a '-o' option to opt for the old Maq format. 
+   * New '--refout' argument sends alignments to a set of files named
+     refXXXXX.map, where XXXXX is the 0-padded index of the reference
+     sequence aligned to.  Useful for dealing with large datasets
+     aligned to, e.g., the assembled human genome.
    * Improved tutorial to use a simple simulated read set (included)
      to do SNP calls with Maq.
 
