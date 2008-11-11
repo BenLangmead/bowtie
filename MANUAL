@@ -448,6 +448,16 @@ Bowtie Manual
 
  If bowtie-build aborts with an out-of-memory error, try re-running it
  with a larger --bmaxdivn (the default is 4).
+ 
+ Because bowtie-build uses 32-bit indexes internally, it can handle up
+ to a maximum of 2^32-1 (somewhat more than 4 billion) characters in an
+ index.  Because bowtie-build adds padding to separate distinct
+ reference sequences in the index, bowtie-build actually supports fewer
+ than 2^32-1 characters when there are multuple reference sequences.
+ If your reference exceeds 2^32-1 characters either before or after
+ padding, bowtie-build will print an error message and abort.  To
+ resolve this, please divide your reference sequences into smaller
+ batches and/or chunks and build a separate index for each.  
 
   Command Line
   ------------
