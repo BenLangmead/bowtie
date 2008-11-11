@@ -3376,6 +3376,14 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 					diff = eh._chunkLen - leftover;
 					assert_gt(diff, 0);
 				}
+				if((sztot + diff) < sztot) {
+					cerr << "Error: The reference sequence, when padding is added, exceeds 2^32-1 characters." << endl
+					     << "This can happen when the reference itself is too long, or when the reference" << endl
+					     << "is divided into many separate sequences.  Please divide your reference sequences" << endl
+					     << "into smaller batches and build a separate index for each batch." << endl;
+					exit(1);
+				}
+				sztot += diff;
 				for(uint32_t i = 0; i < diff; i++) {
 					// Append random characters to fill the gap; note that
 					// the randomness is reproducible as long as the 'seed'

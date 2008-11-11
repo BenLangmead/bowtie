@@ -27,8 +27,8 @@ struct RefRecord {
 		off(_off), len(_len), first(_first)
 	{
 	}
-	size_t off;
-	size_t len;
+	uint32_t off;
+	uint32_t len;
 	bool   first;
 };
 
@@ -196,7 +196,9 @@ static RefRecord fastaRefReadAppend(istream& in,
 			appendValue(dst, (Dna)(char)c);
 			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
 			seqCharsRead++;
-			if((int64_t)seqCharsRead >= refparams.baseCutoff) {
+			if(refparams.baseCutoff > 0 &&
+			   (int64_t)seqCharsRead >= refparams.baseCutoff)
+			{
 				lastc = -1;
 				goto bail;
 			}

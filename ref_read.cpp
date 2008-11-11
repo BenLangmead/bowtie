@@ -111,7 +111,9 @@ RefRecord fastaRefReadSize(istream& in,
 			assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
 			// Consume it
 			seqCharsRead++;
-			if((int64_t)seqCharsRead >= refparams.baseCutoff) {
+			if(refparams.baseCutoff != -1 &&
+			   (int64_t)seqCharsRead >= refparams.baseCutoff)
+			{
 				lastc = -1;
 				return RefRecord(seqOff, seqCharsRead, seqFirst);
 			}
@@ -148,7 +150,7 @@ size_t fastaRefReadSizes(vector<istream*>& in,
                          vector<RefRecord>& recs,
                          const RefReadInParams& refparams)
 {
-	size_t tot = 0;
+	uint32_t tot = 0;
 	RefReadInParams rpcp = refparams;
 	assert_gt(in.size(), 0);
 	// For each input istream
@@ -163,11 +165,17 @@ size_t fastaRefReadSizes(vector<istream*>& in,
 		// For each pattern in this istream
 		while(in[i]->good() && rpcp.baseCutoff != 0 && rpcp.numSeqCutoff != 0) {
 			RefRecord rec = fastaRefReadSize(*in[i], refparams, first);
-			assert_leq((int64_t)rec.len, rpcp.baseCutoff);
+			if(rpcp.baseCutoff > 0) assert_leq((int64_t)rec.len, rpcp.baseCutoff);
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= rec.len;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
 			assert_geq(rpcp.baseCutoff, -1);
 			assert_geq(rpcp.numSeqCutoff, -1);
+			if((tot + rec.len) < tot) {
+				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please divide the" << endl
+				     << "reference into batches or chunks of about 3.6 billion characters or less each" << endl
+				     << "and index each independently." << endl;
+				exit(1);
+			}
 			tot += rec.len;
 			first = false;
 			if(rec.len == 0 && rec.off == 0 && !rec.first) continue;

@@ -32,7 +32,7 @@ static int entireSA          = 0;     // 1 = disable blockwise SA
 static int seed              = 0;     // srandom seed
 static int showVersion       = 0;     // just print version and quit?
 static bool doubleEbwt       = true;  // build forward and reverse Ebwts
-static int64_t cutoff        = 0xffffffff; // max # of reference bases
+static int64_t cutoff        = -1;    // max # of reference bases
 //   Ebwt parameters
 static int32_t lineRate      = 6;  // a "line" is 64 bytes
 static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
@@ -497,9 +497,10 @@ int main(int argc, char **argv) {
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t}: {" << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << "}" << endl;
+		     << ", " << sizeof(void *)
+		     << ", " << sizeof(size_t) << "}" << endl;
 		cout << "Source hash: " << EBWT_BUILD_HASH << endl;
 		return 0;
 	}
@@ -553,7 +554,7 @@ int main(int argc, char **argv) {
 		}
 		cout << "  Difference-cover sample period: " << dcv << endl;
 		cout << "  Reference base cutoff: ";
-		if(cutoff == 0xffffffff) cout << "none"; else cout << cutoff << " bases";
+		if(cutoff == -1) cout << "none"; else cout << cutoff << " bases";
 		cout << endl;
 		cout << "  Endianness: " << (bigEndian? "big":"little") << endl
 	         << "  Actual local endianness: " << (currentlyBigEndian()? "big":"little") << endl
@@ -564,7 +565,7 @@ int main(int argc, char **argv) {
 		cout << "  Assertions: enabled" << endl;
 #endif
 		cout << "  Random seed: " << seed << endl;
-		cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << endl;
+		cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << ", size_t:" << sizeof(size_t) << endl;
 		cout << "Input files DNA, " << file_format_names[format] << ":" << endl;
 		for(size_t i = 0; i < infiles.size(); i++) {
 			cout << "  " << infiles[i] << endl;
