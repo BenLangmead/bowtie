@@ -1341,7 +1341,9 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1374,7 +1376,9 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	BacktrackManager<String<Dna> > bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1407,7 +1411,9 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1420,7 +1426,9 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	BacktrackManager<String<Dna> > bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1547,7 +1555,9 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1560,7 +1570,9 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1573,7 +1585,9 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows
@@ -1586,7 +1600,9 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	BacktrackManager<String<Dna> > bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
+	        // Do not impose maximums in 2/3-mismatch mode
+	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        false,          // reportArrows

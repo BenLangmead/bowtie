@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.9.7.
+available to the public for download.  The current version is 0.9.7.1.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,11 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.9.7.1 - November 11, 2008
+   * Fixed an issue that caused a spurious loss of sensitivity between
+     Bowtie versions 0.9.6 and 0.9.7 in certain modes.  Many thanks to
+     Ali Mortazavi for bringing this to our attention.
 
 Version 0.9.7 - November 8, 2008
    * Added new reporting option -m <int> which suppresses all

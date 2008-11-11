@@ -1541,6 +1541,7 @@ public:
 				if(_halfAndHalf) {
 					_btsAtDepths[stackDepth]++;
 					_totBtsAtDepths[stackDepth]++;
+#if 0
 					if(stackDepth < 3) {
 						if(_maxBts > 0 && (
 						   (stackDepth == 0 && _btsAtDepths[0] > _maxBts0) ||
@@ -1550,6 +1551,7 @@ public:
 							return false;
 						}
 					}
+#endif
 				}
 
 				assert_leq(i+1, _qlen);
