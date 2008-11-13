@@ -48,7 +48,7 @@ static bool integer_quals		= false; //quality strings are space-separated string
 static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
-static int qualThresh           = 7;  // max qual-weighted hamming dist (maq's -e)
+static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 125; // max # backtracks allowed in half-and-half mode
 static int maxBts0              = 28; // max # backtracks allowed in half-and-half mode
 static int maxBts1              = 16; // max # backtracks allowed in half-and-half mode
@@ -72,38 +72,41 @@ static bool refOut				= false; // if true, alignments go to per-ref files
 static bool useBsearch			= false; // if true, don't pad and use binary search over frag starts
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
+static bool noMaqRound          = false;
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
 
-#define ARG_ORIG                256
-#define ARG_SEED                257
-#define ARG_DUMP_PATS           258
-#define ARG_ARROW               259
-#define ARG_CONCISE             260
-#define ARG_SOLEXA_QUALS        261
-#define ARG_MAXBTS              262
-#define ARG_MAXBTS0             263
-#define ARG_MAXBTS1             264
-#define ARG_MAXBTS2             265
-#define ARG_VERBOSE             266
-#define ARG_MAXNS               267
-#define ARG_RANDOM_READS        268
-#define ARG_RANDOM_READS_NOSYNC 269
-#define ARG_NOOUT               270
-#define ARG_FAST                271
-#define ARG_REFIDX              272
-#define ARG_DUMP_NOHIT          273
-#define ARG_DUMP_HHHIT          274
-#define ARG_SANITY              275
-#define ARG_BEST                276
-#define ARG_SPANSTRATA          277
-#define ARG_REFOUT              278
-#define ARG_BSEARCH             279
-#define ARG_ISARATE             280
-#define ARG_SEED_EXTEND         281
-#define ARG_PARTITION           282
-#define ARG_INTEGER_QUALS        283
-
+enum {
+	ARG_ORIG = 256,
+	ARG_SEED,
+	ARG_DUMP_PATS,
+	ARG_ARROW,
+	ARG_CONCISE,
+	ARG_SOLEXA_QUALS,
+	ARG_MAXBTS,
+	ARG_MAXBTS0,
+	ARG_MAXBTS1,
+	ARG_MAXBTS2,
+	ARG_VERBOSE,
+	ARG_MAXNS,
+	ARG_RANDOM_READS,
+	ARG_RANDOM_READS_NOSYNC,
+	ARG_NOOUT,
+	ARG_FAST,
+	ARG_REFIDX,
+	ARG_DUMP_NOHIT,
+	ARG_DUMP_HHHIT,
+	ARG_SANITY,
+	ARG_BEST,
+	ARG_SPANSTRATA,
+	ARG_REFOUT,
+	ARG_BSEARCH,
+	ARG_ISARATE,
+	ARG_SEED_EXTEND,
+	ARG_PARTITION,
+	ARG_INTEGER_QUALS,
+	ARG_NOMAQROUND
+};
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
@@ -143,6 +146,7 @@ static struct option long_options[] = {
 	{"mhits",        required_argument, 0,            'm'},
 	{"best",         no_argument,       0,            ARG_BEST},
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
+	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
 	{"arrows",       no_argument,       0,            ARG_ARROW},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
@@ -460,6 +464,12 @@ static void printLongUsage(ostream& out) {
 	"                     \"40 40 30 40...\", rather than ASCII characters,\n"
 	"                     e.g., \"II?I...\".  Used with -q.  Default: off.\n"
 	"\n"
+	"  --nomaqround       Maq accepts quality values in the Phred scale, but\n"
+	"                     internally rounds quality values to the nearest 10\n"
+	"                     saturating at 30.  By default, Bowtie imitates\n"
+	"                     this behavior.  Use --nomaqround to cancel\n"
+	"                     rounding in Bowtie.\n"
+	"\n"
 	"  --ntoa             No-confidence bases in reads (usually 'N' or '.')\n"
 	"                     are converted to As before alignment.  By default,\n"
 	"                     no-confidence bases do not match any base. \n"
@@ -612,6 +622,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_INTEGER_QUALS: integer_quals = true; break;
+			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 	   		case ARG_SEED:
@@ -645,7 +656,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
 	   		case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
 	   		case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
-	   		case 'e': qualThresh = int(parseInt(1, "-e/--err arg must be at least 1") / 10.0 + 0.5); break;
+	   		case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
 	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); break;
 	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
 	   		case 'h': printLongUsage(cout); exit(0); break;
@@ -1245,6 +1256,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        ebwtfw,      /* ebwtFw */ \
 		        0,           /* iham */ \
 		        NULL,        /* muts */ \
+		        !noMaqRound, /* maqRound */ \
 		        false,       /* halfAndHalf */ \
 		        true,        /* reportExacts */ \
 		        ebwtfw);     /* invert */ \
@@ -1290,6 +1302,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		        ebwtfw,      /* ebwtFw */ \
 		        0,           /* iham */ \
 		        NULL,        /* muts */ \
+		        !noMaqRound, /* maqRound */ \
 		        false,       /* halfAndHalf */ \
 		        true,        /* reportExacts */ \
 		        !ebwtfw);    /* invert */ \
@@ -1745,7 +1758,9 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        NULL,                  // mutations
 	        verbose,               // verbose
 	        seed,                  // seed
-	        &os);
+	        &os,
+	        true,                  // considerQuals
+	        false, !noMaqRound);
     while(true) {
     	GET_READ(patsrc);
 		size_t plen = length(patFw);
@@ -1779,7 +1794,9 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+1,                // seed
-		    &os);                  // reference sequences
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for partial alignments for case 4R
 	BacktrackManager<String<Dna> > btr2(
 			&ebwtBw, params,
@@ -1792,7 +1809,9 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+2,                // seed
-		    &os);                  // reference sequences
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
     while(true) {
 		GET_READ(patsrc);
 		size_t plen = length(patFw);
@@ -1829,7 +1848,9 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+3,                // seed
-		    &os);
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	BacktrackManager<String<Dna> > btr3(
@@ -1843,7 +1864,9 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    NULL,    // mutations
 	        verbose, // verbose
 		    seed+4,  // seed
-		    &os);
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// The half-and-half BacktrackManager
 	BacktrackManager<String<Dna> > btr23(
 			&ebwtFw, params,
@@ -1858,7 +1881,8 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
-		    true);   // halfAndHalf
+		    true,    // halfAndHalf
+		    !noMaqRound);
 	vector<PartialAlignment> pals;
     while(true) {
 		GET_READ(patsrc);
@@ -1895,7 +1919,9 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		    NULL,    // mutations
 	        verbose, // verbose
 	        seed+6,  // seed
-	        &os);
+	        &os,     // reference sequences
+	        true,    // considerQuals
+	        false, !noMaqRound);
 	// Half-and-half BacktrackManager for forward read
 	BacktrackManager<String<Dna> > btf24(
 			&ebwtBw, params,
@@ -1910,7 +1936,8 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals
-	        true);   // halfAndHalf
+	        true,    // halfAndHalf
+	        !noMaqRound);
 	vector<PartialAlignment> pals;
     while(true) {
 		GET_READ_FW(patsrc);
@@ -1963,7 +1990,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // mutations
 	        verbose,               // verbose
 	        seed,                  // seed
-	        &os);
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for hits for cases 1F, 2F, 3F
 	BacktrackManager<String<Dna> > btf2(
 			&ebwtBw, params,
@@ -1976,7 +2005,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+1,                // seed
-		    &os);                  // reference sequences
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for partial alignments for case 4R
 	BacktrackManager<String<Dna> > btr2(
 			&ebwtBw, params,
@@ -1989,7 +2020,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+2,                // seed
-		    &os);                  // reference sequences
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > btf3(
 			&ebwtFw, params,
@@ -2002,7 +2035,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    NULL,                  // mutations
 	        verbose,               // verbose
 		    seed+3,                // seed
-		    &os);
+	        &os,                   // reference sequences
+	        true,                  // considerQuals
+	        false, !noMaqRound);
 	// BacktrackManager to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	BacktrackManager<String<Dna> > btr3(
@@ -2016,7 +2051,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    NULL,    // mutations
 	        verbose, // verbose
 		    seed+4,  // seed
-		    &os);
+	        &os,     // reference sequences
+	        true,    // considerQuals
+	        false, !noMaqRound);
 	// The half-and-half BacktrackManager
 	BacktrackManager<String<Dna> > btr23(
 			&ebwtFw, params,
@@ -2031,7 +2068,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
-		    true);   // halfAndHalf
+		    true,    // halfAndHalf
+		    !noMaqRound);
 	// BacktrackManager to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	BacktrackManager<String<Dna> > btf4(
@@ -2045,7 +2083,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    NULL,    // mutations
 	        verbose, // verbose
 	        seed+6,  // seed
-	        &os);
+	        &os,     // reference sequences
+	        true,    // considerQuals
+	        false, !noMaqRound);
 	// Half-and-half BacktrackManager for forward read
 	BacktrackManager<String<Dna> > btf24(
 			&ebwtBw, params,
@@ -2060,7 +2100,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals
-	        true);   // halfAndHalf
+	        true,    // halfAndHalf
+	        !noMaqRound);
     while(true) {
     	GET_READ(patsrc);
 		size_t plen = length(patFw);

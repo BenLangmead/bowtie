@@ -42,6 +42,7 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
+SEARCH_CPPS = qual.cpp
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)

@@ -36,7 +36,7 @@
 			String<QueryMutation> muts;
 			uint8_t oldQuals =
 				PartialAlignmentManager::toMutsString(
-						pals[i], patRc, qualRc, muts);
+						pals[i], patRc, qualRc, muts, !noMaqRound);
 
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first

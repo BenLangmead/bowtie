@@ -312,6 +312,12 @@ Bowtie Manual
                      "40 40 30 40...", rather than ASCII characters,
                      e.g., "II?I...".  Used with -q.  Default: off.
 
+  --nomaqround       Maq accepts quality values in the Phred scale, but
+                     internally rounds quality values to the nearest 10
+                     saturating at 30.  By default, Bowtie imitates
+                     this behavior.  Use --nomaqround to cancel
+                     rounding in Bowtie.
+
   --ntoa             No-confidence bases in reads (usually 'N' or '.')
                      are converted to As before alignment.  By default,
                      no-confidence bases do not match any base. 
