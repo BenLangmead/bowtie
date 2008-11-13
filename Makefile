@@ -60,10 +60,12 @@ NOASSERT_FLAGS = -DNDEBUG
 BIN_LIST = bowtie-build \
            bowtie-build-packed \
            bowtie \
-           bowtie-convert
+           bowtie-convert \
+		   bowtie-inspect
 BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
-               bowtie-debug
+               bowtie-debug \
+			   bowtie-inspect-debug
 
 GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
@@ -144,10 +146,19 @@ bowtie-asm-debug: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
 bowtie-convert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
+
+bowtie-inspect: maq_convert/bowtie_inspect.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP) $(OTHER_CPPS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(OTHER_CPPS) $(LIBS) $(MAQ_LIB)
+
+bowtie-inspect-debug: maq_convert/bowtie_inspect.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP) $(OTHER_CPPS) 
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(OTHER_CPPS) $(LIBS) $(MAQ_LIB)
+
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl

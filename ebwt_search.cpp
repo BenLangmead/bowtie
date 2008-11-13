@@ -2501,52 +2501,6 @@ static void seedAndSWExtendSearch(
 #endif
 }
 
-/**
- * Try to find the Bowtie index specified by the user.  First try the
- * exact path given by the user.  Then try the user-provided string
- * appended onto the path of the "indexes" subdirectory below this
- * executable, then try the provided string appended onto
- * "$BOWTIE_INDEXES/".
- */
-static string adjustEbwtBase(const string& ebwtFileBase) {
-	string str = ebwtFileBase;
-	ifstream in;
-	if(verbose) cout << "Trying " << str << endl;
-	in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-	if(!in.is_open()) {
-		if(verbose) cout << "  didn't work" << endl;
-		in.close();
-		str = argv0;
-		size_t st = str.find_last_of("/\\");
-		if(st != string::npos) {
-			str.erase(st);
-			str += "/indexes/";
-		} else {
-			str = "indexes/";
-		}
-		str += ebwtFileBase;
-		if(verbose) cout << "Trying " << str << endl;
-		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-		if(!in.is_open()) {
-			if(verbose) cout << "  didn't work" << endl;
-			in.close();
-			if(getenv("BOWTIE_INDEXES") != NULL) {
-				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
-				if(verbose) cout << "Trying " << str << endl;
-				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-				if(!in.is_open()) {
-					if(verbose) cout << "  didn't work" << endl;
-					in.close();
-				}
-			}
-		}
-	}
-	if(!in.is_open()) {
-		cerr << "Could not locate a Bowtie index corresponding to basename \"" << ebwtFileBase << "\"" << endl;
-		exit(1);
-	}
-	return str;
-}
 
 template<typename TStr>
 static void driver(const char * type,
@@ -2578,7 +2532,7 @@ static void driver(const char * type,
 		}
 	}
 	// Adjust
-	string adjustedEbwtFileBase = adjustEbwtBase(ebwtFileBase);
+	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 	// Seed random number generator
 	srand(seed);
 	// Create a pattern source for the queries

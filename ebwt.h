@@ -953,9 +953,9 @@ public:
 	void checkOrigs(const vector<String<Dna5> >& os, bool mirror, bool usePmap) const;
 
 	// Searching and reporting
-	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
-	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
-	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, const EbwtSearchParams<TStr>& params) const;
+	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
+	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
+	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
@@ -2072,7 +2072,7 @@ void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
                                      uint32_t& tidx,
                                      uint32_t& textoff,
                                      uint32_t& tlen,
-                                     const EbwtSearchParams<TStr>& params) const
+                                     bool ebwtFw) const
 {
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
 	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
@@ -2095,7 +2095,7 @@ void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
 		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
 	}
 	textoff = toff;
-	if(params.ebwtFw()) {
+	if(ebwtFw) {
 		textoff += (coff+foff);
 	} else {
 		textoff += (flen - (coff+foff));
@@ -2114,7 +2114,7 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
                                         uint32_t& tidx,
                                         uint32_t& textoff,
                                         uint32_t& tlen,
-                                        const EbwtSearchParams<TStr>& params) const
+                                        bool ebwtFw) const
 {
 	uint32_t top = 0;
 	uint32_t bot = _nFrag; // 1 greater than largest addressable element
@@ -2149,7 +2149,7 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
 				// Initially it's the number of characters that precede
 				// the alignment in the fragment
 				uint32_t fragoff = off - _rstarts[(elt*3)];
-				if(!params.ebwtFw()) {
+				if(ebwtFw) {
 					fragoff = fraglen - fragoff - 1;
 					fragoff -= (qlen-1);
 				}
@@ -2178,14 +2178,14 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
                                  uint32_t& tidx,
                                  uint32_t& textoff,
                                  uint32_t& tlen,
-                                 const EbwtSearchParams<TStr>& params) const
+                                 bool ebwtFw) const
 {
 	if(this->_usePmap) {
 		assert(_pmap != NULL);
-		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen, params);
+		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen, ebwtFw);
 	} else {
 		assert(_rstarts != NULL);
-		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen, params);
+		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen, ebwtFw);
 	}
 }
 
@@ -2250,7 +2250,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	uint32_t tidx;
 	uint32_t textoff;
 	uint32_t tlen;
-	joinedToTextOff(qlen, off, tidx, textoff, tlen, params);
+	joinedToTextOff(qlen, off, tidx, textoff, tlen, params.ebwtFw());
 	if(tidx == 0xffffffff) {
 		return false;
 	}
@@ -2405,7 +2405,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	uint32_t tidx;    // the index (id) of the reference we hit in
 	uint32_t textoff; // the offset of the alignment within the reference
 	uint32_t tlen;    // length of reference seed hit in
-	joinedToTextOff(qlen, off, tidx, textoff, tlen, params);
+	joinedToTextOff(qlen, off, tidx, textoff, tlen, params.ebwtFw());
 	if(tidx == 0xffffffff) {
 		// The seed straddled a reference boundary, and so is spurious.
 		// Return false, indicating that we shouldn't stop.
@@ -3817,6 +3817,56 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// read it back into memory first!
 	assert(!isInMemory());
 	VMSG_NL("Exiting Ebwt::buildToDisk()");
+}
+
+//string adjustEbwtBase(const string& ebwtFileBase);
+/**
+ * Try to find the Bowtie index specified by the user.  First try the
+ * exact path given by the user.  Then try the user-provided string
+ * appended onto the path of the "indexes" subdirectory below this
+ * executable, then try the provided string appended onto
+ * "$BOWTIE_INDEXES/".
+ */
+string adjustEbwtBase(const string& cmdline, 
+					  const string& ebwtFileBase, 
+					  bool verbose = false) {
+	string str = ebwtFileBase;
+	ifstream in;
+	if(verbose) cout << "Trying " << str << endl;
+	in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	if(!in.is_open()) {
+		if(verbose) cout << "  didn't work" << endl;
+		in.close();
+		str = cmdline;
+		size_t st = str.find_last_of("/\\");
+		if(st != string::npos) {
+			str.erase(st);
+			str += "/indexes/";
+		} else {
+			str = "indexes/";
+		}
+		str += ebwtFileBase;
+		if(verbose) cout << "Trying " << str << endl;
+		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+		if(!in.is_open()) {
+			if(verbose) cout << "  didn't work" << endl;
+			in.close();
+			if(getenv("BOWTIE_INDEXES") != NULL) {
+				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
+				if(verbose) cout << "Trying " << str << endl;
+				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+				if(!in.is_open()) {
+					if(verbose) cout << "  didn't work" << endl;
+					in.close();
+				}
+			}
+		}
+	}
+	if(!in.is_open()) {
+		cerr << "Could not locate a Bowtie index corresponding to basename \"" << ebwtFileBase << "\"" << endl;
+		exit(1);
+	}
+	return str;
 }
 
 #endif /*EBWT_H_*/
