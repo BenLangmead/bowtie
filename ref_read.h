@@ -10,15 +10,18 @@
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
+#include "filebuf.h"
 
 using namespace std;
 using namespace seqan;
 
 /// Skip to the end of the current line; return the first character
 /// of the next line
-static inline int skipWhitespace(istream& in) {
+static inline int skipWhitespace(FileBuf& in) {
 	int c;
-	while(isspace(c = in.get()));
+	while(isspace(c = in.get())) {
+		if(in.eof()) return -1;
+	}
 	return c;
 }
 
@@ -50,10 +53,10 @@ struct RefReadInParams {
 	bool nsToAs;
 };
 
-extern RefRecord fastaRefReadSize(istream& in,
+extern RefRecord fastaRefReadSize(FileBuf& in,
                                   const RefReadInParams& refparams,
                                   bool first);
-extern size_t fastaRefReadSizes(vector<istream*>& in,
+extern size_t fastaRefReadSizes(vector<FileBuf*>& in,
                                 vector<RefRecord>& recs,
                                 const RefReadInParams& refparams);
 
@@ -62,7 +65,7 @@ extern size_t fastaRefReadSizes(vector<istream*>& in,
  * the first character on the next line, or -1 if eof is encountered at
  * any time.
  */
-static inline int skipLine(istream& in) {
+static inline int skipLine(FileBuf& in) {
 	while(true) {
 		int c = in.get(); if(in.eof()) return -1;
 		if(c == '\n' || c == '\r') {
@@ -80,7 +83,7 @@ static inline int skipLine(istream& in) {
  * the end of dst, optionally reversing it.
  */
 template <typename TStr>
-static RefRecord fastaRefReadAppend(istream& in,
+static RefRecord fastaRefReadAppend(FileBuf& in,
                                     bool first,
                                     TStr& dst,
                                     RefReadInParams& refparams,

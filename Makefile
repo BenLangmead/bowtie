@@ -110,6 +110,10 @@ bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
+bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
+	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
+
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)

@@ -170,8 +170,7 @@ sub build {
 		$bucketArg = "--bmaxdivn ";
 		$bucketArg .= (int(rand(30))+1);
 	} elsif($bucketRand == 1) {
-		$bucketArg = "--bmaxmultsqrt ";
-		$bucketArg .= (int(rand(50))+10);
+		$bucketArg = "-a ";
 	}
 	
 	my $isaArg = "";

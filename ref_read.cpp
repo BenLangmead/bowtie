@@ -5,7 +5,7 @@
  * the size of the passed sequence.  Does not do anything with the
  * sequence characters themselves; this is purely for counting lengths.
  */
-RefRecord fastaRefReadSize(istream& in,
+RefRecord fastaRefReadSize(FileBuf& in,
                            const RefReadInParams& refparams,
                            bool first)
 {
@@ -19,11 +19,13 @@ RefRecord fastaRefReadSize(istream& in,
 	size_t seqOff = 0;
 	bool seqFirst = true;
 
-	// Pick off the first carat
+	// Pick off the first carat and any preceding whitespace
 	if(first) {
+		assert(!in.eof());
 		lastc = '>';
 		c = skipWhitespace(in);
 		if(in.eof()) {
+			// Got eof right away; emit warning
 			cerr << "Warning: Empty input file" << endl;
 			lastc = -1;
 			return RefRecord(seqOff, seqCharsRead, seqFirst);
@@ -146,7 +148,7 @@ RefRecord fastaRefReadSize(istream& in,
  * all of the given input files, in order.  Returns the total size of
  * all references combined.  Rewinds each istream before returning.
  */
-size_t fastaRefReadSizes(vector<istream*>& in,
+size_t fastaRefReadSizes(vector<FileBuf*>& in,
                          vector<RefRecord>& recs,
                          const RefReadInParams& refparams)
 {
@@ -156,14 +158,13 @@ size_t fastaRefReadSizes(vector<istream*>& in,
 	// For each input istream
 	for(size_t i = 0; i < in.size(); i++) {
 		bool first = true;
-		assert(in[i]->good());
-		streampos pos = in[i]->tellg();
+		assert(!in[i]->eof());
 		assert_geq(rpcp.baseCutoff, -1);
 		assert_neq(rpcp.baseCutoff, 0);
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_neq(rpcp.numSeqCutoff, 0);
 		// For each pattern in this istream
-		while(in[i]->good() && rpcp.baseCutoff != 0 && rpcp.numSeqCutoff != 0) {
+		while(!in[i]->eof() && rpcp.baseCutoff != 0 && rpcp.numSeqCutoff != 0) {
 			RefRecord rec = fastaRefReadSize(*in[i], refparams, first);
 			if(rpcp.baseCutoff > 0) assert_leq((int64_t)rec.len, rpcp.baseCutoff);
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= rec.len;
@@ -181,21 +182,12 @@ size_t fastaRefReadSizes(vector<istream*>& in,
 			if(rec.len == 0 && rec.off == 0 && !rec.first) continue;
 			recs.push_back(rec);
 		}
-		in[i]->clear();
-		in[i]->seekg(pos);
-		assert(!in[i]->bad());
-		assert(!in[i]->fail());
-		in[i]->clear();
-		assert(in[i]->good());
+		in[i]->reset();
 		assert(!in[i]->eof());
 		#ifndef NDEBUG
 		int c = in[i]->get();
 		assert_eq('>', c);
-		assert(in[i]->good());
-		assert(!in[i]->eof());
-		in[i]->seekg(pos);
-		in[i]->clear();
-		assert(in[i]->good());
+		in[i]->reset();
 		assert(!in[i]->eof());
 		#endif
 	}

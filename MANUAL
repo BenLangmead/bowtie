@@ -492,19 +492,23 @@ Bowtie Manual
                             comma-separated list of sequences rather
                             than a list of FASTA files.
 
+    -a                      Instead of taking a user-specified --bmax/
+                            --bmaxdivn and --dcv, bowtie-build
+                            automatically finds appropriate values for
+                            those parameters given the memory
+                            available.  bowtie-build will start at the
+                            specified --bmax/--bmaxdivn and --dcv (or
+                            the defaults, if not specified) and try
+                            more memory-economical settings until
+                            indexing completes with no out-of-memory
+                            exceptions.
+
     --bmax <int>            The maximum number of suffixes allowed in a
                             block.  Allowing more suffixes per block
                             makes indexing faster, but increases memory
                             overhead.  Overrides any previous
                             specification of --bmax, --bmaxmultsqrt or
                             --bmaxdivn. Default: --bmaxdivn 4.
-
-    --bmaxmultsqrt <int>    The maximum number of suffixes allowed in a
-                            block, expressed as a multiple of the
-                            square root of the length of the reference.
-                            Overrides any previous specification of
-                            --bmax, --bmaxmultsqrt or --bmaxdivn.
-                            Default: --bmaxdivn 4.
 
     --bmaxdivn <int>        The maximum number of suffixes allowed in a
                             block, expressed as a fraction of the
@@ -556,23 +560,23 @@ Bowtie Manual
                             to the index file.  Default: little-endian
                             (recommended for Intel- and AMD-based
                             architectures).
-    
+
     --seed <int>            Use <int> as the seed for pseudo-random
                             number generator.
-    
+
     --cutoff <int>          Index only the first <int> bases of the
                             reference sequences (cumulative across
                             sequences) and ignore the rest.
-    
+
     -q/--quiet              ebwt-build is verbose by default.  With
                             this option ebwt-build will print only
                             error messages.
-    
+
     -h/--help               Print detailed description of tool and its
                             options (from MANUAL).
-    
+
     --version               Print version information and quit.
- 
+
  Using the 'bowtie-convert' Alignment Converter
  ----------------------------------------------
 

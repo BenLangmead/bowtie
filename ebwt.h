@@ -419,6 +419,7 @@ public:
 	    _overrideOffRate(__overrideOffRate), \
 	    _overrideIsaRate(__overrideIsaRate), \
 	    _verbose(__verbose), \
+	    _passMemExc(__passMemExc), \
 	    _sanity(__sanityCheck), \
 	    _in1(), \
 	    _in2(), \
@@ -445,6 +446,7 @@ public:
 	     int32_t __overrideIsaRate = -1,
 	     bool __usePmap = true,
 	     bool __verbose = false,
+	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
 	     _eh(readIntoMemory(true, in + ".1.ebwt", in + ".2.ebwt"))
@@ -479,7 +481,7 @@ public:
 	     uint32_t bmaxSqrtMult,
 	     uint32_t bmaxDivN,
 	     int dcv,
-	     vector<istream*>& is,
+	     vector<FileBuf*>& is,
 	     vector<RefRecord>& szs,
 	     uint32_t sztot,
 	     const RefReadInParams& refparams,
@@ -488,6 +490,7 @@ public:
 	     int32_t __overrideIsaRate = -1,
 	     bool __usePmap = true,
 	     bool __verbose = false,
+	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
 	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate)
@@ -550,7 +553,7 @@ public:
 	 * suffix-array producer can then be used to obtain chunks of the
 	 * joined string's suffix array.
 	 */
-	void initFromVector(vector<istream*>& is,
+	void initFromVector(vector<FileBuf*>& is,
 	                    vector<RefRecord>& szs,
 	                    uint32_t sztot,
 	                    const RefReadInParams& refparams,
@@ -581,9 +584,16 @@ public:
 				joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
 			}
 		} catch(bad_alloc& e) {
-			cerr << "Out of memory creating joined string in "
-			     << "Ebwt::initFromVector() at " << __FILE__ << ":"
-			     << __LINE__ << endl;
+			// There's no point passing this exception on.  The fact
+			// that we couldn't allocate the joined string means that
+			// --bmax is irrelevant - the user should re-run with
+			// ebwt-build-packed
+			cerr << "Could not allocate space for a joined string of " << jlen << " elements." << endl
+#ifdef PACKED_STRINGS
+			     << "Please try indexing on a computer with more memory." << endl;
+#else
+			     << "Please try using bowtie-build-packed instead of bowtie-build." << endl;
+#endif
 			exit(1);
 		}
 		assert_geq(length(s), jlen);
@@ -603,20 +613,69 @@ public:
 				bmax = (uint32_t)sqrt(length(s));
 				VMSG_NL("bmax defaulted to: " << bmax);
 			}
-			VMSG("Using blockwise SA w/ bmax=" << bmax);
-			if(dcv == 0) {
-				VMSG_NL(" and *no difference cover*");
-			} else {
-				VMSG_NL(", dcv=" << dcv);
+			int iter = 0;
+			while(true) {
+				if(bmax < 40 && _passMemExc) {
+					cerr << "Could not find approrpiate settings for building this index." << endl;
+#ifdef PACKED_STRINGS
+					cerr << "Please try indexing this reference on a computer with more memory." << endl;
+#else
+					cerr << "Please try indexing this reference using bowtie-build-packed or try indexing" << endl
+					     << "on a computer with more memory." << endl;
+#endif
+					exit(1);
+				}
+				if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
+					dcv <<= 1; // double difference-cover period
+				} else {
+					bmax -= (bmax >> 2); // reduce by 25%
+				}
+				VMSG("Using parameters --bmax " << bmax);
+				if(dcv == 0) {
+					VMSG_NL(" and *no difference cover*");
+				} else {
+					VMSG_NL(" --dcv " << dcv);
+				}
+				iter++;
+				try { {
+						VMSG_NL("  Doing ahead-of-time memory usage test");
+						// Make a quick-and-dirty attempt to force a bad_alloc iff
+						// we would have thrown one eventually as part of
+						// constructing the KarkkainenBlockwiseSA
+						size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
+						uint8_t *tmp = new uint8_t[sz];
+						sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
+						uint8_t *tmp2 = new uint8_t[sz];
+						uint32_t *ftab = new uint32_t[_eh._ftabLen];
+						uint32_t *isaSample = new uint32_t[_eh._isaLen];
+						// If we made it here without throwing bad_alloc, then we
+						// passed the memory-usage stress test
+						delete[] tmp;
+						delete[] tmp2;
+						delete[] ftab;
+						delete[] isaSample;
+						VMSG_NL("  Passed!  Trying construction with these parameters...");
+					}
+					VMSG_NL("Constructing suffix-array element generator");
+					KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _passMemExc, _verbose);
+					assert(bsa.suffixItrIsReset());
+					assert_eq(bsa.size(), length(s)+1);
+					VMSG_NL("Converting suffix-array elements to index image");
+					buildToDisk(bsa, s, out1, out2);
+					break;
+				} catch(bad_alloc& e) {
+					if(_passMemExc) {
+						VMSG_NL("  Ran out of memory; automatically trying more memory-economical parameters.");
+					} else {
+						cerr << "Out of memory while constructing suffix array.  Please try using a smaller" << endl
+						     << "number of blocks by specifying a smaller --bmax or a larger --bmaxdivn" << endl;
+						exit(1);
+					}
+				}
 			}
-			KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _verbose);
-			assert(bsa.suffixItrIsReset());
-			assert_eq(bsa.size(), length(s)+1);
-			// Build Ebwt; doing so writes everything else (p
-			buildToDisk(bsa, s, out1, out2);
 		} else {
 			VMSG_NL("Using entire SA");
-			SillyBlockwiseDnaSA<TStr> bsa(s, 32, _sanity, _verbose);
+			SillyBlockwiseDnaSA<TStr> bsa(s, 32, _sanity, _passMemExc, _verbose);
 			assert(bsa.suffixItrIsReset());
 			assert_eq(bsa.size(), length(s)+1);
 			// Build Ebwt; doing so initializes everything else
@@ -932,8 +991,8 @@ public:
 
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool usePmap);
-	static TStr join(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed, bool usePmap);
-	void joinToDisk(vector<istream*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
+	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed, bool usePmap);
+	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -1010,6 +1069,7 @@ public:
 	int32_t    _overrideOffRate;
 	int32_t    _overrideIsaRate;
 	bool       _verbose;
+	bool       _passMemExc;
 	bool       _sanity;
 	ifstream   _in1;
 	ifstream   _in2;
@@ -3183,7 +3243,7 @@ TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool u
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt<TStr>::join(vector<istream*>& l,
+TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
                       vector<RefRecord>& szs,
                       uint32_t sztot,
                       const RefReadInParams& refparams,
@@ -3202,11 +3262,11 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
 	ASSERT_ONLY(size_t szsi = 0);
 	for(size_t i = 0; i < l.size(); i++) {
 		// For each sequence we can pull out of istream l[i]...
-		assert(l[i]->good());
+		assert(!l[i]->eof());
 		bool first = true;
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
-		while(l[i]->good() && !l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+		while(!l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp);
 			first = false;
 			size_t bases = rec.len;
@@ -3263,7 +3323,7 @@ TStr Ebwt<TStr>::join(vector<istream*>& l,
  * the same seed.
  */
 template<typename TStr>
-void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
+void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
                             vector<RefRecord>& szs,
                             uint32_t sztot,
                             const RefReadInParams& refparams,
@@ -3327,15 +3387,14 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 	ASSERT_ONLY(uint32_t szsi = 0);
 	ASSERT_ONLY(uint32_t entsWritten = 0);
 	for(unsigned int i = 0; i < l.size(); i++) {
-		assert(l[i]->good());
+		assert(!l[i]->eof());
 		bool first = true;
-		streampos pos = l[i]->tellg();
 		assert_geq(rpcp.numSeqCutoff, -1);
 		assert_geq(rpcp.baseCutoff, -1);
 		uint32_t patoff = 0;
 		// For each *fragment* (not necessary an entire sequence) we
 		// can pull out of istream l[i]...
-		while(l[i]->good() && !l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+		while(!l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
 			string name;
 			// Push a new name onto our vector
 			_refnames.push_back("");
@@ -3420,21 +3479,13 @@ void Ebwt<TStr>::joinToDisk(vector<istream*>& l,
 			patoff += bases;
 		}
 		assert_gt(szsi, 0);
-		l[i]->clear();
-		l[i]->seekg(pos);
-		assert(!l[i]->bad());
-		assert(!l[i]->fail());
-		l[i]->clear();
-		assert(l[i]->good());
+		l[i]->reset();
 		assert(!l[i]->eof());
 		#ifndef NDEBUG
 		int c = l[i]->get();
 		assert_eq('>', c);
-		assert(l[i]->good());
 		assert(!l[i]->eof());
-		l[i]->seekg(pos);
-		l[i]->clear();
-		assert(l[i]->good());
+		l[i]->reset();
 		assert(!l[i]->eof());
 		#endif
 	}

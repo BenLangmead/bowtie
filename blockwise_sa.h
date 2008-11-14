@@ -50,11 +50,13 @@ public:
 	BlockwiseSA(const TStr& __text,
 	            uint32_t __bucketSz,
 	            bool __sanityCheck = false,
+	            bool __passMemExc = false,
 	            bool __verbose = false,
 	            ostream& __logger = cout) :
 	_text(__text),
 	_bucketSz(max<uint32_t>(__bucketSz, 2u)),
 	_sanityCheck(__sanityCheck),
+	_passMemExc(__passMemExc),
 	_verbose(__verbose),
 	_itrBucket(),
 	_itrBucketPos(0xffffffff),
@@ -141,7 +143,7 @@ protected:
 	 */
 	virtual const void nextBlock() = 0;
 	/// Return true iff more blocks are available
-	virtual bool hasMoreBlocks() = 0;
+	virtual bool hasMoreBlocks() const = 0;
 	/// Optionally output a verbose message
 	void verbose(const string& s) const {
 		if(this->verbose()) {
@@ -150,14 +152,15 @@ protected:
 		}
 	}
 
-	const TStr&      _text; // original string
-	const uint32_t   _bucketSz; // target maximum bucket size
-	const bool       _sanityCheck;
-	const bool       _verbose;
-	String<uint32_t> _itrBucket;
-	uint32_t         _itrBucketPos;
-	uint32_t         _itrPushedBackSuffix;
-	ostream&         _logger;
+	const TStr&      _text;        /// original string
+	const uint32_t   _bucketSz;    /// target maximum bucket size
+	const bool       _sanityCheck; /// whether to perform sanity checks
+	const bool       _passMemExc;  /// true -> pass on memory exceptions
+	const bool       _verbose;     /// be talkative
+	String<uint32_t> _itrBucket;   /// current bucket
+	uint32_t         _itrBucketPos;/// offset into current bucket
+	uint32_t         _itrPushedBackSuffix; /// temporary slot for lookahead
+	ostream&         _logger;      /// write log messages here
 };
 
 /**
@@ -170,9 +173,10 @@ public:
 	InorderBlockwiseSA(const TStr& __text,
 	                   uint32_t __bucketSz,
 	                   bool __sanityCheck = false,
+	   	               bool __passMemExc = false,
 	                   bool __verbose = false,
 	                   ostream& __logger = cout) :
-	BlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __verbose, __logger)
+	BlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger)
 	{ }
 };
 
@@ -186,9 +190,10 @@ public:
 	SillyBlockwiseDnaSA(TStr& __text,
 	                    uint32_t __bucketSz,
 	                    bool __sanityCheck = false,
+	   	                bool __passMemExc = false,
 	                    bool __verbose = false,
 	                    ostream& __logger = cout) :
-	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __verbose, __logger),
+	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
 	_sa(), _cur(0), _built(false)
 	{ reset(); }
 
@@ -200,7 +205,7 @@ public:
 	}
 
 	/// Return true iff there are more blocks to retrieve
-	virtual bool hasMoreBlocks() {
+	virtual bool hasMoreBlocks() const {
 		return _cur < length(_sa);
 	}
 
@@ -221,10 +226,14 @@ protected:
 				// Use SeqAn's implementation of Karakkainen's Skew7
 				createSuffixArray(_sa, text5, Skew7());
 			} catch(bad_alloc& e) {
-				cerr << "Out of memory creating suffix array in "
-				     << "SillyBlockwiseDnaSA::SillyBlockwiseDnaSA()"
-				     << " at " << __FILE__ << ":" << __LINE__ << endl;
-				throw e;
+				if(this->_passMemExc) {
+					throw e; // rethrow immediately
+				} else {
+					cerr << "Out of memory creating suffix array in "
+					     << "SillyBlockwiseDnaSA::SillyBlockwiseDnaSA()"
+					     << " at " << __FILE__ << ":" << __LINE__ << endl;
+					exit(1);
+				}
 			}
 			assert_eq(length(this->text())+1, length(_sa));
 			_built = true;
@@ -257,26 +266,42 @@ public:
 	                      uint32_t __dcV,
 	                      uint32_t __seed = 0,
 	      	              bool __sanityCheck = false,
+	   	                  bool __passMemExc = false,
 	      	              bool __verbose = false,
 	      	              ostream& __logger = cout) :
-	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __verbose, __logger),
+	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
 	_sampleSuffs(), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _randomSrc(__seed)
 	{ reset(); }
 
 	~KarkkainenBlockwiseSA() {
-		VMSG_NL("Entering ~KarkkainenBlockwiseSA()");
 		if(_dc != NULL) delete _dc; _dc = NULL; // difference cover sample
-		VMSG_NL("Leaving ~KarkkainenBlockwiseSA()");
 	}
 
-	// Defined in blockwise_sa.cpp
+	/**
+	 * Allocate an amount of memory that simulates the peak memory
+	 * usage of the DifferenceCoverSample with the given text and v.
+	 * Throws bad_alloc if it's not going to fit in memory.  Returns
+	 * the approximate number of bytes the Cover takes at all times.
+	 */
+	static size_t simulateAllocs(const TStr& text, uint32_t bucketSz) {
+		size_t len = length(text);
+		// _sampleSuffs and _itrBucket are in memory at the peak
+		String<uint32_t> tmp;
+		size_t bsz = bucketSz;
+		size_t sssz = len / max<uint32_t>(bucketSz-1, 1);
+		reserve(tmp, bsz + sssz);
+		return bsz;
+	}
+
+	/// Defined in blockwise_sa.cpp
 	virtual const void nextBlock();
 
 	/// Return true iff more blocks are available
-	virtual bool hasMoreBlocks() {
+	virtual bool hasMoreBlocks() const {
 		return _cur <= length(_sampleSuffs);
 	}
 
+	/// Return the difference-cover period
 	uint32_t dcV() const { return _dcV; }
 
 protected:
@@ -337,7 +362,7 @@ private:
 	                           bool& lcpIsSoft);
 
 	/**
-	 *
+	 * Compare two suffixes using the difference-cover sample.
 	 */
 	inline bool suffixCmp(uint32_t cmp,
 	                      uint32_t i,
@@ -346,15 +371,14 @@ private:
 	                      bool& kSoft,
 	                      const String<uint32_t>& z);
 
-	// Defined in blockwise_sa.cpp
 	void buildSamples();
 
-	String<uint32_t> _sampleSuffs; // sample suffixes
-	uint32_t         _cur;         // offset to 1st elt of next block
-	const uint32_t   _dcV;         // difference-cover periodicity
-	TDC*             _dc;          // queryable difference-cover data
-	bool             _built;       // whether samples/DC have been built
-	RandomSource     _randomSrc;   // source of pseudo-randoms
+	String<uint32_t> _sampleSuffs; /// sample suffixes
+	uint32_t         _cur;         /// offset to 1st elt of next block
+	const uint32_t   _dcV;         /// difference-cover periodicity
+	TDC*             _dc;          /// queryable difference-cover data
+	bool             _built;       /// whether samples/DC have been built
+	RandomSource     _randomSrc;   /// source of pseudo-randoms
 };
 
 /**
@@ -373,19 +397,32 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	clear(_sampleSuffs);
 	uint32_t numSamples = ((len/bsz)+1)<<1; // ~len/bsz x 2
 	assert_gt(numSamples, 0);
-	try {
-		VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
+	VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
+	if(this->_passMemExc) {
 		reserve(_sampleSuffs, numSamples, Exact());
 		// Randomly generate samples.  Allow duplicates for now.
 		VMSG_NL("Generating random suffixes");
 		for(size_t i = 0; i < numSamples; i++) {
 			appendValue(_sampleSuffs, _randomSrc.nextU32() % len);
 		}
-	} catch(bad_alloc &ba) {
-		cerr << "Could not allocate sample suffix container of " << (numSamples * 4) << " bytes" << endl;
-		cerr << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl <<
-				"--bmaxmultsqrt or a smaller --bmaxdivn" << endl;
-		exit(1);
+	} else {
+		try {
+			reserve(_sampleSuffs, numSamples, Exact());
+			// Randomly generate samples.  Allow duplicates for now.
+			VMSG_NL("Generating random suffixes");
+			for(size_t i = 0; i < numSamples; i++) {
+				appendValue(_sampleSuffs, _randomSrc.nextU32() % len);
+			}
+		} catch(bad_alloc &e) {
+			if(this->_passMemExc) {
+				throw e; // rethrow immediately
+			} else {
+				cerr << "Could not allocate sample suffix container of " << (numSamples * 4) << " bytes." << endl
+				     << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl
+				     << "a smaller --bmaxdivn" << endl;
+				exit(1);
+			}
+		}
 	}
 	// Remove duplicates; very important to do this before the call to
 	// mkeyQSortSuf so that it doesn't try to calculate lexicographical
@@ -447,11 +484,15 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 			// sizes and representatives.
 			fill(bucketSzs, numBuckets, 0, Exact());
 			fill(bucketReps, numBuckets, 0xffffffff, Exact());
-		} catch(bad_alloc &ba) {
-			cerr << "Could not allocate sizes, representatives (" << ((numBuckets*8)>>10) << " KB) for blocks" << endl;
-			cerr << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl <<
-					"--bmaxmultsqrt or a smaller --bmaxdivn" << endl;
-			exit(1);
+		} catch(bad_alloc &e) {
+			if(this->_passMemExc) {
+				throw e; // rethrow immediately
+			} else {
+				cerr << "Could not allocate sizes, representatives (" << ((numBuckets*8)>>10) << " KB) for blocks." << endl
+				     << "Please try using a smaller number of blocks by specifying a larger --bmax or a" << endl
+				     << "smaller --bmaxdivn." << endl;
+				exit(1);
+			}
 		}
 		// Iterate through every suffix in the text, determine which
 		// bucket it falls into by doing a binary search across the
@@ -756,11 +797,15 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				reserve(bucket, len+1, Exact());
 			}
 			for(uint32_t i = 0; i < len; i++) append(bucket, i);
-		} catch(bad_alloc &ba) {
-			cerr << "Could not allocate a master suffix-array block of " << ((len+1) * 4) << " bytes" << endl;
-			cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
-			     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
-			exit(1);
+		} catch(bad_alloc &e) {
+			if(this->_passMemExc) {
+				throw e; // rethrow immediately
+			} else {
+				cerr << "Could not allocate a master suffix-array block of " << ((len+1) * 4) << " bytes" << endl
+				     << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+				     << "a larger --bmaxdivn" << endl;
+				exit(1);
+			}
 		}
 	} else {
 		try {
@@ -768,11 +813,15 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 			if(capacity(bucket) < this->bucketSz()) {
 				reserve(bucket, this->bucketSz(), Exact());
 			}
-		} catch(bad_alloc &ba) {
-			cerr << "Could not allocate a suffix-array block of " << ((this->bucketSz()+1) * 4) << " bytes" << endl;
-			cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
-			     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
-			exit(1);
+		} catch(bad_alloc &e) {
+			if(this->_passMemExc) {
+				throw e; // rethrow immediately
+			} else {
+				cerr << "Could not allocate a suffix-array block of " << ((this->bucketSz()+1) * 4) << " bytes" << endl;
+				cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+				     << "a larger --bmaxdivn" << endl;
+				exit(1);
+			}
 		}
 		// Select upper and lower bounds from _sampleSuffs[] and
 		// calculate the Z array up to the difference-cover periodicity
@@ -803,9 +852,15 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				assert_eq(zLo[0], 0);
 				calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
 			}
-		} catch(bad_alloc &ba) {
-			cerr << "Could not allocate z-box containers" << endl;
-			exit(1);
+		} catch(bad_alloc &e) {
+			if(this->_passMemExc) {
+				throw e; // rethrow immediately
+			} else {
+				cerr << "Could not allocate a z-array of " << (_dcV * 4) << " bytes" << endl;
+				cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+				     << "a larger --bmaxdivn" << endl;
+				exit(1);
+			}
 		}
 
 		// This is the most critical loop in the algorithm; this is where
@@ -840,11 +895,15 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				assert_lt(i, len);
 				try {
 					appendValue(bucket, i);
-				} catch(bad_alloc &ba) {
-					cerr << "Could not append element to block of " << ((length(bucket)) * 4) << " bytes" << endl;
-					cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
-					     << "--bmaxmultsqrt or a larger --bmaxdivn" << endl;
-					exit(1);
+				} catch(bad_alloc &e) {
+					if(this->_passMemExc) {
+						throw e; // rethrow immediately
+					} else {
+						cerr << "Could not append element to block of " << ((length(bucket)) * 4) << " bytes" << endl;
+						cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+						     << "a larger --bmaxdivn" << endl;
+						exit(1);
+					}
 				}
 				// Not necessarily true; we allow overflowing buckets
 				// since we can't guarantee that a good set of sample

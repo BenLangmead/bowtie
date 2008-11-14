@@ -2626,11 +2626,23 @@ static void driver(const char * type,
 		fout = &cout;
 	}
 	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase, /* overriding: */ offRate, /* overriding: */ isaRate, !useBsearch, verbose, sanityCheck);
+    Ebwt<TStr> ebwt(adjustedEbwtFileBase,
+                    /* overriding: */ offRate,
+                    /* overriding: */ isaRate,
+                    !useBsearch,
+                    verbose,
+                    false /*passMemExc*/,
+                    sanityCheck);
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
-    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev", /* overriding: */ offRate, /* overriding: */ isaRate, !useBsearch, verbose, sanityCheck);
+    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
+    	                        /* overriding: */ offRate,
+    	                        /* overriding: */ isaRate,
+    	                        !useBsearch,
+    	                        verbose,
+    	                        false /*passMemExc*/,
+    	                        sanityCheck);
     }
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt

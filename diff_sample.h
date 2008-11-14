@@ -532,6 +532,25 @@ public:
 		fill(_dInv, _v, 0xffffffff, Exact());
 		for(size_t i = 0; i < length(_ds); i++) _dInv[_ds[i]] = i;
 	}
+	
+	/**
+	 * Allocate an amount of memory that simulates the peak memory
+	 * usage of the DifferenceCoverSample with the given text and v.
+	 * Throws bad_alloc if it's not going to fit in memory.  Returns
+	 * the approximate number of bytes the Cover takes at all times.
+	 */
+	static size_t simulateAllocs(const TStr& text, uint32_t v) {
+		String<uint32_t> ds = getDiffCover(v, false /*verbose*/, false /*sanity*/);
+		size_t len = length(text);
+		size_t sPrimeSz = (len / v) * length(ds);
+		{
+			// sPrime, sPrimeOrder, _isaPrime all exist in memory at
+			// once and that's the peak
+			String<uint32_t> sPrime;
+			reserve(sPrime, sPrimeSz * 3);
+		}
+		return sPrimeSz * 4; // sPrime array
+	}
 
 	uint32_t v() const                   { return _v; }
 	uint32_t log2v() const               { return _log2v; }
@@ -757,6 +776,7 @@ void DifferenceCoverSample<TStr>::build() {
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
 	uint32_t nextRank = 0;
 	{
+		VMSG_NL("  Building sPrimeOrder");
 		String<uint32_t> sPrimeOrder;
 		reserve(sPrimeOrder, length(sPrime)+1, Exact()); // reserve extra slot for LS
 		resize(sPrimeOrder, length(sPrime), Exact());
@@ -797,6 +817,7 @@ void DifferenceCoverSample<TStr>::build() {
 		}
 		// Now assign the ranking implied by the sorted sPrime/sPrimeOrder
 		// arrays back into sPrime.
+		VMSG_NL("  Allocating rank array");
 		reserve(_isaPrime, length(sPrime)+1, Exact());
 		fill(_isaPrime, length(sPrime), 0xffffffff, Exact());
 		assert_gt(length(_isaPrime), 0);
@@ -804,7 +825,7 @@ void DifferenceCoverSample<TStr>::build() {
 			Timer timer(cout, "  Ranking v-sort output time: ", this->verbose());
 			VMSG_NL("  Ranking v-sort output");
 			for(size_t i = 0; i < length(sPrime)-1; i++) {
-				// Place the appropriate ranking in
+				// Place the appropriate ranking
 				_isaPrime[sPrimeOrder[i]] = nextRank;
 				// If sPrime[i] and sPrime[i+1] are identical up to v, then we
 				// should give the next suffix the same rank

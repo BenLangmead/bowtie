@@ -43,6 +43,7 @@ static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 static int     bigEndian     = 0;  // little endian
 static bool    useBsearch    = false;
 static bool    nsToAs        = false;
+static bool    autoMem       = false;
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -68,8 +69,9 @@ static void printUsage(ostream& out) {
 	    //<< "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
 	    //<< "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
 	    //<< "    -n/--noblocks           disable blockwise - faster, uses more memory (default)" << endl
+	    << "    -a/--auto               automatically pick bmax/dcv fitting available memory" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
-	    << "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
+	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable difference cover (blockwise is quadratic)" << endl
@@ -171,44 +173,47 @@ static void printLongUsage(ostream& out) {
 	"                            <reference_in>) are FASTA files (usually\n"
 	"                            having extension .fa, .mfa, .fna or\n"
 	"                            similar).\n"
-	"    \n"
+	"\n"
 	"    -c                      The reference sequences are given on the\n"
 	"                            command line.  I.e. <reference_in> is a\n"
 	"                            comma-separated list of sequences rather\n"
 	"                            than a list of FASTA files.\n"
-	"    \n"
+	"\n"
+	"    -a                      Instead of taking a user-specified --bmax/\n"
+	"                            --bmaxdivn and --dcv, bowtie-build\n"
+	"                            automatically finds appropriate values for\n"
+	"                            those parameters given the memory\n"
+	"                            available.  bowtie-build will start at the\n"
+	"                            specified --bmax/--bmaxdivn and --dcv (or\n"
+	"                            the defaults, if not specified) and try\n"
+	"                            more memory-economical settings until\n"
+	"                            indexing completes with no out-of-memory\n"
+	"                            exceptions.\n"
+	"\n"
 	"    --bmax <int>            The maximum number of suffixes allowed in a\n"
 	"                            block.  Allowing more suffixes per block\n"
 	"                            makes indexing faster, but increases memory\n"
 	"                            overhead.  Overrides any previous\n"
-	"                            specification of --bmax, --bmaxmultsqrt or\n"
-	"                            --bmaxdivn. Default: --bmaxdivn 4.\n"
-	"    \n"
-	"    --bmaxmultsqrt <int>    The maximum number of suffixes allowed in a\n"
-	"                            block, expressed as a multiple of the\n"
-	"                            square root of the length of the reference.\n"
-	"                            Overrides any previous specification of\n"
-	"                            --bmax, --bmaxmultsqrt or --bmaxdivn.\n"
+	"                            specification of --bmax, or --bmaxdivn.\n"
 	"                            Default: --bmaxdivn 4.\n"
-	"    \n"
+	"\n"
 	"    --bmaxdivn <int>        The maximum number of suffixes allowed in a\n"
 	"                            block, expressed as a fraction of the\n"
 	"                            length of the reference.  Overrides any\n"
-	"                            previous specification of --bmax,\n"
-	"                            --bmaxmultsqrt or --bmaxdivn. Default:\n"
-	"                            --bmaxdivn 4.\n"
-	"    \n"
+	"                            previous specification of --bmax or\n"
+	"                            --bmaxdivn. Default: --bmaxdivn 4.\n"
+	"\n"
 	"    --dcv <int>             Use <int> as the period for the difference-\n"
 	"                            cover sample.  A larger period yields less\n"
 	"                            memory overhead, but may make suffix\n"
 	"                            sorting slower, especially if repeats are\n"
 	"                            present.  Must be a power of 2 no greater\n"
 	"                            than 4096.  Default: 1024.\n"
-	"    \n"
+	"\n"
 	"    --nodc                  Disable use of the difference-cover sample.\n"
 	"                            Suffix sorting becomes quadratic worst-case\n"
 	"                            time.\n"
-	"    \n"
+	"\n"
 	"    -o/--offrate <int>      To map alignments back to positions on the\n"
 	"                            reference sequences, it's necessary to\n"
 	"                            annotate (\"mark\") some or all of the\n"
@@ -222,7 +227,7 @@ static void printLongUsage(ostream& out) {
 	"                            default is 5 (every 32nd row is marked; for \n"
 	"                            human genome, annotations occupy about 340\n"
 	"                            megabytes).  \n"
-	"    \n"
+	"\n"
 	"    -t/--ftabchars <int>    The ftab is the lookup table used to\n"
 	"                            calculate an initial Burrows-Wheeler range\n"
 	"                            with respect to the first <int> characters\n"
@@ -261,7 +266,7 @@ static void printLongUsage(ostream& out) {
 	;
 }
 
-static const char *short_options = "qrph?nscfl:i:o:t:h:";
+static const char *short_options = "qraph?nscfl:i:o:t:h:";
 
 static struct option long_options[] = {
 	{"quiet",        no_argument,       0,            'q'},
@@ -276,6 +281,7 @@ static struct option long_options[] = {
 	{"seed",         required_argument, 0,            ARG_SEED},
 	{"entiresa",     no_argument,       &entireSA,    1},
 	{"version",      no_argument,       &showVersion, 1},
+	{"auto",         no_argument,       0,            'a'},
 	{"noblocks",     required_argument, 0,            'n'},
 	{"linerate",     required_argument, 0,            'l'},
 	{"linesperside", required_argument, 0,            'i'},
@@ -361,12 +367,12 @@ static void parseOptions(int argc, char **argv) {
 	   			bmaxDivN = 0xffffffff;     // don't use multSqrt
 	   			break;
 	   		case ARG_BMAX_MULT:
-	   			bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxMultSqrt arg must be at least 1");
+	   			bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxmultsqrt arg must be at least 1");
 	   			bmax = 0xffffffff;     // don't use bmax
 	   			bmaxDivN = 0xffffffff; // don't use multSqrt
 	   			break;
 	   		case ARG_BMAX_DIV:
-	   			bmaxDivN = parseNumber<uint32_t>(1, "--bmaxDivN arg must be at least 1");
+	   			bmaxDivN = parseNumber<uint32_t>(1, "--bmaxdivn arg must be at least 1");
 	   			bmax = 0xffffffff;         // don't use bmax
 	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt
 	   			break;
@@ -381,7 +387,7 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case ARG_NTOA: nsToAs = true; break;
 	   		case ARG_BSEARCH: useBsearch = true; break;
-
+	   		case 'a': autoMem = true; break;
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
 
@@ -396,6 +402,11 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
+	if(bmax < 40) {
+		cerr << "Warning: specified bmax is very small (" << bmax << ").  This can lead to" << endl
+		      << "extremely slow performance and memory exhaustion.  Perhaps you meant to specify" << endl
+		      << "a small --bmaxdivn?" << endl; 
+	}
 }
 
 /**
@@ -405,25 +416,35 @@ static void parseOptions(int argc, char **argv) {
 template<typename TStr>
 static void driver(const char * type,
                    const string& infile,
-                   const vector<string>& infiles,
+                   vector<string>& infiles,
                    const string& outfile,
                    bool reverse = false)
 {
-	vector<istream*> is;
+	vector<FileBuf*> is;
 	RefReadInParams refparams(cutoff, -1, reverse, nsToAs);
-	if(format == CMDLINE) {
+	assert_gt(infiles.size(), 0);
+	if(format == CMDLINE && infiles[0] != ".bowtietmp.reads") {
 		// Adapt sequence strings to stringstreams open for input
+		ofstream of(".bowtietmp.reads");
 		for(size_t i = 0; i < infiles.size(); i++) {
 			stringstream ss;
 			ss << ">" << i << endl << infiles[i] << endl;
-			is.push_back(new stringstream(ss.str(), ios::in));
+			of << ss.str();
 		}
-	} else {
-		assert_eq(FASTA, format);
-		// Adapt sequence files to ifstreams
-		for(size_t i = 0; i < infiles.size(); i++) {
-			is.push_back(new ifstream(infiles[i].c_str()));
-		}
+		of.close();
+		infiles.clear();
+		infiles.push_back(".bowtietmp.reads");
+	}
+	// Adapt sequence files to ifstreams
+	for(size_t i = 0; i < infiles.size(); i++) {
+		FILE *f = fopen(infiles[i].c_str(), "r");
+		FileBuf *fb = new FileBuf(f);
+		assert(fb != NULL);
+		assert(!fb->eof());
+		assert(fb->get() == '>');
+		ASSERT_ONLY(fb->reset());
+		assert(!fb->eof());
+		is.push_back(fb);
 	}
 	vector<RefRecord> szs;
 	uint32_t sztot;
@@ -459,6 +480,7 @@ static void driver(const char * type,
 	                -1,           // override isaRate
 	                !useBsearch,  // use pmap (little faster) or a binary search (less memory)
 	                verbose,      // be talkative
+	                autoMem,      // pass exceptions up to the toplevel so that we can adjust memory settings automatically
 	                sanityCheck); // verify results and internal consistency
 	// Note that the Ebwt is *not* resident in memory at this time.  To
 	// load it into memory, call ebwt.loadIntoMemory()
