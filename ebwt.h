@@ -2807,9 +2807,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	try {
 		this->_ebwt = new uint8_t[eh._ebwtTotLen];
 	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating ebwt[] in Ebwt::read()"
-		     << " at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
+		cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
+		     << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
+		     << "-z option does not solve the problem, please try again on a computer with more" << endl
+		     << "memory." << endl;
+		exit(1);
 	}
 	// Read ebwt from primary stream
 	_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
@@ -2857,9 +2859,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			}
 		}
 	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating fchr[], ftab[] or eftab[] in "
-		     << "Ebwt::read()  at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
+		cerr << "Out of memory allocating fchr[], ftab[] or eftab[] arrays for the Bowtie index." << endl
+		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+		     << "computer with more memory." << endl;
+		exit(1);
 	}
 
 	// Read reference sequence names from primary index file
@@ -2883,9 +2887,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		if(_verbose) cout << "Reading offs (" << offsLenSampled << ")" << endl;
 		this->_offs = new uint32_t[offsLenSampled];
 	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating offs[] in Ebwt::read()"
-		     << " at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
+		cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
+		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+		     << "computer with more memory." << endl;
+		exit(1);
 	}
 	if(be || offRateDiff > 0) {
 		for(uint32_t i = 0; i < offsLen; i++) {
@@ -2916,9 +2922,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 		if(_verbose) cout << "Reading isa (" << isaLenSampled << ")" << endl;
 		this->_isa = new uint32_t[isaLenSampled];
 	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating isa[] in Ebwt::read()"
-		     << " at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
+		cerr << "Out of memory allocating the isa[] array  for the Bowtie index." << endl
+		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+		     << "computer with more memory." << endl;
+		exit(1);
 	}
 	// Read _isa[]
 	if(be || isaRateDiff > 0) {
