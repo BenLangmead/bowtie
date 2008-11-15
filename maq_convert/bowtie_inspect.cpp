@@ -34,11 +34,10 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie-inspect [options]* <ebwt_base> <hit_outfile>" << endl
+	out << "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
 	<< "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	<< "  <hit_outfile>      file to write index info to (default: stdout)" << endl
 	<< "Options:" << endl
-	<< "  -v/-verbose          verbose output (for debugging)" << endl
+	<< "  -v/-verbose        verbose output (for debugging)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
 	;
@@ -175,19 +174,14 @@ template<typename TStr>
 static void driver(const char * type,
                    const string& ebwtFileBase,
                    const string& query,
-                   const vector<string>& queries,
-                   const string& outfile)
+                   const vector<string>& queries)
 {
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 	
 	// Open output file
 	ostream *fout;
-	if(!outfile.empty()) {
-		fout = new ofstream(outfile.c_str(), ios::binary);
-	} else {
-		fout = &cout;
-	}
+	fout = &cout;
 	
 	// Initialize Ebwt object and read in header
     Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, true, verbose, false);
@@ -203,9 +197,9 @@ static void driver(const char * type,
 		ebwt.evictFromMemory();
 	}
 
-	if(fout != NULL) {
-		((ofstream*)fout)->close();
-	}
+//	if(fout != NULL) {
+//		((ofstream*)fout)->close();
+//	}
 }
 
 
@@ -240,10 +234,10 @@ int main(int argc, char **argv) {
 	}
 	ebwtFile = argv[optind++];
 	
-	// Get output filename
-	if(optind < argc) {
-		outfile = argv[optind++];
-	}
+//	// Get output filename
+//	if(optind < argc) {
+//		outfile = argv[optind++];
+//	}
 	
 	// Optionally summarize
 	if(verbose) {
@@ -256,7 +250,7 @@ int main(int argc, char **argv) {
 		cout << "Assertions: enabled" << endl;
 #endif
 	}
-	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
+	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries);
 
 	return 0;
 }
