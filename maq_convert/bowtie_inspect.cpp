@@ -144,7 +144,7 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 			if (textoff - last_text_off > 1)
 				curr_ref_seq += string(textoff - last_text_off - 1, 'N');
 			
-			curr_ref_seq.push_back(cat_ref[i]);
+			curr_ref_seq.push_back(getValue(cat_ref,i));
 			last_text_off = textoff;
 		}
 		
@@ -250,7 +250,7 @@ int main(int argc, char **argv) {
 		cout << "Assertions: enabled" << endl;
 #endif
 	}
-	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries);
+	driver<String<Dna, Packed<Alloc<> > > >("DNA", ebwtFile, query, queries);
 
 	return 0;
 }
