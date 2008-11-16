@@ -492,7 +492,7 @@ Bowtie Manual
                             comma-separated list of sequences rather
                             than a list of FASTA files.
 
-    -a                      Instead of taking a user-specified --bmax/
+    -a/--auto               Instead of taking a user-specified --bmax/
                             --bmaxdivn and --dcv, bowtie-build
                             automatically finds appropriate values for
                             those parameters given the memory
