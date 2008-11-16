@@ -2812,7 +2812,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// (i.e. everything up to and including join()).
 	if(justHeader) goto done;
 
-	if(eh._chunkRate >= 0) {
+	if(chunkRate >= 0) {
 		// Read pmap from primary stream
 		try {
 			uint32_t pmapEnts = eh._numChunks*4;
