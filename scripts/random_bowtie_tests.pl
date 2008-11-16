@@ -173,12 +173,17 @@ sub build {
 		$bucketArg = "-a ";
 	}
 	
+	my $bsearch_arg = "";
+	if(int(rand(2)) == 0) {
+		$bsearch_arg = "--oldpmap";
+	}
+	
 	my $isaArg = "";
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
 	}
 
-	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2";
+	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp";

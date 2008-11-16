@@ -97,9 +97,9 @@ public:
 	           _ebwtTotLen(_numSidePairs * (2*_sideSz)),
 	           _ebwtTotSz(_ebwtTotLen),
 	           _chunkRate(__chunkRate),
-	           _chunkLen(1 << _chunkRate),
-	           _chunkMask(0xffffffff << _chunkRate),
-	           _numChunks((_len + _chunkLen - 1) / _chunkLen)
+	           _chunkLen((_chunkRate >= 0) ? (1 << _chunkRate) : 0),
+	           _chunkMask((_chunkRate >= 0) ? (0xffffffff << _chunkRate) : 0),
+	           _numChunks((_chunkRate >= 0) ? ((_len + _chunkLen - 1) / _chunkLen) : 0)
 	{
 		assert(repOk());
 	}
@@ -304,8 +304,10 @@ public:
 		assert_geq(_offRate, 0);
 		assert_leq(_ftabChars, 16);
 		assert_geq(_ftabChars, 1);
-		assert_geq(_chunkRate, 1);
-		assert_lt(_chunkRate, 32);
+		if(_chunkRate != -1) {
+			assert_geq(_chunkRate, 1);
+			assert_lt(_chunkRate, 32);
+		}
 		assert_lt(_lineRate, 32);
 		assert_lt(_linesPerSide, 32);
 		assert_lt(_ftabChars, 32);
@@ -429,7 +431,6 @@ public:
 	    _nPat(0), \
 	    _nFrag(0), \
 	    _plen(NULL), \
-	    _usePmap(__usePmap), \
 	    _pmap(NULL), \
 	    _rstarts(NULL), \
 	    _fchr(NULL), \
@@ -444,7 +445,6 @@ public:
 	Ebwt(const string& in,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
-	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
@@ -488,7 +488,6 @@ public:
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
-	     bool __usePmap = true,
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
@@ -697,9 +696,9 @@ public:
 	 * fragments correspond to input sequences - it just cares about
 	 * the lengths of the fragments.
 	 */
-	uint32_t joinedLen(vector<RefRecord>& szs, uint32_t chunkRate) {
+	uint32_t joinedLen(vector<RefRecord>& szs, int32_t chunkRate) {
 		uint32_t ret = 0;
-		if(_usePmap) {
+		if(chunkRate >= 0) {
 			uint32_t chunkLen = 1 << chunkRate;
 			for(unsigned int i = 0; i < szs.size(); i++) {
 				ret += ((szs[i].len + chunkLen - 1) / chunkLen) * chunkLen;
@@ -762,7 +761,7 @@ public:
 			assert(_fchr != NULL);
 			assert(_offs != NULL);
 			assert(_isa != NULL);
-			if(_usePmap) {
+			if(_eh._chunkRate >= 0) {
 				assert(_pmap != NULL);
 			} else {
 				assert(_rstarts != NULL);
@@ -777,7 +776,7 @@ public:
 			assert(_offs == NULL);
 			// Not necessarily; it's also NULL when there's no ISA
 			//assert(_isa == NULL);
-			if(_usePmap) {
+			if(_eh._chunkRate >= 0) {
 				assert(_pmap == NULL);
 			} else {
 				assert(_rstarts == NULL);
@@ -814,7 +813,7 @@ public:
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
 		//delete[] _plen;  _plen  = NULL;
-		if(_usePmap) {
+		if(_eh._chunkRate >= 0) {
 			delete[] _pmap; _pmap  = NULL;
 		} else {
 			delete[] _rstarts; _rstarts = NULL;
@@ -990,8 +989,8 @@ public:
 	}
 
 	// Building
-	static TStr join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool usePmap);
-	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t chunkRate, uint32_t seed, bool usePmap);
+	static TStr join(vector<TStr>& l, int32_t chunkRate, uint32_t seed);
+	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, int32_t chunkRate, uint32_t seed);
 	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
@@ -1009,7 +1008,7 @@ public:
 	void sanityCheckUpToSide(int upToSide) const;
 	void sanityCheckAll() const;
 	void restore(TStr& s) const;
-	void checkOrigs(const vector<String<Dna5> >& os, bool mirror, bool usePmap) const;
+	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
@@ -1038,9 +1037,9 @@ public:
 		assert_lt(_zEbwtBpOff, 4);
 		assert_lt(_zEbwtByteOff, eh._ebwtTotSz);
 		assert_lt(_zOff, eh._bwtLen);
-		assert(_usePmap  || _rstarts != NULL);
-		assert(!_usePmap || _pmap != NULL);
-		if(!_usePmap) assert_geq(_nFrag, _nPat);
+		assert(eh._chunkRate >= 0 || _rstarts != NULL);
+		assert(eh._chunkRate == -1 || _pmap != NULL);
+		if(eh._chunkRate == -1) assert_geq(_nFrag, _nPat);
 		return true;
 	}
 
@@ -1080,7 +1079,6 @@ public:
 	uint32_t   _nFrag; /// number of fragments
 	uint32_t*  _plen;
 	// _plen ans e
-	bool       _usePmap;
 	uint32_t*  _pmap;
 	uint32_t*  _rstarts; // starting offset of fragments / text indexes
 	// _fchr, _ftab and _eftab are expected to be relatively small
@@ -1557,7 +1555,7 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		assert_geq(this->_plen[i], 0);
 	}
 
-	if(this->_usePmap) {
+	if(eh._chunkRate >= 0) {
 		// Check pmap/plen
 		for(uint32_t i = 0; i < eh._numChunks*4; i += 4) {
 			// valid pattern id
@@ -2134,6 +2132,7 @@ void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
                                      uint32_t& tlen,
                                      bool ebwtFw) const
 {
+	assert_geq(this->_eh._chunkRate, 0);
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
 	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
 	tidx = this->_pmap[ptabOff];                     // id of text matched
@@ -2240,7 +2239,7 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
                                  uint32_t& tlen,
                                  bool ebwtFw) const
 {
-	if(this->_usePmap) {
+	if(this->_eh._chunkRate >= 0) {
 		assert(_pmap != NULL);
 		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen, ebwtFw);
 	} else {
@@ -2590,9 +2589,7 @@ void Ebwt<TStr>::restore(TStr& s) const {
  * the given array of reference sequences.  For sanity checking.
  */
 template <typename TStr>
-void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
-                            bool mirror,
-                            bool usePmap) const
+void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 {
 	TStr rest;
 	restore(rest);
@@ -2626,7 +2623,7 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
 		} else {
 			// Just jumped over a gap
 		}
-		if(usePmap) {
+		if(_eh.chunkRate() >= 0) {
 			uint32_t leftover = (restOff & ~_eh.chunkMask());
 			uint32_t diff = _eh.chunkLen() - leftover;
 			if(leftover != 0) restOff += diff;
@@ -2815,7 +2812,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 	// (i.e. everything up to and including join()).
 	if(justHeader) goto done;
 
-	if(this->_usePmap) {
+	if(eh._chunkRate >= 0) {
 		// Read pmap from primary stream
 		try {
 			uint32_t pmapEnts = eh._numChunks*4;
@@ -3069,7 +3066,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		writeU32(out1, this->_nPat,      be);
 		for(uint32_t i = 0; i < this->_nPat; i++)
 		writeU32(out1, this->_plen[i], be);
-		if(this->_usePmap) {
+		if(eh._chunkRate >= 0) {
 			for(uint32_t i = 0; i < eh._numChunks*4; i++)
 				writeU32(out1, this->_pmap[i], be);
 		} else {
@@ -3135,7 +3132,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	if(_sanity) {
 		if(_verbose)
 			cout << "Re-reading \"" << out1 << "\"/\"" << out2 << "\" for sanity check" << endl;
-		Ebwt copy(out1, out2, _usePmap, _verbose, _sanity);
+		Ebwt copy(out1, out2, _verbose, _sanity);
 		assert(!isInMemory());
 		copy.loadIntoMemory();
 		assert(isInMemory());
@@ -3152,7 +3149,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		assert_eq(_nPat,             copy.nPat());
 		for(uint32_t i = 0; i < _nPat; i++)
 			assert_eq(this->_plen[i], copy.plen()[i]);
-		if(this->_usePmap) {
+		if(eh._chunkRate >= 0) {
 			for(uint32_t i = 0; i < eh._numChunks*4; i++)
 				assert_eq(this->_pmap[i], copy.pcap()[i]);
 		} else {
@@ -3194,7 +3191,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool usePmap) {
+TStr Ebwt<TStr>::join(vector<TStr>& l, int32_t chunkRate, uint32_t seed) {
 	RandomSource rand(seed); // reproducible given same seed
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
@@ -3209,7 +3206,7 @@ TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t chunkRate, uint32_t seed, bool u
 		TStr& s = l[i];
 		assert_gt(length(s), 0);
 		append(ret, s);
-		if(!usePmap) continue;
+		if(chunkRate == -1) continue;
 		// s isn't the last pattern; padding between s and the next
 		// pattern may be necessary
 		uint32_t diff = 0;
@@ -3247,9 +3244,8 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
                       vector<RefRecord>& szs,
                       uint32_t sztot,
                       const RefReadInParams& refparams,
-                      uint32_t chunkRate,
-                      uint32_t seed,
-                      bool usePmap)
+                      int32_t chunkRate,
+                      uint32_t seed)
 {
 	RandomSource rand(seed); // reproducible given same seed
 	RefReadInParams rpcp = refparams;
@@ -3257,7 +3253,7 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
 	size_t guessLen = sztot;
-	if(usePmap) guessLen += (szs.size() * chunkLen);
+	if(chunkRate >= 0) guessLen += (szs.size() * chunkLen);
 	reserve(ret, guessLen, Exact());
 	ASSERT_ONLY(size_t szsi = 0);
 	for(size_t i = 0; i < l.size(); i++) {
@@ -3279,7 +3275,7 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
-			if(!usePmap) continue;
+			if(chunkRate == -1) continue;
 		    // insert padding
 			uint32_t diff = 0;
 			uint32_t rlen = length(ret);
@@ -3379,7 +3375,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	}
 	assert_eq((uint32_t)npat, this->_nPat-1);
 	writeU32(out1, this->_plen[npat], this->toBe());
-	if(!_usePmap) {
+	if(eh._chunkRate == -1) {
 		// Write the number of fragments
 		writeU32(out1, this->_nFrag, this->toBe());
 	}
@@ -3432,7 +3428,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
 			uint32_t seq = seqsRead-1;
-			if(_usePmap) {
+			if(eh._chunkRate >= 0) {
 			    // insert padding
 				uint32_t diff = 0;
 				uint32_t rlen = length(ret);
@@ -3489,7 +3485,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 		assert(!l[i]->eof());
 		#endif
 	}
-	if(_usePmap) {
+	if(eh._chunkRate >= 0) {
 		assert_eq(pmapOff, pmapEnts); // initialized every pmap element
 	} else {
 		assert_eq(entsWritten, this->_nFrag);
@@ -3886,8 +3882,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
  * executable, then try the provided string appended onto
  * "$BOWTIE_INDEXES/".
  */
-string adjustEbwtBase(const string& cmdline, 
-					  const string& ebwtFileBase, 
+string adjustEbwtBase(const string& cmdline,
+					  const string& ebwtFileBase,
 					  bool verbose = false) {
 	string str = ebwtFileBase;
 	ifstream in;

@@ -41,7 +41,7 @@ static int32_t isaRate       = -1; // sample rate for ISA; default: don't sample
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
 //static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
-static bool    useBsearch    = false;
+static bool    useBsearch    = true;
 static bool    nsToAs        = false;
 static bool    autoMem       = false;
 
@@ -52,7 +52,7 @@ static const int ARG_BMAX_DIV  = 258;
 static const int ARG_DCV       = 259;
 static const int ARG_SEED      = 260;
 static const int ARG_CUTOFF    = 261;
-static const int ARG_BSEARCH   = 262;
+static const int ARG_PMAP      = 262;
 static const int ARG_ISARATE   = 263;
 static const int ARG_NTOA      = 264;
 
@@ -85,6 +85,7 @@ static void printUsage(ostream& out) {
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
+	    << "    --oldpmap               use old reference mapping; yields larger index" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
@@ -150,7 +151,7 @@ static void printLongUsage(ostream& out) {
 	" If your reference exceeds 2^32-1 characters either before or after\n"
 	" padding, bowtie-build will print an error message and abort.  To\n"
 	" resolve this, please divide your reference sequences into smaller\n"
-	" batches and/or chunks and build a separate index for each.\n"  
+	" batches and/or chunks and build a separate index for each.\n"
 	"\n"
 	"  Command Line\n"
 	"  ------------\n"
@@ -292,7 +293,7 @@ static struct option long_options[] = {
 	{"help",         no_argument,       0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{"ntoa",         no_argument,       0,            ARG_NTOA},
-	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
+	{"oldpmap",      no_argument,       0,            ARG_PMAP},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -386,7 +387,7 @@ static void parseOptions(int argc, char **argv) {
 	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
 	   			break;
 	   		case ARG_NTOA: nsToAs = true; break;
-	   		case ARG_BSEARCH: useBsearch = true; break;
+	   		case ARG_PMAP: useBsearch = false; break;
 	   		case 'a': autoMem = true; break;
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
@@ -405,7 +406,7 @@ static void parseOptions(int argc, char **argv) {
 	if(bmax < 40) {
 		cerr << "Warning: specified bmax is very small (" << bmax << ").  This can lead to" << endl
 		      << "extremely slow performance and memory exhaustion.  Perhaps you meant to specify" << endl
-		      << "a small --bmaxdivn?" << endl; 
+		      << "a small --bmaxdivn?" << endl;
 	}
 }
 
@@ -453,8 +454,10 @@ static void driver(const char * type,
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
 		sztot = fastaRefReadSizes(is, szs, refparams);
-		chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
-		if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
+		if(!useBsearch) {
+			chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
+			if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
+		}
 	}
 	assert_gt(sztot, 0);
 	assert_gt(szs.size(), 0);
@@ -464,7 +467,7 @@ static void driver(const char * type,
 	                offRate,      // suffix-array sampling rate
 	                isaRate,      // ISA sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
-	                chunkRate,    // alignment
+	                useBsearch? -1 : chunkRate, // alignment
 	                outfile,      // basename for .?.ebwt files
 	                !entireSA,    // useBlockwise
 	                bmax,         // block size for blockwise SA builder
@@ -478,7 +481,6 @@ static void driver(const char * type,
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
 	                -1,           // override isaRate
-	                !useBsearch,  // use pmap (little faster) or a binary search (less memory)
 	                verbose,      // be talkative
 	                autoMem,      // pass exceptions up to the toplevel so that we can adjust memory settings automatically
 	                sanityCheck); // verify results and internal consistency
@@ -496,7 +498,7 @@ static void driver(const char * type,
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed, !useBsearch);
+			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed);
 			assert_eq(length(joinedss), length(s2));
 			assert_eq(joinedss, s2);
 		}

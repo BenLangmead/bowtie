@@ -69,7 +69,6 @@ static uint32_t mhits           = 0xffffffff; // don't report any hits if there 
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
-static bool useBsearch			= false; // if true, don't pad and use binary search over frag starts
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
 static bool noMaqRound          = false;
@@ -100,7 +99,6 @@ enum {
 	ARG_BEST,
 	ARG_SPANSTRATA,
 	ARG_REFOUT,
-	ARG_BSEARCH,
 	ARG_ISARATE,
 	ARG_SEED_EXTEND,
 	ARG_PARTITION,
@@ -160,7 +158,6 @@ static struct option long_options[] = {
 	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
 	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{"refout",       no_argument,       0,            ARG_REFOUT},
-	{"bsearch",      no_argument,       0,            ARG_BSEARCH},
 	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{"partition",    required_argument, 0,            ARG_PARTITION},
 	{0, 0, 0, 0} // terminator
@@ -615,7 +612,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case 'b': outType = BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
-	   		case ARG_BSEARCH: useBsearch = true; break;
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
@@ -1078,7 +1074,7 @@ static void mismatchSearch(PatternSource& _patsrc,
     _patsrc.setReverse(true); // reverse patterns
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwtBw.checkOrigs(os, true, !useBsearch);
+		ebwtBw.checkOrigs(os, true);
 	}
 
 	// Phase 2
@@ -2629,7 +2625,6 @@ static void driver(const char * type,
     Ebwt<TStr> ebwt(adjustedEbwtFileBase,
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
-                    !useBsearch,
                     verbose,
                     false /*passMemExc*/,
                     sanityCheck);
@@ -2639,7 +2634,6 @@ static void driver(const char * type,
     	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
-    	                        !useBsearch,
     	                        verbose,
     	                        false /*passMemExc*/,
     	                        sanityCheck);
@@ -2660,7 +2654,7 @@ static void driver(const char * type,
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
 		if(maqLike) ebwt.loadIntoMemory();
-		ebwt.checkOrigs(os, false, !useBsearch);
+		ebwt.checkOrigs(os, false);
 		if(maqLike) ebwt.evictFromMemory();
 	}
     // If sanity-check is enabled and an original text string
