@@ -2208,7 +2208,7 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
 				// Initially it's the number of characters that precede
 				// the alignment in the fragment
 				uint32_t fragoff = off - _rstarts[(elt*3)];
-				if(ebwtFw) {
+				if(!ebwtFw) {
 					fragoff = fraglen - fragoff - 1;
 					fragoff -= (qlen-1);
 				}
