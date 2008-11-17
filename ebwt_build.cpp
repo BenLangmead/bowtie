@@ -437,17 +437,18 @@ static void driver(const char * type,
 		ASSERT_ONLY(fb->reset());
 		assert(!fb->eof());
 		is.push_back(fb);
-	}
-	// Adapt sequence files to ifstreams
-	for(size_t i = 0; i < infiles.size(); i++) {
-		FILE *f = fopen(infiles[i].c_str(), "r");
-		FileBuf *fb = new FileBuf(f);
-		assert(fb != NULL);
-		assert(!fb->eof());
-		assert(fb->get() == '>');
-		ASSERT_ONLY(fb->reset());
-		assert(!fb->eof());
-		is.push_back(fb);
+	} else {
+		// Adapt sequence files to ifstreams
+		for(size_t i = 0; i < infiles.size(); i++) {
+			FILE *f = fopen(infiles[i].c_str(), "r");
+			FileBuf *fb = new FileBuf(f);
+			assert(fb != NULL);
+			assert(!fb->eof());
+			assert(fb->get() == '>');
+			ASSERT_ONLY(fb->reset());
+			assert(!fb->eof());
+			is.push_back(fb);
+		}
 	}
 	vector<RefRecord> szs;
 	uint32_t sztot;
