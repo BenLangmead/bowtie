@@ -9,7 +9,7 @@ if [ -z "$NUM" ] ; then
 fi
 
 make bowtie-debug bowtie-build-debug bowtie-build-packed-debug
-if [ "$?" ne "0" ] ; then
+if [ "$?" != "0" ] ; then
 	echo "Error during build"
 	exit 1
 fi

@@ -14,11 +14,11 @@
  */
 class FileBuf {
 public:
-	FileBuf(FILE *__in) : _in(__in), _ins(NULL), _inspos(0), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(FILE *__in) : _in(__in), _ins(NULL), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
 		assert(_in != NULL);
 	}
 
-	FileBuf(istream *__ins) : _in(NULL), _ins(__ins), _inspos(_ins->tellg()), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(istream *__ins) : _in(NULL), _ins(__ins), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
 		assert(_ins != NULL);
 	}
 
@@ -35,7 +35,7 @@ public:
 
 	void reset() {
 		if(_ins != NULL) {
-			_ins->seekg(_inspos);
+			_ins->seekg(ios::beg);
 			_ins->clear();
 		} else {
 			rewind(_in);
@@ -97,7 +97,6 @@ private:
 	static const size_t BUF_SZ = 256 * 1024;
 	FILE    *_in;
 	istream *_ins;
-	streampos _inspos;
 	size_t   _cur;
 	size_t   _buf_sz;
 	bool     _done;
