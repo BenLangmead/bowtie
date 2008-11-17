@@ -34,3 +34,6 @@ tmp.*
 .randtmp*
 .randread*
 .gdb_history*
+bowtie*.zip
+.rand*
+.tmp*
