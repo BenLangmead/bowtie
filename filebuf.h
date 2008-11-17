@@ -36,7 +36,7 @@ public:
 	void reset() {
 		if(_ins != NULL) {
 			_ins->clear();
-			_ins.seekg(0, ios::beg);
+			_ins->seekg(0, ios::beg);
 		} else {
 			rewind(_in);
 		}
