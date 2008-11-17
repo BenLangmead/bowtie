@@ -18,7 +18,7 @@ public:
 		assert(_in != NULL);
 	}
 
-	FileBuf(istream *__ins) : _in(NULL), _ins(__ins), _inspos(_ins.tellg()), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(istream *__ins) : _in(NULL), _ins(__ins), _inspos(_ins->tellg()), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
 		assert(_ins != NULL);
 	}
 
@@ -35,8 +35,8 @@ public:
 
 	void reset() {
 		if(_ins != NULL) {
-			_ins.seekg(_inspos);
-			_ins.clear();
+			_ins->seekg(_inspos);
+			_ins->clear();
 		} else {
 			rewind(_in);
 		}
@@ -53,8 +53,8 @@ public:
 			else {
 				// Get the next chunk
 				if(_ins != NULL) {
-					_ins.read(_buf, BUF_SZ);
-					_buf_sz = _ins.gcount();
+					_ins->read(_buf, BUF_SZ);
+					_buf_sz = _ins->gcount();
 				} else {
 					assert(_in != NULL);
 					_buf_sz = fread(_buf, 1, BUF_SZ, _in);

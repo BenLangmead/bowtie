@@ -424,17 +424,13 @@ static void driver(const char * type,
 	vector<FileBuf*> is;
 	RefReadInParams refparams(cutoff, -1, reverse, nsToAs);
 	assert_gt(infiles.size(), 0);
-	if(format == CMDLINE && infiles[0] != ".bowtietmp.reads") {
+	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
-		ofstream of(".bowtietmp.reads");
+		stringstream *ss = new stringstream();
 		for(size_t i = 0; i < infiles.size(); i++) {
-			stringstream ss;
-			ss << ">" << i << endl << infiles[i] << endl;
-			of << ss.str();
+			(*ss) << ">" << i << endl << infiles[i] << endl;
 		}
-		of.close();
-		infiles.clear();
-		infiles.push_back(".bowtietmp.reads");
+		is.push_back(ss);
 	}
 	// Adapt sequence files to ifstreams
 	for(size_t i = 0; i < infiles.size(); i++) {
