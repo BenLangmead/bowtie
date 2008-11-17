@@ -153,7 +153,7 @@ sub build {
 	}
 	my $fasta = int(rand(2)) == 0;
 	if($fasta) {
-		open FA, ">.randtmp.fa" || die "Could not open temporary fasta file";
+		open FA, ">.randtmp$seed.fa" || die "Could not open temporary fasta file";
 		my @seqs = split(/,/, $t);
 		for(my $i = 0; $i <= $#seqs; $i++) {
 			print FA ">ref$i\n";
@@ -161,7 +161,7 @@ sub build {
 		}
 		close(FA);
 		$file1 = "-f";
-		$file2 = ".randtmp.fa";
+		$file2 = ".randtmp$seed.fa";
 	}
 	
 	my $bucketArg = "";
@@ -186,8 +186,8 @@ sub build {
 	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
 	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug $args .tmp";
-	system("echo \"$cmd\" > .tmp.cmd");
+	my $cmd = "./bowtie-build-debug $args .tmp$seed";
+	system("echo \"$cmd\" > .tmp$seed.cmd");
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>&1`);
 	if($out eq "") {
@@ -201,16 +201,16 @@ sub build {
 
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
-	if(int(rand(5)) == 0) {
-		$cmd = "./bowtie-build-packed-debug $args .tmp.packed";
+	if(int(rand(4)) == 0) {
+		$cmd = "./bowtie-build-packed-debug $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
-			if(system("diff .tmp.1.ebwt .tmp.packed.1.ebwt") != 0) {
+			if(system("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
 				if($exitOnFail) {
 					exit 1;
 				}
-			} elsif(system("diff .tmp.2.ebwt .tmp.packed.2.ebwt") != 0) {
+			} elsif(system("diff .tmp$seed.2.ebwt .tmp$seed.packed.2.ebwt") != 0) {
 				if($exitOnFail) {
 					exit 1;
 				}
@@ -237,7 +237,7 @@ sub search {
 	my $format = int(rand(5));
 	if($format == 0) {
 		# FASTA
-		open FA, ">.randread.fa" || die "Could not open temporary fasta file";
+		open FA, ">.randread$seed.fa" || die "Could not open temporary fasta file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -245,10 +245,10 @@ sub search {
 		}
 		close FA;
 		$patarg = "-f";
-		$patstr = ".randread.fa";
+		$patstr = ".randread$seed.fa";
 	} elsif($format == 1) {
 		# FASTQ with ASCII qualities
-		open FQ, ">.randread.fq" || die "Could not open temporary fastq file";
+		open FQ, ">.randread$seed.fq" || die "Could not open temporary fastq file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -256,10 +256,10 @@ sub search {
 		}
 		close FQ;
 		$patarg = "-q";
-		$patstr = ".randread.fq";
+		$patstr = ".randread$seed.fq";
 	} elsif($format == 2) {
 		# FASTQ with integer qualities
-		open FQ, ">.randread.integer.fq" || die "Could not open temporary solexa fastq file";
+		open FQ, ">.randread$seed.integer.fq" || die "Could not open temporary solexa fastq file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -273,10 +273,10 @@ sub search {
 		}
 		close FQ;
 		$patarg = "-q --integer-quals";
-		$patstr = ".randread.integer.fq";
+		$patstr = ".randread$seed.integer.fq";
 	} elsif($format == 3) {
 		# Raw
-		open RAW, ">.randread.raw" || die "Could not open temporary raw file";
+		open RAW, ">.randread$seed.raw" || die "Could not open temporary raw file";
 		my @cs = split /[,]/, $p;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -284,7 +284,7 @@ sub search {
 		}
 		close RAW;
 		$patarg = "-r";
-		$patstr = ".randread.raw";
+		$patstr = ".randread$seed.raw";
 	}
 	
 	my $isaArg = "";
@@ -335,21 +335,21 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $khits --concise $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp $patstr";
+	my $cmd = "./bowtie-debug $policy $khits --concise $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
-	my $out = trim(`$cmd 2>.tmp.stderr`);
+	my $out = trim(`$cmd 2>.tmp$seed.stderr`);
 	
 	# Bad exitlevel?
 	if($? != 0) {
 		print "Exitlevel: $?\n";
 		if($exitOnFail) {
-			my $err = trim(`cat .tmp.stderr 2> /dev/null`);
+			my $err = trim(`cat .tmp$seed.stderr 2> /dev/null`);
 			print "Stdout:\n$out\nStderr:\n$err\n";
 			exit 1;
 		}
 		return 0;
 	}
-	my $err = trim(`cat .tmp.stderr 2> /dev/null`);
+	my $err = trim(`cat .tmp$seed.stderr 2> /dev/null`);
 	
 	# Yielded no results when we were expecting some?
 	if($out eq "No results" && $requireResult) {
