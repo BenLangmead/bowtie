@@ -8,6 +8,12 @@ if [ -z "$NUM" ] ; then
 	NUM=4
 fi
 
+make bowtie-debug bowtie-build-debug bowtie-build-packed-debug
+if [ "$?" ne "0" ] ; then
+	echo "Error during build"
+	exit 1
+fi
+
 echo > .randpids
 while [ $NUM -gt 0 ] ; do
 	echo "Spawning: sh scripts/random_bowtie_tests.sh $NUM > .randstdout.$NUM 2> .randstderr.$NUM &"
