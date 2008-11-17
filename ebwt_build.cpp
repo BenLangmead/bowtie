@@ -430,7 +430,13 @@ static void driver(const char * type,
 		for(size_t i = 0; i < infiles.size(); i++) {
 			(*ss) << ">" << i << endl << infiles[i] << endl;
 		}
-		is.push_back(ss);
+		FileBuf *fb = new FileBuf(ss);
+		assert(fb != NULL);
+		assert(!fb->eof());
+		assert(fb->get() == '>');
+		ASSERT_ONLY(fb->reset());
+		assert(!fb->eof());
+		is.push_back(fb);
 	}
 	// Adapt sequence files to ifstreams
 	for(size_t i = 0; i < infiles.size(); i++) {
