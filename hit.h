@@ -47,6 +47,17 @@ static const int max_read_bp = 1023;
  * reverse-complement version.
  */
 struct Hit {
+	Hit() :
+		h(make_pair(0, 0)),
+		patId(0),
+		patName(String<char>("")),
+		patSeq(String<char>("")),
+		quals(String<char>("")),
+		mms(),
+		refcs(),
+		oms(0),
+		fw(true) { }
+
 	Hit(U32Pair _h,
 		uint32_t _patId,
 		const String<char>& _patName,
@@ -1001,9 +1012,14 @@ private:
 /**
  * Sink that prints lines like this:
  * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
+ *
+ * Activated with --concise
  */
 class ConciseHitSink : public HitSink {
 public:
+	/**
+	 * Construct a single-stream ConciseHitSink (default)
+	 */
 	ConciseHitSink(
 			ostream&        __out,
 			bool            __reportOpps = false,
@@ -1013,6 +1029,10 @@ public:
 		_first(true),
 		_numReported(0llu) { }
 
+	/**
+	 * Construct a multi-stream ConciseHitSink with one stream per
+	 * reference string (see --refout)
+	 */
 	ConciseHitSink(
 	        size_t          __numOuts,
 			bool            __reportOpps = false,
@@ -1097,6 +1117,9 @@ private:
  */
 class VerboseHitSink : public HitSink {
 public:
+	/**
+	 * Construct a single-stream VerboseHitSink (default)
+	 */
 	VerboseHitSink(ostream&        __out,
 				   vector<string>* __refnames = NULL,
 				   int             __partition = 0) :
@@ -1105,6 +1128,10 @@ public:
 	_numReported(0llu),
 	_partition(__partition) { }
 
+	/**
+	 * Construct a multi-stream VerboseHitSink with one stream per
+	 * reference string (see --refout)
+	 */
 	VerboseHitSink(size_t          __numOuts,
 				   vector<string>* __refnames = NULL,
 				   int             __partition = 0) :
@@ -1195,7 +1222,7 @@ public:
 	}
 
 	/**
-	 *
+	 * Append a verbose, readable hit to the given output stream.
 	 */
 	void append(ostream& ss, const Hit& h) {
 		if(_partition > 0) {
@@ -1245,7 +1272,8 @@ public:
 	}
 
 	/**
-	 *
+	 * Report a verbose, human-readable alignment to the appropriate
+	 * output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
 		ostringstream ss;
@@ -1261,7 +1289,8 @@ public:
 	}
 
 	/**
-	 *
+	 * Report a list of verbose, human-readable alignments to the
+	 * appropriate output stream.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		if(hs.size() == 0) return;
@@ -1286,39 +1315,50 @@ public:
 	}
 
 	/**
-	 *
+	 * Finalize the alignment output by printing a summary message to
+	 * stdout.
 	 */
 	virtual void finish() {
 		if(_first) {
 			assert_eq(0llu, _numReported);
 			cout << "No results" << endl;
+		} else {
+			cout << "Reported " << _numReported << " alignments to "
+			     << _outs.size() << " output stream(s)" << endl;
 		}
-		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
 	}
 
 private:
-	bool     _first; /// true -> first hit hasn't yet been reported
-	uint64_t _numReported;
-	int      _partition;
+	bool     _first;       /// true iff this object hasn't yet reported a hit
+	uint64_t _numReported; /// number of hits reported
+	int      _partition;   /// partition size, or 0 if partitioning is disabled
 };
 
 /**
- * Sink for binary output:
+ * Sink for outputting alignments in a binary format.
  */
 class BinaryHitSink : public HitSink {
 public:
+
+	/**
+	 * Construct a single-stream BinaryHitSink (default)
+	 */
 	BinaryHitSink(ostream&        __out,
 				  vector<string>* __refnames = NULL) :
 	HitSink(__out, __refnames),
 	_first(true), _numReported(0llu) { }
 
+	/**
+	 * Construct a multi-stream BinaryHitSink with one stream per
+	 * reference string (see --refout)
+	 */
 	BinaryHitSink(size_t          __numOuts,
 				  vector<string>* __refnames = NULL) :
 	HitSink(__numOuts, __refnames),
 	_first(true), _numReported(0llu) { }
 
 	/**
-	 *
+	 * Append a binary-encoded hit to the given output stream.
 	 */
 	void append(ostream& o, const Hit& h) {
 		// true iff we're going to print the reference sequence name
@@ -1345,6 +1385,7 @@ public:
 		o.write((const char *)&h.h.second, 4);
 		// Write pattern sequence
 		uint16_t plen = (uint16_t)length(h.patSeq);
+		o.write((const char *)&plen, 2);
 		for(size_t i = 0; i < plen; i += 2) {
 			uint8_t twoChrs = (uint8_t)h.patSeq[i];
 			if(i+1 < plen) {
@@ -1354,6 +1395,7 @@ public:
 		}
 		// Write quals sequence
 		uint16_t qlen = (uint16_t)length(h.quals);
+		assert_eq(plen, qlen);
 		o.write(begin(h.quals), qlen);
 		// Write oms
 		o.write((const char *)&h.oms, 4);
@@ -1381,7 +1423,93 @@ public:
 	}
 
 	/**
-	 *
+	 * Read a binary-encoded hit (written by append() above) from an
+	 * input stream.
+	 */
+	static void readHit(Hit& h, istream& in, bool verbose = false) {
+		uint16_t pnamelen;
+		in.read((char *)&pnamelen, 2);
+		if(verbose) cout << "name(" << pnamelen << ")=\"";
+		seqan::resize(h.patName, pnamelen);
+		in.read((char*)begin(h.patName), pnamelen);
+		if(verbose) cout << h.patName << "\", ";
+		// Write fw/refname flags
+		uint8_t flags; // = (h.fw ? 1 : 0) | (refName? 2 : 0);
+		in.read((char *)&flags, 1);
+		h.fw         = ((flags & 1) != 0);
+		bool refName = ((flags & 2) != 0);
+		if(verbose) cout << "fw=" << (h.fw ? "true":"false") << ", ";
+		if(refName) {
+			// Read and ignore reference name
+			uint16_t rnamelen;
+			char buf[2048];
+			in.read((char *)&rnamelen, 2);
+			in.read(buf, rnamelen);
+			buf[rnamelen] = '\0';
+			if(verbose) cout << "refname=\"" << buf << "\", ";
+		} else {
+			// Read reference id as index into global reference name list
+			in.read((char*)&h.h.first, 4);
+			if(verbose) cout << "refidx=" << h.h.first << ", ";
+		}
+		// Read reference offset
+		in.read((char*)&h.h.second, 4);
+		if(verbose) cout << "refoff=" << h.h.second << ", ";
+		// Read pattern length
+		uint16_t plen;
+		in.read((char*)&plen, 2);
+		if(verbose) cout << "plen=" << plen << ", ";
+		h.refcs.resize(plen, 0);
+		assert_gt(plen, 1);
+		assert_lt(plen, 1024);
+		// Read pattern sequence
+		seqan::resize(h.patSeq, plen);
+		for(size_t i = 0; i < plen; i += 2) {
+			uint8_t twoChars;
+			in.read((char *)&twoChars, 1);
+			assert_lt((twoChars & 15), 5);
+			assert_lt((twoChars >> 4), 5);
+			h.patSeq[i] = (twoChars & 15);
+			if(i+1 < plen) {
+				h.patSeq[i+1] = (twoChars >> 4);
+			}
+		}
+		if(verbose) cout << "pat=\"" << h.patSeq << "\", ";
+		// Read quals sequence
+		uint16_t qlen = plen;
+		seqan::resize(h.quals, qlen);
+		in.read((char*)begin(h.quals), qlen);
+		if(verbose) cout << "quals=\"" << h.quals << "\", ";
+#ifndef NDEBUG
+		for(size_t i = 0; i < length(h.quals); i++) {
+			assert_geq(h.quals[i], 33);
+			assert_leq(h.quals[i], 126);
+		}
+#endif
+		// Write oms
+		in.read((char *)&h.oms, 4);
+		if(verbose) cout << "oms=" << h.oms << ", ";
+		// Write # mismatches
+		uint8_t numMms;
+		in.read((char *)&numMms, 1);
+		if(verbose) cout << "nummms=" << ((int)numMms) << ", ";
+		// Output mismatches
+		for(uint8_t i = 0; i < numMms; i++) {
+			uint8_t ii;
+			in.read((char*)&ii, 1);
+			h.mms.set(ii);
+			uint8_t both;
+			in.read((char*)&both, 1);
+			uint8_t refChar = both & 15;
+			uint8_t qryChar = both >> 4;
+			h.refcs[ii] = "ACGTN"[refChar];
+			if(verbose) cout << ((int)ii) << ":" << "ACGTN"[refChar] << ">" << "ACGTN"[qryChar] << ", ";
+		}
+		if(verbose) cout << endl;
+	}
+
+	/**
+	 * Report a single hit to the appropriate output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
 		lock(h.h.first);
@@ -1394,23 +1522,29 @@ public:
 	}
 
 	/**
-	 *
+	 * Report a list of hits to the appropriate output stream.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		if(hs.size() == 0) return;
+		// Sort the hits in order of
 		if(_outs.size() > 1 && hs.size() > 2) {
 			sort(hs.begin(), hs.end());
 		}
 		for(size_t i = 0; i < hs.size(); i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
+				// Lock the first stream
 				lock(h.h.first);
 			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
+				// Move to the next stream; be sure to unlock before
+				// locking the next one
 				unlock(hs[i-1].h.first);
 				lock(h.h.first);
 			}
+			// Actually write the hit
 			append(out(h.h.first), h);
 		}
+		// Unlock the last stream
 		unlock(hs[hs.size()-1].h.first);
 		mainlock();
 		_first = false;
@@ -1419,22 +1553,25 @@ public:
 	}
 
 	/**
-	 *
+	 * Finalize the alignment output by printing a summary message to
+	 * stdout.
 	 */
 	virtual void finish() {
 		if(_first) {
 			assert_eq(0llu, _numReported);
 			cout << "No results" << endl;
+		} else {
+			cout << "Reported " << _numReported << " alignments to "
+			     << _outs.size() << " output stream(s)" << endl;
 		}
-		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
 	}
 private:
-	bool _first;
-	uint64_t _numReported;
+	bool _first;           /// true iff this object hasn't yet reported a hit
+	uint64_t _numReported; /// number of hits reported
 };
 
 /**
- * Sink that does nothing:
+ * Sink that does nothing.
  */
 class StubHitSink : public HitSink {
 public:

@@ -1,15 +1,12 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include <cassert>
 #include <getopt.h>
+#include <seqan/sequence.h>
+#include <seqan/file.h>
 #include "assert_helpers.h"
-#include "sequence_io.h"
 #include "tokenize.h"
-#include "timer.h"
-#include "ref_read.h"
 #include "hit.h"
-#include "rot_buf.h"
 
 enum {
 	FORMAT_DEFAULT = 1,
@@ -136,9 +133,19 @@ int main(int argc, char **argv) {
 	}
 
 	for(size_t i = 0; i < infiles.size(); i++) {
+		Hit h;
 		cout << "Processing " << infiles[i] << endl;
+		ifstream in(infiles[i].c_str(), ios_base::out | ios_base::binary);
+		BinaryHitSink::readHit(h, in, verbose);
+		in.close();
 	}
 	(*out) << "Output" << endl;
+
+	// Close and delete output
+	if(optind < argc) {
+		((ofstream*)out)->close();
+		delete out;
+	}
 
 	return 0;
 }
