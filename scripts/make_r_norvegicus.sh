@@ -71,8 +71,10 @@ for c in 10 11 12 13 14 15 16 17 18 19 20 X MT ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa r_norvegicus
-${BOWTIE_BUILD_EXE} --bmaxdivn 4 rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa r_norvegicus
+INPUTS=rn_ref_chr1.mfa,rn_ref_chr2.mfa,rn_ref_chr3.mfa,rn_ref_chr4.mfa,rn_ref_chr5.mfa,rn_ref_chr6.mfa,rn_ref_chr7.mfa,rn_ref_chr8.mfa,rn_ref_chr9.mfa,rn_ref_chr10.mfa,rn_ref_chr11.mfa,rn_ref_chr12.mfa,rn_ref_chr13.mfa,rn_ref_chr14.mfa,rn_ref_chr15.mfa,rn_ref_chr16.mfa,rn_ref_chr17.mfa,rn_ref_chr18.mfa,rn_ref_chr19.mfa,rn_ref_chr20.mfa,rn_ref_chrMT.mfa,rn_ref_chrX.mfa
+
+echo Running ${BOWTIE_BUILD_EXE} -a ${INPUTS} r_norvegicus
+${BOWTIE_BUILD_EXE} -a ${INPUTS} r_norvegicus
 if [ "$?" = "0" ] ; then
 	echo "r_norvegicus index built:"
 	echo "   r_norvegicus.1.ebwt r_norvegicus.2.ebwt r_norvegicus.rev.1.ebwt r_norvegicus.rev.2.ebwt"

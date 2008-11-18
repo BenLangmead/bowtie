@@ -72,8 +72,10 @@ for c in 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 MT W Z ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 gga_ref_chr1.mfa,gga_ref_chr2.mfa,gga_ref_chr3.mfa,gga_ref_chr4.mfa,gga_ref_chr5.mfa,gga_ref_chr6.mfa,gga_ref_chr7.mfa,gga_ref_chr8.mfa,gga_ref_chr9.mfa,gga_ref_chr10.mfa,gga_ref_chr11.mfa,gga_ref_chr12.mfa,gga_ref_chr13.mfa,gga_ref_chr14.mfa,gga_ref_chr15.mfa,gga_ref_chr16.mfa,gga_ref_chr17.mfa,gga_ref_chr18.mfa,gga_ref_chr19.mfa,gga_ref_chr20.mfa,gga_ref_chr21.mfa,gga_ref_chr22.mfa,gga_ref_chr23.mfa,gga_ref_chr24.mfa,gga_ref_chr25.mfa,gga_ref_chr26.mfa,gga_ref_chr27.mfa,gga_ref_chr28.mfa,gga_ref_chrMT.mfa,gga_ref_chrW.mfa,gga_ref_chrZ.mfa g_gallus
-${BOWTIE_BUILD_EXE} --bmaxdivn 4 gga_ref_chr1.mfa,gga_ref_chr2.mfa,gga_ref_chr3.mfa,gga_ref_chr4.mfa,gga_ref_chr5.mfa,gga_ref_chr6.mfa,gga_ref_chr7.mfa,gga_ref_chr8.mfa,gga_ref_chr9.mfa,gga_ref_chr10.mfa,gga_ref_chr11.mfa,gga_ref_chr12.mfa,gga_ref_chr13.mfa,gga_ref_chr14.mfa,gga_ref_chr15.mfa,gga_ref_chr16.mfa,gga_ref_chr17.mfa,gga_ref_chr18.mfa,gga_ref_chr19.mfa,gga_ref_chr20.mfa,gga_ref_chr21.mfa,gga_ref_chr22.mfa,gga_ref_chr23.mfa,gga_ref_chr24.mfa,gga_ref_chr25.mfa,gga_ref_chr26.mfa,gga_ref_chr27.mfa,gga_ref_chr28.mfa,gga_ref_chrMT.mfa,gga_ref_chrW.mfa,gga_ref_chrZ.mfa g_gallus
+INPUTS=gga_ref_chr1.mfa,gga_ref_chr2.mfa,gga_ref_chr3.mfa,gga_ref_chr4.mfa,gga_ref_chr5.mfa,gga_ref_chr6.mfa,gga_ref_chr7.mfa,gga_ref_chr8.mfa,gga_ref_chr9.mfa,gga_ref_chr10.mfa,gga_ref_chr11.mfa,gga_ref_chr12.mfa,gga_ref_chr13.mfa,gga_ref_chr14.mfa,gga_ref_chr15.mfa,gga_ref_chr16.mfa,gga_ref_chr17.mfa,gga_ref_chr18.mfa,gga_ref_chr19.mfa,gga_ref_chr20.mfa,gga_ref_chr21.mfa,gga_ref_chr22.mfa,gga_ref_chr23.mfa,gga_ref_chr24.mfa,gga_ref_chr25.mfa,gga_ref_chr26.mfa,gga_ref_chr27.mfa,gga_ref_chr28.mfa,gga_ref_chrMT.mfa,gga_ref_chrW.mfa,gga_ref_chrZ.mfa
+
+echo Running ${BOWTIE_BUILD_EXE} -a ${INPUTS} g_gallus
+${BOWTIE_BUILD_EXE} -a ${INPUTS} g_gallus
 if [ "$?" = "0" ] ; then
 	echo "g_gallus index built:"
 	echo "   g_gallus.1.ebwt g_gallus.2.ebwt g_gallus.rev.1.ebwt g_gallus.rev.2.ebwt"

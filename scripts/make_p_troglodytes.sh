@@ -72,8 +72,10 @@ for c in 10 11 12 13 14 15 16 17 18 19 20 21 22 MT X Y  ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} --bmaxdivn 4 ptr_ref_chr1.mfa,ptr_ref_chr2A.mfa,ptr_ref_chr2B.mfa,ptr_ref_chr3.mfa,ptr_ref_chr4.mfa,ptr_ref_chr5.mfa,ptr_ref_chr6.mfa,ptr_ref_chr7.mfa,ptr_ref_chr8.mfa,ptr_ref_chr9.mfa,ptr_ref_chr10.mfa,ptr_ref_chr11.mfa,ptr_ref_chr12.mfa,ptr_ref_chr13.mfa,ptr_ref_chr14.mfa,ptr_ref_chr15.mfa,ptr_ref_chr16.mfa,ptr_ref_chr17.mfa,ptr_ref_chr18.mfa,ptr_ref_chr19.mfa,ptr_ref_chr20.mfa,ptr_ref_chr21.mfa,ptr_ref_chr22.mfa,ptr_ref_chrMT.mfa,ptr_ref_chrX.mfa,ptr_ref_chrY.mfa p_troglodytes
-${BOWTIE_BUILD_EXE} --bmaxdivn 4 ptr_ref_chr1.mfa,ptr_ref_chr2A.mfa,ptr_ref_chr2B.mfa,ptr_ref_chr3.mfa,ptr_ref_chr4.mfa,ptr_ref_chr5.mfa,ptr_ref_chr6.mfa,ptr_ref_chr7.mfa,ptr_ref_chr8.mfa,ptr_ref_chr9.mfa,ptr_ref_chr10.mfa,ptr_ref_chr11.mfa,ptr_ref_chr12.mfa,ptr_ref_chr13.mfa,ptr_ref_chr14.mfa,ptr_ref_chr15.mfa,ptr_ref_chr16.mfa,ptr_ref_chr17.mfa,ptr_ref_chr18.mfa,ptr_ref_chr19.mfa,ptr_ref_chr20.mfa,ptr_ref_chr21.mfa,ptr_ref_chr22.mfa,ptr_ref_chrMT.mfa,ptr_ref_chrX.mfa,ptr_ref_chrY.mfa p_troglodytes
+INPUTS=ptr_ref_chr1.mfa,ptr_ref_chr2A.mfa,ptr_ref_chr2B.mfa,ptr_ref_chr3.mfa,ptr_ref_chr4.mfa,ptr_ref_chr5.mfa,ptr_ref_chr6.mfa,ptr_ref_chr7.mfa,ptr_ref_chr8.mfa,ptr_ref_chr9.mfa,ptr_ref_chr10.mfa,ptr_ref_chr11.mfa,ptr_ref_chr12.mfa,ptr_ref_chr13.mfa,ptr_ref_chr14.mfa,ptr_ref_chr15.mfa,ptr_ref_chr16.mfa,ptr_ref_chr17.mfa,ptr_ref_chr18.mfa,ptr_ref_chr19.mfa,ptr_ref_chr20.mfa,ptr_ref_chr21.mfa,ptr_ref_chr22.mfa,ptr_ref_chrMT.mfa,ptr_ref_chrX.mfa,ptr_ref_chrY.mfa
+
+echo Running ${BOWTIE_BUILD_EXE} -a ${INPUTS} p_troglodytes
+${BOWTIE_BUILD_EXE} -a ${INPUTS} p_troglodytes
 if [ "$?" = "0" ] ; then
 	echo "p_troglodytes index built:"
 	echo "   p_troglodytes.1.ebwt p_troglodytes.2.ebwt p_troglodytes.rev.1.ebwt p_troglodytes.rev.2.ebwt"
