@@ -110,7 +110,7 @@ static void parseOptions(int argc, char **argv) {
 static char *argv0 = NULL;
 
 /**
- * 
+ *
  */
 template<typename T>
 static void processAlignment(const char *line,
@@ -185,7 +185,7 @@ static void processPartitionedAlignments(
 }
 
 /**
- * 
+ *
  */
 template<typename T>
 static void processSortedAlignments(istream& alfile,
@@ -223,9 +223,10 @@ int main(int argc, char **argv) {
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t}: {" << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << "}" << endl;
+		     << ", " << sizeof(void *)
+		     << ", " << sizeof(size_t) << "}" << endl;
 		cout << "Source hash: " << EBWT_ASM_HASH << endl;
 		return 0;
 	}
