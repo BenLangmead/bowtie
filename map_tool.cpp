@@ -16,6 +16,7 @@ enum {
 
 static bool verbose     = false;       // be talkative
 static bool showVersion = false;       // show version info and exit
+static bool refIdx      = false;       // print reference idxs instead of names
 static int informat  = FORMAT_BIN;     // format of input alignments
 static int outformat = FORMAT_DEFAULT; // format of output alignments
 
@@ -41,7 +42,8 @@ static void printUsage(ostream& out) {
 static const char *short_options = "hvsdbDBC";
 
 enum {
-	ARG_VERSION = 256
+	ARG_VERSION = 256,
+	ARG_REFIDX
 };
 
 static struct option long_options[] = {
@@ -52,6 +54,7 @@ static struct option long_options[] = {
 	{"outconcise", no_argument, 0, 'C'},
 	{"verbose",    no_argument, 0, 'v'},
 	{"help",       no_argument, 0, 'h'},
+	{"refidx",     no_argument, 0, ARG_REFIDX},
 	{"version",    no_argument, 0, ARG_VERSION},
 	{0, 0, 0, 0} // terminator
 };
@@ -76,6 +79,7 @@ static void parseOptions(int argc, char **argv) {
 				break;
 	   		case 'v': verbose = false; break;
 	   		case ARG_VERSION: showVersion = true; break;
+	   		case ARG_REFIDX: refIdx = true; break;
 	   		case 'd': informat = FORMAT_DEFAULT; break;
 	   		case 'b': informat = FORMAT_BIN; break;
 	   		case 'D': outformat = FORMAT_DEFAULT; break;
@@ -90,10 +94,9 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 }
 
-static char *argv0 = NULL;
-
 /**
- * main function.  Parses command-line arguments.
+ * Parse command-line options, iterate through input alignments and
+ * output appropriate converted alignment. 
  */
 int main(int argc, char **argv) {
 	string infile;
@@ -101,9 +104,8 @@ int main(int argc, char **argv) {
 	string outfile;
 	parseOptions(argc, argv);
 	ostream *out = &cout;
-	argv0 = argv[0];
 	if(showVersion) {
-		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		cout << argv[0] << " version " << BOWTIE_VERSION << endl;
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
@@ -138,16 +140,24 @@ int main(int argc, char **argv) {
 		ifstream in(infiles[i].c_str(), ios_base::out | ios_base::binary);
 		while(in.good() && !in.eof()) {
 			Hit h;
-			if(informat == FORMAT_BIN) {
-				BinaryHitSink::readHit(h, in, verbose);
-			} else {
-				VerboseHitSink::readHit(h, in, verbose);
+			bool good;
+			vector<string> refnames;
+			vector<string>* inrefnames = &refnames;
+			vector<string>* outrefnames = NULL;
+			if(!refIdx) {
+				outrefnames = &refnames;
 			}
+			if(informat == FORMAT_BIN) {
+				good = BinaryHitSink::readHit(h, in, inrefnames, verbose);
+			} else {
+				good = VerboseHitSink::readHit(h, in, inrefnames, verbose);
+			}
+			if(!good) continue; // bad alignment; skip it
 
 			if(outformat == FORMAT_BIN) {
-				BinaryHitSink::append(*out, h, NULL /* refnames */);
+				BinaryHitSink::append(*out, h,outrefnames);
 			} else if(outformat == FORMAT_DEFAULT) {
-				VerboseHitSink::append(*out, h, NULL /* refnames */, 0 /* partition */);
+				VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */);
 			} else {
 				ConciseHitSink::append(*out, h, false /* reportOpps */);
 			}

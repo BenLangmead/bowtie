@@ -1154,7 +1154,11 @@ public:
 	 * and/or h.first fields may be invalid.  TODO: load the id/name
 	 * mapping from the .ebwt file so that we can handle either case.
 	 */
-	static bool readHit(Hit& h, istream& in, bool verbose = false) {
+	static bool readHit(Hit& h,
+	                    istream& in,
+	                    vector<string>* refnames,
+	                    bool verbose = false)
+	{
 		char buf[4096];
 		in.getline(buf, 4096);
 		if(in.eof()) {
@@ -1171,6 +1175,7 @@ public:
 		string line(buf);
 		vector<string> toks;
 		tokenize(line, "\t", toks);
+		// Skip over a partition key, if one exists
 		if(toks[0].find_first_of(" ", 0) != string::npos) {
 			if(verbose) cout << "Erased partition string" << endl;
 			toks.erase(toks.begin());
@@ -1181,15 +1186,41 @@ public:
 			}
 			cout << endl;
 		}
-		const string& readName    = toks[0];
+		// Parse read name
+		const string& readName = toks[0];
+		// Parse orientation
 		bool orientation = (toks[1] == "+");
 		// Parse reference sequence id
+		bool refIsIdx = true;
+		for(size_t i = 0; i < toks[2].length(); i++) {
+			if(toks[2][i] < '0' || toks[2][i] > '9') refIsIdx = false;
+		}
 		istringstream refIdxSs(toks[2]);
-		uint32_t refIdx; refIdxSs >> refIdx;
+		uint32_t refIdx;
+		if(refIsIdx) refIdxSs >> refIdx;
+		else if(refnames != NULL) {
+			bool found = false;
+			for(size_t i = 0; i < refnames->size(); i++) {
+				if((*refnames)[i] == toks[2]) {
+					found = true;
+					refIdx = i;
+					break;
+				}
+			}
+			if(!found) {
+				refIdx = refnames->size();
+				refnames->push_back(toks[2]);
+			}
+		} else {
+			// reference was named and we have no way of mapping it to
+			// an index, so we ignore it
+		}
 		// Parse reference sequence offset
 		istringstream refOffSs(toks[3]);
 		uint32_t refOff; refOffSs >> refOff;
+		// Parse read sequence (5' is on RHS iff !orientation)
 		const string& readSeq = toks[4];
+		// Parse read qualities (5' is on RHS iff !orientation)
 		const string& readQual = toks[5];
 		assert_eq(readSeq.length(), readQual.length());
 		// Parse the # other hits at this stratum estimate
@@ -1198,11 +1229,14 @@ public:
 		vector<char> refcs;
 		refcs.resize(readSeq.length(), 0);
 		FixedBitset<max_read_bp> mms;
+		// toks.size() == 8 iff there are one or more mismatches
 		if(toks.size() == 8) {
 			vector<string> mmStrs;
+			// Separate comma-delimited mismatch tokens
 			tokenize(toks[7], ",", mmStrs);
 			for(size_t i = 0; i < mmStrs.size(); i++) {
 				vector<string> cs;
+				// Split the offset from the characters
 				tokenize(mmStrs[i], ":", cs);
 				assert_eq(2, cs.size());
 				// first character of the "A>C" string is the reference
@@ -1216,14 +1250,24 @@ public:
 				// of the reference.  This means that we need to invert
 				// it if the 5' end is on the right (i.e., if the
 				// orientation is "-")
+				//
+				// BTL: never mind; I think this is too confusing.  We
+				// shouldn't overload the Hit structure such that there
+				// are multiple interpretations of its fields.
+				//
 				size_t noff = off;
-				if(!orientation) {
-					// read is reversed; invert offset
-					noff = readSeq.length() - off - 1;
-				}
+				//if(!orientation) {
+				//	// read is reversed; invert offset
+				//	noff = readSeq.length() - off - 1;
+				//}
 				mms.set(noff);
 				refcs[noff] = cs[1][0]; // reference char is before the >
-				assert_eq(readSeq[noff], cs[1][2]);
+				//assert_eq(readSeq[noff], cs[1][2]);
+				if(orientation) {
+					assert_eq(readSeq[noff], cs[1][2]);
+				} else {
+					assert_eq(readSeq[readSeq.length() - noff - 1], cs[1][2]);
+				}
 				if(verbose) {
 					cout << "  Set mm at offset " << noff << " to "
 					     << refcs[noff] << endl;
@@ -1473,7 +1517,11 @@ public:
 	 * Read a binary-encoded hit (written by append() above) from an
 	 * input stream.
 	 */
-	static bool readHit(Hit& h, istream& in, bool verbose = false) {
+	static bool readHit(Hit& h,
+	                    istream& in,
+	                    vector<string>* refnames,
+	                    bool verbose = false)
+	{
 		if(!in.good()) return false;
 		uint16_t pnamelen;
 		in.read((char *)&pnamelen, 2);
@@ -1483,7 +1531,7 @@ public:
 		in.read((char*)begin(h.patName), pnamelen);
 		if(verbose) cout << h.patName << "\", ";
 		// Write fw/refname flags
-		uint8_t flags; // = (h.fw ? 1 : 0) | (refName? 2 : 0);
+		uint8_t flags;
 		in.read((char *)&flags, 1);
 		h.fw         = ((flags & 1) != 0);
 		bool refName = ((flags & 2) != 0);
@@ -1496,6 +1544,24 @@ public:
 			in.read(buf, rnamelen);
 			buf[rnamelen] = '\0';
 			if(verbose) cout << "refname=\"" << buf << "\", ";
+			string name(buf);
+			// Add to the refnames vector; this isn't efficient - if
+			// this ends up being a problem, we should use a map
+			// instead of a vector
+			if(refnames != NULL) {
+				bool found = false;
+				for(size_t i = 0; i < refnames->size(); i++) {
+					if((*refnames)[i] == name) {
+						h.h.first = i;
+						found = true;
+						break;
+					}
+				}
+				if(!found) {
+					h.h.first = refnames->size();
+					refnames->push_back(name);
+				}
+			}
 		} else {
 			// Read reference id as index into global reference name list
 			in.read((char*)&h.h.first, 4);

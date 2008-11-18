@@ -152,11 +152,11 @@ bowtie-asm-debug: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie-maptool: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_MAPTOOL_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-maptool-debug: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_MAPTOOL_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
