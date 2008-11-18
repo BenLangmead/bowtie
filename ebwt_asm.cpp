@@ -15,11 +15,10 @@
  * \file Driver for the bowtie-asm assembly (consensus) tool.
  */
 
-// Build parameters
 static bool verbose     = true;  // be talkative (default)
 static int sanityCheck  = 0;     // do slow sanity checks
-static bool showVersion = false;
-static bool partitioned = true;
+static bool showVersion = false; // show version info and exit
+static bool partitioned = true;  // input alignments are pre-partitioned?
 
 /**
  * Print a detailed usage message to the provided output stream.

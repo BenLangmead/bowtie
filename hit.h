@@ -1043,14 +1043,21 @@ public:
 		_numReported(0llu) { }
 
 	/**
-	 *
+	 * Append a verbose, readable hit to the given output stream.
 	 */
-	void append(ostream& ss, const Hit& h) {
+	static void append(ostream& ss, const Hit& h, bool reportOpps) {
 		ss << h.patId << (h.fw? "+" : "-") << ":";
     	// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
-		if(_reportOpps) ss << "," << h.oms;
+		if(reportOpps) ss << "," << h.oms;
 		ss << ">" << endl;
+	}
+
+	/**
+	 * Append a verbose, readable hit to the given output stream.
+	 */
+	void append(ostream& ss, const Hit& h) {
+		ConciseHitSink::append(ss, h, this->_reportOpps);
 	}
 
 	/**
@@ -1147,7 +1154,21 @@ public:
 	 * and/or h.first fields may be invalid.  TODO: load the id/name
 	 * mapping from the .ebwt file so that we can handle either case.
 	 */
-	static Hit parseHit(const string& line, bool verbose = false) {
+	static bool readHit(Hit& h, istream& in, bool verbose = false) {
+		char buf[4096];
+		in.getline(buf, 4096);
+		if(in.eof()) {
+			return false;
+		}
+		if(in.bad()) {
+			cerr << "Alignment file set \"bad\" bit" << endl;
+			exit(1);
+		}
+		if(in.fail()) {
+			cerr << "A line from the alignment file was longer than 4K" << endl;
+			exit(1);
+		}
+		string line(buf);
 		vector<string> toks;
 		tokenize(line, "\t", toks);
 		if(toks[0].find_first_of(" ", 0) != string::npos) {
@@ -1210,25 +1231,30 @@ public:
 			}
 			if(verbose) cout << "Parsing mismatches" << endl;
 		}
-		return Hit(make_pair<uint32_t>(refIdx, refOff),
-		           (uint32_t)0, // patid
-		           String<char>(readName),
-		           String<Dna5>(readSeq),
-		           String<char>(readQual),
-		           orientation, // fw
-		           mms,    // mms
-		           refcs,  // refcs
-		           oms);   // oms
+		h.h = make_pair<uint32_t>(refIdx, refOff);
+		h.patId = (uint32_t)0; // patid
+		h.patName = String<char>(readName);
+		h.patSeq = String<Dna5>(readSeq);
+		h.quals = String<char>(readQual);
+		h.fw = orientation; // fw
+		h.mms = mms;    // mms
+		h.refcs = refcs;  // refcs
+		h.oms = oms;   // oms
+		return true;
 	}
 
 	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
-	void append(ostream& ss, const Hit& h) {
-		if(_partition > 0) {
+	static void append(ostream& ss,
+	                   const Hit& h,
+	                   const vector<string>* refnames,
+	                   int partition)
+	{
+		if(partition > 0) {
 			// Output a partitioning key
 			ss << h.h.first;
-			ostringstream ss2; ss2 << (h.h.second / _partition);
+			ostringstream ss2; ss2 << (h.h.second / partition);
 			string s2 = ss2.str();
 			while(s2.length() < 10) {
 				s2 = "0" + s2;
@@ -1238,8 +1264,8 @@ public:
 		}
 		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
     	// .first is text id, .second is offset
-		if(this->_refnames != NULL && h.h.first < this->_refnames->size()) {
-			ss << (*this->_refnames)[h.h.first];
+		if(refnames != NULL && h.h.first < refnames->size()) {
+			ss << (*refnames)[h.h.first];
 		} else {
 			ss << h.h.first;
 		}
@@ -1270,6 +1296,15 @@ public:
 		}
 		ss << endl;
 	}
+
+	/**
+	 * Append a verbose, readable hit to the output stream
+	 * corresponding to the hit.
+	 */
+	void append(ostream& ss, const Hit& h) {
+		VerboseHitSink::append(ss, h, this->_refnames, this->_partition);
+	}
+
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
@@ -1358,12 +1393,16 @@ public:
 	_first(true), _numReported(0llu) { }
 
 	/**
-	 * Append a binary-encoded hit to the given output stream.
+	 * Append a binary alignment to the output stream corresponding to
+	 * the reference sequence involved.
 	 */
-	void append(ostream& o, const Hit& h) {
+	static void append(ostream& o,
+					   const Hit& h,
+					   const vector<string>* refnames)
+	{
 		// true iff we're going to print the reference sequence name
-		bool refName = this->_refnames != NULL &&
-		                h.h.first < this->_refnames->size();
+		bool refName = refnames != NULL &&
+		                h.h.first < refnames->size();
 		uint16_t pnamelen = (uint16_t)length(h.patName);
 		// Write read name
 		o.write((const char *)&pnamelen, 2);
@@ -1373,9 +1412,9 @@ public:
 		o.write((const char *)&flags, 1);
 		if(refName) {
 			// Write reference name as string
-			uint16_t rnamelen = (uint16_t)(*this->_refnames)[h.h.first].length();
+			uint16_t rnamelen = (uint16_t)(*refnames)[h.h.first].length();
 			o.write((const char *)&rnamelen, 2);
-			o.write((*this->_refnames)[h.h.first].c_str(), rnamelen);
+			o.write((*refnames)[h.h.first].c_str(), rnamelen);
 		} else {
 			// Write reference name as index into global reference name
 			// list
@@ -1423,12 +1462,22 @@ public:
 	}
 
 	/**
+	 * Append a binary alignment to the output stream corresponding to
+	 * the reference sequence involved.
+	 */
+	void append(ostream& o, const Hit& h) {
+		BinaryHitSink::append(o, h, this->_refnames);
+	}
+
+	/**
 	 * Read a binary-encoded hit (written by append() above) from an
 	 * input stream.
 	 */
-	static void readHit(Hit& h, istream& in, bool verbose = false) {
+	static bool readHit(Hit& h, istream& in, bool verbose = false) {
+		if(!in.good()) return false;
 		uint16_t pnamelen;
 		in.read((char *)&pnamelen, 2);
+		if(in.eof()) return false;
 		if(verbose) cout << "name(" << pnamelen << ")=\"";
 		seqan::resize(h.patName, pnamelen);
 		in.read((char*)begin(h.patName), pnamelen);
@@ -1486,26 +1535,31 @@ public:
 			assert_leq(h.quals[i], 126);
 		}
 #endif
-		// Write oms
+		// Read oms
 		in.read((char *)&h.oms, 4);
 		if(verbose) cout << "oms=" << h.oms << ", ";
-		// Write # mismatches
+		// Read # mismatches
 		uint8_t numMms;
 		in.read((char *)&numMms, 1);
 		if(verbose) cout << "nummms=" << ((int)numMms) << ", ";
-		// Output mismatches
+		// Read mismatches
 		for(uint8_t i = 0; i < numMms; i++) {
 			uint8_t ii;
+			// Read the read offset (from 5' end)
 			in.read((char*)&ii, 1);
 			h.mms.set(ii);
 			uint8_t both;
+			// Read the reference and query characters involved
 			in.read((char*)&both, 1);
 			uint8_t refChar = both & 15;
 			uint8_t qryChar = both >> 4;
+			assert_neq(refChar, qryChar);
 			h.refcs[ii] = "ACGTN"[refChar];
 			if(verbose) cout << ((int)ii) << ":" << "ACGTN"[refChar] << ">" << "ACGTN"[qryChar] << ", ";
 		}
 		if(verbose) cout << endl;
+		// Done
+		return true;
 	}
 
 	/**

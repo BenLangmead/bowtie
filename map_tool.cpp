@@ -10,15 +10,14 @@
 
 enum {
 	FORMAT_DEFAULT = 1,
-	FORMAT_BIN
+	FORMAT_BIN,
+	FORMAT_CONCISE
 };
 
-// Build parameters
-static bool verbose     = true;  // be talkative (default)
-static bool sanityCheck = false; // do slow sanity checks
-static bool showVersion = false; //
-static int informat  = FORMAT_BIN;
-static int outformat = FORMAT_DEFAULT;
+static bool verbose     = false;       // be talkative
+static bool showVersion = false;       // show version info and exit
+static int informat  = FORMAT_BIN;     // format of input alignments
+static int outformat = FORMAT_DEFAULT; // format of output alignments
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -32,28 +31,28 @@ static void printUsage(ostream& out) {
 	    << "    -b/--inbin       <align_in> is bowtie -b/--binout output (default)" << endl
 	    << "    -D/--outdef      <align_out> will be default bowtie output  (default)" << endl
 	    << "    -B/--outbin      <align_out> will be -b/--binout bowtie output" << endl
+	    << "    -C/--outconcise  <align_out> will be --concise bowtie output" << endl
 	    << "    -v/--verbose     verbose output (for debugging)" << endl
-	  //<< "    -s/--sanity      enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help        print detailed description of tool and its options" << endl
 	    << "    --version        print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvsdbDB";
+static const char *short_options = "hvsdbDBC";
 
 enum {
 	ARG_VERSION = 256
 };
 
 static struct option long_options[] = {
-	{"indef",   no_argument, 0, 'd'},
-	{"inbin",   no_argument, 0, 'b'},
-	{"outdef",  no_argument, 0, 'D'},
-	{"outbin",  no_argument, 0, 'B'},
-	{"verbose", no_argument, 0, 'v'},
-	{"sanity",  no_argument, 0, 's'},
-	{"help",    no_argument, 0, 'h'},
-	{"version", no_argument, 0, ARG_VERSION},
+	{"indef",      no_argument, 0, 'd'},
+	{"inbin",      no_argument, 0, 'b'},
+	{"outdef",     no_argument, 0, 'D'},
+	{"outbin",     no_argument, 0, 'B'},
+	{"outconcise", no_argument, 0, 'C'},
+	{"verbose",    no_argument, 0, 'v'},
+	{"help",       no_argument, 0, 'h'},
+	{"version",    no_argument, 0, ARG_VERSION},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -76,7 +75,6 @@ static void parseOptions(int argc, char **argv) {
 				exit(0);
 				break;
 	   		case 'v': verbose = false; break;
-	   		case 's': sanityCheck = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
 	   		case 'd': informat = FORMAT_DEFAULT; break;
 	   		case 'b': informat = FORMAT_BIN; break;
@@ -114,7 +112,7 @@ int main(int argc, char **argv) {
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *)
 		     << ", " << sizeof(size_t) << "}" << endl;
-		cout << "Source hash: " << EBWT_SEARCH_HASH << endl;
+		cout << "Source hash: " << EBWT_MAPTOOL_HASH << endl;
 		return 0;
 	}
 
@@ -130,16 +128,32 @@ int main(int argc, char **argv) {
 	// Get output filename
 	if(optind < argc) {
 		out = new ofstream(argv[optind]);
+	} else if(outformat == FORMAT_BIN) {
+		cerr << "If -B/--outbin is specified, <align_out> must also be specified" << endl;
+		exit(1);
 	}
 
+	// Process all input files
 	for(size_t i = 0; i < infiles.size(); i++) {
-		Hit h;
-		cout << "Processing " << infiles[i] << endl;
 		ifstream in(infiles[i].c_str(), ios_base::out | ios_base::binary);
-		BinaryHitSink::readHit(h, in, verbose);
+		while(in.good() && !in.eof()) {
+			Hit h;
+			if(informat == FORMAT_BIN) {
+				BinaryHitSink::readHit(h, in, verbose);
+			} else {
+				VerboseHitSink::readHit(h, in, verbose);
+			}
+
+			if(outformat == FORMAT_BIN) {
+				BinaryHitSink::append(*out, h, NULL /* refnames */);
+			} else if(outformat == FORMAT_DEFAULT) {
+				VerboseHitSink::append(*out, h, NULL /* refnames */, 0 /* partition */);
+			} else {
+				ConciseHitSink::append(*out, h, false /* reportOpps */);
+			}
+		}
 		in.close();
 	}
-	(*out) << "Output" << endl;
 
 	// Close and delete output
 	if(optind < argc) {
