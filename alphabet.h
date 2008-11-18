@@ -27,7 +27,8 @@ static inline std::string u32ToDna(uint32_t a, int len) {
 }
 
 /**
- * Return a new TStr containing the reverse-complement of s.
+ * Return a new TStr containing the reverse-complement of s.  Ns go to
+ * Ns.
  */
 template<typename TStr>
 static inline TStr reverseComplement(const TStr& s) {
@@ -44,6 +45,29 @@ static inline TStr reverseComplement(const TStr& s) {
 		}
 	}
 	return s_rc;
+}
+
+/**
+ * Reverse-complement s in-place.  Ns go to Ns.
+ */
+template<typename TStr>
+static inline void reverseComplementInPlace(TStr& s) {
+	typedef typename Value<TStr>::Type TVal;
+	size_t len = length(s);
+	for(size_t i = 0; i < (len>>1); i++) {
+		int sv = (int)s[len-i-1];
+		int sf = (int)s[i];
+		if(sv == 4) {
+			s[i] = (TVal)4;
+		} else {
+			s[i] = (TVal)(sv ^ 3);
+		}
+		if(sf == 4)  {
+			s[len-i-1] = (TVal)4;
+		} else {
+			s[len-i-1] = (TVal)(sf ^ 3);
+		}
+	}
 }
 
 /// Reverse a string in-place

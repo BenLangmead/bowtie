@@ -11,7 +11,9 @@
 enum {
 	FORMAT_DEFAULT = 1,
 	FORMAT_BIN,
-	FORMAT_CONCISE
+	FORMAT_CONCISE,
+	FORMAT_FASTA,
+	FORMAT_FASTQ
 };
 
 static bool verbose     = false;       // be talkative
@@ -30,16 +32,18 @@ static void printUsage(ostream& out) {
 	    << "Options:" << endl
 	    << "    -d/--indef       <align_in> is default bowtie output" << endl
 	    << "    -b/--inbin       <align_in> is bowtie -b/--binout output (default)" << endl
-	    << "    -D/--outdef      <align_out> will be default bowtie output  (default)" << endl
-	    << "    -B/--outbin      <align_out> will be -b/--binout bowtie output" << endl
-	    << "    -C/--outconcise  <align_out> will be --concise bowtie output" << endl
+	    << "    -D/--outdef      <align_out> is default bowtie output  (default)" << endl
+	    << "    -B/--outbin      <align_out> is -b/--binout bowtie output" << endl
+	    << "    -C/--outconcise  <align_out> is --concise bowtie output" << endl
+	    << "    -Q/--outfastq    <align_out> is aligned reads in FASTQ format" << endl
+	    << "    -F/--outfasta    <align_out> is aligned reads in FASTA format" << endl
 	    << "    -v/--verbose     verbose output (for debugging)" << endl
 	    << "    -h/--help        print detailed description of tool and its options" << endl
 	    << "    --version        print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvsdbDBC";
+static const char *short_options = "hvsdbDBCQF";
 
 enum {
 	ARG_VERSION = 256,
@@ -52,6 +56,8 @@ static struct option long_options[] = {
 	{"outdef",     no_argument, 0, 'D'},
 	{"outbin",     no_argument, 0, 'B'},
 	{"outconcise", no_argument, 0, 'C'},
+	{"outfastq",   no_argument, 0, 'Q'},
+	{"outfasta",   no_argument, 0, 'F'},
 	{"verbose",    no_argument, 0, 'v'},
 	{"help",       no_argument, 0, 'h'},
 	{"refidx",     no_argument, 0, ARG_REFIDX},
@@ -84,6 +90,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'b': informat = FORMAT_BIN; break;
 	   		case 'D': outformat = FORMAT_DEFAULT; break;
 	   		case 'B': outformat = FORMAT_BIN; break;
+	   		case 'C': outformat = FORMAT_CONCISE; break;
+	   		case 'Q': outformat = FORMAT_FASTQ; break;
+	   		case 'F': outformat = FORMAT_FASTA; break;
 			case -1: /* Done with options. */ break;
 			case 0: if (long_options[option_index].flag != 0) break;
 			default:
@@ -92,6 +101,28 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
+}
+
+/**
+ * Print the read involved in an alignment as a FASTQ record. 
+ */
+static void fastqAppend(ostream& out, Hit& h) {
+	if(!h.fw) {
+		reverseComplementInPlace(h.patSeq);
+		reverseInPlace(h.quals);
+	}
+	out << "@" << h.patName << endl
+	    << h.patSeq << endl
+	    << "+" << endl
+	    << h.quals << endl;
+}
+
+/**
+ * Print the read involved in an alignment as a FASTA record. 
+ */
+static void fastaAppend(ostream& out, Hit& h) {
+	if(!h.fw) reverseComplementInPlace(h.patSeq);
+	out << ">" << h.patName << endl << h.patSeq << endl;
 }
 
 /**
@@ -158,6 +189,10 @@ int main(int argc, char **argv) {
 				BinaryHitSink::append(*out, h,outrefnames);
 			} else if(outformat == FORMAT_DEFAULT) {
 				VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */);
+			} else if(outformat == FORMAT_FASTQ) {
+				fastqAppend(*out, h);
+			} else if(outformat == FORMAT_FASTA) {
+				fastaAppend(*out, h);
 			} else {
 				ConciseHitSink::append(*out, h, false /* reportOpps */);
 			}
