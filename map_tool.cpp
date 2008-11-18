@@ -27,7 +27,7 @@ static int outformat = FORMAT_DEFAULT; // format of output alignments
  */
 static void printUsage(ostream& out) {
 	out << "Usage: bowtie-maptool [options]* <align_in> [<align_out>]" << endl
-	    << "    align_in         alignments output by bowtie" << endl
+	    << "    align_in         alignment file output by bowtie, or \"-\" for stdin" << endl
 	    << "    align_out        write output alignments to this file (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "    -d/--indef       <align_in> is default bowtie output" << endl
@@ -83,7 +83,7 @@ static void parseOptions(int argc, char **argv) {
 				printUsage(cerr);
 				exit(0);
 				break;
-	   		case 'v': verbose = false; break;
+	   		case 'v': verbose = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
 	   		case ARG_REFIDX: refIdx = true; break;
 	   		case 'd': informat = FORMAT_DEFAULT; break;
@@ -168,7 +168,13 @@ int main(int argc, char **argv) {
 
 	// Process all input files
 	for(size_t i = 0; i < infiles.size(); i++) {
-		ifstream in(infiles[i].c_str(), ios_base::out | ios_base::binary);
+		istream *inp;
+		if(infiles[i] == "-") {
+			inp = &cin;
+		} else {
+			inp = new ifstream(infiles[i].c_str(), ios_base::out | ios_base::binary);
+		}
+		istream& in = *inp;
 		while(in.good() && !in.eof()) {
 			Hit h;
 			bool good;
@@ -197,7 +203,10 @@ int main(int argc, char **argv) {
 				ConciseHitSink::append(*out, h, false /* reportOpps */);
 			}
 		}
-		in.close();
+		if(infiles[i] != "-") {
+			((ifstream*)inp)->close();
+			delete inp;
+		}
 	}
 
 	// Close and delete output

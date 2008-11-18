@@ -19,7 +19,7 @@ if(defined $options{h}) {
 }
 
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug") == 0 || die "Error building";
+	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug bowtie-maptool-debug") == 0 || die "Error building";
 }
 
 my @policies = (
@@ -234,6 +234,18 @@ sub search {
 	
 	my $patarg = "-c";
 	my $patstr = "\"$p\"";
+	my $outformat = int(rand(3));
+	my $maptool_cmd = "";
+	my $outfile = ".tmp$seed.out";
+	if($outformat == 0) {
+		$outformat = ""; # default (verbose)
+		$maptool_cmd = " && ./bowtie-maptool-debug -d -C .tmp$seed.out"; # default
+	} elsif($outformat == 1) {
+		$outformat = "-b"; # binary
+		$maptool_cmd = " && ./bowtie-maptool-debug -b -C .tmp$seed.out"; # binary
+	} else {
+		$outformat = "--concise"; # concise
+	}
 	my $format = int(rand(5));
 	if($format == 0) {
 		# FASTA
@@ -335,7 +347,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $khits --concise $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr";
+	my $cmd = "./bowtie-debug $policy $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr`);
 	

@@ -1187,7 +1187,16 @@ public:
 			cout << endl;
 		}
 		// Parse read name
+		bool readNameIsIdx = true;
 		const string& readName = toks[0];
+		for(size_t i = 0; i < readName.length(); i++) {
+			if(readName[i] < '0' || readName[i] > '9') readNameIsIdx = false;
+		}
+		uint32_t patid = 0;
+		if(readNameIsIdx) {
+			istringstream readIdxSs(readName);
+			readIdxSs >> patid;
+		}
 		// Parse orientation
 		bool orientation = (toks[1] == "+");
 		// Parse reference sequence id
@@ -1214,6 +1223,8 @@ public:
 		} else {
 			// reference was named and we have no way of mapping it to
 			// an index, so we ignore it
+			cerr << "Could not find an id to map reference name \"" << toks[2] << "\" to." << endl;
+			exit(1);
 		}
 		// Parse reference sequence offset
 		istringstream refOffSs(toks[3]);
@@ -1276,7 +1287,7 @@ public:
 			if(verbose) cout << "Parsing mismatches" << endl;
 		}
 		h.h = make_pair<uint32_t>(refIdx, refOff);
-		h.patId = (uint32_t)0; // patid
+		h.patId = (uint32_t)patid; // patid
 		h.patName = String<char>(readName);
 		h.patSeq = String<Dna5>(readSeq);
 		h.quals = String<char>(readQual);
@@ -1530,6 +1541,14 @@ public:
 		seqan::resize(h.patName, pnamelen);
 		in.read((char*)begin(h.patName), pnamelen);
 		if(verbose) cout << h.patName << "\", ";
+		// Parse read name
+		bool readNameIsIdx = true;
+		h.patId = 0;
+		for(int i = 0; i < pnamelen; i++) {
+			if(h.patName[i] < '0' || h.patName[i] > '9') readNameIsIdx = false;
+			h.patId *= 10;
+			h.patId += (h.patName[i] - '0');
+		}
 		// Write fw/refname flags
 		uint8_t flags;
 		in.read((char *)&flags, 1);
