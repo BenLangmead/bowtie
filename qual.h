@@ -5,6 +5,7 @@ extern unsigned char qualRounds[];
 
 class Penalty {
 public:
+	virtual ~Penalty() { }
 	virtual uint8_t mmPenalty (uint8_t qual) const = 0;
 	virtual uint8_t delPenalty(uint8_t qual) const = 0;
 	virtual uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) const = 0;
@@ -12,6 +13,7 @@ public:
 
 class SimplePhredPenalty : public Penalty {
 public:
+	virtual ~SimplePhredPenalty() { }
 	virtual uint8_t mmPenalty (uint8_t qual) const {
 		return qual;
 	}
@@ -25,6 +27,7 @@ public:
 
 class MaqPhredPenalty : public Penalty {
 public:
+	virtual ~MaqPhredPenalty() { }
 	virtual uint8_t mmPenalty (uint8_t qual) const {
 		return qualRounds[qual];
 	}
