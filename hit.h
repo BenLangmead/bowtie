@@ -1202,7 +1202,10 @@ public:
 		// Parse reference sequence id
 		bool refIsIdx = true;
 		for(size_t i = 0; i < toks[2].length(); i++) {
-			if(toks[2][i] < '0' || toks[2][i] > '9') refIsIdx = false;
+			if(toks[2][i] < '0' || toks[2][i] > '9') {
+				refIsIdx = false;
+				break;
+			}
 		}
 		istringstream refIdxSs(toks[2]);
 		uint32_t refIdx;
@@ -1542,13 +1545,16 @@ public:
 		in.read((char*)begin(h.patName), pnamelen);
 		if(verbose) cout << h.patName << "\", ";
 		// Parse read name
-		bool readNameIsIdx = true;
 		h.patId = 0;
 		for(int i = 0; i < pnamelen; i++) {
-			if(h.patName[i] < '0' || h.patName[i] > '9') readNameIsIdx = false;
+			if(h.patName[i] < '0' || h.patName[i] > '9') {
+				h.patId = 0;
+				break;
+			}
 			h.patId *= 10;
 			h.patId += (h.patName[i] - '0');
 		}
+		if(verbose) cout << "patid(" << h.patId << ")=\"";
 		// Write fw/refname flags
 		uint8_t flags;
 		in.read((char *)&flags, 1);
@@ -1568,19 +1574,42 @@ public:
 			// this ends up being a problem, we should use a map
 			// instead of a vector
 			if(refnames != NULL) {
-				bool found = false;
-				for(size_t i = 0; i < refnames->size(); i++) {
-					if((*refnames)[i] == name) {
-						h.h.first = i;
-						found = true;
+				bool found = true;
+				h.h.first = 0;
+				for(int i = 0; i < rnamelen; i++) {
+					if(buf[i] < '0' || buf[i] > '9') {
+						h.h.first = 0;
+						found = false;
 						break;
 					}
+					h.h.first *= 10;
+					h.h.first += (buf[i] - '0');
 				}
 				if(!found) {
-					h.h.first = refnames->size();
-					refnames->push_back(name);
+					for(size_t i = 0; i < refnames->size(); i++) {
+						if((*refnames)[i] == name) {
+							h.h.first = i;
+							found = true;
+							break;
+						}
+					}
+					if(!found) {
+						h.h.first = refnames->size();
+						refnames->push_back(name);
+					}
+				}
+			} else {
+				h.h.first = 0;
+				for(int i = 0; i < rnamelen; i++) {
+					if(buf[i] < '0' || buf[i] > '9') {
+						h.h.first = 0;
+						break;
+					}
+					h.h.first *= 10;
+					h.h.first += (buf[i] - '0');
 				}
 			}
+			if(verbose) cout << "refidx=\"" << h.h.first << "\", ";
 		} else {
 			// Read reference id as index into global reference name list
 			in.read((char*)&h.h.first, 4);

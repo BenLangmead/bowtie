@@ -104,7 +104,7 @@ static void parseOptions(int argc, char **argv) {
 }
 
 /**
- * Print the read involved in an alignment as a FASTQ record. 
+ * Print the read involved in an alignment as a FASTQ record.
  */
 static void fastqAppend(ostream& out, Hit& h) {
 	if(!h.fw) {
@@ -118,7 +118,7 @@ static void fastqAppend(ostream& out, Hit& h) {
 }
 
 /**
- * Print the read involved in an alignment as a FASTA record. 
+ * Print the read involved in an alignment as a FASTA record.
  */
 static void fastaAppend(ostream& out, Hit& h) {
 	if(!h.fw) reverseComplementInPlace(h.patSeq);
@@ -127,7 +127,7 @@ static void fastaAppend(ostream& out, Hit& h) {
 
 /**
  * Parse command-line options, iterate through input alignments and
- * output appropriate converted alignment. 
+ * output appropriate converted alignment.
  */
 int main(int argc, char **argv) {
 	string infile;
@@ -167,6 +167,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Process all input files
+	vector<string> refnames;
 	for(size_t i = 0; i < infiles.size(); i++) {
 		istream *inp;
 		if(infiles[i] == "-") {
@@ -178,7 +179,6 @@ int main(int argc, char **argv) {
 		while(in.good() && !in.eof()) {
 			Hit h;
 			bool good;
-			vector<string> refnames;
 			vector<string>* inrefnames = &refnames;
 			vector<string>* outrefnames = NULL;
 			if(!refIdx) {
