@@ -6,7 +6,7 @@ SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
 GCC_PREFIX = $(shell dirname `which gcc`)
-GCC_SUFFIX =
+GCC_SUFFIX = -4.2
 CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
@@ -42,7 +42,7 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
-SEARCH_CPPS = qual.cpp
+SEARCH_CPPS = qual.cpp pat.cpp
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)

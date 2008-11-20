@@ -64,8 +64,8 @@ static bool fullIndex           = true;  // load halves one at a time and procee
 static bool noRefNames          = false; // true -> print reference indexes; not names
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
-static ofstream *dumpUnalignFa  = NULL;
-static ofstream *dumpUnalignFq  = NULL;
+static ofstream *dumpUnalignFa  = NULL;  // FASTA file to dump aligned reads to
+static ofstream *dumpUnalignFq  = NULL;  // FASTQ file to dump unaligned reads to
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
@@ -200,8 +200,8 @@ static void printUsage(ostream& out) {
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
-	    << "  --unfa <filename>  append unaligned reads to given FASTA-format file" << endl
-	    << "  --unfq <filename>  append unaligned reads to given FASTQ-format file" << endl
+	    << "  --unfa <filename>  write unaligned reads to FASTA file with name <filename>" << endl
+	    << "  --unfq <filename>  write unaligned reads to FASTQ file with name <filename>" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
@@ -445,6 +445,12 @@ static void printLongUsage(ostream& out) {
 	"  -u/--qupto <int>   Only align the first <int> reads from the\n"
 	"                     specified read set.  Default: no limit.\n"
 	"\n"
+	"  --unfa <filename>  Write all reads that fail to align to a FASTA file\n"
+	"                     with name <filename>.\n"
+	"\n"
+	"  --unfq <filename>  Write all reads that fail to align to a FASTQ file\n"
+	"                     with name <filename>.\n"
+	"\n"
 	"  -t/--time          Print the amount of wall-clock time taken by each\n"
 	"                     search phase and index turnover.\n"
 	"\n"
@@ -625,7 +631,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_UNFA: {
-	   			dumpUnalignFa = new ofstream(optarg, ios_base::out | ios_base::app); break;
+	   			dumpUnalignFa = new ofstream(optarg, ios_base::out); break;
 	   			if(!dumpUnalignFa->good()) {
 	   				cerr << "Could not open unaligned FASTA file " << optarg << " for appending" << endl;
 	   				exit(1);
@@ -633,7 +639,7 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		}
 	   		case ARG_UNFQ: {
-	   			dumpUnalignFq = new ofstream(optarg, ios_base::out | ios_base::app); break;
+	   			dumpUnalignFq = new ofstream(optarg, ios_base::out); break;
 	   			if(!dumpUnalignFq->good()) {
 	   				cerr << "Could not open unaligned FASTQ file " << optarg << " for appending" << endl;
 	   				exit(1);

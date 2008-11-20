@@ -288,6 +288,12 @@ Bowtie Manual
   -u/--qupto <int>   Only align the first <int> reads from the
                      specified read set.  Default: no limit.
 
+  --unfa <filename>  Write all reads that fail to align to a FASTA file
+                     with name <filename>.
+
+  --unfq <filename>  Write all reads that fail to align to a FASTQ file
+                     with name <filename>.
+
   -t/--time          Print the amount of wall-clock time taken by each
                      search phase and index turnover.
 
