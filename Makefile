@@ -1,5 +1,5 @@
 #
-# Makefile for bowtie, bowtie-build, and bowtie-convert
+# Makefile for bowtie, bowtie-build, and bowtie-maqconvert
 #
 
 SEQAN_DIR = SeqAn-1.1
@@ -48,7 +48,7 @@ SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/const.c \
 		  maq_convert/bfa.c
-# bowtie-convert requires zlib because maq's format is compressed
+# bowtie-maqconvert requires zlib because maq's format is compressed
 MAQ_LIB = -lz
 VERSION = $(shell cat VERSION)
 
@@ -61,7 +61,7 @@ NOASSERT_FLAGS = -DNDEBUG
 BIN_LIST = bowtie-build \
            bowtie-build-packed \
            bowtie \
-           bowtie-convert \
+           bowtie-maqconvert \
 		   bowtie-inspect
 BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
@@ -158,10 +158,10 @@ bowtie-maptool-debug: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_MAPTOOL_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
-bowtie-convert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
+bowtie-maqconvert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
-bowtie-convert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
+bowtie-maqconvert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
 bowtie-inspect: maq_convert/bowtie_inspect.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP) $(OTHER_CPPS)
