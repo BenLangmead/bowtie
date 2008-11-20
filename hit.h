@@ -13,6 +13,7 @@
 #include "threading.h"
 #include "bitset.h"
 #include "tokenize.h"
+#include "pat.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -309,8 +310,21 @@ public:
 	vector<int>& retainedStrata() { return _strata; }
 
 	/// Finalize current read
-	virtual void finishRead() {
+	virtual void finishRead(PatternSourcePerThread& p,
+	                        ostream *dumpUnalignFa = NULL,
+	                        ostream *dumpUnalignFq = NULL)
+	{
 		_bestRemainingStratum = 0;
+		if(_hitsForThisRead == 0) {
+			// Dump the unaligned read to one or more of the unaligned-
+			// read output streams
+			if(dumpUnalignFa != NULL) {
+				(*dumpUnalignFa) << ">" << p.name() << endl << p.patFw() << endl;
+			}
+			if(dumpUnalignFq != NULL) {
+				(*dumpUnalignFq) << "@" << p.name() << endl << p.patFw() << endl << "+" << endl << p.qualFw() << endl;
+			}
+		}
 		finishReadImpl();
 		if(_bufferHits && _bufferedHits.size() > 0) {
 			// Flush buffered hits

@@ -21,33 +21,14 @@
 using namespace std;
 using namespace seqan;
 
+extern char* itoa10(int value, char* result);
+
 /// Wildcard policies
 enum {
 	NS_TO_NS    = 1, // Ns stay Ns and don't match anything
 	NS_TO_AS    = 2, // Ns become As
 	NS_TO_RANDS = 3  // Ns become random characters
 };
-
-/**
- * C++ version char* style "itoa":
- */
-char* itoa10(int value, char* result) {
-	// Check that base is valid
-	char* out = result;
-	int quotient = value;
-	do {
-		*out = "0123456789"[ std::abs( quotient % 10 ) ];
-		++out;
-		quotient /= 10;
-	} while ( quotient );
-
-	// Only apply negative sign for base 10
-	if (value < 0) *out++ = '-';
-	std::reverse( result, out );
-
-	*out = 0; // terminator
-	return result;
-}
 
 /**
  * A buffer for keeping all relevant information about a single read.
@@ -945,29 +926,9 @@ private:
 	RandomSource _rand;
 };
 
-void wrongQualityScale()
-{
-	cerr << "Encounterd negative quality value, but Phred qualities can't be negative."<<endl
-	<<  "These qualities appear to use the Solexa scale." << endl
-	<< "Please re-run Bowtie with the --solexa-quals option.";
-}
-
-void wrongQualityFormat()
-{
-	cerr << "Encounterd space-separated qualities"<<endl
-	<<  "This appears to be an FASTQ-int file" << endl
-	<< "Please re-run Bowtie with the --integer-quals option.";
-}
-
-void tooFewQualities(const String<char>& read_name)
-{
-	string s;
-	for(size_t i = 0; i < seqan::length(read_name); i++) {
-		s.push_back(read_name[i]);
-	}
-	cerr << "Too few quality values for read: " << s << endl
-		 << "\tare you sure this is a FASTQ-int file?" << endl;
-}
+extern void wrongQualityScale();
+extern void wrongQualityFormat();
+extern void tooFewQualities(const String<char>& read_name);
 
 /**
  * Read a FASTQ-format file.
@@ -987,7 +948,7 @@ public:
 	                   uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals),
-		_integer_quals(integer_quals),_policy(__policy), _maxNs(__maxNs), 
+		_integer_quals(integer_quals),_policy(__policy), _maxNs(__maxNs),
 		_rand(seed)
 	{
 		for (int l = 0; l != 128; ++l) {
@@ -1174,14 +1135,14 @@ protected:
 							{
 								// Keep the phred quality and translate
 								// to ASCII
-								pQ = (iQ <= 93 ? iQ : 93) + 33;	
+								pQ = (iQ <= 93 ? iQ : 93) + 33;
 								if (pQ < 33)
 								{
 									wrongQualityScale();
 									exit(1);
 								}
 							}
-							
+
 							if (qualsRead >= _trim5)
 							{
 								size_t off = qualsRead - _trim5;
@@ -1277,8 +1238,8 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
-								
-								if (_solexa_quals) 
+
+								if (_solexa_quals)
 								{
 									// Convert solexa-scaled chars to phred
 									// http://maq.sourceforge.net/fastq.shtml
@@ -1294,7 +1255,7 @@ protected:
 										exit(1);
 									}
 								}
-								
+
 								assert_geq(c, 33);
 								r.qualBufFw[off] = c;
 								r.qualBufRc[bufSz - off - 1] = c;
@@ -1325,7 +1286,7 @@ protected:
 									     << "Please truncate reads and quality values and and re-run Bowtie";
 									exit(1);
 								}
-								
+
 								if (_solexa_quals)
 								{
 									// Convert solexa-scaled chars to phred
@@ -1342,8 +1303,8 @@ protected:
 										exit(1);
 									}
 								}
-								
-								
+
+
 								assert_geq(c, 33);
 								r.qualBufFw[bufSz - off - 1] = c;
 								r.qualBufRc[off] = c;

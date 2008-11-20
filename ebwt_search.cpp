@@ -64,6 +64,8 @@ static bool fullIndex           = true;  // load halves one at a time and procee
 static bool noRefNames          = false; // true -> print reference indexes; not names
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
+static ofstream *dumpUnalignFa  = NULL;
+static ofstream *dumpUnalignFq  = NULL;
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
@@ -92,6 +94,8 @@ enum {
 	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
 	ARG_FAST,
+	ARG_UNFA,
+	ARG_UNFQ,
 	ARG_REFIDX,
 	ARG_DUMP_NOHIT,
 	ARG_DUMP_HHHIT,
@@ -125,6 +129,8 @@ static struct option long_options[] = {
 	{"trim5",        required_argument, 0,            '5'},
 	{"seed",         required_argument, 0,            ARG_SEED},
 	{"qupto",        required_argument, 0,            'u'},
+	{"unfa",         required_argument, 0,            ARG_UNFA},
+	{"unfq",         required_argument, 0,            ARG_UNFQ},
 	{"offrate",      required_argument, 0,            'o'},
 	{"isarate",      required_argument, 0,            ARG_ISARATE},
 	{"skipsearch",   no_argument,       &skipSearch,  1},
@@ -194,6 +200,8 @@ static void printUsage(ostream& out) {
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
+	    << "  --unfa <filename>  append unaligned reads to given FASTA-format file" << endl
+	    << "  --unfq <filename>  append unaligned reads to given FASTQ-format file" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
@@ -616,6 +624,22 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
+	   		case ARG_UNFA: {
+	   			dumpUnalignFa = new ofstream(optarg, ios_base::out | ios_base::app); break;
+	   			if(!dumpUnalignFa->good()) {
+	   				cerr << "Could not open unaligned FASTA file " << optarg << " for appending" << endl;
+	   				exit(1);
+	   			}
+	   			break;
+	   		}
+	   		case ARG_UNFQ: {
+	   			dumpUnalignFq = new ofstream(optarg, ios_base::out | ios_base::app); break;
+	   			if(!dumpUnalignFq->good()) {
+	   				cerr << "Could not open unaligned FASTQ file " << optarg << " for appending" << endl;
+	   				exit(1);
+	   			}
+	   			break;
+	   		}
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_INTEGER_QUALS: integer_quals = true; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
@@ -716,10 +740,10 @@ static char *argv0 = NULL;
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
-#define GET_READ(p) \
-	sink->finishRead(); \
+#define GET_READ(p, unfa, unfq) \
+	if(!p->empty()) { sink->finishRead(*p, unfa, unfq); } \
 	p->nextRead(); \
-	if(p->empty() || p->patid() >= qUpto) { /* cout << "done" << endl; */ break; } \
+	if(p->empty() || p->patid() >= qUpto) { break; } \
 	assert(!empty(p->patFw())); \
 	String<Dna5>& patFw  = p->patFw();  \
 	String<Dna5>& patRc  = p->patRc();  \
@@ -728,7 +752,6 @@ static char *argv0 = NULL;
 	String<char>& name   = p->name(); \
 	uint32_t      patid  = p->patid(); \
 	params.setPatId(patid); \
-	/* cout << name << ": " << patFw << ":" << qualFw << endl; */ \
 	if(lastLen == 0) lastLen = length(patFw); \
 	if(qSameLen && length(patFw) != lastLen) { \
 		throw runtime_error("All reads must be the same length"); \
@@ -738,8 +761,8 @@ static char *argv0 = NULL;
 /// possibly aborting depending on whether the result is empty or the
 /// patid exceeds the limit, and marshaling the read into convenient
 /// variables.
-#define GET_READ_FW(p) \
-	sink->finishRead(); \
+#define GET_READ_FW(p, unfa, unfq) \
+	if(!p->empty()) { sink->finishRead(*p, unfa, unfq); } \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) break; \
 	params.setPatId(p->patid()); \
@@ -853,7 +876,7 @@ static void *exactSearchWorker(void *vp) {
 	        &os,
 	        false);         // considerQuals
     while(true) {
-    	GET_READ(patsrc);
+    	GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
     	uint32_t plen = length(patFw);
     	// Process forward-oriented read
     	bt.setOffs(0, 0, plen, plen, plen, plen);
@@ -871,7 +894,7 @@ static void *exactSearchWorker(void *vp) {
 	    bt.backtrack();
 		params.setFw(true);
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
     WORKER_EXIT();
 }
 
@@ -956,7 +979,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        &os,
 	        false);         // considerQuals
 	while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, NULL, NULL);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -964,7 +987,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 		#include "search_1mm_phase1.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
     WORKER_EXIT();
 }
 
@@ -1000,14 +1023,14 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        &os,
 	        false);         // considerQuals
 	while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		if(doneMask.test(patid)) continue;
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		#include "search_1mm_phase2.c"
 	} // End read loop
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
     WORKER_EXIT();
 }
 
@@ -1129,7 +1152,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        &os,
 	        false);         // considerQuals
 	while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1140,7 +1163,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
     WORKER_EXIT();
 }
 
@@ -1363,7 +1386,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        &os,
 	        false);         // considerQuals
     while(true) { // Read read-in loop
-		GET_READ(patsrc);
+		GET_READ(patsrc, NULL, NULL);
 		// If requested, check that this read has the same length
 		// as all the previous ones
 		size_t plen = length(patFw);
@@ -1373,7 +1396,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 		#include "search_23mm_phase1.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1398,7 +1421,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		    &os,
 		    false);         // considerQuals
     while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, NULL, NULL);
 		if(doneMask.test(patid)) continue;
 		size_t plen = length(patFw);
 		uint32_t s = plen;
@@ -1408,7 +1431,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		#include "search_23mm_phase2.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
 	WORKER_EXIT();
 }
 
@@ -1449,7 +1472,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    false,          // considerQuals
 		    true);          // halfAndHalf
     while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		if(doneMask.testUnsync(patid)) continue;
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
@@ -1459,7 +1482,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
 	WORKER_EXIT();
 }
 
@@ -1623,7 +1646,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    false,          // considerQuals
 		    true);          // halfAndHalf
     while(true) { // Read read-in loop
-		GET_READ(patsrc);
+		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		patid += 0; // kill unused variable warning
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
@@ -1637,7 +1660,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1758,7 +1781,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        true,                  // considerQuals
 	        false, !noMaqRound);
     while(true) {
-    	GET_READ(patsrc);
+    	GET_READ(patsrc, NULL, NULL);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
@@ -1766,7 +1789,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 		#include "search_seeded_phase1.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
 	WORKER_EXIT();
 }
 
@@ -1809,7 +1832,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        true,                  // considerQuals
 	        false, !noMaqRound);
     while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, NULL, NULL);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs3 = (qs >> 1);
@@ -1819,7 +1842,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
 	WORKER_EXIT();
 }
 
@@ -1881,7 +1904,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    !noMaqRound);
 	vector<PartialAlignment> pals;
     while(true) {
-		GET_READ(patsrc);
+		GET_READ(patsrc, NULL, NULL);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs3 = (qs >> 1);
@@ -1891,7 +1914,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		#include "search_seeded_phase3.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
 	WORKER_EXIT();
 }
 
@@ -1936,7 +1959,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        !noMaqRound);
 	vector<PartialAlignment> pals;
     while(true) {
-		GET_READ_FW(patsrc);
+		GET_READ_FW(patsrc, dumpUnalignFa, dumpUnalignFq);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
@@ -1945,7 +1968,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
 	WORKER_EXIT();
 }
 
@@ -2099,7 +2122,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        true,    // halfAndHalf
 	        !noMaqRound);
     while(true) {
-    	GET_READ(patsrc);
+    	GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		size_t plen = length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2117,7 +2140,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
 	WORKER_EXIT();
 }
 
@@ -2418,7 +2441,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	        false);  // halfAndHalf
 	vector<Hit>& hits = sink->retainedHits();
     while(true) {
-    	GET_READ(patsrc);
+    	GET_READ(patsrc, NULL, NULL);
 		size_t plen = length(patFw);
 		uint32_t s = min<uint32_t>(plen, seedLen);
 		patid += 0;
@@ -2475,7 +2498,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 		}
 		hits.clear();
     }
-	sink->finishRead();
+	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
     WORKER_EXIT();
 }
 
