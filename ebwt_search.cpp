@@ -1051,6 +1051,7 @@ static void mismatchSearch(PatternSource& _patsrc,
                            vector<String<Dna5> >& os)
 {
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
+	if(fullIndex) numQs = 0;
 	SyncBitset doneMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
@@ -1503,6 +1504,7 @@ static void twoOrThreeMismatchSearch(
 {
 	// Global initialization
 	assert(revcomp);
+	assert(!fullIndex);
 	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 
@@ -1682,6 +1684,7 @@ static void twoOrThreeMismatchSearchFull(
 {
 	// Global initialization
 	assert(revcomp);
+	assert(fullIndex);
 	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 	{
@@ -2179,6 +2182,7 @@ static void seededQualCutoffSearch(
 {
 	// Global intialization
 	assert(revcomp);
+	assert(!fullIndex);
 	assert_leq(seedMms, 3);
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
 	SyncBitset doneMask(numQs,
@@ -2356,6 +2360,7 @@ static void seededQualCutoffSearchFull(
         vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
 {
 	// Global intialization
+	assert(fullIndex);
 	assert(revcomp);
 	assert_leq(seedMms, 3);
 
@@ -2644,8 +2649,8 @@ static void driver(const char * type,
 			fout = new ofstream(outfile.c_str(), ios::binary);
 		}
 	} else {
-		if(outType == BINARY) {
-			cerr << "Errpr: Must specify an output file when output mode is binary" << endl;
+		if(outType == BINARY && !refOut) {
+			cerr << "Error: Must specify an output file when output mode is binary" << endl;
 			exit(1);
 		}
 		fout = &cout;

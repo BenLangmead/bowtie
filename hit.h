@@ -331,6 +331,7 @@ public:
 			_sink.reportHits(_bufferedHits);
 			_bufferedHits.clear();
 		}
+		assert_eq(0, _bufferedHits.size());
 	}
 
 	virtual void finishReadImpl() = 0;

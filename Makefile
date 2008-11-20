@@ -6,7 +6,7 @@ SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
 GCC_PREFIX = $(shell dirname `which gcc`)
-GCC_SUFFIX = -4.2
+GCC_SUFFIX =
 CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
@@ -62,11 +62,13 @@ BIN_LIST = bowtie-build \
            bowtie-build-packed \
            bowtie \
            bowtie-maqconvert \
-		   bowtie-inspect
+           bowtie-inspect \
+           bowtie-maptool
 BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
                bowtie-debug \
-			   bowtie-inspect-debug
+               bowtie-inspect-debug \
+               bowtie-maptool-debug
 
 GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
@@ -164,14 +166,13 @@ bowtie-maqconvert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 bowtie-maqconvert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
-bowtie-inspect: maq_convert/bowtie_inspect.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP) $(OTHER_CPPS)
+bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(OTHER_CPPS) $(LIBS) $(MAQ_LIB)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(OTHER_CPPS) $(LIBS)
 
-bowtie-inspect-debug: maq_convert/bowtie_inspect.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP) $(OTHER_CPPS) 
+bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(OTHER_CPPS) $(LIBS) $(MAQ_LIB)
-
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
@@ -218,6 +219,8 @@ bowtie-all-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) bowtie-asm bowti
 
 .PHONY: clean
 clean:
-	rm -f $(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof \
+	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
+	bowtie_prof bowtie-asm bowtie-asm-debug \
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
+	rm -f core.*

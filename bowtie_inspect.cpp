@@ -13,32 +13,35 @@
 #include "endian_swap.h"
 #include "ebwt.h"
 
-
 using namespace std;
 using namespace seqan;
 
-static int showVersion			= 0; // just print version and quit?
-static int verbose				= 0; // be talkative
-static int names_only			= 0; // just print the sequence names in the index
+static int showVersion = 0;  // just print version and quit?
+static int verbose     = 0;  // be talkative
+static int names_only  = 0;  // just print the sequence names in the index
+static int across      = 60; // number of characters across in FASTA output
 
-static const char *short_options = "vh?n";
+static const char *short_options = "vh?na:";
 
 static struct option long_options[] = {
-{"verbose",      no_argument,       0,            'v'},
-{"names",        no_argument,       0,            'n'},
-{"help",         no_argument,       0,            'h'},
-{0, 0, 0, 0} // terminator
+	{"verbose", no_argument,       0, 'v'},
+	{"names",   no_argument,       0, 'n'},
+	{"help",    no_argument,       0, 'h'},
+	{"across",  required_argument, 0, 'a'},
+	{0, 0, 0, 0} // terminator
 };
 
 /**
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
+	out
+	<< "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
 	<< "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
 	<< "Options:" << endl
-	<< "  -v/-verbose        verbose output (for debugging)" << endl
+	<< "  -a/--across        number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
+	<< "  -v/--verbose       verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
 	;
 }
@@ -59,6 +62,29 @@ static void printLongUsage(ostream& out) {
 }
 
 /**
+ * Parse an int out of optarg and enforce that it be at least 'lower';
+ * if it is less than 'lower', than output the given error message and
+ * exit with an error and a usage message.
+ */
+static int parseInt(int lower, const char *errmsg) {
+	long l;
+	char *endPtr= NULL;
+	l = strtol(optarg, &endPtr, 10);
+	if (endPtr != NULL) {
+		if (l < lower) {
+			cerr << errmsg << endl;
+			printUsage(cerr);
+			exit(1);
+		}
+		return (int32_t)l;
+	}
+	cerr << errmsg << endl;
+	printUsage(cerr);
+	exit(1);
+	return -1;
+}
+
+/**
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
@@ -71,6 +97,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'v': verbose = true; break;
 			case 'n': names_only = true; break;
+			case 'a': across = parseInt(1, "-a/--across arg must be at least 1"); break;
 			case -1: break; /* Done with options. */
 			case 0:
 				if (long_options[option_index].flag != 0)
@@ -83,30 +110,21 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 }
 
-
-static char *argv0 = NULL;
-
 void print_fasta_record(ostream& fout, 
 						const string& defline,
 						const string& seq)
 {
-	//print ref
 	fout << ">";
 	fout << defline << endl;
 	
-	//cerr << seq.length() << endl;
-	
 	size_t i = 0;
-	while (i + 60 < seq.length())
+	while (i + across < seq.length())
 	{
-		fout << seq.substr(i, 60) << endl;
-		i += 60;
+		fout << seq.substr(i, across) << endl;
+		i += across;
 	}
 	if (i < seq.length())
 		fout << seq.substr(i) << endl;
-	
-	//cout << (*refnames)[curr_ref] << endl;
-	//cout << curr_ref_seq << endl;	
 }
 
 template<typename TStr>
@@ -121,12 +139,13 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 	string curr_ref_seq = "";
 	uint32_t last_text_off = 0;
 	size_t orig_len = seqan::length(cat_ref);
+	uint32_t tlen = 0xffffffff;
 	for(size_t i = 0; i < orig_len; i++) {
 		uint32_t tidx = 0xffffffff;
 		uint32_t textoff = 0xffffffff;
-		uint32_t tlen = 0xffffffff;
+		tlen = 0xffffffff;
 		
-		ebwt.joinedToTextOff(1, i, tidx, textoff, tlen, true);
+		ebwt.joinedToTextOff(1 /* qlen */, i, tidx, textoff, tlen, true);
 		
 		if (tidx != 0xffffffff && textoff < tlen)
 		{
@@ -134,6 +153,10 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 			{
 				if (curr_ref != 0xffffffff)
 				{
+					// Add trailing gaps, if any exist
+					if(curr_ref_seq.length() < tlen) {
+						curr_ref_seq += string(tlen - curr_ref_seq.length(), 'N');
+					}
 					print_fasta_record(fout, (*refnames)[curr_ref], curr_ref_seq);
 				}
 				curr_ref = tidx;
@@ -142,16 +165,18 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 			}
 			
 			if (textoff - last_text_off > 1)
-				curr_ref_seq += string(textoff - last_text_off - 1, 'N');
+				curr_ref_seq += string(textoff - last_text_off - (last_text_off ? 1 : 0), 'N');
 			
 			curr_ref_seq.push_back(getValue(cat_ref,i));
 			last_text_off = textoff;
 		}
-		
 	}
-	//print ref;
 	if (curr_ref < refnames->size())
 	{
+		// Add trailing gaps, if any exist
+		if(curr_ref_seq.length() < tlen) {
+			curr_ref_seq += string(tlen - curr_ref_seq.length(), 'N');
+		}
 		print_fasta_record(fout, (*refnames)[curr_ref], curr_ref_seq);
 	}
 	
@@ -170,6 +195,8 @@ void print_index_sequence_names(ostream& fout, Ebwt<TStr>& ebwt)
 	}
 }
 
+static char *argv0 = NULL;
+
 template<typename TStr>
 static void driver(const char * type,
                    const string& ebwtFileBase,
@@ -179,29 +206,20 @@ static void driver(const char * type,
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 	
-	// Open output file
-	ostream *fout;
-	fout = &cout;
-	
 	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, true, verbose, false);
+    Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, verbose, false, false);
 	ebwt.loadIntoMemory();
 	
 	if (names_only)
-		print_index_sequence_names(*fout, ebwt);
+		print_index_sequence_names(cout, ebwt);
 	else
-		print_index_sequences(*fout, ebwt);
+		print_index_sequences(cout, ebwt);
 	
 	// Evict any loaded indexes from memory
 	if(ebwt.isInMemory()) {
 		ebwt.evictFromMemory();
 	}
-
-//	if(fout != NULL) {
-//		((ofstream*)fout)->close();
-//	}
 }
-
 
 /**
  * main function.  Parses command-line arguments.
@@ -211,8 +229,8 @@ int main(int argc, char **argv) {
 	string query;   // read query string(s) from this file
 	vector<string> queries;
 	string outfile; // write query results to this file
-	parseOptions(argc, argv);
 	argv0 = argv[0];
+	parseOptions(argc, argv);
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
 		cout << "Built on " << BUILD_HOST << endl;
@@ -220,8 +238,8 @@ int main(int argc, char **argv) {
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
 		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
-		<< ", " << sizeof(long) << ", " << sizeof(long long)
-		<< ", " << sizeof(void *) << "}" << endl;
+		     << ", " << sizeof(long) << ", " << sizeof(long long)
+		     << ", " << sizeof(void *) << "}" << endl;
 		cout << "Source hash: " << EBWT_INSPECT_HASH << endl;
 		return 0;
 	}
@@ -233,11 +251,6 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	ebwtFile = argv[optind++];
-	
-//	// Get output filename
-//	if(optind < argc) {
-//		outfile = argv[optind++];
-//	}
 	
 	// Optionally summarize
 	if(verbose) {

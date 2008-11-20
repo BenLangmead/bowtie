@@ -254,6 +254,7 @@ public:
 		_partialsMap.erase(patid);
 		assert_eq(0, _partialsMap.size());
 		_partialsList.clear();
+		assert_eq(0, _partialsList.size());
 	}
 
 	size_t size() {
