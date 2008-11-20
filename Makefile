@@ -6,7 +6,7 @@ SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
 GCC_PREFIX = $(shell dirname `which gcc`)
-GCC_SUFFIX =
+GCC_SUFFIX = -4.2
 CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
@@ -62,13 +62,11 @@ BIN_LIST = bowtie-build \
            bowtie-build-packed \
            bowtie \
            bowtie-maqconvert \
-           bowtie-inspect \
-           bowtie-maptool
+		   bowtie-inspect
 BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
                bowtie-debug \
-               bowtie-inspect-debug \
-               bowtie-maptool-debug
+			   bowtie-inspect-debug
 
 GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
@@ -220,8 +218,6 @@ bowtie-all-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) bowtie-asm bowti
 
 .PHONY: clean
 clean:
-	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
-	bowtie_prof bowtie-asm bowtie-asm-debug \
+	rm -f $(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof \
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
-	rm -f core.*
