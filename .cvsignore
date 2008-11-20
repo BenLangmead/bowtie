@@ -39,3 +39,5 @@ bowtie*.zip
 .tmp*
 bowtie-asm
 bowtie-asm-debug
+bowtie-maptool
+bowtie-maptool-debug

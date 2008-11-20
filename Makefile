@@ -6,7 +6,7 @@ SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
 GCC_PREFIX = $(shell dirname `which gcc`)
-GCC_SUFFIX = -4.2
+GCC_SUFFIX =
 CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
@@ -62,11 +62,13 @@ BIN_LIST = bowtie-build \
            bowtie-build-packed \
            bowtie \
            bowtie-maqconvert \
-		   bowtie-inspect
+           bowtie-inspect \
+           bowtie-maptool
 BIN_LIST_AUX = bowtie-build-debug \
                bowtie-build-packed-debug \
                bowtie-debug \
-			   bowtie-inspect-debug
+               bowtie-inspect-debug \
+               bowtie-maptool-debug
 
 GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
@@ -200,8 +202,26 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	cp .bin.tmp/$@ .
 	rm -rf .bin.tmp
 
+bowtie-all-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) bowtie-asm bowtie-asm-debug
+	chmod a+x scripts/*.sh scripts/*.pl
+	rm -rf .bin.tmp
+	mkdir .bin.tmp
+	mkdir .bin.tmp/bowtie-$(VERSION)
+	if [ -f bowtie.exe ] ; then \
+		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie-asm bowtie-asm-debug) ; \
+	else \
+		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) bowtie-asm bowtie-asm-debug ; \
+	fi
+	mv tmp.zip .bin.tmp/bowtie-$(VERSION)
+	cd .bin.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
+	cp .bin.tmp/$@ .
+	rm -rf .bin.tmp
+
 .PHONY: clean
 clean:
-	rm -f $(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof \
+	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
+	bowtie_prof bowtie-asm bowtie-asm-debug \
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
+	rm -f core.*
