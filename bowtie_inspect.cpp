@@ -39,9 +39,9 @@ static void printUsage(ostream& out) {
 	<< "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
 	<< "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
 	<< "Options:" << endl
-	<< "  -a/--across        number of characters across in FASTA output (default: 60)" << endl
+	<< "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
-	<< "  -v/--verbose       verbose output (for debugging)" << endl
+	<< "  -v/--verbose       Verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
 	;
 }
@@ -50,13 +50,49 @@ static void printUsage(ostream& out) {
  * Print a detailed usage message to the provided output stream.
  *
  * Manual text converted to C++ string with something like:
- * cat MANUAL  | head -415 | tail -340 | sed -e 's/\"/\\\"/g' | \
+ * cat MANUAL  | tail -100 | sed -e 's/\"/\\\"/g' | \
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
  */
 static void printLongUsage(ostream& out) {
 	out <<
 	"\n"
-	"LONG USAGE TODO\n"
+	" Using the 'bowtie-inspect' Index Inspector\n"
+	" ------------------------------------------\n"
+	"\n"
+	" 'bowtie-inspect' extracts information from a Bowtie index about the\n"
+	" original reference sequences that were used to build it.  By default,\n"
+	" the tool will output a FASTA file containing the sequences of the\n"
+	" original references (non-A/C/G/T characters are shown as an Ns).  The\n"
+	" tool can also be used to extract just the reference sequence names\n"
+	" using the -n option.\n"
+	"\n"
+	"  Command Line\n"
+	"  ------------\n"
+	" \n"
+	" Usage: bowtie-inspect [options]* <ebwt_base>\n"
+	"\n"
+	"  <ebwt_base>        The basename of the index to be inspected.  The\n"
+	"                     basename is the name of any of the four index\n"
+	"                     files up to but not including the first period.\n"
+	"                     bowtie first looks in the current directory for\n"
+	"                     the index files, then looks in the 'indexes'\n"
+	"                     subdirectory under the directory where the\n"
+	"                     currently-running 'bowtie' executable is located,\n"
+	"                     then looks in the directory specified in the\n"
+	"                     BOWTIE_INDEXES environment variable.\n"
+	"\n"
+	" Options:\n"
+	"\n"
+	"  -a/--across <int>  When printing FASTA output, output a newline\n"
+	"                     character every <int> bases (default: 60).\n"
+	"\n"
+	"  -n/--names         Print reference sequence names only; ignore\n"
+	"                     sequence.\n"
+	"\n"
+	"  -v/--verbose       Print verbose output (for debugging).\n"
+	"\n"
+	"  -h/--help          Print detailed description of tool and its options\n"
+	"                     (from MANUAL).\n"
 	"\n"
 	;
 }
@@ -93,7 +129,9 @@ static void parseOptions(int argc, char **argv) {
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
-	   		case 'h': printLongUsage(cout); exit(0); break;
+	   		case 'h':
+	   		case '?':
+	   			printLongUsage(cout); exit(0); break;
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'v': verbose = true; break;
 			case 'n': names_only = true; break;
@@ -110,13 +148,13 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 }
 
-void print_fasta_record(ostream& fout, 
+void print_fasta_record(ostream& fout,
 						const string& defline,
 						const string& seq)
 {
 	fout << ">";
 	fout << defline << endl;
-	
+
 	size_t i = 0;
 	while (i + across < seq.length())
 	{
@@ -131,10 +169,10 @@ template<typename TStr>
 void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 {
 	vector<string>* refnames = &(ebwt.refnames());
-	
+
 	TStr cat_ref;
 	ebwt.restore(cat_ref);
-	
+
 	uint32_t curr_ref = 0xffffffff;
 	string curr_ref_seq = "";
 	uint32_t last_text_off = 0;
@@ -144,9 +182,9 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 		uint32_t tidx = 0xffffffff;
 		uint32_t textoff = 0xffffffff;
 		tlen = 0xffffffff;
-		
+
 		ebwt.joinedToTextOff(1 /* qlen */, i, tidx, textoff, tlen, true);
-		
+
 		if (tidx != 0xffffffff && textoff < tlen)
 		{
 			if (curr_ref != tidx)
@@ -163,10 +201,10 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 				curr_ref_seq = "";
 				last_text_off = 0;
 			}
-			
+
 			if (textoff - last_text_off > 1)
 				curr_ref_seq += string(textoff - last_text_off - (last_text_off ? 1 : 0), 'N');
-			
+
 			curr_ref_seq.push_back(getValue(cat_ref,i));
 			last_text_off = textoff;
 		}
@@ -179,7 +217,7 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 		}
 		print_fasta_record(fout, (*refnames)[curr_ref], curr_ref_seq);
 	}
-	
+
 }
 
 template<typename TStr>
@@ -205,16 +243,16 @@ static void driver(const char * type,
 {
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
-	
+
 	// Initialize Ebwt object and read in header
     Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, verbose, false, false);
 	ebwt.loadIntoMemory();
-	
+
 	if (names_only)
 		print_index_sequence_names(cout, ebwt);
 	else
 		print_index_sequences(cout, ebwt);
-	
+
 	// Evict any loaded indexes from memory
 	if(ebwt.isInMemory()) {
 		ebwt.evictFromMemory();
@@ -243,7 +281,7 @@ int main(int argc, char **argv) {
 		cout << "Source hash: " << EBWT_INSPECT_HASH << endl;
 		return 0;
 	}
-	
+
 	// Get input filename
 	if(optind >= argc) {
 		cerr << "No index name given!" << endl;
@@ -251,7 +289,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	ebwtFile = argv[optind++];
-	
+
 	// Optionally summarize
 	if(verbose) {
 		cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
