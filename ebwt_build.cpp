@@ -72,13 +72,13 @@ static void printUsage(ostream& out) {
 	    << "    -a/--auto               automatically pick bmax/dcv fitting available memory" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
 	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
-	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len" << endl
+	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
-	    << "    --nodc                  disable difference cover (blockwise is quadratic)" << endl
+	    << "    --nodc                  disable diff-cover (algorithm becomes quadratic)" << endl
 	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
-	    << "    -o/--offrate <int>      SA index is kept every 2^offRate BWT chars" << endl
-	    << "    -t/--ftabchars <int>    # of characters in initial lookup table key" << endl
+	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
+	    << "    -t/--ftabchars <int>    # of chars consumed in initial lookup (default: 10)" << endl
 	    //<< "    --chunkrate <int>       # of characters in a text chunk" << endl
 	    << "    --ntoa                  convert Ns in reference to As" << endl
 	    << "    --big --little          endianness (default: little, this host: "

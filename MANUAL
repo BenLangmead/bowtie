@@ -90,13 +90,6 @@ Bowtie Manual
  are legal, and the -k/-a/--best/--nostrata options which define which
  and how many legal alignments should be reported.
 
- Bowtie is designed to be very fast for read sets where a) many of the
- reads have at least one good, valid alignment, b) many of the reads
- are relatively high-quality, c) the number of alignments reported per
- read is small (close to 1).  These criteria are generally satisfied in
- the context of mammalian resequencing projects, but you may observe
- longer running times in other contexts.
-
  By default, Bowtie enforces a policy that is equivalent to Maq's
  quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it
  can also be made to enforce an end-to-end k-difference policy
@@ -112,6 +105,20 @@ Bowtie Manual
 
  Indels and paired-end alignment are not currently supported.
  Alignment in ABI "color space" is also not currently supported.
+
+ Bowtie is designed to be very fast for read sets where a) many of the
+ reads have at least one good, valid alignment, b) many of the reads
+ are relatively high-quality, c) the number of alignments reported per
+ read is small (close to 1).  These criteria are generally satisfied in
+ the context of modern short-read analyses such as RNA-seq, ChIP-seq,
+ other types of -seq, and especially mammalian genotyping (e.g. the
+ 1000 Genomes Project).  You may observe longer running times in other
+ research contexts.  If you find Bowtie's performance to be
+ disappointingly slow, please try the hints described in the "High
+ Performance Tips" section below.  If Bowtie continues to be too slow,
+ contact us and tell us the nature of your research application and the
+ parameters you are using to run Bowtie.  We are eager to hear your
+ feedback.
 
   Maq-like Policy
   ---------------
@@ -156,6 +163,39 @@ Bowtie Manual
   mismatches.  Quality values are ignored.  The number of mismatches
   permitted is configurable with the -V option.
   
+  High Performance Tips
+  ---------------------
+  
+  Tip 1: If your computer has multiple processors/cores, try -p
+   
+  The -p <int> option causes Bowtie to launch <int> parallel search
+  threads.  Each thread runs on a different processor/core and all
+  threads find alignments in parallel, increasing alignment throughput
+  by approximately a multiple of <int>.
+  
+  Tip 2: If reporting many alignments per read, try a denser index
+   
+  If you are using the -k, -a or -m options and Bowtie is reporting
+  many alignments per read (an average of more than about 10 per read)
+  and you have some physical memory to spare, then consider building
+  an index with a denser SA sample.
+  
+  To build an index with a denser SA sample, specify a smaller
+  --offrate value when running 'bowtie-build'.  A denser SA sample
+  leads to a larger index, but is also particularly effective at
+  speeding up alignment when then number of alignments reported per
+  read is large.  For example, if the number of alignments per read is
+  very large, decreasing the index's --offrate by 1 could as much as
+  double alignment performance, and decreasing by 2 could quadruple
+  alignment performance, etc.
+  
+  On the other hand, decreasing --offrate increases the size of the
+  Bowtie index, both on disk and in memory when aligning reads.  At the
+  default --offrate of 5, the SA sample for the human genome occupies
+  about 375 MB of memory when aligning reads.  Decreasing the --offrate
+  by 1 doubles the memory taken by the SA sample, and decreasing by 2
+  quadruples the memory taken, etc.
+
   Command Line
   ------------
 
@@ -232,7 +272,14 @@ Bowtie Manual
                      alignments are reported, they may be subject to
                      stratification; see --best, --nostrata.  Bowtie is
                      designed to be very fast for small -k but BOWTIE
-                     CAN BECOME VERY SLOW AS -k INCREASES.
+                     CAN BECOME VERY SLOW AS -k INCREASES.  If you
+                     would like to use Bowtie for larger values of -k,
+                     consider building an index with a denser suffix-
+                     array sample, i.e. specify a smaller '--offrate'
+                     when invoking 'bowtie-build' for the relevant
+                     index.  This will increase the memory footprint of
+                     the index, but makes alignment much faster for
+                     large -k.
 
   -a/--all           Report all valid alignments per read (default:
                      off).  Validity of alignments is determined by the
@@ -240,13 +287,21 @@ Bowtie Manual
                      and -e).  Reported alignments may be subject to
                      stratification; see --best, --nostrata.  Bowtie is
                      designed to be very fast for small -k; BOWTIE CAN
-                     CAN BECOME VERY SLOW IF -a/--all IS SPECIFIED.
+                     CAN BECOME VERY SLOW IF -a/--all IS SPECIFIED.  If
+                     you would like to use Bowtie with -a, consider
+                     building an index with a denser suffix-array
+                     sample, i.e. specify a smaller '--offrate' when
+                     invoking 'bowtie-build' for the relevant index.
+                     This will increase the memory footprint of the
+                     index, but makes alignment much faster in -a mode.
 
   -m <int>           Suppress all alignments for a particular read if
                      more than <int> reportable alignments exist for
                      it.  Reportable alignments are those that would be
                      reported given the -n, -v, -l, -e, -k, -a, --best,
                      and --nostrata options.  Default: no limit.
+                     Bowtie is designed to be very fast for small -m
+                     but BOWTIE CAN BECOME VERY SLOW AS -m INCREASES.
 
   --best             Reported alignments must belong to the best
                      possible alignment "stratum" (default: off).  A
