@@ -1159,34 +1159,23 @@ public:
 	               uint32_t oms) const
 	{
 		// The search functions should not have allowed us to get here
-		FixedBitset<max_read_bp> mm;
 		String<Dna5> pat;
 		uint32_t qlen = length(query);
 		reserve(pat, qlen);
-		String<char> patQuals;
-		String<char> patName;
-		vector<char> refc;
+		// Report it using the HitSinkPerThread
+		Hit hit;
 		// Make a copy of the read name
-		if(name != NULL) assign(patName, *name);
-		if (_ebwtFw) {
-			// Let 'pat' and 'patQuals' become copies of 'query' and
-			// '*quals'
-			pat = query;
-			if(quals != NULL) {
-				reserve(patQuals, length(quals));
-				patQuals = *quals;
-			}
-		} else {
+		if(name != NULL) assign(hit.patName, *name);
+		hit.patSeq = query;
+		if(quals != NULL) {
+			hit.quals = *quals;
+		}
+		if(!_ebwtFw) {
 			// Note: this is re-reversing the pattern and the quals
 			// string back to their normal orientation; the pattern
 			// source reversed it initially
-			for(size_t i = 0; i < len; i++)
-			{
-				appendValue(pat, query[len-i-1]);
-				if(quals != NULL && length(*quals) > 0) {
-					appendValue(patQuals, (*quals)[len-i-1]);
-				}
-			}
+			::reverseInPlace(hit.patSeq);
+			::reverseInPlace(hit.quals);
 		}
 #ifndef NDEBUG
 		// Check that no two elements of the mms array are the same
@@ -1198,17 +1187,17 @@ public:
 #endif
 		// Turn the mmui32 and refcs arrays into the mm FixedBitset and
 		// the refc vector
-		refc.resize(qlen, 0);
+		hit.refcs.resize(qlen, 0);
 		for(size_t i = 0; i < numMms; i++) {
 			if (_ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
 				// mismatches w/r/t the 5' end, so we flip
-				mm.set(len - mmui32[i] - 1);
-				refc[len - mmui32[i] - 1] = refcs[i];
+				hit.mms.set(len - mmui32[i] - 1);
+				hit.refcs[len - mmui32[i] - 1] = refcs[i];
 			}
 			else {
-				mm.set(mmui32[i]);
-				refc[mmui32[i]] = refcs[i];
+				hit.mms.set(mmui32[i]);
+				hit.refcs[mmui32[i]] = refcs[i];
 			}
 		}
 		// Check the hit against the original text, if it's available
@@ -1246,10 +1235,10 @@ public:
 					}
 				}
 			}
-			if(diffs != mm) {
+			if(diffs != hit.mms) {
 				// Oops, mismatches were not where we expected them;
 				// print a diagnostic message before asserting
-				cerr << "Expected " << mm.str() << " mismatches, got " << diffs.str() << endl;
+				cerr << "Expected " << hit.mms.str() << " mismatches, got " << diffs.str() << endl;
 				cerr << "  Pat:  ";
 				for(size_t i = 0; i < len; i++) {
 					if(_ebwtFw) cerr << query[i];
@@ -1272,19 +1261,14 @@ public:
 				cerr << "  FW: " << _fw << endl;
 				cerr << "  Ebwt FW: " << _ebwtFw << endl;
 			}
-			if(diffs != mm) assert(false);
+			if(diffs != hit.mms) assert(false);
 		}
-		// Report it using the HitSinkPerThread
-		return sink().reportHit(
-			Hit(_arrowMode? a : h,
-			    _patid,
-			    patName,
-			    pat,
-			    patQuals,
-			    _fw,
-			    mm,
-			    refc,
-			    oms), stratum);
+		hit.h = _arrowMode? a : h;
+		hit.patId = _patid;
+		if(name != NULL) hit.patName = *name;
+		hit.fw = _fw;
+		hit.oms = oms;
+		return sink().reportHit(hit, stratum);
 	}
 	bool arrowMode() const {
 		return _arrowMode;
@@ -2779,6 +2763,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 
 	// Read nPat from primary stream
 	this->_nPat = readI32(_in1, be);
+	if(this->_plen != NULL) {
+		// Delete it so that we can re-read it
+		delete[] this->_plen;
+		this->_plen = NULL;
+	}
 	try {
 		// Read plen from primary stream
 		if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
@@ -2791,18 +2780,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			_in1.read((char *)this->_plen, this->_nPat*4);
 			assert_eq(this->_nPat*4, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < this->_nPat; i++) {
-			// Following is not necessarily true because we
-			// intentionally don't count gaps and ambiguous chars on
-			// the end of a sequence towards its plen
-			//assert_leq(this->_plen[i], len);
-			// Following is not necessarily true because we keep
-			// entries around for empty or all-gap sequeneces
-			//assert_gt(this->_plen[i], 0);
-		}
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating plen[] in Ebwt::read()"
-		     << " at " << __FILE__ << ":" << __LINE__ << endl;
+			 << " at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
 

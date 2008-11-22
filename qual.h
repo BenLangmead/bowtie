@@ -3,40 +3,54 @@
 
 extern unsigned char qualRounds[];
 
-class Penalty {
+class SimplePhredPenalty {
 public:
-	virtual ~Penalty() { }
-	virtual uint8_t mmPenalty (uint8_t qual) const = 0;
-	virtual uint8_t delPenalty(uint8_t qual) const = 0;
-	virtual uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) const = 0;
-};
-
-class SimplePhredPenalty : public Penalty {
-public:
-	virtual ~SimplePhredPenalty() { }
-	virtual uint8_t mmPenalty (uint8_t qual) const {
+	static uint8_t mmPenalty (uint8_t qual) {
 		return qual;
 	}
-	virtual uint8_t delPenalty(uint8_t qual) const {
+	static uint8_t delPenalty(uint8_t qual) {
 		return qual;
 	}
-	virtual uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) const {
+	static uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) {
 		return std::max(qual_left, qual_right);
 	}
 };
 
-class MaqPhredPenalty : public Penalty {
+class MaqPhredPenalty {
 public:
-	virtual ~MaqPhredPenalty() { }
-	virtual uint8_t mmPenalty (uint8_t qual) const {
+	static uint8_t mmPenalty (uint8_t qual) {
 		return qualRounds[qual];
 	}
-	virtual uint8_t delPenalty(uint8_t qual) const {
+	static uint8_t delPenalty(uint8_t qual) {
 		return qualRounds[qual];
 	}
-	virtual uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) const {
+	static uint8_t insPenalty(uint8_t qual_left, uint8_t qual_right) {
 		return qualRounds[std::max(qual_left, qual_right)];
 	}
 };
+
+static inline uint8_t mmPenalty(bool maq, uint8_t qual) {
+	if(maq) {
+		return MaqPhredPenalty::mmPenalty(qual);
+	} else {
+		return SimplePhredPenalty::mmPenalty(qual);
+	}
+}
+
+static inline uint8_t delPenalty(bool maq, uint8_t qual) {
+	if(maq) {
+		return MaqPhredPenalty::delPenalty(qual);
+	} else {
+		return SimplePhredPenalty::delPenalty(qual);
+	}
+}
+
+static inline uint8_t insPenalty(bool maq, uint8_t qual_left, uint8_t qual_right) {
+	if(maq) {
+		return MaqPhredPenalty::insPenalty(qual_left, qual_right);
+	} else {
+		return SimplePhredPenalty::insPenalty(qual_left, qual_right);
+	}
+}
 
 #endif /*QUAL_H_*/

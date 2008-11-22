@@ -33,7 +33,7 @@
 			btr3.setOffs(0, 0, s, s, s, s);
 		}
 		for(size_t i = 0; i < pals.size(); i++) {
-			String<QueryMutation> muts;
+			seqan::clear(muts);
 			uint8_t oldQuals =
 				PartialAlignmentManager::toMutsString(
 						pals[i], patRc, qualRc, muts, !noMaqRound);
@@ -56,6 +56,7 @@
 			}
 		} // Loop over partial alignments
 	}
+	seqan::clear(muts);
 	// Case 4R yielded a hit continue to next pattern
 	if(done) continue;
 	// If we're in two-mismatch mode, then now is the time to

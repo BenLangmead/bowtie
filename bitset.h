@@ -80,9 +80,9 @@ private:
 			}
 			exit(1);
 		}
-		memcpy(newwords, _words, oldsz >> 3);
+		memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
+		memset(newwords + (oldsz >> 5 /*convert to words*/), 0, (oldsz >> 4) /* convert to bytes / 2 */);
 		delete[] _words;
-		memset(newwords + (oldsz >> 5), 0, (oldsz >> 4));
 		_words = newwords;
 	}
 

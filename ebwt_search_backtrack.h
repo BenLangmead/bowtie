@@ -270,13 +270,6 @@ public:
 	                            String<QueryMutation>& muts,
 	                            bool maqPenalty = true)
 	{
-		Penalty* penalty = NULL;
-		if(maqPenalty) {
-			penalty = new MaqPhredPenalty();
-		} else {
-			penalty = new SimplePhredPenalty();
-		}
-		assert(penalty != NULL);
 		reserve(muts, 4);
 		assert_eq(0, length(muts));
 		uint32_t plen = length(seq);
@@ -288,7 +281,7 @@ public:
 		uint16_t tpos0 = plen-1-pos0;
 		uint32_t chr0 = pal.entry.char0;
 		uint8_t oldChar = (uint8_t)seq[tpos0];
-		oldQuals += penalty->mmPenalty(quals[tpos0]-33); // take quality hit
+		oldQuals += mmPenalty(maqPenalty, quals[tpos0]-33); // take quality hit
 		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
 		if(pal.entry.pos1 != 0xff) {
 			// Do second mutation
@@ -296,7 +289,7 @@ public:
 			uint16_t tpos1 = plen-1-pos1;
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
-			oldQuals += penalty->mmPenalty(quals[tpos1]-33); // take quality hit
+			oldQuals += mmPenalty(maqPenalty, quals[tpos1]-33); // take quality hit
 			assert_neq(tpos1, tpos0);
 			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
 			if(pal.entry.pos2 != 0xff) {
@@ -305,7 +298,7 @@ public:
 				uint16_t tpos2 = plen-1-pos2;
 				uint32_t chr2 = pal.entry.char2;
 				oldChar = (uint8_t)seq[tpos2];
-				oldQuals += penalty->mmPenalty(quals[tpos2]-33); // take quality hit
+				oldQuals += mmPenalty(maqPenalty, quals[tpos2]-33); // take quality hit
 				assert_neq(tpos2, tpos0);
 				assert_neq(tpos2, tpos1);
 				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation
@@ -387,7 +380,6 @@ public:
 		_2revOff(0),
 		_3revOff(0),
 		_maqPenalty(__maqPenalty),
-		_penalty(NULL),
 		_qualThresh(__qualThresh),
 		_reportOnHit(true),
 		_pairs(NULL),
@@ -420,14 +412,7 @@ public:
 		_maxBts2(__maxBts.maxBts2),
 		_rand(RandomSource(seed)),
 		_verbose(__verbose)
-	{
-		if(_maqPenalty) {
-			_penalty = new MaqPhredPenalty();
-		} else {
-			_penalty = new SimplePhredPenalty();
-		}
-		assert(_penalty != NULL);
-	}
+	{ }
 
 	~BacktrackManager() {
 		if(_pairs != NULL)          delete[] _pairs;
@@ -449,8 +434,7 @@ public:
 
 	void setQuery(String<Dna5>* __qry,
 	              String<char>* __qual,
-	              String<char>* __name,
-	              String<QueryMutation>* __muts = NULL)
+	              String<char>* __name)
 	{
 		_qry = __qry;
 		_qual = __qual;
@@ -458,14 +442,6 @@ public:
 		assert(_qry != NULL);
 		assert(_qual != NULL);
 		assert(_name != NULL);
-		if(_muts != NULL) {
-			undoMutations();
-		}
-		_muts = __muts;
-		if(_muts != NULL) {
-			applyMutations();
-		}
-		assert(_qry != NULL);
 		for(size_t i = 0; i < length(*_qual); i++) {
 			assert_geq((*_qual)[i], 33);
 		}
@@ -1093,7 +1069,7 @@ public:
 			// not in the unrevisitable region, and b) there is a quality
 			// ceiling and its selection would cause the ceiling to be exceeded
 			bool curIsAlternative = (d >= unrevOff) &&
-			                        (!_considerQuals || (ham + _penalty->mmPenalty(q) <= _qualThresh));
+			                        (!_considerQuals || (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
 			if(curIsAlternative) {
 				if(_considerQuals) {
 					// Is it the best alternative?
@@ -1207,7 +1183,7 @@ public:
 								eltop = PAIR_TOP(d, i);
 								elbot = PAIR_BOT(d, i);
 								assert_eq(elbot-eltop, spread);
-								elham = _penalty->mmPenalty(q);
+								elham = mmPenalty(_maqPenalty, q);
 								elchar = "acgt"[i];
 								elcint = i;
 								elignore = false;
@@ -1430,7 +1406,7 @@ public:
 										//	botloci[j]);
 										//btltop = &toploci[j];
 										//btlbot = &botloci[j];
-										btham += _penalty->mmPenalty(qi);
+										btham += mmPenalty(_maqPenalty, qi);
 										btcint = j;
 										btchar = "acgt"[j];
 										assert_leq(btham, _qualThresh);
@@ -1660,7 +1636,7 @@ public:
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = QUAL(kcur);
 						if(k < unrevOff) break; // already visited all revisitable positions
-						bool kCurIsAlternative = (ham + _penalty->mmPenalty(kq) <= _qualThresh);
+						bool kCurIsAlternative = (ham + mmPenalty(_maqPenalty, kq) <= _qualThresh);
 						bool kCurOverridesEligible = false;
 						if(kCurIsAlternative) {
 							if(kq < lowAltQual) {
@@ -1692,7 +1668,7 @@ public:
 											eltop = PAIR_TOP(k, l);
 											elbot = PAIR_BOT(k, l);
 											assert_eq(elbot-eltop, spread);
-											elham = _penalty->mmPenalty(kq);
+											elham = mmPenalty(_maqPenalty, kq);
 											elchar = "acgt"[l];
 											elcint = l;
 											elignore = false;
@@ -1829,13 +1805,6 @@ public:
 	                        bool invert = false)
 	{
 		bool fivePrimeOnLeft = (ebwtFw == fw);
-		Penalty* penalty = NULL;
-		if(maqPenalty) {
-			penalty = new MaqPhredPenalty();
-		} else {
-			penalty = new SimplePhredPenalty();
-		}
-		assert(penalty != NULL);
 	    uint32_t plen = qlen;
 		uint8_t *pstr = (uint8_t *)begin(qry, Standard());
 	    // For each text...
@@ -1873,7 +1842,7 @@ public:
 					}
 					if(pstr[k] != ostr[ok]) {
 						mms++;
-						ham += penalty->mmPenalty(QUAL2(qual, k));
+						ham += mmPenalty(maqPenalty, QUAL2(qual, k));
 						if(ham > qualThresh) {
 							// Alignment is invalid because it exceeds
 							// our target weighted hamming distance
@@ -2221,7 +2190,7 @@ protected:
 		assert_lt(_mms[0], _qlen);
 		// First, append the mismatch position in the read
 		al.entry.pos0 = (uint16_t)_mms[0]; // pos
-		ASSERT_ONLY(qualTot += _penalty->mmPenalty(((*_qual)[_mms[0]] - 33)));
+		ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[0]] - 33)));
 		uint32_t ci = _qlen - _mms[0] - 1;
 		// _chars[] is index in terms of RHS-relative depth
 		int c = (int)(Dna5)_chars[ci];
@@ -2235,7 +2204,7 @@ protected:
 			assert_lt(_mms[1], _qlen);
 			// First, append the mismatch position in the read
 			al.entry.pos1 = (uint16_t)_mms[1]; // pos
-			ASSERT_ONLY(qualTot += _penalty->mmPenalty(((*_qual)[_mms[1]] - 33)));
+			ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[1]] - 33)));
 			ci = _qlen - _mms[1] - 1;
 			// _chars[] is index in terms of RHS-relative depth
 			c = (int)(Dna5)_chars[ci];
@@ -2253,7 +2222,7 @@ protected:
 			assert_lt(_mms[2], _qlen);
 			// First, append the mismatch position in the read
 			al.entry.pos2 = (uint16_t)_mms[2]; // pos
-			ASSERT_ONLY(qualTot += _penalty->mmPenalty(((*_qual)[_mms[2]] - 33)));
+			ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[2]] - 33)));
 			ci = _qlen - _mms[2] - 1;
 			// _chars[] is index in terms of RHS-relative depth
 			c = (int)(Dna5)_chars[ci];
@@ -2463,7 +2432,6 @@ protected:
 	uint32_t            _3revOff;  // 3-revisitable chunk
 	/// Whether to round qualities off Maq-style when calculating penalties
 	bool                _maqPenalty;
-	Penalty*            _penalty;  // object to assign penalties
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
 	bool                _reportOnHit; // report as soon as we find a

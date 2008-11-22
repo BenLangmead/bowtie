@@ -411,33 +411,33 @@ private:
 
 /// Skip to the end of the current string of newline chars and return
 /// the first character after the newline chars, or -1 for EOF
-static inline int getOverNewline(FileBuf *in) {
+static inline int getOverNewline(FileBuf& in) {
 	int c;
-	while(isspace(c = in->get()));
+	while(isspace(c = in.get()));
 	return c;
 }
 
 /// Skip to the end of the current string of newline chars such that
 /// the next call to get() returns the first character after the
 /// whitespace
-static inline void peekOverNewline(FileBuf *in) {
+static inline void peekOverNewline(FileBuf& in) {
 	while(true) {
-		int c = in->peek();
+		int c = in.peek();
 		if(c != '\r' && c != '\n') {
 			return;
 		}
-		in->get();
+		in.get();
 	}
 }
 
 /// Skip to the end of the current line; return the first character
 /// of the next line or -1 for EOF
-static inline int getToEndOfLine(FileBuf *in) {
+static inline int getToEndOfLine(FileBuf& in) {
 	while(true) {
-		int c = in->get(); if(c < 0) return -1;
+		int c = in.get(); if(c < 0) return -1;
 		if(c == '\n' || c == '\r') {
 			while(c == '\n' || c == '\r') {
-				c = in->get(); if(c < 0) return -1;
+				c = in.get(); if(c < 0) return -1;
 			}
 			// c now holds first character of next line
 			return c;
@@ -447,14 +447,14 @@ static inline int getToEndOfLine(FileBuf *in) {
 
 /// Skip to the end of the current line such that the next call to
 /// get() returns the first character on the next line
-static inline void peekToEndOfLine(FileBuf *in) {
+static inline void peekToEndOfLine(FileBuf& in) {
 	while(true) {
-		int c = in->get(); if(c < 0) return;
+		int c = in.get(); if(c < 0) return;
 		if(c == '\n' || c == '\r') {
-			c = in->peek();
+			c = in.peek();
 			while(c == '\n' || c == '\r') {
-				in->get(); if(c < 0) return; // consume \r or \n
-				c = in->peek();
+				in.get(); if(c < 0) return; // consume \r or \n
+				c = in.peek();
 			}
 			// next get() gets first character of next line
 			return;
@@ -644,20 +644,18 @@ public:
 		TrimmingPatternSource(__reverse, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
 		_filecur(0),
-		_filebuf(NULL),
+		_filebuf(),
 		_first(true)
 	{
 		assert_gt(infiles.size(), 0);
 		open();
 		_filecur++;
 	}
+
 	virtual ~BufferedFilePatternSource() {
-		// close currently-open file
-		if(_filebuf != NULL) {
-			delete _filebuf;
-			_filebuf = NULL;
-		}
+		if(_filebuf.isOpen()) _filebuf.close();
 	}
+
 	/**
 	 * Fill ReadBuf with the sequence, quality and name for the next
 	 * read in the list of read files.  This function gets called by
@@ -674,10 +672,6 @@ public:
 		}
 		_first = false;
 		while(seqan::empty(r.patFw) && _filecur < _infiles.size()) {
-			// Close current file
-			assert(_filebuf != NULL);
-			delete _filebuf;
-			_filebuf = NULL;
 			// Open next file
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
@@ -700,8 +694,6 @@ public:
 	 */
 	virtual void reset() {
 		TrimmingPatternSource::reset();
-		delete _filebuf;
-		_filebuf = NULL;
 		_filecur = 0,
 		open();
 		_filecur++;
@@ -713,7 +705,7 @@ protected:
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() = 0;
 	void open() {
-		assert(_filebuf == NULL);
+		if(_filebuf.isOpen()) _filebuf.close();
 		while(true) {
 			// Open read
 			FILE *in;
@@ -724,13 +716,13 @@ protected:
 				_filecur++;
 				continue;
 			}
-			_filebuf = new FileBuf(in);
+			_filebuf.newFile(in);
 			break;
 		}
 	}
 	const vector<string>& _infiles; // filenames for read files
 	size_t _filecur;   // index into _infiles of next file to read
-	FileBuf *_filebuf; // read file currently being read from
+	FileBuf _filebuf; // read file currently being read from
 	bool _first;
 };
 
@@ -791,13 +783,13 @@ protected:
 			// Read to the end of the id line, sticking everything after the '>'
 			// into *name
 			while(true) {
-				c = _filebuf->get(); if(c < 0) {
+				c = _filebuf.get(); if(c < 0) {
 					r.clearAll(); return;
 				}
 				if(c == '\n' || c == '\r') {
 					// Break at end of line, after consuming all \r's, \n's
 					while(c == '\n' || c == '\r') {
-						c = _filebuf->get(); if(c < 0) {
+						c = _filebuf.get(); if(c < 0) {
 							r.clearAll(); return;
 						}
 					}
@@ -837,7 +829,7 @@ protected:
 						r.qualBufRc[bufSz-dstLen-1] = 'I';
 						dstLen++;
 					}
-					if((c = _filebuf->get()) < 0) break;
+					if((c = _filebuf.get()) < 0) break;
 				}
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
@@ -878,7 +870,7 @@ protected:
 						r.qualBufRc[dstLen] = 'I';
 						dstLen++;
 					}
-					if((c = _filebuf->get()) < 0) break;
+					if((c = _filebuf.get()) < 0) break;
 				}
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
@@ -996,14 +988,14 @@ protected:
 			// Read to the end of the id line, sticking everything after the '@'
 			// into *name
 			while(true) {
-				c = _filebuf->get(); if(c < 0) {
+				c = _filebuf.get(); if(c < 0) {
 					seqan::clear(r.patFw);
 					return;
 				}
 				if(c == '\n' || c == '\r') {
 					// Break at end of line, after consuming all \r's, \n's
 					while(c == '\n' || c == '\r') {
-						c = _filebuf->get();
+						c = _filebuf.get();
 						if(c < 0) {
 							seqan::clear(r.patFw);
 							return;
@@ -1048,7 +1040,7 @@ protected:
 						}
 						charsRead++;
 					}
-					c = _filebuf->get();
+					c = _filebuf.get();
 					if(c < 0) break;
 				}
 				// Trim from 3' end
@@ -1089,7 +1081,7 @@ protected:
 						}
 						charsRead++;
 					}
-					c = _filebuf->get();
+					c = _filebuf.get();
 					if(c < 0) break;
 				}
 				// Trim from 3' end
@@ -1114,7 +1106,7 @@ protected:
 			if (_integer_quals) {
 				char buf[4096];
 				while (qualsRead < charsRead) {
-					size_t rd = _filebuf->gets(buf, sizeof(buf));
+					size_t rd = _filebuf.gets(buf, sizeof(buf));
 					if(rd == 0) break;
 					assert(NULL == strrchr(buf, '\n'));
 					vector<string> s_quals;
@@ -1217,14 +1209,14 @@ protected:
 					_setBegin(r.qualRc, (char*)r.qualBufRc);
 					_setLength(r.qualRc, dstLen);
 				}
-				c = _filebuf->get();
+				c = _filebuf.get();
 			}
 			else
 			{
 				// Non-integer qualities
 				if(!_reverse) {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
-						c = _filebuf->get();
+						c = _filebuf.get();
 						if (c == ' ')
 						{
 							wrongQualityFormat();
@@ -1272,7 +1264,7 @@ protected:
 					_setLength(r.qualRc, dstLen);
 				} else {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
-						c = _filebuf->get();
+						c = _filebuf.get();
 						if (c == ' ')
 						{
 							wrongQualityFormat();
@@ -1437,7 +1429,7 @@ protected:
 						r.qualBufRc[bufSz-dstLen-1] = 'I';
 						dstLen++;
 					}
-					c = _filebuf->get();
+					c = _filebuf.get();
 				}
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns
@@ -1476,7 +1468,7 @@ protected:
 						r.qualBufRc[dstLen] = 'I';
 						dstLen++;
 					}
-					c = _filebuf->get();
+					c = _filebuf.get();
 				}
 				dstLen -= this->_trim3;
 				// Now that we've trimmed on both ends, count the Ns

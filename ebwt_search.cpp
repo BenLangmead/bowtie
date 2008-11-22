@@ -787,9 +787,14 @@ static char *argv0 = NULL;
 	if((long)vp != 0L) { \
     	pthread_exit(NULL); \
     } \
+	delete patsrc; \
+	delete sink; \
     return NULL;
 #else
-#define WORKER_EXIT() return NULL;
+#define WORKER_EXIT() \
+	delete patsrc; \
+	delete sink; \
+	return NULL;
 #endif
 
 
@@ -1912,6 +1917,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    true,    // halfAndHalf
 		    !noMaqRound);
 	vector<PartialAlignment> pals;
+	String<QueryMutation> muts;
     while(true) {
 		GET_READ(patsrc, NULL, NULL);
 		size_t plen = length(patFw);
@@ -1967,6 +1973,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        true,    // halfAndHalf
 	        !noMaqRound);
 	vector<PartialAlignment> pals;
+	String<QueryMutation> muts;
     while(true) {
 		GET_READ_FW(patsrc, dumpUnalignFa, dumpUnalignFq);
 		size_t plen = length(patFw);
@@ -2130,6 +2137,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        true,    // considerQuals
 	        true,    // halfAndHalf
 	        !noMaqRound);
+	String<QueryMutation> muts;
     while(true) {
     	GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
 		size_t plen = length(patFw);
@@ -2150,6 +2158,10 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		#undef DONEMASK_SET
     }
 	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	if(seedMms > 0) {
+		delete pamRc;
+		delete pamFw;
+	}
 	WORKER_EXIT();
 }
 
@@ -2803,8 +2815,8 @@ static void driver(const char * type,
 		if(ebwt.isInMemory()) {
 			ebwt.evictFromMemory();
 		}
-		if(ebwtBw != NULL && ebwtBw->isInMemory()) {
-			ebwtBw->evictFromMemory();
+		if(ebwtBw != NULL) {
+			delete ebwtBw;
 		}
 	    sink->finish(); // end the hits section of the hit file
 	    sink->flush();
@@ -2813,6 +2825,9 @@ static void driver(const char * type,
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();
+		if(dumpUnalignFa != NULL) dumpUnalignFa->close();
+		if(dumpUnalignFq != NULL) dumpUnalignFq->close();
+		delete patsrc;
 		delete sink;
 	}
 }
