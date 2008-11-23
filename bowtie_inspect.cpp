@@ -62,9 +62,9 @@ static void printLongUsage(ostream& out) {
 	" 'bowtie-inspect' extracts information from a Bowtie index about the\n"
 	" original reference sequences that were used to build it.  By default,\n"
 	" the tool will output a FASTA file containing the sequences of the\n"
-	" original references (non-A/C/G/T characters are shown as an Ns).  The\n"
-	" tool can also be used to extract just the reference sequence names\n"
-	" using the -n option.\n"
+	" original references (with all non-A/C/G/T characters converted to Ns).\n"
+	" It can also be used to extract just the reference sequence names using\n"
+	" the -n option.\n"
 	"\n"
 	"  Command Line\n"
 	"  ------------\n"
@@ -178,9 +178,11 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 
 	uint32_t curr_ref = 0xffffffff;
 	string curr_ref_seq = "";
+	uint32_t curr_ref_len = 0xffffffff;
 	uint32_t last_text_off = 0;
 	size_t orig_len = seqan::length(cat_ref);
 	uint32_t tlen = 0xffffffff;
+	bool first = true;
 	for(size_t i = 0; i < orig_len; i++) {
 		uint32_t tidx = 0xffffffff;
 		uint32_t textoff = 0xffffffff;
@@ -195,28 +197,31 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 				if (curr_ref != 0xffffffff)
 				{
 					// Add trailing gaps, if any exist
-					if(curr_ref_seq.length() < tlen) {
-						curr_ref_seq += string(tlen - curr_ref_seq.length(), 'N');
+					if(curr_ref_seq.length() < curr_ref_len) {
+						curr_ref_seq += string(curr_ref_len - curr_ref_seq.length(), 'N');
 					}
 					print_fasta_record(fout, (*refnames)[curr_ref], curr_ref_seq);
 				}
 				curr_ref = tidx;
 				curr_ref_seq = "";
+				curr_ref_len = tlen;
 				last_text_off = 0;
+				first = true;
 			}
 
 			if (textoff - last_text_off > 1)
-				curr_ref_seq += string(textoff - last_text_off - (last_text_off ? 1 : 0), 'N');
+				curr_ref_seq += string(textoff - last_text_off - ((last_text_off || !first) ? 1 : 0), 'N');
 
 			curr_ref_seq.push_back(getValue(cat_ref,i));
 			last_text_off = textoff;
+			first = false;
 		}
 	}
 	if (curr_ref < refnames->size())
 	{
 		// Add trailing gaps, if any exist
-		if(curr_ref_seq.length() < tlen) {
-			curr_ref_seq += string(tlen - curr_ref_seq.length(), 'N');
+		if(curr_ref_seq.length() < curr_ref_len) {
+			curr_ref_seq += string(curr_ref_len - curr_ref_seq.length(), 'N');
 		}
 		print_fasta_record(fout, (*refnames)[curr_ref], curr_ref_seq);
 	}

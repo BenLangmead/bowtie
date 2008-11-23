@@ -19,7 +19,7 @@ if(defined $options{h}) {
 }
 
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug bowtie-maptool-debug") == 0 || die "Error building";
+	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
 
 my @policies = (
@@ -64,6 +64,13 @@ my $exitOnFail = 1;
 my @dnaMap = ('A', 'T', 'C', 'G',
               'N',
               'M', 'R', 'W', 'S', 'Y', 'K', 'V', 'H', 'D', 'B', 'X');
+
+sub nonACGTtoN {
+	my $t = shift;
+	$t =~ tr/-NnMmRrWwSsYyKkVvHhDdBbXx/N/;
+	$t =~ /[ACGTN]+/ || die "Bad N-ized DNA string: $t";
+	return $t;
+}
 
 sub randGap() {
 	my $or = int(rand(4));
@@ -151,15 +158,29 @@ sub build {
 		# Add backslash to escape first dash
 		$file2 = "\"\\$t\"";
 	}
+	
+	# Write reference sequences to a FASTA file
+	open FA, ">.randtmp$seed.fa" || die "Could not open temporary fasta file";
+	my @seqs = split(/,/, $t);
+	for(my $i = 0; $i <= $#seqs; $i++) {
+		print FA ">$i\n";
+		print FA "$seqs[$i]\n";
+	}
+	close(FA);
+	
+	# Make a version of the FASTA file where all non-A/C/G/T characters
+	# are Ns.
+	open FAN, ">.randtmp$seed.ns.fa" || die "Could not open temporary fasta file";
+	for(my $i = 0; $i <= $#seqs; $i++) {
+		print FAN ">$i\n";
+		my $t = nonACGTtoN($seqs[$i]);
+		print FAN "$t\n";
+	}
+	close(FAN);
+	
 	my $fasta = int(rand(2)) == 0;
 	if($fasta) {
-		open FA, ">.randtmp$seed.fa" || die "Could not open temporary fasta file";
-		my @seqs = split(/,/, $t);
-		for(my $i = 0; $i <= $#seqs; $i++) {
-			print FA ">ref$i\n";
-			print FA "$seqs[$i]\n";
-		}
-		close(FA);
+		# Use the FASTA file as input
 		$file1 = "-f";
 		$file2 = ".randtmp$seed.fa";
 	}
@@ -198,6 +219,15 @@ sub build {
 			exit 1;
 		}
 	}
+	
+	# Use bowtie-inspect to compare the output of bowtie-build to the
+	# original reference sequences
+	$cmd = "./bowtie-inspect-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
+	print "$cmd\n";
+	system($cmd) == 0 || die "$cmd - failed";
+	$cmd = "diff .randtmp$seed.ns.fa .tmp$seed.inspect.ref";
+	print "$cmd\n";
+	system($cmd) == 0 || die "$cmd - failed";
 
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
