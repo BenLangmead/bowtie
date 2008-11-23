@@ -209,8 +209,10 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 				first = true;
 			}
 
-			if (textoff - last_text_off > 1)
-				curr_ref_seq += string(textoff - last_text_off - ((last_text_off || !first) ? 1 : 0), 'N');
+			uint32_t textoff_adj = textoff;
+			if(first && textoff > 0) textoff_adj++;
+			if (textoff_adj - last_text_off > 1)
+				curr_ref_seq += string(textoff_adj - last_text_off - 1, 'N');
 
 			curr_ref_seq.push_back(getValue(cat_ref,i));
 			last_text_off = textoff;
