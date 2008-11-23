@@ -1586,18 +1586,6 @@ inline int Ebwt<TStr>::rowL(const SideLocus& l) const {
 }
 
 /**
- * Tricky-bit-bashing population count function for 64-bit argument.
- */
-#define POP64(x) \
-   x = x - ((x >> 1) & 0x5555555555555555llu); \
-   x = (x & 0x3333333333333333llu) + ((x >> 2) & 0x3333333333333333llu); \
-   x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0Fllu; \
-   x = x + (x >> 8); \
-   x = x + (x >> 16); \
-   x = x + (x >> 32); \
-   x = (x & 0x3F);
-
-/**
  * Inline-function version of the above.  This does not always seem to
  * be inlined
  *
@@ -1639,7 +1627,7 @@ inline static int countInU64(int c, uint64_t dw) {
 	default:
 		throw;
 	}
-	POP64(tmp); // Gets 7.62% in profile
+	tmp = pop64(tmp); // Gets 7.62% in profile
 	if(c == 0) {
 		tmp = 32 - tmp;
 	}
