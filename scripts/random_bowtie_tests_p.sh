@@ -8,7 +8,7 @@ if [ -z "$NUM" ] ; then
 	NUM=4
 fi
 
-make bowtie-debug bowtie-build-debug bowtie-build-packed-debug
+make bowtie-debug bowtie-build-debug bowtie-build-packed-debug bowtie-maptool-debug bowtie-inspect-debug
 if [ "$?" != "0" ] ; then
 	echo "Error during build"
 	exit 1
