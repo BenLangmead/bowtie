@@ -132,10 +132,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'h':
 	   		case '?':
 	   			printLongUsage(cout); exit(0); break;
-	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'v': verbose = true; break;
 			case 'n': names_only = true; break;
-			case 'a': across = parseInt(1, "-a/--across arg must be at least 1"); break;
+			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
 			case -1: break; /* Done with options. */
 			case 0:
 				if (long_options[option_index].flag != 0)
@@ -155,14 +154,18 @@ void print_fasta_record(ostream& fout,
 	fout << ">";
 	fout << defline << endl;
 
-	size_t i = 0;
-	while (i + across < seq.length())
-	{
-		fout << seq.substr(i, across) << endl;
-		i += across;
+	if(across > 0) {
+		size_t i = 0;
+		while (i + across < seq.length())
+		{
+			fout << seq.substr(i, across) << endl;
+			i += across;
+		}
+		if (i < seq.length())
+			fout << seq.substr(i) << endl;
+	} else {
+		fout << seq << endl;
 	}
-	if (i < seq.length())
-		fout << seq.substr(i) << endl;
 }
 
 template<typename TStr>
