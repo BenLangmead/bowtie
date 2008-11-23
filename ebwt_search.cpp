@@ -743,11 +743,34 @@ static void parseOptions(int argc, char **argv) {
 
 static char *argv0 = NULL;
 
+#define FINISH_READ(p) \
+	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
+	if(!p->empty()) { \
+		sink->finishRead(*p, skipped ? NULL : dumpUnalignFa, skipped ? NULL : dumpUnalignFq); \
+	} \
+	skipped = false;
+
+#define FINISH_READ_WITH_HITMASK(p, r) \
+	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
+	if(!p->empty()) { \
+		bool reportUnAl = r; \
+		if(reportUnAl) { \
+			reportUnAl = !skipped; \
+			if(reportUnAl) { \
+				reportUnAl = !hitMask.test(p->patid()); \
+			} \
+		} \
+		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, reportUnAl ? dumpUnalignFq : NULL) > 0) { \
+			if(!reportUnAl && (dumpUnalignFa != NULL || dumpUnalignFq != NULL)) \
+			hitMask.setOver(p->patid()); \
+		} \
+	} \
+	skipped = false;
+
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
-#define GET_READ(p, unfa, unfq) \
-	if(!p->empty()) { sink->finishRead(*p, unfa, unfq); } \
+#define GET_READ(p) \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) { break; } \
 	assert(!empty(p->patFw())); \
@@ -767,8 +790,7 @@ static char *argv0 = NULL;
 /// possibly aborting depending on whether the result is empty or the
 /// patid exceeds the limit, and marshaling the read into convenient
 /// variables.
-#define GET_READ_FW(p, unfa, unfq) \
-	if(!p->empty()) { sink->finishRead(*p, unfa, unfq); } \
+#define GET_READ_FW(p) \
 	p->nextRead(); \
 	if(p->empty() || p->patid() >= qUpto) break; \
 	params.setPatId(p->patid()); \
@@ -886,8 +908,10 @@ static void *exactSearchWorker(void *vp) {
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
-    while(true) {
-    	GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
+	bool skipped = false;
+	while(true) {
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
     	uint32_t plen = length(patFw);
     	// Process forward-oriented read
     	bt.setOffs(0, 0, plen, plen, plen, plen);
@@ -905,7 +929,7 @@ static void *exactSearchWorker(void *vp) {
 	    bt.backtrack();
 		params.setFw(true);
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ(patsrc);
     WORKER_EXIT();
 }
 
@@ -958,6 +982,7 @@ static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         mismatchSearch_os;
 static SyncBitset*                    mismatchSearch_doneMask;
+static SyncBitset*                    mismatchSearch_hitMask;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
 	PatternSource&         _patsrc       = *mismatchSearch_patsrc;
@@ -965,6 +990,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
+	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
@@ -989,8 +1015,10 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
+	bool skipped = false;
 	while(true) {
-		GET_READ(patsrc, NULL, NULL);
+		FINISH_READ_WITH_HITMASK(patsrc, false);
+		GET_READ(patsrc);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -998,7 +1026,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 		#include "search_1mm_phase1.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
     WORKER_EXIT();
 }
 
@@ -1008,6 +1036,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
 	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
+	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
@@ -1033,15 +1062,17 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
+	bool skipped = false;
 	while(true) {
-		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
-		if(doneMask.test(patid)) continue;
+		FINISH_READ_WITH_HITMASK(patsrc, true);
+		GET_READ(patsrc);
+		if(doneMask.test(patid)) { skipped = true; continue; }
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		#include "search_1mm_phase2.c"
 	} // End read loop
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ_WITH_HITMASK(patsrc, true);
     WORKER_EXIT();
 }
 
@@ -1061,12 +1092,22 @@ static void mismatchSearch(PatternSource& _patsrc,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
+	// doneMask is sufficient to know whether a read has an alignment
+	if(!allHits && khits == 1) numQs = 0;
+	// No need to keep track of which reads are aligned because the
+	// user hasn't requested an unaligned-read dump
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	SyncBitset hitMask(numQs,
+		// Error message for if an allocation fails
+		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
+		"run bowtie separately on each subset.\n");
 
 	mismatchSearch_patsrc       = &_patsrc;
 	mismatchSearch_sink         = &_sink;
 	mismatchSearch_ebwtFw       = &ebwtFw;
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = &doneMask;
+	mismatchSearch_hitMask      = &hitMask;
 	mismatchSearch_os           = &os;
 
 	assert(ebwtFw.isInMemory());
@@ -1163,8 +1204,10 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
+	bool skipped = false;
 	while(true) {
-		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1175,7 +1218,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ(patsrc);
     WORKER_EXIT();
 }
 
@@ -1194,6 +1237,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 	mismatchSearch_ebwtFw       = &ebwtFw;
 	mismatchSearch_ebwtBw       = &ebwtBw;
 	mismatchSearch_doneMask     = NULL;
+	mismatchSearch_hitMask      = NULL;
 	mismatchSearch_os           = &os;
 
 	assert(ebwtFw.isInMemory());
@@ -1359,6 +1403,7 @@ static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         twoOrThreeMismatchSearch_os;
 static SyncBitset*                    twoOrThreeMismatchSearch_doneMask;
+static SyncBitset*                    twoOrThreeMismatchSearch_hitMask;
 static bool                           twoOrThreeMismatchSearch_two;
 
 #define TWOTHREE_WORKER_SETUP() \
@@ -1381,6 +1426,7 @@ static bool                           twoOrThreeMismatchSearch_two;
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
+	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
@@ -1397,8 +1443,10 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
+	bool skipped = false;
     while(true) { // Read read-in loop
-		GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ_WITH_HITMASK(patsrc, false);
+		GET_READ(patsrc);
 		// If requested, check that this read has the same length
 		// as all the previous ones
 		size_t plen = length(patFw);
@@ -1408,7 +1456,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 		#include "search_23mm_phase1.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1416,6 +1464,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
+	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	BacktrackManager<String<Dna> > bt2(
 			&ebwtBw, params,
@@ -1432,8 +1481,10 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
+	bool skipped = false;
     while(true) {
-		GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ_WITH_HITMASK(patsrc, false);
+		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
 		size_t plen = length(patFw);
 		uint32_t s = plen;
@@ -1443,13 +1494,14 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		#include "search_23mm_phase2.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
 	WORKER_EXIT();
 }
 
 static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
+	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
 	// BacktrackManager to search for seedlings for case 4F
 	BacktrackManager<String<Dna> > bt3(
@@ -1483,9 +1535,11 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
+	bool skipped = false;
     while(true) {
-		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
-		if(doneMask.testUnsync(patid)) continue;
+    	FINISH_READ_WITH_HITMASK(patsrc, true);
+		GET_READ(patsrc);
+		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1494,7 +1548,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ_WITH_HITMASK(patsrc, true);
 	WORKER_EXIT();
 }
 
@@ -1518,6 +1572,15 @@ static void twoOrThreeMismatchSearch(
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
+	// doneMask is sufficient to know whether a read has an alignment
+	if(!allHits && khits == 1) numQs = 0;
+	// No need to keep track of which reads are aligned because the
+	// user hasn't requested an unaligned-read dump
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	SyncBitset hitMask(numQs,
+		// Error message for if an allocation fails
+		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
+		"run bowtie separately on each subset.\n");
 
 	uint32_t numPats = 0;
 
@@ -1527,6 +1590,7 @@ static void twoOrThreeMismatchSearch(
 	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
 	twoOrThreeMismatchSearch_os       = &os;
 	twoOrThreeMismatchSearch_doneMask = &doneMask;
+	twoOrThreeMismatchSearch_hitMask  = &hitMask;
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
@@ -1658,8 +1722,10 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
+	bool skipped = false;
     while(true) { // Read read-in loop
-		GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
+    	FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
@@ -1673,7 +1739,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ(patsrc);
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1703,6 +1769,7 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
 	twoOrThreeMismatchSearch_os       = &os;
 	twoOrThreeMismatchSearch_doneMask = NULL;
+	twoOrThreeMismatchSearch_hitMask  = NULL;
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
@@ -1738,6 +1805,7 @@ static Ebwt<String<Dna> >*            seededQualSearch_ebwtFw;
 static Ebwt<String<Dna> >*            seededQualSearch_ebwtBw;
 static vector<String<Dna5> >*         seededQualSearch_os;
 static SyncBitset*                    seededQualSearch_doneMask;
+static SyncBitset*                    seededQualSearch_hitMask;
 static PartialAlignmentManager*       seededQualSearch_pamFw;
 static PartialAlignmentManager*       seededQualSearch_pamRc;
 static int                            seededQualSearch_qualCutoff;
@@ -1762,6 +1830,7 @@ static int                            seededQualSearch_qualCutoff;
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
+	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -1794,8 +1863,10 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        &os,
 	        true,                  // considerQuals
 	        false, !noMaqRound);
+	bool skipped = false;
     while(true) {
-    	GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
@@ -1803,13 +1874,14 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 		#include "search_seeded_phase1.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase2(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
+	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -1845,8 +1917,10 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
+	bool skipped = false;
     while(true) {
-		GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ_WITH_HITMASK(patsrc, false);
+		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs3 = (qs >> 1);
@@ -1856,13 +1930,14 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase3(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
+	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -1918,8 +1993,10 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		    !noMaqRound);
 	vector<PartialAlignment> pals;
 	String<QueryMutation> muts;
+	bool skipped = false;
     while(true) {
-		GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ_WITH_HITMASK(patsrc, false);
+		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs3 = (qs >> 1);
@@ -1929,13 +2006,14 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		#include "search_seeded_phase3.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ_WITH_HITMASK(patsrc, false);
 	WORKER_EXIT();
 }
 
 static void* seededQualSearchWorkerPhase4(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
+	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
@@ -1974,17 +2052,19 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        !noMaqRound);
 	vector<PartialAlignment> pals;
 	String<QueryMutation> muts;
+	bool skipped = false;
     while(true) {
-		GET_READ_FW(patsrc, dumpUnalignFa, dumpUnalignFq);
+    	FINISH_READ_WITH_HITMASK(patsrc, true);
+		GET_READ_FW(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		if(doneMask.test(patid)) continue;
+		if(doneMask.test(patid)) { skipped = true; continue; }
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ_WITH_HITMASK(patsrc, true);
 	WORKER_EXIT();
 }
 
@@ -2138,8 +2218,10 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        true,    // halfAndHalf
 	        !noMaqRound);
 	String<QueryMutation> muts;
+	bool skipped = false;
     while(true) {
-    	GET_READ(patsrc, dumpUnalignFa, dumpUnalignFq);
+    	FINISH_READ(patsrc);
+    	GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2157,7 +2239,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq); }
+	FINISH_READ(patsrc);
 	if(seedMms > 0) {
 		delete pamRc;
 		delete pamFw;
@@ -2201,6 +2283,15 @@ static void seededQualCutoffSearch(
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
+	// doneMask is sufficient to know whether a read has an alignment
+	if(!allHits && khits == 1) numQs = 0;
+	// No need to keep track of which reads are aligned because the
+	// user hasn't requested an unaligned-read dump
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	SyncBitset hitMask(numQs,
+		// Error message for if an allocation fails
+		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
+		"run bowtie separately on each subset.\n");
 	uint32_t numPats;
 
 	seededQualSearch_patsrc   = &_patsrc;
@@ -2209,6 +2300,7 @@ static void seededQualCutoffSearch(
 	seededQualSearch_ebwtBw   = &ebwtBw;
 	seededQualSearch_os       = &os;
 	seededQualSearch_doneMask = &doneMask;
+	seededQualSearch_hitMask  = &hitMask;
 	seededQualSearch_pamFw    = NULL;
 	seededQualSearch_pamRc    = NULL;
 	seededQualSearch_qualCutoff = qualCutoff;
@@ -2382,6 +2474,7 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_ebwtBw   = &ebwtBw;
 	seededQualSearch_os       = &os;
 	seededQualSearch_doneMask = NULL;
+	seededQualSearch_hitMask  = NULL;
 	seededQualSearch_pamFw    = NULL;
 	seededQualSearch_pamRc    = NULL;
 	seededQualSearch_qualCutoff = qualCutoff;
@@ -2463,8 +2556,10 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	        false,   // considerQuals
 	        false);  // halfAndHalf
 	vector<Hit>& hits = sink->retainedHits();
+	bool skipped = false;
     while(true) {
-    	GET_READ(patsrc, NULL, NULL);
+    	FINISH_READ(patsrc);
+    	GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t s = min<uint32_t>(plen, seedLen);
 		patid += 0;
@@ -2521,7 +2616,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 		}
 		hits.clear();
     }
-	if(!patsrc->empty()) { sink->finishRead(*patsrc, NULL, NULL); }
+	FINISH_READ(patsrc);
     WORKER_EXIT();
 }
 

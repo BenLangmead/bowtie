@@ -50,6 +50,10 @@ public:
 		return ret;
 	}
 
+	/**
+	 * Set a bit in the vector that hasn't been set before.  Assert if
+	 * it has been set.
+	 */
 	void set(size_t i) {
 		MUTEX_LOCK(_lock);
 		while(i >= _sz) {
@@ -65,6 +69,25 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 		MUTEX_UNLOCK(_lock);
 	}
+
+	/**
+	 * Set a bit in the vector that might have already been set.
+	 */
+	void setOver(size_t i) {
+		MUTEX_LOCK(_lock);
+		while(i >= _sz) {
+			// Slow path: bitset needs to be expanded before the
+			// specified bit can be set
+			ASSERT_ONLY(size_t oldsz = _sz);
+			expand();
+			assert_eq(_sz, oldsz);
+		}
+		// Fast path
+		_words[i >> 5] |= (1 << (i & 0x1f));
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		MUTEX_UNLOCK(_lock);
+	}
+
 
 private:
 
@@ -124,6 +147,10 @@ public:
 		return ret;
 	}
 
+	/**
+	 * Set a bit in the vector that hasn't been set before.  Assert if
+	 * it has been set.
+	 */
 	void set(size_t i) {
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
@@ -134,6 +161,22 @@ public:
 		}
 		// Fast path
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		_words[i >> 5] |= (1 << (i & 0x1f));
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+	}
+
+	/**
+	 * Set a bit in the vector that might have already been set.
+	 */
+	void setOver(size_t i) {
+		while(i >= _sz) {
+			// Slow path: bitset needs to be expanded before the
+			// specified bit can be set
+			ASSERT_ONLY(size_t oldsz = _sz);
+			expand();
+			assert_eq(_sz, oldsz);
+		}
+		// Fast path
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
@@ -185,6 +228,17 @@ public:
 		// Fast path
 		assert_lt(i, LEN);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		_words[i >> 5] |= (1 << (i & 0x1f));
+		_cnt++;
+		if(i >= _size) {
+			_size = i+1;
+		}
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+	}
+
+	void setOver(size_t i) {
+		// Fast path
+		assert_lt(i, LEN);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		_cnt++;
 		if(i >= _size) {

@@ -310,12 +310,13 @@ public:
 	vector<int>& retainedStrata() { return _strata; }
 
 	/// Finalize current read
-	virtual void finishRead(PatternSourcePerThread& p,
-	                        ostream *dumpUnalignFa = NULL,
-	                        ostream *dumpUnalignFq = NULL)
+	virtual uint32_t finishRead(PatternSourcePerThread& p,
+	                            ostream *dumpUnalignFa = NULL,
+	                            ostream *dumpUnalignFq = NULL)
 	{
+		uint32_t ret = finishReadImpl();
 		_bestRemainingStratum = 0;
-		if(_hitsForThisRead == 0) {
+		if(ret == 0) {
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
 			if(dumpUnalignFa != NULL) {
@@ -325,16 +326,17 @@ public:
 				(*dumpUnalignFq) << "@" << p.name() << endl << p.patFw() << endl << "+" << endl << p.qualFw() << endl;
 			}
 		}
-		finishReadImpl();
 		if(_bufferHits && _bufferedHits.size() > 0) {
 			// Flush buffered hits
+			//assert_eq(ret, _bufferedHits.size());
 			_sink.reportHits(_bufferedHits);
 			_bufferedHits.clear();
 		}
 		assert_eq(0, _bufferedHits.size());
+		return ret;
 	}
 
-	virtual void finishReadImpl() = 0;
+	virtual uint32_t finishReadImpl() = 0;
 
 	/**
 	 * Implementation for hit reporting; update per-thread _hits and
@@ -483,8 +485,10 @@ public:
 	}
 
 	/// Finalize current read
-	virtual void finishReadImpl() {
+	virtual uint32_t finishReadImpl() {
+		uint32_t ret = _hitsForThisRead;
 		_hitsForThisRead = 0;
+		return ret;
 	}
 
 	/**
@@ -586,11 +590,13 @@ public:
 	 * to worst until they're all reported or until we've reported all
 	 * N
 	 */
-	virtual void finishReadImpl() {
+	virtual uint32_t finishReadImpl() {
 		if(_hitsForThisRead == _n || _hitsForThisRead > _max) {
+			uint32_t ret = _hitsForThisRead;
 			reset();
-			return; // already reported N good hits; stop!
+			return ret; // already reported N good hits; stop!
 		}
+		bool done = false;
 		for(int j = 0; j < 4; j++) {
 			for(size_t i = 0; i < _hitStrata[j].size(); i++) {
 				// This hit is within th best possible remaining stratum,
@@ -598,7 +604,8 @@ public:
 				_hitsForThisRead++;
 				if(_hitsForThisRead > _max) {
 					_bufferedHits.clear();
-					return; // done - report nothing
+					done = true;
+					break; // done - report nothing
 				}
 				if(_hitsForThisRead <= _n) {
 					reportHitImpl(_hitStrata[j][i], j);
@@ -606,13 +613,16 @@ public:
 				if(_hitsForThisRead == _n &&
 				   (_max == 0xffffffff || _max < _n))
 				{
-					reset();
-					return; // already reported N good hits; stop!
+					done = true;
+					break; // already reported N good hits; stop!
 				}
 			}
+			if(done) break;
 			_hitStrata[j].clear();
 		}
+		uint32_t ret = _hitsForThisRead;
 		reset();
+		return ret;
 	}
 
 	/**
@@ -740,7 +750,7 @@ public:
 	 * to worst until they're all reported or until we've reported all
 	 * N
 	 */
-	virtual void finishReadImpl() {
+	virtual uint32_t finishReadImpl() {
 		if(_bestStratumReported < 999 &&
 		   _hitsForThisRead < _n &&
 		   _hitsForThisRead <= _max)
@@ -758,7 +768,7 @@ public:
 				_hitsForThisRead++;
 				if(_hitsForThisRead > _max) {
 					_bufferedHits.clear();
-					return; // done - report nothing
+					break; // done - report nothing
 				}
 				if(_hitsForThisRead <= _n) {
 					reportHitImpl(_hitStrata[_bestStratumReported][i], _bestStratumReported);
@@ -779,7 +789,9 @@ public:
 			}
 #endif
 		}
+		uint32_t ret = _hitsForThisRead;
 		reset();
+		return ret;
 	}
 
 	/**
@@ -877,8 +889,10 @@ public:
 	/**
 	 * Finalize; do nothing because we haven't buffered anything
 	 */
-	virtual void finishReadImpl() {
+	virtual uint32_t finishReadImpl() {
+		uint32_t ret = _hitsForThisRead;
 		_hitsForThisRead = 0;
+		return ret;
 	}
 
 	/**
@@ -946,7 +960,7 @@ public:
 	 * to worst until they're all reported or until we've reported all
 	 * N
 	 */
-	virtual void finishReadImpl() {
+	virtual uint32_t finishReadImpl() {
 		if(_bestStratumReported < 999) {
 #ifndef NDEBUG
 			// All better strata should be empty
@@ -960,7 +974,7 @@ public:
 				_hitsForThisRead++;
 				if(_hitsForThisRead > _max) {
 					_bufferedHits.clear();
-					return; // done - report nothing
+					break; // done - report nothing
 				}
 				reportHitImpl(_hitStrata[_bestStratumReported][i], _bestStratumReported);
 			}
@@ -972,7 +986,9 @@ public:
 			}
 #endif
 		}
+		uint32_t ret = _hitsForThisRead;
 		reset();
+		return ret;
 	}
 
 	/**

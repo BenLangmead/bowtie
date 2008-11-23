@@ -329,6 +329,16 @@ sub search {
 		$patstr = ".randread$seed.raw";
 	}
 	
+	# Perhaps dump unaligned reads using --unfa and/opr --unfq arguments
+	my $unalignArg = "";
+	my $unalign = int(rand(4));
+	if($unalign == 0 || $unalign == 2) {
+		$unalignArg .= "--unfa .tmp.un$seed.fa ";
+	}
+	if($unalign == 1 || $unalign == 2) {
+		$unalignArg .= "--unfq .tmp.un$seed.fq ";
+	}
+	
 	my $isaArg = "";
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
@@ -377,7 +387,7 @@ sub search {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+	my $cmd = "./bowtie-debug $policy $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr`);
 	
@@ -421,9 +431,10 @@ sub search {
 	foreach(@outlines) {
 		chomp;
 		print "$_\n";
+		# No two results should be the same
 		!defined($outhash{$_}) || die "Result $_ appears in output twice";
 		$outhash{$_} = 1;
-		next if /^Reported/;
+		next if /^Reported/; # skip the summary line
 		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
 		unless(m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) {
 			print "Results malformed\n";
@@ -434,6 +445,7 @@ sub search {
 			}
 			return 0;
 		}
+		# Parse out the read id
 		/^([01-9]+)[+-]?[:]/;
 		my $read = $1;
 		if(($read ne $lastread) && ($phased eq "")) {
@@ -445,6 +457,30 @@ sub search {
 		if($mhits > 0) {
 			$readcount{$read} <= $mhits || die "Read $read matched more than $mhits times";
 		}
+	}
+	
+	# If we dumped the unplaced reads, then sanity-check them.
+	if($unalign == 0 || $unalign == 2) {
+		open UNFA, ".tmp.un$seed.fa";
+		while(<UNFA>) {
+			if(/^>(.*)/) {
+				my $read = $1;
+				!defined($readcount{$read}) || die "$read appeared in unplaced file (.tmp.un$seed.fa) and in alignment";
+			}
+		}
+		close(UNFA);
+	}
+	if($unalign == 1 || $unalign == 2) {
+		open UNFQ, ".tmp.un$seed.fq";
+		my $c = 0;
+		while(<UNFQ>) {
+			if(/^@(.*)/ && (($c % 4) == 0)) {
+				my $read = $1;
+				!defined($readcount{$read}) || die "$read appeared in unplaced file (.tmp.un$seed.fq) and in alignment";
+			}
+			$c++;
+		}
+		close(UNFQ);
 	}
 	
 	# Success
