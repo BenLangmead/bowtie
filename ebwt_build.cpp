@@ -101,10 +101,10 @@ static void printUsage(ostream& out) {
  */
 static void printLongUsage(ostream& out) {
 	out <<
-	" \n"
+	"\n"
 	" Using the 'bowtie-build' Indexer\n"
 	" --------------------------------\n"
-	" \n"
+	"\n"
 	" Use 'bowtie-build' to build a Bowtie index from a set of DNA\n"
 	" sequences.  'bowtie-build' outputs a set of 4 files named\n"
 	" NAME.1.ebwt, $NAME.2.ebwt, $NAME.rev.1.ebwt, and $NAME.rev.2.ebwt,\n"
@@ -112,12 +112,12 @@ static void printLongUsage(ostream& out) {
 	" line.  These files together constitute the index: they are all that is\n"
 	" needed to align reads to the reference sequences.  The sequence files\n"
 	" themselves are not needed by Bowtie once the index is built.  \n"
-	" \n"
+	"\n"
 	" The Bowtie index is based on the FM Index of Ferragina and Manzini,\n"
 	" and the algorithm used to build it is the blockwise algorithm of\n"
 	" Karkkainen.  For more information on these techniques, see these\n"
 	" references:\n"
-	" \n"
+	"\n"
 	"  * Ferragina, P. and Manzini, G. 2000. Opportunistic data structures\n"
 	"    with applications. In Proceedings of the 41st Annual Symposium on\n"
 	"    Foundations of Computer Science (November 12 - 14, 2000). FOCS\n"
@@ -127,12 +127,12 @@ static void printLongUsage(ostream& out) {
 	"    January 07 - 09, 2001). 269-278.\n"
 	"  * Karkkainen, J. 2007. Fast BWT in small space by blockwise suffix\n"
 	"    sorting. Theor. Comput. Sci. 387, 3 (Nov. 2007), 249-257\n"
-	" \n"
+	"\n"
 	" bowtie-build allows the user to trade off between running time and\n"
 	" memory footprint.  By default, bowtie-build will use an amount of\n"
 	" memory equal to about 30% the size of the suffix array for the\n"
 	" sequence: about 4 gigabytes for the human genome.\n"
-	" \n"
+	"\n"
 	" The indexer provides many options pertaining to the \"shape\" of the\n"
 	" index, e.g. --offrate governs the number of marked rows.  All of\n"
 	" these options are potentially profitable trade-offs.  They have been\n"
@@ -156,7 +156,7 @@ static void printLongUsage(ostream& out) {
 	"  ------------\n"
 	"\n"
 	" Usage: bowtie-build [options]* <reference_in> <index_basename>\n"
-	" \n"
+	"\n"
 	"    <reference_in>          A comma-separated list of files containing\n"
 	"                            the reference sequences to be aligned to,\n"
 	"                            or, if -c is specified, the sequences\n"
@@ -246,23 +246,23 @@ static void printLongUsage(ostream& out) {
 	"                            to the index file.  Default: little-endian\n"
 	"                            (recommended for Intel- and AMD-based\n"
 	"                            architectures).\n"
-	"    \n"
+	"\n"
 	"    --seed <int>            Use <int> as the seed for pseudo-random\n"
 	"                            number generator.\n"
-	"    \n"
+	"\n"
 	"    --cutoff <int>          Index only the first <int> bases of the\n"
 	"                            reference sequences (cumulative across\n"
 	"                            sequences) and ignore the rest.\n"
-	"    \n"
+	"\n"
 	"    -q/--quiet              ebwt-build is verbose by default.  With\n"
 	"                            this option ebwt-build will print only\n"
 	"                            error messages.\n"
-	"    \n"
+	"\n"
 	"    -h/--help               Print detailed description of tool and its\n"
 	"                            options (from MANUAL).\n"
-	"    \n"
+	"\n"
 	"    --version               Print version information and quit.\n"
-	" \n"
+	"\n"
 	;
 }
 
@@ -414,8 +414,7 @@ static void parseOptions(int argc, char **argv) {
  * result.
  */
 template<typename TStr>
-static void driver(const char * type,
-                   const string& infile,
+static void driver(const string& infile,
                    vector<string>& infiles,
                    const string& outfile,
                    bool reverse = false)
@@ -615,7 +614,7 @@ int main(int argc, char **argv) {
 		Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
 		if(!packed) {
 			try {
-				driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
+				driver<String<Dna, Alloc<> > >(infile, infiles, outfile);
 			} catch(bad_alloc& e) {
 				if(autoMem) {
 					cerr << "Switching to a packed string representation." << endl;
@@ -626,7 +625,7 @@ int main(int argc, char **argv) {
 			}
 		}
 		if(packed) {
-			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
+			driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile);
 		}
 	}
 	cutoff = origCutoff; // reset cutoff for backward Ebwt
@@ -635,7 +634,7 @@ int main(int argc, char **argv) {
 		Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
 		if(!packed) {
 			try {
-				driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
+				driver<String<Dna, Alloc<> > >(infile, infiles, outfile + ".rev", true);
 			} catch(bad_alloc& e) {
 				if(autoMem) {
 					cerr << "Switching to a packed string representation." << endl;
@@ -646,7 +645,7 @@ int main(int argc, char **argv) {
 			}
 		}
 		if(packed) {
-			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
+			driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile + ".rev", true);
 		}
 	}
 	return 0;

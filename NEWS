@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.9.7.1.
+available to the public for download.  The current version is 0.9.8.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,28 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.9.8 - November 25, 2008
+   * --unfa/--unfq <filename> options cause bowtie to dump unaligned
+     reads to FASTA and/or FASTQ files.
+   * bowtie-build now selects its memory-efficiency parameters (--bmax,
+     --dcv, --packed) automatically by default.  New -a option disables
+     this, yielding old behavior.
+   * bowtie-build-packed is no longer a separate binary.  Supplying the
+     new -p/--packed argument to bowtie-build is the new equivalent.
+   * New tool bowtie-maptool converts between Bowtie's output formats.
+   * New tool bowtie-inspect recreates reference strings from Bowtie
+     index.
+   * Renamed bowtie-convert to bowtie-maqconvert for clarity.
+   * New universal Mac binary combines i386 & x86_64 binaries.  PowerPC
+     still not supported.
+   * Fixed memory leaks in bowtie.
+   * Switched to a new scheme for mapping positions in "joined"
+     reference string to positions in original strings.  This changes
+     the index format.  bowtie-build's --pmap parameter reverts to the
+     old format.  Versions of bowtie prior to 0.9.8 cannot search
+     indexes produced by the bowtie-build 0.9.8 unless bowtie-build is
+     run with --pmap.  bowtie 0.9.8 can search either index format.
 
 Version 0.9.7.1 - November 11, 2008
    * Fixed an issue that caused a spurious loss of sensitivity between

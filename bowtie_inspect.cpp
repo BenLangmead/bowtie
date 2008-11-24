@@ -240,8 +240,7 @@ void print_index_sequence_names(ostream& fout, Ebwt<TStr>& ebwt)
 static char *argv0 = NULL;
 
 template<typename TStr>
-static void driver(const char * type,
-                   const string& ebwtFileBase,
+static void driver(const string& ebwtFileBase,
                    const string& query,
                    const vector<string>& queries)
 {
@@ -305,7 +304,7 @@ int main(int argc, char **argv) {
 		cout << "Assertions: enabled" << endl;
 #endif
 	}
-	driver<String<Dna, Packed<Alloc<> > > >("DNA", ebwtFile, query, queries);
+	driver<String<Dna, Packed<Alloc<> > > >(ebwtFile, query, queries);
 
 	return 0;
 }
