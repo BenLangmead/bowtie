@@ -613,20 +613,40 @@ int main(int argc, char **argv) {
 	int64_t origCutoff = cutoff; // save cutoff since it gets modified
 	{
 		Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
+		if(!packed) {
+			try {
+				driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
+			} catch(bad_alloc& e) {
+				if(autoMem) {
+					cerr << "Switching to a packed string representation." << endl;
+					packed = true;
+				} else {
+					throw e;
+				}
+			}
+		}
 		if(packed) {
 			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
-		} else {
-			driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
 		}
 	}
 	cutoff = origCutoff; // reset cutoff for backward Ebwt
 	if(doubleEbwt) {
 		srand(seed);
 		Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
+		if(!packed) {
+			try {
+				driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
+			} catch(bad_alloc& e) {
+				if(autoMem) {
+					cerr << "Switching to a packed string representation." << endl;
+					packed = true;
+				} else {
+					throw e;
+				}
+			}
+		}
 		if(packed) {
 			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
-		} else {
-			driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
 		}
 	}
 	return 0;

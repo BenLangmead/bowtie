@@ -553,37 +553,47 @@ Bowtie Manual
                             comma-separated list of sequences rather
                             than a list of FASTA files.
 
-    -a/--auto               Instead of taking a user-specified --bmax/
-                            --bmaxdivn and --dcv, bowtie-build
+    -a/--auto               Instead of taking user-specified --bmax/
+                            --bmaxdivn, --dcv and --packed bowtie-build
                             automatically finds appropriate values for
                             those parameters given the memory
-                            available.  bowtie-build will start at the
-                            specified --bmax/--bmaxdivn and --dcv (or
-                            the defaults, if not specified) and try
-                            more memory-economical settings until
-                            indexing completes with no out-of-memory
-                            exceptions.
+                            available.  bowtie-build will begin its
+                            search using the specified values for
+                            --bmax/--bmaxdivn, --dcv and --packed (or
+                            their defaults, if not specified) and will
+                            try progrssively more memory-economical
+                            settings until indexing completes
+                            successfully.
+
+    -p/--packed             Use a "packed" (2-bits-per-nucleotide)
+                            representation for DNA strings.  This saves
+                            memory but makes indexing take 2-3 times
+                            longer.  Default: off.  Use -a/--auto to
+                            configure this automatically. 
 
     --bmax <int>            The maximum number of suffixes allowed in a
                             block.  Allowing more suffixes per block
                             makes indexing faster, but increases memory
                             overhead.  Overrides any previous
                             specification of --bmax, --bmaxmultsqrt or
-                            --bmaxdivn. Default: --bmaxdivn 4.
+                            --bmaxdivn.  Default: --bmaxdivn 4.  Use
+                            -a/--auto to configure this automatically.
 
     --bmaxdivn <int>        The maximum number of suffixes allowed in a
                             block, expressed as a fraction of the
                             length of the reference.  Overrides any
                             previous specification of --bmax,
                             --bmaxmultsqrt or --bmaxdivn. Default:
-                            --bmaxdivn 4.
+                            --bmaxdivn 4.  Use -a/--auto to configure
+                            this automatically.
 
     --dcv <int>             Use <int> as the period for the difference-
                             cover sample.  A larger period yields less
                             memory overhead, but may make suffix
                             sorting slower, especially if repeats are
                             present.  Must be a power of 2 no greater
-                            than 4096.  Default: 1024.
+                            than 4096.  Default: 1024.  Use -a/--auto
+                            to configure this automatically.
 
     --nodc                  Disable use of the difference-cover sample.
                             Suffix sorting becomes quadratic worst-case

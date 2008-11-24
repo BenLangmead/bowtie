@@ -415,7 +415,7 @@ template <typename TStr>
 class Ebwt {
 public:
 	typedef typename Value<TStr>::Type TAlphabet;
-
+	
 	#define Ebwt_INITS \
 	    _toBigEndian(currentlyBigEndian()), \
 	    _overrideOffRate(__overrideOffRate), \
@@ -541,6 +541,8 @@ public:
 		}
 		VMSG_NL("Returning from Ebwt constructor");
 	}
+	
+	bool isPacked();
 
 	/**
 	 * Helper for the constructors above.  Takes a vector of text
@@ -583,14 +585,31 @@ public:
 				joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
 			}
 		} catch(bad_alloc& e) {
+			// If we throw an allocation exception in the try block,
+			// that means that the joined version of the reference
+			// string itself is too larger to fit in memory.  The only
+			// alternatives are to tell the user to give us more memory
+			// or to try again with a packed representation of the
+			// reference (if we haven't tried that already).
+			cerr << "Could not allocate space for a joined string of " << jlen << " elements." << endl;
+			if(!isPacked() && _passMemExc) {
+				// Pass the exception up so that we can retry using a
+				// packed string representation
+				throw e;
+			}
 			// There's no point passing this exception on.  The fact
 			// that we couldn't allocate the joined string means that
 			// --bmax is irrelevant - the user should re-run with
 			// ebwt-build-packed
-			cerr << "Could not allocate space for a joined string of " << jlen << " elements." << endl
-			     << "Please try indexing on a computer with more memory." << endl;
+			if(isPacked()) {
+				cerr << "Please try running bowtie-build on a computer with more memory." << endl;
+			} else {
+				cerr << "Please try running bowtie-build in packed mode (-p/--packed) or in automatic" << endl
+				     << "mode (-a/--auto), or try again on a computer with more memory." << endl;
+			}
 			exit(1);
 		}
+		// Succesfully obtained joined reference string
 		assert_geq(length(s), jlen);
 		if(useBlockwise) {
 			if(bmax != 0xffffffff) {
@@ -609,9 +628,17 @@ public:
 				VMSG_NL("bmax defaulted to: " << bmax);
 			}
 			int iter = 0;
+			// Look for bmax/dcv parameters that work.
 			while(true) {
 				if(bmax < 40 && _passMemExc) {
-					cerr << "Could not find approrpiate settings for building this index." << endl;
+					cerr << "Could not find approrpiate bmax/dcv settings for building this index." << endl;
+					if(!isPacked()) {
+						// Throw an exception exception so that we can
+						// retry using a packed string representation
+						throw bad_alloc();
+					} else {
+						cerr << "Already tried a packed string representation." << endl;
+					}
 					cerr << "Please try indexing this reference on a computer with more memory." << endl;
 					exit(1);
 				}
@@ -631,11 +658,14 @@ public:
 						VMSG_NL("  Doing ahead-of-time memory usage test");
 						// Make a quick-and-dirty attempt to force a bad_alloc iff
 						// we would have thrown one eventually as part of
-						// constructing the KarkkainenBlockwiseSA
+						// constructing the DifferenceCoverSample
 						size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
 						uint8_t *tmp = new uint8_t[sz];
+						// Likewise with the KarkkainenBlockwiseSA
 						sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
 						uint8_t *tmp2 = new uint8_t[sz];
+						// Now throw in the 'ftab' and 'isaSample' structures
+						// that we'll eventually allocate in buildToDisk
 						uint32_t *ftab = new uint32_t[_eh._ftabLen];
 						uint32_t *isaSample = new uint32_t[_eh._isaLen];
 						// If we made it here without throwing bad_alloc, then we
@@ -644,7 +674,11 @@ public:
 						delete[] tmp2;
 						delete[] ftab;
 						delete[] isaSample;
-						VMSG_NL("  Passed!  Trying construction with these parameters...");
+						VMSG("  Passed!  Constructing with these parameters: --bmax " << bmax << " --dcv " << dcv);
+						if(isPacked()) {
+							VMSG(" --packed");
+						}
+						VMSG_NL("");
 					}
 					VMSG_NL("Constructing suffix-array element generator");
 					KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _passMemExc, _verbose);
@@ -1105,6 +1139,18 @@ private:
 		}
 	}
 };
+
+/// Specialization for packed Ebwts - return true
+template<>
+bool Ebwt<String<Dna, Packed<> > >::isPacked() {
+	return true;
+}
+
+/// By default, Ebwts are not packed
+template<typename TStr>
+bool Ebwt<TStr>::isPacked() {
+	return false;
+}
 
 /**
  * Structure encapsulating search parameters, such as whether and how
