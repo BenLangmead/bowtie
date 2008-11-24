@@ -141,7 +141,7 @@ protected:
 	 * Grab the next block of sorted suffixes.  The block is guaranteed
 	 * to have at most _bucketSz elements.
 	 */
-	virtual const void nextBlock() = 0;
+	virtual void nextBlock() = 0;
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const = 0;
 	/// Optionally output a verbose message
@@ -198,7 +198,7 @@ public:
 	{ reset(); }
 
 	/// Retrieve the next block of sorted suffix-array elements
-	virtual const void nextBlock() {
+	virtual void nextBlock() {
 		size_t sz = min<uint32_t>(this->bucketSz(), length(_sa)-_cur);
 		_cur += sz;
 		this->_itrBucket = infix(_sa, _cur-sz, _cur-1);
@@ -294,7 +294,10 @@ public:
 	}
 
 	/// Defined in blockwise_sa.cpp
-	virtual const void nextBlock();
+	virtual void nextBlock();
+
+	/// Defined in blockwise_sa.cpp
+	virtual void qsort(String<uint32_t>& bucket);
 
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const {
@@ -382,6 +385,63 @@ private:
 };
 
 /**
+ * Qsort the set of suffixes whose offsets are in 'bucket'.
+ */
+template<typename TStr>
+void KarkkainenBlockwiseSA<TStr>::qsort(String<uint32_t>& bucket) {
+	typedef typename Value<TStr>::Type TAlphabet;
+	const TStr& t = this->text();
+	uint32_t *s = begin(bucket);
+	uint32_t slen = seqan::length(bucket);
+	uint32_t len = seqan::length(t);
+	if(_dc != NULL) {
+		// Use the difference cover as a tie-breaker if we have it
+		VMSG_NL("  (Using difference cover)");
+		// Extract the 'host' array because it's faster to work
+		// with than the String<> container
+		uint8_t *host = (uint8_t*)t.data_begin;
+		mkeyQSortSufDcU8(t, host, len, s, slen, *_dc,
+		                 ValueSize<TAlphabet>::VALUE,
+		                 this->verbose(), this->sanityCheck());
+	} else {
+		VMSG_NL("  (Not using difference cover)");
+		// We don't have a difference cover - just do a normal
+		// suffix sort
+		mkeyQSortSuf(t, s, slen, ValueSize<TAlphabet>::VALUE,
+		             this->verbose(), this->sanityCheck());
+	}
+}
+
+/**
+ * Qsort the set of suffixes whose offsets are in 'bucket'.  This
+ * specialization for packed strings does not attempt to extract and
+ * operate directly on the host string; the fact that the string is
+ * packed means that the array cannot be sorted directly.
+ */
+template<>
+void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<uint32_t>& bucket) {
+	const String<Dna, Packed<> >& t = this->text();
+	uint32_t *s = begin(bucket);
+	uint32_t slen = seqan::length(bucket);
+	uint32_t len = seqan::length(t);
+	if(_dc != NULL) {
+		// Use the difference cover as a tie-breaker if we have it
+		VMSG_NL("  (Using difference cover)");
+		// Can't use the text's 'host' array because the backing
+		// store for the packed string is not one-char-per-elt.
+		mkeyQSortSufDcU8(t, t, len, s, slen, *_dc,
+		                 ValueSize<Dna>::VALUE,
+		                 this->verbose(), this->sanityCheck());
+	} else {
+		VMSG_NL("  (Not using difference cover)");
+		// We don't have a difference cover - just do a normal
+		// suffix sort
+		mkeyQSortSuf(t, s, slen, ValueSize<Dna>::VALUE,
+		             this->verbose(), this->sanityCheck());
+	}
+}
+
+/**
  * Select a set of bucket-delineating sample suffixes such that no
  * bucket is greater than the requested upper limit.  Some care is
  * taken to make each bucket's size close to the limit without
@@ -445,29 +505,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	{
 		Timer timer(cout, "  Multikey QSorting samples time: ", this->verbose());
 		VMSG_NL("Multikey QSorting " << length(_sampleSuffs) << " samples");
-		uint32_t *s = begin(_sampleSuffs);
-		size_t slen = length(_sampleSuffs);
-		if(_dc != NULL) {
-			VMSG_NL("  (Using difference cover)");
-			#ifndef PACKED_STRINGS
-			uint8_t *host = (uint8_t*)begin(t, Standard());
-			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDcU8(t, host, len, s, slen, *_dc,
-			                 ValueSize<TAlphabet>::VALUE,
-			                 this->verbose(), this->sanityCheck());
-			#else
-			// Use the difference cover as a tie-breaker if we have it
-			mkeyQSortSufDcU8(t, t, len, s, slen, *_dc,
-			                 ValueSize<TAlphabet>::VALUE,
-			                 this->verbose(), this->sanityCheck());
-			#endif
-		} else {
-			VMSG_NL("  (Not using difference cover)");
-			// We don't have a difference cover - just do a normal
-			// suffix sort
-			mkeyQSortSuf(t, s, slen, ValueSize<TAlphabet>::VALUE,
-			             this->verbose(), this->sanityCheck());
-		}
+		this->qsort(_sampleSuffs);
 	}
 	// Calculate bucket sizes
 	VMSG_NL("Calculating bucket sizes");
@@ -775,7 +813,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(uint32_t cmp,
  * of the blockwise suffix sorting process.
  */
 template<typename TStr>
-const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
+void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	typedef typename Value<TStr>::Type TAlphabet;
 	String<uint32_t>& bucket = this->_itrBucket;
 	VMSG_NL("Getting block " << (_cur+1) << " of " << length(_sampleSuffs)+1);
@@ -918,26 +956,7 @@ const void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	if(length(bucket) > 0) {
 		Timer timer(cout, "  Sorting block time: ", this->verbose());
 		VMSG_NL("  Sorting block of length " << length(bucket));
-		uint32_t *s = (uint32_t*)begin(bucket);
-		size_t slen = length(bucket);
-		if(_dc != NULL) {
-			VMSG_NL("  (Using difference cover)");
-			#ifndef PACKED_STRINGS
-			// Use the difference cover as a tie-breaker if we have it
-			uint8_t *host = (uint8_t*)begin(t, Standard());
-			mkeyQSortSufDcU8(t, host, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
-			                 this->verbose(), this->sanityCheck());
-			#else
-			mkeyQSortSufDcU8(t, t, len, s, slen, *_dc, ValueSize<TAlphabet>::VALUE,
-			                 this->verbose(), this->sanityCheck());
-			#endif
-		} else {
-			VMSG_NL("  (Not using difference cover)");
-			// We don't have a difference cover - just do a normal
-			// suffix sort
-			mkeyQSortSuf(t, s, slen, ValueSize<TAlphabet>::VALUE,
-			             this->verbose(), this->sanityCheck());
-		}
+		this->qsort(bucket);
 	}
 	if(hi != 0xffffffff) {
 		// Not the final bucket; throw in the sample on the RHS

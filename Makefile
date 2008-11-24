@@ -59,13 +59,11 @@ RELEASE_FLAGS = -O3
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS)\""
 NOASSERT_FLAGS = -DNDEBUG
 BIN_LIST = bowtie-build \
-           bowtie-build-packed \
            bowtie \
            bowtie-maqconvert \
            bowtie-inspect \
            bowtie-maptool
 BIN_LIST_AUX = bowtie-build-debug \
-               bowtie-build-packed-debug \
                bowtie-debug \
                bowtie-inspect-debug \
                bowtie-maptool-debug
@@ -119,14 +117,6 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
-
-bowtie-build-packed: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -DPACKED_STRINGS $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
-
-bowtie-build-packed-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -DPACKED_STRINGS -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

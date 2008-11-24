@@ -19,7 +19,7 @@ if(defined $options{h}) {
 }
 
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug bowtie-build-packed-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
+	system("make bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
 
 my @policies = (
@@ -232,7 +232,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
-		$cmd = "./bowtie-build-packed-debug $args .tmp$seed.packed";
+		$cmd = "./bowtie-build-debug -p $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
@@ -603,8 +603,6 @@ for(; $outer > 0; $outer--) {
 		$pass += search($t, $pfinal, $policy, $oneHit, 0, $offRate, $isaRate); # do not require any results
 		last if(++$tests > $limit);
 	}
-
-	#system("rm -f .tmp.?.ebwt .tmp.packed.?.ebwt");
 }
 
 print "$pass tests passed, $fail failed\n";

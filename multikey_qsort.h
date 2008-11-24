@@ -182,11 +182,8 @@ static inline void vecswap2(TVal* s, size_t slen, TVal* s2, TPos i, TPos j, TPos
 /// Retrieve an int-ized version of the ath character of string s, or,
 /// if a goes off the end of s, return a (user-specified) int greater
 /// than any TAlphabet character - 'hi'.
-#ifndef PACKED_STRINGS
-#define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)host[off+s[si]] : (hi))
-#else
-#define CHAR_AT_SUF_U8(si, off) (((off+s[si]) < hlen) ? (int)(Dna)host[off+s[si]] : (hi))
-#endif
+
+#define CHAR_AT_SUF_U8(si, off) char_at_suf_u8(host, hlen, s, si, off, hi)
 
 // Note that CHOOSE_AND_SWAP_RANDOM_PIVOT is unused
 #define CHOOSE_AND_SWAP_RANDOM_PIVOT(sw, ch) {                            \
@@ -769,6 +766,40 @@ void qsortSufDcU8(const T1& seqanHost,
 // 5 64-element buckets for bucket-sorting A, C, G, T, $
 static uint32_t bkts[4][4 * 1024 * 1024];
 
+/**
+ * Straightforwardly obtain a uint8_t-ized version of t[off].  This
+ * works fine as long as TStr is not packed.
+ */
+template<typename TStr>
+static inline uint8_t get_uint8(const TStr& t, uint32_t off) {
+	return t[off];
+}
+
+/**
+ * For incomprehensible generic-programming reasons, getting a uint8_t
+ * version of a character in a packed String<> requires casting first
+ * to Dna then to uint8_t.
+ */
+template<>
+static inline uint8_t get_uint8(const String<Dna, Packed<> >& t, uint32_t off) {
+	return (uint8_t)(Dna)t[off];
+}
+
+/**
+ * Return character at offset 'off' from the 'si'th suffix in the array
+ * 's' of suffixes.  If the character is out-of-bounds, return hi.
+ */
+template<typename TStr>
+static inline int char_at_suf_u8(const TStr& host,
+                                 uint32_t hlen,
+                                 uint32_t* s,
+                                 uint32_t si,
+                                 uint32_t off,
+                                 uint8_t hi)
+{
+	return ((off+s[si]) < hlen) ? get_uint8(host, off+s[si]) : (hi);
+}
+
 template<typename T1, typename T2>
 static void selectionSortSufDcU8(
 		const T1& seqanHost,
@@ -829,13 +860,8 @@ static void selectionSortSufDcU8(
 			uint32_t k;
 			for(k = 0; k <= lim; k++) {
 				assert_neq(j, targ);
-				#ifndef PACKED_STRINGS
-				uint8_t jc = (k + joff < hlen) ? host[k + joff] : hi;
-				uint8_t tc = (k + targoff < hlen) ? host[k + targoff] : hi;
-				#else
-				uint8_t jc = (k + joff < hlen) ? (uint8_t)(Dna)host[k + joff] : hi;
-				uint8_t tc = (k + targoff < hlen) ? (uint8_t)(Dna)host[k + targoff] : hi;
-				#endif
+				uint8_t jc = (k + joff < hlen)    ? get_uint8(host, k + joff)    : hi;
+				uint8_t tc = (k + targoff < hlen) ? get_uint8(host, k + targoff) : hi;
 				assert(jc != hi || tc != hi);
 				if(jc > tc) {
 					// the jth suffix is greater than the current
@@ -946,12 +972,7 @@ static void bucketSortSufDcU8(
 	}
 	for(size_t i = begin; i < end; i++) {
 		uint32_t off = depth+s[i];
-		// Following line is a huge chunk of the gprof profile
-		#ifndef PACKED_STRINGS
-		uint8_t c = (off < hlen) ? host[off] : hi;
-		#else
-		uint8_t c = (off < hlen) ? (uint8_t)(Dna)host[off] : hi;
-		#endif
+		uint8_t c = (off < hlen) ? get_uint8(host, off) : hi;
 		assert_leq(c, 4);
 		if(c == 0) {
 			s[begin + cnts[0]++] = s[i];
@@ -961,33 +982,10 @@ static void bucketSortSufDcU8(
 	}
 	assert_eq(cnts[0] + cnts[1] + cnts[2] + cnts[3] + cnts[4], end - begin);
 	uint32_t cur = begin + cnts[0];
-	// TODO: are straight copies faster than memcpys?
-#if 1
 	if(cnts[1] > 0) { memcpy(&s[cur], bkts[0], cnts[1] << 2); cur += cnts[1]; }
 	if(cnts[2] > 0) { memcpy(&s[cur], bkts[1], cnts[2] << 2); cur += cnts[2]; }
 	if(cnts[3] > 0) { memcpy(&s[cur], bkts[2], cnts[3] << 2); cur += cnts[3]; }
 	if(cnts[4] > 0) { memcpy(&s[cur], bkts[3], cnts[4] << 2); }
-#else
-	if(cnts[1] > 0) {
-		size_t j = 0, i = cur;
-		for(; j < cnts[1]; i++, j++) s[i] = bkts[0][j];
-		cur += cnts[1];
-	}
-	if(cnts[2] > 0) {
-		size_t j = 0, i = cur;
-		for(; j < cnts[2]; i++, j++) s[i] = bkts[1][j];
-		cur += cnts[2];
-	}
-	if(cnts[3] > 0) {
-		size_t j = 0, i = cur;
-		for(; j < cnts[3]; i++, j++) s[i] = bkts[2][j];
-		cur += cnts[3];
-	}
-	if(cnts[4] > 0) {
-		size_t j = 0, i = cur;
-		for(; j < cnts[4]; i++, j++) s[i] = bkts[3][j];
-	}
-#endif
 	// This frame is now totally finished with bkts[][], so recursive
 	// callees can safely clobber it; we're not done with cnts[], but
 	// that's local to the stack frame.
@@ -1025,9 +1023,6 @@ static void bucketSortSufDcU8(
  *     information for each string.
  *  3. Sorting functions take an extra "upto" parameter that upper-
  *     bounds the depth to which the function sorts.
- *
- * TODO: Consult a tie-breaker (like a difference cover sample) if two
- * keys share a long prefix.
  */
 template<typename T1, typename T2>
 void mkeyQSortSufDcU8(const T1& seqanHost,

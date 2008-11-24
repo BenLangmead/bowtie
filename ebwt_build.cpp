@@ -44,6 +44,7 @@ static int     bigEndian     = 0;  // little endian
 static bool    useBsearch    = true;
 static bool    nsToAs        = false;
 static bool    autoMem       = false;
+static bool    packed        = false;
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -66,10 +67,8 @@ static void printUsage(ostream& out) {
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
-	    //<< "    -d/--double             build forward and reverse Ebwts for fast 1-mismatch" << endl
-	    //<< "    --entiresa              build whole suffix array at once; huge mem footprint" << endl
-	    //<< "    -n/--noblocks           disable blockwise - faster, uses more memory (default)" << endl
-	    << "    -a/--auto               automatically pick bmax/dcv fitting available memory" << endl
+	    << "    -a/--auto               automatically pick -p/--bmax/--dcv to fit in memory" << endl
+	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
 	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
@@ -272,6 +271,7 @@ static const char *short_options = "qraph?nscfl:i:o:t:h:";
 static struct option long_options[] = {
 	{"quiet",        no_argument,       0,            'q'},
 	{"sanity",       no_argument,       0,            's'},
+	{"packed",       no_argument,       0,            'p'},
 	{"little",       no_argument,       &bigEndian,   0},
 	{"big",          no_argument,       &bigEndian,   1},
 	{"bmax",         required_argument, 0,            ARG_BMAX},
@@ -289,7 +289,6 @@ static struct option long_options[] = {
 	{"offrate",      required_argument, 0,            'o'},
 	{"isarate",      required_argument, 0,            ARG_ISARATE},
 	{"ftabchars",    required_argument, 0,            't'},
-	//{"chunkrate",    required_argument, 0,            'h'},
 	{"help",         no_argument,       0,            'h'},
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{"ntoa",         no_argument,       0,            ARG_NTOA},
@@ -331,7 +330,7 @@ static void parseOptions(int argc, char **argv) {
 		switch (next_option) {
 	   		case 'f': format = FASTA; break;
 	   		case 'c': format = CMDLINE; break;
-	   		//case 'd': doubleEbwt = true; break;
+	   		case 'p': packed = true; break;
 	   		case 'l':
    				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
 	   			break;
@@ -573,6 +572,7 @@ int main(int argc, char **argv) {
 		     << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
 		     << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
 		     << "  FTable chars: " << ftabChars << endl
+		     << "  Strings: " << (packed? "packed" : "unpacked") << endl
 		     ;
 		if(bmax == 0xffffffff) {
 			cout << "  Max bucket size: default" << endl;
@@ -613,21 +613,21 @@ int main(int argc, char **argv) {
 	int64_t origCutoff = cutoff; // save cutoff since it gets modified
 	{
 		Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
-		#ifdef PACKED_STRINGS
-		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
-		#else
-		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
-		#endif
+		if(packed) {
+			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile);
+		} else {
+			driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile);
+		}
 	}
 	cutoff = origCutoff; // reset cutoff for backward Ebwt
 	if(doubleEbwt) {
 		srand(seed);
 		Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
-		#ifdef PACKED_STRINGS
-		driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
-		#else
-		driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
-		#endif
+		if(packed) {
+			driver<String<Dna, Packed<Alloc<> > > >("DNA (packed)", infile, infiles, outfile + ".rev", true);
+		} else {
+			driver<String<Dna, Alloc<> > >("DNA", infile, infiles, outfile + ".rev", true);
+		}
 	}
 	return 0;
 }

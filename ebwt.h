@@ -588,11 +588,7 @@ public:
 			// --bmax is irrelevant - the user should re-run with
 			// ebwt-build-packed
 			cerr << "Could not allocate space for a joined string of " << jlen << " elements." << endl
-#ifdef PACKED_STRINGS
 			     << "Please try indexing on a computer with more memory." << endl;
-#else
-			     << "Please try using bowtie-build-packed instead of bowtie-build." << endl;
-#endif
 			exit(1);
 		}
 		assert_geq(length(s), jlen);
@@ -616,12 +612,7 @@ public:
 			while(true) {
 				if(bmax < 40 && _passMemExc) {
 					cerr << "Could not find approrpiate settings for building this index." << endl;
-#ifdef PACKED_STRINGS
 					cerr << "Please try indexing this reference on a computer with more memory." << endl;
-#else
-					cerr << "Please try indexing this reference using bowtie-build-packed or try indexing" << endl
-					     << "on a computer with more memory." << endl;
-#endif
 					exit(1);
 				}
 				if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
