@@ -643,11 +643,13 @@ public:
 	                          int __trim5 = 0) :
 		TrimmingPatternSource(__reverse, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
+		_errs(),
 		_filecur(0),
 		_filebuf(),
 		_first(true)
 	{
 		assert_gt(infiles.size(), 0);
+		_errs.resize(_infiles.size(), false);
 		open();
 		_filecur++;
 	}
@@ -706,23 +708,28 @@ protected:
 	virtual void resetForNextFile() = 0;
 	void open() {
 		if(_filebuf.isOpen()) _filebuf.close();
-		while(true) {
+		while(_filecur < _infiles.size()) {
 			// Open read
 			FILE *in;
 			if(_infiles[_filecur] == "-") {
 				in = stdin;
 			} else if((in = fopen(_infiles[_filecur].c_str(), "r")) == NULL) {
-				cerr << "Warning: Could not open file \"" << _infiles[_filecur] << "\" for reading" << endl;
+				if(!_errs[_filecur]) {
+					cerr << "Warning: Could not open file \"" << _infiles[_filecur] << "\" for reading" << endl;
+					_errs[_filecur] = true;
+				} 
 				_filecur++;
 				continue;
 			}
 			_filebuf.newFile(in);
-			break;
+			return;
 		}
+		exit(1);
 	}
-	const vector<string>& _infiles; // filenames for read files
-	size_t _filecur;   // index into _infiles of next file to read
-	FileBuf _filebuf; // read file currently being read from
+	const vector<string>& _infiles; /// filenames for read files
+	vector<bool> _errs; /// whether we've already printed an error for each file
+	size_t _filecur;   /// index into _infiles of next file to read
+	FileBuf _filebuf;  /// read file currently being read from
 	bool _first;
 };
 
