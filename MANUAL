@@ -508,7 +508,14 @@ Bowtie Manual
  index.  If your reference exceeds 2^32-1 characters, bowtie-build will
  print an error message and abort.  To resolve this, please divide your
  reference sequences into smaller batches and/or chunks and build a
- separate index for each.  
+ separate index for each.
+ 
+ If your computer has more than 3-4 GB of memory and you would like to
+ exploit that fact to make index building faster, you must use a 64-bit
+ version of the bowtie-build binary.  The 32-bit version of the binary
+ is restricted to using less than 4 GB of memory.  If a 64-bit pre-
+ built binary does not yet exist for your platform, you will need to
+ build it from source.
 
  The Bowtie index is based on the FM Index of Ferragina and Manzini,
  which in turn is based on the Burrows-Wheeler transform.  The
