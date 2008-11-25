@@ -819,11 +819,11 @@ Bowtie Manual
  ------------------------------------------
 
  'bowtie-inspect' extracts information from a Bowtie index about the
- original reference sequences that were used to build it.  By default,
- the tool will output a FASTA file containing the sequences of the
- original references (with all non-A/C/G/T characters converted to Ns).
- It can also be used to extract just the reference sequence names using
- the -n option.
+ original reference sequences used to build it.  By default, the tool
+ will output a FASTA file containing the sequences of the original
+ references (with all non-A/C/G/T characters converted to Ns).  It can
+ also be used to extract just the reference sequence names using the -n
+ option.
 
   Command Line
   ------------
