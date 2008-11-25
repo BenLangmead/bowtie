@@ -206,6 +206,7 @@ static void printUsage(ostream& out) {
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
 		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
+		<< "  --nomaqround       disable Maq-like quality rounding (to nearest 10 <= 30)" << endl
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl

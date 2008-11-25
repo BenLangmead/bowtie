@@ -34,6 +34,7 @@ Version 0.9.8 - November 25, 2008
    * Renamed bowtie-convert to bowtie-maqconvert for clarity.
    * New universal Mac binary combines i386 & x86_64 binaries.  PowerPC
      still not supported.
+   * Added --nomaqround option to bowtie.
    * Fixed memory leaks in bowtie.
    * Switched to a new scheme for mapping positions in "joined"
      reference string to positions in original strings.  This changes
