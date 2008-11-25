@@ -195,6 +195,26 @@ Bowtie Manual
   about 375 MB of memory when aligning reads.  Decreasing the --offrate
   by 1 doubles the memory taken by the SA sample, and decreasing by 2
   quadruples the memory taken, etc.
+  
+  Tip 3: If bowtie "thrashes", try using bowtie with a higher --offrate
+  
+  If 'bowtie' is very slow and is consistently triggering more than a
+  few page faults per second (as observed via top or vmstat on Mac/
+  Linux, or via a tool like Process Explorer on Windows), then try
+  giving bowtie the --offrate option with a larger parameter than the
+  parameter used to build the index.  For example, bowtie-build's
+  default --offrate is 5 and all pre-built indexes available from the
+  Bowtie website are built with --offrate 5; so if bowtie thrashes when
+  querying such an index, try using 'bowtie --offrate 6'.  If bowtie
+  still thrashes, try 'bowtie --offrate 7', etc.  Using a higher
+  offrate causes bowtie not to use the entire suffix-array sample
+  stored in the index, which saves memory but makes alignment reporting
+  slower.
+  
+  A note from firsthand experience: I have a MacBook Pro with 2 GB of
+  RAM and I noticed that bowtie would thrash when aligning reads
+  against the pre-built human genome available from the Bowtie website.
+  I was able to resolve this using 'bowtie --offrate 6'.
 
   Command Line
   ------------
