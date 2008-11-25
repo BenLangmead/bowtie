@@ -607,6 +607,10 @@ public:
 				cerr << "Please try running bowtie-build in packed mode (-p/--packed) or in automatic" << endl
 				     << "mode (-a/--auto), or try again on a computer with more memory." << endl;
 			}
+			if(sizeof(void*) == 4) {
+				cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
+				     << "this executable is 32-bit." << endl;
+			}
 			exit(1);
 		}
 		// Succesfully obtained joined reference string
@@ -641,6 +645,10 @@ public:
 						cerr << "Already tried a packed string representation." << endl;
 					}
 					cerr << "Please try indexing this reference on a computer with more memory." << endl;
+					if(sizeof(void*) == 4) {
+						cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
+						     << "this executable is 32-bit." << endl;
+					}
 					exit(1);
 				}
 				if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
