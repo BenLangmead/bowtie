@@ -24,8 +24,10 @@ Version 0.9.8 - November 25, 2008
    * --unfa/--unfq <filename> options cause bowtie to dump unaligned
      reads to FASTA and/or FASTQ files.
    * bowtie-build now selects its memory-efficiency parameters (--bmax,
-     --dcv, --packed) automatically by default.  New -a option disables
-     this, yielding old behavior.
+     --dcv, --packed) automatically by default; this makes it far
+     easier to build an index under memory constraints by eliminating
+     tedious trail-and-error.  New -a option disables this, yielding
+     old behavior.
    * bowtie-build-packed is no longer a separate binary.  Supplying the
      new -p/--packed argument to bowtie-build is the new equivalent.
    * New tool bowtie-maptool converts between Bowtie's output formats.
