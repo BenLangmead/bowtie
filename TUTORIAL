@@ -132,16 +132,16 @@ Bowtie Getting Started Guide
  
     maq fasta2bfa genomes/NC_008253.fna genomes/NC_008253.bfa
 
- Now run 'bowtie-convert' to convert the Bowtie alignment file to a Maq
- alignment file. 
+ Now run 'bowtie-maqconvert' to convert the Bowtie alignment file to a
+ Maq alignment file. 
 
-    bowtie-convert ec_snp.map ec_snp.maq_map genomes/NC_008253.bfa
+    bowtie-maqconvert ec_snp.map ec_snp.maq_map genomes/NC_008253.bfa
 
  Note that the Maq file format changed starting with Maq version 0.7.0
  in order to accommodate reads of up to 127 base pairs in length.  To
  generate a Maq alignment file compatible with versions of Maq older
  than 0.7.0, run the same command as above but add the '-o' option
- after 'bowtie-convert'.
+ after 'bowtie-maqconvert'.
  
  Maq's alignment file format is not human-readable, but you can use
  'maq mapview' to view its contents:
