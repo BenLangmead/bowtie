@@ -415,7 +415,7 @@ template <typename TStr>
 class Ebwt {
 public:
 	typedef typename Value<TStr>::Type TAlphabet;
-	
+
 	#define Ebwt_INITS \
 	    _toBigEndian(currentlyBigEndian()), \
 	    _overrideOffRate(__overrideOffRate), \
@@ -541,7 +541,7 @@ public:
 		}
 		VMSG_NL("Returning from Ebwt constructor");
 	}
-	
+
 	bool isPacked();
 
 	/**
@@ -628,9 +628,10 @@ public:
 				VMSG_NL("bmax defaulted to: " << bmax);
 			}
 			int iter = 0;
+			bool first = true;
 			// Look for bmax/dcv parameters that work.
 			while(true) {
-				if(bmax < 40 && _passMemExc) {
+				if(!first && bmax < 40 && _passMemExc) {
 					cerr << "Could not find approrpiate bmax/dcv settings for building this index." << endl;
 					if(!isPacked()) {
 						// Throw an exception exception so that we can
@@ -696,6 +697,7 @@ public:
 						exit(1);
 					}
 				}
+				first = false;
 			}
 		} else {
 			VMSG_NL("Using entire SA");
