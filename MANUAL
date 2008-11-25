@@ -102,8 +102,11 @@ Bowtie Manual
  an aligner systematically fails to report a particular class of good
  alignments, causing spurious "holes" in the comparative assembly.
  Whenever bowtie reports a subset of the valid alignments that exist,
- it makes an effort to sample them randomly.  Some bias may still
- exist.
+ it makes an effort to sample them randomly.  This randomness flows
+ from a simple seeded pseudo-random number generator and is
+ "deterministic" in the sense that Bowtie will always produce the same
+ results when run with the same initial "seed" value (see documentation
+ for --seed option).
 
  Indels and paired-end alignment are not currently supported.
  Alignment in ABI "color space" is also not currently supported.
@@ -118,9 +121,9 @@ Bowtie Manual
  research contexts.  If you find Bowtie's performance to be
  disappointingly slow, please try the hints described in the "High
  Performance Tips" section below.  If Bowtie continues to be too slow,
- contact us and tell us the nature of your research application and the
- parameters you are using to run Bowtie.  We are eager to hear your
- feedback.
+ please contact us and tell us the nature of your research application
+ and the parameters you are using to run Bowtie.  We are eager to hear
+ your feedback.
 
   Maq-like Policy
   ---------------
@@ -163,7 +166,7 @@ Bowtie Manual
   
   The policy has one criterion: Alignments may have no more than V
   mismatches.  Quality values are ignored.  The number of mismatches
-  permitted is configurable with the -V option.
+  permitted is configurable with the -v option.
   
   High Performance Tips
   ---------------------
@@ -209,8 +212,8 @@ Bowtie Manual
   default --offrate is 5 and all pre-built indexes available from the
   Bowtie website are built with --offrate 5; so if bowtie thrashes when
   querying such an index, try using 'bowtie --offrate 6'.  If bowtie
-  still thrashes, try 'bowtie --offrate 7', etc.  Using a higher
-  offrate causes bowtie not to use a subset of the suffix-array sample
+  still thrashes, try 'bowtie --offrate 7', etc.  A higher --offrate
+  causes bowtie to use a sparser sample of the suffix-array than is
   stored in the index; this saves memory but makes alignment reporting
   slower (which is especially slow when using -a or large -k).
   
@@ -601,7 +604,7 @@ Bowtie Manual
                             memory but makes indexing 2-3 times slower.
                             Default: off.  This is configured
                             automatically by default; use -a/--noauto
-                            to configure manually. 
+                            to configure manually.
 
     --bmax <int>            The maximum number of suffixes allowed in a
                             block.  Allowing more suffixes per block
@@ -765,7 +768,22 @@ Bowtie Manual
     --version       Print version information and quit.
 
  Using the 'bowtie-maqconvert' Alignment Converter
- ----------------------------------------------
+ -------------------------------------------------
+
+ 'bowtie-maqconvert' allows the user to convert from Bowtie's default
+ alignment format to the format used by Maq.  This is a necessary first
+ step to using Maq's analyses to study Bowtie's output, including
+ consensus ('maq assemble') and SNP calling ('maq cns2snp').
+ 
+ The conversion includes an in-memory sort of all alignments with
+ respect to their position on the reference.  This can be problematic
+ for very large sets of alignments; sorting so many alignments may
+ exhaust memory, causing bowtie-maqconvert to crash or run very slowly.
+ One solution is to split alignments into batches and use
+ 'maq mapmerge' to combine them.  Another solution, depending on your
+ application and reference, may be to use bowtie's --refout option at
+ alignment time to pre-partition alignments into separate files
+ according to reference sequence hit.
 
  Note that Maq changed its output format as of version 0.7.0 in order
  to accomodate read lengths up to 127 bases.  Be sure to use the -o
