@@ -1191,7 +1191,6 @@ public:
 	                    bool verbose = false)
 	{
 		char buf[4096];
-		in.getline(buf, 4096);
 		if(in.eof()) {
 			return false;
 		}
@@ -1203,6 +1202,7 @@ public:
 			cerr << "A line from the alignment file was longer than 4K" << endl;
 			exit(1);
 		}
+		in.getline(buf, 4096);
 		string line(buf);
 		vector<string> toks;
 		tokenize(line, "\t", toks);
