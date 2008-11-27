@@ -7,6 +7,7 @@
 #include "assert_helpers.h"
 #include "tokenize.h"
 #include "hit.h"
+#include "ebwt.h"
 
 enum {
 	FORMAT_DEFAULT = 1,
@@ -22,6 +23,7 @@ static bool showVersion = false;          // show version info and exit
 static bool refIdx      = false;          // print reference idxs, not names
 static int informat     = FORMAT_BIN;     // format of input alignments
 static int outformat    = FORMAT_DEFAULT; // format of output alignments
+static string ebwt_name = "";             // basename of Bowtie index to get names from
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -92,6 +94,9 @@ static void printLongUsage(ostream& out) {
 	"                    closer to the left-hand end of the sequence have\n"
 	"                    priority).\n"
 	"\n"
+	"    -n/--names <ebwt> If reference sequence names are needed, obtain them\n"
+	"                      from the Bowtie index with basename <ebwt>.\n"
+	"\n"
 	"    -v/--verbose    Print verbose output (for debugging).\n"
 	"\n"
 	"    -h/--help       Print detailed description of tool and its options\n"
@@ -107,8 +112,8 @@ static void printLongUsage(ostream& out) {
  */
 static void printUsage(ostream& out) {
 	out << "Usage: bowtie-maptool [options]* <align_in> [<align_out>]" << endl
-	    << "  align_in           alignment file output by bowtie, or \"-\" for stdin" << endl
-	    << "  align_out          write output alignments to this file (default: stdout)" << endl
+	    << "  <align_in>         alignment file output by bowtie, or \"-\" for stdin" << endl
+	    << "  <align_out>        write output alignments to this file (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "  -d/--indef         <align_in> is default bowtie output" << endl
 	    << "  -b/--inbin         <align_in> is bowtie -b/--binout output (default)" << endl
@@ -118,13 +123,14 @@ static void printUsage(ostream& out) {
 	    << "  -Q/--outfastq      <align_out> is aligned reads in FASTQ format" << endl
 	    << "  -F/--outfasta      <align_out> is aligned reads in FASTA format" << endl
 	    << "  -s/--sort          sort hits by reference position before outputting" << endl
+	    << "  -n/--names <ebwt>  if needed, get ref names from index w/ basename <ebwt> " << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvsdbsDBCQF";
+static const char *short_options = "hvsdbsDBCQFn:";
 
 enum {
 	ARG_VERSION = 256,
@@ -141,6 +147,7 @@ static struct option long_options[] = {
 	{"outfasta",   no_argument, 0, 'F'},
 	{"sort ",      no_argument, 0, 's'},
 	{"verbose",    no_argument, 0, 'v'},
+	{"names",      no_argument, 0, 'n'},
 	{"help",       no_argument, 0, 'h'},
 	{"refidx",     no_argument, 0, ARG_REFIDX},
 	{"version",    no_argument, 0, ARG_VERSION},
@@ -172,6 +179,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'C': outformat = FORMAT_CONCISE; break;
 	   		case 'Q': outformat = FORMAT_FASTQ; break;
 	   		case 'F': outformat = FORMAT_FASTA; break;
+	   		case 'n': ebwt_name = optarg; break;
 			case -1: /* Done with options. */ break;
 			case 0: if (long_options[option_index].flag != 0) break;
 			default:
@@ -187,8 +195,8 @@ static void parseOptions(int argc, char **argv) {
  */
 static void fastqAppend(ostream& out, Hit& h) {
 	if(!h.fw) {
-		reverseComplementInPlace(h.patSeq);
-		reverseInPlace(h.quals);
+		::reverseComplementInPlace(h.patSeq);
+		::reverseInPlace(h.quals);
 	}
 	out << "@" << h.patName << endl
 	    << h.patSeq << endl
@@ -200,7 +208,7 @@ static void fastqAppend(ostream& out, Hit& h) {
  * Print the read involved in an alignment as a FASTA record.
  */
 static void fastaAppend(ostream& out, Hit& h) {
-	if(!h.fw) reverseComplementInPlace(h.patSeq);
+	if(!h.fw) ::reverseComplementInPlace(h.patSeq);
 	out << ">" << h.patName << endl << h.patSeq << endl;
 }
 
@@ -245,8 +253,16 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	// Process all input files
+	// Read in reference names, if requested
 	vector<string> refnames;
+	if(!ebwt_name.empty()) {
+		string adjust = adjustEbwtBase(argv[0], ebwt_name, verbose);
+		readEbwtRefnames(adjust, refnames);
+		if(verbose) {
+			cout << "Successfully read " << refnames.size() << " reference sequence names from index" << endl;
+		}
+	}
+
 	for(size_t i = 0; i < infiles.size(); i++) {
 		istream *inp;
 		if(infiles[i] == "-") {

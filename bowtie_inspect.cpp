@@ -224,20 +224,17 @@ void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 
 }
 
-template<typename TStr>
-void print_index_sequence_names(ostream& fout, Ebwt<TStr>& ebwt)
+static char *argv0 = NULL;
+
+void print_index_sequence_names(const string& fname, ostream& fout)
 {
-	vector<string>* p_refnames = &ebwt.refnames();
-	if (!p_refnames)
-		return;
-	for (size_t i = 0; i < p_refnames->size() - 1; ++i)
-	{
-		string& name = (*p_refnames)[i];
-		fout << name << endl;
+	vector<string> p_refnames;
+	string adjust = adjustEbwtBase(argv0, fname, verbose);
+	readEbwtRefnames(adjust, p_refnames);
+	for(size_t i = 0; i < p_refnames.size(); i++) {
+		cout << p_refnames[i] << endl;
 	}
 }
-
-static char *argv0 = NULL;
 
 template<typename TStr>
 static void driver(const string& ebwtFileBase,
@@ -247,18 +244,19 @@ static void driver(const string& ebwtFileBase,
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 
-	// Initialize Ebwt object and read in header
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, verbose, false, false);
-	ebwt.loadIntoMemory();
-
-	if (names_only)
-		print_index_sequence_names(cout, ebwt);
-	else
+	if (names_only) {
+		print_index_sequence_names(adjustedEbwtFileBase, cout);
+	}
+	else {
+		// Initialize Ebwt object
+	    Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, verbose, false, false);
+	    // Load whole index into memory
+		ebwt.loadIntoMemory();
 		print_index_sequences(cout, ebwt);
-
-	// Evict any loaded indexes from memory
-	if(ebwt.isInMemory()) {
-		ebwt.evictFromMemory();
+		// Evict any loaded indexes from memory
+		if(ebwt.isInMemory()) {
+			ebwt.evictFromMemory();
+		}
 	}
 }
 

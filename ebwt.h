@@ -2716,6 +2716,107 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader) {
 }
 
 /**
+ * Read reference names from an input stream 'in' for an Ebwt primary
+ * file and store them in 'refnames'.
+ */
+static inline void
+readEbwtRefnames(istream& in, vector<string>& refnames) {
+	// _in1 must already be open with the get cursor at the
+	// beginning and no error flags set.
+	assert(in.good());
+	assert_eq((streamoff)in.tellg(), ios::beg);
+
+	// Read endianness hints from both streams
+	bool be = false;
+	uint32_t one = readU32(in, be); // 1st word of primary stream
+	if(one != 1) {
+		assert_eq((1u<<24), one);
+		be = true;
+	}
+
+	// Reads header entries one by one from primary stream
+	uint32_t len          = readU32(in, be);
+	int32_t  lineRate     = readI32(in, be);
+	int32_t  linesPerSide = readI32(in, be);
+	int32_t  offRate      = readI32(in, be);
+	int32_t  ftabChars    = readI32(in, be);
+	int32_t  chunkRate    = readI32(in, be);
+
+	// Create a new EbwtParams from the entries read from primary stream
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, chunkRate);
+
+	uint32_t nPat = readI32(in, be); // nPat
+	in.seekg(nPat*4, ios_base::cur); // skip plen
+
+	if(chunkRate >= 0) {
+		// Skip pmap
+		uint32_t pmapEnts = eh._numChunks*4;
+		in.seekg(pmapEnts*4, ios_base::cur);
+	} else {
+		// Skip rstarts
+		uint32_t nFrag = readU32(in, be);
+		in.seekg(nFrag*4*3, ios_base::cur);
+	}
+
+	// Skip ebwt
+	in.seekg(eh._ebwtTotLen, ios_base::cur);
+
+	// Skip zOff from primary stream
+	readU32(in, be);
+
+	// Skip fchr
+	in.seekg(5 * 4, ios_base::cur);
+
+	// Skip ftab
+	in.seekg(eh._ftabLen*4, ios_base::cur);
+
+	// Skip eftab
+	in.seekg(eh._eftabLen*4, ios_base::cur);
+
+	// Read reference sequence names from primary index file
+	while(true) {
+		char c = '\0';
+		in.read(&c, 1);
+		if(in.eof()) break;
+		if(c == '\0') break;
+		else if(c == '\n') {
+			refnames.push_back("");
+		} else {
+			if(refnames.size() == 0) {
+				refnames.push_back("");
+			}
+			refnames.back().push_back(c);
+		}
+	}
+	if(refnames.back().empty()) {
+		refnames.pop_back();
+	}
+
+	// Be kind
+	in.clear(); in.seekg(0, ios::beg);
+	assert(in.good());
+}
+
+/**
+ * Read reference names from the index with basename 'in' and store
+ * them in 'refnames'.
+ */
+static inline void
+readEbwtRefnames(const string& instr, vector<string>& refnames) {
+	ifstream in;
+	// Initialize our primary and secondary input-stream fields
+	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	if(!in.is_open()) {
+		throw EbwtFileOpenException("Cannot open file " + instr);
+	}
+	assert(in.is_open());
+	assert(in.good());
+	assert_eq((streamoff)in.tellg(), ios::beg);
+	readEbwtRefnames(in, refnames);
+}
+
+
+/**
  * Read an Ebwt from an input-stream pair.  The endianness of the data
  * read is installed in the bigEndian out parameter (true=big).  The
  * _in1 and _in2 istreams must already be initialized and open.
