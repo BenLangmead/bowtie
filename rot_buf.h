@@ -51,6 +51,7 @@ public:
 			// If this row is different from the reference...
 			if(col[i].first != -1) {
 				// Pick out the reference character
+				assert_lt((col[i].first >> 4), 4);
 				if(rc == -1) {
 					rc = col[i].first >> 4; // ref
 					assert_lt(rc, 4);
@@ -186,10 +187,6 @@ public:
 	 * cleared.
 	 */
 	void finalize(ColumnAnalyzer<T> *analyzer = NULL) {
-		if(analyzer == NULL) {
-			// nothing to do
-			return;
-		}
 #ifndef NDEBUG
 		size_t mn = min(lpos_ % S, rpos_ % S);
 		size_t mx = max(lpos_ % S, rpos_ % S);
@@ -203,7 +200,9 @@ public:
 		for(size_t i = lpos_; i < rpos_; i++) {
 			if(buf_[i % S].size() > 0) {
 				// Analyze this column
-				analyzer->analyze(refidx_, i, buf_[i % S]);
+				if(analyzer != NULL) {
+					analyzer->analyze(refidx_, i, buf_[i % S]);
+				}
 			}
 			buf_[i % S].clear();
 		}
@@ -350,21 +349,27 @@ protected:
 		uint32_t len = h.length();
 		// Add char-pair evidence to each column
 		for(size_t i = 0; i < len; i++) {
-			char q = (h.fw ? h.quals[i]  : h.quals[len - i - 1]);
 			if(h.mms.test(i)) {
 				size_t ii = i;
-				if(!h.fw) {
-					ii = len - i - 1;
-				}
+				if(!h.fw) ii = len - i - 1;
+				char q = h.quals[ii];
 				int readc = (int)h.patSeq[ii];
-				if(readc == 4) {
-					continue; // no evidence inherent in Ns
-				}
+				if(readc == 4) continue; // no evidence inherent in Ns
 				char c = h.refcs[i];
 				assert_eq(1, dna4Cat[(int)c]);
 				c = charToDna5[(int)c];
 				assert_lt(c, 4);
 				assert_neq((int)c, readc);
+#ifndef NDEBUG
+				// Ensure that the reference character for the evidence
+				// we're adding matches the reference character for all
+				// evidence we've already added
+				vector<pair<char, char> > col = this->buf_.get(h.h.second + i);
+				for(size_t j = 0; j < col.size(); j++) {
+					int cc = (col[j].first >> 4);
+					assert_eq(c, cc);
+				}
+#endif
 				c = (c << 4) | readc;
 				this->buf_.add(h.h.second + i, make_pair(c, q));
 			}
