@@ -1203,6 +1203,10 @@ public:
 			exit(1);
 		}
 		in.getline(buf, 4096);
+		size_t len = in.gcount();
+		if(len == 0) {
+			return false;
+		}
 		string line(buf);
 		vector<string> toks;
 		tokenize(line, "\t", toks);
