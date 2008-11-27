@@ -350,12 +350,15 @@ protected:
 		// Add char-pair evidence to each column
 		for(size_t i = 0; i < len; i++) {
 			if(h.mms.test(i)) {
+				// The i'th character from the 5' end has a mismatch.
+				// Let ii = the offset from the left-hand side of the
+				// alignment (not necessarily the 5' end of the read).
 				size_t ii = i;
 				if(!h.fw) ii = len - i - 1;
 				char q = h.quals[ii];
 				int readc = (int)h.patSeq[ii];
 				if(readc == 4) continue; // no evidence inherent in Ns
-				char c = h.refcs[i];
+				char c = h.refcs[i]; // refcs also indexed from 5' end of read
 				assert_eq(1, dna4Cat[(int)c]);
 				c = charToDna5[(int)c];
 				assert_lt(c, 4);
@@ -364,10 +367,10 @@ protected:
 				// Ensure that the reference character for the evidence
 				// we're adding matches the reference character for all
 				// evidence we've already added
-				vector<pair<char, char> > col = this->buf_.get(h.h.second + i);
+				const vector<pair<char, char> >& col = this->buf_.get(h.h.second + ii);
 				for(size_t j = 0; j < col.size(); j++) {
 					int cc = (col[j].first >> 4);
-					assert_eq(c, cc);
+					assert_eq((int)c, cc);
 				}
 #endif
 				c = (c << 4) | readc;
