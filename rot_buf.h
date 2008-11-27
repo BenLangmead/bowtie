@@ -374,7 +374,7 @@ protected:
 				}
 #endif
 				c = (c << 4) | readc;
-				this->buf_.add(h.h.second + i, make_pair(c, q));
+				this->buf_.add(h.h.second + ii, make_pair(c, q));
 			}
 		}
 	}
