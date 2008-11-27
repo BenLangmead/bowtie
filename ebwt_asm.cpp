@@ -19,6 +19,7 @@ static bool verbose     = false; // be talkative (default)
 static int sanityCheck  = 0;     // do slow sanity checks
 static bool showVersion = false; // show version info and exit
 static bool sorted      = false; // alignments are pre-sorted?
+static uint64_t upto    = 0xffffffffffffffffllu; // max # aligns to process
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -30,13 +31,14 @@ static void printUsage(ostream& out) {
 	    << "Options:" << endl
 	    << "    -v/--verbose         verbose output (for debugging)" << endl
 	    << "    -s/--sorted          treat input alignments as already sorted" << endl
+	    << "    -u/--upto            maximum # alignments to process" << endl
 	    //<< "    -s/--sanity          enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help            print detailed description of tool and its options" << endl
 	    << "    --version            print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvs?";
+static const char *short_options = "hvs?u:";
 
 enum {
 	ARG_VERSION = 256,
@@ -46,6 +48,7 @@ enum {
 static struct option long_options[] = {
 	{"verbose", no_argument, 0, 'v'},
 	{"sorted",  no_argument, 0, 's'},
+	{"upto",    required_argument, 0, 'u'},
 	{"sanity",  no_argument, 0, ARG_SANITY},
 	{"help",    no_argument, 0, 'h'},
 	{"version", no_argument, 0, ARG_VERSION},
@@ -92,6 +95,9 @@ static void parseOptions(int argc, char **argv) {
 				break;
 	   		case 'v': verbose = false; break;
 	   		case 's': sorted = true; break;
+	   		case 'u':
+	   			upto = parseNumber<uint64_t>(1, "-u/--upto must be at least 1");
+	   			break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
 			case -1: /* Done with options. */
@@ -194,12 +200,17 @@ static void processAlignments(
 			if(bs > 1) {
 				sort(bucket.begin(), bucket.end());
 			}
-			for(size_t i = 0; i < bs; i++) {
+			size_t i;
+			for(i = 0; i < bs; i++) {
 				asink.addAlignment(bucket[i], &analyzer);
+				assert_neq(0llu, upto);
+				upto--;
+				if(upto == 0) break;
 			}
-			als += bs;
+			als += i;
 			bucket.clear();
 		}
+		if(upto == 0llu) break;
 
 		// A true alignment line will have a tab
 		bool hasTab = false;
@@ -232,21 +243,28 @@ static void processAlignments(
 			assert_gt(h.length(), 0);
 			// Send the alignment to the sink
 			asink.addAlignment(h, &analyzer);
+			assert_neq(0llu, upto);
+			upto--;
+			if(upto == 0) break;
 			als++;
 		}
 	}
 
 	// Sort and flush the bucket if necessary
-	if(!bucket.empty()) {
+	if(!bucket.empty() && upto > 0llu) {
 		assert(!sorted);
 		size_t bs = bucket.size();
 		if(bs > 1) {
 			sort(bucket.begin(), bucket.end());
 		}
-		for(size_t i = 0; i < bs; i++) {
+		size_t i;
+		for(i = 0; i < bs; i++) {
 			asink.addAlignment(bucket[i], &analyzer);
+			assert_neq(0llu, upto);
+			upto--;
+			if(upto == 0) break;
 		}
-		als += bs;
+		als += i;
 		bucket.clear();
 	}
 
