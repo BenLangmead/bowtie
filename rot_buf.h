@@ -130,7 +130,7 @@ public:
 		// New left-hand side must be greater than or equal to previous
 		// left-hand side.
 		if(newLhs < lpos_) {
-			cerr << "Error: unsorted references supplied to RotatingBuf" << endl;
+			cerr << "Error: alignments were not presented to RotatingBuf in sorted order" << endl;
 			exit(1);
 		}
 		// Check if there are columns we're finished adding rows to
@@ -234,12 +234,14 @@ class AlignmentSink {
 
 public:
 
-	AlignmentSink(bool verbose = false) :
+	AlignmentSink(uint32_t partitionLen = 0xffffffff, bool verbose = false) :
 	buf_(),
 	lastRefIdx_(0),
 	lastRefOff_(0),
 	lastLeft_(0),
 	furthestRight_(0),
+	partition_(0xffffffff),
+	partitionLen_(partitionLen),
 	verbose_(verbose) { }
 
 	virtual ~AlignmentSink() { }
@@ -250,10 +252,27 @@ public:
 	virtual void addAlignment(const Hit& h,
 	                          ColumnAnalyzer<T> *analyzer = NULL)
 	{
+		assert_gt(h.length(), 0);
 		if(this->verbose_) {
 			cout << "    Entered AlignmentSink::addAlignmentImpl" << endl;
 			cout << "      Analyzer is " << (analyzer ? "non-null" : "null") << endl;
 		}
+#ifndef NDEBUG
+		// Assert that the hit overlaps with this partition
+		if(partitionLen_ != 0xffffffff) {
+			assert_neq(0xffffffff, partition_);
+			// Overlaps LHS?
+			bool left  = (h.h.second <= partition_) &&
+			             (h.h.second + h.length() > partition_);
+			// Overlaps RHS?
+			bool right = (h.h.second < (partition_ + partitionLen_)) &&
+			             (h.h.second + h.length() >= partition_ + partitionLen_);
+			// Occurs inside?
+			bool inside = (h.h.second >= partition_) &&
+			              (h.h.second + h.length() <= partition_ + partitionLen_);
+			assert(left || right || inside);
+		}
+#endif
 		// Check if we encountered a new reference
 		if(h.h.first != lastRefIdx_) {
 			// Reset state and buffer for new reference sequence
@@ -289,10 +308,15 @@ public:
 	 * buffer.
 	 */
 	virtual void reset(uint32_t refidx,
+	                   uint32_t partition,
 	                   ColumnAnalyzer<T> *analyzer = NULL)
 	{
+		partition_ = partition;
+		if(partitionLen_ != 0xffffffff) {
+			assert_eq(0, partition_ % partitionLen_);
+		}
 		this->buf_.reset(refidx, analyzer);
-		resetImpl(refidx, analyzer);
+		resetImpl(refidx, partition, analyzer);
 	}
 
 protected:
@@ -306,6 +330,7 @@ protected:
 
 	virtual void resetImpl(
 			uint32_t refidx,
+			uint32_t partition,
 			ColumnAnalyzer<T> *analyzer = NULL) { }
 
 	RotatingBuf<T, S> buf_;
@@ -313,6 +338,8 @@ protected:
 	uint32_t lastRefOff_;
 	uint32_t lastLeft_;
 	uint32_t furthestRight_;
+	uint32_t partition_;
+	uint32_t partitionLen_;
 	bool verbose_;
 };
 
@@ -331,8 +358,8 @@ template<int S>
 class RotatingCharPairAlignmentBuf : public AlignmentSink<pair<char, char>, S> {
 
 public:
-	RotatingCharPairAlignmentBuf(bool verbose = false) :
-		AlignmentSink<pair<char, char>, S>(verbose) { }
+	RotatingCharPairAlignmentBuf(uint32_t partitionLen = 0xffffffff, bool verbose = false) :
+		AlignmentSink<pair<char, char>, S>(partitionLen, verbose) { }
 
 protected:
 
@@ -347,14 +374,34 @@ protected:
 			cout << "      Analyzer is " << (analyzer ? "non-null" : "null") << endl;
 		}
 		uint32_t len = h.length();
-		// Add char-pair evidence to each column
-		for(size_t i = 0; i < len; i++) {
+		uint32_t lo = 0;
+		uint32_t hi = len;
+		if(this->partitionLen_ != 0xffffffff) {
+			uint32_t parti = this->partition_;
+			uint32_t partf = this->partition_ + this->partitionLen_;
+			// If LHS of alignment is before the beginning of the
+			// partition, be sure to only consider those columns
+			// beginning at the partition boundary.
+			if(h.h.second < parti) {
+				lo = parti - h.h.second;
+				assert_lt(lo, h.length());
+			}
+			// If RHS of alignment is after the end of the partition,
+			// be sure to only consider those columns up to the
+			// partition boundary.
+			if((h.h.second + h.length()) > partf) {
+				hi -= ((h.h.second + h.length()) - partf);
+			}
+		}
+		assert_lt(lo, hi);
+		// Add char-pair evidence to each column; it's important that
+		// we proceed left-to-right along the reference
+		for(size_t ii = lo; ii < hi; ii++) {
+			// i = offset from 5' end, ii = offset from "left" end
+			// w/r/t reference
+			size_t i = ii;
+			if(!h.fw) i = len - ii - 1;
 			if(h.mms.test(i)) {
-				// The i'th character from the 5' end has a mismatch.
-				// Let ii = the offset from the left-hand side of the
-				// alignment (not necessarily the 5' end of the read).
-				size_t ii = i;
-				if(!h.fw) ii = len - i - 1;
 				char q = h.quals[ii];
 				int readc = (int)h.patSeq[ii];
 				if(readc == 4) continue; // no evidence inherent in Ns

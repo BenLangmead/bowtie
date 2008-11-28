@@ -34,7 +34,7 @@ public:
 	}
 
 	void close() {
-		if(_in != NULL) {
+		if(_in != NULL && _in != stdin) {
 			fclose(_in);
 		} else if(_inf != NULL) {
 			_inf->close();

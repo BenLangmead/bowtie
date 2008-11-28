@@ -15,11 +15,12 @@
  * \file Driver for the bowtie-asm assembly tool.
  */
 
-static bool verbose     = false; // be talkative (default)
-static int sanityCheck  = 0;     // do slow sanity checks
-static bool showVersion = false; // show version info and exit
-static bool sorted      = false; // alignments are pre-sorted?
-static uint64_t upto    = 0xffffffffffffffffllu; // max # aligns to process
+static bool verbose       = false; // be talkative (default)
+static int  sanityCheck   = 0;     // do slow sanity checks
+static bool showVersion   = false; // show version info and exit
+static bool sorted        = false; // alignments are pre-sorted?
+static uint32_t partitionLen = 0xffffffff; // length of a partition, -1 if input isn't partitioned
+static uint64_t upto      = 0xffffffffffffffffllu; // max # aligns to process
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -32,13 +33,14 @@ static void printUsage(ostream& out) {
 	    << "    -v/--verbose         verbose output (for debugging)" << endl
 	    << "    -s/--sorted          treat input alignments as already sorted" << endl
 	    << "    -u/--upto            maximum # alignments to process" << endl
+	    << "    -p/--partition <int> length of a partition, if input is partitioned" << endl
 	    //<< "    -s/--sanity          enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help            print detailed description of tool and its options" << endl
 	    << "    --version            print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvs?u:";
+static const char *short_options = "hvs?u:p:";
 
 enum {
 	ARG_VERSION = 256,
@@ -46,12 +48,13 @@ enum {
 };
 
 static struct option long_options[] = {
-	{"verbose", no_argument, 0, 'v'},
-	{"sorted",  no_argument, 0, 's'},
-	{"upto",    required_argument, 0, 'u'},
-	{"sanity",  no_argument, 0, ARG_SANITY},
-	{"help",    no_argument, 0, 'h'},
-	{"version", no_argument, 0, ARG_VERSION},
+	{"verbose",   no_argument, 0, 'v'},
+	{"sorted",    no_argument, 0, 's'},
+	{"upto",      required_argument, 0, 'u'},
+	{"partition", required_argument, 0, 'p'},
+	{"sanity",    no_argument, 0, ARG_SANITY},
+	{"help",      no_argument, 0, 'h'},
+	{"version",   no_argument, 0, ARG_VERSION},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -98,6 +101,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'u':
 	   			upto = parseNumber<uint64_t>(1, "-u/--upto must be at least 1");
 	   			break;
+	   		case 'p':
+	   			partitionLen = parseNumber<uint32_t>(1, "-p/--partition must be at least 1");
+	   			break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
 			case -1: /* Done with options. */
@@ -131,12 +137,14 @@ static void processAlignments(
 	char partbuf[4096]; // buffer for partition name in previous alignment
 	vector<Hit> bucket; // bucket for buffering alignments in a particular partition
 	size_t als = 0;
+	uint32_t lastRef = 0xffffffff;
 	if(verbose) {
 		cout << "Processing ";
 		if(sorted) cout << "sorted ";
 		cout << "alignment file " << filename<< endl;
 	}
 	while(true) {
+		// Get the next alignment line
 		alfile.getline(buf, 4096);
 		size_t len = alfile.gcount();
 		if(alfile.eof()) break;
@@ -153,11 +161,37 @@ static void processAlignments(
 			exit(1);
 		}
 
+		// A true alignment line will have a tab; if this one doesn't,
+		// then skip it
+		bool hasTab = false;
+		for(size_t i = 0; i < len; i++) {
+			if(buf[i] == '\t') {
+				hasTab = true;
+				break;
+			}
+		}
+		if(!hasTab) {
+			// Not an alignment; could be the summary line
+			continue;
+		}
+
+		// Create an istream from 'buf'
+		std::istringstream ss;
+		ss.rdbuf()->pubsetbuf(buf, len);
+		ss.clear();
+
+		// Add next alignment directly to the alignment sink
+		Hit h;
+		// Parse the alignment from the istream
+		VerboseHitSink::readHit(h, ss, NULL, verbose);
+		assert_gt(h.length(), 0);
+
 		// Determine whether this alignment has the same partition
 		// name as the last one; either way, make sure that 'partbuf'
 		// contains this alignment's partition name when we exit the
 		// loop.
 		bool samePart = true; // assume hit has same partition as last hit
+		bool parsedPart = false;
 		if(!sorted) {
 			bool sawSpace = false;
 			size_t pos = 0;
@@ -188,59 +222,71 @@ static void processAlignments(
 			// single bucket.
 			if(!sawSpace) {
 				samePart = true;
+			} else {
+				parsedPart = true;
 			}
 		}
 
-		// We're moving into a new partition, so sort the elements
-		// belonging to the last partition and push them into the
-		// alignment sink
-		if(!samePart && !bucket.empty()) {
+		bool sameRef = true;
+		if(samePart) {
+			if(h.h.first != lastRef) {
+				sameRef = false;
+				lastRef = h.h.first;
+			}
+		}
+
+		// We're moving into a new partition or into a new reference
+		// sequence, so sort the elements belonging to the last
+		// partition/sequence and push them into the alignment sink.
+		if(!samePart || !sameRef) {
 			assert(!sorted);
 			size_t bs = bucket.size();
-			if(bs > 1) {
-				sort(bucket.begin(), bucket.end());
+			if(bs > 0) {
+				if(bs > 1) {
+					sort(bucket.begin(), bucket.end());
+				}
+				size_t i;
+				for(i = 0; i < bs; i++) {
+					asink.addAlignment(bucket[i], &analyzer);
+					assert_neq(0llu, upto);
+					upto--;
+					if(upto == 0) break;
+				}
+				als += i;
+				bucket.clear();
 			}
-			size_t i;
-			for(i = 0; i < bs; i++) {
-				asink.addAlignment(bucket[i], &analyzer);
-				assert_neq(0llu, upto);
-				upto--;
-				if(upto == 0) break;
+			// Parse the second part of the partition label into an
+			// integer
+			uint32_t part = 0;
+			if(parsedPart) {
+				size_t pos = 0;
+				bool parsed = false;
+				while(true) {
+					if(partbuf[pos++] == ' ') {
+						while(true) {
+							if(partbuf[pos] == '\t') break;
+							part *= 10;
+							part += (partbuf[pos] - '0');
+							pos++;
+						}
+						parsed = true;
+						break;
+					}
+				}
+				assert(parsed);
+				part *= partitionLen;
 			}
-			als += i;
-			bucket.clear();
+			asink.reset(h.h.first, part, &analyzer);
+		} else if (!sameRef) {
+			asink.reset(h.h.first, 0, &analyzer);
 		}
 		if(upto == 0llu) break;
 
-		// A true alignment line will have a tab
-		bool hasTab = false;
-		for(size_t i = 0; i < len; i++) {
-			if(buf[i] == '\t') {
-				hasTab = true;
-				break;
-			}
-		}
-		if(!hasTab) {
-			// Not an alignment; could be the summary line
-			continue;
-		}
-
-		// Create an istream from 'buf'
-		std::istringstream ss;
-		ss.rdbuf()->pubsetbuf(buf, len);
-		ss.clear();
-
 		if(!sorted) {
 			// Add next alignment to back of current bucket
-			bucket.resize(bucket.size() + 1);
-			VerboseHitSink::readHit(bucket.back(), ss, NULL, verbose);
+			bucket.push_back(h);
 			assert_gt(bucket.back().length(), 0);
 		} else {
-			// Add next alignment directly to the alignment sink
-			Hit h;
-			// Parse the alignment from the istream
-			VerboseHitSink::readHit(h, ss, NULL, verbose);
-			assert_gt(h.length(), 0);
 			// Send the alignment to the sink
 			asink.addAlignment(h, &analyzer);
 			assert_neq(0llu, upto);
@@ -308,20 +354,14 @@ int main(int argc, char **argv) {
 
 	// For all input files
 	SNPColumnCharPairAnalyzer ca(std::cout);
-	RotatingCharPairAlignmentBuf<1024> cpBuf(verbose); // hoist this?
+	RotatingCharPairAlignmentBuf<1024> cpBuf(partitionLen, verbose); // hoist this?
 	for(size_t i = 0; i < infiles.size(); i++) {
-		cpBuf.reset(0, &ca);
 		// Input is partitioned, so call the set of functions that
 		// know how to deal with partitioned input
 		if(infiles[i] == "-") {
 			processAlignments(infiles[i], cin, cpBuf, ca, sorted);
 		} else {
 			ifstream inin(infiles[i].c_str());
-			//if(!inin.good()) {
-			//	cerr << "Warning: could not open alignment file \""
-			//		 << infiles[i] << "\" for reading" << endl;
-			//	continue;
-			//}
 			processAlignments(infiles[i], inin, cpBuf, ca, sorted);
 		}
 		cpBuf.finalize(&ca);

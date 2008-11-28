@@ -650,7 +650,7 @@ public:
 	{
 		assert_gt(infiles.size(), 0);
 		_errs.resize(_infiles.size(), false);
-		open();
+		open(); // open first file in the list
 		_filecur++;
 	}
 
@@ -717,7 +717,7 @@ protected:
 				if(!_errs[_filecur]) {
 					cerr << "Warning: Could not open file \"" << _infiles[_filecur] << "\" for reading" << endl;
 					_errs[_filecur] = true;
-				} 
+				}
 				_filecur++;
 				continue;
 			}
