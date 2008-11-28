@@ -1,7 +1,7 @@
 #ifndef SPINLOCK_H_
 #define SPINLOCK_H_
 
-#define USE_SPINLOCK
+#ifdef USE_SPINLOCK
 
 #if ! defined(__GNUC__)
 #error "Need GNU C compiler for spinlocks (see spinlock.h)"
