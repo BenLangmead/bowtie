@@ -1344,50 +1344,83 @@ public:
 	                   const vector<string>* refnames,
 	                   int partition)
 	{
-		if(partition > 0) {
-			// Output a partitioning key
-			ss << h.h.first;
-			ostringstream ss2; ss2 << (h.h.second / partition);
-			string s2 = ss2.str();
-			while(s2.length() < 10) {
-				s2 = "0" + s2;
+		bool spill = false;
+		int spillAmt = 0;
+		uint32_t pdiv = 0xffffffff;
+		uint32_t pmod = 0xffffffff;
+		do {
+			bool dospill = false;
+			if(spill) {
+				assert(partition > 0);
+				spill = false;
+				dospill = true;
+				spillAmt++;
 			}
-			assert_eq(10, s2.length());
-			ss << " " << s2.c_str() << "\t";
-		}
-		ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
-    	// .first is text id, .second is offset
-		if(refnames != NULL && h.h.first < refnames->size()) {
-			ss << (*refnames)[h.h.first];
-		} else {
-			ss << h.h.first;
-		}
-		ss << "\t" << h.h.second;
-		ss << "\t" << h.patSeq;
-		ss << "\t" << h.quals;
-		ss << "\t" << h.oms;
-		ss << "\t";
-		// Output mismatch column
-		bool firstmiss = true;
-		size_t c = 0;
-		for (unsigned int i = 0; i < h.mms.size(); ++ i) {
-			if (h.mms.test(i)) {
-				if (!firstmiss) ss << ",";
-				ss << i;
-				if(h.refcs.size() > 0) {
-					assert_gt(h.refcs.size(), i);
-					ASSERT_ONLY(char cc = toupper(h.refcs[i]));
-					assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
-					char refChar = toupper(h.refcs[i]);
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					assert_neq(refChar, qryChar);
-					ss << ":" << refChar << ">" << qryChar;
+			assert(!spill);
+			if(partition > 0) {
+				// Output a partitioning key
+				// First component of the key is the reference index,
+				// followed by a space.  Note that Hadoop does *not*
+				// treat space as a field separator, so we're still in
+				// the first (key) field.
+				ss << h.h.first << " ";
+				ostringstream ss2;
+				// Next component of the key is the reference offset
+				if(!dospill) {
+					pdiv = h.h.second / partition;
+					pmod = h.h.second % partition;
 				}
-				firstmiss = false;
-				c++;
+				assert_neq(0xffffffff, pdiv);
+				assert_neq(0xffffffff, pmod);
+				if(dospill) assert_gt(spillAmt, 0);
+				ss2 << (pdiv + (dospill ? spillAmt : 0));
+				if((pmod + h.length()) > ((uint32_t)partition * (spillAmt + 1))) {
+					// Spills into the next partition so we need to
+					// output another alignment for that partition
+					spill = true;
+				}
+				string s2 = ss2.str();
+				for(size_t i = s2.length(); i < 10; i++) {
+					ss << "0";
+				}
+				ss << s2.c_str() << "\t";
+			} else {
+				assert(!dospill);
 			}
-		}
-		ss << endl;
+			ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
+			// .first is text id, .second is offset
+			if(refnames != NULL && h.h.first < refnames->size()) {
+				ss << (*refnames)[h.h.first];
+			} else {
+				ss << h.h.first;
+			}
+			ss << "\t" << h.h.second;
+			ss << "\t" << h.patSeq;
+			ss << "\t" << h.quals;
+			ss << "\t" << h.oms;
+			ss << "\t";
+			// Output mismatch column
+			bool firstmiss = true;
+			size_t c = 0;
+			for (unsigned int i = 0; i < h.mms.size(); ++ i) {
+				if (h.mms.test(i)) {
+					if (!firstmiss) ss << ",";
+					ss << i;
+					if(h.refcs.size() > 0) {
+						assert_gt(h.refcs.size(), i);
+						ASSERT_ONLY(char cc = toupper(h.refcs[i]));
+						assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
+						char refChar = toupper(h.refcs[i]);
+						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+						assert_neq(refChar, qryChar);
+						ss << ":" << refChar << ">" << qryChar;
+					}
+					firstmiss = false;
+					c++;
+				}
+			}
+			ss << endl;
+		} while(spill);
 	}
 
 	/**

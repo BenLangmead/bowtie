@@ -6,13 +6,17 @@
  * based on free code by Gert Boddaert:
  *
  * http://www.codeproject.com/KB/threads/spinlocks.aspx
+ *
+ * Using spinlocks instead of the heavier pthreads mutexes can, in some
+ * cases, help Bowtie perform better for large numbers of threads.
  */
+#if defined(__GNUC__)
+#if defined(__x86_64__) || defined(__i386__)
+#define USE_SPINLOCK
+#endif
+#endif
 
 #ifdef USE_SPINLOCK
-
-#if ! defined(__GNUC__)
-#error "Need GNU C compiler for spinlocks (see spinlock.h)"
-#endif
 
 #if defined(__x86_64__)
 #define SPINLOCK_WORD long
