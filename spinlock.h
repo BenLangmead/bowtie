@@ -1,6 +1,13 @@
 #ifndef SPINLOCK_H_
 #define SPINLOCK_H_
 
+/**
+ * This non-reentrant spinlock implementation for i386 and x86_64 is
+ * based on free code by Gert Boddaert:
+ *
+ * http://www.codeproject.com/KB/threads/spinlocks.aspx
+ */
+
 #ifdef USE_SPINLOCK
 
 #if ! defined(__GNUC__)
@@ -86,7 +93,6 @@ class SpinLock {
 #endif
 /* TAS is only defined for GNUC on x86_64 and i386,
  that is where GNUC x86 inline assembly can be used */
-#endif
 
 inline SPINLOCK_WORD SpinLock::TestAndSet(SPINLOCK_WORD* pTargetAddress, SPINLOCK_WORD nValue) {
 
@@ -105,5 +111,6 @@ inline SPINLOCK_WORD SpinLock::TestAndSet(SPINLOCK_WORD* pTargetAddress, SPINLOC
     // lock = 1 CPU cycle
     // xchg = 3 CPU cycles
 }
+#endif
 
 #endif /*SPINLOCK_H_*/
