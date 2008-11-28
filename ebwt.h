@@ -498,7 +498,19 @@ public:
 		string file2 = file + ".2.ebwt";
 		// Open output files
 		ofstream fout1(file1.c_str(), ios::binary);
+		if(!fout1.good()) {
+			cerr << "Could not open index file for writing: \"" << file1 << "\"" << endl
+			     << "Please make sure the directory exists and that permissions allow writing by" << endl
+			     << "Bowtie." << endl;
+			exit(1);
+		}
 		ofstream fout2(file2.c_str(), ios::binary);
+		if(!fout2.good()) {
+			cerr << "Could not open index file for writing: \"" << file2 << "\"" << endl
+			     << "Please make sure the directory exists and that permissions allow writing by" << endl
+			     << "Bowtie." << endl;
+			exit(1);
+		}
 		// Build
 		initFromVector(is,
 		               szs,
