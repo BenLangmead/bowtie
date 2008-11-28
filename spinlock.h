@@ -13,14 +13,13 @@
 #define SPINLOCK_WORD int
 #endif
 
-#ifdef USE_SPINLOCK
 class SpinLock {
   public:    // inlined constructor
 
     // inlined NON-virtual destructor
     inline SpinLock() : m_s(1) {}
-    inline ~SpinLock() {}    
-    
+    inline ~SpinLock() {}
+
     // enter the lock, spinlocks (with/without Sleep)
     // when mutex is already locked
     inline void Enter(void)
@@ -42,7 +41,7 @@ class SpinLock {
         while (true);
     }
     // Tries to enter the lock, returns 0
-    // when mutex is already locked, 
+    // when mutex is already locked,
     // returns != 0 when success
     inline int TryEnter(void)
     {
@@ -60,12 +59,12 @@ class SpinLock {
     {
         TestAndSet(&m_s, 1);
     }
-    
+
   protected:
     // sets BIT value and returns previous
     // value.in 1 atomic un-interruptable operation
 	  SPINLOCK_WORD TestAndSet(SPINLOCK_WORD* pTargetAddress, SPINLOCK_WORD nValue);
-    
+
   private:
 	SPINLOCK_WORD m_s;
 };
