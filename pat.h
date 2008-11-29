@@ -409,6 +409,51 @@ private:
 	RandomSource _rand;
 };
 
+/**
+ * Scan to the next FASTQ record (starting with @) and return the first
+ * character of the record (which will always be @).  Since the quality
+ * line may start with @, we keep scanning until we've seen a line
+ * beginning with @ where the line two lines back began with +.
+ */
+static inline int getToFirstRecord(FileBuf& in) {
+	int line = 0;
+	bool sawPlus = false;
+	int plusLine = -1;
+	int c = in.get();
+	int firstc = c;
+	while(true) {
+		if(line > 20) {
+			// If we couldn't find our desired '@' in the first 20
+			// lines, it's time to give up
+			if(firstc == '>') {
+				// That firstc is '>' may be a hint that this is
+				// actually a FASTA file, so return it intact
+				return '>';
+			}
+			// Return an error
+			return -1;
+		}
+		if(c == -1) return -1;
+		if(c == '\n') {
+			c = in.get();
+			if(c == '@' && sawPlus && plusLine == (line-2)) {
+				return '@';
+			}
+			else if(c == '+') {
+				// Saw a '+' at the beginning of a line; remember where
+				// we saw it
+				sawPlus = true;
+				plusLine = line;
+			}
+			else if(c == -1) {
+				return -1;
+			}
+			line++;
+		}
+		c = in.get();
+	}
+}
+
 /// Skip to the end of the current string of newline chars and return
 /// the first character after the newline chars, or -1 for EOF
 static inline int getOverNewline(FileBuf& in) {
@@ -977,9 +1022,16 @@ protected:
 
 			// Pick off the first at
 			if(_first) {
-				c = getOverNewline(_filebuf); if(c < 0) {
-					seqan::clear(r.patFw);
-					return;
+				c = _filebuf.get();
+				if(c != '@') {
+					//c = getOverNewline(_filebuf); if(c < 0) {
+					//	seqan::clear(r.patFw);
+					//	return;
+					//}
+					c = getToFirstRecord(_filebuf); if(c < 0) {
+						seqan::clear(r.patFw);
+						return;
+					}
 				}
 				if(c != '@') {
 					cerr << "Error: reads file does not look like a FASTQ file" << endl;
