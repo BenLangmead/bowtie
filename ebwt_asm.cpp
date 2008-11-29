@@ -96,7 +96,7 @@ static void parseOptions(int argc, char **argv) {
 				printUsage(cout);
 				exit(0);
 				break;
-	   		case 'v': verbose = false; break;
+	   		case 'v': verbose = true; break;
 	   		case 's': sorted = true; break;
 	   		case 'u':
 	   			upto = parseNumber<uint64_t>(1, "-u/--upto must be at least 1");
@@ -200,6 +200,12 @@ static void processAlignments(
 				if(samePart && partbuf[pos] != buf[pos]) {
 					// The partition name is different in character at
 					// 'pos' so mark them as different
+					if(partbuf[pos] > buf[pos]) {
+						// Oops - appears to be out of order
+						cerr << "Partition labels are present but not sorted; please sort alignments before" << endl
+						     << "feeding to bowtie-asm." << endl;
+						exit(1);
+					}
 					samePart = false;
 				}
 				if(!samePart) {
@@ -300,19 +306,22 @@ static void processAlignments(
 	if(!bucket.empty() && upto > 0llu) {
 		assert(!sorted);
 		size_t bs = bucket.size();
-		if(bs > 1) {
-			sort(bucket.begin(), bucket.end());
+		if(bs > 0) {
+			if(bs > 1) {
+				sort(bucket.begin(), bucket.end());
+			}
+			size_t i;
+			for(i = 0; i < bs; i++) {
+				asink.addAlignment(bucket[i], &analyzer);
+				assert_neq(0llu, upto);
+				upto--;
+				if(upto == 0) break;
+			}
+			als += i;
+			bucket.clear();
 		}
-		size_t i;
-		for(i = 0; i < bs; i++) {
-			asink.addAlignment(bucket[i], &analyzer);
-			assert_neq(0llu, upto);
-			upto--;
-			if(upto == 0) break;
-		}
-		als += i;
-		bucket.clear();
 	}
+	assert(bucket.empty());
 
 	// Output summary
 	if(verbose) {

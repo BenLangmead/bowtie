@@ -111,7 +111,7 @@ public:
 	/**
 	 * Initialize new rotating buf.
 	 */
-	RotatingBuf() : buf_(), refidx_(0), lpos_(0), rpos_(0) {
+	RotatingBuf() : buf_(), refidx_(0), lpos_(0xffffffff), rpos_(0xffffffff) {
 		buf_.resize(S);
 	}
 
@@ -129,20 +129,22 @@ public:
 		assert_leq(newLhs, newRhs);   // left-hand-side can't be to the right of right-hand
 		// New left-hand side must be greater than or equal to previous
 		// left-hand side.
-		if(newLhs < lpos_) {
-			cerr << "Error: alignments were not presented to RotatingBuf in sorted order" << endl;
-			exit(1);
-		}
-		// Check if there are columns we're finished adding rows to
-		if(newLhs > lpos_ && analyzer != NULL) {
-			for(size_t i = lpos_; i < newLhs; i++) {
-				// Column i is done, send it to the column analyzer
-				if(buf_[i % S].size() > 0) {
-					// Analyze this column
-					analyzer->analyze(refidx_, i, buf_[i % S]);
+		if(lpos_ != 0xffffffff) {
+			if(newLhs < lpos_) {
+				cerr << "Error: alignments were not presented to RotatingBuf in sorted order" << endl;
+				exit(1);
+			}
+			// Check if there are columns we're finished adding rows to
+			if(newLhs > lpos_ && analyzer != NULL) {
+				for(size_t i = lpos_; i < newLhs; i++) {
+					// Column i is done, send it to the column analyzer
+					if(buf_[i % S].size() > 0) {
+						// Analyze this column
+						analyzer->analyze(refidx_, i, buf_[i % S]);
+					}
+					// Free it up
+					buf_[i % S].clear();
 				}
-				// Free it up
-				buf_[i % S].clear();
 			}
 		}
 		// Update left-hand side
@@ -155,6 +157,9 @@ public:
 #endif
 			rpos_ = newRhs;
 		}
+		if(rpos_ == 0xffffffff) {
+			rpos_ = newRhs;
+		}
 		assert_leq(rpos_ - lpos_, S); // size of window of interest can't exceed S
 	}
 
@@ -164,6 +169,8 @@ public:
 	 * current window of interest.
 	 */
 	void add(uint32_t pos, const T& elt) {
+		assert_neq(0xffffffff, lpos_);
+		assert_neq(0xffffffff, rpos_);
 		assert_leq(rpos_ - lpos_, S);
 		assert_geq(pos, lpos_);
 		assert_lt(pos, rpos_);
@@ -176,6 +183,8 @@ public:
 	 * interest.
 	 */
 	const vector<T>& get(uint32_t pos) {
+		assert_neq(0xffffffff, lpos_);
+		assert_neq(0xffffffff, rpos_);
 		assert_geq(pos, lpos_);
 		assert_lt(pos, rpos_);
 		return buf_[pos % S];
@@ -188,23 +197,36 @@ public:
 	 */
 	void finalize(ColumnAnalyzer<T> *analyzer = NULL) {
 #ifndef NDEBUG
-		size_t mn = min(lpos_ % S, rpos_ % S);
-		size_t mx = max(lpos_ % S, rpos_ % S);
-		for(size_t i = 0; i < mn; i++) {
-			assert_eq(0, buf_[i % S].size());
-		}
-		for(size_t i = mx; i < S; i++) {
-			assert_eq(0, buf_[i % S].size());
-		}
-#endif
-		for(size_t i = lpos_; i < rpos_; i++) {
-			if(buf_[i % S].size() > 0) {
-				// Analyze this column
-				if(analyzer != NULL) {
-					analyzer->analyze(refidx_, i, buf_[i % S]);
+		if(lpos_ != 0xffffffff) {
+			assert_neq(0xffffffff, rpos_);
+			size_t mn = min(lpos_ % S, rpos_ % S);
+			size_t mx = max(lpos_ % S, rpos_ % S);
+			if(mn == (rpos_ % S)) {
+				// The range lpos_ to rpos_ wraps
+				for(size_t i = mn; i < mx; i++) {
+					assert_eq(0, buf_[i % S].size());
+				}
+			} else {
+				// The range lpos_ to rpos_ doesn't wrap
+				for(size_t i = 0; i < mn; i++) {
+					assert_eq(0, buf_[i % S].size());
+				}
+				for(size_t i = mx; i < S; i++) {
+					assert_eq(0, buf_[i % S].size());
 				}
 			}
-			buf_[i % S].clear();
+#endif
+			for(size_t i = lpos_; i < rpos_; i++) {
+				if(buf_[i % S].size() > 0) {
+					// Analyze this column
+					if(analyzer != NULL) {
+						analyzer->analyze(refidx_, i, buf_[i % S]);
+					}
+				}
+				buf_[i % S].clear();
+			}
+		} else {
+			assert_eq(0xffffffff, rpos_);
 		}
 	}
 
@@ -215,8 +237,8 @@ public:
 	void reset(uint32_t refidx, ColumnAnalyzer<T> *analyzer = NULL) {
 		finalize(analyzer);
 		refidx_ = refidx;
-		lpos_ = 0;
-		rpos_ = 0;
+		lpos_ = 0xffffffff;
+		rpos_ = 0xffffffff;
 	}
 
 private:
@@ -236,10 +258,6 @@ public:
 
 	AlignmentSink(uint32_t partitionLen = 0xffffffff, bool verbose = false) :
 	buf_(),
-	lastRefIdx_(0),
-	lastRefOff_(0),
-	lastLeft_(0),
-	furthestRight_(0),
 	partition_(0xffffffff),
 	partitionLen_(partitionLen),
 	verbose_(verbose) { }
@@ -273,18 +291,6 @@ public:
 			assert(left || right || inside);
 		}
 #endif
-		// Check if we encountered a new reference
-		if(h.h.first != lastRefIdx_) {
-			// Reset state and buffer for new reference sequence
-			assert_gt(h.h.first, lastRefIdx_); // must have greater idx
-			lastRefIdx_ = h.h.first;
-			lastRefOff_ = 0;
-			lastLeft_ = 0;
-			furthestRight_ = 0;
-			// Call reset() to finalize the old buffer and reset for
-			// the new buffer.
-			buf_.reset(h.h.first, analyzer);
-		}
 		uint32_t len = h.length();
 		uint32_t rhs = h.h.second + len;
 		// Update the underlying rotating buffer so that it's ready to
@@ -334,10 +340,6 @@ protected:
 			ColumnAnalyzer<T> *analyzer = NULL) { }
 
 	RotatingBuf<T, S> buf_;
-	uint32_t lastRefIdx_;
-	uint32_t lastRefOff_;
-	uint32_t lastLeft_;
-	uint32_t furthestRight_;
 	uint32_t partition_;
 	uint32_t partitionLen_;
 	bool verbose_;
