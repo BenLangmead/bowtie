@@ -183,8 +183,11 @@ static void processAlignments(
 		// Add next alignment directly to the alignment sink
 		Hit h;
 		// Parse the alignment from the istream
-		VerboseHitSink::readHit(h, ss, NULL, verbose);
-		assert_gt(h.length(), 0);
+		bool goodRead = VerboseHitSink::readHit(h, ss, NULL, verbose);
+		if(!goodRead || h.length() == 0) {
+			// Problem parsing; just skip it
+			continue;
+		}
 
 		// Determine whether this alignment has the same partition
 		// name as the last one; either way, make sure that 'partbuf'
@@ -245,7 +248,6 @@ static void processAlignments(
 		// sequence, so sort the elements belonging to the last
 		// partition/sequence and push them into the alignment sink.
 		if(!samePart || !sameRef) {
-			assert(!sorted);
 			size_t bs = bucket.size();
 			if(bs > 0) {
 				if(bs > 1) {
@@ -362,9 +364,12 @@ int main(int argc, char **argv) {
 	tokenize(infile, ",", infiles);
 
 	// For all input files
-	SNPColumnCharPairAnalyzer ca(std::cout);
-	RotatingCharPairAlignmentBuf<1024> cpBuf(partitionLen, verbose); // hoist this?
+	SNPColumnMassAnalyzer ca(std::cout);
+	RotatingSNPMassAlignmentBuf<1024> cpBuf(partitionLen, verbose); // hoist this?
 	for(size_t i = 0; i < infiles.size(); i++) {
+		if(verbose) {
+			cout << "Processing file " << (i+1) << " of " << infiles.size() << ": \"" << infiles[i] << "\"" << endl;
+		}
 		// Input is partitioned, so call the set of functions that
 		// know how to deal with partitioned input
 		if(infiles[i] == "-") {
@@ -375,7 +380,7 @@ int main(int argc, char **argv) {
 		}
 		cpBuf.finalize(&ca);
 		if(verbose) {
-			cout << "Finished processing alignment file " << infiles[i] << endl;
+			cout << "  Finished processing \"" << infiles[i] << "\"" << endl;
 		}
 	}
 
