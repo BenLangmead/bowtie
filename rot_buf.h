@@ -196,8 +196,8 @@ public:
 	 * cleared.
 	 */
 	void finalize(ColumnAnalyzer<T> *analyzer = NULL) {
-#ifndef NDEBUG
 		if(lpos_ != 0xffffffff) {
+#ifndef NDEBUG
 			assert_neq(0xffffffff, rpos_);
 			size_t mn = min(lpos_ % S, rpos_ % S);
 			size_t mx = max(lpos_ % S, rpos_ % S);
