@@ -1343,7 +1343,7 @@ public:
 		assert_eq(readSeqLen, readQualsLen);
 
 		// Copy quality values into h.quals
-		seqan::resize(h.quals, readNameLen);
+		seqan::resize(h.quals, readSeqLen);
 		char *readQualsDest = (char *)h.quals.data_begin;
 		for(size_t i = 0; i < readQualsLen; i++) {
 			assert_geq(readQuals[i], 33);
