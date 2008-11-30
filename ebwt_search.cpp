@@ -23,6 +23,7 @@ using namespace std;
 using namespace seqan;
 
 static int verbose				= 0; // be talkative
+static bool quiet				= false; // print nothing but the alignments
 static int sanityCheck			= 0;  // enable expensive sanity checks
 static int format				= FASTQ; // default read format is FASTQ
 static string origString		= ""; // reference text, or filename(s)
@@ -89,6 +90,7 @@ enum {
 	ARG_MAXBTS1,
 	ARG_MAXBTS2,
 	ARG_VERBOSE,
+	ARG_QUIET,
 	ARG_MAXNS,
 	ARG_RANDOM_READS,
 	ARG_RANDOM_READS_NOSYNC,
@@ -112,6 +114,7 @@ enum {
 
 static struct option long_options[] = {
 	{"verbose",      no_argument,       0,            ARG_VERBOSE},
+	{"quiet",        no_argument,       0,            ARG_QUIET},
 	{"sanity",       no_argument,       0,            ARG_SANITY},
 	{"exact",        no_argument,       0,            '0'},
 	{"1mm",          no_argument,       0,            '1'},
@@ -224,6 +227,7 @@ static void printUsage(ostream& out) {
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
+	    << "  --quiet            print nothing but the alignments" << endl
 	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
@@ -693,6 +697,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_BEST: onlyBest = true; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
+	   		case ARG_QUIET: quiet = true; break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case 't': timing = true; break;
 			case ARG_MAXBTS:  maxBts  = parseInt(0, "--maxbts must be positive");  break;
@@ -2914,7 +2919,9 @@ static void driver(const char * type,
 		if(ebwtBw != NULL) {
 			delete ebwtBw;
 		}
-	    sink->finish(); // end the hits section of the hit file
+		if(!quiet) {
+			sink->finish(); // end the hits section of the hit file
+		}
 	    sink->flush();
 		if(fout != NULL) {
 			((ofstream*)fout)->close();
