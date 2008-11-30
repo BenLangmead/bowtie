@@ -1204,135 +1204,211 @@ public:
 		}
 		in.getline(buf, 4096);
 		size_t len = in.gcount();
-		if(len == 0) {
+		if(len < 11) {
+			// Can't possibly be a well-formed line if it's this short
 			return false;
 		}
-		string line(buf);
-		vector<string> toks;
-		tokenize(line, "\t", toks);
-		// Skip over a partition key, if one exists
-		if(toks[0].find_first_of(" ", 0) != string::npos) {
-			if(verbose) cout << "Erased partition string" << endl;
-			toks.erase(toks.begin());
-		}
-		if(verbose) {
-			for(size_t i = 0; i < toks.size(); i++) {
-				cout << toks[i] << ", ";
-			}
-			cout << endl;
-		}
-		// Parse read name
-		bool readNameIsIdx = true;
-		const string& readName = toks[0];
-		for(size_t i = 0; i < readName.length(); i++) {
-			if(readName[i] < '0' || readName[i] > '9') readNameIsIdx = false;
-		}
-		uint32_t patid = 0;
-		if(readNameIsIdx) {
-			istringstream readIdxSs(readName);
-			readIdxSs >> patid;
-		}
-		// Parse orientation
-		bool orientation = (toks[1] == "+");
-		// Parse reference sequence id
-		bool refIsIdx = true;
-		for(size_t i = 0; i < toks[2].length(); i++) {
-			if(toks[2][i] < '0' || toks[2][i] > '9') {
-				refIsIdx = false;
+
+		// Push cur pointer past partition label, if it exists
+		char *cur = buf;
+		bool sawSpace = true;
+		while(*cur != ' ') {
+			if(*cur == '\t') {
+				sawSpace = false;
 				break;
 			}
+			cur++;
+			assert_lt((size_t)(cur - buf), len);
 		}
-		istringstream refIdxSs(toks[2]);
-		uint32_t refIdx;
-		if(refIsIdx) refIdxSs >> refIdx;
-		else if(refnames != NULL) {
+		if(sawSpace) {
+			// Keep moving to past the next tab
+			while(*cur != '\t') cur++;
+			assert_eq('\t', *cur);
+			cur++;
+		} else {
+			cur = buf; // rewind
+		}
+
+		// Parse read name and check whether it's totally numeric
+		bool readNameIsIdx = true;
+		h.patId = 0;
+		char *readName = cur;
+		while(*cur != '\t') {
+			if(*cur < '0' || *cur > '9') {
+				readNameIsIdx = false;
+			} else if(readNameIsIdx) {
+				h.patId *= 10;
+				h.patId += (*cur - '0');
+			}
+			assert_lt((size_t)(cur - readName), len);
+			cur++;
+		}
+		*cur = '\0';
+		size_t readNameLen = cur - readName;
+		cur++;
+
+		// Copy read name into h.patName
+		seqan::resize(h.patName, readNameLen);
+		char *patName = seqan::begin(h.patName, Standard());
+		for(size_t i = 0; i < readNameLen; i++) {
+			patName[i] = readName[i];
+		}
+
+		// Parse orientation
+		assert(*cur == '+' || *cur == '-');
+		h.fw = (*cur == '+');
+		cur++;
+		assert_eq('\t', *cur);
+		cur++;
+
+		// Parse reference sequence id
+		bool refIsIdx = true;
+		uint32_t refIdx = 0;
+		char *refName = cur;
+		while(*cur != '\t') {
+			if(*cur < '0' || *cur > '9') {
+				refIsIdx = false;
+			} else if(readNameIsIdx) {
+				refIdx *= 10;
+				refIdx += (*cur - '0');
+			}
+			assert_lt((size_t)(cur - readName), len);
+			cur++;
+		}
+		*cur = '\0';
+		//size_t refNameLen = (size_t)(cur - refName);
+		cur++;
+
+		if(!refIsIdx && refnames != NULL) {
 			bool found = false;
 			for(size_t i = 0; i < refnames->size(); i++) {
-				if((*refnames)[i] == toks[2]) {
+				if((*refnames)[i] == refName) {
 					found = true;
 					refIdx = i;
 					break;
 				}
 			}
-			if(!found) {
-				refIdx = refnames->size();
-				refnames->push_back(toks[2]);
-			}
-		} else {
-			// reference was named and we have no way of mapping it to
-			// an index, so we ignore it
-			cerr << "Could not find an id to map reference name \"" << toks[2] << "\" to." << endl;
+			cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl;
 			exit(1);
 		}
+
 		// Parse reference sequence offset
-		istringstream refOffSs(toks[3]);
-		uint32_t refOff; refOffSs >> refOff;
-		// Parse read sequence (5' is on RHS iff !orientation)
-		const string& readSeq = toks[4];
-		// Parse read qualities (5' is on RHS iff !orientation)
-		const string& readQual = toks[5];
-		assert_eq(readSeq.length(), readQual.length());
-		// Parse the # other hits at this stratum estimate
-		istringstream omsSs(toks[6]);
-		uint32_t oms; omsSs >> oms;
-		vector<char> refcs;
-		refcs.resize(readSeq.length(), 0);
-		FixedBitset<max_read_bp> mms;
-		// toks.size() == 8 iff there are one or more mismatches
-		if(toks.size() == 8) {
-			vector<string> mmStrs;
-			// Separate comma-delimited mismatch tokens
-			tokenize(toks[7], ",", mmStrs);
-			for(size_t i = 0; i < mmStrs.size(); i++) {
-				vector<string> cs;
-				// Split the offset from the characters
-				tokenize(mmStrs[i], ":", cs);
-				assert_eq(2, cs.size());
-				// first character of the "A>C" string is the reference
-				// character
-				istringstream offSs(cs[0]);
-				uint32_t off; offSs >> off;
-				assert_lt(off, readSeq.length());
-				// 'off' is an offset from the 5' end of the read.  We
-				// want to translate it into an offset from the left
-				// end of the read as it aligns to the forward strand
-				// of the reference.  This means that we need to invert
-				// it if the 5' end is on the right (i.e., if the
-				// orientation is "-")
-				//
-				// BTL: never mind; I think this is too confusing.  We
-				// shouldn't overload the Hit structure such that there
-				// are multiple interpretations of its fields.
-				//
-				size_t noff = off;
-				//if(!orientation) {
-				//	// read is reversed; invert offset
-				//	noff = readSeq.length() - off - 1;
-				//}
-				mms.set(noff);
-				refcs[noff] = cs[1][0]; // reference char is before the >
-				//assert_eq(readSeq[noff], cs[1][2]);
-				if(orientation) {
-					assert_eq(readSeq[noff], cs[1][2]);
-				} else {
-					assert_eq(readSeq[readSeq.length() - noff - 1], cs[1][2]);
-				}
-				if(verbose) {
-					cout << "  Set mm at offset " << noff << " to "
-					     << refcs[noff] << endl;
-				}
+		uint32_t refOff = 0;
+		ASSERT_ONLY(char *refOffStr = cur);
+		while(*cur != '\t') {
+			if(*cur < '0' || *cur > '9') {
+				assert(false);
 			}
-			if(verbose) cout << "Parsing mismatches" << endl;
+			refOff *= 10;
+			refOff += (*cur - '0');
+			assert_leq((size_t)(cur - refOffStr), len);
+			cur++;
 		}
+		*cur = '\0'; // terminate reference-offset sequence
+		//size_t refOffLen = (size_t)(cur - refOffStr);
+		cur++;
+
+		// Fill in h.h now that we have refIdx and refOff
 		h.h = make_pair<uint32_t>(refIdx, refOff);
-		h.patId = (uint32_t)patid; // patid
-		h.patName = String<char>(readName);
-		h.patSeq = String<Dna5>(readSeq);
-		h.quals = String<char>(readQual);
-		h.fw = orientation; // fw
-		h.mms = mms;    // mms
-		h.refcs = refcs;  // refcs
-		h.oms = oms;   // oms
+
+		// Parse read sequence
+		char *readSeq = cur;
+		while(*cur != '\t') {
+			cur++;
+			assert_leq((size_t)(cur - refOffStr), len);
+		}
+		*cur = '\0'; // terminate read sequence
+		size_t readSeqLen = cur - readSeq;
+		assert_gt(readSeqLen, 0);
+		cur++;
+
+		// Copy read sequence into h.patSeq
+		seqan::resize(h.patSeq, readSeqLen);
+		uint8_t *readSeqDest = (uint8_t *)seqan::begin(h.patSeq, Standard());
+		for(size_t i = 0; i < readSeqLen; i++) {
+			assert_neq(0, dna4Cat[(int)readSeq[i]]);
+			readSeqDest[i] = charToDna5[(int)readSeq[i]];
+		}
+
+		// Parse read qualities
+		char *readQuals = cur;
+		while(*cur != '\t') {
+			cur++;
+			assert_leq((size_t)(cur - refOffStr), len);
+		}
+		*cur = '\0'; // terminate read sequence
+		size_t readQualsLen = cur - readQuals;
+		assert_gt(readQualsLen, 0);
+		cur++;
+		assert_eq(readSeqLen, readQualsLen);
+
+		// Copy quality values into h.quals
+		seqan::resize(h.quals, readNameLen);
+		char *readQualsDest = seqan::begin(h.quals, Standard());
+		for(size_t i = 0; i < readQualsLen; i++) {
+			assert_geq(readQuals[i], 33);
+			readQualsDest[i] = readQuals[i];
+		}
+
+		// Parse # other hits at this stratum (an underestimate)
+		ASSERT_ONLY(char *omsStr = cur);
+		h.oms = 0;
+		// (the oms field is always followed by a tab, even when the
+		// (following) mismatch field is empty
+		while(*cur != '\t') {
+			// Must be a number
+			assert(*cur >= '0' && *cur <= '9');
+			h.oms *= 10;
+			h.oms += (*cur - '0');
+			cur++;
+			assert_leq((size_t)(cur - omsStr), len);
+		}
+		*cur = '\0'; // terminate read sequence
+		ASSERT_ONLY(size_t omsLen = cur - omsStr);
+		assert_gt(omsLen, 0);
+		cur++;
+
+		// Parse the # other hits at this stratum estimate
+		h.refcs.resize(readSeqLen);
+
+		// (h.mm is fixed-width so we don't need to resize it)
+		if(*cur == '\0') {
+			return true;
+		}
+		assert(*cur >= '0' && *cur <= '9');
+		while(true) {
+			uint32_t i = 0;
+			ASSERT_ONLY(char *offStr = cur);
+			while(*cur != ':') {
+				// Must be a number
+				assert(*cur >= '0' && *cur <= '9');
+				i *= 10;
+				i += (*cur - '0');
+				cur++;
+				assert_leq((size_t)(cur - offStr), len);
+			}
+			assert_lt(i, readSeqLen);
+			cur++; // now points to reference base
+			assert_eq(1, (int)dna4Cat[(int)(*cur)]);
+			ASSERT_ONLY(int rc = *cur);
+			h.refcs[i] = *cur;
+			h.mms.set(i);
+			cur++; assert_eq('>', *cur);
+			cur++;
+			assert_gt((int)dna4Cat[(int)(*cur)], 0);
+			assert_neq((int)dna4Cat[(int)(*cur)], rc);
+			if(h.fw) {
+				assert_eq("ACGTN"[(int)h.patSeq[i]], *cur);
+			} else {
+				assert_eq("ACGTN"[(int)h.patSeq[readSeqLen - i - 1]], *cur);
+			}
+			cur++;
+			if(*cur == '\0') {
+				break;
+			}
+			assert_eq(',', *cur);
+			cur++;
+		}
 		return true;
 	}
 
