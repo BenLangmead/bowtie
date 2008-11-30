@@ -15,12 +15,13 @@
  * \file Driver for the bowtie-asm assembly tool.
  */
 
-static bool verbose       = false; // be talkative (default)
-static int  sanityCheck   = 0;     // do slow sanity checks
-static bool showVersion   = false; // show version info and exit
-static bool sorted        = false; // alignments are pre-sorted?
+static bool     verbose      = false; // be talkative (default)
+static int      sanityCheck  = 0;     // do slow sanity checks
+static bool     showVersion  = false; // show version info and exit
+static bool     sorted       = false; // alignments are pre-sorted?
+static int      threads      = 0;     // # of simultaneous pthreads
 static uint32_t partitionLen = 0xffffffff; // length of a partition, -1 if input isn't partitioned
-static uint64_t upto      = 0xffffffffffffffffllu; // max # aligns to process
+static uint64_t upto         = 0xffffffffffffffffllu; // max # aligns to process
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -33,14 +34,15 @@ static void printUsage(ostream& out) {
 	    << "    -v/--verbose         verbose output (for debugging)" << endl
 	    << "    -s/--sorted          treat input alignments as already sorted" << endl
 	    << "    -u/--upto            maximum # alignments to process" << endl
-	    << "    -p/--partition <int> length of a partition, if input is partitioned" << endl
+	    << "    -p/--threads <int>   # of threads to use in parallel" << endl
+	    << "    -t/--partition <int> length of a partition, if input is partitioned" << endl
 	    //<< "    -s/--sanity          enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help            print detailed description of tool and its options" << endl
 	    << "    --version            print version information and quit" << endl
 	    ;
 }
 
-static const char *short_options = "hvs?u:p:";
+static const char *short_options = "hvs?u:p:t:";
 
 enum {
 	ARG_VERSION = 256,
@@ -51,7 +53,8 @@ static struct option long_options[] = {
 	{"verbose",   no_argument, 0, 'v'},
 	{"sorted",    no_argument, 0, 's'},
 	{"upto",      required_argument, 0, 'u'},
-	{"partition", required_argument, 0, 'p'},
+	{"threads",   required_argument, 0, 'p'},
+	{"partition", required_argument, 0, 't'},
 	{"sanity",    no_argument, 0, ARG_SANITY},
 	{"help",      no_argument, 0, 'h'},
 	{"version",   no_argument, 0, ARG_VERSION},
@@ -102,7 +105,10 @@ static void parseOptions(int argc, char **argv) {
 	   			upto = parseNumber<uint64_t>(1, "-u/--upto must be at least 1");
 	   			break;
 	   		case 'p':
-	   			partitionLen = parseNumber<uint32_t>(1, "-p/--partition must be at least 1");
+	   			threads = parseNumber<int>(1, "-p/--threads must be at least 1");
+	   			break;
+	   		case 't':
+	   			partitionLen = parseNumber<uint32_t>(1, "-t/--partition must be at least 1");
 	   			break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
@@ -143,6 +149,8 @@ static void processAlignments(
 		if(sorted) cout << "sorted ";
 		cout << "alignment file " << filename<< endl;
 	}
+	// Re-use the hit across iterations
+	Hit h;
 	while(true) {
 		// Get the next alignment line
 		alfile.getline(buf, 4096);
@@ -180,8 +188,6 @@ static void processAlignments(
 		ss.rdbuf()->pubsetbuf(buf, len);
 		ss.clear();
 
-		// Add next alignment directly to the alignment sink
-		Hit h;
 		// Parse the alignment from the istream
 		bool goodRead = VerboseHitSink::readHit(h, ss, NULL, verbose);
 		if(!goodRead || h.length() == 0) {

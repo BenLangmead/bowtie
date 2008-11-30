@@ -1369,7 +1369,8 @@ public:
 		cur++;
 
 		// Parse the # other hits at this stratum estimate
-		h.refcs.resize(readSeqLen);
+		h.refcs.resize(readSeqLen, 0);
+		assert_eq(readSeqLen, h.refcs.size());
 
 		// (h.mm is fixed-width so we don't need to resize it)
 		if(*cur == '\0') {
