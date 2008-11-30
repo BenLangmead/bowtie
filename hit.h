@@ -1249,7 +1249,7 @@ public:
 
 		// Copy read name into h.patName
 		seqan::resize(h.patName, readNameLen);
-		char *patName = (char *)seqan::begin(h.patName, Standard());
+		char *patName = (char *)seqan::begin(h.patName);
 		for(size_t i = 0; i < readNameLen; i++) {
 			patName[i] = readName[i];
 		}
@@ -1324,7 +1324,7 @@ public:
 
 		// Copy read sequence into h.patSeq
 		seqan::resize(h.patSeq, readSeqLen);
-		uint8_t *readSeqDest = (uint8_t *)seqan::begin(h.patSeq, Standard());
+		uint8_t *readSeqDest = (uint8_t *)seqan::begin(h.patSeq);
 		for(size_t i = 0; i < readSeqLen; i++) {
 			assert_neq(0, dna4Cat[(int)readSeq[i]]);
 			readSeqDest[i] = charToDna5[(int)readSeq[i]];
@@ -1344,7 +1344,7 @@ public:
 
 		// Copy quality values into h.quals
 		seqan::resize(h.quals, readNameLen);
-		char *readQualsDest = (char *)seqan::begin(h.quals, Standard());
+		char *readQualsDest = (char *)seqan::begin(h.quals);
 		for(size_t i = 0; i < readQualsLen; i++) {
 			assert_geq(readQuals[i], 33);
 			readQualsDest[i] = readQuals[i];
