@@ -189,6 +189,7 @@ static void processAlignments(
 		ss.clear();
 
 		// Parse the alignment from the istream
+		h.mms.clear();
 		bool goodRead = VerboseHitSink::readHit(h, ss, NULL, verbose);
 		if(!goodRead || h.length() == 0) {
 			// Problem parsing; just skip it
