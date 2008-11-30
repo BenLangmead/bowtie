@@ -168,6 +168,9 @@ static void processAlignments(
 			cerr << "A line from the alignment file was empty" << endl;
 			exit(1);
 		}
+		if(verbose) {
+			cout << "Got line: " << buf << endl;
+		}
 
 		// A true alignment line will have a tab; if this one doesn't,
 		// then skip it

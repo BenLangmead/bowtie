@@ -213,10 +213,20 @@ template<int LEN>
 class FixedBitset {
 
 public:
-	FixedBitset(const char *errmsg = NULL) : _errmsg(errmsg), _cnt(0), _size(0) {
+	FixedBitset() : _cnt(0), _size(0) {
 		memset(_words, 0, ((LEN>>5)+1) * 4);
 	}
 
+	/**
+	 * Unset all bits.
+	 */
+	void clear() {
+		memset(_words, 0, ((LEN>>5)+1) * 4);
+	}
+
+	/**
+	 * Return true iff the bit at offset i has been set.
+	 */
 	bool test(size_t i) const {
 		bool ret = false;
 		assert_lt(i, LEN);
@@ -224,6 +234,9 @@ public:
 		return ret;
 	}
 
+	/**
+	 * Set the bit at offset i.  Assert if the bit was already set.
+	 */
 	void set(size_t i) {
 		// Fast path
 		assert_lt(i, LEN);
@@ -236,6 +249,10 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
 
+	/**
+	 * Set the bit at offset i.  Do not assert if the bit was already
+	 * set.
+	 */
 	void setOver(size_t i) {
 		// Fast path
 		assert_lt(i, LEN);
@@ -250,6 +267,10 @@ public:
 	size_t count() const { return _cnt; }
 	size_t size() const  { return _size; }
 
+	/**
+	 * Return true iff this FixedBitset has the same bits set as
+	 * FixedBitset 'that'.
+	 */
 	bool operator== (const FixedBitset<LEN>& that) const {
 		for(size_t i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
@@ -259,6 +280,10 @@ public:
 		return true;
 	}
 
+	/**
+	 * Return true iff this FixedBitset does not have the same bits set
+	 * as FixedBitset 'that'.
+	 */
 	bool operator!= (const FixedBitset<LEN>& that) const {
 		for(size_t i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
@@ -268,6 +293,9 @@ public:
 		return false;
 	}
 
+	/**
+	 * Return a string-ized version of this FixedBitset.
+	 */
 	std::string str() const {
 		std::ostringstream oss;
 		for(int i = (int)size()-1; i >= 0; i--) {
@@ -277,7 +305,6 @@ public:
 	}
 
 private:
-	const char *_errmsg;         // error message if an allocation fails
 	size_t _cnt;
 	size_t _size;
 	uint32_t _words[(LEN>>5)+1]; // storage
