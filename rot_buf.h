@@ -23,12 +23,9 @@ private:
  */
 struct SNPMass {
 	SNPMass() : totalMass(0) { memset(perCharMass, 0, 4 * 4); }
-	bool repOk() const {
-		assert_eq(0, perCharMass[refChar]);
-		return true;
-	}
 	uint8_t refChar;
 	uint32_t totalMass;
+	uint32_t totalNonRefMass;
 	uint32_t perCharMass[4];
 };
 
@@ -56,103 +53,26 @@ public:
 	{
 		assert_eq(1, col.size());
 		const SNPMass& m = col.front();
-		assert(m.repOk());
 		uint32_t maxSnpMass = 0;
 		// If the total mass exceeds a sufficient threshold
-		if(m.totalMass > 300) {
+		if(m.totalNonRefMass > 300) {
 			// Sufficient evidence to try to make a call
-			for(int i = 0; i < 4; i++) {
+			uint8_t maxi = 0xff;
+			for(uint8_t i = 0; i < 4; i++) {
 				// Find the largest per-A/C/G/T mass
 				if(m.perCharMass[i] > maxSnpMass) {
 					maxSnpMass = m.perCharMass[i];
+					maxi = i;
 				}
+			}
+			if(maxi != 0xff && maxi != m.refChar) {
 				// Take ratio of highest-mass character to the total
 				// mass
-				double ratio = m.perCharMass[i] / (double)m.totalMass;
+				double ratio = m.perCharMass[maxi] / (double)m.totalMass;
 				if(ratio > 0.85) {
 					// 85% is the threshold
 					out_ << refidx << " " << refoff << " "
-					     << "ACGT"[m.refChar] << " " << "ACGT"[i] << endl;
-				}
-			}
-		}
-	}
-
-private:
-	ostream& out_;
-};
-
-/**
- * A concrete column-analysis class where each column is a vector of
- * char, char pairs where the first char contains the reference
- * character at that position (hi 4 bits) along with the read character
- * for that column and row (lo 4 bits).  The second char contains the
- * quality value.
- */
-class SNPColumnCharPairAnalyzer : public ColumnAnalyzer<pair<char, char> > {
-public:
-	SNPColumnCharPairAnalyzer(ostream& out) :
-		ColumnAnalyzer<pair<char, char> >(), out_(out) { }
-
-	virtual ~SNPColumnCharPairAnalyzer() { }
-
-	/**
-	 * Analyze a column of ref char, qry char, qual values and output a
-	 * homozygous SNP call where evidence is sufficient.
-	 */
-	virtual void analyze(uint32_t refidx,
-	                     uint32_t refoff,
-	                     const vector<pair<char, char> >& col)
-	{
-		// Quality "mass" (total) for all of A/C/G/T
-		int totalMass = 0;
-		// Quality "mass" (total) for each of A/C/G/T
-		int snpMass[4] = {0, 0, 0, 0};
-		int rc = -1;
-		// Iterate through rows in column
-		for(size_t i = 0; i < col.size(); i++) {
-			// Update total mass
-			totalMass += (col[i].second - 33);
-			// If this row is different from the reference...
-			if(col[i].first != -1) {
-				// Pick out the reference character
-				assert_lt((col[i].first >> 4), 4);
-				if(rc == -1) {
-					rc = col[i].first >> 4; // ref
-					assert_lt(rc, 4);
-				} else {
-					// Assert that reference character is the same
-					assert_eq(rc, (col[i].first >> 4));
-				}
-				// Pick out the read character
-				int c = col[i].first & 15;
-				if(c == 4) continue; // If it's an N, ignore it
-				assert_lt(c, 4);
-				assert_neq(c, rc); // Read char must not match ref char
-				// Update the "mass" for the read character
-				snpMass[c] += ((int)col[i].second - 33);
-			}
-		}
-		// Bail if we didn't encounter any rows
-		if(rc == -1) return;
-		assert_eq(0, snpMass[rc]);
-		int maxSnpMass = 0;
-		// If the total mass exceeds a sufficient threshold
-		if(totalMass > 300) {
-			// Sufficient evidence to try to make a call
-			for(int i = 0; i < 4; i++) {
-				// Find the largest per-A/C/G/T mass
-				if(snpMass[i] > maxSnpMass) {
-					maxSnpMass = snpMass[i];
-				}
-				// Take ratio of highest-mass character to the total
-				// mass
-				double ratio = snpMass[i] / (double)totalMass;
-				if(ratio > 0.85) {
-					// 85% is the threshold
-					assert_neq(-1, rc);
-					out_ << refidx << " " << refoff << " "
-					     << "ACGT"[rc] << " " << "ACGT"[i] << endl;
+					     << "ACGT"[m.refChar] << " " << "ACGT"[maxi] << endl;
 				}
 			}
 		}
@@ -450,68 +370,20 @@ protected:
 		assert_lt(lo, hi);
 		// Add char-pair evidence to each column; it's important that
 		// we proceed left-to-right along the reference
-		for(size_t ii = lo; ii < hi; ii++) {
-			this->addAlignmentAtCol(h, ii, analyzer);
-		}
+		this->addAlignmentCols(h, lo, hi, analyzer);
 	}
 
 	/**
 	 *
 	 */
-	virtual void addAlignmentAtCol(const Hit& h, size_t ii,
-	                               ColumnAnalyzer<T> *analyzer) = 0;
+	virtual void addAlignmentCols(const Hit& h, uint32_t lo, uint32_t hi,
+	                              ColumnAnalyzer<T> *analyzer) = 0;
 };
 
 /**
- * Keep track of
- */
-template<int S>
-class RotatingCharPairAlignmentBuf : public RotatingPartitionedAlignmentBuf<pair<char, char>, S> {
-
-public:
-	RotatingCharPairAlignmentBuf(uint32_t partitionLen = 0xffffffff, bool verbose = false) :
-		RotatingPartitionedAlignmentBuf<pair<char, char>, S>(partitionLen, verbose) { }
-
-protected:
-
-	/**
-	 * Add a new alignment to the rotating buffer.
-	 */
-	virtual void addAlignmentAtCol(const Hit& h, size_t ii,
-	                               ColumnAnalyzer<pair<char, char> > *analyzer)
-	{
-		uint32_t len = h.length();
-		// i = offset from 5' end, ii = offset from "left" end
-		// w/r/t reference
-		size_t i = ii;
-		if(!h.fw) i = len - ii - 1;
-		if(h.mms.test(i)) {
-			char q = h.quals[ii];
-			int readc = (int)h.patSeq[ii];
-			if(readc == 4) return; // no evidence inherent in Ns
-			char c = h.refcs[i]; // refcs also indexed from 5' end of read
-			assert_eq(1, dna4Cat[(int)c]);
-			c = charToDna5[(int)c];
-			assert_lt(c, 4);
-			assert_neq((int)c, readc);
-#ifndef NDEBUG
-			// Ensure that the reference character for the evidence
-			// we're adding matches the reference character for all
-			// evidence we've already added
-			const vector<pair<char, char> >& col = this->buf_.get(h.h.second + ii);
-			for(size_t j = 0; j < col.size(); j++) {
-				int cc = (col[j].first >> 4);
-				assert_eq((int)c, cc);
-			}
-#endif
-			c = (c << 4) | readc;
-			this->buf_.add(h.h.second + ii, make_pair(c, q));
-		}
-	}
-};
-
-/**
- * Keep track of
+ * An alignment sink that considers all columns of an alignment that
+ * lie within a partition and factors the evidence into a "SNPMass"
+ * object.
  */
 template<int S>
 class RotatingSNPMassAlignmentBuf : public RotatingPartitionedAlignmentBuf<SNPMass, S> {
@@ -525,36 +397,51 @@ protected:
 	/**
 	 * Add a new alignment to the rotating buffer.
 	 */
-	virtual void addAlignmentAtCol(const Hit& h, size_t ii,
-	                               ColumnAnalyzer<SNPMass> *analyzer)
+	virtual void addAlignmentCols(const Hit& h, uint32_t lo, uint32_t hi,
+	                              ColumnAnalyzer<SNPMass> *analyzer)
 	{
 		uint32_t len = h.length();
-		// i = offset from 5' end, ii = offset from "left" end
-		// w/r/t reference
-		size_t i = ii;
-		if(!h.fw) i = len - ii - 1;
-		if(h.mms.test(i)) {
-			char q = h.quals[ii] / (h.oms+1);
+		for(size_t ii = lo; ii < hi; ii++) {
+			// i = offset from 5' end, ii = offset from "left" end
+			// w/r/t reference
 			int readc = (int)h.patSeq[ii];
-			if(readc == 4) return; // no evidence inherent in Ns
-			char c = h.refcs[i]; // refcs also indexed from 5' end of read
-			assert_eq(1, dna4Cat[(int)c]);
-			c = charToDna5[(int)c];
-			assert_lt(c, 4);
-			assert_neq((int)c, readc);
+			if(readc == 4) continue; // no evidence inherent in Ns
+			size_t i = ii;
+			if(!h.fw) i = len - ii - 1;
+			char q = h.quals[ii];
+			if(h.oms > 0) {
+				q /= (h.oms+1);
+			}
 			vector<SNPMass>& col = this->buf_.get(h.h.second + ii);
+			bool snp = h.mms.test(i);
+			char c;
+			if(snp) {
+				c = h.refcs[i]; // refcs also indexed from 5' end of read
+				assert_eq(1, dna4Cat[(int)c]);
+				c = charToDna5[(int)c];
+				assert_neq((int)c, readc);
+			} else {
+				c = readc;
+			}
+			assert_lt(c, 4);
 			if(col.empty()) {
-				SNPMass m;
-				m.totalMass = q;
-				m.perCharMass[readc] = q;
-				m.refChar = c;
-				this->buf_.add(h.h.second + ii, m);
+				col.resize(1);
+				col.front().totalMass = q;
+				if(snp) {
+					col.front().totalNonRefMass = q;
+				} else {
+					col.front().totalNonRefMass = 0;
+				}
+				col.front().perCharMass[readc] = q;
+				col.front().refChar = c;
 			} else {
 				assert_eq(1, col.size());
-				SNPMass& m = col.front();
-				m.totalMass += q;
-				m.perCharMass[readc] += q;
-				assert_eq(m.refChar, c);
+				col.front().totalMass += q;
+				if(snp) {
+					col.front().totalNonRefMass += q;
+				}
+				col.front().perCharMass[readc] += q;
+				assert_eq(col.front().refChar, c);
 			}
 			// Done
 		}
