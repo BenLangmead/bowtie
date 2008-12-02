@@ -156,7 +156,7 @@ bowtie-asm32: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
 # 'bowtie-asm' forced to be 64-bit using -m64
 bowtie-asm64: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m32 -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m64 -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-asm-debug: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
