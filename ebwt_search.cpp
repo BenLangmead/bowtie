@@ -75,6 +75,7 @@ static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
 static bool noMaqRound          = false;
+static bool forgiveInput        = false;
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
 
@@ -109,6 +110,7 @@ enum {
 	ARG_SEED_EXTEND,
 	ARG_PARTITION,
 	ARG_INTEGER_QUALS,
+	ARG_FORGIVE_INPUT,
 	ARG_NOMAQROUND
 };
 
@@ -169,6 +171,7 @@ static struct option long_options[] = {
 	{"refout",       no_argument,       0,            ARG_REFOUT},
 	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{"partition",    required_argument, 0,            ARG_PARTITION},
+	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -653,6 +656,7 @@ static void parseOptions(int argc, char **argv) {
 	   		}
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_INTEGER_QUALS: integer_quals = true; break;
+			case ARG_FORGIVE_INPUT: forgiveInput = true; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
@@ -2738,7 +2742,8 @@ static void driver(const char * type,
 		case FASTQ:
 			patsrc = new FastqPatternSource (queries, false,
 			                                 patDumpfile, trim3, trim5,
-			                                 nsPolicy, solexa_quals,
+			                                 nsPolicy, forgiveInput,
+			                                 solexa_quals,
 											 integer_quals, maxNs);
 			break;
 		case CMDLINE:

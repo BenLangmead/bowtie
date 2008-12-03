@@ -1374,11 +1374,11 @@ protected:
 									// Keep the phred quality
 									if (c < 33)
 									{
+										cerr << "Saw ASCII character " << ((int)c) << "." << endl;
 										wrongQualityScale();
 										exit(1);
 									}
 								}
-
 
 								assert_geq(c, 33);
 								r.qualBufFw[bufSz - off - 1] = c;
