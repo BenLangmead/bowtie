@@ -986,13 +986,17 @@ public:
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
+	                   bool forgiveInput = false,
 					   bool solexa_quals = false,
 					   bool integer_quals = true,
 					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _solexa_quals(solexa_quals),
-		_integer_quals(integer_quals),_policy(__policy), _maxNs(__maxNs),
+		_first(true), _reverse(__reverse),
+		_forgiveInput(forgiveInput),
+		_solexa_quals(solexa_quals),
+		_integer_quals(integer_quals),
+		_policy(__policy), _maxNs(__maxNs),
 		_rand(seed)
 	{
 		for (int l = 0; l != 128; ++l) {
@@ -1024,13 +1028,16 @@ protected:
 			if(_first) {
 				c = _filebuf.get();
 				if(c != '@') {
-					//c = getOverNewline(_filebuf); if(c < 0) {
-					//	seqan::clear(r.patFw);
-					//	return;
-					//}
-					c = getToFirstRecord(_filebuf); if(c < 0) {
-						seqan::clear(r.patFw);
-						return;
+					if(_forgiveInput) {
+						c = getOverNewline(_filebuf); if(c < 0) {
+							seqan::clear(r.patFw);
+							return;
+						}
+					} else {
+						c = getToFirstRecord(_filebuf); if(c < 0) {
+							seqan::clear(r.patFw);
+							return;
+						}
 					}
 				}
 				if(c != '@') {
@@ -1100,7 +1107,11 @@ protected:
 						charsRead++;
 					}
 					c = _filebuf.get();
-					if(c < 0) break;
+					if(c < 0) {
+						// EOF occurred in the middle of a read - abort
+						seqan::clear(r.patFw);
+						return;
+					}
 				}
 				// Trim from 3' end
 				dstLen -= this->_trim3;
@@ -1141,7 +1152,11 @@ protected:
 						charsRead++;
 					}
 					c = _filebuf.get();
-					if(c < 0) break;
+					if(c < 0) {
+						// EOF occurred in the middle of a read - abort
+						seqan::clear(r.patFw);
+						return;
+					}
 				}
 				// Trim from 3' end
 				dstLen -= this->_trim3;
@@ -1276,10 +1291,14 @@ protected:
 				if(!_reverse) {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
 						c = _filebuf.get();
-						if (c == ' ')
-						{
+						if (c == ' ') {
 							wrongQualityFormat();
 							exit(1);
+						}
+						if(c < 0) {
+							// EOF occurred in the middle of a read - abort
+							seqan::clear(r.patFw);
+							return;
 						}
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
@@ -1302,6 +1321,7 @@ protected:
 									// Keep the phred quality
 									if (c < 33)
 									{
+										cerr << "Saw ASCII character " << ((int)c) << "." << endl;
 										wrongQualityScale();
 										exit(1);
 									}
@@ -1324,10 +1344,14 @@ protected:
 				} else {
 					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
 						c = _filebuf.get();
-						if (c == ' ')
-						{
+						if (c == ' ') {
 							wrongQualityFormat();
 							exit(1);
+						}
+						if(c < 0) {
+							// EOF occurred in the middle of a read - abort
+							seqan::clear(r.patFw);
+							return;
 						}
 						if (c != '\r' && c != '\n') {
 							if (qualsRead >= _trim5) {
@@ -1404,6 +1428,7 @@ protected:
 private:
 	bool _first;
 	bool _reverse;
+	bool _forgiveInput;
 	bool _solexa_quals;
 	bool _integer_quals;
 	int _policy;
