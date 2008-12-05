@@ -78,6 +78,7 @@ static bool noMaqRound          = false;
 static bool forgiveInput        = false;
 static bool useSpinlock         = true;
 static bool useFifo             = false;
+static bool fileParallel        = false; // separate threads read separate input files in parallel
 static const char *bowtie_fifo  = "/tmp/bowtie.fifo";
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
@@ -116,6 +117,7 @@ enum {
 	ARG_FORGIVE_INPUT,
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
+	ARG_FILEPAR,
 	ARG_FIFO
 };
 
@@ -154,6 +156,7 @@ static struct option long_options[] = {
 	{"maqerr",       required_argument, 0,            'e'},
 	{"seedlen",      required_argument, 0,            'l'},
 	{"seedmms",      required_argument, 0,            'n'},
+	{"filepar",      no_argument,       0,            ARG_FILEPAR},
 	{"help",         no_argument,       0,            'h'},
 	{"threads",      required_argument, 0,            'p'},
 	{"khits",        required_argument, 0,            'k'},
@@ -687,6 +690,13 @@ static void parseOptions(int argc, char **argv) {
 	   			exit(1);
 #endif
 	   			nthreads = parseInt(1, "-p/--threads arg must be at least 1");
+	   			break;
+	   		case ARG_FILEPAR:
+#ifndef BOWTIE_PTHREADS
+	   			cerr << "--filepar is disabled because bowtie was not compiled with pthreads support" << endl;
+	   			exit(1);
+#endif
+	   			fileParallel = true;
 	   			break;
 	   		case 'v':
 	   			maqLike = 0;
@@ -2730,41 +2740,63 @@ static void driver(const char * type,
 	}
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
-	// Create a pattern source for the queries
-	PatternSource *patsrc = NULL;
 	if(nsPolicy == NS_TO_NS && !maqLike) {
 		maxNs = min<int>(maxNs, mismatches);
 	}
-	switch(format) {
-		case FASTA:
-			patsrc = new FastaPatternSource (queries, false, useSpinlock,
-			                                 patDumpfile, trim3, trim5,
-			                                 nsPolicy, maxNs);
+	// Create list of pattern sources
+	vector<PatternSource*> patsrcs;
+	for(size_t i = 0; i < queries.size(); i++) {
+		const vector<string>* qs = &queries;
+		PatternSource* patsrc = NULL;
+		vector<string> tmp;
+		if(fileParallel) {
+			// Feed query files one to each PatternSource
+			qs = &tmp;
+			tmp.push_back(queries[i]);
+			assert_eq(1, tmp.size());
+		}
+		switch(format) {
+			case FASTA:
+				patsrc = new FastaPatternSource (*qs, false, useSpinlock,
+												 patDumpfile, trim3, trim5,
+												 nsPolicy, maxNs);
+				break;
+			case RAW:
+				patsrc = new RawPatternSource   (*qs, false, useSpinlock,
+												 patDumpfile, trim3, trim5,
+												 nsPolicy, maxNs);
+				break;
+			case FASTQ:
+				patsrc = new FastqPatternSource (*qs, false, useSpinlock,
+												 patDumpfile, trim3, trim5,
+												 nsPolicy, forgiveInput,
+												 solexa_quals,
+												 integer_quals, maxNs);
+				break;
+			case CMDLINE:
+				patsrc = new VectorPatternSource(*qs, false, useSpinlock,
+												 patDumpfile, trim3,
+												 trim5, nsPolicy, maxNs);
+				break;
+			case RANDOM:
+				patsrc = new RandomPatternSource(2000000, lenRandomReads,
+												 useSpinlock, patDumpfile,
+												 seed);
+				break;
+			default: assert(false);
+		}
+		assert(patsrc != NULL);
+		patsrcs.push_back(patsrc);
+		if(!fileParallel) {
 			break;
-		case RAW:
-			patsrc = new RawPatternSource   (queries, false, useSpinlock,
-			                                 patDumpfile, trim3, trim5,
-			                                 nsPolicy, maxNs);
-			break;
-		case FASTQ:
-			patsrc = new FastqPatternSource (queries, false, useSpinlock,
-			                                 patDumpfile, trim3, trim5,
-			                                 nsPolicy, forgiveInput,
-			                                 solexa_quals,
-											 integer_quals, maxNs);
-			break;
-		case CMDLINE:
-			patsrc = new VectorPatternSource(queries, false, useSpinlock,
-			                                 patDumpfile, trim3,
-			                                 trim5, nsPolicy, maxNs);
-			break;
-		case RANDOM:
-			patsrc = new RandomPatternSource(2000000, lenRandomReads,
-			                                 useSpinlock, patDumpfile,
-			                                 seed);
-			break;
-		default: assert(false);
+		}
 	}
+	assert_gt(patsrcs.size(), 0);
+	if(patsrcs.size() > 1) {
+		assert(fileParallel);
+	}
+	PatternSource* patsrc = patsrcs[0];
+	assert(patsrc != NULL);
 	if(skipSearch) return;
 	// Open hit output file
 	ostream *fout;
@@ -2818,25 +2850,6 @@ static void driver(const char * type,
 		ebwt.checkOrigs(os, false);
 		if(maqLike) ebwt.evictFromMemory();
 	}
-    // If sanity-check is enabled and an original text string
-    // was specified, sanity-check the Ebwt by confirming that
-    // the unpermuted version equals the original.
-	// NOTE: Disabled since, with fragments, it's no longer possible to do
-	// this straightforwardly with the os vector.  Rather, we need to either
-	// split each element of the os vector on Ns, or we need to read the
-	// references in differently.  The former seems preferable.
-//	if(!maqLike && sanityCheck && !os.empty()) {
-//		TStr rs; ebwt.restore(rs);
-//		TStr joinedo = Ebwt<TStr>::join(os, ebwt.eh().chunkRate(), seed);
-//		assert_leq(length(rs), length(joinedo));
-//		assert_geq(length(rs) + ebwt.eh().chunkLen(), length(joinedo));
-//		for(size_t i = 0; i < length(rs); i++) {
-//			if(rs[i] != joinedo[i]) {
-//				cout << "At character " << i << " of " << length(rs) << endl;
-//			}
-//			assert_eq(rs[i], joinedo[i]);
-//		}
-//	}
 	{
 		Timer _t(cout, "Time searching: ", timing);
 		// Set up hit sink; if sanityCheck && !os.empty() is true,

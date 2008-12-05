@@ -94,6 +94,8 @@ public:
 	    _readCnt(0),
 	    _reverse(__reverse),
 		_dumpfile(__dumpfile),
+		_numWrappers(0),
+		_doLocking(true),
 		_useSpinlock(__useSpinlock),
 		_lock()
 	{
@@ -107,7 +109,18 @@ public:
 		}
 		MUTEX_INIT(_lock);
 	}
+
 	virtual ~PatternSource() { }
+
+	/**
+	 * Call this whenever this PatternSource is wrapped by a new
+	 * WrappedPatternSourcePerThread.  This helps us keep track of
+	 * whether locks will be contended.
+	 */
+	void addWrapper() {
+		_numWrappers++;
+	}
+
 	/**
 	 * The main member function for dispensing patterns.
 	 */
@@ -152,7 +165,13 @@ public:
 		_reverse = __reverse;
 	}
 	uint32_t patid() { return _readCnt; }
+
 protected:
+
+	/**
+	 * Default format for dumping a read to an output stream.  Concrete
+	 * subclasses might want to do something fancier.
+	 */
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
@@ -160,12 +179,16 @@ protected:
 	{
 		out << name << ": " << seq << " " << qual << endl;
 	}
+
+	/// The number of reads read by this PatternSource
 	uint32_t _readCnt;
+
 	/**
 	 * Concrete subclasses call lock() to enter a critical region.
 	 * What constitutes a critical region depends on the subclass.
 	 */
 	void lock() {
+		if(!_doLocking || _numWrappers < 2) return; // no contention
 #ifdef USE_SPINLOCK
 		if(_useSpinlock) {
 			// User can ask to use the normal pthreads lock even if
@@ -178,11 +201,13 @@ protected:
 		}
 #endif
 	}
+
 	/**
 	 * Concrete subclasses call unlock() to exit a critical region
 	 * What constitutes a critical region depends on the subclass.
 	 */
 	void unlock() {
+		if(!_doLocking || _numWrappers < 2) return; // no contention
 #ifdef USE_SPINLOCK
 		if(_useSpinlock) {
 			// User can ask to use the normal pthreads lock even if
@@ -195,10 +220,12 @@ protected:
 		}
 #endif
 	}
-private:
+
 	bool _reverse;         /// reverse patterns before returning them
 	const char *_dumpfile; /// dump patterns to this file before returning them
 	ofstream _out;         /// output stream for dumpfile
+	int _numWrappers;      /// # threads that own a wrapper for this PatternSource
+	bool _doLocking;       ///
 	/// User can ask to use the normal pthreads-style lock even if
 	/// spinlocks is enabled and compiled in.  This is sometimes better
 	/// if we expect bad I/O latency on some reads.
@@ -240,7 +267,10 @@ protected:
 class WrappedPatternSourcePerThread : public PatternSourcePerThread {
 public:
 	WrappedPatternSourcePerThread(PatternSource& __patsrc) :
-		_patsrc(__patsrc) { }
+		_patsrc(__patsrc)
+	{
+		_patsrc.addWrapper();
+	}
 
 	virtual void nextRead() {
 		ASSERT_ONLY(uint32_t lastPatid = _patid);

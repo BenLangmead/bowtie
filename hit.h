@@ -143,6 +143,7 @@ public:
 		_outs(),
 		_deleteOuts(false),
 		_refnames(__refnames),
+		_numWrappers(0),
 		_locks()
 	{
 	    _outs.push_back(&__out);
@@ -184,6 +185,15 @@ public:
 				if(_outs[i] != NULL) delete _outs[i];
 			}
 		}
+	}
+
+	/**
+	 * Call this whenever this HitSink is wrapped by a new
+	 * HitSinkPerThread.  This helps us keep track of whether the main
+	 * lock or any of the per-stream locks will be contended.
+	 */
+	void addWrapper() {
+		_numWrappers++;
 	}
 
 	/**
@@ -238,6 +248,7 @@ public:
 
 protected:
 	void lock(size_t refIdx) {
+		if(_numWrappers < 2) return;
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
 		_locks[strIdx].Enter();
@@ -246,6 +257,7 @@ protected:
 #endif
 	}
 	void mainlock() {
+		if(_numWrappers < 2) return;
 #ifdef USE_SPINLOCK
 		_mainlock.Enter();
 #else
@@ -253,6 +265,7 @@ protected:
 #endif
 	}
 	void unlock(size_t refIdx) {
+		if(_numWrappers < 2) return;
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
 		_locks[strIdx].Leave();
@@ -261,6 +274,7 @@ protected:
 #endif
 	}
 	void mainunlock() {
+		if(_numWrappers < 2) return;
 #ifdef USE_SPINLOCK
 		_mainlock.Leave();
 #else
@@ -270,6 +284,7 @@ protected:
 	vector<ostream*> _outs;     /// the alignment output stream(s)
 	bool             _deleteOuts; /// Whether to delete elements of _outs upon exit
 	vector<string>*  _refnames; /// map from reference indexes to names
+	int              _numWrappers; /// # threads owning a wrapper for this HitSink
 #ifdef USE_SPINLOCK
 	vector<SpinLock> _locks;    /// spinlocks for per-file critical sections
 	SpinLock         _mainlock; /// spinlocks for fields of this object
@@ -296,7 +311,10 @@ public:
 		_bufferedHits(),
 		_strata(),
 		_hitsForThisRead(),
-		_max(__max) { }
+		_max(__max)
+	{
+		_sink.addWrapper();
+	}
 
 	virtual ~HitSinkPerThread() { }
 
