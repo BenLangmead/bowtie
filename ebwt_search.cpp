@@ -76,6 +76,7 @@ static bool seedAndExtend		= false; // use seed-and-extend aligner; for metageno
 static int partitionSz          = 0;     // output a partitioning key in first field
 static bool noMaqRound          = false;
 static bool forgiveInput        = false;
+static bool useSpinlock         = true;
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
 
@@ -111,7 +112,8 @@ enum {
 	ARG_PARTITION,
 	ARG_INTEGER_QUALS,
 	ARG_FORGIVE_INPUT,
-	ARG_NOMAQROUND
+	ARG_NOMAQROUND,
+	ARG_USE_SPINLOCK
 };
 
 static struct option long_options[] = {
@@ -172,6 +174,7 @@ static struct option long_options[] = {
 	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{"partition",    required_argument, 0,            ARG_PARTITION},
 	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
+	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -636,6 +639,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_REFOUT: refOut = true; break;
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
+	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_UNFA: {
@@ -2730,29 +2734,31 @@ static void driver(const char * type,
 	}
 	switch(format) {
 		case FASTA:
-			patsrc = new FastaPatternSource (queries, false,
+			patsrc = new FastaPatternSource (queries, false, useSpinlock,
 			                                 patDumpfile, trim3, trim5,
 			                                 nsPolicy, maxNs);
 			break;
 		case RAW:
-			patsrc = new RawPatternSource   (queries, false,
+			patsrc = new RawPatternSource   (queries, false, useSpinlock,
 			                                 patDumpfile, trim3, trim5,
 			                                 nsPolicy, maxNs);
 			break;
 		case FASTQ:
-			patsrc = new FastqPatternSource (queries, false,
+			patsrc = new FastqPatternSource (queries, false, useSpinlock,
 			                                 patDumpfile, trim3, trim5,
 			                                 nsPolicy, forgiveInput,
 			                                 solexa_quals,
 											 integer_quals, maxNs);
 			break;
 		case CMDLINE:
-			patsrc = new VectorPatternSource(queries, false,
+			patsrc = new VectorPatternSource(queries, false, useSpinlock,
 			                                 patDumpfile, trim3,
 			                                 trim5, nsPolicy, maxNs);
 			break;
 		case RANDOM:
-			patsrc = new RandomPatternSource(2000000, lenRandomReads, patDumpfile, seed);
+			patsrc = new RandomPatternSource(2000000, lenRandomReads,
+			                                 useSpinlock, patDumpfile,
+			                                 seed);
 			break;
 		default: assert(false);
 	}

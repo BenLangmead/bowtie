@@ -89,10 +89,12 @@ struct ReadBuf {
 class PatternSource {
 public:
 	PatternSource(bool __reverse = false,
+	              bool __useSpinlock = true,
 	              const char *__dumpfile = NULL) :
 	    _readCnt(0),
 	    _reverse(__reverse),
 		_dumpfile(__dumpfile),
+		_useSpinlock(__useSpinlock),
 		_lock()
 	{
 		// Open dumpfile, if specified
@@ -103,11 +105,7 @@ public:
 				exit(1);
 			}
 		}
-#ifdef USE_SPINLOCK
-		// No initialization
-#else
 		MUTEX_INIT(_lock);
-#endif
 	}
 	virtual ~PatternSource() { }
 	/**
@@ -169,9 +167,15 @@ protected:
 	 */
 	void lock() {
 #ifdef USE_SPINLOCK
-		_lock.Enter();
-#else
-		MUTEX_LOCK(_lock);
+		if(_useSpinlock) {
+			// User can ask to use the normal pthreads lock even if
+			// spinlocks are compiled in.
+			_spinlock.Enter();
+		} else {
+#endif
+			MUTEX_LOCK(_lock);
+#ifdef USE_SPINLOCK
+		}
 #endif
 	}
 	/**
@@ -180,20 +184,29 @@ protected:
 	 */
 	void unlock() {
 #ifdef USE_SPINLOCK
-		_lock.Leave();
-#else
-		MUTEX_UNLOCK(_lock);
+		if(_useSpinlock) {
+			// User can ask to use the normal pthreads lock even if
+			// spinlocks are compiled in.
+			_spinlock.Leave();
+		} else {
+#endif
+			MUTEX_UNLOCK(_lock);
+#ifdef USE_SPINLOCK
+		}
 #endif
 	}
 private:
 	bool _reverse;         /// reverse patterns before returning them
 	const char *_dumpfile; /// dump patterns to this file before returning them
 	ofstream _out;         /// output stream for dumpfile
+	/// User can ask to use the normal pthreads-style lock even if
+	/// spinlocks is enabled and compiled in.  This is sometimes better
+	/// if we expect bad I/O latency on some reads.
+	bool _useSpinlock;
 #ifdef USE_SPINLOCK
-	SpinLock _lock;
-#else
-	MUTEX_T _lock; /// mutex for locking critical regions
+	SpinLock _spinlock;
 #endif
+	MUTEX_T _lock; /// mutex for locking critical regions
 };
 
 /**
@@ -249,10 +262,11 @@ private:
 class TrimmingPatternSource : public PatternSource {
 public:
 	TrimmingPatternSource(bool __reverse = false,
+	                      bool __useSpinlock = true,
 	                      const char *__dumpfile = NULL,
 	                      int __trim3 = 0,
 	                      int __trim5 = 0) :
-		PatternSource(__reverse, __dumpfile),
+		PatternSource(__reverse, __useSpinlock, __dumpfile),
 		_trim3(__trim3),
 		_trim5(__trim5) { }
 protected:
@@ -269,9 +283,10 @@ class RandomPatternSource : public PatternSource {
 public:
 	RandomPatternSource(uint32_t numReads = 2000000,
 	                    int length = 35,
+	                    bool __useSpinlock = true,
 	                    const char *__dumpfile = NULL,
 	                    uint32_t seed = 0) :
-		PatternSource(false, __dumpfile),
+		PatternSource(false, __useSpinlock, __dumpfile),
 		_numReads(numReads),
 		_length(length),
 		_seed(seed),
@@ -514,13 +529,14 @@ class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(const vector<string>& v,
 	                    bool __reverse = false,
+	                    bool __useSpinlock = true,
 	                    const char *__dumpfile = NULL,
 	                    int __trim3 = 0,
 	                    int __trim5 = 0,
 		                int __policy = NS_TO_NS,
 	                    int __maxNs = 9999,
 	                    uint32_t seed = 0) :
-		TrimmingPatternSource(false, __dumpfile, __trim3, __trim5),
+		TrimmingPatternSource(false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_reverse(__reverse), _cur(0), _maxNs(__maxNs),
 		_v(), _vrev(), _vrc(), _vrcrev(), _quals(), _qualsrev(), _rand(seed)
 	{
@@ -683,10 +699,11 @@ class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
 	BufferedFilePatternSource(const vector<string>& infiles,
 	                          bool __reverse = false,
+	                          bool __useSpinlock = true,
 	                          const char *__dumpfile = NULL,
 	                          int __trim3 = 0,
 	                          int __trim5 = 0) :
-		TrimmingPatternSource(__reverse, __dumpfile, __trim3, __trim5),
+		TrimmingPatternSource(__reverse, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
 		_errs(),
 		_filecur(0),
@@ -785,13 +802,14 @@ class FastaPatternSource : public BufferedFilePatternSource {
 public:
 	FastaPatternSource(const vector<string>& infiles,
 	                   bool __reverse = false,
+	                   bool __useSpinlock = true,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
 	                   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{ }
 	virtual void reset() {
@@ -982,6 +1000,7 @@ class FastqPatternSource : public BufferedFilePatternSource {
 public:
 	FastqPatternSource(const vector<string>& infiles,
 	                   bool __reverse = false,
+	                   bool __useSpinlock = true,
 	                   const char *__dumpfile = NULL,
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
@@ -991,7 +1010,7 @@ public:
 					   bool integer_quals = true,
 					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse),
 		_forgiveInput(forgiveInput),
 		_solexa_quals(solexa_quals),
@@ -1204,6 +1223,7 @@ protected:
 								pQ = (iQ <= 93 ? iQ : 93) + 33;
 								if (pQ < 33)
 								{
+									cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
 									wrongQualityScale();
 									exit(1);
 								}
@@ -1244,6 +1264,7 @@ protected:
 								pQ = (iQ <= 93 ? iQ : 93) + 33;
 								if (pQ < 33)
 								{
+									cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
 									wrongQualityScale();
 									exit(1);
 								}
@@ -1444,13 +1465,14 @@ class RawPatternSource : public BufferedFilePatternSource {
 public:
 	RawPatternSource(const vector<string>& infiles,
 	                 bool __reverse = false,
+	                 bool __useSpinlock = true,
 	                 const char *__dumpfile = NULL,
 	                 int __trim3 = 0,
 	                 int __trim5 = 0,
 	                 int __policy = NS_TO_NS,
 	                 int __maxNs = 9999,
 	                 uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{ }
 	virtual void reset() {

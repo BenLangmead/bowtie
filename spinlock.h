@@ -10,6 +10,11 @@
  * Using spinlocks instead of the heavier pthreads mutexes can, in some
  * cases, help Bowtie perform better for large numbers of threads.
  */
+
+// (If the user hasn't specified this, then there's no need for any
+// kind of locking, so we skip this header)
+#ifdef BOWTIE_PTHREADS
+
 #if defined(__GNUC__)
 #if defined(__x86_64__) || defined(__i386__)
 #define USE_SPINLOCK
@@ -115,6 +120,8 @@ inline SPINLOCK_WORD SpinLock::TestAndSet(SPINLOCK_WORD* pTargetAddress, SPINLOC
     // lock = 1 CPU cycle
     // xchg = 3 CPU cycles
 }
+#endif
+
 #endif
 
 #endif /*SPINLOCK_H_*/
