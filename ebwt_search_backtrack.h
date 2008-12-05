@@ -488,12 +488,6 @@ public:
 			assert(_chars != NULL);
 			_qlen = length(*_qry);
 		}
-		uint32_t rseed = 0;
-		for(size_t i = 0; i < min<uint32_t>(_qlen, 16); i++) {
-			rseed <<= 2;
-			rseed |= (int)(*_qry)[i];
-		}
-		_rand.init(rseed + _randSeed);
 		assert_geq(length(*_qual), _qlen);
 		if(_verbose) {
 			String<char> qual = (*_qual);
@@ -502,6 +496,7 @@ public:
 			}
 			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << qual << ")" << endl;
 		}
+		initRandSeed();
 	}
 
 	/**
@@ -2383,6 +2378,44 @@ protected:
     		}
 		}
 		assert_lt(i, oracleHits.size()); // assert we found a matchup
+	}
+
+	/**
+	 * Calculate a per-read random seed based on a combination of
+	 * the read data (incl. sequence, name, quals) and the global
+	 * seed in '_randSeed'.
+	 */
+	void initRandSeed() {
+		// Calculate a per-read random seed based on a combination of
+		// the read data (incl. sequence, name, quals) and the global
+		// seed
+		uint32_t rseed = 0;
+		// Throw all the characters of the read into the random seed
+		for(size_t i = 0; i < _qlen; i++) {
+			int p = (int)(*_qry)[i];
+			assert_leq(p, 4);
+			size_t off = ((i & 15) << 1);
+			rseed |= (p << off);
+		}
+		// Throw all the quality values for the read into the random
+		// seed
+		for(size_t i = 0; i < _qlen; i++) {
+			int p = (int)(*_qual)[i];
+			assert_leq(p, 255);
+			size_t off = ((i & 3) << 3);
+			rseed |= (p << off);
+		}
+		// Throw all the characters in the read name into the random
+		// seed
+		assert(_name != NULL);
+		size_t namelen = seqan::length(*_name);
+		for(size_t i = 0; i < namelen; i++) {
+			int p = (int)(*_name)[i];
+			assert_leq(p, 255);
+			size_t off = ((i & 3) << 3);
+			rseed |= (p << off);
+		}
+		_rand.init(rseed + _randSeed);
 	}
 
 	/**

@@ -77,6 +77,8 @@ static int partitionSz          = 0;     // output a partitioning key in first f
 static bool noMaqRound          = false;
 static bool forgiveInput        = false;
 static bool useSpinlock         = true;
+static bool useFifo             = false;
+static const char *bowtie_fifo  = "/tmp/bowtie.fifo";
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
 
@@ -113,7 +115,8 @@ enum {
 	ARG_INTEGER_QUALS,
 	ARG_FORGIVE_INPUT,
 	ARG_NOMAQROUND,
-	ARG_USE_SPINLOCK
+	ARG_USE_SPINLOCK,
+	ARG_FIFO
 };
 
 static struct option long_options[] = {
@@ -175,6 +178,7 @@ static struct option long_options[] = {
 	{"partition",    required_argument, 0,            ARG_PARTITION},
 	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
 	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
+	{"fifo",         no_argument,       0,            ARG_FIFO},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -640,6 +644,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
+	   		case ARG_FIFO: useFifo = true; cout << "Using fifo " << bowtie_fifo << endl; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_UNFA: {
