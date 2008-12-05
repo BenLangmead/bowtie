@@ -410,7 +410,8 @@ public:
 		_maxBts0(__maxBts.maxBts0),
 		_maxBts1(__maxBts.maxBts1),
 		_maxBts2(__maxBts.maxBts2),
-		_rand(RandomSource(seed)),
+		_rand(seed),
+		_randSeed(seed),
 		_verbose(__verbose)
 	{ }
 
@@ -487,6 +488,12 @@ public:
 			assert(_chars != NULL);
 			_qlen = length(*_qry);
 		}
+		uint32_t rseed = 0;
+		for(size_t i = 0; i < min<uint32_t>(_qlen, 16); i++) {
+			rseed <<= 2;
+			rseed |= (int)(*_qry)[i];
+		}
+		_rand.init(rseed + _randSeed);
 		assert_geq(length(*_qual), _qlen);
 		if(_verbose) {
 			String<char> qual = (*_qual);
@@ -2510,6 +2517,8 @@ protected:
 	bool                _bailedOnBacktracks;
 	/// Source of pseudo-random numbers
 	RandomSource        _rand;
+	/// Seed for random number generator
+	uint32_t            _randSeed;
 	/// Be talkative
 	bool                _verbose;
 	// Holding area for partial alignments

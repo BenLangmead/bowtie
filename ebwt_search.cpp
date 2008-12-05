@@ -1073,7 +1073,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
+	        seed+1,         // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -2725,8 +2725,6 @@ static void driver(const char * type,
 	}
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
-	// Seed random number generator
-	srand(seed);
 	// Create a pattern source for the queries
 	PatternSource *patsrc = NULL;
 	if(nsPolicy == NS_TO_NS && !maqLike) {
