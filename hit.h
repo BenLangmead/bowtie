@@ -338,10 +338,14 @@ public:
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
 			if(dumpUnalignFa != NULL) {
-				(*dumpUnalignFa) << ">" << p.name() << endl << p.patFw() << endl;
+				(*dumpUnalignFa) << ">" << p.bufa().name << endl
+				                 << p.bufa().patFw << endl;
 			}
 			if(dumpUnalignFq != NULL) {
-				(*dumpUnalignFq) << "@" << p.name() << endl << p.patFw() << endl << "+" << endl << p.qualFw() << endl;
+				(*dumpUnalignFq) << "@" << p.bufa().name << endl
+				                 << p.bufa().patFw << endl
+				                 << "+" << endl <<
+				                 p.bufa().qualFw << endl;
 			}
 		}
 		if(_bufferHits && _bufferedHits.size() > 0) {

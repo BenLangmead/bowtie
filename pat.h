@@ -18,9 +18,14 @@
 #include "threading.h"
 #include "filebuf.h"
 
+/**
+ * Classes and routines for reading reads from various input sources.
+ */
+
 using namespace std;
 using namespace seqan;
 
+/// Constructs string base-10 representation of integer 'value'
 extern char* itoa10(int value, char* result);
 
 /// Wildcard policies
@@ -65,6 +70,10 @@ struct ReadBuf {
 		::reverseInPlace(qualFw);
 		::reverseInPlace(qualRc);
 	}
+	bool empty() {
+		return seqan::empty(patFw);
+	}
+
 	static const int BUF_SIZE = 1024;
 	String<Dna5>  patFw;               // forward-strand sequence
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
@@ -76,6 +85,14 @@ struct ReadBuf {
 	char          qualBufRc[BUF_SIZE]; // reverse quality value buffer
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
+};
+
+/**
+ * Struct encapsulating a pair of mates.
+ */
+struct ReadBufPair {
+	ReadBuf a; // first mate (from -1 arg)
+	ReadBuf b; // second mate (from -2 arg)
 };
 
 /**
@@ -237,6 +254,148 @@ protected:
 };
 
 /**
+ * Encapsulates a synchronized source of both paired-end patterns and
+ * unpaired patterns.
+ */
+class PairedPatternSource {
+
+public:
+
+	PairedPatternSource(const vector<PatternSource*>& srca,
+	                    const vector<PatternSource*>& srcb) :
+		cur_(0), basePatid_(0), srca_(srca), srcb_(srcb)
+	{
+	    // srca_ and srcb_ must be parallel
+	    assert_eq(srca_.size(), srcb_.size());
+	    for(size_t i = 0; i < srca_.size(); i++) {
+	    	// Can't have NULL first-mate sources.  Second-mate sources
+	    	// can be NULL, in the case when the corresponding first-
+	    	// mate source is unpaired.
+	    	assert(srca_[i] != NULL);
+		    for(size_t j = 0; j < srcb_.size(); j++) {
+		    	assert_neq(srca_[i], srcb_[j]);
+		    }
+	    }
+	}
+
+	/**
+	 * Call this whenever this PairedPatternSource is wrapped by a new
+	 * WrappedPatternSourcePerThread.  This helps us keep track of
+	 * whether locks within PatternSources will be contended.
+	 */
+	void addWrapper() {
+		for(size_t i = 0; i < srca_.size(); i++) {
+			srca_[i]->addWrapper();
+			if(srcb_[i] != NULL) {
+				srcb_[i]->addWrapper();
+			}
+		}
+	}
+
+	/**
+	 * Reset this object and all the PatternSources under it so that
+	 * the next call to nextReadPair gets the very first read pair.
+	 */
+	void reset() {
+		for(size_t i = 0; i < srca_.size(); i++) {
+			srca_[i]->reset();
+			if(srcb_[i] != NULL) {
+				srcb_[i]->reset();
+			}
+		}
+		cur_ = 0;
+		basePatid_ = 0;
+	}
+
+	/**
+	 * Set whether to reverse reads as they're read in (useful when
+	 * using the mirror index).
+	 */
+	void setReverse(bool r) {
+		for(size_t i = 0; i < srca_.size(); i++) {
+			srca_[i]->setReverse(r);
+			if(srcb_[i] != NULL) {
+				srcb_[i]->setReverse(r);
+			}
+		}
+	}
+
+	/**
+	 * Return true iff the contained PatternSources are currently
+	 * reversing their output.
+	 */
+	bool reverse() {
+		return srca_[0]->reverse();
+	}
+
+	/**
+	 * Return the patid of the most recently read pair.
+	 */
+	uint32_t patid() {
+		uint32_t ret = basePatid_;
+		if(cur_ < srca_.size()) {
+			ret += srca_[cur_]->patid();
+		}
+		return ret;
+	}
+
+	/**
+	 * The main member function for dispensing pairs of reads or
+	 * singleton reads.  Returns true iff ra and rb contain a new
+	 * pair; returns false if ra contains a new unpaired read.
+	 */
+	bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		while(cur_ < srca_.size()) {
+			if(srcb_[cur_] == NULL) {
+				// Patterns from srca_[cur_] are unpaired
+				srca_[cur_]->nextRead(ra, patid);
+				if(seqan::empty(ra.patFw)) {
+					// If patFw is empty, that's our signal that the
+					// input dried up
+					basePatid_ += srca_[cur_]->patid();
+					cur_++;
+					continue; // on to next pair of PatternSources
+				}
+				return false; // unpaired
+			} else {
+				// Patterns from srca_[cur_] and srcb_[cur_] are paired
+				uint32_t patid_a = 0;
+				uint32_t patid_b = 0;
+				srca_[cur_]->nextRead(ra, patid_a);
+				srcb_[cur_]->nextRead(rb, patid_b);
+				bool cont = false;
+				while(patid_a != patid_b) {
+					// Is either input exhausted?  If so, bail.
+					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
+						seqan::clear(ra.patFw);
+						basePatid_ += srca_[cur_]->patid();
+						cur_++; // on to next pair of PatternSources
+						cont = true;
+						break;
+					}
+					if(patid_a < patid_b) {
+						srca_[cur_]->nextRead(ra, patid_a);
+					} else {
+						srcb_[cur_]->nextRead(rb, patid_b);
+					}
+				}
+				if(cont) continue; // on to next pair of PatternSources
+				assert_eq(patid_a, patid_b);
+				patid = patid_a;
+				return true; // paired
+			}
+		}
+		return false;
+	}
+
+protected:
+	uint32_t cur_; // current element in parallel srca_, srcb_ vectors
+	uint32_t basePatid_;
+	vector<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
+	vector<PatternSource*> srcb_; /// PatternSources for 2nd mates
+};
+
+/**
  * Encapsulates a single thread's interaction with the PatternSource.
  * Most notably, this class holds the buffers into which the
  * PatterSource will write sequences.  This class is *not* threadsafe
@@ -245,43 +404,54 @@ protected:
  */
 class PatternSourcePerThread {
 public:
-	PatternSourcePerThread() : _buf(), _patid(0xffffffff) { }
+	PatternSourcePerThread() :
+		_bufa(), _bufb(), _patid(0xffffffff) { }
+
 	virtual ~PatternSourcePerThread() { }
 
-	virtual void nextRead()  = 0;
+	virtual void nextReadPair()  = 0;
 
-	String<Dna5>& patFw()  { return _buf.patFw;               }
-	String<Dna5>& patRc()  { return _buf.patRc;               }
-	String<char>& qualFw() { return _buf.qualFw;              }
-	String<char>& qualRc() { return _buf.qualRc;              }
-	String<char>& name()   { return _buf.name;                }
-	uint32_t      patid()  { return _patid;                   }
-	bool          empty()  { return seqan::empty(_buf.patFw); }
-	virtual void  reset()  { _patid = 0xffffffff;             }
-	void    reverseRead()  { _buf.reverseAll();               }
+	ReadBuf& bufa()        { return _bufa;         }
+	ReadBuf& bufb()        { return _bufb;         }
+
+	uint32_t      patid()  { return _patid;        }
+	virtual void  reset()  { _patid = 0xffffffff;  }
+	void    reverseRead()  { _bufa.reverseAll();
+	                         _bufb.reverseAll();   }
+	bool          empty()  { return _bufa.empty(); }
+
 protected:
-	ReadBuf  _buf;   // read buffer
+	ReadBuf  _bufa;  // read buffer
+	ReadBuf  _bufb;  // read buffer
 	uint32_t _patid; // index of read just read
 };
 
+/**
+ * A per-thread wrapper for a PairedPatternSource.
+ */
 class WrappedPatternSourcePerThread : public PatternSourcePerThread {
 public:
-	WrappedPatternSourcePerThread(PatternSource& __patsrc) :
+	WrappedPatternSourcePerThread(PairedPatternSource& __patsrc) :
 		_patsrc(__patsrc)
 	{
 		_patsrc.addWrapper();
 	}
 
-	virtual void nextRead() {
+	/**
+	 * Get the next paired or unpaired read from the wrapped
+	 * PairedPatternSource.
+	 */
+	virtual void nextReadPair() {
 		ASSERT_ONLY(uint32_t lastPatid = _patid);
-		_buf.clearAll();
-		_patsrc.nextRead(_buf, _patid);
-		assert(empty() || _patid != lastPatid);
+		_bufa.clearAll();
+		_bufb.clearAll();
+		_patsrc.nextReadPair(_bufa, _bufb, _patid);
+		assert(_bufa.empty() || _patid != lastPatid);
 	}
 private:
-	PatternSource& _patsrc;
+	/// Container for obtaining paired reads from PatternSources
+	PairedPatternSource& _patsrc;
 };
-
 
 /**
  * Encapsualtes a source of patterns where each raw pattern is trimmed
@@ -429,13 +599,16 @@ public:
 		}
 	}
 
-	virtual void nextRead() {
+	virtual void nextReadPair() {
 		if(_patid >= _numreads) {
-			_buf.clearAll();
+			_bufa.clearAll();
+			_bufb.clearAll();
 			return;
 		}
 		RandomPatternSource::fillRandomRead(
-			_buf, _rand.nextU32(), _length, _patid, _reverse);
+			_bufa, _rand.nextU32(), _length, _patid, _reverse);
+		RandomPatternSource::fillRandomRead(
+			_bufb, _rand.nextU32(), _length, _patid, _reverse);
 		_patid += _numthreads;
 	}
 
@@ -818,7 +991,7 @@ protected:
 		}
 		exit(1);
 	}
-	const vector<string>& _infiles; /// filenames for read files
+	vector<string> _infiles; /// filenames for read files
 	vector<bool> _errs; /// whether we've already printed an error for each file
 	size_t _filecur;   /// index into _infiles of next file to read
 	FileBuf _filebuf;  /// read file currently being read from

@@ -22,6 +22,8 @@
 using namespace std;
 using namespace seqan;
 
+static vector<string> mates1; // mated reads (first mate)
+static vector<string> mates2; // mated reads (second mate)
 static int verbose				= 0; // be talkative
 static bool quiet				= false; // print nothing but the alignments
 static int sanityCheck			= 0;  // enable expensive sanity checks
@@ -80,8 +82,9 @@ static bool useSpinlock         = true;
 static bool useFifo             = false;
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static const char *bowtie_fifo  = "/tmp/bowtie.fifo";
+// mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:";
 
 enum {
 	ARG_ORIG = 256,
@@ -189,11 +192,15 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
-	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	    << "  <query_in>         comma-separated list of files containing query reads" << endl
+	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
+	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
+	    << "                     the sequences themselves, if -c is specified) paired with" << endl
+	    << "                     corresponding mates in <mates2>" << endl
+	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
+	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
 	    << "                     (or the sequences themselves, if -c is specified)" << endl
-	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
+	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -631,6 +638,8 @@ static void parseOptions(int argc, char **argv) {
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
+			case '1': tokenize(optarg, ",", mates1); break;
+			case '2': tokenize(optarg, ",", mates2); break;
 	   		case 'f': format = FASTA; break;
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
@@ -751,6 +760,21 @@ static void parseOptions(int argc, char **argv) {
 	if(maqLike) {
 		revcomp = true;
 	}
+	if(mates1.size() != mates2.size()) {
+		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << mates2.size() << endl
+		     << "mate files/sequences were specified with -2.  The same number of mate files/" << endl
+		     << "sequences must be specified with -1 and -2." << endl;
+		exit(1);
+	}
+	if(format != CMDLINE) {
+		for(size_t i = 0; i < mates1.size(); i++) {
+			for(size_t j = 0; j < mates2.size(); j++) {
+				if(mates1[i] == mates2[j]) {
+					cerr << "Warning: Same mate file \"" << mates1[i] << "\" appears as argument to both -1 and -2" << endl;
+				}
+			}
+		}
+	}
 	if(!fullIndex) {
 		bool error = false;
 		if(khits > 1) {
@@ -800,18 +824,18 @@ static char *argv0 = NULL;
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
-	p->nextRead(); \
-	if(p->empty() || p->patid() >= qUpto) { break; } \
-	assert(!empty(p->patFw())); \
-	String<Dna5>& patFw  = p->patFw();  \
-	String<Dna5>& patRc  = p->patRc();  \
-	String<char>& qualFw = p->qualFw(); \
-	String<char>& qualRc = p->qualRc(); \
-	String<char>& name   = p->name(); \
-	uint32_t      patid  = p->patid(); \
+	p->nextReadPair(); \
+	if(p->empty() || p->patid() >= qUpto) break; \
+	assert(!empty(p->bufa().patFw)); \
+	String<Dna5>& patFw  = p->bufa().patFw;  \
+	String<Dna5>& patRc  = p->bufa().patRc;  \
+	String<char>& qualFw = p->bufa().qualFw; \
+	String<char>& qualRc = p->bufa().qualRc; \
+	String<char>& name   = p->bufa().name;   \
+	uint32_t      patid  = p->patid();       \
 	params.setPatId(patid); \
-	if(lastLen == 0) lastLen = length(patFw); \
-	if(qSameLen && length(patFw) != lastLen) { \
+	if(lastLen == 0) lastLen = seqan::length(patFw); \
+	if(qSameLen && seqan::length(patFw) != lastLen) { \
 		throw runtime_error("All reads must be the same length"); \
 	}
 
@@ -820,16 +844,16 @@ static char *argv0 = NULL;
 /// patid exceeds the limit, and marshaling the read into convenient
 /// variables.
 #define GET_READ_FW(p) \
-	p->nextRead(); \
+	p->nextReadPair(); \
 	if(p->empty() || p->patid() >= qUpto) break; \
 	params.setPatId(p->patid()); \
-	assert(!empty(p->patFw())); \
-	String<Dna5>& patFw  = p->patFw();  \
-	String<char>& qualFw = p->qualFw(); \
-	String<char>& name   = p->name(); \
-	uint32_t      patid  = p->patid(); \
-	if(lastLen == 0) lastLen = length(patFw); \
-	if(qSameLen && length(patFw) != lastLen) { \
+	assert(!empty(p->bufa().patFw)); \
+	String<Dna5>& patFw  = p->bufa().patFw;  \
+	String<char>& qualFw = p->bufa().qualFw; \
+	String<char>& name   = p->bufa().name;   \
+	uint32_t      patid  = p->patid();     \
+	if(lastLen == 0) lastLen = seqan::length(patFw); \
+	if(qSameLen && seqan::length(patFw) != lastLen) { \
 		throw runtime_error("All reads must be the same length"); \
 	}
 
@@ -851,7 +875,8 @@ static char *argv0 = NULL;
 
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
-static PatternSourcePerThread* createPatSrc(PatternSource& _patsrc, int tid) {
+static PatternSourcePerThread*
+createPatSrc(PairedPatternSource& _patsrc, int tid) {
 	PatternSourcePerThread *patsrc;
 	if(randReadsNoSync) {
 		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, tid, false);
@@ -901,15 +926,15 @@ static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static PatternSource*                 exactSearch_patsrc;
-static HitSink*                       exactSearch_sink;
-static Ebwt<String<Dna> >*            exactSearch_ebwt;
-static vector<String<Dna5> >*         exactSearch_os;
+static PairedPatternSource*   exactSearch_patsrc;
+static HitSink*               exactSearch_sink;
+static Ebwt<String<Dna> >*    exactSearch_ebwt;
+static vector<String<Dna5> >* exactSearch_os;
 static void *exactSearchWorker(void *vp) {
-	PatternSource& _patsrc               = *exactSearch_patsrc;
-	HitSink& _sink                       = *exactSearch_sink;
-	Ebwt<String<Dna> >& ebwt             = *exactSearch_ebwt;
-	vector<String<Dna5> >& os            = *exactSearch_os;
+	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	HitSink& _sink               = *exactSearch_sink;
+	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
+	vector<String<Dna5> >& os    = *exactSearch_os;
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
@@ -966,7 +991,7 @@ static void *exactSearchWorker(void *vp) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void exactSearch(PatternSource& _patsrc,
+static void exactSearch(PairedPatternSource& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
                         vector<String<Dna5> >& os)
@@ -1005,7 +1030,7 @@ static void exactSearch(PatternSource& _patsrc,
  * Forward Ebwt (ebwtFw) is already loaded into memory and backward
  * Ebwt (ebwtBw) is not loaded into memory.
  */
-static PatternSource*                 mismatchSearch_patsrc;
+static PairedPatternSource*           mismatchSearch_patsrc;
 static HitSink*                       mismatchSearch_sink;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
@@ -1014,7 +1039,7 @@ static SyncBitset*                    mismatchSearch_doneMask;
 static SyncBitset*                    mismatchSearch_hitMask;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
-	PatternSource&         _patsrc       = *mismatchSearch_patsrc;
+	PairedPatternSource&   _patsrc       = *mismatchSearch_patsrc;
 	HitSink&               _sink         = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
@@ -1060,7 +1085,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 }
 
 static void* mismatchSearchWorkerPhase2(void *vp){
-	PatternSource&         _patsrc      = *mismatchSearch_patsrc;
+	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
@@ -1109,7 +1134,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void mismatchSearch(PatternSource& _patsrc,
+static void mismatchSearch(PairedPatternSource& _patsrc,
                            HitSink& _sink,
                            Ebwt<String<Dna> >& ebwtFw,
                            Ebwt<String<Dna> >& ebwtBw,
@@ -1203,7 +1228,7 @@ static void mismatchSearch(PatternSource& _patsrc,
 }
 
 static void* mismatchSearchWorkerFull(void *vp){
-	PatternSource&         _patsrc      = *mismatchSearch_patsrc;
+	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
@@ -1255,7 +1280,7 @@ static void* mismatchSearchWorkerFull(void *vp){
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void mismatchSearchFull(PatternSource& _patsrc,
+static void mismatchSearchFull(PairedPatternSource& _patsrc,
                                HitSink& _sink,
                                Ebwt<String<Dna> >& ebwtFw,
                                Ebwt<String<Dna> >& ebwtBw,
@@ -1426,7 +1451,7 @@ static void mismatchSearchFull(PatternSource& _patsrc,
 		assert_eq(0, hits.size()); \
 	}
 
-static PatternSource*                 twoOrThreeMismatchSearch_patsrc;
+static PairedPatternSource*           twoOrThreeMismatchSearch_patsrc;
 static HitSink*                       twoOrThreeMismatchSearch_sink;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtBw;
@@ -1436,7 +1461,7 @@ static SyncBitset*                    twoOrThreeMismatchSearch_hitMask;
 static bool                           twoOrThreeMismatchSearch_two;
 
 #define TWOTHREE_WORKER_SETUP() \
-	PatternSource&                 _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
+	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
@@ -1583,7 +1608,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 
 template<typename TStr>
 static void twoOrThreeMismatchSearch(
-        PatternSource& _patsrc,         /// pattern source
+		PairedPatternSource& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -1775,7 +1800,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 
 template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
-        PatternSource& _patsrc,         /// pattern source
+		PairedPatternSource& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -1828,7 +1853,7 @@ static void twoOrThreeMismatchSearchFull(
 	return;
 }
 
-static PatternSource*                 seededQualSearch_patsrc;
+static PairedPatternSource*           seededQualSearch_patsrc;
 static HitSink*                       seededQualSearch_sink;
 static Ebwt<String<Dna> >*            seededQualSearch_ebwtFw;
 static Ebwt<String<Dna> >*            seededQualSearch_ebwtBw;
@@ -1840,10 +1865,10 @@ static PartialAlignmentManager*       seededQualSearch_pamRc;
 static int                            seededQualSearch_qualCutoff;
 
 #define SEEDEDQUAL_WORKER_SETUP() \
-	PatternSource&                 _patsrc  = *seededQualSearch_patsrc;   \
-	HitSink&                       _sink    = *seededQualSearch_sink;     \
-	vector<String<Dna5> >&         os       = *seededQualSearch_os;       \
-	int                          qualCutoff = seededQualSearch_qualCutoff; \
+	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;    \
+	HitSink&                 _sink      = *seededQualSearch_sink;      \
+	vector<String<Dna5> >&   os         = *seededQualSearch_os;        \
+	int                      qualCutoff = seededQualSearch_qualCutoff; \
 	uint32_t lastLen = 0; \
 	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
 	HitSinkPerThread* sink = createSink(_sink, false); \
@@ -2290,17 +2315,17 @@ static void* seededQualSearchWorkerFull(void *vp) {
  */
 template<typename TStr>
 static void seededQualCutoffSearch(
-		int seedLen,                    /// length of seed (not a maq option)
-        int qualCutoff,                 /// maximum sum of mismatch qualities
-                                        /// like maq map's -e option
-                                        /// default: 70
-        int seedMms,                    /// max # mismatches allowed in seed
-                                        /// (like maq map's -n option)
-                                        /// Can only be 1 or 2, default: 1
-        PatternSource& _patsrc,         /// pattern source
-        HitSink& _sink,                 /// hit sink
-        Ebwt<TStr>& ebwtFw,             /// index of original text
-        Ebwt<TStr>& ebwtBw,             /// index of mirror text
+		int seedLen,                  /// length of seed (not a maq option)
+        int qualCutoff,               /// maximum sum of mismatch qualities
+                                      /// like maq map's -e option
+                                      /// default: 70
+        int seedMms,                  /// max # mismatches allowed in seed
+                                      /// (like maq map's -n option)
+                                      /// Can only be 1 or 2, default: 1
+        PairedPatternSource& _patsrc, /// pattern source
+        HitSink& _sink,               /// hit sink
+        Ebwt<TStr>& ebwtFw,           /// index of original text
+        Ebwt<TStr>& ebwtBw,           /// index of mirror text
         vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
 {
 	// Global intialization
@@ -2486,11 +2511,11 @@ static void seededQualCutoffSearchFull(
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
-        PatternSource& _patsrc,         /// pattern source
+        PairedPatternSource& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
+        vector<String<Dna5> >& os)      /// text strings, if available (empty otherwise)
 {
 	// Global intialization
 	assert(fullIndex);
@@ -2543,13 +2568,13 @@ static void seededQualCutoffSearchFull(
 #endif
 }
 
-static PatternSource*                 seedAndSWExtendSearch_patsrc;
+static PairedPatternSource*           seedAndSWExtendSearch_patsrc;
 static HitSink*                       seedAndSWExtendSearch_sink;
 static Ebwt<String<Dna> >*            seedAndSWExtendSearch_ebwtFw;
 static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
 
 #define SEED_SW_EXTEND_WORKER_SETUP() \
-	PatternSource&         _patsrc  = *seedAndSWExtendSearch_patsrc;   \
+	PairedPatternSource&   _patsrc  = *seedAndSWExtendSearch_patsrc;   \
 	HitSink&               _sink    = *seedAndSWExtendSearch_sink;     \
 	vector<String<Dna5> >& os       = *seedAndSWExtendSearch_os;       \
 	uint32_t lastLen = 0; \
@@ -2651,14 +2676,14 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 
 template<typename TStr>
 static void seedAndSWExtendSearch(
-		int seedLen,                /// length of seed (not a maq option)
-        int mms,                    /// max # mismatches allowed in seed
-                                    /// (like maq map's -n option)
-                                    /// Can only be 1 or 2, default: 1
-        PatternSource& _patsrc,     /// pattern source
-        HitSink& _sink,             /// hit sink
-        Ebwt<TStr>& ebwtFw,         /// index of original text
-        vector<String<Dna5> >& os)  /// text strings, if available (empty otherwise)
+		int seedLen,                  /// length of seed (not a maq option)
+        int mms,                      /// max # mismatches allowed in seed
+                                      /// (like maq map's -n option)
+                                      /// Can only be 1 or 2, default: 1
+        PairedPatternSource& _patsrc, /// pattern source
+        HitSink& _sink,               /// hit sink
+        Ebwt<TStr>& ebwtFw,           /// index of original text
+        vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
 {
 	// Global intialization
 	assert_eq(0, mms);
@@ -2708,6 +2733,42 @@ static void seedAndSWExtendSearch(
 #endif
 }
 
+/**
+ * Return a new dynamically allocated PatternSource for the given
+ * format, using the given list of strings as the filenames to read
+ * from or as the sequences themselves (i.e. if -c was used).
+ */
+static PatternSource*
+patsrcFromStrings(int format, const vector<string>& qs) {
+	switch(format) {
+		case FASTA:
+			return new FastaPatternSource (qs, false, useSpinlock,
+			                               patDumpfile, trim3, trim5,
+			                               nsPolicy, maxNs);
+		case RAW:
+			return new RawPatternSource   (qs, false, useSpinlock,
+			                               patDumpfile, trim3, trim5,
+			                               nsPolicy, maxNs);
+		case FASTQ:
+			return new FastqPatternSource (qs, false, useSpinlock,
+			                               patDumpfile, trim3, trim5,
+			                               nsPolicy, forgiveInput,
+			                               solexa_quals,
+			                               integer_quals, maxNs);
+		case CMDLINE:
+			return new VectorPatternSource(qs, false, useSpinlock,
+			                               patDumpfile, trim3,
+			                               trim5, nsPolicy, maxNs);
+		case RANDOM:
+			return new RandomPatternSource(2000000, lenRandomReads,
+			                               useSpinlock, patDumpfile,
+			                               seed);
+		default: {
+			cerr << "Internal error; bad patsrc format: " << format << endl;
+			exit(1);
+		}
+	}
+}
 
 template<typename TStr>
 static void driver(const char * type,
@@ -2743,8 +2804,45 @@ static void driver(const char * type,
 	if(nsPolicy == NS_TO_NS && !maqLike) {
 		maxNs = min<int>(maxNs, mismatches);
 	}
-	// Create list of pattern sources
-	vector<PatternSource*> patsrcs;
+
+	vector<PatternSource*> patsrcs_a;
+	vector<PatternSource*> patsrcs_b;
+
+	// Create list of pattern sources for paired reads
+	for(size_t i = 0; i < mates1.size(); i++) {
+		const vector<string>* qs = &mates1;
+		vector<string> tmp;
+		if(fileParallel) {
+			// Feed query files one to each PatternSource
+			qs = &tmp;
+			tmp.push_back(mates1[i]);
+			assert_eq(1, tmp.size());
+		}
+		patsrcs_a.push_back(patsrcFromStrings(format, *qs));
+		if(!fileParallel) {
+			break;
+		}
+	}
+
+	// Create list of pattern sources for paired reads
+	for(size_t i = 0; i < mates2.size(); i++) {
+		const vector<string>* qs = &mates2;
+		vector<string> tmp;
+		if(fileParallel) {
+			// Feed query files one to each PatternSource
+			qs = &tmp;
+			tmp.push_back(mates2[i]);
+			assert_eq(1, tmp.size());
+		}
+		patsrcs_b.push_back(patsrcFromStrings(format, *qs));
+		if(!fileParallel) {
+			break;
+		}
+	}
+	// All mates/mate files must be paired
+	assert_eq(patsrcs_a.size(), patsrcs_b.size());
+
+	// Create list of pattern sources for the unpaired reads
 	for(size_t i = 0; i < queries.size(); i++) {
 		const vector<string>* qs = &queries;
 		PatternSource* patsrc = NULL;
@@ -2755,48 +2853,17 @@ static void driver(const char * type,
 			tmp.push_back(queries[i]);
 			assert_eq(1, tmp.size());
 		}
-		switch(format) {
-			case FASTA:
-				patsrc = new FastaPatternSource (*qs, false, useSpinlock,
-												 patDumpfile, trim3, trim5,
-												 nsPolicy, maxNs);
-				break;
-			case RAW:
-				patsrc = new RawPatternSource   (*qs, false, useSpinlock,
-												 patDumpfile, trim3, trim5,
-												 nsPolicy, maxNs);
-				break;
-			case FASTQ:
-				patsrc = new FastqPatternSource (*qs, false, useSpinlock,
-												 patDumpfile, trim3, trim5,
-												 nsPolicy, forgiveInput,
-												 solexa_quals,
-												 integer_quals, maxNs);
-				break;
-			case CMDLINE:
-				patsrc = new VectorPatternSource(*qs, false, useSpinlock,
-												 patDumpfile, trim3,
-												 trim5, nsPolicy, maxNs);
-				break;
-			case RANDOM:
-				patsrc = new RandomPatternSource(2000000, lenRandomReads,
-												 useSpinlock, patDumpfile,
-												 seed);
-				break;
-			default: assert(false);
-		}
+		patsrc = patsrcFromStrings(format, *qs);
 		assert(patsrc != NULL);
-		patsrcs.push_back(patsrc);
+		patsrcs_a.push_back(patsrc);
+		patsrcs_b.push_back(NULL);
 		if(!fileParallel) {
 			break;
 		}
 	}
-	assert_gt(patsrcs.size(), 0);
-	if(patsrcs.size() > 1) {
-		assert(fileParallel);
-	}
-	PatternSource* patsrc = patsrcs[0];
-	assert(patsrc != NULL);
+	assert_gt(patsrcs_a.size(), 0);
+	PairedPatternSource patsrc(patsrcs_a, patsrcs_b);
+
 	if(skipSearch) return;
 	// Open hit output file
 	ostream *fout;
@@ -2890,7 +2957,7 @@ static void driver(const char * type,
 		if(seedAndExtend) {
 			seedAndSWExtendSearch(seedLen,
 			                      seedMms,
-			                      *patsrc,
+			                      patsrc,
 			                      *sink,
 			                      ebwt,
 			                      os);
@@ -2900,7 +2967,7 @@ static void driver(const char * type,
 				seededQualCutoffSearch(seedLen,
 									   qualThresh,
 									   seedMms,
-									   *patsrc,
+									   patsrc,
 									   *sink,
 									   ebwt,    // forward index
 									   *ebwtBw, // mirror index (not optional)
@@ -2909,7 +2976,7 @@ static void driver(const char * type,
 				seededQualCutoffSearchFull(seedLen,
 				                           qualThresh,
 				                           seedMms,
-				                           *patsrc,
+				                           patsrc,
 				                           *sink,
 				                           ebwt,    // forward index
 				                           *ebwtBw, // mirror index (not optional)
@@ -2919,15 +2986,15 @@ static void driver(const char * type,
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
 				if(!fullIndex) {
-					mismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os);
+					mismatchSearch(patsrc, *sink, ebwt, *ebwtBw, os);
 				} else {
-					mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
+					mismatchSearchFull(patsrc, *sink, ebwt, *ebwtBw, os);
 				}
 			} else if(mismatches == 2 || mismatches == 3) {
 				if(!fullIndex) {
-					twoOrThreeMismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearch(patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				} else {
-					twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearchFull(patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
@@ -2937,7 +3004,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(*patsrc, *sink, ebwt, os);
+			exactSearch(patsrc, *sink, ebwt, os);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
@@ -2957,7 +3024,15 @@ static void driver(const char * type,
 		if(dumpNoHits != NULL) dumpNoHits->close();
 		if(dumpUnalignFa != NULL) dumpUnalignFa->close();
 		if(dumpUnalignFq != NULL) dumpUnalignFq->close();
-		delete patsrc;
+		for(size_t i = 0; i < patsrcs_a.size(); i++) {
+			assert(patsrcs_a[i] != NULL);
+			delete patsrcs_a[i];
+		}
+		for(size_t i = 0; i < patsrcs_a.size(); i++) {
+			if(patsrcs_b[i] != NULL) {
+				delete patsrcs_b[i];
+			}
+		}
 		delete sink;
 	}
 }
