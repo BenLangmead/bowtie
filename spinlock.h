@@ -120,8 +120,8 @@ inline SPINLOCK_WORD SpinLock::TestAndSet(SPINLOCK_WORD* pTargetAddress, SPINLOC
     // lock = 1 CPU cycle
     // xchg = 3 CPU cycles
 }
-#endif
+#endif /*USE_SPINLOCK*/
 
-#endif
+#endif /*BOWTIE_PTHREADS*/
 
 #endif /*SPINLOCK_H_*/

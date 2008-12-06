@@ -11,6 +11,7 @@
 #include <sstream>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
+#include <sys/shm.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "bitpack.h"
@@ -22,6 +23,7 @@
 #include "ref_read.h"
 #include "threading.h"
 #include "bitset.h"
+#include "str_util.h"
 
 using namespace std;
 using namespace seqan;
@@ -423,6 +425,7 @@ public:
 	    _verbose(__verbose), \
 	    _passMemExc(__passMemExc), \
 	    _sanity(__sanityCheck), \
+	    _fw(__fw), \
 	    _in1(), \
 	    _in2(), \
 	    _zOff(0xffffffff), \
@@ -437,19 +440,23 @@ public:
 	    _ftab(NULL), \
 	    _eftab(NULL), \
 	    _offs(NULL), \
+	    _offsIsShmem(false), \
 	    _isa(NULL), \
 	    _ebwt(NULL), \
+	    _ebwtIsShmem(false), \
 	    _refnames()
 
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
+	     bool __fw,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
+	     bool __useShmem = false,
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS,
-	     _eh(readIntoMemory(true, in + ".1.ebwt", in + ".2.ebwt"))
+	     _eh(readIntoMemory(true, __useShmem, in + ".1.ebwt", in + ".2.ebwt"))
 	{
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
@@ -476,6 +483,7 @@ public:
 	     int32_t ftabChars,
 	     int32_t chunkRate,
 	     const string& file,   // base filename for EBWT files
+	     bool __fw,
 	     bool useBlockwise,
 	     uint32_t bmax,
 	     uint32_t bmaxSqrtMult,
@@ -542,7 +550,8 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false);
+			readIntoMemory(false /* not just header */,
+			               false /* don't use shared mem */);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -764,12 +773,20 @@ public:
 		if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
 		if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
 		if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
-		if(_offs    != NULL) delete[] _offs;    _offs    = NULL;
+		if(_offs != NULL && !_offsIsShmem) {
+			delete[] _offs; _offs = NULL;
+		} else if(_offs != NULL) {
+			shmdt(_offs);
+		}
 		if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 		if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
 		if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
 		if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
-		if(_ebwt    != NULL) delete[] _ebwt;    _ebwt    = NULL;
+		if(_ebwt != NULL && !_ebwtIsShmem) {
+			delete[] _ebwt; _ebwt = NULL;
+		} else if(_ebwt != NULL) {
+			shmdt(_ebwt);
+		}
 		try {
 			if(_in1.is_open()) _in1.close();
 			if(_in2.is_open()) _in2.close();
@@ -843,8 +860,8 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory() {
-		readIntoMemory(false);
+	void loadIntoMemory(bool useShmem) {
+		readIntoMemory(false, useShmem);
 	}
 
 	/**
@@ -855,7 +872,9 @@ public:
 		delete[] _fchr;  _fchr  = NULL;
 		delete[] _ftab;  _ftab  = NULL;
 		delete[] _eftab; _eftab = NULL;
-		delete[] _offs;  _offs  = NULL;
+		if(!_offsIsShmem) {
+			delete[] _offs;  _offs  = NULL;
+		}
 		delete[] _isa;   _isa   = NULL;
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
@@ -865,7 +884,9 @@ public:
 		} else {
 			delete[] _rstarts; _rstarts = NULL;
 		}
-		delete[] _ebwt;  _ebwt  = NULL;
+		if(!_ebwtIsShmem) {
+			delete[] _ebwt;  _ebwt  = NULL;
+		}
 		_zEbwtByteOff = 0xffffffff;
 		_zEbwtBpOff = -1;
 	}
@@ -1042,10 +1063,10 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	EbwtParams readIntoMemory(bool justHeader, const string& in1, const string& in2);
-	EbwtParams readIntoMemory(bool justHeader, const string& in1, const string& in2, bool& bigEndian);
-	EbwtParams readIntoMemory(bool justHeader);
-	EbwtParams readIntoMemory(bool justHeader, bool& be);
+	EbwtParams readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2);
+	EbwtParams readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2, bool& bigEndian);
+	EbwtParams readIntoMemory(bool justHeader, bool useShmem);
+	EbwtParams readIntoMemory(bool justHeader, bool useShmem, bool& be);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -1117,8 +1138,11 @@ public:
 	bool       _verbose;
 	bool       _passMemExc;
 	bool       _sanity;
-	ifstream   _in1;
-	ifstream   _in2;
+	bool       _fw;     // true iff this is a forward index
+	ifstream   _in1;    // input stream for primary index file
+	ifstream   _in2;    // input stream for secondary index file
+	string     _in1Str; // filename for primary index file
+	string     _in2Str; // filename for secondary index file
 	uint32_t   _zOff;
 	uint32_t   _zEbwtByteOff;
 	int        _zEbwtBpOff;
@@ -1139,10 +1163,12 @@ public:
 	// offset every 16 rows), the total size of _offs is the same as
 	// the total size of the input sequence
 	uint32_t*  _offs;
+	bool       _offsIsShmem;  /// allocated in shared memory; don't delete
 	uint32_t*  _isa;
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
+	bool       _ebwtIsShmem;  /// allocated in shared memory; don't delete
 	vector<string> _refnames; /// names of the reference sequences
 	EbwtParams _eh;
 
@@ -2675,11 +2701,12 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
  */
 template<typename TStr>
 EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
+                                      bool useShmem,
                                       const string& in1,
                                       const string& in2)
 {
 	bool bigEndian; // dummy; caller doesnn't care
-	return readIntoMemory(justHeader, in1, in2, bigEndian);
+	return readIntoMemory(justHeader, useShmem, in1, in2, bigEndian);
 }
 
 /**
@@ -2688,10 +2715,13 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
  */
 template<typename TStr>
 EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
+                                      bool useShmem,
                                       const string& in1,
                                       const string& in2,
                                       bool& bigEndian)
 {
+	_in1Str = in1;
+	_in2Str = in2;
 	// Initialize our primary and secondary input-stream fields
 	if(!_in1.is_open()) {
 		if(this->verbose()) cout << "Opening \"" << in1 << "\"" << endl;
@@ -2713,7 +2743,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
 	assert(_in2.is_open());
 	assert(_in2.good());
 	assert_eq((streamoff)_in2.tellg(), ios::beg);
-	EbwtParams eh(readIntoMemory(justHeader, bigEndian));
+	EbwtParams eh(readIntoMemory(justHeader, useShmem, bigEndian));
 	return eh;
 }
 
@@ -2722,9 +2752,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
  * object) from the object's input-stream pair fields.
  */
 template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader) {
+EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem) {
 	bool bigEndian; // dummy; caller doesn't care
-	return readIntoMemory(justHeader, bigEndian);
+	return readIntoMemory(justHeader, useShmem, bigEndian);
 }
 
 /**
@@ -2841,7 +2871,7 @@ readEbwtRefnames(const string& instr, vector<string>& refnames) {
  *
  */
 template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
+EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) {
 	// _in1 and _in2 must already be open with the get cursor at the
 	// beginning and no error flags set.
 	assert(_in1.is_open()); assert(_in1.good());
@@ -2986,21 +3016,128 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			assert_eq(this->_nFrag*4*3, (uint32_t)_in1.gcount());
 		}
 	}
-
-	// Allocate ebwt (big allocation)
-	if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ")" << endl;
-	try {
-		this->_ebwt = new uint8_t[eh._ebwtTotLen];
-	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
-		     << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
-		     << "-z option does not solve the problem, please try again on a computer with more" << endl
-		     << "memory." << endl;
-		exit(1);
+	{ // Load _ebwt[]
+		int shmid = -1;
+		// Calculate key given string
+		cout << "hashing " << _in1Str << endl;
+		key_t key = (key_t)hash_string(_in1Str);
+		// Guarantee that forward and reverse versions won't have the
+		// same key
+		key <<= 1;
+		if(key < 0) key = -key;
+		if(!_fw) key |= 1;
+		cout << "Final key " << key << endl;
+		bool readFromStream = true;
+		if(useShmem) {
+			shmid_ds ds;
+			int ret;
+			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into shared memory" << endl;
+			while(true) {
+				// Create the shrared-memory block
+				if((shmid = shmget(key, eh._ebwtTotLen, IPC_CREAT | 0666)) < 0) {
+					if(errno == ENOMEM) {
+						cerr << "Out of memory allocating shared ebwt[] array for the Bowtie index.  If you ran" << endl
+							 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
+							 << "-z option does not solve the problem, please try again on a computer with more" << endl
+							 << "memory." << endl;
+					} else if(errno == EACCES) {
+						cerr << "EACCES" << endl;
+					} else if(errno == EEXIST) {
+						cerr << "EEXIST" << endl;
+					} else if(errno == EINVAL) {
+						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+							 << "Deleteing old shared memory block and trying again." << endl;
+						shmid = shmget(key, 0, 0);
+						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+							cerr << "shmctl returned " << ret
+							     << " for IPC_RMID, errno is " << errno
+							     << ", shmid is " << shmid << endl;
+							exit(1);
+						}
+						continue;
+					} else if(errno == ENOENT) {
+						cerr << "ENOENT" << endl;
+					} else if(errno == ENOSPC) {
+						cerr << "ENOSPC" << endl;
+					} else {
+						cerr << "shmget returned " << shmid << " for and errno is " << errno << endl;
+					}
+					exit(1);
+				}
+				this->_ebwt = (uint8_t*)shmat(shmid, 0, 0);
+				this->_ebwtIsShmem = true;
+				if(this->_ebwt == (uint8_t*)-1) {
+					cerr << "Failed to attach _ebwt pointer to shared memory with shmat()." << endl;
+					exit(1);
+				}
+				if(this->_ebwt == NULL) {
+					cerr << "_ebwt pointer returned by shmat() was NULL." << endl;
+					exit(1);
+				}
+				// Did I create it, or did I just attach to one created by
+				// another process?
+				if((ret = shmctl(shmid, IPC_STAT, &ds)) < 0) {
+					cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
+					exit(1);
+				}
+				if(ds.shm_segsz != eh._ebwtTotLen) {
+					cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
+						 << ") doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+						 << "Deleteing old shared memory block and trying again." << endl;
+					if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+						cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
+						exit(1);
+					}
+				} else {
+					break;
+				}
+			} // while(true)
+			if(ds.shm_cpid == getpid()) {
+				if(_verbose) {
+					cout << "  I (pid = " << getpid() << ") created the shared memory for _ebwt" << endl;
+				}
+			} else {
+				if(_verbose) {
+					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _ebwt.  Pid " << ds.shm_cpid << " did." << endl;
+				}
+				readFromStream = false;
+			}
+		} else {
+			// Allocate ebwt (big allocation)
+			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into process memory" << endl;
+			try {
+				this->_ebwt = new uint8_t[eh._ebwtTotLen];
+			} catch(bad_alloc& e) {
+				cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
+					 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
+					 << "-z option does not solve the problem, please try again on a computer with more" << endl
+					 << "memory." << endl;
+				exit(1);
+			}
+		}
+		if(readFromStream) {
+			// Read ebwt from primary stream
+			_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
+			assert_eq(eh._ebwtTotLen, (uint32_t)_in1.gcount());
+		} else {
+#ifndef NDEBUG
+			// Assert that what's in the shared memory matches what I would
+			// have read from the stream
+			for(size_t i = 0; i < eh._ebwtTotLen; i += 4096) {
+				uint8_t buf[4096];
+				size_t amt = min<size_t>(4096, eh._ebwtTotLen-i);
+				_in1.read((char *)buf, amt);
+				assert_eq(amt, (size_t)_in1.gcount());
+				for(size_t j = 0; j < amt; j++) {
+					assert_eq((int)buf[j], (int)this->_ebwt[i+j]);
+				}
+			}
+#else
+			// Seek past it, since it's already sitting in shared memory
+			_in1.seekg(eh._ebwtTotLen, ios_base::cur);
+#endif
+		}
 	}
-	// Read ebwt from primary stream
-	_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
-	assert_eq(eh._ebwtTotLen, (uint32_t)_in1.gcount());
 
 	// Read zOff from primary stream
 	_zOff = readU32(_in1, be);
@@ -3066,39 +3203,151 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool& be) {
 			this->_refnames.back().push_back(c);
 		}
 	}
-
-	// Allocate offs (big allocation)
-	try {
-		if(_verbose) cout << "Reading offs (" << offsLenSampled << ")" << endl;
-		this->_offs = new uint32_t[offsLenSampled];
-	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
-		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
-		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
-		     << "computer with more memory." << endl;
-		exit(1);
-	}
-	if(be || offRateDiff > 0) {
-		for(uint32_t i = 0; i < offsLen; i++) {
-			if((i & ~(0xffffffff << offRateDiff)) != 0) {
-				char tmp[4];
-				_in2.read(tmp, 4);
+	{
+		// Allocate offs (big allocation)
+		bool readFromStream = true;
+		if(useShmem) {
+			if(offRateDiff != 0) {
+				cerr << "Cannot combine --offrate with shared-memory mode" << endl;
+				exit(1);
+			}
+			shmid_ds ds;
+			int ret;
+			int shmid = -1;
+			// Calculate key given string
+			key_t key = (key_t)hash_string(_in2Str);
+			// Guarantee that forward and reverse versions won't have the
+			// same key
+			key <<= 1;
+			if(key < 0) key = -key;
+			if(!_fw) key |= 1;
+			if(_verbose) cout << "Reading offs (" << offsLen << " 32-bit words) into shared memory" << endl;
+			while(true) {
+				// Create the shrared-memory block
+				if((shmid = shmget(key, offsLen*4, IPC_CREAT | 0666)) < 0) {
+					if(errno == ENOMEM) {
+						cerr << "Out of memory allocating the shared offs[] array  for the Bowtie index." << endl
+							 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+							 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+							 << "computer with more memory." << endl;
+						exit(1);
+					} else if(errno == EACCES) {
+						cerr << "EACCES" << endl;
+					} else if(errno == EEXIST) {
+						cerr << "EEXIST" << endl;
+					} else if(errno == EINVAL) {
+						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+							 << "Deleteing old shared memory block and trying again." << endl;
+						shmid = shmget(key, 0, 0);
+						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+							cerr << "shmctl returned " << ret
+							     << " for IPC_RMID, errno is " << errno
+							     << ", shmid is " << shmid << endl;
+							exit(1);
+						}
+						continue;
+					} else if(errno == ENOENT) {
+						cerr << "ENOENT" << endl;
+					} else if(errno == ENOSPC) {
+						cerr << "ENOSPC" << endl;
+					} else {
+						cerr << "shmget returned " << shmid << " for and errno is " << errno << endl;
+					}
+					exit(1);
+				}
+				this->_offs = (uint32_t*)shmat(shmid, 0, 0);
+				this->_offsIsShmem = true;
+				if(this->_offs == (uint32_t*)-1) {
+					cerr << "Failed to attach _offs pointer to shared memory with shmat()." << endl;
+					exit(1);
+				}
+				if(this->_offs == NULL) {
+					cerr << "_offs pointer returned by shmat() was NULL." << endl;
+					exit(1);
+				}
+				// Did I create it, or did I just attach to one created by
+				// another process?
+				if((ret = shmctl(shmid, IPC_STAT, &ds)) < 0) {
+					cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
+					exit(1);
+				}
+				if(ds.shm_segsz != offsLen*4) {
+					cerr << "Warning: shared-memory _offs chunk's segment size (" << ds.shm_segsz
+						 << ") doesn't match expected size (" << (offsLen*4) << ")" << endl
+						 << "Deleteing old shared memory block and trying again." << endl;
+					if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+						cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
+						exit(1);
+					}
+				} else {
+					break;
+				}
+			} // while(true)
+			if(ds.shm_cpid == getpid()) {
+				if(_verbose) {
+					cout << "  I (pid = " << getpid() << ") created the shared memory for _offs" << endl;
+				}
 			} else {
-				uint32_t idx = i >> offRateDiff;
-				assert_lt(idx, offsLenSampled);
-				this->_offs[idx] = readU32(_in2, be);
+				if(_verbose) {
+					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _offs.  Pid " << ds.shm_cpid << " did." << endl;
+				}
+				readFromStream = false;
+			}
+		} else {
+			try {
+				if(_verbose) cout << "Reading offs (" << offsLenSampled << " 32-bit words)" << endl;
+				this->_offs = new uint32_t[offsLenSampled];
+			} catch(bad_alloc& e) {
+				cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
+					 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+					 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+					 << "computer with more memory." << endl;
+				exit(1);
 			}
 		}
-	} else {
-		_in2.read((char *)this->_offs, offsLen*4);
-		assert_eq(offsLen*4, (uint32_t)_in2.gcount());
-	}
-	{
-		ASSERT_ONLY(Bitset offsSeen(len+1));
-		for(uint32_t i = 0; i < offsLenSampled; i++) {
-			assert(!offsSeen.test(this->_offs[i]));
-			ASSERT_ONLY(offsSeen.set(this->_offs[i]));
-			assert_leq(this->_offs[i], len);
+
+		if(readFromStream) {
+			if(be || offRateDiff > 0) {
+				for(uint32_t i = 0; i < offsLen; i++) {
+					if((i & ~(0xffffffff << offRateDiff)) != 0) {
+						char tmp[4];
+						_in2.read(tmp, 4);
+					} else {
+						uint32_t idx = i >> offRateDiff;
+						assert_lt(idx, offsLenSampled);
+						this->_offs[idx] = readU32(_in2, be);
+					}
+				}
+			} else {
+				_in2.read((char *)this->_offs, offsLen*4);
+				assert_eq(offsLen*4, (uint32_t)_in2.gcount());
+			}
+		} else {
+#ifndef NDEBUG
+			// Assert that what's in the shared memory matches what I would
+			// have read from the stream
+			for(size_t i = 0; i < offsLen; i += 1024) {
+				uint32_t buf[1024];
+				size_t amt = min<size_t>(1024, offsLen - i);
+				_in2.read((char*)buf, amt*4);
+				assert_eq(amt*4, (size_t)_in2.gcount());
+				for(size_t j = 0; j < amt; j++) {
+					assert_eq(buf[j], this->_offs[i+j]);
+				}
+			}
+#else
+			// Seek past it, since it's already sitting in shared memory
+			_in2.seekg(offsLen*4, ios_base::cur);
+#endif
+		}
+
+		{
+			ASSERT_ONLY(Bitset offsSeen(len+1));
+			for(uint32_t i = 0; i < offsLenSampled; i++) {
+				assert(!offsSeen.test(this->_offs[i]));
+				ASSERT_ONLY(offsSeen.set(this->_offs[i]));
+				assert_leq(this->_offs[i], len);
+			}
 		}
 	}
 

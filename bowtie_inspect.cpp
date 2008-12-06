@@ -249,9 +249,9 @@ static void driver(const string& ebwtFileBase,
 	}
 	else {
 		// Initialize Ebwt object
-	    Ebwt<TStr> ebwt(adjustedEbwtFileBase, -1, -1, verbose, false, false);
+	    Ebwt<TStr> ebwt(adjustedEbwtFileBase, true /*fw*/, -1, -1, false /* no shmem */, verbose, false, false);
 	    // Load whole index into memory
-		ebwt.loadIntoMemory();
+		ebwt.loadIntoMemory(false); // no shmem
 		print_index_sequences(cout, ebwt);
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
