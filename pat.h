@@ -902,6 +902,7 @@ public:
 	BufferedFilePatternSource(const vector<string>& infiles,
 	                          bool __reverse = false,
 	                          bool __useSpinlock = true,
+	                          bool __forgiveInput = false,
 	                          const char *__dumpfile = NULL,
 	                          int __trim3 = 0,
 	                          int __trim5 = 0) :
@@ -910,6 +911,7 @@ public:
 		_errs(),
 		_filecur(0),
 		_filebuf(),
+		_forgiveInput(__forgiveInput),
 		_first(true)
 	{
 		assert_gt(infiles.size(), 0);
@@ -932,7 +934,7 @@ public:
 		// manipulating our file handle and _filecur state
 		lock();
 		read(r, patid);
-		if(_first && seqan::empty(r.patFw)) {
+		if(_first && seqan::empty(r.patFw) && !_forgiveInput) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any reads in \"" << _infiles[0] << "\"" << endl;
 		}
@@ -942,7 +944,7 @@ public:
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
 			read(r, patid);
-			if(seqan::empty(r.patFw)) {
+			if(seqan::empty(r.patFw) && !_forgiveInput) {
 				// No reads could be extracted from this _infile
 				cerr << "Warning: Could not find any reads in \"" << _infiles[_filecur] << "\"" << endl;
 			}
@@ -994,6 +996,7 @@ protected:
 	vector<bool> _errs; /// whether we've already printed an error for each file
 	size_t _filecur;   /// index into _infiles of next file to read
 	FileBuf _filebuf;  /// read file currently being read from
+	bool _forgiveInput; /// try hard to parse input even if it's malformed
 	bool _first;
 };
 
@@ -1011,7 +1014,7 @@ public:
 	                   int __policy = NS_TO_NS,
 	                   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{ }
 	virtual void reset() {
@@ -1207,14 +1210,13 @@ public:
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
-	                   bool forgiveInput = false,
+	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
 					   bool integer_quals = true,
 					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse),
-		_forgiveInput(forgiveInput),
 		_solexa_quals(solexa_quals),
 		_integer_quals(integer_quals),
 		_policy(__policy), _maxNs(__maxNs),
@@ -1651,7 +1653,6 @@ protected:
 private:
 	bool _first;
 	bool _reverse;
-	bool _forgiveInput;
 	bool _solexa_quals;
 	bool _integer_quals;
 	int _policy;
@@ -1674,7 +1675,7 @@ public:
 	                 int __policy = NS_TO_NS,
 	                 int __maxNs = 9999,
 	                 uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __useSpinlock, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, false, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{ }
 	virtual void reset() {
