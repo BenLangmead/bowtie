@@ -970,22 +970,117 @@ static void *exactSearchWorker(void *vp) {
 	while(true) {
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
-    	uint32_t plen = length(patFw);
-    	// Process forward-oriented read
-    	bt.setOffs(0, 0, plen, plen, plen, plen);
-    	bt.setQuery(&patFw, &qualFw, &name);
-    	bool hit = bt.backtrack();
-	    // If the forward direction matched exactly, ignore the
-	    // reverse complement
-	    if(hit) {
-	    	continue;
-	    }
-	    if(!revcomp) continue;
-	    // Process reverse-complement read
-		params.setFw(false);
-		bt.setQuery(&patRc, &qualRc, &name);
-	    bt.backtrack();
-		params.setFw(true);
+		#include "search_exact.c"
+    }
+	FINISH_READ(patsrc);
+    WORKER_EXIT();
+}
+
+#define SET_A_FW(bt, p, params) \
+	bt.setQuery(&p->bufa().patFw, &p->bufa().qualFw, &p->bufa().name); \
+	params.setFw(true);
+#define SET_A_RC(bt, p, params) \
+	bt.setQuery(&p->bufa().patRc, &p->bufa().qualRc, &p->bufa().name); \
+	params.setFw(false);
+#define SET_B_FW(bt, p, params) \
+	bt.setQuery(&p->bufb().patFw, &p->bufb().qualFw, &p->bufb().name); \
+	params.setFw(true);
+#define SET_B_RC(bt, p, params) \
+	bt.setQuery(&p->bufb().patRc, &p->bufb().qualRc, &p->bufb().name); \
+	params.setFw(false);
+
+/**
+ * Search through a single (forward) Ebwt index for exact end-to-end
+ * hits.  Assumes that index is already loaded into memory.
+ */
+static void *exactPairedSearchWorker(void *vp) {
+	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	HitSink& _sink               = *exactSearch_sink;
+	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
+	vector<String<Dna5> >& os    = *exactSearch_os;
+	// Global initialization
+	bool sanity = sanityCheck && !os.empty();
+	// Per-thread initialization
+	uint32_t lastLen = 0;
+	PatternSourcePerThread *patsrc = createPatSrc(_patsrc, (int)(long)vp);
+	HitSinkPerThread* sink = new FirstNGoodHitSinkPerThread(_sink, 1, 0xffffffff, sanity);
+	EbwtSearchParams<String<Dna> > params(
+			*sink,      // HitSink
+	        os,         // reference sequences
+	        revcomp,    // forward AND reverse complement?
+	        true,       // read is forward
+	        true,       // index is forward
+	        arrowMode); // arrow mode
+	BacktrackManager<String<Dna> > bt(
+			&ebwt, params,
+	        0xffffffff,     // qualThresh
+	        BacktrackLimits(), // max backtracks (no max)
+	        0,              // reportPartials (don't)
+	        true,           // reportExacts
+	        false,          // reportArrows
+	        NULL,           // seedlings
+	        NULL,           // mutations
+	        verbose,        // verbose
+	        seed,           // seed
+	        &os,
+	        false);         // considerQuals
+	bool skipped = false;
+	vector<Hit>& hits = sink->retainedHits();
+	while(true) {
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
+		if(seqan::empty(patsrc->bufb().patFw)) {
+			// Do singleton-style matching
+			bt.setReportArrows(false);
+			params.setArrowMode(false);
+			sink->setRetainHits(sanity);
+			cout << "Singleton with name " << patsrc->bufa().name << endl;
+			#include "search_exact.c"
+		} else {
+			// Do paired-end matching
+			bt.setReportArrows(true);
+			params.setArrowMode(true);
+			cout << "A: " << patsrc->bufa().patFw << ", B: " << patsrc->bufb().patFw << endl;
+			size_t numRetained = hits.size();
+			sink->setRetainHits(true);
+			uint32_t plen = length(patFw);
+			bt.setOffs(0, 0, plen, plen, plen, plen);
+
+			SET_A_FW(bt, patsrc, params);
+			bool hit;
+			hit = bt.backtrack();
+			if(hit) {
+				numRetained++; assert_eq(numRetained, hits.size());
+				cout << (hits.back().h.second - hits.back().h.first) << ", ";
+			} else {
+				cout << "0, ";
+			}
+			SET_B_RC(bt, patsrc, params);
+			hit = bt.backtrack();
+			if(hit) {
+				numRetained++; assert_eq(numRetained, hits.size());
+				cout << (hits.back().h.second - hits.back().h.first) << "; ";
+			} else {
+				cout << "0; ";
+			}
+
+			SET_B_FW(bt, patsrc, params);
+			hit = bt.backtrack();
+			if(hit) {
+				numRetained++; assert_eq(numRetained, hits.size());
+				cout << (hits.back().h.second - hits.back().h.first) << ", ";
+			} else {
+				cout << "0, ";
+			}
+			SET_A_RC(bt, patsrc, params);
+			hit = bt.backtrack();
+			if(hit) {
+				numRetained++; assert_eq(numRetained, hits.size());
+				cout << (hits.back().h.second - hits.back().h.first) << endl;
+			} else {
+				cout << "0" << endl;
+			}
+		}
     }
 	FINISH_READ(patsrc);
     WORKER_EXIT();
@@ -998,30 +1093,34 @@ static void *exactSearchWorker(void *vp) {
 static void exactSearch(PairedPatternSource& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
-                        vector<String<Dna5> >& os)
+                        vector<String<Dna5> >& os,
+                        bool paired = false)
 {
 	exactSearch_patsrc = &_patsrc;
 	exactSearch_sink   = &_sink;
 	exactSearch_ebwt   = &ebwt;
 	exactSearch_os     = &os;
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
 
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, exactSearchWorker, (void *)(long)(i+1));
+			if(paired) {
+				pthread_create(&threads[i], &pt_attr, exactPairedSearchWorker, (void *)(long)(i+1));
+			} else {
+				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
+			}
 		}
 #endif
-		exactSearchWorker((void*)0L);
+		if(paired) exactPairedSearchWorker((void*)0L);
+		else       exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
-		}
+		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
 	}
 #endif
 }
@@ -1173,9 +1272,9 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	assert(!ebwtBw.isInMemory());
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -1186,7 +1285,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch Phase 1 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerPhase1, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase1, (void *)(long)(i+1));
 		}
 #endif
 		mismatchSearchWorkerPhase1((void*)0L);
@@ -1217,7 +1316,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase2, (void *)(long)(i+1));
 		}
 #endif
 		mismatchSearchWorkerPhase2((void*)0L);
@@ -1309,9 +1408,9 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 
 #ifdef BOWTIE_PTHREADS
 	// Allocate structures for threads
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -1320,7 +1419,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
 		// Go to town
@@ -1653,9 +1752,9 @@ static void twoOrThreeMismatchSearch(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -1663,7 +1762,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)(long)(i+1));
 		}
 #endif
 		twoOrThreeMismatchSearchWorkerPhase1((void*)0L);
@@ -1681,7 +1780,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)(long)(i+1));
 		}
 #endif
 		twoOrThreeMismatchSearchWorkerPhase2((void*)0L);
@@ -1698,7 +1797,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)(long)(i+1));
 		}
 #endif
 		twoOrThreeMismatchSearchWorkerPhase3((void*)0L);
@@ -1832,9 +1931,9 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -1842,7 +1941,7 @@ static void twoOrThreeMismatchSearchFull(
 		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
 		twoOrThreeMismatchSearchWorkerFull((void*)0L);
@@ -2365,9 +2464,9 @@ static void seededQualCutoffSearch(
 	seededQualSearch_qualCutoff = qualCutoff;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -2381,7 +2480,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase1, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)(long)(i+1));
 		}
 #endif
 		seededQualSearchWorkerPhase1((void*)0L);
@@ -2414,7 +2513,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)(long)(i+1));
 		}
 #endif
 		seededQualSearchWorkerPhase2((void*)0L);
@@ -2449,7 +2548,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase3, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)(long)(i+1));
 		}
 #endif
 		seededQualSearchWorkerPhase3((void*)0L);
@@ -2474,7 +2573,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerPhase4, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)(long)(i+1));
 		}
 #endif
 		seededQualSearchWorkerPhase4((void*)0L);
@@ -2539,9 +2638,9 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_qualCutoff = qualCutoff;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -2558,7 +2657,7 @@ static void seededQualCutoffSearchFull(
 		Timer _t(cout, "Seeded quality full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seededQualSearchWorkerFull, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
 		seededQualSearchWorkerFull((void*)0L);
@@ -2700,9 +2799,9 @@ static void seedAndSWExtendSearch(
 	seedAndSWExtendSearch_os       = &os;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pthread_custom_attr;
-	pthread_attr_init(&pthread_custom_attr);
-	pthread_attr_setdetachstate(&pthread_custom_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_t pt_attr;
+	pthread_attr_init(&pt_attr);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
@@ -2720,7 +2819,7 @@ static void seedAndSWExtendSearch(
 		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pthread_custom_attr, seedAndSWExtendSearchWorkerPhase1, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seedAndSWExtendSearchWorkerPhase1, (void *)(long)(i+1));
 		}
 #endif
 		seedAndSWExtendSearchWorkerPhase1((void*)0L);
@@ -2813,6 +2912,7 @@ static void driver(const char * type,
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
 
+	bool paired = mates1.size() > 0;
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
 		const vector<string>* qs = &mates1;
@@ -3013,7 +3113,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(patsrc, *sink, ebwt, os);
+			exactSearch(patsrc, *sink, ebwt, os, paired);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
@@ -3080,18 +3180,22 @@ int main(int argc, char **argv) {
 
 	// Get query filename
 	if(optind >= argc) {
-		cerr << "No query or output file specified!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
-	query = argv[optind++];
-
-	// Tokenize the list of query files
-	tokenize(query, ",", queries);
-	if(queries.size() < 1) {
-		cerr << "Tokenized query file list was empty!" << endl;
-		printUsage(cerr);
-		return 1;
+		if(mates1.size() > 0) {
+			query = "";
+		} else {
+			cerr << "No query or output file specified!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+	} else {
+		query = argv[optind++];
+		// Tokenize the list of query files
+		tokenize(query, ",", queries);
+		if(queries.size() < 1) {
+			cerr << "Tokenized query file list was empty!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
 	}
 
 	// Get output filename

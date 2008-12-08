@@ -566,6 +566,14 @@ public:
 	}
 
 	/**
+	 * Set whether this manager will report hits as matrix ranges
+	 * (true) or as fully-resolved hits (false).
+	 */
+	void setReportArrows(bool a) {
+		_reportArrows = a;
+	}
+
+	/**
 	 * Initiate the recursive backtracking routine starting at the
 	 * extreme right-hand side of the pattern.  Use the ftab to match
 	 * the first several characters in one chomp, as long as doing so

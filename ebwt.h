@@ -1358,6 +1358,9 @@ public:
 	bool arrowMode() const {
 		return _arrowMode;
 	}
+	void setArrowMode(bool a) {
+		_arrowMode = a;
+	}
 	const vector<String<Dna5> >& texts() const { return _texts; }
 private:
 	HitSinkPerThread& _sink;
@@ -3017,24 +3020,25 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 		}
 	}
 	{ // Load _ebwt[]
-		int shmid = -1;
-		// Calculate key given string
-		cout << "hashing " << _in1Str << endl;
-		key_t key = (key_t)hash_string(_in1Str);
-		// Guarantee that forward and reverse versions won't have the
-		// same key
-		key <<= 1;
-		if(key < 0) key = -key;
-		if(!_fw) key |= 1;
-		cout << "Final key " << key << endl;
 		bool readFromStream = true;
 		if(useShmem) {
+			int shmid = -1;
+			// Calculate key given string
+			key_t key = (key_t)hash_string(_in1Str);
+			// Guarantee that forward and reverse versions won't have the
+			// same key
+			key <<= 1;
+			if(key < 0) key = -key;
+			if(!_fw) key |= 1;
 			shmid_ds ds;
 			int ret;
+			// Reserve 8 bytes at the end of the shared memory chunk
+			// for silly synchronization
+			size_t shmemLen = eh._ebwtTotLen + 4;
 			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into shared memory" << endl;
 			while(true) {
 				// Create the shrared-memory block
-				if((shmid = shmget(key, eh._ebwtTotLen, IPC_CREAT | 0666)) < 0) {
+				if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {
 					if(errno == ENOMEM) {
 						cerr << "Out of memory allocating shared ebwt[] array for the Bowtie index.  If you ran" << endl
 							 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
@@ -3045,7 +3049,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					} else if(errno == EEXIST) {
 						cerr << "EEXIST" << endl;
 					} else if(errno == EINVAL) {
-						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << (shmemLen) << ")" << endl
 							 << "Deleteing old shared memory block and trying again." << endl;
 						shmid = shmget(key, 0, 0);
 						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
@@ -3053,6 +3057,8 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 							     << " for IPC_RMID, errno is " << errno
 							     << ", shmid is " << shmid << endl;
 							exit(1);
+						} else {
+							cerr << "Deleted shared mem chunk with shmid " << shmid << endl;
 						}
 						continue;
 					} else if(errno == ENOENT) {
@@ -3080,9 +3086,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
 					exit(1);
 				}
-				if(ds.shm_segsz != eh._ebwtTotLen) {
+				if(ds.shm_segsz != shmemLen) {
 					cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
-						 << ") doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+						 << ") doesn't match expected size (" << shmemLen << ")" << endl
 						 << "Deleteing old shared memory block and trying again." << endl;
 					if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
 						cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
@@ -3096,6 +3102,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") created the shared memory for _ebwt" << endl;
 				}
+				// Set this value just off the end of _ebwt[] array to
+				// indicate that the data hasn't been read yet.
+				((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xffffffff;
 			} else {
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _ebwt.  Pid " << ds.shm_cpid << " did." << endl;
@@ -3119,7 +3128,16 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 			// Read ebwt from primary stream
 			_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
 			assert_eq(eh._ebwtTotLen, (uint32_t)_in1.gcount());
-		} else {
+			if(useShmem) {
+				// I'm the shmem writer - set this flag just off the
+				// end of the ebwt[] array to indicate we're done
+				// writing
+				assert_eq(0xffffffff, ((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0]);
+				((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xf0f0f0f0;
+			}
+		} else /* Consume shared memory instead of reading from stream */ {
+			// Spin until the shmem writer is finished writing
+			while(((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] != 0xf0f0f0f0) ; // spin
 #ifndef NDEBUG
 			// Assert that what's in the shared memory matches what I would
 			// have read from the stream
@@ -3222,9 +3240,10 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 			if(key < 0) key = -key;
 			if(!_fw) key |= 1;
 			if(_verbose) cout << "Reading offs (" << offsLen << " 32-bit words) into shared memory" << endl;
+			uint32_t shmemLen = offsLen+1;
 			while(true) {
 				// Create the shrared-memory block
-				if((shmid = shmget(key, offsLen*4, IPC_CREAT | 0666)) < 0) {
+				if((shmid = shmget(key, shmemLen*4, IPC_CREAT | 0666)) < 0) {
 					if(errno == ENOMEM) {
 						cerr << "Out of memory allocating the shared offs[] array  for the Bowtie index." << endl
 							 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
@@ -3271,9 +3290,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
 					exit(1);
 				}
-				if(ds.shm_segsz != offsLen*4) {
+				if(ds.shm_segsz != shmemLen*4) {
 					cerr << "Warning: shared-memory _offs chunk's segment size (" << ds.shm_segsz
-						 << ") doesn't match expected size (" << (offsLen*4) << ")" << endl
+						 << ") doesn't match expected size (" << (shmemLen*4) << ")" << endl
 						 << "Deleteing old shared memory block and trying again." << endl;
 					if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
 						cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
@@ -3287,6 +3306,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") created the shared memory for _offs" << endl;
 				}
+				// Set this value just off the end of _offs[] array to
+				// indicate that the data hasn't been read yet.
+				this->_offs[offsLen] = 0xffffffff;
 			} else {
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _offs.  Pid " << ds.shm_cpid << " did." << endl;
@@ -3322,7 +3344,16 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				_in2.read((char *)this->_offs, offsLen*4);
 				assert_eq(offsLen*4, (uint32_t)_in2.gcount());
 			}
-		} else {
+			if(useShmem) {
+				// I'm the shmem writer - set this flag just off the
+				// end of the offs[] array to indicate we're done
+				// writing
+				assert_eq(0xffffffff, this->_offs[offsLen]);
+				this->_offs[offsLen] = 0xf0f0f0f0;
+			}
+		} else /* Consume shared memory instead of reading from stream */ {
+			// Spin until the shmem writer is finished writing
+			while(this->_offs[offsLen] != 0xf0f0f0f0) ; // spin
 #ifndef NDEBUG
 			// Assert that what's in the shared memory matches what I would
 			// have read from the stream
