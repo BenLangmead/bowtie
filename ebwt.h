@@ -3104,7 +3104,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				}
 				// Set this value just off the end of _ebwt[] array to
 				// indicate that the data hasn't been read yet.
-				((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xffffffff;
+				((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xffffffff;
 			} else {
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _ebwt.  Pid " << ds.shm_cpid << " did." << endl;
@@ -3132,12 +3132,12 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				// I'm the shmem writer - set this flag just off the
 				// end of the ebwt[] array to indicate we're done
 				// writing
-				assert_eq(0xffffffff, ((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0]);
-				((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xf0f0f0f0;
+				assert_eq(0xffffffff, ((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0]);
+				((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xf0f0f0f0;
 			}
 		} else /* Consume shared memory instead of reading from stream */ {
 			// Spin until the shmem writer is finished writing
-			while(((uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] != 0xf0f0f0f0) ; // spin
+			while(((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] != 0xf0f0f0f0) ; // spin
 #ifndef NDEBUG
 			// Assert that what's in the shared memory matches what I would
 			// have read from the stream
@@ -3308,7 +3308,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				}
 				// Set this value just off the end of _offs[] array to
 				// indicate that the data hasn't been read yet.
-				this->_offs[offsLen] = 0xffffffff;
+				((volatile uint32_t *)this->_offs)[offsLen] = 0xffffffff;
 			} else {
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _offs.  Pid " << ds.shm_cpid << " did." << endl;
@@ -3349,11 +3349,11 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				// end of the offs[] array to indicate we're done
 				// writing
 				assert_eq(0xffffffff, this->_offs[offsLen]);
-				this->_offs[offsLen] = 0xf0f0f0f0;
+				((volatile uint32_t *)this->_offs)[offsLen] = 0xf0f0f0f0;
 			}
 		} else /* Consume shared memory instead of reading from stream */ {
 			// Spin until the shmem writer is finished writing
-			while(this->_offs[offsLen] != 0xf0f0f0f0) ; // spin
+			while(((volatile uint32_t *)this->_offs)[offsLen] != 0xf0f0f0f0) ; // spin
 #ifndef NDEBUG
 			// Assert that what's in the shared memory matches what I would
 			// have read from the stream
