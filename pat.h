@@ -633,9 +633,8 @@ private:
  * line may start with @, we keep scanning until we've seen a line
  * beginning with @ where the line two lines back began with +.
  */
-static inline int getToFirstRecord(FileBuf& in) {
+static inline int getToFirstRecord(FileBuf& in, bool sawPlus) {
 	int line = 0;
-	bool sawPlus = false;
 	int plusLine = -1;
 	int c = in.get();
 	int firstc = c;
@@ -1251,12 +1250,12 @@ protected:
 				c = _filebuf.get();
 				if(c != '@') {
 					if(_forgiveInput) {
-						c = getOverNewline(_filebuf); if(c < 0) {
+						c = getToFirstRecord(_filebuf, c == '+'); if(c < 0) {
 							seqan::clear(r.patFw);
 							return;
 						}
 					} else {
-						c = getToFirstRecord(_filebuf); if(c < 0) {
+						c = getOverNewline(_filebuf); if(c < 0) {
 							seqan::clear(r.patFw);
 							return;
 						}
