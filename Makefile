@@ -52,6 +52,12 @@ MAQ_CPP	= maq_convert/const.c \
 MAQ_LIB = -lz
 VERSION = $(shell cat VERSION)
 
+# For a universal 32/64-bit x86 Mac binary compatible w/ Tiger:
+# EXTRA_FLAGS="-arch i386 -arch x86_64 -mmacosx-version-min=10.4"
+# For a 32-bit x86 binary on Linux (if not the default):
+# EXTRA_FLAGS="-m32"
+# For a 64-bit x86 binary on Linux (if not the default):
+# EXTRA_FLAGS="-m64"
 EXTRA_FLAGS =
 DEBUG_FLAGS = -O0 -g3
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS)\""
