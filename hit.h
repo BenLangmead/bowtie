@@ -22,6 +22,7 @@
 using namespace std;
 using namespace seqan;
 
+/// Constants for the various output modes
 typedef enum output_types {
 	FULL = 1,
 	CONCISE,
@@ -29,6 +30,7 @@ typedef enum output_types {
 	NONE
 };
 
+/// Names of the various output modes
 static const std::string output_type_names[] = {
 	"Invalid!",
 	"Full",
@@ -38,9 +40,9 @@ static const std::string output_type_names[] = {
 };
 
 typedef pair<uint32_t,uint32_t> U32Pair;
-// For now, we support reads up to 63 bp long, which is the same as Maq, as
-// of 0.6.7
-static const int max_read_bp = 1023;
+
+// Support reads of up to 1024 characters for now
+static const int max_read_bp = 1024;
 
 /**
  * Encapsulates a hit, including a text-id/text-offset pair, a pattern
