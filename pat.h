@@ -627,50 +627,6 @@ private:
 	RandomSource _rand;
 };
 
-/**
- * Scan to the next FASTQ record (starting with @) and return the first
- * character of the record (which will always be @).  Since the quality
- * line may start with @, we keep scanning until we've seen a line
- * beginning with @ where the line two lines back began with +.
- */
-static inline int getToFirstRecord(FileBuf& in, bool sawPlus) {
-	int line = 0;
-	int plusLine = -1;
-	int c = in.get();
-	int firstc = c;
-	while(true) {
-		if(line > 20) {
-			// If we couldn't find our desired '@' in the first 20
-			// lines, it's time to give up
-			if(firstc == '>') {
-				// That firstc is '>' may be a hint that this is
-				// actually a FASTA file, so return it intact
-				return '>';
-			}
-			// Return an error
-			return -1;
-		}
-		if(c == -1) return -1;
-		if(c == '\n') {
-			c = in.get();
-			if(c == '@' && sawPlus && plusLine == (line-2)) {
-				return '@';
-			}
-			else if(c == '+') {
-				// Saw a '+' at the beginning of a line; remember where
-				// we saw it
-				sawPlus = true;
-				plusLine = line;
-			}
-			else if(c == -1) {
-				return -1;
-			}
-			line++;
-		}
-		c = in.get();
-	}
-}
-
 /// Skip to the end of the current string of newline chars and return
 /// the first character after the newline chars, or -1 for EOF
 static inline int getOverNewline(FileBuf& in) {
@@ -933,7 +889,9 @@ public:
 		// We are entering a critical region, because we're
 		// manipulating our file handle and _filecur state
 		lock();
-		read(r, patid);
+		do {
+			read(r, patid);
+		} while(seqan::empty(r.patFw) && !_filebuf.eof());
 		if(_first && seqan::empty(r.patFw) && !_forgiveInput) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any reads in \"" << _infiles[0] << "\"" << endl;
@@ -943,7 +901,9 @@ public:
 			// Open next file
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
-			read(r, patid);
+			do {
+				read(r, patid);
+			} while(seqan::empty(r.patFw) && !_filebuf.eof());
 			if(seqan::empty(r.patFw) && !_forgiveInput) {
 				// No reads could be extracted from this _infile
 				cerr << "Warning: Could not find any reads in \"" << _infiles[_filecur] << "\"" << endl;
@@ -1012,9 +972,10 @@ public:
 	                   int __trim3 = 0,
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
+	                   bool __forgiveInput = false,
 	                   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, false, __useSpinlock, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
 	{ }
 	virtual void reset() {
@@ -1026,7 +987,17 @@ public:
 		_reverse = __reverse;
 	}
 protected:
-
+	/**
+	 * Scan to the next FASTA record (starting with >) and return the first
+	 * character of the record (which will always be >).
+	 */
+	static int skipToNextFastaRecord(FileBuf& in) {
+		int c;
+		while((c = in.get()) != '>') {
+			if(in.eof()) return -1;
+		}
+		return c;
+	}
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		const int bufSz = ReadBuf::BUF_SIZE;
@@ -1038,17 +1009,21 @@ protected:
 			ns = 0; // reset 'N' count
 			// Pick off the first carat
 			if(_first) {
-				c = getOverNewline(_filebuf); if(c < 0) {
-					r.clearAll(); return;
+				c = _filebuf.get();
+				if(c != '>') {
+					if(_forgiveInput) {
+						c = FastaPatternSource::skipToNextFastaRecord(_filebuf);
+						if(c < 0) {
+							r.clearAll(); return;
+						}
+					} else {
+						c = getOverNewline(_filebuf); if(c < 0) {
+							r.clearAll(); return;
+						}
+					}
 				}
 				if(c != '>') {
-					int cc = toupper(c);
 					cerr << "Error: reads file does not look like a FASTA file" << endl;
-					if(c == '@') {
-						cerr << "Reads file looks like a FASTQ file; please use -f" << endl;
-					} else if(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T') {
-						cerr << "Reads file may be a raw file; please use -r" << endl;
-					}
 					exit(1);
 				}
 				assert(c == '>' || c == '#');
@@ -1237,6 +1212,49 @@ public:
 		_reverse = __reverse;
 	}
 protected:
+	/**
+	 * Scan to the next FASTQ record (starting with @) and return the first
+	 * character of the record (which will always be @).  Since the quality
+	 * line may start with @, we keep scanning until we've seen a line
+	 * beginning with @ where the line two lines back began with +.
+	 */
+	static int skipToNextFastqRecord(FileBuf& in, bool sawPlus) {
+		int line = 0;
+		int plusLine = -1;
+		int c = in.get();
+		int firstc = c;
+		while(true) {
+			if(line > 20) {
+				// If we couldn't find our desired '@' in the first 20
+				// lines, it's time to give up
+				if(firstc == '>') {
+					// That firstc is '>' may be a hint that this is
+					// actually a FASTA file, so return it intact
+					return '>';
+				}
+				// Return an error
+				return -1;
+			}
+			if(c == -1) return -1;
+			if(c == '\n') {
+				c = in.get();
+				if(c == '@' && sawPlus && plusLine == (line-2)) {
+					return '@';
+				}
+				else if(c == '+') {
+					// Saw a '+' at the beginning of a line; remember where
+					// we saw it
+					sawPlus = true;
+					plusLine = line;
+				}
+				else if(c == -1) {
+					return -1;
+				}
+				line++;
+			}
+			c = in.get();
+		}
+	}
 	/// Read another pattern from a FASTQ input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		int ns;
@@ -1252,7 +1270,7 @@ protected:
 				c = _filebuf.get();
 				if(c != '@') {
 					if(_forgiveInput) {
-						c = getToFirstRecord(_filebuf, c == '+'); if(c < 0) {
+						c = FastqPatternSource::skipToNextFastqRecord(_filebuf, c == '+'); if(c < 0) {
 							seqan::clear(r.patFw);
 							return;
 						}
@@ -1265,9 +1283,6 @@ protected:
 				}
 				if(c != '@') {
 					cerr << "Error: reads file does not look like a FASTQ file" << endl;
-					if(c == '>') {
-						cerr << "Reads file looks like a FASTA file; please use -f" << endl;
-					}
 					exit(1);
 				}
 				assert_eq('@', c);

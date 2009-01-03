@@ -76,13 +76,11 @@ static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
-static bool noMaqRound          = false;
-static bool forgiveInput        = false;
-static bool useSpinlock         = true;
-static bool useFifo             = false;
+static bool noMaqRound          = false; // true -> don't round quals to nearest 10 like maq
+static bool forgiveInput        = false; // let read input be a little wrong w/o complaining or dying
+static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
-static const char *bowtie_fifo  = "/tmp/bowtie.fifo";
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:";
@@ -122,7 +120,6 @@ enum {
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
-	ARG_FIFO,
 	ARG_SHARED_MEM
 };
 
@@ -186,7 +183,6 @@ static struct option long_options[] = {
 	{"partition",    required_argument, 0,            ARG_PARTITION},
 	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
 	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
-	{"fifo",         no_argument,       0,            ARG_FIFO},
 	{"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
 	{0, 0, 0, 0} // terminator
 };
@@ -195,15 +191,20 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
-	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
-	    << "                     the sequences themselves, if -c is specified) paired with" << endl
-	    << "                     corresponding mates in <mates2>" << endl
-	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
-	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
+//	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
+//	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+//	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
+//	    << "                     the sequences themselves, if -c is specified) paired with" << endl
+//	    << "                     corresponding mates in <mates2>" << endl
+//	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
+//	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
+//	    << "                     (or the sequences themselves, if -c is specified)" << endl
+//	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
+	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
+	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <query_in>         comma-separated list of files containing query reads" << endl
 	    << "                     (or the sequences themselves, if -c is specified)" << endl
-	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
+	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -659,7 +660,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
-	   		case ARG_FIFO: useFifo = true; cout << "Using fifo " << bowtie_fifo << endl; break;
 	   		case ARG_SHARED_MEM: useShmem = true; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -993,103 +993,6 @@ static void *exactSearchWorker(void *vp) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void *exactPairedSearchWorker(void *vp) {
-	PairedPatternSource& _patsrc = *exactSearch_patsrc;
-	HitSink& _sink               = *exactSearch_sink;
-	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
-	vector<String<Dna5> >& os    = *exactSearch_os;
-	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
-	// Per-thread initialization
-	uint32_t lastLen = 0;
-	PatternSourcePerThread *patsrc = createPatSrc(_patsrc, (int)(long)vp);
-	HitSinkPerThread* sink = new FirstNGoodHitSinkPerThread(_sink, 1, 0xffffffff, sanity);
-	EbwtSearchParams<String<Dna> > params(
-			*sink,      // HitSink
-	        os,         // reference sequences
-	        revcomp,    // forward AND reverse complement?
-	        true,       // read is forward
-	        true,       // index is forward
-	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt(
-			&ebwt, params,
-	        0xffffffff,     // qualThresh
-	        BacktrackLimits(), // max backtracks (no max)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        false,          // reportArrows
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        seed,           // seed
-	        &os,
-	        false);         // considerQuals
-	bool skipped = false;
-	vector<Hit>& hits = sink->retainedHits();
-	while(true) {
-		FINISH_READ(patsrc);
-		GET_READ(patsrc);
-		if(seqan::empty(patsrc->bufb().patFw)) {
-			// Do singleton-style matching
-			bt.setReportArrows(false);
-			params.setArrowMode(false);
-			sink->setRetainHits(sanity);
-			cout << "Singleton with name " << patsrc->bufa().name << endl;
-			#include "search_exact.c"
-		} else {
-			// Do paired-end matching
-			bt.setReportArrows(true);
-			params.setArrowMode(true);
-			cout << "A: " << patsrc->bufa().patFw << ", B: " << patsrc->bufb().patFw << endl;
-			size_t numRetained = hits.size();
-			sink->setRetainHits(true);
-			uint32_t plen = length(patFw);
-			bt.setOffs(0, 0, plen, plen, plen, plen);
-
-			SET_A_FW(bt, patsrc, params);
-			bool hit;
-			hit = bt.backtrack();
-			if(hit) {
-				numRetained++; assert_eq(numRetained, hits.size());
-				cout << (hits.back().h.second - hits.back().h.first) << ", ";
-			} else {
-				cout << "0, ";
-			}
-			SET_B_RC(bt, patsrc, params);
-			hit = bt.backtrack();
-			if(hit) {
-				numRetained++; assert_eq(numRetained, hits.size());
-				cout << (hits.back().h.second - hits.back().h.first) << "; ";
-			} else {
-				cout << "0; ";
-			}
-
-			SET_B_FW(bt, patsrc, params);
-			hit = bt.backtrack();
-			if(hit) {
-				numRetained++; assert_eq(numRetained, hits.size());
-				cout << (hits.back().h.second - hits.back().h.first) << ", ";
-			} else {
-				cout << "0, ";
-			}
-			SET_A_RC(bt, patsrc, params);
-			hit = bt.backtrack();
-			if(hit) {
-				numRetained++; assert_eq(numRetained, hits.size());
-				cout << (hits.back().h.second - hits.back().h.first) << endl;
-			} else {
-				cout << "0" << endl;
-			}
-		}
-    }
-	FINISH_READ(patsrc);
-    WORKER_EXIT();
-}
-
-/**
- * Search through a single (forward) Ebwt index for exact end-to-end
- * hits.  Assumes that index is already loaded into memory.
- */
 static void exactSearch(PairedPatternSource& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
@@ -1110,15 +1013,10 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
 		for(int i = 0; i < nthreads-1; i++) {
-			if(paired) {
-				pthread_create(&threads[i], &pt_attr, exactPairedSearchWorker, (void *)(long)(i+1));
-			} else {
-				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
-			}
+			pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
 		}
 #endif
-		if(paired) exactPairedSearchWorker((void*)0L);
-		else       exactSearchWorker((void*)0L);
+		exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
 	}
@@ -2848,7 +2746,8 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 		case FASTA:
 			return new FastaPatternSource (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, maxNs);
+			                               nsPolicy, forgiveInput,
+			                               maxNs);
 		case RAW:
 			return new RawPatternSource   (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
