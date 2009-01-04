@@ -810,16 +810,26 @@ static char *argv0 = NULL;
 #define FINISH_READ_WITH_HITMASK(p, r) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(!p->empty()) { \
+		/* r = whether to consider reporting the read as unaligned */ \
 		bool reportUnAl = r; \
 		if(reportUnAl) { \
+			/* If the done-mask already shows the read as done, */ \
+			/* then we already reported the unaligned read and */ \
+			/* should refrain from re-reporting*/ \
 			reportUnAl = !skipped; \
 			if(reportUnAl) { \
+				/* If there hasn't been a hit reported, then report */ \
+				/* read as unaligned */ \
 				reportUnAl = !hitMask.test(p->patid()); \
 			} \
 		} \
 		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, reportUnAl ? dumpUnalignFq : NULL) > 0) { \
-			if(!reportUnAl && (dumpUnalignFa != NULL || dumpUnalignFq != NULL)) \
-			hitMask.setOver(p->patid()); \
+			/* We reported a hit for the read, so we set the */ \
+			/* appropriate bit in the hitMask to prevent it from */ \
+			/* being reported as unaligned. */ \
+			if(!reportUnAl && (dumpUnalignFa != NULL || dumpUnalignFq != NULL)) { \
+				hitMask.setOver(p->patid()); \
+			} \
 		} \
 	} \
 	skipped = false;

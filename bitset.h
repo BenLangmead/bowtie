@@ -14,6 +14,10 @@
 class SyncBitset {
 
 public:
+	/**
+	 * Allocate enough words to accommodate 'sz' bits.  Output the given
+	 * error message and quit if allocation fails.
+	 */
 	SyncBitset(size_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
 		MUTEX_INIT(_lock);
 		size_t nwords = (sz >> 5)+1;
@@ -29,10 +33,16 @@ public:
 		_sz = nwords << 5;
 	}
 
+	/**
+	 * Free memory for words.
+	 */
 	~SyncBitset() {
 		delete[] _words;
 	}
 
+	/**
+	 * Test whether the given bit is set in an unsynchronized manner.
+	 */
 	bool testUnsync(size_t i) {
 		if(i < _sz) {
 			return ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -40,6 +50,9 @@ public:
 		return false;
 	}
 
+	/**
+	 * Test whether the given bit is set in a synchronized manner.
+	 */
 	bool test(size_t i) {
 		bool ret = false;
 		MUTEX_LOCK(_lock);
@@ -52,7 +65,7 @@ public:
 
 	/**
 	 * Set a bit in the vector that hasn't been set before.  Assert if
-	 * it has been set.
+	 * it has been set.  Uses synchronization.
 	 */
 	void set(size_t i) {
 		MUTEX_LOCK(_lock);
@@ -61,7 +74,7 @@ public:
 			// specified bit can be set
 			ASSERT_ONLY(size_t oldsz = _sz);
 			expand();
-			assert_eq(_sz, oldsz);
+			assert_gt(_sz, oldsz);
 		}
 		// Fast path
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
@@ -71,7 +84,8 @@ public:
 	}
 
 	/**
-	 * Set a bit in the vector that might have already been set.
+	 * Set a bit in the vector that might have already been set.  Uses
+	 * synchronization.
 	 */
 	void setOver(size_t i) {
 		MUTEX_LOCK(_lock);
@@ -80,7 +94,7 @@ public:
 			// specified bit can be set
 			ASSERT_ONLY(size_t oldsz = _sz);
 			expand();
-			assert_eq(_sz, oldsz);
+			assert_gt(_sz, oldsz);
 		}
 		// Fast path
 		_words[i >> 5] |= (1 << (i & 0x1f));
@@ -91,22 +105,29 @@ public:
 
 private:
 
+	/**
+	 * Expand the size of the _words array by 50% to accommodate more
+	 * bits.
+	 */
 	void expand() {
 		size_t oldsz = _sz;
-		_sz += (_sz>>1); // Add 50% more elements
+		_sz += (_sz >> 1); // Add 50% more elements
 		uint32_t *newwords;
 		try {
-			newwords = new uint32_t[_sz >> 5];
+			newwords = new uint32_t[_sz >> 5 /* convert to words */];
 		} catch(std::bad_alloc& ba) {
 			if(_errmsg != NULL) {
+				// Output given error message
 				std::cerr << _errmsg;
 			}
 			exit(1);
 		}
+		// Move old values into new array
 		memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
+		// Initialize all new words to 0
 		memset(newwords + (oldsz >> 5 /*convert to words*/), 0, (oldsz >> 4) /* convert to bytes / 2 */);
-		delete[] _words;
-		_words = newwords;
+		delete[] _words;   // delete old array
+		_words = newwords; // install new array
 	}
 
 	const char *_errmsg; // error message if an allocation fails
