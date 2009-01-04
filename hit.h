@@ -62,7 +62,12 @@ public:
 		oms(0),
 		fw(true) { }
 
-	Hit(const Hit& other) { this->operator=(other); }
+	Hit(const Hit& other) {
+		this->operator=(other);
+		assert(this->patName.begin() != other.patName.begin());
+		assert(this->patSeq.begin()  != other.patSeq.begin());
+		assert(this->quals.begin()   != other.quals.begin());
+	}
 
 	Hit(U32Pair _h,
 		uint32_t _patId,
