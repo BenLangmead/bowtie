@@ -248,6 +248,32 @@ public:
 		return *(_outs[strIdx]);
 	}
 
+	/**
+	 * Lock the monolithic lock for this HitSink.  This is useful when,
+	 * for example, outputting a read to an unaligned-read file.
+	 */
+	void mainlock() {
+		if(_numWrappers < 2) return;
+#ifdef USE_SPINLOCK
+		_mainlock.Enter();
+#else
+		MUTEX_LOCK(_mainlock);
+#endif
+	}
+
+	/**
+	 * Unlock the monolithic lock for this HitSink.  This is useful
+	 * when, for example, outputting a read to an unaligned-read file.
+	 */
+	void mainunlock() {
+		if(_numWrappers < 2) return;
+#ifdef USE_SPINLOCK
+		_mainlock.Leave();
+#else
+		MUTEX_UNLOCK(_mainlock);
+#endif
+	}
+
 protected:
 	void lock(size_t refIdx) {
 		if(_numWrappers < 2) return;
@@ -258,14 +284,6 @@ protected:
 		MUTEX_LOCK(_locks[strIdx]);
 #endif
 	}
-	void mainlock() {
-		if(_numWrappers < 2) return;
-#ifdef USE_SPINLOCK
-		_mainlock.Enter();
-#else
-		MUTEX_LOCK(_mainlock);
-#endif
-	}
 	void unlock(size_t refIdx) {
 		if(_numWrappers < 2) return;
 		size_t strIdx = refIdxToStreamIdx(refIdx);
@@ -273,14 +291,6 @@ protected:
 		_locks[strIdx].Leave();
 #else
 		MUTEX_UNLOCK(_locks[strIdx]);
-#endif
-	}
-	void mainunlock() {
-		if(_numWrappers < 2) return;
-#ifdef USE_SPINLOCK
-		_mainlock.Leave();
-#else
-		MUTEX_UNLOCK(_mainlock);
 #endif
 	}
 	vector<ostream*> _outs;     /// the alignment output stream(s)
@@ -339,15 +349,19 @@ public:
 		if(ret == 0) {
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
-			if(dumpUnalignFa != NULL) {
-				(*dumpUnalignFa) << ">" << p.bufa().name << endl
-				                 << p.bufa().patFw << endl;
-			}
-			if(dumpUnalignFq != NULL) {
-				(*dumpUnalignFq) << "@" << p.bufa().name << endl
-				                 << p.bufa().patFw << endl
-				                 << "+" << endl <<
-				                 p.bufa().qualFw << endl;
+			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL) {
+				_sink.mainlock();
+				if(dumpUnalignFa != NULL) {
+					(*dumpUnalignFa) << ">" << p.bufa().name << endl
+									 << p.bufa().patFw << endl;
+				}
+				if(dumpUnalignFq != NULL) {
+					(*dumpUnalignFq) << "@" << p.bufa().name << endl
+									 << p.bufa().patFw << endl
+									 << "+" << endl <<
+									 p.bufa().qualFw << endl;
+				}
+				_sink.mainunlock();
 			}
 		}
 		if(_bufferHits && _bufferedHits.size() > 0) {

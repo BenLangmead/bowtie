@@ -181,24 +181,8 @@ public:
 	virtual void setReverse(bool __reverse) {
 		_reverse = __reverse;
 	}
+
 	uint32_t patid() { return _readCnt; }
-
-protected:
-
-	/**
-	 * Default format for dumping a read to an output stream.  Concrete
-	 * subclasses might want to do something fancier.
-	 */
-	virtual void dump(ostream& out,
-	                  const String<Dna5>& seq,
-	                  const String<char>& qual,
-	                  const String<char>& name)
-	{
-		out << name << ": " << seq << " " << qual << endl;
-	}
-
-	/// The number of reads read by this PatternSource
-	uint32_t _readCnt;
 
 	/**
 	 * Concrete subclasses call lock() to enter a critical region.
@@ -237,6 +221,23 @@ protected:
 		}
 #endif
 	}
+
+protected:
+
+	/**
+	 * Default format for dumping a read to an output stream.  Concrete
+	 * subclasses might want to do something fancier.
+	 */
+	virtual void dump(ostream& out,
+	                  const String<Dna5>& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << name << ": " << seq << " " << qual << endl;
+	}
+
+	/// The number of reads read by this PatternSource
+	uint32_t _readCnt;
 
 	bool _reverse;         /// reverse patterns before returning them
 	const char *_dumpfile; /// dump patterns to this file before returning them
