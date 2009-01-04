@@ -205,7 +205,7 @@ protected:
 	 * What constitutes a critical region depends on the subclass.
 	 */
 	void lock() {
-		if(!_doLocking || _numWrappers < 2) return; // no contention
+		if(!_doLocking) return; // no contention
 #ifdef USE_SPINLOCK
 		if(_useSpinlock) {
 			// User can ask to use the normal pthreads lock even if
@@ -224,7 +224,7 @@ protected:
 	 * What constitutes a critical region depends on the subclass.
 	 */
 	void unlock() {
-		if(!_doLocking || _numWrappers < 2) return; // no contention
+		if(!_doLocking) return; // no contention
 #ifdef USE_SPINLOCK
 		if(_useSpinlock) {
 			// User can ask to use the normal pthreads lock even if
@@ -242,7 +242,7 @@ protected:
 	const char *_dumpfile; /// dump patterns to this file before returning them
 	ofstream _out;         /// output stream for dumpfile
 	int _numWrappers;      /// # threads that own a wrapper for this PatternSource
-	bool _doLocking;       ///
+	bool _doLocking;       /// override whether to lock (true = don't override)
 	/// User can ask to use the normal pthreads-style lock even if
 	/// spinlocks is enabled and compiled in.  This is sometimes better
 	/// if we expect bad I/O latency on some reads.
