@@ -20,7 +20,7 @@ public:
 	 */
 	SyncBitset(size_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
 		MUTEX_INIT(_lock);
-		size_t nwords = (sz >> 5)+1;
+		size_t nwords = (sz >> 5)+1; // divide by 32 and add 1
 		try {
 			_words = new uint32_t[nwords];
 		} catch(std::bad_alloc& ba) {
@@ -29,8 +29,9 @@ public:
 			}
 			exit(1);
 		}
-		memset(_words, 0, nwords * 4);
-		_sz = nwords << 5;
+		assert(_words != NULL);
+		memset(_words, 0, nwords * 4 /* words to bytes */);
+		_sz = nwords << 5 /* words to bits */;
 	}
 
 	/**
@@ -77,6 +78,7 @@ public:
 			assert_gt(_sz, oldsz);
 		}
 		// Fast path
+		assert_lt(i, _sz);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
@@ -97,6 +99,7 @@ public:
 			assert_gt(_sz, oldsz);
 		}
 		// Fast path
+		assert_lt(i, _sz);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 		MUTEX_UNLOCK(_lock);
@@ -111,7 +114,8 @@ private:
 	 */
 	void expand() {
 		size_t oldsz = _sz;
-		_sz += (_sz >> 1); // Add 50% more elements
+		_sz += (_sz >> 1);     // Add 50% more elements
+		_sz += 7; _sz &= ~0x7; // Make sure it's 8-aligned
 		uint32_t *newwords;
 		try {
 			newwords = new uint32_t[_sz >> 5 /* convert to words */];
@@ -125,7 +129,8 @@ private:
 		// Move old values into new array
 		memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
 		// Initialize all new words to 0
-		memset(newwords + (oldsz >> 5 /*convert to words*/), 0, (oldsz >> 4) /* convert to bytes / 2 */);
+		memset(newwords + (oldsz >> 5 /*convert to words*/), 0,
+		       (_sz - oldsz) >> 3 /* convert to bytes */);
 		delete[] _words;   // delete old array
 		_words = newwords; // install new array
 	}
@@ -152,6 +157,7 @@ public:
 			}
 			exit(1);
 		}
+		assert(_words != NULL);
 		memset(_words, 0, nwords * 4);
 		_sz = nwords << 5;
 	}
@@ -160,6 +166,9 @@ public:
 		delete[] _words;
 	}
 
+	/**
+	 * Test whether the given bit is set.
+	 */
 	bool test(size_t i) {
 		bool ret = false;
 		if(i < _sz) {
@@ -178,7 +187,7 @@ public:
 			// specified bit can be set
 			ASSERT_ONLY(size_t oldsz = _sz);
 			expand();
-			assert_eq(_sz, oldsz);
+			assert_gt(_sz, oldsz);
 		}
 		// Fast path
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
@@ -195,7 +204,7 @@ public:
 			// specified bit can be set
 			ASSERT_ONLY(size_t oldsz = _sz);
 			expand();
-			assert_eq(_sz, oldsz);
+			assert_gt(_sz, oldsz);
 		}
 		// Fast path
 		_words[i >> 5] |= (1 << (i & 0x1f));
@@ -204,6 +213,10 @@ public:
 
 private:
 
+	/**
+	 * Expand the size of the _words array by 50% to accommodate more
+	 * bits.
+	 */
 	void expand() {
 		size_t oldsz = _sz;
 		_sz += (_sz>>1); // Add 50% more elements
