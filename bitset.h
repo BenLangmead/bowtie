@@ -115,7 +115,7 @@ private:
 	void expand() {
 		size_t oldsz = _sz;
 		_sz += (_sz >> 1);     // Add 50% more elements
-		_sz += 7; _sz &= ~0x7; // Make sure it's 8-aligned
+		_sz += 31; _sz &= ~0x31; // Make sure it's 32-aligned
 		uint32_t *newwords;
 		try {
 			newwords = new uint32_t[_sz >> 5 /* convert to words */];
