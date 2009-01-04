@@ -49,7 +49,8 @@ static const int max_read_bp = 1024;
  * id, and a boolean indicating whether it matched as its forward or
  * reverse-complement version.
  */
-struct Hit {
+class Hit {
+public:
 	Hit() :
 		h(make_pair(0, 0)),
 		patId(0),
@@ -61,7 +62,7 @@ struct Hit {
 		oms(0),
 		fw(true) { }
 
-	Hit(const Hit& other) { *this = other; }
+	Hit(const Hit& other) { this->operator=(other); }
 
 	Hit(U32Pair _h,
 		uint32_t _patId,
