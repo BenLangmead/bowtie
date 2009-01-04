@@ -61,6 +61,8 @@ struct Hit {
 		oms(0),
 		fw(true) { }
 
+	Hit(const Hit& other) { *this = other; }
+
 	Hit(U32Pair _h,
 		uint32_t _patId,
 		const String<char>& _patName,
