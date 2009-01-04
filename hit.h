@@ -64,9 +64,9 @@ public:
 
 	Hit(const Hit& other) {
 		this->operator=(other);
-		assert(this->patName.begin() != other.patName.begin());
-		assert(this->patSeq.begin()  != other.patSeq.begin());
-		assert(this->quals.begin()   != other.quals.begin());
+		assert(seqan::begin(patName) != seqan::begin(other.patName));
+		assert(seqan::begin(patSeq)  != seqan::begin(other.patSeq));
+		assert(seqan::begin(quals)   != seqan::begin(other.quals));
 	}
 
 	Hit(U32Pair _h,
