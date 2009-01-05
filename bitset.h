@@ -9,6 +9,43 @@
 #include "threading.h"
 
 /**
+ * Given a words array and a size, allocate a new, larger array, moving
+ * data from the old to the new array, and set all newly-allocated
+ * words to 0.  Return the new, larger array, which can be substituted
+ * for the old one.  The new array is larger than the old by about 50%.
+ */
+static inline uint32_t*
+bitsetRealloc(uint32_t& sz, uint32_t* words, const char *errmsg = NULL) {
+	uint32_t oldsz = sz;
+	if(sz > 0) {
+		sz += (sz >> 1) + 31; // Add 50% more elements, plus a bit
+		sz &= ~31;            // Make sure it's 32-aligned
+	} else {
+		sz = 1024; // Start off at 1024 bits to avoid many expansions
+	}
+	assert_gt(sz, oldsz);
+	assert_eq(0, (sz & 31));
+	uint32_t *newwords;
+	try {
+		newwords = new uint32_t[sz >> 5 /* convert to words */];
+	} catch(std::bad_alloc& ba) {
+		if(errmsg != NULL) {
+			// Output given error message
+			std::cerr << errmsg;
+		}
+		exit(1);
+	}
+	if(oldsz > 0) {
+		// Move old values into new array
+		memcpy(newwords, words, oldsz >> 3 /* convert to bytes */);
+	}
+	// Initialize all new words to 0
+	memset(newwords + (oldsz >> 5 /*convert to words*/), 0,
+	       (sz - oldsz) >> 3 /* convert to bytes */);
+	return newwords; // return new array
+}
+
+/**
  * A simple synchronized bitset class.
  */
 class SyncBitset {
@@ -18,9 +55,9 @@ public:
 	 * Allocate enough words to accommodate 'sz' bits.  Output the given
 	 * error message and quit if allocation fails.
 	 */
-	SyncBitset(size_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
+	SyncBitset(uint32_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
 		MUTEX_INIT(_lock);
-		size_t nwords = (sz >> 5)+1; // divide by 32 and add 1
+		uint32_t nwords = (sz >> 5)+1; // divide by 32 and add 1
 		try {
 			_words = new uint32_t[nwords];
 		} catch(std::bad_alloc& ba) {
@@ -44,7 +81,7 @@ public:
 	/**
 	 * Test whether the given bit is set in an unsynchronized manner.
 	 */
-	bool testUnsync(size_t i) {
+	bool testUnsync(uint32_t i) {
 		if(i < _sz) {
 			return ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
 		}
@@ -54,7 +91,7 @@ public:
 	/**
 	 * Test whether the given bit is set in a synchronized manner.
 	 */
-	bool test(size_t i) {
+	bool test(uint32_t i) {
 		bool ret;
 		MUTEX_LOCK(_lock);
 		ret = testUnsync(i);
@@ -66,12 +103,12 @@ public:
 	 * Set a bit in the vector that hasn't been set before.  Assert if
 	 * it has been set.  Uses synchronization.
 	 */
-	void set(size_t i) {
+	void set(uint32_t i) {
 		MUTEX_LOCK(_lock);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(size_t oldsz = _sz);
+			ASSERT_ONLY(uint32_t oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -87,12 +124,12 @@ public:
 	 * Set a bit in the vector that might have already been set.  Uses
 	 * synchronization.
 	 */
-	void setOver(size_t i) {
+	void setOver(uint32_t i) {
 		MUTEX_LOCK(_lock);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(size_t oldsz = _sz);
+			ASSERT_ONLY(uint32_t oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -111,35 +148,13 @@ private:
 	 * bits.
 	 */
 	void expand() {
-		size_t oldsz = _sz;
-		_sz += (_sz >> 1);     // Add 50% more elements
-		if(_sz == oldsz) _sz += 32;
-		_sz += 31; _sz &= ~31; // Make sure it's 32-aligned
-		assert_gt(_sz, oldsz);
-		assert_eq(0, (_sz & 31));
-		uint32_t *newwords;
-		try {
-			newwords = new uint32_t[_sz >> 5 /* convert to words */];
-		} catch(std::bad_alloc& ba) {
-			if(_errmsg != NULL) {
-				// Output given error message
-				std::cerr << _errmsg;
-			}
-			exit(1);
-		}
-		if(oldsz > 0) {
-			// Move old values into new array
-			memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
-		}
-		// Initialize all new words to 0
-		memset(newwords + (oldsz >> 5 /*convert to words*/), 0,
-		       (_sz - oldsz) >> 3 /* convert to bytes */);
+		uint32_t *newwords = bitsetRealloc(_sz, _words, _errmsg);
 		delete[] _words;   // delete old array
 		_words = newwords; // install new array
 	}
 
 	const char *_errmsg; // error message if an allocation fails
-	size_t _sz;          // size as # of bits
+	uint32_t _sz;        // size as # of bits
 	MUTEX_T _lock;       // mutex
 	uint32_t *_words;    // storage
 };
@@ -150,8 +165,8 @@ private:
 class Bitset {
 
 public:
-	Bitset(size_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		size_t nwords = (sz >> 5)+1;
+	Bitset(uint32_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
+		uint32_t nwords = (sz >> 5)+1;
 		try {
 			_words = new uint32_t[nwords];
 		} catch(std::bad_alloc& ba) {
@@ -172,7 +187,7 @@ public:
 	/**
 	 * Test whether the given bit is set.
 	 */
-	bool test(size_t i) {
+	bool test(uint32_t i) {
 		bool ret = false;
 		if(i < _sz) {
 			ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -184,11 +199,11 @@ public:
 	 * Set a bit in the vector that hasn't been set before.  Assert if
 	 * it has been set.
 	 */
-	void set(size_t i) {
+	void set(uint32_t i) {
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(size_t oldsz = _sz);
+			ASSERT_ONLY(uint32_t oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -201,11 +216,11 @@ public:
 	/**
 	 * Set a bit in the vector that might have already been set.
 	 */
-	void setOver(size_t i) {
+	void setOver(uint32_t i) {
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
-			ASSERT_ONLY(size_t oldsz = _sz);
+			ASSERT_ONLY(uint32_t oldsz = _sz);
 			expand();
 			assert_gt(_sz, oldsz);
 		}
@@ -221,25 +236,13 @@ private:
 	 * bits.
 	 */
 	void expand() {
-		size_t oldsz = _sz;
-		_sz += (_sz>>1); // Add 50% more elements
-		uint32_t *newwords;
-		try {
-			newwords = new uint32_t[_sz >> 5];
-		} catch(std::bad_alloc& ba) {
-			if(_errmsg != NULL) {
-				std::cerr << _errmsg;
-			}
-			exit(1);
-		}
-		memcpy(newwords, _words, oldsz >> 3);
-		delete[] _words;
-		memset(newwords + (oldsz >> 5), 0, (oldsz >> 4));
-		_words = newwords;
+		uint32_t *newwords = bitsetRealloc(_sz, _words, _errmsg);
+		delete[] _words;   // delete old array
+		_words = newwords; // install new array
 	}
 
 	const char *_errmsg; // error message if an allocation fails
-	size_t _sz;          // size as # of bits
+	uint32_t _sz;          // size as # of bits
 	uint32_t *_words;    // storage
 };
 
@@ -264,7 +267,7 @@ public:
 	/**
 	 * Return true iff the bit at offset i has been set.
 	 */
-	bool test(size_t i) const {
+	bool test(uint32_t i) const {
 		bool ret = false;
 		assert_lt(i, LEN);
 		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -274,7 +277,7 @@ public:
 	/**
 	 * Set the bit at offset i.  Assert if the bit was already set.
 	 */
-	void set(size_t i) {
+	void set(uint32_t i) {
 		// Fast path
 		assert_lt(i, LEN);
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
@@ -290,7 +293,7 @@ public:
 	 * Set the bit at offset i.  Do not assert if the bit was already
 	 * set.
 	 */
-	void setOver(size_t i) {
+	void setOver(uint32_t i) {
 		// Fast path
 		assert_lt(i, LEN);
 		_words[i >> 5] |= (1 << (i & 0x1f));
@@ -301,15 +304,15 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
 
-	size_t count() const { return _cnt; }
-	size_t size() const  { return _size; }
+	uint32_t count() const { return _cnt; }
+	uint32_t size() const  { return _size; }
 
 	/**
 	 * Return true iff this FixedBitset has the same bits set as
 	 * FixedBitset 'that'.
 	 */
 	bool operator== (const FixedBitset<LEN>& that) const {
-		for(size_t i = 0; i < (LEN>>5)+1; i++) {
+		for(uint32_t i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return false;
 			}
@@ -322,7 +325,7 @@ public:
 	 * as FixedBitset 'that'.
 	 */
 	bool operator!= (const FixedBitset<LEN>& that) const {
-		for(size_t i = 0; i < (LEN>>5)+1; i++) {
+		for(uint32_t i = 0; i < (LEN>>5)+1; i++) {
 			if(_words[i] != that._words[i]) {
 				return true;
 			}
@@ -342,8 +345,8 @@ public:
 	}
 
 private:
-	size_t _cnt;
-	size_t _size;
+	uint32_t _cnt;
+	uint32_t _size;
 	uint32_t _words[(LEN>>5)+1]; // storage
 };
 

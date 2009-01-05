@@ -1159,7 +1159,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	//if(!allHits && khits == 1) numQs = 0;
+	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
@@ -1639,7 +1639,7 @@ static void twoOrThreeMismatchSearch(
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	//if(!allHits && khits == 1) numQs = 0;
+	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
@@ -2350,7 +2350,7 @@ static void seededQualCutoffSearch(
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	//if(!allHits && khits == 1) numQs = 0;
+	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
