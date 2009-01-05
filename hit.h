@@ -80,8 +80,8 @@ public:
 		uint32_t _oms = 0) :
 		h(_h),
 		patId(_patId),
-		fw(_fw),
-		oms(_oms)
+		oms(_oms),
+		fw(_fw)
 	{
 		patName = _patName;
 		patSeq  = _patSeq;
