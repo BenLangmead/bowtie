@@ -1985,7 +1985,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        false, !noMaqRound);
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	FINISH_READ_WITH_HITMASK(patsrc, seedMms == 0);
 		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
@@ -1996,7 +1996,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	FINISH_READ_WITH_HITMASK(patsrc, seedMms == 0);
 	WORKER_EXIT();
 }
 
