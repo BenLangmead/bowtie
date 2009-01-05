@@ -699,7 +699,6 @@ public:
 		_reverse(__reverse), _cur(0), _maxNs(__maxNs),
 		_v(), _vrev(), _vrc(), _vrcrev(), _quals(), _qualsrev(), _rand(seed)
 	{
-		int nrejects = 0;
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
 			tokenize(v[i], ":", ss);
@@ -721,10 +720,8 @@ public:
 				}
 			}
 			// Count Ns and possibly reject
-			int ns = 0;
 			for(size_t j = 0; j < s.length(); j++) {
 				if(s[j] == 'N' || s[j] == 'n') {
-					ns++;
 					if(__policy == NS_TO_NS) {
 						// Leave s[j] == 'N'
 					} else if(__policy == NS_TO_RANDS) {
@@ -734,12 +731,6 @@ public:
 						s[j] = 'A';
 					}
 				}
-			}
-			// Enforce upper limit on Ns; note that this limit is in
-			// effect even if the N policy is not NS_TO_NS
-			if(ns > _maxNs) {
-				nrejects++;
-				continue;
 			}
 			//  Initialize vq
 			string vq;
@@ -784,7 +775,6 @@ public:
 			os << (_names.size());
 			_names.push_back(os.str());
 		}
-		assert_gt(_v.size() + nrejects, 0);
 		assert_eq(_v.size(), _vrev.size());
 		assert_eq(_v.size(), _quals.size());
 		assert_eq(_v.size(), _qualsrev.size());
@@ -1002,153 +992,140 @@ protected:
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		const int bufSz = ReadBuf::BUF_SIZE;
-		int ns;
-		do {
-			int c;
-			int dstLen = 0;
-			int nameLen = 0;
-			ns = 0; // reset 'N' count
-			// Pick off the first carat
-			if(_first) {
-				c = _filebuf.get();
-				if(c != '>') {
-					if(_forgiveInput) {
-						c = FastaPatternSource::skipToNextFastaRecord(_filebuf);
-						if(c < 0) {
-							r.clearAll(); return;
-						}
-					} else {
-						c = getOverNewline(_filebuf); if(c < 0) {
-							r.clearAll(); return;
-						}
+		int c;
+		int dstLen = 0;
+		int nameLen = 0;
+		// Pick off the first carat
+		if(_first) {
+			c = _filebuf.get();
+			if(c != '>') {
+				if(_forgiveInput) {
+					c = FastaPatternSource::skipToNextFastaRecord(_filebuf);
+					if(c < 0) {
+						r.clearAll(); return;
+					}
+				} else {
+					c = getOverNewline(_filebuf); if(c < 0) {
+						r.clearAll(); return;
 					}
 				}
-				if(c != '>') {
-					cerr << "Error: reads file does not look like a FASTA file" << endl;
-					exit(1);
-				}
-				assert(c == '>' || c == '#');
-				_first = false;
 			}
+			if(c != '>') {
+				cerr << "Error: reads file does not look like a FASTA file" << endl;
+				exit(1);
+			}
+			assert(c == '>' || c == '#');
+			_first = false;
+		}
 
-			// Read to the end of the id line, sticking everything after the '>'
-			// into *name
-			while(true) {
-				c = _filebuf.get(); if(c < 0) {
-					r.clearAll(); return;
+		// Read to the end of the id line, sticking everything after the '>'
+		// into *name
+		while(true) {
+			c = _filebuf.get(); if(c < 0) {
+				r.clearAll(); return;
+			}
+			if(c == '\n' || c == '\r') {
+				// Break at end of line, after consuming all \r's, \n's
+				while(c == '\n' || c == '\r') {
+					c = _filebuf.get(); if(c < 0) {
+						r.clearAll(); return;
+					}
 				}
-				if(c == '\n' || c == '\r') {
-					// Break at end of line, after consuming all \r's, \n's
-					while(c == '\n' || c == '\r') {
-						c = _filebuf.get(); if(c < 0) {
-							r.clearAll(); return;
+				break;
+			}
+			r.nameBuf[nameLen++] = c;
+		}
+		_setBegin(r.name, r.nameBuf);
+		_setLength(r.name, nameLen);
+
+		// _in now points just past the first character of a sequence
+		// line, and c holds the first character
+		int begin = 0;
+		if(!_reverse) {
+			while(c != '>' && c != '#') {
+				// Note: can't have a comment in the middle of a sequence,
+				// though a comment can end a sequence
+				if(isalpha(c) && begin++ >= this->_trim5) {
+					if(dstLen + 1 > 1024) {
+						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							 << "reads and re-run Bowtie";
+						exit(1);
+					}
+					if(c == 'N' || c == 'n') {
+						if(_policy == NS_TO_NS) {
+							// Leave c = 'N'
+						} else if(_policy == NS_TO_RANDS) {
+							c = "ACGT"[_rand.nextU32() & 3];
+						} else {
+							assert_eq(NS_TO_AS, _policy);
+							c = 'A';
 						}
 					}
-					break;
+					r.patBufFw [dstLen] = charToDna5[c];
+					r.qualBufFw[dstLen] = 'I';
+					r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
+					r.qualBufRc[bufSz-dstLen-1] = 'I';
+					dstLen++;
 				}
-				r.nameBuf[nameLen++] = c;
+				if((c = _filebuf.get()) < 0) break;
 			}
+			dstLen -= this->_trim3;
+			_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+			_setLength(r.patFw,  dstLen);
+			_setBegin (r.qualFw, r.qualBufFw);
+			_setLength(r.qualFw, dstLen);
+			_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
+			_setLength(r.patRc,  dstLen);
+			_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
+			_setLength(r.qualRc, dstLen);
+		} else {
+			while(c != '>' && c != '#') {
+				// Note: can't have a comment in the middle of a sequence,
+				// though a comment can end a sequence
+				if(isalpha(c) && begin++ >= this->_trim5) {
+					if(dstLen + 1 > 1024) {
+						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							 << "reads and re-run Bowtie";
+						exit(1);
+					}
+					if(c == 'N' || c == 'n') {
+						if(_policy == NS_TO_NS) {
+							// Leave c = 'N'
+						} else if(_policy == NS_TO_RANDS) {
+							c = "ACGT"[_rand.nextU32() & 3];
+						} else {
+							assert_eq(NS_TO_AS, _policy);
+							c = 'A';
+						}
+					}
+					r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
+					r.qualBufFw[bufSz-dstLen-1] = 'I';
+					r.patBufRc [dstLen] = rcCharToDna5[c];
+					r.qualBufRc[dstLen] = 'I';
+					dstLen++;
+				}
+				if((c = _filebuf.get()) < 0) break;
+			}
+			dstLen -= this->_trim3;
+			_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
+			_setLength(r.patFw,  dstLen);
+			_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
+			_setLength(r.qualFw, dstLen);
+			_setBegin (r.patRc,  (Dna5*)r.patBufRc);
+			_setLength(r.patRc,  dstLen);
+			_setBegin (r.qualRc, r.qualBufRc);
+			_setLength(r.qualRc, dstLen);
+		}
+
+		// Set up a default name if one hasn't been set
+		if(nameLen == 0) {
+			itoa10(_readCnt, r.nameBuf);
 			_setBegin(r.name, r.nameBuf);
+			nameLen = strlen(r.nameBuf);
 			_setLength(r.name, nameLen);
-
-			// _in now points just past the first character of a sequence
-			// line, and c holds the first character
-			int begin = 0;
-			if(!_reverse) {
-				while(c != '>' && c != '#') {
-					// Note: can't have a comment in the middle of a sequence,
-					// though a comment can end a sequence
-					if(isalpha(c) && begin++ >= this->_trim5) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							     << "reads and re-run Bowtie";
-							exit(1);
-						}
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
-							}
-						}
-						r.patBufFw [dstLen] = charToDna5[c];
-						r.qualBufFw[dstLen] = 'I';
-						r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
-						r.qualBufRc[bufSz-dstLen-1] = 'I';
-						dstLen++;
-					}
-					if((c = _filebuf.get()) < 0) break;
-				}
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[i] == 4) ns++;
-				}
-				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, r.qualBufFw);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
-				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
-				_setLength(r.qualRc, dstLen);
-			} else {
-				while(c != '>' && c != '#') {
-					// Note: can't have a comment in the middle of a sequence,
-					// though a comment can end a sequence
-					if(isalpha(c) && begin++ >= this->_trim5) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							     << "reads and re-run Bowtie";
-							exit(1);
-						}
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
-							}
-						}
-						r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
-						r.qualBufFw[bufSz-dstLen-1] = 'I';
-						r.patBufRc [dstLen] = rcCharToDna5[c];
-						r.qualBufRc[dstLen] = 'I';
-						dstLen++;
-					}
-					if((c = _filebuf.get()) < 0) break;
-				}
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[bufSz-i-1] == 4) ns++;
-				}
-				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
-				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
-				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, r.qualBufRc);
-				_setLength(r.qualRc, dstLen);
-			}
-
-			// Set up a default name if one hasn't been set
-			if(nameLen == 0) {
-				itoa10(_readCnt, r.nameBuf);
-				_setBegin(r.name, r.nameBuf);
-				nameLen = strlen(r.nameBuf);
-				_setLength(r.name, nameLen);
-			}
-			assert_gt(nameLen, 0);
-			_readCnt++;
-
-		} while(ns > _maxNs);
+		}
+		assert_gt(nameLen, 0);
+		_readCnt++;
 		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {
@@ -1693,129 +1670,111 @@ protected:
 	/// Read another pattern from a Raw input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		const int bufSz = ReadBuf::BUF_SIZE;
-		int ns;
-		do {
-			int c;
-			int dstLen = 0;
-			int nameLen = 0;
-			ns = 0; // reset 'N' count
-			c = getOverNewline(this->_filebuf);
-			assert(!isspace(c));
-			if(_first) {
-				if(dna4Cat[c] == 0) {
-					cerr << "Error: reads file does not look like a Raw file" << endl;
-					if(c == '>') {
-						cerr << "Reads file looks like a FASTA file; please use -f" << endl;
-					}
-					if(c == '@') {
-						cerr << "Reads file looks like a FASTQ file; please use -q" << endl;
-					}
-					exit(1);
+		int c;
+		int dstLen = 0;
+		int nameLen = 0;
+		c = getOverNewline(this->_filebuf);
+		assert(!isspace(c));
+		if(_first) {
+			if(dna4Cat[c] == 0) {
+				cerr << "Error: reads file does not look like a Raw file" << endl;
+				if(c == '>') {
+					cerr << "Reads file looks like a FASTA file; please use -f" << endl;
 				}
-				_first = false;
+				if(c == '@') {
+					cerr << "Reads file looks like a FASTQ file; please use -q" << endl;
+				}
+				exit(1);
 			}
+			_first = false;
+		}
 
-			// _in now points just past the first character of a sequence
-			// line, and c holds the first character
-			if(!_reverse) {
-				while(!isspace(c) && c >= 0) {
-					if(isalpha(c) && dstLen >= this->_trim5) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 characters." << endl
-							     << "Please truncate reads and and re-run Bowtie";
-							exit(1);
-						}
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
-							}
-						}
-						r.patBufFw [dstLen] = charToDna5[c];
-						r.qualBufFw[dstLen] = 'I';
-						r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
-						r.qualBufRc[bufSz-dstLen-1] = 'I';
-						dstLen++;
+		// _in now points just past the first character of a sequence
+		// line, and c holds the first character
+		if(!_reverse) {
+			while(!isspace(c) && c >= 0) {
+				if(isalpha(c) && dstLen >= this->_trim5) {
+					if(dstLen + 1 > 1024) {
+						cerr << "Reads file contained a pattern with more than 1024 characters." << endl
+							 << "Please truncate reads and and re-run Bowtie";
+						exit(1);
 					}
-					c = _filebuf.get();
-				}
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[i] == 4) ns++;
-				}
-				_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, r.qualBufFw);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
-				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
-				_setLength(r.qualRc, dstLen);
-			} else {
-				while(!isspace(c) && c >= 0) {
-					if(isalpha(c) && dstLen >= this->_trim5) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
-							     << "Please truncate reads and and re-run Bowtie";
-							exit(1);
+					if(c == 'N' || c == 'n') {
+						if(_policy == NS_TO_NS) {
+							// Leave c = 'N'
+						} else if(_policy == NS_TO_RANDS) {
+							c = "ACGT"[_rand.nextU32() & 3];
+						} else {
+							assert_eq(NS_TO_AS, _policy);
+							c = 'A';
 						}
-						if(c == 'N' || c == 'n') {
-							if(_policy == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(_policy == NS_TO_RANDS) {
-								c = "ACGT"[_rand.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, _policy);
-								c = 'A';
-							}
-						}
-						r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
-						r.qualBufFw[bufSz-dstLen-1] = 'I';
-						r.patBufRc [dstLen] = rcCharToDna5[c];
-						r.qualBufRc[dstLen] = 'I';
-						dstLen++;
 					}
-					c = _filebuf.get();
+					r.patBufFw [dstLen] = charToDna5[c];
+					r.qualBufFw[dstLen] = 'I';
+					r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
+					r.qualBufRc[bufSz-dstLen-1] = 'I';
+					dstLen++;
 				}
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[bufSz-i-1] == 4) ns++;
-				}
-				_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
-				_setLength(r.patFw,  dstLen);
-				_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.patRc,  (Dna5*)r.patBufRc);
-				_setLength(r.patRc,  dstLen);
-				_setBegin (r.qualRc, r.qualBufRc);
-				_setLength(r.qualRc, dstLen);
+				c = _filebuf.get();
 			}
-
-			// Set up name
-			itoa10(_readCnt, r.nameBuf);
-			_setBegin(r.name, r.nameBuf);
-			nameLen = strlen(r.nameBuf);
-			_setLength(r.name, nameLen);
-			_readCnt++;
-
-			if(c == -1) {
-				if(ns > _maxNs) {
-					// This read violates the Ns constraint and we're
-					// about to return it; make sure that caller
-					// doesn't see this read
-					r.clearAll();
+			dstLen -= this->_trim3;
+			_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+			_setLength(r.patFw,  dstLen);
+			_setBegin (r.qualFw, r.qualBufFw);
+			_setLength(r.qualFw, dstLen);
+			_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
+			_setLength(r.patRc,  dstLen);
+			_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
+			_setLength(r.qualRc, dstLen);
+		} else {
+			while(!isspace(c) && c >= 0) {
+				if(isalpha(c) && dstLen >= this->_trim5) {
+					if(dstLen + 1 > 1024) {
+						cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
+							 << "Please truncate reads and and re-run Bowtie";
+						exit(1);
+					}
+					if(c == 'N' || c == 'n') {
+						if(_policy == NS_TO_NS) {
+							// Leave c = 'N'
+						} else if(_policy == NS_TO_RANDS) {
+							c = "ACGT"[_rand.nextU32() & 3];
+						} else {
+							assert_eq(NS_TO_AS, _policy);
+							c = 'A';
+						}
+					}
+					r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
+					r.qualBufFw[bufSz-dstLen-1] = 'I';
+					r.patBufRc [dstLen] = rcCharToDna5[c];
+					r.qualBufRc[dstLen] = 'I';
+					dstLen++;
 				}
-				return;
-			} else {
-				assert(isspace(c));
+				c = _filebuf.get();
 			}
-		} while(ns > _maxNs);
+			dstLen -= this->_trim3;
+			_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
+			_setLength(r.patFw,  dstLen);
+			_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
+			_setLength(r.qualFw, dstLen);
+			_setBegin (r.patRc,  (Dna5*)r.patBufRc);
+			_setLength(r.patRc,  dstLen);
+			_setBegin (r.qualRc, r.qualBufRc);
+			_setLength(r.qualRc, dstLen);
+		}
+
+		// Set up name
+		itoa10(_readCnt, r.nameBuf);
+		_setBegin(r.name, r.nameBuf);
+		nameLen = strlen(r.nameBuf);
+		_setLength(r.name, nameLen);
+		_readCnt++;
+
+		if(c == -1) {
+			return;
+		} else {
+			assert(isspace(c));
+		}
 		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {

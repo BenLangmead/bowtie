@@ -261,7 +261,6 @@ public:
 	 * for example, outputting a read to an unaligned-read file.
 	 */
 	void mainlock() {
-		if(_numWrappers < 2) return;
 #ifdef USE_SPINLOCK
 		_mainlock.Enter();
 #else
@@ -274,7 +273,6 @@ public:
 	 * when, for example, outputting a read to an unaligned-read file.
 	 */
 	void mainunlock() {
-		if(_numWrappers < 2) return;
 #ifdef USE_SPINLOCK
 		_mainlock.Leave();
 #else
@@ -284,7 +282,6 @@ public:
 
 protected:
 	void lock(size_t refIdx) {
-		if(_numWrappers < 2) return;
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
 		_locks[strIdx].Enter();
@@ -293,7 +290,6 @@ protected:
 #endif
 	}
 	void unlock(size_t refIdx) {
-		if(_numWrappers < 2) return;
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 #ifdef USE_SPINLOCK
 		_locks[strIdx].Leave();
