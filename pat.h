@@ -410,7 +410,11 @@ public:
 
 	virtual ~PatternSourcePerThread() { }
 
-	virtual void nextReadPair()  = 0;
+	/**
+	 * Read the next read pair.  Reset _reverse to indicate that this
+	 * object hasn't yet been used to reverse the sequence and quals.
+	 */
+	virtual void nextReadPair() { _reverse = false; }
 
 	ReadBuf& bufa()        { return _bufa;         }
 	ReadBuf& bufb()        { return _bufb;         }
@@ -451,6 +455,7 @@ public:
 	 * PairedPatternSource.
 	 */
 	virtual void nextReadPair() {
+		PatternSourcePerThread::nextReadPair();
 		ASSERT_ONLY(uint32_t lastPatid = _patid);
 		_bufa.clearAll();
 		_bufb.clearAll();
@@ -617,6 +622,7 @@ public:
 	}
 
 	virtual void nextReadPair() {
+		PatternSourcePerThread::nextReadPair();
 		if(_patid >= _numreads) {
 			_bufa.clearAll();
 			_bufb.clearAll();

@@ -354,8 +354,13 @@ public:
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
 			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL) {
+				// Lock the main lock for the HitSink so that search
+				// threads don't collide when writing to the unaligned-
+				// read file.
 				_sink.mainlock();
 				if(p.reverse()) {
+					// Reverse the sequence and quals back to the
+					// original orientation before outputting
 					String<Dna5> seq = p.bufa().patFw;
 					::reverseInPlace(seq);
 					if(dumpUnalignFa != NULL) {
