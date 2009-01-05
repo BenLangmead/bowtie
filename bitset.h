@@ -55,11 +55,9 @@ public:
 	 * Test whether the given bit is set in a synchronized manner.
 	 */
 	bool test(size_t i) {
-		bool ret = false;
+		bool ret;
 		MUTEX_LOCK(_lock);
-		if(i < _sz) {
-			ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
-		}
+		ret = testUnsync(i);
 		MUTEX_UNLOCK(_lock);
 		return ret;
 	}
@@ -115,7 +113,10 @@ private:
 	void expand() {
 		size_t oldsz = _sz;
 		_sz += (_sz >> 1);     // Add 50% more elements
-		_sz += 31; _sz &= ~0x31; // Make sure it's 32-aligned
+		if(_sz == oldsz) _sz += 32;
+		_sz += 31; _sz &= ~31; // Make sure it's 32-aligned
+		assert_gt(_sz, oldsz);
+		assert_eq(0, (_sz & 31));
 		uint32_t *newwords;
 		try {
 			newwords = new uint32_t[_sz >> 5 /* convert to words */];
@@ -126,8 +127,10 @@ private:
 			}
 			exit(1);
 		}
-		// Move old values into new array
-		memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
+		if(oldsz > 0) {
+			// Move old values into new array
+			memcpy(newwords, _words, oldsz >> 3 /* convert to bytes */);
+		}
 		// Initialize all new words to 0
 		memset(newwords + (oldsz >> 5 /*convert to words*/), 0,
 		       (_sz - oldsz) >> 3 /* convert to bytes */);
