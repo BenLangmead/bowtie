@@ -1159,7 +1159,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
+	//if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
@@ -1492,7 +1492,7 @@ static bool                           twoOrThreeMismatchSearch_two;
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
-	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
+	SyncBitset& hitMask  = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	BacktrackManager<String<Dna> > btr1(
 			&ebwtFw, params,
@@ -1639,7 +1639,7 @@ static void twoOrThreeMismatchSearch(
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
+	//if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
@@ -1896,7 +1896,7 @@ static int                            seededQualSearch_qualCutoff;
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask = *seededQualSearch_hitMask;
+	SyncBitset& hitMask  = *seededQualSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -1947,7 +1947,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 static void* seededQualSearchWorkerPhase2(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask = *seededQualSearch_hitMask;
+	SyncBitset& hitMask  = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -2003,7 +2003,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 static void* seededQualSearchWorkerPhase3(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask = *seededQualSearch_hitMask;
+	SyncBitset& hitMask  = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s3 = s >> 1; /* length of 3' half of seed */
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
@@ -2079,7 +2079,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 static void* seededQualSearchWorkerPhase4(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask = *seededQualSearch_hitMask;
+	SyncBitset& hitMask  = *seededQualSearch_hitMask;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
@@ -2350,7 +2350,7 @@ static void seededQualCutoffSearch(
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
+	//if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
 	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
