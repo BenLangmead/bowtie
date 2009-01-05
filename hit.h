@@ -80,14 +80,14 @@ public:
 		uint32_t _oms = 0) :
 		h(_h),
 		patId(_patId),
-		patName(_patName),
-		patSeq(_patSeq),
-		quals(_quals),
-		mms(_mms),
-		refcs(_refcs),
-		oms(_oms),
-		fw(_fw)
+		fw(_fw),
+		oms(_oms)
 	{
+		patName = _patName;
+		patSeq  = _patSeq;
+		quals   = _quals;
+		mms     = _mms;
+		refcs   = _refcs;
 		// Enforce the constraints imposed by the binary output format
 		if(seqan::length(patName) > 0xffff) {
 			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
