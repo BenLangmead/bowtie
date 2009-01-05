@@ -406,7 +406,7 @@ protected:
 class PatternSourcePerThread {
 public:
 	PatternSourcePerThread() :
-		_bufa(), _bufb(), _patid(0xffffffff) { }
+		_bufa(), _bufb(), _patid(0xffffffff), _reverse(false) { }
 
 	virtual ~PatternSourcePerThread() { }
 
@@ -418,13 +418,21 @@ public:
 	uint32_t      patid()  { return _patid;        }
 	virtual void  reset()  { _patid = 0xffffffff;  }
 	void    reverseRead()  { _bufa.reverseAll();
-	                         _bufb.reverseAll();   }
+	                         _bufb.reverseAll();
+	                         _reverse = !_reverse; }
 	bool          empty()  { return _bufa.empty(); }
 
+	/**
+	 * Return true iff the reads in the buffers bufa and bufb are
+	 * reversed from their original representation in the input reads.
+	 */
+	virtual bool reverse() { return _reverse; }
+
 protected:
-	ReadBuf  _bufa;  // read buffer
-	ReadBuf  _bufb;  // read buffer
-	uint32_t _patid; // index of read just read
+	ReadBuf  _bufa;    // read buffer for mate a
+	ReadBuf  _bufb;    // read buffer for mate b
+	uint32_t _patid;   // index of read just read
+	bool     _reverse; // whether the read is reversed
 };
 
 /**
@@ -449,7 +457,15 @@ public:
 		_patsrc.nextReadPair(_bufa, _bufb, _patid);
 		assert(_bufa.empty() || _patid != lastPatid);
 	}
+
+	/**
+	 * Return true iff the reads in the buffers bufa and bufb are
+	 * reversed from their original representation in the input reads.
+	 */
+	virtual bool reverse() { return _reverse != _patsrc.reverse(); }
+
 private:
+
 	/// Container for obtaining paired reads from PatternSources
 	PairedPatternSource& _patsrc;
 };

@@ -355,15 +355,32 @@ public:
 			// read output streams
 			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL) {
 				_sink.mainlock();
-				if(dumpUnalignFa != NULL) {
-					(*dumpUnalignFa) << ">" << p.bufa().name << endl
-									 << p.bufa().patFw << endl;
-				}
-				if(dumpUnalignFq != NULL) {
-					(*dumpUnalignFq) << "@" << p.bufa().name << endl
-									 << p.bufa().patFw << endl
-									 << "+" << endl <<
-									 p.bufa().qualFw << endl;
+				if(p.reverse()) {
+					String<Dna5> seq = p.bufa().patFw;
+					::reverseInPlace(seq);
+					if(dumpUnalignFa != NULL) {
+						(*dumpUnalignFa) << ">" << p.bufa().name << endl
+										 << seq << endl;
+					}
+					if(dumpUnalignFq != NULL) {
+						String<char> qual = p.bufa().qualFw;
+						::reverseInPlace(qual);
+						(*dumpUnalignFq) << "@" << p.bufa().name << endl
+										 << seq << endl
+										 << "+" << endl
+										 << qual << endl;
+					}
+				} else {
+					if(dumpUnalignFa != NULL) {
+						(*dumpUnalignFa) << ">" << p.bufa().name << endl
+										 << p.bufa().patFw << endl;
+					}
+					if(dumpUnalignFq != NULL) {
+						(*dumpUnalignFq) << "@" << p.bufa().name << endl
+										 << p.bufa().patFw << endl
+										 << "+" << endl
+										 << p.bufa().qualFw << endl;
+					}
 				}
 				_sink.mainunlock();
 			}
