@@ -1258,402 +1258,389 @@ protected:
 	}
 	/// Read another pattern from a FASTQ input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		int ns;
 		const int bufSz = ReadBuf::BUF_SIZE;
-		do {
-			int c;
-			ns = 0;
-			int dstLen = 0;
-			int nameLen = 0;
-
-			// Pick off the first at
-			if(_first) {
-				c = _filebuf.get();
-				if(c != '@') {
-					if(_forgiveInput) {
-						c = FastqPatternSource::skipToNextFastqRecord(_filebuf, c == '+'); if(c < 0) {
-							seqan::clear(r.patFw);
-							return;
-						}
-					} else {
-						c = getOverNewline(_filebuf); if(c < 0) {
-							seqan::clear(r.patFw);
-							return;
-						}
+		int c;
+		int dstLen = 0;
+		int nameLen = 0;
+		// Pick off the first at
+		if(_first) {
+			c = _filebuf.get();
+			if(c != '@') {
+				if(_forgiveInput) {
+					c = FastqPatternSource::skipToNextFastqRecord(_filebuf, c == '+'); if(c < 0) {
+						seqan::clear(r.patFw);
+						return;
+					}
+				} else {
+					c = getOverNewline(_filebuf); if(c < 0) {
+						seqan::clear(r.patFw);
+						return;
 					}
 				}
-				if(c != '@') {
-					cerr << "Error: reads file does not look like a FASTQ file" << endl;
-					exit(1);
-				}
-				assert_eq('@', c);
-				_first = false;
 			}
+			if(c != '@') {
+				cerr << "Error: reads file does not look like a FASTQ file" << endl;
+				exit(1);
+			}
+			assert_eq('@', c);
+			_first = false;
+		}
 
-			// Read to the end of the id line, sticking everything after the '@'
-			// into *name
-			while(true) {
-				c = _filebuf.get(); if(c < 0) {
+		// Read to the end of the id line, sticking everything after the '@'
+		// into *name
+		while(true) {
+			c = _filebuf.get(); if(c < 0) {
+				seqan::clear(r.patFw);
+				return;
+			}
+			if(c == '\n' || c == '\r') {
+				// Break at end of line, after consuming all \r's, \n's
+				while(c == '\n' || c == '\r') {
+					c = _filebuf.get();
+					if(c < 0) {
+						seqan::clear(r.patFw);
+						return;
+					}
+				}
+				break;
+			}
+			r.nameBuf[nameLen++] = c;
+		}
+		_setBegin(r.name, r.nameBuf);
+		_setLength(r.name, nameLen);
+		// c now holds the first character on the line after the
+		// @name line
+
+		// _filebuf now points just past the first character of a
+		// sequence line, and c holds the first character
+		int charsRead = 0;
+		if(!_reverse) {
+			while(c != '+') {
+				if(isalpha(c)) {
+					// If it's past the 5'-end trim point
+					if(charsRead >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+								 << "reads and re-run Bowtie";
+							exit(1);
+						}
+						// Add it to the read buffer
+						if(c == 'N' || c == 'n') {
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								c = "ACGT"[_rand.nextU32() & 3];
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
+							}
+						}
+						r.patBufFw[dstLen] = charToDna5[c];
+						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
+						dstLen++;
+					}
+					charsRead++;
+				}
+				c = _filebuf.get();
+				if(c < 0) {
+					// EOF occurred in the middle of a read - abort
 					seqan::clear(r.patFw);
 					return;
 				}
-				if(c == '\n' || c == '\r') {
-					// Break at end of line, after consuming all \r's, \n's
-					while(c == '\n' || c == '\r') {
-						c = _filebuf.get();
-						if(c < 0) {
-							seqan::clear(r.patFw);
-							return;
-						}
-					}
-					break;
-				}
-				r.nameBuf[nameLen++] = c;
 			}
-			_setBegin(r.name, r.nameBuf);
-			_setLength(r.name, nameLen);
-			// c now holds the first character on the line after the
-			// @name line
-
-			// _filebuf now points just past the first character of a
-			// sequence line, and c holds the first character
-			int charsRead = 0;
-			if(!_reverse) {
-				while(c != '+') {
-					if(isalpha(c)) {
-						// If it's past the 5'-end trim point
-						if(charsRead >= this->_trim5) {
-							if(dstLen + 1 > 1024) {
-								cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-								     << "reads and re-run Bowtie";
-								exit(1);
-							}
-							// Add it to the read buffer
-							if(c == 'N' || c == 'n') {
-								if(_policy == NS_TO_NS) {
-									// Leave c = 'N'
-								} else if(_policy == NS_TO_RANDS) {
-									c = "ACGT"[_rand.nextU32() & 3];
-								} else {
-									assert_eq(NS_TO_AS, _policy);
-									c = 'A';
-								}
-							}
-							r.patBufFw[dstLen] = charToDna5[c];
-							r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
-							dstLen++;
+			// Trim from 3' end
+			dstLen -= this->_trim3;
+			// Set trimmed bounds of buffers
+			_setBegin(r.patFw, (Dna5*)r.patBufFw);
+			_setLength(r.patFw, dstLen);
+			_setBegin(r.patRc, (Dna5*)&r.patBufRc[bufSz-dstLen]);
+			_setLength(r.patRc, dstLen);
+		} else {
+			while(c != '+') {
+				if(isalpha(c)) {
+					// If it's past the 5'-end trim point
+					if(charsRead >= this->_trim5) {
+						if(dstLen + 1 > 1024) {
+							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+								 << "reads and re-run Bowtie";
+							exit(1);
 						}
-						charsRead++;
-					}
-					c = _filebuf.get();
-					if(c < 0) {
-						// EOF occurred in the middle of a read - abort
-						seqan::clear(r.patFw);
-						return;
-					}
-				}
-				// Trim from 3' end
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[i] == 4) ns++;
-				}
-				// Set trimmed bounds of buffers
-				_setBegin(r.patFw, (Dna5*)r.patBufFw);
-				_setLength(r.patFw, dstLen);
-				_setBegin(r.patRc, (Dna5*)&r.patBufRc[bufSz-dstLen]);
-				_setLength(r.patRc, dstLen);
-			} else {
-				while(c != '+') {
-					if(isalpha(c)) {
-						// If it's past the 5'-end trim point
-						if(charsRead >= this->_trim5) {
-							if(dstLen + 1 > 1024) {
-								cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-								     << "reads and re-run Bowtie";
-								exit(1);
+						// Add it to the read buffer
+						if(c == 'N' || c == 'n') {
+							if(_policy == NS_TO_NS) {
+								// Leave c = 'N'
+							} else if(_policy == NS_TO_RANDS) {
+								c = "ACGT"[_rand.nextU32() & 3];
+							} else {
+								assert_eq(NS_TO_AS, _policy);
+								c = 'A';
 							}
-							// Add it to the read buffer
-							if(c == 'N' || c == 'n') {
-								if(_policy == NS_TO_NS) {
-									// Leave c = 'N'
-								} else if(_policy == NS_TO_RANDS) {
-									c = "ACGT"[_rand.nextU32() & 3];
-								} else {
-									assert_eq(NS_TO_AS, _policy);
-									c = 'A';
-								}
-							}
-							r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
-							r.patBufRc[dstLen] = rcCharToDna5[c];
-							dstLen++;
 						}
-						charsRead++;
+						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
+						r.patBufRc[dstLen] = rcCharToDna5[c];
+						dstLen++;
 					}
-					c = _filebuf.get();
-					if(c < 0) {
-						// EOF occurred in the middle of a read - abort
-						seqan::clear(r.patFw);
-						return;
-					}
-				}
-				// Trim from 3' end
-				dstLen -= this->_trim3;
-				// Now that we've trimmed on both ends, count the Ns
-				for(int i = 0; i < dstLen; i++) {
-					if(r.patBufFw[bufSz-i-1] == 4) ns++;
-				}
-				// Set trimmed bounds of buffers
-				_setBegin(r.patFw, (Dna5*)&r.patBufFw[bufSz-dstLen]);
-				_setLength(r.patFw, dstLen);
-				_setBegin(r.patRc, (Dna5*)r.patBufRc);
-				_setLength(r.patRc, dstLen);
-			}
-			assert_eq('+', c);
-
-			// Chew up the optional name on the '+' line
-			peekToEndOfLine(_filebuf);
-
-			// Now read the qualities
-			int qualsRead = 0;
-			if (_integer_quals) {
-				char buf[4096];
-				while (qualsRead < charsRead) {
-					size_t rd = _filebuf.gets(buf, sizeof(buf));
-					if(rd == 0) break;
-					assert(NULL == strrchr(buf, '\n'));
-					vector<string> s_quals;
-					tokenize(string(buf), " ", s_quals);
-					if(!_reverse) {
-						for (unsigned int j = 0; j < s_quals.size(); ++j)
-						{
-							int iQ = atoi(s_quals[j].c_str());
-							int pQ;
-							if (_solexa_quals)
-							{
-								// Convert from solexa quality to phred
-								// quality and translate to ASCII
-								// http://maq.sourceforge.net/qual.shtml
-								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
-							}
-							else
-							{
-								// Keep the phred quality and translate
-								// to ASCII
-								pQ = (iQ <= 93 ? iQ : 93) + 33;
-								if (pQ < 33)
-								{
-									cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-									wrongQualityScale();
-									exit(1);
-								}
-							}
-
-							if (qualsRead >= _trim5)
-							{
-								size_t off = qualsRead - _trim5;
-								if(off + 1 > 1024) {
-									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									     << "Please truncate reads and quality values and and re-run Bowtie";
-									exit(1);
-								}
-								c = (char)(pQ);
-								assert_geq(c, 33);
-								assert_leq(c, 73);
-								r.qualBufFw[off] = c;
-								r.qualBufRc[bufSz - off - 1] = c;
-							}
-							++qualsRead;
-						}
-					} else {
-						for (unsigned int j = 0; j < s_quals.size(); ++j)
-						{
-							int iQ = atoi(s_quals[j].c_str());
-							int pQ;
-							if (_solexa_quals)
-							{
-								// Convert from solexa quality to phred
-								// quality and translate to ASCII
-								// http://maq.sourceforge.net/qual.shtml
-								pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
-							}
-							else
-							{
-								// Keep the phred quality and translate
-								// to ASCII
-								pQ = (iQ <= 93 ? iQ : 93) + 33;
-								if (pQ < 33)
-								{
-									cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-									wrongQualityScale();
-									exit(1);
-								}
-							}
-							if (qualsRead >= _trim5)
-							{
-								size_t off = qualsRead - _trim5;
-								if(off + 1 > 1024) {
-									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									     << "Please truncate reads and quality values and and re-run Bowtie";
-									exit(1);
-								}
-								c = (char)(pQ);
-								assert_geq(c, 33);
-								assert_leq(c, 73);
-								r.qualBufFw[bufSz - off - 1] = c;
-								r.qualBufRc[off] = c;
-							}
-							++qualsRead;
-						}
-					}
-				} // done reading integer quality lines
-				//assert_eq(charsRead, qualsRead);
-				if (charsRead > qualsRead)
-				{
-					tooFewQualities(r.name);
-					exit(1);
-				}
-				if(!_reverse) {
-					_setBegin(r.qualFw, (char*)r.qualBufFw);
-					_setLength(r.qualFw, dstLen);
-					_setBegin(r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
-					_setLength(r.qualRc, dstLen);
-				} else {
-					_setBegin(r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
-					_setLength(r.qualFw, dstLen);
-					_setBegin(r.qualRc, (char*)r.qualBufRc);
-					_setLength(r.qualRc, dstLen);
+					charsRead++;
 				}
 				c = _filebuf.get();
+				if(c < 0) {
+					// EOF occurred in the middle of a read - abort
+					seqan::clear(r.patFw);
+					return;
+				}
 			}
-			else
-			{
-				// Non-integer qualities
+			// Trim from 3' end
+			dstLen -= this->_trim3;
+			// Set trimmed bounds of buffers
+			_setBegin(r.patFw, (Dna5*)&r.patBufFw[bufSz-dstLen]);
+			_setLength(r.patFw, dstLen);
+			_setBegin(r.patRc, (Dna5*)r.patBufRc);
+			_setLength(r.patRc, dstLen);
+		}
+		assert_eq('+', c);
+
+		// Chew up the optional name on the '+' line
+		peekToEndOfLine(_filebuf);
+
+		// Now read the qualities
+		int qualsRead = 0;
+		if (_integer_quals) {
+			char buf[4096];
+			while (qualsRead < charsRead) {
+				size_t rd = _filebuf.gets(buf, sizeof(buf));
+				if(rd == 0) break;
+				assert(NULL == strrchr(buf, '\n'));
+				vector<string> s_quals;
+				tokenize(string(buf), " ", s_quals);
 				if(!_reverse) {
-					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
-						c = _filebuf.get();
-						if (c == ' ') {
-							wrongQualityFormat();
-							exit(1);
+					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					{
+						int iQ = atoi(s_quals[j].c_str());
+						int pQ;
+						if (_solexa_quals)
+						{
+							// Convert from solexa quality to phred
+							// quality and translate to ASCII
+							// http://maq.sourceforge.net/qual.shtml
+							pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
 						}
-						if(c < 0) {
-							// EOF occurred in the middle of a read - abort
-							seqan::clear(r.patFw);
-							return;
+						else
+						{
+							// Keep the phred quality and translate
+							// to ASCII
+							pQ = (iQ <= 93 ? iQ : 93) + 33;
+							if (pQ < 33)
+							{
+								cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
+								wrongQualityScale();
+								exit(1);
+							}
 						}
-						if (c != '\r' && c != '\n') {
-							if (qualsRead >= _trim5) {
-								size_t off = qualsRead - _trim5;
-								if(off + 1 > 1024) {
-									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									     << "Please truncate reads and quality values and and re-run Bowtie";
+
+						if (qualsRead >= _trim5)
+						{
+							size_t off = qualsRead - _trim5;
+							if(off + 1 > 1024) {
+								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									 << "Please truncate reads and quality values and and re-run Bowtie";
+								exit(1);
+							}
+							c = (char)(pQ);
+							assert_geq(c, 33);
+							assert_leq(c, 73);
+							r.qualBufFw[off] = c;
+							r.qualBufRc[bufSz - off - 1] = c;
+						}
+						++qualsRead;
+					}
+				} else {
+					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					{
+						int iQ = atoi(s_quals[j].c_str());
+						int pQ;
+						if (_solexa_quals)
+						{
+							// Convert from solexa quality to phred
+							// quality and translate to ASCII
+							// http://maq.sourceforge.net/qual.shtml
+							pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+						}
+						else
+						{
+							// Keep the phred quality and translate
+							// to ASCII
+							pQ = (iQ <= 93 ? iQ : 93) + 33;
+							if (pQ < 33)
+							{
+								cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
+								wrongQualityScale();
+								exit(1);
+							}
+						}
+						if (qualsRead >= _trim5)
+						{
+							size_t off = qualsRead - _trim5;
+							if(off + 1 > 1024) {
+								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									 << "Please truncate reads and quality values and and re-run Bowtie";
+								exit(1);
+							}
+							c = (char)(pQ);
+							assert_geq(c, 33);
+							assert_leq(c, 73);
+							r.qualBufFw[bufSz - off - 1] = c;
+							r.qualBufRc[off] = c;
+						}
+						++qualsRead;
+					}
+				}
+			} // done reading integer quality lines
+			//assert_eq(charsRead, qualsRead);
+			if (charsRead > qualsRead)
+			{
+				tooFewQualities(r.name);
+				exit(1);
+			}
+			if(!_reverse) {
+				_setBegin(r.qualFw, (char*)r.qualBufFw);
+				_setLength(r.qualFw, dstLen);
+				_setBegin(r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
+				_setLength(r.qualRc, dstLen);
+			} else {
+				_setBegin(r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
+				_setLength(r.qualFw, dstLen);
+				_setBegin(r.qualRc, (char*)r.qualBufRc);
+				_setLength(r.qualRc, dstLen);
+			}
+			c = _filebuf.get();
+		}
+		else
+		{
+			// Non-integer qualities
+			if(!_reverse) {
+				while((qualsRead < dstLen + this->_trim5) && c >= 0) {
+					c = _filebuf.get();
+					if (c == ' ') {
+						wrongQualityFormat();
+						exit(1);
+					}
+					if(c < 0) {
+						// EOF occurred in the middle of a read - abort
+						seqan::clear(r.patFw);
+						return;
+					}
+					if (c != '\r' && c != '\n') {
+						if (qualsRead >= _trim5) {
+							size_t off = qualsRead - _trim5;
+							if(off + 1 > 1024) {
+								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									 << "Please truncate reads and quality values and and re-run Bowtie";
+								exit(1);
+							}
+
+							if (_solexa_quals)
+							{
+								// Convert solexa-scaled chars to phred
+								// http://maq.sourceforge.net/fastq.shtml
+								int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+								c = (char)(pQ);
+							}
+							else
+							{
+								// Keep the phred quality
+								if (c < 33)
+								{
+									cerr << "Saw ASCII character " << ((int)c) << "." << endl;
+									wrongQualityScale();
 									exit(1);
 								}
-
-								if (_solexa_quals)
-								{
-									// Convert solexa-scaled chars to phred
-									// http://maq.sourceforge.net/fastq.shtml
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-									c = (char)(pQ);
-								}
-								else
-								{
-									// Keep the phred quality
-									if (c < 33)
-									{
-										cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-										wrongQualityScale();
-										exit(1);
-									}
-								}
-
-								assert_geq(c, 33);
-								r.qualBufFw[off] = c;
-								r.qualBufRc[bufSz - off - 1] = c;
 							}
-							qualsRead++;
-						} else {
-							break;
+
+							assert_geq(c, 33);
+							r.qualBufFw[off] = c;
+							r.qualBufRc[bufSz - off - 1] = c;
 						}
+						qualsRead++;
+					} else {
+						break;
 					}
-					assert_eq(qualsRead, dstLen + this->_trim5);
-					_setBegin (r.qualFw, (char*)r.qualBufFw);
-					_setLength(r.qualFw, dstLen);
-					_setBegin (r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
-					_setLength(r.qualRc, dstLen);
-				} else {
-					while((qualsRead < dstLen + this->_trim5) && c >= 0) {
-						c = _filebuf.get();
-						if (c == ' ') {
-							wrongQualityFormat();
-							exit(1);
-						}
-						if(c < 0) {
-							// EOF occurred in the middle of a read - abort
-							seqan::clear(r.patFw);
-							return;
-						}
-						if (c != '\r' && c != '\n') {
-							if (qualsRead >= _trim5) {
-								size_t off = qualsRead - _trim5;
-								if(off + 1 > 1024) {
-									cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									     << "Please truncate reads and quality values and and re-run Bowtie";
+				}
+				assert_eq(qualsRead, dstLen + this->_trim5);
+				_setBegin (r.qualFw, (char*)r.qualBufFw);
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
+				_setLength(r.qualRc, dstLen);
+			} else {
+				while((qualsRead < dstLen + this->_trim5) && c >= 0) {
+					c = _filebuf.get();
+					if (c == ' ') {
+						wrongQualityFormat();
+						exit(1);
+					}
+					if(c < 0) {
+						// EOF occurred in the middle of a read - abort
+						seqan::clear(r.patFw);
+						return;
+					}
+					if (c != '\r' && c != '\n') {
+						if (qualsRead >= _trim5) {
+							size_t off = qualsRead - _trim5;
+							if(off + 1 > 1024) {
+								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+									 << "Please truncate reads and quality values and and re-run Bowtie";
+								exit(1);
+							}
+
+							if (_solexa_quals)
+							{
+								// Convert solexa-scaled chars to phred
+								// http://maq.sourceforge.net/fastq.shtml
+								int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+								c = (char)(pQ);
+							}
+							else
+							{
+								// Keep the phred quality
+								if (c < 33)
+								{
+									cerr << "Saw ASCII character " << ((int)c) << "." << endl;
+									wrongQualityScale();
 									exit(1);
 								}
-
-								if (_solexa_quals)
-								{
-									// Convert solexa-scaled chars to phred
-									// http://maq.sourceforge.net/fastq.shtml
-									int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-									c = (char)(pQ);
-								}
-								else
-								{
-									// Keep the phred quality
-									if (c < 33)
-									{
-										cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-										wrongQualityScale();
-										exit(1);
-									}
-								}
-
-								assert_geq(c, 33);
-								r.qualBufFw[bufSz - off - 1] = c;
-								r.qualBufRc[off] = c;
 							}
-							qualsRead++;
-						} else {
-							break;
-						}
-					}
-					assert_eq(qualsRead, dstLen + this->_trim5);
-					_setBegin (r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
-					_setLength(r.qualFw, dstLen);
-					_setBegin (r.qualRc, (char*)r.qualBufRc);
-					_setLength(r.qualRc, dstLen);
-				}
-				if(c == '\r' || c == '\n') {
-					c = getOverNewline(_filebuf);
-				} else {
-					c = getToEndOfLine(_filebuf);
-				}
-			}
-			assert(c == -1 || c == '@');
 
-			// Set up a default name if one hasn't been set
-			if(nameLen == 0) {
-				itoa10(_readCnt, r.nameBuf);
-				_setBegin(r.name, r.nameBuf);
-				nameLen = strlen(r.nameBuf);
-				_setLength(r.name, nameLen);
+							assert_geq(c, 33);
+							r.qualBufFw[bufSz - off - 1] = c;
+							r.qualBufRc[off] = c;
+						}
+						qualsRead++;
+					} else {
+						break;
+					}
+				}
+				assert_eq(qualsRead, dstLen + this->_trim5);
+				_setBegin (r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
+				_setLength(r.qualFw, dstLen);
+				_setBegin (r.qualRc, (char*)r.qualBufRc);
+				_setLength(r.qualRc, dstLen);
 			}
-			assert_gt(nameLen, 0);
-			_readCnt++;
-		} while(ns > _maxNs);
+			if(c == '\r' || c == '\n') {
+				c = getOverNewline(_filebuf);
+			} else {
+				c = getToEndOfLine(_filebuf);
+			}
+		}
+		assert(c == -1 || c == '@');
+
+		// Set up a default name if one hasn't been set
+		if(nameLen == 0) {
+			itoa10(_readCnt, r.nameBuf);
+			_setBegin(r.name, r.nameBuf);
+			nameLen = strlen(r.nameBuf);
+			_setLength(r.name, nameLen);
+		}
+		assert_gt(nameLen, 0);
+		_readCnt++;
 		patid = _readCnt-1;
 	}
 	virtual void resetForNextFile() {
