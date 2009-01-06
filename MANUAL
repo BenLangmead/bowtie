@@ -371,10 +371,26 @@ Bowtie Manual
                      specified read set.  Default: no limit.
 
   --unfa <filename>  Write all reads that fail to align to a FASTA file
-                     with name <filename>.
+                     with name <filename>.  Unless --maxfa is
+                     specified, reads with a number of valid alignments
+                     exceeding the limit set with the -m option are
+                     also written to this file.
 
   --unfq <filename>  Write all reads that fail to align to a FASTQ file
-                     with name <filename>.
+                     with name <filename>.  Unless --maxfq is
+                     specified, reads with a number of valid alignments
+                     exceeding the limit specified by the -m option are
+                     also written to this file.
+
+  --maxfa <filename> Write all reads with a number of valid alignments
+                     exceeding the limit set with the -m option to a
+                     FASTA file with given name.  These reads are not
+                     written to the file specified with --unfa.
+
+  --maxfq <filename> Write all reads with a number of valid alignments
+                     exceeding the limit set with the -m option to a
+                     FASTQ file with given name.  These reads are not
+                     written to the file specified with --unfq.
 
   -t/--time          Print the amount of wall-clock time taken by each
                      search phase and index turnover.

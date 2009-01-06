@@ -352,14 +352,16 @@ public:
 	{
 		uint32_t ret = finishReadImpl();
 		_bestRemainingStratum = 0;
-		if(ret == 0 || _bufferedHits.size() == 0) {
+		if(ret == 0 || (ret > 0 && _bufferedHits.size() == 0)) {
 			// Either no reportable hits were found or the number of
 			// reportable hits exceeded the -m limit specified by the
 			// user
 			assert(ret == 0 || ret > _max);
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
-			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL) {
+			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL ||
+			   dumpMaxedFa   != NULL || dumpMaxedFq   != NULL)
+			{
 				// Lock the main lock for the HitSink so that search
 				// threads don't collide when writing to the unaligned-
 				// read file.

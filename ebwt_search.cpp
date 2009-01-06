@@ -235,6 +235,8 @@ static void printUsage(ostream& out) {
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 	    << "  --unfa <filename>  write unaligned reads to FASTA file with name <filename>" << endl
 	    << "  --unfq <filename>  write unaligned reads to FASTQ file with name <filename>" << endl
+	    << "  --maxfa <filename> write reads exceeding -m limit to FASTA file <filename>" << endl
+	    << "  --maxfq <filename> write reads exceeding -m limit to FASTQ file <filename>" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
@@ -481,10 +483,26 @@ static void printLongUsage(ostream& out) {
 	"                     specified read set.  Default: no limit.\n"
 	"\n"
 	"  --unfa <filename>  Write all reads that fail to align to a FASTA file\n"
-	"                     with name <filename>.\n"
+	"                     with name <filename>.  Unless --maxfa is\n"
+	"                     specified, reads with a number of valid alignments\n"
+	"                     exceeding the limit set with the -m option are\n"
+	"                     also written to this file.\n"
 	"\n"
 	"  --unfq <filename>  Write all reads that fail to align to a FASTQ file\n"
-	"                     with name <filename>.\n"
+	"                     with name <filename>.  Unless --maxfq is\n"
+	"                     specified, reads with a number of valid alignments\n"
+	"                     exceeding the limit specified by the -m option are\n"
+	"                     also written to this file.\n"
+	"\n"
+	"  --maxfa <filename> Write all reads with a number of valid alignments\n"
+	"                     exceeding the limit set with the -m option to a\n"
+	"                     FASTA file with given name.  These reads are not\n"
+	"                     written to the file specified with --unfa.\n"
+	"\n"
+	"  --maxfq <filename> Write all reads with a number of valid alignments\n"
+	"                     exceeding the limit set with the -m option to a\n"
+	"                     FASTQ file with given name.  These reads are not\n"
+	"                     written to the file specified with --unfq.\n"
 	"\n"
 	"  -t/--time          Print the amount of wall-clock time taken by each\n"
 	"                     search phase and index turnover.\n"
@@ -671,7 +689,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_UNFA: {
 	   			if(dumpUnalignFa != NULL) delete dumpUnalignFa;
-	   			dumpUnalignFa = new ofstream(optarg, ios_base::out); break;
+	   			dumpUnalignFa = new ofstream(optarg, ios_base::out);
 	   			if(!dumpUnalignFa->good()) {
 	   				cerr << "Could not open unaligned FASTA file " << optarg << " for appending" << endl;
 	   				exit(1);
@@ -681,7 +699,7 @@ static void parseOptions(int argc, char **argv) {
 	   		}
 	   		case ARG_UNFQ: {
 	   			if(dumpUnalignFq != NULL) delete dumpUnalignFq;
-	   			dumpUnalignFq = new ofstream(optarg, ios_base::out); break;
+	   			dumpUnalignFq = new ofstream(optarg, ios_base::out);
 	   			if(!dumpUnalignFq->good()) {
 	   				cerr << "Could not open unaligned FASTQ file " << optarg << " for appending" << endl;
 	   				exit(1);
@@ -693,7 +711,7 @@ static void parseOptions(int argc, char **argv) {
 	   			if(dumpMaxedFa != NULL && dumpMaxedFa != dumpUnalignFa) {
 	   				delete dumpMaxedFa;
 	   			}
-	   			dumpMaxedFa = new ofstream(optarg, ios_base::out); break;
+	   			dumpMaxedFa = new ofstream(optarg, ios_base::out);
 	   			if(!dumpMaxedFa->good()) {
 	   				cerr << "Could not open maxed-out read FASTA file " << optarg << " for appending" << endl;
 	   				exit(1);
@@ -704,7 +722,7 @@ static void parseOptions(int argc, char **argv) {
 	   			if(dumpMaxedFq != NULL && dumpMaxedFq != dumpUnalignFq) {
 	   				delete dumpMaxedFq;
 	   			}
-	   			dumpMaxedFq = new ofstream(optarg, ios_base::out); break;
+	   			dumpMaxedFq = new ofstream(optarg, ios_base::out);
 	   			if(!dumpMaxedFq->good()) {
 	   				cerr << "Could not open maxed-out read FASTQ file " << optarg << " for appending" << endl;
 	   				exit(1);
