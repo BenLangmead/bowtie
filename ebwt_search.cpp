@@ -67,8 +67,10 @@ static bool fullIndex           = true;  // load halves one at a time and procee
 static bool noRefNames          = false; // true -> print reference indexes; not names
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
-static ofstream *dumpUnalignFa  = NULL;  // FASTA file to dump aligned reads to
+static ofstream *dumpUnalignFa  = NULL;  // FASTA file to dump unaligned reads to
 static ofstream *dumpUnalignFq  = NULL;  // FASTQ file to dump unaligned reads to
+static ofstream *dumpMaxedFa    = NULL;  // FASTA file to dump reads with more than -m valid alignments to
+static ofstream *dumpMaxedFq    = NULL;  // FASTQ file to dump reads with more than -m valid alignments to
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
@@ -105,6 +107,8 @@ enum {
 	ARG_FAST,
 	ARG_UNFA,
 	ARG_UNFQ,
+	ARG_MAXFA,
+	ARG_MAXFQ,
 	ARG_REFIDX,
 	ARG_DUMP_NOHIT,
 	ARG_DUMP_HHHIT,
@@ -145,6 +149,8 @@ static struct option long_options[] = {
 	{"qupto",        required_argument, 0,            'u'},
 	{"unfa",         required_argument, 0,            ARG_UNFA},
 	{"unfq",         required_argument, 0,            ARG_UNFQ},
+	{"maxfa",        required_argument, 0,            ARG_MAXFA},
+	{"maxfq",        required_argument, 0,            ARG_MAXFQ},
 	{"offrate",      required_argument, 0,            'o'},
 	{"isarate",      required_argument, 0,            ARG_ISARATE},
 	{"skipsearch",   no_argument,       &skipSearch,  1},
@@ -664,17 +670,43 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_UNFA: {
+	   			if(dumpUnalignFa != NULL) delete dumpUnalignFa;
 	   			dumpUnalignFa = new ofstream(optarg, ios_base::out); break;
 	   			if(!dumpUnalignFa->good()) {
 	   				cerr << "Could not open unaligned FASTA file " << optarg << " for appending" << endl;
 	   				exit(1);
 	   			}
+	   			if(dumpMaxedFa == NULL) dumpMaxedFa = dumpUnalignFa;
 	   			break;
 	   		}
 	   		case ARG_UNFQ: {
+	   			if(dumpUnalignFq != NULL) delete dumpUnalignFq;
 	   			dumpUnalignFq = new ofstream(optarg, ios_base::out); break;
 	   			if(!dumpUnalignFq->good()) {
 	   				cerr << "Could not open unaligned FASTQ file " << optarg << " for appending" << endl;
+	   				exit(1);
+	   			}
+	   			if(dumpMaxedFq == NULL) dumpMaxedFq = dumpUnalignFq;
+	   			break;
+	   		}
+	   		case ARG_MAXFA: {
+	   			if(dumpMaxedFa != NULL && dumpMaxedFa != dumpUnalignFa) {
+	   				delete dumpMaxedFa;
+	   			}
+	   			dumpMaxedFa = new ofstream(optarg, ios_base::out); break;
+	   			if(!dumpMaxedFa->good()) {
+	   				cerr << "Could not open maxed-out read FASTA file " << optarg << " for appending" << endl;
+	   				exit(1);
+	   			}
+	   			break;
+	   		}
+	   		case ARG_MAXFQ: {
+	   			if(dumpMaxedFq != NULL && dumpMaxedFq != dumpUnalignFq) {
+	   				delete dumpMaxedFq;
+	   			}
+	   			dumpMaxedFq = new ofstream(optarg, ios_base::out); break;
+	   			if(!dumpMaxedFq->good()) {
+	   				cerr << "Could not open maxed-out read FASTQ file " << optarg << " for appending" << endl;
 	   				exit(1);
 	   			}
 	   			break;
@@ -803,7 +835,10 @@ static char *argv0 = NULL;
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(!p->empty()) { \
-		sink->finishRead(*p, skipped ? NULL : dumpUnalignFa, skipped ? NULL : dumpUnalignFq); \
+		sink->finishRead(*p, skipped ? NULL : dumpUnalignFa, \
+		                     skipped ? NULL : dumpUnalignFq, \
+		                     skipped ? NULL : dumpMaxedFa,   \
+		                     skipped ? NULL : dumpMaxedFq);  \
 	} \
 	skipped = false;
 
@@ -824,11 +859,16 @@ static char *argv0 = NULL;
 			} \
 		} \
 		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, \
-		                        reportUnAl ? dumpUnalignFq : NULL) > 0) { \
+		                        reportUnAl ? dumpUnalignFq : NULL, \
+		   	                    reportUnAl ? dumpMaxedFa   : NULL, \
+		   	                    reportUnAl ? dumpMaxedFq   : NULL) > 0) { \
 			/* We reported a hit for the read, so we set the */ \
 			/* appropriate bit in the hitMask to prevent it from */ \
 			/* being reported as unaligned. */ \
-			if(!reportUnAl && (dumpUnalignFa != NULL || dumpUnalignFq != NULL)) { \
+			if(!reportUnAl && \
+			   (dumpUnalignFa != NULL || dumpUnalignFq != NULL || \
+			    dumpMaxedFa   != NULL || dumpMaxedFq   != NULL)) \
+			{ \
 				hitMask.setOver(p->patid()); \
 			} \
 		} \
@@ -1159,11 +1199,13 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
-	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
+	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
+	{
+		numQs = 0;
+	}
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -1639,11 +1681,13 @@ static void twoOrThreeMismatchSearch(
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
-	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
+	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
+	{
+		numQs = 0;
+	}
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -2350,11 +2394,13 @@ static void seededQualCutoffSearch(
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
-	// doneMask is sufficient to know whether a read has an alignment
-	if(!allHits && khits == 1) numQs = 0;
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL) numQs = 0;
+	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
+	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
+	{
+		numQs = 0;
+	}
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -3041,8 +3087,22 @@ static void driver(const char * type,
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();
-		if(dumpUnalignFa != NULL) dumpUnalignFa->close();
-		if(dumpUnalignFq != NULL) dumpUnalignFq->close();
+		if(dumpUnalignFa != NULL) {
+			dumpUnalignFa->close();
+			delete dumpUnalignFa;
+		}
+		if(dumpUnalignFq != NULL) {
+			dumpUnalignFq->close();
+			delete dumpUnalignFq;
+		}
+		if(dumpMaxedFa != NULL && dumpMaxedFa != dumpUnalignFa) {
+			dumpMaxedFa->close();
+			delete dumpMaxedFa;
+		}
+		if(dumpMaxedFq != NULL && dumpMaxedFq != dumpUnalignFq) {
+			dumpMaxedFq->close();
+			delete dumpMaxedFq;
+		}
 		for(size_t i = 0; i < patsrcs_a.size(); i++) {
 			assert(patsrcs_a[i] != NULL);
 			delete patsrcs_a[i];
@@ -3078,62 +3138,64 @@ int main(int argc, char **argv) {
 		cout << "Source hash: " << EBWT_SEARCH_HASH << endl;
 		return 0;
 	}
-	Timer _t(cout, "Overall time: ", timing);
+	{
+		Timer _t(cout, "Overall time: ", timing);
 
-	// Get input filename
-	if(optind >= argc) {
-		cerr << "No input sequence, query, or output file specified!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
-	ebwtFile = argv[optind++];
+		// Get input filename
+		if(optind >= argc) {
+			cerr << "No input sequence, query, or output file specified!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+		ebwtFile = argv[optind++];
 
-	// Get query filename
-	if(optind >= argc) {
-		if(mates1.size() > 0) {
-			query = "";
+		// Get query filename
+		if(optind >= argc) {
+			if(mates1.size() > 0) {
+				query = "";
+			} else {
+				cerr << "No query or output file specified!" << endl;
+				printUsage(cerr);
+				return 1;
+			}
 		} else {
-			cerr << "No query or output file specified!" << endl;
-			printUsage(cerr);
-			return 1;
+			query = argv[optind++];
+			// Tokenize the list of query files
+			tokenize(query, ",", queries);
+			if(queries.size() < 1) {
+				cerr << "Tokenized query file list was empty!" << endl;
+				printUsage(cerr);
+				return 1;
+			}
 		}
-	} else {
-		query = argv[optind++];
-		// Tokenize the list of query files
-		tokenize(query, ",", queries);
-		if(queries.size() < 1) {
-			cerr << "Tokenized query file list was empty!" << endl;
-			printUsage(cerr);
-			return 1;
-		}
-	}
 
-	// Get output filename
-	if(optind < argc) {
-		outfile = argv[optind++];
-	}
-
-	// Optionally summarize
-	if(verbose) {
-		cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
-		cout << "Query inputs (DNA, " << file_format_names[format] << "):" << endl;
-		for(size_t i = 0; i < queries.size(); i++) {
-			cout << "  " << queries[i] << endl;
+		// Get output filename
+		if(optind < argc) {
+			outfile = argv[optind++];
 		}
-		cout << "Output file: \"" << outfile << "\"" << endl;
-		cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
-		cout << "Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
-	#ifdef NDEBUG
-		cout << "Assertions: disabled" << endl;
-	#else
-		cout << "Assertions: enabled" << endl;
-	#endif
+
+		// Optionally summarize
+		if(verbose) {
+			cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
+			cout << "Query inputs (DNA, " << file_format_names[format] << "):" << endl;
+			for(size_t i = 0; i < queries.size(); i++) {
+				cout << "  " << queries[i] << endl;
+			}
+			cout << "Output file: \"" << outfile << "\"" << endl;
+			cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
+			cout << "Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
+		#ifdef NDEBUG
+			cout << "Assertions: disabled" << endl;
+		#else
+			cout << "Assertions: enabled" << endl;
+		#endif
+		}
+		if(ipause) {
+			cout << "Press key to continue..." << endl;
+			getchar();
+		}
+		driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
 	}
-	if(ipause) {
-		cout << "Press key to continue..." << endl;
-		getchar();
-	}
-	driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
 #ifdef BOWTIE_PTHREADS
 	pthread_exit(NULL);
 #else

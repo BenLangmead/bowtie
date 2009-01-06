@@ -14,6 +14,7 @@
 #include "bitset.h"
 #include "tokenize.h"
 #include "pat.h"
+#include "formats.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -319,7 +320,6 @@ public:
 	HitSinkPerThread(HitSink& sink, uint32_t __max = 0xffffffff, bool __keep = false) :
 		_sink(sink),
 		_bestRemainingStratum(0),
-		_bufferHits(true),
 		_numReportableHits(0llu),
 		_numValidHits(0llu),
 		_keep(__keep),
@@ -346,11 +346,17 @@ public:
 	/// Finalize current read
 	virtual uint32_t finishRead(PatternSourcePerThread& p,
 	                            ostream *dumpUnalignFa = NULL,
-	                            ostream *dumpUnalignFq = NULL)
+	                            ostream *dumpUnalignFq = NULL,
+	                            ostream *dumpMaxedFa   = NULL,
+	                            ostream *dumpMaxedFq   = NULL)
 	{
 		uint32_t ret = finishReadImpl();
 		_bestRemainingStratum = 0;
-		if(ret == 0) {
+		if(ret == 0 || _bufferedHits.size() == 0) {
+			// Either no reportable hits were found or the number of
+			// reportable hits exceeded the -m limit specified by the
+			// user
+			assert(ret == 0 || ret > _max);
 			// Dump the unaligned read to one or more of the unaligned-
 			// read output streams
 			if(dumpUnalignFa != NULL || dumpUnalignFq != NULL) {
@@ -363,38 +369,56 @@ public:
 					// original orientation before outputting
 					String<Dna5> seq = p.bufa().patFw;
 					::reverseInPlace(seq);
-					if(dumpUnalignFa != NULL) {
-						(*dumpUnalignFa) << ">" << p.bufa().name << endl
-										 << seq << endl;
-					}
-					if(dumpUnalignFq != NULL) {
-						String<char> qual = p.bufa().qualFw;
-						::reverseInPlace(qual);
-						(*dumpUnalignFq) << "@" << p.bufa().name << endl
-										 << seq << endl
-										 << "+" << endl
-										 << qual << endl;
+					if(ret > 0) {
+						// The read failed to align because the number
+						// of valid alignments exceeded the -m
+						// threshold given by the user
+						if(dumpMaxedFa != NULL)
+							printFastaRecord(*dumpMaxedFa, p.bufa().name, seq);
+						if(dumpMaxedFq != NULL) {
+							String<char> qual = p.bufa().qualFw;
+							::reverseInPlace(qual);
+							printFastqRecord(*dumpMaxedFq, p.bufa().name, seq, qual);
+						}
+					} else {
+						// The read failed to align because there were
+						// no valid alignments
+						if(dumpUnalignFa != NULL)
+							printFastaRecord(*dumpUnalignFa, p.bufa().name, seq);
+						if(dumpUnalignFq != NULL) {
+							String<char> qual = p.bufa().qualFw;
+							::reverseInPlace(qual);
+							printFastqRecord(*dumpUnalignFq, p.bufa().name, seq, qual);
+						}
 					}
 				} else {
-					if(dumpUnalignFa != NULL) {
-						(*dumpUnalignFa) << ">" << p.bufa().name << endl
-										 << p.bufa().patFw << endl;
-					}
-					if(dumpUnalignFq != NULL) {
-						(*dumpUnalignFq) << "@" << p.bufa().name << endl
-										 << p.bufa().patFw << endl
-										 << "+" << endl
-										 << p.bufa().qualFw << endl;
+					if(ret > 0) {
+						// The read failed to align because the number
+						// of valid alignments exceeded the -m
+						// threshold given by the user
+						if(dumpMaxedFa != NULL)
+							printFastaRecord(*dumpMaxedFa, p.bufa().name, p.bufa().patFw);
+						if(dumpMaxedFq != NULL)
+							printFastqRecord(*dumpMaxedFq, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+					} else {
+						// The read failed to align because there were
+						// no valid alignments
+						if(dumpUnalignFa != NULL)
+							printFastaRecord(*dumpUnalignFa, p.bufa().name, p.bufa().patFw);
+						if(dumpUnalignFq != NULL)
+							printFastqRecord(*dumpUnalignFq, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 					}
 				}
 				_sink.mainunlock();
 			}
 		}
-		if(_bufferHits && _bufferedHits.size() > 0) {
+		if(_bufferedHits.size() > 0) {
 			// Flush buffered hits
-			//assert_eq(ret, _bufferedHits.size());
 			_sink.reportHits(_bufferedHits);
+			ret = _bufferedHits.size();
 			_bufferedHits.clear();
+		} else {
+			ret = 0;
 		}
 		assert_eq(0, _bufferedHits.size());
 		return ret;
@@ -433,17 +457,13 @@ public:
 			_hits.push_back(h);
 			_strata.push_back(stratum);
 		}
-		if(_bufferHits) {
 #ifndef NDEBUG
-			// Ensure all buffered hits have the same patid
-			for(size_t i = 1; i < _bufferedHits.size(); i++) {
-				assert_eq(_bufferedHits[0].patId, _bufferedHits[i].patId);
-			}
-#endif
-			_bufferedHits.push_back(h);
-		} else {
-			_sink.reportHit(h);
+		// Ensure all buffered hits have the same patid
+		for(size_t i = 1; i < _bufferedHits.size(); i++) {
+			assert_eq(_bufferedHits[0].patId, _bufferedHits[i].patId);
 		}
+#endif
+		_bufferedHits.push_back(h);
 	}
 
 	/**
@@ -500,9 +520,6 @@ protected:
 	/// Least # mismatches in alignments that will be reported in the
 	/// future.  Updated by the search routine.
 	int         _bestRemainingStratum;
-	/// Whether to buffer-and-flush such that all hits for a given read
-	/// appear consecutively (per phase)
-	bool        _bufferHits;
 	/// # hits reported to this HitSink so far (not all of which were
 	/// necesssary reported to _sink)
 	uint64_t    _numReportableHits;
