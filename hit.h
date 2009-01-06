@@ -582,13 +582,13 @@ public:
 	virtual bool reportHit(const Hit& h, int stratum) {
 		HitSinkPerThread::reportHit(h, stratum);
 		_hitsForThisRead++;
+		if(_hitsForThisRead > _max) {
+			if(!_bufferedHits.empty()) _bufferedHits.clear();
+			return true; // done - report nothing
+		}
 		if(_hitsForThisRead <= _n) {
 			// Only report hit if we haven't
 			reportHitImpl(h, stratum);
-		}
-		if(_hitsForThisRead > _max) {
-			_bufferedHits.clear();
-			return true; // done - report nothing
 		}
 		if(_hitsForThisRead == _n &&
 		   (_max == 0xffffffff || _max < _n))
@@ -962,7 +962,7 @@ public:
 		HitSinkPerThread::reportHit(h, stratum);
 		_hitsForThisRead++;
 		if(_hitsForThisRead > _max) {
-			_bufferedHits.clear();
+			if(!_bufferedHits.empty()) _bufferedHits.clear();
 			return true; // done - report nothing
 		}
 		reportHitImpl(h, stratum);
@@ -1110,6 +1110,7 @@ private:
 		clearAll();
 		_reported = false;
 		_bestStratumReported = 999;
+		_hitsForThisRead = 0;
 	}
 
 	void clearAll() {
