@@ -143,8 +143,8 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
-		ASSERT_ONLY(size_t origPlSz = _partialsList.size());
 		MUTEX_LOCK(_partialLock);
+		size_t origPlSz = _partialsList.size();
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
 		if(ps.size() == 1) {
@@ -159,24 +159,32 @@ public:
 				}
 			}
 #endif
+			// Insert a "pointer" record into the map that refers to
+			// the stretch of the _partialsList vector that contains
+			// the partial alignments.
 			PartialAlignment al;
 			al.u64.u64 = 0xffffffffffffffffllu;
-			al.off.off = _partialsList.size();
+			al.off.off = origPlSz;
 			al.off.type = 1; // list offset
-			_partialsMap[patid] = al;
+			_partialsMap[patid] = al; // install pointer
 			assert_gt(ps.size(), 1);
+			// Now add all the non-tail partial alignments (all but the
+			// last) to the _partialsList
 			for(size_t i = 0; i < ps.size()-1; i++) {
 				assert(validPartialAlignment(ps[i]));
 				_partialsList.push_back(ps[i]);
 				// list entry (non-tail)
 				_partialsList.back().entry.type = 2;
 			}
+			// Now add the tail (last) partial alignment and mark it as
+			// such
 			assert(validPartialAlignment(ps.back()));
 			_partialsList.push_back(ps.back());
 			// list tail
 			_partialsList.back().entry.type = 3;
 #ifndef NDEBUG
 			// Make sure there are not duplicate entries
+			assert_eq(_partialsList.size(), origPlSz + ps.size());
 			for(size_t i = origPlSz; i < _partialsList.size()-1; i++) {
 				for(size_t j = i+1; j < _partialsList.size(); j++) {
 					assert(!samePartialAlignment(_partialsList[i], _partialsList[j]));
