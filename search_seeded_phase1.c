@@ -32,6 +32,7 @@
 		for(size_t i = 0; i < slen; i++) {
 			if((int)(Dna5)patFw[i] == 4) {
 				if(++ns > seedMms) {
+					// Set 'done' so that
 					done = true;
 					break;
 				}
@@ -41,6 +42,8 @@
 			ASSERT_NO_HITS_FW(true);
 			ASSERT_NO_HITS_RC(true);
 			DONEMASK_SET(patid);
+			skipped = true;
+			sink->finishRead(*patsrc, dumpUnalignFa, dumpUnalignFq);
 			continue;
 		}
 	}

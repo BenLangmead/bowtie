@@ -808,7 +808,7 @@ static char *argv0 = NULL;
 	skipped = false;
 
 #define FINISH_READ_WITH_HITMASK(p, r) \
-	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
+	/* Don't do finishRead if the read isn't legit */ \
 	if(!p->empty()) { \
 		/* r = whether to consider reporting the read as unaligned */ \
 		bool reportUnAl = r; \
@@ -823,7 +823,8 @@ static char *argv0 = NULL;
 				reportUnAl = !hitMask.test(p->patid()); \
 			} \
 		} \
-		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, reportUnAl ? dumpUnalignFq : NULL) > 0) { \
+		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, \
+		                        reportUnAl ? dumpUnalignFq : NULL) > 0) { \
 			/* We reported a hit for the read, so we set the */ \
 			/* appropriate bit in the hitMask to prevent it from */ \
 			/* being reported as unaligned. */ \
@@ -1987,11 +1988,11 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
     while(true) {
     	FINISH_READ_WITH_HITMASK(patsrc, seedMms == 0);
 		GET_READ(patsrc);
+		if(doneMask.test(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs3 = (qs >> 1);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		if(doneMask.test(patid)) continue;
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
@@ -2122,10 +2123,10 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
     while(true) {
     	FINISH_READ_WITH_HITMASK(patsrc, true);
 		GET_READ_FW(patsrc);
+		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		if(doneMask.test(patid)) { skipped = true; continue; }
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
