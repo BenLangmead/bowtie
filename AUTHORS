@@ -4,7 +4,7 @@ Primary contact <langmead@umd.edu>
 Ben Langmead and Cole Trapnell wrote Bowtie.  The SeqAn-1.1 library is
 used in Bowtie and some of its sources are included in Bowtie source
 releases; its authors are Andreas Doring, David Weese, Tobias Rausch,
-and Knut Reinert.  Parts of Maq v0.6.6 are also used in Bowtie (see
+and Knut Reinert.  Parts of Maq are also used in Bowtie (see
 maq_convert subdirectory).  Maq's author is Heng Li of the Sanger
 Institute, U.K.  A DLL from the pthreads for Win32 library is
 distributed with the Win32 version of Bowtie.  The pthreads for Win32
@@ -18,4 +18,4 @@ Websites:
  SeqAn:              http://www.seqan.de
  pthreads for Win32: http://sourceware.org/pthreads-win32
 
-November 2008
+January 2009

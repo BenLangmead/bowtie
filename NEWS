@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.9.8.
+available to the public for download.  The current version is 0.9.8.1.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,22 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.9.8.1 - January 7, 2009
+   * Fixed many problems with the --unfa/--unfq options:
+     * Now work properly with more than one thread
+     * Fixed issue where sequence and quals were sometimes reversed
+     * Fixed other issues causing spurious omission of unaligned reads
+   * Added --maxfa/--maxfq options so that reads that don't align due
+     to the -m limit can be dumped separately from reads that don't
+     align at all
+   * Alignment output is now guaranteed to be "deterministic" even when
+     multiple threads are used.  I.e., given the same input reads (in
+     any order) and the same --seed, bowtie will produce the same
+     alignments every time it is run, though not necessarily in the
+     same order.  This does not hold across different versions of
+     bowtie.
+   * Multiple other bug fixes. 
 
 Version 0.9.8 - November 25, 2008
    * --unfa/--unfq <filename> options cause bowtie to dump unaligned
