@@ -182,8 +182,6 @@ public:
 		_reverse = __reverse;
 	}
 
-	uint32_t patid() { return _readCnt; }
-
 	/**
 	 * Concrete subclasses call lock() to enter a critical region.
 	 * What constitutes a critical region depends on the subclass.
@@ -277,6 +275,7 @@ public:
 		    	assert_neq(srca_[i], srcb_[j]);
 		    }
 	    }
+		MUTEX_INIT(_lock);
 	}
 
 	/**
@@ -330,31 +329,24 @@ public:
 	}
 
 	/**
-	 * Return the patid of the most recently read pair.
-	 */
-	uint32_t patid() {
-		uint32_t ret = basePatid_;
-		if(cur_ < srca_.size()) {
-			ret += srca_[cur_]->patid();
-		}
-		return ret;
-	}
-
-	/**
 	 * The main member function for dispensing pairs of reads or
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		while(cur_ < srca_.size()) {
-			if(srcb_[cur_] == NULL) {
+		uint32_t cur = cur_;
+		while(cur < srca_.size()) {
+			if(srcb_[cur] == NULL) {
 				// Patterns from srca_[cur_] are unpaired
-				srca_[cur_]->nextRead(ra, patid);
+				srca_[cur]->nextRead(ra, patid);
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
-					basePatid_ += srca_[cur_]->patid();
-					cur_++;
+					lock();
+					//basePatid_ += srca_[cur]->patid();
+					if(cur + 1 > cur_) cur_++;
+					cur = cur_;
+					unlock();
 					continue; // on to next pair of PatternSources
 				}
 				return false; // unpaired
@@ -362,22 +354,25 @@ public:
 				// Patterns from srca_[cur_] and srcb_[cur_] are paired
 				uint32_t patid_a = 0;
 				uint32_t patid_b = 0;
-				srca_[cur_]->nextRead(ra, patid_a);
-				srcb_[cur_]->nextRead(rb, patid_b);
+				srca_[cur]->nextRead(ra, patid_a);
+				srcb_[cur]->nextRead(rb, patid_b);
 				bool cont = false;
 				while(patid_a != patid_b) {
 					// Is either input exhausted?  If so, bail.
 					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
 						seqan::clear(ra.patFw);
-						basePatid_ += srca_[cur_]->patid();
-						cur_++; // on to next pair of PatternSources
+						lock();
+						//basePatid_ += srca_[cur]->patid();
+						if(cur + 1 > cur_) cur_++;
+						cur = cur_;
+						unlock();
 						cont = true;
 						break;
 					}
 					if(patid_a < patid_b) {
-						srca_[cur_]->nextRead(ra, patid_a);
+						srca_[cur]->nextRead(ra, patid_a);
 					} else {
-						srcb_[cur_]->nextRead(rb, patid_b);
+						srcb_[cur]->nextRead(rb, patid_b);
 					}
 				}
 				if(cont) continue; // on to next pair of PatternSources
@@ -389,11 +384,38 @@ public:
 		return false;
 	}
 
+	/**
+	 * Lock this PairedPatternSource, usually because one of its shared
+	 * fields is being updated.
+	 */
+	void lock() {
+#ifdef USE_SPINLOCK
+		_spinlock.Enter();
+#else
+		MUTEX_LOCK(_lock);
+#endif
+	}
+
+	/**
+	 * Unlock this PairedPatternSource.
+	 */
+	void unlock() {
+#ifdef USE_SPINLOCK
+		_spinlock.Leave();
+#else
+		MUTEX_UNLOCK(_lock);
+#endif
+	}
+
 protected:
 	uint32_t cur_; // current element in parallel srca_, srcb_ vectors
 	uint32_t basePatid_;
 	vector<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
 	vector<PatternSource*> srcb_; /// PatternSources for 2nd mates
+#ifdef USE_SPINLOCK
+	SpinLock _spinlock;
+#endif
+	MUTEX_T _lock; /// mutex for locking critical regions
 };
 
 /**

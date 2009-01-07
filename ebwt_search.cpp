@@ -1711,8 +1711,6 @@ static void twoOrThreeMismatchSearch(
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
 
-	uint32_t numPats = 0;
-
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
 	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
@@ -1742,8 +1740,6 @@ static void twoOrThreeMismatchSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 1
-	    numPats = _patsrc.patid();
     }
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
@@ -1760,8 +1756,6 @@ static void twoOrThreeMismatchSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 2
-	    assert_eq(numPats, _patsrc.patid());
 	}
 	SWITCH_TO_FW_INDEX();
 	{ // Phase 3
@@ -1777,8 +1771,6 @@ static void twoOrThreeMismatchSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 3
-	    assert_eq(numPats, _patsrc.patid());
 	}
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
@@ -2423,7 +2415,6 @@ static void seededQualCutoffSearch(
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
 		"run bowtie separately on each subset.\n");
-	uint32_t numPats;
 
 	seededQualSearch_patsrc   = &_patsrc;
 	seededQualSearch_sink     = &_sink;
@@ -2462,8 +2453,6 @@ static void seededQualCutoffSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 1
-	    numPats = _patsrc.patid();
 	}
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
@@ -2495,8 +2484,6 @@ static void seededQualCutoffSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 2
-	    assert_eq(numPats, _patsrc.patid());
 	}
 	if(seedMms == 0) {
 		// If we're not allowing any mismatches in the seed, then there
@@ -2530,8 +2517,6 @@ static void seededQualCutoffSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 3
-	    assert_eq(numPats, _patsrc.patid());
 	}
 	// Some with the reverse-complement partial alignments
 	if(pamRc != NULL) {
@@ -2555,8 +2540,6 @@ static void seededQualCutoffSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 4
-	    assert_eq(numPats, _patsrc.patid());
 	}
 	if(pamFw != NULL) {
 		delete pamFw;
@@ -2764,7 +2747,6 @@ static void seedAndSWExtendSearch(
 {
 	// Global intialization
 	assert_eq(0, mms);
-	uint32_t numPats;
 
 	seedAndSWExtendSearch_patsrc   = &_patsrc;
 	seedAndSWExtendSearch_sink     = &_sink;
@@ -2801,8 +2783,6 @@ static void seedAndSWExtendSearch(
 			pthread_join(threads[i], NULL);
 		}
 #endif
-	    // Threads join at end of Phase 1
-	    numPats = _patsrc.patid();
 	}
 
 #ifdef BOWTIE_PTHREADS
