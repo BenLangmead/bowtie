@@ -21,19 +21,19 @@ Version Release History
 =======================
 
 Version 0.9.8.1 - January 7, 2009
-   * Fixed many problems with the --unfa/--unfq options:
-     * Now work properly with more than one thread
-     * Fixed issue where sequence and quals were sometimes reversed
-     * Fixed other issues causing spurious omission of unaligned reads
+   * Fixed all known problems with the --unfa/--unfq options:
+     * They now work properly with multiple threads.
+     * Fixed issue where sequence and quals were sometimes reversed.
+     * Fixed other issues causing spurious omission of unaligned reads.
    * Added --maxfa/--maxfq options so that reads that don't align due
      to the -m limit can be dumped separately from reads that don't
-     align at all
+     align at all.
    * Alignment output is now guaranteed to be "deterministic" even when
      multiple threads are used.  I.e., given the same input reads (in
      any order) and the same --seed, bowtie will produce the same
      alignments every time it is run, though not necessarily in the
      same order.  This does not hold across different versions of
-     bowtie.
+     Bowtie.
    * Multiple other bug fixes. 
 
 Version 0.9.8 - November 25, 2008
