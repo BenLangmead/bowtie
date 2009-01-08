@@ -1085,6 +1085,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	{
 		MultiAligner multi(
 				64,
+				qUpto,
 				alfact,
 				*patsrcFact);
 		// Run that mother

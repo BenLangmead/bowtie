@@ -2819,11 +2819,11 @@ public:
 					// Advance an aligner already in progress
 					done = false;
 					(*aligners_)[i]->advance();
-				} else if(qUpto > 0) {
+				} else if(qUpto_ > 0) {
 					// Get a new read and initialize an aligner with it
 					(*patsrcs_)[i]->nextReadPair();
 					if(!(*patsrcs_)[i]->empty()) {
-						qUpto--;
+						qUpto_--;
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
 						assert(!(*aligners_)[i]->done());
 						done = false;
@@ -2839,8 +2839,8 @@ public:
 	}
 
 protected:
-	uint32_t n_;    /// Number of aligners
-	uint32_t qUpto; /// Number of reads to align before stopping
+	uint32_t n_;     /// Number of aligners
+	uint32_t qUpto_; /// Number of reads to align before stopping
 	const AlignerFactory&                  alignFact_;
 	const PatternSourcePerThreadFactory&   patsrcFact_;
 	std::vector<Aligner *>*                aligners_;
