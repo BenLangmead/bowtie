@@ -3,353 +3,201 @@
 
 #include "pat.h"
 #include "qual.h"
+#include "ebwt_search_util.h"
 
-/// Encapsulates a change made to a query base, i.e. "the 3rd base from
-/// the 5' end was changed from an A to a T".  Useful when using
-/// for matching seeded by "seedlings".
-struct QueryMutation {
-	QueryMutation() : pos(0), oldBase(0), newBase(0) { }
-	QueryMutation(uint16_t _pos, uint8_t _oldBase, uint8_t _newBase) :
-		pos(_pos), oldBase(_oldBase), newBase(_newBase)
-	{
-		assert_neq(oldBase, newBase);
-		assert_leq(oldBase, 4);
-		assert_lt(newBase, 4);
-	}
-	uint16_t pos;
-	uint8_t oldBase; // original base from the read
-	uint8_t newBase; // mutated to fit the reference in at least one place
+/**
+ * A range along with the alignment it represents.
+ */
+struct Range {
+	uint32_t top;     // top of range
+	uint32_t bot;     // bottom of range
+	uint32_t stratum; // stratum
+	uint32_t numMms;  // # mismatches
+	uint32_t *mms;   // list of positions with mismatches
+	char     *refcs; // reference characters at mismatch positions
 };
 
 /**
- * Encapsulates a partial alignment.  Supports up to 256 positions and
- * up to 3 substitutions.  The 'type' field of all the alternative
- * structs tells us whether this entry is a singleton entry, an offset
- * into the spillover list, a non-tail entry in the spillover list, or
- * a tail entry in the spillover list.
+ * Encapsulates an algorithm that navigates the Bowtie index to produce
+ * candidate ranges of alignments in the Burrows-Wheeler matrix.  A
+ * higher authority is responsible for reporting hits out of those
+ * ranges, and stopping when the consumer is satisfied.
  */
-typedef union {
-	struct {
-		uint64_t pos0  : 16;   // mismatched pos 1
-		uint64_t pos1  : 16;   // mismatched pos 2
-		uint64_t pos2  : 16;   // mismatched pos 3
-		uint64_t char0 : 2;    // substituted char for pos 1
-		uint64_t char1 : 2;    // substituted char for pos 2
-		uint64_t char2 : 2;    // substituted char for pos 3
-		uint64_t reserved : 8;
-		uint64_t type  : 2;    // type of entry; 0=singleton_entry,
-		                       // 1=list_offset, 2=list_entry,
-		                       // 3=list_tail
-	} entry;
-	struct {
-		uint64_t off   : 62;// offset into list
-		uint64_t type  : 2; // type of entry; 0=singleton,
-                            // 1=list_offset, 2=list_entry,
-                            // 3=list_tail
-	} off; // offset into list
-	struct {
-		uint64_t unk   : 62;// padding
-		uint64_t type  : 2; // type of entry; 0=singleton,
-                            // 1=list_offset, 2=list_entry,
-                            // 3=list_tail
-	} unk;   // unknown
-	struct {
-		uint64_t u64   : 64;
-	} u64;
-} PartialAlignment;
-
-#ifndef NDEBUG
-static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
-	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
-	assert_neq(0xff, pa1.entry.pos0);
-	assert_neq(0xff, pa2.entry.pos0);
-
-	// Make sure pa1's pos0 is represented in pa1
-	if(pa1.entry.pos0 == pa2.entry.pos0) {
-		if(pa1.entry.char0 != pa2.entry.char0) return false;
-	} else if(pa1.entry.pos0 == pa2.entry.pos1) {
-		if(pa1.entry.char0 != pa2.entry.char1) return false;
-	} else if(pa1.entry.pos0 == pa2.entry.pos2) {
-		if(pa1.entry.char0 != pa2.entry.char2) return false;
-	} else {
-		return false;
-	}
-	if(pa1.entry.pos1 != 0xff) {
-		if       (pa1.entry.pos1 == pa2.entry.pos0) {
-			if(pa1.entry.char1 != pa2.entry.char0) return false;
-		} else if(pa1.entry.pos1 == pa2.entry.pos1) {
-			if(pa1.entry.char1 != pa2.entry.char1) return false;
-		} else if(pa1.entry.pos1 == pa2.entry.pos2) {
-			if(pa1.entry.char1 != pa2.entry.char2) return false;
-		} else {
-			return false;
-		}
-	}
-	if(pa1.entry.pos2 != 0xff) {
-		if       (pa1.entry.pos2 == pa2.entry.pos0) {
-			if(pa1.entry.char2 != pa2.entry.char0) return false;
-		} else if(pa1.entry.pos2 == pa2.entry.pos1) {
-			if(pa1.entry.char2 != pa2.entry.char1) return false;
-		} else if(pa1.entry.pos2 == pa2.entry.pos2) {
-			if(pa1.entry.char2 != pa2.entry.char2) return false;
-		} else {
-			return false;
-		}
-	}
-	return true;
-}
-
-static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
-	return sameHalfPartialAlignment(pa1, pa2) && sameHalfPartialAlignment(pa2, pa1);
-}
-
-static bool validPartialAlignment(PartialAlignment pa) {
-	if(pa.entry.pos0 != 0xff) {
-		if(pa.entry.pos0 == pa.entry.pos1) return false;
-		if(pa.entry.pos0 == pa.entry.pos2) return false;
-	} else {
-		if(pa.entry.pos1 != 0xff) return false;
-		if(pa.entry.pos2 != 0xff) return false;
-	}
-
-	if(pa.entry.pos1 != 0xff) {
-		if(pa.entry.pos1 == pa.entry.pos2) return false;
-	} else {
-		if(pa.entry.pos2 != 0xff) return false;
-	}
-	return true;
-}
-#endif
-
-/**
- * A synchronized data structure for storing partial alignments
- * associated with patids, with particular attention to compactness.
- */
-class PartialAlignmentManager {
+template<typename TContinuationManager>
+class RangeSource {
 public:
-	PartialAlignmentManager(size_t listSz = 10 * 1024 * 1024) {
-		MUTEX_INIT(_partialLock);
-		// Reserve space for 10M partialsList entries = 40 MB
-		_partialsList.reserve(listSz);
-	}
+	RangeSource()  { }
+	virtual ~RangeSource() { }
 
-	~PartialAlignmentManager() { }
-
-	/**
-	 * Add a set of partial alignments for a particular patid into the
-	 * partial-alignment database.  This version locks the database,
-	 * and so is safe to call if there are potential readers or
-	 * writers currently running.
-	 */
-	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
-		if(ps.size() == 0) return;
-		MUTEX_LOCK(_partialLock);
-		size_t origPlSz = _partialsList.size();
-		// Assert that the entry doesn't exist yet
-		assert(_partialsMap.find(patid) == _partialsMap.end());
-		if(ps.size() == 1) {
-			_partialsMap[patid] = ps[0];
-			_partialsMap[patid].entry.type = 0; // singleton
-		} else {
-#ifndef NDEBUG
-			// Make sure there are not duplicate entries
-			for(size_t i = 0; i < ps.size()-1; i++) {
-				for(size_t j = i+1; j < ps.size(); j++) {
-					assert(!samePartialAlignment(ps[i], ps[j]));
-				}
-			}
-#endif
-			// Insert a "pointer" record into the map that refers to
-			// the stretch of the _partialsList vector that contains
-			// the partial alignments.
-			PartialAlignment al;
-			al.u64.u64 = 0xffffffffffffffffllu;
-			al.off.off = origPlSz;
-			al.off.type = 1; // list offset
-			_partialsMap[patid] = al; // install pointer
-			assert_gt(ps.size(), 1);
-			// Now add all the non-tail partial alignments (all but the
-			// last) to the _partialsList
-			for(size_t i = 0; i < ps.size()-1; i++) {
-				assert(validPartialAlignment(ps[i]));
-				_partialsList.push_back(ps[i]);
-				// list entry (non-tail)
-				_partialsList.back().entry.type = 2;
-			}
-			// Now add the tail (last) partial alignment and mark it as
-			// such
-			assert(validPartialAlignment(ps.back()));
-			_partialsList.push_back(ps.back());
-			// list tail
-			_partialsList.back().entry.type = 3;
-#ifndef NDEBUG
-			// Make sure there are not duplicate entries
-			assert_eq(_partialsList.size(), origPlSz + ps.size());
-			for(size_t i = origPlSz; i < _partialsList.size()-1; i++) {
-				for(size_t j = i+1; j < _partialsList.size(); j++) {
-					assert(!samePartialAlignment(_partialsList[i], _partialsList[j]));
-				}
-			}
-#endif
-		}
-		// Assert that we added an entry
-		assert(_partialsMap.find(patid) != _partialsMap.end());
-		MUTEX_UNLOCK(_partialLock);
-	}
-
-	/**
-	 * Get a set of partial alignments for a particular patid out of
-	 * the partial-alignment database.
-	 */
-	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
-		assert_eq(0, ps.size());
-		MUTEX_LOCK(_partialLock);
-		getPartialsUnsync(patid, ps);
-		MUTEX_UNLOCK(_partialLock);
-	}
-
-	/**
-	 * Get a set of partial alignments for a particular patid out of
-	 * the partial-alignment database.  This version does not attempt to
-	 * lock the database.  This is more efficient than the synchronized
-	 * version, but is unsafe if there are other threads that may be
-	 * writing to the database.
-	 */
-	void getPartialsUnsync(uint32_t patid, vector<PartialAlignment>& ps) {
-		assert_eq(0, ps.size());
-		if(_partialsMap.find(patid) == _partialsMap.end()) {
-			return;
-		}
-		PartialAlignment al;
-		al.u64.u64 = _partialsMap[patid].u64.u64;
-		uint32_t type = al.unk.type;
-		if(type == 0) {
-			// singleton
-			ps.push_back(al);
-		} else {
-			// list
-			assert_eq(1, type);
-			uint32_t off = al.off.off;
-			do {
-				assert_lt(off, _partialsList.size());
-				ASSERT_ONLY(type = _partialsList[off].entry.type);
-				assert(type == 2 || type == 3);
-#ifndef NDEBUG
-				// Make sure this entry isn't equal to any other entry
-				for(size_t i = 0; i < ps.size(); i++) {
-					assert(validPartialAlignment(ps[i]));
-					assert(!samePartialAlignment(ps[i], _partialsList[off]));
-				}
-#endif
-				assert(validPartialAlignment(_partialsList[off]));
-				ps.push_back(_partialsList[off]);
-				ASSERT_ONLY(uint32_t pos0 = ps.back().entry.pos0);
-				ASSERT_ONLY(uint32_t pos1 = ps.back().entry.pos1);
-				ASSERT_ONLY(uint32_t pos2 = ps.back().entry.pos2);
-				assert(pos1 == 0xff || pos0 != pos1);
-				assert(pos2 == 0xff || pos0 != pos2);
-				assert(pos2 == 0xff || pos1 != pos2);
-			} while(_partialsList[off++].entry.type == 2);
-			assert_eq(3, _partialsList[off-1].entry.type);
-		}
-		assert_gt(ps.size(), 0);
-	}
-
-	/// Call to clear the database when there is only one element in it
-	void clear(uint32_t patid) {
-		assert_eq(1, _partialsMap.count(patid));
-		assert_eq(1, _partialsMap.size());
-		_partialsMap.erase(patid);
-		assert_eq(0, _partialsMap.size());
-		_partialsList.clear();
-		assert_eq(0, _partialsList.size());
-	}
-
-	size_t size() {
-		return _partialsMap.size();
-	}
-
-	/**
-	 * Convert a partial alignment into a QueryMutation string.
-	 */
-	static uint8_t toMutsString(const PartialAlignment& pal,
-	                            const String<Dna5>& seq,
-	                            const String<char>& quals,
-	                            String<QueryMutation>& muts,
-	                            bool maqPenalty = true)
-	{
-		reserve(muts, 4);
-		assert_eq(0, length(muts));
-		uint32_t plen = length(seq);
-		assert_gt(plen, 0);
-		assert_neq(1, pal.unk.type);
-		// Do first mutation
-		uint8_t oldQuals = 0;
-		uint32_t pos0 = pal.entry.pos0;
-		uint16_t tpos0 = plen-1-pos0;
-		uint32_t chr0 = pal.entry.char0;
-		uint8_t oldChar = (uint8_t)seq[tpos0];
-		oldQuals += mmPenalty(maqPenalty, quals[tpos0]-33); // take quality hit
-		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
-		if(pal.entry.pos1 != 0xff) {
-			// Do second mutation
-			uint32_t pos1 = pal.entry.pos1;
-			uint16_t tpos1 = plen-1-pos1;
-			uint32_t chr1 = pal.entry.char1;
-			oldChar = (uint8_t)seq[tpos1];
-			oldQuals += mmPenalty(maqPenalty, quals[tpos1]-33); // take quality hit
-			assert_neq(tpos1, tpos0);
-			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
-			if(pal.entry.pos2 != 0xff) {
-				// Do second mutation
-				uint32_t pos2 = pal.entry.pos2;
-				uint16_t tpos2 = plen-1-pos2;
-				uint32_t chr2 = pal.entry.char2;
-				oldChar = (uint8_t)seq[tpos2];
-				oldQuals += mmPenalty(maqPenalty, quals[tpos2]-33); // take quality hit
-				assert_neq(tpos2, tpos0);
-				assert_neq(tpos2, tpos1);
-				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation
-			}
-		}
-		assert_gt(length(muts), 0);
-		assert_leq(length(muts), 3);
-		return oldQuals;
-	}
-private:
-	/// Maps patids to partial alignments for that patid
-	map<uint32_t, PartialAlignment> _partialsMap;
-	/// Overflow for when a patid has more than 1 partial alignment
-	vector<PartialAlignment> _partialsList;
-	/// Lock for 'partialsMap' and 'partialsList'; necessary because
-	/// search threads will be reading and writing them
-	MUTEX_T _partialLock;
+	/// Set query to find ranges for
+	virtual void setQuery(String<Dna5>* qry,
+	                      String<char>* qual,
+	                      String<char>* name) = 0;
+	/// Set up the range search.
+	virtual bool initConts(TContinuationManager& conts, uint32_t ham) = 0;
+	/// Advance the range search by one memory op
+	virtual bool advance(TContinuationManager& conts) = 0;
+	/// Returns true iff the last call to advance yielded a range
+	virtual bool foundRange() = 0;
+	/// Return the last valid range found
+	virtual Range& range() = 0;
+	/// All searching w/r/t the current query is finished
+	virtual bool done() = 0;
 };
 
-struct BacktrackLimits {
+/**
+ * All information needed to resume an in-progress backtracking search.
+ */
+struct GreedyDFSContinuation {
+	GreedyDFSContinuation() { }
 
-	BacktrackLimits() {
-		maxBts  = 0;
-		maxBts0 = 0;
-		maxBts1 = 0;
-		maxBts2 = 0;
-	}
-
-	BacktrackLimits(uint32_t _maxBts,
-	                uint32_t _maxBts0,
-	                uint32_t _maxBts1,
-	                uint32_t _maxBts2)
+	/**
+	 * Initialize a continuation given alignment state.  ltop and lbot
+	 * are intitialized lazily using prep(), so they aren't assigned
+	 * here.
+	 */
+	void init(
+			uint32_t _stackDepth,
+			uint32_t _depth,
+			uint32_t _unrevOff,
+			uint32_t _oneRevOff,
+			uint32_t _twoRevOff,
+			uint32_t _threeRevOff,
+			uint32_t _top,
+			uint32_t _bot,
+			uint32_t _ham,
+			uint32_t _iham,
+			uint32_t* _pairs,
+			uint8_t* _elims,
+			uint32_t _disableFtab)
 	{
-		maxBts  = _maxBts;
-		maxBts0 = _maxBts0;
-		maxBts1 = _maxBts1;
-		maxBts2 = _maxBts2;
+		stackDepth = _stackDepth;
+		depth = _depth;
+		unrevOff = _unrevOff;
+		oneRevOff = _oneRevOff;
+		twoRevOff = _twoRevOff;
+		threeRevOff = _threeRevOff;
+		top = _top;
+		bot = _bot;
+		ham = _ham;
+		iham = _iham;
+		pairs = _pairs;
+		elims = _elims;
+		disableFtab = _disableFtab;
+		prepped = false;
 	}
 
-	uint32_t maxBts;  // limit on overall number of backtracks per read
-	uint32_t maxBts0; // limit on number of backtracks at depth 0
-	uint32_t maxBts1; // limit on number of backtracks at depth 1
-	uint32_t maxBts2; // limit on number of backtracks at depth 2
+	/**
+	 * Prepare this continuation to be resumed.  Involves calculating
+	 * top and bottom loci given rows 'top' and 'bot' and prefetching
+	 * the relevant cache lines.
+	 */
+	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
+		if(top != bot) {
+			// Calculate the loci based on the top and bot pointers
+			SideLocus::initFromTopBot(top, bot, ep, ebwt, ltop, lbot);
+			// Prefetch the cache lines at the top and bot loci
+			SideLocus::prefetchTopBot(ltop, lbot);
+		} else {
+			// top == bot, so we don't care about their loci and cache
+			// lines
+		}
+		prepped = true;
+	}
+
+	uint32_t  stackDepth;  // depth of the recursion stack; = # mismatches so far
+	uint32_t  depth;       // next depth where a post-pair needs to be calculated
+	uint32_t  unrevOff;    // depths < unrevOff are unrevisitable
+	uint32_t  oneRevOff;   // depths < oneRevOff are 1-revisitable
+	uint32_t  twoRevOff;   // depths < twoRevOff are 2-revisitable
+	uint32_t  threeRevOff; // depths < threeRevOff are 3-revisitable
+	uint32_t  top;         // top arrow in pair prior to 'depth'
+	uint32_t  bot;         // bottom arrow in pair prior to 'depth'
+	SideLocus ltop;        // locus for top
+	SideLocus lbot;        // locus for bottom
+	uint32_t  ham;         // weighted hamming distance so far
+	uint32_t  iham;        // initial weighted hamming distance
+	uint32_t* pairs;       // portion of pairs array to be used for this backtrack frame
+	uint8_t*  elims;       // portion of elims array to be used for this backtrack frame
+	bool      disableFtab; // whether to disable ftab skipping
+	bool      prepped;     // ready to be continued
+};
+
+/**
+ * Container/dispenser for continuations for the greedy depth-first
+ * backtracker.
+ */
+class GreedyDFSContinuationManager {
+public:
+	GreedyDFSContinuationManager() : conts_(), cur_(0) {
+		// Reserve plenty of space to avoid untimely reallocations
+		conts_.reserve(4096);
+	}
+
+	/**
+	 * Return the frontmost continuation (usually this is the
+	 * currently active one).
+	 */
+	GreedyDFSContinuation& front() {
+		return conts_[cur_];
+	}
+
+	/**
+	 * Return the backmost continuation.
+	 */
+	GreedyDFSContinuation& back() {
+		return conts_[conts_.size()-1];
+	}
+
+	/**
+	 * Prepare for the next continuation by prepping the frontmost.
+	 */
+	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
+		conts_[cur_].prep(ep, ebwt);
+	}
+
+	/**
+	 * Remove the frontmost continuation.
+	 */
+	void pop() {
+		// Don't actually destroy any objects or trigger any memory
+		// deallocation.
+		cur_++;
+	}
+
+	/**
+	 * Add a new uninitialized continuation to the back of the queue.
+	 */
+	void expand1() {
+		conts_.resize(conts_.size() + 1);
+	}
+
+	/**
+	 * Return the number of continuations in the queue.
+	 */
+	size_t size() const {
+		return conts_.size() - cur_;
+	}
+
+	/**
+	 * Return true iff there are no continuations to process.
+	 */
+	bool empty() {
+		return conts_.size() == cur_;
+	}
+
+	/**
+	 * Remove all continuations and reset.
+	 */
+	void clear() {
+		conts_.clear();
+		cur_ = 0;
+	}
+
+protected:
+
+	vector<GreedyDFSContinuation> conts_;
+	uint32_t cur_;
 };
 
 /**
@@ -359,24 +207,28 @@ struct BacktrackLimits {
  * The creator can configure the BacktrackManager to treat different
  * stretches of the read differently.
  */
-template<typename TStr>
-class BacktrackManager {
+class GreedyDFSRangeSource : public RangeSource<GreedyDFSContinuationManager> {
 public:
-	BacktrackManager(const Ebwt<TStr>* __ebwt,
-	                 const EbwtSearchParams<TStr>& __params,
-	                 uint32_t __qualThresh,  /// max acceptable q-distance
-	                 const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
-	                 uint32_t __reportPartials = 0,
-	                 bool __reportExacts = true,
-	                 bool __reportArrows = false,
-	                 PartialAlignmentManager* __partials = NULL,
-	                 String<QueryMutation>* __muts = NULL,
-	                 bool __verbose = true,
-	                 uint32_t seed = 0,
-	                 vector<String<Dna5> >* __os = NULL,
-	                 bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
-	                 bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
-	                 bool __maqPenalty = true):
+	GreedyDFSRangeSource(
+			const Ebwt<String<Dna> >* __ebwt,
+			const EbwtSearchParams<String<Dna> >& __params,
+			uint32_t __qualThresh,  /// max acceptable q-distance
+			const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
+			uint32_t __reportPartials = 0,
+			bool __reportExacts = true,
+			bool __reportArrows = false,
+			PartialAlignmentManager* __partials = NULL,
+			String<QueryMutation>* __muts = NULL,
+			bool __verbose = true,
+			uint32_t seed = 0,
+			vector<String<Dna5> >* __os = NULL,
+			bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
+			bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
+			bool __maqPenalty = true) :
+	    RangeSource<GreedyDFSContinuationManager>(),
+	    _started(false),
+	    _finished(false),
+	    _foundRange(false),
 		_qry(NULL),
 		_qlen(0),
 		_qual(NULL),
@@ -389,7 +241,6 @@ public:
 		_3revOff(0),
 		_maqPenalty(__maqPenalty),
 		_qualThresh(__qualThresh),
-		_reportOnHit(true),
 		_pairs(NULL),
 		_elims(NULL),
 		_mms(NULL),
@@ -406,44 +257,35 @@ public:
 		_halfAndHalf(__halfAndHalf),
 		_5depth(0),
 		_3depth(0),
-		_hiDepth(0),
 		_numBts(0),
 		_totNumBts(0),
 		_maxBts(__maxBts.maxBts),
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
-		_btsAtDepths(NULL),
-		_totBtsAtDepths(NULL),
 		_maxBts0(__maxBts.maxBts0),
 		_maxBts1(__maxBts.maxBts1),
 		_maxBts2(__maxBts.maxBts2),
 		_rand(seed),
 		_randSeed(seed),
-		_verbose(__verbose)
+		_verbose(__verbose),
+		_ihits(0llu)
 	{ }
 
-	~BacktrackManager() {
+	virtual ~GreedyDFSRangeSource() {
 		if(_pairs != NULL)          delete[] _pairs;
 		if(_elims != NULL)          delete[] _elims;
 		if(_mms != NULL)            delete[] _mms;
 		if(_refcs != NULL)          delete[] _refcs;
-		if(_btsAtDepths != NULL)    delete[] _btsAtDepths;
-		if(_totBtsAtDepths != NULL) delete[] _totBtsAtDepths;
 		if(_chars != NULL)          delete[] _chars;
 	}
 
-	#define PAIR_TOP(d, c)    (pairs[d*8 + c + 0])
-	#define PAIR_BOT(d, c)    (pairs[d*8 + c + 4])
-	#define PAIR_SPREAD(d, c) (PAIR_BOT(d, c) - PAIR_TOP(d, c))
-	#define PHRED_QUAL(k)     ((uint8_t)(*_qual)[k] >= 33 ? ((uint8_t)(*_qual)[k] - 33) : 0)
-	#define PHRED_QUAL2(q, k) ((uint8_t)(q)[k] >= 33 ? ((uint8_t)(q)[k] - 33) : 0)
-	#define QUAL(k)           PHRED_QUAL(k)
-	#define QUAL2(q, k)       PHRED_QUAL2(q, k)
-
-	void setQuery(String<Dna5>* __qry,
-	              String<char>* __qual,
-	              String<char>* __name)
+	/**
+	 * Set a new query read.
+	 */
+	virtual void setQuery(String<Dna5>* __qry,
+	                      String<char>* __qual,
+	                      String<char>* __name)
 	{
 		_qry = __qry;
 		_qual = __qual;
@@ -451,6 +293,7 @@ public:
 		assert(_qry != NULL);
 		assert(_qual != NULL);
 		assert(_name != NULL);
+		// Make sure every qual is a valid qual ASCII character (>= 33)
 		for(size_t i = 0; i < length(*_qual); i++) {
 			assert_geq((*_qual)[i], 33);
 		}
@@ -470,12 +313,6 @@ public:
 			// Resize _refcs
 	 		if(_refcs != NULL) { delete[] _refcs; }
 			_refcs = new char[_qlen];
-			// Resize _btsAtDepths
-	 		if(_btsAtDepths != NULL) { delete[] _btsAtDepths; }
-			_btsAtDepths = new uint32_t[_qlen];
-			// Resize _totBtsAtDepths
-	 		if(_totBtsAtDepths != NULL) { delete[] _totBtsAtDepths; }
-			_totBtsAtDepths = new uint32_t[_qlen];
 			// Resize _chars
 	 		if(_chars != NULL) { delete[] _chars; }
 			_chars = new char[_qlen];
@@ -483,28 +320,27 @@ public:
 			assert(_elims != NULL);
 			assert(_mms != NULL);
 			assert(_refcs != NULL);
-			assert(_btsAtDepths != NULL);
-			assert(_totBtsAtDepths != NULL);
 			assert(_chars != NULL);
 		} else {
+			// New length is less than old length, so there's no need
+			// to resize any data structures.
 			assert(_pairs != NULL);
 			assert(_elims != NULL);
 			assert(_mms != NULL);
 			assert(_refcs != NULL);
-			assert(_btsAtDepths != NULL);
-			assert(_totBtsAtDepths != NULL);
 			assert(_chars != NULL);
 			_qlen = length(*_qry);
 		}
 		assert_geq(length(*_qual), _qlen);
 		if(_verbose) {
-			String<char> qual = (*_qual);
-			if(length(qual) > length(*_qry)) {
-				resize(qual, length(*_qry));
-			}
-			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << qual << ")" << endl;
+			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << (*_qual) << ")" << endl;
 		}
-		initRandSeed();
+		_started = false;
+		_finished = false;
+		_foundRange = false;
+		// Initialize the random source using new read as part of the
+		// seed.
+		_rand.init(genRandSeed(*_qry, *_qual, *_name) + _randSeed);
 	}
 
 	/**
@@ -515,21 +351,24 @@ public:
 		if(_muts != NULL) {
 			// Undo previous mutations
 			assert_gt(length(*_muts), 0);
-			undoMutations();
+			undoPartialMutations();
 		}
 		_muts = __muts;
 		if(_muts != NULL) {
 			assert_gt(length(*_muts), 0);
-			applyMutations();
+			applyPartialMutations();
 		}
 	}
 
-	void setOffs(uint32_t __5depth,
-	             uint32_t __3depth,
-	             uint32_t __unrevOff,
-	             uint32_t __1revOff,
-	             uint32_t __2revOff,
-	             uint32_t __3revOff)
+	/**
+	 * Set backtracking constraints.
+	 */
+	void setOffs(uint32_t __5depth,   // depth of far edge of hi-half
+	             uint32_t __3depth,   // depth of far edge of lo-half
+	             uint32_t __unrevOff, // depth above which we cannot backtrack
+	             uint32_t __1revOff,  // depth above which we may backtrack just once
+	             uint32_t __2revOff,  // depth above which we may backtrack just twice
+	             uint32_t __3revOff)  // depth above which we may backtrack just three times
 	{
 		_5depth   = __5depth;
 		_3depth   = __3depth;
@@ -554,8 +393,13 @@ public:
 		_reportExacts = stratum;
 	}
 
-	void setEbwt(const Ebwt<TStr>* ebwt) {
+	void setEbwt(const Ebwt<String<Dna> >* ebwt) {
 		_ebwt = ebwt;
+	}
+
+	/// Return the current range
+	virtual Range& range() {
+		return _curRange;
 	}
 
 	/**
@@ -594,54 +438,21 @@ public:
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
-		const Ebwt<TStr>& ebwt = *_ebwt;
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
 		int ftabChars = ebwt._eh._ftabChars;
+		int nsInSeed = 0; int nsInFtab = 0;
+		if(!tallyNs(nsInSeed, nsInFtab)) {
+			// No alignments are possible because of the distribution
+			// of Ns in the read in combination with the backtracking
+			// constraints.
+			return false;
+		}
+		bool ret;
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
 		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
-		int nsInSeed = 0;
-		int nsInFtab = 0;
-		// Count Ns
-		for(size_t i = 0; i < _3revOff; i++) {
-			if((int)(*_qry)[_qlen-i-1] == 4) {
-				nsInSeed++;
-				if(nsInSeed == 1) {
-					if(i < _unrevOff) {
-						return false; // Exceeded mm budget on Ns alone
-					}
-				} else if(nsInSeed == 2) {
-					if(i < _1revOff) {
-						return false; // Exceeded mm budget on Ns alone
-					}
-				} else if(nsInSeed == 3) {
-					if(i < _2revOff) {
-						return false; // Exceeded mm budget on Ns alone
-					}
-				} else {
-					assert_gt(nsInSeed, 3);
-					return false;     // Exceeded mm budget on Ns alone
-				}
-			}
-		}
-		// Calculate the number of Ns there are in the region that
-		// would get jumped over if the ftab were used.
-		for(size_t i = 0; i < ebwt._eh._ftabLen && i < _qlen; i++) {
-			if((int)(*_qry)[_qlen-i-1] == 4) nsInFtab++;
-		}
-		bool ret;
 		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
-			// The ftab doesn't extend past the unrevisitable portion,
-			// so we can go ahead and use it
-			// Rightmost char gets least significant bit-pair
-			uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
-			assert_lt(ftabOff, ebwt._eh._ftabLen-1);
-			for(int i = ftabChars - 1; i > 0; i--) {
-				ftabOff <<= 2;
-				assert_lt((uint32_t)(*_qry)[_qlen-i], 4);
-				ftabOff |= (uint32_t)(*_qry)[_qlen-i];
-				assert_lt(ftabOff, ebwt._eh._ftabLen-1);
-			}
-			assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+			uint32_t ftabOff = calcFtabOff();
 			uint32_t top = ebwt.ftabHi(ftabOff);
 			uint32_t bot = ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
@@ -681,6 +492,399 @@ public:
 			                // than 1 N in it
 			                nsInFtab > 0);
 		}
+		_finished = true;
+		if(finalize()) ret = true;
+		return ret;
+	}
+
+	/**
+	 * Initiate continuations so that the next call to advance() begins
+	 * a new search.  Note that contMan is empty upon return if there
+	 * are no valid continuations to begin with.  Also note that
+	 * calling initConts() may result in finding a range (i.e., if we
+	 * immediately jump to a valid range using the ftab).
+	 */
+	virtual bool
+	initConts(GreedyDFSContinuationManager& contMan, uint32_t ham) {
+		assert_gt(length(*_qry), 0);
+		assert_leq(_qlen, length(*_qry));
+		assert_geq(length(*_qual), length(*_qry));
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
+		int ftabChars = ebwt._eh._ftabChars;
+		_foundRange = false;
+		int nsInSeed = 0; int nsInFtab = 0;
+		if(!tallyNs(nsInSeed, nsInFtab)) {
+			// No alignments are possible because of the distribution
+			// of Ns in the read in combination with the backtracking
+			// constraints.
+			return false;
+		}
+		contMan.clear();
+		// m = depth beyond which ftab must not extend or else we might
+		// miss some legitimate paths
+		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
+		contMan.expand1();
+		GreedyDFSContinuation& cont = contMan.back();
+		// Let skipInvalidExact = true if using the ftab would be a
+		// waste because it would jump directly to an alignment we
+		// couldn't use.
+		bool ftabSkipsToEnd = (_qlen == (uint32_t)ftabChars);
+		bool skipInvalidExact = (!_reportExacts && ftabSkipsToEnd);
+		bool skipInvalidPartial = (_reportPartials > 0 && ftabSkipsToEnd);
+		// If it's OK to use the ftab...
+		if(nsInFtab == 0 && m >= (uint32_t)ftabChars &&
+		   !skipInvalidExact && !skipInvalidPartial)
+		{
+			// Use the ftab to jump 'ftabChars' chars into the read
+			// from the right
+			uint32_t ftabOff = calcFtabOff();
+			uint32_t top = ebwt.ftabHi(ftabOff);
+			uint32_t bot = ebwt.ftabLo(ftabOff+1);
+			if(_qlen == (uint32_t)ftabChars && bot > top) {
+				// We have a valid range already!
+				assert_eq(0, _reportPartials);
+				assert(_reportExacts);
+				_curRange.top     = top;
+				_curRange.bot     = bot;
+				_curRange.stratum = calcStratum(_mms, 0);
+				_curRange.numMms  = 0;
+				_curRange.mms     = _mms;
+				_curRange.refcs   = _refcs;
+				_foundRange       = true;
+				return true;
+			} else if (bot > top) {
+				// We have a range to extend
+				cont.init(0, ftabChars, _unrevOff, _1revOff, _2revOff,
+				         _3revOff, top, bot, ham, ham, _pairs,
+				         _elims, nsInFtab > 0);
+			} else {
+				// The arrows are already closed within the
+				// unrevisitable region; give up
+			}
+		} else {
+			// We can't use the ftab, so we start from the rightmost
+			// position and use _fchr
+			cont.init(0, 0, _unrevOff, _1revOff, _2revOff,
+			         _3revOff, 0, 0, ham, ham, _pairs,
+			         _elims, nsInFtab > 0);
+		}
+		return false;
+	}
+
+	/**
+	 * Recursive routine for progressing to the next backtracking
+	 * decision given some initial conditions.  If a hit is found, it
+	 * is recorded and true is returned.  Otherwise, if there are more
+	 * backtracking opportunities, the function will call itself
+	 * recursively and return the result.  As soon as there is a
+	 * mismatch and no backtracking opporunities, false is returned.
+	 *
+	 * Continuations provide a way to resume the search at a lower
+	 * stack frame.  When we might otherwise return false to indicate
+	 * we're done and we didn't find any hits, we instead will dequeue
+	 * a continuation and prefetch its top/bot loci.
+	 */
+	virtual bool
+	advance(GreedyDFSContinuationManager& contMan) {
+		// Restore alignment state from the frontmost continuation.
+		// The frontmost continuation should in principle be the most
+		// promising partial alignment found so far.  In the case of
+		// the greedy DFS backtracker, which partial alignment is most
+		// promising is determined in a greedy, depth-first, non-
+		// optimal fashion.
+		assert_gt(contMan.size(), 0);
+		GreedyDFSContinuation& cont = contMan.front();
+		assert(cont.prepped); // must have been prepped
+		uint32_t  stackDepth  = cont.stackDepth; // depth of the recursion stack; = # mismatches so far
+		uint32_t  depth       = cont.depth;      // next depth where a post-pair needs to be calculated
+		uint32_t  unrevOff    = cont.unrevOff;   // depths < unrevOff are unrevisitable
+		uint32_t  oneRevOff   = cont.oneRevOff;  // depths < oneRevOff are 1-revisitable
+		uint32_t  twoRevOff   = cont.twoRevOff;  // depths < twoRevOff are 2-revisitable
+		uint32_t  threeRevOff = cont.threeRevOff;// depths < threeRevOff are 3-revisitable
+		uint32_t  top         = cont.top;        // top arrow in pair prior to 'depth'
+		uint32_t  bot         = cont.bot;        // bottom arrow in pair prior to 'depth'
+		uint32_t  ham         = cont.ham;        // weighted hamming distance so far
+		uint32_t  iham        = cont.iham;       // initial weighted hamming distance
+		uint32_t* pairs       = cont.pairs;      // portion of pairs array to be used for this backtrack frame
+		uint8_t*  elims       = cont.elims;      // portion of elims array to be used for this backtrack frame
+		bool      disableFtab = cont.disableFtab;//
+		// TODO: Also need to save and restore _muts, _mms, _refcs, _chars somehow
+
+		// Let _foundRange = false; we'll set it to true iff this call
+		// to advance yielded a new valid-alignment range.
+		_foundRange = false;
+
+		// Can't have already exceeded weighted hamming distance threshold
+		assert_leq(stackDepth, depth);
+		assert_gt(length(*_qry), 0);
+		assert_leq(_qlen, length(*_qry));
+		assert_geq(length(*_qual), length(*_qry));
+		assert_leq(ham, _qualThresh);
+		assert_geq(bot, top);
+		assert_leq(stackDepth, _qlen);
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
+		if(_halfAndHalf) {
+			assert_eq(0, _reportPartials);
+			assert_gt(_3depth, _5depth);
+		}
+		if(_reportPartials) {
+			assert(!_halfAndHalf);
+			assert_leq(stackDepth, _reportPartials);
+		}
+		if(_verbose) {
+			cout << "  advance(stackDepth=" << stackDepth << ", "
+                 << "depth=" << depth << ", "
+                 << "top=" << top << ", "
+                 << "bot=" << bot << ", "
+                 << "ham=" << ham << ", "
+                 << "iham=" << iham << ", "
+                 << "pairs=" << pairs << ", "
+                 << "elims=" << (void*)elims << "): \"";
+			for(int i = (int)depth - 1; i >= 0; i--) {
+				cout << _chars[i];
+			}
+			cout << "\"" << endl;
+		}
+		// We can't have already processed the entire read
+		assert_leq(depth, _qlen);
+
+		// If we're searching for a half-and-half solution, then
+		// enforce the boundary-crossing constraints here.
+		if(_halfAndHalf &&
+		   !halfAndHalfOK(stackDepth, depth, iham))
+		{
+			// Continuation is rejected because it violates a boundary-
+			// crossing constraint.
+			contMan.pop();
+			return false;
+		}
+		uint32_t cur = _qlen - depth - 1; // current offset into _qry
+		if(depth < _qlen) {
+			// If we're still trying to make progress along the length of
+			// the read...
+			if(_verbose) {
+				cout << "    cur=" << cur << " \"";
+				for(int i = (int)depth - 1; i >= 0; i--) {
+					cout << _chars[i];
+				}
+				cout << "\"";
+			}
+
+			// Determine whether ranges at this location are candidates
+			// for backtracking
+			int c = (int)(*_qry)[cur]; // get char at this position
+			assert_leq(c, 4);
+			uint8_t q = qualAt(cur);   // get qual at this position
+
+			// The current query position is a legit alternative if it a) is
+			// not in the unrevisitable region, and b) its selection would
+			// not cause the quality ceiling (if one exists) to be exceeded
+			bool curIsAlternative =
+				 (depth >= unrevOff) &&
+				 (!_considerQuals ||
+				  (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
+			if(_verbose) {
+				cout << " alternative: " << curIsAlternative << endl;
+			}
+
+			// If c is 'N', then it's a mismatch
+			if(c == 4 && depth > 0) {
+				// Force the 'else if(curIsAlternative)' or 'else'
+				// branches below
+				top = bot = 1;
+			} else if(c == 4) {
+				// We'll take the 'if(top == 0 && bot == 0)' branch below
+				assert_eq(0, top);
+				assert_eq(0, bot);
+			}
+
+			// Calculate the ranges for this position
+			if(top == 0 && bot == 0) {
+				// Calculate first quartet of ranges using the _fchr[]
+				// array
+							   pairs[0 + 0] = ebwt._fchr[0];
+				pairs[0 + 4] = pairs[1 + 0] = ebwt._fchr[1];
+				pairs[1 + 4] = pairs[2 + 0] = ebwt._fchr[2];
+				pairs[2 + 4] = pairs[3 + 0] = ebwt._fchr[3];
+				pairs[3 + 4]                = ebwt._fchr[4];
+				// Update top and bot
+				if(c < 4) {
+					top = pairTop(pairs, depth, c);
+					bot = pairBot(pairs, depth, c);
+				}
+			} else if(curIsAlternative) {
+				// Clear pairs
+				memset(&pairs[depth*8], 0, 8 * 4);
+				// Calculate next quartet of ranges.  We hope that the
+				// appropriate cache lines are prefetched before now;
+				// otherwise, we're about to take an expensive cache
+				// miss.
+				assert(cont.ltop.valid());
+				assert(cont.lbot.valid());
+				ebwt.mapLFEx(cont.ltop, cont.lbot,
+							 &pairs[depth*8], &pairs[(depth*8)+4]);
+				// Update top and bot
+				if(c < 4) {
+					top = pairTop(pairs, depth, c);
+					bot = pairBot(pairs, depth, c);
+				}
+			} else {
+				// This read position is not a legitimate backtracking
+				// alternative.  No need to do the bookkeeping for the
+				// entire quartet, just do c.  We hope that the
+				// appropriate cache lines are prefetched before now;
+				// otherwise, we're about to take an expensive cache
+				// miss.
+				assert(cont.ltop.valid());
+				assert(cont.lbot.valid());
+				if(c < 4) {
+					top = ebwt.mapLF(cont.ltop, c);
+					bot = ebwt.mapLF(cont.lbot, c);
+				}
+			}
+
+			// Calculate alternative paths emanating from this position
+			// and push them onto the continuation list
+			if(curIsAlternative) {
+				// Given the just-calculated range quartet, update
+				// elims, altNum, eligibleNum, eligibleSz
+				for(int i = 0; i < 4; i++) {
+					if(i == c) continue; // skip the actual query character
+					uint32_t atop = pairTop(pairs, depth, i);
+					uint32_t abot = pairBot(pairs, depth, i);
+					assert_leq(atop, abot);
+					if(abot == atop) continue;
+					// Add a new continuation on the back
+					contMan.expand1();
+					GreedyDFSContinuation& back = contMan.back();
+					// Update revisitability boundaries
+					uint32_t btUnrevOff    = unrevOff;
+					uint32_t btOneRevOff   = oneRevOff;
+					uint32_t btTwoRevOff   = twoRevOff;
+					uint32_t btThreeRevOff = threeRevOff;
+					if(depth < oneRevOff)   btUnrevOff = oneRevOff;
+					if(depth < twoRevOff)   btOneRevOff = twoRevOff;
+					if(depth < threeRevOff) btTwoRevOff = threeRevOff;
+					// TODO: Check if we can use the ftab to jump a
+					// little further into the read
+					// Note the character that we're backtracking on in the
+					// mm array:
+					_mms[stackDepth] = cur;
+					_refcs[stackDepth] = i;
+	#ifndef NDEBUG
+					for(int j = 0; j < (int)stackDepth; j++) {
+						assert_neq(_mms[j], cur)
+					}
+	#endif
+					_chars[depth] = i;
+					// Get a new stretch of the pairs and elims arrays
+					uint32_t *newPairs = pairs + (_qlen*8);
+					uint8_t  *newElims = elims + (_qlen);
+					back.init(stackDepth+1,  // adding a mismatch
+							  depth+1,
+							  btUnrevOff,    // TODO
+							  btOneRevOff,   // TODO
+							  btTwoRevOff,   // TODO
+							  btThreeRevOff, // TODO
+							  atop,
+							  abot,
+							  ham + mmPenalty(_maqPenalty, q),
+							  iham,
+							  newPairs,
+							  newElims,
+							  disableFtab);
+				}
+			}
+		} else {
+			// The continuation had already processed the whole read
+			depth--;
+			cur = 0;
+		}
+		bool empty = (top == bot);
+		bool hit = (cur == 0 && !empty);
+
+		// Is this a potential partial-alignment range?
+		bool backtrackDespiteMatch = false;
+		bool reportedPartial = false;
+		if(hit && _reportPartials > 0) {
+			// This is a potential alignment range; set
+			// backtrackDespiteMatch to 'true' so that we keep looking
+			backtrackDespiteMatch = true;
+			// We don't care to report exact partial alignments, only
+			// ones with mismatches.
+			if(stackDepth > 0) {
+				reportPartial(stackDepth);
+				reportedPartial = true;
+			}
+			// Now continue on to find legitimate partial
+			// mismatches
+		}
+
+		// Check whether we've obtained an exact alignment when
+		// we've been instructed not to report exact alignments
+		bool invalidExact = (hit && stackDepth == 0 && !_reportExacts);
+
+		// Set this to true if the only way to make legal progress
+		// is via one or more additional backtracks.
+		if(_halfAndHalf &&
+		   !halfAndHalfCheckBounds(stackDepth, depth, _mms, empty))
+		{
+			// This alignment doesn't satisfy the half-and-half
+			// requirements; reject it
+			contMan.pop();
+			return false;
+		}
+
+		if(hit &&            // there are alignments to report
+		   !invalidExact &&  // not disqualified by no-exact-hits setting
+		   !reportedPartial) // not an already-reported partial alignment
+		{
+			_curRange.top     = top;
+			_curRange.bot     = bot;
+			_curRange.stratum = calcStratum(_mms, stackDepth);
+			_curRange.numMms  = stackDepth;
+			_curRange.mms     = _mms;
+			_curRange.refcs   = _refcs;
+			_foundRange       = true;
+			contMan.pop();
+			return true;
+		} else if(empty || cur == 0) {
+			// This continuation hit a dead end so pop it off
+			contMan.pop();
+			// The next continuation to be processed is whichever is
+			// now returned by front().
+		} else {
+			// Push the front continuation forward by one position
+			assert_neq(0, cur);
+			cont.depth++;
+			cont.top = top;
+			cont.bot = bot;
+		}
+		return false;
+	}
+
+	/**
+	 * Return true iff the most recent call to advance() discovered a
+	 * range of valid alignment.
+	 */
+	virtual bool foundRange() {
+		return _foundRange;
+	}
+
+	/**
+	 * Return true iff we are sure there are no valid & reportable
+	 * ranges left
+	 */
+	virtual bool done() {
+		return _finished;
+	}
+
+	/**
+	 * If there are any buffered results that have yet to be committed,
+	 * commit them.  This happens when looking for partial alignments.
+	 */
+	bool finalize() {
+		bool ret = false;
 		if(_reportPartials > 0) {
 			// We're in partial alignment mode; take elements of the
 			// _partialBuf and install them in the _partials database
@@ -711,151 +915,26 @@ public:
 	               bool disableFtab = false)
 	{
 		HitSinkPerThread& sink = _params.sink();
-		// Initial sanity checking
-		assert_gt(length(*_qry), 0);
-		assert_leq(_qlen, length(*_qry));
-		assert_geq(length(*_qual), length(*_qry));
-		if(_verbose) cout << "backtrack(top=" << top << ", "
-		                 << "bot=" << bot << ", "
-		                 << "iham=" << iham << ", "
-		                 << "_pairs" << _pairs << ", "
-		                 << "_elims=" << (void*)_elims << ")" << endl;
 		bool oldRetain = sink.retainHits();
-		size_t oldRetainSz = sink.retainedHits().size();
+		_ihits = sink.retainedHits().size();
 		if(_sanity) {
 			// Save some info about hits retained at this point
 			sink.setRetainHits(true);
 		}
-		uint64_t nhits = sink.numReportedHits();
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
-		memset(_btsAtDepths, 0, _qlen * sizeof(uint32_t));
-		memset(_totBtsAtDepths, 0, _qlen * sizeof(uint32_t));
-		_hiDepth = 0; _bailedOnBacktracks = false;
+		_bailedOnBacktracks = false;
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
-		bool hits = sink.numReportedHits() > nhits;
 
 		// Remainder of this function is sanity checking
 		sink.setRetainHits(oldRetain); // restore old value
-		// If we have the original texts, then we double-check the
-		// backtracking result against the naive oracle
-		if(_sanity &&
-		   hits && // no-hit results are confirmed as part of the call to backtrack()
-		   // ignore partial alignments; we'll check full alignments downstream
-		   _reportPartials == 0 &&
-		   !_bailedOnBacktracks)   // ignore excessive-backtracking copouts
-		{
-			uint32_t maxHitsAllowed = sink.maxHits();
-			// Get the 'retained' hits and strata; i.e., all hits and
-			// strata that have been reported up to this point
-			vector<Hit>& retainedHits = sink.retainedHits();
-			vector<int>& retainedStrata = sink.retainedStrata();
-			assert_leq(retainedHits.size() - oldRetainSz, maxHitsAllowed);
-			assert_eq(retainedHits.size(), retainedStrata.size());
-			vector<Hit> oracleHits; vector<int> oracleStrata;
-			// Invoke the naive oracle, which will place all qualifying
-			// hits and their strata in the 'oracleHits' and
-			// 'oracleStrata' vectors
-			naiveOracle(oracleHits, oracleStrata, iham);
-			assert_eq(oracleHits.size(), oracleStrata.size());
-			assert_gt(oracleHits.size(), 0);
-			int lastStratum = -1;
-			int bestStratum = -1;
-			int worstStratum = -1;
-			for(size_t j = oldRetainSz; j < retainedHits.size(); j++) {
-				Hit& rhit = retainedHits[j];
-				// Keep a running measure of the "worst" stratum
-				// observed in the retained hits
-				if(worstStratum == -1) {
-					worstStratum = retainedStrata[j];
-				} else if(retainedStrata[j] > worstStratum) {
-					worstStratum = retainedStrata[j];
-				}
-				// Keep a running measure of the "best" stratum
-				// observed in the retained hits
-				if(bestStratum == -1) {
-					bestStratum = retainedStrata[j];
-				} else if(retainedStrata[j] < bestStratum) {
-					bestStratum = retainedStrata[j];
-				}
-				if(lastStratum == -1) {
-					lastStratum = retainedStrata[j];
-				} else if(!sink.spanStrata()) {
-					// Retained hits are not allowed to "span" strata,
-					// so this hit's stratum had better be the same as
-					// the last hit's
-					assert_eq(lastStratum, retainedStrata[j]);
-				}
-				// Go through oracleHits and look for a match
-				size_t i;
-				bool found = false;
-				for(i = 0; i < oracleHits.size(); i++) {
-					const Hit& h = oracleHits[i];
-					if(h.h.first  == rhit.h.first &&
-					   h.h.second == rhit.h.second &&
-					   h.fw == rhit.fw)
-					{
-						// Oracle hit i and retained hit j refer to the
-						// same stretch of reference
-						assert(h.mms == rhit.mms);
-						assert_eq(retainedStrata[j], oracleStrata[i]);
-						// Erase the element in the oracle vector
-						oracleHits.erase(oracleHits.begin() + i);
-						oracleStrata.erase(oracleStrata.begin() + i);
-						found = true;
-						break;
-					}
-				}
-				// If the backtracker found a hit, it had better be one
-				// of the ones that the oracle found
-				assert(found); // assert we found a matchup
-			}
-			// All of the oracle hits that corresponded to a retained
-			// hit have now been eliminated
-			assert_neq(-1, lastStratum);
-			assert_neq(-1, worstStratum);
-			assert_eq(oracleHits.size(), oracleStrata.size());
-			if(maxHitsAllowed == 0xffffffff && !sink.exceededOverThresh()) {
-				if(sink.spanStrata()) {
-					// All hits remaining must occur more times than the max
-					map<uint32_t,uint32_t> readToCnt;
-					for(size_t i = 0; i < oracleHits.size(); i++) {
-						readToCnt[oracleHits[i].patId]++;
-					}
-					map<uint32_t,uint32_t>::iterator it;
-					for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
-						assert_gt(it->second, sink.overThresh());
-					}
-				} else {
-					// Must have matched all oracle hits at the best
-					// stratum
-					size_t numLeftovers = 0;
-					for(size_t i = 0; i < oracleStrata.size(); i++) {
-						if(oracleStrata[i] == bestStratum) {
-							numLeftovers++;
-						}
-					}
-					// Must have matched every oracle hit
-					if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
-						for(size_t i = 0; i < oracleHits.size(); i++) {
-							if(oracleStrata[i] == bestStratum) {
-								printHit(oracleHits[i]);
-							}
-						}
-						assert(0);
-					}
-				}
-			}
-			if(sink.best() && sink.overThresh() == 0xffffffff && !sink.exceededOverThresh()) {
-				// Ensure that all oracle hits have a stratum at least
-				// as bad as the worst stratum observed in the retained
-				// hits
-				for(size_t i = 0; i < oracleStrata.size(); i++) {
-					assert_leq(bestStratum, oracleStrata[i]);
-				}
-			}
+		if(_sanity) {
+			// Check that the alignments produced for the read and
+			// backtracking constraints are consistent with results
+			// obtained by a naive oracle
+			sanityCheckHits(sink.retainedHits(), sink.retainedStrata(), _ihits, iham);
 		}
 		_totNumBts += _numBts;
 		_numBts = 0;
@@ -870,7 +949,7 @@ public:
 	 * is recorded and true is returned.  Otherwise, if there are more
 	 * backtracking opportunities, the function will call itself
 	 * recursively and return the result.  As soon as there is a
-	 * mismatch and no backtracking opporunities, false is returned.
+	 * mismatch and no backtracking opportunities, false is returned.
 	 */
 	bool backtrack(uint32_t  stackDepth, // depth of the recursion stack; = # mismatches so far
 	               uint32_t  depth,    // next depth where a post-pair needs to be calculated
@@ -901,7 +980,7 @@ public:
 		assert(pairs != NULL);
 		assert(elims != NULL);
 		assert_leq(stackDepth, _qlen);
-		const Ebwt<TStr>& ebwt = *_ebwt;
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
 		HitSinkPerThread& sink = _params.sink();
 		uint64_t prehits = sink.numValidHits();
 		if(_halfAndHalf) {
@@ -944,10 +1023,6 @@ public:
 			}
 			_numBts++;
 		}
-		// Update stack-depth high water mark
-		if(stackDepth > _hiDepth) {
-			_hiDepth = stackDepth;
-		}
 		// The total number of arrow pairs that are acceptable
 		// backtracking targets ("alternative" arrow pairs)
 		uint32_t altNum = 0;
@@ -982,97 +1057,13 @@ public:
 				}
 				cout << "\"";
 			}
+
 			// If we're searching for a half-and-half solution, then
-			// enforce the boundary-crossing constraints here
-			if(_halfAndHalf) {
-				assert_eq(0, _reportPartials);
-				// Crossing from the hi-half into the lo-half
-				if(d == _5depth) {
-					if(_3revOff == _2revOff) {
-						// 1 and 1
-
-						// The backtracking logic should have prevented us from
-						// backtracking more than once into this region
-						assert_leq(stackDepth, 1);
-						// Reject if we haven't encountered mismatch by this point
-						if(stackDepth == 0) {
-							if(sink.numValidHits() == prehits) {
-								// We're returning from the bottommost frame
-								// without having reported any hits; let's
-								// sanity-check that there really aren't any
-								confirmNoHit(iham);
-							}
-							return false;
-						}
-					} else {
-						// 1 and 1,2
-
-						// The backtracking logic should have prevented us from
-						// backtracking more than twice into this region
-						assert_leq(stackDepth, 2);
-						// Reject if we haven't encountered mismatch by this point
-						if(stackDepth < 1) {
-							if(sink.numValidHits() == prehits) {
-								// We're returning from the bottommost frame
-								// without having found any hits; let's
-								// sanity-check that there really aren't any
-								confirmNoHit(iham);
-							}
-							return false;
-						}
-					}
-				}
-				else if(d == _3depth) {
-					if(_3revOff == _2revOff) {
-						// 1 and 1
-						// The backtracking logic should have prevented us from
-						// backtracking more than twice within this region
-						assert_leq(stackDepth, 2);
-						// Must have encountered two mismatches by this point
-						if(stackDepth < 2) {
-							if(stackDepth == 0 && sink.numValidHits() == prehits) {
-								confirmNoHit(iham);
-							}
-							// We're returning from the bottommost frame
-							// without having found any hits; let's
-							// sanity-check that there really aren't any
-							return false;
-						}
-					} else {
-						// 1 and 1,2
-						// Count the mismatches in the lo and hi halves
-						int loHalfMms = 0, hiHalfMms = 0;
-						for(size_t i = 0; i < stackDepth; i++) {
-							uint32_t d = _qlen - _mms[i] - 1;
-							if     (d < _5depth) hiHalfMms++;
-							else if(d < _3depth) loHalfMms++;
-							else assert(false);
-						}
-						assert_leq(loHalfMms+hiHalfMms, 3);
-						assert_gt(hiHalfMms, 0);
-						if(loHalfMms == 0) {
-							// Didn't encounter any mismatches in the lo-half
-							if(stackDepth == 0 && sink.numValidHits() == prehits) {
-								confirmNoHit(iham);
-							}
-							// We're returning from the bottommost frame
-							// without having found any hits; let's
-							// sanity-check that there really aren't any
-							return false;
-						}
-						assert_geq(stackDepth, 2);
-						// The backtracking logic should have prevented us from
-						// backtracking more than twice within this region
-						assert_leq(stackDepth, 3);
-					}
-				}
-				// In-between sanity checks
-				if(d >= _5depth) {
-					assert_geq(stackDepth, 1);
-				} else if(d >= _3depth) {
-					assert_geq(stackDepth, 2);
-				}
+			// enforce the boundary-crossing constraints here.
+			if(_halfAndHalf && !halfAndHalfOK(stackDepth, d, iham, prehits)) {
+				return false;
 			}
+
 			bool curIsEligible = false;
 			// Reset eligibleNum and eligibleSz if there are any
 			// eligible pairs discovered at this spot
@@ -1081,13 +1072,14 @@ public:
 			// candidates for backtracking
 			int c = (int)(*_qry)[cur];
 			assert_leq(c, 4);
-			uint8_t q = QUAL(cur);
-			assert_lt((uint32_t)q, 100);
+			uint8_t q = qualAt(cur);
 			// The current query position is a legit alternative if it a) is
-			// not in the unrevisitable region, and b) there is a quality
-			// ceiling and its selection would cause the ceiling to be exceeded
-			bool curIsAlternative = (d >= unrevOff) &&
-			                        (!_considerQuals || (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
+			// not in the unrevisitable region, and b) the quality ceiling (if
+			// one exists) is not exceeded
+			bool curIsAlternative =
+				(d >= unrevOff) &&
+			    (!_considerQuals ||
+			     (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
 			if(curIsAlternative) {
 				if(_considerQuals) {
 					// Is it the best alternative?
@@ -1120,31 +1112,34 @@ public:
 				if(curOverridesEligible) cout << "(overrides)";
 				cout << endl;
 			}
-			// If c is 'N', then it's a mismatch
+
+			// If c is 'N', then it's guaranteed to be a mismatch
 			if(c == 4 && d > 0) {
+				// Force the 'else if(curIsAlternative)' branch below
 				top = bot = 1;
 			} else if(c == 4) {
+				// We'll take the 'if(top == 0 && bot == 0)' branch below
 				assert_eq(0, top);
 				assert_eq(0, bot);
 			}
 			// Calculate the ranges for this position
 			if(top == 0 && bot == 0) {
-				// Calculate first quartet of pairs using the _fchr[]
+				// Calculate first quartet of ranges using the _fchr[]
 				// array
-				PAIR_TOP(0, 0)                  = ebwt._fchr[0];
-				PAIR_BOT(0, 0) = PAIR_TOP(0, 1) = ebwt._fchr[1];
-				PAIR_BOT(0, 1) = PAIR_TOP(0, 2) = ebwt._fchr[2];
-				PAIR_BOT(0, 2) = PAIR_TOP(0, 3) = ebwt._fchr[3];
-				PAIR_BOT(0, 3)                  = ebwt._fchr[4];
+				               pairs[0 + 0] = ebwt._fchr[0];
+				pairs[0 + 4] = pairs[1 + 0] = ebwt._fchr[1];
+				pairs[1 + 4] = pairs[2 + 0] = ebwt._fchr[2];
+				pairs[2 + 4] = pairs[3 + 0] = ebwt._fchr[3];
+				pairs[3 + 4]                = ebwt._fchr[4];
 				// Update top and bot
-				if(c < 4) { top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c); }
+				if(c < 4) { top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c); }
 			} else if(curIsAlternative) {
 				// Clear pairs
 				memset(&pairs[d*8], 0, 8 * 4);
-				// Calculate next quartet of pairs
+				// Calculate next quartet of ranges
 				ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
 				// Update top and bot
-				if(c < 4) { top = PAIR_TOP(d, c); bot = PAIR_BOT(d, c); }
+				if(c < 4) { top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c); }
 			} else {
 				// This query character is not even a legitimate
 				// alternative (because backtracking here would blow
@@ -1159,22 +1154,15 @@ public:
 				SideLocus::initFromTopBot(top, bot, ebwt._eh, ebwt._ebwt, ltop, lbot);
 			}
 			// Update the elim array
-			if(c < 4) {
-				elims[d] = (1 << c);
-				assert_gt(elims[d], 0);
-				assert_lt(elims[d], 16);
-			} else {
-				elims[d] = 0;
-			}
-			assert_lt(elims[d], 16);
+			eliminate(elims, d, c);
 
 			if(curIsAlternative) {
 				// Given the just-calculated range quartet, update
 				// elims, altNum, eligibleNum, eligibleSz
 				for(int i = 0; i < 4; i++) {
 					if(i == c) continue;
-					assert_leq(PAIR_TOP(d, i), PAIR_BOT(d, i));
-					uint32_t spread = PAIR_SPREAD(d, i);
+					assert_leq(pairTop(pairs, d, i), pairBot(pairs, d, i));
+					uint32_t spread = pairSpread(pairs, d, i);
 					if(spread == 0) {
 						// Indicate this char at this position is
 						// eliminated as far as this backtracking frame is
@@ -1198,8 +1186,8 @@ public:
 								// this turns out to be the only
 								// eligible target
 								eli = d;
-								eltop = PAIR_TOP(d, i);
-								elbot = PAIR_BOT(d, i);
+								eltop = pairTop(pairs, d, i);
+								elbot = pairBot(pairs, d, i);
 								assert_eq(elbot-eltop, spread);
 								elham = mmPenalty(_maqPenalty, q);
 								elchar = "acgt"[i];
@@ -1223,6 +1211,7 @@ public:
 			assert_leq(eligibleNum, altNum);
 			assert_lt(elims[d], 16);
 			assert(sanityCheckEligibility(depth, d, unrevOff, lowAltQual, eligibleSz, eligibleNum, pairs, elims));
+
 			// Achieved a match, but need to keep going
 			bool backtrackDespiteMatch = false;
 			bool reportedPartial = false;
@@ -1345,8 +1334,6 @@ public:
 			// Mismatch with alternatives
 			//
 			while((top == bot || backtrackDespiteMatch) && altNum > 0) {
-				//SideLocus toploci[4];
-				//SideLocus botloci[4];
 				if(_verbose) cout << "    top (" << top << "), bot ("
 				                 << bot << ") with " << altNum
 				                 << " alternatives, eligible: "
@@ -1368,8 +1355,6 @@ public:
 				uint32_t btham = ham;
 				char     btchar = 0;
 				int      btcint = 0;
-				//SideLocus *btltop = NULL;
-				//SideLocus *btlbot = NULL;
 				uint32_t icur = 0;
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
@@ -1378,7 +1363,7 @@ public:
 					for(; i >= depth; i--) {
 						assert_geq(i, unrevOff);
 						icur = _qlen - i - 1; // current offset into _qry
-						uint8_t qi = QUAL(icur);
+						uint8_t qi = qualAt(icur);
 						assert_lt(elims[i], 16); // 1.26% in profile (next or prev?)
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 							// This is the leftmost eligible position with at
@@ -1387,18 +1372,8 @@ public:
 							// Add up the spreads for A, C, G, T
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
-									assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
-									assert_gt(PAIR_SPREAD(i, j), 0);
-									posSz += PAIR_SPREAD(i, j);
-									// Calculate BWT locus and prefetch
-									// appropriate cache lines
-									//SideLocus::initFromTopBot(
-									//	PAIR_TOP(i, j),
-									//	PAIR_BOT(i, j),
-									//	ebwt._eh,
-									//	ebwt._ebwt,
-									//	toploci[j],
-									//	botloci[j]);
+									assert_gt(pairSpread(pairs, i, j), 0);
+									posSz += pairSpread(pairs, i, j);
 								}
 							}
 							// Generate a random number
@@ -1408,22 +1383,13 @@ public:
 								if((elims[i] & (1 << j)) == 0) {
 									// This range has not been eliminated
 									ASSERT_ONLY(eligiblesVisited++);
-									uint32_t spread = PAIR_SPREAD(i, j);
+									uint32_t spread = pairSpread(pairs, i, j);
 									if(r < spread) {
 										// This is our randomly-selected
 										// backtrack target
 										foundTarget = true;
-										bttop = PAIR_TOP(i, j);
-										btbot = PAIR_BOT(i, j);
-										//SideLocus::initFromTopBot(
-										//	bttop,
-										//	btbot,
-										//	ebwt._eh,
-										//	ebwt._ebwt,
-										//	toploci[j],
-										//	botloci[j]);
-										//btltop = &toploci[j];
-										//btlbot = &botloci[j];
+										bttop = pairTop(pairs, i, j);
+										btbot = pairBot(pairs, i, j);
 										btham += mmPenalty(_maqPenalty, qi);
 										btcint = j;
 										btchar = "acgt"[j];
@@ -1518,23 +1484,6 @@ public:
 				}
 #endif
 				_chars[i] = btchar;
-				// Now backtrack to target
-				if(_halfAndHalf) {
-					_btsAtDepths[stackDepth]++;
-					_totBtsAtDepths[stackDepth]++;
-#if 0
-					if(stackDepth < 3) {
-						if(_maxBts > 0 && (
-						   (stackDepth == 0 && _btsAtDepths[0] > _maxBts0) ||
-						   (stackDepth == 1 && _btsAtDepths[1] > _maxBts1) ||
-						   (stackDepth == 2 && _btsAtDepths[2] > _maxBts2)))
-						{
-							return false;
-						}
-					}
-#endif
-				}
-
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
@@ -1610,7 +1559,6 @@ public:
 					//if(_sanity) confirmHit(iham);
 					return true; // return, signaling that we're done
 				}
-				_btsAtDepths[stackDepth+1] = 0; // clear bts deeper in
 				if(_bailedOnBacktracks ||
 				  (_halfAndHalf && (_maxBts > 0) && (_numBts >= _maxBts)))
 				{
@@ -1652,7 +1600,7 @@ public:
 					lowAltQual = 0xff;
 					for(size_t k = d; k >= depth && k <= _qlen; k--) {
 						uint32_t kcur = _qlen - k - 1; // current offset into _qry
-						uint8_t kq = QUAL(kcur);
+						uint8_t kq = qualAt(kcur);
 						if(k < unrevOff) break; // already visited all revisitable positions
 						bool kCurIsAlternative = (ham + mmPenalty(_maqPenalty, kq) <= _qualThresh);
 						bool kCurOverridesEligible = false;
@@ -1668,7 +1616,7 @@ public:
 								for(int l = 0; l < 4; l++) {
 									if((elims[k] & (1 << l)) == 0) {
 										// Not yet eliminated
-										uint32_t spread = PAIR_SPREAD(k, l);
+										uint32_t spread = pairSpread(pairs, k, l);
 										if(kCurOverridesEligible) {
 											// Clear previous eligible results;
 											// this one's better
@@ -1683,8 +1631,8 @@ public:
 											eligibleNum = 0;
 											eligibleSz = 0;
 											eli = k;
-											eltop = PAIR_TOP(k, l);
-											elbot = PAIR_BOT(k, l);
+											eltop = pairTop(pairs, k, l);
+											elbot = pairBot(pairs, k, l);
 											assert_eq(elbot-eltop, spread);
 											elham = mmPenalty(_maqPenalty, kq);
 											elchar = "acgt"[l];
@@ -1752,266 +1700,294 @@ public:
 		return ret;
 	}
 
+	/**
+	 * Pretty print a hit along with the backtracking constraints.
+	 */
 	void printHit(const Hit& h) {
-		BacktrackManager::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _params.ebwtFw());
+		::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _params.ebwtFw());
 	}
-
-	/**
-	 * Print a hit along with information about the backtracking
-	 * regions constraining the hit.
-	 */
-	static void printHit(const vector<String<Dna5> >& os,
-	                     const Hit& h,
-	                     const String<Dna5>& qry,
-	                     size_t qlen,
-	                     uint32_t unrevOff,
-	                     uint32_t oneRevOff,
-	                     uint32_t twoRevOff,
-	                     uint32_t threeRevOff,
-	                     bool ebwtFw)
-	{
-		// Print pattern sequence
-		cout << "  Pat:  " << qry << endl;
-		// Print text sequence
-		cout << "  Tseg: ";
-		if(ebwtFw) {
-			for(size_t i = 0; i < qlen; i++) {
-				cout << os[h.h.first][h.h.second + i];
-			}
-		} else {
-			for(int i = (int)qlen-1; i >= 0; i--) {
-				cout << os[h.h.first][h.h.second + i];
-			}
-		}
-		cout << endl;
-		cout << "  Bt:   ";
-		for(int i = (int)qlen-1; i >= 0; i--) {
-			if     (i < (int)unrevOff)    cout << "0";
-			else if(i < (int)oneRevOff)   cout << "1";
-			else if(i < (int)twoRevOff)   cout << "2";
-			else if(i < (int)threeRevOff) cout << "3";
-			else cout << "X";
-		}
-		cout << endl;
-	}
-
-	/**
-	 * Naively search for the same hits that should be found by the
-	 * backtracking search.  This is used only if --orig and -s have
-	 * been specified for bowtie-debug.
-	 */
-	static void naiveOracle(const vector<String<Dna5> >& os,
-	                        const String<Dna5>& qry,
-	                        uint32_t qlen,
-	                        const String<char>& qual,
-	                        const String<char>& name,
-	                        uint32_t patid,
-	                        vector<Hit>& hits,
-	                        vector<int>& strata,
-	                        uint32_t qualThresh,
-	                        uint32_t unrevOff,
-	                        uint32_t oneRevOff,
-	                        uint32_t twoRevOff,
-	                        uint32_t threeRevOff,
-	                        bool fw,
-	                        bool ebwtFw,
-	                        uint32_t iham = 0,
-	                        String<QueryMutation>* muts = NULL,
-	                        bool maqPenalty = true,
-	                        bool halfAndHalf = false,
-	                        bool reportExacts = true,
-	                        bool invert = false)
-	{
-		bool fivePrimeOnLeft = (ebwtFw == fw);
-	    uint32_t plen = qlen;
-		uint8_t *pstr = (uint8_t *)begin(qry, Standard());
-	    // For each text...
-		for(size_t i = 0; i < os.size(); i++) {
-			// For each text position...
-			if(length(os[i]) < plen) continue;
-			uint32_t olen = length(os[i]);
-			uint8_t *ostr = (uint8_t *)begin(os[i], Standard());
-			// For each possible alignment of pattern against text
-			for(size_t j = 0; j <= olen - plen; j++) {
-				size_t mms = 0; // mismatches observed over the whole thing
-				size_t rev1mm  = 0; // mismatches observed in the 1-revisitable region
-				size_t rev2mm  = 0; // mismatches observed in the 2-revisitable region
-				size_t rev3mm  = 0; // mismatches observed in the 3-revisitable region
-				uint32_t ham = iham; // weighted hamming distance so far
-				FixedBitset<max_read_bp> diffs; // mismatch bitvector
-				vector<char> refcs; // reference characters for mms
-				refcs.resize(qlen, 0);
-				// For each alignment column, from right to left
-				bool success = true;
-				int ok, okInc;
-				if(ebwtFw) {
-					ok = j+(int)plen-1;
-					okInc = -1;
-				} else {
-					ok = olen-(j+((int)plen-1))-1;
-					okInc = 1;
-				}
-				bool rejectN = false;
-				for(int k = (int)plen-1; k >= 0; k--) {
-					size_t kr = plen-1-k;
-					if((int)ostr[ok] == 4) {
-						rejectN = true;
-						break;
-					}
-					if(pstr[k] != ostr[ok]) {
-						mms++;
-						ham += mmPenalty(maqPenalty, QUAL2(qual, k));
-						if(ham > qualThresh) {
-							// Alignment is invalid because it exceeds
-							// our target weighted hamming distance
-							// threshold
-							success = false;
-							break;
-						}
-						size_t koff = kr;
-						if(invert) koff = (size_t)k;
-						// What region does the mm fall into?
-						if(koff < unrevOff) {
-							// Alignment is invalid because it contains
-							// a mismatch in the unrevisitable region
-							success = false;
-							break;
-						} else if(koff < oneRevOff) {
-							rev1mm++;
-							if(rev1mm > 1) {
-								// Alignment is invalid because it
-								// contains more than 1 mismatch in the
-								// 1-revisitable region
-								success = false;
-								break;
-							}
-						} else if(koff < twoRevOff) {
-							rev2mm++;
-							if(rev2mm > 2) {
-								// Alignment is invalid because it
-								// contains more than 2 mismatches in the
-								// 2-revisitable region
-								success = false;
-								break;
-							}
-						} else if(koff < threeRevOff) {
-							rev3mm++;
-							if(rev3mm > 3) {
-								// Alignment is invalid because it
-								// contains more than 3 mismatches in the
-								// 3-revisitable region
-								success = false;
-								break;
-							}
-						}
-						if(halfAndHalf) {
-							if(twoRevOff == threeRevOff) {
-								// 1 and 1
-								assert_eq(0, rev3mm);
-								if(rev1mm > 1 || rev2mm > 1) {
-									// Half-and-half alignment is invalid
-									// because it contains more than 1 mismatch
-									// in either one or the other half
-									success = false;
-									break;
-								}
-							} else {
-								// 1 and 1,2
-								assert_eq(unrevOff, oneRevOff);
-								assert_eq(0, rev1mm);
-								if(rev2mm > 2 || rev3mm > 2) {
-									success = false;
-									break;
-								}
-							}
-						}
-						// Update 'diffs' and 'refcs' to reflect this
-						// mismatch
-						if(fivePrimeOnLeft) {
-							diffs.set(k);
-							refcs[k] = (char)ostr[ok];
-						} else {
-							// The 3' end is on on the left end of the
-							// pattern, but the diffs vector should
-							// encode mismatches w/r/t the 5' end, so
-							// we flip
-							diffs.set(plen-k-1);
-							refcs[plen-k-1] = (char)ostr[ok];
-						}
-					}
-					ok += okInc;
-				}
-				if(rejectN) {
-					// Rejected because the reference half of the
-					// alignment contained one or more Ns
-					continue;
-				}
-				if(halfAndHalf) {
-					if(twoRevOff == threeRevOff) {
-						if(rev1mm != 1 || rev2mm != 1) {
-							success = false;
-						}
-					} else {
-						if(rev2mm == 0 || rev3mm == 0 ||
-						   rev2mm + rev3mm < 2 ||
-						   rev2mm + rev3mm > 3)
-						{
-							success = false;
-						}
-					}
-				}
-				if(!reportExacts && mms == 0) {
-					// Reject this exact alignment because we've been
-					// instructed to ignore them (usually because a
-					// previous invocation already reported them)
-					success = false;
-				}
-				if(success) {
-					// It's a hit
-					uint32_t off = j;
-					int stratum = (int)(rev1mm + rev2mm + rev3mm);
-					if(!ebwtFw) {
-						off = olen - off;
-						off -= plen;
-					}
-					// Add in mismatches from _muts
-					if(muts != NULL) {
-						for(size_t i = 0; i < length(*muts); i++) {
-							// Entries in _mms[] are in terms of offset into
-							// _qry - not in terms of offset from 3' or 5' end
-							if(fivePrimeOnLeft) {
-								diffs.set((*muts)[i].pos);
-								refcs[(*muts)[i].pos] = (*muts)[i].newBase;
-							} else {
-								diffs.set(plen - (*muts)[i].pos - 1);
-								refcs[plen - (*muts)[i].pos - 1] = (*muts)[i].newBase;
-							}
-							stratum++;
-						}
-					}
-					Hit h(make_pair(i, off),
-						  patid,  // read id
-						  name,   // read name
-						  qry,    // read sequence
-						  qual,   // read qualities
-						  fw,     // forward/reverse-comp
-						  diffs,  // mismatch bitvector
-						  refcs);
-					hits.push_back(h);
-					strata.push_back(stratum);
-				} // For each pattern character
-			} // For each alignment over current text
-		} // For each text
-	}
-
 
 protected:
+
+	/**
+	 *
+	 */
+	bool halfAndHalfCheckBounds(uint32_t stackDepth, uint32_t depth,
+	                            uint32_t *mms,
+	                            bool empty)
+	{
+		ASSERT_ONLY(uint32_t lim = (_3revOff == _2revOff)? 2 : 3);
+		if((depth == (_5depth-1)) && !empty) {
+			// We're crossing the boundary separating the hi-half
+			// from the non-seed portion of the read.
+			// We should induce a mismatch if we haven't mismatched
+			// yet, so that we don't waste time pursuing a match
+			// that was covered by a previous phase
+			assert_eq(0, _reportPartials);
+			assert_leq(stackDepth, lim-1);
+			return stackDepth > 0;
+		} else if((depth == (_3depth-1)) && !empty) {
+			// We're crossing the boundary separating the lo-half
+			// from the non-seed portion of the read
+			assert_eq(0, _reportPartials);
+			assert_leq(stackDepth, lim);
+			assert_gt(stackDepth, 0);
+			// Count the mismatches in the lo and hi halves
+			uint32_t loHalfMms = 0, hiHalfMms = 0;
+			for(size_t i = 0; i < stackDepth; i++) {
+				uint32_t depth = _qlen - mms[i] - 1;
+				if     (depth < _5depth) hiHalfMms++;
+				else if(depth < _3depth) loHalfMms++;
+				else assert(false);
+			}
+			assert_leq(loHalfMms + hiHalfMms, lim);
+			bool invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
+			return (stackDepth >= 2 && !invalidHalfAndHalf);
+		}
+		if(depth < _5depth-1) {
+			assert_leq(stackDepth, lim-1);
+		}
+		else if(depth >= _5depth && depth < _3depth-1) {
+			assert_gt(stackDepth, 0);
+			assert_leq(stackDepth, lim);
+		}
+		return true;
+	}
+
+	/**
+	 * Calculate the stratum of the partial (or full) alignment
+	 * currently under consideration.  Stratum is equal to the number
+	 * of mismatches in the seed portion of the alignment.
+	 */
+	int calcStratum(uint32_t *mms, uint32_t stackDepth) {
+		int stratum = 0;
+		for(size_t i = 0; i < stackDepth; i++) {
+			if(mms[i] >= (_qlen - _3revOff)) {
+				// This mismatch falls within the seed; count it
+				// toward the stratum to report
+				stratum++;
+				// Don't currently support more than 3
+				// mismatches in the seed
+				assert_leq(stratum, 3);
+			}
+		}
+		return stratum;
+	}
+
+	/**
+	 * Mark character c at depth d as being eliminated with respect to
+	 * future backtracks.
+	 */
+	void eliminate(uint8_t *elims, uint32_t d, int c) {
+		if(c < 4) {
+			elims[d] = (1 << c);
+			assert_gt(elims[d], 0);
+			assert_lt(elims[d], 16);
+		} else {
+			elims[d] = 0;
+		}
+		assert_lt(elims[d], 16);
+	}
+
+	/**
+	 * Return true iff the state of the backtracker as encoded by
+	 * stackDepth, d and iham is compatible with the current half-and-
+	 * half alignment mode.  prehits is for sanity checking when
+	 * bailing.
+	 */
+	bool halfAndHalfOK(uint32_t stackDepth,
+	                   uint32_t d,
+	                   uint32_t iham,
+	                   uint64_t prehits = 0xffffffffffffffffllu)
+	{
+		HitSinkPerThread& sink = _params.sink();
+		assert_eq(0, _reportPartials);
+		// Crossing from the hi-half into the lo-half
+		if(d == _5depth) {
+			if(_3revOff == _2revOff) {
+				// Total of 2 mismatches allowed: 1 hi, 1 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than once into this region
+				assert_leq(stackDepth, 1);
+				// Reject if we haven't encountered mismatch by this point
+				if(stackDepth == 0) {
+					if(prehits != 0xffffffffffffffffllu &&
+					   sink.numValidHits() == prehits)
+					{
+						// We're returning from the bottommost frame
+						// without having reported any hits; let's
+						// sanity-check that there really aren't any
+						confirmNoHit(iham);
+					}
+					return false;
+				}
+			} else { // if(_3revOff != _2revOff)
+				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice into this region
+				assert_leq(stackDepth, 2);
+				// Reject if we haven't encountered mismatch by this point
+				if(stackDepth < 1) {
+					if(prehits != 0xffffffffffffffffllu &&
+					   sink.numValidHits() == prehits)
+					{
+						// We're returning from the bottommost frame
+						// without having found any hits; let's
+						// sanity-check that there really aren't any
+						confirmNoHit(iham);
+					}
+					return false;
+				}
+			}
+		} else if(d == _3depth) {
+			// Crossing from lo-half to outside of the seed
+			if(_3revOff == _2revOff) {
+				// Total of 2 mismatches allowed: 1 hi, 1 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice within this region
+				assert_leq(stackDepth, 2);
+				// Must have encountered two mismatches by this point
+				if(stackDepth < 2) {
+					if(prehits != 0xffffffffffffffffllu &&
+					   sink.numValidHits() == prehits &&
+					   stackDepth == 0)
+					{
+						confirmNoHit(iham);
+					}
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
+					return false;
+				}
+			} else { // if(_3revOff != _2revOff)
+				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
+				// Count the mismatches in the lo and hi halves
+				int loHalfMms = 0, hiHalfMms = 0;
+				for(size_t i = 0; i < stackDepth; i++) {
+					uint32_t d = _qlen - _mms[i] - 1;
+					if     (d < _5depth) hiHalfMms++;
+					else if(d < _3depth) loHalfMms++;
+					else assert(false);
+				}
+				assert_leq(loHalfMms + hiHalfMms, 3);
+				assert_gt(hiHalfMms, 0);
+				if(loHalfMms == 0) {
+					// Didn't encounter any mismatches in the lo-half
+					if(prehits != 0xffffffffffffffffllu &&
+					   sink.numValidHits() == prehits &&
+					   stackDepth == 0)
+					{
+						confirmNoHit(iham);
+					}
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
+					return false;
+				}
+				assert_geq(stackDepth, 2);
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice within this region
+				assert_leq(stackDepth, 3);
+			}
+		} else {
+			// We didn't just cross a boundary, so do an in-between check
+			if(d >= _5depth) {
+				assert_geq(stackDepth, 1);
+			} else if(d >= _3depth) {
+				assert_geq(stackDepth, 2);
+			}
+		}
+		return true;
+	}
+
+	inline uint8_t qualAt(size_t off) {
+		return phredCharToPhredQual((*_qual)[off]);
+	}
+
+	/// Get the top offset for character c at depth d
+	inline uint32_t pairTop(uint32_t* pairs, size_t d, size_t c) {
+		return pairs[d*8 + c + 0];
+	}
+
+	/// Get the bot offset for character c at depth d
+	inline uint32_t pairBot(uint32_t* pairs, size_t d, size_t c) {
+		return pairs[d*8 + c + 4];
+	}
+
+	/// Get the spread between the bot and top offsets for character c
+	/// at depth d
+	inline uint32_t pairSpread(uint32_t* pairs, size_t d, size_t c) {
+		assert_geq(pairBot(pairs, d, c), pairTop(pairs, d, c));
+		return pairBot(pairs, d, c) - pairTop(pairs, d, c);
+	}
+
+	/**
+	 * Tally how many Ns occur in the seed region and in the ftab-
+	 * jumpable region of the read.  Check whether the mismatches
+	 * induced by the Ns already violates the current policy.  Return
+	 * false if the policy is already violated, true otherwise.
+	 */
+	bool tallyNs(int& nsInSeed, int& nsInFtab) {
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
+		int ftabChars = ebwt._eh._ftabChars;
+		// Count Ns in the seed region of the read and short-circuit if
+		// the configuration of Ns guarantees that there will be no
+		// valid alignments given the backtracking constraints.
+		for(size_t i = 0; i < _3revOff; i++) {
+			if((int)(*_qry)[_qlen-i-1] == 4) {
+				nsInSeed++;
+				if(nsInSeed == 1) {
+					if(i < _unrevOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 2) {
+					if(i < _1revOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 3) {
+					if(i < _2revOff) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else {
+					assert_gt(nsInSeed, 3);
+					return false;     // Exceeded mm budget on Ns alone
+				}
+			}
+		}
+		// Calculate the number of Ns there are in the region that
+		// would get jumped over if the ftab were used.
+		for(size_t i = 0; i < (size_t)ftabChars && i < _qlen; i++) {
+			if((int)(*_qry)[_qlen-i-1] == 4) nsInFtab++;
+		}
+		return true;
+	}
+
+	/**
+	 * Calculate the offset into the ftab for the rightmost 'ftabChars'
+	 * characters of the current query. Rightmost char gets least
+	 * significant bit-pair.
+	 */
+	uint32_t calcFtabOff() {
+		const Ebwt<String<Dna> >& ebwt = *_ebwt;
+		int ftabChars = ebwt._eh._ftabChars;
+		uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+		assert_lt(ftabOff, 4);
+		assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		for(int i = ftabChars - 1; i > 0; i--) {
+			ftabOff <<= 2;
+			assert_lt((uint32_t)(*_qry)[_qlen-i], 4);
+			ftabOff |= (uint32_t)(*_qry)[_qlen-i];
+			assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		}
+		assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		return ftabOff;
+	}
 
 	/**
 	 * Mutate the _qry string according to the contents of the _muts
 	 * array, which represents a partial alignment.
 	 */
-	void applyMutations() {
+	void applyPartialMutations() {
 		if(_muts == NULL) {
 			// No mutations to apply
 			return;
@@ -2028,10 +2004,42 @@ protected:
 	}
 
 	/**
+	 * Take partial-alignment mutations present in the _muts list and
+	 * place them on the _mm list so that they become part of the
+	 * reported alignment.
+	 */
+	void promotePartialMutations(int stackDepth) {
+		if(_muts == NULL) {
+			// No mutations to undo
+			return;
+		}
+		size_t numMuts = length(*_muts);
+		assert_leq(numMuts, _qlen);
+		for(size_t i = 0; i < numMuts; i++) {
+			// Entries in _mms[] are in terms of offset into
+			// _qry - not in terms of offset from 3' or 5' end
+			assert_lt(stackDepth + i, _qlen);
+			// All partial-alignment mutations should fall
+			// within bounds
+			assert_lt((*_muts)[i].pos, _qlen);
+			// All partial-alignment mutations should fall
+			// within unrevisitable region
+			assert_lt(_qlen - (*_muts)[i].pos - 1, _unrevOff);
+#ifndef NDEBUG
+			for(size_t j = 0; j < stackDepth + i; j++) {
+				assert_neq(_mms[j], (uint32_t)(*_muts)[i].pos);
+			}
+#endif
+			_mms[stackDepth + i] = (*_muts)[i].pos;
+			_refcs[stackDepth + i] = "ACGT"[(*_muts)[i].newBase];
+		}
+	}
+
+	/**
 	 * Undo mutations to the _qry string, returning it to the original
 	 * read.
 	 */
-	void undoMutations() {
+	void undoPartialMutations() {
 		if(_muts == NULL) {
 			// No mutations to undo
 			return;
@@ -2074,58 +2082,35 @@ protected:
 				reportPartial(stackDepth);
 			}
 			return false; // keep going - we want to find all partial alignments
-		} else {
-			int stratum = 0;
-			if(stackDepth > 0) {
-				for(size_t i = 0; i < stackDepth; i++) {
-					if(_mms[i] >= (_qlen - _3revOff)) {
-						// This mismatch falls within the seed; count it
-						// toward the stratum to report
-						stratum++;
-						assert_leq(stratum, 3);
-					}
-				}
-			}
-			// Undo mutations
-			ASSERT_ONLY(String<Dna5> tmp = (*_qry));
-			undoMutations();
-			bool hit;
-			if(_muts != NULL) {
-				// Add the mutations to the _mms[] array
-				assert_neq(tmp, (*_qry));
-				size_t numMuts = length(*_muts);
-				assert_leq(numMuts, _qlen);
-				for(size_t i = 0; i < numMuts; i++) {
-					// Entries in _mms[] are in terms of offset into
-					// _qry - not in terms of offset from 3' or 5' end
-					assert_lt(stackDepth + i, _qlen);
-					// All partial-alignment mutations should fall
-					// within bounds
-					assert_lt((*_muts)[i].pos, _qlen);
-					// All partial-alignment mutations should fall
-					// within unrevisitable region
-					assert_lt(_qlen - (*_muts)[i].pos - 1, _unrevOff);
-#ifndef NDEBUG
-					for(size_t j = 0; j < stackDepth + i; j++) {
-						assert_neq(_mms[j], (uint32_t)(*_muts)[i].pos);
-					}
-#endif
-					_mms[stackDepth + i] = (*_muts)[i].pos;
-					_refcs[stackDepth + i] = "ACGT"[(*_muts)[i].newBase];
-					// all muts are in the seed, so they count toward the stratum
-					stratum++;
-				}
-				// Report the range of full alignments
-				hit = reportFullAlignment(stackDepth+numMuts, top, bot, stratum);
-			} else {
-				// Report the range of full alignments
-				hit = reportFullAlignment(stackDepth, top, bot, stratum);
-			}
-			// Re-apply mutations
-			applyMutations();
-			assert_eq(tmp, (*_qry));
-			return hit;
 		}
+		int stratum = 0;
+		if(stackDepth > 0) {
+			stratum = calcStratum(_mms, stackDepth);
+		}
+		bool hit;
+		// If _muts != NULL then this alignment extends a partial
+		// alignment, so we have to account for the differences present
+		// in the partial.
+		if(_muts != NULL) {
+			// Undo partial-alignment mutations to get original _qry
+			ASSERT_ONLY(String<Dna5> tmp = (*_qry));
+			undoPartialMutations();
+			assert_neq(tmp, (*_qry));
+			// Add the partial-alignment mutations to the _mms[] array
+			promotePartialMutations(stackDepth);
+			// All muts are in the seed, so they count toward the stratum
+			size_t numMuts = length(*_muts);
+			stratum += numMuts;
+			// Report the range of full alignments
+			hit = reportFullAlignment(stackDepth + numMuts, top, bot, stratum);
+			// Re-apply partial-alignment mutations
+			applyPartialMutations();
+			assert_eq(tmp, (*_qry));
+		} else {
+			// Report the range of full alignments
+			hit = reportFullAlignment(stackDepth, top, bot, stratum);
+		}
+		return hit;
 	}
 
 	/**
@@ -2284,7 +2269,7 @@ protected:
 		uint32_t eligiblesVisited = 0;
 		for(; i <= d; i++) {
 			uint32_t icur = _qlen - i - 1; // current offset into _qry
-			uint8_t qi = QUAL(icur);
+			uint8_t qi = qualAt(icur);
 			assert_lt(elims[i], 16);
 			if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 				// This is an eligible position with at least
@@ -2292,8 +2277,8 @@ protected:
 				for(j = 0; j < 4; j++) {
 					if((elims[i] & (1 << j)) == 0) {
 						// This pair has not been eliminated
-						assert_gt(PAIR_BOT(i, j), PAIR_TOP(i, j));
-						cumSz += PAIR_SPREAD(i, j);
+						assert_gt(pairBot(pairs, i, j), pairTop(pairs, i, j));
+						cumSz += pairSpread(pairs, i, j);
 						eligiblesVisited++;
 					}
 				}
@@ -2325,9 +2310,9 @@ protected:
 				const Hit& h = oracleHits[i];
 				cout << "  Oracle hit " << i << ": " << endl;
 				if(_muts != NULL) {
-					undoMutations();
+					undoPartialMutations();
 					cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
-					applyMutations();
+					applyPartialMutations();
 				}
 				cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
 				cout << "  Tseg:           ";
@@ -2371,7 +2356,7 @@ protected:
 		vector<Hit>& retainedHits = _params.sink().retainedHits();
 		assert_gt(retainedHits.size(), 0);
 		if(oracleHits.size() == 0) {
-			BacktrackManager::printHit(
+			::printHit(
 					(*_os), retainedHits.back(), (*_qry), _qlen, _unrevOff,
 					_1revOff, _2revOff, _3revOff, _params.ebwtFw());
 		}
@@ -2397,41 +2382,124 @@ protected:
 	}
 
 	/**
-	 * Calculate a per-read random seed based on a combination of
-	 * the read data (incl. sequence, name, quals) and the global
-	 * seed in '_randSeed'.
+	 * Sanity-check the final set of alignments generated for this read
+	 * with respect to the current backtracking constraints.
 	 */
-	void initRandSeed() {
-		// Calculate a per-read random seed based on a combination of
-		// the read data (incl. sequence, name, quals) and the global
-		// seed
-		uint32_t rseed = 0;
-		// Throw all the characters of the read into the random seed
-		for(size_t i = 0; i < _qlen; i++) {
-			int p = (int)(*_qry)[i];
-			assert_leq(p, 4);
-			size_t off = ((i & 15) << 1);
-			rseed |= (p << off);
+	void sanityCheckHits(const vector<Hit>& hits,
+	                     const vector<int>& strata,
+	                     size_t first, uint32_t iham)
+	{
+		if(!_sanity || _reportPartials > 0 || _bailedOnBacktracks || first == hits.size()) {
+			return;
 		}
-		// Throw all the quality values for the read into the random
-		// seed
-		for(size_t i = 0; i < _qlen; i++) {
-			int p = (int)(*_qual)[i];
-			assert_leq(p, 255);
-			size_t off = ((i & 3) << 3);
-			rseed |= (p << off);
+		assert_eq(hits.size(), strata.size());
+		HitSinkPerThread& sink = _params.sink();
+		uint32_t maxHitsAllowed = sink.maxHits();
+		vector<Hit> oracleHits; vector<int> oracleStrata;
+		// Invoke the naive oracle, which will place all qualifying
+		// hits and their strata in the 'oracleHits' and
+		// 'oracleStrata' vectors
+		naiveOracle(oracleHits, oracleStrata, iham);
+		assert_eq(oracleHits.size(), oracleStrata.size());
+		assert_gt(oracleHits.size(), 0);
+		int lastStratum = -1;
+		int bestStratum = -1;
+		int worstStratum = -1;
+		// For each hit generated for this read
+		for(size_t i = first; i < hits.size(); i++) {
+			const Hit& rhit = hits[i];
+			int stratum = strata[i];
+			// Keep a running measure of the "worst" stratum
+			// observed in the reported hits
+			if(worstStratum == -1) {
+				worstStratum = stratum;
+			} else if(stratum > worstStratum) {
+				worstStratum = stratum;
+			}
+			// Keep a running measure of the "best" stratum
+			// observed in the reported hits
+			if(bestStratum == -1) {
+				bestStratum = stratum;
+			} else if(stratum < bestStratum) {
+				bestStratum = stratum;
+			}
+			if(lastStratum == -1) {
+				lastStratum = stratum;
+			} else if(!sink.spanStrata()) {
+				// Retained hits are not allowed to "span" strata,
+				// so this hit's stratum had better be the same as
+				// the last hit's
+				assert_eq(lastStratum, stratum);
+			}
+			// Go through oracleHits and look for a match
+			size_t i;
+			bool found = false;
+			for(i = 0; i < oracleHits.size(); i++) {
+				const Hit& h = oracleHits[i];
+				if(h.h.first  == rhit.h.first  &&
+				   h.h.second == rhit.h.second &&
+				   h.fw       == rhit.fw)
+				{
+					// Oracle hit i and reported hit j refer to the
+					// same alignment
+					assert(h.mms == rhit.mms);
+					assert_eq(stratum, oracleStrata[i]);
+					// Erase the elements in the oracle vectors
+					oracleHits.erase(oracleHits.begin() + i);
+					oracleStrata.erase(oracleStrata.begin() + i);
+					found = true;
+					break;
+				}
+			}
+			// If the backtracker found a hit, it had better be one
+			// of the ones that the oracle found
+			assert(found);
 		}
-		// Throw all the characters in the read name into the random
-		// seed
-		assert(_name != NULL);
-		size_t namelen = seqan::length(*_name);
-		for(size_t i = 0; i < namelen; i++) {
-			int p = (int)(*_name)[i];
-			assert_leq(p, 255);
-			size_t off = ((i & 3) << 3);
-			rseed |= (p << off);
+		// All of the oracle hits that corresponded to a reported
+		// hit have now been eliminated
+		assert_neq(-1, lastStratum);
+		assert_neq(-1, bestStratum);
+		assert_neq(-1, worstStratum);
+		assert_eq(oracleHits.size(), oracleStrata.size());
+		if(maxHitsAllowed == 0xffffffff && !sink.exceededOverThresh()) {
+			if(sink.spanStrata()) {
+				// All hits remaining must occur more times than the max
+				map<uint32_t,uint32_t> readToCnt;
+				for(size_t i = 0; i < oracleHits.size(); i++) {
+					readToCnt[oracleHits[i].patId]++;
+				}
+				map<uint32_t,uint32_t>::iterator it;
+				for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
+					assert_gt(it->second, sink.overThresh());
+				}
+			} else {
+				// Must have matched all oracle hits at the best
+				// stratum
+				size_t numLeftovers = 0;
+				for(size_t i = 0; i < oracleStrata.size(); i++) {
+					if(oracleStrata[i] == bestStratum) {
+						numLeftovers++;
+					}
+				}
+				// Must have matched every oracle hit
+				if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
+					for(size_t i = 0; i < oracleHits.size(); i++) {
+						if(oracleStrata[i] == bestStratum) {
+							printHit(oracleHits[i]);
+						}
+					}
+					assert(0);
+				}
+			}
 		}
-		_rand.init(rseed + _randSeed);
+		if(sink.best() && sink.overThresh() == 0xffffffff && !sink.exceededOverThresh()) {
+			// Ensure that all oracle hits have a stratum at least
+			// as bad as the worst stratum observed in the reported
+			// hits
+			for(size_t i = 0; i < oracleStrata.size(); i++) {
+				assert_leq(bestStratum, oracleStrata[i]);
+			}
+		}
 	}
 
 	/**
@@ -2454,7 +2522,8 @@ protected:
 		bool fw = _params.fw();
 		uint32_t patid = _params.patId();
 
-		naiveOracle((*_os),
+		::naiveOracle(
+		            (*_os),
 		            (*_qry),
 		            _qlen,
 		            (*_qual),
@@ -2473,15 +2542,19 @@ protected:
 		            _muts,
 		            _maqPenalty,
 		            _halfAndHalf,
-		            _reportExacts);
+		            _reportExacts,
+		            false);
 	}
 
+	bool                _started;
+	bool                _finished;
+	bool                _foundRange;
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry
 	String<char>*       _name;   // name of _qry
-	const Ebwt<TStr>*   _ebwt;   // Ebwt to search in
-	const EbwtSearchParams<TStr>& _params;   // Ebwt to search in
+	const Ebwt<String<Dna> >*   _ebwt;   // Ebwt to search in
+	const EbwtSearchParams<String<Dna> >& _params;   // Ebwt to search in
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
 	uint32_t            _2revOff;  // 2-revisitable chunk
@@ -2490,9 +2563,6 @@ protected:
 	bool                _maqPenalty;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
-	bool                _reportOnHit; // report as soon as we find a
-	                             // hit? (as opposed to leaving it up
-	                             // to the caller whether to report)
 	uint32_t           *_pairs;  // arrow pairs, leveled in parallel
 	                             // with decision stack
 	uint8_t            *_elims;  // which arrow pairs have been
@@ -2532,8 +2602,6 @@ protected:
 	uint32_t            _3depth;
 	/// Default quals
 	String<char>        _qualDefault;
-	/// Greatest stack depth seen since last reset
-	uint32_t            _hiDepth;
 	/// Number of backtracks in last call to backtrack()
 	uint32_t            _numBts;
 	/// Number of backtracks since last reset
@@ -2547,11 +2615,6 @@ protected:
 	SideLocus           _preLtop;
 	/// Precalculated bot locus
 	SideLocus           _preLbot;
-	/// Keep track of # backtracks at various stack depths, but not
-	/// cumulatively (just "in order to get where I am now")
-	uint32_t*           _btsAtDepths;
-	/// Keep track of # backtracks at various stack depths cumulatively
-	uint32_t*           _totBtsAtDepths;
 	/// Number of backtracks permitted w/ stackDepth 0 before giving up
 	/// in halfAndHalf mode
 	uint32_t            _maxBts0;
@@ -2570,8 +2633,380 @@ protected:
 	uint32_t            _randSeed;
 	/// Be talkative
 	bool                _verbose;
+	uint64_t            _ihits;
 	// Holding area for partial alignments
 	vector<PartialAlignment> _partialsBuf;
+	// Current range to expose to consumers
+	Range               _curRange;
+};
+
+/**
+ * State machine for carrying out an alignment, which usually consists
+ * of a series of phases that conduct different alignments using
+ * different backtracking constraints.
+ *
+ * Each Aligner should have a dedicated HitSinkPerThread and
+ * PatternSourcePerThread.
+ */
+class Aligner {
+public:
+	Aligner(const Ebwt<String<Dna> >* ebwtFw,
+	        const Ebwt<String<Dna> >* ebwtRc,
+	        uint32_t seed) :
+		ebwtFw_(ebwtFw), ebwtRc_(ebwtRc), patsrc_(NULL),
+		bufa_(NULL), bufb_(NULL), seed_(seed)
+	{ }
+
+	virtual ~Aligner() { }
+	/// Advance the range search by one memory op
+	virtual bool advance() = 0;
+	/**
+	 * Returns true if all searching w/r/t the current query is
+	 * finished or if there is no current query.
+	 */
+	virtual bool done() = 0;
+
+	/// Prepare Aligner for the next read
+	virtual void setQuery(PatternSourcePerThread *patsrc) {
+		assert(patsrc != NULL);
+		patsrc_ = patsrc;
+		bufa_ = &patsrc->bufa();
+		assert(bufa_ != NULL);
+		bufb_ = &patsrc->bufb();
+		alen_ = bufa_->length();
+		blen_ = (bufb_ != NULL) ? bufb_->length() : 0;
+		rand_.init(seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name));
+	}
+
+	/**
+	 * Report hit(s) from a given range.
+	 */
+	bool reportSingleEndHitFromRange(Range& ra,
+	                                 EbwtSearchParams<String<Dna> >& params,
+	                                 bool fw)
+	{
+		assert_gt(ra.bot, ra.top);
+		assert(bufa_ != NULL);
+		assert(!seqan::empty(bufa_->patFw));
+		assert(!seqan::empty(bufa_->qualFw));
+		assert(!seqan::empty(bufa_->name));
+//		if(stackDepth == 0 && !_reportExacts) {
+//			// We are not reporting exact hits (usually because we've
+//			// already reported them as part of a previous invocation
+//			// of the backtracker)
+//			return false;
+//		}
+//		if(_reportArrows) {
+//			assert(_params.arrowMode());
+//			return _ebwt->report((*_qry), _qual, _name,
+//                    _mms, _refcs, stackDepth, 0,
+//                    top, bot, _qlen, stratum, _params);
+//		}
+		uint32_t spread = ra.bot - ra.top;
+		// Pick a random spot in the range to begin report
+		uint32_t r = ra.top + (rand_.nextU32() % spread);
+		for(uint32_t i = 0; i < spread; i++) {
+			uint32_t ri = r + i;
+			if(ri >= ra.bot) ri -= spread;
+			// reportChaseOne takes the _mms[] list in terms of
+			// their indices into the query string; not in terms
+			// of their offset from the 3' or 5' end.
+			if(ebwtFw_->reportChaseOne(fw ?  bufa_->patFw  :  bufa_->patRc,
+			                           fw ? &bufa_->qualFw : &bufa_->qualRc,
+			                           &bufa_->name,
+			                           ra.mms, ra.refcs, ra.numMms, ri,
+			                           ra.top, ra.bot, alen_,
+			                           ra.stratum, params))
+			{
+				// Return value of true means that we can stop
+				return true;
+			}
+			// Return value of false means that we should continue
+			// searching.  This could happen if we the call to
+			// reportChaseOne() reported a hit, but the user asked for
+			// multiple hits and we haven't reached the ceiling yet.
+			// This might also happen if the call to reportChaseOne()
+			// didn't report a hit because the alignment was spurious
+			// (i.e. overlapped some padding).
+		}
+		// All range elements were examined and we should keep going
+		return false;
+	}
+
+protected:
+
+	// Index
+	const Ebwt<String<Dna> >* ebwtFw_;
+	const Ebwt<String<Dna> >* ebwtRc_;
+	// Current read pair
+	PatternSourcePerThread* patsrc_;
+	ReadBuf* bufa_;
+	uint32_t alen_;
+	ReadBuf* bufb_;
+	uint32_t blen_;
+	// RandomSource for choosing alignments to report from ranges
+	uint32_t seed_;
+	RandomSource rand_;
+};
+
+/**
+ * Abstract parent factory class for constructing aligners of all kinds.
+ */
+class AlignerFactory {
+public:
+	virtual ~AlignerFactory() { }
+	virtual Aligner* create() const = 0;
+	virtual std::vector<Aligner*>* create(uint32_t) const = 0;
+
+	/// Free memory associated with the aligner
+	virtual void destroy(Aligner* al) const {
+		assert(al != NULL);
+		// Free the Aligner
+		delete al;
+	}
+
+	/// Free memory associated with an aligner list
+	virtual void destroy(std::vector<Aligner*>* als) const {
+		assert(als != NULL);
+		// Free all of the Aligners
+		for(size_t i = 0; i < als->size(); i++) {
+			if((*als)[i] != NULL) {
+				delete (*als)[i];
+				(*als)[i] = NULL;
+			}
+		}
+		// Free the vector
+		delete als;
+	}
+};
+
+/**
+ * Coordinates multiple aligners.
+ */
+class MultiAligner {
+public:
+	MultiAligner(
+			uint32_t n,
+			const AlignerFactory& alignFact,
+			const PatternSourcePerThreadFactory& patsrcFact) :
+			n_(n),
+			alignFact_(alignFact), patsrcFact_(patsrcFact),
+			aligners_(NULL), patsrcs_(NULL)
+	{
+		aligners_ = alignFact_.create(n_);
+		assert(aligners_ != NULL);
+		patsrcs_ = patsrcFact_.create(n_);
+		assert(patsrcs_ != NULL);
+	}
+
+	/// Free memory associated with the aligners and their pattern sources.
+	virtual ~MultiAligner() {
+		alignFact_.destroy(aligners_);
+		patsrcFact_.destroy(patsrcs_);
+	}
+
+	/**
+	 * Advance an array of aligners in parallel, using prefetches to
+	 * try to hide all the latency.
+	 */
+	void run() {
+		bool done = false;
+		while(!done) {
+			done = true;
+			for(uint32_t i = 0; i < n_; i++) {
+				if(!(*aligners_)[i]->done()) {
+					done = false;
+					(*aligners_)[i]->advance();
+				} else {
+					(*patsrcs_)[i]->nextReadPair();
+					if(!(*patsrcs_)[i]->empty()) {
+						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
+						assert(!(*aligners_)[i]->done());
+						done = false;
+					} else {
+						// if done == true, it remains true
+					}
+				}
+			}
+		}
+	}
+
+protected:
+	uint32_t n_; /// Number of aligners
+	const AlignerFactory&                  alignFact_;
+	const PatternSourcePerThreadFactory&   patsrcFact_;
+	std::vector<Aligner *>*                aligners_;
+	std::vector<PatternSourcePerThread *>* patsrcs_;
+};
+
+/**
+ * An aligner for finding exact matches of unpaired reads.  Always
+ * tries the forward-oriented version of the read before the reverse-
+ * oriented read.
+ */
+class UnpairedExactAlignerV1 : public Aligner {
+public:
+	UnpairedExactAlignerV1(
+		const Ebwt<String<Dna> >& ebwt,
+		HitSink& sink,
+		const HitSinkPerThreadFactory& sinkPtFactory,
+		vector<String<Dna5> >& os,
+		bool arrowMode,
+		bool verbose,
+		uint32_t seed) :
+		Aligner(&ebwt, NULL, seed),
+		doneFw_(false), done_(true), firstFw_(true), firstRc_(true),
+		sinkPt_(sinkPtFactory.create()),
+		params_(*sinkPt_, os, true, true, true, arrowMode),
+		ebwt_(ebwt),
+		r1_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
+		    false, NULL, NULL, verbose, seed, &os, false, false, false)
+	{
+		assert(c1_.empty());
+	}
+
+	virtual ~UnpairedExactAlignerV1() {
+		delete sinkPt_; sinkPt_ = NULL;
+	}
+
+	/**
+	 * Prepare this aligner for the next read.
+	 */
+	virtual void setQuery(PatternSourcePerThread* patsrc) {
+		Aligner::setQuery(patsrc); // set fields & random seed
+		doneFw_ = false;
+		done_ = false;
+		firstFw_ = true;
+		firstRc_ = true;
+	}
+
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 */
+	virtual bool advance() {
+		assert(!done_);
+		if(!doneFw_) {
+			if(firstFw_) {
+				// Set up the RangeSource for the forward read
+				r1_.setOffs(0, 0, alen_, alen_, alen_, alen_);
+				r1_.setQuery(&patsrc_->bufa().patFw, &patsrc_->bufa().qualFw, &patsrc_->bufa().name);
+				params_.setFw(true);
+				r1_.initConts(c1_, 0); // set up initial continuation
+				firstFw_ = false;
+			} else {
+				// Advance the RangeSource for the forward-oriented read
+				r1_.advance(c1_);
+			}
+			c1_.prep(ebwt_.eh(), ebwt_.ebwt());
+			if(r1_.foundRange()) {
+				done_ = reportSingleEndHitFromRange(r1_.range(), params_, true);
+			}
+			if(!done_) doneFw_ = c1_.empty();
+		} else {
+			if(firstRc_) {
+				// Set up the RangeSource for the reverse-complement
+				// read
+				c1_.clear();
+				assert(c1_.empty());
+				r1_.setOffs(0, 0, alen_, alen_, alen_, alen_);
+				r1_.setQuery(&patsrc_->bufa().patRc, &patsrc_->bufa().qualRc, &patsrc_->bufa().name);
+				params_.setFw(false);
+				r1_.initConts(c1_, 0); // set up initial continuation
+				firstRc_ = false;
+			} else {
+				// Advance the RangeSource for the reverse-complement read
+				r1_.advance(c1_);
+			}
+			c1_.prep(ebwt_.eh(), ebwt_.ebwt());
+			// Advance the RangeSource for the reverse-complement read
+			if(r1_.foundRange()) {
+				done_ = reportSingleEndHitFromRange(r1_.range(), params_, false);
+			}
+			if(!done_) done_ = c1_.empty();
+		}
+		if(done_) {
+			sinkPt_->finishRead(*patsrc_, NULL, NULL, NULL, NULL);
+		}
+		return done_;
+	}
+
+	/**
+	 * Returns true if all searching w/r/t the current query is
+	 * finished or if there is no current query.
+	 */
+	virtual bool done() {
+		return done_;
+	}
+
+protected:
+	// Progress state
+	bool doneFw_;
+	bool done_;
+	bool firstFw_;
+	bool firstRc_;
+
+	// Temporary HitSink; to be deleted
+	HitSinkPerThread* sinkPt_;
+
+	// State for alignment
+	EbwtSearchParams<String<Dna> > params_;
+	const Ebwt<String<Dna> >&      ebwt_;
+	GreedyDFSRangeSource           r1_;
+	GreedyDFSContinuationManager   c1_;
+};
+
+/**
+ * Concrete factory class for constructing unpaired exact aligners.
+ */
+class UnpairedExactAlignerV1Factory : public AlignerFactory {
+public:
+	UnpairedExactAlignerV1Factory(
+			Ebwt<String<Dna> >& ebwt,
+			HitSink& sink,
+			const HitSinkPerThreadFactory& sinkPtFactory,
+			vector<String<Dna5> >& os,
+			bool arrowMode,
+			bool verbose,
+			uint32_t seed) :
+			ebwt_(ebwt),
+			sink_(sink),
+			sinkPtFactory_(sinkPtFactory),
+			os_(os),
+			arrowMode_(arrowMode),
+			verbose_(verbose),
+			seed_(seed)
+	{ }
+
+	/**
+	 * Create a new UnpairedExactAlignerV1s.
+	 */
+	virtual Aligner* create() const {
+		return new UnpairedExactAlignerV1(
+			ebwt_, sink_, sinkPtFactory_, os_, arrowMode_, verbose_, seed_);
+	}
+
+	/**
+	 * Create a new vector of new UnpairedExactAlignerV1s.
+	 */
+	virtual std::vector<Aligner*>* create(uint32_t n) const {
+		std::vector<Aligner*>* v = new std::vector<Aligner*>;
+		for(uint32_t i = 0; i < n; i++) {
+			v->push_back(new UnpairedExactAlignerV1(
+				ebwt_, sink_, sinkPtFactory_, os_, arrowMode_, verbose_, seed_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
+
+private:
+	Ebwt<String<Dna> >& ebwt_;
+	HitSink& sink_;
+	const HitSinkPerThreadFactory& sinkPtFactory_;
+	vector<String<Dna5> >& os_;
+	bool arrowMode_;
+	bool verbose_;
+	uint32_t seed_;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

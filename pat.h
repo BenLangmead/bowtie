@@ -74,6 +74,11 @@ struct ReadBuf {
 		return seqan::empty(patFw);
 	}
 
+	/// Return length of the read in the buffer
+	uint32_t length() {
+		return seqan::length(patFw);
+	}
+
 	static const int BUF_SIZE = 1024;
 	String<Dna5>  patFw;               // forward-strand sequence
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
@@ -462,6 +467,37 @@ protected:
 };
 
 /**
+ * Abstract parent factory for PatternSourcePerThreads.
+ */
+class PatternSourcePerThreadFactory {
+public:
+	virtual ~PatternSourcePerThreadFactory() { }
+	virtual PatternSourcePerThread* create() const = 0;
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const = 0;
+
+	/// Free memory associated with a pattern source
+	virtual void destroy(PatternSourcePerThread* patsrc) const {
+		assert(patsrc != NULL);
+		// Free the PatternSourcePerThread
+		delete patsrc;
+	}
+
+	/// Free memory associated with a pattern source list
+	virtual void destroy(std::vector<PatternSourcePerThread*>* patsrcs) const {
+		assert(patsrcs != NULL);
+		// Free all of the PatternSourcePerThreads
+		for(size_t i = 0; i < patsrcs->size(); i++) {
+			if((*patsrcs)[i] != NULL) {
+				delete (*patsrcs)[i];
+				(*patsrcs)[i] = NULL;
+			}
+		}
+		// Free the vector
+		delete patsrcs;
+	}
+};
+
+/**
  * A per-thread wrapper for a PairedPatternSource.
  */
 class WrappedPatternSourcePerThread : public PatternSourcePerThread {
@@ -495,6 +531,39 @@ private:
 
 	/// Container for obtaining paired reads from PatternSources
 	PairedPatternSource& _patsrc;
+};
+
+/**
+ * Abstract parent factory for PatternSourcePerThreads.
+ */
+class WrappedPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
+public:
+	WrappedPatternSourcePerThreadFactory(PairedPatternSource& patsrc) :
+		patsrc_(patsrc) { }
+
+	/**
+	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
+	 */
+	virtual PatternSourcePerThread* create() const {
+		return new WrappedPatternSourcePerThread(patsrc_);
+	}
+
+	/**
+	 * Create a new heap-allocated vector of heap-allocated
+	 * WrappedPatternSourcePerThreads.
+	 */
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
+		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+		for(size_t i = 0; i < n; i++) {
+			v->push_back(new WrappedPatternSourcePerThread(patsrc_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
+
+private:
+	/// Container for obtaining paired reads from PatternSources
+	PairedPatternSource& patsrc_;
 };
 
 /**
@@ -670,6 +739,53 @@ private:
 	int          _thread;
 	bool         _reverse;
 	RandomSource _rand;
+};
+
+/**
+ * Abstract parent factory for PatternSourcePerThreads.
+ */
+class RandomPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
+public:
+	RandomPatternSourcePerThreadFactory(
+			uint32_t numreads,
+            int length,
+            int numthreads,
+            int thread,
+            bool reverse) :
+            numreads_(numreads),
+            length_(length),
+            numthreads_(numthreads),
+            thread_(thread),
+            reverse_(reverse) { }
+
+	/**
+	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
+	 */
+	virtual PatternSourcePerThread* create() const {
+		return new RandomPatternSourcePerThread(
+			numreads_, length_, numthreads_, thread_, reverse_);
+	}
+
+	/**
+	 * Create a new heap-allocated vector of heap-allocated
+	 * WrappedPatternSourcePerThreads.
+	 */
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
+		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+		for(size_t i = 0; i < n; i++) {
+			v->push_back(new RandomPatternSourcePerThread(
+				numreads_, length_, numthreads_, thread_, reverse_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
+
+private:
+	uint32_t numreads_;
+    int length_;
+    int numthreads_;
+    int thread_;
+    bool reverse_;
 };
 
 /// Skip to the end of the current string of newline chars and return

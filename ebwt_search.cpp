@@ -83,6 +83,7 @@ static bool forgiveInput        = false; // let read input be a little wrong w/o
 static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
+static bool stateful            = false; // use stateful aligners
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:";
@@ -124,7 +125,8 @@ enum {
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
-	ARG_SHARED_MEM
+	ARG_SHARED_MEM,
+	ARG_STATEFUL
 };
 
 static struct option long_options[] = {
@@ -190,6 +192,7 @@ static struct option long_options[] = {
 	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
 	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
+	{"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -743,6 +746,7 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
+			case ARG_STATEFUL: stateful = true; break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -956,47 +960,50 @@ static char *argv0 = NULL;
 
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
-static PatternSourcePerThread*
-createPatSrc(PairedPatternSource& _patsrc, int tid) {
-	PatternSourcePerThread *patsrc;
+static PatternSourcePerThreadFactory*
+createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
+	PatternSourcePerThreadFactory *patsrcFact;
 	if(randReadsNoSync) {
-		patsrc = new RandomPatternSourcePerThread(numRandomReads, lenRandomReads, nthreads, tid, false);
+		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid, false);
 	} else {
-		patsrc = new WrappedPatternSourcePerThread(_patsrc);
+		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
 	}
-    assert(patsrc != NULL);
-    return patsrc;
+    assert(patsrcFact != NULL);
+    return patsrcFact;
 }
 
-/// Create a HitSinkPerThread according to the global params and return
-/// a pointer to it
-static HitSinkPerThread* createSink(HitSink& _sink, bool sanity) {
-    HitSinkPerThread *sink = NULL;
+/**
+ * Allocate a HitSinkPerThreadFactory on the heap according to the
+ * global params and return a pointer to it.
+ */
+static HitSinkPerThreadFactory*
+createSinkFactory(HitSink& _sink, bool sanity) {
+    HitSinkPerThreadFactory *sink = NULL;
     if(spanStrata) {
 		if(!allHits) {
 			if(onlyBest) {
 				// First N best, spanning strata
-				sink = new FirstNBestHitSinkPerThread(_sink, khits, mhits, sanity);
+				sink = new FirstNBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThread(_sink, khits, mhits, sanity);
+				sink = new FirstNGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, spanning strata
-			sink = new AllHitSinkPerThread(_sink, mhits, sanity);
+			sink = new AllHitSinkPerThreadFactory(_sink, mhits, sanity);
 		}
     } else {
 		if(!allHits) {
 			if(onlyBest) {
 				// First N best, not spanning strata
-				sink = new FirstNBestStratifiedHitSinkPerThread(_sink, khits, mhits, sanity);
+				sink = new FirstNBestStratifiedHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThread(_sink, khits, mhits, sanity);
+				sink = new FirstNGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, not spanning strata
-			sink = new AllStratifiedHitSinkPerThread(_sink, mhits, sanity);
+			sink = new AllStratifiedHitSinkPerThreadFactory(_sink, mhits, sanity);
 		}
     }
     assert(sink != NULL);
@@ -1021,8 +1028,8 @@ static void *exactSearchWorker(void *vp) {
 	bool sanity = sanityCheck && !os.empty();
 	// Per-thread initialization
 	uint32_t lastLen = 0;
-	PatternSourcePerThread *patsrc = createPatSrc(_patsrc, (int)(long)vp);
-	HitSinkPerThread* sink = createSink(_sink, sanity);
+	PatternSourcePerThread *patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
+	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSink
 	        os,         // reference sequences
@@ -1030,7 +1037,7 @@ static void *exactSearchWorker(void *vp) {
 	        true,       // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt(
+	GreedyDFSRangeSource bt(
 			&ebwt, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
@@ -1051,6 +1058,46 @@ static void *exactSearchWorker(void *vp) {
     }
 	FINISH_READ(patsrc);
     WORKER_EXIT();
+}
+
+/**
+ * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
+ */
+static void *exactSearchWorkerStateful(void *vp) {
+	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	HitSink& _sink               = *exactSearch_sink;
+	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
+	vector<String<Dna5> >& os    = *exactSearch_os;
+
+	// Global initialization
+	bool sanity = sanityCheck && !os.empty();
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+
+	UnpairedExactAlignerV1Factory alfact(
+			ebwt,
+			_sink,
+			*sinkFact,
+			os,
+			arrowMode,
+			verbose,
+			seed);
+	{
+		MultiAligner multi(
+				64,
+				alfact,
+				*patsrcFact);
+		// Run that mother
+		multi.run();
+		// MultiAligner must be destroyed before patsrcFact
+	}
+
+	delete patsrcFact;
+	delete sinkFact;
+#ifdef BOWTIE_PTHREADS
+	if((long)vp != 0L) pthread_exit(NULL);
+#endif
+	return NULL;
 }
 
 #define SET_A_FW(bt, p, params) \
@@ -1090,10 +1137,14 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
+			if(stateful)
+				pthread_create(&threads[i], &pt_attr, exactSearchWorkerStateful, (void *)(long)(i+1));
+			else
+				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
 		}
 #endif
-		exactSearchWorker((void*)0L);
+		if(stateful) exactSearchWorkerStateful((void*)0L);
+		else         exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
 	}
@@ -1126,8 +1177,8 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
-	HitSinkPerThread* sink = createSink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
+	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -1135,7 +1186,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        false,      // read is forward
 	        true,       // index is forward
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt(
+	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
@@ -1173,8 +1224,8 @@ static void* mismatchSearchWorkerPhase2(void *vp){
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
-	HitSinkPerThread* sink = createSink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
+	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -1182,7 +1233,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt(
+	GreedyDFSRangeSource bt(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
@@ -1317,8 +1368,8 @@ static void* mismatchSearchWorkerFull(void *vp){
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !arrowMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp);
-	HitSinkPerThread* sink = createSink(_sink, sanity);
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
+	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -1326,7 +1377,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        true,       // read is forward
 	        false,      // index is mirror index
 	        arrowMode); // arrow mode
-	BacktrackManager<String<Dna> > bt(
+	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
@@ -1448,7 +1499,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
 		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
-		BacktrackManager<String<Dna> >::naiveOracle( \
+		::naiveOracle( \
 		        os, \
 				patFw, \
 				plen, \
@@ -1472,7 +1523,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        ebwtfw);     /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \
-			BacktrackManager<String<Dna> >::printHit( \
+			::printHit( \
 				os, \
 				hits[0], \
 				patFw, \
@@ -1494,7 +1545,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
 		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
-		BacktrackManager<String<Dna> >::naiveOracle( \
+		::naiveOracle( \
 		        os, \
 				patRc, \
 				plen, \
@@ -1518,7 +1569,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        !ebwtfw);    /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \
-			BacktrackManager<String<Dna> >::printHit( \
+			::printHit( \
 				os, \
 				hits[0], \
 				patRc, \
@@ -1547,8 +1598,8 @@ static bool                           twoOrThreeMismatchSearch_two;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
 	uint32_t lastLen = 0; \
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
-	HitSinkPerThread* sink = createSink(_sink, false); \
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
+	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
@@ -1563,7 +1614,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask  = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
-	BacktrackManager<String<Dna> > btr1(
+	GreedyDFSRangeSource btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1601,7 +1652,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	BacktrackManager<String<Dna> > bt2(
+	GreedyDFSRangeSource bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1638,8 +1689,8 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
-	// BacktrackManager to search for seedlings for case 4F
-	BacktrackManager<String<Dna> > bt3(
+	// GreedyDFSRangeSource to search for seedlings for case 4F
+	GreedyDFSRangeSource bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1654,7 +1705,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
-	BacktrackManager<String<Dna> > bthh3(
+	GreedyDFSRangeSource bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1790,7 +1841,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	BacktrackManager<String<Dna> > btr1(
+	GreedyDFSRangeSource btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1805,7 +1856,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
-	BacktrackManager<String<Dna> > bt2(
+	GreedyDFSRangeSource bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1820,7 +1871,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
-	BacktrackManager<String<Dna> > bt3(
+	GreedyDFSRangeSource bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1835,7 +1886,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
-	BacktrackManager<String<Dna> > bthh3(
+	GreedyDFSRangeSource bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
@@ -1945,8 +1996,8 @@ static int                            seededQualSearch_qualCutoff;
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;        \
 	int                      qualCutoff = seededQualSearch_qualCutoff; \
 	uint32_t lastLen = 0; \
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
-	HitSinkPerThread* sink = createSink(_sink, false); \
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
+	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
@@ -1959,13 +2010,13 @@ static int                            seededQualSearch_qualCutoff;
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask  = *seededQualSearch_hitMask;
+	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-	// BacktrackManager for finding exact hits for the forward-
+	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
-	BacktrackManager<String<Dna> > btf1(
+	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -1978,7 +2029,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
-	BacktrackManager<String<Dna> > bt1(
+	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2016,8 +2067,8 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
-	// BacktrackManager to search for hits for cases 1F, 2F, 3F
-	BacktrackManager<String<Dna> > btf2(
+	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
+	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2031,8 +2082,8 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for partial alignments for case 4R
-	BacktrackManager<String<Dna> > btr2(
+	// GreedyDFSRangeSource to search for partial alignments for case 4R
+	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2073,8 +2124,8 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	Ebwt<String<Dna> >& ebwtFw        = *seededQualSearch_ebwtFw;
 	PartialAlignmentManager* pamFw    = seededQualSearch_pamFw;
 	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
-	// BacktrackManager to search for seedlings for case 4F
-	BacktrackManager<String<Dna> > btf3(
+	// GreedyDFSRangeSource to search for seedlings for case 4F
+	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2088,9 +2139,9 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for hits for case 4R by extending
+	// GreedyDFSRangeSource to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
-	BacktrackManager<String<Dna> > btr3(
+	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2104,8 +2155,8 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// The half-and-half BacktrackManager
-	BacktrackManager<String<Dna> > btr23(
+	// The half-and-half GreedyDFSRangeSource
+	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2147,9 +2198,9 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamFw = seededQualSearch_pamFw;
-	// BacktrackManager to search for hits for case 4F by extending
+	// GreedyDFSRangeSource to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
-	BacktrackManager<String<Dna> > btf4(
+	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2163,8 +2214,8 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
-	// Half-and-half BacktrackManager for forward read
-	BacktrackManager<String<Dna> > btf24(
+	// Half-and-half GreedyDFSRangeSource for forward read
+	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2208,9 +2259,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		pamFw = new PartialAlignmentManager(64);
 	}
 	vector<PartialAlignment> pals;
-	// BacktrackManager for finding exact hits for the forward-
+	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
-	BacktrackManager<String<Dna> > btf1(
+	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2223,7 +2274,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
-	BacktrackManager<String<Dna> > bt1(
+	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2237,8 +2288,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for hits for cases 1F, 2F, 3F
-	BacktrackManager<String<Dna> > btf2(
+	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
+	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2252,8 +2303,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for partial alignments for case 4R
-	BacktrackManager<String<Dna> > btr2(
+	// GreedyDFSRangeSource to search for partial alignments for case 4R
+	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2267,8 +2318,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for seedlings for case 4F
-	BacktrackManager<String<Dna> > btf3(
+	// GreedyDFSRangeSource to search for seedlings for case 4F
+	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2282,9 +2333,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
-	// BacktrackManager to search for hits for case 4R by extending
+	// GreedyDFSRangeSource to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
-	BacktrackManager<String<Dna> > btr3(
+	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2298,8 +2349,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
-	// The half-and-half BacktrackManager
-	BacktrackManager<String<Dna> > btr23(
+	// The half-and-half GreedyDFSRangeSource
+	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
@@ -2314,9 +2365,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		    true,    // considerQuals
 		    true,    // halfAndHalf
 		    !noMaqRound);
-	// BacktrackManager to search for hits for case 4F by extending
+	// GreedyDFSRangeSource to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
-	BacktrackManager<String<Dna> > btf4(
+	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
@@ -2330,8 +2381,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
-	// Half-and-half BacktrackManager for forward read
-	BacktrackManager<String<Dna> > btf24(
+	// Half-and-half GreedyDFSRangeSource for forward read
+	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
@@ -2646,7 +2697,7 @@ static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
 	HitSink&               _sink    = *seedAndSWExtendSearch_sink;     \
 	vector<String<Dna5> >& os       = *seedAndSWExtendSearch_os;       \
 	uint32_t lastLen = 0; \
-	PatternSourcePerThread* patsrc = createPatSrc(_patsrc, (int)(long)vp); \
+	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
 	allHits = false; khits = 0; onlyBest = false; \
 	HitSinkPerThread* sink = new AllHitSinkPerThread(_sink, true); \
 	/* Per-thread initialization */ \
@@ -2662,8 +2713,8 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	SEED_SW_EXTEND_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *seedAndSWExtendSearch_ebwtFw;
 
-	// Half-and-half BacktrackManager for forward read
-	BacktrackManager<String<Dna> > bt(
+	// Half-and-half GreedyDFSRangeSource for forward read
+	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,        // qualThresh
 	        BacktrackLimits(), // max backtracks

@@ -1396,7 +1396,7 @@ struct SideLocus {
 	/**
 	 * Construct from row and other relevant information about the Ebwt.
 	 */
-	SideLocus(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
+	SideLocus(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
 		initFromRow(row, ep, ebwt);
 	}
 
@@ -1407,7 +1407,7 @@ struct SideLocus {
 	static void initFromTopBot(uint32_t top,
 	                           uint32_t bot,
 	                           const EbwtParams& ep,
-	                           uint8_t* ebwt,
+	                           const uint8_t* ebwt,
 	                           SideLocus& ltop,
 	                           SideLocus& lbot)
 	{
@@ -1435,37 +1435,19 @@ struct SideLocus {
 	/**
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the shape of the Ebwt.
-	 *
-	 * Function gets 23.76% in profile
 	 */
-	void initFromRow(uint32_t row, const EbwtParams& ep, uint8_t* ebwt) {
-		// Above line gets 2.02% in profile
-		//const uint32_t sideBwtLen = ep._sideBwtLen;
-		//const uint32_t sideBwtSz  = ep._sideBwtSz;
+	void initFromRow(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
 		const uint32_t sideSz     = ep._sideSz;
+		// Side length is hard-coded for now; this allows the compiler
+		// to do clever things to accelerate / and %.
 		_sideNum                  = row / 224;
 		_charOff                  = row % 224;
 		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
-#ifndef NO_PREFETCH
-		// prefetch this side
-		__builtin_prefetch((const void *)_side,
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY /* no locality */); // 8.63% in profile
-		// prefetch the other half of this side
-		__builtin_prefetch((const void *)(_side + 64),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY /* no locality */);
-#endif
 		// prefetch tjside too
 		_fw = _sideNum & 1;   // odd-numbered sides are forward
-#ifndef NO_PREFETCH
-		__builtin_prefetch((const void *)(_side + (_fw? -64 : 128)),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY /* no locality */); // 8.95% in profile
-#endif
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte
@@ -1475,13 +1457,52 @@ struct SideLocus {
 		}
 	}
 
+	/// Return true iff this is an initialized SideLocus
+	bool valid() {
+		return _side != NULL;
+	}
+
+	/**
+	 * Prefetch the relevant cache lines associated with this locus.
+	 */
+	void prefetch() {
+		assert(valid());
+#ifndef NO_PREFETCH
+		// prefetch this side
+		__builtin_prefetch((const void *)_side,
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY /* no locality */);
+		// prefetch the other half of this side
+		__builtin_prefetch((const void *)(_side + 64),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY /* no locality */);
+		// prefetch the half of the opposite side that contains the
+		// cumulative character occurrence counts
+		__builtin_prefetch((const void *)(_side + (_fw? (-64) : 128)),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY /* no locality */);
+#endif
+	}
+
+	/**
+	 * Prefetch relevant cache lines for top and bot arrows.  Try not
+	 * to redundantly prefetch the same lines twice.
+	 */
+	static void prefetchTopBot(SideLocus& ltop, SideLocus& lbot) {
+		assert(ltop.valid() && lbot.valid());
+		ltop.prefetch();
+		if(ltop._sideNum != lbot._sideNum) {
+			lbot.prefetch();
+		}
+	}
+
     uint32_t _sideByteOff; // offset of top side within ebwt[]
     uint32_t _sideNum;     // index of side
     uint32_t _charOff;     // character offset within side
     int _fw;               // side is forward or backward?
     int _by;               // byte within side (not adjusted for bw sides)
     int _bp;               // bitpair within byte (not adjusted for bw sides)
-    uint8_t *_side;        // ptr to beginning of top side
+    const uint8_t *_side;  // ptr to beginning of top side
 };
 
 #include "ebwt_search_backtrack.h"
@@ -1824,7 +1845,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
-	uint8_t *ebwtSide = l._side;
+	const uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
@@ -1846,12 +1867,12 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	uint32_t ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
+		const uint32_t *ac = reinterpret_cast<const uint32_t*>(ebwtSide - 8);
 		assert_leq(ac[0], eh._numSides * eh._sideBwtLen); // b/c it's used as padding
 		assert_lt(ac[1], eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
-		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8); // next
+		const uint32_t *gt = reinterpret_cast<const uint32_t*>(ebwtSide + eh._sideSz - 8); // next
 		assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
@@ -1877,7 +1898,7 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
-	uint8_t *ebwtSide = l._side;
+	const uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(by, (int)eh._sideBwtSz);
 	assert_geq(by, 0);
@@ -1898,8 +1919,8 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide - 8);
-	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+	const uint32_t *ac = reinterpret_cast<const uint32_t*>(ebwtSide - 8);
+	const uint32_t *gt = reinterpret_cast<const uint32_t*>(ebwtSide + eh._sideSz - 8);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
@@ -1930,7 +1951,7 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
-	uint8_t *ebwtSide = l._side;
+	const uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
@@ -1953,12 +1974,12 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	uint32_t ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
+		const uint32_t *ac = reinterpret_cast<const uint32_t*>(ebwtSide + eh._sideSz - 8);
 		assert_leq(ac[0], eh._numSides * eh._sideBwtLen); // b/c it's used as padding
 		assert_lt(ac[1], eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
-		uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh._sideSz) - 8); // next
+		const uint32_t *gt = reinterpret_cast<const uint32_t*>(ebwtSide + (2*eh._sideSz) - 8); // next
 		assert_lt(gt[0], eh._len); assert_lt(gt[1], eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
@@ -1983,7 +2004,7 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 	const EbwtParams& eh = this->_eh;
 	int by = l._by;
 	int bp = l._bp;
-	uint8_t *ebwtSide = l._side;
+	const uint8_t *ebwtSide = l._side;
 	uint32_t sideByteOff = l._sideByteOff;
 	assert_lt(by, (int)eh._sideBwtSz);
 	assert_geq(by, 0);
@@ -2005,8 +2026,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	uint32_t *ac = reinterpret_cast<uint32_t*>(ebwtSide + eh._sideSz - 8);
-	uint32_t *gt = reinterpret_cast<uint32_t*>(ebwtSide + (2*eh._sideSz) - 8);
+	const uint32_t *ac = reinterpret_cast<const uint32_t*>(ebwtSide + eh._sideSz - 8);
+	const uint32_t *gt = reinterpret_cast<const uint32_t*>(ebwtSide + (2*eh._sideSz) - 8);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);

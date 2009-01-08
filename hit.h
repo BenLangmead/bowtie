@@ -539,6 +539,15 @@ protected:
 };
 
 /**
+ * Abstract parent factory for HitSinkPerThreads.
+ */
+class HitSinkPerThreadFactory {
+public:
+	virtual ~HitSinkPerThreadFactory() { }
+	virtual HitSinkPerThread* create() const = 0;
+};
+
+/**
  * Report first N good alignments encountered; trust search routine
  * to try alignments in something approximating a best-first order.
  * Best used in combination with a stringent alignment policy.
@@ -549,8 +558,8 @@ public:
 	FirstNGoodHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t __n,
-	        uint32_t __max = 0xffffffff,
-	        bool __keep = false) :
+	        uint32_t __max,
+	        bool __keep) :
 	        HitSinkPerThread(sink, __max, __keep),
 	        _n(__n)
 	{
@@ -607,6 +616,38 @@ public:
 private:
 	uint32_t _n;               /// max # hits to report per read
 };
+
+/**
+ * Concrete factory for FirstNGoodHitSinkPerThreads.
+ */
+class FirstNGoodHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	FirstNGoodHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t n,
+			uint32_t max = 0xffffffff,
+			bool keep = false) :
+			sink_(sink),
+			n_(n),
+			max_(max),
+			keep_(keep)
+	{ }
+
+	/**
+	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t n_;
+    uint32_t max_;
+    bool keep_;
+};
+
 
 /**
  * Report the first N best alignments encountered.  Aggregator and
@@ -759,6 +800,37 @@ private:
 
 	uint32_t _n;               /// max # hits to report
 	vector<Hit> _hitStrata[4]; /// lower numbered strata are better
+};
+
+/**
+ * Concrete factory for FirstNBestHitSinkPerThreads.
+ */
+class FirstNBestHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	FirstNBestHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t n,
+			uint32_t max = 0xffffffff,
+			bool keep = false) :
+			sink_(sink),
+			n_(n),
+			max_(max),
+			keep_(keep)
+	{ }
+
+	/**
+	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new FirstNBestHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t n_;
+    uint32_t max_;
+    bool keep_;
 };
 
 /**
@@ -933,6 +1005,37 @@ private:
 };
 
 /**
+ * Concrete factory for FirstNBestStratifiedHitSinkPerThread.
+ */
+class FirstNBestStratifiedHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	FirstNBestStratifiedHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t n,
+			uint32_t max = 0xffffffff,
+			bool keep = false) :
+			sink_(sink),
+			n_(n),
+			max_(max),
+			keep_(keep)
+	{ }
+
+	/**
+	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t n_;
+    uint32_t max_;
+    bool keep_;
+};
+
+/**
  * Report all valid alignments.
  */
 class AllHitSinkPerThread : public HitSinkPerThread {
@@ -982,6 +1085,34 @@ public:
 	 * Always return false; search routine should not stop.
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) { return false; }
+};
+
+/**
+ * Concrete factory for AllHitSinkPerThread.
+ */
+class AllHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	AllHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t max = 0xffffffff,
+			bool keep = false) :
+			sink_(sink),
+			max_(max),
+			keep_(keep)
+	{ }
+
+	/**
+	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new AllHitSinkPerThread(sink_, max_, keep_);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t max_;
+    bool keep_;
 };
 
 /**
@@ -1122,6 +1253,34 @@ private:
 	int _bestStratumReported;          /// stratum of best reported hit thus far
 	bool _reported;
 	vector<Hit> _hitStrata[4];
+};
+
+/**
+ * Concrete factory for AllStratifiedHitSinkPerThread.
+ */
+class AllStratifiedHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	AllStratifiedHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t max = 0xffffffff,
+			bool keep = false) :
+			sink_(sink),
+			max_(max),
+			keep_(keep)
+	{ }
+
+	/**
+	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new AllStratifiedHitSinkPerThread(sink_, max_, keep_);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t max_;
+    bool keep_;
 };
 
 /**
