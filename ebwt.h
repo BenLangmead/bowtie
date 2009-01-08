@@ -1398,6 +1398,7 @@ struct SideLocus {
 	 */
 	SideLocus(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
 		initFromRow(row, ep, ebwt);
+		prefetch();
 	}
 
 	/**
@@ -2447,7 +2448,6 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	const uint32_t* offs = this->_offs;
 	if(l == NULL) {
 		l = &myl;
-		myl.initFromRow(i, this->_eh, this->_ebwt);
 	}
 	assert(l != NULL);
 	// Walk along until we reach the next marked row to the left
@@ -2457,6 +2457,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_neq(newi, i);
 		i = newi;                                  // update row
 		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+		l->prefetch();
 		jumps++;
 	}
 	// This is a marked row
@@ -2512,6 +2513,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	if(l == NULL) {
 		l = &myl;
 		myl.initFromRow(i, this->_eh, this->_ebwt);
+		myl.prefetch();
 	}
 	assert(l != NULL);
 	clear(lbuf); clear(rbuf);
@@ -2584,6 +2586,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 			i = newi;                                  // update row
 			assert_neq(i, _zOff);
 			l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+			l->prefetch();
 			jumps++;
 		}
 		assert_eq(textoff, jumps);
@@ -2610,6 +2613,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
 	uint32_t right_steps = ref_right - (off + qlen);
 	l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+	l->prefetch();
 	for(size_t j = 0; j < right_steps_rounded; j++) {
 		// Not a marked row; walk left one more char
 		int c = unpack_2b_from_8b(l->_side[l->_by], l->_bp);
@@ -2623,6 +2627,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		i = newi;                                  // update row
 		assert_neq(i, _zOff);
 		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
+		l->prefetch();
 		jumps++;
 	}
 	if(right_steps_rounded > right_steps) {
@@ -2666,6 +2671,7 @@ void Ebwt<TStr>::restore(TStr& s) const {
 		s[this->_eh._len - jumps - 1] = rowL(l);
 		i = newi;
 		l.initFromRow(i, this->_eh, this->_ebwt);
+		l.prefetch();
 		jumps++;
 	}
 	assert_eq(jumps, this->_eh._len);

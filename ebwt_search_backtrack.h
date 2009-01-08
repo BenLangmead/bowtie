@@ -1014,6 +1014,7 @@ public:
 			_precalcedSideLocus = false;
 		} else if(top != 0 || bot != 0) {
 			SideLocus::initFromTopBot(top, bot, ebwt._eh, ebwt._ebwt, ltop, lbot);
+			SideLocus::prefetchTopBot(ltop, lbot);
 		}
 		// Check whether we've exceeded any backtracking limit
 		if(_halfAndHalf) {
@@ -1152,6 +1153,7 @@ public:
 				// those prefetches are fired off as soon as possible.
 				// This eventually calls SideLocus.initfromRow().
 				SideLocus::initFromTopBot(top, bot, ebwt._eh, ebwt._ebwt, ltop, lbot);
+				SideLocus::prefetchTopBot(ltop, lbot);
 			}
 			// Update the elim array
 			eliminate(elims, d, c);
@@ -1430,6 +1432,7 @@ public:
 				SideLocus::initFromTopBot(bttop, btbot,
 				                          ebwt._eh, ebwt._ebwt,
 				                          _preLtop, _preLbot);
+				SideLocus::prefetchTopBot(_preLtop, _preLbot);
 				icur = _qlen - i - 1; // current offset into _qry
 				// Slide over to the next backtacking frame within
 				// pairs and elims; won't interfere with our frame or
