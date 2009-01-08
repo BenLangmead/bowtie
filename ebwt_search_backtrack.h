@@ -2787,9 +2787,10 @@ class MultiAligner {
 public:
 	MultiAligner(
 			uint32_t n,
+			uint32_t qUpto,
 			const AlignerFactory& alignFact,
 			const PatternSourcePerThreadFactory& patsrcFact) :
-			n_(n),
+			n_(n), qUpto_(qUpto),
 			alignFact_(alignFact), patsrcFact_(patsrcFact),
 			aligners_(NULL), patsrcs_(NULL)
 	{
@@ -2815,24 +2816,31 @@ public:
 			done = true;
 			for(uint32_t i = 0; i < n_; i++) {
 				if(!(*aligners_)[i]->done()) {
+					// Advance an aligner already in progress
 					done = false;
 					(*aligners_)[i]->advance();
-				} else {
+				} else if(qUpto > 0) {
+					// Get a new read and initialize an aligner with it
 					(*patsrcs_)[i]->nextReadPair();
 					if(!(*patsrcs_)[i]->empty()) {
+						qUpto--;
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
 						assert(!(*aligners_)[i]->done());
 						done = false;
 					} else {
-						// if done == true, it remains true
+						// No more reads; if done == true, it remains
+						// true
 					}
+				} else {
+					// Past read limit; if done == true, it remains true
 				}
 			}
 		}
 	}
 
 protected:
-	uint32_t n_; /// Number of aligners
+	uint32_t n_;    /// Number of aligners
+	uint32_t qUpto; /// Number of reads to align before stopping
 	const AlignerFactory&                  alignFact_;
 	const PatternSourcePerThreadFactory&   patsrcFact_;
 	std::vector<Aligner *>*                aligners_;
