@@ -41,3 +41,5 @@ bowtie-asm
 bowtie-asm-debug
 bowtie-maptool
 bowtie-maptool-debug
+bowtie-maqconvert
+e_coli.map
