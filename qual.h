@@ -3,6 +3,11 @@
 
 extern unsigned char qualRounds[];
 
+/// Translate a Phred-encoded ASCII character into a Phred quality
+static inline uint8_t phredCharToPhredQual(char c) {
+	return ((uint8_t)c >= 33 ? ((uint8_t)c - 33) : 0);
+}
+
 class SimplePhredPenalty {
 public:
 	static uint8_t mmPenalty (uint8_t qual) {
