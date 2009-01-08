@@ -38,6 +38,12 @@ PTHREAD_LIB = -lpthread
 endif
 endif
 
+SHMEM_DEF = -DBOWTIE_SHARED_MEM
+ifeq (1,$(WINDOWS))
+# No shared-mem facility in Windows
+SHMEM_DEF =
+endif
+
 LIBS = 
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
