@@ -116,7 +116,8 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DBUILD_HOST="\"`hostname`\"" \
      -DBUILD_TIME="\"`date`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
-     $(PTHREAD_DEF)
+     $(PTHREAD_DEF) \
+     $(SHMEM_DEF)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

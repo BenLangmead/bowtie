@@ -11,7 +11,9 @@
 #include <sstream>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
+#ifdef BOWTIE_SHARED_MEM
 #include <sys/shm.h>
+#endif
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "bitpack.h"
@@ -776,7 +778,9 @@ public:
 		if(_offs != NULL && !_offsIsShmem) {
 			delete[] _offs; _offs = NULL;
 		} else if(_offs != NULL) {
+#ifdef BOWTIE_SHARED_MEM
 			shmdt(_offs);
+#endif
 		}
 		if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 		if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
@@ -785,7 +789,9 @@ public:
 		if(_ebwt != NULL && !_ebwtIsShmem) {
 			delete[] _ebwt; _ebwt = NULL;
 		} else if(_ebwt != NULL) {
+#ifdef BOWTIE_SHARED_MEM
 			shmdt(_ebwt);
+#endif
 		}
 		try {
 			if(_in1.is_open()) _in1.close();
@@ -3021,6 +3027,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 	}
 	{ // Load _ebwt[]
 		bool readFromStream = true;
+#ifdef BOWTIE_SHARED_MEM
 		if(useShmem) {
 			int shmid = -1;
 			// Calculate key given string
@@ -3112,6 +3119,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				readFromStream = false;
 			}
 		} else {
+#endif
 			// Allocate ebwt (big allocation)
 			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into process memory" << endl;
 			try {
@@ -3123,7 +3131,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					 << "memory." << endl;
 				exit(1);
 			}
+#ifdef BOWTIE_SHARED_MEM
 		}
+#endif
 		if(readFromStream) {
 			// Read ebwt from primary stream
 			_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
@@ -3224,6 +3234,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 	{
 		// Allocate offs (big allocation)
 		bool readFromStream = true;
+#ifdef BOWTIE_SHARED_MEM
 		if(useShmem) {
 			if(offRateDiff != 0) {
 				cerr << "Cannot combine --offrate with shared-memory mode" << endl;
@@ -3316,6 +3327,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				readFromStream = false;
 			}
 		} else {
+#endif
 			try {
 				if(_verbose) cout << "Reading offs (" << offsLenSampled << " 32-bit words)" << endl;
 				this->_offs = new uint32_t[offsLenSampled];
@@ -3326,8 +3338,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					 << "computer with more memory." << endl;
 				exit(1);
 			}
+#ifdef BOWTIE_SHARED_MEM
 		}
-
+#endif
 		if(readFromStream) {
 			if(be || offRateDiff > 0) {
 				for(uint32_t i = 0; i < offsLen; i++) {
