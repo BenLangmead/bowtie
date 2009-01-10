@@ -343,6 +343,10 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 	algo_sort(mm->n_mapped_reads, mm->mapped_reads);
 
+	if (verbose)
+	{
+		fprintf(stderr, "Converted %d alignments, writing Maq map\n", mm->n_mapped_reads);
+	}
 	// Write out the header
 	maq_write_header(maqf, mm);
 	// Write out the alignments
