@@ -2447,11 +2447,14 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	const uint32_t offMask = this->_eh._offMask;
 	const uint32_t offRate = this->_eh._offRate;
 	const uint32_t* offs = this->_offs;
+	// If the caller didn't give us a pre-initialized
 	if(l == NULL) {
 		l = &myl;
 		l->initFromRow(i, this->_eh, this->_ebwt);
+		l->prefetch();
 	}
 	assert(l != NULL);
+	assert(l->valid());
 	// Walk along until we reach the next marked row to the left
 	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
