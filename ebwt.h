@@ -2126,6 +2126,7 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
                                   ) const
 {
 	uint32_t ret;
+	assert(l._side != NULL);
 	int c = unpack_2b_from_8b(l._side[l._by], l._bp);
 	assert_lt(c, 4);
 	assert_geq(c, 0);
@@ -2448,6 +2449,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	const uint32_t* offs = this->_offs;
 	if(l == NULL) {
 		l = &myl;
+		l->initFromRow(i, this->_eh, this->_ebwt);
 	}
 	assert(l != NULL);
 	// Walk along until we reach the next marked row to the left
