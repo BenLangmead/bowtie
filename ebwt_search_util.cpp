@@ -1,4 +1,5 @@
 #include "ebwt_search_util.h"
+#include "seqan/file.h"
 
 using namespace std;
 using namespace seqan;
