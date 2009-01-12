@@ -208,16 +208,22 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		qualities              = strsep((char**)&buf, "\t");
 		char *scan_oms         = strsep((char**)&buf, "\t");
 		mismatches             = strsep((char**)&buf, "\t");
-
 		if(scan_oms == NULL) {
+			// One or more of the fields up to the 'oms' field didn't exist
 			fprintf(stderr, "Warning: found malformed record, skipping\n");
 			continue;
 		}
-
-		assert(scan_orientation != NULL);
+		// All fields through 'oms' should exist
+		assert(name             != NULL &&
+		       scan_orientation != NULL &&
+		       text_name        != NULL &&
+		       scan_refoff      != NULL &&
+		       sequence         != NULL &&
+		       qualities        != NULL &&
+		       scan_oms         != NULL);
+		// Parse orientation, text offset and oms
 		orientation = *scan_orientation;
 		assert(orientation == '+' || orientation == '-');
-
 		text_offset = (unsigned int)strtol(scan_refoff, (char**)NULL, 10);
 		other_occs  = (unsigned int)strtol(scan_oms,    (char**)NULL, 10);
 
