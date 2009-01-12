@@ -44,6 +44,9 @@ ifeq (1,$(WINDOWS))
 SHMEM_DEF =
 endif
 
+PREFETCH_LOCALITY = 0
+PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
+
 LIBS = 
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
@@ -117,7 +120,8 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DBUILD_TIME="\"`date`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
      $(PTHREAD_DEF) \
-     $(SHMEM_DEF)
+     $(SHMEM_DEF) \
+     $(PREF_DEF)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum

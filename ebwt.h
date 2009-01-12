@@ -2447,7 +2447,8 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	const uint32_t offMask = this->_eh._offMask;
 	const uint32_t offRate = this->_eh._offRate;
 	const uint32_t* offs = this->_offs;
-	// If the caller didn't give us a pre-initialized
+	// If the caller didn't give us a pre-calculated (and prefetched)
+	// locus, then we have to do that now
 	if(l == NULL) {
 		l = &myl;
 		l->initFromRow(i, this->_eh, this->_ebwt);

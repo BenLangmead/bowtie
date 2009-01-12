@@ -216,7 +216,7 @@ public:
 			const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
 			uint32_t __reportPartials = 0,
 			bool __reportExacts = true,
-			bool __reportArrows = false,
+			bool __reportRanges = false,
 			PartialAlignmentManager* __partials = NULL,
 			String<QueryMutation>* __muts = NULL,
 			bool __verbose = true,
@@ -248,7 +248,7 @@ public:
 		_chars(NULL),
 		_reportPartials(__reportPartials),
 		_reportExacts(__reportExacts),
-		_reportArrows(__reportArrows),
+		_reportRanges(__reportRanges),
 		_partials(__partials),
 		_muts(__muts),
 		_os(__os),
@@ -421,8 +421,8 @@ public:
 	 * Set whether this manager will report hits as matrix ranges
 	 * (true) or as fully-resolved hits (false).
 	 */
-	void setReportArrows(bool a) {
-		_reportArrows = a;
+	void setreportRanges(bool a) {
+		_reportRanges = a;
 	}
 
 	/**
@@ -1024,15 +1024,15 @@ public:
 			}
 			_numBts++;
 		}
-		// The total number of arrow pairs that are acceptable
-		// backtracking targets ("alternative" arrow pairs)
+		// The total number of ranges that are acceptable
+		// backtracking targets ("alternative" ranges)
 		uint32_t altNum = 0;
-		// The total number of arrow pairs that are candidates to be
+		// The total number of ranges that are candidates to be
 		// the *next* backtracking target because they are low quality
-		// ("eligible" arrow pairs)
+		// ("eligible" ranges)
 		uint32_t eligibleNum = 0;
 		// Total distance between all lowest-quality "alternative"
-		// arrow pairs that haven't yet been eliminated
+		// ranges that haven't yet been eliminated
 		uint32_t eligibleSz = 0;
 		// If there is just one eligible slot at the moment (a common
 		// case), these are its parameters
@@ -1044,7 +1044,7 @@ public:
 		char     elchar = 0;
 		int      elcint = 0;
 		// The lowest quality value associated with any alternative
-		// arrow pairs; all alternative pairs with this quality are
+		// ranges; all alternative ranges with this quality are
 		// eligible
 		uint8_t lowAltQual = 0xff;
 		uint32_t d = depth;
@@ -1069,7 +1069,7 @@ public:
 			// Reset eligibleNum and eligibleSz if there are any
 			// eligible pairs discovered at this spot
 			bool curOverridesEligible = false;
-			// Determine whether arrow pairs at this location are
+			// Determine whether ranges at this location are
 			// candidates for backtracking
 			int c = (int)(*_qry)[cur];
 			assert_leq(c, 4);
@@ -1528,8 +1528,8 @@ public:
 					                    btOneRevOff, // new 1-revisitable boundary
 					                    btTwoRevOff, // new 2-revisitable boundary
 					                    btThreeRevOff, // new 3-revisitable boundary
-					                    ftabTop,  // top arrow in pair prior to 'depth'
-					                    ftabBot,  // bottom arrow in pair prior to 'depth'
+					                    ftabTop,  // top arrow in range prior to 'depth'
+					                    ftabBot,  // bottom arrow in range prior to 'depth'
 					                    btham,  // weighted hamming distance so far
 					                    iham,   // initial weighted hamming distance
 					                    newPairs,
@@ -1546,8 +1546,8 @@ public:
 				                    btOneRevOff, // new 1-revisitable boundary
 				                    btTwoRevOff, // new 2-revisitable boundary
 				                    btThreeRevOff, // new 3-revisitable boundary
-				                    bttop,  // top arrow in pair prior to 'depth'
-				                    btbot,  // bottom arrow in pair prior to 'depth'
+				                    bttop,  // top arrow in range prior to 'depth'
+				                    btbot,  // bottom arrow in range prior to 'depth'
 				                    btham,  // weighted hamming distance so far
 				                    iham,   // initial weighted hamming distance
 				                    newPairs,
@@ -2135,7 +2135,7 @@ protected:
 			// of the backtracker)
 			return false;
 		}
-		if(_reportArrows) {
+		if(_reportRanges) {
 			assert(_params.arrowMode());
 			return _ebwt->report((*_qry), _qual, _name,
                     _mms, _refcs, stackDepth, 0,
@@ -2566,9 +2566,9 @@ protected:
 	bool                _maqPenalty;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
-	uint32_t           *_pairs;  // arrow pairs, leveled in parallel
+	uint32_t           *_pairs;  // ranges, leveled in parallel
 	                             // with decision stack
-	uint8_t            *_elims;  // which arrow pairs have been
+	uint8_t            *_elims;  // which ranges have been
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
 	uint8_t            *_bts;    // how many backtracks remain in each
@@ -2584,7 +2584,7 @@ protected:
 	bool                _reportExacts;
 	/// When reporting a full alignment, report top/bot; don't chase
 	/// any of the results
-	bool                _reportArrows;
+	bool                _reportRanges;
 	/// Append partial alignments here
 	PartialAlignmentManager *_partials;
 	/// Set of mutations that apply for a partial alignment
@@ -2655,9 +2655,10 @@ class Aligner {
 public:
 	Aligner(const Ebwt<String<Dna> >* ebwtFw,
 	        const Ebwt<String<Dna> >* ebwtRc,
+	        bool rangeMode,
 	        uint32_t seed) :
 		ebwtFw_(ebwtFw), ebwtRc_(ebwtRc), patsrc_(NULL),
-		bufa_(NULL), bufb_(NULL), seed_(seed)
+		bufa_(NULL), bufb_(NULL), rangeMode_(rangeMode), seed_(seed)
 	{ }
 
 	virtual ~Aligner() { }
@@ -2699,12 +2700,15 @@ public:
 //			// of the backtracker)
 //			return false;
 //		}
-//		if(_reportArrows) {
-//			assert(_params.arrowMode());
-//			return _ebwt->report((*_qry), _qual, _name,
-//                    _mms, _refcs, stackDepth, 0,
-//                    top, bot, _qlen, stratum, _params);
-//		}
+		if(rangeMode_) {
+			return ebwtFw_->report(
+					fw ?  bufa_->patFw  :  bufa_->patRc,
+					fw ? &bufa_->qualFw : &bufa_->qualRc,
+					&bufa_->name,
+                    ra.mms, ra.refcs, ra.numMms, 0,
+                    ra.top, ra.bot, alen_,
+                    ra.stratum, params);
+		}
 		uint32_t spread = ra.bot - ra.top;
 		// Pick a random spot in the range to begin report
 		uint32_t r = ra.top + (rand_.nextU32() % spread);
@@ -2748,6 +2752,7 @@ protected:
 	ReadBuf* bufb_;
 	uint32_t blen_;
 	// RandomSource for choosing alignments to report from ranges
+	bool rangeMode_;
 	uint32_t seed_;
 	RandomSource rand_;
 };
@@ -2862,13 +2867,13 @@ public:
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		vector<String<Dna5> >& os,
-		bool arrowMode,
+		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(&ebwt, NULL, seed),
+		Aligner(&ebwt, NULL, rangeMode, seed),
 		doneFw_(false), done_(true), firstFw_(true), firstRc_(true),
 		sinkPt_(sinkPtFactory.create()),
-		params_(*sinkPt_, os, true, true, true, arrowMode),
+		params_(*sinkPt_, os, true, true, true, rangeMode),
 		ebwt_(ebwt),
 		r1_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
 		    false, NULL, NULL, verbose, seed, &os, false, false, false)
@@ -2977,14 +2982,14 @@ public:
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			vector<String<Dna5> >& os,
-			bool arrowMode,
+			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
 			ebwt_(ebwt),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			os_(os),
-			arrowMode_(arrowMode),
+			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
 	{ }
@@ -2994,7 +2999,7 @@ public:
 	 */
 	virtual Aligner* create() const {
 		return new UnpairedExactAlignerV1(
-			ebwt_, sink_, sinkPtFactory_, os_, arrowMode_, verbose_, seed_);
+			ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_);
 	}
 
 	/**
@@ -3004,7 +3009,7 @@ public:
 		std::vector<Aligner*>* v = new std::vector<Aligner*>;
 		for(uint32_t i = 0; i < n; i++) {
 			v->push_back(new UnpairedExactAlignerV1(
-				ebwt_, sink_, sinkPtFactory_, os_, arrowMode_, verbose_, seed_));
+				ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -3015,7 +3020,7 @@ private:
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	vector<String<Dna5> >& os_;
-	bool arrowMode_;
+	bool rangeMode_;
 	bool verbose_;
 	uint32_t seed_;
 };

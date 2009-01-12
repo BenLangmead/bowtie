@@ -33,7 +33,7 @@ static int revcomp				= 1; // search for reverse complements?
 static int seed					= 0; // srandom() seed
 static int timing				= 0; // whether to report basic timing data
 static bool allHits				= false; // for multihits, report just one
-static bool arrowMode			= false; // report SA arrows instead of locs
+static bool rangeMode			= false; // report BWT ranges instead of ref locs
 static int showVersion			= 0; // just print version and quit?
 static int ipause				= 0; // pause before maching?
 static uint32_t qUpto			= 0xffffffff; // max # of queries to read
@@ -84,6 +84,7 @@ static bool useSpinlock         = true;  // false -> don't use of spinlocks even
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
 static bool stateful            = false; // use stateful aligners
+static uint32_t prefetchWidth   = 64;    // number of reads to process in parallel w/ --stateful
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:";
@@ -92,7 +93,7 @@ enum {
 	ARG_ORIG = 256,
 	ARG_SEED,
 	ARG_DUMP_PATS,
-	ARG_ARROW,
+	ARG_RANGE,
 	ARG_CONCISE,
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
@@ -126,7 +127,8 @@ enum {
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
 	ARG_SHARED_MEM,
-	ARG_STATEFUL
+	ARG_STATEFUL,
+	ARG_PREFETCH_WIDTH
 };
 
 static struct option long_options[] = {
@@ -175,7 +177,7 @@ static struct option long_options[] = {
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
-	{"arrows",       no_argument,       0,            ARG_ARROW},
+	{"range",        no_argument,       0,            ARG_RANGE},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{"maxbts0",      required_argument, 0,            ARG_MAXBTS0},
 	{"maxbts1",      required_argument, 0,            ARG_MAXBTS1},
@@ -193,6 +195,7 @@ static struct option long_options[] = {
 	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
 	{"stateful",     no_argument,       0,            ARG_STATEFUL},
+	{"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -250,7 +253,7 @@ static void printUsage(ostream& out) {
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
 	    //<< "  --qsamelen         die with error if queries don't all have the same length" << endl
 	    //<< "  --reportopps       report # of other potential mapping targets for each hit" << endl
-	    //<< "  --arrows           report hits as top/bottom offsets into SA" << endl
+	    //<< "  --range            report hits as top/bottom offsets into SA" << endl
 	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r and <query_in>" << endl
 	    << "  --concise          write hits in concise format" << endl
 	    << "  -b/--binout        write hits in binary format (<hit_outfile> not optional)" << endl
@@ -680,7 +683,7 @@ static void parseOptions(int argc, char **argv) {
 	   			format = RANDOM;
 	   			randReadsNoSync = true;
 	   			break;
-	   		case ARG_ARROW: arrowMode = true; break;
+	   		case ARG_RANGE: rangeMode = true; break;
 	   		case ARG_CONCISE: outType = CONCISE; break;
 	   		case 'b': outType = BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
@@ -1036,14 +1039,14 @@ static void *exactSearchWorker(void *vp) {
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        true,       // index is forward
-	        arrowMode); // arrow mode
+	        rangeMode); // range mode
 	GreedyDFSRangeSource bt(
 			&ebwt, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1079,12 +1082,12 @@ static void *exactSearchWorkerStateful(void *vp) {
 			_sink,
 			*sinkFact,
 			os,
-			arrowMode,
+			rangeMode,
 			verbose,
 			seed);
 	{
 		MultiAligner multi(
-				64,
+				prefetchWidth,
 				qUpto,
 				alfact,
 				*patsrcFact);
@@ -1176,7 +1179,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
-    bool sanity = sanityCheck && !os.empty() && !arrowMode;
+    bool sanity = sanityCheck && !os.empty() && !rangeMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
@@ -1186,14 +1189,14 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        revcomp,    // forward AND reverse complement?
 	        false,      // read is forward
 	        true,       // index is forward
-	        arrowMode); // arrow mode
+	        rangeMode); // range mode
 	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1223,7 +1226,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
     // Per-thread initialization
-    bool sanity = sanityCheck && !os.empty() && !arrowMode;
+    bool sanity = sanityCheck && !os.empty() && !rangeMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
@@ -1233,14 +1236,14 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        false,      // index is mirror index
-	        arrowMode); // arrow mode
+	        rangeMode); // range mode
 	GreedyDFSRangeSource bt(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1367,7 +1370,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
     // Per-thread initialization
-    bool sanity = sanityCheck && !os.empty() && !arrowMode;
+    bool sanity = sanityCheck && !os.empty() && !rangeMode;
 	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
@@ -1377,14 +1380,14 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        false,      // index is mirror index
-	        arrowMode); // arrow mode
+	        rangeMode); // range mode
 	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        BacktrackLimits(), // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1608,7 +1611,7 @@ static bool                           twoOrThreeMismatchSearch_two;
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
 	        true,        /* index is forward */ \
-	        arrowMode);  /* arrow mode (irrelevant here) */
+	        rangeMode);  /* range mode (irrelevant here) */
 
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
@@ -1623,7 +1626,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1661,7 +1664,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1699,7 +1702,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1714,7 +1717,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1850,7 +1853,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
@@ -1865,7 +1868,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1880,7 +1883,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -1895,7 +1898,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
-	        false,          // reportArrows
+	        false,          // reportRanges
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
@@ -2006,7 +2009,7 @@ static int                            seededQualSearch_qualCutoff;
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
 	        true,        /* index is forward */ \
-	        arrowMode);  /* arrow mode (irrelevant here) */
+	        rangeMode);  /* range mode (irrelevant here) */
 
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
@@ -2023,7 +2026,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // partials
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -2036,7 +2039,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // partials
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -2075,7 +2078,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2090,7 +2093,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2132,7 +2135,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2148,7 +2151,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2163,7 +2166,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2207,7 +2210,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2222,7 +2225,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2268,7 +2271,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -2281,7 +2284,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
@@ -2296,7 +2299,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2311,7 +2314,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2326,7 +2329,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
-	        false,                 // reportArrows
+	        false,                 // reportRanges
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
@@ -2342,7 +2345,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2357,7 +2360,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2374,7 +2377,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2389,7 +2392,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        false,   // reportArrows
+	        false,   // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
@@ -2708,7 +2711,7 @@ static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
 	        true,        /* index is forward */ \
-	        true);       /* arrow mode (irrelevant here) */
+	        true);       /* range mode (irrelevant here) */
 
 static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	SEED_SW_EXTEND_WORKER_SETUP();
@@ -2721,7 +2724,7 @@ static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
 	        BacktrackLimits(), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
-	        true,    // reportArrows
+	        true,    // reportRanges
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
