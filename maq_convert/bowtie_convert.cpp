@@ -217,7 +217,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 		if (bwtf_ret > 0 && bwtf_ret < 6)
 		{
-			fprintf(stderr, "Warning: found malformed record, skipping\n");
+			fprintf(stderr, "Warning: found malformed record (%d fields read), skipping\n", bwt_ret);
 			continue;
 		}
 
