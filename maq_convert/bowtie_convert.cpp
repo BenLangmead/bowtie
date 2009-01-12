@@ -185,6 +185,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	while (fgets(bwt_buf, 2048, bwtf))
 	{
 		char* nl = strrchr(bwt_buf, '\n');
+		char* buf = bwt_buf;
 		if (nl) *nl = 0;
 
 		/**
@@ -199,14 +200,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			8) mismatch positions - this is a comma-delimited list of positions
 				w.r.t. the 5 prime end of the read.
 		 */
-		name                   = strsep((char**)&bwt_buf, "\t");
-		char *scan_orientation = strsep((char**)&bwt_buf, "\t");
-		text_name              = strsep((char**)&bwt_buf, "\t");
-		char *scan_refoff      = strsep((char**)&bwt_buf, "\t");
-		sequence               = strsep((char**)&bwt_buf, "\t");
-		qualities              = strsep((char**)&bwt_buf, "\t");
-		char *scan_oms         = strsep((char**)&bwt_buf, "\t");
-		mismatches             = strsep((char**)&bwt_buf, "\t");
+		name                   = strsep((char**)&buf, "\t");
+		char *scan_orientation = strsep((char**)&buf, "\t");
+		text_name              = strsep((char**)&buf, "\t");
+		char *scan_refoff      = strsep((char**)&buf, "\t");
+		sequence               = strsep((char**)&buf, "\t");
+		qualities              = strsep((char**)&buf, "\t");
+		char *scan_oms         = strsep((char**)&buf, "\t");
+		mismatches             = strsep((char**)&buf, "\t");
 
 		if(scan_oms == NULL) {
 			fprintf(stderr, "Warning: found malformed record, skipping\n");
