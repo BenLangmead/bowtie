@@ -165,35 +165,20 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	std::map<string, int> seqid_to_name;
 	char bwt_buf[2048];
 	static const int buf_size = 256;
-	char name[buf_size];
-	int bwtf_ret = 0;
+	char *name;
 	uint32_t seqid = 0;
 
 	// Initialize a new Maq map table
 	header_t<MAXLEN> *mm = maq_init_header<MAXLEN>();
 
-	/**
-	 Fields are:
-		1) name (or for now, Id)
-		2) orientations ('+'/'-')
-		3) text name
-		4) text offset
-		5) sequence of hit (i.e. trimmed read)
-	    6) quality values of sequence (trimmed)
-		7) # of other hits in EBWT
-		8) mismatch positions - this is a comma-delimited list of positions
-			w.r.t. the 5 prime end of the read.
-	 */
-	const char* bwt_fmt_str = "%s %c %s %d %s %s %d %s";
-
 	char orientation;
-	char text_name[buf_size];
+	char *text_name;
 	unsigned int text_offset;
-	char sequence[buf_size];
+	char *sequence;
 
-	char qualities[buf_size];
+	char *qualities;
 	unsigned int other_occs;
-	char mismatches[buf_size];
+	char *mismatches = NULL;
 
 	int max = 0;
 
@@ -202,24 +187,38 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		char* nl = strrchr(bwt_buf, '\n');
 		if (nl) *nl = 0;
 
-		memset(mismatches, 0, sizeof(mismatches));
+		/**
+		 Fields are:
+			1) name (or for now, Id)
+			2) orientations ('+'/'-')
+			3) text name
+			4) text offset
+			5) sequence of hit (i.e. trimmed read)
+		    6) quality values of sequence (trimmed)
+			7) # of other hits in EBWT
+			8) mismatch positions - this is a comma-delimited list of positions
+				w.r.t. the 5 prime end of the read.
+		 */
+		name                   = strsep((char**)&bwt_buf, "\t");
+		char *scan_orientation = strsep((char**)&bwt_buf, "\t");
+		text_name              = strsep((char**)&bwt_buf, "\t");
+		char *scan_refoff      = strsep((char**)&bwt_buf, "\t");
+		sequence               = strsep((char**)&bwt_buf, "\t");
+		qualities              = strsep((char**)&bwt_buf, "\t");
+		char *scan_oms         = strsep((char**)&bwt_buf, "\t");
+		mismatches             = strsep((char**)&bwt_buf, "\t");
 
-		bwtf_ret = sscanf(bwt_buf,
-						  bwt_fmt_str,
-						  name,
-						  &orientation,
-						  text_name,   // name of reference sequence
-						  &text_offset,
-						  sequence,
-						  qualities,
-						  &other_occs,
-						  mismatches);
-
-		if (bwtf_ret > 0 && bwtf_ret < 6)
-		{
-			fprintf(stderr, "Warning: found malformed record (%d fields read), skipping\n", bwtf_ret);
+		if(scan_oms == NULL) {
+			fprintf(stderr, "Warning: found malformed record, skipping\n");
 			continue;
 		}
+
+		assert(scan_orientation != NULL);
+		orientation = *scan_orientation;
+		assert(orientation == '+' || orientation == '-');
+
+		text_offset = (unsigned int)strtol(scan_refoff, (char**)NULL, 10);
+		other_occs  = (unsigned int)strtol(scan_oms,    (char**)NULL, 10);
 
 		if (mm->n_mapped_reads == (bit64_t)max)
 		{
@@ -259,7 +258,9 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		}
 
 		vector<string> mismatch_tokens;
-		tokenize(mismatches, ",", mismatch_tokens);
+		if(mismatches != NULL) {
+			tokenize(mismatches, ",", mismatch_tokens);
+		}
 
 		vector<int> mis_positions;
 		int five_prime_mismatches = 0;
