@@ -595,19 +595,6 @@ public:
 		assert_gt(contMan.size(), 0);
 		GreedyDFSContinuation& cont = contMan.front();
 		assert(cont.prepped); // must have been prepped
-		uint32_t  stackDepth  = cont.stackDepth; // depth of the recursion stack; = # mismatches so far
-		uint32_t  depth       = cont.depth;      // next depth where a post-pair needs to be calculated
-		uint32_t  unrevOff    = cont.unrevOff;   // depths < unrevOff are unrevisitable
-		uint32_t  oneRevOff   = cont.oneRevOff;  // depths < oneRevOff are 1-revisitable
-		uint32_t  twoRevOff   = cont.twoRevOff;  // depths < twoRevOff are 2-revisitable
-		uint32_t  threeRevOff = cont.threeRevOff;// depths < threeRevOff are 3-revisitable
-		uint32_t  top         = cont.top;        // top arrow in pair prior to 'depth'
-		uint32_t  bot         = cont.bot;        // bottom arrow in pair prior to 'depth'
-		uint32_t  ham         = cont.ham;        // weighted hamming distance so far
-		uint32_t  iham        = cont.iham;       // initial weighted hamming distance
-		uint32_t* pairs       = cont.pairs;      // portion of pairs array to be used for this backtrack frame
-		uint8_t*  elims       = cont.elims;      // portion of elims array to be used for this backtrack frame
-		bool      disableFtab = cont.disableFtab;//
 		// TODO: Also need to save and restore _muts, _mms, _refcs, _chars somehow
 
 		// Let _foundRange = false; we'll set it to true iff this call
@@ -615,13 +602,13 @@ public:
 		_foundRange = false;
 
 		// Can't have already exceeded weighted hamming distance threshold
-		assert_leq(stackDepth, depth);
+		assert_leq(cont.stackDepth, cont.depth);
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
-		assert_leq(ham, _qualThresh);
-		assert_geq(bot, top);
-		assert_leq(stackDepth, _qlen);
+		assert_leq(cont.ham, _qualThresh);
+		assert_geq(cont.bot, cont.top);
+		assert_leq(cont.stackDepth, _qlen);
 		const Ebwt<String<Dna> >& ebwt = *_ebwt;
 		if(_halfAndHalf) {
 			assert_eq(0, _reportPartials);
@@ -629,42 +616,42 @@ public:
 		}
 		if(_reportPartials) {
 			assert(!_halfAndHalf);
-			assert_leq(stackDepth, _reportPartials);
+			assert_leq(cont.stackDepth, _reportPartials);
 		}
 		if(_verbose) {
-			cout << "  advance(stackDepth=" << stackDepth << ", "
-                 << "depth=" << depth << ", "
-                 << "top=" << top << ", "
-                 << "bot=" << bot << ", "
-                 << "ham=" << ham << ", "
-                 << "iham=" << iham << ", "
-                 << "pairs=" << pairs << ", "
-                 << "elims=" << (void*)elims << "): \"";
-			for(int i = (int)depth - 1; i >= 0; i--) {
+			cout << "  advance(stackDepth=" << cont.stackDepth << ", "
+                 << "depth=" << cont.depth << ", "
+                 << "top=" << cont.top << ", "
+                 << "bot=" << cont.bot << ", "
+                 << "ham=" << cont.ham << ", "
+                 << "iham=" << cont.iham << ", "
+                 << "pairs=" << cont.pairs << ", "
+                 << "elims=" << (void*)cont.elims << "): \"";
+			for(int i = (int)cont.depth - 1; i >= 0; i--) {
 				cout << _chars[i];
 			}
 			cout << "\"" << endl;
 		}
 		// We can't have already processed the entire read
-		assert_leq(depth, _qlen);
+		assert_leq(cont.depth, _qlen);
 
 		// If we're searching for a half-and-half solution, then
 		// enforce the boundary-crossing constraints here.
 		if(_halfAndHalf &&
-		   !halfAndHalfOK(stackDepth, depth, iham))
+		   !halfAndHalfOK(cont.stackDepth, cont.depth, cont.iham))
 		{
 			// Continuation is rejected because it violates a boundary-
 			// crossing constraint.
 			contMan.pop();
 			return false;
 		}
-		uint32_t cur = _qlen - depth - 1; // current offset into _qry
-		if(depth < _qlen) {
+		uint32_t cur = _qlen - cont.depth - 1; // current offset into _qry
+		if(cont.depth < _qlen) {
 			// If we're still trying to make progress along the length of
 			// the read...
 			if(_verbose) {
 				cout << "    cur=" << cur << " \"";
-				for(int i = (int)depth - 1; i >= 0; i--) {
+				for(int i = (int)cont.depth - 1; i >= 0; i--) {
 					cout << _chars[i];
 				}
 				cout << "\"";
@@ -680,41 +667,41 @@ public:
 			// not in the unrevisitable region, and b) its selection would
 			// not cause the quality ceiling (if one exists) to be exceeded
 			bool curIsAlternative =
-				 (depth >= unrevOff) &&
+				 (cont.depth >= cont.unrevOff) &&
 				 (!_considerQuals ||
-				  (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
+				  (cont.ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
 			if(_verbose) {
 				cout << " alternative: " << curIsAlternative << endl;
 			}
 
 			// If c is 'N', then it's a mismatch
-			if(c == 4 && depth > 0) {
+			if(c == 4 && cont.depth > 0) {
 				// Force the 'else if(curIsAlternative)' or 'else'
 				// branches below
-				top = bot = 1;
+				cont.top = cont.bot = 1;
 			} else if(c == 4) {
 				// We'll take the 'if(top == 0 && bot == 0)' branch below
-				assert_eq(0, top);
-				assert_eq(0, bot);
+				assert_eq(0, cont.top);
+				assert_eq(0, cont.bot);
 			}
 
 			// Calculate the ranges for this position
-			if(top == 0 && bot == 0) {
+			if(cont.top == 0 && cont.bot == 0) {
 				// Calculate first quartet of ranges using the _fchr[]
 				// array
-							   pairs[0 + 0] = ebwt._fchr[0];
-				pairs[0 + 4] = pairs[1 + 0] = ebwt._fchr[1];
-				pairs[1 + 4] = pairs[2 + 0] = ebwt._fchr[2];
-				pairs[2 + 4] = pairs[3 + 0] = ebwt._fchr[3];
-				pairs[3 + 4]                = ebwt._fchr[4];
+							        cont.pairs[0 + 0] = ebwt._fchr[0];
+				cont.pairs[0 + 4] = cont.pairs[1 + 0] = ebwt._fchr[1];
+				cont.pairs[1 + 4] = cont.pairs[2 + 0] = ebwt._fchr[2];
+				cont.pairs[2 + 4] = cont.pairs[3 + 0] = ebwt._fchr[3];
+				cont.pairs[3 + 4]                     = ebwt._fchr[4];
 				// Update top and bot
 				if(c < 4) {
-					top = pairTop(pairs, depth, c);
-					bot = pairBot(pairs, depth, c);
+					cont.top = pairTop(cont.pairs, cont.depth, c);
+					cont.bot = pairBot(cont.pairs, cont.depth, c);
 				}
 			} else if(curIsAlternative) {
 				// Clear pairs
-				memset(&pairs[depth*8], 0, 8 * 4);
+				memset(&cont.pairs[cont.depth*8], 0, 8 * 4);
 				// Calculate next quartet of ranges.  We hope that the
 				// appropriate cache lines are prefetched before now;
 				// otherwise, we're about to take an expensive cache
@@ -722,11 +709,12 @@ public:
 				assert(cont.ltop.valid());
 				assert(cont.lbot.valid());
 				ebwt.mapLFEx(cont.ltop, cont.lbot,
-							 &pairs[depth*8], &pairs[(depth*8)+4]);
+							 &cont.pairs[cont.depth*8],
+							 &cont.pairs[(cont.depth*8)+4]);
 				// Update top and bot
 				if(c < 4) {
-					top = pairTop(pairs, depth, c);
-					bot = pairBot(pairs, depth, c);
+					cont.top = pairTop(cont.pairs, cont.depth, c);
+					cont.bot = pairBot(cont.pairs, cont.depth, c);
 				}
 			} else {
 				// This read position is not a legitimate backtracking
@@ -738,8 +726,8 @@ public:
 				assert(cont.ltop.valid());
 				assert(cont.lbot.valid());
 				if(c < 4) {
-					top = ebwt.mapLF(cont.ltop, c);
-					bot = ebwt.mapLF(cont.lbot, c);
+					cont.top = ebwt.mapLF(cont.ltop, c);
+					cont.bot = ebwt.mapLF(cont.lbot, c);
 				}
 			}
 
@@ -750,57 +738,57 @@ public:
 				// elims, altNum, eligibleNum, eligibleSz
 				for(int i = 0; i < 4; i++) {
 					if(i == c) continue; // skip the actual query character
-					uint32_t atop = pairTop(pairs, depth, i);
-					uint32_t abot = pairBot(pairs, depth, i);
+					uint32_t atop = pairTop(cont.pairs, cont.depth, i);
+					uint32_t abot = pairBot(cont.pairs, cont.depth, i);
 					assert_leq(atop, abot);
 					if(abot == atop) continue;
 					// Add a new continuation on the back
 					contMan.expand1();
 					GreedyDFSContinuation& back = contMan.back();
 					// Update revisitability boundaries
-					uint32_t btUnrevOff    = unrevOff;
-					uint32_t btOneRevOff   = oneRevOff;
-					uint32_t btTwoRevOff   = twoRevOff;
-					uint32_t btThreeRevOff = threeRevOff;
-					if(depth < oneRevOff)   btUnrevOff = oneRevOff;
-					if(depth < twoRevOff)   btOneRevOff = twoRevOff;
-					if(depth < threeRevOff) btTwoRevOff = threeRevOff;
+					uint32_t btUnrevOff    = cont.unrevOff;
+					uint32_t btOneRevOff   = cont.oneRevOff;
+					uint32_t btTwoRevOff   = cont.twoRevOff;
+					uint32_t btThreeRevOff = cont.threeRevOff;
+					if(cont.depth < cont.oneRevOff)   btUnrevOff = cont.oneRevOff;
+					if(cont.depth < cont.twoRevOff)   btOneRevOff = cont.twoRevOff;
+					if(cont.depth < cont.threeRevOff) btTwoRevOff = cont.threeRevOff;
 					// TODO: Check if we can use the ftab to jump a
 					// little further into the read
 					// Note the character that we're backtracking on in the
 					// mm array:
-					_mms[stackDepth] = cur;
-					_refcs[stackDepth] = i;
+					_mms[cont.stackDepth] = cur;
+					_refcs[cont.stackDepth] = i;
 	#ifndef NDEBUG
-					for(int j = 0; j < (int)stackDepth; j++) {
+					for(int j = 0; j < (int)cont.stackDepth; j++) {
 						assert_neq(_mms[j], cur)
 					}
 	#endif
-					_chars[depth] = i;
+					_chars[cont.depth] = i;
 					// Get a new stretch of the pairs and elims arrays
-					uint32_t *newPairs = pairs + (_qlen*8);
-					uint8_t  *newElims = elims + (_qlen);
-					back.init(stackDepth+1,  // adding a mismatch
-							  depth+1,
+					uint32_t *newPairs = cont.pairs + (_qlen*8);
+					uint8_t  *newElims = cont.elims + (_qlen);
+					back.init(cont.stackDepth+1,  // adding a mismatch
+							  cont.depth+1,
 							  btUnrevOff,    // TODO
 							  btOneRevOff,   // TODO
 							  btTwoRevOff,   // TODO
 							  btThreeRevOff, // TODO
 							  atop,
 							  abot,
-							  ham + mmPenalty(_maqPenalty, q),
-							  iham,
+							  cont.ham + mmPenalty(_maqPenalty, q),
+							  cont.iham,
 							  newPairs,
 							  newElims,
-							  disableFtab);
+							  cont.disableFtab);
 				}
 			}
 		} else {
 			// The continuation had already processed the whole read
-			depth--;
+			cont.depth--;
 			cur = 0;
 		}
-		bool empty = (top == bot);
+		bool empty = (cont.top == cont.bot);
 		bool hit = (cur == 0 && !empty);
 
 		// Is this a potential partial-alignment range?
@@ -812,8 +800,8 @@ public:
 			backtrackDespiteMatch = true;
 			// We don't care to report exact partial alignments, only
 			// ones with mismatches.
-			if(stackDepth > 0) {
-				reportPartial(stackDepth);
+			if(cont.stackDepth > 0) {
+				reportPartial(cont.stackDepth);
 				reportedPartial = true;
 			}
 			// Now continue on to find legitimate partial
@@ -822,12 +810,12 @@ public:
 
 		// Check whether we've obtained an exact alignment when
 		// we've been instructed not to report exact alignments
-		bool invalidExact = (hit && stackDepth == 0 && !_reportExacts);
+		bool invalidExact = (hit && cont.stackDepth == 0 && !_reportExacts);
 
 		// Set this to true if the only way to make legal progress
 		// is via one or more additional backtracks.
 		if(_halfAndHalf &&
-		   !halfAndHalfCheckBounds(stackDepth, depth, _mms, empty))
+		   !halfAndHalfCheckBounds(cont.stackDepth, cont.depth, _mms, empty))
 		{
 			// This alignment doesn't satisfy the half-and-half
 			// requirements; reject it
@@ -839,10 +827,10 @@ public:
 		   !invalidExact &&  // not disqualified by no-exact-hits setting
 		   !reportedPartial) // not an already-reported partial alignment
 		{
-			_curRange.top     = top;
-			_curRange.bot     = bot;
-			_curRange.stratum = calcStratum(_mms, stackDepth);
-			_curRange.numMms  = stackDepth;
+			_curRange.top     = cont.top;
+			_curRange.bot     = cont.bot;
+			_curRange.stratum = calcStratum(_mms, cont.stackDepth);
+			_curRange.numMms  = cont.stackDepth;
 			_curRange.mms     = _mms;
 			_curRange.refcs   = _refcs;
 			_foundRange       = true;
@@ -857,8 +845,6 @@ public:
 			// Push the front continuation forward by one position
 			assert_neq(0, cur);
 			cont.depth++;
-			cont.top = top;
-			cont.bot = bot;
 		}
 		return false;
 	}
@@ -1133,20 +1119,29 @@ public:
 				pairs[2 + 4] = pairs[3 + 0] = ebwt._fchr[3];
 				pairs[3 + 4]                = ebwt._fchr[4];
 				// Update top and bot
-				if(c < 4) { top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c); }
+				if(c < 4) {
+					top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c);
+					assert_geq(bot, top);
+				}
 			} else if(curIsAlternative) {
 				// Clear pairs
 				memset(&pairs[d*8], 0, 8 * 4);
 				// Calculate next quartet of ranges
 				ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
 				// Update top and bot
-				if(c < 4) { top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c); }
+				if(c < 4) {
+					top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c);
+					assert_geq(bot, top);
+				}
 			} else {
 				// This query character is not even a legitimate
 				// alternative (because backtracking here would blow
 				// our mismatch quality budget), so no need to do the
 				// bookkeeping for the entire quartet, just do c
-				if(c < 4) { top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c); }
+				if(c < 4) {
+					top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c);
+					assert_geq(bot, top);
+				}
 			}
 			if(top != bot) {
 				// Calculate loci from row indices; do it now so that

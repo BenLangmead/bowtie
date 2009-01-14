@@ -750,6 +750,9 @@ static void parseOptions(int argc, char **argv) {
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
+			case ARG_PREFETCH_WIDTH:
+				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
+				break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
