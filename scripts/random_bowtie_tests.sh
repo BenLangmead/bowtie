@@ -3,7 +3,16 @@
 SEED="$1"
 if [ -z "$SEED" ] ; then
 	SEED=77
+else
+	shift
 fi
+
+if [ "$1" == "-c" ] ; then
+	rm -f bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug
+	shift
+fi
+
+make $* bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug
 
 # Args: seed, outer, inner, tbase, trand, pbase, prand
 
