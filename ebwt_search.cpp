@@ -18,6 +18,9 @@
 #include "pat.h"
 #include "bitset.h"
 #include "threading.h"
+#ifdef CHUD_PROFILING
+#include <CHUD/CHUD.h>
+#endif
 
 using namespace std;
 using namespace seqan;

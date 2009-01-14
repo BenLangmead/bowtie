@@ -22,6 +22,11 @@ WINDOWS = 1
 endif
 endif
 
+MACOS = 0
+ifneq (,$(findstring Darwin,$(shell uname)))
+MACOS = 1
+endif
+
 BOWTIE_PTHREADS = 1
 PTHREAD_PKG =
 PTHREAD_LIB =
@@ -42,6 +47,14 @@ SHMEM_DEF = -DBOWTIE_SHARED_MEM
 ifeq (1,$(WINDOWS))
 # No shared-mem facility in Windows
 SHMEM_DEF =
+endif
+
+CHUD=0
+CHUD_DEF =
+ifeq (1,$(CHUD))
+ifeq (1,$(MACOS))
+CHUD_DEF = -F/System/Library/PrivateFrameworks -weak_framework CHUD -DCHUD_PROFILING
+endif
 endif
 
 PREFETCH_LOCALITY = 2
@@ -121,7 +134,8 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
      $(PTHREAD_DEF) \
      $(SHMEM_DEF) \
-     $(PREF_DEF)
+     $(PREF_DEF) \
+     $(CHUD_DEF)
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
