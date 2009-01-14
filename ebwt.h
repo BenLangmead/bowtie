@@ -1722,6 +1722,43 @@ inline int Ebwt<TStr>::rowL(const SideLocus& l) const {
  * be inlined
  */
 #if 0
+// Use gcc's intrinsic popcountll.  I don't recommend it because it
+// seems to be somewhat slower than the bit-bashing pop64 routine both
+// on an AMD server and on an Intel workstation.  On the other hand,
+// perhaps when the builtin is used GCC is smart enough to insert a
+// pop-count instruction on architectures that have one (e.g. Itanium).
+// For now, it's disabled.
+#define pop64(x) __builtin_popcountll(x)
+#elif 0
+// Use a bytewise LUT version of popcount.  This is slower than the
+// bit-bashing pop64 routine both on an AMD server and on an Intel
+// workstation.  It seems to be about the same speed as the GCC builtin
+// on Intel, and a bit faster than it on AMD.  For now, it's disabled.
+const int popcntU8Table[256] = {
+    0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    1,2,2,3,2,3,3,4,2,3,3,4,3,4,4,5,2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    2,3,3,4,3,4,4,5,3,4,4,5,4,5,5,6,3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
+    3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8
+};
+
+// Use this bytewise population count table
+inline static int pop64(uint64_t x) {
+	const unsigned char * p = (const unsigned char *) &x;
+	return popcntU8Table[p[0]] +
+	popcntU8Table[p[1]] +
+	popcntU8Table[p[2]] +
+	popcntU8Table[p[3]] +
+	popcntU8Table[p[4]] +
+	popcntU8Table[p[5]] +
+	popcntU8Table[p[6]] +
+	popcntU8Table[p[7]];
+}
+#else
+// Use this standard bit-bashing population count
 inline static int pop64(uint64_t x) {
    x = x - ((x >> 1) & 0x5555555555555555llu);
    x = (x & 0x3333333333333333llu) + ((x >> 2) & 0x3333333333333333llu);
@@ -1731,11 +1768,6 @@ inline static int pop64(uint64_t x) {
    x = x + (x >> 32);
    return x & 0x3F;
 }
-#else
-// Use gcc's intrinsic popcountll.  It's somewhat faster than the above
-// routine and hopefully it's smart enough to use a 64-bit popcnt
-// instruction if one is available (e.g. on Itanium).
-#define pop64(x) __builtin_popcountll(x)
 #endif
 
 /**
