@@ -476,6 +476,11 @@ static void driver(const string& infile,
 		// Adapt sequence files to ifstreams
 		for(size_t i = 0; i < infiles.size(); i++) {
 			FILE *f = fopen(infiles[i].c_str(), "r");
+			if (f == NULL)
+			{
+				cerr << "Error: could not open "<< infiles[i] << endl;
+				exit(1);
+			}
 			FileBuf *fb = new FileBuf(f);
 			assert(fb != NULL);
 			assert(!fb->eof());
@@ -533,7 +538,7 @@ static void driver(const string& infile,
 		// Try restoring the original string (if there were
 		// multiple texts, what we'll get back is the joined,
 		// padded string, not a list)
-		ebwt.loadIntoMemory();
+		ebwt.loadIntoMemory(false);
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
