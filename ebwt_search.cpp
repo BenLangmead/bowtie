@@ -18,6 +18,8 @@
 #include "pat.h"
 #include "bitset.h"
 #include "threading.h"
+#include "aligner.h"
+#include "aligner_0mm.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -832,6 +834,13 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
+	if(rangeMode) {
+		// Tell the Ebwt loader to ignore the suffix-array portion of
+		// the index.  We don't need it because the user isn't asking
+		// for bowtie to report reference positions (just matrix
+		// ranges).
+		offRate = 32;
+	}
 	if(maqLike) {
 		revcomp = true;
 	}

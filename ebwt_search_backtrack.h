@@ -4,46 +4,8 @@
 #include "pat.h"
 #include "qual.h"
 #include "ebwt_search_util.h"
-
-/**
- * A range along with the alignment it represents.
- */
-struct Range {
-	uint32_t top;     // top of range
-	uint32_t bot;     // bottom of range
-	uint32_t stratum; // stratum
-	uint32_t numMms;  // # mismatches
-	uint32_t *mms;   // list of positions with mismatches
-	char     *refcs; // reference characters at mismatch positions
-};
-
-/**
- * Encapsulates an algorithm that navigates the Bowtie index to produce
- * candidate ranges of alignments in the Burrows-Wheeler matrix.  A
- * higher authority is responsible for reporting hits out of those
- * ranges, and stopping when the consumer is satisfied.
- */
-template<typename TContinuationManager>
-class RangeSource {
-public:
-	RangeSource()  { }
-	virtual ~RangeSource() { }
-
-	/// Set query to find ranges for
-	virtual void setQuery(String<Dna5>* qry,
-	                      String<char>* qual,
-	                      String<char>* name) = 0;
-	/// Set up the range search.
-	virtual bool initConts(TContinuationManager& conts, uint32_t ham) = 0;
-	/// Advance the range search by one memory op
-	virtual bool advance(TContinuationManager& conts) = 0;
-	/// Returns true iff the last call to advance yielded a range
-	virtual bool foundRange() = 0;
-	/// Return the last valid range found
-	virtual Range& range() = 0;
-	/// All searching w/r/t the current query is finished
-	virtual bool done() = 0;
-};
+#include "range.h"
+#include "range_source.h"
 
 /**
  * All information needed to resume an in-progress backtracking search.
@@ -127,39 +89,44 @@ struct GreedyDFSContinuation {
  * Container/dispenser for continuations for the greedy depth-first
  * backtracker.
  */
-class GreedyDFSContinuationManager {
+class GreedyDFSContinuationManager : public ContinuationManager<GreedyDFSContinuation> {
 public:
-	GreedyDFSContinuationManager() : conts_(), cur_(0) {
+	GreedyDFSContinuationManager() :
+		ContinuationManager<GreedyDFSContinuation>(),
+		conts_(), cur_(0)
+	{
 		// Reserve plenty of space to avoid untimely reallocations
 		conts_.reserve(4096);
 	}
+
+	virtual ~GreedyDFSContinuationManager() { }
 
 	/**
 	 * Return the frontmost continuation (usually this is the
 	 * currently active one).
 	 */
-	GreedyDFSContinuation& front() {
+	virtual GreedyDFSContinuation& front() {
 		return conts_[cur_];
 	}
 
 	/**
 	 * Return the backmost continuation.
 	 */
-	GreedyDFSContinuation& back() {
+	virtual GreedyDFSContinuation& back() {
 		return conts_[conts_.size()-1];
 	}
 
 	/**
 	 * Prepare for the next continuation by prepping the frontmost.
 	 */
-	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
+	virtual void prep(const EbwtParams& ep, const uint8_t* ebwt) {
 		conts_[cur_].prep(ep, ebwt);
 	}
 
 	/**
 	 * Remove the frontmost continuation.
 	 */
-	void pop() {
+	virtual void pop() {
 		// Don't actually destroy any objects or trigger any memory
 		// deallocation.
 		cur_++;
@@ -168,35 +135,35 @@ public:
 	/**
 	 * Add a new uninitialized continuation to the back of the queue.
 	 */
-	void expand1() {
+	virtual void expand1() {
 		conts_.resize(conts_.size() + 1);
 	}
 
 	/**
 	 * Return the number of continuations in the queue.
 	 */
-	size_t size() const {
+	virtual size_t size() const {
 		return conts_.size() - cur_;
 	}
 
 	/**
 	 * Return true iff there are no continuations to process.
 	 */
-	bool empty() {
+	virtual bool empty() const {
 		return conts_.size() == cur_;
 	}
 
 	/**
 	 * Remove all continuations and reset.
 	 */
-	void clear() {
+	virtual void clear() {
 		conts_.clear();
 		cur_ = 0;
 	}
 
 protected:
 
-	vector<GreedyDFSContinuation> conts_;
+	std::vector<GreedyDFSContinuation> conts_;
 	uint32_t cur_;
 };
 
@@ -2636,388 +2603,6 @@ protected:
 	vector<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
-};
-
-/**
- * State machine for carrying out an alignment, which usually consists
- * of a series of phases that conduct different alignments using
- * different backtracking constraints.
- *
- * Each Aligner should have a dedicated HitSinkPerThread and
- * PatternSourcePerThread.
- */
-class Aligner {
-public:
-	Aligner(const Ebwt<String<Dna> >* ebwtFw,
-	        const Ebwt<String<Dna> >* ebwtRc,
-	        bool rangeMode,
-	        uint32_t seed) :
-		ebwtFw_(ebwtFw), ebwtRc_(ebwtRc), patsrc_(NULL),
-		bufa_(NULL), bufb_(NULL), rangeMode_(rangeMode), seed_(seed)
-	{ }
-
-	virtual ~Aligner() { }
-	/// Advance the range search by one memory op
-	virtual bool advance() = 0;
-	/**
-	 * Returns true if all searching w/r/t the current query is
-	 * finished or if there is no current query.
-	 */
-	virtual bool done() = 0;
-
-	/// Prepare Aligner for the next read
-	virtual void setQuery(PatternSourcePerThread *patsrc) {
-		assert(patsrc != NULL);
-		patsrc_ = patsrc;
-		bufa_ = &patsrc->bufa();
-		assert(bufa_ != NULL);
-		bufb_ = &patsrc->bufb();
-		alen_ = bufa_->length();
-		blen_ = (bufb_ != NULL) ? bufb_->length() : 0;
-		rand_.init(seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name));
-	}
-
-	/**
-	 * Report hit(s) from a given range.
-	 */
-	bool reportSingleEndHitFromRange(Range& ra,
-	                                 EbwtSearchParams<String<Dna> >& params,
-	                                 bool fw)
-	{
-		assert_gt(ra.bot, ra.top);
-		assert(bufa_ != NULL);
-		assert(!seqan::empty(bufa_->patFw));
-		assert(!seqan::empty(bufa_->qualFw));
-		assert(!seqan::empty(bufa_->name));
-//		if(stackDepth == 0 && !_reportExacts) {
-//			// We are not reporting exact hits (usually because we've
-//			// already reported them as part of a previous invocation
-//			// of the backtracker)
-//			return false;
-//		}
-		if(rangeMode_) {
-			return ebwtFw_->report(
-					fw ?  bufa_->patFw  :  bufa_->patRc,
-					fw ? &bufa_->qualFw : &bufa_->qualRc,
-					&bufa_->name,
-                    ra.mms, ra.refcs, ra.numMms, 0,
-                    ra.top, ra.bot, alen_,
-                    ra.stratum, params);
-		}
-		uint32_t spread = ra.bot - ra.top;
-		// Pick a random spot in the range to begin report
-		uint32_t r = ra.top + (rand_.nextU32() % spread);
-		for(uint32_t i = 0; i < spread; i++) {
-			uint32_t ri = r + i;
-			if(ri >= ra.bot) ri -= spread;
-			// reportChaseOne takes the _mms[] list in terms of
-			// their indices into the query string; not in terms
-			// of their offset from the 3' or 5' end.
-			if(ebwtFw_->reportChaseOne(fw ?  bufa_->patFw  :  bufa_->patRc,
-			                           fw ? &bufa_->qualFw : &bufa_->qualRc,
-			                           &bufa_->name,
-			                           ra.mms, ra.refcs, ra.numMms, ri,
-			                           ra.top, ra.bot, alen_,
-			                           ra.stratum, params))
-			{
-				// Return value of true means that we can stop
-				return true;
-			}
-			// Return value of false means that we should continue
-			// searching.  This could happen if we the call to
-			// reportChaseOne() reported a hit, but the user asked for
-			// multiple hits and we haven't reached the ceiling yet.
-			// This might also happen if the call to reportChaseOne()
-			// didn't report a hit because the alignment was spurious
-			// (i.e. overlapped some padding).
-		}
-		// All range elements were examined and we should keep going
-		return false;
-	}
-
-protected:
-
-	// Index
-	const Ebwt<String<Dna> >* ebwtFw_;
-	const Ebwt<String<Dna> >* ebwtRc_;
-	// Current read pair
-	PatternSourcePerThread* patsrc_;
-	ReadBuf* bufa_;
-	uint32_t alen_;
-	ReadBuf* bufb_;
-	uint32_t blen_;
-	// RandomSource for choosing alignments to report from ranges
-	bool rangeMode_;
-	uint32_t seed_;
-	RandomSource rand_;
-};
-
-/**
- * Abstract parent factory class for constructing aligners of all kinds.
- */
-class AlignerFactory {
-public:
-	virtual ~AlignerFactory() { }
-	virtual Aligner* create() const = 0;
-	virtual std::vector<Aligner*>* create(uint32_t) const = 0;
-
-	/// Free memory associated with the aligner
-	virtual void destroy(Aligner* al) const {
-		assert(al != NULL);
-		// Free the Aligner
-		delete al;
-	}
-
-	/// Free memory associated with an aligner list
-	virtual void destroy(std::vector<Aligner*>* als) const {
-		assert(als != NULL);
-		// Free all of the Aligners
-		for(size_t i = 0; i < als->size(); i++) {
-			if((*als)[i] != NULL) {
-				delete (*als)[i];
-				(*als)[i] = NULL;
-			}
-		}
-		// Free the vector
-		delete als;
-	}
-};
-
-/**
- * Coordinates multiple aligners.
- */
-class MultiAligner {
-public:
-	MultiAligner(
-			uint32_t n,
-			uint32_t qUpto,
-			const AlignerFactory& alignFact,
-			const PatternSourcePerThreadFactory& patsrcFact) :
-			n_(n), qUpto_(qUpto),
-			alignFact_(alignFact), patsrcFact_(patsrcFact),
-			aligners_(NULL), patsrcs_(NULL)
-	{
-		aligners_ = alignFact_.create(n_);
-		assert(aligners_ != NULL);
-		patsrcs_ = patsrcFact_.create(n_);
-		assert(patsrcs_ != NULL);
-	}
-
-	/// Free memory associated with the aligners and their pattern sources.
-	virtual ~MultiAligner() {
-		alignFact_.destroy(aligners_);
-		patsrcFact_.destroy(patsrcs_);
-	}
-
-	/**
-	 * Advance an array of aligners in parallel, using prefetches to
-	 * try to hide all the latency.
-	 */
-	void run() {
-		bool done = false;
-		while(!done) {
-			done = true;
-			for(uint32_t i = 0; i < n_; i++) {
-				if(!(*aligners_)[i]->done()) {
-					// Advance an aligner already in progress
-					done = false;
-					(*aligners_)[i]->advance();
-				} else if(qUpto_ > 0) {
-					// Get a new read and initialize an aligner with it
-					(*patsrcs_)[i]->nextReadPair();
-					if(!(*patsrcs_)[i]->empty()) {
-						qUpto_--;
-						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
-						assert(!(*aligners_)[i]->done());
-						done = false;
-					} else {
-						// No more reads; if done == true, it remains
-						// true
-					}
-				} else {
-					// Past read limit; if done == true, it remains true
-				}
-			}
-		}
-	}
-
-protected:
-	uint32_t n_;     /// Number of aligners
-	uint32_t qUpto_; /// Number of reads to align before stopping
-	const AlignerFactory&                  alignFact_;
-	const PatternSourcePerThreadFactory&   patsrcFact_;
-	std::vector<Aligner *>*                aligners_;
-	std::vector<PatternSourcePerThread *>* patsrcs_;
-};
-
-/**
- * An aligner for finding exact matches of unpaired reads.  Always
- * tries the forward-oriented version of the read before the reverse-
- * oriented read.
- */
-class UnpairedExactAlignerV1 : public Aligner {
-public:
-	UnpairedExactAlignerV1(
-		const Ebwt<String<Dna> >& ebwt,
-		HitSink& sink,
-		const HitSinkPerThreadFactory& sinkPtFactory,
-		vector<String<Dna5> >& os,
-		bool rangeMode,
-		bool verbose,
-		uint32_t seed) :
-		Aligner(&ebwt, NULL, rangeMode, seed),
-		doneFw_(false), done_(true), firstFw_(true), firstRc_(true),
-		sinkPt_(sinkPtFactory.create()),
-		params_(*sinkPt_, os, true, true, true, rangeMode),
-		ebwt_(ebwt),
-		r1_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		    false, NULL, NULL, verbose, seed, &os, false, false, false)
-	{
-		assert(c1_.empty());
-	}
-
-	virtual ~UnpairedExactAlignerV1() {
-		delete sinkPt_; sinkPt_ = NULL;
-	}
-
-	/**
-	 * Prepare this aligner for the next read.
-	 */
-	virtual void setQuery(PatternSourcePerThread* patsrc) {
-		Aligner::setQuery(patsrc); // set fields & random seed
-		doneFw_ = false;
-		done_ = false;
-		firstFw_ = true;
-		firstRc_ = true;
-	}
-
-	/**
-	 * Advance the aligner by one memory op.  Return true iff we're
-	 * done with this read.
-	 */
-	virtual bool advance() {
-		assert(!done_);
-		if(!doneFw_) {
-			if(firstFw_) {
-				// Set up the RangeSource for the forward read
-				r1_.setOffs(0, 0, alen_, alen_, alen_, alen_);
-				r1_.setQuery(&patsrc_->bufa().patFw, &patsrc_->bufa().qualFw, &patsrc_->bufa().name);
-				params_.setFw(true);
-				r1_.initConts(c1_, 0); // set up initial continuation
-				firstFw_ = false;
-			} else {
-				// Advance the RangeSource for the forward-oriented read
-				r1_.advance(c1_);
-			}
-			c1_.prep(ebwt_.eh(), ebwt_.ebwt());
-			if(r1_.foundRange()) {
-				done_ = reportSingleEndHitFromRange(r1_.range(), params_, true);
-			}
-			if(!done_) doneFw_ = c1_.empty();
-		} else {
-			if(firstRc_) {
-				// Set up the RangeSource for the reverse-complement
-				// read
-				c1_.clear();
-				assert(c1_.empty());
-				r1_.setOffs(0, 0, alen_, alen_, alen_, alen_);
-				r1_.setQuery(&patsrc_->bufa().patRc, &patsrc_->bufa().qualRc, &patsrc_->bufa().name);
-				params_.setFw(false);
-				r1_.initConts(c1_, 0); // set up initial continuation
-				firstRc_ = false;
-			} else {
-				// Advance the RangeSource for the reverse-complement read
-				r1_.advance(c1_);
-			}
-			c1_.prep(ebwt_.eh(), ebwt_.ebwt());
-			// Advance the RangeSource for the reverse-complement read
-			if(r1_.foundRange()) {
-				done_ = reportSingleEndHitFromRange(r1_.range(), params_, false);
-			}
-			if(!done_) done_ = c1_.empty();
-		}
-		if(done_) {
-			sinkPt_->finishRead(*patsrc_, NULL, NULL, NULL, NULL);
-		}
-		return done_;
-	}
-
-	/**
-	 * Returns true if all searching w/r/t the current query is
-	 * finished or if there is no current query.
-	 */
-	virtual bool done() {
-		return done_;
-	}
-
-protected:
-	// Progress state
-	bool doneFw_;
-	bool done_;
-	bool firstFw_;
-	bool firstRc_;
-
-	// Temporary HitSink; to be deleted
-	HitSinkPerThread* sinkPt_;
-
-	// State for alignment
-	EbwtSearchParams<String<Dna> > params_;
-	const Ebwt<String<Dna> >&      ebwt_;
-	GreedyDFSRangeSource           r1_;
-	GreedyDFSContinuationManager   c1_;
-};
-
-/**
- * Concrete factory class for constructing unpaired exact aligners.
- */
-class UnpairedExactAlignerV1Factory : public AlignerFactory {
-public:
-	UnpairedExactAlignerV1Factory(
-			Ebwt<String<Dna> >& ebwt,
-			HitSink& sink,
-			const HitSinkPerThreadFactory& sinkPtFactory,
-			vector<String<Dna5> >& os,
-			bool rangeMode,
-			bool verbose,
-			uint32_t seed) :
-			ebwt_(ebwt),
-			sink_(sink),
-			sinkPtFactory_(sinkPtFactory),
-			os_(os),
-			rangeMode_(rangeMode),
-			verbose_(verbose),
-			seed_(seed)
-	{ }
-
-	/**
-	 * Create a new UnpairedExactAlignerV1s.
-	 */
-	virtual Aligner* create() const {
-		return new UnpairedExactAlignerV1(
-			ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_);
-	}
-
-	/**
-	 * Create a new vector of new UnpairedExactAlignerV1s.
-	 */
-	virtual std::vector<Aligner*>* create(uint32_t n) const {
-		std::vector<Aligner*>* v = new std::vector<Aligner*>;
-		for(uint32_t i = 0; i < n; i++) {
-			v->push_back(new UnpairedExactAlignerV1(
-				ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_));
-			assert(v->back() != NULL);
-		}
-		return v;
-	}
-
-private:
-	Ebwt<String<Dna> >& ebwt_;
-	HitSink& sink_;
-	const HitSinkPerThreadFactory& sinkPtFactory_;
-	vector<String<Dna5> >& os_;
-	bool rangeMode_;
-	bool verbose_;
-	uint32_t seed_;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

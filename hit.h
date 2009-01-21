@@ -545,6 +545,13 @@ class HitSinkPerThreadFactory {
 public:
 	virtual ~HitSinkPerThreadFactory() { }
 	virtual HitSinkPerThread* create() const = 0;
+
+	/// Free memory associated with a per-thread hit sink
+	virtual void destroy(HitSinkPerThread* sink) const {
+		assert(sink != NULL);
+		// Free the HitSinkPerThread
+		delete sink;
+	}
 };
 
 /**

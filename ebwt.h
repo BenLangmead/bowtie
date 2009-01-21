@@ -1085,9 +1085,9 @@ public:
 	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
 
 	// Searching and reporting
-	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
-	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
-	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen, bool ebwtFw) const;
+	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
+	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
+	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
@@ -1448,9 +1448,28 @@ struct SideLocus {
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
 		_side = ebwt + _sideByteOff;
+#ifndef NO_PREFETCH
+		__builtin_prefetch((const void *)_side,
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY);
+		__builtin_prefetch((const void *)(_side + 32),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY);
+		__builtin_prefetch((const void *)(_side + 64),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY);
+		__builtin_prefetch((const void *)(_side + 96),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY);
+#endif
 		// prefetch tjside too
 		_fw = _sideNum & 1;   // odd-numbered sides are forward
 		_oside = _side + (_fw? (-128) : (128));
+#ifndef NO_PREFETCH
+		__builtin_prefetch((const void *)(_oside + 96),
+		                   0 /* prepare for read */,
+		                   PREFETCH_LOCALITY);
+#endif
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte
@@ -1463,6 +1482,11 @@ struct SideLocus {
 	/// Return true iff this is an initialized SideLocus
 	bool valid() {
 		return _side != NULL;
+	}
+
+	/// Make this look like an invalid SideLocus
+	void invalidate() {
+		_side = NULL;
 	}
 
 	/**
@@ -1483,14 +1507,11 @@ struct SideLocus {
 //		                   PREFETCH_LOCALITY /* no locality */);
 		// prefetch the half of the opposite side that contains the
 		// cumulative character occurrence counts
-		__builtin_prefetch((const void *)_oside,
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY /* no locality */);
 
 		// prefetch this side
-		__builtin_prefetch((const void *)_side,
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY /* no locality */);
+		//__builtin_prefetch((const void *)_side,
+		//                   0 /* prepare for read */,
+		//                   PREFETCH_LOCALITY /* no locality */);
 #endif
 	}
 
@@ -2271,8 +2292,7 @@ template<typename TStr>
 void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
                                      uint32_t& tidx,
                                      uint32_t& textoff,
-                                     uint32_t& tlen,
-                                     bool ebwtFw) const
+                                     uint32_t& tlen) const
 {
 	assert_geq(this->_eh._chunkRate, 0);
 	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
@@ -2296,7 +2316,7 @@ void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
 		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
 	}
 	textoff = toff;
-	if(ebwtFw) {
+	if(this->_fw) {
 		textoff += (coff+foff);
 	} else {
 		textoff += (flen - (coff+foff));
@@ -2314,8 +2334,7 @@ template<typename TStr>
 void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
                                         uint32_t& tidx,
                                         uint32_t& textoff,
-                                        uint32_t& tlen,
-                                        bool ebwtFw) const
+                                        uint32_t& tlen) const
 {
 	uint32_t top = 0;
 	uint32_t bot = _nFrag; // 1 greater than largest addressable element
@@ -2350,7 +2369,7 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
 				// Initially it's the number of characters that precede
 				// the alignment in the fragment
 				uint32_t fragoff = off - _rstarts[(elt*3)];
-				if(!ebwtFw) {
+				if(!this->_fw) {
 					fragoff = fraglen - fragoff - 1;
 					fragoff -= (qlen-1);
 				}
@@ -2378,18 +2397,16 @@ template<typename TStr>
 void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
                                  uint32_t& tidx,
                                  uint32_t& textoff,
-                                 uint32_t& tlen,
-                                 bool ebwtFw) const
+                                 uint32_t& tlen) const
 {
 	if(this->_eh._chunkRate >= 0) {
 		assert(_pmap != NULL);
-		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen, ebwtFw);
+		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen);
 	} else {
 		assert(_rstarts != NULL);
-		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen, ebwtFw);
+		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen);
 	}
 }
-
 
 /**
  * Report a potential match at offset 'off' with pattern length
@@ -2451,7 +2468,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	uint32_t tidx;
 	uint32_t textoff;
 	uint32_t tlen;
-	joinedToTextOff(qlen, off, tidx, textoff, tlen, params.ebwtFw());
+	joinedToTextOff(qlen, off, tidx, textoff, tlen);
 	if(tidx == 0xffffffff) {
 		return false;
 	}
@@ -2469,6 +2486,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			stratum,                  // alignment stratum
 			bot-top-1);               // # other hits
 }
+
+#include "row_chaser.h"
 
 /**
  * Report a result.  Involves walking backwards along the original
@@ -2496,6 +2515,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	assert(!params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
+	ASSERT_ONLY(uint32_t origi = i);
 	SideLocus myl;
 	const uint32_t offMask = this->_eh._offMask;
 	const uint32_t offRate = this->_eh._offRate;
@@ -2531,6 +2551,12 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		off = offs[i >> offRate] + jumps;
 		VMSG_NL("reportChaseOne found off=" << off << " (jumps=" << jumps << ")");
 	}
+#ifndef NDEBUG
+	{
+		uint32_t rcoff = RowChaser<TStr>::toFlatRefOff(*this, qlen, origi);
+		assert_eq(rcoff, off);
+	}
+#endif
 	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, stratum, params);
 }
 
@@ -2612,7 +2638,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	uint32_t tidx;    // the index (id) of the reference we hit in
 	uint32_t textoff; // the offset of the alignment within the reference
 	uint32_t tlen;    // length of reference seed hit in
-	joinedToTextOff(qlen, off, tidx, textoff, tlen, params.ebwtFw());
+	joinedToTextOff(qlen, off, tidx, textoff, tlen);
 	if(tidx == 0xffffffff) {
 		// The seed straddled a reference boundary, and so is spurious.
 		// Return false, indicating that we shouldn't stop.
@@ -3317,7 +3343,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 			this->_refnames.back().push_back(c);
 		}
 	}
-	{
+	if(_overrideIsaRate < 32) {
 		// Allocate offs (big allocation)
 		bool readFromStream = true;
 #ifdef BOWTIE_SHARED_MEM
