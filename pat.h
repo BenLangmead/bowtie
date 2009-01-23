@@ -450,8 +450,17 @@ public:
 	virtual void  reset()  { _patid = 0xffffffff;  }
 	void    reverseRead()  { _bufa.reverseAll();
 	                         _bufb.reverseAll();
-	                         _reverse = !_reverse; }
-	bool          empty()  { return _bufa.empty(); }
+	                         _reverse = !_reverse;     }
+	bool          empty()  { return _bufa.empty();     }
+
+	/**
+	 * Return true iff the buffers jointly contain a paired-end read.
+	 */
+	bool paired() {
+		bool ret = !_bufb.empty();
+	    assert(!ret || !empty());
+	    return ret;
+	}
 
 	/**
 	 * Return true iff the reads in the buffers bufa and bufb are

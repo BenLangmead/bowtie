@@ -24,10 +24,10 @@ class RowChaser {
 	typedef Ebwt<TStr> EbwtT;
 
 public:
-	RowChaser(const EbwtT& ebwt, uint32_t qlen) :
+	RowChaser(const EbwtT& ebwt) :
 		prepped_(false),
 		ebwt_(ebwt),
-		qlen_(qlen),
+		qlen_(0),
 		eh_(ebwt._eh),
 		offMask_(ebwt_._eh._offMask),
 		offRate_(ebwt_._eh._offRate),
@@ -38,7 +38,8 @@ public:
 		jumps_(0),
 		sideloc_(),
 		done_(false),
-		off_(0xffffffff)
+		off_(0xffffffff),
+		tlen_(0)
 	{ }
 
 	/**
@@ -47,12 +48,10 @@ public:
 	 * offset within it.
 	 */
 	static uint32_t toFlatRefOff(const EbwtT& ebwt, uint32_t qlen, uint32_t row) {
-		RowChaser rc(ebwt, qlen);
-		rc.setRow(row);
-		rc.prep();
+		RowChaser rc(ebwt);
+		rc.setRow(row, qlen);
 		while(!rc.done()) {
 			rc.advance();
-			rc.prep();
 		}
 		return rc.flatOff();
 	}
@@ -61,12 +60,10 @@ public:
 	 * Convert a row to a reference offset.
 	 */
 	static U32Pair toRefOff(const EbwtT& ebwt, uint32_t qlen, uint32_t row) {
-		RowChaser rc(ebwt, qlen);
-		rc.setRow(row);
-		rc.prep();
+		RowChaser rc(ebwt);
+		rc.setRow(row, qlen);
 		while(!rc.done()) {
 			rc.advance();
-			rc.prep();
 		}
 		return rc.off();
 	}
@@ -75,9 +72,12 @@ public:
 	 * Set the next row for us to "chase" (i.e. map to a reference
 	 * location using the BWT step-left operation).
 	 */
-	void setRow(uint32_t row) {
+	void setRow(uint32_t row, uint32_t qlen) {
 		assert_neq(0xffffffff, row);
+		assert_gt(qlen, 0);
 		row_ = row;
+		qlen_ = qlen;
+		ASSERT_ONLY(sideloc_.invalidate());
 		if(row_ == zOff_) {
 			// We arrived at the extreme left-hand end of the reference
 			off_ = 0;
@@ -92,7 +92,8 @@ public:
 		done_ = false;
 		jumps_ = 0;
 		off_ = 0xffffffff;
-		ASSERT_ONLY(sideloc_.invalidate());
+		prepped_ = false;
+		prep();
 	}
 
 	/**
@@ -126,6 +127,7 @@ public:
 			off_ = offs_[row_ >> offRate_] + jumps_;
 			done_ = true;
 		}
+		prep();
 	}
 
 	/**
@@ -135,12 +137,13 @@ public:
 	 */
 	void prep() {
 		if(!done_) {
+			assert(!prepped_);
 			assert(!sideloc_.valid());
 			sideloc_.initFromRow(row_, eh_, ebwtPtr_);
 			sideloc_.prefetch();
 			assert(sideloc_.valid());
-			prepped_ = true;
 		}
+		prepped_ = true;
 	}
 
 	/**
@@ -160,14 +163,20 @@ public:
 		assert_neq(0xffffffff, off);
 		uint32_t tidx;
 		uint32_t textoff;
-		uint32_t tlen;
-		ebwt_.joinedToTextOff(qlen_, off, tidx, textoff, tlen);
+		ebwt_.joinedToTextOff(qlen_, off, tidx, textoff, tlen_);
+		// Note: tidx may be 0xffffffff, if alignment overlaps a
+		// reference boundary
 		return make_pair(tidx, textoff);
+	}
+
+	uint32_t tlen() const {
+		return tlen_;
 	}
 
 	bool prepped_; /// true = prefetch is issued and it's OK to call advance()
 
 protected:
+
 	const EbwtT& ebwt_;      /// index to resolve row in
 	uint32_t qlen_;          /// length of read; needed to convert to ref. coordinates
 	const EbwtParams& eh_;   /// eh field from index
@@ -179,8 +188,9 @@ protected:
 	uint32_t row_;           /// current row
 	uint32_t jumps_;         /// # steps so far
 	SideLocus sideloc_;      /// current side locus
-	bool done_;              /// true = chase is done & answer is in row_
+	bool done_;              /// true = chase is done & answer is in off_
 	uint32_t off_;           /// calculated offset (0xffffffff if not done)
+	uint32_t tlen_;          /// hit text length
 };
 
 #endif /* ROW_CHASER_H_ */

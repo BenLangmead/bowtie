@@ -89,10 +89,12 @@ static bool useSpinlock         = true;  // false -> don't use of spinlocks even
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
 static bool stateful            = false; // use stateful aligners
-static uint32_t prefetchWidth   = 64;    // number of reads to process in parallel w/ --stateful
+static uint32_t prefetchWidth   = 2;     // number of reads to process in parallel w/ --stateful
+static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
+static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP = 600)
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:";
 
 enum {
 	ARG_ORIG = 256,
@@ -178,6 +180,8 @@ static struct option long_options[] = {
 	{"threads",      required_argument, 0,            'p'},
 	{"khits",        required_argument, 0,            'k'},
 	{"mhits",        required_argument, 0,            'm'},
+	{"minins",       required_argument, 0,            'I'},
+	{"maxins",       required_argument, 0,            'X'},
 	{"best",         no_argument,       0,            ARG_BEST},
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
@@ -208,20 +212,20 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-//	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
-//	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-//	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
-//	    << "                     the sequences themselves, if -c is specified) paired with" << endl
-//	    << "                     corresponding mates in <mates2>" << endl
-//	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
-//	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
-//	    << "                     (or the sequences themselves, if -c is specified)" << endl
-//	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
-	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
-	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	    << "  <query_in>         comma-separated list of files containing query reads" << endl
+	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
+	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
+	    << "                     the sequences themselves, if -c is specified) paired with" << endl
+	    << "                     corresponding mates in <mates2>" << endl
+	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
+	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
 	    << "                     (or the sequences themselves, if -c is specified)" << endl
-	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
+	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
+//	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
+//	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+//	    << "  <query_in>         comma-separated list of files containing query reads" << endl
+//	    << "                     (or the sequences themselves, if -c is specified)" << endl
+//	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -233,6 +237,8 @@ static void printUsage(ostream& out) {
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: 2)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
+	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
+	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
@@ -683,6 +689,12 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
+	   		case 'I':
+	   			minInsert = (uint32_t)parseInt(1, "-I arg must be at least 1");
+	   			break;
+	   		case 'X':
+	   			maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
+	   			break;
 	   		case ARG_RANDOM_READS: format = RANDOM; break;
 	   		case ARG_RANDOM_READS_NOSYNC:
 	   			format = RANDOM;
@@ -1092,7 +1104,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
-	UnpairedExactAlignerV1Factory alfact(
+	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			_sink,
 			*sinkFact,
@@ -1100,11 +1112,22 @@ static void *exactSearchWorkerStateful(void *vp) {
 			rangeMode,
 			verbose,
 			seed);
+	PairedExactAlignerV1Factory alPEfact(
+			ebwt,
+			_sink,
+			*sinkFact,
+			minInsert,
+			maxInsert,
+			os,
+			rangeMode,
+			verbose,
+			seed);
 	{
-		MultiAligner multi(
+		MixedMultiAligner multi(
 				prefetchWidth,
 				qUpto,
-				alfact,
+				alSEfact,
+				alPEfact,
 				*patsrcFact);
 		// Run that mother
 		multi.run();

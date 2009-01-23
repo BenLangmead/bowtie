@@ -168,6 +168,11 @@ public:
 		return done_;
 	}
 
+	/// Return length of current query
+	uint32_t qlen() {
+		return len_;
+	}
+
 protected:
 	// Progress state
 	bool done_;

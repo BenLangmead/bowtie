@@ -545,6 +545,9 @@ class HitSinkPerThreadFactory {
 public:
 	virtual ~HitSinkPerThreadFactory() { }
 	virtual HitSinkPerThread* create() const = 0;
+	virtual HitSinkPerThread* createNMult(uint32_t m) const {
+		return create();
+	}
 
 	/// Free memory associated with a per-thread hit sink
 	virtual void destroy(HitSinkPerThread* sink) const {
@@ -646,6 +649,9 @@ public:
 	 */
 	virtual HitSinkPerThread* create() const {
 		return new FirstNGoodHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+	virtual HitSinkPerThread* createNMult(uint32_t m) const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, max_, keep_);
 	}
 
 private:
@@ -831,6 +837,9 @@ public:
 	 */
 	virtual HitSinkPerThread* create() const {
 		return new FirstNBestHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+	virtual HitSinkPerThread* createNMult(uint32_t m) const {
+		return new FirstNBestHitSinkPerThread(sink_, n_ * m, max_, keep_);
 	}
 
 private:
@@ -1033,6 +1042,9 @@ public:
 	 */
 	virtual HitSinkPerThread* create() const {
 		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, max_, keep_);
+	}
+	virtual HitSinkPerThread* createNMult(uint32_t m) const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, max_, keep_);
 	}
 
 private:
