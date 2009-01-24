@@ -11,7 +11,10 @@ use List::Util qw[min max];
 use Getopt::Std;
 
 my %options=();
-getopts("mhn",\%options);
+getopts("mhno",\%options);
+
+my $old_args = 0;
+$old_args = 1 if defined $options{o};
 
 if(defined $options{h}) {
 	print "Usage: perl random_bowtie_tests.pl.pl seed outer inner tbase trand pbase prand\n";
@@ -333,10 +336,14 @@ sub search {
 	my $unalignArg = "";
 	my $unalign = int(rand(4));
 	if($unalign == 0 || $unalign == 2) {
-		$unalignArg .= "--unfa .tmp.un$seed.fa ";
+		$unalignArg .= "--unfa .tmp.un$seed";
+		$unalignArg .= ".fa" if $old_args;
+		$unalignArg .= " ";
 	}
 	if($unalign == 1 || $unalign == 2) {
-		$unalignArg .= "--unfq .tmp.un$seed.fq ";
+		$unalignArg .= "--unfq .tmp.un$seed";
+		$unalignArg .= ".fq" if $old_args;
+		$unalignArg .= " ";
 	}
 	
 	my $isaArg = "";

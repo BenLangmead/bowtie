@@ -95,6 +95,7 @@ public:
 		while(true) {
 			// Set up the chaser
 			chaser_.setRow(row_, qlen_);
+			assert(chaser_.prepped_ || chaser_.done());
 			// It might be done immediately...
 			if(chaser_.done()) {
 				// We're done immediately
@@ -122,6 +123,7 @@ public:
 				break;
 			}
 		}
+		assert(chaser_.prepped_);
 	}
 
 	/**
@@ -141,7 +143,7 @@ public:
 		done_ = false;
 		reset();
 		setRow(irow_);
-		assert(chaser_.prepped_);
+		assert(chaser_.prepped_ || foundOff() || done_);
 	}
 
 	/**
@@ -157,7 +159,7 @@ public:
 	 */
 	virtual void advance() {
 		assert(!done_);
-		assert(chaser_.prepped_);
+		assert(chaser_.prepped_ || chaser_.done());
 		reset();
 		if(chaser_.done()) {
 			// chaser finished with this row
@@ -172,10 +174,10 @@ public:
 				return;
 			}
 			setRow(row_);
-			assert(chaser_.prepped_);
+			assert(chaser_.prepped_ || done_);
 		} else {
 			chaser_.advance();
-			assert(chaser_.prepped_);
+			assert(chaser_.prepped_ || chaser_.done());
 			if(chaser_.done()) {
 				// We're done immediately
 				off_ = chaser_.off();

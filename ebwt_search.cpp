@@ -72,10 +72,10 @@ static bool fullIndex           = true;  // load halves one at a time and procee
 static bool noRefNames          = false; // true -> print reference indexes; not names
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
-static ofstream *dumpUnalignFa  = NULL;  // FASTA file to dump unaligned reads to
-static ofstream *dumpUnalignFq  = NULL;  // FASTQ file to dump unaligned reads to
-static ofstream *dumpMaxedFa    = NULL;  // FASTA file to dump reads with more than -m valid alignments to
-static ofstream *dumpMaxedFq    = NULL;  // FASTQ file to dump reads with more than -m valid alignments to
+static string dumpUnalFaBase    = "";    // basename of FASTA files to dump unaligned reads to
+static string dumpUnalFqBase    = "";    // basename of FASTQ files to dump unaligned reads to
+static string dumpMaxFaBase     = "";    // basename of FASTA files to dump reads with more than -m valid alignments to
+static string dumpMaxFqBase     = "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
@@ -92,6 +92,8 @@ static bool stateful            = false; // use stateful aligners
 static uint32_t prefetchWidth   = 2;     // number of reads to process in parallel w/ --stateful
 static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
 static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP = 600)
+static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand
+static bool mate2fw             = false; // -2 mate aligns in rc orientation on fw strand
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:";
@@ -135,7 +137,10 @@ enum {
 	ARG_FILEPAR,
 	ARG_SHARED_MEM,
 	ARG_STATEFUL,
-	ARG_PREFETCH_WIDTH
+	ARG_PREFETCH_WIDTH,
+	ARG_FF,
+	ARG_FR,
+	ARG_RF
 };
 
 static struct option long_options[] = {
@@ -205,6 +210,9 @@ static struct option long_options[] = {
 	{"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
 	{"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
+	{"ff",           no_argument,       0,            ARG_FF},
+	{"fr",           no_argument,       0,            ARG_FR},
+	{"rf",           no_argument,       0,            ARG_RF},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -212,15 +220,15 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie [options]* <ebwt> [-1 <mates1> -2 <mates2>] <reads> [<hits_out>]" << endl
-	    << "  <ebwt>             ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-	    << "  <mates1>           comma-separated list of files containing mated reads (or" << endl
-	    << "                     the sequences themselves, if -c is specified) paired with" << endl
-	    << "                     corresponding mates in <mates2>" << endl
-	    << "  <mates2>           mates corresponding entry-for-entry with those in <mates1>" << endl
-	    << "  <reads>            comma-separated list of files containing unpaired reads" << endl
-	    << "                     (or the sequences themselves, if -c is specified)" << endl
-	    << "  <hits_out>         file to write hits to (default: stdout)" << endl
+	out << "Usage: bowtie [options]* [-1 <mates1> -2 <mates2>] <ebwt> <reads> [<hits>]" << endl
+	    << "  <mates1>  comma-separated list of files containing upstream mates (or the" << endl
+	    << "            sequences themselves, if -c is set) paired with mates in <mates2>" << endl
+	    << "  <mates2>  comma-separated list of files containing downstream mates (or" << endl
+	    << "            sequences themselves if -c is set) paired with mates in <mates1>" << endl
+	    << "  <reads>   comma-separated list of files containing unpaired reads, or" << endl
+	    << "            sequences themselves, if -c is set; specify \"-\" for stdin" << endl
+	    << "  <ebwt>    index filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <hits>    file to write hits to (default: stdout)" << endl
 //	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
 //	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
 //	    << "  <query_in>         comma-separated list of files containing query reads" << endl
@@ -230,15 +238,14 @@ static void printUsage(ostream& out) {
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
-	    //<< "  -m                 query input files are Maq .bfq" << endl
-	    //<< "  -x                 query input files are Solexa _seq.txt" << endl
-	    << "  -c                 query sequences given on command line (as <query_in>)" << endl
+	    << "  -c                 query sequences given on cmd line (as <mates>, <reads>)" << endl
 	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: 2)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
+	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
@@ -250,10 +257,10 @@ static void printUsage(ostream& out) {
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
-	    << "  --unfa <filename>  write unaligned reads to FASTA file with name <filename>" << endl
-	    << "  --unfq <filename>  write unaligned reads to FASTQ file with name <filename>" << endl
-	    << "  --maxfa <filename> write reads exceeding -m limit to FASTA file <filename>" << endl
-	    << "  --maxfq <filename> write reads exceeding -m limit to FASTQ file <filename>" << endl
+	    << "  --unfa <fname>     write unaligned reads to FASTA file(s) <fname>*.fa" << endl
+	    << "  --unfq <fname>     write unaligned reads to FASTQ file(s) <fname>*.fq" << endl
+	    << "  --maxfa <fname>    write reads exceeding -m limit to FASTA file(s) <fname>*.fa" << endl
+	    << "  --maxfq <fname>    write reads exceeding -m limit to FASTQ file(s) <fname>*.fq" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
@@ -262,12 +269,10 @@ static void printUsage(ostream& out) {
 		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
 	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
 	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
-	    //<< "  --qsamelen         die with error if queries don't all have the same length" << endl
-	    //<< "  --reportopps       report # of other potential mapping targets for each hit" << endl
 	    //<< "  --range            report hits as top/bottom offsets into SA" << endl
-	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r and <query_in>" << endl
+	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r/<matesX>/<reads>" << endl
 	    << "  --concise          write hits in concise format" << endl
-	    << "  -b/--binout        write hits in binary format (<hit_outfile> not optional)" << endl
+	    << "  -b/--binout        write hits in binary format (<hits> not optional)" << endl
 	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
@@ -695,6 +700,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'X':
 	   			maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
 	   			break;
+	   		case ARG_FF: mate1fw = true;  mate2fw = true;  break;
+	   		case ARG_RF: mate1fw = false; mate2fw = true;  break;
+	   		case ARG_FR: mate1fw = true;  mate2fw = false; break;
 	   		case ARG_RANDOM_READS: format = RANDOM; break;
 	   		case ARG_RANDOM_READS_NOSYNC:
 	   			format = RANDOM;
@@ -718,48 +726,10 @@ static void parseOptions(int argc, char **argv) {
 	   		}
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
-	   		case ARG_UNFA: {
-	   			if(dumpUnalignFa != NULL) delete dumpUnalignFa;
-	   			dumpUnalignFa = new ofstream(optarg, ios_base::out);
-	   			if(!dumpUnalignFa->good()) {
-	   				cerr << "Could not open unaligned FASTA file " << optarg << " for appending" << endl;
-	   				exit(1);
-	   			}
-	   			if(dumpMaxedFa == NULL) dumpMaxedFa = dumpUnalignFa;
-	   			break;
-	   		}
-	   		case ARG_UNFQ: {
-	   			if(dumpUnalignFq != NULL) delete dumpUnalignFq;
-	   			dumpUnalignFq = new ofstream(optarg, ios_base::out);
-	   			if(!dumpUnalignFq->good()) {
-	   				cerr << "Could not open unaligned FASTQ file " << optarg << " for appending" << endl;
-	   				exit(1);
-	   			}
-	   			if(dumpMaxedFq == NULL) dumpMaxedFq = dumpUnalignFq;
-	   			break;
-	   		}
-	   		case ARG_MAXFA: {
-	   			if(dumpMaxedFa != NULL && dumpMaxedFa != dumpUnalignFa) {
-	   				delete dumpMaxedFa;
-	   			}
-	   			dumpMaxedFa = new ofstream(optarg, ios_base::out);
-	   			if(!dumpMaxedFa->good()) {
-	   				cerr << "Could not open maxed-out read FASTA file " << optarg << " for appending" << endl;
-	   				exit(1);
-	   			}
-	   			break;
-	   		}
-	   		case ARG_MAXFQ: {
-	   			if(dumpMaxedFq != NULL && dumpMaxedFq != dumpUnalignFq) {
-	   				delete dumpMaxedFq;
-	   			}
-	   			dumpMaxedFq = new ofstream(optarg, ios_base::out);
-	   			if(!dumpMaxedFq->good()) {
-	   				cerr << "Could not open maxed-out read FASTQ file " << optarg << " for appending" << endl;
-	   				exit(1);
-	   			}
-	   			break;
-	   		}
+	   		case ARG_UNFA: dumpUnalFaBase = optarg; break;
+	   		case ARG_UNFQ: dumpUnalFqBase = optarg; break;
+	   		case ARG_MAXFA: dumpMaxFaBase = optarg; break;
+	   		case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
 			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
 			case ARG_INTEGER_QUALS: integer_quals = true; break;
 			case ARG_FORGIVE_INPUT: forgiveInput = true; break;
@@ -895,10 +865,7 @@ static char *argv0 = NULL;
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(!p->empty()) { \
-		sink->finishRead(*p, skipped ? NULL : dumpUnalignFa, \
-		                     skipped ? NULL : dumpUnalignFq, \
-		                     skipped ? NULL : dumpMaxedFa,   \
-		                     skipped ? NULL : dumpMaxedFq);  \
+		sink->finishRead(*p, !skipped); \
 	} \
 	skipped = false;
 
@@ -918,17 +885,11 @@ static char *argv0 = NULL;
 				reportUnAl = !hitMask.test(p->patid()); \
 			} \
 		} \
-		if(sink->finishRead(*p, reportUnAl ? dumpUnalignFa : NULL, \
-		                        reportUnAl ? dumpUnalignFq : NULL, \
-		   	                    reportUnAl ? dumpMaxedFa   : NULL, \
-		   	                    reportUnAl ? dumpMaxedFq   : NULL) > 0) { \
+		if(sink->finishRead(*p, reportUnAl) > 0) { \
 			/* We reported a hit for the read, so we set the */ \
 			/* appropriate bit in the hitMask to prevent it from */ \
 			/* being reported as unaligned. */ \
-			if(!reportUnAl && \
-			   (dumpUnalignFa != NULL || dumpUnalignFq != NULL || \
-			    dumpMaxedFa   != NULL || dumpMaxedFq   != NULL)) \
-			{ \
+			if(!reportUnAl && sink->dumpsReads()) { \
 				hitMask.setOver(p->patid()); \
 			} \
 		} \
@@ -1116,6 +1077,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			ebwt,
 			_sink,
 			*sinkFact,
+			mate1fw,
+			mate2fw,
 			minInsert,
 			maxInsert,
 			os,
@@ -1320,11 +1283,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		"run bowtie separately on each subset.\n");
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
-	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
-	{
-		numQs = 0;
-	}
+	if(!_sink.dumpsReads()) numQs = 0;
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -1802,11 +1761,7 @@ static void twoOrThreeMismatchSearch(
 		"run bowtie separately on each subset.\n");
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
-	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
-	{
-		numQs = 0;
-	}
+	if(!_sink.dumpsReads()) numQs = 0;
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -2507,11 +2462,7 @@ static void seededQualCutoffSearch(
 		"run bowtie separately on each subset.\n");
 	// No need to keep track of which reads are aligned because the
 	// user hasn't requested an unaligned-read dump
-	if(dumpUnalignFa == NULL && dumpUnalignFq == NULL &&
-	   dumpMaxedFa   == NULL && dumpMaxedFq   == NULL)
-	{
-		numQs = 0;
-	}
+	if(!_sink.dumpsReads()) numQs = 0;
 	SyncBitset hitMask(numQs,
 		// Error message for if an allocation fails
 		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
@@ -3092,23 +3043,23 @@ static void driver(const char * type,
 		switch(outType) {
 			case FULL:
 				if(refOut) {
-					sink = new VerboseHitSink(ebwt.nPat(), refnames, partitionSz);
+					sink = new VerboseHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				} else {
-					sink = new VerboseHitSink(*fout, refnames, partitionSz);
+					sink = new VerboseHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				}
 				break;
 			case CONCISE:
 				if(refOut) {
-					sink = new ConciseHitSink(ebwt.nPat(), reportOpps, refnames);
+					sink = new ConciseHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				} else {
-					sink = new ConciseHitSink(*fout, reportOpps, refnames);
+					sink = new ConciseHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				}
 				break;
 			case BINARY:
 				if(refOut) {
-					sink = new BinaryHitSink(ebwt.nPat(), refnames);
+					sink = new BinaryHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				} else {
-					sink = new BinaryHitSink(*fout, refnames);
+					sink = new BinaryHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				}
 				break;
 			case NONE:
@@ -3192,22 +3143,6 @@ static void driver(const char * type,
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();
-		if(dumpUnalignFa != NULL) {
-			dumpUnalignFa->close();
-			delete dumpUnalignFa;
-		}
-		if(dumpUnalignFq != NULL) {
-			dumpUnalignFq->close();
-			delete dumpUnalignFq;
-		}
-		if(dumpMaxedFa != NULL && dumpMaxedFa != dumpUnalignFa) {
-			dumpMaxedFa->close();
-			delete dumpMaxedFa;
-		}
-		if(dumpMaxedFq != NULL && dumpMaxedFq != dumpUnalignFq) {
-			dumpMaxedFq->close();
-			delete dumpMaxedFq;
-		}
 		for(size_t i = 0; i < patsrcs_a.size(); i++) {
 			assert(patsrcs_a[i] != NULL);
 			delete patsrcs_a[i];

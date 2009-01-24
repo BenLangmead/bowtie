@@ -74,6 +74,8 @@ public:
 			Ebwt<String<Dna> >& ebwt,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
+			bool mate1fw,
+			bool mate2fw,
 			uint32_t peInner,
 			uint32_t peOuter,
 			vector<String<Dna5> >& os,
@@ -83,6 +85,8 @@ public:
 			ebwt_(ebwt),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
+			mate1fw_(mate1fw),
+			mate2fw_(mate2fw),
 			peInner_(peInner),
 			peOuter_(peOuter),
 			os_(os),
@@ -96,7 +100,8 @@ public:
 	 */
 	virtual Aligner* create() const {
 		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			ebwt_, sink_, sinkPtFactory_, peInner_, peOuter_, os_, rangeMode_, verbose_, seed_);
+			ebwt_, sink_, sinkPtFactory_, mate1fw_, mate2fw_,
+			peInner_, peOuter_, os_, rangeMode_, verbose_, seed_);
 	}
 
 	/**
@@ -106,7 +111,8 @@ public:
 		std::vector<Aligner*>* v = new std::vector<Aligner*>;
 		for(uint32_t i = 0; i < n; i++) {
 			v->push_back(new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-				ebwt_, sink_, sinkPtFactory_, peInner_, peOuter_, os_, rangeMode_, verbose_, seed_));
+				ebwt_, sink_, sinkPtFactory_, mate1fw_, mate2fw_,
+				peInner_, peOuter_, os_, rangeMode_, verbose_, seed_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -116,6 +122,8 @@ private:
 	Ebwt<String<Dna> >& ebwt_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
+	bool mate1fw_;
+	bool mate2fw_;
 	uint32_t peInner_;
 	uint32_t peOuter_;
 	vector<String<Dna5> >& os_;

@@ -139,6 +139,7 @@ public:
 		if(!done_) {
 			assert(!prepped_);
 			assert(!sideloc_.valid());
+			assert_leq(row_, eh_._len);
 			sideloc_.initFromRow(row_, eh_, ebwtPtr_);
 			sideloc_.prefetch();
 			assert(sideloc_.valid());

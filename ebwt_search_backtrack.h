@@ -11,7 +11,7 @@
  * All information needed to resume an in-progress backtracking search.
  */
 struct GreedyDFSContinuation {
-	GreedyDFSContinuation() { }
+	GreedyDFSContinuation() : inited(false) { }
 
 	/**
 	 * Initialize a continuation given alignment state.  ltop and lbot
@@ -47,6 +47,7 @@ struct GreedyDFSContinuation {
 		elims = _elims;
 		disableFtab = _disableFtab;
 		prepped = false;
+		inited = true;
 	}
 
 	/**
@@ -55,8 +56,11 @@ struct GreedyDFSContinuation {
 	 * the relevant cache lines.
 	 */
 	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
+		assert(inited);
 		if(top != bot) {
 			// Calculate the loci based on the top and bot pointers
+			assert_leq(top, ep._len);
+			assert_leq(bot, ep._len);
 			SideLocus::initFromTopBot(top, bot, ep, ebwt, ltop, lbot);
 			// Prefetch the cache lines at the top and bot loci
 			SideLocus::prefetchTopBot(ltop, lbot);
@@ -83,6 +87,7 @@ struct GreedyDFSContinuation {
 	uint8_t*  elims;       // portion of elims array to be used for this backtrack frame
 	bool      disableFtab; // whether to disable ftab skipping
 	bool      prepped;     // ready to be continued
+	bool      inited;      // true = init() has been called
 };
 
 /**
@@ -106,6 +111,7 @@ public:
 	 * currently active one).
 	 */
 	virtual GreedyDFSContinuation& front() {
+		assert_gt(size(), 0);
 		return conts_[cur_];
 	}
 
@@ -113,6 +119,7 @@ public:
 	 * Return the backmost continuation.
 	 */
 	virtual GreedyDFSContinuation& back() {
+		assert_gt(size(), 0);
 		return conts_[conts_.size()-1];
 	}
 
@@ -120,7 +127,9 @@ public:
 	 * Prepare for the next continuation by prepping the frontmost.
 	 */
 	virtual void prep(const EbwtParams& ep, const uint8_t* ebwt) {
-		conts_[cur_].prep(ep, ebwt);
+		if(conts_.size() > cur_) {
+			conts_[cur_].prep(ep, ebwt);
+		}
 	}
 
 	/**
@@ -159,6 +168,7 @@ public:
 	virtual void clear() {
 		conts_.clear();
 		cur_ = 0;
+		assert_eq(0, conts_.size());
 	}
 
 protected:
@@ -508,7 +518,8 @@ public:
 			uint32_t top = ebwt.ftabHi(ftabOff);
 			uint32_t bot = ebwt.ftabLo(ftabOff+1);
 			if(_qlen == (uint32_t)ftabChars && bot > top) {
-				// We have a valid range already!
+				// We found a range with 0 mismatches immediately.  Set
+				// fields to indicate we found a range.
 				assert_eq(0, _reportPartials);
 				assert(_reportExacts);
 				_curRange.top     = top;
@@ -521,12 +532,15 @@ public:
 				return true;
 			} else if (bot > top) {
 				// We have a range to extend
+				assert_leq(top, ebwt._eh._len);
+				assert_leq(bot, ebwt._eh._len);
 				cont.init(0, ftabChars, _unrevOff, _1revOff, _2revOff,
 				         _3revOff, top, bot, ham, ham, _pairs,
 				         _elims, nsInFtab > 0);
 			} else {
 				// The arrows are already closed within the
 				// unrevisitable region; give up
+				contMan.pop();
 			}
 		} else {
 			// We can't use the ftab, so we start from the rightmost
@@ -735,6 +749,8 @@ public:
 					// Get a new stretch of the pairs and elims arrays
 					uint32_t *newPairs = cont.pairs + (_qlen*8);
 					uint8_t  *newElims = cont.elims + (_qlen);
+					assert_leq(atop, ebwt._eh._len);
+					assert_leq(abot, ebwt._eh._len);
 					back.init(cont.stackDepth+1,  // adding a mismatch
 							  cont.depth+1,
 							  btUnrevOff,    // TODO
