@@ -26,7 +26,7 @@
  */
 class Aligner {
 public:
-	Aligner(const Ebwt<String<Dna> >* ebwtFw,
+	Aligner(const Ebwt<String<Dna> >& ebwtFw,
 	        const Ebwt<String<Dna> >* ebwtRc,
 	        bool rangeMode,
 	        uint32_t seed) :
@@ -58,7 +58,7 @@ public:
 protected:
 
 	// Index
-	const Ebwt<String<Dna> >* ebwtFw_;
+	const Ebwt<String<Dna> >& ebwtFw_;
 	const Ebwt<String<Dna> >* ebwtRc_;
 	// Current read pair
 	PatternSourcePerThread* patsrc_;
@@ -283,7 +283,8 @@ class UnpairedAlignerV1 : public Aligner {
 	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
 public:
 	UnpairedAlignerV1(
-		const Ebwt<String<Dna> >& ebwt,
+		const Ebwt<String<Dna> >& ebwtFw,
+		const Ebwt<String<Dna> >* ebwtBw,
 		EbwtSearchParams<String<Dna> >* params,
 		TRangeSource* rFw, TRangeSource* rRc,
 		TContMan* cmFw, TContMan* cmRc,
@@ -295,13 +296,13 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(&ebwt, NULL, rangeMode, seed),
+		Aligner(ebwtFw, ebwtBw, rangeMode, seed),
 		doneFw_(true), done_(true),
 		chaseFw_(false), chaseRc_(false),
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
 		params_(params),
-		rchase_(ebwt, rand_),
+		rchase_(rand_),
 		rFw_(rFw), cFw_(cmFw),
 		rRc_(rRc), cRc_(cmRc),
 		driverFw_(driverFw),
@@ -414,7 +415,7 @@ public:
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, true);
 					} else {
-						rchase_.setTopBot(ra.top, ra.bot, alen_);
+						rchase_.setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
 						if(rchase_.foundOff()) {
 							done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), true);
 							rchase_.reset();
@@ -436,7 +437,7 @@ public:
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, false);
 					} else {
-						rchase_.setTopBot(ra.top, ra.bot, alen_);
+						rchase_.setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
 						if(rchase_.foundOff()) {
 							done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), false);
 							rchase_.reset();
@@ -504,7 +505,8 @@ class PairedAlignerV1 : public Aligner {
 
 public:
 	PairedAlignerV1(
-		const Ebwt<String<Dna> >& ebwt,
+		const Ebwt<String<Dna> >& ebwtFw,
+		const Ebwt<String<Dna> >* ebwtBw,
 		EbwtSearchParams<String<Dna> >* params,
 		TRangeSource* r1Fw, TRangeSource* r1Rc,
 		TRangeSource* r2Fw, TRangeSource* r2Rc,
@@ -522,7 +524,7 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(&ebwt, NULL, rangeMode, seed),
+		Aligner(ebwtFw, NULL, rangeMode, seed),
 		doneFw_(true), done_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
@@ -534,7 +536,7 @@ public:
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
 		fw1_(fw1), fw2_(fw2),
-		rchase_(ebwt, rand_),
+		rchase_(rand_),
 		r1Fw_(r1Fw), c1Fw_(cm1Fw),
 		r1Rc_(r1Rc), c1Rc_(cm1Rc),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
@@ -791,7 +793,7 @@ protected:
 							       dr1.range(), dr2.range(),
 								   h.first,
 								   left, right,
-								   this->ebwtFw_->_plen[h.first],
+								   this->ebwtFw_._plen[h.first],
 								   fwa, fwb,
 								   pairFw)) return true;
 						}
@@ -851,7 +853,7 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
 					assert(dr2.foundRange());
-					rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen());
+					rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen(), dr2.curEbwt());
 					chase2 = true;
 					delayedChase2 = false;
 				}
@@ -881,7 +883,7 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
 					assert(dr1.foundRange());
-					rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen());
+					rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen(), dr1.curEbwt());
 					chase1 = true;
 					delayedChase1 = false;
 				}
@@ -916,7 +918,7 @@ protected:
 					} else {
 						// Start chasing this range
 						if(verbose) cout << "Chasing a range for first mate" << endl;
-						rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen());
+						rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen(), dr1.curEbwt());
 						chase1 = true;
 					}
 				}
@@ -946,7 +948,7 @@ protected:
 					} else {
 						// Start chasing this range
 						if(verbose) cout << "Chasing a range for second mate" << endl;
-						rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen());
+						rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen(), dr2.curEbwt());
 						chase2 = true;
 					}
 				}

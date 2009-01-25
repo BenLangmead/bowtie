@@ -16,11 +16,12 @@
  */
 template<typename TStr>
 class RangeChaser {
+	typedef Ebwt<TStr> EbwtT;
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 public:
 	RangeChaser() : prepped_(false) { }
 	virtual ~RangeChaser() { }
-	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen) = 0;
+	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen, const EbwtT* ebwt) = 0;
 	virtual bool done() const = 0;
 	virtual void advance() = 0;
 	virtual void prep() = 0;
@@ -42,9 +43,9 @@ class RandomScanningRangeChaser : public RangeChaser<TStr> {
 	typedef std::vector<U32Pair> U32PairVec;
 
 public:
-	RandomScanningRangeChaser(const EbwtT& ebwt, RandomSource& rand) :
+	RandomScanningRangeChaser(RandomSource& rand) :
 		RangeChaser<TStr>(),
-		ebwt_(ebwt),
+		ebwt_(NULL),
 		qlen_(0),
 		rand_(rand),
 		top_(0xffffffff),
@@ -54,7 +55,7 @@ public:
 		done_(false),
 		off_(make_pair(0xffffffff, 0)),
 		tlen_(0),
-		chaser_(ebwt)
+		chaser_()
 	{ }
 
 	virtual ~RandomScanningRangeChaser() { }
@@ -94,7 +95,7 @@ public:
 		row_ = row;
 		while(true) {
 			// Set up the chaser
-			chaser_.setRow(row_, qlen_);
+			chaser_.setRow(row_, qlen_, ebwt_);
 			assert(chaser_.prepped_ || chaser_.done());
 			// It might be done immediately...
 			if(chaser_.done()) {
@@ -130,11 +131,16 @@ public:
 	 * Set the next range for us to "chase" (i.e. convert row-by-row
 	 * to reference loci).
 	 */
-	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen) {
+	virtual void setTopBot(uint32_t top,
+	                       uint32_t bot,
+	                       uint32_t qlen,
+	                       const EbwtT* ebwt)
+	{
 		assert_neq(0xffffffff, top);
 		assert_neq(0xffffffff, bot);
 		assert_gt(bot, top);
 		assert_gt(qlen, 0);
+		ebwt_ = ebwt;
 		qlen_ = qlen;
 		top_ = top;
 		bot_ = bot;
@@ -230,7 +236,7 @@ public:
 
 protected:
 
-	const EbwtT& ebwt_;  /// index to resolve row in
+	const EbwtT* ebwt_;  /// index to resolve row in
 	uint32_t qlen_;      /// length of read; needed to convert to ref. coordinates
 	RandomSource& rand_; /// pseudo-random number generator
 	uint32_t top_;       /// range top

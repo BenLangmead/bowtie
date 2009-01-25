@@ -2553,7 +2553,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	}
 #ifndef NDEBUG
 	{
-		uint32_t rcoff = RowChaser<TStr>::toFlatRefOff(*this, qlen, origi);
+		uint32_t rcoff = RowChaser<TStr>::toFlatRefOff(this, qlen, origi);
 		assert_eq(rcoff, off);
 	}
 #endif

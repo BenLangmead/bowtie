@@ -24,16 +24,11 @@ class RowChaser {
 	typedef Ebwt<TStr> EbwtT;
 
 public:
-	RowChaser(const EbwtT& ebwt) :
+	RowChaser() :
 		prepped_(false),
-		ebwt_(ebwt),
+		ebwt_(NULL),
 		qlen_(0),
-		eh_(ebwt._eh),
-		offMask_(ebwt_._eh._offMask),
-		offRate_(ebwt_._eh._offRate),
-		zOff_(ebwt_._zOff),
-		offs_(ebwt_._offs),
-		ebwtPtr_(ebwt_._ebwt),
+		eh_(NULL),
 		row_(0xffffffff),
 		jumps_(0),
 		sideloc_(),
@@ -47,9 +42,9 @@ public:
 	 * converted to understand where it is w/r/t the reference hit and
 	 * offset within it.
 	 */
-	static uint32_t toFlatRefOff(const EbwtT& ebwt, uint32_t qlen, uint32_t row) {
-		RowChaser rc(ebwt);
-		rc.setRow(row, qlen);
+	static uint32_t toFlatRefOff(const EbwtT* ebwt, uint32_t qlen, uint32_t row) {
+		RowChaser rc;
+		rc.setRow(row, qlen, ebwt);
 		while(!rc.done()) {
 			rc.advance();
 		}
@@ -59,9 +54,9 @@ public:
 	/**
 	 * Convert a row to a reference offset.
 	 */
-	static U32Pair toRefOff(const EbwtT& ebwt, uint32_t qlen, uint32_t row) {
-		RowChaser rc(ebwt);
-		rc.setRow(row, qlen);
+	static U32Pair toRefOff(const EbwtT* ebwt, uint32_t qlen, uint32_t row) {
+		RowChaser rc;
+		rc.setRow(row, qlen, ebwt);
 		while(!rc.done()) {
 			rc.advance();
 		}
@@ -72,20 +67,22 @@ public:
 	 * Set the next row for us to "chase" (i.e. map to a reference
 	 * location using the BWT step-left operation).
 	 */
-	void setRow(uint32_t row, uint32_t qlen) {
+	void setRow(uint32_t row, uint32_t qlen, const EbwtT* ebwt) {
 		assert_neq(0xffffffff, row);
 		assert_gt(qlen, 0);
+		ebwt_ = ebwt;
+		eh_ = &ebwt->_eh;
 		row_ = row;
 		qlen_ = qlen;
 		ASSERT_ONLY(sideloc_.invalidate());
-		if(row_ == zOff_) {
+		if(row_ == ebwt_->_zOff) {
 			// We arrived at the extreme left-hand end of the reference
 			off_ = 0;
 			done_ = true;
 			return;
-		} else if((row_ & offMask_) == row_) {
+		} else if((row_ & eh_->_offMask) == row_) {
 			// We arrived at a marked row
-			off_ = offs_[row_ >> offRate_];
+			off_ = ebwt_->_offs[row_ >> eh_->_offRate];
 			done_ = true;
 			return;
 		}
@@ -112,19 +109,19 @@ public:
 		assert(!done_);
 		assert(prepped_);
 		prepped_ = false;
-		uint32_t newrow = ebwt_.mapLF(sideloc_);
+		uint32_t newrow = ebwt_->mapLF(sideloc_);
 		ASSERT_ONLY(sideloc_.invalidate());
 		jumps_++;
 		assert_neq(newrow, row_);
 		// Update row_ field
 		row_ = newrow;
-		if(row_ == zOff_) {
+		if(row_ == ebwt_->_zOff) {
 			// We arrived at the extreme left-hand end of the reference
 			off_ = jumps_;
 			done_ = true;
-		} else if((row_ & offMask_) == row_) {
+		} else if((row_ & eh_->_offMask) == row_) {
 			// We arrived at a marked row
-			off_ = offs_[row_ >> offRate_] + jumps_;
+			off_ = ebwt_->_offs[row_ >> eh_->_offRate] + jumps_;
 			done_ = true;
 		}
 		prep();
@@ -139,8 +136,8 @@ public:
 		if(!done_) {
 			assert(!prepped_);
 			assert(!sideloc_.valid());
-			assert_leq(row_, eh_._len);
-			sideloc_.initFromRow(row_, eh_, ebwtPtr_);
+			assert_leq(row_, eh_->_len);
+			sideloc_.initFromRow(row_, *eh_, (const uint8_t*)ebwt_->_ebwt);
 			sideloc_.prefetch();
 			assert(sideloc_.valid());
 		}
@@ -164,7 +161,7 @@ public:
 		assert_neq(0xffffffff, off);
 		uint32_t tidx;
 		uint32_t textoff;
-		ebwt_.joinedToTextOff(qlen_, off, tidx, textoff, tlen_);
+		ebwt_->joinedToTextOff(qlen_, off, tidx, textoff, tlen_);
 		// Note: tidx may be 0xffffffff, if alignment overlaps a
 		// reference boundary
 		return make_pair(tidx, textoff);
@@ -178,14 +175,9 @@ public:
 
 protected:
 
-	const EbwtT& ebwt_;      /// index to resolve row in
+	const EbwtT* ebwt_;      /// index to resolve row in
 	uint32_t qlen_;          /// length of read; needed to convert to ref. coordinates
-	const EbwtParams& eh_;   /// eh field from index
-	const uint32_t offMask_; /// offMask field from index
-	const uint32_t offRate_; /// offRate field from index
-	const uint32_t zOff_;    /// zOff field from index
-	const uint32_t* offs_;   /// ptr to offs[] array from index
-	const uint8_t* ebwtPtr_; /// ptr to ebwt[] array from index
+	const EbwtParams* eh_;   /// eh field from index
 	uint32_t row_;           /// current row
 	uint32_t jumps_;         /// # steps so far
 	SideLocus sideloc_;      /// current side locus

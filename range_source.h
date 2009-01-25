@@ -133,9 +133,13 @@ public:
  */
 template<typename TRangeSource, typename TContMan>
 class RangeSourceDriver {
+
+	typedef Ebwt<String<Dna> > EbwtT;
+
 public:
 	RangeSourceDriver(
-		const Ebwt<String<Dna> >& ebwt,
+		const EbwtT& ebwtFw,
+		const EbwtT* ebwtBw,
 		EbwtSearchParams<String<Dna> >& params,
 		TRangeSource& rs,
 		TContMan& cm,
@@ -148,7 +152,7 @@ public:
 		done_(true), first_(true), len_(0),
 		pat_(NULL), qual_(NULL), name_(NULL),
 		sinkPt_(sinkPt), params_(params),
-		fw_(fw), ebwt_(ebwt), rs_(rs), cm_(cm)
+		fw_(fw), ebwtFw_(ebwtFw), ebwtBw_(ebwtBw), rs_(rs), cm_(cm)
 	{
 		assert(cm_.empty());
 	}
@@ -213,7 +217,7 @@ public:
 		if(!done_) {
 			// Hopefully, this will prefetch enough so that when we
 			// resume, stuff is already in cache
-			cm_.prep(ebwt_.eh(), ebwt_.ebwt());
+			cm_.prep(ebwtFw_.eh(), ebwtFw_.ebwt());
 		}
 		return;
 	}
@@ -245,6 +249,14 @@ public:
 		return len_;
 	}
 
+	/**
+	 * Return a const ptr to whichever Ebwt (forward or backward) the
+	 * current range came from.
+	 */
+	virtual const EbwtT *curEbwt() {
+		return &ebwtFw_;
+	}
+
 protected:
 
 	virtual void initRangeSource(TRangeSource& rs) = 0;
@@ -263,7 +275,8 @@ protected:
 	// State for alignment
 	EbwtSearchParams<String<Dna> >& params_;
 	bool                            fw_;
-	const Ebwt<String<Dna> >&       ebwt_;
+	const EbwtT&                    ebwtFw_;
+	const EbwtT*                    ebwtBw_;
 	TRangeSource&                   rs_;
 	TContMan&                       cm_;
 };

@@ -2632,7 +2632,8 @@ class GreedyDFSRangeSourceDriver :
 {
 public:
 	GreedyDFSRangeSourceDriver(
-			const Ebwt<String<Dna> >& ebwt,
+			const Ebwt<String<Dna> >& ebwtFw,
+			const Ebwt<String<Dna> >* ebwtBw,
 			EbwtSearchParams<String<Dna> >& params,
 			GreedyDFSRangeSource& rs,
 			GreedyDFSContinuationManager& cm,
@@ -2649,7 +2650,7 @@ public:
 			bool verbose,
 			uint32_t seed) :
 			RangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-					ebwt, params, rs, cm, fw, sink, sinkPt, os, verbose, seed),
+					ebwtFw, ebwtBw, params, rs, cm, fw, sink, sinkPt, os, verbose, seed),
 			hiHalfDepth_(hiHalfDepth), loHalfDepth_(loHalfDepth),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
 			rev2Off_(rev2Off), rev3Off_(rev3Off)

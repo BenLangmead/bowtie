@@ -51,16 +51,16 @@ public:
 			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSContinuationManager * cmFw = new GreedyDFSContinuationManager();
 		GreedyDFSRangeSourceDriver * driverFw = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *rFw, *cmFw, true, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *rFw, *cmFw, true, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 		GreedyDFSContinuationManager * cmRc = new GreedyDFSContinuationManager();
 		GreedyDFSRangeSourceDriver * driverRc = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *rRc, *cmRc, false, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *rRc, *cmRc, false, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			ebwtFw_, params, rFw, rRc, cmFw, cmRc, driverFw, driverRc,
+			ebwtFw_, ebwtBw_, params, rFw, rRc, cmFw, cmRc, driverFw, driverRc,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
 			seed_);
 	}
@@ -136,11 +136,11 @@ public:
 		GreedyDFSContinuationManager * cm1Fw = new GreedyDFSContinuationManager();
 		GreedyDFSContinuationManager * cm1Rc = new GreedyDFSContinuationManager();
 		GreedyDFSRangeSourceDriver * driver1Fw = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *r1Fw, *cm1Fw, mate1fw_, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *r1Fw, *cm1Fw, mate1fw_, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 		GreedyDFSRangeSourceDriver * driver1Rc = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *r1Rc, *cm1Rc, !mate1fw_, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *r1Rc, *cm1Rc, !mate1fw_, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 
@@ -153,16 +153,16 @@ public:
 		GreedyDFSContinuationManager * cm2Fw = new GreedyDFSContinuationManager();
 		GreedyDFSContinuationManager * cm2Rc = new GreedyDFSContinuationManager();
 		GreedyDFSRangeSourceDriver * driver2Fw = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *r2Fw, *cm2Fw, mate2fw_, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *r2Fw, *cm2Fw, mate2fw_, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 		GreedyDFSRangeSourceDriver * driver2Rc = new GreedyDFSRangeSourceDriver(
-			ebwtFw_, *params, *r2Rc, *cm2Rc, !mate2fw_, sink_, sinkPt,
+			ebwtFw_, ebwtBw_, *params, *r2Rc, *cm2Rc, !mate2fw_, sink_, sinkPt,
 			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
 			os_, verbose_, seed_);
 
 		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			ebwtFw_, params,
+			ebwtFw_, ebwtBw_, params,
 			r1Fw, r1Rc, r2Fw, r2Rc, cm1Fw, cm1Rc, cm2Fw, cm2Rc,
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
