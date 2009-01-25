@@ -481,7 +481,7 @@ public:
 	 * calling initConts() may result in finding a range (i.e., if we
 	 * immediately jump to a valid range using the ftab).
 	 */
-	virtual bool
+	virtual void
 	initConts(GreedyDFSContinuationManager& contMan, uint32_t ham) {
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
@@ -494,7 +494,7 @@ public:
 			// No alignments are possible because of the distribution
 			// of Ns in the read in combination with the backtracking
 			// constraints.
-			return false;
+			return;
 		}
 		contMan.clear();
 		// m = depth beyond which ftab must not extend or else we might
@@ -529,7 +529,7 @@ public:
 				_curRange.mms     = _mms;
 				_curRange.refcs   = _refcs;
 				_foundRange       = true;
-				return true;
+				return;
 			} else if (bot > top) {
 				// We have a range to extend
 				assert_leq(top, ebwt._eh._len);
@@ -549,7 +549,7 @@ public:
 			         _3revOff, 0, 0, ham, ham, _pairs,
 			         _elims, nsInFtab > 0);
 		}
-		return false;
+		return;
 	}
 
 	/**
@@ -565,7 +565,7 @@ public:
 	 * we're done and we didn't find any hits, we instead will dequeue
 	 * a continuation and prefetch its top/bot loci.
 	 */
-	virtual bool
+	virtual void
 	advance(GreedyDFSContinuationManager& contMan) {
 		// Restore alignment state from the frontmost continuation.
 		// The frontmost continuation should in principle be the most
@@ -624,7 +624,7 @@ public:
 			// Continuation is rejected because it violates a boundary-
 			// crossing constraint.
 			contMan.pop();
-			return false;
+			return;
 		}
 		uint32_t cur = _qlen - cont.depth - 1; // current offset into _qry
 		if(cont.depth < _qlen) {
@@ -803,7 +803,7 @@ public:
 			// This alignment doesn't satisfy the half-and-half
 			// requirements; reject it
 			contMan.pop();
-			return false;
+			return;
 		}
 
 		if(hit &&            // there are alignments to report
@@ -818,7 +818,7 @@ public:
 			_curRange.refcs   = _refcs;
 			_foundRange       = true;
 			contMan.pop();
-			return true;
+			return;
 		} else if(empty || cur == 0) {
 			// This continuation hit a dead end so pop it off
 			contMan.pop();
@@ -829,7 +829,7 @@ public:
 			assert_neq(0, cur);
 			cont.depth++;
 		}
-		return false;
+		return;
 	}
 
 	/**
@@ -2619,6 +2619,64 @@ protected:
 	vector<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
+};
+
+/**
+ * Concrete RangeSourceDriver that deals properly with
+ * GreedyDFSRangeSource by calling setOffs() with the appropriate
+ * parameters when initializing it;
+ */
+class GreedyDFSRangeSourceDriver :
+	public RangeSourceDriver<GreedyDFSRangeSource,
+	                         GreedyDFSContinuationManager>
+{
+public:
+	GreedyDFSRangeSourceDriver(
+			const Ebwt<String<Dna> >& ebwt,
+			EbwtSearchParams<String<Dna> >& params,
+			GreedyDFSRangeSource& rs,
+			GreedyDFSContinuationManager& cm,
+			bool fw,
+			HitSink& sink,
+			HitSinkPerThread* sinkPt,
+			uint32_t hiHalfDepth,
+			uint32_t loHalfDepth,
+			uint32_t rev0Off,
+			uint32_t rev1Off,
+			uint32_t rev2Off,
+			uint32_t rev3Off,
+			vector<String<Dna5> >& os,
+			bool verbose,
+			uint32_t seed) :
+			RangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+					ebwt, params, rs, cm, fw, sink, sinkPt, os, verbose, seed),
+			hiHalfDepth_(hiHalfDepth), loHalfDepth_(loHalfDepth),
+			rev0Off_(rev0Off), rev1Off_(rev1Off),
+			rev2Off_(rev2Off), rev3Off_(rev3Off)
+	{ }
+
+	virtual ~GreedyDFSRangeSourceDriver() { }
+
+protected:
+
+	/**
+	 *
+	 */
+	virtual void initRangeSource(GreedyDFSRangeSource& rs) {
+		rs.setOffs(min(hiHalfDepth_, len_), // depth of far edge of hi-half (only matters where half-and-half is possible)
+		           min(loHalfDepth_, len_), // depth of far edge of lo-half (only matters where half-and-half is possible)
+		           min(rev0Off_, len_),     // depth above which we cannot backtrack
+		           min(rev1Off_, len_),     // depth above which we may backtrack just once
+		           min(rev2Off_, len_),     // depth above which we may backtrack just twice
+		           min(rev3Off_, len_));    // depth above which we may backtrack just three times
+	}
+
+	uint32_t hiHalfDepth_;
+	uint32_t loHalfDepth_;
+	uint32_t rev0Off_;
+	uint32_t rev1Off_;
+	uint32_t rev2Off_;
+	uint32_t rev3Off_;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

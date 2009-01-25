@@ -18,14 +18,16 @@
 class UnpairedExactAlignerV1Factory : public AlignerFactory {
 public:
 	UnpairedExactAlignerV1Factory(
-			Ebwt<String<Dna> >& ebwt,
+			Ebwt<String<Dna> >& ebwtFw,
+			Ebwt<String<Dna> >* ebwtBw,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
-			ebwt_(ebwt),
+			ebwtFw_(ebwtFw),
+			ebwtBw_(ebwtBw),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			os_(os),
@@ -38,8 +40,29 @@ public:
 	 * Create a new UnpairedExactAlignerV1s.
 	 */
 	virtual Aligner* create() const {
+		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
+		EbwtSearchParams<String<Dna> >* params =
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		GreedyDFSRangeSource *rFw = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSRangeSource *rRc = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSContinuationManager * cmFw = new GreedyDFSContinuationManager();
+		GreedyDFSRangeSourceDriver * driverFw = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *rFw, *cmFw, true, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
+		GreedyDFSContinuationManager * cmRc = new GreedyDFSContinuationManager();
+		GreedyDFSRangeSourceDriver * driverRc = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *rRc, *cmRc, false, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
 		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_);
+			ebwtFw_, params, rFw, rRc, cmFw, cmRc, driverFw, driverRc,
+			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
+			seed_);
 	}
 
 	/**
@@ -48,15 +71,15 @@ public:
 	virtual std::vector<Aligner*>* create(uint32_t n) const {
 		std::vector<Aligner*>* v = new std::vector<Aligner*>;
 		for(uint32_t i = 0; i < n; i++) {
-			v->push_back(new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-				ebwt_, sink_, sinkPtFactory_, os_, rangeMode_, verbose_, seed_));
+			v->push_back(create());
 			assert(v->back() != NULL);
 		}
 		return v;
 	}
 
 private:
-	Ebwt<String<Dna> >& ebwt_;
+	Ebwt<String<Dna> >& ebwtFw_;
+	Ebwt<String<Dna> >* ebwtBw_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	vector<String<Dna5> >& os_;
@@ -71,7 +94,8 @@ private:
 class PairedExactAlignerV1Factory : public AlignerFactory {
 public:
 	PairedExactAlignerV1Factory(
-			Ebwt<String<Dna> >& ebwt,
+			Ebwt<String<Dna> >& ebwtFw,
+			Ebwt<String<Dna> >* ebwtBw,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			bool mate1fw,
@@ -82,7 +106,7 @@ public:
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
-			ebwt_(ebwt),
+			ebwtFw_(ebwtFw),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			mate1fw_(mate1fw),
@@ -99,8 +123,49 @@ public:
 	 * Create a new UnpairedExactAlignerV1s.
 	 */
 	virtual Aligner* create() const {
+		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
+		EbwtSearchParams<String<Dna> >* params =
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+
+		GreedyDFSRangeSource *r1Fw = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSRangeSource *r1Rc = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSContinuationManager * cm1Fw = new GreedyDFSContinuationManager();
+		GreedyDFSContinuationManager * cm1Rc = new GreedyDFSContinuationManager();
+		GreedyDFSRangeSourceDriver * driver1Fw = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *r1Fw, *cm1Fw, mate1fw_, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
+		GreedyDFSRangeSourceDriver * driver1Rc = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *r1Rc, *cm1Rc, !mate1fw_, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
+
+		GreedyDFSRangeSource *r2Fw = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSRangeSource *r2Rc = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
+			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		GreedyDFSContinuationManager * cm2Fw = new GreedyDFSContinuationManager();
+		GreedyDFSContinuationManager * cm2Rc = new GreedyDFSContinuationManager();
+		GreedyDFSRangeSourceDriver * driver2Fw = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *r2Fw, *cm2Fw, mate2fw_, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
+		GreedyDFSRangeSourceDriver * driver2Rc = new GreedyDFSRangeSourceDriver(
+			ebwtFw_, *params, *r2Rc, *cm2Rc, !mate2fw_, sink_, sinkPt,
+			0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+			os_, verbose_, seed_);
+
 		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			ebwt_, sink_, sinkPtFactory_, mate1fw_, mate2fw_,
+			ebwtFw_, params,
+			r1Fw, r1Rc, r2Fw, r2Rc, cm1Fw, cm1Rc, cm2Fw, cm2Rc,
+			driver1Fw, driver1Rc, driver2Fw, driver2Rc,
+			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, os_, rangeMode_, verbose_, seed_);
 	}
 
@@ -110,16 +175,15 @@ public:
 	virtual std::vector<Aligner*>* create(uint32_t n) const {
 		std::vector<Aligner*>* v = new std::vector<Aligner*>;
 		for(uint32_t i = 0; i < n; i++) {
-			v->push_back(new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-				ebwt_, sink_, sinkPtFactory_, mate1fw_, mate2fw_,
-				peInner_, peOuter_, os_, rangeMode_, verbose_, seed_));
+			v->push_back(create());
 			assert(v->back() != NULL);
 		}
 		return v;
 	}
 
 private:
-	Ebwt<String<Dna> >& ebwt_;
+	Ebwt<String<Dna> >& ebwtFw_;
+	Ebwt<String<Dna> >* ebwtBw_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	bool mate1fw_;

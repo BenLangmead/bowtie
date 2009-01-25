@@ -1067,6 +1067,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
+			NULL,
 			_sink,
 			*sinkFact,
 			os,
@@ -1075,6 +1076,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			seed);
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
+			NULL,
 			_sink,
 			*sinkFact,
 			mate1fw,

@@ -381,6 +381,16 @@ public:
 					}
 				}
 				if(cont) continue; // on to next pair of PatternSources
+				if(seqan::empty(ra.patFw)) {
+					// If patFw is empty, that's our signal that the
+					// input dried up
+					lock();
+					//basePatid_ += srca_[cur]->patid();
+					if(cur + 1 > cur_) cur_++;
+					cur = cur_;
+					unlock();
+					continue; // on to next pair of PatternSources
+				}
 				assert_eq(patid_a, patid_b);
 				patid = patid_a;
 				return true; // paired

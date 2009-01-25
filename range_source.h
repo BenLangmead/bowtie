@@ -31,9 +31,9 @@ public:
 	                      seqan::String<char>* qual,
 	                      seqan::String<char>* name) = 0;
 	/// Set up the range search.
-	virtual bool initConts(TContinuationManager& conts, uint32_t ham) = 0;
+	virtual void initConts(TContinuationManager& conts, uint32_t ham) = 0;
 	/// Advance the range search by one memory op
-	virtual bool advance(TContinuationManager& conts) = 0;
+	virtual void advance(TContinuationManager& conts) = 0;
 	/// Returns true iff the last call to advance yielded a range
 	virtual bool foundRange() = 0;
 	/// Return the last valid range found
@@ -41,6 +41,76 @@ public:
 	/// All searching w/r/t the current query is finished
 	virtual bool done() = 0;
 };
+
+/**
+ * Encapsulates an algorithm that navigates the Bowtie index to produce
+ * candidate ranges of alignments in the Burrows-Wheeler matrix.  A
+ * higher authority is responsible for reporting hits out of those
+ * ranges, and stopping when the consumer is satisfied.
+ */
+template<typename TContinuationManager>
+class ListRangeSource : public RangeSource<TContinuationManager> {
+
+	typedef std::vector<RangeSource<TContinuationManager>*> TRangeSourcePtrVec;
+
+public:
+
+	ListRangeSource(const TRangeSourcePtrVec& rss) :
+		cur_(0), done_(false), ham_(0), rss_(rss)
+	{
+		assert_gt(rss_.size(), 0);
+	}
+
+	virtual ~ListRangeSource() { }
+
+	/// Set query to find ranges for
+	virtual void setQuery(seqan::String<Dna5>* qry,
+	                      seqan::String<char>* qual,
+	                      seqan::String<char>* name)
+	{
+		cur_ = 0;
+		done_ = false;
+		rss_[0]->setQuery(qry, qual, name);
+	}
+
+	/// Set up the range search.
+	virtual void initConts(TContinuationManager& conts, uint32_t ham) {
+		assert_eq(0, cur_);
+		ham_ = ham;
+		rss_[0]->initConts(conts, ham);
+	}
+
+	/// Advance the range search by one memory op
+	virtual void advance(TContinuationManager& conts) {
+		assert(!done_);
+		if(rss_[cur_]->done()) {
+			assert(conts.empty());
+			if(cur_ < rss_.size()-1) {
+				rss_[++cur_]->initConts(conts, ham_);
+			} else {
+				done_ = true;
+				return;
+			}
+		} else {
+			rss_[cur_]->advance(conts);
+		}
+	}
+
+	/// Returns true iff the last call to advance yielded a range
+	virtual bool foundRange() { return rss_[cur_]->foundRange(); }
+	/// Return the last valid range found
+	virtual Range& range() { return rss_[cur_]->range(); }
+	/// All searching w/r/t the current query is finished
+	virtual bool done() { return done_; }
+
+protected:
+
+	uint32_t cur_;
+	bool done_;
+	uint32_t ham_;
+	TRangeSourcePtrVec rss_;
+};
+
 
 template<typename TCont>
 class ContinuationManager {
@@ -83,6 +153,8 @@ public:
 		assert(cm_.empty());
 	}
 
+	virtual ~RangeSourceDriver() { }
+
 	/**
 	 * Prepare this aligner for the next read.
 	 */
@@ -114,21 +186,21 @@ public:
 		done_ = false;
 		first_ = true;
 		cm_.clear();
+		rs_.setQuery(pat_, qual_, name_);
+		initRangeSource(rs_);
+		rs_.initConts(cm_, 0); // set up initial continuation
 	}
 
 	/**
 	 * Advance the aligner by one memory op.  Return true iff we're
 	 * done with this read.
 	 */
-	bool advance() {
+	void advance() {
 		assert(!done_);
 		assert(pat_ != NULL);
 		params_.setFw(fw_);
 		if(first_) {
 			// Set up the RangeSource for the forward read
-			rs_.setOffs(0, 0, len_, len_, len_, len_);
-			rs_.setQuery(pat_, qual_, name_);
-			rs_.initConts(cm_, 0); // set up initial continuation
 			first_ = false;
 		} else {
 			// Advance the RangeSource for the forward-oriented read
@@ -143,7 +215,7 @@ public:
 			// resume, stuff is already in cache
 			cm_.prep(ebwt_.eh(), ebwt_.ebwt());
 		}
-		return done_;
+		return;
 	}
 
 	/**
@@ -174,6 +246,9 @@ public:
 	}
 
 protected:
+
+	virtual void initRangeSource(TRangeSource& rs) = 0;
+
 	// Progress state
 	bool done_;
 	bool first_;
@@ -192,4 +267,5 @@ protected:
 	TRangeSource&                   rs_;
 	TContMan&                       cm_;
 };
+
 #endif /* RANGE_SOURCE_H_ */

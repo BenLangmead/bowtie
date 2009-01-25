@@ -284,30 +284,47 @@ class UnpairedAlignerV1 : public Aligner {
 public:
 	UnpairedAlignerV1(
 		const Ebwt<String<Dna> >& ebwt,
+		EbwtSearchParams<String<Dna> >* params,
+		TRangeSource* rFw, TRangeSource* rRc,
+		TContMan* cmFw, TContMan* cmRc,
+		TDriver* driverFw, TDriver* driverRc,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
+		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
 		Aligner(&ebwt, NULL, rangeMode, seed),
-		doneFw_(true), done_(true), firstFw_(true), firstRc_(true),
+		doneFw_(true), done_(true),
 		chaseFw_(false), chaseRc_(false),
 		sinkPtFactory_(sinkPtFactory),
-		sinkPt_(sinkPtFactory.create()),
-		params_(*sinkPt_, os, true, true, true, rangeMode),
+		sinkPt_(sinkPt),
+		params_(params),
 		rchase_(ebwt, rand_),
-		rFw_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		    false, NULL, NULL, verbose, seed, &os, false, false, false),
-		cFw_(),
-		rRc_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		    false, NULL, NULL, verbose, seed, &os, false, false, false),
-		cRc_(),
-		driverFw_(ebwt, params_, rFw_, cFw_, true,  sink, sinkPt_, os, verbose, seed),
-		driverRc_(ebwt, params_, rRc_, cRc_, false, sink, sinkPt_, os, verbose, seed)
-	{ }
+		rFw_(rFw), cFw_(cmFw),
+		rRc_(rRc), cRc_(cmRc),
+		driverFw_(driverFw),
+		driverRc_(driverRc)
+	{
+		assert(sinkPt_ != NULL);
+		assert(params_ != NULL);
+		assert(rFw_ != NULL);
+		assert(rRc_ != NULL);
+		assert(cFw_ != NULL);
+		assert(cRc_ != NULL);
+		assert(driverFw_ != NULL);
+		assert(driverRc_ != NULL);
+	}
 
 	virtual ~UnpairedAlignerV1() {
+		delete driverFw_; driverFw_ = NULL;
+		delete driverRc_; driverRc_ = NULL;
+		delete rFw_;      rFw_      = NULL;
+		delete rRc_;      rRc_      = NULL;
+		delete cFw_;      cFw_      = NULL;
+		delete cRc_;      cRc_      = NULL;
+		delete params_;   params_   = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -316,12 +333,10 @@ public:
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		Aligner::setQuery(patsrc); // set fields & random seed
-		driverFw_.setQuery(patsrc);
-		driverRc_.setQuery(patsrc);
+		driverFw_->setQuery(patsrc);
+		driverRc_->setQuery(patsrc);
 		doneFw_  = false;
 		done_    = false;
-		firstFw_ = true;
-		firstRc_ = true;
 		chaseFw_ = false;
 		chaseRc_ = false;
 	}
@@ -335,7 +350,7 @@ public:
 	                   uint32_t tlen,
 	                   bool fw)
 	{
-		return params_.reportHit(
+		return params_->reportHit(
 				fw ?  bufa_->patFw  :  bufa_->patRc,
 				fw ? &bufa_->qualFw : &bufa_->qualRc,
 				&bufa_->name,
@@ -359,45 +374,43 @@ public:
 		assert(!chaseFw_ || !chaseRc_);
 		if(chaseFw_) {
 			assert(!rangeMode_);
-			assert(driverFw_.foundRange());
-			const Range& ra = driverFw_.range();
+			assert(driverFw_->foundRange());
 			if(!rchase_.foundOff() && !rchase_.done()) {
 				rchase_.advance();
 				return false;
 			}
 			if(rchase_.foundOff()) {
-				done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), true);
+				done_ = report(driverFw_->range(), rchase_.off().first, rchase_.off().second, rchase_.tlen(), true);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
 				// Forget this range; keep looking for ranges
 				chaseFw_ = false;
-				done_ = driverFw_.done();
+				doneFw_ = driverFw_->done();
 			}
 		} else if(chaseRc_) {
 			assert(!rangeMode_);
-			assert(driverRc_.foundRange());
-			const Range& ra = driverRc_.range();
+			assert(driverRc_->foundRange());
 			if(!rchase_.foundOff() && !rchase_.done()) {
 				rchase_.advance();
 				return false;
 			}
 			if(rchase_.foundOff()) {
-				done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), false);
+				done_ = report(driverRc_->range(), rchase_.off().first, rchase_.off().second, rchase_.tlen(), false);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
 				// Forget this range; keep looking for ranges
 				chaseRc_ = false;
-				done_ = driverRc_.done();
+				done_ = driverRc_->done();
 			}
 		}
 		// Still advancing a
 		if(!done_ && !chaseFw_ && !chaseRc_) {
 			if(!doneFw_) {
-				driverFw_.advance();
-				if(driverFw_.foundRange()) {
-					const Range& ra = driverFw_.range();
+				driverFw_->advance();
+				if(driverFw_->foundRange()) {
+					const Range& ra = driverFw_->range();
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, true);
 					} else {
@@ -412,14 +425,14 @@ public:
 						}
 					}
 				}
-				if(!done_ && !chaseFw_) {
-					doneFw_ = driverFw_.done();
+				if(!doneFw_ && !chaseFw_) {
+					doneFw_ = driverFw_->done();
 				}
 			} else {
-				driverRc_.advance();
+				driverRc_->advance();
 				// Advance the RangeSource for the reverse-complement read
-				if(driverRc_.foundRange()) {
-					const Range& ra = driverRc_.range();
+				if(driverRc_->foundRange()) {
+					const Range& ra = driverRc_->range();
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, false);
 					} else {
@@ -435,7 +448,7 @@ public:
 					}
 				}
 				if(!done_ && !chaseRc_) {
-					done_ = driverRc_.done();
+					done_ = driverRc_->done();
 				}
 			}
 		}
@@ -457,8 +470,6 @@ protected:
 	// Progress state
 	bool doneFw_;
 	bool done_;
-	bool firstFw_;
-	bool firstRc_;
 	bool chaseFw_;
 	bool chaseRc_;
 
@@ -467,18 +478,18 @@ protected:
 	HitSinkPerThread* sinkPt_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> > params_;
+	EbwtSearchParams<String<Dna> >* params_;
 
 	// State for getting alignments from ranges statefully
 	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state
-	TRangeSource rFw_;
-	TContMan     cFw_;
-	TRangeSource rRc_;
-	TContMan     cRc_;
-	TDriver      driverFw_;
-	TDriver      driverRc_;
+	TRangeSource* rFw_;
+	TContMan*     cFw_;
+	TRangeSource* rRc_;
+	TContMan*     cRc_;
+	TDriver*      driverFw_;
+	TDriver*      driverRc_;
 };
 
 /**
@@ -494,8 +505,16 @@ class PairedAlignerV1 : public Aligner {
 public:
 	PairedAlignerV1(
 		const Ebwt<String<Dna> >& ebwt,
+		EbwtSearchParams<String<Dna> >* params,
+		TRangeSource* r1Fw, TRangeSource* r1Rc,
+		TRangeSource* r2Fw, TRangeSource* r2Rc,
+		TContMan* cm1Fw, TContMan* cm1Rc,
+		TContMan* cm2Fw, TContMan* cm2Rc,
+		TDriver* driver1Fw, TDriver* driver1Rc,
+		TDriver* driver2Fw, TDriver* driver2Rc,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
+		HitSinkPerThread* sinkPt,
 		bool fw1, bool fw2,
 		uint32_t minInsert,
 		uint32_t maxInsert,
@@ -504,39 +523,57 @@ public:
 		bool verbose,
 		uint32_t seed) :
 		Aligner(&ebwt, NULL, rangeMode, seed),
-		doneFw_(true), done_(true), firstFw_(true), firstRc_(true),
+		doneFw_(true), done_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
 		delayedChase1Fw_(false), delayedChase1Rc_(false),
 		delayedChase2Fw_(false), delayedChase2Rc_(false),
 		sinkPtFactory_(sinkPtFactory),
-		sinkPt_(sinkPtFactory.createMult(2)), // using Mult(2) allows us to print two records per paired alignment
-		params_(*sinkPt_, os, true, true, true, rangeMode),
+		sinkPt_(sinkPt),
+		params_(params),
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(ebwt, rand_),
-		r1Fw_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		      false, NULL, NULL, verbose, seed, &os, false, false, false),
-		c1Fw_(),
-		r1Rc_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		      false, NULL, NULL, verbose, seed, &os, false, false, false),
-		c1Rc_(),
-		driver1Fw_(ebwt, params_, r1Fw_, c1Fw_, fw1,  sink, sinkPt_, os, verbose, seed),
-		driver1Rc_(ebwt, params_, r1Rc_, c1Rc_, !fw1, sink, sinkPt_, os, verbose, seed),
+		r1Fw_(r1Fw), c1Fw_(cm1Fw),
+		r1Rc_(r1Rc), c1Rc_(cm1Rc),
+		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
-		r2Fw_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		      false, NULL, NULL, verbose, seed, &os, false, false, false),
-		c2Fw_(),
-		r2Rc_(&ebwt, params_, 0xffffffff, BacktrackLimits(), 0, true,
-		      false, NULL, NULL, verbose, seed, &os, false, false, false),
-		c2Rc_(),
-		driver2Fw_(ebwt, params_, r2Fw_, c2Fw_, fw2,  sink, sinkPt_, os, verbose, seed),
-		driver2Rc_(ebwt, params_, r2Rc_, c2Rc_, !fw2, sink, sinkPt_, os, verbose, seed),
+		r2Fw_(r2Fw), c2Fw_(cm2Fw),
+		r2Rc_(r2Rc), c2Rc_(cm2Rc),
+		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
 		offs2FwSz_(0), offs2RcSz_(0)
-	{ }
+	{
+		assert(sinkPt_ != NULL);
+		assert(params_ != NULL);
+		assert(r1Fw_ != NULL);
+		assert(r1Rc_ != NULL);
+		assert(c1Fw_ != NULL);
+		assert(c1Rc_ != NULL);
+		assert(driver1Fw_ != NULL);
+		assert(driver1Rc_ != NULL);
+		assert(r2Fw_ != NULL);
+		assert(r2Rc_ != NULL);
+		assert(c2Fw_ != NULL);
+		assert(c2Rc_ != NULL);
+		assert(driver2Fw_ != NULL);
+		assert(driver2Rc_ != NULL);
+	}
 
 	virtual ~PairedAlignerV1() {
+		delete driver1Fw_; driver1Fw_ = NULL;
+		delete driver1Rc_; driver1Rc_ = NULL;
+		delete driver2Fw_; driver2Fw_ = NULL;
+		delete driver2Rc_; driver2Rc_ = NULL;
+		delete r1Fw_;      r1Fw_      = NULL;
+		delete r1Rc_;      r1Rc_      = NULL;
+		delete r2Fw_;      r2Fw_      = NULL;
+		delete r2Rc_;      r2Rc_      = NULL;
+		delete c1Fw_;      c1Fw_      = NULL;
+		delete c1Rc_;      c1Rc_      = NULL;
+		delete c2Fw_;      c2Fw_      = NULL;
+		delete c2Rc_;      c2Rc_      = NULL;
+		delete params_;    params_    = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -548,10 +585,10 @@ public:
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
-		driver1Fw_.setQuery(patsrc, true  /* mate1 */);
-		driver1Rc_.setQuery(patsrc, true  /* mate1 */);
-		driver2Fw_.setQuery(patsrc, false /* mate2 */);
-		driver2Rc_.setQuery(patsrc, false /* mate2 */);
+		driver1Fw_->setQuery(patsrc, true  /* mate1 */);
+		driver1Rc_->setQuery(patsrc, true  /* mate1 */);
+		driver2Fw_->setQuery(patsrc, false /* mate2 */);
+		driver2Rc_->setQuery(patsrc, false /* mate2 */);
 		// Neither orientation is done
 		doneFw_   = false;
 		done_     = false;
@@ -587,7 +624,7 @@ public:
 			// are stored in fw1_, fw2_.
 			advanceOrientation(chase1Fw_,        chase2Fw_,
 	                           delayedChase1Fw_, delayedChase2Fw_,
-			                   driver1Fw_,       driver2Fw_,
+			                   *driver1Fw_,      *driver2Fw_,
 			                   offs1Fw_,         offs2Fw_,
 			                   offs1FwSz_,       offs2FwSz_,
 			                   doneFw_,
@@ -599,7 +636,7 @@ public:
 			// orientations from what we stored in fw1_ and fw2_.
 			advanceOrientation(chase2Rc_,        chase1Rc_,
 			                   delayedChase2Rc_, delayedChase1Rc_,
-			                   driver2Rc_,       driver1Rc_,
+			                   *driver2Rc_,      *driver1Rc_,
 			                   offs2Rc_,         offs1Rc_,
 			                   offs2RcSz_,       offs1RcSz_,
 			                   done_,
@@ -643,8 +680,8 @@ protected:
 		uint32_t oms = min(spreada, spreadb) - 1;
 		bool ret;
 		if(pairFw) {
-			params_.setFw(fwa);
-			ret = params_.reportHit(
+			params_->setFw(fwa);
+			ret = params_->reportHit(
 					fwa ?  bufa_->patFw  :  bufa_->patRc,
 					fwa ? &bufa_->qualFw : &bufa_->qualRc,
 					&bufa_->name,
@@ -658,8 +695,8 @@ protected:
 					ra.stratum,                   // alignment stratum
 					oms);                         // # other hits
 			assert(!ret);
-			params_.setFw(fwb);
-			ret = params_.reportHit(
+			params_->setFw(fwb);
+			ret = params_->reportHit(
 					fwb ?  bufb_->patFw  :  bufb_->patRc,
 					fwb ? &bufb_->qualFw : &bufb_->qualRc,
 					&bufb_->name,
@@ -673,8 +710,8 @@ protected:
 					rb.stratum,                   // alignment stratum
 					oms);                         // # other hits
 		} else {
-			params_.setFw(fwb);
-			ret = params_.reportHit(
+			params_->setFw(fwb);
+			ret = params_->reportHit(
 					fwb ?  bufb_->patFw  :  bufb_->patRc,
 					fwb ? &bufb_->qualFw : &bufb_->qualRc,
 					&bufb_->name,
@@ -688,8 +725,8 @@ protected:
 					rb.stratum,                   // alignment stratum
 					oms);                         // # other hits
 			assert(!ret);
-			params_.setFw(fwa);
-			ret = params_.reportHit(
+			params_->setFw(fwa);
+			ret = params_->reportHit(
 					fwa ?  bufa_->patFw  :  bufa_->patRc,
 					fwa ? &bufa_->qualFw : &bufa_->qualRc,
 					&bufa_->name,
@@ -924,8 +961,6 @@ protected:
 	// Progress state
 	bool doneFw_;   // finished with forward orientation of both mates?
 	bool done_;
-	bool firstFw_;
-	bool firstRc_;
 
 	bool chase1Fw_;
 	bool chase1Rc_;
@@ -942,7 +977,7 @@ protected:
 	HitSinkPerThread* sinkPt_;
 
 	// State for alignment
-	EbwtSearchParams<String<Dna> > params_;
+	EbwtSearchParams<String<Dna> >* params_;
 
 	// Paired-end boundaries
 	const uint32_t minInsert_;
@@ -957,28 +992,28 @@ protected:
 	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state for first mate
-	TRangeSource r1Fw_;
-	TContMan     c1Fw_;
-	TRangeSource r1Rc_;
-	TContMan     c1Rc_;
-	TDriver      driver1Fw_;
-	TDriver      driver1Rc_;
-	U32PairVec   offs1Fw_;
-	uint32_t     offs1FwSz_; // total size of all ranges found in this category
-	U32PairVec   offs1Rc_;
-	uint32_t     offs1RcSz_; // total size of all ranges found in this category
+	TRangeSource* r1Fw_;
+	TContMan*     c1Fw_;
+	TRangeSource* r1Rc_;
+	TContMan*     c1Rc_;
+	TDriver*      driver1Fw_;
+	TDriver*      driver1Rc_;
+	U32PairVec    offs1Fw_;
+	uint32_t      offs1FwSz_; // total size of all ranges found in this category
+	U32PairVec    offs1Rc_;
+	uint32_t      offs1RcSz_; // total size of all ranges found in this category
 
 	// Range-finding state for second mate
-	TRangeSource r2Fw_;
-	TContMan     c2Fw_;
-	TRangeSource r2Rc_;
-	TContMan     c2Rc_;
-	TDriver      driver2Fw_;
-	TDriver      driver2Rc_;
-	U32PairVec   offs2Fw_;
-	uint32_t     offs2FwSz_; // total size of all ranges found in this category
-	U32PairVec   offs2Rc_;
-	uint32_t     offs2RcSz_; // total size of all ranges found in this category
+	TRangeSource* r2Fw_;
+	TContMan*     c2Fw_;
+	TRangeSource* r2Rc_;
+	TContMan*     c2Rc_;
+	TDriver*      driver2Fw_;
+	TDriver*      driver2Rc_;
+	U32PairVec    offs2Fw_;
+	uint32_t      offs2FwSz_; // total size of all ranges found in this category
+	U32PairVec    offs2Rc_;
+	uint32_t      offs2RcSz_; // total size of all ranges found in this category
 };
 
 #endif /* ALIGNER_H_ */
