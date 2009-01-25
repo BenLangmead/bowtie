@@ -16,12 +16,12 @@
  */
 template<typename TStr>
 class RangeChaser {
-	typedef Ebwt<TStr> EbwtT;
+	typedef Ebwt<TStr> TEbwt;
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 public:
 	RangeChaser() : prepped_(false) { }
 	virtual ~RangeChaser() { }
-	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen, const EbwtT* ebwt) = 0;
+	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen, const TEbwt* ebwt) = 0;
 	virtual bool done() const = 0;
 	virtual void advance() = 0;
 	virtual void prep() = 0;
@@ -38,7 +38,7 @@ public:
 template<typename TStr>
 class RandomScanningRangeChaser : public RangeChaser<TStr> {
 
-	typedef Ebwt<TStr> EbwtT;
+	typedef Ebwt<TStr> TEbwt;
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 	typedef std::vector<U32Pair> U32PairVec;
 
@@ -64,7 +64,7 @@ public:
 	 * Convert a range to a vector of reference loci, where a locus is
 	 * a u32 pair of <ref-idx, ref-offset>.
 	 */
-	static void toOffs(const EbwtT& ebwt,
+	static void toOffs(const TEbwt& ebwt,
 	                   uint32_t qlen,
 	                   RandomSource& rand,
 	                   uint32_t top,
@@ -134,12 +134,13 @@ public:
 	virtual void setTopBot(uint32_t top,
 	                       uint32_t bot,
 	                       uint32_t qlen,
-	                       const EbwtT* ebwt)
+	                       const TEbwt* ebwt)
 	{
 		assert_neq(0xffffffff, top);
 		assert_neq(0xffffffff, bot);
 		assert_gt(bot, top);
 		assert_gt(qlen, 0);
+		assert(ebwt != NULL);
 		ebwt_ = ebwt;
 		qlen_ = qlen;
 		top_ = top;
@@ -236,7 +237,7 @@ public:
 
 protected:
 
-	const EbwtT* ebwt_;  /// index to resolve row in
+	const TEbwt* ebwt_;  /// index to resolve row in
 	uint32_t qlen_;      /// length of read; needed to convert to ref. coordinates
 	RandomSource& rand_; /// pseudo-random number generator
 	uint32_t top_;       /// range top

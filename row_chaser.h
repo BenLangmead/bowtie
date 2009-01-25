@@ -21,7 +21,7 @@ template<typename TStr>
 class RowChaser {
 
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef Ebwt<TStr> EbwtT;
+	typedef Ebwt<TStr> TEbwt;
 
 public:
 	RowChaser() :
@@ -42,7 +42,7 @@ public:
 	 * converted to understand where it is w/r/t the reference hit and
 	 * offset within it.
 	 */
-	static uint32_t toFlatRefOff(const EbwtT* ebwt, uint32_t qlen, uint32_t row) {
+	static uint32_t toFlatRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done()) {
@@ -54,7 +54,7 @@ public:
 	/**
 	 * Convert a row to a reference offset.
 	 */
-	static U32Pair toRefOff(const EbwtT* ebwt, uint32_t qlen, uint32_t row) {
+	static U32Pair toRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done()) {
@@ -67,9 +67,10 @@ public:
 	 * Set the next row for us to "chase" (i.e. map to a reference
 	 * location using the BWT step-left operation).
 	 */
-	void setRow(uint32_t row, uint32_t qlen, const EbwtT* ebwt) {
+	void setRow(uint32_t row, uint32_t qlen, const TEbwt* ebwt) {
 		assert_neq(0xffffffff, row);
 		assert_gt(qlen, 0);
+		assert(ebwt != NULL);
 		ebwt_ = ebwt;
 		eh_ = &ebwt->_eh;
 		row_ = row;
@@ -175,7 +176,7 @@ public:
 
 protected:
 
-	const EbwtT* ebwt_;      /// index to resolve row in
+	const TEbwt* ebwt_;      /// index to resolve row in
 	uint32_t qlen_;          /// length of read; needed to convert to ref. coordinates
 	const EbwtParams* eh_;   /// eh field from index
 	uint32_t row_;           /// current row

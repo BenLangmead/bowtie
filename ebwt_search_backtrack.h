@@ -247,7 +247,9 @@ public:
 		_randSeed(seed),
 		_verbose(__verbose),
 		_ihits(0llu)
-	{ }
+	{
+		curEbwt_ = __ebwt;
+	}
 
 	virtual ~GreedyDFSRangeSource() {
 		if(_pairs != NULL)          delete[] _pairs;
@@ -483,6 +485,7 @@ public:
 	 */
 	virtual void
 	initConts(GreedyDFSContinuationManager& contMan, uint32_t ham) {
+		assert(curEbwt_ != NULL);
 		assert_gt(length(*_qry), 0);
 		assert_leq(_qlen, length(*_qry));
 		assert_geq(length(*_qual), length(*_qry));
@@ -573,6 +576,7 @@ public:
 		// the greedy DFS backtracker, which partial alignment is most
 		// promising is determined in a greedy, depth-first, non-
 		// optimal fashion.
+		assert(curEbwt_ != NULL);
 		assert_gt(contMan.size(), 0);
 		GreedyDFSContinuation& cont = contMan.front();
 		assert(cont.prepped); // must have been prepped
@@ -2622,6 +2626,17 @@ protected:
 };
 
 /**
+ * What boundary within the alignment to "pin" a particular
+ * backtracking constraint to.
+ */
+enum SearchConstraintExtent {
+	PIN_TO_BEGINNING = 1, // depth 0; i.e., constraint is inactive
+	PIN_TO_LEN,           // constraint applies to while alignment
+	PIN_TO_HI_HALF_EDGE,  // constraint applies to hi-half of seed region
+	PIN_TO_SEED_EDGE      // constraint applies to entire seed region
+};
+
+/**
  * Concrete RangeSourceDriver that deals properly with
  * GreedyDFSRangeSource by calling setOffs() with the appropriate
  * parameters when initializing it;
@@ -2640,18 +2655,19 @@ public:
 			bool fw,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
-			uint32_t hiHalfDepth,
-			uint32_t loHalfDepth,
-			uint32_t rev0Off,
-			uint32_t rev1Off,
-			uint32_t rev2Off,
-			uint32_t rev3Off,
+			uint32_t seedLen,
+			bool nudgeLeft,
+			SearchConstraintExtent rev0Off,
+			SearchConstraintExtent rev1Off,
+			SearchConstraintExtent rev2Off,
+			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
 			uint32_t seed) :
 			RangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 					ebwtFw, ebwtBw, params, rs, cm, fw, sink, sinkPt, os, verbose, seed),
-			hiHalfDepth_(hiHalfDepth), loHalfDepth_(loHalfDepth),
+			seedLen_(seedLen),
+			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
 			rev2Off_(rev2Off), rev3Off_(rev3Off)
 	{ }
@@ -2663,21 +2679,51 @@ protected:
 	/**
 	 *
 	 */
-	virtual void initRangeSource(GreedyDFSRangeSource& rs) {
-		rs.setOffs(min(hiHalfDepth_, len_), // depth of far edge of hi-half (only matters where half-and-half is possible)
-		           min(loHalfDepth_, len_), // depth of far edge of lo-half (only matters where half-and-half is possible)
-		           min(rev0Off_, len_),     // depth above which we cannot backtrack
-		           min(rev1Off_, len_),     // depth above which we may backtrack just once
-		           min(rev2Off_, len_),     // depth above which we may backtrack just twice
-		           min(rev3Off_, len_));    // depth above which we may backtrack just three times
+	inline uint32_t cextToDepth(SearchConstraintExtent cext,
+	                            uint32_t sRight,
+	                            uint32_t s,
+	                            uint32_t len)
+	{
+		if(cext == PIN_TO_SEED_EDGE)    return s;
+		if(cext == PIN_TO_HI_HALF_EDGE) return sRight;
+		if(cext == PIN_TO_BEGINNING)    return 0;
+		if(cext == PIN_TO_LEN)          return len;
+		cerr << "Bad SearchConstraintExtent: " << cext;
+		exit(1);
 	}
 
-	uint32_t hiHalfDepth_;
-	uint32_t loHalfDepth_;
-	uint32_t rev0Off_;
-	uint32_t rev1Off_;
-	uint32_t rev2Off_;
-	uint32_t rev3Off_;
+	/**
+	 * Called every time setQuery() is called in the parent class,
+	 * after setQuery() has been called on the RangeSource but before
+	 * initConts() has been called.
+	 */
+	virtual void initRangeSource(GreedyDFSRangeSource& rs) {
+		// If seedLen_ is huge, then it will always cover the whole
+		// alignment
+		uint32_t s = (seedLen_ > 0 ? min(seedLen_, len_) : len_);
+		uint32_t sLeft  = s >> 1;
+		uint32_t sRight = s >> 1;
+		// If seed has odd length, then nudge appropriate half up by
+		// one (TODO: is this right?)
+		if((s & 1) != 0) { if(nudgeLeft_) sLeft++; else sRight++; }
+		uint32_t rev0Off = cextToDepth(rev0Off_, sRight, s, len_);
+		uint32_t rev1Off = cextToDepth(rev1Off_, sRight, s, len_);
+		uint32_t rev2Off = cextToDepth(rev2Off_, sRight, s, len_);
+		uint32_t rev3Off = cextToDepth(rev3Off_, sRight, s, len_);
+		rs.setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)
+		           s,        // depth of far edge of lo-half (only matters where half-and-half is possible)
+		           rev0Off,  // depth above which we cannot backtrack
+		           rev1Off,  // depth above which we may backtrack just once
+		           rev2Off,  // depth above which we may backtrack just twice
+		           rev3Off); // depth above which we may backtrack just three times
+	}
+
+	uint32_t seedLen_;
+	bool nudgeLeft_;
+	SearchConstraintExtent rev0Off_;
+	SearchConstraintExtent rev1Off_;
+	SearchConstraintExtent rev2Off_;
+	SearchConstraintExtent rev3Off_;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

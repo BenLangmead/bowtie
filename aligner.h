@@ -26,12 +26,9 @@
  */
 class Aligner {
 public:
-	Aligner(const Ebwt<String<Dna> >& ebwtFw,
-	        const Ebwt<String<Dna> >* ebwtRc,
-	        bool rangeMode,
-	        uint32_t seed) :
-		ebwtFw_(ebwtFw), ebwtRc_(ebwtRc), patsrc_(NULL),
-		bufa_(NULL), bufb_(NULL), rangeMode_(rangeMode), seed_(seed)
+	Aligner(bool rangeMode, uint32_t seed) :
+		patsrc_(NULL), bufa_(NULL), bufb_(NULL),
+		rangeMode_(rangeMode), seed_(seed)
 	{ }
 
 	virtual ~Aligner() { }
@@ -57,9 +54,6 @@ public:
 
 protected:
 
-	// Index
-	const Ebwt<String<Dna> >& ebwtFw_;
-	const Ebwt<String<Dna> >* ebwtRc_;
 	// Current read pair
 	PatternSourcePerThread* patsrc_;
 	ReadBuf* bufa_;
@@ -79,7 +73,19 @@ class AlignerFactory {
 public:
 	virtual ~AlignerFactory() { }
 	virtual Aligner* create() const = 0;
-	virtual std::vector<Aligner*>* create(uint32_t) const = 0;
+
+	/**
+	 * Allocate a vector of n Aligners; use destroy(std::vector...) to
+	 * free the memory.
+	 */
+	virtual std::vector<Aligner*>* create(uint32_t n) const {
+		std::vector<Aligner*>* v = new std::vector<Aligner*>;
+		for(uint32_t i = 0; i < n; i++) {
+			v->push_back(create());
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
 
 	/// Free memory associated with the aligner
 	virtual void destroy(Aligner* al) const {
@@ -283,8 +289,6 @@ class UnpairedAlignerV1 : public Aligner {
 	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
 public:
 	UnpairedAlignerV1(
-		const Ebwt<String<Dna> >& ebwtFw,
-		const Ebwt<String<Dna> >* ebwtBw,
 		EbwtSearchParams<String<Dna> >* params,
 		TRangeSource* rFw, TRangeSource* rRc,
 		TContMan* cmFw, TContMan* cmRc,
@@ -296,7 +300,7 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(ebwtFw, ebwtBw, rangeMode, seed),
+		Aligner(rangeMode, seed),
 		doneFw_(true), done_(true),
 		chaseFw_(false), chaseRc_(false),
 		sinkPtFactory_(sinkPtFactory),
@@ -505,8 +509,6 @@ class PairedAlignerV1 : public Aligner {
 
 public:
 	PairedAlignerV1(
-		const Ebwt<String<Dna> >& ebwtFw,
-		const Ebwt<String<Dna> >* ebwtBw,
 		EbwtSearchParams<String<Dna> >* params,
 		TRangeSource* r1Fw, TRangeSource* r1Rc,
 		TRangeSource* r2Fw, TRangeSource* r2Rc,
@@ -524,7 +526,7 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(ebwtFw, NULL, rangeMode, seed),
+		Aligner(rangeMode, seed),
 		doneFw_(true), done_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
@@ -793,7 +795,8 @@ protected:
 							       dr1.range(), dr2.range(),
 								   h.first,
 								   left, right,
-								   this->ebwtFw_._plen[h.first],
+								   // _plen array is same both Fw and Bw
+								   dr1.curEbwt()->_plen[h.first],
 								   fwa, fwb,
 								   pairFw)) return true;
 						}

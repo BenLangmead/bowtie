@@ -22,8 +22,9 @@
  */
 template<typename TContinuationManager>
 class RangeSource {
+	typedef Ebwt<String<Dna> > TEbwt;
 public:
-	RangeSource()  { }
+	RangeSource() : curEbwt_(NULL) { }
 	virtual ~RangeSource() { }
 
 	/// Set query to find ranges for
@@ -40,6 +41,11 @@ public:
 	virtual Range& range() = 0;
 	/// All searching w/r/t the current query is finished
 	virtual bool done() = 0;
+	/// Return ptr to index this RangeSource is currently getting ranges from
+	const TEbwt *curEbwt() const { return curEbwt_; }
+protected:
+	/// ptr to index this RangeSource is currently getting ranges from
+	const TEbwt *curEbwt_;
 };
 
 /**
@@ -51,6 +57,7 @@ public:
 template<typename TContinuationManager>
 class ListRangeSource : public RangeSource<TContinuationManager> {
 
+	typedef Ebwt<String<Dna> > TEbwt;
 	typedef std::vector<RangeSource<TContinuationManager>*> TRangeSourcePtrVec;
 
 public:
@@ -68,7 +75,7 @@ public:
 	                      seqan::String<char>* qual,
 	                      seqan::String<char>* name)
 	{
-		cur_ = 0;
+		cur_ = 0; // go back to first RangeSource in list
 		done_ = false;
 		rss_[0]->setQuery(qry, qual, name);
 	}
@@ -83,25 +90,33 @@ public:
 	/// Advance the range search by one memory op
 	virtual void advance(TContinuationManager& conts) {
 		assert(!done_);
+		assert_lt(cur_, rss_.size());
 		if(rss_[cur_]->done()) {
+			// Move on to next RangeSource
 			assert(conts.empty());
 			if(cur_ < rss_.size()-1) {
 				rss_[++cur_]->initConts(conts, ham_);
 			} else {
+				// No RangeSources in list; done
 				done_ = true;
 				return;
 			}
 		} else {
+			// Advance current RangeSource
 			rss_[cur_]->advance(conts);
 		}
 	}
 
 	/// Returns true iff the last call to advance yielded a range
-	virtual bool foundRange() { return rss_[cur_]->foundRange(); }
+	virtual bool foundRange() { assert(!done_); return rss_[cur_]->foundRange(); }
 	/// Return the last valid range found
 	virtual Range& range() { return rss_[cur_]->range(); }
 	/// All searching w/r/t the current query is finished
 	virtual bool done() { return done_; }
+	/// Return curEbwt for the currently-active RangeSource
+	const TEbwt* curEbwt() const {
+		return rss_[cur_]->curEbwt();
+	}
 
 protected:
 
@@ -134,12 +149,12 @@ public:
 template<typename TRangeSource, typename TContMan>
 class RangeSourceDriver {
 
-	typedef Ebwt<String<Dna> > EbwtT;
+	typedef Ebwt<String<Dna> > TEbwt;
 
 public:
 	RangeSourceDriver(
-		const EbwtT& ebwtFw,
-		const EbwtT* ebwtBw,
+		const TEbwt& ebwtFw,
+		const TEbwt* ebwtBw,
 		EbwtSearchParams<String<Dna> >& params,
 		TRangeSource& rs,
 		TContMan& cm,
@@ -150,8 +165,8 @@ public:
 		bool verbose,
 		uint32_t seed) :
 		done_(true), first_(true), len_(0),
-		pat_(NULL), qual_(NULL), name_(NULL),
-		sinkPt_(sinkPt), params_(params),
+		pat_(NULL), qual_(NULL), name_(NULL), sinkPt_(sinkPt),
+		params_(params),
 		fw_(fw), ebwtFw_(ebwtFw), ebwtBw_(ebwtBw), rs_(rs), cm_(cm)
 	{
 		assert(cm_.empty());
@@ -249,12 +264,9 @@ public:
 		return len_;
 	}
 
-	/**
-	 * Return a const ptr to whichever Ebwt (forward or backward) the
-	 * current range came from.
-	 */
-	virtual const EbwtT *curEbwt() {
-		return &ebwtFw_;
+	/// Return ptr to index this RangeSource is currently getting ranges from
+	const TEbwt* curEbwt() const {
+		return rs_.curEbwt();
 	}
 
 protected:
@@ -275,8 +287,8 @@ protected:
 	// State for alignment
 	EbwtSearchParams<String<Dna> >& params_;
 	bool                            fw_;
-	const EbwtT&                    ebwtFw_;
-	const EbwtT*                    ebwtBw_;
+	const TEbwt&                    ebwtFw_;
+	const TEbwt*                    ebwtBw_;
 	TRangeSource&                   rs_;
 	TContMan&                       cm_;
 };
