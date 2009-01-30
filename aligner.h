@@ -513,6 +513,7 @@ public:
 		bool fw1, bool fw2,
 		uint32_t minInsert,
 		uint32_t maxInsert,
+		uint32_t symCeiling,
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
@@ -528,6 +529,7 @@ public:
 		params_(params),
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
+		symCeiling_(symCeiling),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rand_),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
@@ -836,7 +838,8 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
 					assert(drR.foundRange());
-					rchase_.setTopBot(drR.range().top, drR.range().bot, drR.qlen(), drR.curEbwt());
+					uint32_t top = drR.range().top; uint32_t bot = drR.range().bot;
+					rchase_.setTopBot(top, bot, drR.qlen(), drR.curEbwt());
 					chaseR = true;
 					delayedchaseR = false;
 				}
@@ -866,7 +869,8 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
 					assert(drL.foundRange());
-					rchase_.setTopBot(drL.range().top, drL.range().bot, drL.qlen(), drL.curEbwt());
+					uint32_t top = drL.range().top; uint32_t bot = drL.range().bot;
+					rchase_.setTopBot(top, bot, drL.qlen(), drL.curEbwt());
 					chaseL = true;
 					delayedchaseL = false;
 				}
@@ -891,6 +895,12 @@ protected:
 				if(drL.foundRange()) {
 					// Add the size of this range to the total for this mate
 					offsLsz += (drL.range().bot - drL.range().top);
+					if(offsLsz >= symCeiling_ && offsRsz >= symCeiling_) {
+						// Too many candidates for both mates; abort
+						// without any more searching
+						done_ = true;
+						return;
+					}
 					if(offsRsz == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
@@ -921,6 +931,12 @@ protected:
 				if(drR.foundRange()) {
 					// Add the size of this range to the total for this mate
 					offsRsz += (drR.range().bot - drR.range().top);
+					if(offsLsz >= symCeiling_ && offsRsz >= symCeiling_) {
+						// Too many candidates for both mates; abort
+						// without any more searching
+						done_ = true;
+						return;
+					}
 					if(offsLsz == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
@@ -967,6 +983,10 @@ protected:
 	// Paired-end boundaries
 	const uint32_t minInsert_;
 	const uint32_t maxInsert_;
+
+	// If both reads align >= symCeiling times, then immediately give
+	// up on reporting a paired alignment
+	const uint32_t symCeiling_;
 
 	// Orientation of upstream/downstream mates when aligning to
 	// forward strand

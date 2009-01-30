@@ -1084,6 +1084,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			mate2fw,
 			minInsert,
 			maxInsert,
+			mhits,     // for symCeiling
 			os,
 			rangeMode,
 			verbose,
@@ -1396,6 +1397,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			mate2fw,
 			minInsert,
 			maxInsert,
+			mhits,     // for symCeiling
 			os,
 			rangeMode,
 			verbose,

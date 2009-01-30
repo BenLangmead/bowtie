@@ -150,6 +150,7 @@ public:
 			bool mate2fw,
 			uint32_t peInner,
 			uint32_t peOuter,
+			uint32_t symCeil,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -162,6 +163,7 @@ public:
 			mate2fw_(mate2fw),
 			peInner_(peInner),
 			peOuter_(peOuter),
+			symCeil_(symCeil),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -303,7 +305,7 @@ public:
 		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, os_, rangeMode_, verbose_, seed_);
+			peInner_, peOuter_, symCeil_, os_, rangeMode_, verbose_, seed_);
 	}
 
 private:
@@ -315,6 +317,7 @@ private:
 	bool mate2fw_;
 	uint32_t peInner_;
 	uint32_t peOuter_;
+	uint32_t symCeil_;
 	vector<String<Dna5> >& os_;
 	bool rangeMode_;
 	bool verbose_;
