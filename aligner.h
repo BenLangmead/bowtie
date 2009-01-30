@@ -535,7 +535,31 @@ public:
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
 		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
-		offs2FwSz_(0), offs2RcSz_(0)
+		offs2FwSz_(0), offs2RcSz_(0),
+		chaseL_fw_(fw1_ ? chase1Fw_ : chase1Rc_),
+		chaseR_fw_(fw2_ ? chase2Fw_ : chase2Rc_),
+		delayedchaseL_fw_(fw1_ ? delayedChase1Fw_ : delayedChase1Rc_),
+		delayedchaseR_fw_(fw2_ ? delayedChase2Fw_ : delayedChase2Rc_),
+		drL_fw_(fw1_ ? *driver1Fw_ : *driver1Rc_),
+		drR_fw_(fw2_ ? *driver2Fw_ : *driver2Rc_),
+		offsL_fw_(fw1_ ? offs1Fw_ : offs1Rc_),
+		offsR_fw_(fw2_ ? offs2Fw_ : offs2Rc_),
+		rangesL_fw_(fw1_ ? ranges1Fw_ : ranges1Rc_),
+		rangesR_fw_(fw2_ ? ranges2Fw_ : ranges2Rc_),
+		offsLsz_fw_(fw1_ ? offs1FwSz_ : offs1RcSz_),
+		offsRsz_fw_(fw2_ ? offs2FwSz_ : offs2RcSz_),
+		chaseL_rc_(fw2_ ? chase2Rc_ : chase2Fw_),
+		chaseR_rc_(fw1_ ? chase1Rc_ : chase1Fw_),
+		delayedchaseL_rc_(fw2_ ? delayedChase2Rc_ : delayedChase2Fw_),
+		delayedchaseR_rc_(fw1_ ? delayedChase1Rc_ : delayedChase1Fw_),
+		drL_rc_(fw2_ ? *driver2Rc_ : *driver2Fw_),
+		drR_rc_(fw1_ ? *driver1Rc_ : *driver1Fw_),
+		offsL_rc_(fw2_ ? offs2Rc_ : offs2Fw_),
+		offsR_rc_(fw1_ ? offs1Rc_ : offs1Fw_),
+		rangesL_rc_(fw2_ ? ranges2Rc_ : ranges2Fw_),
+		rangesR_rc_(fw1_ ? ranges1Rc_ : ranges1Fw_),
+		offsLsz_rc_(fw2_ ? offs2RcSz_ : offs2FwSz_),
+		offsRsz_rc_(fw1_ ? offs1RcSz_ : offs1FwSz_)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
@@ -601,18 +625,12 @@ public:
 		if(!doneFw_) {
 			// Mate 1 aligns upstream of mate 2.  Expected orientations
 			// are stored in fw1_, fw2_.
-			advanceOrientation(fw1_ ? chase1Fw_        : chase1Rc_,
-			                   fw2_ ? chase2Fw_        : chase2Rc_,
-			                   fw1_ ? delayedChase1Fw_ : delayedChase1Rc_,
-			                   fw2_ ? delayedChase2Fw_ : delayedChase2Rc_,
-			                   fw1_ ? *driver1Fw_      : *driver1Rc_,
-			                   fw2_ ? *driver2Fw_      : *driver2Rc_,
-			                   fw1_ ? offs1Fw_         : offs1Rc_,
-			                   fw2_ ? offs2Fw_         : offs2Rc_,
-			                   fw1_ ? ranges1Fw_       : ranges1Rc_,
-			                   fw2_ ? ranges2Fw_       : ranges2Rc_,
-			                   fw1_ ? offs1FwSz_       : offs1RcSz_,
-			                   fw2_ ? offs2FwSz_       : offs2RcSz_,
+			advanceOrientation(chaseL_fw_, chaseR_fw_,
+			                   delayedchaseL_fw_, delayedchaseR_fw_,
+			                   drL_fw_, drR_fw_,
+			                   offsL_fw_, offsR_fw_,
+			                   rangesL_fw_, rangesR_fw_,
+			                   offsLsz_fw_, offsRsz_fw_,
 			                   doneFw_,
 			                   fw1_, fw2_,
 			                   true, verbose);
@@ -620,18 +638,12 @@ public:
 			// In reverse-complement space, we expect mate 2 to align
 			// upstream of mate 1.  Also, mates 1 and 2 have reversed
 			// orientations from what we stored in fw1_ and fw2_.
-			advanceOrientation(fw2_ ? chase2Rc_        : chase2Fw_,
-			                   fw1_ ? chase1Rc_        : chase1Fw_,
-			                   fw2_ ? delayedChase2Rc_ : delayedChase2Fw_,
-			                   fw1_ ? delayedChase1Rc_ : delayedChase1Fw_,
-			                   fw2_ ? *driver2Rc_      : *driver2Fw_,
-			                   fw1_ ? *driver1Rc_      : *driver1Fw_,
-			                   fw2_ ? offs2Rc_         : offs2Fw_,
-			                   fw1_ ? offs1Rc_         : offs1Fw_,
-			                   fw2_ ? ranges2Rc_       : ranges2Fw_,
-			                   fw1_ ? ranges1Rc_       : ranges1Fw_,
-			                   fw2_ ? offs2RcSz_       : offs2FwSz_,
-			                   fw1_ ? offs1RcSz_       : offs1FwSz_,
+			advanceOrientation(chaseL_rc_, chaseR_rc_,
+			                   delayedchaseL_rc_, delayedchaseR_rc_,
+			                   drL_rc_, drR_rc_,
+			                   offsL_rc_, offsR_rc_,
+			                   rangesL_rc_, rangesR_rc_,
+			                   offsLsz_rc_, offsRsz_rc_,
 			                   done_,
 			                   !fw2_, !fw1_,
 			                   false, verbose);
@@ -1015,6 +1027,32 @@ protected:
 	U32PairVec    offs2Rc_;
 	TRangeVec     ranges2Rc_;
 	uint32_t      offs2RcSz_; // total size of all ranges found in this category
+
+	bool& chaseL_fw_;
+	bool& chaseR_fw_;
+	bool& delayedchaseL_fw_;
+	bool& delayedchaseR_fw_;
+	TDriver& drL_fw_;
+	TDriver& drR_fw_;
+	U32PairVec& offsL_fw_;
+	U32PairVec& offsR_fw_;
+	TRangeVec& rangesL_fw_;
+	TRangeVec& rangesR_fw_;
+	uint32_t& offsLsz_fw_;
+	uint32_t& offsRsz_fw_;
+
+	bool& chaseL_rc_;
+	bool& chaseR_rc_;
+	bool& delayedchaseL_rc_;
+	bool& delayedchaseR_rc_;
+	TDriver& drL_rc_;
+	TDriver& drR_rc_;
+	U32PairVec& offsL_rc_;
+	U32PairVec& offsR_rc_;
+	TRangeVec& rangesL_rc_;
+	TRangeVec& rangesR_rc_;
+	uint32_t& offsLsz_rc_;
+	uint32_t& offsRsz_rc_;
 };
 
 #endif /* ALIGNER_H_ */
