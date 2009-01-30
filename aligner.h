@@ -895,7 +895,7 @@ protected:
 				if(drL.foundRange()) {
 					// Add the size of this range to the total for this mate
 					offsLsz += (drL.range().bot - drL.range().top);
-					if(offsLsz >= symCeiling_ && offsRsz >= symCeiling_) {
+					if(offsLsz > symCeiling_ && offsRsz > symCeiling_) {
 						// Too many candidates for both mates; abort
 						// without any more searching
 						done_ = true;
@@ -931,7 +931,7 @@ protected:
 				if(drR.foundRange()) {
 					// Add the size of this range to the total for this mate
 					offsRsz += (drR.range().bot - drR.range().top);
-					if(offsLsz >= symCeiling_ && offsRsz >= symCeiling_) {
+					if(offsLsz > symCeiling_ && offsRsz > symCeiling_) {
 						// Too many candidates for both mates; abort
 						// without any more searching
 						done_ = true;
