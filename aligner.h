@@ -290,8 +290,6 @@ class UnpairedAlignerV1 : public Aligner {
 public:
 	UnpairedAlignerV1(
 		EbwtSearchParams<String<Dna> >* params,
-		TRangeSource* rFw, TRangeSource* rRc,
-		TContMan* cmFw, TContMan* cmRc,
 		TDriver* driverFw, TDriver* driverRc,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
@@ -307,17 +305,11 @@ public:
 		sinkPt_(sinkPt),
 		params_(params),
 		rchase_(rand_),
-		rFw_(rFw), cFw_(cmFw),
-		rRc_(rRc), cRc_(cmRc),
 		driverFw_(driverFw),
 		driverRc_(driverRc)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
-		assert(rFw_ != NULL);
-		assert(rRc_ != NULL);
-		assert(cFw_ != NULL);
-		assert(cRc_ != NULL);
 		assert(driverFw_ != NULL);
 		assert(driverRc_ != NULL);
 	}
@@ -325,10 +317,6 @@ public:
 	virtual ~UnpairedAlignerV1() {
 		delete driverFw_; driverFw_ = NULL;
 		delete driverRc_; driverRc_ = NULL;
-		delete rFw_;      rFw_      = NULL;
-		delete rRc_;      rRc_      = NULL;
-		delete cFw_;      cFw_      = NULL;
-		delete cRc_;      cRc_      = NULL;
 		delete params_;   params_   = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
@@ -355,10 +343,14 @@ public:
 	                   uint32_t tlen,
 	                   bool fw)
 	{
+		bool ebwtFw = ra.ebwt->fw();
 		return params_->reportHit(
-				fw ?  bufa_->patFw  :  bufa_->patRc,
-				fw ? &bufa_->qualFw : &bufa_->qualRc,
+				fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
+				     (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
+				fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
+				     (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
 				&bufa_->name,
+				ebwtFw,
 				ra.mms,                   // mismatch positions
 				ra.refcs,                 // reference characters for mms
 				ra.numMms,                // # mismatches
@@ -385,7 +377,8 @@ public:
 				return false;
 			}
 			if(rchase_.foundOff()) {
-				done_ = report(driverFw_->range(), rchase_.off().first, rchase_.off().second, rchase_.tlen(), true);
+				done_ = report(driverFw_->range(), rchase_.off().first,
+				               rchase_.off().second, rchase_.tlen(), true);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
@@ -401,7 +394,8 @@ public:
 				return false;
 			}
 			if(rchase_.foundOff()) {
-				done_ = report(driverRc_->range(), rchase_.off().first, rchase_.off().second, rchase_.tlen(), false);
+				done_ = report(driverRc_->range(), rchase_.off().first,
+				               rchase_.off().second, rchase_.tlen(), false);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
@@ -421,7 +415,9 @@ public:
 					} else {
 						rchase_.setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
 						if(rchase_.foundOff()) {
-							done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), true);
+							done_ = report(ra, rchase_.off().first,
+							               rchase_.off().second, rchase_.tlen(),
+							               true);
 							rchase_.reset();
 						}
 						if(!rchase_.done()) {
@@ -443,7 +439,9 @@ public:
 					} else {
 						rchase_.setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
 						if(rchase_.foundOff()) {
-							done_ = report(ra, rchase_.off().first, rchase_.off().second, rchase_.tlen(), false);
+							done_ = report(ra, rchase_.off().first,
+							               rchase_.off().second, rchase_.tlen(),
+							               false);
 							rchase_.reset();
 						}
 						if(!rchase_.done()) {
@@ -489,12 +487,8 @@ protected:
 	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state
-	TRangeSource* rFw_;
-	TContMan*     cFw_;
-	TRangeSource* rRc_;
-	TContMan*     cRc_;
-	TDriver*      driverFw_;
-	TDriver*      driverRc_;
+	TDriver* driverFw_;
+	TDriver* driverRc_;
 };
 
 /**
@@ -505,15 +499,12 @@ class PairedAlignerV1 : public Aligner {
 
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
 
 public:
 	PairedAlignerV1(
 		EbwtSearchParams<String<Dna> >* params,
-		TRangeSource* r1Fw, TRangeSource* r1Rc,
-		TRangeSource* r2Fw, TRangeSource* r2Rc,
-		TContMan* cm1Fw, TContMan* cm1Rc,
-		TContMan* cm2Fw, TContMan* cm2Rc,
 		TDriver* driver1Fw, TDriver* driver1Rc,
 		TDriver* driver2Fw, TDriver* driver2Rc,
 		HitSink& sink,
@@ -539,27 +530,15 @@ public:
 		maxInsert_(maxInsert),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rand_),
-		r1Fw_(r1Fw), c1Fw_(cm1Fw),
-		r1Rc_(r1Rc), c1Rc_(cm1Rc),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
-		r2Fw_(r2Fw), c2Fw_(cm2Fw),
-		r2Rc_(r2Rc), c2Rc_(cm2Rc),
 		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
 		offs2FwSz_(0), offs2RcSz_(0)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
-		assert(r1Fw_ != NULL);
-		assert(r1Rc_ != NULL);
-		assert(c1Fw_ != NULL);
-		assert(c1Rc_ != NULL);
 		assert(driver1Fw_ != NULL);
 		assert(driver1Rc_ != NULL);
-		assert(r2Fw_ != NULL);
-		assert(r2Rc_ != NULL);
-		assert(c2Fw_ != NULL);
-		assert(c2Rc_ != NULL);
 		assert(driver2Fw_ != NULL);
 		assert(driver2Rc_ != NULL);
 	}
@@ -569,14 +548,6 @@ public:
 		delete driver1Rc_; driver1Rc_ = NULL;
 		delete driver2Fw_; driver2Fw_ = NULL;
 		delete driver2Rc_; driver2Rc_ = NULL;
-		delete r1Fw_;      r1Fw_      = NULL;
-		delete r1Rc_;      r1Rc_      = NULL;
-		delete r2Fw_;      r2Fw_      = NULL;
-		delete r2Rc_;      r2Rc_      = NULL;
-		delete c1Fw_;      c1Fw_      = NULL;
-		delete c1Rc_;      c1Rc_      = NULL;
-		delete c2Fw_;      c2Fw_      = NULL;
-		delete c2Rc_;      c2Rc_      = NULL;
 		delete params_;    params_    = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
@@ -608,6 +579,8 @@ public:
 		// Clear all intermediate ranges
 		offs1Fw_.clear(); offs1Rc_.clear();
 		offs2Fw_.clear(); offs2Rc_.clear();
+		ranges1Fw_.clear(); ranges1Rc_.clear();
+		ranges2Fw_.clear(); ranges2Rc_.clear();
 		offs1FwSz_ = offs1RcSz_ = offs2FwSz_ = offs2RcSz_ = 0;
 	}
 
@@ -626,11 +599,18 @@ public:
 		if(!doneFw_) {
 			// Mate 1 aligns upstream of mate 2.  Expected orientations
 			// are stored in fw1_, fw2_.
-			advanceOrientation(chase1Fw_,        chase2Fw_,
-	                           delayedChase1Fw_, delayedChase2Fw_,
-			                   *driver1Fw_,      *driver2Fw_,
-			                   offs1Fw_,         offs2Fw_,
-			                   offs1FwSz_,       offs2FwSz_,
+			advanceOrientation(fw1_ ? chase1Fw_        : chase1Rc_,
+			                   fw2_ ? chase2Fw_        : chase2Rc_,
+			                   fw1_ ? delayedChase1Fw_ : delayedChase1Rc_,
+			                   fw2_ ? delayedChase2Fw_ : delayedChase2Rc_,
+			                   fw1_ ? *driver1Fw_      : *driver1Rc_,
+			                   fw2_ ? *driver2Fw_      : *driver2Rc_,
+			                   fw1_ ? offs1Fw_         : offs1Rc_,
+			                   fw2_ ? offs2Fw_         : offs2Rc_,
+			                   fw1_ ? ranges1Fw_       : ranges1Rc_,
+			                   fw2_ ? ranges2Fw_       : ranges2Rc_,
+			                   fw1_ ? offs1FwSz_       : offs1RcSz_,
+			                   fw2_ ? offs2FwSz_       : offs2RcSz_,
 			                   doneFw_,
 			                   fw1_, fw2_,
 			                   true, verbose);
@@ -638,11 +618,18 @@ public:
 			// In reverse-complement space, we expect mate 2 to align
 			// upstream of mate 1.  Also, mates 1 and 2 have reversed
 			// orientations from what we stored in fw1_ and fw2_.
-			advanceOrientation(chase2Rc_,        chase1Rc_,
-			                   delayedChase2Rc_, delayedChase1Rc_,
-			                   *driver2Rc_,      *driver1Rc_,
-			                   offs2Rc_,         offs1Rc_,
-			                   offs2RcSz_,       offs1RcSz_,
+			advanceOrientation(fw2_ ? chase2Rc_        : chase2Fw_,
+			                   fw1_ ? chase1Rc_        : chase1Fw_,
+			                   fw2_ ? delayedChase2Rc_ : delayedChase2Fw_,
+			                   fw1_ ? delayedChase1Rc_ : delayedChase1Fw_,
+			                   fw2_ ? *driver2Rc_      : *driver2Fw_,
+			                   fw1_ ? *driver1Rc_      : *driver1Fw_,
+			                   fw2_ ? offs2Rc_         : offs2Fw_,
+			                   fw1_ ? offs1Rc_         : offs1Fw_,
+			                   fw2_ ? ranges2Rc_       : ranges2Fw_,
+			                   fw1_ ? ranges1Rc_       : ranges1Fw_,
+			                   fw2_ ? offs2RcSz_       : offs2FwSz_,
+			                   fw1_ ? offs1RcSz_       : offs1FwSz_,
 			                   done_,
 			                   !fw2_, !fw1_,
 			                   false, verbose);
@@ -668,82 +655,63 @@ protected:
 	 * a paired alignment by reporting two consecutive alignments, one
 	 * for each mate.
 	 */
-	bool report(const Range& ra, // range for mate1
-	            const Range& rb, // range for mate2
+	bool report(const Range& rL, // range for mate1
+	            const Range& rR, // range for mate2
 	            uint32_t first,  // ref idx
 	            uint32_t upstreamOff,// offset for mate1
 	            uint32_t dnstreamOff,// offset for mate2
 	            uint32_t tlen,   // length of ref
-	            bool fwa,        // whether mate1 is in fw orientation
-	            bool fwb,        // whether mate2 is in fw orientation
+	            bool fwL,        // whether mate1 is in fw orientation
+	            bool fwR,        // whether mate2 is in fw orientation
 	            bool pairFw)    // whether the pair is being mapped to fw strand
 	{
 		assert_lt(upstreamOff, dnstreamOff);
-		uint32_t spreada = ra.bot - ra.top;
-		uint32_t spreadb = rb.bot - rb.top;
-		uint32_t oms = min(spreada, spreadb) - 1;
+		uint32_t spreadL = rL.bot - rL.top;
+		uint32_t spreadR = rR.bot - rR.top;
+		uint32_t oms = min(spreadL, spreadR) - 1;
+		bool ebwtFwL = rL.ebwt->fw();
+		bool ebwtFwR = rR.ebwt->fw();
+		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
+		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
+		uint32_t lenL = pairFw ? alen_ : blen_;
+		uint32_t lenR = pairFw ? blen_ : alen_;
 		bool ret;
-		if(pairFw) {
-			params_->setFw(fwa);
-			ret = params_->reportHit(
-					fwa ?  bufa_->patFw  :  bufa_->patRc,
-					fwa ? &bufa_->qualFw : &bufa_->qualRc,
-					&bufa_->name,
-					ra.mms,                       // mismatch positions
-					ra.refcs,                     // reference characters for mms
-					ra.numMms,                    // # mismatches
-					make_pair(first, upstreamOff),// position
-					make_pair(ra.top, ra.bot),    // arrows
-					tlen,                         // textlen
-					alen_,                        // qlen
-					ra.stratum,                   // alignment stratum
-					oms);                         // # other hits
-			assert(!ret);
-			params_->setFw(fwb);
-			ret = params_->reportHit(
-					fwb ?  bufb_->patFw  :  bufb_->patRc,
-					fwb ? &bufb_->qualFw : &bufb_->qualRc,
-					&bufb_->name,
-					rb.mms,                       // mismatch positions
-					rb.refcs,                     // reference characters for mms
-					rb.numMms,                    // # mismatches
-					make_pair(first, dnstreamOff),// position
-					make_pair(rb.top, rb.bot),    // arrows
-					tlen,                         // textlen
-					blen_,                        // qlen
-					rb.stratum,                   // alignment stratum
-					oms);                         // # other hits
-		} else {
-			params_->setFw(fwb);
-			ret = params_->reportHit(
-					fwb ?  bufb_->patFw  :  bufb_->patRc,
-					fwb ? &bufb_->qualFw : &bufb_->qualRc,
-					&bufb_->name,
-					rb.mms,                       // mismatch positions
-					rb.refcs,                     // reference characters for mms
-					rb.numMms,                    // # mismatches
-					make_pair(first, upstreamOff),// position
-					make_pair(rb.top, rb.bot),    // arrows
-					tlen,                         // textlen
-					blen_,                        // qlen
-					rb.stratum,                   // alignment stratum
-					oms);                         // # other hits
-			assert(!ret);
-			params_->setFw(fwa);
-			ret = params_->reportHit(
-					fwa ?  bufa_->patFw  :  bufa_->patRc,
-					fwa ? &bufa_->qualFw : &bufa_->qualRc,
-					&bufa_->name,
-					ra.mms,                       // mismatch positions
-					ra.refcs,                     // reference characters for mms
-					ra.numMms,                    // # mismatches
-					make_pair(first, dnstreamOff),// position
-					make_pair(ra.top, ra.bot),    // arrows
-					tlen,                         // textlen
-					alen_,                        // qlen
-					ra.stratum,                   // alignment stratum
-					oms);                         // # other hits
-		}
+		params_->setFw(fwL);
+		// Print upstream mate first
+		ret = params_->reportHit(
+				fwL ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
+					  (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
+				fwL ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
+					  (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
+				&bufL->name,
+				ebwtFwL,
+				rL.mms,                       // mismatch positions
+				rL.refcs,                     // reference characters for mms
+				rL.numMms,                    // # mismatches
+				make_pair(first, upstreamOff),// position
+				make_pair(rL.top, rL.bot),    // arrows
+				tlen,                         // textlen
+				lenL,                         // qlen
+				rL.stratum,                   // alignment stratum
+				oms);                         // # other hits
+		assert(!ret);
+		params_->setFw(fwR);
+		ret = params_->reportHit(
+				fwR ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
+					  (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
+				fwR ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
+					  (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
+				&bufR->name,
+				ebwtFwR,
+				rR.mms,                       // mismatch positions
+				rR.refcs,                     // reference characters for mms
+				rR.numMms,                    // # mismatches
+				make_pair(first, dnstreamOff),// position
+				make_pair(rR.top, rR.bot),    // arrows
+				tlen,                         // textlen
+				lenR,                         // qlen
+				rR.stratum,                   // alignment stratum
+				oms);                         // # other hits
 		return ret;
 	}
 
@@ -756,33 +724,37 @@ protected:
 	 * The parameters ending in 1 pertain to the upstream mate.
 	 */
 	bool reconcileAndAdd(const U32Pair& h,
-	                     bool newFrom1,
-	                     U32PairVec& offs1,
-	                     const U32PairVec& offs2,
-		                 TDriver& dr1,
-		                 TDriver& dr2,
-		                 bool fwa,
-		                 bool fwb,
+	                     bool newFromL,
+	                     U32PairVec& offsL,
+	                     U32PairVec& offsR,
+	                     TRangeVec& rangesL,
+	                     TRangeVec& rangesR,
+		                 TDriver& drL,
+		                 TDriver& drR,
+		                 bool fwL,
+		                 bool fwR,
 		                 bool pairFw,
 		                 bool verbose = false)
 	{
+		assert_eq(offsL.size(), rangesL.size());
+		assert_eq(offsR.size(), rangesR.size());
 		// For each known hit for the other mate, check if this new
 		// alignment can be mated with it.  If so, report the mates.
-		size_t offsDstSz = newFrom1 ? offs2.size() : offs1.size();
+		size_t offsDstSz = newFromL ? offsR.size() : offsL.size();
 		if(verbose) cout << "reconcileAndAdd called" << endl;
 		if(offsDstSz > 0) {
-			// Start in a random spot in the offs2 array and scan
+			// Start in a random spot in the offsR array and scan
 			// linearly
 			uint32_t rand = rand_.nextU32() % offsDstSz;
 			for(size_t i = 0; i < offsDstSz; i++) {
 				rand++;
 				if(rand == offsDstSz) rand = 0;
-				const U32Pair& h2 = newFrom1 ? offs2[rand] : offs1[rand];
+				const U32Pair& h2 = newFromL ? offsR[rand] : offsL[rand];
 				if(h.first == h2.first) {
 					if(verbose) cout << "Found pair on some reference" << endl;
 					// Incoming hit hits same reference as buffered
-					uint32_t left  = newFrom1 ? h.second : h2.second;
-					uint32_t right = newFrom1 ? h2.second : h.second;
+					uint32_t left  = newFromL ? h.second : h2.second;
+					uint32_t right = newFromL ? h2.second : h.second;
 					if(right > left) {
 						if(verbose) cout << "...and in right orientation" << endl;
 						uint32_t gap = right - left;
@@ -791,50 +763,58 @@ protected:
 							// Gap between the two alignments satisfies
 							// the paired-end policy, so we can report
 							// them
+							const Range& rL = newFromL ? drL.range() : rangesL[rand];
+							const Range& rR = newFromL ? rangesR[rand] : drR.range();
 							if(report(
-							       dr1.range(), dr2.range(),
-								   h.first,
-								   left, right,
+							       rL, // upstream (left) range
+							       rR, // downstream (right) range
+								   h.first,     // reference target
+								   left, right, // up/downstream offsets
 								   // _plen array is same both Fw and Bw
-								   dr1.curEbwt()->_plen[h.first],
-								   fwa, fwb,
+								   drL.curEbwt()->_plen[h.first],
+								   fwL, // true -> upstream mate is fw
+								   fwR, // true -> downstream mate is fw
 								   pairFw)) return true;
 						}
 					}
 				}
 			}
 		}
-		offs1.push_back(h);
+		// Push new reference locus and range onto the appropriate
+		// parallel mate buffers
+		if(newFromL) { offsL.push_back(h); rangesL.push_back(drL.range()); }
+		else         { offsR.push_back(h); rangesR.push_back(drR.range()); }
 		return false;
 	}
 
 	/**
-	 * Advance paired-end alignment where both reads are in their
-	 * forward orientation.
+	 * Advance paired-end alignment.
 	 */
-	void advanceOrientation(bool& chase1,
-	                        bool& chase2,
-	                        bool& delayedChase1,
-	                        bool& delayedChase2,
-	                        TDriver& dr1,
-	                        TDriver& dr2,
-	                        U32PairVec& offs1,
-	                        U32PairVec& offs2,
-	                        uint32_t& offs1sz,
-	                        uint32_t& offs2sz,
+	void advanceOrientation(bool& chaseL,
+	                        bool& chaseR,
+	                        bool& delayedchaseL,
+	                        bool& delayedchaseR,
+	                        TDriver& drL,
+	                        TDriver& drR,
+	                        U32PairVec& offsL,
+	                        U32PairVec& offsR,
+	                    	TRangeVec& rangesL,
+	                    	TRangeVec& rangesR,
+	                        uint32_t& offsLsz,
+	                        uint32_t& offsRsz,
 	                        bool& done,
-	                        bool fw1,
-	                        bool fw2,
+	                        bool fwL,
+	                        bool fwR,
 	                        bool pairFw,
 	                        bool verbose = false)
 	{
 		assert(!done_);
 		assert(!done);
-		assert(!chase1 || !chase2);
-		if(chase1) {
+		assert(!chaseL || !chaseR);
+		if(chaseL) {
 			assert(!rangeMode_);
-			assert(!delayedChase1);
-			assert(dr1.foundRange());
+			assert(!delayedchaseL);
+			assert(drL.foundRange());
 			if(!rchase_.foundOff() && !rchase_.done()) {
 				// Keep trying to resolve the reference loci for
 				// alignments in this range
@@ -843,28 +823,28 @@ protected:
 			} else if(rchase_.foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				done_ = reconcileAndAdd(rchase_.off(), true,
-				                        offs1, offs2, dr1, dr2,
-				                        fw1, fw2, pairFw, verbose);
+				done_ = reconcileAndAdd(rchase_.off(), true /* new entry is from 1 */,
+				                        offsL, offsR, rangesL, rangesR, drL, drR,
+				                        fwL, fwR, pairFw, verbose);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
 				// Forget this range; keep looking for ranges
-				chase1 = false;
+				chaseL = false;
 				if(verbose) cout << "Done with case for first mate" << endl;
-				if(delayedChase2) {
+				if(delayedchaseR) {
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
-					assert(dr2.foundRange());
-					rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen(), dr2.curEbwt());
-					chase2 = true;
-					delayedChase2 = false;
+					assert(drR.foundRange());
+					rchase_.setTopBot(drR.range().top, drR.range().bot, drR.qlen(), drR.curEbwt());
+					chaseR = true;
+					delayedchaseR = false;
 				}
 			}
-		} else if(chase2) {
+		} else if(chaseR) {
 			assert(!rangeMode_);
-			assert(!delayedChase2);
-			assert(dr2.foundRange());
+			assert(!delayedchaseR);
+			assert(drR.foundRange());
 			if(!rchase_.foundOff() && !rchase_.done()) {
 				// Keep trying to resolve the reference loci for
 				// alignments in this range
@@ -873,91 +853,91 @@ protected:
 			} else if(rchase_.foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				done_ = reconcileAndAdd(rchase_.off(), false,
-				                        offs1, offs2, dr1, dr2,
-				                        fw1, fw2, pairFw, verbose);
+				done_ = reconcileAndAdd(rchase_.off(), false /* new entry is from 2 */,
+				                        offsL, offsR, rangesL, rangesR, drL, drR,
+				                        fwL, fwR, pairFw, verbose);
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
 				// Forget this range; keep looking for ranges
-				chase2 = false;
+				chaseR = false;
 				if(verbose) cout << "Done with case for second mate" << endl;
-				if(delayedChase1) {
+				if(delayedchaseL) {
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
-					assert(dr1.foundRange());
-					rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen(), dr1.curEbwt());
-					chase1 = true;
-					delayedChase1 = false;
+					assert(drL.foundRange());
+					rchase_.setTopBot(drL.range().top, drL.range().bot, drL.qlen(), drL.curEbwt());
+					chaseL = true;
+					delayedchaseL = false;
 				}
 			}
 		}
-		if(!done_ && !done && !chase1 && !chase2) {
+		if(!done_ && !done && !chaseL && !chaseR) {
 			// Search for more ranges for whichever mate currently has
 			// fewer ranges
-			if((offs1sz < offs2sz || dr2.done()) && !dr1.done()) {
+			if((offsLsz < offsRsz || drR.done()) && !drL.done()) {
 				// If there are no more ranges for the other mate and
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				assert(!delayedChase1);
-				if(dr2.done() && offs2sz == 0) {
+				if(drR.done() && offsRsz == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
 					done = true;
 					return;
 				}
-				dr1.advance();
-				if(dr1.foundRange()) {
+				assert(!delayedchaseL);
+				drL.advance();
+				if(drL.foundRange()) {
 					// Add the size of this range to the total for this mate
-					offs1sz += (dr1.range().bot - dr1.range().top);
-					if(offs2sz == 0) {
+					offsLsz += (drL.range().bot - drL.range().top);
+					if(offsRsz == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
 						// anywhere
 						if(verbose) cout << "Delaying a chase for first mate" << endl;
-						delayedChase1 = true;
+						delayedchaseL = true;
 					} else {
 						// Start chasing this range
 						if(verbose) cout << "Chasing a range for first mate" << endl;
-						rchase_.setTopBot(dr1.range().top, dr1.range().bot, dr1.qlen(), dr1.curEbwt());
-						chase1 = true;
+						rchase_.setTopBot(drL.range().top, drL.range().bot, drL.qlen(), drL.curEbwt());
+						chaseL = true;
 					}
 				}
-			} else if(!dr2.done()) {
+			} else if(!drR.done()) {
 				// If there are no more ranges for the other mate and
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				assert(!delayedChase2);
-				if(dr1.done() && offs1sz == 0) {
+				if(drL.done() && offsLsz == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					done = true;
 					return;
 				}
-				dr2.advance();
-				if(dr2.foundRange()) {
+				assert(!delayedchaseR);
+				drR.advance();
+				if(drR.foundRange()) {
 					// Add the size of this range to the total for this mate
-					offs2sz += (dr2.range().bot - dr2.range().top);
-					if(offs1sz == 0) {
+					offsRsz += (drR.range().bot - drR.range().top);
+					if(offsLsz == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
 						// anywhere
 						if(verbose) cout << "Delaying a chase for second mate" << endl;
-						delayedChase2 = true;
+						delayedchaseR = true;
 					} else {
 						// Start chasing this range
 						if(verbose) cout << "Chasing a range for second mate" << endl;
-						rchase_.setTopBot(dr2.range().top, dr2.range().bot, dr2.qlen(), dr2.curEbwt());
-						chase2 = true;
+						rchase_.setTopBot(drR.range().top, drR.range().bot, drR.qlen(), drR.curEbwt());
+						chaseR = true;
 					}
 				}
 			} else {
 				// Finished processing ranges for both mates
-				assert(dr1.done() && dr2.done());
+				assert(drL.done() && drR.done());
 				done = true;
 			}
 		}
@@ -997,27 +977,23 @@ protected:
 	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state for first mate
-	TRangeSource* r1Fw_;
-	TContMan*     c1Fw_;
-	TRangeSource* r1Rc_;
-	TContMan*     c1Rc_;
 	TDriver*      driver1Fw_;
 	TDriver*      driver1Rc_;
 	U32PairVec    offs1Fw_;
+	TRangeVec     ranges1Fw_;
 	uint32_t      offs1FwSz_; // total size of all ranges found in this category
 	U32PairVec    offs1Rc_;
+	TRangeVec     ranges1Rc_;
 	uint32_t      offs1RcSz_; // total size of all ranges found in this category
 
 	// Range-finding state for second mate
-	TRangeSource* r2Fw_;
-	TContMan*     c2Fw_;
-	TRangeSource* r2Rc_;
-	TContMan*     c2Rc_;
 	TDriver*      driver2Fw_;
 	TDriver*      driver2Rc_;
 	U32PairVec    offs2Fw_;
+	TRangeVec     ranges2Fw_;
 	uint32_t      offs2FwSz_; // total size of all ranges found in this category
 	U32PairVec    offs2Rc_;
+	TRangeVec     ranges2Rc_;
 	uint32_t      offs2RcSz_; // total size of all ranges found in this category
 };
 

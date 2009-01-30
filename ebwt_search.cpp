@@ -20,6 +20,7 @@
 #include "threading.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
+#include "aligner_1mm.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -1362,6 +1363,63 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 #endif
 }
 
+/**
+ * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
+ */
+static void *mismatchSearchWorkerFullStateful(void *vp) {
+	PairedPatternSource&   _patsrc = *mismatchSearch_patsrc;
+	HitSink&               _sink   = *mismatchSearch_sink;
+	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >&    ebwtBw  = *mismatchSearch_ebwtBw;
+	vector<String<Dna5> >& os      = *mismatchSearch_os;
+
+	// Global initialization
+	bool sanity = sanityCheck && !os.empty();
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+
+	Unpaired1mmAlignerV1Factory alSEfact(
+			ebwtFw,
+			&ebwtBw,
+			_sink,
+			*sinkFact,
+			os,
+			rangeMode,
+			verbose,
+			seed);
+	Paired1mmAlignerV1Factory alPEfact(
+			ebwtFw,
+			&ebwtBw,
+			_sink,
+			*sinkFact,
+			mate1fw,
+			mate2fw,
+			minInsert,
+			maxInsert,
+			os,
+			rangeMode,
+			verbose,
+			seed);
+	{
+		MixedMultiAligner multi(
+				prefetchWidth,
+				qUpto,
+				alSEfact,
+				alPEfact,
+				*patsrcFact);
+		// Run that mother
+		multi.run();
+		// MultiAligner must be destroyed before patsrcFact
+	}
+
+	delete patsrcFact;
+	delete sinkFact;
+#ifdef BOWTIE_PTHREADS
+	if((long)vp != 0L) pthread_exit(NULL);
+#endif
+	return NULL;
+}
+
 static void* mismatchSearchWorkerFull(void *vp){
 	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
@@ -1450,11 +1508,15 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
+			if(stateful)
+				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)(long)(i+1));
+			else
+				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
 		// Go to town
-		mismatchSearchWorkerFull((void*)0L);
+		if(stateful) mismatchSearchWorkerFullStateful((void*)0L);
+		else         mismatchSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_join(threads[i], NULL);
@@ -3108,6 +3170,7 @@ static void driver(const char * type,
 				if(!fullIndex) {
 					mismatchSearch(patsrc, *sink, ebwt, *ebwtBw, os);
 				} else {
+					assert(ebwtBw != NULL);
 					mismatchSearchFull(patsrc, *sink, ebwt, *ebwtBw, os);
 				}
 			} else if(mismatches == 2 || mismatches == 3) {

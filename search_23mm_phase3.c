@@ -7,7 +7,6 @@
  */
 {
 	params.setFw(true);
-	params.setEbwtFw(true);
 	bt3.setReportExacts(false);
 
 	// Try 2/3 backtracks in the 3' half of the forward read

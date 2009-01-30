@@ -42,34 +42,56 @@ enum {
 struct ReadBuf {
 	~ReadBuf() {
 		clearAll(); reset();
+		// Prevent seqan from trying to free buffers
 		_setBegin(patFw, NULL);
 		_setBegin(patRc, NULL);
 		_setBegin(qualFw, NULL);
 		_setBegin(qualRc, NULL);
+		_setBegin(patFwRev, NULL);
+		_setBegin(patRcRev, NULL);
+		_setBegin(qualFwRev, NULL);
+		_setBegin(qualRcRev, NULL);
 		_setBegin(name, NULL);
 	}
+
 	/// Point all Strings to the beginning of their respective buffers
 	/// and set all lengths to 0
 	void reset() {
-		_setBegin(patFw,  (Dna5*)patBufFw);  _setLength(patFw, 0);  _setCapacity(patFw, 1024);
-		_setBegin(patRc,  (Dna5*)patBufRc);  _setLength(patRc, 0);  _setCapacity(patRc, 1024);
-		_setBegin(qualFw, (char*)qualBufFw); _setLength(qualFw, 0); _setCapacity(qualFw, 1024);
-		_setBegin(qualRc, (char*)qualBufRc); _setLength(qualRc, 0); _setCapacity(qualRc, 1024);
-		_setBegin(name,   (char*)nameBuf);   _setLength(name, 0);   _setCapacity(name, 1024);
+		_setBegin(patFw,     (Dna5*)patBufFw);     _setLength(patFw, 0);     _setCapacity(patFw, BUF_SIZE);
+		_setBegin(patRc,     (Dna5*)patBufRc);     _setLength(patRc, 0);     _setCapacity(patRc, BUF_SIZE);
+		_setBegin(qualFw,    (char*)qualBufFw);    _setLength(qualFw, 0);    _setCapacity(qualFw, BUF_SIZE);
+		_setBegin(qualRc,    (char*)qualBufRc);    _setLength(qualRc, 0);    _setCapacity(qualRc, BUF_SIZE);
+		_setBegin(patFwRev,  (Dna5*)patBufFwRev);  _setLength(patFwRev, 0);  _setCapacity(patFwRev, BUF_SIZE);
+		_setBegin(patRcRev,  (Dna5*)patBufRcRev);  _setLength(patRcRev, 0);  _setCapacity(patRcRev, BUF_SIZE);
+		_setBegin(qualFwRev, (char*)qualBufFwRev); _setLength(qualFwRev, 0); _setCapacity(qualFwRev, BUF_SIZE);
+		_setBegin(qualRcRev, (char*)qualBufRcRev); _setLength(qualRcRev, 0); _setCapacity(qualRcRev, BUF_SIZE);
+		_setBegin(name,      (char*)nameBuf);      _setLength(name, 0);      _setCapacity(name, BUF_SIZE);
 	}
+
 	void clearAll() {
 		seqan::clear(patFw);
 		seqan::clear(patRc);
 		seqan::clear(qualFw);
 		seqan::clear(qualRc);
+		seqan::clear(patFwRev);
+		seqan::clear(patRcRev);
+		seqan::clear(qualFwRev);
+		seqan::clear(qualRcRev);
 		seqan::clear(name);
 	}
+
 	void reverseAll() {
 		::reverseInPlace(patFw);
 		::reverseInPlace(patRc);
 		::reverseInPlace(qualFw);
 		::reverseInPlace(qualRc);
+		::reverseInPlace(patFwRev);
+		::reverseInPlace(patRcRev);
+		::reverseInPlace(qualFwRev);
+		::reverseInPlace(qualRcRev);
 	}
+
+	/// Return true iff the read (pair) is empty
 	bool empty() {
 		return seqan::empty(patFw);
 	}
@@ -79,7 +101,36 @@ struct ReadBuf {
 		return seqan::length(patFw);
 	}
 
+	void constructReverse() {
+		uint32_t len = length();
+
+		_setBegin(patFwRev,  (Dna5*)patBufFwRev);
+		_setBegin(patRcRev,  (Dna5*)patBufRcRev);
+		_setBegin(qualFwRev, (char*)qualBufFwRev);
+		_setBegin(qualRcRev, (char*)qualBufRcRev);
+
+		_setLength(patFwRev,  len);
+		_setLength(patRcRev,  len);
+		_setLength(qualFwRev, len);
+		_setLength(qualRcRev, len);
+
+		_setCapacity(patFwRev,  BUF_SIZE);
+		_setCapacity(patRcRev,  BUF_SIZE);
+		_setCapacity(qualFwRev, BUF_SIZE);
+		_setCapacity(qualRcRev, BUF_SIZE);
+
+		for(uint32_t i = 0; i < len; i++) {
+			patFwRev[i]  = patFw[len-i-1];
+			patRcRev[i]  = patRc[len-i-1];
+			qualFwRev[i] = qualFw[len-i-1];
+			qualRcRev[i] = qualRc[len-i-1];
+		}
+	}
+
 	static const int BUF_SIZE = 1024;
+
+	bool          reversed;
+
 	String<Dna5>  patFw;               // forward-strand sequence
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
 	String<Dna5>  patRc;               // reverse-complement sequence
@@ -88,6 +139,16 @@ struct ReadBuf {
 	char          qualBufFw[BUF_SIZE]; // quality value buffer
 	String<char>  qualRc;              // reverse quality values
 	char          qualBufRc[BUF_SIZE]; // reverse quality value buffer
+
+	String<Dna5>  patFwRev;               // forward-strand sequence reversed
+	uint8_t       patBufFwRev[BUF_SIZE];  // forward-strand sequence buffer reversed
+	String<Dna5>  patRcRev;               // reverse-complement sequence reversed
+	uint8_t       patBufRcRev[BUF_SIZE];  // reverse-complement sequence buffer reversed
+	String<char>  qualFwRev;              // quality values reversed
+	char          qualBufFwRev[BUF_SIZE]; // quality value buffer reversed
+	String<char>  qualRcRev;              // reverse quality values reversed
+	char          qualBufRcRev[BUF_SIZE]; // reverse quality value buffer reversed
+
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
 };
@@ -150,15 +211,20 @@ public:
 		// nextPatternImpl does the reading from the ultimate source;
 		// it is implemented in concrete subclasses
 		nextReadImpl(r, patid);
-		// If it's this class's responsibility to reverse the pattern,
-		// do so here.  Usually it's the responsibility of one of the
-		// concrete subclasses, since they can usually do it more
-		// efficiently.
-		if(_reverse) {
-			::reverseInPlace(r.patFw);
-			::reverseInPlace(r.patRc);
-			::reverseInPlace(r.qualFw);
-			::reverseInPlace(r.qualRc);
+		if(!r.empty()) {
+			// Construct the reversed versions of the fw and rc seqs
+			// and quals
+			r.constructReverse();
+			// If it's this class's responsibility to reverse the pattern,
+			// do so here.  Usually it's the responsibility of one of the
+			// concrete subclasses, since they can usually do it more
+			// efficiently.
+			if(_reverse) {
+				::reverseInPlace(r.patFw);
+				::reverseInPlace(r.patRc);
+				::reverseInPlace(r.qualFw);
+				::reverseInPlace(r.qualRc);
+			}
 		}
 		// Output it, if desired
 		if(_dumpfile != NULL) {
@@ -1873,7 +1939,8 @@ protected:
 		if(!_reverse) {
 			while(!isspace(c) && c >= 0) {
 				if(isalpha(c) && dstLen >= this->_trim5) {
-					if(dstLen + 1 > 1024) {
+					size_t len = dstLen - this->_trim5;
+					if(len + 1 > 1024) {
 						cerr << "Reads file contained a pattern with more than 1024 characters." << endl
 							 << "Please truncate reads and and re-run Bowtie";
 						exit(1);
@@ -1888,15 +1955,19 @@ protected:
 							c = 'A';
 						}
 					}
-					r.patBufFw [dstLen] = charToDna5[c];
-					r.qualBufFw[dstLen] = 'I';
-					r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
-					r.qualBufRc[bufSz-dstLen-1] = 'I';
+					r.patBufFw [len] = charToDna5[c];
+					r.qualBufFw[len] = 'I';
+					r.patBufRc [bufSz-len-1] = rcCharToDna5[c];
+					r.qualBufRc[bufSz-len-1] = 'I';
 					dstLen++;
-				}
+				} else if(isalpha(c)) dstLen++;
 				c = _filebuf.get();
 			}
-			dstLen -= this->_trim3;
+			if(dstLen >= (this->_trim3 + this->_trim5)) {
+				dstLen -= (this->_trim3 + this->_trim5);
+			} else {
+				dstLen = 0;
+			}
 			_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 			_setLength(r.patFw,  dstLen);
 			_setBegin (r.qualFw, r.qualBufFw);
@@ -1908,7 +1979,8 @@ protected:
 		} else {
 			while(!isspace(c) && c >= 0) {
 				if(isalpha(c) && dstLen >= this->_trim5) {
-					if(dstLen + 1 > 1024) {
+					size_t len = dstLen - this->_trim5;
+					if(len + 1 > 1024) {
 						cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
 							 << "Please truncate reads and and re-run Bowtie";
 						exit(1);
@@ -1923,15 +1995,19 @@ protected:
 							c = 'A';
 						}
 					}
-					r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
-					r.qualBufFw[bufSz-dstLen-1] = 'I';
-					r.patBufRc [dstLen] = rcCharToDna5[c];
-					r.qualBufRc[dstLen] = 'I';
+					r.patBufFw [bufSz-len-1] = charToDna5[c];
+					r.qualBufFw[bufSz-len-1] = 'I';
+					r.patBufRc [len] = rcCharToDna5[c];
+					r.qualBufRc[len] = 'I';
 					dstLen++;
-				}
+				} else if(isalpha(c)) dstLen++;
 				c = _filebuf.get();
 			}
-			dstLen -= this->_trim3;
+			if(dstLen >= (this->_trim3 + this->_trim5)) {
+				dstLen -= (this->_trim3 + this->_trim5);
+			} else {
+				dstLen = 0;
+			}
 			_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
 			_setLength(r.patFw,  dstLen);
 			_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);

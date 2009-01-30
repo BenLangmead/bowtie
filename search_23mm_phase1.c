@@ -9,7 +9,6 @@
 	// If requested, check that this read has the same length
 	// as all the previous ones
 	params.setFw(true);
-	params.setEbwtFw(true);
 	btr1.setReportExacts(true);
 
 	if(plen < 3 && two) {

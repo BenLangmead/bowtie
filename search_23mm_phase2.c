@@ -6,7 +6,6 @@
  * situations.
  */
 {
-	params.setEbwtFw(false);
 	params.setFw(true);
 	bt2.setReportExacts(false);
 

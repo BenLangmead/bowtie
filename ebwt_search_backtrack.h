@@ -19,6 +19,7 @@ struct GreedyDFSContinuation {
 	 * here.
 	 */
 	void init(
+			uint32_t qlen,
 			uint32_t _stackDepth,
 			uint32_t _depth,
 			uint32_t _unrevOff,
@@ -31,6 +32,8 @@ struct GreedyDFSContinuation {
 			uint32_t _iham,
 			uint32_t* _pairs,
 			uint8_t* _elims,
+			const std::vector<uint32_t>* _mms,
+			const std::vector<uint8_t>* _refcs,
 			uint32_t _disableFtab)
 	{
 		stackDepth = _stackDepth;
@@ -45,6 +48,10 @@ struct GreedyDFSContinuation {
 		iham = _iham;
 		pairs = _pairs;
 		elims = _elims;
+		if(_mms != NULL)   mms = *_mms;
+		else               mms.clear();
+		if(_refcs != NULL) refcs = *_refcs;
+		else               refcs.resize(qlen);
 		disableFtab = _disableFtab;
 		prepped = false;
 		inited = true;
@@ -85,6 +92,8 @@ struct GreedyDFSContinuation {
 	uint32_t  iham;        // initial weighted hamming distance
 	uint32_t* pairs;       // portion of pairs array to be used for this backtrack frame
 	uint8_t*  elims;       // portion of elims array to be used for this backtrack frame
+	std::vector<uint32_t> mms; // mismatches
+	std::vector<uint8_t> refcs; // reference characters
 	bool      disableFtab; // whether to disable ftab skipping
 	bool      prepped;     // ready to be continued
 	bool      inited;      // true = init() has been called
@@ -220,8 +229,8 @@ public:
 		_qualThresh(__qualThresh),
 		_pairs(NULL),
 		_elims(NULL),
-		_mms(NULL),
-		_refcs(NULL),
+		_mms(),
+		_refcs(),
 		_chars(NULL),
 		_reportPartials(__reportPartials),
 		_reportExacts(__reportExacts),
@@ -254,8 +263,6 @@ public:
 	virtual ~GreedyDFSRangeSource() {
 		if(_pairs != NULL)          delete[] _pairs;
 		if(_elims != NULL)          delete[] _elims;
-		if(_mms != NULL)            delete[] _mms;
-		if(_refcs != NULL)          delete[] _refcs;
 		if(_chars != NULL)          delete[] _chars;
 	}
 
@@ -286,30 +293,22 @@ public:
 	 		if(_elims != NULL) { delete[] _elims; }
 	 		_elims = new uint8_t[_qlen*_qlen];
 	 		memset(_elims, 0, _qlen*_qlen);
-	 		// Resize _mms
-	 		if(_mms != NULL) { delete[] _mms; }
-			_mms = new uint32_t[_qlen];
-			// Resize _refcs
-	 		if(_refcs != NULL) { delete[] _refcs; }
-			_refcs = new char[_qlen];
 			// Resize _chars
 	 		if(_chars != NULL) { delete[] _chars; }
 			_chars = new char[_qlen];
+			_refcs.resize(_qlen);
 			assert(_pairs != NULL);
 			assert(_elims != NULL);
-			assert(_mms != NULL);
-			assert(_refcs != NULL);
 			assert(_chars != NULL);
 		} else {
 			// New length is less than old length, so there's no need
 			// to resize any data structures.
 			assert(_pairs != NULL);
 			assert(_elims != NULL);
-			assert(_mms != NULL);
-			assert(_refcs != NULL);
 			assert(_chars != NULL);
 			_qlen = length(*_qry);
 		}
+		_mms.clear();
 		assert_geq(length(*_qual), _qlen);
 		if(_verbose) {
 			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << (*_qual) << ")" << endl;
@@ -529,17 +528,17 @@ public:
 				_curRange.bot     = bot;
 				_curRange.stratum = calcStratum(_mms, 0);
 				_curRange.numMms  = 0;
-				_curRange.mms     = _mms;
-				_curRange.refcs   = _refcs;
+				_curRange.mms.clear(); // no mismatches
+				// no need to do anything with _curRange.refcs
 				_foundRange       = true;
 				return;
 			} else if (bot > top) {
 				// We have a range to extend
 				assert_leq(top, ebwt._eh._len);
 				assert_leq(bot, ebwt._eh._len);
-				cont.init(0, ftabChars, _unrevOff, _1revOff, _2revOff,
+				cont.init(_qlen, 0, ftabChars, _unrevOff, _1revOff, _2revOff,
 				         _3revOff, top, bot, ham, ham, _pairs,
-				         _elims, nsInFtab > 0);
+				         _elims, NULL, NULL, nsInFtab > 0);
 			} else {
 				// The arrows are already closed within the
 				// unrevisitable region; give up
@@ -548,9 +547,9 @@ public:
 		} else {
 			// We can't use the ftab, so we start from the rightmost
 			// position and use _fchr
-			cont.init(0, 0, _unrevOff, _1revOff, _2revOff,
+			cont.init(_qlen, 0, 0, _unrevOff, _1revOff, _2revOff,
 			         _3revOff, 0, 0, ham, ham, _pairs,
-			         _elims, nsInFtab > 0);
+			         _elims, NULL, NULL, nsInFtab > 0);
 		}
 		return;
 	}
@@ -580,7 +579,6 @@ public:
 		assert_gt(contMan.size(), 0);
 		GreedyDFSContinuation& cont = contMan.front();
 		assert(cont.prepped); // must have been prepped
-		// TODO: Also need to save and restore _muts, _mms, _refcs, _chars somehow
 
 		// Let _foundRange = false; we'll set it to true iff this call
 		// to advance yielded a new valid-alignment range.
@@ -612,9 +610,6 @@ public:
                  << "iham=" << cont.iham << ", "
                  << "pairs=" << cont.pairs << ", "
                  << "elims=" << (void*)cont.elims << "): \"";
-			for(int i = (int)cont.depth - 1; i >= 0; i--) {
-				cout << _chars[i];
-			}
 			cout << "\"" << endl;
 		}
 		// We can't have already processed the entire read
@@ -632,16 +627,6 @@ public:
 		}
 		uint32_t cur = _qlen - cont.depth - 1; // current offset into _qry
 		if(cont.depth < _qlen) {
-			// If we're still trying to make progress along the length of
-			// the read...
-			if(_verbose) {
-				cout << "    cur=" << cur << " \"";
-				for(int i = (int)cont.depth - 1; i >= 0; i--) {
-					cout << _chars[i];
-				}
-				cout << "\"";
-			}
-
 			// Determine whether ranges at this location are candidates
 			// for backtracking
 			int c = (int)(*_qry)[cur]; // get char at this position
@@ -738,36 +723,35 @@ public:
 					if(cont.depth < cont.oneRevOff)   btUnrevOff = cont.oneRevOff;
 					if(cont.depth < cont.twoRevOff)   btOneRevOff = cont.twoRevOff;
 					if(cont.depth < cont.threeRevOff) btTwoRevOff = cont.threeRevOff;
-					// TODO: Check if we can use the ftab to jump a
-					// little further into the read
-					// Note the character that we're backtracking on in the
-					// mm array:
-					_mms[cont.stackDepth] = cur;
-					_refcs[cont.stackDepth] = i;
-	#ifndef NDEBUG
-					for(int j = 0; j < (int)cont.stackDepth; j++) {
-						assert_neq(_mms[j], cur)
-					}
-	#endif
-					_chars[cont.depth] = i;
 					// Get a new stretch of the pairs and elims arrays
 					uint32_t *newPairs = cont.pairs + (_qlen*8);
 					uint8_t  *newElims = cont.elims + (_qlen);
 					assert_leq(atop, ebwt._eh._len);
 					assert_leq(abot, ebwt._eh._len);
-					back.init(cont.stackDepth+1,  // adding a mismatch
+					back.init(_qlen,
+					          cont.stackDepth+1,  // adding a mismatch
 							  cont.depth+1,
-							  btUnrevOff,    // TODO
-							  btOneRevOff,   // TODO
-							  btTwoRevOff,   // TODO
-							  btThreeRevOff, // TODO
+							  btUnrevOff,
+							  btOneRevOff,
+							  btTwoRevOff,
+							  btThreeRevOff,
 							  atop,
 							  abot,
 							  cont.ham + mmPenalty(_maqPenalty, q),
 							  cont.iham,
 							  newPairs,
 							  newElims,
+							  &cont.mms,
+							  &cont.refcs,
 							  cont.disableFtab);
+#ifndef NDEBUG
+					for(uint32_t j = 0; j < cont.stackDepth; j++) {
+						assert_neq(cont.mms[j], cur);
+					}
+#endif
+					back.mms.push_back(cur);
+					back.refcs[cont.stackDepth] = (uint8_t)("ACGT"[i]);
+					assert_neq((int)charToDna5[back.refcs[cont.stackDepth]], (int)(*_qry)[cur]);
 				}
 			}
 		} else {
@@ -802,7 +786,7 @@ public:
 		// Set this to true if the only way to make legal progress
 		// is via one or more additional backtracks.
 		if(_halfAndHalf &&
-		   !halfAndHalfCheckBounds(cont.stackDepth, cont.depth, _mms, empty))
+		   !halfAndHalfCheckBounds(cont.stackDepth, cont.depth, cont.mms, empty))
 		{
 			// This alignment doesn't satisfy the half-and-half
 			// requirements; reject it
@@ -816,10 +800,11 @@ public:
 		{
 			_curRange.top     = cont.top;
 			_curRange.bot     = cont.bot;
-			_curRange.stratum = calcStratum(_mms, cont.stackDepth);
+			_curRange.stratum = calcStratum(cont.mms, cont.stackDepth);
 			_curRange.numMms  = cont.stackDepth;
-			_curRange.mms     = _mms;
-			_curRange.refcs   = _refcs;
+			_curRange.mms     = cont.mms;
+			_curRange.refcs   = cont.refcs;
+			_curRange.ebwt    = _ebwt;
 			_foundRange       = true;
 			contMan.pop();
 			return;
@@ -1258,6 +1243,7 @@ public:
 					assert_gt(stackDepth, 0);
 					// Count the mismatches in the lo and hi halves
 					uint32_t loHalfMms = 0, hiHalfMms = 0;
+					assert_geq(_mms.size(), stackDepth);
 					for(size_t i = 0; i < stackDepth; i++) {
 						uint32_t d = _qlen - _mms[i] - 1;
 						if     (d < _5depth) hiHalfMms++;
@@ -1460,12 +1446,17 @@ public:
 				}
 				// Note the character that we're backtracking on in the
 				// mm array:
-				_mms[stackDepth] = icur;
+				if(_mms.size() <= stackDepth) {
+					assert_eq(_mms.size(), stackDepth);
+					_mms.push_back(icur);
+				} else {
+					_mms[stackDepth] = icur;
+				}
 				assert_eq(1, dna4Cat[(int)btchar]);
 				_refcs[stackDepth] = btchar;
 #ifndef NDEBUG
-				for(int j = 0; j < (int)stackDepth; j++) {
-					assert_neq(_mms[j], icur)
+				for(uint32_t j = 0; j < stackDepth; j++) {
+					assert_neq(_mms[j], icur);
 				}
 #endif
 				_chars[i] = btchar;
@@ -1689,7 +1680,7 @@ public:
 	 * Pretty print a hit along with the backtracking constraints.
 	 */
 	void printHit(const Hit& h) {
-		::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _params.ebwtFw());
+		::printHit(*_os, h, *_qry, _qlen, _unrevOff, _1revOff, _2revOff, _3revOff, _ebwt->fw());
 	}
 
 protected:
@@ -1698,7 +1689,7 @@ protected:
 	 *
 	 */
 	bool halfAndHalfCheckBounds(uint32_t stackDepth, uint32_t depth,
-	                            uint32_t *mms,
+	                            const std::vector<uint32_t>& mms,
 	                            bool empty)
 	{
 		ASSERT_ONLY(uint32_t lim = (_3revOff == _2revOff)? 2 : 3);
@@ -1744,7 +1735,7 @@ protected:
 	 * currently under consideration.  Stratum is equal to the number
 	 * of mismatches in the seed portion of the alignment.
 	 */
-	int calcStratum(uint32_t *mms, uint32_t stackDepth) {
+	int calcStratum(const std::vector<uint32_t>& mms, uint32_t stackDepth) {
 		int stratum = 0;
 		for(size_t i = 0; i < stackDepth; i++) {
 			if(mms[i] >= (_qlen - _3revOff)) {
@@ -1848,6 +1839,7 @@ protected:
 				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
 				// Count the mismatches in the lo and hi halves
 				int loHalfMms = 0, hiHalfMms = 0;
+				assert_geq(_mms.size(), stackDepth);
 				for(size_t i = 0; i < stackDepth; i++) {
 					uint32_t d = _qlen - _mms[i] - 1;
 					if     (d < _5depth) hiHalfMms++;
@@ -2011,11 +2003,18 @@ protected:
 			// within unrevisitable region
 			assert_lt(_qlen - (*_muts)[i].pos - 1, _unrevOff);
 #ifndef NDEBUG
+			// Shouldn't be any overlap between mismatched positions
+			// and positions that mismatched in the partial alignment.
 			for(size_t j = 0; j < stackDepth + i; j++) {
 				assert_neq(_mms[j], (uint32_t)(*_muts)[i].pos);
 			}
 #endif
-			_mms[stackDepth + i] = (*_muts)[i].pos;
+			if(_mms.size() <= stackDepth + i) {
+				assert_eq(_mms.size(), stackDepth + i);
+				_mms.push_back((*_muts)[i].pos);
+			} else {
+				_mms[stackDepth + i] = (*_muts)[i].pos;
+			}
 			_refcs[stackDepth + i] = "ACGT"[(*_muts)[i].newBase];
 		}
 	}
@@ -2050,6 +2049,7 @@ protected:
 	bool reportAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
 #ifndef NDEBUG
 		// No two elements of _mms[] should be the same
+		assert_geq(_mms.size(), stackDepth);
 		for(size_t i = 0; i < stackDepth; i++) {
 			for(size_t j = i+1; j < stackDepth; j++) {
 				assert_neq(_mms[j], _mms[i]);
@@ -2175,6 +2175,7 @@ protected:
 		assert_gt(stackDepth, 0);
 
 		// First mismatch
+		assert_gt(_mms.size(), 0);
 		assert_lt(_mms[0], _qlen);
 		// First, append the mismatch position in the read
 		al.entry.pos0 = (uint16_t)_mms[0]; // pos
@@ -2188,6 +2189,7 @@ protected:
 		al.entry.char0 = c;
 
 		if(stackDepth > 1) {
+			assert_gt(_mms.size(), 1);
 			// Second mismatch
 			assert_lt(_mms[1], _qlen);
 			// First, append the mismatch position in the read
@@ -2206,6 +2208,7 @@ protected:
 		}
 
 		if(stackDepth > 2) {
+			assert_gt(_mms.size(), 2);
 			// Second mismatch
 			assert_lt(_mms[2], _qlen);
 			// First, append the mismatch position in the read
@@ -2301,7 +2304,7 @@ protected:
 				}
 				cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
 				cout << "  Tseg:           ";
-				bool ebwtFw = _params.ebwtFw();
+				bool ebwtFw = _ebwt->fw();
 				if(ebwtFw) {
 					for(size_t i = 0; i < _qlen; i++) {
 						cout << (*_os)[h.h.first][h.h.second + i];
@@ -2343,7 +2346,7 @@ protected:
 		if(oracleHits.size() == 0) {
 			::printHit(
 					(*_os), retainedHits.back(), (*_qry), _qlen, _unrevOff,
-					_1revOff, _2revOff, _3revOff, _params.ebwtFw());
+					_1revOff, _2revOff, _3revOff, _ebwt->fw());
 		}
 		// If we found a hit, it had better be one of the ones
 		// that the oracle found
@@ -2503,7 +2506,7 @@ protected:
 		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
 		if(twoRevOff == 0xffffffff) twoRevOff = _2revOff;
 		if(threeRevOff == 0xffffffff) threeRevOff = _3revOff;
-		bool ebwtFw = _params.ebwtFw();
+		bool ebwtFw = _ebwt->fw();
 		bool fw = _params.fw();
 		uint32_t patid = _params.patId();
 
@@ -2555,8 +2558,8 @@ protected:
 	                             // with decision stack
 	uint8_t            *_bts;    // how many backtracks remain in each
 	                             // equivalence class
-	uint32_t           *_mms;    // array for holding mismatches
-	char               *_refcs;  // array for holding mismatches
+	std::vector<uint32_t> _mms;  // array for holding mismatches
+	std::vector<uint8_t> _refcs;  // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end
 	char               *_chars;  // characters selected so far
@@ -2642,16 +2645,13 @@ enum SearchConstraintExtent {
  * parameters when initializing it;
  */
 class GreedyDFSRangeSourceDriver :
-	public RangeSourceDriver<GreedyDFSRangeSource,
-	                         GreedyDFSContinuationManager>
+	public SingleRangeSourceDriver<GreedyDFSRangeSource,
+	                               GreedyDFSContinuationManager>
 {
 public:
 	GreedyDFSRangeSourceDriver(
-			const Ebwt<String<Dna> >& ebwtFw,
-			const Ebwt<String<Dna> >* ebwtBw,
 			EbwtSearchParams<String<Dna> >& params,
-			GreedyDFSRangeSource& rs,
-			GreedyDFSContinuationManager& cm,
+			GreedyDFSRangeSource* rs,
 			bool fw,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
@@ -2664,8 +2664,8 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			uint32_t seed) :
-			RangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-					ebwtFw, ebwtBw, params, rs, cm, fw, sink, sinkPt, os, verbose, seed),
+			SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+					params, rs, fw, sink, sinkPt, os, verbose, seed),
 			seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),

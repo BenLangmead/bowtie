@@ -7,7 +7,6 @@
  */
 {
 	params.setFw(false);
-	params.setEbwtFw(true);
 	btr3.setReportExacts(true);
 
 	btr3.setQuery(&patRc, &qualRc, &name);

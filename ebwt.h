@@ -821,6 +821,7 @@ public:
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
 	vector<string>& refnames()       { return _refnames; }
+	bool        fw() const           { return _fw; }
 
 	/// Return true iff the Ebwt is currently in memory
 	bool isInMemory() const {
@@ -1088,8 +1089,8 @@ public:
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
 	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
 	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const uint32_t *mmui32, const char *refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1224,23 +1225,21 @@ public:
 		_patid(0xffffffff),
 		_revcomp(__revcomp),
 		_fw(__fw),
-		_ebwtFw(__ebwtFw),
         _arrowMode(__arrowMode) { }
 	HitSinkPerThread& sink() const   { return _sink; }
 	void setPatId(uint32_t __patid)  { _patid = __patid; }
 	uint32_t patId() const           { return _patid; }
 	void setFw(bool __fw)            { _fw = __fw; }
 	bool fw() const                  { return _fw; }
-	void setEbwtFw(bool __ebwtFw)    { _ebwtFw = __ebwtFw; }
-	bool ebwtFw() const              { return _ebwtFw; }
 	/**
 	 * Report a hit.  Returns true iff caller can call off the search.
 	 */
 	bool reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
-	               const uint32_t *mmui32, // mismatch list
-	               const char *refcs,  // reference characters
+	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
+	               const std::vector<uint32_t>& mmui32, // mismatch list
+	               const std::vector<uint8_t>& refcs,  // reference characters
 	               size_t numMms,      // # mismatches
 	               U32Pair h,          // hit position in reference
 	               U32Pair a,          // arrow pair
@@ -1252,6 +1251,7 @@ public:
 		// The search functions should not have allowed us to get here
 		String<Dna5> pat;
 		uint32_t qlen = length(query);
+		assert_gt(qlen, 0);
 		reserve(pat, qlen);
 		// Report it using the HitSinkPerThread
 		Hit hit;
@@ -1261,7 +1261,7 @@ public:
 		if(quals != NULL) {
 			hit.quals = *quals;
 		}
-		if(!_ebwtFw) {
+		if(!ebwtFw) {
 			// Note: this is re-reversing the pattern and the quals
 			// string back to their normal orientation; the pattern
 			// source reversed it initially
@@ -1280,15 +1280,18 @@ public:
 		// the refc vector
 		hit.refcs.resize(qlen, 0);
 		for(size_t i = 0; i < numMms; i++) {
-			if (_ebwtFw != _fw) {
+			if (ebwtFw != _fw) {
 				// The 3' end is on the left but the mm vector encodes
 				// mismatches w/r/t the 5' end, so we flip
-				hit.mms.set(len - mmui32[i] - 1);
-				hit.refcs[len - mmui32[i] - 1] = refcs[i];
+				uint32_t off = len - mmui32[i] - 1;
+				hit.mms.set(off);
+				hit.refcs[off] = refcs[i];
+				//assert_neq((int)charToDna5[(int)hit.refcs[off]], (int)query[off]);
 			}
 			else {
 				hit.mms.set(mmui32[i]);
 				hit.refcs[mmui32[i]] = refcs[i];
+				//assert_neq((int)charToDna5[(int)hit.refcs[mmui32[i]]], (int)query[mmui32[i]]);
 			}
 		}
 		// Check the hit against the original text, if it's available
@@ -1302,27 +1305,27 @@ public:
 			assert_leq(h.second + len, length(_texts[h.first]));
 			for(size_t i = 0; i < len; i++) {
 				assert_neq(4, (int)_texts[h.first][h.second + i]);
-				if(_ebwtFw) {
+				if(ebwtFw) {
 					// Forward pattern appears at h
 					if((int)query[i] != (int)_texts[h.first][h.second + i]) {
 						uint32_t qoff = i;
-						// if _ebwtFw != _fw the 3' end is on on the
+						// if ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
 						// should encode mismatches w/r/t the 5' end,
 						// so we flip
-						if (_ebwtFw != _fw) diffs.set(len - qoff - 1);
-						else                diffs.set(qoff);
+						if (ebwtFw != _fw) diffs.set(len - qoff - 1);
+						else               diffs.set(qoff);
 					}
 				} else {
 					// Reverse of pattern appears at h
 					if((int)query[len-i-1] != (int)_texts[h.first][h.second + i]) {
 						uint32_t qoff = len-i-1;
-						// if _ebwtFw != _fw the 3' end is on on the
+						// if ebwtFw != _fw the 3' end is on on the
 						// left end of the pattern, but the diff vector
 						// should encode mismatches w/r/t the 5' end,
 						// so we flip
-						if (_ebwtFw != _fw) diffs.set(len - qoff - 1);
-						else                diffs.set(qoff);
+						if (ebwtFw != _fw) diffs.set(len - qoff - 1);
+						else               diffs.set(qoff);
 					}
 				}
 			}
@@ -1332,7 +1335,7 @@ public:
 				cerr << "Expected " << hit.mms.str() << " mismatches, got " << diffs.str() << endl;
 				cerr << "  Pat:  ";
 				for(size_t i = 0; i < len; i++) {
-					if(_ebwtFw) cerr << query[i];
+					if(ebwtFw) cerr << query[i];
 					else cerr << query[len-i-1];
 				}
 				cerr << endl;
@@ -1350,7 +1353,7 @@ public:
 				}
 				cerr << endl;
 				cerr << "  FW: " << _fw << endl;
-				cerr << "  Ebwt FW: " << _ebwtFw << endl;
+				cerr << "  Ebwt FW: " << ebwtFw << endl;
 			}
 			if(diffs != hit.mms) assert(false);
 		}
@@ -1375,7 +1378,6 @@ private:
 	uint32_t _patid;      // id of current read
 	bool _revcomp;        // whether reverse complements are enabled
 	bool _fw;             // current read is forward-oriented
-	bool _ebwtFw;         // current Ebwt is forward-oriented
 	bool _arrowMode;      // report arrows
 };
 
@@ -2417,8 +2419,8 @@ template<typename TStr>
 inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
-                               const uint32_t *mmui32,
-                               const char *refcs,
+                               const std::vector<uint32_t>& mmui32,
+                               const std::vector<uint8_t>& refcs,
                                size_t numMms,
                                uint32_t off,
                                uint32_t top,
@@ -2436,6 +2438,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				query,               // read sequence
 				quals,               // read quality values
 				name,                // read name
+				_fw,                 // true = index is forward; false = mirror
 				mmui32,              // mismatch positions
 				refcs,               // reference characters for mms
 				numMms,              // # mismatches
@@ -2476,6 +2479,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			query,                    // read sequence
 			quals,                    // read quality values
 			name,                     // read name
+			_fw,                      // true = index is forward; false = mirror
 			mmui32,                   // mismatch positions
 			refcs,                    // reference characters for mms
 			numMms,                   // # mismatches
@@ -2500,8 +2504,8 @@ template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
-                                       const uint32_t *mmui32,
-                                       const char* refcs,
+                                       const std::vector<uint32_t>& mmui32,
+                                       const std::vector<uint8_t>& refcs,
                                        size_t numMms,
                                        uint32_t i,
                                        uint32_t top,

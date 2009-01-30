@@ -7,7 +7,6 @@
  */
 {
 	params.setFw(true);
-	params.setEbwtFw(true);
 	bt.setEbwt(&ebwtFw);
 	bt.setReportExacts(true);
 

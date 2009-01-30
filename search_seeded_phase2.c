@@ -10,7 +10,6 @@
 	// eliminated.  The next most likely cases are 1F, 2F and
 	// 3F...
 	params.setFw(true);  // looking at forward strand
-	params.setEbwtFw(false);
 	btf2.setReportExacts(false);
 	btr2.setReportExacts(false);
 

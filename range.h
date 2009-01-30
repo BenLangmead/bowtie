@@ -5,6 +5,7 @@
 #ifndef RANGE_H_
 #define RANGE_H_
 
+#include <vector>
 #include <stdint.h>
 
 /**
@@ -15,8 +16,9 @@ struct Range {
 	uint32_t bot;     // bottom of range
 	uint32_t stratum; // stratum
 	uint32_t numMms;  // # mismatches
-	uint32_t *mms;    // list of positions with mismatches
-	char     *refcs;  // reference characters at mismatch positions
+	std::vector<uint32_t> mms;   // list of positions with mismatches
+	std::vector<uint8_t>  refcs; // reference characters at mismatch positions
+	const Ebwt<seqan::String<seqan::Dna> > *ebwt;
 };
 
 #endif /* RANGE_H_ */

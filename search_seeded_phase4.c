@@ -7,7 +7,6 @@
  */
 {
 	params.setFw(true);
-	params.setEbwtFw(false);
 	btf4.setReportExacts(true);
 
 	btf4.setQuery(&patFw, &qualFw, &name);
