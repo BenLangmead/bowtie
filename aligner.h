@@ -973,8 +973,8 @@ protected:
 				if(drR_->foundRange()) {
 #ifndef NDEBUG
 					std::set<uint32_t>& s = (pairFw ? allTopsR_fw_ : allTopsR_rc_);
-					assert(s.find(drL_->range().top) == s.end());
-					s.insert(drL_->range().top);
+					assert(s.find(drR_->range().top) == s.end());
+					s.insert(drR_->range().top);
 #endif
 					// Add the size of this range to the total for this mate
 					*offsRsz_ += (drR_->range().bot - drR_->range().top);
