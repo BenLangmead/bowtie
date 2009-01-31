@@ -126,7 +126,7 @@ public:
 	 * Create a new UnpairedExactAlignerV1s.
 	 */
 	virtual Aligner* create() const {
-		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
+		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2, 0xffffffff);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -180,7 +180,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_);
 
-		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params,
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,

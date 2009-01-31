@@ -704,8 +704,8 @@ protected:
 class HitSinkPerThreadFactory {
 public:
 	virtual ~HitSinkPerThreadFactory() { }
-	virtual HitSinkPerThread* create() const = 0;
-	virtual HitSinkPerThread* createMult(uint32_t m) const = 0;
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const = 0;
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const = 0;
 
 	/// Free memory associated with a per-thread hit sink
 	virtual void destroy(HitSinkPerThread* sink) const {
@@ -805,11 +805,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create() const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_, max_, keep_);
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
 	}
 
 private:
@@ -993,11 +993,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create() const {
-		return new FirstNBestHitSinkPerThread(sink_, n_, max_, keep_);
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
+		return new FirstNBestHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNBestHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
+		return new FirstNBestHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
 	}
 
 private:
@@ -1198,11 +1198,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create() const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, max_, keep_);
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
 	}
 
 private:
@@ -1282,11 +1282,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create() const {
-		return new AllHitSinkPerThread(sink_, max_, keep_);
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
+		return new AllHitSinkPerThread(sink_, mhits ? mhits : max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new AllHitSinkPerThread(sink_, max_ * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
+		return new AllHitSinkPerThread(sink_, (mhits ? mhits : max_) * m, keep_);
 	}
 
 private:
@@ -1453,11 +1453,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create() const {
-		return new AllStratifiedHitSinkPerThread(sink_, max_, keep_);
+	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
+		return new AllStratifiedHitSinkPerThread(sink_, mhits ? mhits : max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new AllStratifiedHitSinkPerThread(sink_, max_ * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
+		return new AllStratifiedHitSinkPerThread(sink_, (mhits ? mhits : max_) * m, keep_);
 	}
 
 private:

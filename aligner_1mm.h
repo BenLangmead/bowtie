@@ -178,7 +178,7 @@ public:
 	 * Create a new UnpairedExactAlignerV1s.
 	 */
 	virtual Aligner* create() const {
-		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
+		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2, 0xffffffff);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -302,7 +302,7 @@ public:
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 
-		return new PairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, symCeil_, os_, rangeMode_, verbose_, seed_);
