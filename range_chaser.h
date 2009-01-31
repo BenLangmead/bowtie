@@ -315,33 +315,33 @@ public:
 		assert_geq(row, top_);
 		row_ = row;
 		// Check if row is itself marked
-		if((row_ & ebwt_->_eh._offMask) == row_) {
-			uint32_t off = ebwt_->_offs[row_ >> ebwt_->_eh._offRate];
-			ebwt_->joinedToTextOff(qlen_, off, off_.first, off_.second, tlen_);
-			if(foundOff()) {
-				assert(RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_) == off_);
-				return; // found result
-			} else {
-				assert_eq(0xffffffff, RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_).first);
-			}
-		}
-		if(tops_.size() > 0) {
-			uint32_t diff = row_ - top_;
-			for(size_t i = 0; i < tops_.size(); i++) {
-				uint32_t row2 = tops_[i] + diff;
-				if((row2 & ebwt_->_eh._offMask) == row2) {
-					uint32_t off = ebwt_->_offs[row2 >> ebwt_->_eh._offRate] + i + 1;
-					ebwt_->joinedToTextOff(qlen_, off, off_.first, off_.second, tlen_);
-					if(foundOff()) {
-						assert(RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_) == off_);
-						cout << "Got a result from tops" << endl;
-						return; // found result
-					} else {
-						assert_eq(0xffffffff, RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_).first);
-					}
-				}
-			}
-		}
+//		if((row_ & ebwt_->_eh._offMask) == row_) {
+//			uint32_t off = ebwt_->_offs[row_ >> ebwt_->_eh._offRate];
+//			ebwt_->joinedToTextOff(qlen_, off, off_.first, off_.second, tlen_);
+//			if(foundOff()) {
+//				assert(RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_) == off_);
+//				return; // found result
+//			} else {
+//				assert_eq(0xffffffff, RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_).first);
+//			}
+//		}
+//		if(tops_.size() > 0) {
+//			uint32_t diff = row_ - top_;
+//			for(size_t i = 0; i < tops_.size(); i++) {
+//				uint32_t row2 = tops_[i] + diff;
+//				if((row2 & ebwt_->_eh._offMask) == row2) {
+//					uint32_t off = ebwt_->_offs[row2 >> ebwt_->_eh._offRate] + i + 1;
+//					ebwt_->joinedToTextOff(qlen_, off, off_.first, off_.second, tlen_);
+//					if(foundOff()) {
+//						assert(RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_) == off_);
+//						cout << "Got a result from tops" << endl;
+//						return; // found result
+//					} else {
+//						assert_eq(0xffffffff, RowChaser<TStr>::toRefOff(ebwt_, qlen_, row_).first);
+//					}
+//				}
+//			}
+//		}
 		// Now check
 		while(true) {
 			// Set up the chaser
@@ -354,7 +354,7 @@ public:
 				if(off_.first != 0xffffffff) {
 					// This is a valid result
 					tlen_ = chaser_.tlen();
-					assert(foundOff());
+					assert(foundOff() && chaser_.done());
 					return; // found result
 				}
 				// That row didn't have a valid result, move to the next
@@ -366,6 +366,7 @@ public:
 				if(row_ == irow_) {
 					// Exhausted all possible rows
 					done_ = true;
+					assert(!foundOff());
 					assert_eq(0xffffffff, off_.first);
 					return;
 				}
@@ -400,30 +401,31 @@ public:
 		irow_ = top + (rand_.nextU32() % spread); // initial row
 		done_ = false;
 		reset();
-		if(bot_ - top_ > 5) {
-			SideLocus tloc, bloc;
-			SideLocus::initFromTopBot(top_, bot_, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
-			SideLocus::prefetchTopBot(tloc, bloc);
-			uint32_t newtop = top_, newbot = bot_;
-			for(size_t i = 0; i < 6; i++) {
-				int ctop = ebwt_->rowL(tloc);
-				int cbot = ebwt_->rowL(bloc);
-				if(ctop != cbot) break;
-				newtop = ebwt_->mapLF(tloc);
-				newbot = ebwt_->mapLF(bloc);
-				if((newbot - newtop) == (bot_ - top_)) {
-					// Hello!
-					tops_.push_back(newtop);
-					SideLocus::initFromTopBot(newtop, newbot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
-					SideLocus::prefetchTopBot(tloc, bloc);
-				} else {
-					break;
-				}
-			}
-			if(verbose_ && tops_.size() > 0) {
-				cout << "Tops is size " << tops_.size() << endl;
-			}
-		}
+//		if(bot_ - top_ > 5) {
+//			SideLocus tloc, bloc;
+//			SideLocus::initFromTopBot(top_, bot_, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
+//			SideLocus::prefetchTopBot(tloc, bloc);
+//			uint32_t newtop = top_, newbot = bot_;
+//			for(size_t i = 0; i < 6; i++) {
+//				int ctop = ebwt_->rowL(tloc);
+//				int cbot = ebwt_->rowL(bloc);
+//				if(ctop != cbot) break;
+//				newtop = ebwt_->mapLF(tloc);
+//				newbot = ebwt_->mapLF(bloc);
+//				if((newbot - newtop) == (bot_ - top_)) {
+//					// Hello!
+//					tops_.push_back(newtop);
+//					SideLocus::initFromTopBot(newtop, newbot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
+//					SideLocus::prefetchTopBot(tloc, bloc);
+//				} else {
+//					break;
+//				}
+//			}
+//			if(verbose_ && tops_.size() > 0) {
+//				cout << "Tops is size " << tops_.size() << endl;
+//			}
+//		}
+		assert(!foundOff());
 		setRow(irow_);
 		assert(chaser_.prepped_ || foundOff() || done_);
 		assert(!foundOff() || chaser_.done());

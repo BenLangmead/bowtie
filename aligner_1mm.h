@@ -55,12 +55,12 @@ public:
 
 		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *rFw_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *rFw_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		//
 		GreedyDFSRangeSourceDriver * drFw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, rFw_Fw, true, sink_, sinkPt,
@@ -87,12 +87,12 @@ public:
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		// Source for ranges from mirror index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		//
 		GreedyDFSRangeSourceDriver * drRc_Fw = new GreedyDFSRangeSourceDriver(
 			*params, rRc_Fw, false, sink_, sinkPt,

@@ -412,16 +412,21 @@ public:
 			} else {
 				// No RangeSources in list; done
 				done_ = true;
+				// signal that no new foundRange() should result
+				cur_ = 0xffffffff;
 				return;
 			}
 		} else {
 			// Advance current RangeSource
 			rss_[cur_]->advance();
+			done_ = (cur_ == rss_.size()-1) && rss_[cur_]->done();
 		}
 	}
 
 	/// Returns true iff the last call to advance yielded a range
-	virtual bool foundRange() const { return rss_[cur_]->foundRange(); }
+	virtual bool foundRange() const {
+		return cur_ != 0xffffffff && rss_[cur_]->foundRange();
+	}
 
 	/// Return the last valid range found
 	virtual Range& range() { return rss_[cur_]->range(); }
