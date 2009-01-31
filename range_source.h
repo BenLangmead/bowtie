@@ -143,7 +143,7 @@ public:
 };
 
 /**
- * Abstract parent of RangeSourceDrivers
+ * Abstract parent of RangeSourceDrivers.
  */
 template<typename TRangeSource, typename TContMan>
 class RangeSourceDriver {
@@ -153,12 +153,37 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQuery(PatternSourcePerThread* patsrc, bool mate1 = true) = 0;
+	virtual void setQuery(PatternSourcePerThread* patsrc, bool mate1 = true) {
+#ifndef NDEBUG
+		// Clear our buffer of previously-dished-out top offsets
+		allTops_.clear();
+#endif
+		setQueryImpl(patsrc, mate1);
+	}
+	/**
+	 * Prepare this aligner for the next read.
+	 */
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) = 0;
 	/**
 	 * Advance the aligner by one memory op.  Return true iff we're
 	 * done with this read.
 	 */
-	virtual void advance() = 0;
+	virtual void advance() {
+		advanceImpl();
+#ifndef NDEBUG
+		if(foundRange()) {
+			// Assert that we have not yet dished out a range with this
+			// top offset
+			assert(allTops_.find(range().top) == allTops_.end());
+			allTops_.insert(range().top);
+		}
+#endif
+	}
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 */
+	virtual void advanceImpl() = 0;
 	/**
 	 * Return true iff we just found a range.
 	 */
@@ -179,6 +204,10 @@ public:
 protected:
 
 	virtual void initRangeSource(TRangeSource& rs) = 0;
+
+#ifndef NDEBUG
+	std::set<uint32_t> allTops_;
+#endif
 };
 
 /**
@@ -216,7 +245,7 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQuery(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
 		if(mate1) {
 			if(fw_) {
 				pat_  = (curEbwt()->fw() ? &patsrc->bufa().patFw  : &patsrc->bufa().patFwRev);
@@ -253,7 +282,7 @@ public:
 	 * Advance the aligner by one memory op.  Return true iff we're
 	 * done with this read.
 	 */
-	virtual void advance() {
+	virtual void advanceImpl() {
 		assert(!done_);
 		assert(pat_ != NULL);
 		params_.setFw(fw_);
@@ -361,7 +390,7 @@ public:
 	}
 
 	/// Set query to find ranges for
-	virtual void setQuery(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
 		cur_ = 0; // go back to first RangeSource in list
 		done_ = false;
 		rss_[0]->setQuery(patsrc, mate1);
@@ -370,7 +399,7 @@ public:
 	}
 
 	/// Advance the range search by one memory op
-	virtual void advance() {
+	virtual void advanceImpl() {
 		assert(!done_);
 		assert_lt(cur_, rss_.size());
 		if(rss_[cur_]->done()) {
