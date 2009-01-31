@@ -938,7 +938,7 @@ protected:
 					if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
 						// Too many candidates for both mates; abort
 						// without any more searching
-						done_ = true;
+						*donePair_ = true;
 						return;
 					}
 					if(*offsRsz_ == 0) {
@@ -981,7 +981,7 @@ protected:
 					if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
 						// Too many candidates for both mates; abort
 						// without any more searching
-						done_ = true;
+						*donePair_ = true;
 						return;
 					}
 					if(*offsLsz_ == 0) {
