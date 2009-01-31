@@ -183,11 +183,11 @@ public:
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
 		GreedyDFSRangeSource *r1Fw_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSource *r1Fw_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSourceDriver * dr1Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Fw, true, sink_, sinkPt,
 			0,          // seedLen
@@ -213,11 +213,11 @@ public:
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
 
 		GreedyDFSRangeSource *r1Rc_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSource *r1Rc_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSourceDriver * dr1Rc_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_Fw, false, sink_, sinkPt,
 			0,          // seedLen
@@ -243,11 +243,11 @@ public:
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
 
 		GreedyDFSRangeSource *r2Fw_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSource *r2Fw_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSourceDriver * dr2Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Fw, true, sink_, sinkPt,
 			0,          // seedLen
@@ -273,11 +273,11 @@ public:
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
 
 		GreedyDFSRangeSource *r2Rc_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSource *r2Rc_Bw = new GreedyDFSRangeSource(
-			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		GreedyDFSRangeSourceDriver * dr2Rc_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_Fw, false, sink_, sinkPt,
 			0,          // seedLen
