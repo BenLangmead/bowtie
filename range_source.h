@@ -174,8 +174,11 @@ public:
 		if(foundRange()) {
 			// Assert that we have not yet dished out a range with this
 			// top offset
-			assert(allTops_.find(range().top) == allTops_.end());
-			allTops_.insert(range().top);
+			int64_t top = (int64_t)range().top;
+			top++; // ensure it's not 0
+			if(!range().ebwt->fw()) top = -top;
+			assert(allTops_.find(top) == allTops_.end());
+			allTops_.insert(top);
 		}
 #endif
 	}
@@ -206,7 +209,7 @@ protected:
 	virtual void initRangeSource(TRangeSource& rs) = 0;
 
 #ifndef NDEBUG
-	std::set<uint32_t> allTops_;
+	std::set<int64_t> allTops_;
 #endif
 };
 
