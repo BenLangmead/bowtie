@@ -17,6 +17,7 @@
 #include "range.h"
 #include "range_source.h"
 #include "range_chaser.h"
+#include "ref_aligner.h"
 
 /**
  * State machine for carrying out an alignment, which usually consists
@@ -509,6 +510,7 @@ public:
 		EbwtSearchParams<String<Dna> >* params,
 		TDriver* driver1Fw, TDriver* driver1Rc,
 		TDriver* driver2Fw, TDriver* driver2Rc,
+		RefAligner<String<Dna5> >* refAligner,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
@@ -516,22 +518,27 @@ public:
 		uint32_t minInsert,
 		uint32_t maxInsert,
 		uint32_t symCeiling,
+		uint32_t mixedThresh,
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
 		Aligner(rangeMode, seed),
-		doneFw_(true), doneFwFirst_(true), done_(true),
+		os_(os), patsrc_(NULL), doneFw_(true),
+		doneFwFirst_(true), done_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
 		delayedChase1Fw_(false), delayedChase1Rc_(false),
 		delayedChase2Fw_(false), delayedChase2Rc_(false),
+		refAligner_(refAligner),
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
 		params_(params),
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
 		symCeiling_(symCeiling),
+		mixedThresh_(mixedThresh),
+		mixedAttempts_(0),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rand_),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
@@ -607,6 +614,7 @@ public:
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
+		patsrc_ = patsrc;
 		driver1Fw_->setQuery(patsrc, true  /* mate1 */);
 		driver1Rc_->setQuery(patsrc, true  /* mate1 */);
 		driver2Fw_->setQuery(patsrc, false /* mate2 */);
@@ -645,6 +653,7 @@ public:
 		donePair_      = &doneFw_;
 		fwL_           = fw1_;
 		fwR_           = fw2_;
+		mixedAttempts_ = 0;
 #ifndef NDEBUG
 		allTopsL_fw_.clear();
 		allTopsR_fw_.clear();
@@ -683,6 +692,7 @@ public:
 			fwL_           = !fw2_;
 			fwR_           = !fw1_;
 			doneFwFirst_   = false;
+			mixedAttempts_ = 0;
 		}
 		advanceOrientation(!doneFw_, verbose);
 		if(done_) {
@@ -707,15 +717,15 @@ protected:
 	 * a paired alignment by reporting two consecutive alignments, one
 	 * for each mate.
 	 */
-	bool report(const Range& rL, // range for mate1
-	            const Range& rR, // range for mate2
+	bool report(const Range& rL, // range for upstream mate
+	            const Range& rR, // range for downstream mate
 	            uint32_t first,  // ref idx
-	            uint32_t upstreamOff,// offset for mate1
-	            uint32_t dnstreamOff,// offset for mate2
-	            uint32_t tlen,   // length of ref
-	            bool fwL,        // whether mate1 is in fw orientation
-	            bool fwR,        // whether mate2 is in fw orientation
-	            bool pairFw)    // whether the pair is being mapped to fw strand
+	            uint32_t upstreamOff, // offset for upstream mate
+	            uint32_t dnstreamOff, // offset for downstream mate
+	            uint32_t tlen, // length of ref
+	            bool fwL,      // whether upstream mate is in fw orientation
+	            bool fwR,      // whether downstream mate is in fw orientation
+	            bool pairFw)   // whether the pair is being mapped to fw strand
 	{
 		assert_lt(upstreamOff, dnstreamOff);
 		uint32_t spreadL = rL.bot - rL.top;
@@ -841,6 +851,80 @@ protected:
 	}
 
 	/**
+	 * Given a vector of reference positions where one of the two mates
+	 * (the "anchor" mate) has aligned, look directly at the reference
+	 * sequence for instances where the other mate (the "outstanding"
+	 * mate) aligns such that mating constraint is satisfied.
+	 *
+	 * This function picks up to 'pick' anchors at random from the
+	 * 'offs' array.  It returns the number that it actually picked.
+	 */
+	bool resolveOutstandingInRef(const bool offs1,
+	                             const U32Pair& off,
+	                             const uint32_t tlen,
+	                             const Range& range)
+	{
+		assert_gt(os_.size(), 0);
+		assert_lt(off.first, os_.size());
+		assert_eq(tlen, seqan::length(os_[off.first]));
+		// If matchRight is true, then we're trying to align the other
+		// mate to the right of the already-aligned mate.  Otherwise,
+		// to the left.
+		bool matchRight = (offs1 && !doneFw_);
+		// Sequence and quals for mate to be matched
+		const String<Dna5>& seq  = (offs1 ? patsrc_->bufb().patFw  : patsrc_->bufa().patFw);
+		const String<char>& qual = (offs1 ? patsrc_->bufb().qualFw : patsrc_->bufa().qualFw);
+		bool fw = offs1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
+		if(doneFw_) fw = !fw;
+		// Sequence for anchor mate
+		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t alen = (offs1 ? patsrc_->bufa().length() : patsrc_->bufb().length());
+		// Don't even try if either of the mates is longer than the
+		// maximum insert size; this seems to be compatible with what
+		// Maq does.
+		if(maxInsert_ <= max(qlen, alen)) {
+			return false;
+		}
+		const uint32_t tidx = off.first;
+		const uint32_t toff = off.second;
+		// Set begin/end to be a range of all reference
+		// positions that are legally permitted to be involved in
+		// the alignment of the outstanding mate.  It's up to the
+		// callee to worry about how to scan these positions.
+		uint32_t begin, end;
+		if(matchRight) {
+			begin = toff + 1;
+			end = toff + maxInsert_;
+			end = min<uint32_t>(seqan::length(os_[tidx]), end);
+		} else {
+			if(toff + alen < maxInsert_) {
+				begin = 0;
+			} else {
+				begin = toff + alen - maxInsert_;
+			}
+			end = toff + alen - 1;
+		}
+		// Check if there's not enough space in the range to fit an
+		// alignment for the outstanding mate.
+		if(end - begin < qlen) return false;
+		Range r;
+		uint32_t result = refAligner_->findOne(os_[tidx], seq, qual, begin, end, r);
+		if(result != 0xffffffff) {
+			return report(
+					matchRight ? range : r, // range for upstream mate
+			        matchRight ? r : range, // range for downstream mate
+				    tidx,                   // ref idx
+				    matchRight ? toff : result, // upstream offset
+			        matchRight ? result : toff, // downstream offset
+				    tlen,       // length of ref
+				    fwL_, fwR_, // whether mate1 is in fw orientation
+				    !doneFw_); // whether the pair is being mapped to fw strand
+		} else {
+			return false;
+		}
+	}
+
+	/**
 	 * Advance paired-end alignment.
 	 */
 	void advanceOrientation(bool pairFw, bool verbose = false) {
@@ -862,6 +946,19 @@ protected:
 				done_ = reconcileAndAdd(rchase_.off(), true /* new entry is from 1 */,
 				                        *offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
 				                        fwL_, fwR_, pairFw, verbose);
+				if(!done_ && (*offsLsz_ + *offsRsz_) > mixedThresh_) {
+					// Because the total size of both ranges exceeds
+					// our threshold, we're now operating in "mixed
+					// mode"
+					done_ = resolveOutstandingInRef(pairFw, rchase_.off(),
+					                                drL_->curEbwt()->_plen[rchase_.off().first],
+					                                drL_->range());
+					if(++mixedAttempts_ > mixedThresh_) {
+						// Give up on this pair
+						*donePair_ = true;
+						return;
+					}
+				}
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
@@ -893,6 +990,19 @@ protected:
 				done_ = reconcileAndAdd(rchase_.off(), false /* new entry is from 2 */,
 				                        *offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
 				                        fwL_, fwR_, pairFw, verbose);
+				if(!done_ && (*offsLsz_ + *offsRsz_) > mixedThresh_) {
+					// Because the total size of both ranges exceeds
+					// our threshold, we're now operating in "mixed
+					// mode"
+					done_ = resolveOutstandingInRef(pairFw, rchase_.off(),
+					                                drR_->curEbwt()->_plen[rchase_.off().first],
+					                                drR_->range());
+					if(++mixedAttempts_ > mixedThresh_) {
+						// Give up on this pair
+						*donePair_ = true;
+						return;
+					}
+				}
 				rchase_.reset();
 			} else {
 				assert(rchase_.done());
@@ -929,18 +1039,16 @@ protected:
 				drL_->advance();
 				if(drL_->foundRange()) {
 #ifndef NDEBUG
-					std::set<uint32_t>& s = (pairFw ? allTopsL_fw_ : allTopsL_rc_);
-					assert(s.find(drL_->range().top) == s.end());
-					s.insert(drL_->range().top);
+					{
+						std::set<int64_t>& s = (pairFw ? allTopsL_fw_ : allTopsL_rc_);
+						int64_t t = drL_->range().top + 1; // add 1 to avoid 0
+						if(!drL_->curEbwt()->fw()) t = -t; // invert for bw index
+						assert(s.find(t) == s.end());
+						s.insert(t);
+					}
 #endif
 					// Add the size of this range to the total for this mate
 					*offsLsz_ += (drL_->range().bot - drL_->range().top);
-					if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
-						// Too many candidates for both mates; abort
-						// without any more searching
-						*donePair_ = true;
-						return;
-					}
 					if(*offsRsz_ == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
@@ -952,8 +1060,28 @@ protected:
 						// Start chasing this range
 						if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << " " << drL_->range().top << endl;
 						if(verbose) cout << "Chasing a range for first mate" << endl;
-						rchase_.setTopBot(drL_->range().top, drL_->range().bot, drL_->qlen(), drL_->curEbwt());
-						*chaseL_ = true;
+						if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
+							// Too many candidates for both mates; abort
+							// without any more searching
+							*donePair_ = true;
+							return;
+						}
+						// If this is the first range for both mates,
+						// choose the smaller range to chase down first
+						if(*delayedchaseR_ && (*offsRsz_ < *offsLsz_)) {
+							assert(drR_->foundRange());
+							*delayedchaseR_ = false;
+							*delayedchaseL_ = true;
+							*chaseR_ = true;
+							rchase_.setTopBot(drR_->range().top, drR_->range().bot,
+							                  drR_->qlen(), drR_->curEbwt());
+						} else {
+							// Use Burrows-Wheeler for this pair (as
+							// usual)
+							*chaseL_ = true;
+							rchase_.setTopBot(drL_->range().top, drL_->range().bot,
+							                  drL_->qlen(), drL_->curEbwt());
+						}
 					}
 				}
 			} else if(!drR_->done()) {
@@ -972,18 +1100,16 @@ protected:
 				drR_->advance();
 				if(drR_->foundRange()) {
 #ifndef NDEBUG
-					std::set<uint32_t>& s = (pairFw ? allTopsR_fw_ : allTopsR_rc_);
-					assert(s.find(drR_->range().top) == s.end());
-					s.insert(drR_->range().top);
+					{
+						std::set<int64_t>& s = (pairFw ? allTopsR_fw_ : allTopsR_rc_);
+						int64_t t = drR_->range().top + 1; // add 1 to avoid 0
+						if(!drR_->curEbwt()->fw()) t = -t; // invert for bw index
+						assert(s.find(t) == s.end());
+						s.insert(t);
+					}
 #endif
 					// Add the size of this range to the total for this mate
 					*offsRsz_ += (drR_->range().bot - drR_->range().top);
-					if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
-						// Too many candidates for both mates; abort
-						// without any more searching
-						*donePair_ = true;
-						return;
-					}
 					if(*offsLsz_ == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
@@ -995,8 +1121,28 @@ protected:
 						// Start chasing this range
 						if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << " " << drR_->range().top << endl;
 						if(verbose) cout << "Chasing a range for second mate" << endl;
-						rchase_.setTopBot(drR_->range().top, drR_->range().bot, drR_->qlen(), drR_->curEbwt());
-						*chaseR_ = true;
+						if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
+							// Too many candidates for both mates; abort
+							// without any more searching
+							*donePair_ = true;
+							return;
+						}
+						// If this is the first range for both mates,
+						// choose the smaller range to chase down first
+						if(*delayedchaseL_ && *offsLsz_ < *offsRsz_) {
+							assert(drL_->foundRange());
+							*delayedchaseL_ = false;
+							*delayedchaseR_ = true;
+							*chaseL_ = true;
+							rchase_.setTopBot(drL_->range().top, drL_->range().bot,
+							                  drL_->qlen(), drL_->curEbwt());
+						} else {
+							// Use Burrows-Wheeler for this pair (as
+							// usual)
+							*chaseR_ = true;
+							rchase_.setTopBot(drR_->range().top, drR_->range().bot,
+							                  drR_->qlen(), drR_->curEbwt());
+						}
 					}
 				}
 			} else {
@@ -1006,6 +1152,10 @@ protected:
 			}
 		}
 	}
+
+	std::vector<String<Dna5> >& os_;
+
+	PatternSourcePerThread *patsrc_;
 
 	// Progress state
 	bool doneFw_;   // finished with forward orientation of both mates?
@@ -1022,6 +1172,9 @@ protected:
 	bool delayedChase2Fw_;
 	bool delayedChase2Rc_;
 
+	// For searching for outstanding mates
+	RefAligner<String<Dna5> >* refAligner_;
+
 	// Temporary HitSink; to be deleted
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	HitSinkPerThread* sinkPt_;
@@ -1033,9 +1186,14 @@ protected:
 	const uint32_t minInsert_;
 	const uint32_t maxInsert_;
 
-	// If both reads align >= symCeiling times, then immediately give
-	// up on reporting a paired alignment
+	// If both mates in a given orientation align >= symCeiling times,
+	// then immediately give up
 	const uint32_t symCeiling_;
+
+	// If the total number of alignments for both mates in a given
+	// orientation exceeds mixedThresh, then switch to mixed mode
+	const uint32_t mixedThresh_;
+	uint32_t mixedAttempts_;
 
 	// Orientation of upstream/downstream mates when aligning to
 	// forward strand
@@ -1108,10 +1266,10 @@ protected:
 	bool        fwR_;
 
 #ifndef NDEBUG
-	std::set<uint32_t> allTopsL_fw_;
-	std::set<uint32_t> allTopsR_fw_;
-	std::set<uint32_t> allTopsL_rc_;
-	std::set<uint32_t> allTopsR_rc_;
+	std::set<int64_t> allTopsL_fw_;
+	std::set<int64_t> allTopsR_fw_;
+	std::set<int64_t> allTopsL_rc_;
+	std::set<int64_t> allTopsR_rc_;
 #endif
 
 	bool verbose2_;

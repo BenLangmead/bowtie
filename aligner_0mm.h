@@ -102,6 +102,7 @@ public:
 			uint32_t peInner,
 			uint32_t peOuter,
 			uint32_t symCeil,
+			uint32_t mixedThresh,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -114,6 +115,7 @@ public:
 			peInner_(peInner),
 			peOuter_(peOuter),
 			symCeil_(symCeil),
+			mixedThresh_(mixedThresh),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -180,11 +182,14 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_);
 
+		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
+
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params,
-			driver1Fw, driver1Rc, driver2Fw, driver2Rc,
+			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, symCeil_, os_, rangeMode_, verbose_, seed_);
+			peInner_, peOuter_, symCeil_, mixedThresh_, os_,
+			rangeMode_, verbose_, seed_);
 	}
 
 private:
@@ -197,6 +202,7 @@ private:
 	uint32_t peInner_;
 	uint32_t peOuter_;
 	uint32_t symCeil_;
+	uint32_t mixedThresh_;
 	vector<String<Dna5> >& os_;
 	bool rangeMode_;
 	bool verbose_;

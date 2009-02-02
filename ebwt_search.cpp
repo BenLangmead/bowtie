@@ -95,9 +95,10 @@ static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP =
 static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP = 600)
 static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand
 static bool mate2fw             = false; // -2 mate aligns in rc orientation on fw strand
+static uint32_t mixedThresh     = 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:";
 
 enum {
 	ARG_ORIG = 256,
@@ -214,6 +215,7 @@ static struct option long_options[] = {
 	{"ff",           no_argument,       0,            ARG_FF},
 	{"fr",           no_argument,       0,            ARG_FR},
 	{"rf",           no_argument,       0,            ARG_RF},
+	{"mixthresh",    no_argument,       0,            'x'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -753,6 +755,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'm':
 	   			mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
 	   			break;
+	   		case 'x':
+	   			mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
+	   			break;
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
 	   			cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
@@ -1084,7 +1089,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			mate2fw,
 			minInsert,
 			maxInsert,
-			mhits,     // for symCeiling
+			mhits,       // for symCeiling
+			mixedThresh,
 			os,
 			rangeMode,
 			verbose,
@@ -1398,6 +1404,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			minInsert,
 			maxInsert,
 			mhits,     // for symCeiling
+			mixedThresh,
 			os,
 			rangeMode,
 			verbose,
@@ -2956,7 +2963,7 @@ static void driver(const char * type,
 	// Vector of the reference sequences; used for sanity-checking
 	vector<String<Dna5> > os;
 	// Read reference sequences from the command-line or from a FASTA file
-	if(sanityCheck && !origString.empty()) {
+	if(!origString.empty()) {
 		// Determine if it's a file by looking at whether it has a FASTA-like
 		// extension
 		size_t len = origString.length();

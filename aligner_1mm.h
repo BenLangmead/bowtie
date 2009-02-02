@@ -12,6 +12,7 @@
 #include "range_source.h"
 #include "row_chaser.h"
 #include "range_chaser.h"
+#include "ref_aligner.h"
 
 /**
  * Concrete factory class for constructing unpaired exact aligners.
@@ -151,6 +152,7 @@ public:
 			uint32_t peInner,
 			uint32_t peOuter,
 			uint32_t symCeil,
+			uint32_t mixedThresh,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -164,6 +166,7 @@ public:
 			peInner_(peInner),
 			peOuter_(peOuter),
 			symCeil_(symCeil),
+			mixedThresh_(mixedThresh),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -302,10 +305,13 @@ public:
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 
+		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
+
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc,
+			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, symCeil_, os_, rangeMode_, verbose_, seed_);
+			peInner_, peOuter_, symCeil_, mixedThresh_, os_,
+			rangeMode_, verbose_, seed_);
 	}
 
 private:
@@ -318,6 +324,7 @@ private:
 	uint32_t peInner_;
 	uint32_t peOuter_;
 	uint32_t symCeil_;
+	uint32_t mixedThresh_;
 	vector<String<Dna5> >& os_;
 	bool rangeMode_;
 	bool verbose_;
