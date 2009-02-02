@@ -113,12 +113,19 @@ protected:
 		for(uint32_t i = begin; i <= end - qlen; i++) {
 			bool match = true;
 			for(uint32_t j = 0; j < qlen; j++) {
+				assert_lt((int)ref[i+j], 4);
 				if(qry[j] != ref[i+j]) {
 					match = false;
 					break;
 				}
 	 		}
-			if(match) return i;
+			if(match) {
+				range.stratum = 0;
+				range.numMms = 0;
+				assert_eq(0, range.mms.size());
+				assert_eq(0, range.refcs.size());
+				return i;
+			}
 		}
 		return 0xffffffff;
 	}
@@ -135,11 +142,18 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		const uint32_t rlen = seqan::length(ref);
+		ASSERT_ONLY(const uint32_t rlen = seqan::length(ref));
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
+#ifndef NDEBUG
+		uint32_t naive;
+		{
+			Range r2;
+			naive = naiveFindOne(ref, qry, quals, begin, end, r2);
+		}
+#endif
 		uint32_t seedBitPairs = min<int>(qlen, 32);
 		uint32_t seedCushion = qlen <= 32 ? 0 : qlen - 32;
 		uint64_t seed = 0llu;
@@ -156,60 +170,61 @@ protected:
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[begin + i]; // next reference character
 			if(c == 4) {
-#ifndef NDEBUG
-				Range r2;
-				assert_eq(0xffffffff, naiveFindOne(ref, qry, quals, begin, end, r2));
-#endif
+				assert_eq(0xffffffff, naive);
 				return 0xffffffff;   // can't match if query has Ns
 			}
 			assert_lt(c, 4);
 			seed = ((seed << 2llu) | c);
 			buf  = ((buf  << 2llu) | r);
 		}
-		buf >>= 1;
-		if(seed == buf)
+		buf >>= 2;
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
-#ifndef NDEBUG
-				Range r2;
-				assert_eq(0xffffffff, naiveFindOne(ref, qry, quals, begin, end, r2));
-#endif
+				assert_eq(0xffffffff, naive);
 				return 0xffffffff; // can't match if query has Ns
 			}
 		}
-		const uint32_t lim = end - seedCushion - qlen;
+		const uint32_t lim = end - seedCushion;
+		// We're moving the right-hand edge of the seed along
 		for(uint32_t i = begin + (seedBitPairs-1); i < lim; i++) {
 			const int r = (int)ref[i];
+			assert_lt(r, 4);
 			buf = ((buf << 2llu) | r);
 			if(useMask) buf &= clearMask;
-			if(buf != seed) continue;
+			if(buf != seed) {
+				assert_neq(i - seedBitPairs + 1, naive);
+				continue;
+			}
 			// Seed hit!
 			if(seedCushion == 0) {
-#ifndef NDEBUG
-				Range r2;
-				assert_eq(i, naiveFindOne(ref, qry, quals, begin, end, r2));
-#endif
-				return i;
+				uint32_t ret = i - seedBitPairs + 1;
+				assert_eq(ret, naive);
+				range.stratum = 0;
+				range.numMms = 0;
+				assert_eq(0, range.mms.size());
+				assert_eq(0, range.refcs.size());
+				return ret;
 			}
 			bool foundHit = true;
 			for(uint32_t j = 0; j < seedCushion; j++) {
+				assert_lt(i+1+j, end);
+				assert_lt(i+1+j, rlen);
 				if((int)qry[32+j] != (int)ref[i+1+j]) {
 					foundHit = false;
 					break;
 				}
 			}
 			if(foundHit) {
-#ifndef NDEBUG
-				Range r2;
-				assert_eq(i, naiveFindOne(ref, qry, quals, begin, end, r2));
-#endif
-				return i;
+				uint32_t ret = i - seedBitPairs + 1;
+				assert_eq(ret, naive);
+				range.stratum = 0;
+				range.numMms = 0;
+				assert_eq(0, range.mms.size());
+				assert_eq(0, range.refcs.size());
+				return ret;
 			}
 		}
-#ifndef NDEBUG
-		Range r2;
-		assert_eq(0xffffffff, naiveFindOne(ref, qry, quals, begin, end, r2));
-#endif
+		assert_eq(0xffffffff, naive);
 		return 0xffffffff; // no hit
 	}
 };

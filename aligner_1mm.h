@@ -151,8 +151,10 @@ public:
 			bool mate2fw,
 			uint32_t peInner,
 			uint32_t peOuter,
+			bool dontReconcile,
 			uint32_t symCeil,
 			uint32_t mixedThresh,
+			uint32_t mixedAttemptLim,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -165,8 +167,10 @@ public:
 			mate2fw_(mate2fw),
 			peInner_(peInner),
 			peOuter_(peOuter),
+			dontReconcile_(dontReconcile),
 			symCeil_(symCeil),
 			mixedThresh_(mixedThresh),
+			mixedAttemptLim_(mixedAttemptLim),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -310,8 +314,8 @@ public:
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, symCeil_, mixedThresh_, os_,
-			rangeMode_, verbose_, seed_);
+			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
+			mixedAttemptLim_, os_, rangeMode_, verbose_, seed_);
 	}
 
 private:
@@ -319,16 +323,18 @@ private:
 	Ebwt<String<Dna> >* ebwtBw_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
-	bool mate1fw_;
-	bool mate2fw_;
-	uint32_t peInner_;
-	uint32_t peOuter_;
-	uint32_t symCeil_;
-	uint32_t mixedThresh_;
+	const bool mate1fw_;
+	const bool mate2fw_;
+	const uint32_t peInner_;
+	const uint32_t peOuter_;
+	const bool dontReconcile_;
+	const uint32_t symCeil_;
+	const uint32_t mixedThresh_;
+	const uint32_t mixedAttemptLim_;
 	vector<String<Dna5> >& os_;
-	bool rangeMode_;
-	bool verbose_;
-	uint32_t seed_;
+	const bool rangeMode_;
+	const bool verbose_;
+	const uint32_t seed_;
 };
 
 #endif /* ALIGNER_1MM_H_ */

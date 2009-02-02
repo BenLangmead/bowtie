@@ -12,6 +12,10 @@
  * A range along with the alignment it represents.
  */
 struct Range {
+	Range() : top(0), bot(0), stratum(0), numMms(0), ebwt(NULL) {
+		mms.clear();
+		refcs.clear();
+	}
 	uint32_t top;     // top of range
 	uint32_t bot;     // bottom of range
 	uint32_t stratum; // stratum

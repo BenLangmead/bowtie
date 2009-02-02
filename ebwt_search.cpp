@@ -96,6 +96,8 @@ static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP
 static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand
 static bool mate2fw             = false; // -2 mate aligns in rc orientation on fw strand
 static uint32_t mixedThresh     = 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
+static uint32_t mixedAttemptLim = 5;     // number of attempts to make in "mixed mode" before giving up on orientation
+static bool dontReconcileMates  = false; // suppress pairwise all-versus-all way of resolving mates
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:";
@@ -142,7 +144,9 @@ enum {
 	ARG_PREFETCH_WIDTH,
 	ARG_FF,
 	ARG_FR,
-	ARG_RF
+	ARG_RF,
+	ARG_MIXED_ATTEMPTS,
+	ARG_NO_RECONCILE
 };
 
 static struct option long_options[] = {
@@ -215,7 +219,9 @@ static struct option long_options[] = {
 	{"ff",           no_argument,       0,            ARG_FF},
 	{"fr",           no_argument,       0,            ARG_FR},
 	{"rf",           no_argument,       0,            ARG_RF},
-	{"mixthresh",    no_argument,       0,            'x'},
+	{"mixthresh",    required_argument, 0,            'x'},
+	{"mixatts",      required_argument, 0,            ARG_MIXED_ATTEMPTS},
+	{"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -758,6 +764,12 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'x':
 	   			mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
 	   			break;
+	   		case ARG_MIXED_ATTEMPTS:
+	   			mixedAttemptLim = (uint32_t)parseInt(1, "--mixatt arg must be at least 1");
+	   			break;
+	   		case ARG_NO_RECONCILE:
+	   			dontReconcileMates = true;
+	   			break;
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
 	   			cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
@@ -1089,8 +1101,10 @@ static void *exactSearchWorkerStateful(void *vp) {
 			mate2fw,
 			minInsert,
 			maxInsert,
+			dontReconcileMates,
 			mhits,       // for symCeiling
 			mixedThresh,
+			mixedAttemptLim,
 			os,
 			rangeMode,
 			verbose,
@@ -1403,8 +1417,10 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			mate2fw,
 			minInsert,
 			maxInsert,
+			dontReconcileMates,
 			mhits,     // for symCeiling
 			mixedThresh,
+			mixedAttemptLim,
 			os,
 			rangeMode,
 			verbose,

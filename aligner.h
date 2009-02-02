@@ -517,8 +517,10 @@ public:
 		bool fw1, bool fw2,
 		uint32_t minInsert,
 		uint32_t maxInsert,
+		bool dontReconcile,
 		uint32_t symCeiling,
 		uint32_t mixedThresh,
+		uint32_t mixedAttemptLim,
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
@@ -536,8 +538,10 @@ public:
 		params_(params),
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
+		dontReconcile_(dontReconcile),
 		symCeiling_(symCeiling),
 		mixedThresh_(mixedThresh),
+		mixedAttemptLim_(mixedAttemptLim),
 		mixedAttempts_(0),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rand_),
@@ -725,14 +729,14 @@ protected:
 	            uint32_t tlen, // length of ref
 	            bool fwL,      // whether upstream mate is in fw orientation
 	            bool fwR,      // whether downstream mate is in fw orientation
-	            bool pairFw)   // whether the pair is being mapped to fw strand
+	            bool pairFw,   // whether the pair is being mapped to fw strand
+	            bool ebwtFwL,
+	            bool ebwtFwR)
 	{
 		assert_lt(upstreamOff, dnstreamOff);
 		uint32_t spreadL = rL.bot - rL.top;
 		uint32_t spreadR = rR.bot - rR.top;
 		uint32_t oms = min(spreadL, spreadR) - 1;
-		bool ebwtFwL = rL.ebwt->fw();
-		bool ebwtFwR = rR.ebwt->fw();
 		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
 		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
 		uint32_t lenL = pairFw ? alen_ : blen_;
@@ -776,6 +780,20 @@ protected:
 				rR.stratum,                   // alignment stratum
 				oms);                         // # other hits
 		return ret;
+	}
+
+	bool report(const Range& rL, // range for upstream mate
+	            const Range& rR, // range for downstream mate
+	            uint32_t first,  // ref idx
+	            uint32_t upstreamOff, // offset for upstream mate
+	            uint32_t dnstreamOff, // offset for downstream mate
+	            uint32_t tlen, // length of ref
+	            bool fwL,      // whether upstream mate is in fw orientation
+	            bool fwR,      // whether downstream mate is in fw orientation
+	            bool pairFw)   // whether the pair is being mapped to fw strand
+	{
+		return report(rL, rR, first, upstreamOff, dnstreamOff, tlen, fwL, fwR,
+		              pairFw, rL.ebwt->fw(), rR.ebwt->fw());
 	}
 
 	/**
@@ -870,15 +888,25 @@ protected:
 		// If matchRight is true, then we're trying to align the other
 		// mate to the right of the already-aligned mate.  Otherwise,
 		// to the left.
-		bool matchRight = (offs1 && !doneFw_);
+		bool matchRight = (offs1 ? !doneFw_ : doneFw_);
 		// Sequence and quals for mate to be matched
-		const String<Dna5>& seq  = (offs1 ? patsrc_->bufb().patFw  : patsrc_->bufa().patFw);
-		const String<char>& qual = (offs1 ? patsrc_->bufb().qualFw : patsrc_->bufa().qualFw);
 		bool fw = offs1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
 		if(doneFw_) fw = !fw;
-		// Sequence for anchor mate
+		// 'seq' gets sequence of outstanding mate w/r/t the forward
+		// reference strand
+		const String<Dna5>& seq  = fw ? (offs1 ? patsrc_->bufb().patFw   :
+		                                         patsrc_->bufa().patFw)  :
+		                                (offs1 ? patsrc_->bufb().patRc   :
+		                                         patsrc_->bufa().patRc);
+		// 'seq' gets qualities of outstanding mate w/r/t the forward
+		// reference strand
+		const String<char>& qual = fw ? (offs1 ? patsrc_->bufb().qualFw  :
+		                                         patsrc_->bufa().qualFw) :
+		                                (offs1 ? patsrc_->bufb().qualRc  :
+		                                         patsrc_->bufa().qualRc);
 		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
-		uint32_t alen = (offs1 ? patsrc_->bufa().length() : patsrc_->bufb().length());
+		uint32_t alen = (offs1 ? patsrc_->bufa().length() :
+		                         patsrc_->bufb().length());
 		// Don't even try if either of the mates is longer than the
 		// maximum insert size; this seems to be compatible with what
 		// Maq does.
@@ -910,6 +938,11 @@ protected:
 		Range r;
 		uint32_t result = refAligner_->findOne(os_[tidx], seq, qual, begin, end, r);
 		if(result != 0xffffffff) {
+			// Just copy the known range's top and bot for now
+			r.top = range.top;
+			r.bot = range.bot;
+			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
+			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
 			return report(
 					matchRight ? range : r, // range for upstream mate
 			        matchRight ? r : range, // range for downstream mate
@@ -918,7 +951,9 @@ protected:
 			        matchRight ? result : toff, // downstream offset
 				    tlen,       // length of ref
 				    fwL_, fwR_, // whether mate1 is in fw orientation
-				    !doneFw_); // whether the pair is being mapped to fw strand
+				    !doneFw_,   // whether the pair is being mapped to fw strand
+				    ebwtLFw,
+				    ebwtRFw);
 		} else {
 			return false;
 		}
@@ -943,17 +978,19 @@ protected:
 			} else if(rchase_.foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				done_ = reconcileAndAdd(rchase_.off(), true /* new entry is from 1 */,
-				                        *offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
-				                        fwL_, fwR_, pairFw, verbose);
-				if(!done_ && (*offsLsz_ + *offsRsz_) > mixedThresh_) {
+				if(!dontReconcile_) {
+					done_ = reconcileAndAdd(rchase_.off(), true /* new entry is from 1 */,
+											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
+											fwL_, fwR_, pairFw, verbose);
+				}
+				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
 					done_ = resolveOutstandingInRef(pairFw, rchase_.off(),
 					                                drL_->curEbwt()->_plen[rchase_.off().first],
 					                                drL_->range());
-					if(++mixedAttempts_ > mixedThresh_) {
+					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
 						return;
@@ -987,17 +1024,19 @@ protected:
 			} else if(rchase_.foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				done_ = reconcileAndAdd(rchase_.off(), false /* new entry is from 2 */,
-				                        *offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
-				                        fwL_, fwR_, pairFw, verbose);
-				if(!done_ && (*offsLsz_ + *offsRsz_) > mixedThresh_) {
+				if(!dontReconcile_) {
+					done_ = reconcileAndAdd(rchase_.off(), false /* new entry is from 2 */,
+											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
+											fwL_, fwR_, pairFw, verbose);
+				}
+				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(pairFw, rchase_.off(),
+					done_ = resolveOutstandingInRef(!pairFw, rchase_.off(),
 					                                drR_->curEbwt()->_plen[rchase_.off().first],
 					                                drR_->range());
-					if(++mixedAttempts_ > mixedThresh_) {
+					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
 						return;
@@ -1186,6 +1225,10 @@ protected:
 	const uint32_t minInsert_;
 	const uint32_t maxInsert_;
 
+	// Don't attempt pairwise all-versus-all style of mate
+	// reconciliation; just rely on mixed mode
+	const bool dontReconcile_;
+
 	// If both mates in a given orientation align >= symCeiling times,
 	// then immediately give up
 	const uint32_t symCeiling_;
@@ -1193,6 +1236,7 @@ protected:
 	// If the total number of alignments for both mates in a given
 	// orientation exceeds mixedThresh, then switch to mixed mode
 	const uint32_t mixedThresh_;
+	const uint32_t mixedAttemptLim_;
 	uint32_t mixedAttempts_;
 
 	// Orientation of upstream/downstream mates when aligning to

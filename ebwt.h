@@ -1286,12 +1286,10 @@ public:
 				uint32_t off = len - mmui32[i] - 1;
 				hit.mms.set(off);
 				hit.refcs[off] = refcs[i];
-				//assert_neq((int)charToDna5[(int)hit.refcs[off]], (int)query[off]);
 			}
 			else {
 				hit.mms.set(mmui32[i]);
 				hit.refcs[mmui32[i]] = refcs[i];
-				//assert_neq((int)charToDna5[(int)hit.refcs[mmui32[i]]], (int)query[mmui32[i]]);
 			}
 		}
 		// Check the hit against the original text, if it's available
