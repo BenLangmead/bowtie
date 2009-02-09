@@ -3275,9 +3275,9 @@ int main(int argc, char **argv) {
 	{
 		Timer _t(cout, "Overall time: ", timing);
 
-		// Get input filename
+		// Get index basename
 		if(optind >= argc) {
-			cerr << "No input sequence, query, or output file specified!" << endl;
+			cerr << "No index, query, or output file specified!" << endl;
 			printUsage(cerr);
 			return 1;
 		}

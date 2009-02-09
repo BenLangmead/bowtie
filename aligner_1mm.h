@@ -309,7 +309,7 @@ public:
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 
-		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
+		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
 
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner,
