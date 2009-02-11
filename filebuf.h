@@ -167,4 +167,63 @@ private:
 	char      _buf[BUF_SZ]; // (large) input buffer
 };
 
+/**
+ * Wrapper for a buffered output stream that writes bitpairs.
+ */
+class BitpairOutFileBuf {
+public:
+	/**
+	 * Open a new output stream to a file with given name.
+	 */
+	BitpairOutFileBuf(const char *in) : bpPtr_(0), cur_(0) {
+		assert(in != NULL);
+		out_ = fopen(in, "wb");
+		if(out_ == NULL) {
+			cerr << "Error: Could not open bitpair-output file " << in << endl;
+			exit(1);
+		}
+	}
+
+	/**
+	 * Write a single bitpair into the buf.  Flush the buffer if it's
+	 * full.
+	 */
+	void write(int bp) {
+		assert_lt(bp, 4);
+		assert_geq(bp, 0);
+		buf_[cur_] |= (bp << bpPtr_);
+		if(bpPtr_ == 6) {
+			bpPtr_ = 0;
+			cur_++;
+			if(cur_ == BUF_SZ) {
+				// Flush the buffer
+				fwrite((const void *)buf_, BUF_SZ, 1, out_);
+				// Reset to beginning of the buffer
+				cur_ = 0;
+			}
+			// Initialize next octet to 0
+			buf_[cur_] = 0;
+		} else {
+			bpPtr_ += 2;
+		}
+	}
+
+	/**
+	 * Write any remaining bitpairs and then close the input
+	 */
+	void close() {
+		if(cur_ > 0 || bpPtr_ > 0) {
+			if(bpPtr_ == 0) cur_--;
+			fwrite((const void *)buf_, cur_ + 1, 1, out_);
+		}
+		fclose(out_);
+	}
+private:
+	static const size_t BUF_SZ = 128 * 1024;
+	FILE    *out_;
+	int      bpPtr_;
+	uint32_t cur_;
+	char     buf_[BUF_SZ]; // (large) input buffer
+};
+
 #endif /*ndef FILEBUF_H_*/

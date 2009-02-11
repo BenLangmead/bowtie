@@ -486,7 +486,7 @@ protected:
 	EbwtSearchParams<String<Dna> >* params_;
 
 	// State for getting alignments from ranges statefully
-	WideRandomScanningRangeChaser<String<Dna> > rchase_;
+	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state
 	TDriver* driverFw_;
@@ -1245,7 +1245,7 @@ protected:
 	const bool fw2_;
 
 	// State for getting alignments from ranges statefully
-	WideRandomScanningRangeChaser<String<Dna> > rchase_;
+	RandomScanningRangeChaser<String<Dna> > rchase_;
 
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;

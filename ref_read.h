@@ -11,6 +11,7 @@
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "filebuf.h"
+#include "word_io.h"
 
 using namespace std;
 using namespace seqan;
@@ -25,14 +26,43 @@ static inline int skipWhitespace(FileBuf& in) {
 	return c;
 }
 
+/**
+ * Encapsulates a stretch of the reference containing only unambiguous
+ * characters.  From an ordered list of RefRecords, one can (almost)
+ * deduce the "shape" of the reference sequences (almost because we
+ * lose information about stretches of ambiguous characters at the end
+ * of reference sequences).
+ */
 struct RefRecord {
 	RefRecord(uint32_t _off, uint32_t _len, bool _first) :
 		off(_off), len(_len), first(_first)
-	{
+	{ }
+
+	RefRecord(std::istream& in, bool be) {
+		assert(in.good());
+		off = readU32(in, be);
+		len = readU32(in, be);
+		first = in.get() ? true : false;
 	}
-	uint32_t off;
-	uint32_t len;
-	bool   first;
+
+	RefRecord(FILE *in, bool swap) {
+		assert(in != NULL);
+		fread(&off, 4, 1, in);
+		if(swap) off = endianSwapU32(off);
+		fread(&len, 4, 1, in);
+		if(swap) len = endianSwapU32(len);
+		first = fgetc(in) ? true : false;
+	}
+
+	void write(std::ostream& out, bool be) {
+		writeU32(out, off, be);
+		writeU32(out, len, be);
+		out.put(first ? 1 : 0);
+	}
+
+	uint32_t off; /// Offset of the first character in the record
+	uint32_t len; /// Length of the record
+	bool   first; /// Whether this record is the first for a reference sequence
 };
 
 /**
@@ -55,10 +85,12 @@ struct RefReadInParams {
 
 extern RefRecord fastaRefReadSize(FileBuf& in,
                                   const RefReadInParams& refparams,
-                                  bool first);
+                                  bool first,
+                                  BitpairOutFileBuf* bpout = NULL);
 extern size_t fastaRefReadSizes(vector<FileBuf*>& in,
                                 vector<RefRecord>& recs,
-                                const RefReadInParams& refparams);
+                                const RefReadInParams& refparams,
+                                BitpairOutFileBuf* bpout = NULL);
 
 /**
  * For given filehandle, read to the end of the current line and return

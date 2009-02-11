@@ -7,7 +7,8 @@
  */
 RefRecord fastaRefReadSize(FileBuf& in,
                            const RefReadInParams& refparams,
-                           bool first)
+                           bool first,
+                           BitpairOutFileBuf* bpout)
 {
 	int c;
 	static int lastc = '>';
@@ -64,6 +65,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	// as we go
 	while(true) {
 		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			// Turn this 'N' (or other ambiguous char) into an 'A'
 			c = 'A';
 		}
 		int cat = dna4Cat[c];
@@ -102,10 +104,9 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	// line, and c holds the first character
 	while(c != -1 && c != '>') {
 		if(refparams.nsToAs && dna4Cat[c] == 2) {
+			// Turn this 'N' (or other ambiguous char) into an 'A'
 			c = 'A';
 		}
-		// Note: can't have a comment in the middle of a sequence,
-		// though a comment can end a sequence
 		uint8_t cat = dna4Cat[c];
 		ASSERT_ONLY(int cc = toupper(c));
 		if(cat == 1) {
@@ -113,6 +114,8 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
 			// Consume it
 			seqCharsRead++;
+			// Output it
+			if(bpout) bpout->write(charToDna5[c]);
 			if(refparams.baseCutoff != -1 &&
 			   (int64_t)seqCharsRead >= refparams.baseCutoff)
 			{
@@ -150,7 +153,8 @@ RefRecord fastaRefReadSize(FileBuf& in,
  */
 size_t fastaRefReadSizes(vector<FileBuf*>& in,
                          vector<RefRecord>& recs,
-                         const RefReadInParams& refparams)
+                         const RefReadInParams& refparams,
+                         BitpairOutFileBuf* bpout)
 {
 	uint32_t tot = 0;
 	RefReadInParams rpcp = refparams;
@@ -165,7 +169,7 @@ size_t fastaRefReadSizes(vector<FileBuf*>& in,
 		assert_neq(rpcp.numSeqCutoff, 0);
 		// For each pattern in this istream
 		while(!in[i]->eof() && rpcp.baseCutoff != 0 && rpcp.numSeqCutoff != 0) {
-			RefRecord rec = fastaRefReadSize(*in[i], refparams, first);
+			RefRecord rec = fastaRefReadSize(*in[i], refparams, first, bpout);
 			if(rpcp.baseCutoff > 0) assert_leq((int64_t)rec.len, rpcp.baseCutoff);
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= rec.len;
 			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;

@@ -14,6 +14,8 @@
 #include "tokenize.h"
 #include "timer.h"
 #include "ref_read.h"
+#include "filebuf.h"
+#include "reference.h"
 
 /**
  * \file Driver for the bowtie-build indexing tool.
@@ -45,6 +47,8 @@ static bool    useBsearch    = true;
 static bool    nsToAs        = false;
 static bool    autoMem       = true;
 static bool    packed        = false;
+static bool    writeRef      = false;
+static bool    justRef       = false;
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -74,6 +78,7 @@ static void printUsage(ostream& out) {
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable diff-cover (algorithm becomes quadratic)" << endl
+	    << "    --justref/-3            just build .3.ebwt (reference) portion of the index" << endl
 	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
@@ -303,7 +308,7 @@ static void printLongUsage(ostream& out) {
 	;
 }
 
-static const char *short_options = "qraph?nscfl:i:o:t:h:";
+static const char *short_options = "qraph?nscfl:i:o:t:h:3";
 
 static struct option long_options[] = {
 	{"quiet",        no_argument,       0,            'q'},
@@ -330,6 +335,8 @@ static struct option long_options[] = {
 	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{"ntoa",         no_argument,       0,            ARG_NTOA},
 	{"oldpmap",      no_argument,       0,            ARG_PMAP},
+	{"justref",      no_argument,       0,            '3'},
+	{"writeref",     no_argument,       0,            'r'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -380,6 +387,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_ISARATE:
 	   			isaRate = parseNumber<int>(0, "--isaRate arg must be at least 0");
 	   			break;
+	   		case '3':
+	   			justRef = true;
+	   			break;
 	   		case 't':
 	   			ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
 	   			break;
@@ -427,6 +437,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'a': autoMem = false; break;
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
+	   		case 'r': writeRef = true; break;
 
 			case -1: /* Done with options. */
 				break;
@@ -490,17 +501,56 @@ static void driver(const string& infile,
 			is.push_back(fb);
 		}
 	}
+	// Vector for the ordered list of "records" comprising the input
+	// sequences.  A record represents a stretch of unambiguous
+	// characters in one of the input sequences.
 	vector<RefRecord> szs;
 	uint32_t sztot;
 	int32_t chunkRate = 0;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
-		sztot = fastaRefReadSizes(is, szs, refparams);
-		if(!useBsearch) {
-			chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
-			if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
+		if(!reverse && writeRef) {
+			string file3 = outfile + ".3.ebwt";
+			string file4 = outfile + ".4.ebwt";
+			BitpairOutFileBuf bpout(file4.c_str());
+			// Read in the sizes of all the unambiguous stretches of the
+			// genome into a vector of RefRecords
+			sztot = fastaRefReadSizes(is, szs, refparams, &bpout);
+			// Write the records back out to a '.3.ebwt' file.
+			ofstream fout3(file3.c_str(), ios::binary);
+			if(!fout3.good()) {
+				cerr << "Could not open index file for writing: \"" << file3 << "\"" << endl
+					 << "Please make sure the directory exists and that permissions allow writing by" << endl
+					 << "Bowtie." << endl;
+				exit(1);
+			}
+			bool be = currentlyBigEndian();
+			writeU32(fout3, 1, be); // endianness sentinel
+			writeU32(fout3, szs.size(), be); // write # records
+			// Write the records themselves
+			for(size_t i = 0; i < szs.size(); i++) {
+				szs[i].write(fout3, be);
+			}
+			bpout.close();
+			fout3.close();
+#ifndef NDEBUG
+			if(sanityCheck) {
+				BitPairReference bpr(outfile, true, &infiles, format == CMDLINE);
+			}
+#endif
+		} else {
+			// Read in the sizes of all the unambiguous stretches of the
+			// genome into a vector of RefRecords
+			sztot = fastaRefReadSizes(is, szs, refparams);
 		}
+	}
+	if(justRef) return;
+	// If we have to insert padding between reference sequences...
+	if(!useBsearch) {
+		// Then calculate the space-optimal size for the padding
+		chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
+		if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
 	}
 	assert_gt(sztot, 0);
 	assert_gt(szs.size(), 0);
