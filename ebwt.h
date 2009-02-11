@@ -3457,14 +3457,18 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 #endif
 		if(readFromStream) {
 			if(be || offRateDiff > 0) {
-				for(uint32_t i = 0; i < offsLen; i++) {
-					if((i & ~(0xffffffff << offRateDiff)) != 0) {
-						char tmp[4];
-						_in2.read(tmp, 4);
-					} else {
-						uint32_t idx = i >> offRateDiff;
+				const uint32_t blockSz = (2 * 1024 * 1024); // 2 MB block size
+				const uint32_t blockSzU32 = blockSz >> 2;
+				char buf[blockSz];
+				for(uint32_t i = 0; i < offsLen; i += blockSzU32) {
+					uint32_t block = min<uint32_t>(blockSzU32, offsLen - i);
+					_in2.read(buf, block << 2);
+					assert_eq((block << 2), (uint32_t)_in2.gcount());
+					uint32_t idx = i >> offRateDiff;
+					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
 						assert_lt(idx, offsLenSampled);
-						this->_offs[idx] = readU32(_in2, be);
+						this->_offs[idx++] = ((uint32_t*)buf)[j];
+						if(be) this->_offs[idx] = endianSwapU32(this->_offs[idx]);
 					}
 				}
 			} else {
