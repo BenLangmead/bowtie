@@ -64,6 +64,9 @@ public:
 		}
 		assert_gt(lim_, 0);
 		uint32_t ret = occ_;
+		// Clear the first elt so that we don't think there's already
+		// something there
+		buf_[occ_] = 0;
 		occ_ += numElts;
 		assert_leq(occ_, lim_);
 		if(lim_ - occ_ < 10) {
@@ -373,6 +376,7 @@ protected:
 					uint32_t newentIdx = pool_.alloc(2);
 					if(newentIdx != RANGE_CACHE_BAD_ALLOC) {
 						uint32_t *newent = pool_.get(newentIdx);
+						assert_eq(0, newent[0]);
 						if(ents[0] & 0x80000000) {
 							// The cache entry we found was a wrapper; make
 							// a new wrapper that points to that wrapper's
@@ -421,6 +425,7 @@ protected:
 		if(newentIdx != RANGE_CACHE_BAD_ALLOC) {
 			// Successfully allocated new range cache entry; install it
 			uint32_t *newent = pool_.get(newentIdx);
+			assert_eq(0, newent[0]);
 			newent[0] = spread;
 			memset(&newent[1], 0xff, spread << 2);
 			uint32_t entTop = top;
@@ -436,6 +441,7 @@ protected:
 			uint32_t wrapentIdx = pool_.alloc(2);
 			if(wrapentIdx != RANGE_CACHE_BAD_ALLOC) {
 				uint32_t *wrapent = pool_.get(wrapentIdx);
+				assert_eq(0, wrapent[0]);
 				wrapent[0] = 0x80000000 | jumps;
 				wrapent[1] = newentIdx;
 			}
