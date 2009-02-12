@@ -27,8 +27,9 @@ public:
 			Ebwt<String<Dna> >* ebwtBw,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
+			RangeCache *cacheFw,
+			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			uint32_t cacheSize,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -37,8 +38,9 @@ public:
 			ebwtBw_(ebwtBw),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
+			cacheFw_(cacheFw),
+			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
-			cacheSize_(cacheSize),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -124,8 +126,7 @@ public:
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(
-					seed_, cacheLimit_, cacheSize_, &ebwtFw_, NULL);
+			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
 		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, drFw, drRc, rchase,
@@ -137,8 +138,9 @@ private:
 	Ebwt<String<Dna> >* ebwtBw_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
+	RangeCache *cacheFw_;
+	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	const uint32_t cacheSize_;
 	vector<String<Dna5> >& os_;
 	bool rangeMode_;
 	bool verbose_;
@@ -166,8 +168,9 @@ public:
 			uint32_t symCeil,
 			uint32_t mixedThresh,
 			uint32_t mixedAttemptLim,
+			RangeCache *cacheFw,
+			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			uint32_t cacheSize,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -184,8 +187,9 @@ public:
 			symCeil_(symCeil),
 			mixedThresh_(mixedThresh),
 			mixedAttemptLim_(mixedAttemptLim),
+			cacheFw_(cacheFw),
+			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
-			cacheSize_(cacheSize),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -328,8 +332,7 @@ public:
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(
-					seed_, cacheLimit_, cacheSize_, &ebwtFw_, ebwtBw_);
+			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
@@ -351,8 +354,9 @@ private:
 	const uint32_t symCeil_;
 	const uint32_t mixedThresh_;
 	const uint32_t mixedAttemptLim_;
+	RangeCache *cacheFw_;
+	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	const uint32_t cacheSize_;
 	vector<String<Dna5> >& os_;
 	const bool rangeMode_;
 	const bool verbose_;

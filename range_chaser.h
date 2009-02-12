@@ -26,9 +26,8 @@ class RangeChaser {
 	typedef RowChaser<TStr> TRowChaser;
 
 public:
-	RangeChaser(uint32_t seed, uint32_t cacheThresh = 0,
-	            uint32_t lim = 0,
-	            TEbwt* ebwtFw = NULL, TEbwt* ebwtBw = NULL) :
+	RangeChaser(uint32_t seed, uint32_t cacheThresh,
+	            RangeCache* cacheFw, RangeCache* cacheBw) :
 		ebwt_(NULL),
 		qlen_(0),
 		cacheThresh_(cacheThresh),
@@ -42,7 +41,7 @@ public:
 		tlen_(0),
 		chaser_(),
 		cached_(false),
-		cacheFw_(lim, ebwtFw), cacheBw_(lim, ebwtBw)
+		cacheFw_(cacheFw), cacheBw_(cacheBw)
 	{ }
 
 	virtual ~RangeChaser() { }
@@ -170,9 +169,9 @@ public:
 		if(spread > cacheThresh_) {
 			bool ret;
 			if(ebwt->fw()) {
-				ret = this->cacheFw_.lookup(top, bot, cacheEnt_);
+				ret = cacheFw_->lookup(top, bot, cacheEnt_);
 			} else {
-				ret = this->cacheBw_.lookup(top, bot, cacheEnt_);
+				ret = cacheBw_->lookup(top, bot, cacheEnt_);
 			}
 			assert_eq(cacheEnt_.valid(), ret);
 			cached_ = ret;
@@ -286,8 +285,8 @@ protected:
 	TRowChaser chaser_;    /// stateful row chaser
 	RangeCacheEntry cacheEnt_; /// current cache entry
 	bool cached_;          /// cacheEnt is active for current range?
-	RangeCache cacheFw_; /// cache for the forward index
-	RangeCache cacheBw_; /// cache for the backward index
+	RangeCache* cacheFw_; /// cache for the forward index
+	RangeCache* cacheBw_; /// cache for the backward index
 };
 
 #endif /* RANGE_CHASER_H_ */

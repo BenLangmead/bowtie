@@ -18,6 +18,7 @@
 #include "pat.h"
 #include "bitset.h"
 #include "threading.h"
+#include "range_cache.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
@@ -1096,13 +1097,16 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
+	RangeCache cacheFw(cacheSize, &ebwt);
+	RangeCache cacheBw(0, NULL);
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
 			_sink,
 			*sinkFact,
+			&cacheFw,
+			&cacheBw,
 			cacheLimit,
-			cacheSize,
 			os,
 			rangeMode,
 			verbose,
@@ -1120,8 +1124,9 @@ static void *exactSearchWorkerStateful(void *vp) {
 			mhits,       // for symCeiling
 			mixedThresh,
 			mixedAttemptLim,
+			&cacheFw,
+			&cacheBw,
 			cacheLimit,
-			cacheSize,
 			os,
 			rangeMode,
 			verbose,
@@ -1416,13 +1421,17 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
+	// Create range caches, which are shared among all aligners
+	RangeCache cacheFw(cacheSize, &ebwtFw);
+	RangeCache cacheBw(cacheSize, &ebwtBw);
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
 			_sink,
 			*sinkFact,
+			&cacheFw,
+			&cacheBw,
 			cacheLimit,
-			cacheSize,
 			os,
 			rangeMode,
 			verbose,
@@ -1440,8 +1449,9 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			mhits,     // for symCeiling
 			mixedThresh,
 			mixedAttemptLim,
+			&cacheFw,
+			&cacheBw,
 			cacheLimit,
-			cacheSize,
 			os,
 			rangeMode,
 			verbose,
