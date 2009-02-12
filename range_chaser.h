@@ -201,7 +201,7 @@ public:
 				return;
 			}
 			setRow(row_);
-			assert(chaser_.prepped_ || done_);
+			assert(chaser_.prepped_ || foundOff() || done_);
 		} else {
 			chaser_.advance();
 			assert(chaser_.prepped_ || chaser_.done());
