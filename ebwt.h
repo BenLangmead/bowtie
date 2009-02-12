@@ -3457,23 +3457,42 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 #endif
 		if(readFromStream) {
 			if(be || offRateDiff > 0) {
-				const uint32_t blockSz = (2 * 1024 * 1024); // 2 MB block size
-				const uint32_t blockSzU32 = blockSz >> 2;
-				char buf[blockSz];
-				for(uint32_t i = 0; i < offsLen; i += blockSzU32) {
-					uint32_t block = min<uint32_t>(blockSzU32, offsLen - i);
+				const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
+				const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
+				char buf[blockMaxSz];
+				for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
+					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
 					_in2.read(buf, block << 2);
 					assert_eq((block << 2), (uint32_t)_in2.gcount());
 					uint32_t idx = i >> offRateDiff;
 					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
 						assert_lt(idx, offsLenSampled);
-						this->_offs[idx++] = ((uint32_t*)buf)[j];
-						if(be) this->_offs[idx] = endianSwapU32(this->_offs[idx]);
+						this->_offs[idx] = ((uint32_t*)buf)[j];
+						if(be != currentlyBigEndian()) {
+							this->_offs[idx] = endianSwapU32(this->_offs[idx]);
+						}
+						idx++;
 					}
 				}
 			} else {
-				_in2.read((char *)this->_offs, offsLen*4);
-				assert_eq(offsLen*4, (uint32_t)_in2.gcount());
+				// If any of the high two bits are set
+				if((offsLen & 0xc0000000) != 0) {
+					if(sizeof(char *) <= 4) {
+						cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
+						exit(1);
+					}
+					// offsLen << 2 overflows, so do it in four reads
+					char *offs = (char *)this->_offs;
+					for(int i = 0; i < 4; i++) {
+						_in2.read(offs, offsLen);
+						assert_eq(offsLen, (uint32_t)_in2.gcount());
+						offs += offsLen;
+					}
+				} else {
+					// Do it all in one read
+					_in2.read((char *)this->_offs, offsLen << 2);
+					assert_eq(offsLen*4, (uint32_t)_in2.gcount());
+				}
 			}
 			if(useShmem) {
 				// I'm the shmem writer - set this flag just off the
