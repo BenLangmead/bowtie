@@ -293,6 +293,7 @@ public:
 	UnpairedAlignerV1(
 		EbwtSearchParams<String<Dna> >* params,
 		TDriver* driverFw, TDriver* driverRc,
+		RangeChaser<String<Dna> >* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
@@ -306,7 +307,7 @@ public:
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
 		params_(params),
-		rchase_(rand_),
+		rchase_(rchase),
 		driverFw_(driverFw),
 		driverRc_(driverRc)
 	{
@@ -320,6 +321,7 @@ public:
 		delete driverFw_; driverFw_ = NULL;
 		delete driverRc_; driverRc_ = NULL;
 		delete params_;   params_   = NULL;
+		delete rchase_;   rchase_   = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -374,16 +376,16 @@ public:
 		if(chaseFw_) {
 			assert(!rangeMode_);
 			assert(driverFw_->foundRange());
-			if(!rchase_.foundOff() && !rchase_.done()) {
-				rchase_.advance();
+			if(!rchase_->foundOff() && !rchase_->done()) {
+				rchase_->advance();
 				return false;
 			}
-			if(rchase_.foundOff()) {
-				done_ = report(driverFw_->range(), rchase_.off().first,
-				               rchase_.off().second, rchase_.tlen(), true);
-				rchase_.reset();
+			if(rchase_->foundOff()) {
+				done_ = report(driverFw_->range(), rchase_->off().first,
+				               rchase_->off().second, rchase_->tlen(), true);
+				rchase_->reset();
 			} else {
-				assert(rchase_.done());
+				assert(rchase_->done());
 				// Forget this range; keep looking for ranges
 				chaseFw_ = false;
 				doneFw_ = driverFw_->done();
@@ -391,16 +393,16 @@ public:
 		} else if(chaseRc_) {
 			assert(!rangeMode_);
 			assert(driverRc_->foundRange());
-			if(!rchase_.foundOff() && !rchase_.done()) {
-				rchase_.advance();
+			if(!rchase_->foundOff() && !rchase_->done()) {
+				rchase_->advance();
 				return false;
 			}
-			if(rchase_.foundOff()) {
-				done_ = report(driverRc_->range(), rchase_.off().first,
-				               rchase_.off().second, rchase_.tlen(), false);
-				rchase_.reset();
+			if(rchase_->foundOff()) {
+				done_ = report(driverRc_->range(), rchase_->off().first,
+				               rchase_->off().second, rchase_->tlen(), false);
+				rchase_->reset();
 			} else {
-				assert(rchase_.done());
+				assert(rchase_->done());
 				// Forget this range; keep looking for ranges
 				chaseRc_ = false;
 				done_ = driverRc_->done();
@@ -415,14 +417,14 @@ public:
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, true);
 					} else {
-						rchase_.setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
-						if(rchase_.foundOff()) {
-							done_ = report(ra, rchase_.off().first,
-							               rchase_.off().second, rchase_.tlen(),
+						rchase_->setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
+						if(rchase_->foundOff()) {
+							done_ = report(ra, rchase_->off().first,
+							               rchase_->off().second, rchase_->tlen(),
 							               true);
-							rchase_.reset();
+							rchase_->reset();
 						}
-						if(!rchase_.done()) {
+						if(!rchase_->done()) {
 							// Keep chasing this range
 							chaseFw_ = true;
 						}
@@ -439,14 +441,14 @@ public:
 					if(rangeMode_) {
 						done_ = report(ra, ra.top, ra.bot, 0, false);
 					} else {
-						rchase_.setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
-						if(rchase_.foundOff()) {
-							done_ = report(ra, rchase_.off().first,
-							               rchase_.off().second, rchase_.tlen(),
+						rchase_->setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
+						if(rchase_->foundOff()) {
+							done_ = report(ra, rchase_->off().first,
+							               rchase_->off().second, rchase_->tlen(),
 							               false);
-							rchase_.reset();
+							rchase_->reset();
 						}
-						if(!rchase_.done()) {
+						if(!rchase_->done()) {
 							// Keep chasing this range
 							chaseRc_ = true;
 						}
@@ -486,7 +488,7 @@ protected:
 	EbwtSearchParams<String<Dna> >* params_;
 
 	// State for getting alignments from ranges statefully
-	RandomScanningRangeChaser<String<Dna> > rchase_;
+	RangeChaser<String<Dna> >* rchase_;
 
 	// Range-finding state
 	TDriver* driverFw_;
@@ -511,6 +513,7 @@ public:
 		TDriver* driver1Fw, TDriver* driver1Rc,
 		TDriver* driver2Fw, TDriver* driver2Rc,
 		RefAligner<String<Dna5> >* refAligner,
+		RangeChaser<String<Dna> >* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
@@ -544,7 +547,7 @@ public:
 		mixedAttemptLim_(mixedAttemptLim),
 		mixedAttempts_(0),
 		fw1_(fw1), fw2_(fw2),
-		rchase_(rand_),
+		rchase_(rchase),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
 		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
@@ -607,6 +610,7 @@ public:
 		delete driver2Fw_; driver2Fw_ = NULL;
 		delete driver2Rc_; driver2Rc_ = NULL;
 		delete params_;    params_    = NULL;
+		delete rchase_;    rchase_    = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -970,16 +974,16 @@ protected:
 			assert(!rangeMode_);
 			assert(!*delayedchaseL_);
 			assert(drL_->foundRange());
-			if(!rchase_.foundOff() && !rchase_.done()) {
+			if(!rchase_->foundOff() && !rchase_->done()) {
 				// Keep trying to resolve the reference loci for
 				// alignments in this range
-				rchase_.advance();
+				rchase_->advance();
 				return;
-			} else if(rchase_.foundOff()) {
+			} else if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				if(!dontReconcile_) {
-					done_ = reconcileAndAdd(rchase_.off(), true /* new entry is from 1 */,
+					done_ = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
 											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
@@ -987,8 +991,8 @@ protected:
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(pairFw, rchase_.off(),
-					                                drL_->curEbwt()->_plen[rchase_.off().first],
+					done_ = resolveOutstandingInRef(pairFw, rchase_->off(),
+					                                drL_->curEbwt()->_plen[rchase_->off().first],
 					                                drL_->range());
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
@@ -996,9 +1000,9 @@ protected:
 						return;
 					}
 				}
-				rchase_.reset();
+				rchase_->reset();
 			} else {
-				assert(rchase_.done());
+				assert(rchase_->done());
 				// Forget this range; keep looking for ranges
 				*chaseL_ = false;
 				if(verbose) cout << "Done with case for first mate" << endl;
@@ -1007,7 +1011,7 @@ protected:
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
 					assert(drR_->foundRange());
 					uint32_t top = drR_->range().top; uint32_t bot = drR_->range().bot;
-					rchase_.setTopBot(top, bot, drR_->qlen(), drR_->curEbwt());
+					rchase_->setTopBot(top, bot, drR_->qlen(), drR_->curEbwt());
 					*chaseR_ = true;
 					*delayedchaseR_ = false;
 				}
@@ -1016,16 +1020,16 @@ protected:
 			assert(!rangeMode_);
 			assert(!*delayedchaseR_);
 			assert(drR_->foundRange());
-			if(!rchase_.foundOff() && !rchase_.done()) {
+			if(!rchase_->foundOff() && !rchase_->done()) {
 				// Keep trying to resolve the reference loci for
 				// alignments in this range
-				rchase_.advance();
+				rchase_->advance();
 				return;
-			} else if(rchase_.foundOff()) {
+			} else if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				if(!dontReconcile_) {
-					done_ = reconcileAndAdd(rchase_.off(), false /* new entry is from 2 */,
+					done_ = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
 											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
@@ -1033,8 +1037,8 @@ protected:
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(!pairFw, rchase_.off(),
-					                                drR_->curEbwt()->_plen[rchase_.off().first],
+					done_ = resolveOutstandingInRef(!pairFw, rchase_->off(),
+					                                drR_->curEbwt()->_plen[rchase_->off().first],
 					                                drR_->range());
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
@@ -1042,9 +1046,9 @@ protected:
 						return;
 					}
 				}
-				rchase_.reset();
+				rchase_->reset();
 			} else {
-				assert(rchase_.done());
+				assert(rchase_->done());
 				// Forget this range; keep looking for ranges
 				*chaseR_ = false;
 				if(verbose) cout << "Done with case for second mate" << endl;
@@ -1053,7 +1057,7 @@ protected:
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
 					assert(drL_->foundRange());
 					uint32_t top = drL_->range().top; uint32_t bot = drL_->range().bot;
-					rchase_.setTopBot(top, bot, drL_->qlen(), drL_->curEbwt());
+					rchase_->setTopBot(top, bot, drL_->qlen(), drL_->curEbwt());
 					*chaseL_ = true;
 					*delayedchaseL_ = false;
 				}
@@ -1112,13 +1116,13 @@ protected:
 							*delayedchaseR_ = false;
 							*delayedchaseL_ = true;
 							*chaseR_ = true;
-							rchase_.setTopBot(drR_->range().top, drR_->range().bot,
+							rchase_->setTopBot(drR_->range().top, drR_->range().bot,
 							                  drR_->qlen(), drR_->curEbwt());
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseL_ = true;
-							rchase_.setTopBot(drL_->range().top, drL_->range().bot,
+							rchase_->setTopBot(drL_->range().top, drL_->range().bot,
 							                  drL_->qlen(), drL_->curEbwt());
 						}
 					}
@@ -1173,14 +1177,14 @@ protected:
 							*delayedchaseL_ = false;
 							*delayedchaseR_ = true;
 							*chaseL_ = true;
-							rchase_.setTopBot(drL_->range().top, drL_->range().bot,
-							                  drL_->qlen(), drL_->curEbwt());
+							rchase_->setTopBot(drL_->range().top, drL_->range().bot,
+							                   drL_->qlen(), drL_->curEbwt());
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseR_ = true;
-							rchase_.setTopBot(drR_->range().top, drR_->range().bot,
-							                  drR_->qlen(), drR_->curEbwt());
+							rchase_->setTopBot(drR_->range().top, drR_->range().bot,
+							                   drR_->qlen(), drR_->curEbwt());
 						}
 					}
 				}
@@ -1245,7 +1249,7 @@ protected:
 	const bool fw2_;
 
 	// State for getting alignments from ranges statefully
-	RandomScanningRangeChaser<String<Dna> > rchase_;
+	RangeChaser<String<Dna> >* rchase_;
 
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;

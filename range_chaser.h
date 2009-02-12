@@ -11,34 +11,6 @@
 #include "row_chaser.h"
 #include "range_cache.h"
 
-/**
- * Abstract parent for classes that report alignments from ranges in a
- * stateful manner.
- */
-template<typename TStr>
-class RangeChaser {
-	typedef Ebwt<TStr> TEbwt;
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-
-public:
-	RangeChaser(uint32_t cacheLim = 0, TEbwt* ebwtFw = NULL, TEbwt* ebwtBw = NULL) :
-		prepped_(false),
-		cacheFw_(cacheLim, ebwtFw), cacheBw_(cacheLim, ebwtBw)
-	{ }
-
-	virtual ~RangeChaser() { }
-	virtual void setTopBot(uint32_t top, uint32_t bot, uint32_t qlen, const TEbwt* ebwt) = 0;
-	virtual bool done() const = 0;
-	virtual void advance() = 0;
-	virtual void prep() = 0;
-	virtual bool foundOff() const = 0;
-	virtual U32Pair off() const = 0;
-	bool prepped_; /// true = prefetch is issued and it's OK to call advance()
-
-protected:
-	RangeCache cacheFw_;
-	RangeCache cacheBw_;
-};
 
 /**
  * A class that statefully processes a range by picking one row
@@ -46,21 +18,21 @@ protected:
  * reporting reference offsets as we go.
  */
 template<typename TStr>
-class RandomScanningRangeChaser : public RangeChaser<TStr> {
+class RangeChaser {
 
 	typedef Ebwt<TStr> TEbwt;
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 	typedef std::vector<U32Pair> U32PairVec;
+	typedef RowChaser<TStr> TRowChaser;
 
 public:
-	RandomScanningRangeChaser(RandomSource& rand, uint32_t cacheThresh = 0,
-	                          uint32_t lim = 0,
-	                          TEbwt* ebwtFw = NULL, TEbwt* ebwtRc = NULL) :
-		RangeChaser<TStr>(lim, ebwtFw, ebwtRc),
+	RangeChaser(uint32_t seed, uint32_t cacheThresh = 0,
+	            uint32_t lim = 0,
+	            TEbwt* ebwtFw = NULL, TEbwt* ebwtBw = NULL) :
 		ebwt_(NULL),
 		qlen_(0),
 		cacheThresh_(cacheThresh),
-		rand_(rand),
+		rand_(seed),
 		top_(0xffffffff),
 		bot_(0xffffffff),
 		irow_(0xffffffff),
@@ -68,10 +40,12 @@ public:
 		done_(false),
 		off_(make_pair(0xffffffff, 0)),
 		tlen_(0),
-		chaser_()
+		chaser_(),
+		cached_(false),
+		cacheFw_(lim, ebwtFw), cacheBw_(lim, ebwtBw)
 	{ }
 
-	virtual ~RandomScanningRangeChaser() { }
+	virtual ~RangeChaser() { }
 
 	/**
 	 * Convert a range to a vector of reference loci, where a locus is
@@ -84,7 +58,7 @@ public:
 	                   uint32_t bot,
 	                   U32PairVec& dest)
 	{
-		RandomScanningRangeChaser rc(ebwt, rand);
+		RangeChaser rc(ebwt, rand);
 		rc.setTopBot(top, bot, qlen);
 		rc.prep();
 		while(!rc.done()) {
@@ -107,7 +81,31 @@ public:
 		assert_geq(row, top_);
 		row_ = row;
 		while(true) {
-			// Set up the chaser
+			// First thing to try is the cache
+			if(cached_) {
+				assert(cacheEnt_.valid());
+				uint32_t cached = cacheEnt_.get(row_ - top_);
+				assert(cacheEnt_.valid());
+				if(cached != RANGE_NOT_SET) {
+					// Assert that it matches what we would have got...
+					ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, row_));
+					assert_eq(sanity, cached);
+					// We have a cached result.  Cached result is in the
+					// form of an offset into the joined reference string,
+					// so now we have to convert it to a tidx/toff pair.
+					ebwt_->joinedToTextOff(qlen_, cached, off_.first, off_.second, tlen_);
+					// Note: tidx may be 0xffffffff, if alignment overlaps a
+					// reference boundary
+					if(off_.first != 0xffffffff) {
+						// Bingo, we found a valid result using the cache
+						assert(foundOff());
+						return;
+					}
+				} else {
+					// Wasn't in the cache; use the RowChaser
+				}
+			}
+			// Second thing to try is the chaser
 			chaser_.setRow(row_, qlen_, ebwt_);
 			assert(chaser_.prepped_ || chaser_.done());
 			// It might be done immediately...
@@ -116,25 +114,31 @@ public:
 				off_ = chaser_.off();
 				if(off_.first != 0xffffffff) {
 					// This is a valid result
+					if(cached_) {
+						// Install the result in the cache
+						assert(cacheEnt_.valid());
+						cacheEnt_.install(row_ - top_, chaser_.flatOff());
+						assert(cacheEnt_.valid());
+					}
 					tlen_ = chaser_.tlen();
 					assert(foundOff());
 					return; // found result
 				}
-				// That row didn't have a valid result, move to the next
-				row_++;
-				if(row_ == bot_) {
-					// Wrap back to top_
-					row_ = top_;
-				}
-				if(row_ == irow_) {
-					// Exhausted all possible rows
-					done_ = true;
-					assert_eq(0xffffffff, off_.first);
-					return;
-				}
 			} else {
 				// Pursue this row
 				break;
+			}
+			// That row didn't have a valid result, move to the next
+			row_++;
+			if(row_ == bot_) {
+				// Wrap back to top_
+				row_ = top_;
+			}
+			if(row_ == irow_) {
+				// Exhausted all possible rows
+				done_ = true;
+				assert_eq(0xffffffff, off_.first);
+				return;
 			}
 		}
 		assert(chaser_.prepped_);
@@ -161,13 +165,19 @@ public:
 		uint32_t spread = bot - top;
 		irow_ = top + (rand_.nextU32() % spread); // initial row
 		done_ = false;
+		cached_ = false;
 		reset();
 		if(spread > cacheThresh_) {
+			bool ret;
 			if(ebwt->fw()) {
-				this->cacheFw_.lookup(top, bot, cacheEnt_);
+				ret = this->cacheFw_.lookup(top, bot, cacheEnt_);
 			} else {
-				this->cacheBw_.lookup(top, bot, cacheEnt_);
+				ret = this->cacheBw_.lookup(top, bot, cacheEnt_);
 			}
+			assert_eq(cacheEnt_.valid(), ret);
+			cached_ = ret;
+		} else {
+			cacheEnt_.reset();
 		}
 		setRow(irow_);
 		assert(chaser_.prepped_ || foundOff() || done_);
@@ -209,6 +219,11 @@ public:
 				// We're done immediately
 				off_ = chaser_.off();
 				if(off_.first != 0xffffffff) {
+					if(cached_) {
+						// Install the result in the cache
+						assert(cacheEnt_.valid());
+						cacheEnt_.install(row_ - top_, chaser_.flatOff());
+					}
 					// Found a reference position
 					tlen_ = chaser_.tlen();
 					assert(foundOff());
@@ -251,7 +266,7 @@ public:
 	/**
 	 * Get the length of the hit reference.
 	 */
-	uint32_t tlen() const {
+	virtual uint32_t tlen() const {
 		return tlen_;
 	}
 
@@ -260,7 +275,7 @@ protected:
 	const TEbwt* ebwt_;    /// index to resolve row in
 	uint32_t qlen_;        /// length of read; needed to convert to ref. coordinates
 	uint32_t cacheThresh_; /// ranges wider than thresh use cacheing
-	RandomSource& rand_;   /// pseudo-random number generator
+	RandomSource rand_;    /// pseudo-random number generator
 	uint32_t top_;         /// range top
 	uint32_t bot_;         /// range bottom
 	uint32_t irow_;        /// initial randomly-chosen row within range
@@ -268,8 +283,11 @@ protected:
 	bool done_;            /// true = chase is done & answer is in off_
 	U32Pair off_;          /// calculated offset (0xffffffff if not done)
 	uint32_t tlen_;        /// length of text hit
-	RowChaser<TStr> chaser_; /// stateful row chaser
+	TRowChaser chaser_;    /// stateful row chaser
 	RangeCacheEntry cacheEnt_; /// current cache entry
+	bool cached_;          /// cacheEnt is active for current range?
+	RangeCache cacheFw_; /// cache for the forward index
+	RangeCache cacheBw_; /// cache for the backward index
 };
 
 #endif /* RANGE_CHASER_H_ */

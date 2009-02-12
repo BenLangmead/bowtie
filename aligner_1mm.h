@@ -27,6 +27,8 @@ public:
 			Ebwt<String<Dna> >* ebwtBw,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
+			uint32_t cacheLimit,
+			uint32_t cacheSize,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -35,6 +37,8 @@ public:
 			ebwtBw_(ebwtBw),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
+			cacheLimit_(cacheLimit),
+			cacheSize_(cacheSize),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -118,8 +122,13 @@ public:
 		drRcVec.push_back(drRc_Fw); drRcVec.push_back(drRc_Bw);
 		TListRangeSrcDr* drRc = new TListRangeSrcDr(drRcVec);
 
+		// Set up a RangeChaser
+		RangeChaser<String<Dna> > *rchase =
+			new RangeChaser<String<Dna> >(
+					seed_, cacheLimit_, cacheSize_, &ebwtFw_, NULL);
+
 		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			params, drFw, drRc,
+			params, drFw, drRc, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
 	}
 
@@ -128,6 +137,8 @@ private:
 	Ebwt<String<Dna> >* ebwtBw_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
+	const uint32_t cacheLimit_;
+	const uint32_t cacheSize_;
 	vector<String<Dna5> >& os_;
 	bool rangeMode_;
 	bool verbose_;
@@ -155,6 +166,8 @@ public:
 			uint32_t symCeil,
 			uint32_t mixedThresh,
 			uint32_t mixedAttemptLim,
+			uint32_t cacheLimit,
+			uint32_t cacheSize,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -171,6 +184,8 @@ public:
 			symCeil_(symCeil),
 			mixedThresh_(mixedThresh),
 			mixedAttemptLim_(mixedAttemptLim),
+			cacheLimit_(cacheLimit),
+			cacheSize_(cacheSize),
 			os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -311,8 +326,13 @@ public:
 
 		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
 
+		// Set up a RangeChaser
+		RangeChaser<String<Dna> > *rchase =
+			new RangeChaser<String<Dna> >(
+					seed_, cacheLimit_, cacheSize_, &ebwtFw_, ebwtBw_);
+
 		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner,
+			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 			mixedAttemptLim_, os_, rangeMode_, verbose_, seed_);
@@ -331,6 +351,8 @@ private:
 	const uint32_t symCeil_;
 	const uint32_t mixedThresh_;
 	const uint32_t mixedAttemptLim_;
+	const uint32_t cacheLimit_;
+	const uint32_t cacheSize_;
 	vector<String<Dna5> >& os_;
 	const bool rangeMode_;
 	const bool verbose_;

@@ -169,6 +169,7 @@ public:
 		assert(ebwt != NULL);
 		ebwt_ = ebwt;
 		top_ = top;
+		jumps_ = jumps;
 		uint32_t *ents = pool.get(ent);
 		// Must not be a wrapper
 		assert_eq(0, ents[0] & 0x80000000);
@@ -222,7 +223,7 @@ public:
 		assert_leq(jumps_, val);
 		if(elt < len_) {
 			val -= jumps_;
-			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 0, top_ + elt));
+			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, val);
 			ents_[elt] = val;
 		} else {
@@ -240,9 +241,9 @@ public:
 		}
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
-		if(elt < len_) {
+		if(elt < len_ && ents_[elt] != RANGE_NOT_SET) {
 			uint32_t ret = ents_[elt] + jumps_;
-			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 0, top_ + elt));
+			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, ret);
 			return ret;
 		} else {
