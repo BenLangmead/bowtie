@@ -559,10 +559,10 @@ public:
 		delayedchaseR_fw_(fw2_ ? delayedChase2Fw_ : delayedChase2Rc_),
 		drL_fw_          (fw1_ ? *driver1Fw_      : *driver1Rc_),
 		drR_fw_          (fw2_ ? *driver2Fw_      : *driver2Rc_),
-		offsL_fw_        (fw1_ ? offs1Fw_         : offs1Rc_),
-		offsR_fw_        (fw2_ ? offs2Fw_         : offs2Rc_),
-		rangesL_fw_      (fw1_ ? ranges1Fw_       : ranges1Rc_),
-		rangesR_fw_      (fw2_ ? ranges2Fw_       : ranges2Rc_),
+		offsLarr_fw_     (fw1_ ? offs1FwArr_      : offs1RcArr_),
+		offsRarr_fw_     (fw2_ ? offs2FwArr_      : offs2RcArr_),
+		rangesLarr_fw_   (fw1_ ? ranges1FwArr_    : ranges1RcArr_),
+		rangesRarr_fw_   (fw2_ ? ranges2FwArr_    : ranges2RcArr_),
 		offsLsz_fw_      (fw1_ ? offs1FwSz_       : offs1RcSz_),
 		offsRsz_fw_      (fw2_ ? offs2FwSz_       : offs2RcSz_),
 
@@ -572,10 +572,10 @@ public:
 		delayedchaseR_rc_(fw1_ ? delayedChase1Rc_ : delayedChase1Fw_),
 		drL_rc_          (fw2_ ? *driver2Rc_      : *driver2Fw_),
 		drR_rc_          (fw1_ ? *driver1Rc_      : *driver1Fw_),
-		offsL_rc_        (fw2_ ? offs2Rc_         : offs2Fw_),
-		offsR_rc_        (fw1_ ? offs1Rc_         : offs1Fw_),
-		rangesL_rc_      (fw2_ ? ranges2Rc_       : ranges2Fw_),
-		rangesR_rc_      (fw1_ ? ranges1Rc_       : ranges1Fw_),
+		offsLarr_rc_     (fw2_ ? offs2RcArr_      : offs2FwArr_),
+		offsRarr_rc_     (fw1_ ? offs1RcArr_      : offs1FwArr_),
+		rangesLarr_rc_   (fw2_ ? ranges2RcArr_    : ranges2FwArr_),
+		rangesRarr_rc_   (fw1_ ? ranges1RcArr_    : ranges1FwArr_),
 		offsLsz_rc_      (fw2_ ? offs2RcSz_       : offs2FwSz_),
 		offsRsz_rc_      (fw1_ ? offs1RcSz_       : offs1FwSz_),
 
@@ -585,10 +585,10 @@ public:
 		delayedchaseR_(&delayedchaseR_fw_),
 		drL_          (&drL_fw_),
 		drR_          (&drR_fw_),
-		offsL_        (&offsL_fw_),
-		offsR_        (&offsR_fw_),
-		rangesL_      (&rangesL_fw_),
-		rangesR_      (&rangesR_fw_),
+		offsLarr_     (offsLarr_fw_),
+		offsRarr_     (offsRarr_fw_),
+		rangesLarr_   (rangesLarr_fw_),
+		rangesRarr_   (rangesRarr_fw_),
 		offsLsz_      (&offsLsz_fw_),
 		offsRsz_      (&offsRsz_fw_),
 		donePair_     (&doneFw_),
@@ -641,10 +641,12 @@ public:
 		delayedChase2Fw_ = false;
 		delayedChase2Rc_ = false;
 		// Clear all intermediate ranges
-		offs1Fw_.clear(); offs1Rc_.clear();
-		offs2Fw_.clear(); offs2Rc_.clear();
-		ranges1Fw_.clear(); ranges1Rc_.clear();
-		ranges2Fw_.clear(); ranges2Rc_.clear();
+		for(size_t i = 0; i < 32; i++) {
+			offs1FwArr_[i].clear();   offs1RcArr_[i].clear();
+			offs2FwArr_[i].clear();   offs2RcArr_[i].clear();
+			ranges1FwArr_[i].clear(); ranges1RcArr_[i].clear();
+			ranges2FwArr_[i].clear(); ranges2RcArr_[i].clear();
+		}
 		offs1FwSz_ = offs1RcSz_ = offs2FwSz_ = offs2RcSz_ = 0;
 		chaseL_        = &chaseL_fw_;
 		chaseR_        = &chaseR_fw_;
@@ -652,10 +654,10 @@ public:
 		delayedchaseR_ = &delayedchaseR_fw_;
 		drL_           = &drL_fw_;
 		drR_           = &drR_fw_;
-		offsL_         = &offsL_fw_;
-		offsR_         = &offsR_fw_;
-		rangesL_       = &rangesL_fw_;
-		rangesR_       = &rangesR_fw_;
+		offsLarr_      = offsLarr_fw_;
+		offsRarr_      = offsRarr_fw_;
+		rangesLarr_    = rangesLarr_fw_;
+		rangesRarr_    = rangesRarr_fw_;
 		offsLsz_       = &offsLsz_fw_;
 		offsRsz_       = &offsRsz_fw_;
 		donePair_      = &doneFw_;
@@ -690,10 +692,10 @@ public:
 			delayedchaseR_ = &delayedchaseR_rc_;
 			drL_           = &drL_rc_;
 			drR_           = &drR_rc_;
-			offsL_         = &offsL_rc_;
-			offsR_         = &offsR_rc_;
-			rangesL_       = &rangesL_rc_;
-			rangesR_       = &rangesR_rc_;
+			offsLarr_      = offsLarr_rc_;
+			offsRarr_      = offsRarr_rc_;
+			rangesLarr_    = rangesLarr_rc_;
+			rangesRarr_    = rangesRarr_rc_;
 			offsLsz_       = &offsLsz_rc_;
 			offsRsz_       = &offsRsz_rc_;
 			donePair_      = &done_;
@@ -810,10 +812,10 @@ protected:
 	 */
 	bool reconcileAndAdd(const U32Pair& h,
 	                     bool newFromL,
-	                     U32PairVec& offsL,
-	                     U32PairVec& offsR,
-	                     TRangeVec& rangesL,
-	                     TRangeVec& rangesR,
+	                     U32PairVec* offsLarr,
+	                     U32PairVec* offsRarr,
+	                     TRangeVec* rangesLarr,
+	                     TRangeVec* rangesRarr,
 		                 TDriver& drL,
 		                 TDriver& drR,
 		                 bool fwL,
@@ -821,6 +823,10 @@ protected:
 		                 bool pairFw,
 		                 bool verbose = false)
 	{
+		U32PairVec& offsL   = offsLarr  [h.first & 31];
+		U32PairVec& offsR   = offsRarr  [h.first & 31];
+		TRangeVec&  rangesL = rangesLarr[h.first & 31];
+		TRangeVec&  rangesR = rangesRarr[h.first & 31];
 		assert_eq(offsL.size(), rangesL.size());
 		assert_eq(offsR.size(), rangesR.size());
 		// For each known hit for the other mate, check if this new
@@ -836,12 +842,10 @@ protected:
 				if(rand == offsDstSz) rand = 0;
 				const U32Pair& h2 = newFromL ? offsR[rand] : offsL[rand];
 				if(h.first == h2.first) {
-					if(verbose) cout << "Found pair on some reference" << endl;
 					// Incoming hit hits same reference as buffered
 					uint32_t left  = newFromL ? h.second : h2.second;
 					uint32_t right = newFromL ? h2.second : h.second;
 					if(right > left) {
-						if(verbose) cout << "...and in right orientation" << endl;
 						uint32_t gap = right - left;
 						if(gap >= minInsert_ && gap <= maxInsert_) {
 							if(verbose) cout << "...and with the right sized gap; reporting" << endl;
@@ -984,7 +988,7 @@ protected:
 				// determined for the other mate
 				if(!dontReconcile_) {
 					done_ = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
-											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
+											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
 				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
@@ -1030,7 +1034,7 @@ protected:
 				// determined for the other mate
 				if(!dontReconcile_) {
 					done_ = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
-											*offsL_, *offsR_, *rangesL_, *rangesR_, *drL_, *drR_,
+											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
 				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
@@ -1254,21 +1258,21 @@ protected:
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;
 	TDriver*      driver1Rc_;
-	U32PairVec    offs1Fw_;
-	TRangeVec     ranges1Fw_;
+	U32PairVec    offs1FwArr_[32];
+	TRangeVec     ranges1FwArr_[32];
 	uint32_t      offs1FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs1Rc_;
-	TRangeVec     ranges1Rc_;
+	U32PairVec    offs1RcArr_[32];
+	TRangeVec     ranges1RcArr_[32];
 	uint32_t      offs1RcSz_; // total size of all ranges found in this category
 
 	// Range-finding state for second mate
 	TDriver*      driver2Fw_;
 	TDriver*      driver2Rc_;
-	U32PairVec    offs2Fw_;
-	TRangeVec     ranges2Fw_;
+	U32PairVec    offs2FwArr_[32];
+	TRangeVec     ranges2FwArr_[32];
 	uint32_t      offs2FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs2Rc_;
-	TRangeVec     ranges2Rc_;
+	U32PairVec    offs2RcArr_[32];
+	TRangeVec     ranges2RcArr_[32];
 	uint32_t      offs2RcSz_; // total size of all ranges found in this category
 
 	bool&       chaseL_fw_;
@@ -1277,10 +1281,10 @@ protected:
 	bool&       delayedchaseR_fw_;
 	TDriver&    drL_fw_;
 	TDriver&    drR_fw_;
-	U32PairVec& offsL_fw_;
-	U32PairVec& offsR_fw_;
-	TRangeVec&  rangesL_fw_;
-	TRangeVec&  rangesR_fw_;
+	U32PairVec* offsLarr_fw_;
+	U32PairVec* offsRarr_fw_;
+	TRangeVec*  rangesLarr_fw_;
+	TRangeVec*  rangesRarr_fw_;
 	uint32_t&   offsLsz_fw_;
 	uint32_t&   offsRsz_fw_;
 
@@ -1290,10 +1294,10 @@ protected:
 	bool&       delayedchaseR_rc_;
 	TDriver&    drL_rc_;
 	TDriver&    drR_rc_;
-	U32PairVec& offsL_rc_;
-	U32PairVec& offsR_rc_;
-	TRangeVec&  rangesL_rc_;
-	TRangeVec&  rangesR_rc_;
+	U32PairVec* offsLarr_rc_;
+	U32PairVec* offsRarr_rc_;
+	TRangeVec*  rangesLarr_rc_;
+	TRangeVec*  rangesRarr_rc_;
 	uint32_t&   offsLsz_rc_;
 	uint32_t&   offsRsz_rc_;
 
@@ -1303,10 +1307,10 @@ protected:
 	bool*       delayedchaseR_;
 	TDriver*    drL_;
 	TDriver*    drR_;
-	U32PairVec* offsL_;
-	U32PairVec* offsR_;
-	TRangeVec*  rangesL_;
-	TRangeVec*  rangesR_;
+	U32PairVec* offsLarr_;
+	U32PairVec* offsRarr_;
+	TRangeVec*  rangesLarr_;
+	TRangeVec*  rangesRarr_;
 	uint32_t*   offsLsz_;
 	uint32_t*   offsRsz_;
 	bool*       donePair_;

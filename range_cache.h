@@ -35,9 +35,9 @@ public:
 	RangeCacheMemPool(uint32_t lim) :
 		lim_(lim), occ_(0), buf_(NULL), closed_(false)
 	{
-		if(lim > 0) {
+		if(lim > 3) {
 			try {
-				buf_ = new uint32_t[lim_];
+				buf_ = new uint32_t[lim_ >> 2];
 				if(buf_ == NULL) throw std::bad_alloc();
 			} catch(std::bad_alloc& e) {
 				cerr << "Allocation error allocating " << lim
@@ -223,11 +223,13 @@ public:
 		assert_leq(jumps_, val);
 		if(elt < len_) {
 			val -= jumps_;
+			if(verbose_) cout << "Installed reference offset: " << (top_ + elt) << endl;
 			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, val);
 			ents_[elt] = val;
 		} else {
 			// ignore install request
+			if(verbose_) cout << "Fell off end of cache entry for install: " << (top_ + elt) << endl;
 		}
 	}
 
@@ -242,11 +244,13 @@ public:
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
 		if(elt < len_ && ents_[elt] != RANGE_NOT_SET) {
+			if(verbose_) cout << "Retrieved result from cache: " << (top_ + elt) << endl;
 			uint32_t ret = ents_[elt] + jumps_;
 			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, ret);
 			return ret;
 		} else {
+			if(verbose_) cout << "Cache entry not set: " << (top_ + elt) << endl;
 			return RANGE_NOT_SET;
 		}
 	}
@@ -276,6 +280,7 @@ private:
 	uint32_t *ents_; /// ptr to entries, which are flat offs within joined ref
 	//U32Pair *ents_;  /// pointer to entries, which are tidx,toff pairs
 	TEbwt    *ebwt_; /// index that alignments are in
+	bool     verbose_; /// be talkative?
 };
 
 /**
