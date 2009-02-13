@@ -471,7 +471,7 @@ protected:
 						uint32_t *newent = pool_.get(newentIdx); // get ptr to it
 						assert_eq(0, newent[0]);
 						newent[0] = 0x80000000 | jumps; // set jumps
-						newent[1] = ents[1];            // set target
+						newent[1] = idx;                // set target
 						assert(map_.find(top) == map_.end());
 						map_[top] = newentIdx;
 						if(sanity_) assert(repOk());
