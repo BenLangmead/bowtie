@@ -510,7 +510,7 @@ static void driver(const string& infile,
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
-		if(!reverse && writeRef) {
+		if(!reverse && (writeRef || justRef)) {
 			string file3 = outfile + ".3.ebwt";
 			string file4 = outfile + ".4.ebwt";
 			BitpairOutFileBuf bpout(file4.c_str());

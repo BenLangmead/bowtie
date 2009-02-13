@@ -32,12 +32,13 @@
  */
 class RangeCacheMemPool {
 public:
-	RangeCacheMemPool(uint32_t lim) :
-		lim_(lim), occ_(0), buf_(NULL), closed_(false)
+	RangeCacheMemPool(uint32_t lim /* max cache size in bytes */) :
+		lim_(lim >> 2 /* convert to words */), occ_(0), buf_(NULL),
+		closed_(false)
 	{
-		if(lim > 3) {
+		if(lim_ > 0) {
 			try {
-				buf_ = new uint32_t[lim_ >> 2];
+				buf_ = new uint32_t[lim_];
 				if(buf_ == NULL) throw std::bad_alloc();
 			} catch(std::bad_alloc& e) {
 				cerr << "Allocation error allocating " << lim
@@ -45,6 +46,9 @@ public:
 				exit(1);
 			}
 			assert(buf_ != NULL);
+			// Fill with 1s to signal that these elements are
+			// uninitialized
+			memset(buf_, 0xff, lim_ << 2 /* convert back to bytes */);
 		}
 	}
 
@@ -64,8 +68,15 @@ public:
 		}
 		assert_gt(lim_, 0);
 		uint32_t ret = occ_;
+		assert(allocs_.find(ret) == allocs_.end());
+		ASSERT_ONLY(allocs_.insert(ret));
 		// Clear the first elt so that we don't think there's already
 		// something there
+#ifndef NDEBUG
+		for(size_t i = 0; i < numElts; i++) {
+			assert_eq(0xffffffff, buf_[occ_ + i]);
+		}
+#endif
 		buf_[occ_] = 0;
 		occ_ += numElts;
 		assert_leq(occ_, lim_);
@@ -83,8 +94,10 @@ public:
 	inline uint32_t *get(uint32_t off) {
 		assert_gt(lim_, 0);
 		assert_lt(off, lim_);
+		assert(allocs_.find(off) != allocs_.end());
 		uint32_t *ret = buf_ + off;
 		assert_neq(0x80000000, ret[0]);
+		assert_neq(0xffffffff, ret[0]);
 		return ret;
 	}
 
@@ -100,6 +113,9 @@ private:
 	uint32_t occ_;  /// number of occupied words
 	uint32_t *buf_; /// buffer of 32-bit words
 	bool closed_;   ///
+#ifndef NDEBUG
+	std::set<uint32_t> allocs_; // elements allocated
+#endif
 };
 
 /**
@@ -115,14 +131,18 @@ public:
 	/**
 	 *
 	 */
-	RangeCacheEntry() :
-		top_(0xffffffff), jumps_(0), len_(0), ents_(NULL), ebwt_(NULL)
+	RangeCacheEntry(bool sanity = false) :
+		top_(0xffffffff), jumps_(0), len_(0), ents_(NULL), ebwt_(NULL),
+		sanity_(sanity)
 	{ }
 
 	/**
 	 * Create a new RangeCacheEntry from the data in the pool at 'ents'.
 	 */
-	RangeCacheEntry(RangeCacheMemPool& pool, uint32_t top, uint32_t ent, TEbwt* ebwt) {
+	RangeCacheEntry(RangeCacheMemPool& pool, uint32_t top,
+	                uint32_t ent, TEbwt* ebwt, bool sanity = false) :
+	    sanity_(sanity)
+	{
 		init(pool, top, ent, ebwt);
 	}
 
@@ -135,7 +155,7 @@ public:
 		ebwt_ = ebwt;
 		uint32_t *ents = pool.get(ent);
 		// Is hi bit set?
-		if(ents[0] & 0x80000000) {
+		if((ents[0] & 0x80000000) != 0) {
 			// If so, the target is a wrapper and the non-hi bits
 			// contain the # jumps
 			jumps_ = (ents[0] & ~0x80000000);
@@ -145,6 +165,7 @@ public:
 			uint32_t *dest = pool.get(ents[1]);
 			// Get the length from the target entry
 			len_ = dest[0];
+			assert_leq(top_ + len_, ebwt_->_eh._len);
 			assert_gt(len_, 0);
 			assert_leq(len_, ebwt_->_eh._len);
 			// Get the pointer to the entries themselves
@@ -154,6 +175,7 @@ public:
 			jumps_ = 0;
 			// Get the length from the target entry
 			len_  = ents[0];
+			assert_leq(top_ + len_, ebwt_->_eh._len);
 			assert_gt(len_, 0);
 			assert_leq(len_, ebwt_->_eh._len);
 			// Get the pointer to the entries themselves
@@ -182,6 +204,7 @@ public:
 		assert_leq(len_, ebwt_->_eh._len);
 		// Get the pointer to the entries themselves
 		ents_ = ents + 1;
+		assert_leq(top_ + len_, ebwt_->_eh._len);
 		assert(sanityCheckEnts());
 	}
 
@@ -211,6 +234,10 @@ public:
 		return ents_ != NULL;
 	}
 
+	TEbwt *ebwt() {
+		return ebwt_;
+	}
+
 	/**
 	 * Install a result obtained by a client of this cache; be sure to
 	 * adjust for how many jumps down the tunnel the cache entry is
@@ -224,11 +251,19 @@ public:
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
 		assert_leq(jumps_, val);
+		assert_neq(0xffffffff, val);
+		assert_leq(top_ + len_, ebwt_->_eh._len);
 		if(elt < len_) {
 			val -= jumps_;
 			if(verbose_) cout << "Installed reference offset: " << (top_ + elt) << endl;
 			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, val);
+#ifndef NDEBUG
+			for(size_t i = 0; i < len_; i++) {
+				if(i == elt) continue;
+				assert_neq(val, ents_[i]);
+			}
+#endif
 			ents_[elt] = val;
 		} else {
 			// ignore install request
@@ -246,6 +281,7 @@ public:
 		}
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
+		assert_leq(top_ + len_, ebwt_->_eh._len);
 		if(elt < len_ && ents_[elt] != RANGE_NOT_SET) {
 			if(verbose_) cout << "Retrieved result from cache: " << (top_ + elt) << endl;
 			uint32_t ret = ents_[elt] + jumps_;
@@ -258,24 +294,40 @@ public:
 		}
 	}
 
-private:
+	/**
+	 * Check that len_ and the ents_ array both make sense.
+	 */
+	static bool sanityCheckEnts(uint32_t len, uint32_t *ents, TEbwt* ebwt) {
+		assert_gt(len, 0);
+		assert_leq(len, ebwt->_eh._len);
+		if(len < 10) {
+			for(size_t i = 0; i < len; i++) {
+				if(ents[i] == 0xffffffff) continue;
+				assert_leq(ents[i], ebwt->_eh._len);
+				for(size_t j = i+1; j < len; j++) {
+					if(ents[j] == 0xffffffff) continue;
+					assert_neq(ents[i], ents[j]);
+				}
+			}
+		} else {
+			std::set<uint32_t> seen;
+			for(size_t i = 0; i < len; i++) {
+				if(ents[i] == 0xffffffff) continue;
+				assert(seen.find(ents[i]) == seen.end());
+				seen.insert(ents[i]);
+			}
+		}
+		return true;
+	}
 
 	/**
 	 * Check that len_ and the ents_ array both make sense.
 	 */
 	bool sanityCheckEnts() {
-		assert_gt(len_, 0);
-		assert_leq(len_, ebwt_->_eh._len);
-		for(size_t i = 0; i < len_; i++) {
-			if(ents_[i] == 0xffffffff) continue;
-			assert_leq(ents_[i], ebwt_->_eh._len);
-			for(size_t j = i+1; j < len_; j++) {
-				if(ents_[j] == 0xffffffff) continue;
-				assert_neq(ents_[i], ents_[j]);
-			}
-		}
-		return true;
+		return RangeCacheEntry::sanityCheckEnts(len_, ents_, ebwt_);
 	}
+
+private:
 
 	uint32_t top_;   /// top pointer for this range
 	uint32_t jumps_; /// how many tunnel-jumps it is away from the requester
@@ -284,6 +336,7 @@ private:
 	//U32Pair *ents_;  /// pointer to entries, which are tidx,toff pairs
 	TEbwt    *ebwt_; /// index that alignments are in
 	bool     verbose_; /// be talkative?
+	bool     sanity_;  /// do consistency checks?
 };
 
 /**
@@ -298,7 +351,7 @@ class RangeCache {
 
 public:
 	RangeCache(uint32_t lim, TEbwt* ebwt) :
-		lim_(lim), map_(), pool_(lim), closed_(false), ebwt_(ebwt) { }
+		lim_(lim), map_(), pool_(lim), closed_(false), ebwt_(ebwt), sanity_(true) { }
 
 	/**
 	 * Given top and bot offsets, retrieve the canonical cache entry
@@ -310,6 +363,7 @@ public:
 	bool lookup(uint32_t top, uint32_t bot, RangeCacheEntry& ent) {
 		if(ebwt_ == NULL || lim_ == 0) return false;
 		assert_gt(bot, top);
+		ent.reset();
 		TMapItr itr = map_.find(top);
 		if(itr == map_.end()) {
 			// No cache entry for the given 'top' offset
@@ -322,7 +376,8 @@ public:
 				}
 			}
 			// Use the tunnel
-			return tunnel(top, bot, ent);
+			bool ret = tunnel(top, bot, ent);
+			return ret;
 		} else {
 			// There is a cache entry for the given 'top' offset
 			uint32_t ret = itr->second;
@@ -331,7 +386,34 @@ public:
 		}
 	}
 
+	/**
+	 * Exhaustively check all entries linked to from map_ to ensure
+	 * they're well-formed.
+	 */
+	bool repOk() {
+#ifndef NDEBUG
+		for(TMapItr itr = map_.begin(); itr != map_.end(); itr++) {
+			uint32_t top = itr->first;
+			uint32_t idx = itr->second;
+			uint32_t jumps = 0;
+			assert_leq(top, ebwt_->_eh._len);
+			uint32_t *ents = pool_.get(idx);
+			if((ents[0] & 0x80000000) != 0) {
+				jumps = ents[0] & ~0x80000000;
+				assert_leq(jumps, ebwt_->_eh._len);
+				idx = ents[1];
+				ents = pool_.get(idx);
+			}
+			uint32_t len = ents[0];
+			assert_leq(top + len, ebwt_->_eh._len);
+			RangeCacheEntry::sanityCheckEnts(len, ents + 1, ebwt_);
+		}
+#endif
+		return true;
+	}
+
 protected:
+
 	/**
 	 * Tunnel through to the first range that 1) includes all the same
 	 * suffixes (though longer) as the given range, and 2) has a cache
@@ -348,7 +430,6 @@ protected:
 		uint32_t jumps = 0;
 		// Walk left through the tunnel
 		while(true) {
-			jumps++;
 			if(ebwt_->rowL(tloc) != ebwt_->rowL(bloc)) {
 				// Different characters at top and bot positions of
 				// BWT; this means that the calls to mapLF below are
@@ -360,6 +441,7 @@ protected:
 			newtop = ebwt_->mapLF(tloc);
 			newbot = ebwt_->mapLF(bloc);
 			assert_geq(newbot, newtop);
+			assert_leq(newbot - newtop, spread);
 			// If the new spread is the same as the old spread, we can
 			// be confident that the new range includes all of the same
 			// suffixes as the last range (though longer by 1 char)
@@ -372,33 +454,28 @@ protected:
 					// entry already, so use that
 					uint32_t idx = itr->second;
 					uint32_t *ents = pool_.get(idx);
+					if((ents[0] & 0x80000000) != 0) {
+						// The cache entry we found was a wrapper; make
+						// a new wrapper that points to that wrapper's
+						// target, with the appropriate number of jumps
+						jumps += (ents[0] & ~0x80000000);
+						idx = ents[1];
+					}
 					// Allocate a new wrapper
 					uint32_t newentIdx = pool_.alloc(2);
 					if(newentIdx != RANGE_CACHE_BAD_ALLOC) {
-						uint32_t *newent = pool_.get(newentIdx);
+						// We successfully made a new wrapper entry;
+						// now populate it and install it in map_
+						uint32_t *newent = pool_.get(newentIdx); // get ptr to it
 						assert_eq(0, newent[0]);
-						if(ents[0] & 0x80000000) {
-							// The cache entry we found was a wrapper; make
-							// a new wrapper that points to that wrapper's
-							// target, with the appropriate number of jumps
-							jumps += (ents[0] & ~0x80000000);
-							newent[0] = 0x80000000 | jumps;
-							newent[1] = ents[1]; // same target
-						} else {
-							// The cache entry we found was a wrapper; make
-							// a new wrapper that points to that wrapper's
-							// target, with the appropriate number of jumps
-							newent[0] = 0x80000000 | jumps;
-							newent[1] = idx;
-						}
-						// Initialize the entry
-						ent.init(pool_, top, newentIdx, ebwt_);
-					} else {
-						// Could not allocate a new entry
-						ent.init(pool_, top, newentIdx, ebwt_);
+						newent[0] = 0x80000000 | jumps; // set jumps
+						newent[1] = ents[1];            // set target
+						assert(map_.find(top) == map_.end());
+						map_[top] = newentIdx;
+						if(sanity_) assert(repOk());
 					}
-					// Cache the entry for 'top'
-					map_.insert(make_pair(top, newentIdx));
+					// Initialize the entry
+					ent.init(pool_, top, jumps, idx, ebwt_);
 					return true;
 				}
 				// Save this range
@@ -412,8 +489,10 @@ protected:
 				// range's cached results
 				break;
 			}
+			jumps++;
 		}
 		assert_eq(tops.size(), bots.size());
+		assert_eq(jumps, bots.size());
 #ifndef NDEBUG
 		for(size_t i = 0; i < tops.size(); i++) {
 			assert_eq(spread, bots[i] - tops[i]);
@@ -426,8 +505,10 @@ protected:
 			// Successfully allocated new range cache entry; install it
 			uint32_t *newent = pool_.get(newentIdx);
 			assert_eq(0, newent[0]);
+			// Store cache-range length in first word
 			newent[0] = spread;
-			memset(&newent[1], 0xff, spread << 2);
+			assert_lt(newent[0], 0x80000000);
+			assert_eq(spread, newent[0]);
 			uint32_t entTop = top;
 			uint32_t jumps = 0;
 			if(tops.size() > 0) {
@@ -435,15 +516,24 @@ protected:
 				jumps = tops.size();
 			}
 			// Cache the entry for the end of the tunnel
-			map_.insert(make_pair(entTop, newentIdx));
+			assert(map_.find(entTop) == map_.end());
+			map_[entTop] = newentIdx;
+			if(sanity_) assert(repOk());
 			ent.init(pool_, entTop, jumps, newentIdx, ebwt_);
-			// Cache a wrapper entry for the query range (if possible)
-			uint32_t wrapentIdx = pool_.alloc(2);
-			if(wrapentIdx != RANGE_CACHE_BAD_ALLOC) {
-				uint32_t *wrapent = pool_.get(wrapentIdx);
-				assert_eq(0, wrapent[0]);
-				wrapent[0] = 0x80000000 | jumps;
-				wrapent[1] = newentIdx;
+			assert_eq(spread, newent[0]);
+			if(jumps > 0) {
+				assert_neq(entTop, top);
+				// Cache a wrapper entry for the query range (if possible)
+				uint32_t wrapentIdx = pool_.alloc(2);
+				if(wrapentIdx != RANGE_CACHE_BAD_ALLOC) {
+					uint32_t *wrapent = pool_.get(wrapentIdx);
+					assert_eq(0, wrapent[0]);
+					wrapent[0] = 0x80000000 | jumps;
+					wrapent[1] = newentIdx;
+					assert(map_.find(top) == map_.end());
+					map_[top] = wrapentIdx;
+					if(sanity_) assert(repOk());
+				}
 			}
 			return true;
 		} else {
@@ -457,6 +547,7 @@ protected:
 	RangeCacheMemPool pool_; /// Memory pool
 	bool closed_;            /// Out of space; no new entries
 	TEbwt* ebwt_;            /// Index that alignments are in
+	bool sanity_;
 };
 
 #endif /* RANGE_CACHE_H_ */

@@ -117,7 +117,8 @@ public:
 						// Install the result in the cache
 						assert(cacheEnt_.valid());
 						cacheEnt_.install(row_ - top_, chaser_.flatOff());
-						assert(cacheEnt_.valid());
+						//if(ebwt_->fw()) assert(cacheFw_->repOk());
+						//else            assert(cacheBw_->repOk());
 					}
 					tlen_ = chaser_.tlen();
 					assert(foundOff());
@@ -170,8 +171,10 @@ public:
 			bool ret;
 			if(ebwt->fw()) {
 				ret = cacheFw_->lookup(top, bot, cacheEnt_);
+				if(ret) assert(cacheEnt_.ebwt()->fw());
 			} else {
 				ret = cacheBw_->lookup(top, bot, cacheEnt_);
+				if(ret) assert(!cacheEnt_.ebwt()->fw());
 			}
 			assert_eq(cacheEnt_.valid(), ret);
 			cached_ = ret;
@@ -222,6 +225,8 @@ public:
 						// Install the result in the cache
 						assert(cacheEnt_.valid());
 						cacheEnt_.install(row_ - top_, chaser_.flatOff());
+						//if(ebwt_->fw()) assert(cacheFw_->repOk());
+						//else            assert(cacheBw_->repOk());
 					}
 					// Found a reference position
 					tlen_ = chaser_.tlen();

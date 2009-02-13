@@ -2,24 +2,25 @@
 #define REFERENCE_H_
 
 /**
- * Abstract parent class for a representation of the reference strings.
- */
-class Reference {
-public:
-	virtual ~Reference() { }
-	virtual void loadStretch(uint8_t *dest, uint32_t tidx, uint32_t toff, uint32_t count) = 0;
-};
-
-/**
  * Concrete reference representation that bulk-loads the reference from
  * the bit-pair-compacted binary file and stores it in memory also in
- * bit-pair-compacted format.
+ * bit-pair-compacted format.  The user may request reference
+ * characters either on a per-character bases or by "stretch" using
+ * getBase(...) and getStretch(...) respectively.
+ *
+ * Most of the complexity in this class is due to the fact that we want
+ * to represent references with ambiguous (non-A/C/G/T) characters but
+ * we don't want to use more than two bits per base.  This means we
+ * need a way to encode the ambiguous stretches of the reference in a
+ * way that is external to the bitpair sequence.  To accomplish this,
+ * we use the RefRecords vector, which is stored in the .3.ebwt index
+ * file.  The bitpairs themselves are stored in the .4.ebwt index file.
  */
 class BitPairReference {
 
 public:
 	/**
-	 * Load from Bowtie index.
+	 * Load from .3.ebwt/.4.ebwt Bowtie index files.
 	 */
 	BitPairReference(const string& in,
 	                 bool sanity = false,
@@ -60,37 +61,43 @@ public:
 		// stretch 8-bit alignment (i.e. count of bytes we need to
 		// allocate in buf_)
 		uint32_t cumsz = 0;
-		// Cumulative offset in reference string
-		uint32_t cumoff = 0;
+		// For each unambiguous stretch...
 		for(uint32_t i = 0; i < sz; i++) {
 			recs_.push_back(RefRecord(f3, swap));
 			if(recs_.back().first) {
 				// Remember that this is the first record for this
-				// reference sequence
+				// reference sequence (and the last record for the one
+				// before)
 				refRecOffs_.push_back(recs_.size()-1);
+				refOffs_.push_back(cumsz);
 				nrefs_++;
-				cumoff = 0;
 			}
-			cumoff += recs_.back().off;
-			refOffs_.push_back(cumoff);
-			cumoff += recs_.back().len;
 			cumsz += recs_.back().len;
 		}
+		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back(recs_.size());
+		refOffs_.push_back(cumsz);
 		assert_eq(sz, recs_.size());
 		fclose(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
 		if((cumsz & 3) != 0) {
 			cumsz += (4 - (cumsz & 3));
 		}
-		assert_eq(0, cumsz & 3);
+		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
 		FILE *f4 = fopen(s4.c_str(), "rb");
+		// Allocate a buffer to hold the whole reference string
 		buf_ = new uint8_t[cumsz >> 2];
+		// Read the whole thing in
 		size_t ret = fread(buf_, 1, cumsz >> 2, f4);
+		// Didn't read all of it?
 		if(ret != (cumsz >> 2)) {
 			cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
 			exit(1);
 		}
+		char c;
+		// Make sure there's no more
+		ret = fread(&c, 1, 1, f4);
+		assert_eq(0, ret); // should have failed
 		fclose(f4);
 #ifndef NDEBUG
 		if(sanity_) {
@@ -106,87 +113,122 @@ public:
 				readSequenceFiles<seqan::String<seqan::Dna5>, seqan::Fasta>(*infiles, os);
 			}
 			for(size_t i = 0; i < os.size(); i++) {
-//				size_t olen = seqan::length(os[i]);
-//				uint8_t *buf = new uint8_t[olen];
-//				loadStretch(buf, i, 0, olen);
-//				for(size_t j = 0; j < olen; j++) {
-//					assert_eq(os[i][j], buf[j]);
-//				}
-//				delete[] buf;
+				size_t olen = seqan::length(os[i]);
+				uint8_t *buf = new uint8_t[olen];
+				getStretch(buf, i, 0, olen);
+				for(size_t j = 0; j < olen; j++) {
+					assert_eq(os[i][j], buf[j]);
+					assert_eq((int)os[i][j], getBase(i, j));
+				}
+				delete[] buf;
 			}
 		}
 #endif
 	}
 
-	virtual ~BitPairReference() {
+	~BitPairReference() {
 		delete[] buf_;
 	}
 
 	/**
-	 * Load a stretch of the reference string into memory at 'dest'.
+	 * Return a single base of the reference.  Calling this repeatedly
+	 * is not an efficient way to retrieve bases from the reference;
+	 * use loadStretch() instead.
+	 *
+	 * This implementation scans linearly through the records for the
+	 * unambiguous stretches of the target reference sequence.  When
+	 * there are many records, binary search would be more appropriate.
 	 */
-	virtual void loadStretch(uint8_t *dest,
-	                         uint32_t tidx,
-	                         uint32_t toff,
-	                         uint32_t count)
+	int getBase(uint32_t tidx, uint32_t toff) {
+		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
+		assert_gt(recf, reci);
+		uint32_t bufOff = refOffs_[tidx];
+		uint32_t off = 0;
+		// For all records pertaining to the target reference sequence...
+		for(uint32_t i = reci; i < recf; i++) {
+			assert_geq(toff, off);
+			off += recs_[i].off;
+			if(toff < off) {
+				return 4;
+			}
+			assert_geq(toff, off);
+			uint32_t recOff = off + recs_[i].len;
+			if(toff < recOff) {
+				toff -= off;
+				bufOff += toff;
+				assert_lt(bufOff, refOffs_[tidx+1]);
+				const uint32_t bufElt = (bufOff) >> 2;
+				assert_lt(bufElt, bufSz_);
+				const uint32_t shift = (bufOff & 3) << 1;
+				return ((buf_[bufElt] >> shift) & 3);
+			}
+			bufOff += recs_[i].len;
+			off = recOff;
+			assert_geq(toff, off);
+		} // end for loop over records
+		return 4;
+	}
+
+	/**
+	 * Load a stretch of the reference string into memory at 'dest'.
+	 *
+	 * This implementation scans linearly through the records for the
+	 * unambiguous stretches of the target reference sequence.  When
+	 * there are many records, binary search would be more appropriate.
+	 */
+	void getStretch(uint8_t *dest,
+	                uint32_t tidx,
+	                uint32_t toff,
+	                uint32_t count)
 	{
-		uint32_t reci = refRecOffs_[tidx];
-		uint32_t recf = refRecOffs_[tidx+1];
+		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
 		uint32_t cur = 0;
+		uint32_t bufOff = refOffs_[tidx];
+		uint32_t off = 0;
+		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
-			if(i < recf-1) {
-				assert_lt(refOffs_[i], refOffs_[i+1]);
+			assert_geq(toff, off);
+			off += recs_[i].off;
+			for(; toff < off && count > 0; toff++) {
+				dest[cur++] = 4;
+				count--;
 			}
-			// Holds the beginning of the stretch?
-			if(refOffs_[i] <= toff && recs_[i].len + refOffs_[i] > toff) {
-
-				//
-				// TODO
-				//
-
-				uint8_t *ptr = buf_;
-				// Calculate offset into this stretch to start capturing
-				uint32_t off = toff - refOffs_[i];
-				// Calculate how much of this stretch to capture
-				uint32_t captureSz = min(count, recs_[i].len - off);
-				uint32_t byOff = off >> 2;
-				uint32_t bpOff = off & 3;
-				uint32_t j = 0;
-				// Do some base-pairs at the beginning
-				//int beginDiff = 4 - (off & 3);
-				for(; bpOff != 0; bpOff++) {
-					dest[cur++] = ptr[byOff];
-
-				}
-				// Do base-pairs in the middle
-				for(; j + 4 < captureSz; j += 4) {
-					dest[cur++] =  ptr[byOff]       & 3;
-					dest[cur++] = (ptr[byOff] >> 2) & 3;
-					dest[cur++] = (ptr[byOff] >> 4) & 3;
-					dest[cur++] = (ptr[byOff] >> 6) & 3;
-					byOff++;
-				}
-				// Do
-				for(; j + 4 < captureSz; j += 4) {
-
-				}
-				assert_leq(captureSz, count);
-				count -= captureSz;
+			if(count == 0) break;
+			assert_geq(toff, off);
+			off += recs_[i].len;
+			for(; toff < off && count > 0; toff++) {
+				assert_lt(bufOff, refOffs_[tidx+1]);
+				const uint32_t bufElt = (bufOff) >> 2;
+				assert_lt(bufElt, bufSz_);
+				const uint32_t shift = (bufOff & 3) << 1;
+				dest[cur++] = (buf_[bufElt] >> shift) & 3;
+				bufOff++;
+				count--;
 			}
+			if(count == 0) break;
+			assert_geq(toff, off);
+		} // end for loop over records
+		// In any chars are left after scanning all the records,
+		// they must be ambiguous
+		while(count > 0) {
+			count--;
+			dest[cur++] = 4;
 		}
+		assert_eq(0, count);
 	}
 
 protected:
-	uint8_t **refs_;
-	std::vector<RefRecord> recs_;
-	std::vector<uint32_t>  refOffs_;
-	std::vector<uint32_t>  refRecOffs_;
-	uint8_t *buf_;   // the whole reference as a big bitpacked byte array
-	uint32_t bufSz_; // size of buf_
-	uint32_t nrefs_; //
-	bool     sanity_;
-	bool     useShmem_;
+	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
+	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
+	std::vector<uint32_t>  refRecOffs_; /// record begin/end offsets per ref seq
+	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
+	uint32_t bufSz_;    /// size of buf_
+	uint32_t nrefs_;    /// the number of reference sequences
+	bool     sanity_;   /// do sanity checking
+	bool     useShmem_; /// put the cache memory in shared memory
 };
 
 #endif
