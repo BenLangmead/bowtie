@@ -154,6 +154,7 @@ public:
 		top_ = top;
 		ebwt_ = ebwt;
 		uint32_t *ents = pool.get(ent);
+		assert_neq(0x80000000, ents[0]);
 		// Is hi bit set?
 		if((ents[0] & 0x80000000) != 0) {
 			// If so, the target is a wrapper and the non-hi bits
@@ -421,7 +422,7 @@ protected:
 	 */
 	bool tunnel(uint32_t top, uint32_t bot, RangeCacheEntry& ent) {
 		assert_gt(bot, top);
-		TU32Vec tops, bots;
+		TU32Vec tops;
 		const uint32_t spread = bot - top;
 		SideLocus tloc, bloc;
 		SideLocus::initFromTopBot(top, bot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
@@ -448,6 +449,7 @@ protected:
 			if((newbot - newtop) == spread) {
 				// Check if newtop is already cached
 				TMapItr itr = map_.find(newtop);
+				jumps++;
 				if(itr != map_.end()) {
 					// This range, which is further to the left in the
 					// same tunnel as the query range, has a cache
@@ -480,7 +482,6 @@ protected:
 				}
 				// Save this range
 				tops.push_back(newtop);
-				bots.push_back(newbot);
 				SideLocus::initFromTopBot(newtop, newbot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
 				SideLocus::prefetchTopBot(tloc, bloc);
 			} else {
@@ -489,15 +490,9 @@ protected:
 				// range's cached results
 				break;
 			}
-			jumps++;
+			assert_eq(jumps, tops.size());
 		}
-		assert_eq(tops.size(), bots.size());
-		assert_eq(jumps, bots.size());
-#ifndef NDEBUG
-		for(size_t i = 0; i < tops.size(); i++) {
-			assert_eq(spread, bots[i] - tops[i]);
-		}
-#endif
+		assert_eq(jumps, tops.size());
 		// Try to create a new cache entry for the leftmost range in
 		// the tunnel (which might be the query range)
 		uint32_t newentIdx = pool_.alloc(spread + 1);
