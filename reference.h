@@ -107,6 +107,13 @@ public:
 			std::vector<seqan::String<seqan::Dna5> > os; // for holding references
 			if(infilesSeq) {
 				for(size_t i = 0; i < infiles->size(); i++) {
+					// Remove initial backslash; that's almost
+					// certainly being used to protect the first
+					// character of the sequence from getopts (e.g.,
+					// when the first char is -)
+					if((*infiles)[i].at(0) == '\\') {
+						(*infiles)[i].erase(0, 1);
+					}
 					os.push_back(String<Dna5>((*infiles)[i]));
 				}
 			} else {
