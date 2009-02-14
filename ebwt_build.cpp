@@ -47,8 +47,8 @@ static bool    useBsearch    = true;
 static bool    nsToAs        = false;
 static bool    autoMem       = true;
 static bool    packed        = false;
-static bool    writeRef      = false;
-static bool    justRef       = false;
+static bool    writeRef      = true;  // write compact reference to .3.ebwt/.4.ebwt
+static bool    justRef       = false; // *just* write compact reference, don't index
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -78,7 +78,8 @@ static void printUsage(ostream& out) {
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable diff-cover (algorithm becomes quadratic)" << endl
-	    << "    --justref/-3            just build .3.ebwt (reference) portion of the index" << endl
+	    << "    --noref/-r              don't build .3/.4.ebwt (packed reference) portion" << endl
+	    << "    --justref/-3            just build .3/.4.ebwt (packed reference) portion" << endl
 	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
@@ -336,7 +337,7 @@ static struct option long_options[] = {
 	{"ntoa",         no_argument,       0,            ARG_NTOA},
 	{"oldpmap",      no_argument,       0,            ARG_PMAP},
 	{"justref",      no_argument,       0,            '3'},
-	{"writeref",     no_argument,       0,            'r'},
+	{"noref",        no_argument,       0,            'r'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -437,7 +438,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'a': autoMem = false; break;
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
-	   		case 'r': writeRef = true; break;
+	   		case 'r': writeRef = false; break;
 
 			case -1: /* Done with options. */
 				break;
