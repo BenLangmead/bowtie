@@ -1479,6 +1479,7 @@ public:
 	 */
 	ConciseHitSink(
 			ostream&           __out,
+			int                offBase,
 			const std::string& dumpUnalFa,
 			const std::string& dumpUnalFq,
 			const std::string& dumpMaxFa,
@@ -1488,7 +1489,8 @@ public:
 		HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
 		_first(true),
-		_numReported(0llu) { }
+		_numReported(0llu),
+		offBase_(offBase) { }
 
 	/**
 	 * Construct a multi-stream ConciseHitSink with one stream per
@@ -1496,6 +1498,7 @@ public:
 	 */
 	ConciseHitSink(
 	        size_t             __numOuts,
+	        int                offBase,
 			const std::string& dumpUnalFa,
 			const std::string& dumpUnalFq,
 			const std::string& dumpMaxFa,
@@ -1505,15 +1508,16 @@ public:
 		HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
 		_first(true),
-		_numReported(0llu) { }
+		_numReported(0llu),
+		offBase_(offBase) { }
 
 	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
-	static void append(ostream& ss, const Hit& h, bool reportOpps) {
+	static void append(ostream& ss, const Hit& h, int offBase, bool reportOpps) {
 		ss << h.patId << (h.fw? "+" : "-") << ":";
     	// .first is text id, .second is offset
-		ss << "<" << h.h.first << "," << h.h.second << "," << h.mms.count();
+		ss << "<" << h.h.first << "," << (h.h.second + offBase) << "," << h.mms.count();
 		if(reportOpps) ss << "," << h.oms;
 		ss << ">" << endl;
 	}
@@ -1522,7 +1526,7 @@ public:
 	 * Append a verbose, readable hit to the given output stream.
 	 */
 	void append(ostream& ss, const Hit& h) {
-		ConciseHitSink::append(ss, h, this->_reportOpps);
+		ConciseHitSink::append(ss, h, this->offBase_, this->_reportOpps);
 	}
 
 	/**
@@ -1581,6 +1585,9 @@ private:
 	bool     _reportOpps;
 	bool     _first;       /// true -> first hit hasn't yet been reported
 	uint64_t _numReported;
+	int      offBase_;     /// Add this to reference offsets before outputting.
+	                       /// (An easy way to make things 1-based instead of
+	                       /// 0-based)
 };
 
 /**
@@ -1593,6 +1600,7 @@ public:
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
 	VerboseHitSink(ostream&           __out,
+	               int                offBase,
 	               const std::string& dumpUnalFa,
 	               const std::string& dumpUnalFq,
 	               const std::string& dumpMaxFa,
@@ -1602,13 +1610,16 @@ public:
 	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 	_first(true),
 	_numReported(0llu),
-	_partition(__partition) { }
+	_partition(__partition),
+	offBase_(offBase)
+	{ }
 
 	/**
 	 * Construct a multi-stream VerboseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
 	VerboseHitSink(size_t          __numOuts,
+	               int                offBase,
 	               const std::string& dumpUnalFa,
 	               const std::string& dumpUnalFq,
 	               const std::string& dumpMaxFa,
@@ -1618,7 +1629,9 @@ public:
 	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 	_first(true),
 	_numReported(0llu),
-	_partition(__partition) { }
+	_partition(__partition),
+	offBase_(offBase)
+	{ }
 
 	/**
 	 * Given a line of output from the VerboseHitSink, parse it into a
@@ -1861,7 +1874,8 @@ public:
 	static void append(ostream& ss,
 	                   const Hit& h,
 	                   const vector<string>* refnames,
-	                   int partition)
+	                   int partition,
+	                   int offBase)
 	{
 		bool spill = false;
 		int spillAmt = 0;
@@ -1913,7 +1927,7 @@ public:
 			} else {
 				ss << h.h.first;
 			}
-			ss << "\t" << h.h.second;
+			ss << "\t" << (h.h.second + offBase);
 			ss << "\t" << h.patSeq;
 			ss << "\t" << h.quals;
 			ss << "\t" << h.oms;
@@ -1947,7 +1961,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, this->_refnames, this->_partition);
+		VerboseHitSink::append(ss, h, this->_refnames, this->_partition, this->offBase_);
 	}
 
 
@@ -2012,6 +2026,9 @@ private:
 	bool     _first;       /// true iff this object hasn't yet reported a hit
 	uint64_t _numReported; /// number of hits reported
 	int      _partition;   /// partition size, or 0 if partitioning is disabled
+	int      offBase_;     /// Add this to reference offsets before outputting.
+	                       /// (An easy way to make things 1-based instead of
+	                       /// 0-based)
 };
 
 /**
@@ -2024,6 +2041,7 @@ public:
 	 * Construct a single-stream BinaryHitSink (default)
 	 */
 	BinaryHitSink(ostream&           __out,
+	              int                offBase,
 	              const std::string& dumpUnalFa,
 	              const std::string& dumpUnalFq,
 	              const std::string& dumpMaxFa,
@@ -2037,6 +2055,7 @@ public:
 	 * reference string (see --refout)
 	 */
 	BinaryHitSink(size_t             __numOuts,
+	              int                offBase,
 	              const std::string& dumpUnalFa,
 	              const std::string& dumpUnalFq,
 	              const std::string& dumpMaxFa,
@@ -2051,7 +2070,8 @@ public:
 	 */
 	static void append(ostream& o,
 					   const Hit& h,
-					   const vector<string>* refnames)
+					   const vector<string>* refnames,
+					   int offBase)
 	{
 		// true iff we're going to print the reference sequence name
 		bool refName = refnames != NULL &&
@@ -2074,7 +2094,8 @@ public:
 			o.write((const char *)&h.h.first, 4);
 		}
 		// Write reference offset
-		o.write((const char *)&h.h.second, 4);
+		uint32_t offset = h.h.second + offBase;
+		o.write((const char *)&offset, 4);
 		// Write pattern sequence
 		uint16_t plen = (uint16_t)length(h.patSeq);
 		o.write((const char *)&plen, 2);
@@ -2119,7 +2140,7 @@ public:
 	 * the reference sequence involved.
 	 */
 	void append(ostream& o, const Hit& h) {
-		BinaryHitSink::append(o, h, this->_refnames);
+		BinaryHitSink::append(o, h, this->_refnames, this->offBase_);
 	}
 
 	/**
@@ -2331,6 +2352,9 @@ public:
 private:
 	bool _first;           /// true iff this object hasn't yet reported a hit
 	uint64_t _numReported; /// number of hits reported
+	int offBase_;          /// Add this to reference offsets before outputting.
+                           /// (An easy way to make things 1-based instead of
+                           /// 0-based)
 };
 
 /**

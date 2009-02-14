@@ -169,30 +169,44 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		//const uint32_t rlen = seqan::length(ref);
 		assert_geq(end - begin, qlen); // caller should have checked this
-		//assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
-		for(uint32_t i = begin; i <= end - qlen; i++) {
-			uint32_t ri = i - begin;
+		uint32_t qend = end - qlen;
+		uint32_t lim = qend - begin;
+		uint32_t halfway = begin + (lim >> 1);
+		bool hi = false;
+		for(uint32_t i = 1; i <= lim+1; i++) {
+			uint32_t ri;  // leftmost position in candidate alignment
+			uint32_t rir; // same, minus begin; for indexing into ref[]
+			if(hi) {
+				ri = halfway + (i >> 1); rir = ri - begin;
+				assert_leq(ri, qend);
+			} else {
+				ri = halfway - (i >> 1); rir = ri - begin;
+				assert_geq(ri, begin);
+			}
+			hi = !hi;
+			// Do the naive comparison
 			bool match = true;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[ri + j], 4);
-				if(qry[j] != ref[ri + j]) {
+				assert_lt((int)ref[rir + j], 4);
+				if(qry[j] != ref[rir + j]) {
+					// Mismatch
 					match = false;
 					break;
 				}
+				// Match; continue
 	 		}
 			if(match) {
 				range.stratum = 0;
 				range.numMms = 0;
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
-				return i;
+				return ri;
 			}
 		}
-		return 0xffffffff;
+		return 0xffffffff; // no match
 	}
 
 	/**
@@ -207,9 +221,7 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		//ASSERT_ONLY(const uint32_t rlen = seqan::length(ref));
 		assert_geq(end - begin, qlen); // caller should have checked this
-		//assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
@@ -219,10 +231,12 @@ protected:
 			naive = naiveFindOne(ref, qry, quals, begin, end, r2);
 		}
 #endif
-		uint32_t seedBitPairs = min<int>(qlen, 32);
-		uint32_t seedOverhang = qlen <= 32 ? 0 : qlen - 32;
+		const uint32_t seedBitPairs = min<int>(qlen, 32);
+		const uint32_t seedOverhang = qlen <= 32 ? 0 : qlen - 32;
+		const uint32_t lim = end - qlen - begin;
+		const uint32_t halfway = begin + (lim >> 1);
 		uint64_t seed = 0llu;
-		uint64_t buf = 0llu;
+		uint64_t buffw = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
 		// to discard bits that were rotated out of the seed area
 		uint64_t clearMask = 0xffffffffffffffffllu;
@@ -231,62 +245,99 @@ protected:
 			clearMask >>= ((32-seedBitPairs) << 1);
 			useMask = true;
 		}
+		const int lhsShift = ((seedBitPairs - 1) << 1);
+		// Build the contents of the 'seed' dword and the initial
+		// contents of the 'buffw' dword.  If there are fewer than 32
+		// seedBitPairs, the content will be packed into the least
+		// significant bits of the word.
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
-			int r = (int)ref[i]; // next reference character
+			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(c == 4) {
 				assert_eq(0xffffffff, naive);
 				return 0xffffffff;   // can't match if query has Ns
 			}
 			assert_lt(c, 4);
-			seed = ((seed << 2llu) | c);
-			buf  = ((buf  << 2llu) | r);
+			seed  = ((seed  << 2llu) | c);
+			buffw = ((buffw << 2llu) | r);
 		}
-		buf >>= 2;
+		// Check whether read is disqualified by Ns outside of the seed
+		// region
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				assert_eq(0xffffffff, naive);
 				return 0xffffffff; // can't match if query has Ns
 			}
 		}
-		const uint32_t lim = end - seedOverhang;
-		// We're moving the right-hand edge of the seed along
-		for(uint32_t i = begin + (seedBitPairs-1); i < lim; i++) {
-			uint32_t ri = i - begin;
-			const int r = (int)ref[ri];
-			assert_lt(r, 4);
-			buf = ((buf << 2llu) | r);
-			if(useMask) buf &= clearMask;
-			if(buf != seed) {
-				assert_neq(i - seedBitPairs + 1, naive);
-				continue;
+		uint64_t bufbw = buffw;
+		// We're moving the right-hand edge of the seed along until
+		// it's 'seedOverhang' chars from the end of the target region.
+		// Note that we're not making a 3'/5' distinction here; if we
+		// were, we might need to make the 'seedOverhang' adjustment on
+		// the left end of the range rather than the right.
+		bool hi = false;
+		for(uint32_t i = 1; i <= lim + 1; i++) {
+			uint32_t ri; // leftmost position in proposed alignment
+			uint32_t rir;// same, but minus 'begin'
+			int r;       // new reference char
+			if(hi) {
+				// Moving left-to-right
+				ri = halfway + (i >> 1); rir = ri - begin;
+				r = (int)ref[rir + seedBitPairs - 1];
+				assert_lt(r, 4);
+				// Bring in new base pair at the least significant
+				// position
+				buffw = ((buffw << 2llu) | r);
+				if(useMask) buffw &= clearMask;
+				hi = false;
+				if(buffw != seed) {
+					// We're about to reject; make sure naive algorithm
+					// also rejected
+					assert_neq(ri, naive);
+					continue;
+				}
+			} else {
+				// Moving right-to-left
+				ri = halfway - (i >> 1); rir = ri - begin;
+				if(i >= 2) {
+					r = (int)ref[rir];
+					assert_lt(r, 4);
+					bufbw >>= 2llu;
+					// Bring in new base pair at the most significant
+					// position
+					bufbw |= (r << lhsShift);
+				}
+				hi = true;
+				if(bufbw != seed) {
+					// We're about to reject; make sure naive algorithm
+					// also rejected
+					assert_neq(ri, naive);
+					continue;
+				}
 			}
 			// Seed hit!
-			if(seedOverhang == 0) {
-				uint32_t ret = i - seedBitPairs + 1;
-				assert_eq(ret, naive);
-				range.stratum = 0;
-				range.numMms = 0;
-				assert_eq(0, range.mms.size());
-				assert_eq(0, range.refcs.size());
-				return ret;
-			}
 			bool foundHit = true;
-			for(uint32_t j = 0; j < seedOverhang; j++) {
-				assert_lt(i+1+j, end);
-				if((int)qry[32+j] != (int)ref[ri + 1 + j]) {
-					foundHit = false;
-					break;
+			if(seedOverhang > 0) {
+				// Does the non-seed part of the alignment (the
+				// "overhang") ruin it?
+				for(uint32_t j = 0; j < seedOverhang; j++) {
+					assert_lt(ri + seedBitPairs + j, end);
+					if((int)qry[32 + j] != (int)ref[rir + seedBitPairs + j]) {
+						// Yes, overhang ruins it
+						foundHit = false;
+						break;
+					}
 				}
 			}
 			if(foundHit) {
-				uint32_t ret = i - seedBitPairs + 1;
-				assert_eq(ret, naive);
+				assert_eq(ri, naive);
 				range.stratum = 0;
 				range.numMms = 0;
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
-				return ret;
+				return ri;
+			} else {
+				// Keep scanning
 			}
 		}
 		assert_eq(0xffffffff, naive);
@@ -366,20 +417,34 @@ protected:
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
-		for(uint32_t i = begin; i <= end - qlen; i++) {
-			uint32_t ri = i - begin;
+		uint32_t qend = end - qlen;
+		uint32_t lim = qend - begin;
+		uint32_t halfway = begin + (lim >> 1);
+		bool hi = false;
+		for(uint32_t i = 1; i <= lim+1; i++) {
+			uint32_t ri;  // leftmost position in candidate alignment
+			uint32_t rir; // same, minus begin; for indexing into ref[]
+			if(hi) {
+				ri = halfway + (i >> 1); rir = ri - begin;
+				assert_leq(ri, qend);
+			} else {
+				ri = halfway - (i >> 1); rir = ri - begin;
+				assert_geq(ri, begin);
+			}
+			hi = !hi;
+			// Do the naive comparison
 			bool match = true;
-			int mms = 0;
-			int mmOff = -1;
 			int refc = -1;
+			uint32_t mmOff = 0xffffffff;
+			int mms = 0;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[ri + j], 4);
-				if(qry[j] != ref[ri + j]) {
+				assert_lt((int)ref[rir + j], 4);
+				if(qry[j] != ref[rir + j]) {
 					if(++mms > 1) {
 						match = false;
 						break;
 					} else {
-						refc = "ACGT"[(int)ref[ri + j]];
+						refc = "ACGT"[(int)ref[rir + j]];
 						mmOff = j;
 					}
 				}
@@ -391,10 +456,11 @@ protected:
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
 				if(mms == 1) {
+					assert_lt(mmOff, qlen);
 					range.mms.push_back(mmOff);
 					range.refcs.push_back(refc);
 				}
-				return i;
+				return ri;
 			}
 		}
 		return 0xffffffff;
@@ -416,6 +482,7 @@ protected:
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
+		// Get results from the naive matcher for sanity-checking
 		uint32_t naive;
 		int naiveNumMms;
 		int naiveMmsOff = -1;
@@ -432,10 +499,13 @@ protected:
 		}
 #endif
 		const uint32_t seedBitPairs = min<int>(qlen, 32);
+		const int lhsShift = ((seedBitPairs - 1) << 1);
 		const uint32_t seedCushion  = 32 - seedBitPairs;
 		const uint32_t seedOverhang = (qlen <= 32 ? 0 : (qlen - 32));
+		const uint32_t lim = end - qlen - begin;
+		const uint32_t halfway = begin + (lim >> 1);
 		uint64_t seed = 0llu;
-		uint64_t buf = 0llu;
+		uint64_t buffw = 0llu;
 		// OR the 'diff' buffer with this so that we can always count
 		// 'N's as mismatches
 		uint64_t diffMask = 0llu;
@@ -453,7 +523,7 @@ protected:
 		// the first 'seedBitPairs' bit pairs of the query.
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
-			int r = (int)ref[i]; // next reference character
+			int r = (int)ref[halfway - begin + i]; // next reference character
 			assert_leq(c, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
@@ -470,10 +540,11 @@ protected:
 			} else {
 				diffMask <<= 2llu;
 			}
-			seed = ((seed << 2llu) | c);
-			buf  = ((buf  << 2llu) | r);
+			seed  = ((seed  << 2llu) | c);
+			buffw = ((buffw << 2llu) | r);
 		}
-		buf >>= 2;
+		// Check whether read is disqualified by Ns outside of the seed
+		// region
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				if(++nsInSeed > 1) {
@@ -482,15 +553,43 @@ protected:
 				}
 			}
 		}
-		const uint32_t lim = end - seedOverhang;
-		// We're moving the right-hand edge of the seed along
-		for(uint32_t i = begin + (seedBitPairs-1); i < lim; i++) {
-			uint32_t ri = i - begin;
-			const int r = (int)ref[ri];
-			assert_lt(r, 4);
-			buf = ((buf << 2llu) | r);
-			if(useMask) buf &= clearMask;
-			uint64_t diff = (buf ^ seed) | diffMask;
+		uint64_t bufbw = buffw;
+		// We're moving the right-hand edge of the seed along until
+		// it's 'seedOverhang' chars from the end of the target region.
+		// Note that we're not making a 3'/5' distinction here; if we
+		// were, we might need to make the 'seedOverhang' adjustment on
+		// the left end of the range rather than the right.
+		bool hi = false;
+		for(uint32_t i = 1; i <= lim + 1; i++) {
+			uint32_t ri; // leftmost position in proposed alignment
+			uint32_t rir;// same, but minus 'begin'
+			int r;       // new reference char
+			uint64_t diff;
+			if(hi) {
+				// Moving left-to-right
+				ri = halfway + (i >> 1); rir = ri - begin;
+				r = (int)ref[rir + seedBitPairs - 1];
+				assert_lt(r, 4);
+				// Bring in new base pair at the least significant
+				// position
+				buffw = ((buffw << 2llu) | r);
+				if(useMask) buffw &= clearMask;
+				hi = false;
+				diff = (buffw ^ seed) | diffMask;
+			} else {
+				// Moving right-to-left
+				ri = halfway - (i >> 1); rir = ri - begin;
+				if(i >= 2) {
+					r = (int)ref[rir];
+					assert_lt(r, 4);
+					bufbw >>= 2llu;
+					// Bring in new base pair at the most significant
+					// position
+					bufbw |= (r << lhsShift);
+				}
+				hi = true;
+				diff = (bufbw ^ seed) | diffMask;
+			}
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
 			int mmpos = -1;
@@ -499,7 +598,7 @@ protected:
 			// the first and last parts of the seed
 			int diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
 			if(diffs > 1) {
-				assert_neq(i - seedBitPairs + 1, naive);
+				assert_neq(ri, naive);
 				continue;
 			}
 			diffs += u8toMms[(int)diff8[1]] +
@@ -509,11 +608,14 @@ protected:
 			         u8toMms[(int)diff8[5]] +
 			         u8toMms[(int)diff8[6]];
 			if(diffs > 1) {
-				assert_neq(i - seedBitPairs + 1, naive);
+				assert_neq(ri, naive);
+				// Too many differences
 				continue;
 			} else if(diffs == 1 && nPos != -1) {
+				// There was one difference, but there was also one N,
+				// so we already know where the difference is
 				mmpos = nPos;
-				refc = "ACGT"[(int)ref[ri - seedBitPairs + nPos + 1]];
+				refc = "ACGT"[(int)ref[rir + nPos]];
 #ifndef NDEBUG
 				if(naiveNumMms == 1) {
 					assert_eq(mmpos, naiveMmsOff);
@@ -536,7 +638,7 @@ protected:
 				assert_geq(mmpos, 0);
 				assert_lt(mmpos, 32);
 				mmpos -= seedCushion;
-				refc = "ACGT"[(int)ref[ri - seedBitPairs + mmpos + 1]];
+				refc = "ACGT"[(int)ref[rir + mmpos]];
 #ifndef NDEBUG
 				if(naiveNumMms == 1) {
 					assert_eq(mmpos, naiveMmsOff);
@@ -544,45 +646,25 @@ protected:
 				}
 #endif
 			}
-			// There's nothing else to match beyond the seed, so this
-			// is a seed hit!
-			if(seedOverhang == 0) {
-				uint32_t ret = i - seedBitPairs + 1;
-				assert(diffs <= 1);
-				assert_eq(ret, naive);
-				assert_eq(diffs, naiveNumMms);
-				range.stratum = diffs;
-				range.numMms = diffs;
-				assert_eq(0, range.mms.size());
-				assert_eq(0, range.refcs.size());
-				if(diffs == 1) {
-					assert_geq(mmpos, 0);
-					assert_eq(mmpos, naiveMmsOff);
-					assert_neq(-1, refc);
-					assert_eq(refc, naiveRefc);
-					range.mms.push_back(mmpos);
-					range.refcs.push_back(refc);
-				}
-				return ret;
-			}
 			// Now extend the seed into a longer alignment
 			bool foundHit = true;
-			for(uint32_t j = 0; j < seedOverhang; j++) {
-				assert_lt(i+1+j, end);
-				if((int)qry[32+j] != (int)ref[ri + 1 + j]) {
-					if(++diffs > 1) {
-						foundHit = false;
-						break;
-					} else {
-						mmpos = 32+j;
-						refc = "ACGT"[(int)ref[ri + 1 + j]];
+			if(seedOverhang > 0) {
+				assert_leq(ri + seedBitPairs + seedOverhang, end);
+				for(uint32_t j = 0; j < seedOverhang; j++) {
+					if((int)qry[32 + j] != (int)ref[rir + 32 + j]) {
+						if(++diffs > 1) {
+							foundHit = false;
+							break;
+						} else {
+							mmpos = 32 + j;
+							refc = "ACGT"[(int)ref[rir + 32 + j]];
+						}
 					}
 				}
 			}
 			if(!foundHit) continue;
-			uint32_t ret = i - seedBitPairs + 1;
 			assert(diffs <= 1);
-			assert_eq(ret, naive);
+			assert_eq(ri, naive);
 			assert_eq(diffs, naiveNumMms);
 			range.stratum = diffs;
 			range.numMms = diffs;
@@ -596,7 +678,7 @@ protected:
 				range.mms.push_back(mmpos);
 				range.refcs.push_back(refc);
 			}
-			return ret;
+			return ri;
 		}
 		assert_eq(0xffffffff, naive);
 		return 0xffffffff; // no hit

@@ -536,7 +536,7 @@ static void driver(const string& infile,
 			fout3.close();
 #ifndef NDEBUG
 			if(sanityCheck) {
-				BitPairReference bpr(outfile, true, &infiles, format == CMDLINE);
+				BitPairReference bpr(outfile, true, &infiles, NULL, format == CMDLINE);
 			}
 #endif
 		} else {

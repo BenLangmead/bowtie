@@ -101,10 +101,11 @@ static uint32_t mixedThresh     = 4;     // threshold for when to switch to pair
 static uint32_t mixedAttemptLim = 5;     // number of attempts to make in "mixed mode" before giving up on orientation
 static bool dontReconcileMates  = false; // suppress pairwise all-versus-all way of resolving mates
 static uint32_t cacheLimit      = 5;     // ranges w/ size > limit will be cached
-static uint32_t cacheSize       = 2 * 1024 * 1024; // # words per range cache
+static uint32_t cacheSize       = 0;     // # words per range cache
+static int offBase              = 0;     // offsets are 0-based by default, but configurable
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:";
 
 enum {
 	ARG_ORIG = 256,
@@ -230,6 +231,7 @@ static struct option long_options[] = {
 	{"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
 	{"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
 	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
+	{"offbase",      required_argument, 0,            'B'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -237,20 +239,15 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie [options]* [-1 <mates1> -2 <mates2>] <ebwt> <reads> [<hits>]" << endl
+	out << "Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]" << endl
+	    << "  <ebwt>    base filename for index files (minus trailing .1.ebwt/.2.ebwt/etc.)" << endl
 	    << "  <mates1>  comma-separated list of files containing upstream mates (or the" << endl
 	    << "            sequences themselves, if -c is set) paired with mates in <mates2>" << endl
 	    << "  <mates2>  comma-separated list of files containing downstream mates (or" << endl
 	    << "            sequences themselves if -c is set) paired with mates in <mates1>" << endl
-	    << "  <reads>   comma-separated list of files containing unpaired reads, or" << endl
-	    << "            sequences themselves, if -c is set; specify \"-\" for stdin" << endl
-	    << "  <ebwt>    index filename minus trailing .1.ebwt/.2.ebwt" << endl
+	    << "  <singles> comma-separated list of files containing unpaired reads, or the" << endl
+	    << "            sequences themselves, if -c is set; \"-\" = stdin" << endl
 	    << "  <hits>    file to write hits to (default: stdout)" << endl
-//	out << "Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]" << endl
-//	    << "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
-//	    << "  <query_in>         comma-separated list of files containing query reads" << endl
-//	    << "                     (or the sequences themselves, if -c is specified)" << endl
-//	    << "  <hit_outfile>      file to write hits to (default: stdout)" << endl
 	    << "Options:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -274,6 +271,7 @@ static void printUsage(ostream& out) {
 	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
 #endif
 	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
+	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
 	    << "  --unfa <fname>     write unaligned reads to FASTA file(s) <fname>*.fa" << endl
 	    << "  --unfq <fname>     write unaligned reads to FASTQ file(s) <fname>*.fq" << endl
 	    << "  --maxfa <fname>    write reads exceeding -m limit to FASTA file(s) <fname>*.fa" << endl
@@ -757,6 +755,9 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_PREFETCH_WIDTH:
 				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
 				break;
+	   		case 'B':
+	   			offBase = parseInt(-999999, "-B/--offbase cannot be a large negative number");
+	   			break;
 	   		case ARG_SEED:
 	   			seed = parseInt(0, "--seed arg must be at least 0");
 	   			break;
@@ -3177,23 +3178,23 @@ static void driver(const char * type,
 		switch(outType) {
 			case FULL:
 				if(refOut) {
-					sink = new VerboseHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
+					sink = new VerboseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				} else {
-					sink = new VerboseHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
+					sink = new VerboseHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				}
 				break;
 			case CONCISE:
 				if(refOut) {
-					sink = new ConciseHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
+					sink = new ConciseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				} else {
-					sink = new ConciseHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
+					sink = new ConciseHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				}
 				break;
 			case BINARY:
 				if(refOut) {
-					sink = new BinaryHitSink(ebwt.nPat(), dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
+					sink = new BinaryHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				} else {
-					sink = new BinaryHitSink(*fout, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
+					sink = new BinaryHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				}
 				break;
 			case NONE:
@@ -3337,7 +3338,7 @@ int main(int argc, char **argv) {
 				printUsage(cerr);
 				return 1;
 			}
-		} else {
+		} else if (mates1.size() == 0) {
 			query = argv[optind++];
 			// Tokenize the list of query files
 			tokenize(query, ",", queries);
@@ -3351,6 +3352,21 @@ int main(int argc, char **argv) {
 		// Get output filename
 		if(optind < argc) {
 			outfile = argv[optind++];
+		}
+
+		// Extra parametesr?
+		if(optind < argc) {
+			cerr << "Extra parameter(s) specified: ";
+			for(int i = optind; i < argc; i++) {
+				cerr << "\"" << argv[i] << "\"";
+				if(i < argc-1) cerr << ", ";
+			}
+			cerr << endl;
+			if(mates1.size() > 0) {
+				cerr << "Note that if <mates> files are specified using -1/-2, a <singles> file cannot" << endl
+				     << "also be specified.  Please run bowtie separately for mates and singles." << endl;
+			}
+			exit(1);
 		}
 
 		// Optionally summarize
