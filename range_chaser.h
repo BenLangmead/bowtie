@@ -169,13 +169,15 @@ public:
 		reset();
 		if(cacheFw_ != NULL || cacheBw_ != NULL) {
 			if(spread > cacheThresh_) {
-				bool ret;
+				bool ret = false;
 				if(ebwt->fw() && cacheFw_ != NULL) {
 					ret = cacheFw_->lookup(top, bot, cacheEnt_);
 					if(ret) assert(cacheEnt_.ebwt()->fw());
 				} else if(!ebwt->fw() && cacheBw_ != NULL) {
 					ret = cacheBw_->lookup(top, bot, cacheEnt_);
 					if(ret) assert(!cacheEnt_.ebwt()->fw());
+				} else {
+					cacheEnt_.reset();
 				}
 				assert_eq(cacheEnt_.valid(), ret);
 				cached_ = ret;
