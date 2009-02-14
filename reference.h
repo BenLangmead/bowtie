@@ -37,7 +37,11 @@ public:
 		FILE *f3 = fopen(s3.c_str(), "rb");
 		if(f3 == NULL) {
 			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
-			exit(1);
+			cerr << "This is most likely because your index was built with an older version" << endl
+			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+			     << "index (or download one from the Bowtie website) and try again." << endl;
+			loaded_ = false;
+			return;
 		}
 		// Read endianness sentinel, set 'swap'
 		uint32_t one;
@@ -97,6 +101,14 @@ public:
 		}
 		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
 		FILE *f4 = fopen(s4.c_str(), "rb");
+		if(f4 == NULL) {
+			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
+			cerr << "This is most likely because your index was built with an older version" << endl
+			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+			     << "index (or download one from the Bowtie website) and try again." << endl;
+			loaded_ = false;
+			return;
+		}
 		// Allocate a buffer to hold the whole reference string
 		buf_ = new uint8_t[cumsz >> 2];
 		// Read the whole thing in

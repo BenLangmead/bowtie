@@ -1104,6 +1104,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	BitPairReference *refs = NULL;
 	if(mixedThresh < 0xffffffff) {
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
 	}
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
@@ -1434,6 +1435,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	BitPairReference *refs = NULL;
 	if(mixedThresh < 0xffffffff) {
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
 	}
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
