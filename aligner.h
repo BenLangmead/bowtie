@@ -18,6 +18,7 @@
 #include "range_source.h"
 #include "range_chaser.h"
 #include "ref_aligner.h"
+#include "reference.h"
 
 /**
  * State machine for carrying out an alignment, which usually consists
@@ -524,12 +525,12 @@ public:
 		uint32_t symCeiling,
 		uint32_t mixedThresh,
 		uint32_t mixedAttemptLim,
-		vector<String<Dna5> >& os,
+		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
 		Aligner(rangeMode, seed),
-		os_(os), patsrc_(NULL), doneFw_(true),
+		refs_(refs), patsrc_(NULL), doneFw_(true),
 		doneFwFirst_(true), done_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
@@ -890,9 +891,8 @@ protected:
 	                             const uint32_t tlen,
 	                             const Range& range)
 	{
-		assert_gt(os_.size(), 0);
-		assert_lt(off.first, os_.size());
-		assert_eq(tlen, seqan::length(os_[off.first]));
+		assert(refs_->loaded());
+		assert_lt(off.first, refs_->numRefs());
 		// If matchRight is true, then we're trying to align the other
 		// mate to the right of the already-aligned mate.  Otherwise,
 		// to the left.
@@ -931,20 +931,20 @@ protected:
 		if(matchRight) {
 			begin = toff + 1;
 			end = toff + maxInsert_;
-			end = min<uint32_t>(seqan::length(os_[tidx]), end);
+			end = min<uint32_t>(refs_->approxLen(tidx), end);
 		} else {
 			if(toff + alen < maxInsert_) {
 				begin = 0;
 			} else {
 				begin = toff + alen - maxInsert_;
 			}
-			end = toff + alen - 1;
+			end = toff + min<uint32_t>(alen, qlen) - 1;
 		}
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
 		Range r;
-		uint32_t result = refAligner_->findOne(os_[tidx], seq, qual, begin, end, r);
+		uint32_t result = refAligner_->findOne(tidx, refs_, seq, qual, begin, end, r);
 		if(result != 0xffffffff) {
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
@@ -1200,7 +1200,7 @@ protected:
 		}
 	}
 
-	std::vector<String<Dna5> >& os_;
+	const BitPairReference* refs_;
 
 	PatternSourcePerThread *patsrc_;
 

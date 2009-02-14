@@ -206,8 +206,13 @@ sub build {
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
 	}
+	
+	my $rArg = "-r";
+	if(int(rand(3)) == 0) {
+		$rArg = "";
+	}
 
-	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
+	my $args = "-q $rArg $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";

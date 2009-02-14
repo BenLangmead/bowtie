@@ -10,6 +10,11 @@
 #include <vector>
 #include "seqan/sequence.h"
 #include "range.h"
+#include "reference.h"
+
+// Let the reference-aligner buffer size be 16K by default.  If more
+// room is required, a new buffer must be allocated from the heap.
+const static int REF_ALIGNER_BUFSZ = 16 * 1024;
 
 /**
  * Abstract parent class for classes that look for alignments by
@@ -23,22 +28,71 @@ class RefAligner {
 	typedef seqan::String<seqan::Dna5> TDna5Str;
 	typedef seqan::String<char> TCharStr;
 public:
-	RefAligner(uint32_t seedLen) : seedLen_(seedLen) { }
-	virtual ~RefAligner() { }
-	virtual uint32_t findOne(const TStr& ref,
+	RefAligner(uint32_t seedLen) :
+		seedLen_(seedLen), refbuf_(buf_), refbufSz_(REF_ALIGNER_BUFSZ),
+		freeRefbuf_(false) { }
+
+	/**
+	 * Free the reference-space alignment buffer if this object
+	 * allocated it.
+	 */
+	virtual ~RefAligner() {
+		if(freeRefbuf_) {
+			delete[] refbuf_;
+		}
+	}
+
+	virtual uint32_t findOne(const uint32_t tidx,
+	                         const BitPairReference *refs,
 	                         const TDna5Str& qry,
 	                         const TCharStr& quals,
 	                         uint32_t begin,
 	                         uint32_t end,
-	                         Range& range) const = 0;
-	virtual void findAll    (const TStr& ref,
+	                         Range& range) = 0;
+	virtual void findAll    (const uint32_t tidx,
+	                         const BitPairReference *refs,
 	                         const TDna5Str& qry,
 	                         const TCharStr& quals,
 	                         uint32_t begin,
 	                         uint32_t end,
-	                         std::vector<Range>& results) const = 0;
+	                         std::vector<Range>& results) = 0;
+
+	/**
+	 * Set a new reference-sequence buffer.
+	 */
+	void setBuf(uint8_t *newbuf, uint32_t newsz) {
+		if(freeRefbuf_) {
+			delete[] refbuf_;
+			freeRefbuf_ = false;
+		}
+		refbuf_ = newbuf;
+		refbufSz_ = newsz;
+	}
+
+	/**
+	 * Set a new reference-sequence buffer.
+	 */
+	void newBuf(uint32_t newsz) {
+		if(freeRefbuf_) {
+			delete[] refbuf_;
+		}
+		try {
+			refbuf_ = new uint8_t[newsz];
+			if(refbuf_ == NULL) throw std::bad_alloc();
+		} catch(std::bad_alloc& e) {
+			cerr << "Error: Could not allocate reference-space alignment buffer of " << newsz << "B" << endl;
+			exit(1);
+		}
+		refbufSz_ = newsz;
+		freeRefbuf_ = true;
+	}
+
 protected:
 	uint32_t seedLen_;
+	uint8_t *refbuf_;
+	uint32_t refbufSz_;
+	uint8_t  buf_[REF_ALIGNER_BUFSZ];
+	bool     freeRefbuf_;
 };
 
 /**
@@ -65,29 +119,39 @@ public:
 	ExactRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
 	virtual ~ExactRefAligner() { }
 
-
 	/**
-	 *
+	 * Find one alignment of qry:quals in the range begin-end in
+	 * reference string ref.  Store the alignment details in range.
 	 */
-	virtual uint32_t findOne(const TStr& ref,
+	virtual uint32_t findOne(const uint32_t tidx,
+	                         const BitPairReference *refs,
 	                         const TDna5Str& qry,
 	                         const TCharStr& quals,
 	                         uint32_t begin,
 	                         uint32_t end,
-	                         Range& range) const
+	                         Range& range)
 	{
-		return seed64FindOne(ref, qry, quals, begin, end, range);
+		uint32_t spread = end - begin;
+		// Make sure the buffer is large enough to accommodate the spread
+		if(spread > this->refbufSz_) {
+			this->newBuf(spread);
+		}
+		// Read in the relevant stretch of the reference string
+		refs->getStretch(this->refbuf_, tidx, begin, spread);
+		// Look for alignments
+		return seed64FindOne(this->refbuf_, qry, quals, begin, end, range);
 	}
 
 	/**
 	 *
 	 */
-	virtual void findAll(const TStr& ref,
+	virtual void findAll(const uint32_t tidx,
+                         const BitPairReference *refs,
 	                     const TDna5Str& qry,
 	                     const TCharStr& quals,
 	                     uint32_t begin,
 	                     uint32_t end,
-	                     std::vector<Range>& results) const
+	                     std::vector<Range>& results)
 	{
 		throw;
 	}
@@ -97,7 +161,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t naiveFindOne( const TStr& ref,
+	uint32_t naiveFindOne( uint8_t* ref,
                            const TDna5Str& qry,
                            const TCharStr& quals,
                            uint32_t begin,
@@ -105,16 +169,17 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		const uint32_t rlen = seqan::length(ref);
+		//const uint32_t rlen = seqan::length(ref);
 		assert_geq(end - begin, qlen); // caller should have checked this
-		assert_leq(end, rlen);
+		//assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 		for(uint32_t i = begin; i <= end - qlen; i++) {
+			uint32_t ri = i - begin;
 			bool match = true;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[i+j], 4);
-				if(qry[j] != ref[i+j]) {
+				assert_lt((int)ref[ri + j], 4);
+				if(qry[j] != ref[ri + j]) {
 					match = false;
 					break;
 				}
@@ -134,7 +199,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t seed64FindOne(const TStr& ref,
+	uint32_t seed64FindOne(uint8_t *ref,
                            const TDna5Str& qry,
                            const TCharStr& quals,
                            uint32_t begin,
@@ -142,9 +207,9 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		ASSERT_ONLY(const uint32_t rlen = seqan::length(ref));
+		//ASSERT_ONLY(const uint32_t rlen = seqan::length(ref));
 		assert_geq(end - begin, qlen); // caller should have checked this
-		assert_leq(end, rlen);
+		//assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
@@ -155,7 +220,7 @@ protected:
 		}
 #endif
 		uint32_t seedBitPairs = min<int>(qlen, 32);
-		uint32_t seedCushion = qlen <= 32 ? 0 : qlen - 32;
+		uint32_t seedOverhang = qlen <= 32 ? 0 : qlen - 32;
 		uint64_t seed = 0llu;
 		uint64_t buf = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
@@ -168,7 +233,7 @@ protected:
 		}
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
-			int r = (int)ref[begin + i]; // next reference character
+			int r = (int)ref[i]; // next reference character
 			if(c == 4) {
 				assert_eq(0xffffffff, naive);
 				return 0xffffffff;   // can't match if query has Ns
@@ -184,10 +249,11 @@ protected:
 				return 0xffffffff; // can't match if query has Ns
 			}
 		}
-		const uint32_t lim = end - seedCushion;
+		const uint32_t lim = end - seedOverhang;
 		// We're moving the right-hand edge of the seed along
 		for(uint32_t i = begin + (seedBitPairs-1); i < lim; i++) {
-			const int r = (int)ref[i];
+			uint32_t ri = i - begin;
+			const int r = (int)ref[ri];
 			assert_lt(r, 4);
 			buf = ((buf << 2llu) | r);
 			if(useMask) buf &= clearMask;
@@ -196,7 +262,7 @@ protected:
 				continue;
 			}
 			// Seed hit!
-			if(seedCushion == 0) {
+			if(seedOverhang == 0) {
 				uint32_t ret = i - seedBitPairs + 1;
 				assert_eq(ret, naive);
 				range.stratum = 0;
@@ -206,10 +272,9 @@ protected:
 				return ret;
 			}
 			bool foundHit = true;
-			for(uint32_t j = 0; j < seedCushion; j++) {
+			for(uint32_t j = 0; j < seedOverhang; j++) {
 				assert_lt(i+1+j, end);
-				assert_lt(i+1+j, rlen);
-				if((int)qry[32+j] != (int)ref[i+1+j]) {
+				if((int)qry[32+j] != (int)ref[ri + 1 + j]) {
 					foundHit = false;
 					break;
 				}
@@ -249,27 +314,38 @@ public:
 
 
 	/**
-	 *
+	 * Find one alignment of qry:quals in the range begin-end in
+	 * reference string ref.  Store the alignment details in range.
 	 */
-	virtual uint32_t findOne(const TStr& ref,
+	virtual uint32_t findOne(const uint32_t tidx,
+	                         const BitPairReference *refs,
 	                         const TDna5Str& qry,
 	                         const TCharStr& quals,
 	                         uint32_t begin,
 	                         uint32_t end,
-	                         Range& range) const
+	                         Range& range)
 	{
-		return seed64FindOne(ref, qry, quals, begin, end, range);
+		uint32_t spread = end - begin;
+		// Make sure the buffer is large enough to accommodate the spread
+		if(spread > this->refbufSz_) {
+			this->newBuf(spread);
+		}
+		// Read in the relevant stretch of the reference string
+		refs->getStretch(this->refbuf_, tidx, begin, spread);
+		// Look for alignments
+		return seed64FindOne(this->refbuf_, qry, quals, begin, end, range);
 	}
 
 	/**
 	 *
 	 */
-	virtual void findAll(const TStr& ref,
+	virtual void findAll(const uint32_t tidx,
+	                     const BitPairReference *refs,
 	                     const TDna5Str& qry,
 	                     const TCharStr& quals,
 	                     uint32_t begin,
 	                     uint32_t end,
-	                     std::vector<Range>& results) const
+	                     std::vector<Range>& results)
 	{
 		throw;
 	}
@@ -279,7 +355,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t naiveFindOne( const TStr& ref,
+	uint32_t naiveFindOne( uint8_t* ref,
                            const TDna5Str& qry,
                            const TCharStr& quals,
                            uint32_t begin,
@@ -287,24 +363,23 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		const uint32_t rlen = seqan::length(ref);
 		assert_geq(end - begin, qlen); // caller should have checked this
-		assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 		for(uint32_t i = begin; i <= end - qlen; i++) {
+			uint32_t ri = i - begin;
 			bool match = true;
 			int mms = 0;
 			int mmOff = -1;
 			int refc = -1;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[i+j], 4);
-				if(qry[j] != ref[i+j]) {
+				assert_lt((int)ref[ri + j], 4);
+				if(qry[j] != ref[ri + j]) {
 					if(++mms > 1) {
 						match = false;
 						break;
 					} else {
-						refc = "ACGT"[(int)ref[i+j]];
+						refc = "ACGT"[(int)ref[ri + j]];
 						mmOff = j;
 					}
 				}
@@ -329,7 +404,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t seed64FindOne(const TStr& ref,
+	uint32_t seed64FindOne(uint8_t* ref,
                            const TDna5Str& qry,
                            const TCharStr& quals,
                            uint32_t begin,
@@ -337,9 +412,7 @@ protected:
                            Range& range) const
 	{
 		const uint32_t qlen = seqan::length(qry);
-		ASSERT_ONLY(const uint32_t rlen = seqan::length(ref));
 		assert_geq(end - begin, qlen); // caller should have checked this
-		assert_leq(end, rlen);
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
@@ -358,8 +431,9 @@ protected:
 			}
 		}
 #endif
-		uint32_t seedBitPairs = min<int>(qlen, 32);
-		uint32_t seedCushion = qlen <= 32 ? 0 : qlen - 32;
+		const uint32_t seedBitPairs = min<int>(qlen, 32);
+		const uint32_t seedCushion  = 32 - seedBitPairs;
+		const uint32_t seedOverhang = (qlen <= 32 ? 0 : (qlen - 32));
 		uint64_t seed = 0llu;
 		uint64_t buf = 0llu;
 		// OR the 'diff' buffer with this so that we can always count
@@ -379,7 +453,7 @@ protected:
 		// the first 'seedBitPairs' bit pairs of the query.
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
-			int r = (int)ref[begin + i]; // next reference character
+			int r = (int)ref[i]; // next reference character
 			assert_leq(c, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
@@ -408,10 +482,11 @@ protected:
 				}
 			}
 		}
-		const uint32_t lim = end - seedCushion;
+		const uint32_t lim = end - seedOverhang;
 		// We're moving the right-hand edge of the seed along
 		for(uint32_t i = begin + (seedBitPairs-1); i < lim; i++) {
-			const int r = (int)ref[i];
+			uint32_t ri = i - begin;
+			const int r = (int)ref[ri];
 			assert_lt(r, 4);
 			buf = ((buf << 2llu) | r);
 			if(useMask) buf &= clearMask;
@@ -438,7 +513,7 @@ protected:
 				continue;
 			} else if(diffs == 1 && nPos != -1) {
 				mmpos = nPos;
-				refc = "ACGT"[(int)ref[i - seedBitPairs + nPos + 1]];
+				refc = "ACGT"[(int)ref[ri - seedBitPairs + nPos + 1]];
 #ifndef NDEBUG
 				if(naiveNumMms == 1) {
 					assert_eq(mmpos, naiveMmsOff);
@@ -460,7 +535,8 @@ protected:
 				assert_neq(0, diff);
 				assert_geq(mmpos, 0);
 				assert_lt(mmpos, 32);
-				refc = "ACGT"[(int)ref[i - seedBitPairs + mmpos + 1]];
+				mmpos -= seedCushion;
+				refc = "ACGT"[(int)ref[ri - seedBitPairs + mmpos + 1]];
 #ifndef NDEBUG
 				if(naiveNumMms == 1) {
 					assert_eq(mmpos, naiveMmsOff);
@@ -470,7 +546,7 @@ protected:
 			}
 			// There's nothing else to match beyond the seed, so this
 			// is a seed hit!
-			if(seedCushion == 0) {
+			if(seedOverhang == 0) {
 				uint32_t ret = i - seedBitPairs + 1;
 				assert(diffs <= 1);
 				assert_eq(ret, naive);
@@ -491,16 +567,15 @@ protected:
 			}
 			// Now extend the seed into a longer alignment
 			bool foundHit = true;
-			for(uint32_t j = 0; j < seedCushion; j++) {
+			for(uint32_t j = 0; j < seedOverhang; j++) {
 				assert_lt(i+1+j, end);
-				assert_lt(i+1+j, rlen);
-				if((int)qry[32+j] != (int)ref[i+1+j]) {
+				if((int)qry[32+j] != (int)ref[ri + 1 + j]) {
 					if(++diffs > 1) {
 						foundHit = false;
 						break;
 					} else {
 						mmpos = 32+j;
-						refc = "ACGT"[(int)ref[i+1+j]];
+						refc = "ACGT"[(int)ref[ri + 1 + j]];
 					}
 				}
 			}

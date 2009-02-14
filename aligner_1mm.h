@@ -171,6 +171,7 @@ public:
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
+			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool rangeMode,
 			bool verbose,
@@ -190,7 +191,7 @@ public:
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
-			os_(os),
+			refs_(refs), os_(os),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -338,7 +339,7 @@ public:
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, os_, rangeMode_, verbose_, seed_);
+			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_);
 	}
 
 private:
@@ -357,6 +358,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
+	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool rangeMode_;
 	const bool verbose_;

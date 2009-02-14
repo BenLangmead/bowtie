@@ -24,9 +24,11 @@ public:
 	 */
 	BitPairReference(const string& in,
 	                 bool sanity = false,
-	                 vector<string>* infiles = NULL,
+	                 std::vector<string>* infiles = NULL,
+	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
 	                 bool useShmem = false) :
+	loaded_(true),
 	sanity_(sanity),
 	useShmem_(useShmem)
 	{
@@ -61,6 +63,7 @@ public:
 		// stretch 8-bit alignment (i.e. count of bytes we need to
 		// allocate in buf_)
 		uint32_t cumsz = 0;
+		uint32_t cumlen = 0;
 		// For each unambiguous stretch...
 		for(uint32_t i = 0; i < sz; i++) {
 			recs_.push_back(RefRecord(f3, swap));
@@ -70,13 +73,22 @@ public:
 				// before)
 				refRecOffs_.push_back(recs_.size()-1);
 				refOffs_.push_back(cumsz);
+				if(nrefs_ > 0) {
+					refLens_.push_back(cumlen);
+				}
+				cumlen = 0;
 				nrefs_++;
 			}
 			cumsz += recs_.back().len;
+			cumlen += recs_.back().off;
+			cumlen += recs_.back().len;
 		}
 		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back(recs_.size());
 		refOffs_.push_back(cumsz);
+		refLens_.push_back(cumlen);
+		bufSz_ = cumsz;
+		assert_eq(nrefs_, refLens_.size());
 		assert_eq(sz, recs_.size());
 		fclose(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
@@ -103,29 +115,35 @@ public:
 		if(sanity_) {
 			// Compare the sequence we just read from the compact index
 			// file to the true reference sequence.
-			assert(infiles != NULL);
-			std::vector<seqan::String<seqan::Dna5> > os; // for holding references
-			if(infilesSeq) {
-				for(size_t i = 0; i < infiles->size(); i++) {
-					// Remove initial backslash; that's almost
-					// certainly being used to protect the first
-					// character of the sequence from getopts (e.g.,
-					// when the first char is -)
-					if((*infiles)[i].at(0) == '\\') {
-						(*infiles)[i].erase(0, 1);
+			std::vector<seqan::String<seqan::Dna5> > *os; // for holding references
+			std::vector<seqan::String<seqan::Dna5> > osv; // for holding references
+			if(infiles != NULL) {
+				if(infilesSeq) {
+					for(size_t i = 0; i < infiles->size(); i++) {
+						// Remove initial backslash; that's almost
+						// certainly being used to protect the first
+						// character of the sequence from getopts (e.g.,
+						// when the first char is -)
+						if((*infiles)[i].at(0) == '\\') {
+							(*infiles)[i].erase(0, 1);
+						}
+						osv.push_back(String<Dna5>((*infiles)[i]));
 					}
-					os.push_back(String<Dna5>((*infiles)[i]));
+				} else {
+					readSequenceFiles<seqan::String<seqan::Dna5>, seqan::Fasta>(*infiles, osv);
 				}
+				os = &osv;
 			} else {
-				readSequenceFiles<seqan::String<seqan::Dna5>, seqan::Fasta>(*infiles, os);
+				assert(origs != NULL);
+				os = origs;
 			}
-			for(size_t i = 0; i < os.size(); i++) {
-				size_t olen = seqan::length(os[i]);
+			for(size_t i = 0; i < os->size(); i++) {
+				size_t olen = seqan::length((*os)[i]);
 				uint8_t *buf = new uint8_t[olen];
 				getStretch(buf, i, 0, olen);
 				for(size_t j = 0; j < olen; j++) {
-					assert_eq(os[i][j], buf[j]);
-					assert_eq((int)os[i][j], getBase(i, j));
+					assert_eq((*os)[i][j], buf[j]);
+					assert_eq((int)(*os)[i][j], getBase(i, j));
 				}
 				delete[] buf;
 			}
@@ -146,7 +164,7 @@ public:
 	 * unambiguous stretches of the target reference sequence.  When
 	 * there are many records, binary search would be more appropriate.
 	 */
-	int getBase(uint32_t tidx, uint32_t toff) {
+	int getBase(uint32_t tidx, uint32_t toff) const {
 		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
 		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
@@ -187,7 +205,7 @@ public:
 	void getStretch(uint8_t *dest,
 	                uint32_t tidx,
 	                uint32_t toff,
-	                uint32_t count)
+	                uint32_t count) const
 	{
 		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
 		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
@@ -205,6 +223,7 @@ public:
 			}
 			if(count == 0) break;
 			assert_geq(toff, off);
+			bufOff += (toff - off); // move bufOff pointer forward
 			off += recs_[i].len;
 			for(; toff < off && count > 0; toff++) {
 				assert_lt(bufOff, refOffs_[tidx+1]);
@@ -227,13 +246,31 @@ public:
 		assert_eq(0, count);
 	}
 
+	/// Return the number of reference sequences.
+	uint32_t numRefs() const {
+		return nrefs_;
+	}
+
+	/// Return the number of reference sequences.
+	uint32_t approxLen(uint32_t elt) const {
+		assert_lt(elt, nrefs_);
+		return refLens_[elt];
+	}
+
+	/// Return true iff buf_ and all the vectors are populated.
+	bool loaded() const {
+		return loaded_;
+	}
+
 protected:
 	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
+	std::vector<uint32_t>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
 	std::vector<uint32_t>  refRecOffs_; /// record begin/end offsets per ref seq
 	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
 	uint32_t bufSz_;    /// size of buf_
 	uint32_t nrefs_;    /// the number of reference sequences
+	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
 	bool     useShmem_; /// put the cache memory in shared memory
 };

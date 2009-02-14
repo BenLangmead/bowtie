@@ -31,6 +31,7 @@ using namespace seqan;
 
 static vector<string> mates1; // mated reads (first mate)
 static vector<string> mates2; // mated reads (second mate)
+static string adjustedEbwtFileBase = "";
 static int verbose				= 0; // be talkative
 static bool quiet				= false; // print nothing but the alignments
 static int sanityCheck			= 0;  // enable expensive sanity checks
@@ -1099,6 +1100,10 @@ static void *exactSearchWorkerStateful(void *vp) {
 
 	RangeCache cacheFw(cacheSize, &ebwt);
 	RangeCache cacheBw(0, NULL);
+	BitPairReference *refs = NULL;
+	if(mixedThresh < 0xffffffff) {
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+	}
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
@@ -1127,7 +1132,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			&cacheFw,
 			&cacheBw,
 			cacheLimit,
-			os,
+			refs, os,
 			rangeMode,
 			verbose,
 			seed);
@@ -1143,6 +1148,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
+	if(refs != NULL) delete refs;
 	delete patsrcFact;
 	delete sinkFact;
 #ifdef BOWTIE_PTHREADS
@@ -1424,6 +1430,10 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	// Create range caches, which are shared among all aligners
 	RangeCache cacheFw(cacheSize, &ebwtFw);
 	RangeCache cacheBw(cacheSize, &ebwtBw);
+	BitPairReference *refs = NULL;
+	if(mixedThresh < 0xffffffff) {
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+	}
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -1452,7 +1462,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			&cacheFw,
 			&cacheBw,
 			cacheLimit,
-			os,
+			refs, os,
 			rangeMode,
 			verbose,
 			seed);
@@ -1468,6 +1478,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
+	if(refs != NULL) delete refs;
 	delete patsrcFact;
 	delete sinkFact;
 #ifdef BOWTIE_PTHREADS
@@ -3030,7 +3041,7 @@ static void driver(const char * type,
 		}
 	}
 	// Adjust
-	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
+	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 	if(nsPolicy == NS_TO_NS && !maqLike) {
 		maxNs = min<int>(maxNs, mismatches);
 	}
@@ -3038,7 +3049,10 @@ static void driver(const char * type,
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
 
+	// If there were any first-mates specified, we will operate in
+	// stateful mode
 	bool paired = mates1.size() > 0;
+	if(paired) stateful = true;
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
 		const vector<string>* qs = &mates1;
