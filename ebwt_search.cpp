@@ -875,6 +875,14 @@ static void parseOptions(int argc, char **argv) {
 			}
 		}
 	}
+	if((mates1.size() > 0 || mates2.size() > 0) && maqLike) {
+		cerr << "Paired-end mode is not yet compatible with -n mode; use -v 0 or -v 1 instead." << endl;
+		exit(1);
+	}
+	if((mates1.size() > 0 || mates2.size() > 0) && !maqLike && mismatches > 1) {
+		cerr << "Paired-end mode is not yet compatible with -v " << mismatches << "; use -v 0 or -v 1 instead." << endl;
+		exit(1);
+	}
 	if(!fullIndex) {
 		bool error = false;
 		if(khits > 1) {
@@ -888,6 +896,10 @@ static void parseOptions(int argc, char **argv) {
 		if(allHits && !spanStrata) {
 			cerr << "When -a/--all and -z/--phased are used, --nostrata must also be used." << endl
 			     << "Stratified all-hits search cannot be combined with phased search." << endl;
+			error = true;
+		}
+		if(mates1.size() > 0 || mates2.size() > 0) {
+			cerr << "When -z/--phased is used, paired-end mode is unavailable" << endl;
 			error = true;
 		}
 		if(error) exit(1);
@@ -1043,6 +1055,7 @@ static PairedPatternSource*   exactSearch_patsrc;
 static HitSink*               exactSearch_sink;
 static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
+static BitPairReference*      exactSearch_refs;
 static void *exactSearchWorker(void *vp) {
 	PairedPatternSource& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
@@ -1093,26 +1106,20 @@ static void *exactSearchWorkerStateful(void *vp) {
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
+	BitPairReference* refs       =  exactSearch_refs;
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
-	RangeCache cacheFw(cacheSize, &ebwt);
-	RangeCache cacheBw(0, NULL);
-	BitPairReference *refs = NULL;
-	if(mixedThresh < 0xffffffff) {
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
-		if(!refs->loaded()) exit(1);
-	}
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
 			_sink,
 			*sinkFact,
-			&cacheFw,
-			&cacheBw,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
 			cacheLimit,
 			os,
 			rangeMode,
@@ -1131,8 +1138,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			mhits,       // for symCeiling
 			mixedThresh,
 			mixedAttemptLim,
-			&cacheFw,
-			&cacheBw,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
 			rangeMode,
@@ -1186,6 +1193,23 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	exactSearch_sink   = &_sink;
 	exactSearch_ebwt   = &ebwt;
 	exactSearch_os     = &os;
+
+	assert(!ebwt.isInMemory());
+	{
+		// Load the rest of (vast majority of) the backward Ebwt into
+		// memory
+		Timer _t(cout, "Time loading forward index: ", timing);
+		ebwt.loadIntoMemory(useShmem);
+	}
+
+	BitPairReference *refs = NULL;
+	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+		Timer _t(cout, "Time loading reference: ", timing);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
+	}
+	exactSearch_refs   = refs;
+
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
@@ -1226,6 +1250,7 @@ static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
 static vector<String<Dna5> >*         mismatchSearch_os;
 static SyncBitset*                    mismatchSearch_doneMask;
 static SyncBitset*                    mismatchSearch_hitMask;
+static BitPairReference*              mismatchSearch_refs;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
 	PairedPatternSource&   _patsrc       = *mismatchSearch_patsrc;
@@ -1351,8 +1376,15 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	mismatchSearch_hitMask      = &hitMask;
 	mismatchSearch_os           = &os;
 
-	assert(ebwtFw.isInMemory());
+	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
+
+	{
+		// Load the rest of (vast majority of) the backward Ebwt into
+		// memory
+		Timer _t(cout, "Time loading forward index: ", timing);
+		ebwtFw.loadIntoMemory(useShmem);
+	}
 
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
@@ -1423,27 +1455,20 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw  = *mismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os      = *mismatchSearch_os;
+	BitPairReference*      refs    =  mismatchSearch_refs;
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
-	// Create range caches, which are shared among all aligners
-	RangeCache cacheFw(cacheSize, &ebwtFw);
-	RangeCache cacheBw(cacheSize, &ebwtBw);
-	BitPairReference *refs = NULL;
-	if(mixedThresh < 0xffffffff) {
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
-		if(!refs->loaded()) exit(1);
-	}
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
 			_sink,
 			*sinkFact,
-			&cacheFw,
-			&cacheBw,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
 			cacheLimit,
 			os,
 			rangeMode,
@@ -1462,8 +1487,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			mhits,     // for symCeiling
 			mixedThresh,
 			mixedAttemptLim,
-			&cacheFw,
-			&cacheBw,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
 			rangeMode,
@@ -1557,13 +1582,26 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	mismatchSearch_hitMask      = NULL;
 	mismatchSearch_os           = &os;
 
-	assert(ebwtFw.isInMemory());
+	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
+	{
+		// Load the other half of the index into memory
+		Timer _t(cout, "Time loading forward index: ", timing);
+		ebwtFw.loadIntoMemory(useShmem);
+	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory(useShmem);
 	}
+	// Create range caches, which are shared among all aligners
+	BitPairReference *refs = NULL;
+	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+		Timer _t(cout, "Time loading reference: ", timing);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
+	}
+	mismatchSearch_refs = refs;
 
 #ifdef BOWTIE_PTHREADS
 	// Allocate structures for threads
@@ -1885,7 +1923,7 @@ static void twoOrThreeMismatchSearch(
 	// Global initialization
 	assert(revcomp);
 	assert(!fullIndex);
-	assert(ebwtFw.isInMemory());
+	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
@@ -1917,6 +1955,8 @@ static void twoOrThreeMismatchSearch(
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
 
+	// Load forward index
+	SWITCH_TO_FW_INDEX();
     { // Phase 1
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
@@ -2067,8 +2107,13 @@ static void twoOrThreeMismatchSearchFull(
 	// Global initialization
 	assert(revcomp);
 	assert(fullIndex);
-	assert(ebwtFw.isInMemory());
+	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
+	{
+		// Load the other half of the index into memory
+		Timer _t(cout, "Time loading forward index: ", timing);
+		ebwtFw.loadIntoMemory(useShmem);
+	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
@@ -2787,7 +2832,6 @@ static void seededQualCutoffSearchFull(
 #endif
 
 	SWITCH_TO_FW_INDEX();
-	assert(ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 	{
 		// Load the other half of the index into memory
@@ -2809,168 +2853,6 @@ static void seededQualCutoffSearchFull(
 		}
 #endif
 	}
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-#endif
-}
-
-static PairedPatternSource*           seedAndSWExtendSearch_patsrc;
-static HitSink*                       seedAndSWExtendSearch_sink;
-static Ebwt<String<Dna> >*            seedAndSWExtendSearch_ebwtFw;
-static vector<String<Dna5> >*         seedAndSWExtendSearch_os;
-
-#define SEED_SW_EXTEND_WORKER_SETUP() \
-	PairedPatternSource&   _patsrc  = *seedAndSWExtendSearch_patsrc;   \
-	HitSink&               _sink    = *seedAndSWExtendSearch_sink;     \
-	vector<String<Dna5> >& os       = *seedAndSWExtendSearch_os;       \
-	uint32_t lastLen = 0; \
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
-	allHits = false; khits = 0; onlyBest = false; \
-	HitSinkPerThread* sink = new AllHitSinkPerThread(_sink, true); \
-	/* Per-thread initialization */ \
-	EbwtSearchParams<String<Dna> > params( \
-			*sink,       /* HitSink */ \
-	        os,          /* reference sequences */ \
-	        revcomp,     /* forward AND reverse complement? */ \
-	        true,        /* read is forward */ \
-	        true,        /* index is forward */ \
-	        true);       /* range mode (irrelevant here) */
-
-static void* seedAndSWExtendSearchWorkerPhase1(void *vp) {
-	SEED_SW_EXTEND_WORKER_SETUP();
-	Ebwt<String<Dna> >& ebwtFw = *seedAndSWExtendSearch_ebwtFw;
-
-	// Half-and-half GreedyDFSRangeSource for forward read
-	GreedyDFSRangeSource bt(
-			&ebwtFw, params,
-	        0xffffffff,        // qualThresh
-	        BacktrackLimits(), // max backtracks
-	        0,       // reportPartials (don't)
-	        true,    // reportExacts
-	        rangeMode,// reportRanges
-	        NULL,    // seedlings
-		    NULL,    // mutations
-	        verbose, // verbose
-	        seed,    // seed
-	        &os,     // orig strings
-	        false,   // considerQuals
-	        false);  // halfAndHalf
-	vector<Hit>& hits = sink->retainedHits();
-	bool skipped = false;
-    while(true) {
-    	FINISH_READ(patsrc);
-    	GET_READ(patsrc);
-		size_t plen = length(patFw);
-		uint32_t s = min<uint32_t>(plen, seedLen);
-		patid += 0;
-		// First, try exact hits for the forward-oriented read
-		params.setFw(true);
-		bt.setQuery(&patFw, &qualFw, &name);
-		bt.setOffs(0, 0, s, s, s, s);
-		bt.backtrack();
-		for(size_t i = 0; i < hits.size(); i++) {
-			String<Dna5> lhsbuf; String<Dna5> rhsbuf;
-			// h.first has 'top' and h.second has 'bot'
-			assert_gt(hits[i].h.second, hits[i].h.first);
-			for(size_t j = hits[i].h.first; j < hits[i].h.second; j++) {
-				ebwtFw.reportReconstruct(patFw, &qualFw, &name,
-				                         lhsbuf,           // lbuf
-				                         rhsbuf,           // rbuf
-				                         NULL,             // mmui32
-				                         NULL,             // refcs
-				                         0,                // numMms
-				                         j,                // i
-				                         hits[i].h.first,  // top
-				                         hits[i].h.second, // bot
-				                         s,                // qlen
-				                         0,                // stratum
-				                         params,           // params
-				                         NULL);            // locus
-			}
-		}
-		hits.clear();
-		// First, try exact hits for the forward-oriented read
-		params.setFw(false);
-		bt.setQuery(&patRc, &qualRc, &name);
-		bt.setOffs(0, 0, s, s, s, s);
-		bt.backtrack();
-		for(size_t i = 0; i < hits.size(); i++) {
-			String<Dna5> lhsbuf; String<Dna5> rhsbuf;
-			// h.first has 'top' and h.second has 'bot'
-			assert_gt(hits[i].h.second, hits[i].h.first);
-			for(size_t j = hits[i].h.first; j < hits[i].h.second; j++) {
-				ebwtFw.reportReconstruct(patRc, &qualRc, &name,
-				                         lhsbuf,           // lbuf
-				                         rhsbuf,           // rbuf
-				                         NULL,             // mmui32
-				                         NULL,             // refcs
-				                         0,                // numMms
-				                         j,                // i
-				                         hits[i].h.first,  // top
-				                         hits[i].h.second, // bot
-				                         s,                // qlen
-				                         0,                // stratum
-				                         params,           // params
-				                         NULL);            // locus
-			}
-		}
-		hits.clear();
-    }
-	FINISH_READ(patsrc);
-    WORKER_EXIT();
-}
-
-template<typename TStr>
-static void seedAndSWExtendSearch(
-		int seedLen,                  /// length of seed (not a maq option)
-        int mms,                      /// max # mismatches allowed in seed
-                                      /// (like maq map's -n option)
-                                      /// Can only be 1 or 2, default: 1
-        PairedPatternSource& _patsrc, /// pattern source
-        HitSink& _sink,               /// hit sink
-        Ebwt<TStr>& ebwtFw,           /// index of original text
-        vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
-{
-	// Global intialization
-	assert_eq(0, mms);
-
-	seedAndSWExtendSearch_patsrc   = &_patsrc;
-	seedAndSWExtendSearch_sink     = &_sink;
-	seedAndSWExtendSearch_ebwtFw   = &ebwtFw;
-	seedAndSWExtendSearch_os       = &os;
-
-#ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
-	pthread_t *threads = new pthread_t[nthreads-1];
-#endif
-
-	/* Load the forward index into memory if necessary */ \
-	if(!ebwtFw.isInMemory()) {
-		Timer _t(cout, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(useShmem);
-	}
-	assert(ebwtFw.isInMemory());
-	_patsrc.reset(); /* rewind pattern source to first pattern */
-	_patsrc.setReverse(false); /* tell pattern source not to reverse patterns */
-	{
-		// Phase 1: Consider cases 1R and 2R
-		const char * msg = "Seed-and-SW-extend search Phase 1 of 1: ";
-		Timer _t(cout, msg, timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seedAndSWExtendSearchWorkerPhase1, (void *)(long)(i+1));
-		}
-#endif
-		seedAndSWExtendSearchWorkerPhase1((void*)0L);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
-		}
-#endif
-	}
-
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
 #endif
@@ -3158,16 +3040,11 @@ static void driver(const char * type,
 			assert_eq(length(os[i]), ebwt.plen()[i]);
 		}
 	}
-    // Load rest of (vast majority of) Ebwt into memory
-	if(!maqLike) {
-		Timer _t(cout, "Time loading forward index: ", timing);
-	    ebwt.loadIntoMemory(useShmem);
-	}
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		if(maqLike) ebwt.loadIntoMemory(useShmem);
+		ebwt.loadIntoMemory(useShmem);
 		ebwt.checkOrigs(os, false);
-		if(maqLike) ebwt.evictFromMemory();
+		ebwt.evictFromMemory();
 	}
 	{
 		Timer _t(cout, "Time searching: ", timing);
@@ -3209,15 +3086,7 @@ static void driver(const char * type,
 #ifdef CHUD_PROFILING
 		chudStartRemotePerfMonitor("Bowtie");
 #endif
-		if(seedAndExtend) {
-			seedAndSWExtendSearch(seedLen,
-			                      seedMms,
-			                      patsrc,
-			                      *sink,
-			                      ebwt,
-			                      os);
-		}
-		else if(maqLike) {
+		if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
 									   qualThresh,

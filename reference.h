@@ -15,6 +15,9 @@
  * way that is external to the bitpair sequence.  To accomplish this,
  * we use the RefRecords vector, which is stored in the .3.ebwt index
  * file.  The bitpairs themselves are stored in the .4.ebwt index file.
+ *
+ * Once it has been loaded, a BitPairReference is read-only, and is
+ * safe for many threads to access at once.
  */
 class BitPairReference {
 

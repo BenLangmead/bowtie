@@ -167,19 +167,21 @@ public:
 		done_ = false;
 		cached_ = false;
 		reset();
-		if(spread > cacheThresh_) {
-			bool ret;
-			if(ebwt->fw()) {
-				ret = cacheFw_->lookup(top, bot, cacheEnt_);
-				if(ret) assert(cacheEnt_.ebwt()->fw());
+		if(cacheFw_ != NULL || cacheBw_ != NULL) {
+			if(spread > cacheThresh_) {
+				bool ret;
+				if(ebwt->fw() && cacheFw_ != NULL) {
+					ret = cacheFw_->lookup(top, bot, cacheEnt_);
+					if(ret) assert(cacheEnt_.ebwt()->fw());
+				} else if(!ebwt->fw() && cacheBw_ != NULL) {
+					ret = cacheBw_->lookup(top, bot, cacheEnt_);
+					if(ret) assert(!cacheEnt_.ebwt()->fw());
+				}
+				assert_eq(cacheEnt_.valid(), ret);
+				cached_ = ret;
 			} else {
-				ret = cacheBw_->lookup(top, bot, cacheEnt_);
-				if(ret) assert(!cacheEnt_.ebwt()->fw());
+				cacheEnt_.reset();
 			}
-			assert_eq(cacheEnt_.valid(), ret);
-			cached_ = ret;
-		} else {
-			cacheEnt_.reset();
 		}
 		setRow(irow_);
 		assert(chaser_.prepped_ || foundOff() || done_);

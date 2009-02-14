@@ -44,7 +44,9 @@ echo Running ${BOWTIE_BUILD_EXE} $FNAME d_melanogaster
 ${BOWTIE_BUILD_EXE} $FNAME d_melanogaster
 if [ "$?" = "0" ] ; then
 	echo "d_melanogaster index built:"
-	echo "   d_melanogaster.1.ebwt d_melanogaster.2.ebwt d_melanogaster.rev.1.ebwt d_melanogaster.rev.2.ebwt"
+	echo "   d_melanogaster.1.ebwt d_melanogaster.2.ebwt"
+	echo "   d_melanogaster.3.ebwt d_melanogaster.4.ebwt"
+	echo "   d_melanogaster.rev.1.ebwt d_melanogaster.rev.2.ebwt"
 	echo "You may remove $FNAME"
 else
 	echo "Index building failed; see error message"

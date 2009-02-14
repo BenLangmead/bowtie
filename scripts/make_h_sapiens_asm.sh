@@ -70,7 +70,9 @@ ${BOWTIE_BUILD_EXE} ${INPUTS} h_sapiens_asm
 
 if [ "$?" = "0" ] ; then
 	echo "h_sapiens_asm index built:"
-	echo "   h_sapiens_asm.1.ebwt h_sapiens_asm.2.ebwt h_sapiens_asm.rev.1.ebwt h_sapiens_asm.rev.2.ebwt"
+	echo "   h_sapiens_asm.1.ebwt h_sapiens_asm.2.ebwt"
+	echo "   h_sapiens_asm.3.ebwt h_sapiens_asm.4.ebwt"
+	echo "   h_sapiens_asm.rev.1.ebwt h_sapiens_asm.rev.2.ebwt"
 	echo "You may remove hs_ref_chr*.fa"
 else
 	echo "Index building failed; see error message"

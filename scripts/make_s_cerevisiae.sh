@@ -42,7 +42,9 @@ echo Running ${BOWTIE_BUILD_EXE} Scerevisiae_chr.fna s_cerevisiae
 ${BOWTIE_BUILD_EXE} Scerevisiae_chr.fna s_cerevisiae
 if [ "$?" = "0" ] ; then
 	echo "s_cerevisiae index built:"
-	echo "   s_cerevisiae.1.ebwt s_cerevisiae.2.ebwt s_cerevisiae.rev.1.ebwt s_cerevisiae.rev.2.ebwt"
+	echo "   s_cerevisiae.1.ebwt s_cerevisiae.2.ebwt"
+	echo "   s_cerevisiae.3.ebwt s_cerevisiae.4.ebwt"
+	echo "   s_cerevisiae.rev.1.ebwt s_cerevisiae.rev.2.ebwt"
 	echo "You may remove Scerevisiae_chr.fna"
 else
 	echo "Index building failed; see error message"

@@ -43,7 +43,9 @@ echo Running ${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
 ${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
 if [ "$?" = "0" ] ; then
 	echo "c_elegans index built:"
-	echo "   c_elegans.1.ebwt c_elegans.2.ebwt c_elegans.rev.1.ebwt c_elegans.rev.2.ebwt"
+	echo "   c_elegans.1.ebwt c_elegans.2.ebwt"
+	echo "   c_elegans.3.ebwt c_elegans.4.ebwt"
+	echo "   c_elegans.rev.1.ebwt c_elegans.rev.2.ebwt"
 	echo "You may remove elegans.WS190.dna.fa"
 else
 	echo "Index building failed; see error message"

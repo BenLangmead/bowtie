@@ -79,7 +79,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} c_familiaris
 ${BOWTIE_BUILD_EXE} ${INPUTS} c_familiaris
 if [ "$?" = "0" ] ; then
 	echo "c_familiaris index built:"
-	echo "   c_familiaris.1.ebwt c_familiaris.2.ebwt c_familiaris.rev.1.ebwt c_familiaris.rev.2.ebwt"
+	echo "   c_familiaris.1.ebwt c_familiaris.2.ebwt"
+	echo "   c_familiaris.3.ebwt c_familiaris.4.ebwt"
+	echo "   c_familiaris.rev.1.ebwt c_familiaris.rev.2.ebwt"
 	echo "You may remove cfa_ref_chr*.mfa"
 else
 	echo "Index building failed; see error message"

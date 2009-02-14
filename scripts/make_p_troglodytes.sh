@@ -78,7 +78,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} p_troglodytes
 ${BOWTIE_BUILD_EXE} ${INPUTS} p_troglodytes
 if [ "$?" = "0" ] ; then
 	echo "p_troglodytes index built:"
-	echo "   p_troglodytes.1.ebwt p_troglodytes.2.ebwt p_troglodytes.rev.1.ebwt p_troglodytes.rev.2.ebwt"
+	echo "   p_troglodytes.1.ebwt p_troglodytes.2.ebwt"
+	echo "   p_troglodytes.3.ebwt p_troglodytes.4.ebwt"
+	echo "   p_troglodytes.rev.1.ebwt p_troglodytes.rev.2.ebwt"
 	echo "You may remove ptr_ref_chr*.mfa"
 else
 	echo "Index building failed; see error message"

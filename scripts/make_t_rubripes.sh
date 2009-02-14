@@ -42,7 +42,9 @@ echo Running ${BOWTIE_BUILD_EXE} fugu.041029.scaffolds.fasta t_rubripes
 ${BOWTIE_BUILD_EXE} fugu.041029.scaffolds.fasta t_rubripes
 if [ "$?" = "0" ] ; then
 	echo "t_rubripes index built:"
-	echo "   t_rubripes.1.ebwt t_rubripes.2.ebwt t_rubripes.rev.1.ebwt t_rubripes.rev.2.ebwt"
+	echo "   t_rubripes.1.ebwt t_rubripes.2.ebwt"
+	echo "   t_rubripes.3.ebwt t_rubripes.4.ebwt"
+	echo "   t_rubripes.rev.1.ebwt t_rubripes.rev.2.ebwt"
 	echo "You may remove fugu.041029.scaffolds.fasta"
 else
 	echo "Index building failed; see error message"

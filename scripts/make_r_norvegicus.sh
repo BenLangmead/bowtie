@@ -77,7 +77,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} r_norvegicus
 ${BOWTIE_BUILD_EXE} ${INPUTS} r_norvegicus
 if [ "$?" = "0" ] ; then
 	echo "r_norvegicus index built:"
-	echo "   r_norvegicus.1.ebwt r_norvegicus.2.ebwt r_norvegicus.rev.1.ebwt r_norvegicus.rev.2.ebwt"
+	echo "   r_norvegicus.1.ebwt r_norvegicus.2.ebwt"
+	echo "   r_norvegicus.3.ebwt r_norvegicus.4.ebwt"
+	echo "   r_norvegicus.rev.1.ebwt r_norvegicus.rev.2.ebwt"
 	echo "You may remove rn_ref_chr*.mfa"
 else
 	echo "Index building failed; see error message"

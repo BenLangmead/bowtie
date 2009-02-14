@@ -75,7 +75,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} h_sapiens
 ${BOWTIE_BUILD_EXE} ${INPUTS} h_sapiens
 if [ "$?" = "0" ] ; then
 	echo "h_sapiens index built:"
-	echo "   h_sapiens.1.ebwt h_sapiens.2.ebwt h_sapiens.rev.1.ebwt h_sapiens.rev.2.ebwt"
+	echo "   h_sapiens.1.ebwt h_sapiens.2.ebwt"
+	echo "   h_sapiens.3.ebwt h_sapiens.4.ebwt"
+	echo "   h_sapiens.rev.1.ebwt h_sapiens.rev.2.ebwt"
 	echo "You may remove hs_ref_chr*.mfa"
 else
 	echo "Index building failed; see error message"

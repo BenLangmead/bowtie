@@ -97,7 +97,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} m_musculus
 ${BOWTIE_BUILD_EXE} ${INPUTS} m_musculus
 if [ "$?" = "0" ] ; then
 	echo "m_musculus index built:"
-	echo "   m_musculus.1.ebwt m_musculus.2.ebwt m_musculus.rev.1.ebwt m_musculus.rev.2.ebwt"
+	echo "   m_musculus.1.ebwt m_musculus.2.ebwt"
+	echo "   m_musculus.3.ebwt m_musculus.4.ebwt"
+	echo "   m_musculus.rev.1.ebwt m_musculus.rev.2.ebwt"
 	echo "You may remove mm_ref_chr*.mfa and mm_ref_chrMT.fa"
 else
 	echo "Index building failed; see error message"

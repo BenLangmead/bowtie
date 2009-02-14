@@ -78,7 +78,9 @@ echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} g_gallus
 ${BOWTIE_BUILD_EXE} ${INPUTS} g_gallus
 if [ "$?" = "0" ] ; then
 	echo "g_gallus index built:"
-	echo "   g_gallus.1.ebwt g_gallus.2.ebwt g_gallus.rev.1.ebwt g_gallus.rev.2.ebwt"
+	echo "   g_gallus.1.ebwt g_gallus.2.ebwt"
+	echo "   g_gallus.3.ebwt g_gallus.4.ebwt"
+	echo "   g_gallus.rev.1.ebwt g_gallus.rev.2.ebwt"
 	echo "You may remove gga_ref_chr*.mfa"
 else
 	echo "Index building failed; see error message"
