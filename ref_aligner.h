@@ -190,8 +190,27 @@ protected:
 			// Do the naive comparison
 			bool match = true;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[rir + j], 4);
-				if(qry[j] != ref[rir + j]) {
+#if 0
+				// Count Ns in the reference as mismatches
+				const int q = (int)qry[j];
+				const int r = (int)ref[rir + j];
+				assert_leq(q, 4);
+				assert_leq(r, 4);
+				if(q == 4 || r == 4 || q != r) {
+#else
+				// Disallow alignments that involve an N in the
+				// reference
+				const int r = (int)ref[rir + j];
+				if(r == 4) {
+					// N in reference; bail
+					match = false;
+					break;
+				}
+				const int q = (int)qry[j];
+				assert_leq(q, 4);
+				assert_lt(r, 4);
+				if(q != r) {
+#endif
 					// Mismatch
 					match = false;
 					break;
@@ -250,13 +269,22 @@ protected:
 		// contents of the 'buffw' dword.  If there are fewer than 32
 		// seedBitPairs, the content will be packed into the least
 		// significant bits of the word.
+		uint32_t skipLeftToRights = 0;
+		uint32_t skipRightToLefts = 0;
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
-			int r = (int)ref[halfway - begin + i]; // next reference character
+			assert_leq(c, 4);
 			if(c == 4) {
 				assert_eq(0xffffffff, naive);
 				return 0xffffffff;   // can't match if query has Ns
 			}
+			int r = (int)ref[halfway - begin + i]; // next reference character
+			if(r == 4) {
+				r = 0;
+				skipLeftToRights = max(skipLeftToRights, i + 1);
+				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+			}
+			assert_lt(r, 4);
 			assert_lt(c, 4);
 			seed  = ((seed  << 2llu) | c);
 			buffw = ((buffw << 2llu) | r);
@@ -280,16 +308,26 @@ protected:
 			uint32_t ri; // leftmost position in proposed alignment
 			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
+			assert_lt(skipLeftToRights, seedBitPairs);
+			assert_lt(skipRightToLefts, seedBitPairs);
 			if(hi) {
+				hi = false;
 				// Moving left-to-right
 				ri = halfway + (i >> 1); rir = ri - begin;
 				r = (int)ref[rir + seedBitPairs - 1];
+				if(r == 4) {
+					r = 0;
+					skipLeftToRights = seedBitPairs;
+				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
 				// position
 				buffw = ((buffw << 2llu) | r);
 				if(useMask) buffw &= clearMask;
-				hi = false;
+				if(skipLeftToRights > 0) {
+					skipLeftToRights--;
+					continue;
+				}
 				if(buffw != seed) {
 					// We're about to reject; make sure naive algorithm
 					// also rejected
@@ -297,17 +335,25 @@ protected:
 					continue;
 				}
 			} else {
+				hi = true;
 				// Moving right-to-left
 				ri = halfway - (i >> 1); rir = ri - begin;
+				r = (int)ref[rir];
+				if(r == 4) {
+					r = 0;
+					skipRightToLefts = seedBitPairs;
+				}
+				assert_lt(r, 4);
 				if(i >= 2) {
-					r = (int)ref[rir];
-					assert_lt(r, 4);
 					bufbw >>= 2llu;
 					// Bring in new base pair at the most significant
 					// position
-					bufbw |= (r << lhsShift);
+					bufbw |= ((uint64_t)r << lhsShift);
 				}
-				hi = true;
+				if(skipRightToLefts > 0) {
+					skipRightToLefts--;
+					continue;
+				}
 				if(bufbw != seed) {
 					// We're about to reject; make sure naive algorithm
 					// also rejected
@@ -438,13 +484,35 @@ protected:
 			uint32_t mmOff = 0xffffffff;
 			int mms = 0;
 			for(uint32_t j = 0; j < qlen; j++) {
-				assert_lt((int)ref[rir + j], 4);
-				if(qry[j] != ref[rir + j]) {
+#if 0
+				// Count Ns in the reference as mismatches
+				const int q = (int)qry[j];
+				const int r = (int)ref[rir + j];
+				assert_leq(q, 4);
+				assert_leq(r, 4);
+				if(q == 4 || r == 4 || q != r) {
+#else
+				// Disallow alignments that involve an N in the
+				// reference
+				const int r = (int)ref[rir + j];
+				if(r == 4) {
+					// N in reference; bail
+					match = false;
+					break;
+				}
+				const int q = (int)qry[j];
+				assert_leq(q, 4);
+				assert_lt(r, 4);
+				if(q != r) {
+#endif
+					// Mismatch!
 					if(++mms > 1) {
+						// Too many; reject this alignment
 						match = false;
 						break;
 					} else {
-						refc = "ACGT"[(int)ref[rir + j]];
+						// First one; remember offset and ref char
+						refc = "ACGTN"[r];
 						mmOff = j;
 					}
 				}
@@ -505,7 +573,7 @@ protected:
 		const uint32_t lim = end - qlen - begin;
 		const uint32_t halfway = begin + (lim >> 1);
 		uint64_t seed = 0llu;
-		uint64_t buffw = 0llu;
+		uint64_t buffw = 0llu;  // rotating ref sequence buffer
 		// OR the 'diff' buffer with this so that we can always count
 		// 'N's as mismatches
 		uint64_t diffMask = 0llu;
@@ -519,11 +587,18 @@ protected:
 		}
 		int nsInSeed = 0;
 		int nPos = -1;
+		uint32_t skipLeftToRights = 0;
+		uint32_t skipRightToLefts = 0;
 		// Construct the 'seed' 64-bit buffer so that it holds all of
 		// the first 'seedBitPairs' bit pairs of the query.
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
+			if(r == 4) {
+				r = 0;
+				skipLeftToRights = max(skipLeftToRights, i + 1);
+				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+			}
 			assert_leq(c, 4);
 			assert_lt(r, 4);
 			// Special case: query has an 'N'
@@ -566,29 +641,47 @@ protected:
 			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
 			uint64_t diff;
+			assert_lt(skipLeftToRights, seedBitPairs);
+			assert_lt(skipRightToLefts, seedBitPairs);
 			if(hi) {
+				hi = false;
 				// Moving left-to-right
 				ri = halfway + (i >> 1); rir = ri - begin;
 				r = (int)ref[rir + seedBitPairs - 1];
+				if(r == 4) {
+					r = 0;
+					skipLeftToRights = seedBitPairs;
+				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
 				// position
 				buffw = ((buffw << 2llu) | r);
 				if(useMask) buffw &= clearMask;
-				hi = false;
+				if(skipLeftToRights > 0) {
+					skipLeftToRights--;
+					continue;
+				}
 				diff = (buffw ^ seed) | diffMask;
 			} else {
+				hi = true;
 				// Moving right-to-left
 				ri = halfway - (i >> 1); rir = ri - begin;
+				r = (int)ref[rir];
+				if(r == 4) {
+					r = 0;
+					skipRightToLefts = seedBitPairs;
+				}
+				assert_lt(r, 4);
 				if(i >= 2) {
-					r = (int)ref[rir];
-					assert_lt(r, 4);
 					bufbw >>= 2llu;
 					// Bring in new base pair at the most significant
 					// position
 					bufbw |= ((uint64_t)r << lhsShift);
 				}
-				hi = true;
+				if(skipRightToLefts > 0) {
+					skipRightToLefts--;
+					continue;
+				}
 				diff = (bufbw ^ seed) | diffMask;
 			}
 			// Could use pop count
