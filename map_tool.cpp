@@ -302,15 +302,15 @@ int main(int argc, char **argv) {
 				if(!good) continue; // bad alignment; skip it
 
 				if(outformat == FORMAT_BIN) {
-					BinaryHitSink::append(*out, h, outrefnames);
+					BinaryHitSink::append(*out, h, outrefnames, 0);
 				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */);
+					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */, 0);
 				} else if(outformat == FORMAT_FASTQ) {
 					fastqAppend(*out, h);
 				} else if(outformat == FORMAT_FASTA) {
 					fastaAppend(*out, h);
 				} else {
-					ConciseHitSink::append(*out, h, false /* reportOpps */);
+					ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
 				}
 			}
 		}
@@ -324,15 +324,15 @@ int main(int argc, char **argv) {
 			for(size_t i = 0; i < hits.size(); i++) {
 				Hit& h = hits[i];
 				if(outformat == FORMAT_BIN) {
-					BinaryHitSink::append(*out, h, outrefnames);
+					BinaryHitSink::append(*out, h, outrefnames, 0);
 				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */);
+					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */, 0);
 				} else if(outformat == FORMAT_FASTQ) {
 					fastqAppend(*out, h);
 				} else if(outformat == FORMAT_FASTA) {
 					fastaAppend(*out, h);
 				} else {
-					ConciseHitSink::append(*out, h, false /* reportOpps */);
+					ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
 				}
 			}
 		} else {

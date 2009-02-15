@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <string>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -162,8 +163,8 @@ public:
 		_locks(),
 		dumpUnalFaBase_(dumpUnalignFaBasename),
 		dumpUnalFqBase_(dumpUnalignFqBasename),
-		dumpMaxFaBase_(dumpUnalignFaBasename),
-		dumpMaxFqBase_(dumpUnalignFqBasename)
+		dumpMaxFaBase_(dumpMaxedFaBasename),
+		dumpMaxFqBase_(dumpMaxedFqBasename)
 	{
 		_outs.push_back(&out);
 		_locks.resize(1);
@@ -298,7 +299,7 @@ public:
 	 * stream (i.e., iff --maxfa or --maxfq are specified).
 	 */
 	bool dumpsMaxedReads() {
-		return dumpMaxed_;
+		return dumpMaxed_ || dumpUnalign_;
 	}
 
 	/**
@@ -354,7 +355,10 @@ public:
 	 * simultaneous writers.
 	 */
 	void dumpMaxed(PatternSourcePerThread& p) {
-		if(!dumpMaxed_) return;
+		if(!dumpMaxed_) {
+			if(dumpUnalign_) dumpUnalign(p);
+			return;
+		}
 		if(!p.paired()) {
 			if(!dumpMaxFaBase_.empty()) {
 				assert(dumpMaxFa_ != NULL);
@@ -426,10 +430,31 @@ protected:
      * Open an ofstream with given name; output error message and quit
      * if it fails.
      */
-    std::ofstream* openOf(const std::string& name, const char *errmsg) {
-    	std::ofstream* tmp = new ofstream(name.c_str(), ios::out);
+    std::ofstream* openOf(const std::string& name, int mateType, bool fa) {
+    	std::string s = name;
+		size_t dotoff = name.find_last_of(".");
+    	if(mateType == 1) {
+    		if(dotoff == string::npos) {
+    			s += (fa ? "_1.fa" : "_1.fq");
+    		} else {
+    			s = name.substr(0, dotoff) + "_1" + s.substr(dotoff);
+    		}
+    	} else if(mateType == 2) {
+    		if(dotoff == string::npos) {
+    			s += (fa ? "_2.fa" : "_2.fq");
+    		} else {
+    			s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
+    		}
+    	} else if(mateType != 0) {
+    		cerr << "Bad mate type " << mateType << endl; exit(1);
+    	}
+    	std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
     	if(tmp->fail()) {
-    		cerr << errmsg << name << endl;
+    		if(mateType == 0) {
+    			cerr << "Could not open single-ended unaligned-read file for writing: " << name << endl;
+    		} else {
+    			cerr << "Could not open paired-end unaligned-read file for writing: " << name << endl;
+    		}
     		exit(1);
     	}
     	return tmp;
@@ -448,36 +473,24 @@ protected:
     	dumpMaxed_   = !dumpMaxFaBase_.empty() ||
     	               !dumpMaxFqBase_.empty();
     	if(!dumpUnalFaBase_.empty()) {
-    		dumpUnalFa_   = openOf(dumpUnalFaBase_ +   ".fa",
-    			"Could not open single-ended unaligned-read file: ");
-    		dumpUnalFa_1_ = openOf(dumpUnalFaBase_ + "_1.fa",
-        			"Could not open paired-end unaligned-read file: ");
-    		dumpUnalFa_2_ = openOf(dumpUnalFaBase_ + "_2.fa",
-        			"Could not open paired-end unaligned-read file: ");
+    		dumpUnalFa_   = openOf(dumpUnalFaBase_, 0, true);
+    		dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
+    		dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
     	}
     	if(!dumpUnalFqBase_.empty()) {
-    		dumpUnalFq_   = openOf(dumpUnalFqBase_ +   ".fq",
-    			"Could not open single-ended unaligned-read file: ");
-    		dumpUnalFq_1_ = openOf(dumpUnalFqBase_ + "_1.fq",
-        			"Could not open paired-end unaligned-read file: ");
-    		dumpUnalFq_2_ = openOf(dumpUnalFqBase_ + "_2.fq",
-        			"Could not open paired-end unaligned-read file: ");
+    		dumpUnalFq_   = openOf(dumpUnalFqBase_, 0, false);
+    		dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
+    		dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
     	}
     	if(!dumpMaxFaBase_.empty()) {
-    		dumpMaxFa_   = openOf(dumpMaxFaBase_ +   ".fa",
-    			"Could not open single-ended maxed-out-read file: ");
-    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_ + "_1.fa",
-        			"Could not open paired-end maxed-out-read file: ");
-    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_ + "_2.fa",
-        			"Could not open paired-end maxed-out-read file: ");
+    		dumpMaxFa_   = openOf(dumpMaxFaBase_, 0, true);
+    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
+    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
     	}
     	if(!dumpMaxFqBase_.empty()) {
-    		dumpMaxFq_   = openOf(dumpMaxFqBase_ +   ".fq",
-    			"Could not open single-ended maxed-out-read file: ");
-    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_ + "_1.fq",
-        			"Could not open paired-end maxed-out-read file: ");
-    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_ + "_2.fq",
-        			"Could not open paired-end maxed-out-read file: ");
+    		dumpMaxFq_   = openOf(dumpMaxFqBase_, 0, false);
+    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
+    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
     	}
    		MUTEX_INIT(dumpUnalignFaLock_);
    		MUTEX_INIT(dumpUnalignFaLockPE_);
