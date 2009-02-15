@@ -237,7 +237,11 @@ public:
 			}
 			if(count == 0) break;
 			assert_geq(toff, off);
-			bufOff += (toff - off); // move bufOff pointer forward
+			if(toff < off + recs_[i].len) {
+				bufOff += (toff - off); // move bufOff pointer forward
+			} else {
+				bufOff += recs_[i].len;
+			}
 			off += recs_[i].len;
 			for(; toff < off && count > 0; toff++) {
 				assert_lt(bufOff, bufSz_);
