@@ -525,6 +525,7 @@ protected:
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			assert_leq(c, 4);
+			assert_lt(r, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
 				if(++nsInSeed > 1) {
@@ -585,7 +586,7 @@ protected:
 					bufbw >>= 2llu;
 					// Bring in new base pair at the most significant
 					// position
-					bufbw |= (r << lhsShift);
+					bufbw |= ((uint64_t)r << lhsShift);
 				}
 				hi = true;
 				diff = (bufbw ^ seed) | diffMask;
