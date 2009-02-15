@@ -98,7 +98,7 @@ static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP
 static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand
 static bool mate2fw             = false; // -2 mate aligns in rc orientation on fw strand
 static uint32_t mixedThresh     = 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
-static uint32_t mixedAttemptLim = 5;     // number of attempts to make in "mixed mode" before giving up on orientation
+static uint32_t mixedAttemptLim = 100;   // number of attempts to make in "mixed mode" before giving up on orientation
 static bool dontReconcileMates  = false; // suppress pairwise all-versus-all way of resolving mates
 static uint32_t cacheLimit      = 5;     // ranges w/ size > limit will be cached
 static uint32_t cacheSize       = 0;     // # words per range cache

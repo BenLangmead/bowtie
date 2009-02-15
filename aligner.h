@@ -986,12 +986,13 @@ protected:
 			} else if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				if(!dontReconcile_) {
+				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
+				if(!dontReconcile_ && !overThresh) {
 					done_ = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
 											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
-				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
+				if(!done_ && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
@@ -1032,12 +1033,13 @@ protected:
 			} else if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
-				if(!dontReconcile_) {
+				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
+				if(!dontReconcile_ && !overThresh) {
 					done_ = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
 											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
-				if(!done_ && ((*offsLsz_ + *offsRsz_) > mixedThresh_ || dontReconcile_)) {
+				if(!done_ && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
