@@ -197,9 +197,8 @@ public:
 			if(toff < recOff) {
 				toff -= off;
 				bufOff += toff;
-				assert_lt(bufOff, refOffs_[tidx+1]);
+				assert_lt(bufOff, bufSz_);
 				const uint32_t bufElt = (bufOff) >> 2;
-				assert_lt(bufElt, bufSz_);
 				const uint32_t shift = (bufOff & 3) << 1;
 				return ((buf_[bufElt] >> shift) & 3);
 			}
@@ -241,9 +240,8 @@ public:
 			bufOff += (toff - off); // move bufOff pointer forward
 			off += recs_[i].len;
 			for(; toff < off && count > 0; toff++) {
-				assert_lt(bufOff, refOffs_[tidx+1]);
+				assert_lt(bufOff, bufSz_);
 				const uint32_t bufElt = (bufOff) >> 2;
-				assert_lt(bufElt, bufSz_);
 				const uint32_t shift = (bufOff & 3) << 1;
 				dest[cur++] = (buf_[bufElt] >> shift) & 3;
 				bufOff++;
