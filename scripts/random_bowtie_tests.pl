@@ -341,14 +341,10 @@ sub search {
 	my $unalignArg = "";
 	my $unalign = int(rand(4));
 	if($unalign == 0 || $unalign == 2) {
-		$unalignArg .= "--unfa .tmp.un$seed";
-		$unalignArg .= ".fa" if $old_args;
-		$unalignArg .= " ";
+		$unalignArg .= "--unfa .tmp.un$seed.fa ";
 	}
 	if($unalign == 1 || $unalign == 2) {
-		$unalignArg .= "--unfq .tmp.un$seed";
-		$unalignArg .= ".fq" if $old_args;
-		$unalignArg .= " ";
+		$unalignArg .= "--unfq .tmp.un$seed.fq ";
 	}
 	
 	my $isaArg = "";
