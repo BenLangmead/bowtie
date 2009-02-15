@@ -710,12 +710,6 @@ protected:
 				// so we already know where the difference is
 				mmpos = nPos;
 				refc = "ACGT"[(int)ref[rir + nPos]];
-#ifndef NDEBUG
-				if(naiveNumMms == 1) {
-					assert_eq(mmpos, naiveMmsOff);
-					assert_eq(refc, naiveRefc);
-				}
-#endif
 			} else if(diffs == 1) {
 				// Figure out which position mismatched
 				mmpos = 31;
@@ -733,12 +727,6 @@ protected:
 				assert_lt(mmpos, 32);
 				mmpos -= seedCushion;
 				refc = "ACGT"[(int)ref[rir + mmpos]];
-#ifndef NDEBUG
-				if(naiveNumMms == 1) {
-					assert_eq(mmpos, naiveMmsOff);
-					assert_eq(refc, naiveRefc);
-				}
-#endif
 			}
 			// Now extend the seed into a longer alignment
 			bool foundHit = true;
