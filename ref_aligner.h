@@ -281,7 +281,10 @@ protected:
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r == 4) {
 				r = 0;
-				skipLeftToRights = max(skipLeftToRights, i + 1);
+				// The right-to-left direction absorbs the candidate
+				// alignment based at 'halfway'; so skipLeftToRights is
+				// i, not i+1
+				skipLeftToRights = max(skipLeftToRights, i);
 				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
 			}
 			assert_lt(r, 4);
@@ -596,7 +599,10 @@ protected:
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r == 4) {
 				r = 0;
-				skipLeftToRights = max(skipLeftToRights, i + 1);
+				// The right-to-left direction absorbs the candidate
+				// alignment based at 'halfway'; so skipLeftToRights is
+				// i, not i+1
+				skipLeftToRights = max(skipLeftToRights, i);
 				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
 			}
 			assert_leq(c, 4);
