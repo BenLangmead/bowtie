@@ -169,6 +169,7 @@ public:
 		_outs.push_back(&out);
 		_locks.resize(1);
 		MUTEX_INIT(_locks[0]);
+		MUTEX_INIT(_mainlock);
 		initDumps();
 	}
 
@@ -199,6 +200,7 @@ public:
 			_locks.resize(i+1);
 			MUTEX_INIT(_locks[i]);
 		}
+		MUTEX_INIT(_mainlock);
    		initDumps();
 	}
 
@@ -233,9 +235,10 @@ public:
 	virtual void reportHit(const Hit& h) = 0;
 
 	virtual void reportHits(vector<Hit>& hs) {
-		for(size_t i = 0; i < hs.size(); i++) {
+		size_t hssz = hs.size();
+		for(size_t i = 0; i < hssz; i++) {
 #ifndef NDEBUG
-			for(size_t j = i+1; j < hs.size(); j++) {
+			for(size_t j = i+1; j < hssz; j++) {
 				assert_eq(hs[i].h.first, hs[j].h.first);
 			}
 #endif
@@ -1562,11 +1565,12 @@ public:
 	 * is no interlacing of hits for different reads.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
-		if(hs.size() == 0) return;
-		if(_outs.size() > 1 && hs.size() > 2) {
+		size_t hssz = hs.size();
+		if(hssz == 0) return;
+		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
 		}
-		for(size_t i = 0; i < hs.size(); i++) {
+		for(size_t i = 0; i < hssz; i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				lock(h.h.first);
@@ -1576,10 +1580,10 @@ public:
 			}
 			append(out(h.h.first), h);
 		}
-		unlock(hs[hs.size()-1].h.first);
+		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hs.size();
+		_numReported += hssz;
 		mainunlock();
 	}
 
@@ -2000,11 +2004,12 @@ public:
 	 * appropriate output stream.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
-		if(hs.size() == 0) return;
-		if(_outs.size() > 1 && hs.size() > 2) {
+		size_t hssz = hs.size();
+		if(hssz == 0) return;
+		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
 		}
-		for(size_t i = 0; i < hs.size(); i++) {
+		for(size_t i = 0; i < hssz; i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				lock(h.h.first);
@@ -2014,10 +2019,10 @@ public:
 			}
 			append(out(h.h.first), h);
 		}
-		unlock(hs[hs.size()-1].h.first);
+		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hs.size();
+		_numReported += hssz;
 		mainunlock();
 	}
 
@@ -2322,12 +2327,13 @@ public:
 	 * Report a list of hits to the appropriate output stream.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
-		if(hs.size() == 0) return;
+		size_t hssz = hs.size();
+		if(hssz == 0) return;
 		// Sort the hits in order of
-		if(_outs.size() > 1 && hs.size() > 2) {
+		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
 		}
-		for(size_t i = 0; i < hs.size(); i++) {
+		for(size_t i = 0; i < hssz; i++) {
 			const Hit& h = hs[i];
 			if(i == 0) {
 				// Lock the first stream
@@ -2342,10 +2348,10 @@ public:
 			append(out(h.h.first), h);
 		}
 		// Unlock the last stream
-		unlock(hs[hs.size()-1].h.first);
+		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hs.size();
+		_numReported += hssz;
 		mainunlock();
 	}
 
