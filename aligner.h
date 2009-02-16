@@ -767,7 +767,9 @@ protected:
 				tlen,                         // textlen
 				lenL,                         // qlen
 				rL.stratum,                   // alignment stratum
-				oms);                         // # other hits
+				oms,                          // # other hits
+				bufL->patid,
+				pairFw ? 1 : 2);
 		assert(!ret);
 		params_->setFw(fwR);
 		ret = params_->reportHit(
@@ -785,7 +787,9 @@ protected:
 				tlen,                         // textlen
 				lenR,                         // qlen
 				rR.stratum,                   // alignment stratum
-				oms);                         // # other hits
+				oms,                          // # other hits
+				bufR->patid,
+				pairFw ? 2 : 1);
 		return ret;
 	}
 
@@ -1138,7 +1142,7 @@ protected:
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drL_->done() && (dontReconcile_ || *offsLsz_ == 0)) {
+				if(drL_->done() && (dontReconcile_ || (*offsLsz_ == 0))) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
