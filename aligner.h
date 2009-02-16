@@ -152,11 +152,10 @@ public:
 					// Advance an aligner already in progress
 					done = false;
 					(*aligners_)[i]->advance();
-				} else if(qUpto_ > 0) {
+				} else {
 					// Get a new read and initialize an aligner with it
 					(*patsrcs_)[i]->nextReadPair();
-					if(!(*patsrcs_)[i]->empty()) {
-						qUpto_--;
+					if(!(*patsrcs_)[i]->empty() && (*patsrcs_)[i]->patid() < qUpto_) {
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
 						assert(!(*aligners_)[i]->done());
 						done = false;
@@ -164,8 +163,6 @@ public:
 						// No more reads; if done == true, it remains
 						// true
 					}
-				} else {
-					// Past read limit; if done == true, it remains true
 				}
 			}
 		}
@@ -245,8 +242,7 @@ public:
 					PatternSourcePerThread *ps = (*patsrcs_)[i];
 					// Get a new read
 					ps->nextReadPair();
-					if(!ps->empty()) {
-						qUpto_--;
+					if(ps->patid() < qUpto_ && !ps->empty()) {
 						if(ps->paired()) {
 							// Read currently in buffer is paired-end
 							if(verbose) cout << "Paired input: " << ps->bufa().patFw << "," << ps->bufb().patFw << endl;
