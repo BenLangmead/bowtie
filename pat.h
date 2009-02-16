@@ -127,6 +127,34 @@ struct ReadBuf {
 		}
 	}
 
+	/**
+	 * Append a "/1" or "/2" string onto the end of the name buf if
+	 * it's not already there.
+	 */
+	void fixMateName(int i) {
+		assert(i == 1 || i == 2);
+		size_t namelen = seqan::length(name);
+		bool append = false;
+		if(namelen < 2) append = true;
+		else {
+			if(i == 1) {
+				append =
+					nameBuf[namelen-2] != '/' ||
+					nameBuf[namelen-1] != '1';
+			} else {
+				append =
+					nameBuf[namelen-2] != '/' ||
+					nameBuf[namelen-1] != '2';
+			}
+		}
+		if(append) {
+			assert_leq(namelen, BUF_SIZE-2);
+			_setLength(name, namelen + 2);
+			nameBuf[namelen] = '/';
+			nameBuf[namelen+1] = "012"[i];
+		}
+	}
+
 	static const int BUF_SIZE = 1024;
 
 	bool          reversed;
@@ -426,14 +454,15 @@ public:
 				uint32_t patid_a = 0;
 				uint32_t patid_b = 0;
 				srca_[cur]->nextRead(ra, patid_a);
+				ra.fixMateName(1);
 				srcb_[cur]->nextRead(rb, patid_b);
+				rb.fixMateName(2);
 				bool cont = false;
 				while(patid_a != patid_b) {
 					// Is either input exhausted?  If so, bail.
 					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
 						seqan::clear(ra.patFw);
 						lock();
-						//basePatid_ += srca_[cur]->patid();
 						if(cur + 1 > cur_) cur_++;
 						cur = cur_;
 						unlock();
@@ -442,8 +471,10 @@ public:
 					}
 					if(patid_a < patid_b) {
 						srca_[cur]->nextRead(ra, patid_a);
+						ra.fixMateName(1);
 					} else {
 						srcb_[cur]->nextRead(rb, patid_b);
+						rb.fixMateName(2);
 					}
 				}
 				if(cont) continue; // on to next pair of PatternSources
@@ -451,7 +482,6 @@ public:
 					// If patFw is empty, that's our signal that the
 					// input dried up
 					lock();
-					//basePatid_ += srca_[cur]->patid();
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
 					unlock();
@@ -1527,8 +1557,17 @@ protected:
 				break;
 			}
 			r.nameBuf[nameLen++] = c;
+			if(nameLen > bufSz-2) {
+				// Too many chars in read name; print friendly error message
+				_setBegin(r.name, r.nameBuf);
+				_setLength(r.name, nameLen);
+				cerr << "FASTQ read name is too long; read names must be " << (bufSz-2) << " characters or fewer." << endl;
+				cerr << "Beginning of bad read name: " << r.name << endl;
+				exit(1);
+			}
 		}
 		_setBegin(r.name, r.nameBuf);
+		assert_leq(nameLen, bufSz-2);
 		_setLength(r.name, nameLen);
 		// c now holds the first character on the line after the
 		// @name line
