@@ -1102,7 +1102,7 @@ protected:
 #endif
 					// Add the size of this range to the total for this mate
 					*offsLsz_ += (drL_->range().bot - drL_->range().top);
-					if(*offsRsz_ == 0) {
+					if(*offsRsz_ == 0 && !dontReconcile_) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
