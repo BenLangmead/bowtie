@@ -1232,6 +1232,8 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
 	}
 #endif
+
+	if(refs != NULL) delete refs;
 }
 
 /**
@@ -1506,7 +1508,6 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
-	if(refs != NULL) delete refs;
 	delete patsrcFact;
 	delete sinkFact;
 #ifdef BOWTIE_PTHREADS
@@ -1634,6 +1635,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
 #endif
+	if(refs != NULL) delete refs;
 }
 
 #define SWITCH_TO_FW_INDEX() { \
