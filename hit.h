@@ -62,7 +62,8 @@ public:
 		mms(),
 		refcs(),
 		oms(0),
-		fw(true) { }
+		fw(true),
+		mate(0) { }
 
 	Hit(const Hit& other) {
 		this->operator=(other);
@@ -79,11 +80,13 @@ public:
 		bool _fw,
 		const FixedBitset<max_read_bp>& _mms,
 		const vector<char>& _refcs,
-		uint32_t _oms = 0) :
+		uint32_t _oms = 0,
+		uint8_t _mate = 0) :
 		h(_h),
 		patId(_patId),
 		oms(_oms),
-		fw(_fw)
+		fw(_fw),
+		mate(_mate)
 	{
 		patName = _patName;
 		patSeq  = _patSeq;
@@ -123,6 +126,9 @@ public:
 	vector<char>        refcs;   /// reference characters for mms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
+	uint8_t             mate;    /// matedness; 0 = not a mate
+	                             ///            1 = upstream mate
+	                             ///            2 = downstream mate
 
 	size_t length() const { return seqan::length(patSeq); }
 
@@ -136,6 +142,7 @@ public:
 	    this->refcs   = other.refcs;
 	    this->oms     = other.oms;
 		this->fw      = other.fw;
+		this->mate    = other.mate;
 	    return *this;
 	}
 };
@@ -1531,7 +1538,12 @@ public:
 	 * Append a verbose, readable hit to the given output stream.
 	 */
 	static void append(ostream& ss, const Hit& h, int offBase, bool reportOpps) {
-		ss << h.patId << (h.fw? "+" : "-") << ":";
+		ss << h.patId;
+		if(h.mate > 0) {
+			assert(h.mate == 1 || h.mate == 2);
+			ss << '/' << (int)h.mate;
+		}
+		ss << (h.fw? "+" : "-") << ":";
     	// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << (h.h.second + offBase) << "," << h.mms.count();
 		if(reportOpps) ss << "," << h.oms;
@@ -1600,8 +1612,8 @@ public:
 
 private:
 	bool     _reportOpps;
-	bool     _first;       /// true -> first hit hasn't yet been reported
-	uint64_t _numReported;
+	volatile bool     _first;       /// true -> first hit hasn't yet been reported
+	volatile uint64_t _numReported;
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
@@ -2041,8 +2053,8 @@ public:
 	}
 
 private:
-	bool     _first;       /// true iff this object hasn't yet reported a hit
-	uint64_t _numReported; /// number of hits reported
+	volatile bool     _first;       /// true iff this object hasn't yet reported a hit
+	volatile uint64_t _numReported; /// number of hits reported
 	int      _partition;   /// partition size, or 0 if partitioning is disabled
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
@@ -2369,8 +2381,8 @@ public:
 		}
 	}
 private:
-	bool _first;           /// true iff this object hasn't yet reported a hit
-	uint64_t _numReported; /// number of hits reported
+	volatile bool _first;           /// true iff this object hasn't yet reported a hit
+	volatile uint64_t _numReported; /// number of hits reported
 	int offBase_;          /// Add this to reference offsets before outputting.
                            /// (An easy way to make things 1-based instead of
                            /// 0-based)

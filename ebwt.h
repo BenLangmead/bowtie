@@ -1246,7 +1246,9 @@ public:
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
 	               int stratum,        // alignment stratum
-	               uint32_t oms) const
+	               uint32_t oms,       // approx. # other valid alignments
+	               uint32_t patid = 0xffffffff,
+	               uint8_t mate = 0) const
 	{
 		// The search functions should not have allowed us to get here
 		String<Dna5> pat;
@@ -1255,6 +1257,7 @@ public:
 		reserve(pat, qlen);
 		// Report it using the HitSinkPerThread
 		Hit hit;
+		if(patid == 0xffffffff) patid = _patid;
 		// Make a copy of the read name
 		if(name != NULL) assign(hit.patName, *name);
 		hit.patSeq = query;
@@ -1356,10 +1359,11 @@ public:
 			if(diffs != hit.mms) assert(false);
 		}
 		hit.h = _arrowMode? a : h;
-		hit.patId = _patid;
+		hit.patId = patid;
 		if(name != NULL) hit.patName = *name;
 		hit.fw = _fw;
 		hit.oms = oms;
+		hit.mate = mate;
 		return sink().reportHit(hit, stratum);
 	}
 	bool arrowMode() const {

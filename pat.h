@@ -57,6 +57,7 @@ struct ReadBuf {
 	/// Point all Strings to the beginning of their respective buffers
 	/// and set all lengths to 0
 	void reset() {
+		patid = 0;
 		_setBegin(patFw,     (Dna5*)patBufFw);     _setLength(patFw, 0);     _setCapacity(patFw, BUF_SIZE);
 		_setBegin(patRc,     (Dna5*)patBufRc);     _setLength(patRc, 0);     _setCapacity(patRc, BUF_SIZE);
 		_setBegin(qualFw,    (char*)qualBufFw);    _setLength(qualFw, 0);    _setCapacity(qualFw, BUF_SIZE);
@@ -179,6 +180,8 @@ struct ReadBuf {
 
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
+	uint32_t      patid;               // unique 0-based id based on order in read file(s)
+	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
 };
 
 /**
@@ -361,7 +364,7 @@ public:
 
 	PairedPatternSource(const vector<PatternSource*>& srca,
 	                    const vector<PatternSource*>& srcb) :
-		cur_(0), basePatid_(0), srca_(srca), srcb_(srcb)
+		cur_(0), srca_(srca), srcb_(srcb)
 	{
 	    // srca_ and srcb_ must be parallel
 	    assert_eq(srca_.size(), srcb_.size());
@@ -403,7 +406,6 @@ public:
 			}
 		}
 		cur_ = 0;
-		basePatid_ = 0;
 	}
 
 	/**
@@ -442,22 +444,25 @@ public:
 					// If patFw is empty, that's our signal that the
 					// input dried up
 					lock();
-					//basePatid_ += srca_[cur]->patid();
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
 					unlock();
 					continue; // on to next pair of PatternSources
 				}
+				ra.patid = patid;
+				ra.mate  = 0;
 				return false; // unpaired
 			} else {
 				// Patterns from srca_[cur_] and srcb_[cur_] are paired
 				uint32_t patid_a = 0;
 				uint32_t patid_b = 0;
+				// Lock to ensure that this thread gets parallel reads
+				// in the two mate files
+				lock();
 				srca_[cur]->nextRead(ra, patid_a);
-				ra.fixMateName(1);
 				srcb_[cur]->nextRead(rb, patid_b);
-				rb.fixMateName(2);
 				bool cont = false;
+				// Did the pair obtained fail to match up?
 				while(patid_a != patid_b) {
 					// Is either input exhausted?  If so, bail.
 					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
@@ -477,7 +482,10 @@ public:
 						rb.fixMateName(2);
 					}
 				}
+				unlock();
 				if(cont) continue; // on to next pair of PatternSources
+				ra.fixMateName(1);
+				rb.fixMateName(2);
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
@@ -489,6 +497,10 @@ public:
 				}
 				assert_eq(patid_a, patid_b);
 				patid = patid_a;
+				ra.patid = patid;
+				rb.patid = patid;
+				ra.mate  = 1;
+				rb.mate  = 2;
 				return true; // paired
 			}
 		}
@@ -519,8 +531,7 @@ public:
 	}
 
 protected:
-	uint32_t cur_; // current element in parallel srca_, srcb_ vectors
-	uint32_t basePatid_;
+	volatile uint32_t cur_; // current element in parallel srca_, srcb_ vectors
 	vector<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
 	vector<PatternSource*> srcb_; /// PatternSources for 2nd mates
 #ifdef USE_SPINLOCK
