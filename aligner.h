@@ -1077,7 +1077,7 @@ protected:
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drR_->done() && *offsRsz_ == 0) {
+				if(drR_->done() && (dontReconcile_ || *offsRsz_ == 0)) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
 					*donePair_ = true;
@@ -1138,7 +1138,7 @@ protected:
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drL_->done() && *offsLsz_ == 0) {
+				if(drL_->done() && (dontReconcile_ || *offsLsz_ == 0)) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
