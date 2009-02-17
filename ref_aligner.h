@@ -244,7 +244,7 @@ protected:
 						//pairs->insert(p);
 					}
 				}
-				ranges.resize(ranges.size());
+				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
 				range.stratum = 0;
 				range.numMms = 0;
