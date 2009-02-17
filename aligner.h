@@ -996,9 +996,10 @@ protected:
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(pairFw, rchase_->off(),
-					                                drL_->curEbwt()->_plen[rchase_->off().first],
-					                                drL_->range());
+					done_ = resolveOutstandingInRef(
+							pairFw, rchase_->off(),
+					        drL_->curEbwt()->_plen[rchase_->off().first],
+					        drL_->range());
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
@@ -1043,9 +1044,10 @@ protected:
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(!pairFw, rchase_->off(),
-					                                drR_->curEbwt()->_plen[rchase_->off().first],
-					                                drR_->range());
+					done_ = resolveOutstandingInRef(
+							!pairFw, rchase_->off(),
+					        drR_->curEbwt()->_plen[rchase_->off().first],
+					        drR_->range());
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
@@ -1071,13 +1073,13 @@ protected:
 		}
 		if(!done_ && !*donePair_ && !*chaseL_ && !*chaseR_) {
 			// Search for more ranges for whichever mate currently has
-			// fewer ranges
+			// fewer candidate alignments
 			if((*offsLsz_ < *offsRsz_ || drR_->done()) && !drL_->done()) {
 				// If there are no more ranges for the other mate and
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drR_->done() && (dontReconcile_ || *offsRsz_ == 0)) {
+				if(drR_->done() && *offsRsz_ == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
 					*donePair_ = true;
@@ -1098,7 +1100,7 @@ protected:
 #endif
 					// Add the size of this range to the total for this mate
 					*offsLsz_ += (drL_->range().bot - drL_->range().top);
-					if(*offsRsz_ == 0 && !dontReconcile_) {
+					if(*offsRsz_ == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
@@ -1138,7 +1140,7 @@ protected:
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drL_->done() && (dontReconcile_ || (*offsLsz_ == 0))) {
+				if(drL_->done() && *offsLsz_ == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
@@ -1159,7 +1161,7 @@ protected:
 #endif
 					// Add the size of this range to the total for this mate
 					*offsRsz_ += (drR_->range().bot - drR_->range().top);
-					if(*offsLsz_ == 0 && !dontReconcile_) {
+					if(*offsLsz_ == 0) {
 						// Delay chasing this range; we delay to avoid
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
