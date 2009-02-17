@@ -205,7 +205,7 @@ public:
 	 * Create a new UnpairedExactAlignerV1s.
 	 */
 	virtual Aligner* create() const {
-		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2, 0xffffffff);
+		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 

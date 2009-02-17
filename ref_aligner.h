@@ -25,8 +25,14 @@ const static int REF_ALIGNER_BUFSZ = 16 * 1024;
  */
 template<typename TStr>
 class RefAligner {
+
 	typedef seqan::String<seqan::Dna5> TDna5Str;
 	typedef seqan::String<char> TCharStr;
+	typedef std::vector<uint32_t> TU32Vec;
+	typedef std::vector<Range> TRangeVec;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
+
 public:
 	RefAligner(uint32_t seedLen) :
 		seedLen_(seedLen), refbuf_(buf_), refbufSz_(REF_ALIGNER_BUFSZ),
@@ -42,20 +48,21 @@ public:
 		}
 	}
 
-	virtual uint32_t findOne(const uint32_t tidx,
-	                         const BitPairReference *refs,
-	                         const TDna5Str& qry,
-	                         const TCharStr& quals,
-	                         uint32_t begin,
-	                         uint32_t end,
-	                         Range& range) = 0;
-	virtual void findAll    (const uint32_t tidx,
-	                         const BitPairReference *refs,
-	                         const TDna5Str& qry,
-	                         const TCharStr& quals,
-	                         uint32_t begin,
-	                         uint32_t end,
-	                         std::vector<Range>& results) = 0;
+	/**
+	 * Find all new alignments and store in results vector.
+	 */
+	virtual void find(uint32_t numToFind,
+	                  const uint32_t tidx,
+	                  const BitPairReference *refs,
+	                  const TDna5Str& qry,
+	                  const TCharStr& quals,
+	                  uint32_t begin,
+	                  uint32_t end,
+	                  TRangeVec& ranges,
+	                  TU32Vec& results,
+	                  TSetPairs* pairs = NULL,
+	                  uint32_t aoff = 0,
+	                  bool low = false) = 0;
 
 	/**
 	 * Set a new reference-sequence buffer.
@@ -88,24 +95,11 @@ public:
 	}
 
 protected:
-	uint32_t seedLen_;
-	uint8_t *refbuf_;
-	uint32_t refbufSz_;
-	uint8_t  buf_[REF_ALIGNER_BUFSZ];
-	bool     freeRefbuf_;
-};
-
-/**
- * Abstract factory parent class for RefAligners.
- */
-template<typename TStr>
-class RefAlignerFactory {
-public:
-	RefAlignerFactory(uint32_t seedLen) : seedLen_(seedLen) { }
-	virtual ~RefAlignerFactory() { }
-	virtual RefAligner<TStr>* create() const = 0;
-protected:
-	uint32_t seedLen_;
+	uint32_t seedLen_;   /// length of seed region for read
+	uint8_t *refbuf_;    /// pointer to current reference buffer
+	uint32_t refbufSz_;  /// size of current reference buffer
+	uint8_t  buf_[REF_ALIGNER_BUFSZ]; /// built-in reference buffer (may be superseded)
+	bool     freeRefbuf_; /// whether refbuf_ points to something we should delete
 };
 
 /**
@@ -113,8 +107,14 @@ protected:
  */
 template<typename TStr>
 class ExactRefAligner : public RefAligner<TStr> {
+
 	typedef seqan::String<seqan::Dna5> TDna5Str;
 	typedef seqan::String<char> TCharStr;
+	typedef std::vector<uint32_t> TU32Vec;
+	typedef std::vector<Range> TRangeVec;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
+
 public:
 	ExactRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
 	virtual ~ExactRefAligner() { }
@@ -123,14 +123,20 @@ public:
 	 * Find one alignment of qry:quals in the range begin-end in
 	 * reference string ref.  Store the alignment details in range.
 	 */
-	virtual uint32_t findOne(const uint32_t tidx,
-	                         const BitPairReference *refs,
-	                         const TDna5Str& qry,
-	                         const TCharStr& quals,
-	                         uint32_t begin,
-	                         uint32_t end,
-	                         Range& range)
+	virtual void find(uint32_t numToFind,
+	                  const uint32_t tidx,
+	                  const BitPairReference *refs,
+	                  const TDna5Str& qry,
+	                  const TCharStr& quals,
+	                  uint32_t begin,
+	                  uint32_t end,
+	                  TRangeVec& ranges,
+	                  TU32Vec& results,
+	                  TSetPairs* pairs = NULL,
+	                  uint32_t apos = 0,
+	                  bool low = false)
 	{
+		assert_gt(numToFind, 0);
 		uint32_t spread = end - begin;
 		// Make sure the buffer is large enough to accommodate the spread
 		if(spread > this->refbufSz_) {
@@ -139,21 +145,9 @@ public:
 		// Read in the relevant stretch of the reference string
 		refs->getStretch(this->refbuf_, tidx, begin, spread);
 		// Look for alignments
-		return seed64FindOne(this->refbuf_, qry, quals, begin, end, range);
-	}
-
-	/**
-	 *
-	 */
-	virtual void findAll(const uint32_t tidx,
-                         const BitPairReference *refs,
-	                     const TDna5Str& qry,
-	                     const TCharStr& quals,
-	                     uint32_t begin,
-	                     uint32_t end,
-	                     std::vector<Range>& results)
-	{
-		throw;
+		return seed64Find(numToFind, tidx, this->refbuf_, qry, quals,
+		                  begin, end, ranges, results, pairs, apos,
+		                  low);
 	}
 
 protected:
@@ -161,13 +155,20 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t naiveFindOne( uint8_t* ref,
-                           const TDna5Str& qry,
-                           const TCharStr& quals,
-                           uint32_t begin,
-                           uint32_t end,
-                           Range& range) const
+	void naiveFind(uint32_t numToFind,
+	               uint32_t tidx,
+	               uint8_t* ref,
+                   const TDna5Str& qry,
+                   const TCharStr& quals,
+                   uint32_t begin,
+                   uint32_t end,
+	               TRangeVec& ranges,
+	               TU32Vec& results,
+	               TSetPairs* pairs,
+	               uint32_t aoff, // offset of anchor
+	               bool low) const
 	{
+		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -197,6 +198,11 @@ protected:
 				assert_leq(q, 4);
 				assert_leq(r, 4);
 				if(q == 4 || r == 4 || q != r) {
+					// Mismatch
+					match = false;
+					break;
+				}
+				// Match; continue
 #else
 				// Disallow alignments that involve an N in the
 				// reference
@@ -210,45 +216,75 @@ protected:
 				assert_leq(q, 4);
 				assert_lt(r, 4);
 				if(q != r) {
-#endif
 					// Mismatch
 					match = false;
 					break;
 				}
 				// Match; continue
-	 		}
+#endif
+			}
 			if(match) {
+				if(pairs != NULL) {
+					TU64Pair p;
+					if(low) {
+						// By convention, the upstream ("low") mate's
+						// coordinates go in the 'first' field
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+					} else {
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					}
+					if(pairs->find(p) != pairs->end()) {
+						// We already found this hit!  Continue.
+						continue;
+					} else {
+						// *Don't* record this hit - this is just a
+						// sanity check
+						//pairs->insert(p);
+					}
+				}
+				ranges.resize(ranges.size());
+				Range& range = ranges.back();
 				range.stratum = 0;
 				range.numMms = 0;
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
-				return ri;
+				results.push_back(ri);
+				if(--numToFind == 0) return;
 			}
 		}
-		return 0xffffffff; // no match
+		return; // no match
 	}
 
 	/**
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t seed64FindOne(uint8_t *ref,
-                           const TDna5Str& qry,
-                           const TCharStr& quals,
-                           uint32_t begin,
-                           uint32_t end,
-                           Range& range) const
+	void seed64Find(uint32_t numToFind,
+                    uint32_t tidx,
+	                uint8_t *ref,
+                    const TDna5Str& qry,
+                    const TCharStr& quals,
+                    uint32_t begin,
+                    uint32_t end,
+ 	                TRangeVec& ranges,
+	                TU32Vec& results,
+	                TSetPairs* pairs,
+	                uint32_t aoff, // offset of anchor mate
+	                bool low) const
 	{
+		assert_gt(numToFind, 0);
+		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
-		uint32_t naive;
-		{
-			Range r2;
-			naive = naiveFindOne(ref, qry, quals, begin, end, r2);
-		}
+		// Get all naive hits
+		TRangeVec r2; TU32Vec re2;
+		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
+		          re2, pairs, aoff, low);
 #endif
 		const uint32_t seedBitPairs = min<int>(qlen, 32);
 		const uint32_t seedOverhang = qlen <= 32 ? 0 : qlen - 32;
@@ -275,8 +311,8 @@ protected:
 			int c = (int)qry[i]; // next query character
 			assert_leq(c, 4);
 			if(c == 4) {
-				assert_eq(0xffffffff, naive);
-				return 0xffffffff;   // can't match if query has Ns
+				assert_eq(r2.size(), ranges.size() - rangesInitSz);
+				return; // can't match if query has Ns
 			}
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r == 4) {
@@ -296,8 +332,8 @@ protected:
 		// region
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
-				assert_eq(0xffffffff, naive);
-				return 0xffffffff; // can't match if query has Ns
+				assert_eq(r2.size(), ranges.size() - rangesInitSz);
+				return; // can't match if query has Ns
 			}
 		}
 		uint64_t bufbw = buffw;
@@ -332,9 +368,6 @@ protected:
 					continue;
 				}
 				if(buffw != seed) {
-					// We're about to reject; make sure naive algorithm
-					// also rejected
-					assert_neq(ri, naive);
 					continue;
 				}
 			} else {
@@ -358,9 +391,6 @@ protected:
 					continue;
 				}
 				if(bufbw != seed) {
-					// We're about to reject; make sure naive algorithm
-					// also rejected
-					assert_neq(ri, naive);
 					continue;
 				}
 			}
@@ -379,18 +409,42 @@ protected:
 				}
 			}
 			if(foundHit) {
-				assert_eq(ri, naive);
+				if(pairs != NULL) {
+					TU64Pair p;
+					if(low) {
+						// By convention, the upstream ("low") mate's
+						// coordinates go in the 'first' field
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+					} else {
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					}
+					if(pairs->find(p) != pairs->end()) {
+						// We already found this hit!  Continue.
+						continue;
+					} else {
+						// Record this hit
+						pairs->insert(p);
+					}
+				}
+				ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
+				assert_lt(added, r2.size());
+				assert_eq(re2[added], ri);
+				ranges.resize(ranges.size()+1);
+				Range& range = ranges.back();
 				range.stratum = 0;
 				range.numMms = 0;
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
-				return ri;
+				results.push_back(ri);
+				if(--numToFind == 0) return;
 			} else {
 				// Keep scanning
 			}
 		}
-		assert_eq(0xffffffff, naive);
-		return 0xffffffff; // no hit
+		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		return; // no hit
 	}
 };
 
@@ -406,25 +460,36 @@ extern unsigned char u8toMms[];
  */
 template<typename TStr>
 class OneMMRefAligner : public RefAligner<TStr> {
+
 	typedef seqan::String<seqan::Dna5> TDna5Str;
 	typedef seqan::String<char> TCharStr;
+	typedef std::vector<Range> TRangeVec;
+	typedef std::vector<uint32_t> TU32Vec;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
+
 public:
 	OneMMRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
 	virtual ~OneMMRefAligner() { }
-
 
 	/**
 	 * Find one alignment of qry:quals in the range begin-end in
 	 * reference string ref.  Store the alignment details in range.
 	 */
-	virtual uint32_t findOne(const uint32_t tidx,
-	                         const BitPairReference *refs,
-	                         const TDna5Str& qry,
-	                         const TCharStr& quals,
-	                         uint32_t begin,
-	                         uint32_t end,
-	                         Range& range)
+	virtual void find(uint32_t numToFind,
+	                  const uint32_t tidx,
+	                  const BitPairReference *refs,
+	                  const TDna5Str& qry,
+	                  const TCharStr& quals,
+	                  uint32_t begin,
+	                  uint32_t end,
+	                  TRangeVec& ranges,
+	                  TU32Vec& results,
+	                  TSetPairs* pairs = NULL,
+	                  uint32_t aoff = 0xffffffff,
+	                  bool low = false)
 	{
+		assert_gt(numToFind, 0);
 		uint32_t spread = end - begin;
 		// Make sure the buffer is large enough to accommodate the spread
 		if(spread > this->refbufSz_) {
@@ -433,21 +498,8 @@ public:
 		// Read in the relevant stretch of the reference string
 		refs->getStretch(this->refbuf_, tidx, begin, spread);
 		// Look for alignments
-		return seed64FindOne(this->refbuf_, qry, quals, begin, end, range);
-	}
-
-	/**
-	 *
-	 */
-	virtual void findAll(const uint32_t tidx,
-	                     const BitPairReference *refs,
-	                     const TDna5Str& qry,
-	                     const TCharStr& quals,
-	                     uint32_t begin,
-	                     uint32_t end,
-	                     std::vector<Range>& results)
-	{
-		throw;
+		return seed64Find(numToFind, tidx, this->refbuf_, qry, quals,
+		                  begin, end, ranges, results, pairs, aoff, low);
 	}
 
 protected:
@@ -455,13 +507,20 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t naiveFindOne( uint8_t* ref,
-                           const TDna5Str& qry,
-                           const TCharStr& quals,
-                           uint32_t begin,
-                           uint32_t end,
-                           Range& range) const
+	void naiveFind(uint32_t numToFind,
+	               uint32_t tidx,
+	               uint8_t* ref,
+                   const TDna5Str& qry,
+                   const TCharStr& quals,
+                   uint32_t begin,
+                   uint32_t end,
+	               TRangeVec& ranges,
+	               TU32Vec& results,
+	               TSetPairs* pairs,
+	               uint32_t aoff,
+	               bool low) const
 	{
+		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -521,7 +580,29 @@ protected:
 				}
 	 		}
 			if(match) {
+				if(pairs != NULL) {
+					TU64Pair p;
+					if(low) {
+						// By convention, the upstream ("low") mate's
+						// coordinates go in the 'first' field
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+					} else {
+						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					}
+					if(pairs->find(p) != pairs->end()) {
+						// We already found this hit!  Continue.
+						continue;
+					} else {
+						// *Don't* record this hit - this is just a
+						// sanity check
+						// pairs->insert(p);
+					}
+				}
 				assert_leq(mms, 1);
+				ranges.resize(ranges.size()+1);
+				Range& range = ranges.back();
 				range.stratum = mms;
 				range.numMms = mms;
 				assert_eq(0, range.mms.size());
@@ -531,43 +612,41 @@ protected:
 					range.mms.push_back(mmOff);
 					range.refcs.push_back(refc);
 				}
-				return ri;
+				results.push_back(ri);
+				if(--numToFind == 0) return;
 			}
 		}
-		return 0xffffffff;
+		return;
 	}
 
 	/**
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	uint32_t seed64FindOne(uint8_t* ref,
-                           const TDna5Str& qry,
-                           const TCharStr& quals,
-                           uint32_t begin,
-                           uint32_t end,
-                           Range& range) const
+	void seed64Find(uint32_t numToFind,
+	                uint32_t tidx,
+	                uint8_t* ref,
+                    const TDna5Str& qry,
+                    const TCharStr& quals,
+                    uint32_t begin,
+                    uint32_t end,
+	                TRangeVec& ranges,
+	                TU32Vec& results,
+	                TSetPairs* pairs = NULL,
+	                uint32_t aoff = 0xffffffff,
+	                bool low = false) const
 	{
+		assert_gt(numToFind, 0);
+		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		uint32_t naive;
-		int naiveNumMms;
-		int naiveMmsOff = -1;
-		int naiveRefc = -1;
-		{
-			Range r2;
-			naive = naiveFindOne(ref, qry, quals, begin, end, r2);
-			naiveNumMms = r2.numMms;
-			assert_leq(naiveNumMms, 1);
-			if(naiveNumMms == 1) {
-				naiveMmsOff = r2.mms[0];
-				naiveRefc = r2.refcs[0];
-			}
-		}
+		TRangeVec r2; TU32Vec re2;
+		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
+		          re2, pairs, aoff, low);
 #endif
 		const uint32_t seedBitPairs = min<int>(qlen, 32);
 		const int lhsShift = ((seedBitPairs - 1) << 1);
@@ -612,8 +691,8 @@ protected:
 				if(++nsInSeed > 1) {
 					// More than one 'N' in the seed region; can't
 					// possibly have a 1-mismatch hit anywhere
-					assert_eq(0xffffffff, naive);
-					return 0xffffffff;   // can't match if query has Ns
+					assert_eq(r2.size(), ranges.size() - rangesInitSz);
+					return;   // can't match if query has Ns
 				}
 				nPos = (int)i;
 				// Make it look like an 'A' in the seed
@@ -630,8 +709,8 @@ protected:
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				if(++nsInSeed > 1) {
-					assert_eq(0xffffffff, naive);
-					return 0xffffffff; // can't match if query has Ns
+					assert_eq(r2.size(), ranges.size() - rangesInitSz);
+					return; // can't match if query has Ns
 				}
 			}
 		}
@@ -692,13 +771,12 @@ protected:
 			}
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
-			int mmpos = -1;
+			uint32_t mmpos = 0xffffffff;
 			int refc = -1;
 			// As a first cut, see if there are too many mismatches in
 			// the first and last parts of the seed
-			int diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
+			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
 			if(diffs > 1) {
-				assert_neq(ri, naive);
 				continue;
 			}
 			diffs += u8toMms[(int)diff8[1]] +
@@ -708,7 +786,6 @@ protected:
 			         u8toMms[(int)diff8[5]] +
 			         u8toMms[(int)diff8[6]];
 			if(diffs > 1) {
-				assert_neq(ri, naive);
 				// Too many differences
 				continue;
 			} else if(diffs == 1 && nPos != -1) {
@@ -751,38 +828,49 @@ protected:
 				}
 			}
 			if(!foundHit) continue;
+			if(pairs != NULL) {
+				TU64Pair p;
+				if(low) {
+					// By convention, the upstream ("low") mate's
+					// coordinates go in the 'first' field
+					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+				} else {
+					p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+				}
+				if(pairs->find(p) != pairs->end()) {
+					// We already found this hit!  Continue.
+					continue;
+				} else {
+					// Record this hit
+					pairs->insert(p);
+				}
+			}
 			assert(diffs <= 1);
-			assert_eq(ri, naive);
-			assert_eq(diffs, naiveNumMms);
+			ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
+			assert_lt(added, r2.size());
+			assert_eq(re2[added], ri);
+			ranges.resize(ranges.size()+1);
+			Range& range = ranges.back();
+			assert_eq(diffs, r2[added].numMms);
 			range.stratum = diffs;
 			range.numMms = diffs;
 			assert_eq(0, range.mms.size());
 			assert_eq(0, range.refcs.size());
 			if(diffs == 1) {
-				assert_geq(mmpos, 0);
-				assert_eq(mmpos, naiveMmsOff);
+				assert_neq(mmpos, 0xffffffff);
+				assert_eq(mmpos, r2[added].mms[0]);
 				assert_neq(-1, refc);
-				assert_eq(refc, naiveRefc);
+				assert_eq(refc, r2[added].refcs[0]);
 				range.mms.push_back(mmpos);
 				range.refcs.push_back(refc);
 			}
-			return ri;
+			results.push_back(ri);
+			if(--numToFind == 0) return;
 		}
-		assert_eq(0xffffffff, naive);
-		return 0xffffffff; // no hit
-	}
-};
-
-/**
- * Concrete factory for ExactRefAligners.
- */
-template<typename TStr>
-class ExactRefAlignerFactory : public RefAlignerFactory<TStr> {
-public:
-	ExactRefAlignerFactory(uint32_t seedLen) :
-		ExactRefAligner<TStr>(seedLen) { }
-	virtual RefAligner<TStr>* create() const {
-		return new ExactRefAligner<TStr>(this->seedLen_);
+		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		return; // no hit
 	}
 };
 

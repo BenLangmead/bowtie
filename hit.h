@@ -727,8 +727,8 @@ protected:
 class HitSinkPerThreadFactory {
 public:
 	virtual ~HitSinkPerThreadFactory() { }
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const = 0;
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const = 0;
+	virtual HitSinkPerThread* create() const = 0;
+	virtual HitSinkPerThread* createMult(uint32_t m) const = 0;
 
 	/// Free memory associated with a per-thread hit sink
 	virtual void destroy(HitSinkPerThread* sink) const {
@@ -828,11 +828,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
+	virtual HitSinkPerThread* create() const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_, max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1016,11 +1016,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
-		return new FirstNBestHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
+	virtual HitSinkPerThread* create() const {
+		return new FirstNBestHitSinkPerThread(sink_, n_, max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
-		return new FirstNBestHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new FirstNBestHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1221,11 +1221,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, mhits ? mhits : max_, keep_);
+	virtual HitSinkPerThread* create() const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, (mhits ? mhits : max_) * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1305,11 +1305,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
-		return new AllHitSinkPerThread(sink_, mhits ? mhits : max_, keep_);
+	virtual HitSinkPerThread* create() const {
+		return new AllHitSinkPerThread(sink_, max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
-		return new AllHitSinkPerThread(sink_, (mhits ? mhits : max_) * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new AllHitSinkPerThread(sink_, max_ * m, keep_);
 	}
 
 private:
@@ -1476,11 +1476,11 @@ public:
 	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
-	virtual HitSinkPerThread* create(uint32_t mhits = 0) const {
-		return new AllStratifiedHitSinkPerThread(sink_, mhits ? mhits : max_, keep_);
+	virtual HitSinkPerThread* create() const {
+		return new AllStratifiedHitSinkPerThread(sink_, max_, keep_);
 	}
-	virtual HitSinkPerThread* createMult(uint32_t m, uint32_t mhits = 0) const {
-		return new AllStratifiedHitSinkPerThread(sink_, (mhits ? mhits : max_) * m, keep_);
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new AllStratifiedHitSinkPerThread(sink_, max_ * m, keep_);
 	}
 
 private:
@@ -1568,7 +1568,8 @@ public:
 		unlock(h.h.first);
 		mainlock();
 		_first = false;
-		_numReported++;
+		if(h.mate > 0) _numReportedPaired++;
+		else           _numReported++;
 		mainunlock();
 	}
 
@@ -1579,6 +1580,7 @@ public:
 	virtual void reportHits(vector<Hit>& hs) {
 		size_t hssz = hs.size();
 		if(hssz == 0) return;
+		bool paired = hs[0].mate > 0;
 		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
 		}
@@ -1595,7 +1597,8 @@ public:
 		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hssz;
+		if(paired) _numReportedPaired += hssz;
+		else       _numReported += hssz;
 		mainunlock();
 	}
 
@@ -1607,13 +1610,31 @@ public:
 			assert_eq(0llu, _numReported);
 			cout << "No results" << endl;
 		}
-		else cout << "Reported " << _numReported << " alignments to " << _outs.size() << " output stream(s)" << endl;
+		else if(_numReportedPaired > 0 && _numReported == 0) {
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else if(_numReported > 0 && _numReportedPaired == 0) {
+			cout << "Reported " << _numReported
+			     << " alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else {
+			assert_gt(_numReported, 0);
+			assert_gt(_numReportedPaired, 0);
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments and " << _numReported
+			     << " singleton alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
 	}
 
 private:
 	bool     _reportOpps;
 	volatile bool     _first;       /// true -> first hit hasn't yet been reported
 	volatile uint64_t _numReported;
+	volatile uint64_t _numReportedPaired;
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
@@ -2007,7 +2028,8 @@ public:
 		unlock(h.h.first);
 		mainlock();
 		_first = false;
-		_numReported++;
+		if(h.mate > 0) _numReportedPaired++;
+		else           _numReported++;
 		mainunlock();
 	}
 
@@ -2018,6 +2040,7 @@ public:
 	virtual void reportHits(vector<Hit>& hs) {
 		size_t hssz = hs.size();
 		if(hssz == 0) return;
+		bool paired = hs[0].mate > 0;
 		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
 		}
@@ -2034,7 +2057,8 @@ public:
 		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hssz;
+		if(paired) _numReportedPaired += hssz;
+		else       _numReported += hssz;
 		mainunlock();
 	}
 
@@ -2046,15 +2070,31 @@ public:
 		if(_first) {
 			assert_eq(0llu, _numReported);
 			cout << "No results" << endl;
-		} else {
-			cout << "Reported " << _numReported << " alignments to "
-			     << _outs.size() << " output stream(s)" << endl;
+		}
+		else if(_numReportedPaired > 0 && _numReported == 0) {
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else if(_numReported > 0 && _numReportedPaired == 0) {
+			cout << "Reported " << _numReported
+			     << " alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else {
+			assert_gt(_numReported, 0);
+			assert_gt(_numReportedPaired, 0);
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments and " << _numReported
+			     << " singleton alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
 		}
 	}
 
 private:
 	volatile bool     _first;       /// true iff this object hasn't yet reported a hit
 	volatile uint64_t _numReported; /// number of hits reported
+	volatile uint64_t _numReportedPaired; /// number of paired-end hits reported
 	int      _partition;   /// partition size, or 0 if partitioning is disabled
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
@@ -2331,7 +2371,8 @@ public:
 		unlock(h.h.first);
 		mainlock();
 		_first = false;
-		_numReported++;
+		if(h.mate > 0) _numReportedPaired++;
+		else           _numReported++;
 		mainunlock();
 	}
 
@@ -2341,6 +2382,7 @@ public:
 	virtual void reportHits(vector<Hit>& hs) {
 		size_t hssz = hs.size();
 		if(hssz == 0) return;
+		bool paired = hs[0].mate > 0;
 		// Sort the hits in order of
 		if(_outs.size() > 1 && hssz > 2) {
 			sort(hs.begin(), hs.end());
@@ -2363,7 +2405,8 @@ public:
 		unlock(hs[hssz-1].h.first);
 		mainlock();
 		_first = false;
-		_numReported += hssz;
+		if(paired) _numReportedPaired += hssz;
+		else       _numReported       += hssz;
 		mainunlock();
 	}
 
@@ -2375,14 +2418,30 @@ public:
 		if(_first) {
 			assert_eq(0llu, _numReported);
 			cout << "No results" << endl;
-		} else {
-			cout << "Reported " << _numReported << " alignments to "
-			     << _outs.size() << " output stream(s)" << endl;
+		}
+		else if(_numReportedPaired > 0 && _numReported == 0) {
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else if(_numReported > 0 && _numReportedPaired == 0) {
+			cout << "Reported " << _numReported
+			     << " alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else {
+			assert_gt(_numReported, 0);
+			assert_gt(_numReportedPaired, 0);
+			cout << "Reported " << (_numReportedPaired >> 1)
+			     << " paired-end alignments and " << _numReported
+			     << " singleton alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
 		}
 	}
 private:
 	volatile bool _first;           /// true iff this object hasn't yet reported a hit
 	volatile uint64_t _numReported; /// number of hits reported
+	volatile uint64_t _numReportedPaired; /// number of paried-end hits reported
 	int offBase_;          /// Add this to reference offsets before outputting.
                            /// (An easy way to make things 1-based instead of
                            /// 0-based)

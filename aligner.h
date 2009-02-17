@@ -506,6 +506,8 @@ class PairedBWAlignerV1 : public Aligner {
 	typedef std::vector<U32Pair> U32PairVec;
 	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
 
 public:
 	PairedBWAlignerV1(
@@ -770,7 +772,7 @@ protected:
 				oms,                          // # other hits
 				bufL->patid,
 				pairFw ? 1 : 2);
-		assert(!ret);
+		if(ret) return true; // can happen when -m is set
 		params_->setFw(fwR);
 		ret = params_->reportHit(
 				fwR ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
@@ -947,15 +949,21 @@ protected:
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
-		Range r;
-		uint32_t result = refAligner_->findOne(tidx, refs_, seq, qual, begin, end, r);
-		if(result != 0xffffffff) {
+		std::vector<Range> ranges;
+		std::vector<uint32_t> offs;
+		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
+		                  offs, doneFw_ ? &pairs_rc_ : &pairs_fw_,
+		                  toff, !matchRight);
+		assert_eq(ranges.size(), offs.size());
+		for(size_t i = 0; i < ranges.size(); i++) {
+			Range& r = ranges[i];
+			const uint32_t result = offs[i];
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
 			r.bot = range.bot;
 			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
 			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
-			return report(
+			if(report(
 					matchRight ? range : r, // range for upstream mate
 			        matchRight ? r : range, // range for downstream mate
 				    tidx,                   // ref idx
@@ -965,10 +973,9 @@ protected:
 				    fwL_, fwR_, // whether mate1 is in fw orientation
 				    !doneFw_,   // whether the pair is being mapped to fw strand
 				    ebwtLFw,
-				    ebwtRFw);
-		} else {
-			return false;
+				    ebwtRFw)) return true;
 		}
+		return false;
 	}
 
 	/**
@@ -1324,6 +1331,11 @@ protected:
 	bool*       donePair_;
 	bool        fwL_;
 	bool        fwR_;
+
+	/// For keeping track of paired alignments that have already been
+	/// found for the forward and reverse-comp pair orientations
+	TSetPairs   pairs_fw_;
+	TSetPairs   pairs_rc_;
 
 #ifndef NDEBUG
 	std::set<int64_t> allTopsL_fw_;
