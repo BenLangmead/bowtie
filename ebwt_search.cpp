@@ -103,9 +103,10 @@ static bool dontReconcileMates  = true;  // suppress pairwise all-versus-all way
 static uint32_t cacheLimit      = 5;     // ranges w/ size > limit will be cached
 static uint32_t cacheSize       = 0;     // # words per range cache
 static int offBase              = 0;     // offsets are 0-based by default, but configurable
+static bool tryHard             = false;
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:";
+static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
 
 enum {
 	ARG_ORIG = 256,
@@ -232,6 +233,7 @@ static struct option long_options[] = {
 	{"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
 	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
 	{"offbase",      required_argument, 0,            'B'},
+	{"tryhard",      no_argument,       0,            'y'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -265,6 +267,7 @@ static void printUsage(ostream& out) {
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
 	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
+	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
 #ifdef BOWTIE_PTHREADS
@@ -819,6 +822,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case ARG_MAXNS: maxNs = parseInt(0, "--maxns arg must be at least 0"); break;
 	   		case 'a': allHits = true; break;
+	   		case 'y': tryHard = true; break;
 	   		case ARG_BEST: onlyBest = true; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
@@ -903,6 +907,12 @@ static void parseOptions(int argc, char **argv) {
 			error = true;
 		}
 		if(error) exit(1);
+	}
+	if(tryHard) {
+		// Increase backtracking limit to huge number
+		maxBts = INT_MAX;
+		// Increase number of paired-end scan attempts to huge number
+		mixedAttemptLim = UINT_MAX;
 	}
 }
 
