@@ -667,6 +667,8 @@ public:
 		fwL_           = fw1_;
 		fwR_           = fw2_;
 		mixedAttempts_ = 0;
+		pairs_fw_.clear();
+		pairs_rc_.clear();
 #ifndef NDEBUG
 		allTopsL_fw_.clear();
 		allTopsR_fw_.clear();
