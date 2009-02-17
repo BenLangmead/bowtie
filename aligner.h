@@ -52,7 +52,8 @@ public:
 		bufb_ = &patsrc->bufb();
 		alen_ = bufa_->length();
 		blen_ = (bufb_ != NULL) ? bufb_->length() : 0;
-		rand_.init(seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name));
+		qseed_ = seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name);
+		rand_.init(qseed_);
 	}
 
 protected:
@@ -66,6 +67,7 @@ protected:
 	// RandomSource for choosing alignments to report from ranges
 	bool rangeMode_;
 	uint32_t seed_;
+	uint32_t qseed_; // query-specific seed
 	RandomSource rand_;
 };
 
@@ -329,6 +331,7 @@ public:
 		Aligner::setQuery(patsrc); // set fields & random seed
 		driverFw_->setQuery(patsrc);
 		driverRc_->setQuery(patsrc);
+		rchase_.initRand(qseed_);
 		doneFw_  = false;
 		done_    = false;
 		chaseFw_ = false;
@@ -637,6 +640,7 @@ public:
 		delayedChase1Rc_ = false;
 		delayedChase2Fw_ = false;
 		delayedChase2Rc_ = false;
+		rchase_.initRand(qseed_);
 		// Clear all intermediate ranges
 		for(size_t i = 0; i < 32; i++) {
 			offs1FwArr_[i].clear();   offs1RcArr_[i].clear();
