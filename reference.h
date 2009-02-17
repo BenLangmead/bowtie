@@ -31,6 +31,7 @@ public:
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
 	                 bool useShmem = false) :
+	buf_(NULL),
 	loaded_(true),
 	sanity_(sanity),
 	useShmem_(useShmem)
@@ -112,8 +113,15 @@ public:
 			loaded_ = false;
 			return;
 		}
-		// Allocate a buffer to hold the whole reference string
-		buf_ = new uint8_t[cumsz >> 2];
+		try {
+			// Allocate a buffer to hold the whole reference string
+			buf_ = new uint8_t[cumsz >> 2];
+			if(buf_ == NULL) throw std::bad_alloc();
+		} catch(std::bad_alloc& e) {
+			cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
+			     << "re-run on a computer with more memory." << endl;
+			exit(1);
+		}
 		// Read the whole thing in
 		size_t ret = fread(buf_, 1, cumsz >> 2, f4);
 		// Didn't read all of it?
@@ -167,7 +175,7 @@ public:
 	}
 
 	~BitPairReference() {
-		delete[] buf_;
+		if(buf_ != NULL) delete[] buf_;
 	}
 
 	/**

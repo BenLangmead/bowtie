@@ -1167,7 +1167,6 @@ static void *exactSearchWorkerStateful(void *vp) {
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
-	if(refs != NULL) delete refs;
 	delete patsrcFact;
 	delete sinkFact;
 #ifdef BOWTIE_PTHREADS
@@ -1226,9 +1225,11 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
+#endif
 
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
+#ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			if(stateful)
 				pthread_create(&threads[i], &pt_attr, exactSearchWorkerStateful, (void *)(long)(i+1));
@@ -1240,9 +1241,11 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		else         exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
-	}
 #endif
-
+	}
+#ifdef BOWTIE_PTHREADS
+	delete[] threads;
+#endif
 	if(refs != NULL) delete refs;
 }
 
