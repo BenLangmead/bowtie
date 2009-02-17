@@ -44,7 +44,7 @@ public:
 		cacheFw_(cacheFw), cacheBw_(cacheBw)
 	{ }
 
-	virtual ~RangeChaser() { }
+	~RangeChaser() { }
 
 	/**
 	 * Convert a range to a vector of reference loci, where a locus is
@@ -148,10 +148,10 @@ public:
 	 * Set the next range for us to "chase" (i.e. convert row-by-row
 	 * to reference loci).
 	 */
-	virtual void setTopBot(uint32_t top,
-	                       uint32_t bot,
-	                       uint32_t qlen,
-	                       const TEbwt* ebwt)
+	void setTopBot(uint32_t top,
+	               uint32_t bot,
+	               uint32_t qlen,
+	               const TEbwt* ebwt)
 	{
 		assert_neq(0xffffffff, top);
 		assert_neq(0xffffffff, bot);
@@ -193,14 +193,14 @@ public:
 	 * Return true iff off_ now holds the reference location
 	 * corresponding to the row last set with setRow().
 	 */
-	virtual bool done() const {
+	bool done() const {
 		return done_;
 	}
 
 	/**
 	 * Advance the step-left process by one step.  Check if we're done.
 	 */
-	virtual void advance() {
+	void advance() {
 		assert(!done_);
 		assert(chaser_.prepped_ || chaser_.done());
 		reset();
@@ -244,7 +244,7 @@ public:
 	 * Prepare for the next call to advance() by prefetching relevant
 	 * data.  In this case, 'chaser_' is doing this for us.
 	 */
-	virtual void prep() {
+	void prep() {
 		// nothing
 	}
 
@@ -252,7 +252,7 @@ public:
 	 * Return true iff off_ contains a valid reference location for
 	 * this range.
 	 */
-	virtual bool foundOff() const {
+	bool foundOff() const {
 		return off_.first != 0xffffffff;
 	}
 
@@ -260,22 +260,29 @@ public:
 	 * Reset the chaser so that 'off_' does not hold a valid offset and
 	 * foundOff() returns false.
 	 */
-	virtual void reset() {
+	void reset() {
 		off_.first = 0xffffffff;
 	}
 
 	/**
 	 * Get the calculated offset.
 	 */
-	virtual U32Pair off() const {
+	U32Pair off() const {
 		return off_;
 	}
 
 	/**
 	 * Get the length of the hit reference.
 	 */
-	virtual uint32_t tlen() const {
+	uint32_t tlen() const {
 		return tlen_;
+	}
+
+	/**
+	 * Re-initialize pseudo-random number generator.
+	 */
+	void initRand(uint32_t seed) {
+		rand_.init(seed);
 	}
 
 protected:
