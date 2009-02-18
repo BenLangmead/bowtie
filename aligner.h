@@ -774,7 +774,9 @@ protected:
 				oms,                          // # other hits
 				bufL->patid,
 				pairFw ? 1 : 2);
-		if(ret) return true; // can happen when -m is set
+		if(ret) {
+			return true; // can happen when -m is set
+		}
 		params_->setFw(fwR);
 		ret = params_->reportHit(
 				fwR ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :

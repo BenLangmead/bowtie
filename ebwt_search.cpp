@@ -64,7 +64,6 @@ static int maxBts               = 125; // max # backtracks allowed in half-and-h
 static int maxBts0              = 28; // max # backtracks allowed in half-and-half mode
 static int maxBts1              = 16; // max # backtracks allowed in half-and-half mode
 static int maxBts2              = 12; // max # backtracks allowed in half-and-half mode
-static int maxNs                = 999999; // max # Ns allowed in read
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;     // number of pthreads operating concurrently
 static output_types outType		= FULL;  // style of output
@@ -121,7 +120,6 @@ enum {
 	ARG_MAXBTS2,
 	ARG_VERBOSE,
 	ARG_QUIET,
-	ARG_MAXNS,
 	ARG_RANDOM_READS,
 	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
@@ -210,7 +208,6 @@ static struct option long_options[] = {
 	{"maxbts0",      required_argument, 0,            ARG_MAXBTS0},
 	{"maxbts1",      required_argument, 0,            ARG_MAXBTS1},
 	{"maxbts2",      required_argument, 0,            ARG_MAXBTS2},
-	{"maxns",        required_argument, 0,            ARG_MAXNS},
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{"phased",       no_argument,       0,            'z'},
@@ -248,61 +245,59 @@ static void printUsage(ostream& out) {
 	    << "  <mates2>  comma-separated list of files containing downstream mates (or" << endl
 	    << "            sequences themselves if -c is set) paired with mates in <mates1>" << endl
 	    << "  <singles> comma-separated list of files containing unpaired reads, or the" << endl
-	    << "            sequences themselves, if -c is set; \"-\" = stdin" << endl
+	    << "            sequences themselves, if -c is set" << endl
 	    << "  <hits>    file to write hits to (default: stdout)" << endl
-	    << "Options:" << endl
+	    << "Input:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
-	    << "  -c                 query sequences given on cmd line (as <mates>, <reads>)" << endl
+	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
+	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
+	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
+	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
+		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
+		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
+	    << "Alignment:" << endl
+	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: -n 2)" << endl
 	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
 	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
-	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: 2)" << endl
+		<< "  --nomaqround       disable Maq-like quality rounding (to nearest 10 <= 30)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
+	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
+	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
+	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
+	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
 	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
-	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
-	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
-	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
-#ifdef BOWTIE_PTHREADS
-	    << "  -p/--threads <int> number of search threads to launch (default: 1)" << endl
-#endif
-	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
+	    << "Output:" << endl
+	    << "  --concise          write hits in concise format" << endl
+	    << "  -b/--binout        write hits in binary format (<hits> argument not optional)" << endl
+	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
+	    << "  --quiet            print nothing but the alignments" << endl
+	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
+	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --unfa <fname>     write unaligned reads to FASTA file(s) <fname>*.fa" << endl
 	    << "  --unfq <fname>     write unaligned reads to FASTQ file(s) <fname>*.fq" << endl
 	    << "  --maxfa <fname>    write reads exceeding -m limit to FASTA file(s) <fname>*.fa" << endl
 	    << "  --maxfq <fname>    write reads exceeding -m limit to FASTQ file(s) <fname>*.fq" << endl
-	    << "  -t/--time          print wall-clock time taken by search phases" << endl
+	    << "Performance:" << endl
+#ifdef BOWTIE_PTHREADS
+	    << "  -p/--threads <int> number of alignment threads to launch (default: 1)" << endl
+#endif
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
-		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
-		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
-		<< "  --nomaqround       disable Maq-like quality rounding (to nearest 10 <= 30)" << endl
-		<< "  --ntoa             Ns in reads become As; default: Ns match nothing" << endl
-	    //<< "  --sanity           enable sanity checks (increases runtime and mem usage!)" << endl
-	    //<< "  --orig <str>       specify original string (for sanity-checking)" << endl
-	    //<< "  --range            report hits as top/bottom offsets into SA" << endl
-	    //<< "  --randomReads      generate random reads; ignore -q/-f/-r/<matesX>/<reads>" << endl
-	    << "  --concise          write hits in concise format" << endl
-	    << "  -b/--binout        write hits in binary format (<hits> not optional)" << endl
-	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
-	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
-	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
-	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
-	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
-	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
+	    << "Other:" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
-	    << "  --quiet            print nothing but the alignments" << endl
-	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    << "  --version          print version information and quit" << endl
+	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    ;
 }
 
@@ -821,7 +816,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
 	   		case 'h': printLongUsage(cout); exit(0); break;
 	   		case '?': printUsage(cerr); exit(1); break;
-	   		case ARG_MAXNS: maxNs = parseInt(0, "--maxns arg must be at least 0"); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
 	   		case ARG_BEST: onlyBest = true; break;
@@ -879,6 +873,9 @@ static void parseOptions(int argc, char **argv) {
 				}
 			}
 		}
+	}
+	if(mates1.size() > 0 || mates2.size() > 0) {
+		spanStrata = true;
 	}
 	if((mates1.size() > 0 || mates2.size() > 0) && maqLike) {
 		cerr << "Paired-end mode is not yet compatible with -n mode; use -v 0 or -v 1 instead." << endl;
@@ -2885,22 +2882,21 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 		case FASTA:
 			return new FastaPatternSource (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, forgiveInput,
-			                               maxNs);
+			                               nsPolicy, forgiveInput);
 		case RAW:
 			return new RawPatternSource   (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, maxNs);
+			                               nsPolicy);
 		case FASTQ:
 			return new FastqPatternSource (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, forgiveInput,
 			                               solexa_quals,
-			                               integer_quals, maxNs);
+			                               integer_quals);
 		case CMDLINE:
 			return new VectorPatternSource(qs, false, useSpinlock,
 			                               patDumpfile, trim3,
-			                               trim5, nsPolicy, maxNs);
+			                               trim5, nsPolicy);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
@@ -2943,9 +2939,6 @@ static void driver(const char * type,
 	}
 	// Adjust
 	adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
-	if(nsPolicy == NS_TO_NS && !maqLike) {
-		maxNs = min<int>(maxNs, mismatches);
-	}
 
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;

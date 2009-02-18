@@ -979,10 +979,9 @@ public:
 	                    int __trim3 = 0,
 	                    int __trim5 = 0,
 		                int __policy = NS_TO_NS,
-	                    int __maxNs = 9999,
 	                    uint32_t seed = 0) :
 		TrimmingPatternSource(false, __useSpinlock, __dumpfile, __trim3, __trim5),
-		_reverse(__reverse), _cur(0), _maxNs(__maxNs),
+		_reverse(__reverse), _cur(0),
 		_v(), _vrev(), _vrc(), _vrcrev(), _quals(), _qualsrev(), _rand(seed)
 	{
 		for(size_t i = 0; i < v.size(); i++) {
@@ -1114,7 +1113,6 @@ public:
 private:
 	bool   _reverse;
 	size_t _cur;
-	int    _maxNs;
 	vector<String<Dna5> > _v;        /// forward sequences
 	vector<String<Dna5> > _vrev;     /// reversed forward sequences
 	vector<String<Dna5> > _vrc;      /// rev-comp sequences
@@ -1250,10 +1248,9 @@ public:
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
 	                   bool __forgiveInput = false,
-	                   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
+		_first(true), _reverse(__reverse), _policy(__policy), _rand(seed)
 	{ }
 	virtual void reset() {
 		_first = true;
@@ -1428,7 +1425,6 @@ private:
 	bool _first;
 	bool _reverse;
 	int _policy;
-	int _maxNs;
 	RandomSource _rand;
 };
 
@@ -1452,13 +1448,12 @@ public:
 	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
 					   bool integer_quals = true,
-					   int __maxNs = 9999,
 	                   uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
 		_first(true), _reverse(__reverse),
 		_solexa_quals(solexa_quals),
 		_integer_quals(integer_quals),
-		_policy(__policy), _maxNs(__maxNs),
+		_policy(__policy),
 		_rand(seed)
 	{
 		for (int l = 0; l != 128; ++l) {
@@ -1931,7 +1926,6 @@ private:
 	bool _solexa_quals;
 	bool _integer_quals;
 	int _policy;
-	int _maxNs;
 	int _table[128];
 	RandomSource _rand;
 };
@@ -1948,10 +1942,9 @@ public:
 	                 int __trim3 = 0,
 	                 int __trim5 = 0,
 	                 int __policy = NS_TO_NS,
-	                 int __maxNs = 9999,
 	                 uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, false, __useSpinlock, __dumpfile, __trim3, __trim5),
-		_first(true), _reverse(__reverse), _policy(__policy), _maxNs(__maxNs), _rand(seed)
+		_first(true), _reverse(__reverse), _policy(__policy), _rand(seed)
 	{ }
 	virtual void reset() {
 		_first = true;
@@ -2096,7 +2089,6 @@ private:
 	bool _first;
 	bool _reverse;
 	int _policy;
-	int _maxNs;
 	RandomSource _rand;
 };
 

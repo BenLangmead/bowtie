@@ -78,8 +78,8 @@ static void printUsage(ostream& out) {
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
 	    << "    --dcv <int>             diff-cover period for blockwise (default: 1024)" << endl
 	    << "    --nodc                  disable diff-cover (algorithm becomes quadratic)" << endl
-	    << "    --noref/-r              don't build .3/.4.ebwt (packed reference) portion" << endl
-	    << "    --justref/-3            just build .3/.4.ebwt (packed reference) portion" << endl
+	    << "    -r/--noref              don't build .3/.4.ebwt (packed reference) portion" << endl
+	    << "    -3/--justref            just build .3/.4.ebwt (packed reference) portion" << endl
 	    //<< "    -l/--linerate <int>     line rate (single line is 2^rate bytes)" << endl
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
