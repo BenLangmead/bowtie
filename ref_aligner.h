@@ -377,7 +377,7 @@ protected:
 				r = (int)ref[rir];
 				if(r == 4) {
 					r = 0;
-					skipRightToLefts = seedBitPairs;
+					skipRightToLefts = qlen;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -401,7 +401,22 @@ protected:
 				// "overhang") ruin it?
 				for(uint32_t j = 0; j < seedOverhang; j++) {
 					assert_lt(ri + seedBitPairs + j, end);
-					if((int)qry[32 + j] != (int)ref[rir + seedBitPairs + j]) {
+					int rc = (int)ref[rir + seedBitPairs + j];
+					if(rc == 4) {
+						// Oops, encountered an N in the reference in
+						// the overhang portion of the candidate
+						// alignment
+						// (Note that we inverted hi earlier)
+						if(hi) {
+							// Right-to-left
+							skipRightToLefts = seedOverhang - j - 1;
+						} else {
+							// Left-to-right
+							skipLeftToRights = seedBitPairs + j;
+						}
+						continue; // Skip this candidate
+					}
+					if((int)qry[32 + j] != rc) {
 						// Yes, overhang ruins it
 						foundHit = false;
 						break;
@@ -754,7 +769,7 @@ protected:
 				r = (int)ref[rir];
 				if(r == 4) {
 					r = 0;
-					skipRightToLefts = seedBitPairs;
+					skipRightToLefts = qlen;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -816,7 +831,22 @@ protected:
 			if(seedOverhang > 0) {
 				assert_leq(ri + seedBitPairs + seedOverhang, end);
 				for(uint32_t j = 0; j < seedOverhang; j++) {
-					if((int)qry[32 + j] != (int)ref[rir + 32 + j]) {
+					int rc = (int)ref[rir + 32 + j];
+					if(rc == 4) {
+						// Oops, encountered an N in the reference in
+						// the overhang portion of the candidate
+						// alignment
+						// (Note that we inverted hi earlier)
+						if(hi) {
+							// Right-to-left
+							skipRightToLefts = seedOverhang - j - 1;
+						} else {
+							// Left-to-right
+							skipLeftToRights = seedBitPairs + j;
+						}
+						continue; // Skip this candidate
+					}
+					if((int)qry[32 + j] != rc) {
 						if(++diffs > 1) {
 							foundHit = false;
 							break;
@@ -847,7 +877,7 @@ protected:
 					pairs->insert(p);
 				}
 			}
-			assert(diffs <= 1);
+			assert_leq(diffs, 1);
 			ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
 			assert_lt(added, r2.size());
 			assert_eq(re2[added], ri);

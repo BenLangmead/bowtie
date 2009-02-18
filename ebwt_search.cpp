@@ -228,7 +228,7 @@ static struct option long_options[] = {
 	{"fr",           no_argument,       0,            ARG_FR},
 	{"rf",           no_argument,       0,            ARG_RF},
 	{"mixthresh",    required_argument, 0,            'x'},
-	{"mixatts",      required_argument, 0,            ARG_MIXED_ATTEMPTS},
+	{"pairtries",    required_argument, 0,            ARG_MIXED_ATTEMPTS},
 	{"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
 	{"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
 	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
@@ -294,6 +294,7 @@ static void printUsage(ostream& out) {
 	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
+	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  --maxns <int>      skip reads w/ >n no-confidence bases (default: no limit)" << endl
 	    //<< "  --dumppats <file>  dump all patterns read to a file" << endl
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl

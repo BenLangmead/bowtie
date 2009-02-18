@@ -292,6 +292,34 @@ Bowtie Manual
                      -v is specified, quality values and the -e, -l and
                      -n options are ignored.
 
+  -I/--minins <int>  The minimum insert size for valid paired-end
+                     alignments.  E.g. if -I 40 is specified and a
+                     paired-end alignment consists of two 10-bp
+                     alignments in the proper orientation with a 20-bp
+                     gap between them, that alignment is considered
+                     valid (as long as -X is also satisfied).  A 19-bp
+                     gap would not be valid.  Default: 0.
+
+  -X/--maxins <int>  The maximum insert size for valid paired-end
+                     alignments.  E.g. if -X 100 is specified and a
+                     paired-end alignment consists of two 20-bp
+                     alignments in the proper orientation with a 60-bp
+                     gap between them, that alignment is considered
+                     valid (as long as -I is also satisfied).  A 61-bp
+                     gap would not be valid.  Default: 0.
+
+  --fr/--rf/--ff     The upstream/downstream mate orientations for a
+                     valid paired-end alignment against the forward
+                     reference strand.  E.g., if --fr is specified and
+                     there is a candidate paired-end alignment where
+                     mate1 appears upstream of the reverse complement
+                     of mate2 and the insert-length constraints are
+                     met, that alignment is valid.  Similarly, if mate2
+                     appears upstream of the reverse complement of
+                     mate1 and all other constraints are met, that too
+                     is valid.  Default: --fr (appropriate for the
+                     Illumina short insert library). 
+
   -k <int>           Report up to <int> valid alignments per read
                      (default: 1).  Validity of alignments is
                      determined by the alignment policy (combined
@@ -349,7 +377,18 @@ Bowtie Manual
                      alignments that fall into the best stratum, i.e.,
                      the one with fewest mismatches.  BOWTIE CAN BECOME
                      VERY SLOW WHEN --nostrata IS COMBINED WITH -k OR
-                     -a. 
+                     -a.
+
+  -y/--tryhard       Try as hard as possible to find valid alignments
+                     when they exist, including paired-end alignments.
+                     This is equivalent to specifying very high values
+                     for the --maxbts and --pairtries options.  This
+                     mode is generally MUCH SLOWER than the default
+                     settings, but can be useful for certain research
+                     problems.  This mode is slower when (a) the
+                     reference is very repetitive, (b) the reads are
+                     low quality, or (c) not many reads have valid
+                     alignments.
 
   -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
                      each read before alignment (default: 0).
@@ -466,7 +505,10 @@ Bowtie Manual
                      significantly.  The drawback of having a limit is
                      that some valid alignments may be missed.  Higher
                      limits yield greater sensitivity at the expensive
-                     of longer running times.  
+                     of longer running times.
+
+  --pairtries <int>  The maximum number of attempts Bowtie should make
+                     to find a mate for one or TODO  
 
   --maxns <int>      Skip reads with more than <int> N's (no-confidence
                      bases) in their sequence.  Default: no limit.
