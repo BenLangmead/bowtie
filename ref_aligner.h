@@ -347,8 +347,8 @@ protected:
 			uint32_t ri; // leftmost position in proposed alignment
 			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
-			assert_leq(skipLeftToRights, seedBitPairs);
-			assert_leq(skipRightToLefts, seedBitPairs);
+			assert_lt(skipLeftToRights, qlen);
+			assert_lt(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
@@ -741,8 +741,8 @@ protected:
 			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
 			uint64_t diff;
-			assert_leq(skipLeftToRights, seedBitPairs);
-			assert_leq(skipRightToLefts, seedBitPairs);
+			assert_lt(skipLeftToRights, qlen);
+			assert_lt(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
