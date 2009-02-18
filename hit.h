@@ -211,10 +211,21 @@ public:
    		initDumps();
 	}
 
+
 	virtual ~HitSink() {
+		// Flush and close all non-NULL output streams
+		for(size_t i = 0; i < _outs.size(); i++) {
+			if(_outs[i] != NULL) {
+				_outs[i]->flush();
+				if(_outs[i] != &std::cout) ((std::ofstream*)_outs[i])->close();
+			}
+		}
 		if(_deleteOuts) {
+			// Delete all non-NULL output streams
 			for(size_t i = 0; i < _outs.size(); i++) {
-				if(_outs[i] != NULL) delete _outs[i];
+				if(_outs[i] != NULL && _outs[i] != &std::cout) {
+					delete _outs[i];
+				}
 			}
 		}
 		destroyDumps();
@@ -513,18 +524,18 @@ protected:
     }
 
     void destroyDumps() {
-    	if(dumpUnalFa_   != NULL) delete dumpUnalFa_;
-    	if(dumpUnalFa_1_ != NULL) delete dumpUnalFa_1_;
-    	if(dumpUnalFa_2_ != NULL) delete dumpUnalFa_2_;
-    	if(dumpUnalFq_   != NULL) delete dumpUnalFq_;
-    	if(dumpUnalFq_1_ != NULL) delete dumpUnalFq_1_;
-    	if(dumpUnalFq_2_ != NULL) delete dumpUnalFq_2_;
-    	if(dumpMaxFa_    != NULL) delete dumpMaxFa_;
-    	if(dumpMaxFa_1_  != NULL) delete dumpMaxFa_1_;
-    	if(dumpMaxFa_2_  != NULL) delete dumpMaxFa_2_;
-    	if(dumpMaxFq_    != NULL) delete dumpMaxFq_;
-    	if(dumpMaxFq_1_  != NULL) delete dumpMaxFq_1_;
-    	if(dumpMaxFq_2_  != NULL) delete dumpMaxFq_2_;
+    	if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
+    	if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
+    	if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
+    	if(dumpUnalFq_   != NULL) { dumpUnalFq_->close();   delete dumpUnalFq_; }
+    	if(dumpUnalFq_1_ != NULL) { dumpUnalFq_1_->close(); delete dumpUnalFq_1_; }
+    	if(dumpUnalFq_2_ != NULL) { dumpUnalFq_2_->close(); delete dumpUnalFq_2_; }
+    	if(dumpMaxFa_    != NULL) { dumpMaxFa_->close();    delete dumpMaxFa_; }
+    	if(dumpMaxFa_1_  != NULL) { dumpMaxFa_1_->close();  delete dumpMaxFa_1_; }
+    	if(dumpMaxFa_2_  != NULL) { dumpMaxFa_2_->close();  delete dumpMaxFa_2_; }
+    	if(dumpMaxFq_    != NULL) { dumpMaxFq_->close();    delete dumpMaxFq_; }
+    	if(dumpMaxFq_1_  != NULL) { dumpMaxFq_1_->close();  delete dumpMaxFq_1_; }
+    	if(dumpMaxFq_2_  != NULL) { dumpMaxFq_2_->close();  delete dumpMaxFq_2_; }
     }
 
     // Locks for dumping

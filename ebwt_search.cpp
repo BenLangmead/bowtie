@@ -1238,7 +1238,13 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		if(stateful) exactSearchWorkerStateful((void*)0L);
 		else         exactSearchWorker((void*)0L);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < numAdditionalThreads; i++) pthread_join(threads[i], NULL);
+		for(int i = 0; i < numAdditionalThreads; i++) {
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
+		}
 #endif
 	}
 #ifdef BOWTIE_PTHREADS
@@ -1419,7 +1425,11 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		mismatchSearchWorkerPhase1((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
     }
@@ -1450,7 +1460,11 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		mismatchSearchWorkerPhase2((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -1639,7 +1653,11 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		else         mismatchSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
     }
@@ -1980,7 +1998,11 @@ static void twoOrThreeMismatchSearch(
 		twoOrThreeMismatchSearchWorkerPhase1((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
     }
@@ -1996,7 +2018,11 @@ static void twoOrThreeMismatchSearch(
 		twoOrThreeMismatchSearchWorkerPhase2((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2011,7 +2037,11 @@ static void twoOrThreeMismatchSearch(
 		twoOrThreeMismatchSearchWorkerPhase3((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2158,7 +2188,11 @@ static void twoOrThreeMismatchSearchFull(
 		twoOrThreeMismatchSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
     }
@@ -2694,7 +2728,11 @@ static void seededQualCutoffSearch(
 		seededQualSearchWorkerPhase1((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2725,7 +2763,11 @@ static void seededQualCutoffSearch(
 		seededQualSearchWorkerPhase2((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2758,7 +2800,11 @@ static void seededQualCutoffSearch(
 		seededQualSearchWorkerPhase3((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2781,7 +2827,11 @@ static void seededQualCutoffSearch(
 		seededQualSearchWorkerPhase4((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -2862,7 +2912,11 @@ static void seededQualCutoffSearchFull(
 		seededQualSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_join(threads[i], NULL);
+			int ret;
+			if((ret = pthread_join(threads[i], NULL)) != 0) {
+				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+				exit(1);
+			}
 		}
 #endif
 	}
@@ -3152,10 +3206,6 @@ static void driver(const char * type,
 		}
 		if(!quiet) {
 			sink->finish(); // end the hits section of the hit file
-		}
-	    sink->flush();
-		if(fout != NULL) {
-			((ofstream*)fout)->close();
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();
