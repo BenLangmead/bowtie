@@ -236,22 +236,19 @@ void print_index_sequence_names(const string& fname, ostream& fout)
 	}
 }
 
-template<typename TStr>
-static void driver(const string& ebwtFileBase,
-                   const string& query,
-                   const vector<string>& queries)
-{
+typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
+
+static void driver(const string& ebwtFileBase, const string& query) {
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 
 	if (names_only) {
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
-	}
-	else {
+	} else {
 		// Initialize Ebwt object
-	    Ebwt<TStr> ebwt(adjustedEbwtFileBase, true /*fw*/, -1, -1, false /* no shmem */, verbose, false, false);
+		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1, false, verbose);
 	    // Load whole index into memory
-		ebwt.loadIntoMemory(false); // no shmem
+		ebwt.loadIntoMemory(); // no shmem
 		print_index_sequences(cout, ebwt);
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
@@ -302,7 +299,6 @@ int main(int argc, char **argv) {
 		cout << "Assertions: enabled" << endl;
 #endif
 	}
-	driver<String<Dna, Packed<Alloc<> > > >(ebwtFile, query, queries);
-
+	driver(ebwtFile, query);
 	return 0;
 }

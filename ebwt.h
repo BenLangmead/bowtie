@@ -436,7 +436,10 @@ public:
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS
 	{
-		this->readIntoMemory(true, __useShmem, in + ".1.ebwt", in + ".2.ebwt", &_eh);
+		_in1Str = in + ".1.ebwt";
+		_in2Str = in + ".2.ebwt";
+		_ebwtIsShmem = _offsIsShmem = __useShmem;
+		readIntoMemory(true, &_eh);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -530,8 +533,7 @@ public:
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
 			readIntoMemory(false /* not just header */,
-			               false /* don't use shared mem */,
-			               "", "", NULL);
+			               NULL);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -848,8 +850,8 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory(bool useShmem) {
-		readIntoMemory(false, useShmem, "", "", NULL);
+	void loadIntoMemory() {
+		readIntoMemory(false, NULL);
 	}
 
 	/**
@@ -1051,7 +1053,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2, EbwtParams *params);
+	void readIntoMemory(bool justHeader, EbwtParams *params);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -2805,32 +2807,26 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
  * Read an Ebwt from file with given filename.
  */
 template<typename TStr>
-void Ebwt<TStr>::readIntoMemory(bool justHeader,
-                                bool useShmem,
-                                const string& in1,
-                                const string& in2,
-                                EbwtParams *params)
-{
+void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
+	bool useShmem = _offsIsShmem || _ebwtIsShmem;
 	bool be; // dummy; caller doesnn't care
-	if(in1.length() > 0) {
-		_in1Str = in1;
-		_in2Str = in2;
+	if(_in1Str.length() > 0) {
 		// Initialize our primary and secondary input-stream fields
 		if(!_in1.is_open()) {
-			if(this->verbose()) cout << "Opening \"" << in1 << "\"" << endl;
-			_in1.open(in1.c_str(), ios_base::in | ios::binary);
+			if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
+			_in1.open(_in1Str.c_str(), ios_base::in | ios::binary);
 			if(!_in1.is_open()) {
-				throw EbwtFileOpenException("Cannot open file " + in1);
+				throw EbwtFileOpenException("Cannot open file " + _in1Str);
 			}
 		}
 		assert(_in1.is_open());
 		assert(_in1.good());
 		assert_eq((streamoff)_in1.tellg(), ios::beg);
 		if(!_in2.is_open()) {
-			if(this->verbose()) cout << "Opening \"" << in2 << "\"" << endl;
-			_in2.open(in2.c_str(), ios_base::in | ios::binary);
+			if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
+			_in2.open(_in2Str.c_str(), ios_base::in | ios::binary);
 			if(!_in2.is_open()) {
-				throw EbwtFileOpenException("Cannot open file " + in2);
+				throw EbwtFileOpenException("Cannot open file " + _in2Str);
 			}
 		}
 		assert(_in2.is_open());
@@ -3006,7 +3002,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			// Reserve 8 bytes at the end of the shared memory chunk
 			// for silly synchronization
 			size_t shmemLen = eh->_ebwtTotLen + 4;
-			if(_verbose) cout << "Reading ebwt (" << eh->ebwtTotLen << ") into shared memory" << endl;
+			if(_verbose) cout << "Reading ebwt (" << eh->_ebwtTotLen << ") into shared memory" << endl;
 			while(true) {
 				// Create the shrared-memory block
 				if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {
@@ -3309,7 +3305,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			if(be || offRateDiff > 0) {
 				const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
 				const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
-				char buf[blockMaxSz];
+				char *buf = new char[blockMaxSz];
 				for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
 					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
 					_in2.read(buf, block << 2);
@@ -3324,6 +3320,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 						idx++;
 					}
 				}
+				delete[] buf;
 			} else {
 				// If any of the high two bits are set
 				if((offsLen & 0xc0000000) != 0) {

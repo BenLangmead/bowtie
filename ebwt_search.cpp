@@ -1206,7 +1206,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cout, "Time loading forward index: ", timing);
-		ebwt.loadIntoMemory(useShmem);
+		ebwt.loadIntoMemory();
 	}
 
 	BitPairReference *refs = NULL;
@@ -1402,7 +1402,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cout, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(useShmem);
+		ebwtFw.loadIntoMemory();
 	}
 
 #ifdef BOWTIE_PTHREADS
@@ -1440,7 +1440,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(useShmem);
+		ebwtBw.loadIntoMemory();
 	}
     _patsrc.reset();          // reset pattern source to 1st pattern
     _patsrc.setReverse(true); // reverse patterns
@@ -1613,12 +1613,12 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(useShmem);
+		ebwtFw.loadIntoMemory();
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(useShmem);
+		ebwtBw.loadIntoMemory();
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
@@ -1674,7 +1674,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
 		Timer _t(cout, "Time loading forward index: ", timing); \
-		ebwtFw.loadIntoMemory(useShmem); \
+		ebwtFw.loadIntoMemory(); \
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -1688,7 +1688,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
 		Timer _t(cout, "Time loading mirror index: ", timing); \
-		ebwtBw.loadIntoMemory(useShmem); \
+		ebwtBw.loadIntoMemory(); \
 	} \
 	assert(ebwtBw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -2155,12 +2155,12 @@ static void twoOrThreeMismatchSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(useShmem);
+		ebwtFw.loadIntoMemory();
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(useShmem);
+		ebwtBw.loadIntoMemory();
 	}
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
@@ -2899,7 +2899,7 @@ static void seededQualCutoffSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cout, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(useShmem);
+		ebwtBw.loadIntoMemory();
 	}
 	{
 		// Phase 1: Consider cases 1R and 2R
@@ -3105,7 +3105,7 @@ static void driver(const char * type,
 	}
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwt.loadIntoMemory(useShmem);
+		ebwt.loadIntoMemory();
 		ebwt.checkOrigs(os, false);
 		ebwt.evictFromMemory();
 	}
