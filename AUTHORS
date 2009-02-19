@@ -8,8 +8,8 @@ and Knut Reinert.  Parts of Maq are also used in Bowtie (see
 maq_convert subdirectory).  Maq's author is Heng Li of the Sanger
 Institute, U.K.  A DLL from the pthreads for Win32 library is
 distributed with the Win32 version of Bowtie.  The pthreads for Win32
-library has many contributors (listed at
-http://sourceware.org/pthreads-win32/contributors.html). 
+library and the GnuWin32 package have many contributors (see their
+respective web sites).
 
 Websites:
 
@@ -17,5 +17,6 @@ Websites:
  Maq:                http://maq.sf.net
  SeqAn:              http://www.seqan.de
  pthreads for Win32: http://sourceware.org/pthreads-win32
+ GnuWin32:           http://gnuwin32.sf.net
 
-January 2009
+February 2009
