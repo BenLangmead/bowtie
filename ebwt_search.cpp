@@ -537,7 +537,7 @@ static void printLongUsage(ostream& out) {
 	"                     -c is given, this might be \"GTATGCTG,AATTCAGGCTG\".\n"
 	"                     Sequences specified with this option must\n"
 	"                     correspond file-for-file and read-for-read with\n"
-	"                     those specified in <mates2>.  Reads may be a mix\n"
+	"                     those specified in <mates1>.  Reads may be a mix\n"
 	"                     of different lengths.  Note that as of version\n"
 	"                     0.9.9, bowtie can perform paired-end alignment\n"
 	"                     only when the alignment policy is -v 0 or -v 1.\n"

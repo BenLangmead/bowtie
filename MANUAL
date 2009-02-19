@@ -11,25 +11,23 @@ Bowtie Manual
  mammalian genomes. It aligns 35-base-pair reads to the human genome at
  a rate of 25 million reads per hour on a typical workstation with 2
  gigabytes of memory. Bowtie indexes the genome with a Burrows-Wheeler
- index to keep its memory footprint small: as small as 1.1 GB for the
- human genome (using -z).  Unlike tools using heavier-duty indexing
- schemes like suffix trees, suffix arrays, or spaced seeds, Bowtie can
- be run efficiently on a typical desktop PC and the index can be easily
- saved to disk and reused across alignment runs. Bowtie supports
- alignment policies equivalent to Maq and SOAP but is much faster:
- about 35x faster than Maq and over 250x faster than SOAP when aligning
- to the human genome.  Multiple processor cores can be used
- simultaneously to achieve greater alignment speed.  Bowtie's output
- format can be converted to the format used by Maq, allowing users to
- rapidly align reads with Bowtie then identify variations with Maq. The
- Bowtie tools run on the command line under Windows XP, Mac OS X, and
- Linux.
+ index to keep its memory footprint small: for the human genome, the
+ index is as small as 1.1 GB (using -z), and typically about 2.2 GB
+ (not using -z) or 2.9 GB (for paired-end alignment).  Bowtie supports
+ alignment policies equivalent to Maq and SOAP but is substantially
+ faster: about 35x faster than Maq and over 250x faster than SOAP when
+ aligning 35-bp reads to the human genome.  Multiple processor cores
+ can be used simultaneously to achieve greater alignment speed.
+ Bowtie's output format can be converted to the format used by Maq,
+ allowing users to rapidly align reads with Bowtie then identify
+ variations with Maq. The Bowtie tools run on the command line under
+ Windows XP, Mac OS X, and Linux.
 
  What isn't Bowtie?
  ------------------
 
  Bowtie is not a general-purpose alignment tool like MUMmer, BLAST or
- Vmatch. Bowtie works best with short reads (though it supports reads
+ Vmatch.  Bowtie works best with short reads (though it supports reads
  up to 1024 bases in length) and is designed to be extremely fast for
  read sets where a) many of the reads have at least one good, valid
  alignment, b) many of the reads are relatively high-quality, and c)
@@ -38,10 +36,8 @@ Bowtie Manual
  resequencing projects, but less competitive running times may be
  observed in other contexts.
 
- Bowtie does not yet work in ABI "color space," does not yet report
- alignments with insertions or deletions, and does not yet handle joint
- alignment of paired-end reads.  All off these are future work, with
- paired-end alignment as the highest priority.
+ Bowtie does not yet work in ABI "color space," and does not yet report
+ gapped alignments.  These featuers are future work.
 
  Obtaining Bowtie Binaries
  -------------------------
@@ -61,12 +57,13 @@ Bowtie Manual
  Windows using Cygwin or MinGW (MinGW recommended).  If building with
  MinGW, first install MinGW and MSYS (http://www.mingw.org/), the zlib
  library (http://cygwin.com/packages/mingw-zlib/), and the pthreads
- library (http://sourceware.org/pthreads-win32/).
+ library (http://sourceware.org/pthreads-win32/).  You may also need
+ the GnuWin32 core (http://gnuwin32.sf.net/packages/coreutils.htm).
 
- Bowtie depends on code from Maq v0.6.6 (http://maq.sf.net) and from
- the SeqAn library v1.1 (http://www.seqan.de).  However, all supporting
- code is included in the Bowtie source archive, so there is no need to
- download additional sources.
+ Bowtie depends on code from Maq (http://maq.sf.net) and from the SeqAn
+ library (http://www.seqan.de).  However, all supporting code is
+ included in the Bowtie source archive, so there is no need to download
+ additional sources.
 
  Obtain Bowtie sources from the Download section of the Sourceforge
  project site:
@@ -89,10 +86,10 @@ Bowtie Manual
  The 'bowtie' aligner takes an index and a set of reads as input and
  outputs a list of alignments.  Alignments are selected according to a
  combination of the -v/-n/-e/-l options, which define which alignments
- are legal, and the -k/-a/--best/--nostrata options which define which
- and how many legal alignments should be reported.
+ are legal, and the -k/-a/-m/--best/--nostrata options which define
+ which and how many legal alignments should be reported.
 
- By default, Bowtie enforces a policy that is equivalent to Maq's
+ By default, Bowtie enforces an alignment policy equivalent to Maq's
  quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it
  can also be made to enforce an end-to-end k-difference policy
  equivalent to SOAP's (http://soap.genomics.org.cn/) (-v 2).
@@ -108,8 +105,9 @@ Bowtie Manual
  results when run with the same initial "seed" value (see documentation
  for --seed option).
 
- Indels and paired-end alignment are not currently supported.
- Alignment in ABI "color space" is also not currently supported.
+ Gapped alignments are not currently supported, but we do plan to
+ implement this in the future.  Alignment in ABI "color space" is also
+ not currently supported.
 
  Bowtie is designed to be very fast for read sets where a) many of the
  reads have at least one good, valid alignment, b) many of the reads
@@ -167,6 +165,52 @@ Bowtie Manual
   The policy has one criterion: Alignments may have no more than V
   mismatches.  Quality values are ignored.  The number of mismatches
   permitted is configurable with the -v option.
+  
+  Paired-end Alignment
+  --------------------
+  
+  As of version 0.9.9, Bowtie contains preliminary support for
+  paired-end alignment.  Support is described as "preliminary" because
+  paired-end alignment only works under -v 0 or -v 1 alignment policies
+  and because performance has not been thoroughly optimized.  Also,
+  there is currently no way to get Bowtie to report a mix of paired-end
+  alignments and singleton alignments (for unpaired mates) in one run;
+  if a mix of alignments is desired, the user must first perform a
+  paired-end run using the --unfa or --unfq option to write unaligned
+  pairs to files, then run Bowtie again in single-ended mode using
+  those files as input.  Future versions of Bowtie will expand paired-
+  end support and, hopefully, improve performance as well.
+  
+  A valid paired-end alignment satisfies the following criteria:
+  
+  1. Both mates have a valid alignment according to the alignment
+     policy specified by the -v/-n/-e/-l options.
+  2. The relative orientation and position of the mates satisfy the
+     constraints given by the -I/-X/--lr/--rl/--ll options. 
+  
+  Policies governing which paired-end alignments are reported for a
+  given read are specified using the -k, -a and -m options as usual.
+  The --nostrata and --best options do not apply in paired-end mode.
+  
+  A paired-end alignment is reported as a pair of mate alignments, both
+  on a separate line, where the alignment for each mate is formatted
+  the same as an unpaired (singleton) alignment.  The alignment for the
+  mate that occurs closest to the beginning of the reference sequence
+  (the "upstream" mate) is always printed before the alignment for the
+  downstream mate.  Reads files containing paired-end reads will
+  sometimes name the reads according to whether they are the #1 or #2
+  mates by appending a "/1" or "/2" suffix to the read name.  If no
+  such suffix is present in Bowtie's input, the suffix will be added
+  when Bowtie prints read names in alignments.
+  
+  Finding a valid paired-end alignment where both mates align to
+  repetitive regions of the reference can be very time-consuming.  By
+  default, Bowtie avoids much of this cost by imposing a limit on the
+  number of "tries" it makes to match an alignment for one mate with a
+  nearby alignment for the other.  The default limit is 100.  This
+  causes Bowtie to miss some valid paired-end alignments where both
+  mates lie in repetitive regions, but the user may use the --pairtries
+  or -y options to increase Bowtie's sensitivity as desired.  
   
   High Performance Tips
   ---------------------
@@ -229,47 +273,115 @@ Bowtie Manual
   The following is a detailed description of the options used to control
   the 'bowtie' aligner:
 
- Usage: bowtie [options]* <ebwt_base> <query_in> [<hit_outfile>]
+ Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]
 
-  <ebwt_base>        The basename of the index to be searched.  The
-                     basename is the name of any of the four index
-                     files up to but not including the first period.
-                     bowtie first looks in the current directory for
-                     the index files, then looks in the 'indexes'
-                     subdirectory under the directory where the
-                     currently-running 'bowtie' executable is located,
-                     then looks in the directory specified in the
-                     BOWTIE_INDEXES environment variable.
+  <ebwt>             The basename of the index to be searched.  The
+                     basename is the name of any of the index files up
+                     to but not including the final .1.ebwt /
+                     .rev.1.ebwt / etc.  bowtie looks for the specified
+                     index first in the current directory, then in the
+                     'indexes' subdirectory under the directory where
+                     the currently-running 'bowtie' executable is
+                     located, then looks in the directory specified in
+                     the BOWTIE_INDEXES environment variable.
 
-  <query_in>         A comma-separated list of files containing the
+  <mates1>           Comma-separated list of files containing the #1
+                     mates (filename usually includes "_1"), or, if -c
+                     is specified, the mate sequences themselves.
+                     E.g., this might be "flyA_1.fq,flyB_1.fq", or, if
+                     -c is given, this might be "GGTCATCCT,ACGGGTCGT".
+                     Sequences specified with this option must
+                     correspond file-for-file and read-for-read with
+                     those specified in <mates2>.  Reads may be a mix
+                     of different lengths.  Note that as of version
+                     0.9.9, bowtie can perform paired-end alignment
+                     only when the alignment policy is -v 0 or -v 1.
+                     Paired-end support will be expanded in future
+                     versions. 
+
+  <mates2>           Comma-separated list of files containing the #2
+                     mates (filename usually includes "_2"), or, if -c
+                     is specified, the mate sequences themselves.
+                     E.g., this might be "flyA_2.fq,flyB_2.fq", or, if
+                     -c is given, this might be "GTATGCTG,AATTCAGGCTG".
+                     Sequences specified with this option must
+                     correspond file-for-file and read-for-read with
+                     those specified in <mates1>.  Reads may be a mix
+                     of different lengths.  Note that as of version
+                     0.9.9, bowtie can perform paired-end alignment
+                     only when the alignment policy is -v 0 or -v 1.
+                     Paired-end support will be expanded in future
+                     versions. 
+
+  <singles>          A comma-separated list of files containing the
                      reads to be aligned, or, if -c is specified, the
                      sequences themselves. E.g., this might be
                      "lane1.fq,lane2.fq,lane3.fq,lane4.fq", or, if -c
-                     is specified, this might be "GGTCATCCT,ACGGGTCGT"
+                     is specified, this might be "GGTCATCCT,ACGGGTCGT".
+                     Reads may be a mix of different lengths.
 
-  <hit_outfile>      File to write alignments to.  By default,
-                     alignments are written to stdout (the console).
+  <hits>             File to write alignments to.  By default,
+                     alignments are written to stdout (the console),
+                     but a <hits> file must be specified if the
+                     -b/--binout option is also specified.
 
  Options:
- 
-  -q                 The query input files (specified as <query_in>)
-                     are FASTQ files (usually having extension .fq or
-                     .fastq).  This is the default.  See also:
-                     --solexa-quals.
+ ========
 
-  -f                 The query input files (specified as <query_in>)
-                     are FASTA files (usually having extension .fa,
-                     .mfa, .fna or similar).  All quality values are
-                     assumed to be 40.
+   Input:
+   ------
 
-  -r                 The query input files (specified as <query_in>)
-                     are Raw files: one sequence per line, without
-                     quality values or names.
+  -q                 The query input files (specified as <mates1>,
+                     <mates2> and <singles>) are FASTQ files (usually
+                     having extension .fq or .fastq).  This is the
+                     default.  See also: --solexa-quals and
+                     --integer-quals.
+
+  -f                 The query input files (specified as <mates1>,
+                     <mates2> and <singles>) are FASTA files (usually
+                     having extension .fa, .mfa, .fna or similar).  All
+                     quality values are assumed to be 40 on the Phred
+                     scale.
+
+  -r                 The query input files (specified as <mates1>,
+                     <mates2> and <singles>) are Raw files: one
+                     sequence per line, without quality values or
+                     names.  All quality values are assumed to be 40 on
+                     the Phred scale.
 
   -c                 The query sequences are given on command line.
-                     I.e. <query_in> is a comma-separated list of
-                     reads rather than a list of read files.
+                     I.e. <mates1>, <mates2> and <singles> are comma-
+                     separated lists of reads rather than lists of
+                     read files.
 
+  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
+                     each read before alignment (default: 0).
+
+  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
+                     each read before alignment (default: 0).
+
+  -u/--qupto <int>   Only align the first <int> reads or read pairs
+                     from the input.  Default: no limit.
+
+  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which
+                     can be negative) to phred-scaled (which can't).
+                     The formula for conversion is phred-qual =
+                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).
+                     Used with -q.  Default: off.
+
+  --integer-quals    Quality values are represented in the FASTQ file
+                     as space-separated ASCII integers, e.g.,
+                     "40 40 30 40...", rather than ASCII characters,
+                     e.g., "II?I...".  Used with -q.  Default: off.
+
+   Alignment:
+   ----------
+
+  -n/--seedmms <int> The maximum number of mismatches permitted in the
+                     "seed", which is the first 28 base pairs of the
+                     read by default (see -l/--seedlen).  This may be
+                     0, 1, 2 or 3 and the default is 2.
+ 
   -e/--maqerr <int>  The maximum permitted total of quality values at
                      mismatched read positions.  This total is also
                      called the "quality-weighted hamming distance" or
@@ -282,23 +394,26 @@ Bowtie Manual
                      the high-quality end of the read to which the -n
                      ceiling applies.  The default is 28.
 
-  -n/--seedmms <int> The maximum number of mismatches permitted in the
-                     seed.  This may be 0, 1, 2 or 3 and the default is
-                     2.
+  --nomaqround       Maq accepts quality values in the Phred scale, but
+                     internally rounds quality values to the nearest 10
+                     saturating at 30.  By default, Bowtie imitates
+                     this behavior.  Use --nomaqround to prevent this
+                     type of rounding in Bowtie.
 
   -v <int>           Forego the Maq-like alignment policy and use a
                      SOAP-like alignment policy.  I.e., report end-to-
                      end alignments with at most <int> mismatches.  If
-                     -v is specified, quality values and the -e, -l and
-                     -n options are ignored.
+                     -v is specified, base quality values and the -e,
+                     -l and -n options are ignored.
 
   -I/--minins <int>  The minimum insert size for valid paired-end
-                     alignments.  E.g. if -I 40 is specified and a
-                     paired-end alignment consists of two 10-bp
-                     alignments in the proper orientation with a 20-bp
-                     gap between them, that alignment is considered
-                     valid (as long as -X is also satisfied).  A 19-bp
-                     gap would not be valid.  Default: 0.
+                     alignments.  E.g. if -I 60 is specified and a
+                     paired-end alignment consists of two 20-bp
+                     alignments in the appropriate orientation with a
+                     20-bp gap between them, that alignment is
+                     considered valid (as long as -X is also
+                     satisfied).  A 19-bp gap would not be valid in
+                     that case.  Default: 0.
 
   -X/--maxins <int>  The maximum insert size for valid paired-end
                      alignments.  E.g. if -X 100 is specified and a
@@ -306,22 +421,67 @@ Bowtie Manual
                      alignments in the proper orientation with a 60-bp
                      gap between them, that alignment is considered
                      valid (as long as -I is also satisfied).  A 61-bp
-                     gap would not be valid.  Default: 0.
+                     gap would not be valid in that case.  Default:
+                     250.
 
   --fr/--rf/--ff     The upstream/downstream mate orientations for a
                      valid paired-end alignment against the forward
                      reference strand.  E.g., if --fr is specified and
                      there is a candidate paired-end alignment where
                      mate1 appears upstream of the reverse complement
-                     of mate2 and the insert-length constraints are
-                     met, that alignment is valid.  Similarly, if mate2
+                     of mate2 and the insert length constraints are
+                     met, that alignment is valid.  Also, if mate2
                      appears upstream of the reverse complement of
                      mate1 and all other constraints are met, that too
-                     is valid.  Default: --fr (appropriate for the
-                     Illumina short insert library). 
+                     is valid.  --rf likewise requires that an upstream
+                     mate1 be reverse-complemented and a downstream
+                     mate2 be forward-oriented.  --ll requires both an
+                     upstream mate1 and a downstream mate2 to be
+                     forward-oriented.  Default: --fr (appropriate for
+                     the Illumina short insert library). 
 
-  -k <int>           Report up to <int> valid alignments per read
-                     (default: 1).  Validity of alignments is
+  --maxbts           The maximum number of backtracks permitted when
+                     aligning a read in -n 2 or -n 3 mode (default:
+                     125).  A "backtrack" is the introduction of a
+                     speculative substitution into the alignment.
+                     Without this limit, the default parameters will
+                     sometimes require that 'bowtie' try 100s or 1,000s
+                     of backtracks to align a read, especially if the
+                     read has many low-quality bases and/or has no
+                     valid alignments, slowing bowtie down
+                     significantly.  The drawback of having a limit is
+                     that some valid alignments may be missed.  Higher
+                     limits yield greater sensitivity at the expensive
+                     of longer running times.  See also: -y/--tryhard.
+
+  --pairtries <int>  For paired-end alignment, this is the maximum
+                     number of attempts Bowtie will make to match an
+                     alignment for one mate up with an alignment for
+                     the opposite mate.  Most paired-end alignments
+                     require only a few such attempts, but pairs where
+                     both mates occur in highly repetitive regions of
+                     the reference can require significantly more.
+                     Setting this to a higher number allows Bowtie to
+                     find more paired-end alignments for repetitive
+                     pairs at the expense of speed.  The default is
+                     100.  See also: -y/--tryhard.
+
+  -y/--tryhard       Try as hard as possible to find valid alignments
+                     when they exist, including paired-end alignments.
+                     This is equivalent to specifying very high values
+                     for the --maxbts and --pairtries options.  This
+                     mode is generally MUCH SLOWER than the default
+                     settings, but can be useful for certain research
+                     problems.  This mode is slower when (a) the
+                     reference is very repetitive, (b) the reads are
+                     low quality, or (c) not many reads have valid
+                     alignments.
+
+   Reporting:
+   ----------
+
+  -k <int>           Report up to <int> valid alignments per read or
+                     pair (default: 1).  Validity of alignments is
                      determined by the alignment policy (combined
                      effects of -n, -v, -l, and -e).  If many
                      alignments are reported, they may be subject to
@@ -336,31 +496,33 @@ Bowtie Manual
                      the index, but makes alignment much faster for
                      large -k.
 
-  -a/--all           Report all valid alignments per read (default:
-                     off).  Validity of alignments is determined by the
-                     alignment policy (combined effects of -n, -v, -l,
-                     and -e).  Reported alignments may be subject to
-                     stratification; see --best, --nostrata.  Bowtie is
-                     designed to be very fast for small -k; BOWTIE CAN
-                     CAN BECOME VERY SLOW IF -a/--all IS SPECIFIED.  If
-                     you would like to use Bowtie with -a, consider
-                     building an index with a denser suffix-array
-                     sample, i.e. specify a smaller '--offrate' when
-                     invoking 'bowtie-build' for the relevant index.
-                     This will increase the memory footprint of the
-                     index, but makes alignment much faster in -a mode.
+  -a/--all           Report all valid alignments per read or pair
+                     (default: off).  Validity of alignments is
+                     determined by the alignment policy (combined
+                     effects of -n, -v, -l, and -e).  Reported
+                     alignments may be subject to stratification; see
+                     --best, --nostrata.  Bowtie is designed to be very
+                     fast for small -k; BOWTIE CAN BECOME VERY SLOW
+                     IF -a/--all IS SPECIFIED.  If you would like to
+                     use Bowtie with -a, consider building an index
+                     with a denser suffix-array sample, i.e. specify a
+                     smaller '--offrate' when invoking 'bowtie-build'
+                     for the relevant index.  This will increase the
+                     memory footprint of the index, but makes alignment
+                     much faster in -a mode.
 
-  -m <int>           Suppress all alignments for a particular read if
-                     more than <int> reportable alignments exist for
-                     it.  Reportable alignments are those that would be
-                     reported given the -n, -v, -l, -e, -k, -a, --best,
-                     and --nostrata options.  Default: no limit.
-                     Bowtie is designed to be very fast for small -m
-                     but BOWTIE CAN BECOME VERY SLOW AS -m INCREASES.
+  -m <int>           Suppress all alignments for a particular read or
+                     pair if more than <int> reportable alignments
+                     exist for it.  Reportable alignments are those
+                     that would be reported given the -n, -v, -l, -e,
+                     -k, -a, --best, and --nostrata options.  Default:
+                     no limit.  Bowtie is designed to be very fast for
+                     small -m but BOWTIE CAN BECOME VERY SLOW AS -m
+                     INCREASES.
 
-  --best             Reported alignments must belong to the best
-                     possible alignment "stratum" (default: off).  A
-                     stratum is a category defined by the number of
+  --best             Reported singleton alignments must belong to the
+                     best possible alignment "stratum" (default: off).
+                     A stratum is a category defined by the number of
                      mismatches present in the alignment (for -n, the
                      number of mismatches present in the seed region of
                      the alignment).  E.g., if --best is not specified,
@@ -370,100 +532,18 @@ Bowtie Manual
                      BOWTIE IS ABOUT 3-5 TIMES SLOWER WHEN --best IS
                      SPECIFIED.
 
-  --nostrata         If many valid alignments exist and are reportable
-                     (according to the --best and -k options) and they
-                     fall into various alignment "strata", report all
-                     of them.  By default, Bowtie only reports those
-                     alignments that fall into the best stratum, i.e.,
-                     the one with fewest mismatches.  BOWTIE CAN BECOME
-                     VERY SLOW WHEN --nostrata IS COMBINED WITH -k OR
-                     -a.
+  --nostrata         If many valid singleton alignments exist and are
+                     reportable (according to the --best and -k
+                     options) and they fall into more than one
+                     alignment "stratum", report all of them.  By
+                     default, Bowtie only reports those alignments that
+                     fall into the best stratum for which alignments
+                     were found, i.e., the one with fewest mismatches.
+                     BOWTIE CAN BECOME VERY SLOW WHEN --nostrata IS
+                     COMBINED WITH -k OR -a.
 
-  -y/--tryhard       Try as hard as possible to find valid alignments
-                     when they exist, including paired-end alignments.
-                     This is equivalent to specifying very high values
-                     for the --maxbts and --pairtries options.  This
-                     mode is generally MUCH SLOWER than the default
-                     settings, but can be useful for certain research
-                     problems.  This mode is slower when (a) the
-                     reference is very repetitive, (b) the reads are
-                     low quality, or (c) not many reads have valid
-                     alignments.
-
-  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
-                     each read before alignment (default: 0).
-
-  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
-                     each read before alignment (default: 0).
-
-  -p/--threads <int> Launch <int> parallel search threads (default: 1).
-                     Threads will run on separate processors/cores and
-                     synchronize when grabbing reads and outputting
-                     alignments.  Searching for alignments is almost
-                     totally parallel, and speedup is close to linear.
-                     Speedup suffers somewhat in -z mode.  This option
-                     is only available if bowtie is linked with the
-                     pthreads library (i.e. if BOWTIE_PTHREADS=0 is not
-                     specified at build time).
-
-  -u/--qupto <int>   Only align the first <int> reads from the
-                     specified read set.  Default: no limit.
-
-  --unfa <filename>  Write all reads that fail to align to a FASTA file
-                     with name <filename>.  Unless --maxfa is
-                     specified, reads with a number of valid alignments
-                     exceeding the limit set with the -m option are
-                     also written to this file.
-
-  --unfq <filename>  Write all reads that fail to align to a FASTQ file
-                     with name <filename>.  Unless --maxfq is
-                     specified, reads with a number of valid alignments
-                     exceeding the limit specified by the -m option are
-                     also written to this file.
-
-  --maxfa <filename> Write all reads with a number of valid alignments
-                     exceeding the limit set with the -m option to a
-                     FASTA file with given name.  These reads are not
-                     written to the file specified with --unfa.
-
-  --maxfq <filename> Write all reads with a number of valid alignments
-                     exceeding the limit set with the -m option to a
-                     FASTQ file with given name.  These reads are not
-                     written to the file specified with --unfq.
-
-  -t/--time          Print the amount of wall-clock time taken by each
-                     search phase and index turnover.
-
-  -z/--phased        Alternate between using the forward and mirror
-                     indexes in a series of phases such that only one
-                     "half" of the index is resident in memory at one
-                     time.  This uses about half the amount of memory
-                     as the default (which keeps both forward and
-                     mirror indexes resident in memory at once), but is
-                     somewhat slower, scales worse (see -p), and is
-                     incompatible with use of --best or -k greater than
-                     1.
-
-  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which
-                     can be negative) to phred-scaled (which can't).
-                     The formula for conversion is phred-qual =
-                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).
-                     Used with -q.  Default: off.
-
-  --integer-quals    Quality values are represented in the FASTQ file
-                     as space-separated ASCII integers, e.g.,
-                     "40 40 30 40...", rather than ASCII characters,
-                     e.g., "II?I...".  Used with -q.  Default: off.
-
-  --nomaqround       Maq accepts quality values in the Phred scale, but
-                     internally rounds quality values to the nearest 10
-                     saturating at 30.  By default, Bowtie imitates
-                     this behavior.  Use --nomaqround to cancel
-                     rounding in Bowtie.
-
-  --ntoa             No-confidence bases in reads (usually 'N' or '.')
-                     are converted to As before alignment.  By default,
-                     no-confidence bases do not match any base. 
+   Output:
+   -------
 
   --concise          Print alignments in a concise format. Each line
                      has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',
@@ -475,9 +555,18 @@ Bowtie Manual
                      alignment.  Each alignment appears on a separate
                      line.
 
-  -b/--binout        Outout alignments in a concise binary format.  If
+  -b/--binout        Output alignments in a concise binary format.  If
                      this is specified, <hit_outfile> must also be
-                     specified. 
+                     specified.
+
+  -t/--time          Print the amount of wall-clock time taken by each
+                     search phase and index turnover.
+
+  -B/--offbase <int> When outputting alignments, number the first base
+                     of a reference sequence as <int>.  Default: 0.
+                     (Default is likely to change to 1 in Bowtie 1.0.)
+
+  --quiet            Print nothing besides alignments.
 
   --refout           Write alignments to a set of files named
                      refXXXXX.map, where XXXXX is the 0-padded index of
@@ -485,33 +574,74 @@ Bowtie Manual
                      useful way to break up work for downstream
                      analyses when dealing with, for example, large
                      numbers of reads aligned to the assembled human
-                     genome.  If <hit_outfile> is also specified, it
-                     will be ignored.
+                     genome.  If <hits> is also specified, it will be
+                     ignored.
 
   --refidx           When a reference sequence is referred to in a
                      reported alignment, refer to it by 0-based index
                      (its offset into the list of references that were
                      indexed) rather than by name.
 
-  --maxbts           The maximum number of backtracks permitted when
-                     aligning a read in -n 2 or -n 3 mode (default:
-                     125).  A "backtrack" is the introduction of a
-                     speculative substitution into the alignment.
-                     Without this limit, the default paramters will
-                     sometimes require that 'bowtie' try 100s or 1,000s
-                     of backtracks to align a read, especially if the
-                     read has many low-quality bases and/or has no
-                     valid alignments, slowing bowtie down
-                     significantly.  The drawback of having a limit is
-                     that some valid alignments may be missed.  Higher
-                     limits yield greater sensitivity at the expensive
-                     of longer running times.
+  --unfa <filename>  Write all reads that fail to align to a FASTA file
+                     with name <filename>.  Paired-end reads will be
+                     written to two parallel files with "_1" and "_2"
+                     inserted in the filename, e.g., if <filename> is
+                     unaligned.fa, the #1 and #2 mates that fail to
+                     align will be written to unaligned_1.fa and
+                     unaligned_2.fa respectively.  Unless --maxfa is
+                     also specified, reads with a number of valid
+                     alignments exceeding the limit set with the -m
+                     option are also written to <filename>.
 
-  --pairtries <int>  The maximum number of attempts Bowtie should make
-                     to find a mate for one or TODO  
+  --unfq <filename>  Write all reads that fail to align to a FASTQ file
+                     with name <filename>.  Paired-end reads will be
+                     written to two parallel files with "_1" and "_2"
+                     inserted in the filename, e.g., if <filename> is
+                     unaligned.fq, the #1 and #2 mates that fail to
+                     align will be written to unaligned_1.fq and
+                     unaligned_2.fq respectively.  Unless --maxfq is
+                     also specified, reads with a number of valid
+                     alignments exceeding the limit set with the -m
+                     option are also written to <filename>.
 
-  --maxns <int>      Skip reads with more than <int> N's (no-confidence
-                     bases) in their sequence.  Default: no limit.
+  --maxfa <filename> Write all reads with a number of valid alignments
+                     exceeding the limit set with the -m option to a
+                     FASTA file with given name.  Paired-end reads that
+                     exceed the -m limit are written to parallel files
+                     with "_1" and "_2" inserted into the filename, in
+                     the same way as with --unfa.  These reads are not
+                     written to the file specified with --unfa.
+
+  --maxfq <filename> Write all reads with a number of valid alignments
+                     exceeding the limit set with the -m option to a
+                     FASTQ file with given name.  Paired-end reads that
+                     exceed the -m limit are written to parallel files
+                     with "_1" and "_2" inserted into the filename, in
+                     the same way as with --unfq.  These reads are not
+                     written to the file specified with --unfq.
+
+   Performance:
+   ------------
+
+  -p/--threads <int> Launch <int> parallel search threads (default: 1).
+                     Threads will run on separate processors/cores and
+                     synchronize when grabbing reads and outputting
+                     alignments.  Searching for alignments is almost
+                     totally parallel, and speedup is close to linear.
+                     Speedup suffers somewhat in -z mode.  This option
+                     is only available if bowtie is linked with the
+                     pthreads library (i.e. if BOWTIE_PTHREADS=0 is not
+                     specified at build time).
+
+  -z/--phased        Alternate between using the forward and mirror
+                     indexes in a series of phases such that only one
+                     "half" of the index is resident in memory at one
+                     time.  This uses about half the amount of memory
+                     as the default (which keeps both forward and
+                     mirror indexes resident in memory at once), but is
+                     somewhat slower, scales worse (see -p), and is
+                     incompatible with use of --best or -k greater than
+                     1.
 
   -o/--offrate <int> Override the offrate of the index with <int>.  If
                      <int> is greater than the offrate used to build
@@ -521,18 +651,21 @@ Bowtie Manual
                      more time to calculate text offsets.  <int> must
                      be greater than the value used to build the index.
 
+   Other:
+   ------
+
   --seed <int>       Use <int> as the seed for pseudo-random number
                      generator.
 
   --verbose          Print verbose output (for debugging).
 
+  --version          Print version information and quit.
+
   -h/--help          Print detailed description of tool and its options
                      (from MANUAL).
 
-  --version          Print version information and quit.
-
-  Output
-  ------
+  Default output
+  --------------
 
   The 'bowtie' aligner outputs each alignment on a separate line.  Each
   line is a collection of 8 fields separated by tabs; from left to
@@ -565,12 +698,13 @@ Bowtie Manual
  --------------------------------
 
  Use 'bowtie-build' to build a Bowtie index from a set of DNA
- sequences.  bowtie-build outputs a set of 4 files named NAME.1.ebwt,
- NAME.2.ebwt, NAME.rev.1.ebwt, and NAME.rev.2.ebwt, where NAME is
- <index_basename> supplied by the user on the command line.  These
- files together constitute the index: they are all that is needed to
- align reads to the reference sequences.  The original sequence files
- are no longer used by Bowtie once the index is built.  
+ sequences.  bowtie-build outputs a set of 6 files with suffixes
+ .1.ebwt, .2.ebwt, .3.ebwt, .4.ebwt, .rev.1.ebwt, and .rev.2.ebwt,
+ where the prefix is the <ebwt_outfile_base> parameter supplied by the
+ user on the command line.  These files together constitute the index:
+ they are all that is needed to align reads to the reference sequences.
+ The original sequence files are no longer used by Bowtie once the
+ index is built.  
 
  Use of Karkkainen's blockwise algorithm (see reference #4 below)
  allows bowtie-build to trade off between running time and memory
@@ -582,11 +716,12 @@ Bowtie Manual
 
  The indexer provides options pertaining to the "shape" of the index,
  e.g. --offrate governs the fraction of Burrows-Wheeler rows that are
- "marked" (see reference #2).  All of these options are potentially
- profitable trade-offs depending on the application.  They have been
- set to defaults that are reasonable for most cases according to our
- experiments.  See "High Performance Tips" in the "Using the 'bowtie'
- Aligner" section for additional details.
+ "marked" (i.e., the "density" of the suffix-array sample; see
+ reference #2).  All of these options are potentially profitable trade-
+ offs depending on the application.  They have been set to defaults
+ that are reasonable for most cases according to our experiments.  See
+ "High Performance Tips" in the "Using the 'bowtie' Aligner" section
+ for additional details.
 
  Because bowtie-build uses 32-bit pointers internally, it can handle up
  to a maximum of 2^32-1 (somewhat more than 4 billion) characters in an
@@ -624,7 +759,7 @@ Bowtie Manual
   Command Line
   ------------
 
- Usage: bowtie-build [options]* <reference_in> <index_basename>
+ Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>
 
     <reference_in>          A comma-separated list of FASTA files
                             containing the reference sequences to be
@@ -634,7 +769,12 @@ Bowtie Manual
                             -c is specified, this might be
                             "GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA".
 
-    <index_basename>        The basename of the index files to write.
+    <ebwt_outfile_base>     The basename of the index files to write.
+                            By default, bowtie-build writes files named
+                            NAME.1.ebwt, NAME.2.ebwt, NAME.3.ebwt,
+                            NAME.4.ebwt, NAME.rev.1.ebwt, and
+                            NAME.rev.2.ebwt, where NAME is the
+                            basename.
 
  Options:
 
@@ -696,6 +836,18 @@ Bowtie Manual
                             the worst case (where the worst case is an
                             extremely repetitive reference).  Default:
                             off.
+
+    -r/--noref              Do not build the NAME.3.ebwt and
+                            NAME.4.ebwt portions of the index, which
+                            contain a bitpacked version of the
+                            reference sequences and are (currently)
+                            only used for paired-end alignment.
+
+    -3/--justref            Build *only* the NAME.3.ebwt and
+                            NAME.4.ebwt portions of the index, which
+                            contain a bitpacked version of the
+                            reference sequences and are (currently)
+                            only used for paired-end alignment.
 
     -o/--offrate <int>      To map alignments back to positions on the
                             reference sequences, it's necessary to
@@ -831,17 +983,22 @@ Bowtie Manual
  'bowtie-maqconvert' allows the user to convert from Bowtie's default
  alignment format to the format used by Maq.  This is a necessary first
  step to using Maq's analyses to study Bowtie's output, including
- consensus ('maq assemble') and SNP calling ('maq cns2snp').
+ consensus ('maq assemble') and SNP calling ('maq cns2snp').  Please
+ note that, because Bowtie does not mimic Maq's exact calculation for
+ alignment "mapping quality," results obtained by feeding Bowtie
+ alignments to the Maq tools will generally be less accurate than those
+ obtained using Maq's own aligner with the Maq tools.   
  
- The conversion includes an in-memory sort of all alignments with
- respect to their position on the reference.  This can be problematic
- for very large sets of alignments; sorting so many alignments may
- exhaust memory, causing bowtie-maqconvert to crash or run very slowly.
- One solution is to split alignments into batches and use
- 'maq mapmerge' to combine them.  Another solution, depending on your
- application and reference, may be to use bowtie's --refout option at
- alignment time to pre-partition alignments into separate files
- according to reference sequence hit.
+ The conversion process includes an in-memory sort of all alignments
+ with respect to their position on the reference.  This can be
+ problematic for very large sets of alignments; sorting so many
+ alignments may exhaust memory, causing bowtie-maqconvert to crash or
+ run very slowly.  One solution is to split alignments into batches and
+ use 'maq mapmerge' to combine outputs from bowtie-maqconvert.  Another
+ solution, depending on your application and reference sequences, may
+ be to use bowtie's --refout option at alignment time to pre-partition
+ alignments into separate files according to the reference sequence
+ aligned against.
 
  Note that Maq changed its output format as of version 0.7.0 in order
  to accomodate read lengths up to 127 bases.  Be sure to use the -o

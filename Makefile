@@ -102,6 +102,8 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
+               reads/e_coli_10000snp.fa \
+               reads/e_coli_10000snp.fq \
                $(PTHREAD_PKG) \
                AUTHORS \
                COPYING \
