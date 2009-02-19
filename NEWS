@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.9 - February 15, 2009
+Version 0.9.9 - February 19, 2009
    * Added some preliminary support for paired-end alignment in -v 0
      and -v 1 modes.  -1/-2 options to specify the paired-end files,
      -I/-X to specify min and max insert sizes, and --fr/--rf/--ff
@@ -47,7 +47,11 @@ Version 0.9.9 - February 15, 2009
    * Fixed a bug that caused the Win32 version of bowtie to hang just
      before it would normally have exited.
    * Fixed bug that could prevent successful read-in of very large
-     (>1GB) .2.ebwt index files.  
+     (>1GB) .2.ebwt index files.
+   * Removed --maxns option since it's mostly redundant with what -v
+     and -n already do.
+   * Removed --ntoa option.
+   * bowtie usage message is now divided into sections for clarity.
 
 Version 0.9.8.1 - January 7, 2009
    * Fixed all known problems with the --unfa/--unfq options:
