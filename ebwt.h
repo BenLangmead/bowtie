@@ -3006,7 +3006,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			// Reserve 8 bytes at the end of the shared memory chunk
 			// for silly synchronization
 			size_t shmemLen = eh->_ebwtTotLen + 4;
-			if(_verbose) cout << "Reading ebwt (" << eeh->ebwtTotLen << ") into shared memory" << endl;
+			if(_verbose) cout << "Reading ebwt (" << eh->ebwtTotLen << ") into shared memory" << endl;
 			while(true) {
 				// Create the shrared-memory block
 				if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {

@@ -516,7 +516,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	while(--limit >= 0) {
 		// Calculate bucket sizes by doing a binary search for each
 		// suffix and noting where it lands
-		uint32_t numBuckets = length(_sampleSuffs)+1;
+		uint32_t numBuckets numBuckets = length(_sampleSuffs)+1;
 		String<uint32_t> bucketSzs; // holds computed bucket sizes
 		String<uint32_t> bucketReps; // holds 1 member of each bucket (for splitting)
 		try {
