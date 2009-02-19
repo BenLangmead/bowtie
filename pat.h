@@ -1139,7 +1139,6 @@ public:
 	                          int __trim5 = 0) :
 		TrimmingPatternSource(__reverse, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
-		_errs(),
 		_filecur(0),
 		_filebuf(),
 		_forgiveInput(__forgiveInput),

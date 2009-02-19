@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: sequence_multiple.h,v 1.1 2008/08/25 16:20:04 langmead Exp $
+  $Id: sequence_multiple.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_STRING_SET_H
@@ -58,7 +58,7 @@ namespace SEQAN_NAMESPACE_MAIN
 ..signature:StringSet<TString, Owner<ConcatDirect<> > >
 ..param.TString:The string type.
 ...type:Class.String
-..remarks:The strings are internally stored in a $TString$ object and the character position type is a 
+..remarks:The strings are internally stored in a $TString$ object and the character position type is a
 a single integer value between 0 and the sum of string lengths minus 1.
 ..remarks:The position type can be returned or modified by the meta-function @Metafunction.SAValue@ called with the @Class.StringSet@ type.
 */
@@ -76,7 +76,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 ..signature:StringSet<TString, Owner<Default> >
 ..param.TString:The string type.
 ...type:Class.String
-..remarks:The strings are internally stored in a $String<TString>$ object and the character position type is a 
+..remarks:The strings are internally stored in a $String<TString>$ object and the character position type is a
 @Class.Pair@ $(seqNo,seqOfs)$ where seqNo identifies the string within the stringset and seqOfs identifies the position within this string.
 ..remarks:The position type can be returned or modified by the meta-function @Metafunction.SAValue@ called with the @Class.StringSet@ type.
 */
@@ -159,7 +159,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
     template <typename TString, typename TSpec>
-	inline typename StringSetLimits< StringSet<TString, TSpec> >::Type & 
+	inline typename StringSetLimits< StringSet<TString, TSpec> >::Type &
 	stringSetLimits(StringSet<TString, TSpec> &stringSet) {
 		if (!_validStringSetLimits(stringSet))
 			_refreshStringSetLimits(stringSet);
@@ -167,7 +167,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
     template <typename TString, typename TSpec>
-	inline typename StringSetLimits< StringSet<TString, TSpec> const>::Type & 
+	inline typename StringSetLimits< StringSet<TString, TSpec> const>::Type &
 	stringSetLimits(StringSet<TString, TSpec> const &stringSet) {
 		if (!_validStringSetLimits(stringSet))
 			_refreshStringSetLimits(const_cast< StringSet<TString, TSpec>& >(stringSet));
@@ -315,7 +315,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	// local_position and limits_string -> global_position
 	template <typename TLimitsString, typename T1, typename T2, typename TCompression>
-	inline typename Value<TLimitsString>::Type 
+	inline typename Value<TLimitsString>::Type
 	posGlobalize(Pair<T1, T2, TCompression> const &pos, TLimitsString const &limits) {
 		return limits[getSeqNo(pos, limits)] + getSeqOffset(pos, limits);
 	}
@@ -371,7 +371,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template < typename TString, typename TSpec, typename TPosition >
-	inline typename Prefix<TString>::Type 
+	inline typename Prefix<TString>::Type
 	prefix(StringSet< TString, TSpec > &me, TPosition pos)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -385,7 +385,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TSpec, typename TPosition >
-	inline typename Prefix<TString const>::Type 
+	inline typename Prefix<TString const>::Type
 	prefix(StringSet< TString, TSpec > const &me, TPosition pos)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -399,14 +399,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition >
-	inline typename Infix<TString>::Type 
+	inline typename Infix<TString>::Type
 	prefix(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me, TPosition pos)
 	{
 		return infix(me.concat, stringSetLimits(me)[getSeqNo(pos, stringSetLimits(me))], posGlobalize(pos, stringSetLimits(me)));
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition >
-	inline typename Infix<TString const>::Type 
+	inline typename Infix<TString const>::Type
 	prefix(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > const &me, TPosition pos)
 	{
 		return infix(me.concat, stringSetLimits(me)[getSeqNo(pos, stringSetLimits(me))], posGlobalize(pos, stringSetLimits(me)));
@@ -417,7 +417,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template < typename TString, typename TSpec, typename TPosition >
-	inline typename Suffix<TString>::Type 
+	inline typename Suffix<TString>::Type
 	suffix(StringSet< TString, TSpec > &me, TPosition pos)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -431,7 +431,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TSpec, typename TPosition >
-	inline typename Suffix<TString const>::Type 
+	inline typename Suffix<TString const>::Type
 	suffix(StringSet< TString, TSpec > const &me, TPosition pos)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -445,14 +445,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition >
-	inline typename Infix<TString>::Type 
+	inline typename Infix<TString>::Type
 	suffix(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me, TPosition pos)
 	{
 		return infix(me.concat, posGlobalize(pos, stringSetLimits(me)), stringSetLimits(me)[getSeqNo(pos, stringSetLimits(me)) + 1]);
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition >
-	inline typename Infix<TString const>::Type 
+	inline typename Infix<TString const>::Type
 	suffix(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > const &me, TPosition pos)
 	{
 		return infix(me.concat, posGlobalize(pos, stringSetLimits(me)), stringSetLimits(me)[getSeqNo(pos, stringSetLimits(me)) + 1]);
@@ -463,7 +463,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template < typename TString, typename TSpec, typename TPosition, typename TSize >
-	inline typename Infix<TString>::Type 
+	inline typename Infix<TString>::Type
 	infixWithLength(StringSet< TString, TSpec > &me, TPosition pos, TSize length)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -477,7 +477,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TSpec, typename TPosition, typename TSize >
-	inline typename Infix<TString const>::Type 
+	inline typename Infix<TString const>::Type
 	infixWithLength(StringSet< TString, TSpec > const &me, TPosition pos, TSize length)
 	{
 		typedef StringSet<TString, TSpec>				TStringSet;
@@ -491,14 +491,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition, typename TSize >
-	inline typename Infix<TString>::Type 
+	inline typename Infix<TString>::Type
 	infixWithLength(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me, TPosition pos, TSize length)
 	{
 		return infixWithLength(me.concat, posGlobalize(pos, stringSetLimits(me)), length);
 	}
 
 	template < typename TString, typename TDelimiter, typename TPosition, typename TSize >
-	inline typename Infix<TString const>::Type 
+	inline typename Infix<TString const>::Type
 	infixWithLength(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > const &me, TPosition pos, TSize length)
 	{
 		return infixWithLength(me.concat, posGlobalize(pos, stringSetLimits(me)), length);
@@ -537,7 +537,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template <typename T1, typename T2, typename TCompression>
-	inline Pair<T1, T2, TCompression> 
+	inline Pair<T1, T2, TCompression>
 	posNext(Pair<T1, T2, TCompression> const &pos) {
 		return Pair<T1, T2, TCompression>(getValueI1(pos), getValueI2(pos) + 1);
 	}
@@ -549,7 +549,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template <typename T1, typename T2, typename TCompression, typename TDelta>
-	inline Pair<T1, T2, TCompression> 
+	inline Pair<T1, T2, TCompression>
 	posAdd(Pair<T1, T2, TCompression> const &pos, TDelta delta) {
 		return Pair<T1, T2, TCompression>(getValueI1(pos), getValueI2(pos) + delta);
 	}
@@ -616,13 +616,13 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template <typename TString>
-	inline unsigned 
+	inline unsigned
 	countSequences(TString const &) {
 		return 1;
 	}
 
 	template <typename TString, typename TSpec>
-	inline typename Size<StringSet<TString, TSpec> >::Type 
+	inline typename Size<StringSet<TString, TSpec> >::Type
 	countSequences(StringSet<TString, TSpec> const &stringSet) {
 		return length(stringSet);
 	}
@@ -630,13 +630,13 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template <typename TSeqNo, typename TString>
-	inline typename Size<TString>::Type 
+	inline typename Size<TString>::Type
 	sequenceLength(TSeqNo /*seqNo*/, TString const &string) {
 		return length(string);
 	}
 
 	template <typename TSeqNo, typename TString, typename TSpec>
-	inline typename Size<StringSet<TString, TSpec> >::Type 
+	inline typename Size<StringSet<TString, TSpec> >::Type
 	sequenceLength(TSeqNo seqNo, StringSet<TString, TSpec> const &stringSet) {
 		return length(stringSet[seqNo]);
 	}
@@ -705,7 +705,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 			}
 
 			template <typename TPos>
-			inline typename Reference<StringSet const>::Type 
+			inline typename Reference<StringSet const>::Type
 			operator [] (TPos pos) const
 			{
 				return value(*this, pos);
@@ -756,7 +756,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 			}
 
 			template <typename TPos>
-			inline typename Reference<StringSet const>::Type 
+			inline typename Reference<StringSet const>::Type
 			operator [] (TPos pos) const
 			{
 				return value(*this, pos);
@@ -797,7 +797,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 		}
 
 		template <typename TPos>
-		inline typename Reference<StringSet const>::Type 
+		inline typename Reference<StringSet const>::Type
 		operator [] (TPos pos) const
 		{
 			return value(*this, pos);
@@ -833,7 +833,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 		}
 
 		template <typename TPos>
-		inline typename Reference<StringSet const>::Type 
+		inline typename Reference<StringSet const>::Type
 		operator [] (TPos pos) const
 		{
 		SEQAN_CHECKPOINT
@@ -962,7 +962,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
     inline void _refreshStringSetLimits(StringSet< TString, Owner<ConcatDirect<TSpec> > > &) {}
 
 	template < typename TString, typename TSpec >
-    inline void _refreshStringSetLimits(StringSet< TString, TSpec > &me) 
+    inline void _refreshStringSetLimits(StringSet< TString, TSpec > &me)
 	{
 		typedef StringSet< TString, TSpec >					TStringSet;
 		typedef typename StringSetLimits<TStringSet>::Type	TLimits;
@@ -992,11 +992,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 		typename Iterator< String<TValue, TSpec> const, Standard >::Type itEnd = end(me, Standard());
 
 		for(; it != itEnd; ++it)
-			if (*it) 
-				if (i)
+			if (*it) {
+				if (i) {
 					--i;
-				else
+				}
+				else {
 					return position(it, me);
+				}
+			}
 		return length(me);
 	}
 
@@ -1036,9 +1039,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	// Default
 	template < typename TString, typename TString2, typename TExpand >
     inline void appendValue(
-		StringSet< TString, Owner<Default> > &me, 
+		StringSet< TString, Owner<Default> > &me,
 		TString2 const &obj,
-		Tag<TExpand> const) 
+		Tag<TExpand> const)
 	{
         appendValue(me.strings, obj);
         appendValue(me.limits, lengthSum(me) + length(obj));
@@ -1047,9 +1050,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	// ConcatDirect
 	template < typename TString, typename TString2, typename TExpand >
     inline void appendValue(
-		StringSet< TString, Owner<ConcatDirect<void> > > &me, 
+		StringSet< TString, Owner<ConcatDirect<void> > > &me,
 		TString2 const &obj,
-		Tag<TExpand> const) 
+		Tag<TExpand> const)
 	{
         append(me.concat, obj);
         appendValue(me.limits, lengthSum(me) + length(obj));
@@ -1057,9 +1060,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
     template < typename TString, typename TDelimiter, typename TString2, typename TExpand >
     inline void appendValue(
-		StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me, 
+		StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me,
 		TString2 const &obj,
-		Tag<TExpand> const) 
+		Tag<TExpand> const)
 	{
         append(me.concat, obj);
         appendValue(me.concat, TDelimiter());
@@ -1070,8 +1073,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	template < typename TString, typename TExpand >
 	inline void appendValue(
 		StringSet<TString, Dependent<Generous> > &me,
-		TString const &obj, 
-		Tag<TExpand> const) 
+		TString const &obj,
+		Tag<TExpand> const)
 	{
 		SEQAN_CHECKPOINT
 		appendValue(me.strings, const_cast<TString*>(&obj));
@@ -1081,16 +1084,16 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	// Tight
 	template < typename TString, typename TExpand >
 	inline void appendValue(
-		StringSet<TString, Dependent<Tight> > &me, 
+		StringSet<TString, Dependent<Tight> > &me,
 		TString const &obj,
-		Tag<TExpand> const) 
+		Tag<TExpand> const)
 	{
 		SEQAN_CHECKPOINT
 		appendValue(me.strings, const_cast<TString*>(&obj));
 		appendValue(me.ids, length(me.strings) - 1);
         appendValue(me.limits, lengthSum(me) + length(obj));
 	}
-  
+
 /*
     inline void append(TString *_objs[], unsigned count) {
         for(unsigned i = 0; i < count; ++i)
@@ -1103,7 +1106,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 // clear
 
 	template < typename TString >
-    inline void	clear(StringSet< TString, Owner<Default> > &me) 
+    inline void	clear(StringSet< TString, Owner<Default> > &me)
 	{
 	SEQAN_CHECKPOINT
 		clear(me.strings);
@@ -1112,7 +1115,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
     }
 
     template < typename TString, typename TDelimiter >
-    inline void	clear(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me) 
+    inline void	clear(StringSet< TString, Owner<ConcatDirect<TDelimiter> > > &me)
 	{
 	SEQAN_CHECKPOINT
 		clear(me.concat);
@@ -1120,7 +1123,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
     }
 
     template < typename TString >
-	inline void	clear(StringSet< TString, Dependent<Generous> > & me) 
+	inline void	clear(StringSet< TString, Dependent<Generous> > & me)
 	{
 	SEQAN_CHECKPOINT
 		clear(me.strings);
@@ -1129,7 +1132,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
     template < typename TString >
-	inline void	clear(StringSet<TString, Dependent<Tight> >& me) 
+	inline void	clear(StringSet<TString, Dependent<Tight> >& me)
 	{
 	SEQAN_CHECKPOINT
 		clear(me.strings);
@@ -1144,14 +1147,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 // length
 
     template < typename TString, typename TSpec >
-    inline typename Size< StringSet< TString, TSpec > >::Type 
+    inline typename Size< StringSet< TString, TSpec > >::Type
 	length(StringSet< TString, TSpec > const &me) {
         return length(me.limits) - 1;
     }
 
 	template <typename TString>
-	inline typename Size<StringSet<TString, Dependent<Tight> > >::Type 
-	length(StringSet<TString, Dependent<Tight> > const &me) 
+	inline typename Size<StringSet<TString, Dependent<Tight> > >::Type
+	length(StringSet<TString, Dependent<Tight> > const &me)
 	{
 		return length(me.strings);
 	}
@@ -1161,7 +1164,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 // resize
 
 	template < typename TString, typename TSpec, typename TSize >
-    inline typename Size< StringSet< TString, TSpec > >::Type 
+    inline typename Size< StringSet< TString, TSpec > >::Type
 	resize(StringSet< TString, TSpec > &me, TSize new_size) {
 		resize(me.limits, new_size + 1);
 		me.limitsValid = (new_size == 0);
@@ -1169,14 +1172,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
     }
 
 	template < typename TString, typename TSpec, typename TSize >
-    inline typename Size< StringSet< TString, Owner<ConcatDirect<TSpec> > > >::Type 
+    inline typename Size< StringSet< TString, Owner<ConcatDirect<TSpec> > > >::Type
 	resize(StringSet< TString, Owner<ConcatDirect<TSpec> > > &me, TSize new_size) {
 		return resize(me.limits, new_size + 1) - 1;
     }
 
 ///.Function.value.param.object.type:Class.StringSet
 //////////////////////////////////////////////////////////////////////////////
-// value	
+// value
 
 	// Default
 	template < typename TString, typename TPos >
@@ -1199,14 +1202,14 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	value(StringSet< TString, Owner<ConcatDirect<TSpec> > > & me, TPos pos)
 	{
 		return infix(me.concat, me.limits[pos], me.limits[pos + 1]);
-	} 
+	}
 
 	template < typename TString, typename TSpec, typename TPos >
 	inline typename Infix<TString const>::Type
 	value(StringSet< TString, Owner<ConcatDirect<TSpec> > > const & me, TPos pos)
 	{
 		return infix(me.concat, me.limits[pos], me.limits[pos + 1]);
-	} 
+	}
 
 	// Tight
 	template < typename TString, typename TPos >
@@ -1274,8 +1277,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TSpec, typename TId>
 	inline typename Reference<StringSet<TString, Owner<TSpec> > >::Type
-	getValueById(StringSet<TString, Owner<TSpec> >& me, 
-				TId const id) 
+	getValueById(StringSet<TString, Owner<TSpec> >& me,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		if (id < (TId) length(me)) return value(me, id);
@@ -1285,8 +1288,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TId>
 	inline typename Reference<StringSet<TString, Dependent<Generous> > >::Type
-	getValueById(StringSet<TString, Dependent<Generous> >& me, 
-				TId const id) 
+	getValueById(StringSet<TString, Dependent<Generous> >& me,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		if (me.strings[id])
@@ -1297,8 +1300,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TId>
 	inline typename Reference<StringSet<TString, Dependent<Tight> > >::Type
-	getValueById(StringSet<TString, Dependent<Tight> >&me, 
-				TId const id) 
+	getValueById(StringSet<TString, Dependent<Tight> >&me,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		for(unsigned i = 0; i < length(me.strings); ++i)
@@ -1328,8 +1331,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template<typename TString, typename TSpec, typename TId>
 	inline typename Reference<StringSet<TString, TSpec> >::Type
-	valueById(StringSet<TString, TSpec>& me, 
-			TId const id) 
+	valueById(StringSet<TString, TSpec>& me,
+			TId const id)
 	{
 	SEQAN_CHECKPOINT
 		return getValueById(me, id);
@@ -1360,9 +1363,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 */
 
 	template<typename TString, typename TSpec, typename TString2>
-	inline typename Id<StringSet<TString, TSpec> >::Type 
+	inline typename Id<StringSet<TString, TSpec> >::Type
 	assignValueById(StringSet<TString, TSpec>& me,
-					TString2& obj) 
+					TString2& obj)
 	{
 	SEQAN_CHECKPOINT
 		appendValue(me, obj);
@@ -1371,10 +1374,10 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template <typename TString, typename TSpec, typename TId>
-	inline typename Id<StringSet<TString, Owner<TSpec> > >::Type 
-	assignValueById(StringSet<TString, Owner<TSpec> >& me, 
+	inline typename Id<StringSet<TString, Owner<TSpec> > >::Type
+	assignValueById(StringSet<TString, Owner<TSpec> >& me,
 					TString& obj,
-					TId id) 
+					TId id)
 	{
 	SEQAN_CHECKPOINT
 		if (id >= (TId) length(me.strings)) {
@@ -1387,10 +1390,10 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template<typename TString, typename TId>
-	inline typename Id<StringSet<TString, Dependent<Generous> > >::Type 
-	assignValueById(StringSet<TString, Dependent<Generous> >& me, 
+	inline typename Id<StringSet<TString, Dependent<Generous> > >::Type
+	assignValueById(StringSet<TString, Dependent<Generous> >& me,
 					TString& obj,
-					TId id) 
+					TId id)
 	{
 	SEQAN_CHECKPOINT
 		SEQAN_ASSERT(length(me.limits) == length(me) + 1);
@@ -1406,15 +1409,15 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template<typename TString, typename TId>
-	inline typename Id<StringSet<TString, Dependent<Tight> > >::Type 
-	assignValueById(StringSet<TString, Dependent<Tight> >& me, 
+	inline typename Id<StringSet<TString, Dependent<Tight> > >::Type
+	assignValueById(StringSet<TString, Dependent<Tight> >& me,
 					TString& obj,
-					TId id) 
+					TId id)
 	{
 	SEQAN_CHECKPOINT
 		typedef StringSet<TString, Dependent<Tight> > TStringSet;
 		typedef typename Size<TStringSet>::Type TSize;
-		
+
 		for(TSize i = 0; i < length(me.ids); ++i)
 			if ((TId) me.ids[i] == id) {
 				me.strings[i] = &obj;
@@ -1427,10 +1430,10 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template<typename TString, typename TSpec1, typename TSpec2, typename TId>
-	inline typename Id<StringSet<TString, TSpec1> >::Type 
-	assignValueById(StringSet<TString, TSpec1>& dest, 
+	inline typename Id<StringSet<TString, TSpec1> >::Type
+	assignValueById(StringSet<TString, TSpec1>& dest,
 					StringSet<TString, TSpec2>& source,
-					TId id) 
+					TId id)
 	{
 	SEQAN_CHECKPOINT
 		return assignValueById(dest, getValueById(source, id), id);
@@ -1454,7 +1457,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template<typename TString, typename TSpec, typename TId>
 	inline void
-	removeValueById(StringSet<TString, Owner<TSpec> >& me, TId const id) 
+	removeValueById(StringSet<TString, Owner<TSpec> >& me, TId const id)
 	{
 	SEQAN_CHECKPOINT
 		erase(me.strings, id);
@@ -1464,7 +1467,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template<typename TString, typename TId>
 	inline void
-	removeValueById(StringSet<TString, Dependent<Generous> >& me, TId const id) 
+	removeValueById(StringSet<TString, Dependent<Generous> >& me, TId const id)
 	{
 	SEQAN_CHECKPOINT
 		if (me.strings[id] != (TString*) 0) {
@@ -1478,7 +1481,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template<typename TString, typename TId>
 	inline void
-	removeValueById(StringSet<TString, Dependent<Tight> >& me, TId const id) 
+	removeValueById(StringSet<TString, Dependent<Tight> >& me, TId const id)
 	{
 	SEQAN_CHECKPOINT
 		typedef StringSet<TString, Dependent<Tight> > TStringSet;
@@ -1496,7 +1499,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 //////////////////////////////////////////////////////////////////////////////
-// 
+//
 
 /**
 .Function.positionToId:
@@ -1513,8 +1516,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TSpec, typename TPos>
 	inline typename Id<StringSet<TString, Owner<TSpec> > >::Type
-	positionToId(StringSet<TString, Owner<TSpec> >&, 
-				TPos const pos) 
+	positionToId(StringSet<TString, Owner<TSpec> >&,
+				TPos const pos)
 	{
 	SEQAN_CHECKPOINT
 		return pos;
@@ -1522,8 +1525,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TPos>
 	inline typename Id<StringSet<TString, Dependent<Generous> > >::Type
-	positionToId(StringSet<TString, Dependent<Generous> >& me, 
-			TPos const pos) 
+	positionToId(StringSet<TString, Dependent<Generous> >& me,
+			TPos const pos)
 	{
 	SEQAN_CHECKPOINT
 		return _findIthNonZeroValue(me.strings,pos);
@@ -1531,8 +1534,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TPos>
 	inline typename Id<StringSet<TString, Dependent<Generous> > >::Type
-	positionToId(StringSet<TString, Dependent<Generous> > const& me, 
-				TPos const pos) 
+	positionToId(StringSet<TString, Dependent<Generous> > const& me,
+				TPos const pos)
 	{
 	SEQAN_CHECKPOINT
 		return _findIthNonZeroValue(me.strings,pos);
@@ -1540,8 +1543,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TPos>
 	inline typename Id<StringSet<TString, Dependent<Tight> > >::Type
-	positionToId(StringSet<TString, Dependent<Tight> >&me, 
-				TPos const pos) 
+	positionToId(StringSet<TString, Dependent<Tight> >&me,
+				TPos const pos)
 	{
 	SEQAN_CHECKPOINT
 		return me.ids[pos];
@@ -1549,8 +1552,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TPos>
 	inline typename Id<StringSet<TString, Dependent<Tight> > >::Type
-	positionToId(StringSet<TString, Dependent<Tight> > const&me, 
-				TPos const pos) 
+	positionToId(StringSet<TString, Dependent<Tight> > const&me,
+				TPos const pos)
 	{
 	SEQAN_CHECKPOINT
 		return me.ids[pos];
@@ -1573,8 +1576,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TSpec, typename TId>
 	inline typename Id<StringSet<TString, Owner<TSpec> > >::Type
-	idToPosition(StringSet<TString, Owner<TSpec> >&, 
-				TId const id) 
+	idToPosition(StringSet<TString, Owner<TSpec> >&,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		return id;
@@ -1582,8 +1585,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TId>
 	inline typename Id<StringSet<TString, Dependent<Generous> > >::Type
-	idToPosition(StringSet<TString, Dependent<Generous> >& me, 
-				TId const id) 
+	idToPosition(StringSet<TString, Dependent<Generous> >& me,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		return _countNonZeroValues(me.strings,id);
@@ -1591,8 +1594,8 @@ a single integer value between 0 and the sum of string lengths minus 1.
 
 	template <typename TString, typename TId>
 	inline typename Id<StringSet<TString, Dependent<Tight> > >::Type
-	idToPosition(StringSet<TString, Dependent<Tight> >&me, 
-				TId const id) 
+	idToPosition(StringSet<TString, Dependent<Tight> >&me,
+				TId const id)
 	{
 	SEQAN_CHECKPOINT
 		for(unsigned i = 0; i < length(me.ids); ++i)
@@ -1714,7 +1717,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 		ConcatenatorNto1 (TStringSet &_set): set(&_set) {}
 
 //____________________________________________________________________________
-// WARNING: 
+// WARNING:
 // operator[] conducts a binary search and should be avoided
 // you better use StringSet<.., Owner<ConcatDirect<..> > > for random access
 // or ConcatenatorNto1's iterators for sequential access
@@ -1728,7 +1731,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 		}
 
 		template <typename TPos>
-		inline typename Reference<ConcatenatorNto1 const>::Type 
+		inline typename Reference<ConcatenatorNto1 const>::Type
 		operator [] (TPos pos) const
 		{
 	SEQAN_CHECKPOINT
@@ -1786,7 +1789,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 // length
 
 	template < typename TStringSet >
-    inline typename Size< ConcatenatorNto1<TStringSet> >::Type 
+    inline typename Size< ConcatenatorNto1<TStringSet> >::Type
 	length(ConcatenatorNto1<TStringSet> const &me) {
         return lengthSum(*me.set);
     }
@@ -1815,7 +1818,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	inline typename Iterator< ConcatenatorNto1<TStringSet const>, Tag<TSpec> const >::Type
 	end(ConcatenatorNto1<TStringSet const> concat, Tag<TSpec> const)
 	{
-		return typename Iterator< ConcatenatorNto1<TStringSet>, Tag<TSpec> const >::Type 
+		return typename Iterator< ConcatenatorNto1<TStringSet>, Tag<TSpec> const >::Type
 			(*concat.set, length(*concat.set), 0);
 	}
 
@@ -1823,7 +1826,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	inline typename Iterator< ConcatenatorNto1<TStringSet>, Tag<TSpec> const >::Type
 	end(ConcatenatorNto1<TStringSet> concat, Tag<TSpec> const)
 	{
-		return typename Iterator< ConcatenatorNto1<TStringSet>, Tag<TSpec> const >::Type 
+		return typename Iterator< ConcatenatorNto1<TStringSet>, Tag<TSpec> const >::Type
 			(*concat.set, length(*concat.set), 0);
 	}
 
@@ -1844,7 +1847,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 // concat
 
 	template <typename TString>
-	inline typename Concatenator<TString>::Type & 
+	inline typename Concatenator<TString>::Type &
 	concat(TString &string) {
 		return string;
 	}
@@ -1871,7 +1874,7 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	struct ConcatVirtual;
 
     template < typename TStringSet, typename TSpec >
-	class Iter< TStringSet, ConcatVirtual<TSpec> > 
+	class Iter< TStringSet, ConcatVirtual<TSpec> >
 	{
 	public:
 		typedef typename Value<TStringSet>::Type		TString;
@@ -2135,9 +2138,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template <typename TSSetL, typename TSpecL, typename TSSetR, typename TSpecR>
-	typename Difference<Iter<TSSetL, ConcatVirtual<TSpecL> > >::Type 
+	typename Difference<Iter<TSSetL, ConcatVirtual<TSpecL> > >::Type
 	operator - (
-		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L, 
+		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L,
 		Iter<TSSetR, ConcatVirtual<TSpecR> > const &R)
 	{
         return L._tell() - R._tell();
@@ -2156,9 +2159,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template <typename TSSetL, typename TSpecL, typename TSSetR, typename TSpecR>
-	inline bool 
+	inline bool
 	operator == (
-		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L, 
+		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L,
 		Iter<TSSetR, ConcatVirtual<TSpecR> > const &R)
 	{
 		SEQAN_ASSERT(L.host == R.host);
@@ -2166,9 +2169,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template <typename TSSetL, typename TSpecL, typename TSSetR, typename TSpecR>
-	inline bool 
+	inline bool
 	operator != (
-		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L, 
+		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L,
 		Iter<TSSetR, ConcatVirtual<TSpecR> > const &R)
 	{
 		SEQAN_ASSERT(L.host == R.host);
@@ -2180,9 +2183,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	//////////////////////////////////////////////////////////////////////////////
 
 	template <typename TSSetL, typename TSpecL, typename TSSetR, typename TSpecR>
-	inline bool 
+	inline bool
 	operator < (
-		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L, 
+		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L,
 		Iter<TSSetR, ConcatVirtual<TSpecR> > const &R)
 	{
 		SEQAN_ASSERT(L.host == R.host);
@@ -2190,9 +2193,9 @@ a single integer value between 0 and the sum of string lengths minus 1.
 	}
 
 	template <typename TSSetL, typename TSpecL, typename TSSetR, typename TSpecR>
-	inline bool 
+	inline bool
 	operator > (
-		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L, 
+		Iter<TSSetL, ConcatVirtual<TSpecL> > const &L,
 		Iter<TSSetR, ConcatVirtual<TSpecR> > const &R)
 	{
 		SEQAN_ASSERT(L.host == R.host);

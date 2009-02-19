@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: basic_allocator_chunkpool.h,v 1.1 2008/08/25 16:20:01 langmead Exp $
+  $Id: basic_allocator_chunkpool.h,v 1.2 2009/02/19 01:51:22 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_BASIC_ALLOCATOR_CHUNKPOOL_H
@@ -41,17 +41,17 @@ namespace SEQAN_NAMESPACE_MAIN
 ..param.ParentAllocator:An allocator that is by the pool allocator used to allocate memory.
 ...default:@Spec.Simple Allocator@
 ...note:The multi pool allocator only supports @Function.clear@ if this function is also implemented for $ParentAllocator$.
-..remarks:A pool allocator allocates several memory blocks at once. 
+..remarks:A pool allocator allocates several memory blocks at once.
 Freed blocks are not immediately deallocated but recycled in subsequential allocations.
 This way, the number of calls to the heap manager is reduced, and that speeds up memory management.
-...text:Note that memory blocks of size different than $SIZE$, $2*SIZE$, $3*SIZE$, ..., $MAX_COUNT * SIZE$ 
+...text:Note that memory blocks of size different than $SIZE$, $2*SIZE$, $3*SIZE$, ..., $MAX_COUNT * SIZE$
 are not pooled but immediately allocated and deallocated using $ParentAllocator$.
 */
 
 
 template <
-	size_t SIZE, 
-	size_t MAX_COUNT = 26, 
+	size_t SIZE,
+	size_t MAX_COUNT = 26,
 	typename TParentAllocator = Allocator<SimpleAlloc<Default> > >
 struct ChunkPool;
 
@@ -80,7 +80,7 @@ struct Allocator<ChunkPool<SIZE, MAX_COUNT, TParentAllocator> >
 	Allocator()
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
 		data_current_end = data_current_free = 0;
 		//dont need to initialize data_current_begin
 	}
@@ -88,7 +88,7 @@ SEQAN_CHECKPOINT
 	Allocator(size_t reserve_item_count)
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
 
 		size_t storage_size = (reserve_item_count * SIZE > STORAGE_SIZE_MIN) ? reserve_item_count * SIZE : STORAGE_SIZE_MIN;
 		allocate( parentAllocator( *this ), data_current_begin, storage_size );
@@ -99,7 +99,7 @@ SEQAN_CHECKPOINT
 	Allocator(TParentAllocator & parent_alloc)
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
 		data_current_end = data_current_free = 0;
 		//dont need to initialize data_current_begin
 
@@ -109,7 +109,7 @@ SEQAN_CHECKPOINT
 	Allocator(size_t reserve_item_count, TParentAllocator & parent_alloc)
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
 
 		setValue(data_parent_allocator, parent_alloc);
 
@@ -122,7 +122,7 @@ SEQAN_CHECKPOINT
 	//Dummy copy
 	Allocator(Allocator const &)
 	{
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
 		data_current_end = data_current_free = 0;
 		//dont need to initialize data_current_begin
 	}
@@ -156,7 +156,7 @@ void
 clear(Allocator<ChunkPool<SIZE, MAX_COUNT, TParentAllocator> > & me)
 {
 SEQAN_CHECKPOINT
-	::std::memset(me.data_recycled_blocks, 0, sizeof(me.data_recycled_blocks));
+	memset(me.data_recycled_blocks, 0, sizeof(me.data_recycled_blocks));
 	me.data_current_end = me.data_current_free = 0;
 
 	clear(parentAllocator(me));
@@ -166,7 +166,7 @@ SEQAN_CHECKPOINT
 
 template <size_t SIZE, size_t MAX_COUNT, typename TParentAllocator, typename TValue, typename TSize, typename TUsage>
 inline void
-allocate(Allocator<ChunkPool<SIZE, MAX_COUNT, TParentAllocator> > & me, 
+allocate(Allocator<ChunkPool<SIZE, MAX_COUNT, TParentAllocator> > & me,
 		 TValue * & data,
 		 TSize count,
 		 Tag<TUsage> const tag_)
@@ -214,9 +214,9 @@ SEQAN_ASSERT(count > 0)
 //////////////////////////////////////////////////////////////////////////////
 
 template <size_t SIZE, size_t MAX_COUNT, typename TParentAllocator, typename TValue, typename TSize, typename TUsage>
-inline void 
+inline void
 deallocate(Allocator<ChunkPool<SIZE, MAX_COUNT, TParentAllocator> > & me,
-		   TValue * data, 
+		   TValue * data,
 		   TSize count,
 		   Tag<TUsage> const tag_)
 {
@@ -242,8 +242,8 @@ SEQAN_ASSERT(count > 0)
 //////////////////////////////////////////////////////////////////////////////
 
 template <
-	typename TValue, 
-	size_t MAX_COUNT = 26, 
+	typename TValue,
+	size_t MAX_COUNT = 26,
 	typename TParentAllocator = Allocator<SimpleAlloc<Default> > >
 struct ChunkPool2;
 
@@ -295,7 +295,7 @@ SEQAN_CHECKPOINT
 
 template <typename TValue, size_t MAX_COUNT, typename TParentAllocator, typename TValue2, typename TSize, typename TUsage>
 inline void
-allocate(Allocator<ChunkPool2<TValue, MAX_COUNT, TParentAllocator> > & me, 
+allocate(Allocator<ChunkPool2<TValue, MAX_COUNT, TParentAllocator> > & me,
 		 TValue2 * & data,
 		 TSize count,
 		 Tag<TUsage> const tag_)
@@ -305,9 +305,9 @@ SEQAN_CHECKPOINT
 }
 
 template <typename TValue, size_t MAX_COUNT, typename TParentAllocator, typename TValue2, typename TSize, typename TUsage>
-inline void 
+inline void
 deallocate(Allocator<ChunkPool2<TValue, MAX_COUNT, TParentAllocator> > & me,
-		   TValue2 * data, 
+		   TValue2 * data,
 		   TSize count,
 		   Tag<TUsage> const tag_)
 {

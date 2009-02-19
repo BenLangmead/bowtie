@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: string_pointer.h,v 1.1 2008/08/25 16:20:04 langmead Exp $
+  $Id: string_pointer.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_SEQUENCE_POINTER_H
@@ -35,7 +35,7 @@ namespace SEQAN_NAMESPACE_MAIN
 //////////////////////////////////////////////////////////////////////////////
 
 /**
-.Adaption.char array.remarks:The default overflow strategy 
+.Adaption.char array.remarks:The default overflow strategy
 (both @Metafunction.DefaultOverflowImplicit@ and @Metafunction.DefaultOverflowExplicit@)
 for all operations on char arrays is @Tag.Overflow Strategy.insist@.
 */
@@ -115,7 +115,7 @@ struct IsContiguous< TValue const [SIZE] >
 	enum { VALUE = true };
 };
 
-/*DISABLED 
+/*DISABLED
 .Metafunction.IsString.param.T.type:Adaption.char array
 */
 
@@ -142,7 +142,7 @@ struct IsSequence< TValue const [SIZE] >
 
 
 template <typename T>
-inline typename Iterator<T *, typename DefaultGetIteratorSpec<T>::Type>::Type 
+inline typename Iterator<T *, typename DefaultGetIteratorSpec<T>::Type>::Type
 begin(T * me)
 {
 SEQAN_CHECKPOINT
@@ -152,8 +152,8 @@ SEQAN_CHECKPOINT
 ///.Function.begin.param.object.type:Adaption.char array
 
 template <typename TValue>
-inline typename Iterator<TValue *, Standard>::Type  
-begin(TValue * me, 
+inline typename Iterator<TValue *, Standard>::Type
+begin(TValue * me,
 	  Standard)
 {
 SEQAN_CHECKPOINT
@@ -162,8 +162,8 @@ SEQAN_CHECKPOINT
 
 //folgende Versionen wurde wegen seltsamer Phaenomene bei VC++ 2003 hinzugenommen
 template <typename TValue>
-inline typename Iterator<TValue const *, Standard>::Type  
-begin(TValue const * me, 
+inline typename Iterator<TValue const *, Standard>::Type
+begin(TValue const * me,
 	  Standard)
 {
 SEQAN_CHECKPOINT
@@ -171,8 +171,8 @@ SEQAN_CHECKPOINT
 }
 
 template <typename TValue, typename TSpec>
-inline typename Iterator<TValue *, Tag<TSpec> const>::Type  
-begin(TValue * me, 
+inline typename Iterator<TValue *, Tag<TSpec> const>::Type
+begin(TValue * me,
 	  Tag<TSpec> const)
 {
 SEQAN_CHECKPOINT
@@ -181,8 +181,8 @@ SEQAN_CHECKPOINT
 }
 
 template <typename TValue, typename TSpec>
-inline typename Iterator<TValue const *, Tag<TSpec> const>::Type  
-begin(TValue const * me, 
+inline typename Iterator<TValue const *, Tag<TSpec> const>::Type
+begin(TValue const * me,
 	  Tag<TSpec> const)
 {
 SEQAN_CHECKPOINT
@@ -195,8 +195,8 @@ SEQAN_CHECKPOINT
 ///.Function.end.param.object.type:Adaption.char array
 
 template <typename TValue>
-inline typename Iterator<TValue *, Standard>::Type  
-end(TValue * me, 
+inline typename Iterator<TValue *, Standard>::Type
+end(TValue * me,
 	Standard)
 {
 SEQAN_CHECKPOINT
@@ -205,8 +205,8 @@ SEQAN_CHECKPOINT
 
 //folgende Version wurde wegen eines seltsamen Phaenomens bei VC++ hinzugenommen
 template <typename TValue>
-inline typename Iterator<TValue const *, Standard>::Type  
-end(TValue const * me, 
+inline typename Iterator<TValue const *, Standard>::Type
+end(TValue const * me,
 	Standard)
 {
 SEQAN_CHECKPOINT
@@ -214,8 +214,8 @@ SEQAN_CHECKPOINT
 }
 
 template <typename TValue, typename TSpec>
-inline typename Iterator<TValue *, Tag<TSpec> const>::Type  
-end(TValue * me, 
+inline typename Iterator<TValue *, Tag<TSpec> const>::Type
+end(TValue * me,
 	  Tag<TSpec> const tag_)
 {
 SEQAN_CHECKPOINT
@@ -223,8 +223,8 @@ SEQAN_CHECKPOINT
 }
 
 template <typename TValue, typename TSpec>
-inline typename Iterator<TValue const *, Tag<TSpec> const>::Type  
-end(TValue const * me, 
+inline typename Iterator<TValue const *, Tag<TSpec> const>::Type
+end(TValue const * me,
 	  Tag<TSpec> const tag_)
 {
 SEQAN_CHECKPOINT
@@ -261,12 +261,12 @@ SEQAN_CHECKPOINT
 template <typename TValue, typename TPos>
 inline void
 assignValue(TValue * me,
-			TPos pos, 
+			TPos pos,
 			TValue const & _value)
 {
 SEQAN_CHECKPOINT
 	assign(value(me, pos), _value);
-} 
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // moveValue
@@ -275,12 +275,12 @@ SEQAN_CHECKPOINT
 template <typename TValue, typename TPos>
 inline void
 moveValue(TValue * me,
-		  TPos pos, 
+		  TPos pos,
 		  TValue const & _value)
 {
 SEQAN_CHECKPOINT
 	move(value(me, pos), _value);
-} 
+}
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -296,7 +296,7 @@ SEQAN_CHECKPOINT
 
 template <typename TValue>
 inline bool
-atEnd(TValue * pos, 
+atEnd(TValue * pos,
 	  TValue const * container)
 {
 SEQAN_CHECKPOINT
@@ -307,7 +307,7 @@ SEQAN_CHECKPOINT
 
 ///.Function.length.param.object.type:Adaption.char array
 
-template <typename TValue> 
+template <typename TValue>
 inline size_t
 length(TValue * me)
 {
@@ -318,7 +318,7 @@ SEQAN_CHECKPOINT
 	return it - me;
 }
 
-template <typename TValue> 
+template <typename TValue>
 inline size_t
 length(TValue const * me)
 {
@@ -333,14 +333,14 @@ inline size_t
 length(char * me)
 {
 SEQAN_CHECKPOINT
-	return ::std::strlen(me);
+	return strlen(me);
 }
 
 inline size_t
 length(char const * me)
 {
 SEQAN_CHECKPOINT
-	return ::std::strlen(me);
+	return strlen(me);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -383,9 +383,9 @@ SEQAN_CHECKPOINT
 
 
 template<typename TValue, typename TExpand>
-inline size_t 
-_clearSpace(TValue * me, 
-		   size_t size, 
+inline size_t
+_clearSpace(TValue * me,
+		   size_t size,
 		   Tag<TExpand> const)
 {
 SEQAN_CHECKPOINT
@@ -393,10 +393,10 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TValue, typename TExpand>
-inline size_t 
-_clearSpace(TValue * me, 
-		   size_t size, 
-		   size_t limit, 
+inline size_t
+_clearSpace(TValue * me,
+		   size_t size,
+		   size_t limit,
 		   Tag<TExpand> const)
 {
 SEQAN_CHECKPOINT
@@ -404,11 +404,11 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TValue, typename TPosition, typename TExpand>
-inline size_t 
-_clearSpace(TValue * me, 
-		   size_t size, 
-		   TPosition pos_begin, 
-		   TPosition pos_end, 
+inline size_t
+_clearSpace(TValue * me,
+		   size_t size,
+		   TPosition pos_begin,
+		   TPosition pos_end,
 		   Tag<TExpand> const)
 {
 SEQAN_CHECKPOINT
@@ -416,12 +416,12 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TValue, typename TPosition, typename TExpand>
-inline size_t 
-_clearSpace(TValue * me, 
-		   size_t size, 
-		   TPosition pos_begin, 
-		   TPosition pos_end, 
-		   size_t limit, 
+inline size_t
+_clearSpace(TValue * me,
+		   size_t size,
+		   TPosition pos_begin,
+		   TPosition pos_end,
+		   size_t limit,
 		   Tag<TExpand> const)
 {
 SEQAN_CHECKPOINT
@@ -435,11 +435,11 @@ SEQAN_CHECKPOINT
 ///.Function.assign.param.target.type:.Adaption.char array
 ///.Function.assign.param.source.type:.Adaption.char array
 
-//overload of binary version for strings: 
+//overload of binary version for strings:
 
 template<typename TTargetValue, typename TSource>
-inline void 
-assign(TTargetValue * target, 
+inline void
+assign(TTargetValue * target,
 	   TSource & source)
 {
 SEQAN_CHECKPOINT
@@ -447,8 +447,8 @@ SEQAN_CHECKPOINT
 	assign(target, source, typename DefaultOverflowImplicit<TTarget>::Type());
 }
 template<typename TTargetValue, typename TSource>
-inline void 
-assign(TTargetValue * target, 
+inline void
+assign(TTargetValue * target,
 	   TSource const & source)
 {
 SEQAN_CHECKPOINT
@@ -459,7 +459,7 @@ SEQAN_CHECKPOINT
 //____________________________________________________________________________
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
+inline void
 assign(TTargetValue * target,
 	   TSource const & source,
 	   Tag<TExpand> const)
@@ -469,9 +469,9 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
-assign(TTargetValue * target, 
-	   TSource const & source, 
+inline void
+assign(TTargetValue * target,
+	   TSource const & source,
 	   size_t limit,
 	   Tag<TExpand> const)
 {
@@ -483,7 +483,7 @@ SEQAN_CHECKPOINT
 //this variant is a workaround for the "const array"-bug of VC++
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
+inline void
 assign(TTargetValue * target,
 	   TSourceValue const * source,
 	   Tag<TExpand> const)
@@ -493,9 +493,9 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
-assign(TTargetValue * target, 
-	   TSourceValue const * source, 
+inline void
+assign(TTargetValue * target,
+	   TSourceValue const * source,
 	   size_t limit,
 	   Tag<TExpand> const)
 {
@@ -507,19 +507,19 @@ SEQAN_CHECKPOINT
 // move
 //////////////////////////////////////////////////////////////////////////////
 
-//overload of binary version for strings: 
+//overload of binary version for strings:
 
 template<typename TTargetValue, typename TSource>
-inline void 
-move(TTargetValue * & target, 
+inline void
+move(TTargetValue * & target,
 	 TSource & source)
 {
 SEQAN_CHECKPOINT
 	target = source;
 }
 template<typename TTargetValue, typename TSource>
-inline void 
-move(TTargetValue * & target, 
+inline void
+move(TTargetValue * & target,
 	 TSource const & source)
 {
 SEQAN_CHECKPOINT
@@ -535,7 +535,7 @@ SEQAN_CHECKPOINT
 ///.Function.append.param.source.type:.Adaption.char array
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
+inline void
 append(TTargetValue * target,
 	   TSource const & source,
 	   Tag<TExpand> const)
@@ -545,9 +545,9 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
-append(TTargetValue * target, 
-	   TSource const & source, 
+inline void
+append(TTargetValue * target,
+	   TSource const & source,
 	   size_t limit,
 	   Tag<TExpand> const)
 {
@@ -559,7 +559,7 @@ SEQAN_CHECKPOINT
 //this variant is a workaround for the "const array"-bug of VC++
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
+inline void
 append(TTargetValue * target,
 	   TSourceValue const * source,
 	   Tag<TExpand> const)
@@ -569,9 +569,9 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
-append(TTargetValue * target, 
-	   TSourceValue const * source, 
+inline void
+append(TTargetValue * target,
+	   TSourceValue const * source,
 	   size_t limit,
 	   Tag<TExpand> const)
 {
@@ -587,10 +587,10 @@ SEQAN_CHECKPOINT
 ///.Function.replace.param.source.type:.Adaption.char array
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
+inline void
 replace(TTargetValue * target,
-		size_t pos_begin, 
-		size_t pos_end, 
+		size_t pos_begin,
+		size_t pos_end,
 		TSource const & source,
 		Tag<TExpand> const)
 {
@@ -599,11 +599,11 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
-replace(TTargetValue * target, 
-		size_t pos_begin, 
-		size_t pos_end, 
-		TSource const & source, 
+inline void
+replace(TTargetValue * target,
+		size_t pos_begin,
+		size_t pos_end,
+		TSource const & source,
 		size_t limit,
 		Tag<TExpand> const)
 {
@@ -614,10 +614,10 @@ SEQAN_CHECKPOINT
 //this variant is a workaround for the "const array"-bug of VC++
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
+inline void
 replace(TTargetValue * target,
-		size_t pos_begin, 
-		size_t pos_end, 
+		size_t pos_begin,
+		size_t pos_end,
 		TSourceValue const * source,
 		Tag<TExpand> const)
 {
@@ -626,11 +626,11 @@ SEQAN_CHECKPOINT
 }
 
 template<typename TTargetValue, typename TSourceValue, typename TExpand>
-inline void 
-replace(TTargetValue * target, 
-		size_t pos_begin, 
-		size_t pos_end, 
-		TSourceValue const * source, 
+inline void
+replace(TTargetValue * target,
+		size_t pos_begin,
+		size_t pos_end,
+		TSourceValue const * source,
 		size_t limit,
 		Tag<TExpand> const)
 {
@@ -642,20 +642,20 @@ SEQAN_CHECKPOINT
 // handling of iterators as begin and and
 /*
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
-replace(TTargetValue * target, 
-		typename Iterator<TTargetValue *, Rooted>::Type pos_begin, 
-		typename Iterator<TTargetValue *, Rooted>::Type pos_end, 
+inline void
+replace(TTargetValue * target,
+		typename Iterator<TTargetValue *, Rooted>::Type pos_begin,
+		typename Iterator<TTargetValue *, Rooted>::Type pos_end,
 		TSource const & source,
 		Tag<TExpand> const tag)
 {
 	replace(target, position(pos_begin), position(pos_end), source, tag);
 }
 template<typename TTargetValue, typename TSource, typename TExpand>
-inline void 
-replace(TTargetValue * target, 
-		typename Iterator<TTargetValue *, Rooted>::Type pos_begin, 
-		typename Iterator<TTargetValue *, Rooted>::Type pos_end, 
+inline void
+replace(TTargetValue * target,
+		typename Iterator<TTargetValue *, Rooted>::Type pos_begin,
+		typename Iterator<TTargetValue *, Rooted>::Type pos_end,
 		TSource const & source,
 		size_t limit,
 		Tag<TExpand> const tag)
@@ -710,7 +710,7 @@ SEQAN_CHECKPOINT
 
 template <typename TLeftValue, typename TRight >
 inline bool
-isEqual(TLeftValue * left, 
+isEqual(TLeftValue * left,
 		TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -720,7 +720,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight >
 inline bool
-operator == (TLeftValue * left, 
+operator == (TLeftValue * left,
 			TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -742,7 +742,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight >
 inline bool
-operator != (TLeftValue * left, 
+operator != (TLeftValue * left,
 			 TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -755,7 +755,7 @@ SEQAN_CHECKPOINT
 
 template <typename TLeftValue, typename TRight>
 inline bool
-isLess(TLeftValue * left, 
+isLess(TLeftValue * left,
 	   TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -764,7 +764,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight>
 inline bool
-operator < (TLeftValue * left, 
+operator < (TLeftValue * left,
 			TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -775,7 +775,7 @@ SEQAN_CHECKPOINT
 
 template <typename TLeftValue, typename TRight>
 inline bool
-isLessOrEqual(TLeftValue * left, 
+isLessOrEqual(TLeftValue * left,
 			 TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -784,7 +784,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight>
 inline bool
-operator <= (TLeftValue * left, 
+operator <= (TLeftValue * left,
 			 TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -795,7 +795,7 @@ SEQAN_CHECKPOINT
 
 template <typename TLeftValue, typename TRight>
 inline bool
-isGreater(TLeftValue * left, 
+isGreater(TLeftValue * left,
 		TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -804,7 +804,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight>
 inline bool
-operator > (TLeftValue * left, 
+operator > (TLeftValue * left,
 		TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -815,7 +815,7 @@ SEQAN_CHECKPOINT
 
 template <typename TLeftValue, typename TRight>
 inline bool
-isGreaterOrEqual(TLeftValue * left, 
+isGreaterOrEqual(TLeftValue * left,
 		TRight const & right)
 {
 SEQAN_CHECKPOINT
@@ -824,7 +824,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TLeftValue, typename TRight>
 inline bool
-operator >= (TLeftValue * left, 
+operator >= (TLeftValue * left,
 		TRight const & right)
 {
 SEQAN_CHECKPOINT

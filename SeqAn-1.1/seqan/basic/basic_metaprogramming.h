@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: basic_metaprogramming.h,v 1.1 2008/08/25 16:20:02 langmead Exp $
+  $Id: basic_metaprogramming.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_BASIC_METAPROGRAMMING_H
@@ -70,7 +70,7 @@ namespace SEQAN_NAMESPACE_MAIN
 	const int DEFAULT = ~(~0u >> 1); // initialize with the smallest int
 
 	struct NilCase {};
-	  
+
 	template <int tag_,class Type_,class Next_ = NilCase>
 	struct CASE
 	{
@@ -89,7 +89,7 @@ namespace SEQAN_NAMESPACE_MAIN
 			found   = (caseTag == tag || caseTag == DEFAULT)
 		};
 	public:
-		typedef typename 
+		typedef typename
 			IF<
 				found,
 				typename Case::Type,
@@ -184,10 +184,10 @@ namespace SEQAN_NAMESPACE_MAIN
 
 	template < __int64 base, __int64 exponent >
 	struct Power {
-		enum { 
-			VALUE = 
-				Power<base, exponent / 2>::VALUE * 
-				Power<base, exponent - (exponent / 2)>::VALUE 
+		enum {
+			VALUE =
+				Power<base, exponent / 2>::VALUE *
+				Power<base, exponent - (exponent / 2)>::VALUE
 		};
 	};
 
@@ -199,11 +199,11 @@ namespace SEQAN_NAMESPACE_MAIN
 	// memset with fill size (using meta-programming)
 	//////////////////////////////////////////////////////////////////////////////
 
-	using ::std::memset;
+	using ::memset;
 
 	template <unsigned SIZE, bool direct>
 	struct MemsetWorker {
-		finline static void run(unsigned char* ptr, unsigned char c) { ::std::memset(ptr, c, SIZE); }
+		finline static void run(unsigned char* ptr, unsigned char c) { memset(ptr, c, SIZE); }
 	};
 
 	template <unsigned  SIZE>
@@ -249,7 +249,7 @@ namespace SEQAN_NAMESPACE_MAIN
 
 	template <unsigned SIZE, bool direct, unsigned char c>
 	struct MemsetConstValueWorker {
-		finline static void run(unsigned char* ptr) { ::std::memset(ptr, c, SIZE); }
+		finline static void run(unsigned char* ptr) { memset(ptr, c, SIZE); }
 	};
 
 	template <unsigned  SIZE, unsigned char c>

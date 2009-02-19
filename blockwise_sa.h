@@ -180,6 +180,7 @@ public:
 	{ }
 };
 
+#if 0
 /**
  * Build the entire SA at once, then dole it out one bucket at a time,
  * in order.
@@ -251,6 +252,7 @@ private:
 	uint32_t _cur;        // the index of the current bucket
 	bool _built;          // true iff the suffix array has been built
 };
+#endif
 
 /**
  * Build the SA a block at a time according to the scheme outlined in

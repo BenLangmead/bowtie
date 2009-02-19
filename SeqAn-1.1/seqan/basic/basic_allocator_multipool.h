@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: basic_allocator_multipool.h,v 1.1 2008/08/25 16:20:02 langmead Exp $
+  $Id: basic_allocator_multipool.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_BASIC_ALLOCATOR_MULTIPOOL_H
@@ -36,12 +36,12 @@ namespace SEQAN_NAMESPACE_MAIN
 ..param.ParentAllocator:An allocator that is by the pool allocator used to allocate memory.
 ...default:@Spec.Simple Allocator@
 ...note:The multi pool allocator only supports @Function.clear@ if this function is also implemented for $ParentAllocator$.
-..remarks:A pool allocator allocates several memory blocks at once. 
+..remarks:A pool allocator allocates several memory blocks at once.
 ..param.BLOCKING_LIMIT:The maximum size for memory blocks to be pooled.
 ...default:256
 Freed blocks are not immediately deallocated but recycled in subsequential allocations.
 This way, the number of calls to the heap manager is reduced, and that speeds up memory management.
-...text:Note that memory blocks larger than $BLOCKING_LIMIT$ are not pooled 
+...text:Note that memory blocks larger than $BLOCKING_LIMIT$ are not pooled
 but immediately allocated and deallocated using $ParentAllocator$.
 */
 
@@ -72,17 +72,17 @@ struct Allocator<MultiPool<TParentAllocator, BLOCKING_LIMIT_> >
 	Allocator()
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
-		::std::memset(data_current_begin, 0, sizeof(data_current_begin));
-		::std::memset(data_current_free, 0, sizeof(data_current_free));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_current_begin, 0, sizeof(data_current_begin));
+		memset(data_current_free, 0, sizeof(data_current_free));
 	}
 
 	Allocator(TParentAllocator & parent_alloc)
 	{
 SEQAN_CHECKPOINT
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
-		::std::memset(data_current_begin, 0, sizeof(data_current_begin));
-		::std::memset(data_current_free, 0, sizeof(data_current_free));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_current_begin, 0, sizeof(data_current_begin));
+		memset(data_current_free, 0, sizeof(data_current_free));
 
 		setValue(data_parent_allocator, parent_alloc);
 	}
@@ -90,9 +90,9 @@ SEQAN_CHECKPOINT
 	//Dummy copy
 	Allocator(Allocator const &)
 	{
-		::std::memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
-		::std::memset(data_current_begin, 0, sizeof(data_current_begin));
-		::std::memset(data_current_free, 0, sizeof(data_current_free));
+		memset(data_recycled_blocks, 0, sizeof(data_recycled_blocks));
+		memset(data_current_begin, 0, sizeof(data_current_begin));
+		memset(data_current_free, 0, sizeof(data_current_free));
 	}
 	inline Allocator &
 	operator = (Allocator const &)
@@ -124,9 +124,9 @@ void
 clear(Allocator<MultiPool<TParentAllocator, BLOCKING_LIMIT> > & me)
 {
 SEQAN_CHECKPOINT
-	::std::memset(me.data_recycled_blocks, 0, sizeof(me.data_recycled_blocks));
-	::std::memset(me.data_current_begin, 0, sizeof(me.data_current_begin));
-	::std::memset(me.data_current_free, 0, sizeof(me.data_current_free));
+	memset(me.data_recycled_blocks, 0, sizeof(me.data_recycled_blocks));
+	memset(me.data_current_begin, 0, sizeof(me.data_current_begin));
+	memset(me.data_current_free, 0, sizeof(me.data_current_free));
 
 	clear(parentAllocator(me));
 }
@@ -158,7 +158,7 @@ SEQAN_CHECKPOINT
 
 template <typename TParentAllocator, unsigned int BLOCKING_LIMIT, typename TValue, typename TSize, typename TUsage>
 inline void
-allocate(Allocator<MultiPool<TParentAllocator, BLOCKING_LIMIT> > & me, 
+allocate(Allocator<MultiPool<TParentAllocator, BLOCKING_LIMIT> > & me,
 		 TValue * & data,
 		 TSize count,
 		 Tag<TUsage> const tag_)
@@ -199,9 +199,9 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename TParentAllocator, unsigned int BLOCKING_LIMIT, typename TValue, typename TSize, typename TUsage>
-inline void 
+inline void
 deallocate(Allocator<MultiPool<TParentAllocator, BLOCKING_LIMIT> > & me,
-		   TValue * data, 
+		   TValue * data,
 		   TSize count,
 		   Tag<TUsage> const tag_)
 {

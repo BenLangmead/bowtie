@@ -771,7 +771,7 @@ static uint32_t bkts[4][4 * 1024 * 1024];
  * works fine as long as TStr is not packed.
  */
 template<typename TStr>
-static inline uint8_t get_uint8(const TStr& t, uint32_t off) {
+inline uint8_t get_uint8(const TStr& t, uint32_t off) {
 	return t[off];
 }
 
@@ -781,7 +781,7 @@ static inline uint8_t get_uint8(const TStr& t, uint32_t off) {
  * to Dna then to uint8_t.
  */
 template<>
-static inline uint8_t get_uint8(const String<Dna, Packed<> >& t, uint32_t off) {
+inline uint8_t get_uint8(const String<Dna, Packed<> >& t, uint32_t off) {
 	return (uint8_t)(Dna)t[off];
 }
 

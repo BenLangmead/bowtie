@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: file_base.h,v 1.1 2008/08/25 16:20:03 langmead Exp $
+  $Id: file_base.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_FILE_BASE_H
@@ -120,7 +120,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 
 	template <typename T>
 	struct DefaultOpenMode {
-		enum { VALUE = OPEN_RDWR + OPEN_CREATE | OPEN_APPEND };
+		enum { VALUE = (OPEN_RDWR + OPEN_CREATE) | OPEN_APPEND };
 	};
 
 	template <typename T>
@@ -246,7 +246,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
     template < typename File >
     inline void reopen(File &, int) {
 	}
-    
+
 /**
 .Function.close:
 ..cat:Input/Output
@@ -288,7 +288,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
     inline bool read(File<TSpec> & me, TValue *memPtr, TSize const count) {
 		return me.read(memPtr, count * sizeof(TValue));
     }
-    
+
 /**
 .Function.write:
 ..cat:Input/Output
@@ -326,7 +326,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 		seek(me, (pos_t)fileOfs * (pos_t)sizeof(TValue));
 		return read(me, memPtr, count);
     }
-    
+
 /**
 .Function.writeAt:
 ..summary:Saves records to a specific position in a file.
@@ -377,7 +377,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         #endif
         return newOfs;
     }
-    
+
 	template < typename TSpec, typename TPos >
     inline typename Position< File<TSpec> >::Type seek(File<TSpec> &me, TPos const fileOfs) {
 		return seek(me, fileOfs, SEEK_BEGIN);
@@ -411,7 +411,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
     inline void rewind(File &me) {
 		seek(me, 0);
     }
-    
+
 /**
 .Function.size:
 ..summary:Gets the file size.
@@ -457,8 +457,8 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 */
 
     template < typename TSpec >
-    inline bool setEOF(File<TSpec> &/*me*/) { 
-		return true; 
+    inline bool setEOF(File<TSpec> &/*me*/) {
+		return true;
 	}
 
 
@@ -479,7 +479,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         cb(hint);
         return NULL;
     }
-    
+
     template < typename File, typename TValue, typename TSize,
                typename aCallback, typename aHint >
     inline typename aRequest<File>::Type
@@ -501,7 +501,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         cb(hint);
         return NULL;
     }
-    
+
     template < typename File, typename TValue, typename TSize, typename TPos,
                typename aCallback, typename aHint >
     inline typename aRequest<File>::Type
@@ -527,7 +527,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         event.signal();
         return NULL;
     }
-    
+
     template < typename File, typename TValue, typename TSize,
                typename aEvent >
     inline typename aRequest<File>::Type
@@ -549,7 +549,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         event.signal();
         return NULL;
     }
-    
+
     template < typename File, typename TValue, typename TSize, typename TPos,
                typename aEvent >
     inline typename aRequest<File>::Type
@@ -582,13 +582,13 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 
     template < typename File, typename TValue, typename TSize, typename TPos,
                typename aRequest >
-    inline bool 
+    inline bool
 	areadAt(File & me, TValue *memPtr, TSize const count, TPos const fileOfs,
         aRequest &request)
     {
         return readAt(me, memPtr, count, fileOfs);
     }
-    
+
 /**
 .Function.awriteAt:
 ..summary:Asynchronously saves records to a specific position in a file.
@@ -613,7 +613,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
         return writeAt(me, memPtr, count, fileOfs);
     }
 
-	
+
 	//////////////////////////////////////////////////////////////////////
     // pseudo queue specific functions
 
@@ -645,13 +645,13 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 ..remarks:$waitFor$ suspends the calling process until $request$ is completed or after $timeout_millis$ milliseconds.
 */
 
-    inline bool waitFor(aDummyRequest &) { 
-		return true; 
+    inline bool waitFor(aDummyRequest &) {
+		return true;
 	}
 
 	template < typename TTime >
-    inline bool waitFor(aDummyRequest &, TTime) { 
-		return true; 
+    inline bool waitFor(aDummyRequest &, TTime) {
+		return true;
 	}
 
 	// deprecated
@@ -673,7 +673,7 @@ Chained Files should be used for file systems or $TFile$ types that don't suppor
 
     template < typename TSpec, typename aRequest >
     inline bool cancel(File<TSpec> &, aRequest &) {
-		return true; 
+		return true;
 	}
 
 

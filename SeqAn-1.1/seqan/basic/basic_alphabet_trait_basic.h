@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: basic_alphabet_trait_basic.h,v 1.1 2008/08/25 16:20:01 langmead Exp $
+  $Id: basic_alphabet_trait_basic.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_BASIC_ALPHABET_TRAIT_BASIC_H
@@ -29,8 +29,8 @@ namespace SEQAN_NAMESPACE_MAIN
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TIterator>
-inline void 
-_arrayConstruct_Pointer(TIterator, 
+inline void
+_arrayConstruct_Pointer(TIterator,
 						TIterator,
 						True)
 {
@@ -38,8 +38,8 @@ SEQAN_CHECKPOINT
 	//nothing to do
 }
 template<typename TIterator>
-inline void 
-_arrayConstruct_Pointer(TIterator begin_, 
+inline void
+_arrayConstruct_Pointer(TIterator begin_,
 						TIterator end_,
 						False)
 {
@@ -47,8 +47,8 @@ SEQAN_CHECKPOINT
 	_arrayConstruct_Default(begin_, end_);
 }
 template<typename TValue>
-inline void 
-arrayConstruct(TValue * begin_, 
+inline void
+arrayConstruct(TValue * begin_,
 			   TValue * end_)
 {
 SEQAN_CHECKPOINT
@@ -58,9 +58,9 @@ SEQAN_CHECKPOINT
 //____________________________________________________________________________
 
 template<typename TIterator, typename TParam>
-inline void 
-_arrayConstruct_Pointer(TIterator begin_, 
-						TIterator end_, 
+inline void
+_arrayConstruct_Pointer(TIterator begin_,
+						TIterator end_,
 						TParam const & param_,
 						True)
 {
@@ -68,9 +68,9 @@ SEQAN_CHECKPOINT
 	arrayFill(begin_, end_, param_);
 }
 template<typename TIterator, typename TParam>
-inline void 
-_arrayConstruct_Pointer(TIterator begin_, 
-						TIterator end_, 
+inline void
+_arrayConstruct_Pointer(TIterator begin_,
+						TIterator end_,
 						TParam const & param_,
 						False)
 {
@@ -78,9 +78,9 @@ SEQAN_CHECKPOINT
 	_arrayConstruct_Default(begin_, end_, param_);
 }
 template<typename TValue, typename TParam>
-inline void 
-arrayConstruct(TValue * begin_, 
-			   TValue * end_, 
+inline void
+arrayConstruct(TValue * begin_,
+			   TValue * end_,
 			   TParam const & param_)
 {
 SEQAN_CHECKPOINT
@@ -92,9 +92,9 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TValue>
-inline void 
-_arrayConstructCopy_Pointer(TValue * source_begin, 
-							TValue * source_end, 
+inline void
+_arrayConstructCopy_Pointer(TValue * source_begin,
+							TValue * source_end,
 							TValue * target_begin,
 							True)
 {
@@ -102,9 +102,9 @@ SEQAN_CHECKPOINT
 	arrayCopyForward(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-_arrayConstructCopy_Pointer(TValue * source_begin, 
-							TValue * source_end, 
+inline void
+_arrayConstructCopy_Pointer(TValue * source_begin,
+							TValue * source_end,
 							TValue * target_begin,
 							False)
 {
@@ -112,9 +112,9 @@ SEQAN_CHECKPOINT
 	_arrayConstructCopy_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayConstructCopy(TValue * source_begin, 
-				   TValue * source_end, 
+inline void
+arrayConstructCopy(TValue * source_begin,
+				   TValue * source_end,
 				   TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -126,9 +126,9 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TValue>
-inline void 
-_arrayConstructMove_Pointer(TValue * source_begin, 
-							TValue * source_end, 
+inline void
+_arrayConstructMove_Pointer(TValue * source_begin,
+							TValue * source_end,
 							TValue * target_begin,
 							True)
 {
@@ -136,9 +136,9 @@ SEQAN_CHECKPOINT
 	arrayMoveForward(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-_arrayConstructMove_Pointer(TValue * source_begin, 
-							TValue * source_end, 
+inline void
+_arrayConstructMove_Pointer(TValue * source_begin,
+							TValue * source_end,
 							TValue * target_begin,
 							False)
 {
@@ -146,9 +146,9 @@ SEQAN_CHECKPOINT
 	_arrayConstructMove_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayConstructMove(TValue * source_begin, 
-				   TValue * source_end, 
+inline void
+arrayConstructMove(TValue * source_begin,
+				   TValue * source_end,
 				   TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -160,8 +160,8 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TValue>
-inline void 
-_arrayDestruct_Pointer(TValue * /*begin_*/, 
+inline void
+_arrayDestruct_Pointer(TValue * /*begin_*/,
 					   TValue * /*end_*/,
 					   True)
 {
@@ -169,8 +169,8 @@ SEQAN_CHECKPOINT
 	//do nothing
 }
 template<typename TValue>
-inline void 
-_arrayDestruct_Pointer(TValue * begin_, 
+inline void
+_arrayDestruct_Pointer(TValue * begin_,
 					   TValue * end_,
 					   False)
 {
@@ -178,8 +178,8 @@ SEQAN_CHECKPOINT
 	_arrayDestruct_Default(begin_, end_);
 }
 template<typename TValue>
-inline void 
-arrayDestruct(TValue * begin_, 
+inline void
+arrayDestruct(TValue * begin_,
 			  TValue * end_)
 {
 SEQAN_CHECKPOINT
@@ -197,19 +197,19 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TValue>
-inline void 
-_arrayCopyForward_Pointer(TValue * source_begin, 
-						  TValue * source_end, 
+inline void
+_arrayCopyForward_Pointer(TValue * source_begin,
+						  TValue * source_end,
 						  TValue * target_begin,
 						  True)
 {
 SEQAN_CHECKPOINT
-	::std::memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
+	memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
 }
 template<typename TValue>
-inline void 
-_arrayCopyForward_Pointer(TValue * source_begin, 
-						  TValue * source_end, 
+inline void
+_arrayCopyForward_Pointer(TValue * source_begin,
+						  TValue * source_end,
 						  TValue * target_begin,
 						  False)
 {
@@ -217,9 +217,9 @@ SEQAN_CHECKPOINT
 	_arrayCopyForward_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayCopyForward(TValue * source_begin, 
-				 TValue * source_end, 
+inline void
+arrayCopyForward(TValue * source_begin,
+				 TValue * source_end,
 				 TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -231,29 +231,29 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename TValue>
-inline void 
-_arrayCopyBackward_Pointer(TValue * source_begin, 
-						   TValue * source_end, 
+inline void
+_arrayCopyBackward_Pointer(TValue * source_begin,
+						   TValue * source_end,
 						   TValue * target_begin,
 						   True)
 {
 SEQAN_CHECKPOINT
-	::std::memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
+	memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
 }
 template <typename TValue>
-inline void 
-_arrayCopyBackward_Pointer(TValue * source_begin, 
-						   TValue * source_end, 
+inline void
+_arrayCopyBackward_Pointer(TValue * source_begin,
+						   TValue * source_end,
 						   TValue * target_begin,
 						   False)
 {
 SEQAN_CHECKPOINT
-	_arrayCopyBackward_Default(source_begin, source_end, target_begin); 
+	_arrayCopyBackward_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayCopyBackward(TValue * source_begin, 
-				  TValue * source_end, 
+inline void
+arrayCopyBackward(TValue * source_begin,
+				  TValue * source_end,
 				  TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -265,19 +265,19 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template<typename TValue>
-inline void 
-_arrayMoveForward_Pointer(TValue * source_begin, 
-						  TValue * source_end, 
+inline void
+_arrayMoveForward_Pointer(TValue * source_begin,
+						  TValue * source_end,
 						  TValue * target_begin,
 						  True)
 {
 SEQAN_CHECKPOINT
-	::std::memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
+	memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
 }
 template<typename TValue>
-inline void 
-_arrayMoveForward_Pointer(TValue * source_begin, 
-						  TValue * source_end, 
+inline void
+_arrayMoveForward_Pointer(TValue * source_begin,
+						  TValue * source_end,
 						  TValue * target_begin,
 						  False)
 {
@@ -285,9 +285,9 @@ SEQAN_CHECKPOINT
 	_arrayMoveForward_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayMoveForward(TValue * source_begin, 
-				 TValue * source_end, 
+inline void
+arrayMoveForward(TValue * source_begin,
+				 TValue * source_end,
 				 TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -299,29 +299,29 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename TValue>
-inline void 
-_arrayMoveBackward_Pointer(TValue * source_begin, 
-						   TValue * source_end, 
+inline void
+_arrayMoveBackward_Pointer(TValue * source_begin,
+						   TValue * source_end,
 						   TValue * target_begin,
 						   True)
 {
 SEQAN_CHECKPOINT
-	::std::memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
+	memmove(target_begin, source_begin, (source_end - source_begin) * sizeof(TValue));
 }
 template <typename TValue>
-inline void 
-_arrayMoveBackward_Pointer(TValue * source_begin, 
-						   TValue * source_end, 
+inline void
+_arrayMoveBackward_Pointer(TValue * source_begin,
+						   TValue * source_end,
 						   TValue * target_begin,
 						   False)
 {
 SEQAN_CHECKPOINT
-	_arrayMoveBackward_Default(source_begin, source_end, target_begin); 
+	_arrayMoveBackward_Default(source_begin, source_end, target_begin);
 }
 template<typename TValue>
-inline void 
-arrayMoveBackward(TValue * source_begin, 
-				  TValue * source_end, 
+inline void
+arrayMoveBackward(TValue * source_begin,
+				  TValue * source_end,
 				  TValue * target_begin)
 {
 SEQAN_CHECKPOINT
@@ -333,10 +333,10 @@ SEQAN_CHECKPOINT
 //////////////////////////////////////////////////////////////////////////////
 
 template <typename TValue>
-inline void 
-_arrayClearSpace_Pointer(TValue * array_begin, 
-						size_t array_length, 
-						size_t keep_from, 
+inline void
+_arrayClearSpace_Pointer(TValue * array_begin,
+						size_t array_length,
+						size_t keep_from,
 						size_t move_to,
 						True)
 {
@@ -345,19 +345,19 @@ SEQAN_CHECKPOINT
 	arrayMove(array_begin + keep_from, array_begin + array_length, array_begin + move_to);
 }
 template <typename TValue>
-inline void 
-_arrayClearSpace_Pointer(TValue * array_begin, 
-						size_t array_length, 
-						size_t keep_from, 
+inline void
+_arrayClearSpace_Pointer(TValue * array_begin,
+						size_t array_length,
+						size_t keep_from,
 						size_t move_to,
 						False)
 {
 	_arrayClearSpace_Default(array_begin, array_length, keep_from, move_to);
 }
 template <typename TValue>
-void arrayClearSpace(TValue * array_begin, 
-					 size_t array_length, 
-					 size_t keep_from, 
+void arrayClearSpace(TValue * array_begin,
+					 size_t array_length,
+					 size_t keep_from,
 					 size_t move_to)
 {
 	_arrayClearSpace_Pointer(array_begin, array_length, keep_from, move_to, typename IsSimple<TValue>::Type() );
@@ -430,14 +430,14 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// bool 
+// bool
 //////////////////////////////////////////////////////////////////////////////
 
 template <> struct BitsPerValue< bool > { enum { VALUE = 1 }; };
 
 /*
 //////////////////////////////////////////////////////////////////////////////
-// char 
+// char
 //////////////////////////////////////////////////////////////////////////////
 
 inline char const &
@@ -456,7 +456,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// signed char 
+// signed char
 //////////////////////////////////////////////////////////////////////////////
 
 inline signed char const &
@@ -475,7 +475,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// unsigned char 
+// unsigned char
 //////////////////////////////////////////////////////////////////////////////
 
 inline unsigned char const &
@@ -513,7 +513,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// signed short 
+// signed short
 //////////////////////////////////////////////////////////////////////////////
 
 inline signed short const &
@@ -532,7 +532,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// unsigned short 
+// unsigned short
 //////////////////////////////////////////////////////////////////////////////
 
 inline unsigned short const &
@@ -551,7 +551,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// signed int 
+// signed int
 //////////////////////////////////////////////////////////////////////////////
 
 inline signed int const &
@@ -570,7 +570,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// unsigned int 
+// unsigned int
 //////////////////////////////////////////////////////////////////////////////
 
 inline unsigned int const &
@@ -647,7 +647,7 @@ SEQAN_CHECKPOINT
 */
 
 //////////////////////////////////////////////////////////////////////////////
-// float 
+// float
 //////////////////////////////////////////////////////////////////////////////
 
 inline float const &
@@ -674,7 +674,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// double 
+// double
 //////////////////////////////////////////////////////////////////////////////
 
 inline double const &
@@ -701,7 +701,7 @@ SEQAN_CHECKPOINT
 }
 
 //////////////////////////////////////////////////////////////////////////////
-// long double 
+// long double
 //////////////////////////////////////////////////////////////////////////////
 
 inline long double const &

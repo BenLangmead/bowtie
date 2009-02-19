@@ -2976,11 +2976,11 @@ static void driver(const char * type,
 		// Determine if it's a file by looking at whether it has a FASTA-like
 		// extension
 		size_t len = origString.length();
-		if(len >= 6 && origString.substr(len-6) == ".fasta" ||
-		   len >= 4 && origString.substr(len-4) == ".mfa"   ||
-		   len >= 4 && origString.substr(len-4) == ".fas"   ||
-		   len >= 4 && origString.substr(len-4) == ".fna"   ||
-		   len >= 3 && origString.substr(len-3) == ".fa")
+		if((len >= 6 && origString.substr(len-6) == ".fasta") ||
+		   (len >= 4 && origString.substr(len-4) == ".mfa")   ||
+		   (len >= 4 && origString.substr(len-4) == ".fas")   ||
+		   (len >= 4 && origString.substr(len-4) == ".fna")   ||
+		   (len >= 3 && origString.substr(len-3) == ".fa"))
 		{
 			// Read fasta file
 			vector<string> origFiles;

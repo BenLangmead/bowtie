@@ -399,6 +399,7 @@ protected:
 			if(seedOverhang > 0) {
 				// Does the non-seed part of the alignment (the
 				// "overhang") ruin it?
+				bool skipCandidate = false;
 				for(uint32_t j = 0; j < seedOverhang; j++) {
 					assert_lt(ri + seedBitPairs + j, end);
 					int rc = (int)ref[rir + seedBitPairs + j];
@@ -414,7 +415,8 @@ protected:
 							// Left-to-right
 							skipLeftToRights = seedBitPairs + j;
 						}
-						continue; // Skip this candidate
+						skipCandidate = true;
+						break; // Skip this candidate
 					}
 					if((int)qry[32 + j] != rc) {
 						// Yes, overhang ruins it
@@ -422,6 +424,7 @@ protected:
 						break;
 					}
 				}
+				if(skipCandidate) continue;
 			}
 			if(foundHit) {
 				if(pairs != NULL) {
@@ -830,6 +833,7 @@ protected:
 			bool foundHit = true;
 			if(seedOverhang > 0) {
 				assert_leq(ri + seedBitPairs + seedOverhang, end);
+				bool skipCandidate = false;
 				for(uint32_t j = 0; j < seedOverhang; j++) {
 					int rc = (int)ref[rir + 32 + j];
 					if(rc == 4) {
@@ -844,7 +848,8 @@ protected:
 							// Left-to-right
 							skipLeftToRights = seedBitPairs + j;
 						}
-						continue; // Skip this candidate
+						skipCandidate = true; // Skip this candidate
+						break;
 					}
 					if((int)qry[32 + j] != rc) {
 						if(++diffs > 1) {
@@ -856,6 +861,7 @@ protected:
 						}
 					}
 				}
+				if(skipCandidate) continue;
 			}
 			if(!foundHit) continue;
 			if(pairs != NULL) {

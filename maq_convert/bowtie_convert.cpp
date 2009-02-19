@@ -137,6 +137,48 @@ static inline int cal_map_qual(int default_qual,
 		return default_qual - log_n[other_occs];
 }
 
+/**
+ * My version of the strsep function; strsep is not included in MinGW.
+ */
+static char *my_strsep(char **stringp, const char delim) {
+	char *string = *stringp;
+	if(string == NULL) return NULL;
+	// We're already pointing to the end of the string; just return
+	// NULL to indicate there are no more tokens
+	int i = 0;
+	if(string[i] == '\0') {
+		return NULL;
+	}
+	// Skip over any initial delimiters
+	while(string[i] == delim) i++;
+	string = &string[i];
+	i = 0;
+	// Skip to nearest delimiter or terminator
+	while(string[i] != delim && string[i] != '\0') {
+		i++;
+	}
+	// Now string[i] is either a delimiter or a terminator
+	// Overwrite delimiters with terminators
+	while(string[i] == delim) {
+		string[i] = '\0';
+		i++;
+	}
+	// Now string[i] either points just past the last delimiter seen,
+	// or it points to the existing terminator
+	*stringp = &string[i];
+#ifndef NDEBUG
+	{
+		int j = 0;
+		while(string[j] != '\0') {
+			// No delimiters in the middle of string
+			assert_neq(delim, string[j]);
+			j++;
+		}
+	}
+#endif
+	return string;
+}
+
 /** This function, and the types aln_t and header_t, are parameterized by an
  *  integer specifying the maximum read length supported by the Maq map to be
  *  written
@@ -200,14 +242,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			8) mismatch positions - this is a comma-delimited list of positions
 				w.r.t. the 5 prime end of the read.
 		 */
-		name                   = strsep((char**)&buf, "\t");
-		char *scan_orientation = strsep((char**)&buf, "\t");
-		text_name              = strsep((char**)&buf, "\t");
-		char *scan_refoff      = strsep((char**)&buf, "\t");
-		sequence               = strsep((char**)&buf, "\t");
-		qualities              = strsep((char**)&buf, "\t");
-		char *scan_oms         = strsep((char**)&buf, "\t");
-		mismatches             = strsep((char**)&buf, "\t");
+		name                   = my_strsep((char**)&buf, '\t');
+		char *scan_orientation = my_strsep((char**)&buf, '\t');
+		text_name              = my_strsep((char**)&buf, '\t');
+		char *scan_refoff      = my_strsep((char**)&buf, '\t');
+		sequence               = my_strsep((char**)&buf, '\t');
+		qualities              = my_strsep((char**)&buf, '\t');
+		char *scan_oms         = my_strsep((char**)&buf, '\t');
+		mismatches             = my_strsep((char**)&buf, '\t');
 		if(scan_oms == NULL) {
 			// One or more of the fields up to the 'oms' field didn't exist
 			fprintf(stderr, "Warning: found malformed record, skipping\n");

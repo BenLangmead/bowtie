@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: index.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_H
@@ -65,24 +65,16 @@
 
 #include <seqan/index/pump_extender3.h>
 #include <seqan/index/pipe_merger3.h>
-#include <seqan/index/index_skew3.h>
 
 #include <seqan/index/pump_extender7.h>
 #include <seqan/index/pipe_merger7.h>
-#include <seqan/index/index_skew7.h>
 
 #include <seqan/index/pump_separator7.h>
-#include <seqan/index/index_skew7_multi.h>
 
 //____________________________________________________________________________
 // enhanced table creators
 
 #include <seqan/index/pump_lcp_core.h>
-#include <seqan/index/index_lcp.h>
-#include <seqan/index/index_lcp_tree.h>
-
-#include <seqan/index/index_childtab.h>
-#include <seqan/index/index_bwt.h>
 
 //____________________________________________________________________________
 // q-gram index creator
@@ -90,7 +82,7 @@
 #include <seqan/index/shape_base.h>
 #include <seqan/index/shape_gapped.h>
 #include <seqan/index/shape_predefined.h>
-#include <seqan/index/index_qgram.h>
+//#include <seqan/index/index_qgram.h>
 //#include <seqan/index/index_qgram_nested.h>
 
 
@@ -98,26 +90,14 @@
 // INDEX USAGE
 //////////////////////////////////////////////////////////////////////////////
 
-#include <seqan/index/index_shims.h>
-#include <seqan/index/index_esa_find.h>
 #include <seqan/index/index_qgram_find.h>
 #include <seqan/index/index_find.h>
 
 //____________________________________________________________________________
 // (virtual) suffix trees
 
-#include <seqan/index/index_esa_base.h>
-#include <seqan/index/index_esa_stree.h>
-#include <seqan/index/index_wotd.h>
-#include <seqan/index/index_dfi.h>
-
 //____________________________________________________________________________
 // suffix tree algorithms
-
-#include <seqan/index/index_esa_algs.h>
-#include <seqan/index/index_esa_algs_multi.h>
-#include <seqan/index/index_esa_drawing.h>
-#include <seqan/index/repeat_base.h>
 
 //____________________________________________________________________________
 // Pizza & Chili interface (compressed indices)

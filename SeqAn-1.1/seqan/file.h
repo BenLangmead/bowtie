@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: file.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: file.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_FILE_H
@@ -79,7 +79,6 @@
 // files
 
 #include <seqan/file/file_base.h>
-#include <seqan/file/file_cstyle.h>
 #include <seqan/file/file_array.h>
 
 #include <seqan/system.h>	// async file (default file type of File<>)
@@ -89,9 +88,5 @@
 */
 //____________________________________________________________________________
 // external string
-
-#include <seqan/file/file_page.h>
-#include <seqan/file/file_page_raid0.h>
-#include <seqan/file/string_external.h>
 
 #endif //#ifndef SEQAN_HEADER_...

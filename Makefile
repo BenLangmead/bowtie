@@ -100,7 +100,8 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
                $(wildcard indexes/e_coli*) \
                $(wildcard genomes/NC_008253.fna) \
-               $(wildcard reads/e_coli*) \
+               $(wildcard reads/e_coli_1000.*) \
+               $(wildcard reads/e_coli_1000_*) \
                $(PTHREAD_PKG) \
                AUTHORS \
                COPYING \

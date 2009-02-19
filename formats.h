@@ -8,7 +8,7 @@
  * File-format constants and names
  */
 
-typedef enum file_format {
+enum file_format {
 	FASTA = 1,
 	FASTQ,
 	RAW,

@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: pipe.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: pipe.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_PIPE_H
@@ -61,11 +61,7 @@
 //____________________________________________________________________________
 // pools
 
-#include <seqan/pipe/pool_base.h>
-#include <seqan/pipe/pool_mapper.h>
-
 #include <seqan/misc/priority_type_base.h>
 #include <seqan/misc/priority_type_heap.h>
-#include <seqan/pipe/pool_sorter.h>
 
 #endif //#ifndef SEQAN_HEADER_...

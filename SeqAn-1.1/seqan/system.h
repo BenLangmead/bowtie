@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: system.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: system.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_SYSTEM_H
@@ -61,10 +61,6 @@
 // multi-threading
 
 #include <seqan/system/system_base.h>
-#include <seqan/system/system_mutex.h>
-#include <seqan/system/system_sema.h>
-#include <seqan/system/system_event.h>
-#include <seqan/system/system_thread.h>
 
 //____________________________________________________________________________
 // synchronous and asynchronous files

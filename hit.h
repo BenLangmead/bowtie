@@ -25,7 +25,7 @@ using namespace std;
 using namespace seqan;
 
 /// Constants for the various output modes
-typedef enum output_types {
+enum output_types {
 	FULL = 1,
 	CONCISE,
 	BINARY,

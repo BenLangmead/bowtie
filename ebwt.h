@@ -64,85 +64,62 @@ if(this->verbose()) { \
 class EbwtParams {
 
 public:
+	EbwtParams() { }
+
 	EbwtParams(uint32_t __len,
 	           int32_t __lineRate,
 	           int32_t __linesPerSide,
 	           int32_t __offRate,
-	           int32_t __isaRate,  // -1 -> don't sample ISA
+	           int32_t __isaRate,
 	           int32_t __ftabChars,
-	           int32_t __chunkRate) :
-	           _len(__len),        // # characters in the original string
-	           _bwtLen(_len + 1),  // # characters in the BWT string ; extra 1 for $ suffix
-	           _sz((_len+3)/4),    // # bytes needed to hold original string
-	           _bwtSz(_len/4 + 1), // # bytes needed to hold BWT string
-	           _lineRate(__lineRate),
-	           _linesPerSide(__linesPerSide),
-	           _origOffRate(__offRate),
-	           _offRate(__offRate),
-	           _offMask(0xffffffff << _offRate),
-	           _isaRate(__isaRate),
-	           _isaMask(0xffffffff << ((_isaRate >= 0) ? _isaRate : 0)),
-	           _ftabChars(__ftabChars),
-	           _eftabLen(_ftabChars*2),
-	           _eftabSz(_eftabLen*4),
-	           _ftabLen((1 << (_ftabChars*2))+1),
-	           _ftabSz(_ftabLen*4),
-	           _offsLen((_bwtLen + (1 << _offRate) - 1) >> _offRate),
-	           _offsSz(_offsLen*4),
-	           _isaLen((_isaRate == -1)? 0 : ((_bwtLen + (1 << _isaRate) - 1) >> _isaRate)),
-	           _isaSz(_isaLen*4),
-	           _lineSz(1 << _lineRate),
-	           _sideSz(_lineSz * _linesPerSide),
-	           _sideBwtSz(_sideSz - 8),
-	           _sideBwtLen(_sideBwtSz*4),
-	           _numSidePairs((_bwtSz+(2*_sideBwtSz)-1)/(2*_sideBwtSz)), // string size rounded up to nearest line pair
-	           _numSides(_numSidePairs*2),
-	           _numLines(_numSides * _linesPerSide),
-	           _ebwtTotLen(_numSidePairs * (2*_sideSz)),
-	           _ebwtTotSz(_ebwtTotLen),
-	           _chunkRate(__chunkRate),
-	           _chunkLen((_chunkRate >= 0) ? (1 << _chunkRate) : 0),
-	           _chunkMask((_chunkRate >= 0) ? (0xffffffff << _chunkRate) : 0),
-	           _numChunks((_chunkRate >= 0) ? ((_len + _chunkLen - 1) / _chunkLen) : 0)
+	           int32_t __chunkRate)
 	{
-		assert(repOk());
+		init(__len, __lineRate, __linesPerSide, __offRate, __isaRate,
+		     __ftabChars, __chunkRate);
 	}
 
-	EbwtParams(const EbwtParams& eh) :
-	           _len(eh._len),
-	           _bwtLen(eh._bwtLen),
-	           _sz(eh._sz),
-	           _bwtSz(eh._bwtSz),
-	           _lineRate(eh._lineRate),
-	           _linesPerSide(eh._linesPerSide),
-	           _origOffRate(eh._origOffRate),
-	           _offRate(eh._offRate),
-	           _offMask(eh._offMask),
-	           _isaRate(eh._isaRate),
-	           _isaMask(eh._isaMask),
-	           _ftabChars(eh._ftabChars),
-	           _eftabLen(eh._eftabLen),
-	           _eftabSz(eh._eftabSz),
-	           _ftabLen(eh._ftabLen),
-	           _ftabSz(eh._ftabSz),
-	           _offsLen(eh._offsLen),
-	           _offsSz(eh._offsSz),
-	           _isaLen(eh._isaLen),
-	           _isaSz(eh._isaSz),
-	           _lineSz(eh._lineSz),
-	           _sideSz(eh._sideSz),
-	           _sideBwtSz(eh._sideBwtSz),
-	           _sideBwtLen(eh._sideBwtLen),
-	           _numSidePairs(eh._numSidePairs),
-	           _numSides(eh._numSides),
-	           _numLines(eh._numLines),
-	           _ebwtTotLen(eh._ebwtTotLen),
-	           _ebwtTotSz(eh._ebwtTotSz),
-	           _chunkRate(eh._chunkRate),
-	           _chunkLen(eh._chunkLen),
-	           _chunkMask(eh._chunkMask),
-	           _numChunks(eh._numChunks)
+	EbwtParams(const EbwtParams& eh) {
+		init(eh._len, eh._lineRate, eh._linesPerSide, eh._offRate,
+		     eh._isaRate, eh._ftabChars, eh._chunkRate);
+	}
+
+	void init(uint32_t len, int32_t lineRate, int32_t linesPerSide,
+	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
+	          int32_t chunkRate)
 	{
+		_len = len;
+		_bwtLen = _len + 1;
+		_sz = (len+3)/4;
+		_bwtSz = (len/4 + 1);
+		_lineRate = lineRate;
+		_linesPerSide = linesPerSide;
+		_origOffRate = offRate;
+		_offRate = offRate;
+		_offMask = 0xffffffff << _offRate;
+		_isaRate = isaRate;
+		_isaMask = 0xffffffff << ((_isaRate >= 0) ? _isaRate : 0);
+		_ftabChars = ftabChars;
+		_eftabLen = _ftabChars*2;
+		_eftabSz = _eftabLen*4;
+		_ftabLen = (1 << (_ftabChars*2))+1;
+		_ftabSz = _ftabLen*4;
+		_offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
+		_offsSz = _offsLen*4;
+		_isaLen = (_isaRate == -1)? 0 : ((_bwtLen + (1 << _isaRate) - 1) >> _isaRate);
+		_isaSz = _isaLen*4;
+		_lineSz = 1 << _lineRate;
+		_sideSz = _lineSz * _linesPerSide;
+		_sideBwtSz = _sideSz - 8;
+		_sideBwtLen = _sideBwtSz*4;
+		_numSidePairs = (_bwtSz+(2*_sideBwtSz)-1)/(2*_sideBwtSz);
+		_numSides = _numSidePairs*2;
+		_numLines = _numSides * _linesPerSide;
+		_ebwtTotLen = _numSidePairs * (2*_sideSz);
+		_ebwtTotSz = _ebwtTotLen;
+		_chunkRate = chunkRate;
+		_chunkLen = (_chunkRate >= 0) ? (1 << _chunkRate) : 0;
+		_chunkMask = (_chunkRate >= 0) ? (0xffffffff << _chunkRate) : 0;
+		_numChunks = (_chunkRate >= 0) ? ((_len + _chunkLen - 1) / _chunkLen) : 0;
 		assert(repOk());
 	}
 
@@ -457,9 +434,9 @@ public:
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
-	     Ebwt_INITS,
-	     _eh(readIntoMemory(true, __useShmem, in + ".1.ebwt", in + ".2.ebwt"))
+	     Ebwt_INITS
 	{
+		this->readIntoMemory(true, __useShmem, in + ".1.ebwt", in + ".2.ebwt", &_eh);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -553,7 +530,8 @@ public:
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
 			readIntoMemory(false /* not just header */,
-			               false /* don't use shared mem */);
+			               false /* don't use shared mem */,
+			               "", "", NULL);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -594,7 +572,8 @@ public:
 		// initializes _plen, _pmap, _nPat
 		VMSG_NL("Calculating joined length");
 		TStr s; // holds the entire joined reference after call to joinToDisk
-		uint32_t jlen = joinedLen(szs, _eh._chunkRate);
+		uint32_t jlen;
+		jlen = joinedLen(szs, _eh._chunkRate);
 		assert_geq(jlen, sztot);
 		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " characters of padding)");
 		VMSG_NL("Writing header");
@@ -638,7 +617,7 @@ public:
 		}
 		// Succesfully obtained joined reference string
 		assert_geq(length(s), jlen);
-		if(useBlockwise) {
+		//if(useBlockwise) {
 			if(bmax != 0xffffffff) {
 				VMSG_NL("bmax according to bmax setting: " << bmax);
 			}
@@ -730,6 +709,7 @@ public:
 				}
 				first = false;
 			}
+#if 0
 		} else {
 			VMSG_NL("Using entire SA");
 			SillyBlockwiseDnaSA<TStr> bsa(s, 32, _sanity, _passMemExc, _verbose);
@@ -737,7 +717,8 @@ public:
 			assert_eq(bsa.size(), length(s)+1);
 			// Build Ebwt; doing so initializes everything else
 			buildToDisk(bsa, s, out1, out2);
-		}
+#endif
+		//}
 		assert(repOk());
 		// Now write reference sequence names on the end
 		assert_eq(this->_refnames.size(), this->_nPat);
@@ -868,7 +849,7 @@ public:
 	 * _in2 streams.
 	 */
 	void loadIntoMemory(bool useShmem) {
-		readIntoMemory(false, useShmem);
+		readIntoMemory(false, useShmem, "", "", NULL);
 	}
 
 	/**
@@ -1070,10 +1051,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	EbwtParams readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2);
-	EbwtParams readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2, bool& bigEndian);
-	EbwtParams readIntoMemory(bool justHeader, bool useShmem);
-	EbwtParams readIntoMemory(bool justHeader, bool useShmem, bool& be);
+	void readIntoMemory(bool justHeader, bool useShmem, const string& in1, const string& in2, EbwtParams *params);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -1946,8 +1924,8 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
-		if(l._sideByteOff + l._by > _zEbwtByteOff ||
-		   l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff)
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff))
 		{
 			cCnt--; // Adjust for '$' looking like an 'A'
 		}
@@ -2001,8 +1979,8 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 	if(l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
-		if(l._sideByteOff + l._by > _zEbwtByteOff ||
-		   l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff)
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp > _zEbwtBpOff))
 		{
 			arrs[0]--; // Adjust for '$' looking like an 'A'
 		}
@@ -2049,8 +2027,8 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
-		if(l._sideByteOff + l._by > _zEbwtByteOff ||
-		   l._sideByteOff + l._by == _zEbwtByteOff && l._bp >= _zEbwtBpOff)
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp >= _zEbwtBpOff))
 		{
 			cCnt--;
 		}
@@ -2098,8 +2076,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 	if(l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
 		// shouldn't count it as an 'A' here
-		if(l._sideByteOff + l._by > _zEbwtByteOff ||
-		   l._sideByteOff + l._by == _zEbwtByteOff && l._bp >= _zEbwtBpOff)
+		if((l._sideByteOff + l._by > _zEbwtByteOff) ||
+		   (l._sideByteOff + l._by == _zEbwtByteOff && l._bp >= _zEbwtBpOff))
 		{
 			arrs[0]--; // Adjust for '$' looking like an 'A'
 		}
@@ -2827,180 +2805,40 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
  * Read an Ebwt from file with given filename.
  */
 template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
-                                      bool useShmem,
-                                      const string& in1,
-                                      const string& in2)
+void Ebwt<TStr>::readIntoMemory(bool justHeader,
+                                bool useShmem,
+                                const string& in1,
+                                const string& in2,
+                                EbwtParams *params)
 {
-	bool bigEndian; // dummy; caller doesnn't care
-	return readIntoMemory(justHeader, useShmem, in1, in2, bigEndian);
-}
-
-/**
- * Read an Ebwt from a file with given filename.  The endianness of the
- * data read is installed in the bigEndian out parameter (true=big).
- */
-template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader,
-                                      bool useShmem,
-                                      const string& in1,
-                                      const string& in2,
-                                      bool& bigEndian)
-{
-	_in1Str = in1;
-	_in2Str = in2;
-	// Initialize our primary and secondary input-stream fields
-	if(!_in1.is_open()) {
-		if(this->verbose()) cout << "Opening \"" << in1 << "\"" << endl;
-		_in1.open(in1.c_str(), ios_base::in | ios::binary);
+	bool be; // dummy; caller doesnn't care
+	if(in1.length() > 0) {
+		_in1Str = in1;
+		_in2Str = in2;
+		// Initialize our primary and secondary input-stream fields
 		if(!_in1.is_open()) {
-			throw EbwtFileOpenException("Cannot open file " + in1);
-		}
-	}
-	assert(_in1.is_open());
-	assert(_in1.good());
-	assert_eq((streamoff)_in1.tellg(), ios::beg);
-	if(!_in2.is_open()) {
-		if(this->verbose()) cout << "Opening \"" << in2 << "\"" << endl;
-		_in2.open(in2.c_str(), ios_base::in | ios::binary);
-		if(!_in2.is_open()) {
-			throw EbwtFileOpenException("Cannot open file " + in2);
-		}
-	}
-	assert(_in2.is_open());
-	assert(_in2.good());
-	assert_eq((streamoff)_in2.tellg(), ios::beg);
-	EbwtParams eh(readIntoMemory(justHeader, useShmem, bigEndian));
-	return eh;
-}
-
-/**
- * Read an Ebwt into memory (specifically, into the fields of this Ebwt
- * object) from the object's input-stream pair fields.
- */
-template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem) {
-	bool bigEndian; // dummy; caller doesn't care
-	return readIntoMemory(justHeader, useShmem, bigEndian);
-}
-
-/**
- * Read reference names from an input stream 'in' for an Ebwt primary
- * file and store them in 'refnames'.
- */
-static inline void
-readEbwtRefnames(istream& in, vector<string>& refnames) {
-	// _in1 must already be open with the get cursor at the
-	// beginning and no error flags set.
-	assert(in.good());
-	assert_eq((streamoff)in.tellg(), ios::beg);
-
-	// Read endianness hints from both streams
-	bool be = false;
-	uint32_t one = readU32(in, be); // 1st word of primary stream
-	if(one != 1) {
-		assert_eq((1u<<24), one);
-		be = true;
-	}
-
-	// Reads header entries one by one from primary stream
-	uint32_t len          = readU32(in, be);
-	int32_t  lineRate     = readI32(in, be);
-	int32_t  linesPerSide = readI32(in, be);
-	int32_t  offRate      = readI32(in, be);
-	int32_t  ftabChars    = readI32(in, be);
-	int32_t  chunkRate    = readI32(in, be);
-
-	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, chunkRate);
-
-	uint32_t nPat = readI32(in, be); // nPat
-	in.seekg(nPat*4, ios_base::cur); // skip plen
-
-	if(chunkRate >= 0) {
-		// Skip pmap
-		uint32_t pmapEnts = eh._numChunks*4;
-		in.seekg(pmapEnts*4, ios_base::cur);
-	} else {
-		// Skip rstarts
-		uint32_t nFrag = readU32(in, be);
-		in.seekg(nFrag*4*3, ios_base::cur);
-	}
-
-	// Skip ebwt
-	in.seekg(eh._ebwtTotLen, ios_base::cur);
-
-	// Skip zOff from primary stream
-	readU32(in, be);
-
-	// Skip fchr
-	in.seekg(5 * 4, ios_base::cur);
-
-	// Skip ftab
-	in.seekg(eh._ftabLen*4, ios_base::cur);
-
-	// Skip eftab
-	in.seekg(eh._eftabLen*4, ios_base::cur);
-
-	// Read reference sequence names from primary index file
-	while(true) {
-		char c = '\0';
-		in.read(&c, 1);
-		if(in.eof()) break;
-		if(c == '\0') break;
-		else if(c == '\n') {
-			refnames.push_back("");
-		} else {
-			if(refnames.size() == 0) {
-				refnames.push_back("");
+			if(this->verbose()) cout << "Opening \"" << in1 << "\"" << endl;
+			_in1.open(in1.c_str(), ios_base::in | ios::binary);
+			if(!_in1.is_open()) {
+				throw EbwtFileOpenException("Cannot open file " + in1);
 			}
-			refnames.back().push_back(c);
 		}
+		assert(_in1.is_open());
+		assert(_in1.good());
+		assert_eq((streamoff)_in1.tellg(), ios::beg);
+		if(!_in2.is_open()) {
+			if(this->verbose()) cout << "Opening \"" << in2 << "\"" << endl;
+			_in2.open(in2.c_str(), ios_base::in | ios::binary);
+			if(!_in2.is_open()) {
+				throw EbwtFileOpenException("Cannot open file " + in2);
+			}
+		}
+		assert(_in2.is_open());
+		assert(_in2.good());
+		assert_eq((streamoff)_in2.tellg(), ios::beg);
+		// _in1 and _in2 must already be open with the get cursor at the
+		// beginning and no error flags set.
 	}
-	if(refnames.back().empty()) {
-		refnames.pop_back();
-	}
-
-	// Be kind
-	in.clear(); in.seekg(0, ios::beg);
-	assert(in.good());
-}
-
-/**
- * Read reference names from the index with basename 'in' and store
- * them in 'refnames'.
- */
-static inline void
-readEbwtRefnames(const string& instr, vector<string>& refnames) {
-	ifstream in;
-	// Initialize our primary and secondary input-stream fields
-	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-	if(!in.is_open()) {
-		throw EbwtFileOpenException("Cannot open file " + instr);
-	}
-	assert(in.is_open());
-	assert(in.good());
-	assert_eq((streamoff)in.tellg(), ios::beg);
-	readEbwtRefnames(in, refnames);
-}
-
-
-/**
- * Read an Ebwt from an input-stream pair.  The endianness of the data
- * read is installed in the bigEndian out parameter (true=big).  The
- * _in1 and _in2 istreams must already be initialized and open.
- *
- * The caller is responsible for ensuring that both istreams are set up
- * to point just before the Ebwt records.  In most cases, this means
- * that they will both be completely rewound.
- *
- * This function rewinds the streams before returning.
- *
- */
-template<typename TStr>
-EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) {
-	// _in1 and _in2 must already be open with the get cursor at the
-	// beginning and no error flags set.
 	assert(_in1.is_open()); assert(_in1.good());
 	assert(_in2.is_open()); assert(_in2.good());
 	assert_eq((streamoff)_in1.tellg(), ios::beg);
@@ -3035,11 +2873,19 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 	int32_t  chunkRate    = readI32(_in1, be);
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
-	if(_verbose) eh.print(cout);
+	EbwtParams *eh;
+	bool deleteEh = false;
+	if(params != NULL) {
+		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
+		if(_verbose) params->print(cout);
+		eh = params;
+	} else {
+		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
+		deleteEh = true;
+	}
 
 	// Set up overridden suffix-array-sample parameters
-	uint32_t offsLen = eh._offsLen;
+	uint32_t offsLen = eh->_offsLen;
 	uint32_t offRateDiff = 0;
 	uint32_t offsLenSampled = offsLen;
 	if(_overrideOffRate > offRate) {
@@ -3053,7 +2899,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 	}
 
 	// Set up overridden inverted-suffix-array-sample parameters
-	uint32_t isaLen = eh._isaLen;
+	uint32_t isaLen = eh->_isaLen;
 	uint32_t isaRateDiff = 0;
 	uint32_t isaLenSampled = isaLen;
 	if(_overrideIsaRate > isaRate) {
@@ -3100,7 +2946,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 	if(chunkRate >= 0) {
 		// Read pmap from primary stream
 		try {
-			uint32_t pmapEnts = eh._numChunks*4;
+			uint32_t pmapEnts = eh->_numChunks*4;
 			if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
 			this->_pmap = new uint32_t[pmapEnts];
 			if(be) {
@@ -3159,8 +3005,8 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 			int ret;
 			// Reserve 8 bytes at the end of the shared memory chunk
 			// for silly synchronization
-			size_t shmemLen = eh._ebwtTotLen + 4;
-			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into shared memory" << endl;
+			size_t shmemLen = eh->_ebwtTotLen + 4;
+			if(_verbose) cout << "Reading ebwt (" << eh->_ebwtTotLen << ") into shared memory" << endl;
 			while(true) {
 				// Create the shrared-memory block
 				if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {
@@ -3229,7 +3075,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 				}
 				// Set this value just off the end of _ebwt[] array to
 				// indicate that the data hasn't been read yet.
-				((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xffffffff;
+				((volatile uint32_t*)(&this->_ebwt[eh->_ebwtTotLen]))[0] = 0xffffffff;
 			} else {
 				if(_verbose) {
 					cout << "  I (pid = " << getpid() << ") did not create the shared memory for _ebwt.  Pid " << ds.shm_cpid << " did." << endl;
@@ -3239,9 +3085,9 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 		} else {
 #endif
 			// Allocate ebwt (big allocation)
-			if(_verbose) cout << "Reading ebwt (" << eh._ebwtTotLen << ") into process memory" << endl;
+			if(_verbose) cout << "Reading ebwt (" << eh->_ebwtTotLen << ") into process memory" << endl;
 			try {
-				this->_ebwt = new uint8_t[eh._ebwtTotLen];
+				this->_ebwt = new uint8_t[eh->_ebwtTotLen];
 			} catch(bad_alloc& e) {
 				cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
 					 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
@@ -3254,24 +3100,24 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 #endif
 		if(readFromStream) {
 			// Read ebwt from primary stream
-			_in1.read((char *)this->_ebwt, eh._ebwtTotLen);
-			assert_eq(eh._ebwtTotLen, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_ebwt, eh->_ebwtTotLen);
+			assert_eq(eh->_ebwtTotLen, (uint32_t)_in1.gcount());
 			if(useShmem) {
 				// I'm the shmem writer - set this flag just off the
 				// end of the ebwt[] array to indicate we're done
 				// writing
-				assert_eq(0xffffffff, ((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0]);
-				((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] = 0xf0f0f0f0;
+				assert_eq(0xffffffff, ((volatile uint32_t*)(&this->_ebwt[eh->_ebwtTotLen]))[0]);
+				((volatile uint32_t*)(&this->_ebwt[eh->_ebwtTotLen]))[0] = 0xf0f0f0f0;
 			}
 		} else /* Consume shared memory instead of reading from stream */ {
 			// Spin until the shmem writer is finished writing
-			while(((volatile uint32_t*)(&this->_ebwt[eh._ebwtTotLen]))[0] != 0xf0f0f0f0) ; // spin
+			while(((volatile uint32_t*)(&this->_ebwt[eh->_ebwtTotLen]))[0] != 0xf0f0f0f0) ; // spin
 #ifndef NDEBUG
 			// Assert that what's in the shared memory matches what I would
 			// have read from the stream
-			for(size_t i = 0; i < eh._ebwtTotLen; i += 4096) {
+			for(size_t i = 0; i < eh->_ebwtTotLen; i += 4096) {
 				uint8_t buf[4096];
-				size_t amt = min<size_t>(4096, eh._ebwtTotLen-i);
+				size_t amt = min<size_t>(4096, eh->_ebwtTotLen-i);
 				_in1.read((char *)buf, amt);
 				assert_eq(amt, (size_t)_in1.gcount());
 				for(size_t j = 0; j < amt; j++) {
@@ -3280,7 +3126,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 			}
 #else
 			// Seek past it, since it's already sitting in shared memory
-			_in1.seekg(eh._ebwtTotLen, ios_base::cur);
+			_in1.seekg(eh->_ebwtTotLen, ios_base::cur);
 #endif
 		}
 	}
@@ -3300,26 +3146,26 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 		}
 		assert_gt(this->_fchr[4], this->_fchr[0]);
 		// Read ftab from primary stream
-		if(_verbose) cout << "Reading ftab (" << eh._ftabLen << ")" << endl;
-		this->_ftab = new uint32_t[eh._ftabLen];
+		if(_verbose) cout << "Reading ftab (" << eh->_ftabLen << ")" << endl;
+		this->_ftab = new uint32_t[eh->_ftabLen];
 		if(be) {
-			for(uint32_t i = 0; i < eh._ftabLen; i++)
+			for(uint32_t i = 0; i < eh->_ftabLen; i++)
 				this->_ftab[i] = readU32(_in1, be);
 		} else {
-			_in1.read((char *)this->_ftab, eh._ftabLen*4);
-			assert_eq(eh._ftabLen*4, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_ftab, eh->_ftabLen*4);
+			assert_eq(eh->_ftabLen*4, (uint32_t)_in1.gcount());
 		}
 		// Read etab from primary stream
-		if(_verbose) cout << "Reading eftab (" << eh._eftabLen << ")" << endl;
-		this->_eftab = new uint32_t[eh._eftabLen];
+		if(_verbose) cout << "Reading eftab (" << eh->_eftabLen << ")" << endl;
+		this->_eftab = new uint32_t[eh->_eftabLen];
 		if(be) {
-			for(uint32_t i = 0; i < eh._eftabLen; i++)
+			for(uint32_t i = 0; i < eh->_eftabLen; i++)
 				this->_eftab[i] = readU32(_in1, be);
 		} else {
-			_in1.read((char *)this->_eftab, eh._eftabLen*4);
-			assert_eq(eh._eftabLen*4, (uint32_t)_in1.gcount());
+			_in1.read((char *)this->_eftab, eh->_eftabLen*4);
+			assert_eq(eh->_eftabLen*4, (uint32_t)_in1.gcount());
 		}
-		for(uint32_t i = 0; i < eh._eftabLen; i++) {
+		for(uint32_t i = 0; i < eh->_eftabLen; i++) {
 			if(i > 0 && this->_eftab[i] > 0) {
 				assert_geq(this->_eftab[i], this->_eftab[i-1]);
 			} else if(i > 0 && this->_eftab[i-1] == 0) {
@@ -3384,7 +3230,7 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 					} else if(errno == EEXIST) {
 						cerr << "EEXIST" << endl;
 					} else if(errno == EINVAL) {
-						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << eh._ebwtTotLen << ")" << endl
+						cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << eh->_ebwtTotLen << ")" << endl
 							 << "Deleteing old shared memory block and trying again." << endl;
 						shmid = shmget(key, 0, 0);
 						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
@@ -3572,8 +3418,8 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
 		}
 	}
 
-	postReadInit(eh); // Initialize fields of Ebwt not read from file
-	if(_verbose) print(cout, eh);
+	this->postReadInit(*eh); // Initialize fields of Ebwt not read from file
+	if(_verbose) print(cout, *eh);
 
 	// The fact that _ebwt and friends actually point to something
 	// (other than NULL) now signals to other member functions that the
@@ -3582,11 +3428,111 @@ EbwtParams Ebwt<TStr>::readIntoMemory(bool justHeader, bool useShmem, bool& be) 
   done: // Exit hatch for both justHeader and !justHeader
 
 	// Be kind
+	if(deleteEh) delete eh;
 	_in1.clear(); _in1.seekg(0, ios::beg);
 	_in2.clear(); _in2.seekg(0, ios::beg);
 	assert(_in1.is_open()); assert(_in1.good());
 	assert(_in2.is_open()); assert(_in2.good());
-	return eh;
+}
+
+/**
+ * Read reference names from an input stream 'in' for an Ebwt primary
+ * file and store them in 'refnames'.
+ */
+static inline void
+readEbwtRefnames(istream& in, vector<string>& refnames) {
+	// _in1 must already be open with the get cursor at the
+	// beginning and no error flags set.
+	assert(in.good());
+	assert_eq((streamoff)in.tellg(), ios::beg);
+
+	// Read endianness hints from both streams
+	bool be = false;
+	uint32_t one = readU32(in, be); // 1st word of primary stream
+	if(one != 1) {
+		assert_eq((1u<<24), one);
+		be = true;
+	}
+
+	// Reads header entries one by one from primary stream
+	uint32_t len          = readU32(in, be);
+	int32_t  lineRate     = readI32(in, be);
+	int32_t  linesPerSide = readI32(in, be);
+	int32_t  offRate      = readI32(in, be);
+	int32_t  ftabChars    = readI32(in, be);
+	int32_t  chunkRate    = readI32(in, be);
+
+	// Create a new EbwtParams from the entries read from primary stream
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, chunkRate);
+
+	uint32_t nPat = readI32(in, be); // nPat
+	in.seekg(nPat*4, ios_base::cur); // skip plen
+
+	if(chunkRate >= 0) {
+		// Skip pmap
+		uint32_t pmapEnts = eh._numChunks*4;
+		in.seekg(pmapEnts*4, ios_base::cur);
+	} else {
+		// Skip rstarts
+		uint32_t nFrag = readU32(in, be);
+		in.seekg(nFrag*4*3, ios_base::cur);
+	}
+
+	// Skip ebwt
+	in.seekg(eh._ebwtTotLen, ios_base::cur);
+
+	// Skip zOff from primary stream
+	readU32(in, be);
+
+	// Skip fchr
+	in.seekg(5 * 4, ios_base::cur);
+
+	// Skip ftab
+	in.seekg(eh._ftabLen*4, ios_base::cur);
+
+	// Skip eftab
+	in.seekg(eh._eftabLen*4, ios_base::cur);
+
+	// Read reference sequence names from primary index file
+	while(true) {
+		char c = '\0';
+		in.read(&c, 1);
+		if(in.eof()) break;
+		if(c == '\0') break;
+		else if(c == '\n') {
+			refnames.push_back("");
+		} else {
+			if(refnames.size() == 0) {
+				refnames.push_back("");
+			}
+			refnames.back().push_back(c);
+		}
+	}
+	if(refnames.back().empty()) {
+		refnames.pop_back();
+	}
+
+	// Be kind
+	in.clear(); in.seekg(0, ios::beg);
+	assert(in.good());
+}
+
+/**
+ * Read reference names from the index with basename 'in' and store
+ * them in 'refnames'.
+ */
+static inline void
+readEbwtRefnames(const string& instr, vector<string>& refnames) {
+	ifstream in;
+	// Initialize our primary and secondary input-stream fields
+	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	if(!in.is_open()) {
+		throw EbwtFileOpenException("Cannot open file " + instr);
+	}
+	assert(in.is_open());
+	assert(in.good());
+	assert_eq((streamoff)in.tellg(), ios::beg);
+	readEbwtRefnames(in, refnames);
 }
 
 /**
