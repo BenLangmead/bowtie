@@ -239,7 +239,7 @@ public:
 					// the common case
 					done = false;
 					al->advance();
-				} else if(qUpto_ > 0) {
+				} else {
 					// Feed a new read to a vacant aligner
 					PatternSourcePerThread *ps = (*patsrcs_)[i];
 					// Get a new read
@@ -261,8 +261,6 @@ public:
 						// No more reads; if done == true, it remains
 						// true
 					}
-				} else {
-					// Past read limit; if done == true, it remains true
 				}
 			}
 		}

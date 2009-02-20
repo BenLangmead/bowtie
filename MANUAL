@@ -354,14 +354,18 @@ Bowtie Manual
                      separated lists of reads rather than lists of
                      read files.
 
+  -s/--skip <int>    Skip (i.e. do not align) the first <int> reads or
+                     pairs in the input.
+
+  -u/--qupto <int>   Only align the first <int> reads or read pairs
+                     from the input (after the -s/--skip reads or pairs
+                     have been skipped).  Default: no limit.
+
   -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
                      each read before alignment (default: 0).
 
   -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
                      each read before alignment (default: 0).
-
-  -u/--qupto <int>   Only align the first <int> reads or read pairs
-                     from the input.  Default: no limit.
 
   --solexa-quals     Convert FASTQ qualities from solexa-scaled (which
                      can be negative) to phred-scaled (which can't).

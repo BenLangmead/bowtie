@@ -102,10 +102,11 @@ static bool dontReconcileMates  = true;  // suppress pairwise all-versus-all way
 static uint32_t cacheLimit      = 5;     // ranges w/ size > limit will be cached
 static uint32_t cacheSize       = 0;     // # words per range cache
 static int offBase              = 0;     // offsets are 0-based by default, but configurable
-static bool tryHard             = false;
+static bool tryHard             = false; // set very high maxBts, mixedAttemptLim
+static uint32_t skipReads       = 0;     // # reads/read pairs to skip
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:sat3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
+static const char *short_options = "fqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
 
 enum {
 	ARG_ORIG = 256,
@@ -152,7 +153,8 @@ enum {
 	ARG_MIXED_ATTEMPTS,
 	ARG_NO_RECONCILE,
 	ARG_CACHE_LIM,
-	ARG_CACHE_SZ
+	ARG_CACHE_SZ,
+	ARG_SKIP
 };
 
 static struct option long_options[] = {
@@ -231,6 +233,7 @@ static struct option long_options[] = {
 	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
 	{"offbase",      required_argument, 0,            'B'},
 	{"tryhard",      no_argument,       0,            'y'},
+	{"skip",         required_argument, 0,            's'},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -252,9 +255,10 @@ static void printUsage(ostream& out) {
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
+	    << "  -s/--skip <int>    skip the first <int> reads/pairs in the input" << endl
+	    << "  -u/--qupto <int>   stop after first <int> reads/pairs (excl. skipped reads)" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
-	    << "  -u/--qupto <int>   stop after the first <int> reads" << endl
 		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
 		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
 	    << "Alignment:" << endl
@@ -585,14 +589,18 @@ static void printLongUsage(ostream& out) {
 	"                     separated lists of reads rather than a list of\n"
 	"                     read files.\n"
 	"\n"
+	"  -s/--skip <int>    Skip (i.e. do not align) the first <int> reads or\n"
+	"                     pairs in the input.\n"
+	"\n"
+	"  -u/--qupto <int>   Only align the first <int> reads or read pairs\n"
+	"                     from the input (after the -s/--skip reads or pairs\n"
+	"                     have been skipped).  Default: no limit.\n"
+	"\n"
 	"  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of\n"
 	"                     each read before alignment (default: 0).\n"
 	"\n"
 	"  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of\n"
 	"                     each read before alignment (default: 0).\n"
-	"\n"
-	"  -u/--qupto <int>   Only align the first <int> reads or read pairs\n"
-	"                     from the input.  Default: no limit.\n"
 	"\n"
 	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which\n"
 	"                     can be negative) to phred-scaled (which can't).\n"
@@ -972,6 +980,9 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'X':
 	   			maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
 	   			break;
+	   		case 's':
+	   			skipReads = (uint32_t)parseInt(0, "-s arg must be positive");
+	   			break;
 	   		case ARG_FF: mate1fw = true;  mate2fw = true;  break;
 	   		case ARG_RF: mate1fw = false; mate2fw = true;  break;
 	   		case ARG_FR: mate1fw = true;  mate2fw = false; break;
@@ -1169,6 +1180,12 @@ static void parseOptions(int argc, char **argv) {
 		maxBts = INT_MAX;
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
+	}
+	// If both -s and -u are used, we need to adjust qUpto accordingly
+	// since it uses patid to know if we've reached the -u limit (and
+	// patids are all shifted up by skipReads characters)
+	if(qUpto + skipReads > qUpto) {
+		qUpto += skipReads;
 	}
 }
 
@@ -3194,21 +3211,22 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 		case FASTA:
 			return new FastaPatternSource (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, forgiveInput);
+			                               nsPolicy, forgiveInput,
+			                               skipReads);
 		case RAW:
 			return new RawPatternSource   (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy);
+			                               nsPolicy, skipReads);
 		case FASTQ:
 			return new FastqPatternSource (qs, false, useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, forgiveInput,
 			                               solexa_quals,
-			                               integer_quals);
+			                               integer_quals, skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(qs, false, useSpinlock,
 			                               patDumpfile, trim3,
-			                               trim5, nsPolicy);
+			                               trim5, nsPolicy, skipReads);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,

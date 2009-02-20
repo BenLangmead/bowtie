@@ -979,9 +979,10 @@ public:
 	                    int __trim3 = 0,
 	                    int __trim5 = 0,
 		                int __policy = NS_TO_NS,
+		                uint32_t skip = 0,
 	                    uint32_t seed = 0) :
 		TrimmingPatternSource(false, __useSpinlock, __dumpfile, __trim3, __trim5),
-		_reverse(__reverse), _cur(0),
+		_reverse(__reverse), _cur(skip), skip_(skip),
 		_v(), _vrev(), _vrc(), _vrcrev(), _quals(), _qualsrev(), _rand(seed)
 	{
 		for(size_t i = 0; i < v.size(); i++) {
@@ -1104,7 +1105,7 @@ public:
 	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
-		_cur = 0;
+		_cur = skip_;
 	}
 	virtual bool reverse() const { return _reverse; }
 	virtual void setReverse(bool __reverse) {
@@ -1113,6 +1114,7 @@ public:
 private:
 	bool   _reverse;
 	size_t _cur;
+	uint32_t skip_;
 	vector<String<Dna5> > _v;        /// forward sequences
 	vector<String<Dna5> > _vrev;     /// reversed forward sequences
 	vector<String<Dna5> > _vrc;      /// rev-comp sequences
@@ -1136,12 +1138,14 @@ public:
 	                          bool __forgiveInput = false,
 	                          const char *__dumpfile = NULL,
 	                          int __trim3 = 0,
-	                          int __trim5 = 0) :
+	                          int __trim5 = 0,
+	                          uint32_t skip = 0) :
 		TrimmingPatternSource(__reverse, __useSpinlock, __dumpfile, __trim3, __trim5),
 		_infiles(infiles),
 		_filecur(0),
 		_filebuf(),
 		_forgiveInput(__forgiveInput),
+		skip_(skip),
 		_first(true)
 	{
 		assert_gt(infiles.size(), 0);
@@ -1165,7 +1169,12 @@ public:
 		lock();
 		do {
 			read(r, patid);
-		} while(seqan::empty(r.patFw) && !_filebuf.eof());
+			// Try again if r is empty (indicating an error) and input
+			// is not yet exhausted, OR if we have more reads to skip
+			// over
+		} while((seqan::empty(r.patFw) && !_filebuf.eof()) ||
+		        patid < skip_);
+		assert_geq(patid, skip_);
 		if(_first && seqan::empty(r.patFw) && !_forgiveInput) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any reads in \"" << _infiles[0] << "\"" << endl;
@@ -1177,7 +1186,8 @@ public:
 			resetForNextFile(); // reset state to handle a fresh file
 			do {
 				read(r, patid);
-			} while(seqan::empty(r.patFw) && !_filebuf.eof());
+			} while((seqan::empty(r.patFw) && !_filebuf.eof()));
+			assert_geq(patid, skip_);
 			if(seqan::empty(r.patFw) && !_forgiveInput) {
 				// No reads could be extracted from this _infile
 				cerr << "Warning: Could not find any reads in \"" << _infiles[_filecur] << "\"" << endl;
@@ -1231,11 +1241,12 @@ protected:
 	size_t _filecur;   /// index into _infiles of next file to read
 	FileBuf _filebuf;  /// read file currently being read from
 	bool _forgiveInput; /// try hard to parse input even if it's malformed
+	uint32_t skip_;     /// number of reads to skip
 	bool _first;
 };
 
 /**
- *
+ * Synchronized concrete pattern source for a list of FASTA files.
  */
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
@@ -1247,8 +1258,11 @@ public:
 	                   int __trim5 = 0,
 	                   int __policy = NS_TO_NS,
 	                   bool __forgiveInput = false,
+	                   uint32_t skip = 0,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock,
+		                          __forgiveInput, __dumpfile,
+		                          __trim3, __trim5, skip),
 		_first(true), _reverse(__reverse), _policy(__policy), _rand(seed)
 	{ }
 	virtual void reset() {
@@ -1447,8 +1461,11 @@ public:
 	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
 					   bool integer_quals = true,
+					   uint32_t skip = 0,
 	                   uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, __useSpinlock, __forgiveInput, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, __useSpinlock,
+		                          __forgiveInput, __dumpfile,
+		                          __trim3, __trim5, skip),
 		_first(true), _reverse(__reverse),
 		_solexa_quals(solexa_quals),
 		_integer_quals(integer_quals),
@@ -1941,8 +1958,10 @@ public:
 	                 int __trim3 = 0,
 	                 int __trim5 = 0,
 	                 int __policy = NS_TO_NS,
+	                 uint32_t skip = 0,
 	                 uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, false, __useSpinlock, __dumpfile, __trim3, __trim5),
+		BufferedFilePatternSource(infiles, false, false, __useSpinlock,
+		                          __dumpfile, __trim3, __trim5, skip),
 		_first(true), _reverse(__reverse), _policy(__policy), _rand(seed)
 	{ }
 	virtual void reset() {
