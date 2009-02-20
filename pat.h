@@ -1167,14 +1167,20 @@ public:
 		// We are entering a critical region, because we're
 		// manipulating our file handle and _filecur state
 		lock();
+		bool notDone = true;
 		do {
 			read(r, patid);
 			// Try again if r is empty (indicating an error) and input
 			// is not yet exhausted, OR if we have more reads to skip
 			// over
-		} while((seqan::empty(r.patFw) && !_filebuf.eof()) ||
-		        patid < skip_);
-		assert_geq(patid, skip_);
+			notDone = seqan::empty(r.patFw) && !_filebuf.eof();
+		} while(notDone || (!_filebuf.eof() && patid < skip_));
+		if(patid < skip_) {
+			unlock();
+			r.clearAll();
+			assert(seqan::empty(r.patFw));
+			return;
+		}
 		if(_first && seqan::empty(r.patFw) && !_forgiveInput) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any reads in \"" << _infiles[0] << "\"" << endl;
