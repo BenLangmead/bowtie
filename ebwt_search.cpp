@@ -22,6 +22,7 @@
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
+#include "aligner_23mm.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -1150,8 +1151,8 @@ static void parseOptions(int argc, char **argv) {
 		cerr << "Paired-end mode is not yet compatible with -n mode; use -v 0 or -v 1 instead." << endl;
 		exit(1);
 	}
-	if((mates1.size() > 0 || mates2.size() > 0) && !maqLike && mismatches > 1) {
-		cerr << "Paired-end mode is not yet compatible with -v " << mismatches << "; use -v 0 or -v 1 instead." << endl;
+	if((mates1.size() > 0 || mates2.size() > 0) && !maqLike && mismatches > 2) {
+		cerr << "Paired-end mode is not yet compatible with -v " << mismatches << "; use -v 0, -v 1 or -v 2 instead." << endl;
 		exit(1);
 	}
 	if(!fullIndex) {
@@ -2070,6 +2071,7 @@ static vector<String<Dna5> >*         twoOrThreeMismatchSearch_os;
 static SyncBitset*                    twoOrThreeMismatchSearch_doneMask;
 static SyncBitset*                    twoOrThreeMismatchSearch_hitMask;
 static bool                           twoOrThreeMismatchSearch_two;
+static BitPairReference*              twoOrThreeMismatchSearch_refs;
 
 #define TWOTHREE_WORKER_SETUP() \
 	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
@@ -2326,6 +2328,75 @@ static void twoOrThreeMismatchSearch(
 	return;
 }
 
+/**
+ * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
+ */
+static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
+	PairedPatternSource&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
+	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
+	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >&    ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
+	vector<String<Dna5> >& os      = *twoOrThreeMismatchSearch_os;
+	BitPairReference*      refs    =  twoOrThreeMismatchSearch_refs;
+	//static bool            two     =  twoOrThreeMismatchSearch_two;
+
+	// Global initialization
+	bool sanity = sanityCheck && !os.empty();
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+
+	Unpaired23mmAlignerV1Factory alSEfact(
+			ebwtFw,
+			&ebwtBw,
+			_sink,
+			*sinkFact,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
+			cacheLimit,
+			os,
+			rangeMode,
+			verbose,
+			seed);
+	Paired23mmAlignerV1Factory alPEfact(
+			ebwtFw,
+			&ebwtBw,
+			_sink,
+			*sinkFact,
+			mate1fw,
+			mate2fw,
+			minInsert,
+			maxInsert,
+			dontReconcileMates,
+			mhits,       // for symCeiling
+			mixedThresh,
+			mixedAttemptLim,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
+			cacheLimit,
+			refs, os,
+			rangeMode,
+			verbose,
+			seed);
+	{
+		MixedMultiAligner multi(
+				prefetchWidth,
+				qUpto,
+				alSEfact,
+				alPEfact,
+				*patsrcFact);
+		// Run that mother
+		multi.run();
+		// MultiAligner must be destroyed before patsrcFact
+	}
+
+	delete patsrcFact;
+	delete sinkFact;
+#ifdef BOWTIE_PTHREADS
+	if((long)vp != 0L) pthread_exit(NULL);
+#endif
+	return NULL;
+}
+
 static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
@@ -2437,6 +2508,14 @@ static void twoOrThreeMismatchSearchFull(
 		Timer _t(cout, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
+	// Create range caches, which are shared among all aligners
+	BitPairReference *refs = NULL;
+	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+		Timer _t(cout, "Time loading reference: ", timing);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
+	}
+	twoOrThreeMismatchSearch_refs     = refs;
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
 	twoOrThreeMismatchSearch_sink     = &_sink;
 	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
@@ -2457,10 +2536,14 @@ static void twoOrThreeMismatchSearchFull(
 		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
+			if(stateful)
+				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)(long)(i+1));
+			else
+				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
-		twoOrThreeMismatchSearchWorkerFull((void*)0L);
+		if(stateful) twoOrThreeMismatchSearchWorkerFull((void*)0L);
+		else         twoOrThreeMismatchSearchWorkerStateful((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
