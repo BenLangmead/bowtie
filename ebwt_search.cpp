@@ -975,7 +975,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
 	   		case 'I':
-	   			minInsert = (uint32_t)parseInt(1, "-I arg must be at least 1");
+	   			minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
 	   			break;
 	   		case 'X':
 	   			maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");

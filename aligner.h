@@ -707,6 +707,11 @@ public:
 			doneFwFirst_   = false;
 			mixedAttempts_ = 0;
 		}
+		bool chasing = *chaseL_ || *chaseR_;
+		if(chasing && !rchase_->foundOff() && !rchase_->done()) {
+			rchase_->advance();
+			return false;
+		}
 		advanceOrientation(!doneFw_, verbose);
 		if(done_) {
 			if(verbose2_) cout << "----" << endl;
@@ -991,12 +996,8 @@ protected:
 			assert(!rangeMode_);
 			assert(!*delayedchaseL_);
 			assert(drL_->foundRange());
-			if(!rchase_->foundOff() && !rchase_->done()) {
-				// Keep trying to resolve the reference loci for
-				// alignments in this range
-				rchase_->advance();
-				return;
-			} else if(rchase_->foundOff()) {
+			assert(rchase_->foundOff() || rchase_->done());
+			if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
@@ -1039,12 +1040,8 @@ protected:
 			assert(!rangeMode_);
 			assert(!*delayedchaseR_);
 			assert(drR_->foundRange());
-			if(!rchase_->foundOff() && !rchase_->done()) {
-				// Keep trying to resolve the reference loci for
-				// alignments in this range
-				rchase_->advance();
-				return;
-			} else if(rchase_->foundOff()) {
+			assert(rchase_->foundOff() || rchase_->done());
+			if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;

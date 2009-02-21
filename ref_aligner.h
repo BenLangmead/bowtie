@@ -67,7 +67,7 @@ public:
 	/**
 	 * Set a new reference-sequence buffer.
 	 */
-	void setBuf(uint8_t *newbuf, uint32_t newsz) {
+	void setBuf(uint32_t *newbuf, uint32_t newsz) {
 		if(freeRefbuf_) {
 			delete[] refbuf_;
 			freeRefbuf_ = false;
@@ -84,7 +84,7 @@ public:
 			delete[] refbuf_;
 		}
 		try {
-			refbuf_ = new uint8_t[newsz];
+			refbuf_ = new uint32_t[(newsz + 3) / 4];
 			if(refbuf_ == NULL) throw std::bad_alloc();
 		} catch(std::bad_alloc& e) {
 			cerr << "Error: Could not allocate reference-space alignment buffer of " << newsz << "B" << endl;
@@ -95,11 +95,11 @@ public:
 	}
 
 protected:
-	uint32_t seedLen_;   /// length of seed region for read
-	uint8_t *refbuf_;    /// pointer to current reference buffer
-	uint32_t refbufSz_;  /// size of current reference buffer
-	uint8_t  buf_[REF_ALIGNER_BUFSZ]; /// built-in reference buffer (may be superseded)
-	bool     freeRefbuf_; /// whether refbuf_ points to something we should delete
+	uint32_t  seedLen_;   /// length of seed region for read
+	uint32_t *refbuf_;    /// pointer to current reference buffer
+	uint32_t  refbufSz_;  /// size of current reference buffer
+	uint32_t  buf_[REF_ALIGNER_BUFSZ / 4]; /// built-in reference buffer (may be superseded)
+	bool      freeRefbuf_; /// whether refbuf_ points to something we should delete
 };
 
 /**
@@ -133,21 +133,22 @@ public:
 	                  TRangeVec& ranges,
 	                  TU32Vec& results,
 	                  TSetPairs* pairs = NULL,
-	                  uint32_t apos = 0,
+	                  uint32_t aoff = 0,
 	                  bool low = false)
 	{
 		assert_gt(numToFind, 0);
 		uint32_t spread = end - begin;
+		uint32_t spreadPlus = spread + 12;
 		// Make sure the buffer is large enough to accommodate the spread
-		if(spread > this->refbufSz_) {
-			this->newBuf(spread);
+		if(spreadPlus > this->refbufSz_) {
+			this->newBuf(spreadPlus);
 		}
 		// Read in the relevant stretch of the reference string
-		refs->getStretch(this->refbuf_, tidx, begin, spread);
+		int offset = refs->getStretch(this->refbuf_, tidx, begin, spread);
+		uint8_t *buf = ((uint8_t*)this->refbuf_) + offset;
 		// Look for alignments
-		return seed64Find(numToFind, tidx, this->refbuf_, qry, quals,
-		                  begin, end, ranges, results, pairs, apos,
-		                  low);
+		return seed64Find(numToFind, tidx, buf, qry, quals, begin,
+		                  end, ranges, results, pairs, aoff, low);
 	}
 
 protected:
@@ -165,7 +166,7 @@ protected:
 	               TRangeVec& ranges,
 	               TU32Vec& results,
 	               TSetPairs* pairs,
-	               uint32_t aoff, // offset of anchor
+	               uint32_t aoff,
 	               bool low) const
 	{
 		assert_gt(numToFind, 0);
@@ -207,7 +208,7 @@ protected:
 				// Disallow alignments that involve an N in the
 				// reference
 				const int r = (int)ref[rir + j];
-				if(r == 4) {
+				if(r & 4) {
 					// N in reference; bail
 					match = false;
 					break;
@@ -310,12 +311,12 @@ protected:
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			assert_leq(c, 4);
-			if(c == 4) {
+			if(c & 4) {
 				assert_eq(r2.size(), ranges.size() - rangesInitSz);
 				return; // can't match if query has Ns
 			}
 			int r = (int)ref[halfway - begin + i]; // next reference character
-			if(r == 4) {
+			if(r & 4) {
 				r = 0;
 				// The right-to-left direction absorbs the candidate
 				// alignment based at 'halfway'; so skipLeftToRights is
@@ -343,18 +344,21 @@ protected:
 		// were, we might need to make the 'seedOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
+		uint32_t riHi  = halfway;
+		uint32_t rirHi = halfway - begin;
+		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t riLo  = halfway + 1;
+		uint32_t rirLo = halfway - begin + 1;
 		for(uint32_t i = 1; i <= lim + 1; i++) {
-			uint32_t ri; // leftmost position in proposed alignment
-			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
 			assert_lt(skipLeftToRights, qlen);
 			assert_lt(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
-				ri = halfway + (i >> 1); rir = ri - begin;
-				r = (int)ref[rir + seedBitPairs - 1];
-				if(r == 4) {
+				riHi++; rirHi++; rirHiSeed++;
+				r = (int)ref[rirHiSeed];
+				if(r & 4) {
 					r = 0;
 					skipLeftToRights = seedBitPairs;
 				}
@@ -373,9 +377,9 @@ protected:
 			} else {
 				hi = true;
 				// Moving right-to-left
-				ri = halfway - (i >> 1); rir = ri - begin;
-				r = (int)ref[rir];
-				if(r == 4) {
+				riLo--; rirLo--;
+				r = (int)ref[rirLo];
+				if(r & 4) {
 					r = 0;
 					skipRightToLefts = qlen;
 				}
@@ -396,6 +400,8 @@ protected:
 			}
 			// Seed hit!
 			bool foundHit = true;
+			uint32_t ri = hi ? riLo : riHi;
+			uint32_t rir = hi ? rirLo : rirHi;
 			if(seedOverhang > 0) {
 				// Does the non-seed part of the alignment (the
 				// "overhang") ruin it?
@@ -509,15 +515,17 @@ public:
 	{
 		assert_gt(numToFind, 0);
 		uint32_t spread = end - begin;
+		uint32_t spreadPlus = spread + 12;
 		// Make sure the buffer is large enough to accommodate the spread
-		if(spread > this->refbufSz_) {
-			this->newBuf(spread);
+		if(spreadPlus > this->refbufSz_) {
+			this->newBuf(spreadPlus);
 		}
 		// Read in the relevant stretch of the reference string
-		refs->getStretch(this->refbuf_, tidx, begin, spread);
+		int offset = refs->getStretch(this->refbuf_, tidx, begin, spread);
+		uint8_t *buf = ((uint8_t*)this->refbuf_) + offset;
 		// Look for alignments
-		return seed64Find(numToFind, tidx, this->refbuf_, qry, quals,
-		                  begin, end, ranges, results, pairs, aoff, low);
+		return seed64Find(numToFind, tidx, buf, qry, quals, begin,
+		                  end, ranges, results, pairs, aoff, low);
 	}
 
 protected:
@@ -575,7 +583,7 @@ protected:
 				// Disallow alignments that involve an N in the
 				// reference
 				const int r = (int)ref[rir + j];
-				if(r == 4) {
+				if(r & 4) {
 					// N in reference; bail
 					match = false;
 					break;
@@ -694,7 +702,7 @@ protected:
 		for(uint32_t i = 0; i < seedBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
-			if(r == 4) {
+			if(r & 4) {
 				r = 0;
 				// The right-to-left direction absorbs the candidate
 				// alignment based at 'halfway'; so skipLeftToRights is
@@ -739,9 +747,12 @@ protected:
 		// were, we might need to make the 'seedOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
+		uint32_t riHi  = halfway;
+		uint32_t rirHi = halfway - begin;
+		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t riLo  = halfway + 1;
+		uint32_t rirLo = halfway - begin + 1;
 		for(uint32_t i = 1; i <= lim + 1; i++) {
-			uint32_t ri; // leftmost position in proposed alignment
-			uint32_t rir;// same, but minus 'begin'
 			int r;       // new reference char
 			uint64_t diff;
 			assert_lt(skipLeftToRights, qlen);
@@ -749,9 +760,11 @@ protected:
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
-				ri = halfway + (i >> 1); rir = ri - begin;
-				r = (int)ref[rir + seedBitPairs - 1];
-				if(r == 4) {
+				riHi++;
+				rirHi++;
+				rirHiSeed++;
+				r = (int)ref[rirHiSeed];
+				if(r & 4) {
 					r = 0;
 					skipLeftToRights = seedBitPairs;
 				}
@@ -768,9 +781,10 @@ protected:
 			} else {
 				hi = true;
 				// Moving right-to-left
-				ri = halfway - (i >> 1); rir = ri - begin;
-				r = (int)ref[rir];
-				if(r == 4) {
+				riLo--;
+				rirLo--;
+				r = (int)ref[rirLo];
+				if(r & 4) {
 					r = 0;
 					skipRightToLefts = qlen;
 				}
@@ -787,22 +801,24 @@ protected:
 				}
 				diff = (bufbw ^ seed) | diffMask;
 			}
+			if((diff & 0xffffffff00000000llu) &&
+			   (diff & 0x00000000ffffffffllu)) continue;
+			uint32_t ri  = hi ? riLo  : riHi;
+			uint32_t rir = hi ? rirLo : rirHi;
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
-			uint32_t mmpos = 0xffffffff;
-			int refc = -1;
 			// As a first cut, see if there are too many mismatches in
 			// the first and last parts of the seed
 			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
-			if(diffs > 1) {
-				continue;
-			}
+			if(diffs > 1) continue;
 			diffs += u8toMms[(int)diff8[1]] +
 			         u8toMms[(int)diff8[2]] +
 			         u8toMms[(int)diff8[3]] +
 			         u8toMms[(int)diff8[4]] +
 			         u8toMms[(int)diff8[5]] +
 			         u8toMms[(int)diff8[6]];
+			uint32_t mmpos = 0xffffffff;
+			int refc = -1;
 			if(diffs > 1) {
 				// Too many differences
 				continue;

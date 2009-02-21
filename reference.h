@@ -1,6 +1,8 @@
 #ifndef REFERENCE_H_
 #define REFERENCE_H_
 
+#include "endian_swap.h"
+
 /**
  * Concrete reference representation that bulk-loads the reference from
  * the bit-pair-compacted binary file and stores it in memory also in
@@ -134,6 +136,25 @@ public:
 		ret = fread(&c, 1, 1, f4);
 		assert_eq(0, ret); // should have failed
 		fclose(f4);
+
+		// Populate byteToU32_
+		bool big = currentlyBigEndian();
+		for(int i = 0; i < 256; i++) {
+			uint32_t word = 0;
+			if(big) {
+				word |= ((i >> 0) & 3) << 24;
+				word |= ((i >> 2) & 3) << 16;
+				word |= ((i >> 4) & 3) << 8;
+				word |= ((i >> 6) & 3) << 0;
+			} else {
+				word |= ((i >> 0) & 3) << 0;
+				word |= ((i >> 2) & 3) << 8;
+				word |= ((i >> 4) & 3) << 16;
+				word |= ((i >> 6) & 3) << 24;
+			}
+			byteToU32_[i] = word;
+		}
+
 #ifndef NDEBUG
 		if(sanity_) {
 			// Compare the sequence we just read from the compact index
@@ -162,10 +183,12 @@ public:
 			}
 			for(size_t i = 0; i < os->size(); i++) {
 				size_t olen = seqan::length((*os)[i]);
-				uint8_t *buf = new uint8_t[olen];
-				getStretch(buf, i, 0, olen);
+				size_t olenU32 = (olen + 12) / 4;
+				uint32_t *buf = new uint32_t[olenU32];
+				uint8_t *bufadj = (uint8_t*)buf;
+				bufadj += getStretch(buf, i, 0, olen);
 				for(size_t j = 0; j < olen; j++) {
-					assert_eq((*os)[i][j], buf[j]);
+					assert_eq((*os)[i][j], bufadj[j]);
 					assert_eq((int)(*os)[i][j], getBase(i, j));
 				}
 				delete[] buf;
@@ -224,11 +247,12 @@ public:
 	 * unambiguous stretches of the target reference sequence.  When
 	 * there are many records, binary search would be more appropriate.
 	 */
-	void getStretch(uint8_t *dest,
-	                uint32_t tidx,
-	                uint32_t toff,
-	                uint32_t count) const
+	int getStretchNaive(uint32_t *destU32,
+	                    uint32_t tidx,
+	                    uint32_t toff,
+	                    uint32_t count) const
 	{
+		uint8_t *dest = (uint8_t*)destU32;
 		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
 		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
@@ -269,6 +293,139 @@ public:
 			dest[cur++] = 4;
 		}
 		assert_eq(0, count);
+		return 0;
+	}
+
+	/**
+	 * Load a stretch of the reference string into memory at 'dest'.
+	 *
+	 * This implementation scans linearly through the records for the
+	 * unambiguous stretches of the target reference sequence.  When
+	 * there are many records, binary search would be more appropriate.
+	 */
+	int getStretch(uint32_t *destU32,
+	               uint32_t tidx,
+	               uint32_t toff,
+	               uint32_t count) const
+	{
+		ASSERT_ONLY(uint32_t origCount = count);
+		ASSERT_ONLY(uint32_t origToff = toff);
+		if(count == 0) return 0;
+		uint8_t *dest = (uint8_t*)destU32;
+#ifndef NDEBUG
+		uint32_t *destU32_2 = new uint32_t[(origCount >> 2) + 2];
+		int off2 = getStretchNaive(destU32_2, tidx, origToff, origCount);
+		uint8_t *dest_2 = ((uint8_t*)destU32_2) + off2;
+#endif
+		destU32[0] = 0x04040404; // Add Ns, which we might end up using later
+		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
+		assert_gt(recf, reci);
+		uint32_t cur = 4; // keep a cushion of 4 bases at the beginning
+		uint32_t bufOff = refOffs_[tidx];
+		uint32_t off = 0;
+		int offset = 4;
+		bool firstStretch = true;
+		// For all records pertaining to the target reference sequence...
+		for(uint32_t i = reci; i < recf; i++) {
+			assert_geq(toff, off);
+			off += recs_[i].off;
+			assert_gt(count, 0);
+			if(toff < off) {
+				uint32_t cpycnt = min(off - toff, count);
+				memset(&dest[cur], 4, cpycnt);
+				count -= cpycnt;
+				toff += cpycnt;
+				cur += cpycnt;
+				if(count == 0) break;
+			}
+			assert_geq(toff, off);
+			if(toff < off + recs_[i].len) {
+				bufOff += (toff - off); // move bufOff pointer forward
+			} else {
+				bufOff += recs_[i].len;
+			}
+			off += recs_[i].len;
+			if(toff < off) {
+				//if(false) {
+				if(firstStretch) {
+					if(toff + 8 < off && count > 8) {
+						// We already added some Ns, so we have to do
+						// a fixup at the beginning of the buffer so
+						// that we can start clobbering at cur >> 2
+						if(cur & 3) {
+							offset -= (cur & 3);
+						}
+						uint32_t curU32 = cur >> 2;
+						// Do the initial few bases
+						if(bufOff & 3) {
+							const uint32_t bufElt = (bufOff) >> 2;
+							const int low2 = bufOff & 3;
+							destU32[curU32] = 0x04040404;
+							destU32[curU32++] = byteToU32_[buf_[bufElt]];
+							offset += low2;
+							const int chars = 4 - low2;
+							count -= chars;
+							bufOff += chars;
+							toff += chars;
+						}
+						assert_eq(0, bufOff & 3);
+						uint32_t bufOffU32 = bufOff >> 2;
+						uint32_t countLim = count >> 2;
+						uint32_t offLim = (off - (toff + 4)) >> 2;
+						uint32_t lim = min(countLim, offLim);
+						// Do the fast thing for as far as possible
+						for(uint32_t j = 0; j < lim; j++) {
+							destU32[curU32] = byteToU32_[buf_[bufOffU32++]];
+							assert_eq(dest[(curU32 << 2) + 0], dest_2[(curU32 << 2) - offset + 0]);
+							assert_eq(dest[(curU32 << 2) + 1], dest_2[(curU32 << 2) - offset + 1]);
+							assert_eq(dest[(curU32 << 2) + 2], dest_2[(curU32 << 2) - offset + 2]);
+							assert_eq(dest[(curU32 << 2) + 3], dest_2[(curU32 << 2) - offset + 3]);
+							curU32++;
+						}
+						toff += (lim << 2);
+						assert_leq(toff, off);
+						assert_leq((lim << 2), count);
+						count -= (lim << 2);
+						bufOff = bufOffU32 << 2;
+						cur = curU32 << 2;
+					}
+					// Do the slow thing for the rest
+					for(; toff < off && count > 0; toff++) {
+						assert_lt(bufOff, bufSz_);
+						const uint32_t bufElt = (bufOff) >> 2;
+						const uint32_t shift = (bufOff & 3) << 1;
+						dest[cur++] = (buf_[bufElt] >> shift) & 3;
+						bufOff++;
+						count--;
+					}
+					firstStretch = false;
+				} else {
+					// Do the slow thing
+					for(; toff < off && count > 0; toff++) {
+						assert_lt(bufOff, bufSz_);
+						const uint32_t bufElt = (bufOff) >> 2;
+						const uint32_t shift = (bufOff & 3) << 1;
+						dest[cur++] = (buf_[bufElt] >> shift) & 3;
+						bufOff++;
+						count--;
+					}
+				}
+			}
+			if(count == 0) break;
+			assert_geq(toff, off);
+		} // end for loop over records
+		// In any chars are left after scanning all the records,
+		// they must be ambiguous
+		while(count > 0) {
+			count--;
+			dest[cur++] = 4;
+		}
+		assert_eq(0, count);
+#ifndef NDEBUG
+		delete[] destU32_2;
+#endif
+		return offset;
 	}
 
 	/// Return the number of reference sequences.
@@ -288,6 +445,9 @@ public:
 	}
 
 protected:
+
+	uint32_t byteToU32_[256];
+
 	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
 	std::vector<uint32_t>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
