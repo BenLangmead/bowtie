@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,12 +15,12 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: cstream.h,v 1.1 2008/08/25 16:20:03 langmead Exp $
+  $Id: cstream.h,v 1.2 2009/03/03 18:47:37 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_CSTREAM_H
 #define SEQAN_HEADER_CSTREAM_H
- 
+
 #include <cstdio>
 
 namespace SEQAN_NAMESPACE_MAIN
@@ -70,25 +70,32 @@ struct _IsTellSeekStream<FILE *>
 
 //////////////////////////////////////////////////////////////////////////////
 
-inline bool 
+inline bool
 _streamOpen(::std::FILE * & me, String<char> path, bool for_read = true)
 {
 SEQAN_CHECKPOINT
+	size_t plen = length(path);
+	char *s = new char[plen + 1];
+	for(size_t i = 0; i < plen; i++) {
+		s[i] = path[i];
+	}
+	s[plen] = '\0';
 	if (for_read)
 	{
-		me = fopen(toCString(path), "rb");
+		me = fopen(s, "rb");
 	}
 	else
 	{
-		me = fopen(toCString(path), "wb");
+		me = fopen(s, "wb");
 	}
+	delete[] s;
 	return (me != 0);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////
 
-inline void 
+inline void
 _streamClose(::std::FILE * & me)
 {
 SEQAN_CHECKPOINT
@@ -103,7 +110,7 @@ SEQAN_CHECKPOINT
 
 ///.Internal._streamEOF.param.stream.type:Adaption."std::FILE *"
 
-inline bool 
+inline bool
 _streamEOF(::std::FILE * me)
 {
 SEQAN_CHECKPOINT
@@ -115,7 +122,7 @@ SEQAN_CHECKPOINT
 ///.Internal._streamRead.param.stream.type:Adaption."std::FILE *"
 
 template <typename TValue>
-inline size_t 
+inline size_t
 _streamRead(TValue * target,
 			::std::FILE * source,
 			size_t limit)
@@ -128,7 +135,7 @@ SEQAN_CHECKPOINT
 
 ///.Internal._streamGet.param.stream.type:Adaption."std::FILE *"
 
-inline char 
+inline char
 _streamGet(::std::FILE * source)
 {
 SEQAN_CHECKPOINT
@@ -230,7 +237,7 @@ SEQAN_CHECKPOINT
 /*
 template <typename TSource>
 inline FILE *
-operator << (FILE * target, 
+operator << (FILE * target,
 			 TSource & source)
 {
 SEQAN_CHECKPOINT
@@ -239,7 +246,7 @@ SEQAN_CHECKPOINT
 }
 template <typename TSource>
 inline FILE *
-operator << (FILE * target, 
+operator << (FILE * target,
 			 TSource const & source)
 {
 SEQAN_CHECKPOINT
@@ -251,7 +258,7 @@ SEQAN_CHECKPOINT
 
 template <typename TTarget>
 inline FILE *
-operator >> (FILE * source, 
+operator >> (FILE * source,
 			 TTarget & target)
 {
 SEQAN_CHECKPOINT
@@ -260,7 +267,7 @@ SEQAN_CHECKPOINT
 }
 template <typename TTarget>
 inline FILE *
-operator >> (FILE * source, 
+operator >> (FILE * source,
 			 TTarget const & target)
 {
 SEQAN_CHECKPOINT
