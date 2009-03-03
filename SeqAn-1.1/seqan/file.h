@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: file.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
+  $Id: file.h,v 1.3 2009/03/03 18:41:38 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_FILE_H
@@ -46,9 +46,6 @@
 #include <seqan/file/cstream.h>
 #include <seqan/file/stream.h>
 
-#include <seqan/file/file_filereaderiterator.h>
-#include <seqan/file/file_filereader.h>
-
 #include <seqan/file/chunk_collector.h>
 #include <seqan/file/meta.h>
 
@@ -62,8 +59,8 @@
 //file formats for sequences
 #include <seqan/file/file_format_raw.h>
 #include <seqan/file/file_format_fasta.h>
-#include <seqan/file/file_format_embl.h>
-#include <seqan/file/file_format_genbank.h>
+//#include <seqan/file/file_format_embl.h>
+//#include <seqan/file/file_format_genbank.h>
 
 //file formats for alignments
 #include <seqan/file/file_format_fasta_align.h>
