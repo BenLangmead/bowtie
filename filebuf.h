@@ -197,7 +197,10 @@ public:
 			cur_++;
 			if(cur_ == BUF_SZ) {
 				// Flush the buffer
-				fwrite((const void *)buf_, BUF_SZ, 1, out_);
+				if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
+					cerr << "Error writing to the reference index file (.4.ebwt)" << endl;
+					exit(1);
+				}
 				// Reset to beginning of the buffer
 				cur_ = 0;
 			}
@@ -214,7 +217,10 @@ public:
 	void close() {
 		if(cur_ > 0 || bpPtr_ > 0) {
 			if(bpPtr_ == 0) cur_--;
-			fwrite((const void *)buf_, cur_ + 1, 1, out_);
+			if(!fwrite((const void *)buf_, cur_ + 1, 1, out_)) {
+				cerr << "Error writing to the reference index file (.4.ebwt)" << endl;
+				exit(1);
+			}
 		}
 		fclose(out_);
 	}

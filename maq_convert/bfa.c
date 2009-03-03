@@ -21,6 +21,10 @@ void nst_delete_bfa1(nst_bfa1_t *bfa1)
 	free(bfa1->mask);
 	free(bfa1);
 }
+static void bfa_read_error() {
+	fprintf(stderr, "Error reading from .bfa file\n");
+	exit(1);
+}
 nst_bfa1_t *nst_load_bfa1(FILE *fp)
 {
 	int len;
@@ -28,13 +32,27 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	if (fread(&len, sizeof(int), 1, fp) == 0) return 0;
 	bfa1 = nst_new_bfa1();
 	bfa1->name = (char*)malloc(sizeof(char) * len);
-	fread(bfa1->name, sizeof(char), len, fp);
-	fread(&bfa1->ori_len, sizeof(int), 1, fp);
-	fread(&bfa1->len, sizeof(int), 1, fp);
+	/*
+	 * BTL: I had to add in these return-value checks to keep gcc 4.3.2
+	 * from complaining.
+	 */
+	if(fread(bfa1->name, sizeof(char), len, fp) != (size_t)len) {
+		bfa_read_error();
+	}
+	if(fread(&bfa1->ori_len, sizeof(int), 1, fp) != 1) {
+		bfa_read_error();
+	}
+	if(fread(&bfa1->len, sizeof(int), 1, fp) != 1) {
+		bfa_read_error();
+	}
 	bfa1->seq = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
-	fread(bfa1->seq, sizeof(bit64_t), bfa1->len, fp);
+	if(fread(bfa1->seq, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {
+		bfa_read_error();
+	}
 	bfa1->mask = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
-	fread(bfa1->mask, sizeof(bit64_t), bfa1->len, fp);
+	if(fread(bfa1->mask, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {
+		bfa_read_error();
+	}
 	return bfa1;
 }
 nst_bfa_t *nst_new_bfa()

@@ -47,9 +47,15 @@ struct RefRecord {
 
 	RefRecord(FILE *in, bool swap) {
 		assert(in != NULL);
-		fread(&off, 4, 1, in);
+		if(!fread(&off, 4, 1, in)) {
+			cerr << "Error reading RefRecord offset from FILE" << endl;
+			exit(1);
+		}
 		if(swap) off = endianSwapU32(off);
-		fread(&len, 4, 1, in);
+		if(!fread(&len, 4, 1, in)) {
+			cerr << "Error reading RefRecord offset from FILE" << endl;
+			exit(1);
+		}
 		if(swap) len = endianSwapU32(len);
 		first = fgetc(in) ? true : false;
 	}
