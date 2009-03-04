@@ -425,6 +425,15 @@ public:
 	    _ebwtIsShmem(false), \
 	    _refnames()
 
+#ifdef EBWT_STATS
+#define Ebwt_STAT_INITS \
+	,mapLFExs_(0llu), \
+	mapLFs_(0llu), \
+	mapLFcs_(0llu)
+#else
+#define Ebwt_STAT_INITS
+#endif
+
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
 	     bool __fw,
@@ -435,6 +444,7 @@ public:
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS
+	     Ebwt_STAT_INITS
 	{
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
@@ -481,7 +491,8 @@ public:
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
-	     Ebwt_INITS,
+	     Ebwt_INITS
+	     Ebwt_STAT_INITS,
 	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate)
 	{
 		string file1 = file + ".1.ebwt";
@@ -782,6 +793,12 @@ public:
 		} catch(...) {
 			VMSG_NL("~Ebwt(): Caught an exception while closing streams!");
 		}
+#ifdef EBWT_STATS
+		cout << (_fw ? "Forward index:" : "Mirror index:") << endl;
+		cout << "  mapLFEx:  " << mapLFExs_ << endl;
+		cout << "  mapLF:    " << mapLFs_   << endl;
+		cout << "  mapLF(c): " << mapLFcs_  << endl;
+#endif
 	}
 
 	/// Accessors
@@ -1083,7 +1100,6 @@ public:
 	inline void mapLFEx(const SideLocus& l, uint32_t *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline uint32_t mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline uint32_t mapLF1(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -1158,6 +1174,12 @@ public:
 	bool       _ebwtIsShmem;  /// allocated in shared memory; don't delete
 	vector<string> _refnames; /// names of the reference sequences
 	EbwtParams _eh;
+
+#ifdef EBWT_STATS
+	uint64_t   mapLFExs_;
+	uint64_t   mapLFs_;
+	uint64_t   mapLFcs_;
+#endif
 
 private:
 
@@ -2121,6 +2143,9 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 {
 	// TODO: Where there's overlap, reuse the count for the overlapping
 	// portion
+#ifdef EBWT_STATS
+	const_cast<Ebwt<TStr>*>(this)->mapLFExs_++;
+#endif
 	assert_eq(0, tops[0]); assert_eq(0, bots[0]);
 	assert_eq(0, tops[1]); assert_eq(0, bots[1]);
 	assert_eq(0, tops[2]); assert_eq(0, bots[2]);
@@ -2146,6 +2171,7 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
 #endif
 }
 
+#ifndef NDEBUG
 /**
  * Given top and bot loci, calculate counts of all four DNA chars up to
  * those loci.  Used for more advanced backtracking-search.
@@ -2174,6 +2200,7 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& l,
 	}
 #endif
 }
+#endif
 
 /**
  * Given row i, return the row that the LF mapping maps i to.
@@ -2183,6 +2210,9 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
                                   ASSERT_ONLY(, bool overrideSanity)
                                   ) const
 {
+#ifdef EBWT_STATS
+	const_cast<Ebwt<TStr>*>(this)->mapLFs_++;
+#endif
 	uint32_t ret;
 	assert(l._side != NULL);
 	int c = rowL(l); // unpack_2b_from_8b(l._side[l._by], l._bp);
@@ -2213,42 +2243,10 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
                                   ASSERT_ONLY(, bool overrideSanity)
                                   ) const
 {
-	uint32_t ret;
-	assert_lt(c, 4);
-	assert_geq(c, 0);
-	if(l._fw) ret = countFwSide(l, c); // Forward side
-	else      ret = countBwSide(l, c); // Backward side
-	assert_lt(ret, this->_eh._bwtLen);
-#ifndef NDEBUG
-	if(_sanity && !overrideSanity) {
-		// Make sure results match up with results from mapLFEx;
-		// be sure to override sanity-checking in the callee, or we'll
-		// have infinite recursion
-		uint32_t arrs[] = { 0, 0, 0, 0 };
-		mapLFEx(l, arrs, true);
-		assert_eq(arrs[c], ret);
-	}
+#ifdef EBWT_STATS
+	const_cast<Ebwt<TStr>*>(this)->mapLFcs_++;
 #endif
-	return ret;
-}
-
-/**
- * Like mapLF1, except it returns 0xffffffff if the character int the
- * final column of row i is not c.  This is an optimization for the
- * (hopefully common) case where we're matching and the top and bottom
- * arrows are separated by a single row.
- *
- * Is it because this is the first place to read from the side, thus
- * taking the cache miss?
- */
-template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
-                                   ASSERT_ONLY(, bool overrideSanity)) const
-{
 	uint32_t ret;
-	if(c == 4 || rowL(l) /*unpack_2b_from_8b(l._side[l._by], l._bp)*/ != c) { // L2 miss?
-		return 0xffffffff;
-	}
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side

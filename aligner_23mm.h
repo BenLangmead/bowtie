@@ -15,6 +15,37 @@
 #include "ref_aligner.h"
 
 /**
+ *
+ */
+class Two3mmRangeSourceDriver {
+	typedef GreedyDFSRangeSourceDriver TDriver;
+
+public:
+	Two3mmRangeSourceDriver(TDriver * drFw_Fw,
+	                        TDriver * drFw_Bw,
+	                        TDriver * drFw_BwHalf,
+	                        TDriver * drRc_Fw,
+	                        TDriver * drRc_Bw,
+	                        TDriver * drRc_FwHalf) :
+	                        drFw_Fw_(drFw_Fw),
+	                        drFw_Bw_(drFw_Fw),
+	                        drFw_BwHalf_(drFw_Fw),
+	                        drRc_Fw_(drFw_Fw),
+	                        drRc_Bw_(drFw_Fw),
+	                        drRc_FwHalf_(drFw_Fw)
+	{ }
+
+protected:
+	TDriver * drFw_Fw_;
+	TDriver * drFw_Bw_;
+	TDriver * drFw_BwHalf_;
+
+	TDriver * drRc_Fw_;
+	TDriver * drRc_Bw_;
+	TDriver * drRc_FwHalf_;
+};
+
+/**
  * Concrete factory class for constructing unpaired exact aligners.
  */
 class Unpaired23mmAlignerV1Factory : public AlignerFactory {
@@ -25,6 +56,7 @@ public:
 	Unpaired23mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool two,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			RangeCache *cacheFw,
@@ -36,6 +68,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			two_(two),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			cacheFw_(cacheFw),
@@ -79,8 +112,8 @@ public:
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			PIN_TO_LEN, // allow 2 mismatches in rest of read
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * drFw_Bw = new GreedyDFSRangeSourceDriver(
@@ -89,8 +122,8 @@ public:
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			PIN_TO_LEN, // allow 2 mismatches in rest of read
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * drFw_FwHalf = new GreedyDFSRangeSourceDriver(
@@ -98,9 +131,9 @@ public:
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_HI_HALF_EDGE, // hi-half is 1-mm
-			PIN_TO_LEN, // lo-half is 2-mm
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec drFwVec;
 		drFwVec.push_back(drFw_Fw);
@@ -127,8 +160,8 @@ public:
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			PIN_TO_LEN, // allow 2 mismatches in rest of read
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * drRc_Bw = new GreedyDFSRangeSourceDriver(
@@ -137,8 +170,8 @@ public:
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			PIN_TO_LEN, // allow 2 mismatches in rest of read
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * drRc_FwHalf = new GreedyDFSRangeSourceDriver(
@@ -146,9 +179,9 @@ public:
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_HI_HALF_EDGE, // hi-half is 1-mm
-			PIN_TO_LEN, // lo-half is 2-mm
-			PIN_TO_LEN, // trumped by 2-mm
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec drRcVec;
 		drRcVec.push_back(drRc_Fw);
@@ -168,6 +201,7 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool two_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	RangeCache *cacheFw_;

@@ -29,19 +29,14 @@
  */
 class Aligner {
 public:
-	Aligner(bool rangeMode, uint32_t seed) :
-		patsrc_(NULL), bufa_(NULL), bufb_(NULL),
+	Aligner(bool _done, bool rangeMode, uint32_t seed) :
+		done(_done), patsrc_(NULL), bufa_(NULL), bufb_(NULL),
 		rangeMode_(rangeMode), seed_(seed)
 	{ }
 
 	virtual ~Aligner() { }
 	/// Advance the range search by one memory op
 	virtual bool advance() = 0;
-	/**
-	 * Returns true if all searching w/r/t the current query is
-	 * finished or if there is no current query.
-	 */
-	virtual bool done() = 0;
 
 	/// Prepare Aligner for the next read
 	virtual void setQuery(PatternSourcePerThread *patsrc) {
@@ -55,6 +50,12 @@ public:
 		qseed_ = seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name);
 		rand_.init(qseed_);
 	}
+
+	/**
+	 * Set to true if all searching w/r/t the current query is
+	 * finished or if there is no current query.
+	 */
+	bool done;
 
 protected:
 
@@ -150,7 +151,7 @@ public:
 		while(!done) {
 			done = true;
 			for(uint32_t i = 0; i < n_; i++) {
-				if(!(*aligners_)[i]->done()) {
+				if(!(*aligners_)[i]->done) {
 					// Advance an aligner already in progress
 					done = false;
 					(*aligners_)[i]->advance();
@@ -159,7 +160,7 @@ public:
 					(*patsrcs_)[i]->nextReadPair();
 					if(!(*patsrcs_)[i]->empty() && (*patsrcs_)[i]->patid() < qUpto_) {
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
-						assert(!(*aligners_)[i]->done());
+						assert(!(*aligners_)[i]->done);
 						done = false;
 					} else {
 						// No more reads; if done == true, it remains
@@ -234,7 +235,7 @@ public:
 			for(uint32_t i = 0; i < n_; i++) {
 				Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
 				                           (*alignersPE_)[i];
-				if(!al->done()) {
+				if(!al->done) {
 					// Advance an aligner already in progress; this is
 					// the common case
 					done = false;
@@ -284,6 +285,167 @@ protected:
  * oriented read.
  */
 template<typename TRangeSource, typename TContMan>
+class UnpairedAlignerV2 : public Aligner {
+	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
+public:
+	UnpairedAlignerV2(
+		EbwtSearchParams<String<Dna> >* params,
+		TDriver* driver,
+		RangeChaser<String<Dna> >* rchase,
+		HitSink& sink,
+		const HitSinkPerThreadFactory& sinkPtFactory,
+		HitSinkPerThread* sinkPt,
+		vector<String<Dna5> >& os,
+		bool rangeMode,
+		bool verbose,
+		uint32_t seed) :
+		Aligner(true, rangeMode, seed),
+		doneFirst_(true),
+		firstIsFw_(true),
+		chase_(false),
+		sinkPtFactory_(sinkPtFactory),
+		sinkPt_(sinkPt),
+		params_(params),
+		rchase_(rchase),
+		driver_(driver)
+	{
+		assert(sinkPt_ != NULL);
+		assert(params_ != NULL);
+		assert(driver_ != NULL);
+	}
+
+	virtual ~UnpairedAlignerV2() {
+		delete driver_; driver_ = NULL;
+		delete params_; params_ = NULL;
+		delete rchase_; rchase_ = NULL;
+		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
+	}
+
+	/**
+	 * Prepare this aligner for the next read.
+	 */
+	virtual void setQuery(PatternSourcePerThread* patsrc) {
+		Aligner::setQuery(patsrc); // set fields & random seed
+		driver_->setQuery(patsrc);
+		rchase_->initRand(qseed_);
+		this->done = false;
+		doneFirst_ = false;
+		firstIsFw_ = ((qseed_ & 0x10) == 0);
+		chase_ = false;
+	}
+
+	/**
+	 * Helper for reporting an alignment.
+	 */
+	inline bool report(const Range& ra,
+	                   uint32_t first,
+	                   uint32_t second,
+	                   uint32_t tlen,
+	                   bool fw)
+	{
+		bool ebwtFw = ra.ebwt->fw();
+		params_->setFw(fw);
+		return params_->reportHit(
+				fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
+				     (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
+				fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
+				     (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
+				&bufa_->name,
+				ebwtFw,
+				ra.mms,                   // mismatch positions
+				ra.refcs,                 // reference characters for mms
+				ra.numMms,                // # mismatches
+				make_pair(first, second), // position
+				make_pair(ra.top, ra.bot),// arrows
+				tlen,                     // textlen
+				alen_,                    // qlen
+				ra.stratum,               // alignment stratum
+				ra.bot - ra.top - 1);     // # other hits
+	}
+
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 */
+	virtual bool advance() {
+		assert(!this->done);
+		if(chase_) {
+			assert(!rangeMode_);
+			assert(driver_->foundRange);
+			if(!rchase_->foundOff() && !rchase_->done) {
+				rchase_->advance();
+				return false;
+			}
+			if(rchase_->foundOff()) {
+				this->done = report(driver_->range(), rchase_->off().first,
+				                    rchase_->off().second, rchase_->tlen(),
+				                    driver_->fw());
+				rchase_->reset();
+			} else {
+				assert(rchase_->done);
+				// Forget this range; keep looking for ranges
+				chase_ = false;
+				this->done = driver_->done;
+			}
+		}
+		// Still advancing a
+		if(!this->done && !chase_) {
+			driver_->advance();
+			if(driver_->foundRange) {
+				const Range& ra = driver_->range();
+				if(rangeMode_) {
+					this->done = report(ra, ra.top, ra.bot, 0, driver_->fw());
+				} else {
+					rchase_->setTopBot(ra.top, ra.bot, alen_, driver_->curEbwt());
+					if(rchase_->foundOff()) {
+						this->done = report(
+								ra, rchase_->off().first,
+								rchase_->off().second, rchase_->tlen(),
+								driver_->fw());
+						rchase_->reset();
+					}
+					if(!rchase_->done) {
+						// Keep chasing this range
+						chase_ = true;
+					}
+				}
+			}
+			if(driver_->done && !chase_) {
+				this->done = true;
+			}
+		}
+		if(this->done) {
+			sinkPt_->finishRead(*patsrc_, true);
+		}
+		return this->done;
+	}
+
+protected:
+	// Progress state
+	bool doneFirst_;
+	bool firstIsFw_;
+	bool chase_;
+
+	// Temporary HitSink; to be deleted
+	const HitSinkPerThreadFactory& sinkPtFactory_;
+	HitSinkPerThread* sinkPt_;
+
+	// State for alignment
+	EbwtSearchParams<String<Dna> >* params_;
+
+	// State for getting alignments from ranges statefully
+	RangeChaser<String<Dna> >* rchase_;
+
+	// Range-finding state
+	TDriver* driver_;
+};
+
+/**
+ * An aligner for finding exact matches of unpaired reads.  Always
+ * tries the forward-oriented version of the read before the reverse-
+ * oriented read.
+ */
+template<typename TRangeSource, typename TContMan>
 class UnpairedAlignerV1 : public Aligner {
 	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
 public:
@@ -298,8 +460,9 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(rangeMode, seed),
-		doneFw_(true), done_(true),
+		Aligner(true, rangeMode, seed),
+		doneFirst_(true),
+		firstIsFw_(true),
 		chaseFw_(false), chaseRc_(false),
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
@@ -330,8 +493,9 @@ public:
 		driverFw_->setQuery(patsrc);
 		driverRc_->setQuery(patsrc);
 		rchase_->initRand(qseed_);
-		doneFw_  = false;
-		done_    = false;
+		this->done = false;
+		doneFirst_ = false;
+		firstIsFw_ = ((qseed_ & 0x10) == 0);
 		chaseFw_ = false;
 		chaseRc_ = false;
 	}
@@ -346,6 +510,7 @@ public:
 	                   bool fw)
 	{
 		bool ebwtFw = ra.ebwt->fw();
+		params_->setFw(fw);
 		return params_->reportHit(
 				fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
 				     (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
@@ -369,112 +534,109 @@ public:
 	 * done with this read.
 	 */
 	virtual bool advance() {
-		assert(!done_);
+		assert(!this->done);
 		assert(!chaseFw_ || !chaseRc_);
 		if(chaseFw_) {
 			assert(!rangeMode_);
-			assert(driverFw_->foundRange());
-			if(!rchase_->foundOff() && !rchase_->done()) {
+			assert(driverFw_->foundRange);
+			if(!rchase_->foundOff() && !rchase_->done) {
 				rchase_->advance();
 				return false;
 			}
 			if(rchase_->foundOff()) {
-				done_ = report(driverFw_->range(), rchase_->off().first,
-				               rchase_->off().second, rchase_->tlen(), true);
+				this->done = report(driverFw_->range(), rchase_->off().first,
+				                    rchase_->off().second, rchase_->tlen(), true);
 				rchase_->reset();
 			} else {
-				assert(rchase_->done());
+				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				chaseFw_ = false;
-				doneFw_ = driverFw_->done();
+				if(doneFirst_) this->done = driverFw_->done;
+				else           doneFirst_ = driverFw_->done;
 			}
 		} else if(chaseRc_) {
 			assert(!rangeMode_);
-			assert(driverRc_->foundRange());
-			if(!rchase_->foundOff() && !rchase_->done()) {
+			assert(driverRc_->foundRange);
+			if(!rchase_->foundOff() && !rchase_->done) {
 				rchase_->advance();
 				return false;
 			}
 			if(rchase_->foundOff()) {
-				done_ = report(driverRc_->range(), rchase_->off().first,
-				               rchase_->off().second, rchase_->tlen(), false);
+				this->done = report(driverRc_->range(), rchase_->off().first,
+				                    rchase_->off().second, rchase_->tlen(), false);
 				rchase_->reset();
 			} else {
-				assert(rchase_->done());
+				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				chaseRc_ = false;
-				done_ = driverRc_->done();
+				if(doneFirst_) this->done = driverRc_->done;
+				else           doneFirst_ = driverRc_->done;
 			}
 		}
 		// Still advancing a
-		if(!done_ && !chaseFw_ && !chaseRc_) {
-			if(!doneFw_) {
+		if(!this->done && !chaseFw_ && !chaseRc_) {
+			bool fw = (doneFirst_ != firstIsFw_);
+			if(fw) {
 				driverFw_->advance();
-				if(driverFw_->foundRange()) {
+				if(driverFw_->foundRange) {
 					const Range& ra = driverFw_->range();
 					if(rangeMode_) {
-						done_ = report(ra, ra.top, ra.bot, 0, true);
+						this->done = report(ra, ra.top, ra.bot, 0, fw);
 					} else {
 						rchase_->setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
 						if(rchase_->foundOff()) {
-							done_ = report(ra, rchase_->off().first,
+							this->done = report(ra, rchase_->off().first,
 							               rchase_->off().second, rchase_->tlen(),
-							               true);
+							               fw);
 							rchase_->reset();
 						}
-						if(!rchase_->done()) {
+						if(!rchase_->done) {
 							// Keep chasing this range
 							chaseFw_ = true;
 						}
 					}
 				}
-				if(!doneFw_ && !chaseFw_) {
-					doneFw_ = driverFw_->done();
+				if(driverFw_->done && !chaseFw_) {
+					if(doneFirst_ ) this->done = true;
+					else            doneFirst_ = true;
 				}
 			} else {
 				driverRc_->advance();
 				// Advance the RangeSource for the reverse-complement read
-				if(driverRc_->foundRange()) {
+				if(driverRc_->foundRange) {
 					const Range& ra = driverRc_->range();
 					if(rangeMode_) {
-						done_ = report(ra, ra.top, ra.bot, 0, false);
+						this->done = report(ra, ra.top, ra.bot, 0, fw);
 					} else {
 						rchase_->setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
 						if(rchase_->foundOff()) {
-							done_ = report(ra, rchase_->off().first,
+							this->done = report(ra, rchase_->off().first,
 							               rchase_->off().second, rchase_->tlen(),
-							               false);
+							               fw);
 							rchase_->reset();
 						}
-						if(!rchase_->done()) {
+						if(!rchase_->done) {
 							// Keep chasing this range
 							chaseRc_ = true;
 						}
 					}
 				}
-				if(!done_ && !chaseRc_) {
-					done_ = driverRc_->done();
+				if(driverRc_->done && !chaseRc_) {
+					if(doneFirst_ ) this->done = true;
+					else            doneFirst_ = true;
 				}
 			}
 		}
-		if(done_) {
+		if(this->done) {
 			sinkPt_->finishRead(*patsrc_, true);
 		}
-		return done_;
-	}
-
-	/**
-	 * Returns true if all searching w/r/t the current query is
-	 * finished or if there is no current query.
-	 */
-	virtual bool done() {
-		return done_;
+		return this->done;
 	}
 
 protected:
 	// Progress state
-	bool doneFw_;
-	bool done_;
+	bool doneFirst_;
+	bool firstIsFw_;
 	bool chaseFw_;
 	bool chaseRc_;
 
@@ -528,9 +690,9 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed) :
-		Aligner(rangeMode, seed),
+		Aligner(true, rangeMode, seed),
 		refs_(refs), patsrc_(NULL), doneFw_(true),
-		doneFwFirst_(true), done_(true),
+		doneFwFirst_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
 		delayedChase1Fw_(false), delayedChase1Rc_(false),
@@ -630,7 +792,7 @@ public:
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;
-		done_     = false;
+		this->done   = false;
 		// No ranges are being chased yet
 		chase1Fw_ = false;
 		chase1Rc_ = false;
@@ -685,7 +847,7 @@ public:
 	 *    offset for a an alignment in a range
 	 */
 	virtual bool advance() {
-		assert(!done_);
+		assert(!this->done);
 		bool verbose = false;
 		if(doneFw_ && doneFwFirst_) {
 			if(verbose2_) cout << "--" << endl;
@@ -701,31 +863,23 @@ public:
 			rangesRarr_    = rangesRarr_rc_;
 			offsLsz_       = &offsLsz_rc_;
 			offsRsz_       = &offsRsz_rc_;
-			donePair_      = &done_;
+			donePair_      = &this->done;
 			fwL_           = !fw2_;
 			fwR_           = !fw1_;
 			doneFwFirst_   = false;
 			mixedAttempts_ = 0;
 		}
 		bool chasing = *chaseL_ || *chaseR_;
-		if(chasing && !rchase_->foundOff() && !rchase_->done()) {
+		if(chasing && !rchase_->foundOff() && !rchase_->done) {
 			rchase_->advance();
 			return false;
 		}
 		advanceOrientation(!doneFw_, verbose);
-		if(done_) {
+		if(this->done) {
 			if(verbose2_) cout << "----" << endl;
 			sinkPt_->finishRead(*patsrc_, true);
 		}
-		return done_;
-	}
-
-	/**
-	 * Returns true if all searching w/r/t the current query is
-	 * finished or if there is no current query.
-	 */
-	virtual bool done() {
-		return done_;
+		return this->done;
 	}
 
 protected:
@@ -989,28 +1143,28 @@ protected:
 	 * Advance paired-end alignment.
 	 */
 	void advanceOrientation(bool pairFw, bool verbose = false) {
-		assert(!done_);
+		assert(!this->done);
 		assert(!*donePair_);
 		assert(!*chaseL_ || !*chaseR_);
 		if(*chaseL_) {
 			assert(!rangeMode_);
 			assert(!*delayedchaseL_);
-			assert(drL_->foundRange());
-			assert(rchase_->foundOff() || rchase_->done());
+			assert(drL_->foundRange);
+			assert(rchase_->foundOff() || rchase_->done);
 			if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
 				if(!dontReconcile_ && !overThresh) {
-					done_ = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
+					this->done = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
 											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
-				if(!done_ && (overThresh || dontReconcile_)) {
+				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(
+					this->done = resolveOutstandingInRef(
 							pairFw, rchase_->off(),
 					        drL_->curEbwt()->_plen[rchase_->off().first],
 					        drL_->range());
@@ -1022,14 +1176,14 @@ protected:
 				}
 				rchase_->reset();
 			} else {
-				assert(rchase_->done());
+				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				*chaseL_ = false;
 				if(verbose) cout << "Done with case for first mate" << endl;
 				if(*delayedchaseR_) {
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
-					assert(drR_->foundRange());
+					assert(drR_->foundRange);
 					uint32_t top = drR_->range().top; uint32_t bot = drR_->range().bot;
 					rchase_->setTopBot(top, bot, drR_->qlen(), drR_->curEbwt());
 					*chaseR_ = true;
@@ -1039,22 +1193,22 @@ protected:
 		} else if(*chaseR_) {
 			assert(!rangeMode_);
 			assert(!*delayedchaseR_);
-			assert(drR_->foundRange());
-			assert(rchase_->foundOff() || rchase_->done());
+			assert(drR_->foundRange);
+			assert(rchase_->foundOff() || rchase_->done);
 			if(rchase_->foundOff()) {
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
 				if(!dontReconcile_ && !overThresh) {
-					done_ = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
+					this->done = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
 											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
 											fwL_, fwR_, pairFw, verbose);
 				}
-				if(!done_ && (overThresh || dontReconcile_)) {
+				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
-					done_ = resolveOutstandingInRef(
+					this->done = resolveOutstandingInRef(
 							!pairFw, rchase_->off(),
 					        drR_->curEbwt()->_plen[rchase_->off().first],
 					        drR_->range());
@@ -1066,14 +1220,14 @@ protected:
 				}
 				rchase_->reset();
 			} else {
-				assert(rchase_->done());
+				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				*chaseR_ = false;
 				if(verbose) cout << "Done with case for second mate" << endl;
 				if(*delayedchaseL_) {
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
-					assert(drL_->foundRange());
+					assert(drL_->foundRange);
 					uint32_t top = drL_->range().top; uint32_t bot = drL_->range().bot;
 					rchase_->setTopBot(top, bot, drL_->qlen(), drL_->curEbwt());
 					*chaseL_ = true;
@@ -1081,15 +1235,15 @@ protected:
 				}
 			}
 		}
-		if(!done_ && !*donePair_ && !*chaseL_ && !*chaseR_) {
+		if(!this->done && !*donePair_ && !*chaseL_ && !*chaseR_) {
 			// Search for more ranges for whichever mate currently has
 			// fewer candidate alignments
-			if((*offsLsz_ < *offsRsz_ || drR_->done()) && !drL_->done()) {
+			if((*offsLsz_ < *offsRsz_ || drR_->done) && !drL_->done) {
 				// If there are no more ranges for the other mate and
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drR_->done() && *offsRsz_ == 0) {
+				if(drR_->done && *offsRsz_ == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
 					*donePair_ = true;
@@ -1098,7 +1252,7 @@ protected:
 				}
 				assert(!*delayedchaseL_);
 				drL_->advance();
-				if(drL_->foundRange()) {
+				if(drL_->foundRange) {
 #ifndef NDEBUG
 					{
 						std::set<int64_t>& s = (pairFw ? allTopsL_fw_ : allTopsL_rc_);
@@ -1130,7 +1284,7 @@ protected:
 						// If this is the first range for both mates,
 						// choose the smaller range to chase down first
 						if(*delayedchaseR_ && (*offsRsz_ < *offsLsz_)) {
-							assert(drR_->foundRange());
+							assert(drR_->foundRange);
 							*delayedchaseR_ = false;
 							*delayedchaseL_ = true;
 							*chaseR_ = true;
@@ -1145,12 +1299,12 @@ protected:
 						}
 					}
 				}
-			} else if(!drR_->done()) {
+			} else if(!drR_->done) {
 				// If there are no more ranges for the other mate and
 				// there are no candidate alignments either, then we're
 				// not going to find a paired alignment in this
 				// orientation.
-				if(drL_->done() && *offsLsz_ == 0) {
+				if(drL_->done && *offsLsz_ == 0) {
 					// Give up on this orientation
 					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
@@ -1159,7 +1313,7 @@ protected:
 				}
 				assert(!*delayedchaseR_);
 				drR_->advance();
-				if(drR_->foundRange()) {
+				if(drR_->foundRange) {
 #ifndef NDEBUG
 					{
 						std::set<int64_t>& s = (pairFw ? allTopsR_fw_ : allTopsR_rc_);
@@ -1191,7 +1345,7 @@ protected:
 						// If this is the first range for both mates,
 						// choose the smaller range to chase down first
 						if(*delayedchaseL_ && *offsLsz_ < *offsRsz_) {
-							assert(drL_->foundRange());
+							assert(drL_->foundRange);
 							*delayedchaseL_ = false;
 							*delayedchaseR_ = true;
 							*chaseL_ = true;
@@ -1208,7 +1362,7 @@ protected:
 				}
 			} else {
 				// Finished processing ranges for both mates
-				assert(drL_->done() && drR_->done());
+				assert(drL_->done && drR_->done);
 				*donePair_ = true;
 			}
 		}
@@ -1221,7 +1375,6 @@ protected:
 	// Progress state
 	bool doneFw_;   // finished with forward orientation of both mates?
 	bool doneFwFirst_;
-	bool done_;
 
 	bool chase1Fw_;
 	bool chase1Rc_;

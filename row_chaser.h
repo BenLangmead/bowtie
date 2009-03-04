@@ -25,6 +25,7 @@ class RowChaser {
 
 public:
 	RowChaser() :
+		done(false),
 		prepped_(false),
 		ebwt_(NULL),
 		qlen_(0),
@@ -32,7 +33,6 @@ public:
 		row_(0xffffffff),
 		jumps_(0),
 		sideloc_(),
-		done_(false),
 		off_(0xffffffff),
 		tlen_(0)
 	{ }
@@ -45,7 +45,7 @@ public:
 	static uint32_t toFlatRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
-		while(!rc.done()) {
+		while(!rc.done) {
 			rc.advance();
 		}
 		return rc.flatOff();
@@ -57,7 +57,7 @@ public:
 	static U32Pair toRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
-		while(!rc.done()) {
+		while(!rc.done) {
 			rc.advance();
 		}
 		return rc.off();
@@ -79,15 +79,15 @@ public:
 		if(row_ == ebwt_->_zOff) {
 			// We arrived at the extreme left-hand end of the reference
 			off_ = 0;
-			done_ = true;
+			done = true;
 			return;
 		} else if((row_ & eh_->_offMask) == row_) {
 			// We arrived at a marked row
 			off_ = ebwt_->_offs[row_ >> eh_->_offRate];
-			done_ = true;
+			done = true;
 			return;
 		}
-		done_ = false;
+		done = false;
 		jumps_ = 0;
 		off_ = 0xffffffff;
 		prepped_ = false;
@@ -95,19 +95,11 @@ public:
 	}
 
 	/**
-	 * Return true iff off_ now holds the reference location
-	 * corresponding to the row last set with setRow().
-	 */
-	bool done() const {
-		return done_;
-	}
-
-	/**
 	 * Advance the step-left process by one step.  Check if we're done.
 	 */
 	void advance() {
 		// Advance by 1
-		assert(!done_);
+		assert(!done);
 		assert(prepped_);
 		prepped_ = false;
 		uint32_t newrow = ebwt_->mapLF(sideloc_);
@@ -119,11 +111,11 @@ public:
 		if(row_ == ebwt_->_zOff) {
 			// We arrived at the extreme left-hand end of the reference
 			off_ = jumps_;
-			done_ = true;
+			done = true;
 		} else if((row_ & eh_->_offMask) == row_) {
 			// We arrived at a marked row
 			off_ = ebwt_->_offs[row_ >> eh_->_offRate] + jumps_;
-			done_ = true;
+			done = true;
 		}
 		prep();
 	}
@@ -134,7 +126,7 @@ public:
 	 * that the
 	 */
 	void prep() {
-		if(!done_) {
+		if(!done) {
 			assert(!prepped_);
 			assert(!sideloc_.valid());
 			assert_leq(row_, eh_->_len);
@@ -172,6 +164,7 @@ public:
 		return tlen_;
 	}
 
+	bool done;               /// true = chase is done & answer is in off_
 	bool prepped_; /// true = prefetch is issued and it's OK to call advance()
 
 protected:
@@ -182,7 +175,6 @@ protected:
 	uint32_t row_;           /// current row
 	uint32_t jumps_;         /// # steps so far
 	SideLocus sideloc_;      /// current side locus
-	bool done_;              /// true = chase is done & answer is in off_
 	uint32_t off_;           /// calculated offset (0xffffffff if not done)
 	uint32_t tlen_;          /// hit text length
 };

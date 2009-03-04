@@ -171,7 +171,10 @@ public:
 		dumpUnalFaBase_(dumpUnalignFaBasename),
 		dumpUnalFqBase_(dumpUnalignFqBasename),
 		dumpMaxFaBase_(dumpMaxedFaBasename),
-		dumpMaxFqBase_(dumpMaxedFqBasename)
+		dumpMaxFqBase_(dumpMaxedFqBasename),
+		first_(true),
+		numReported_(0llu),
+		numReportedPaired_(0llu)
 	{
 		_outs.push_back(&out);
 		_locks.resize(1);
@@ -265,7 +268,31 @@ public:
 	}
 
 	/// Called when all alignments are complete
-	virtual void finish()               { }
+	virtual void finish() {
+		if(first_) {
+			assert_eq(0llu, numReported_);
+			cout << "No results" << endl;
+		}
+		else if(numReportedPaired_ > 0 && numReported_ == 0) {
+			cout << "Reported " << (numReportedPaired_ >> 1)
+			     << " paired-end alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else if(numReported_ > 0 && numReportedPaired_ == 0) {
+			cout << "Reported " << numReported_
+			     << " alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+		else {
+			assert_gt(numReported_, 0);
+			assert_gt(numReportedPaired_, 0);
+			cout << "Reported " << (numReportedPaired_ >> 1)
+			     << " paired-end alignments and " << numReported_
+			     << " singleton alignments to " << _outs.size()
+			     << " output stream(s)" << endl;
+		}
+	}
+
 	/// Flushes the alignment output stream
 	virtual void flush() {
 		for(size_t i = 0; i < _outs.size(); i++) {
@@ -551,6 +578,10 @@ protected:
     // false = there's no unaligned dumping
     bool dumpUnalign_;
     bool dumpMaxed_;
+
+	volatile bool     first_;       /// true -> first hit hasn't yet been reported
+	volatile uint64_t numReported_;
+	volatile uint64_t numReportedPaired_;
 };
 
 /**
@@ -1522,8 +1553,6 @@ public:
 			vector<string>*    __refnames = NULL) :
 		HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
-		_first(true),
-		_numReported(0llu),
 		offBase_(offBase) { }
 
 	/**
@@ -1541,8 +1570,6 @@ public:
 			vector<string>*    __refnames = NULL) :
 		HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
-		_first(true),
-		_numReported(0llu),
 		offBase_(offBase) { }
 
 	/**
@@ -1578,9 +1605,9 @@ public:
 		out(h.h.first) << ss.str();
 		unlock(h.h.first);
 		mainlock();
-		_first = false;
-		if(h.mate > 0) _numReportedPaired++;
-		else           _numReported++;
+		first_ = false;
+		if(h.mate > 0) numReportedPaired_++;
+		else           numReported_++;
 		mainunlock();
 	}
 
@@ -1607,45 +1634,14 @@ public:
 		}
 		unlock(hs[hssz-1].h.first);
 		mainlock();
-		_first = false;
-		if(paired) _numReportedPaired += hssz;
-		else       _numReported += hssz;
+		first_ = false;
+		if(paired) numReportedPaired_ += hssz;
+		else       numReported_ += hssz;
 		mainunlock();
-	}
-
-	/**
-	 * Wrap up and report a short summary.
-	 */
-	virtual void finish() {
-		if(_first) {
-			assert_eq(0llu, _numReported);
-			cout << "No results" << endl;
-		}
-		else if(_numReportedPaired > 0 && _numReported == 0) {
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else if(_numReported > 0 && _numReportedPaired == 0) {
-			cout << "Reported " << _numReported
-			     << " alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else {
-			assert_gt(_numReported, 0);
-			assert_gt(_numReportedPaired, 0);
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments and " << _numReported
-			     << " singleton alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
 	}
 
 private:
 	bool     _reportOpps;
-	volatile bool     _first;       /// true -> first hit hasn't yet been reported
-	volatile uint64_t _numReported;
-	volatile uint64_t _numReportedPaired;
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
@@ -1669,8 +1665,6 @@ public:
 				   vector<string>*    __refnames = NULL,
 				   int                __partition = 0) :
 	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
-	_first(true),
-	_numReported(0llu),
 	_partition(__partition),
 	offBase_(offBase)
 	{ }
@@ -1688,8 +1682,6 @@ public:
 				   vector<string>* __refnames = NULL,
 				   int             __partition = 0) :
 	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
-	_first(true),
-	_numReported(0llu),
 	_partition(__partition),
 	offBase_(offBase)
 	{ }
@@ -2038,9 +2030,9 @@ public:
 		out(h.h.first) << ss.str();
 		unlock(h.h.first);
 		mainlock();
-		_first = false;
-		if(h.mate > 0) _numReportedPaired++;
-		else           _numReported++;
+		first_ = false;
+		if(h.mate > 0) numReportedPaired_++;
+		else           numReported_++;
 		mainunlock();
 	}
 
@@ -2067,45 +2059,13 @@ public:
 		}
 		unlock(hs[hssz-1].h.first);
 		mainlock();
-		_first = false;
-		if(paired) _numReportedPaired += hssz;
-		else       _numReported += hssz;
+		first_ = false;
+		if(paired) numReportedPaired_ += hssz;
+		else       numReported_ += hssz;
 		mainunlock();
 	}
 
-	/**
-	 * Finalize the alignment output by printing a summary message to
-	 * stdout.
-	 */
-	virtual void finish() {
-		if(_first) {
-			assert_eq(0llu, _numReported);
-			cout << "No results" << endl;
-		}
-		else if(_numReportedPaired > 0 && _numReported == 0) {
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else if(_numReported > 0 && _numReportedPaired == 0) {
-			cout << "Reported " << _numReported
-			     << " alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else {
-			assert_gt(_numReported, 0);
-			assert_gt(_numReportedPaired, 0);
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments and " << _numReported
-			     << " singleton alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-	}
-
 private:
-	volatile bool     _first;       /// true iff this object hasn't yet reported a hit
-	volatile uint64_t _numReported; /// number of hits reported
-	volatile uint64_t _numReportedPaired; /// number of paired-end hits reported
 	int      _partition;   /// partition size, or 0 if partitioning is disabled
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
@@ -2128,8 +2088,8 @@ public:
 	              const std::string& dumpMaxFa,
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
-	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
-	_first(true), _numReported(0llu) { }
+	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
+	{ }
 
 	/**
 	 * Construct a multi-stream BinaryHitSink with one stream per
@@ -2142,8 +2102,8 @@ public:
 	              const std::string& dumpMaxFa,
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
-	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
-	_first(true), _numReported(0llu) { }
+	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
+	{ }
 
 	/**
 	 * Append a binary alignment to the output stream corresponding to
@@ -2381,9 +2341,9 @@ public:
 		append(out(h.h.first), h);
 		unlock(h.h.first);
 		mainlock();
-		_first = false;
-		if(h.mate > 0) _numReportedPaired++;
-		else           _numReported++;
+		first_ = false;
+		if(h.mate > 0) numReportedPaired_++;
+		else           numReported_++;
 		mainunlock();
 	}
 
@@ -2415,44 +2375,13 @@ public:
 		// Unlock the last stream
 		unlock(hs[hssz-1].h.first);
 		mainlock();
-		_first = false;
-		if(paired) _numReportedPaired += hssz;
-		else       _numReported       += hssz;
+		first_ = false;
+		if(paired) numReportedPaired_ += hssz;
+		else       numReported_       += hssz;
 		mainunlock();
 	}
 
-	/**
-	 * Finalize the alignment output by printing a summary message to
-	 * stdout.
-	 */
-	virtual void finish() {
-		if(_first) {
-			assert_eq(0llu, _numReported);
-			cout << "No results" << endl;
-		}
-		else if(_numReportedPaired > 0 && _numReported == 0) {
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else if(_numReported > 0 && _numReportedPaired == 0) {
-			cout << "Reported " << _numReported
-			     << " alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else {
-			assert_gt(_numReported, 0);
-			assert_gt(_numReportedPaired, 0);
-			cout << "Reported " << (_numReportedPaired >> 1)
-			     << " paired-end alignments and " << _numReported
-			     << " singleton alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-	}
 private:
-	volatile bool _first;           /// true iff this object hasn't yet reported a hit
-	volatile uint64_t _numReported; /// number of hits reported
-	volatile uint64_t _numReportedPaired; /// number of paried-end hits reported
 	int offBase_;          /// Add this to reference offsets before outputting.
                            /// (An easy way to make things 1-based instead of
                            /// 0-based)

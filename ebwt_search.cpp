@@ -2338,7 +2338,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Ebwt<String<Dna> >&    ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
 	vector<String<Dna5> >& os      = *twoOrThreeMismatchSearch_os;
 	BitPairReference*      refs    =  twoOrThreeMismatchSearch_refs;
-	//static bool            two     =  twoOrThreeMismatchSearch_two;
+	static bool            two     =  twoOrThreeMismatchSearch_two;
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
@@ -2348,6 +2348,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Unpaired23mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
+			two,
 			_sink,
 			*sinkFact,
 			NULL, //&cacheFw,
@@ -2542,8 +2543,8 @@ static void twoOrThreeMismatchSearchFull(
 				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
 		}
 #endif
-		if(stateful) twoOrThreeMismatchSearchWorkerFull((void*)0L);
-		else         twoOrThreeMismatchSearchWorkerStateful((void*)0L);
+		if(stateful) twoOrThreeMismatchSearchWorkerStateful((void*)0L);
+		else         twoOrThreeMismatchSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;

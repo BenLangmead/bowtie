@@ -28,6 +28,7 @@ class RangeChaser {
 public:
 	RangeChaser(uint32_t seed, uint32_t cacheThresh,
 	            RangeCache* cacheFw, RangeCache* cacheBw) :
+		done(false),
 		ebwt_(NULL),
 		qlen_(0),
 		cacheThresh_(cacheThresh),
@@ -36,7 +37,6 @@ public:
 		bot_(0xffffffff),
 		irow_(0xffffffff),
 		row_(0xffffffff),
-		done_(false),
 		off_(make_pair(0xffffffff, 0)),
 		tlen_(0),
 		chaser_(),
@@ -60,7 +60,7 @@ public:
 		RangeChaser rc(ebwt, rand);
 		rc.setTopBot(top, bot, qlen);
 		rc.prep();
-		while(!rc.done()) {
+		while(!rc.done) {
 			rc.advance();
 			if(rc.foundOff()) {
 				dest.push_back(rc.off());
@@ -106,9 +106,9 @@ public:
 			}
 			// Second thing to try is the chaser
 			chaser_.setRow(row_, qlen_, ebwt_);
-			assert(chaser_.prepped_ || chaser_.done());
+			assert(chaser_.prepped_ || chaser_.done);
 			// It might be done immediately...
-			if(chaser_.done()) {
+			if(chaser_.done) {
 				// We're done immediately
 				off_ = chaser_.off();
 				if(off_.first != 0xffffffff) {
@@ -136,7 +136,7 @@ public:
 			}
 			if(row_ == irow_) {
 				// Exhausted all possible rows
-				done_ = true;
+				done = true;
 				assert_eq(0xffffffff, off_.first);
 				return;
 			}
@@ -164,7 +164,7 @@ public:
 		bot_ = bot;
 		uint32_t spread = bot - top;
 		irow_ = top + (rand_.nextU32() % spread); // initial row
-		done_ = false;
+		done = false;
 		cached_ = false;
 		reset();
 		if(cacheFw_ != NULL || cacheBw_ != NULL) {
@@ -186,25 +186,17 @@ public:
 			}
 		}
 		setRow(irow_);
-		assert(chaser_.prepped_ || foundOff() || done_);
-	}
-
-	/**
-	 * Return true iff off_ now holds the reference location
-	 * corresponding to the row last set with setRow().
-	 */
-	bool done() const {
-		return done_;
+		assert(chaser_.prepped_ || foundOff() || done);
 	}
 
 	/**
 	 * Advance the step-left process by one step.  Check if we're done.
 	 */
 	void advance() {
-		assert(!done_);
-		assert(chaser_.prepped_ || chaser_.done());
+		assert(!done);
+		assert(chaser_.prepped_ || chaser_.done);
 		reset();
-		if(chaser_.done()) {
+		if(chaser_.done) {
 			// chaser finished with this row
 			row_++;
 			if(row_ == bot_) {
@@ -212,16 +204,16 @@ public:
 			}
 			if(row_ == irow_) {
 				// Exhausted all possible rows
-				done_ = true;
+				done = true;
 				assert_eq(0xffffffff, off_.first);
 				return;
 			}
 			setRow(row_);
-			assert(chaser_.prepped_ || foundOff() || done_);
+			assert(chaser_.prepped_ || foundOff() || done);
 		} else {
 			chaser_.advance();
-			assert(chaser_.prepped_ || chaser_.done());
-			if(chaser_.done()) {
+			assert(chaser_.prepped_ || chaser_.done);
+			if(chaser_.done) {
 				// We're done immediately
 				off_ = chaser_.off();
 				if(off_.first != 0xffffffff) {
@@ -285,6 +277,8 @@ public:
 		rand_.init(seed);
 	}
 
+	bool done;             /// true = chase is done & answer is in off_
+
 protected:
 
 	const TEbwt* ebwt_;    /// index to resolve row in
@@ -295,7 +289,6 @@ protected:
 	uint32_t bot_;         /// range bottom
 	uint32_t irow_;        /// initial randomly-chosen row within range
 	uint32_t row_;         /// current row within range
-	bool done_;            /// true = chase is done & answer is in off_
 	U32Pair off_;          /// calculated offset (0xffffffff if not done)
 	uint32_t tlen_;        /// length of text hit
 	TRowChaser chaser_;    /// stateful row chaser

@@ -20,6 +20,7 @@
 class Unpaired1mmAlignerV1Factory : public AlignerFactory {
 	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
 	typedef ListRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TListRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Unpaired1mmAlignerV1Factory(
@@ -60,24 +61,14 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
-		// Source for ranges from forward index & forward read
-		GreedyDFSRangeSource *rFw_Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
-			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *rFw_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		//
-		GreedyDFSRangeSourceDriver * drFw_Fw = new GreedyDFSRangeSourceDriver(
-			*params, rFw_Fw, true, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_LEN, // allow 1 mismatch in rest of read
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+		// Source for ranges from forward index & forward read
+		GreedyDFSRangeSource *rFw_Fw = new GreedyDFSRangeSource(
+			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		//
 		GreedyDFSRangeSourceDriver * drFw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, rFw_Bw, true, sink_, sinkPt,
@@ -88,9 +79,19 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_);
-		TRangeSrcDrPtrVec drFwVec;
-		drFwVec.push_back(drFw_Fw); drFwVec.push_back(drFw_Bw);
-		TListRangeSrcDr* drFw = new TListRangeSrcDr(drFwVec);
+		//
+		GreedyDFSRangeSourceDriver * drFw_Fw = new GreedyDFSRangeSourceDriver(
+			*params, rFw_Fw, true, sink_, sinkPt,
+			0,          // seedLen (0 = whole read is seed)
+			true,       // nudgeLeft (true for Fw index, false for Bw)
+			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+			PIN_TO_LEN, // allow 1 mismatch in rest of read
+			PIN_TO_LEN, // "
+			PIN_TO_LEN, // "
+			os_, verbose_, seed_);
+		TRangeSrcDrPtrVec drVec;
+		drVec.push_back(drFw_Bw);
+		drVec.push_back(drFw_Fw);
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Fw = new GreedyDFSRangeSource(
@@ -120,16 +121,16 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_);
-		TRangeSrcDrPtrVec drRcVec;
-		drRcVec.push_back(drRc_Fw); drRcVec.push_back(drRc_Bw);
-		TListRangeSrcDr* drRc = new TListRangeSrcDr(drRcVec);
+		drVec.push_back(drRc_Fw); drVec.push_back(drRc_Bw);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			params, drFw, drRc, rchase,
+		// Set up the aligner
+		return new UnpairedAlignerV2<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
 	}
 
