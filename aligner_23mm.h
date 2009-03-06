@@ -50,7 +50,7 @@ protected:
  */
 class Unpaired23mmAlignerV1Factory : public AlignerFactory {
 	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
-	typedef ListRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TListRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Unpaired23mmAlignerV1Factory(
@@ -135,11 +135,10 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
-		TRangeSrcDrPtrVec drFwVec;
-		drFwVec.push_back(drFw_Fw);
-		drFwVec.push_back(drFw_Bw);
-		drFwVec.push_back(drFw_FwHalf);
-		TListRangeSrcDr* drFw = new TListRangeSrcDr(drFwVec);
+		TRangeSrcDrPtrVec drVec;
+		drVec.push_back(drFw_Fw);
+		drVec.push_back(drFw_Bw);
+		drVec.push_back(drFw_FwHalf);
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Fw = new GreedyDFSRangeSource(
@@ -183,18 +182,17 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
-		TRangeSrcDrPtrVec drRcVec;
-		drRcVec.push_back(drRc_Fw);
-		drRcVec.push_back(drRc_Bw);
-		drRcVec.push_back(drRc_FwHalf);
-		TListRangeSrcDr* drRc = new TListRangeSrcDr(drRcVec);
+		drVec.push_back(drRc_Fw);
+		drVec.push_back(drRc_Bw);
+		drVec.push_back(drRc_FwHalf);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
-			params, drFw, drRc, rchase,
+		return new UnpairedAlignerV2<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
 	}
 

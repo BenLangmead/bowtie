@@ -1493,5 +1493,4 @@ protected:
 	bool verbose2_;
 };
 
-
 #endif /* ALIGNER_H_ */

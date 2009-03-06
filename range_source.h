@@ -255,6 +255,9 @@ public:
 		assert_leq(elts, lastAllocSz_);
 		assert_leq(elts, cur_);
 		cur_ -= elts;
+#ifndef NDEBUG
+		memset(&pools_[curPool_][cur_], 0, elts * sizeof(RangeState));
+#endif
 	}
 
 	/**
@@ -263,7 +266,7 @@ public:
 	void reset() {
 #ifndef NDEBUG
 		for(size_t i = 0; i < pools_.size(); i++) {
-			memset(pools_[i], 0, (lim_) * sizeof(RangeState));
+			memset(pools_[i], 0, lim_ * sizeof(RangeState));
 		}
 #endif
 		cur_ = 0;
