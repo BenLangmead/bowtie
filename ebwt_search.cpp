@@ -3419,20 +3419,20 @@ static void driver(const char * type,
 
 	if(skipSearch) return;
 	// Open hit output file
-	ostream *fout;
+	OutFileBuf *fout;
 	if(!outfile.empty()) {
 		if(refOut) {
 			fout = NULL;
 			cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
 		} else {
-			fout = new ofstream(outfile.c_str(), ios::binary);
+			fout = new OutFileBuf(outfile.c_str(), outType == BINARY);
 		}
 	} else {
 		if(outType == BINARY && !refOut) {
 			cerr << "Error: Must specify an output file when output mode is binary" << endl;
 			exit(1);
 		}
-		fout = &cout;
+		fout = new OutFileBuf();
 	}
 	// Initialize Ebwt object and read in header
     Ebwt<TStr> ebwt(adjustedEbwtFileBase,
@@ -3482,21 +3482,21 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new VerboseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				} else {
-					sink = new VerboseHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
+					sink = new VerboseHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
 				}
 				break;
 			case CONCISE:
 				if(refOut) {
 					sink = new ConciseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				} else {
-					sink = new ConciseHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
+					sink = new ConciseHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
 				}
 				break;
 			case BINARY:
 				if(refOut) {
 					sink = new BinaryHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				} else {
-					sink = new BinaryHitSink(*fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
+					sink = new BinaryHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
 				}
 				break;
 			case NONE:

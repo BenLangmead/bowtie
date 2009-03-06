@@ -340,16 +340,15 @@ public:
 	inline bool report(const Range& ra,
 	                   uint32_t first,
 	                   uint32_t second,
-	                   uint32_t tlen,
-	                   bool fw)
+	                   uint32_t tlen)
 	{
 		bool ebwtFw = ra.ebwt->fw();
-		params_->setFw(fw);
+		params_->setFw(ra.fw);
 		return params_->reportHit(
-				fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
-				     (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
-				fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
-				     (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
+				ra.fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
+				        (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
+				ra.fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
+				        (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
 				&bufa_->name,
 				ebwtFw,
 				ra.mms,                   // mismatch positions
@@ -378,8 +377,7 @@ public:
 			}
 			if(rchase_->foundOff()) {
 				this->done = report(driver_->range(), rchase_->off().first,
-				                    rchase_->off().second, rchase_->tlen(),
-				                    driver_->fw());
+				                    rchase_->off().second, rchase_->tlen());
 				rchase_->reset();
 			} else {
 				assert(rchase_->done);
@@ -390,18 +388,18 @@ public:
 		}
 		// Still advancing a
 		if(!this->done && !chase_) {
+			assert(!driver_->done);
 			driver_->advance();
 			if(driver_->foundRange) {
 				const Range& ra = driver_->range();
 				if(rangeMode_) {
-					this->done = report(ra, ra.top, ra.bot, 0, driver_->fw());
+					this->done = report(ra, ra.top, ra.bot, 0);
 				} else {
-					rchase_->setTopBot(ra.top, ra.bot, alen_, driver_->curEbwt());
+					rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
 					if(rchase_->foundOff()) {
 						this->done = report(
 								ra, rchase_->off().first,
-								rchase_->off().second, rchase_->tlen(),
-								driver_->fw());
+								rchase_->off().second, rchase_->tlen());
 						rchase_->reset();
 					}
 					if(!rchase_->done) {
@@ -506,16 +504,15 @@ public:
 	inline bool report(const Range& ra,
 	                   uint32_t first,
 	                   uint32_t second,
-	                   uint32_t tlen,
-	                   bool fw)
+	                   uint32_t tlen)
 	{
 		bool ebwtFw = ra.ebwt->fw();
-		params_->setFw(fw);
+		params_->setFw(ra.fw);
 		return params_->reportHit(
-				fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
-				     (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
-				fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
-				     (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
+				ra.fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
+				        (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
+				ra.fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
+				        (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
 				&bufa_->name,
 				ebwtFw,
 				ra.mms,                   // mismatch positions
@@ -545,7 +542,7 @@ public:
 			}
 			if(rchase_->foundOff()) {
 				this->done = report(driverFw_->range(), rchase_->off().first,
-				                    rchase_->off().second, rchase_->tlen(), true);
+				                    rchase_->off().second, rchase_->tlen());
 				rchase_->reset();
 			} else {
 				assert(rchase_->done);
@@ -563,7 +560,7 @@ public:
 			}
 			if(rchase_->foundOff()) {
 				this->done = report(driverRc_->range(), rchase_->off().first,
-				                    rchase_->off().second, rchase_->tlen(), false);
+				                    rchase_->off().second, rchase_->tlen());
 				rchase_->reset();
 			} else {
 				assert(rchase_->done);
@@ -580,14 +577,14 @@ public:
 				driverFw_->advance();
 				if(driverFw_->foundRange) {
 					const Range& ra = driverFw_->range();
+					assert(ra.fw == fw);
 					if(rangeMode_) {
-						this->done = report(ra, ra.top, ra.bot, 0, fw);
+						this->done = report(ra, ra.top, ra.bot, 0);
 					} else {
-						rchase_->setTopBot(ra.top, ra.bot, alen_, driverFw_->curEbwt());
+						rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
 						if(rchase_->foundOff()) {
 							this->done = report(ra, rchase_->off().first,
-							               rchase_->off().second, rchase_->tlen(),
-							               fw);
+							               rchase_->off().second, rchase_->tlen());
 							rchase_->reset();
 						}
 						if(!rchase_->done) {
@@ -606,13 +603,12 @@ public:
 				if(driverRc_->foundRange) {
 					const Range& ra = driverRc_->range();
 					if(rangeMode_) {
-						this->done = report(ra, ra.top, ra.bot, 0, fw);
+						this->done = report(ra, ra.top, ra.bot, 0);
 					} else {
-						rchase_->setTopBot(ra.top, ra.bot, alen_, driverRc_->curEbwt());
+						rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
 						if(rchase_->foundOff()) {
 							this->done = report(ra, rchase_->off().first,
-							               rchase_->off().second, rchase_->tlen(),
-							               fw);
+							               rchase_->off().second, rchase_->tlen());
 							rchase_->reset();
 						}
 						if(!rchase_->done) {
@@ -895,8 +891,6 @@ protected:
 	            uint32_t upstreamOff, // offset for upstream mate
 	            uint32_t dnstreamOff, // offset for downstream mate
 	            uint32_t tlen, // length of ref
-	            bool fwL,      // whether upstream mate is in fw orientation
-	            bool fwR,      // whether downstream mate is in fw orientation
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
 	            bool ebwtFwR)
@@ -911,13 +905,13 @@ protected:
 		uint32_t lenR = pairFw ? blen_ : alen_;
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
-		params_->setFw(fwL);
+		params_->setFw(rL.fw);
 		// Print upstream mate first
 		ret = params_->reportHit(
-				fwL ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
-					  (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
-				fwL ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
-					  (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
+				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
+					    (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
+				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
+					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
 				&bufL->name,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
@@ -934,12 +928,12 @@ protected:
 		if(ret) {
 			return true; // can happen when -m is set
 		}
-		params_->setFw(fwR);
+		params_->setFw(rR.fw);
 		ret = params_->reportHit(
-				fwR ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
-					  (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
-				fwR ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
-					  (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
+				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
+					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
+				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
+					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
 				&bufR->name,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
@@ -962,11 +956,9 @@ protected:
 	            uint32_t upstreamOff, // offset for upstream mate
 	            uint32_t dnstreamOff, // offset for downstream mate
 	            uint32_t tlen, // length of ref
-	            bool fwL,      // whether upstream mate is in fw orientation
-	            bool fwR,      // whether downstream mate is in fw orientation
 	            bool pairFw)   // whether the pair is being mapped to fw strand
 	{
-		return report(rL, rR, first, upstreamOff, dnstreamOff, tlen, fwL, fwR,
+		return report(rL, rR, first, upstreamOff, dnstreamOff, tlen,
 		              pairFw, rL.ebwt->fw(), rR.ebwt->fw());
 	}
 
@@ -986,8 +978,6 @@ protected:
 	                     TRangeVec* rangesRarr,
 		                 TDriver& drL,
 		                 TDriver& drR,
-		                 bool fwL,
-		                 bool fwR,
 		                 bool pairFw,
 		                 bool verbose = false)
 	{
@@ -1028,9 +1018,7 @@ protected:
 								   h.first,     // reference target
 								   left, right, // up/downstream offsets
 								   // _plen array is same both Fw and Bw
-								   drL.curEbwt()->_plen[h.first],
-								   fwL, // true -> upstream mate is fw
-								   fwR, // true -> downstream mate is fw
+								   rL.ebwt->_plen[h.first],
 								   pairFw)) return true;
 						}
 					}
@@ -1118,6 +1106,7 @@ protected:
 		assert_eq(ranges.size(), offs.size());
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
+			r.fw = fw;
 			const uint32_t result = offs[i];
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
@@ -1131,7 +1120,6 @@ protected:
 				    matchRight ? toff : result, // upstream offset
 			        matchRight ? result : toff, // downstream offset
 				    tlen,       // length of ref
-				    fwL_, fwR_, // whether mate1 is in fw orientation
 				    !doneFw_,   // whether the pair is being mapped to fw strand
 				    ebwtLFw,
 				    ebwtRFw)) return true;
@@ -1156,18 +1144,19 @@ protected:
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
 				if(!dontReconcile_ && !overThresh) {
-					this->done = reconcileAndAdd(rchase_->off(), true /* new entry is from 1 */,
-											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
-											fwL_, fwR_, pairFw, verbose);
+					this->done = reconcileAndAdd(
+							rchase_->off(), true /* new entry is from 1 */,
+							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
+							*drL_, *drR_, pairFw, verbose);
 				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
+					const Range& r = drL_->range();
 					this->done = resolveOutstandingInRef(
 							pairFw, rchase_->off(),
-					        drL_->curEbwt()->_plen[rchase_->off().first],
-					        drL_->range());
+					        r.ebwt->_plen[rchase_->off().first], r);
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
@@ -1184,8 +1173,10 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
 					assert(drR_->foundRange);
-					uint32_t top = drR_->range().top; uint32_t bot = drR_->range().bot;
-					rchase_->setTopBot(top, bot, drR_->qlen(), drR_->curEbwt());
+					const Range& r = drR_->range();
+					uint32_t top = r.top;
+					uint32_t bot = r.bot;
+					rchase_->setTopBot(top, bot, drR_->qlen(), r.ebwt);
 					*chaseR_ = true;
 					*delayedchaseR_ = false;
 				}
@@ -1200,18 +1191,19 @@ protected:
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
 				if(!dontReconcile_ && !overThresh) {
-					this->done = reconcileAndAdd(rchase_->off(), false /* new entry is from 2 */,
-											offsLarr_, offsRarr_, rangesLarr_, rangesRarr_, *drL_, *drR_,
-											fwL_, fwR_, pairFw, verbose);
+					this->done = reconcileAndAdd(
+							rchase_->off(), false /* new entry is from 2 */,
+							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
+							*drL_, *drR_, pairFw, verbose);
 				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
 					// mode"
+					const Range& r = drR_->range();
 					this->done = resolveOutstandingInRef(
 							!pairFw, rchase_->off(),
-					        drR_->curEbwt()->_plen[rchase_->off().first],
-					        drR_->range());
+					        r.ebwt->_plen[rchase_->off().first], r);
 					if(++mixedAttempts_ > mixedAttemptLim_) {
 						// Give up on this pair
 						*donePair_ = true;
@@ -1228,8 +1220,10 @@ protected:
 					// Start chasing the delayed range
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
 					assert(drL_->foundRange);
-					uint32_t top = drL_->range().top; uint32_t bot = drL_->range().bot;
-					rchase_->setTopBot(top, bot, drL_->qlen(), drL_->curEbwt());
+					const Range& r = drL_->range();
+					uint32_t top = r.top;
+					uint32_t bot = r.bot;
+					rchase_->setTopBot(top, bot, drL_->qlen(), r.ebwt);
 					*chaseL_ = true;
 					*delayedchaseL_ = false;
 				}
@@ -1257,7 +1251,7 @@ protected:
 					{
 						std::set<int64_t>& s = (pairFw ? allTopsL_fw_ : allTopsL_rc_);
 						int64_t t = drL_->range().top + 1; // add 1 to avoid 0
-						if(!drL_->curEbwt()->fw()) t = -t; // invert for bw index
+						if(!drL_->range().ebwt->fw()) t = -t; // invert for bw index
 						assert(s.find(t) == s.end());
 						s.insert(t);
 					}
@@ -1288,14 +1282,14 @@ protected:
 							*delayedchaseR_ = false;
 							*delayedchaseL_ = true;
 							*chaseR_ = true;
-							rchase_->setTopBot(drR_->range().top, drR_->range().bot,
-							                  drR_->qlen(), drR_->curEbwt());
+							const Range& r = drR_->range();
+							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseL_ = true;
-							rchase_->setTopBot(drL_->range().top, drL_->range().bot,
-							                  drL_->qlen(), drL_->curEbwt());
+							const Range& r = drL_->range();
+							rchase_->setTopBot(r.top, r.bot, drL_->qlen(), r.ebwt);
 						}
 					}
 				}
@@ -1318,7 +1312,7 @@ protected:
 					{
 						std::set<int64_t>& s = (pairFw ? allTopsR_fw_ : allTopsR_rc_);
 						int64_t t = drR_->range().top + 1; // add 1 to avoid 0
-						if(!drR_->curEbwt()->fw()) t = -t; // invert for bw index
+						if(!drR_->range().ebwt->fw()) t = -t; // invert for bw index
 						assert(s.find(t) == s.end());
 						s.insert(t);
 					}
@@ -1349,14 +1343,14 @@ protected:
 							*delayedchaseL_ = false;
 							*delayedchaseR_ = true;
 							*chaseL_ = true;
-							rchase_->setTopBot(drL_->range().top, drL_->range().bot,
-							                   drL_->qlen(), drL_->curEbwt());
+							const Range& r = drL_->range();
+							rchase_->setTopBot(r.top, r.bot, drL_->qlen(), r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseR_ = true;
-							rchase_->setTopBot(drR_->range().top, drR_->range().bot,
-							                   drR_->qlen(), drR_->curEbwt());
+							const Range& r = drR_->range();
+							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
 						}
 					}
 				}

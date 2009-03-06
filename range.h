@@ -20,6 +20,7 @@ struct Range {
 	uint32_t bot;     // bottom of range
 	uint32_t stratum; // stratum
 	uint32_t numMms;  // # mismatches
+	bool fw;          // the forward orientation of read aligned?
 	std::vector<uint32_t> mms;   // list of positions with mismatches
 	std::vector<uint8_t>  refcs; // reference characters at mismatch positions
 	const Ebwt<seqan::String<seqan::Dna> > *ebwt;

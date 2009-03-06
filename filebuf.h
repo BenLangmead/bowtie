@@ -232,4 +232,118 @@ private:
 	char     buf_[BUF_SZ]; // (large) input buffer
 };
 
+/**
+ * Wrapper for a buffered output stream that writes characters and
+ * other data types.  This class is *not* synchronized; the caller is
+ * responsible for synchronization.
+ */
+class OutFileBuf {
+
+public:
+
+	/**
+	 * Open a new output stream to a file with given name.
+	 */
+	OutFileBuf(const char *out, bool binary = false) : name_(out), cur_(0) {
+		assert(out != NULL);
+		out_ = fopen(out, binary ? "wb" : "w");
+		if(out_ == NULL) {
+			cerr << "Error: Could not open alignment output file " << out << endl;
+			exit(1);
+		}
+	}
+
+	/**
+	 * Open a new output stream to a file with given name.
+	 */
+	OutFileBuf() : name_("cout"), cur_(0) {
+		out_ = stdout;
+	}
+
+	/**
+	 * Write a single character into the write buffer and, if
+	 * necessary, flush.
+	 */
+	void write(int c) {
+		if(cur_ == BUF_SZ) {
+			// Flush the buffer
+			if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
+				cerr << "Error writing to alignment output file " << name_ << endl;
+				exit(1);
+			}
+			// Reset to beginning of the buffer
+			cur_ = 0;
+		}
+		buf_[cur_++] = c;
+	}
+
+	/**
+	 * Write a c++ string to the write buffer and, if necessary, flush.
+	 */
+	void writeString(const string& s) {
+		size_t slen = s.length();
+		if(cur_ + slen > BUF_SZ) {
+			// Flush the buffer
+			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
+				cerr << "Error writing to alignment output file " << name_ << endl;
+				exit(1);
+			}
+			// Reset to beginning of the buffer
+			cur_ = 0;
+		}
+		memcpy(&buf_[cur_], s.data(), slen);
+		cur_ += slen;
+		assert_leq(cur_, BUF_SZ);
+	}
+
+	/**
+	 * Write a c++ string to the write buffer and, if necessary, flush.
+	 */
+	void writeChars(const char * s, size_t len) {
+		if(cur_ + len > BUF_SZ) {
+			// Flush the buffer
+			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
+				cerr << "Error writing to alignment output file " << name_ << endl;
+				exit(1);
+			}
+			// Reset to beginning of the buffer
+			cur_ = 0;
+		}
+		memcpy(&buf_[cur_], s, len);
+		cur_ += len;
+		assert_leq(cur_, BUF_SZ);
+	}
+
+	/**
+	 * Write any remaining bitpairs and then close the input
+	 */
+	void close() {
+		if(cur_ > 0) {
+			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
+				cerr << "Error while flushing and closing output" << endl;
+				exit(1);
+			}
+		}
+		if(out_ != stdout) {
+			fclose(out_);
+		}
+	}
+
+	/**
+	 * Return the filename.
+	 */
+	const char *name() {
+		return name_;
+	}
+
+private:
+
+	static const size_t BUF_SZ = 256 * 1024;
+
+	const char *name_;
+	FILE       *out_;
+	uint32_t    cur_;
+	char        buf_[BUF_SZ]; // (large) input buffer
+};
+
 #endif /*ndef FILEBUF_H_*/

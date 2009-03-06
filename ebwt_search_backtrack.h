@@ -536,6 +536,7 @@ public:
 				_curRange.bot     = bot;
 				_curRange.stratum = calcStratum(_mms, 0);
 				_curRange.numMms  = 0;
+				_curRange.fw      = _params.fw();
 				_curRange.mms.clear(); // no mismatches
 				// no need to do anything with _curRange.refcs
 				this->foundRange  = true;
@@ -612,6 +613,7 @@ public:
 				_curRange.bot     = bot;
 				_curRange.stratum = calcStratum(_mms, 0);
 				_curRange.numMms  = 0;
+				_curRange.fw      = _params.fw();
 				_curRange.mms.clear(); // no mismatches
 				// no need to do anything with _curRange.refcs
 				this->foundRange  = true;
@@ -894,6 +896,7 @@ public:
 			_curRange.mms     = cont->mms;
 			_curRange.refcs   = cont->refcs;
 			_curRange.ebwt    = _ebwt;
+			_curRange.fw      = _params.fw();
 			this->foundRange  = true;
 			contMan.pop();
 			return;
@@ -933,9 +936,7 @@ public:
 				assert(br == pm.front());
 				pm.pop();
 				assert(!pm.contains(br));
-				// br is allocated from a pool; it'll get cleaned up
-				// later
-				//delete br;
+				// br is allocated from a pool; it'll get freed later
 			} else if(br->cost_ > origCost) {
 				// br's cost changed so we need to re-insert it into
 				// the priority queue
@@ -947,6 +948,9 @@ public:
 			pm.push(newbr);
 			assert(newbr == pm.front());
 			br = newbr;
+		}
+		if(_verbose) {
+			br->print((*_qry), (*_qual), cout, _params.fw(), _ebwt->fw());
 		}
 		assert(!br->curtailed_);
 		assert(!br->exhausted_);
@@ -1033,7 +1037,7 @@ public:
 				rs->bots[1] = rs->tops[2] = ebwt._fchr[2];
 				rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
 				rs->bots[3]               = ebwt._fchr[4];
-				ASSERT_ONLY(int r =) br->installRanges(c, nextc);
+				ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
 				assert(r < 4 || c == 4);
 				// Update top and bot
 				if(c < 4) {
@@ -1051,7 +1055,7 @@ public:
 				rs->bots[2] = rs->tops[3] =
 				rs->bots[3]               = 0;
 				ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
-				ASSERT_ONLY(int r =) br->installRanges(c, nextc);
+				ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
 				assert(r < 4 || c == 4);
 				// Update top and bot
 				if(c < 4) {
@@ -1116,10 +1120,15 @@ public:
 		   !invalidExact &&  // not disqualified by no-exact-hits setting
 		   !reportedPartial) // not an already-reported partial alignment
 		{
+			if(_verbose) {
+				br->extend();
+				br->print((*_qry), (*_qual), cout, _params.fw(), _ebwt->fw());
+			}
 			_curRange.top     = br->top_;
 			_curRange.bot     = br->bot_;
 			_curRange.stratum = (br->cost_ >> 14);
 			_curRange.numMms  = br->numEdits_;
+			_curRange.fw      = _params.fw();
 			_curRange.mms.clear();
 			_curRange.refcs.clear();
 			for(size_t i = 0; i < br->numEdits_; i++) {
@@ -3201,7 +3210,8 @@ protected:
 				}
 			}
 			assert_lt(lowQual, 0xff);
-			minCost += lowQual;
+			assert_geq(lowQual, 33);
+			minCost += (lowQual - 33);
 		} else {
 			// Half-and-half constraints are active, so there must be
 			// at least 1 mismatch in both halves of the seed
@@ -3214,6 +3224,7 @@ protected:
 				}
 			}
 			assert_lt(lowQual1, 0xff);
+			assert_geq(lowQual1, 33);
 			uint8_t lowQual2 = 0xff;
 			for(uint32_t d = sRight; d < s; d++) {
 				if((*this->qual_)[len_ - d - 1] < lowQual2) {
@@ -3221,7 +3232,8 @@ protected:
 				}
 			}
 			assert_lt(lowQual2, 0xff);
-			minCost += (lowQual1 + lowQual2);
+			assert_geq(lowQual2, 33);
+			minCost += (lowQual1 + lowQual2 - 66);
 		}
 		this->minCostAdjustment_ = minCost;
 		rs_->setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)

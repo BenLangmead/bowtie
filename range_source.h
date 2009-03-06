@@ -39,15 +39,6 @@ enum {
 union ElimsAndQual {
 
 	/**
-	 * Return true iff all outgoing paths are eliminated.
-	 */
-	//bool eliminated() const {
-		// All non-qual bits of the flags field are 1, meaning
-		// everything's eliminated
-	//	return join.elims == 511;
-	//}
-
-	/**
 	 * Set all the non-qual bits of the flags field to 1, indicating
 	 * that all outgoing paths are eliminated.
 	 */
@@ -428,6 +419,7 @@ public:
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
 		assert(ranges_ != NULL);
+		assert(curtailed_);
 		int tiedPositions[3];
 		int numTiedPositions = 0;
 		// Lowest marginal cost incurred by any of the positions with
@@ -497,7 +489,7 @@ public:
 		newBranch->init(
 				rpool, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
-				newRdepth, 0, bestCost, top, bot, ep, ebwt,
+				newRdepth, 0, cost_, top, bot, ep, ebwt,
 				numEdits_,
 				edits_);
 		// Add the new edit
@@ -512,9 +504,74 @@ public:
 			// We exhausted the last outgoing edge at the current best
 			// cost; update the best cost to be the next-best
 			assert_neq(0xffff, nextCost);
-			cost_ += nextCost;
+			if(bestCost != nextCost) {
+				cost_ -= bestCost;
+				cost_ += nextCost;
+			}
 		}
 		return newBranch;
+	}
+
+	/**
+	 * Pretty-print the state of this branch.
+	 */
+	void print(const String<Dna5>& qry,
+	           const String<char>& quals,
+	           std::ostream& out,
+	           bool fw,
+	           bool ebwtFw)
+	{
+		size_t editidx = 0;
+		size_t printed = 0;
+		const size_t qlen = seqan::length(qry);
+		if(exhausted_)      out << "E ";
+		else if(curtailed_) out << "C ";
+		else                out << "  ";
+		if(ebwtFw) out << "<";
+		else       out << ">";
+		if(fw)     out << "F";
+		else       out << "R";
+		std::stringstream ss;
+		ss << cost_;
+		string s = ss.str();
+		if(s.length() < 6) {
+			for(size_t i = 0; i < 6 - s.length(); i++) {
+				out << "0";
+			}
+		}
+		out << s;
+		std::stringstream ss2;
+		ss2 << " ";
+		if(rdepth_ > 0) {
+			for(size_t i = 0; i < rdepth_; i++) {
+				if(editidx < numEdits_ && edits_[editidx].pos == i) {
+					ss2 << " " << "acgt"[edits_[editidx].chr];
+					editidx++;
+				} else {
+					ss2 << " " << qry[qlen - i - 1];
+				}
+				printed++;
+			}
+			ss2 << "|";
+		}
+		for(size_t i = 0; i < len_; i++) {
+			if(editidx < numEdits_ && edits_[editidx].pos == printed) {
+				ss2 << " " << "acgt"[edits_[editidx].chr];
+				editidx++;
+			} else {
+				ss2 << qry[qlen - printed - 1] << " ";
+			}
+			printed++;
+		}
+		assert_eq(editidx, numEdits_);
+		for(size_t i = printed; i < qlen; i++) {
+			ss2 << "- ";
+		}
+		s = ss2.str();
+		if(ebwtFw) {
+			std::reverse(s.begin(), s.end());
+		}
+		out << s << endl;
 	}
 
 	/**
@@ -588,7 +645,7 @@ public:
 	 * Set the elims to match the ranges in ranges_[len_], already
 	 * calculated by the caller.  Only does mismatches for now.
 	 */
-	int installRanges(int c, int nextc) {
+	int installRanges(int c, int nextc, uint8_t q) {
 		assert(ranges_ != NULL);
 		assert_eq(0, gaveBack_);
 		RangeState& r = ranges_[len_];
@@ -599,6 +656,7 @@ public:
 		assert_neq(0, r.bots[3]);
 		r.eliminated_ = true; // start with everything eliminated
 		r.eq.eliminate();
+		r.eq.flags.qual = q;
 		// Set one/both of these to true to do the accounting for
 		// insertions and deletions as well as mismatches
 		bool doInserts = false;
@@ -1214,6 +1272,8 @@ public:
 		if(this->foundRange) {
 			// Assert that we have not yet dished out a range with this
 			// top offset
+			assert_gt(range().bot, range().top);
+			assert(range().ebwt != NULL);
 			int64_t top = (int64_t)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
@@ -1231,16 +1291,8 @@ public:
 	 * Return the range found.
 	 */
 	virtual Range& range() = 0;
-	/// Return ptr to index this RangeSource is currently getting ranges from
-	virtual const TEbwt* curEbwt() const = 0;
 
 	virtual uint32_t qlen() const = 0;
-
-	/**
-	 * Return true iff the read pattern currently being processed is
-	 * the forward or the reverse-complement orientation.
-	 */
-	virtual bool fw() const = 0;
 
 	/// Set to true iff we just found a range.
 	bool foundRange;
@@ -1310,22 +1362,23 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
+		bool ebwtFw = rs_->curEbwt()->fw();
 		if(mate1) {
 			if(fw_) {
-				pat_  = (curEbwt()->fw() ? &patsrc->bufa().patFw  : &patsrc->bufa().patFwRev);
-				qual_ = (curEbwt()->fw() ? &patsrc->bufa().qualFw : &patsrc->bufa().qualFwRev);
+				pat_  = (ebwtFw ? &patsrc->bufa().patFw  : &patsrc->bufa().patFwRev);
+				qual_ = (ebwtFw ? &patsrc->bufa().qualFw : &patsrc->bufa().qualFwRev);
 			} else {
-				pat_  = (curEbwt()->fw() ? &patsrc->bufa().patRc  : &patsrc->bufa().patRcRev);
-				qual_ = (curEbwt()->fw() ? &patsrc->bufa().qualRc : &patsrc->bufa().qualRcRev);
+				pat_  = (ebwtFw ? &patsrc->bufa().patRc  : &patsrc->bufa().patRcRev);
+				qual_ = (ebwtFw ? &patsrc->bufa().qualRc : &patsrc->bufa().qualRcRev);
 			}
 			name_ = &patsrc->bufa().name;
 		} else {
 			if(fw_) {
-				pat_  = (curEbwt()->fw() ? &patsrc->bufb().patFw  : &patsrc->bufb().patFwRev);
-				qual_ = (curEbwt()->fw() ? &patsrc->bufb().qualFw : &patsrc->bufb().qualFwRev);
+				pat_  = (ebwtFw ? &patsrc->bufb().patFw  : &patsrc->bufb().patFwRev);
+				qual_ = (ebwtFw ? &patsrc->bufb().qualFw : &patsrc->bufb().qualFwRev);
 			} else {
-				pat_  = (curEbwt()->fw() ? &patsrc->bufb().patRc  : &patsrc->bufb().patRcRev);
-				qual_ = (curEbwt()->fw() ? &patsrc->bufb().qualRc : &patsrc->bufb().qualRcRev);
+				pat_  = (ebwtFw ? &patsrc->bufb().patRc  : &patsrc->bufb().patRcRev);
+				qual_ = (ebwtFw ? &patsrc->bufb().qualRc : &patsrc->bufb().qualRcRev);
 			}
 			name_ = &patsrc->bufb().name;
 		}
@@ -1367,7 +1420,7 @@ public:
 		if(!this->done) {
 			// Hopefully, this will prefetch enough so that when we
 			// resume, stuff is already in cache
-			const TEbwt* ebwt = curEbwt();
+			const TEbwt* ebwt = rs_->curEbwt();
 			assert(ebwt != NULL);
 			pm_.prep(ebwt->_eh, ebwt->_ebwt);
 		}
@@ -1383,19 +1436,6 @@ public:
 	/// Return length of current query
 	virtual uint32_t qlen() const {
 		return len_;
-	}
-
-	/// Return ptr to index this RangeSource is currently getting ranges from
-	virtual const TEbwt* curEbwt() const {
-		return rs_->curEbwt();
-	}
-
-	/**
-	 * Return true iff the read pattern currently being processed is
-	 * the forward or the reverse-complement orientation.
-	 */
-	virtual bool fw() const {
-		return fw_;
 	}
 
 protected:
@@ -1461,6 +1501,7 @@ public:
 		mate1_ = mate1;   // so that we can call setQuery on the other elements later
 		this->done = (cur_ == rss_.size()-1) && rss_[cur_]->done;
 		this->minCost = max(rss_[cur_]->minCost, this->minCostAdjustment_);
+		this->foundRange = rss_[cur_]->foundRange;
 	}
 
 	/// Advance the range search by one memory op
@@ -1490,22 +1531,9 @@ public:
 	/// Return the last valid range found
 	virtual Range& range() { return rss_[cur_]->range(); }
 
-	/// Return curEbwt for the currently-active RangeSource
-	const TEbwt* curEbwt() const {
-		return rss_[cur_]->curEbwt();
-	}
-
 	/// Return length of current query
 	virtual uint32_t qlen() const {
 		return rss_[cur_]->qlen();
-	}
-
-	/**
-	 * Return true iff the read pattern currently being processed is
-	 * the forward or the reverse-complement orientation.
-	 */
-	virtual bool fw() const {
-		return rss_[cur_]->fw();
 	}
 
 protected:
@@ -1560,6 +1588,11 @@ public:
 			rss_[i]->setQuery(patsrc, mate1);
 		}
 		this->done = rss_[0]->done;
+		this->foundRange = rss_[0]->foundRange;
+		lastRange_ = NULL;
+		if(this->foundRange) {
+			lastRange_ = &rss_[0]->range();
+		}
 		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
 		sortRss();
 		assert(sortedRss());
@@ -1580,8 +1613,15 @@ public:
 			// Move on to next RangeSourceDriver
 			if(!rss_[0]->done) {
 				this->foundRange = rss_[0]->foundRange;
+				if(this->foundRange) {
+					lastRange_ = &rss_[0]->range();
+				} else {
+					lastRange_ = NULL;
+				}
 				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
 			} else {
+				this->foundRange = false;
+				lastRange_ = NULL;
 				this->done = true;
 			}
 		} else {
@@ -1589,6 +1629,11 @@ public:
 			uint16_t precost = rss_[0]->minCost;
 			rss_[0]->advance();
 			this->foundRange = rss_[0]->foundRange;
+			if(this->foundRange) {
+				lastRange_ = &rss_[0]->range();
+			} else {
+				lastRange_ = NULL;
+			}
 			if(precost != rss_[0]->minCost) {
 				assert_gt(rss_[0]->minCost, precost);
 				// Remove and re-insert
@@ -1602,8 +1647,10 @@ public:
 						// Stop here
 						rss_[i] = p;
 #ifndef NDEBUG
-						if(i > 0) {
+						if(i > 0 && !rss_[i-1]->done) {
 							assert_geq(rss_[i]->minCost, rss_[i-1]->minCost);
+						}
+						if(!rss_[i+1]->done) {
 							assert_leq(rss_[i]->minCost, rss_[i+1]->minCost);
 						}
 #endif
@@ -1618,27 +1665,20 @@ public:
 				assert(sortedRss());
 			}
 		}
+#ifndef NDEBUG
+		if(this->foundRange) {
+			assert_gt(range().bot, range().top);
+			assert(range().ebwt != NULL);
+		}
+#endif
 	}
 
 	/// Return the last valid range found
-	virtual Range& range() { return rss_[0]->range(); }
-
-	/// Return curEbwt for the currently-active RangeSource
-	const TEbwt* curEbwt() const {
-		return rss_[0]->curEbwt();
-	}
+	virtual Range& range() { assert(lastRange_ != NULL); return *lastRange_; }
 
 	/// Return length of current query
 	virtual uint32_t qlen() const {
 		return rss_[0]->qlen();
-	}
-
-	/**
-	 * Return true iff the read pattern currently being processed is
-	 * the forward or the reverse-complement orientation.
-	 */
-	virtual bool fw() const {
-		return rss_[0]->fw();
 	}
 
 protected:
@@ -1709,6 +1749,7 @@ protected:
 	TRangeSrcDrPtrVec rss_;
 	/// The random seed from the Aligner, which we use to randomly break ties
 	RandomSource rand_;
+	Range *lastRange_;
 };
 
 #endif /* RANGE_SOURCE_H_ */

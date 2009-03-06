@@ -16,6 +16,7 @@
 #include "tokenize.h"
 #include "pat.h"
 #include "formats.h"
+#include "filebuf.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -157,7 +158,7 @@ bool operator< (const Hit& a, const Hit& b);
  */
 class HitSink {
 public:
-	HitSink(ostream& out,
+	HitSink(OutFileBuf* out,
 			const std::string& dumpUnalignFaBasename,
 			const std::string& dumpUnalignFqBasename,
 			const std::string& dumpMaxedFaBasename,
@@ -174,9 +175,11 @@ public:
 		dumpMaxFqBase_(dumpMaxedFqBasename),
 		first_(true),
 		numReported_(0llu),
-		numReportedPaired_(0llu)
+		numReportedPaired_(0llu),
+		quiet_(false),
+		ssmode_(ios_base::out)
 	{
-		_outs.push_back(&out);
+		_outs.push_back(out);
 		_locks.resize(1);
 		MUTEX_INIT(_locks[0]);
 		MUTEX_INIT(_mainlock);
@@ -202,7 +205,9 @@ public:
 		dumpUnalFaBase_(dumpUnalignFaBasename),
 		dumpUnalFqBase_(dumpUnalignFqBasename),
 		dumpMaxFaBase_(dumpUnalignFaBasename),
-		dumpMaxFqBase_(dumpUnalignFqBasename)
+		dumpMaxFqBase_(dumpUnalignFqBasename),
+		quiet_(false),
+		ssmode_(ios_base::out)
 	{
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
@@ -214,19 +219,20 @@ public:
    		initDumps();
 	}
 
-
+	/**
+	 *
+	 */
 	virtual ~HitSink() {
 		// Flush and close all non-NULL output streams
 		for(size_t i = 0; i < _outs.size(); i++) {
 			if(_outs[i] != NULL) {
-				_outs[i]->flush();
-				if(_outs[i] != &std::cout) ((std::ofstream*)_outs[i])->close();
+				_outs[i]->close();
 			}
 		}
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
 			for(size_t i = 0; i < _outs.size(); i++) {
-				if(_outs[i] != NULL && _outs[i] != &std::cout) {
+				if(_outs[i] != NULL) {
 					delete _outs[i];
 				}
 			}
@@ -255,20 +261,50 @@ public:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) = 0;
 
+	/**
+	 * Append a single hit to the given output stream.
+	 */
+	virtual void append(ostream& o, const Hit& h) = 0;
+
+	/**
+	 * Report a batch of hits.
+	 */
 	virtual void reportHits(vector<Hit>& hs) {
 		size_t hssz = hs.size();
-		for(size_t i = 0; i < hssz; i++) {
-#ifndef NDEBUG
-			for(size_t j = i+1; j < hssz; j++) {
-				assert_eq(hs[i].h.first, hs[j].h.first);
-			}
-#endif
-			reportHit(hs[i]);
+		if(hssz == 0) return;
+		bool paired = hs[0].mate > 0;
+		// Sort reads so that those against the same reference sequence
+		// are consecutive.
+		if(_outs.size() > 1 && hssz > 2) {
+			sort(hs.begin(), hs.end());
 		}
+		char buf[4096];
+		for(size_t i = 0; i < hssz; i++) {
+			const Hit& h = hs[i];
+			bool diff = false;
+			if(i > 0) {
+				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
+				if(diff) unlock(hs[i-1].h.first);
+			}
+			ostringstream ss(ssmode_);
+			ss.rdbuf()->pubsetbuf(buf, 4096);
+			append(ss, h);
+			if(i == 0 || diff) {
+				lock(h.h.first);
+			}
+			out(h.h.first).writeChars(buf, ss.tellp());
+		}
+		unlock(hs[hssz-1].h.first);
+		mainlock();
+		first_ = false;
+		if(paired) numReportedPaired_ += hssz;
+		else       numReported_ += hssz;
+		mainunlock();
 	}
 
 	/// Called when all alignments are complete
-	virtual void finish() {
+	void finish() {
+		if(quiet_) return;
 		if(first_) {
 			assert_eq(0llu, numReported_);
 			cout << "No results" << endl;
@@ -293,15 +329,9 @@ public:
 		}
 	}
 
-	/// Flushes the alignment output stream
-	virtual void flush() {
-		for(size_t i = 0; i < _outs.size(); i++) {
-			if(_outs[i] != NULL) _outs[i]->flush();
-		}
-	}
 	/// Returns the alignment output stream; if the stream needs to be
 	/// created, create it
-	virtual ostream& out(size_t refIdx) {
+	OutFileBuf& out(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 		if(_outs[strIdx] == NULL) {
 			assert(_deleteOuts);
@@ -312,7 +342,7 @@ public:
 			else if(strIdx < 1000)  oss << "00";
 			else if(strIdx < 10000) oss << "0";
 			oss << strIdx << ".map";
-			_outs[strIdx] = new ofstream(oss.str().c_str());
+			_outs[strIdx] = new OutFileBuf(oss.str().c_str());
 		}
 		assert(_outs[strIdx] != NULL);
 		return *(_outs[strIdx]);
@@ -439,20 +469,35 @@ public:
 	}
 
 protected:
+
+	/**
+	 * Lock the output buffer for the output stream for reference with
+	 * index 'refIdx'.  By default, hits for all references are
+	 * directed to the same output stream, but if --refout is
+	 * specified, each reference has its own reference stream.
+	 */
 	void lock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 		MUTEX_LOCK(_locks[strIdx]);
 	}
+
+	/**
+	 * Lock the output buffer for the output stream for reference with
+	 * index 'refIdx'.  By default, hits for all references are
+	 * directed to the same output stream, but if --refout is
+	 * specified, each reference has its own reference stream.
+	 */
 	void unlock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
 		MUTEX_UNLOCK(_locks[strIdx]);
 	}
-	vector<ostream*> _outs;     /// the alignment output stream(s)
-	bool             _deleteOuts; /// Whether to delete elements of _outs upon exit
-	vector<string>*  _refnames; /// map from reference indexes to names
-	int              _numWrappers; /// # threads owning a wrapper for this HitSink
-	vector<MUTEX_T>  _locks;    /// pthreads mutexes for per-file critical sections
-	MUTEX_T          _mainlock; /// pthreads mutexes for fields of this object
+
+	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
+	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
+	vector<string>*     _refnames;    /// map from reference indexes to names
+	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
+	vector<MUTEX_T>     _locks;       /// pthreads mutexes for per-file critical sections
+	MUTEX_T             _mainlock;    /// pthreads mutexes for fields of this object
 
 	// Output filenames for dumping
 	std::string dumpUnalFaBase_;
@@ -580,8 +625,10 @@ protected:
     bool dumpMaxed_;
 
 	volatile bool     first_;       /// true -> first hit hasn't yet been reported
-	volatile uint64_t numReported_;
-	volatile uint64_t numReportedPaired_;
+	volatile uint64_t numReported_; /// # single-ended alignments reported
+	volatile uint64_t numReportedPaired_; /// # paired-end alignments reported
+	bool quiet_;  /// true -> don't print alignment stats at the end
+	ios_base::openmode ssmode_;     /// output mode for stringstreams
 };
 
 /**
@@ -1543,7 +1590,7 @@ public:
 	 * Construct a single-stream ConciseHitSink (default)
 	 */
 	ConciseHitSink(
-			ostream&           __out,
+			OutFileBuf*        __out,
 			int                offBase,
 			const std::string& dumpUnalFa,
 			const std::string& dumpUnalFq,
@@ -1602,41 +1649,12 @@ public:
 		ostringstream ss;
 		append(ss, h);
 		lock(h.h.first);
-		out(h.h.first) << ss.str();
+		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
-		mainunlock();
-	}
-
-	/**
-	 * Report a set of hits in one big critical section, so that there
-	 * is no interlacing of hits for different reads.
-	 */
-	virtual void reportHits(vector<Hit>& hs) {
-		size_t hssz = hs.size();
-		if(hssz == 0) return;
-		bool paired = hs[0].mate > 0;
-		if(_outs.size() > 1 && hssz > 2) {
-			sort(hs.begin(), hs.end());
-		}
-		for(size_t i = 0; i < hssz; i++) {
-			const Hit& h = hs[i];
-			if(i == 0) {
-				lock(h.h.first);
-			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
-				unlock(hs[i-1].h.first);
-				lock(h.h.first);
-			}
-			append(out(h.h.first), h);
-		}
-		unlock(hs[hssz-1].h.first);
-		mainlock();
-		first_ = false;
-		if(paired) numReportedPaired_ += hssz;
-		else       numReported_ += hssz;
 		mainunlock();
 	}
 
@@ -1656,7 +1674,7 @@ public:
 	/**
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
-	VerboseHitSink(ostream&           __out,
+	VerboseHitSink(OutFileBuf*        __out,
 	               int                offBase,
 	               const std::string& dumpUnalFa,
 	               const std::string& dumpUnalFq,
@@ -1937,6 +1955,8 @@ public:
 		do {
 			bool dospill = false;
 			if(spill) {
+				// The read spilled over a partition boundary and so
+				// needs to be printed more than once
 				assert(partition > 0);
 				spill = false;
 				dospill = true;
@@ -2013,7 +2033,7 @@ public:
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	void append(ostream& ss, const Hit& h) {
+	virtual void append(ostream& ss, const Hit& h) {
 		VerboseHitSink::append(ss, h, this->_refnames, this->_partition, this->offBase_);
 	}
 
@@ -2027,41 +2047,12 @@ public:
 		append(ss, h);
 		// Make sure to grab lock before writing to output stream
 		lock(h.h.first);
-		out(h.h.first) << ss.str();
+		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
-		mainunlock();
-	}
-
-	/**
-	 * Report a list of verbose, human-readable alignments to the
-	 * appropriate output stream.
-	 */
-	virtual void reportHits(vector<Hit>& hs) {
-		size_t hssz = hs.size();
-		if(hssz == 0) return;
-		bool paired = hs[0].mate > 0;
-		if(_outs.size() > 1 && hssz > 2) {
-			sort(hs.begin(), hs.end());
-		}
-		for(size_t i = 0; i < hssz; i++) {
-			const Hit& h = hs[i];
-			if(i == 0) {
-				lock(h.h.first);
-			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
-				unlock(hs[i-1].h.first);
-				lock(h.h.first);
-			}
-			append(out(h.h.first), h);
-		}
-		unlock(hs[hssz-1].h.first);
-		mainlock();
-		first_ = false;
-		if(paired) numReportedPaired_ += hssz;
-		else       numReported_ += hssz;
 		mainunlock();
 	}
 
@@ -2081,7 +2072,7 @@ public:
 	/**
 	 * Construct a single-stream BinaryHitSink (default)
 	 */
-	BinaryHitSink(ostream&           __out,
+	BinaryHitSink(OutFileBuf*        __out,
 	              int                offBase,
 	              const std::string& dumpUnalFa,
 	              const std::string& dumpUnalFq,
@@ -2089,7 +2080,9 @@ public:
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
 	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
-	{ }
+	{
+		ssmode_ |= ios_base::binary;
+	}
 
 	/**
 	 * Construct a multi-stream BinaryHitSink with one stream per
@@ -2103,7 +2096,9 @@ public:
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
 	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
-	{ }
+	{
+		ssmode_ |= ios_base::binary;
+	}
 
 	/**
 	 * Append a binary alignment to the output stream corresponding to
@@ -2139,6 +2134,7 @@ public:
 		o.write((const char *)&offset, 4);
 		// Write pattern sequence
 		uint16_t plen = (uint16_t)length(h.patSeq);
+		assert_lt(plen, 1024);
 		o.write((const char *)&plen, 2);
 		for(size_t i = 0; i < plen; i += 2) {
 			uint8_t twoChrs = (uint8_t)h.patSeq[i];
@@ -2180,7 +2176,7 @@ public:
 	 * Append a binary alignment to the output stream corresponding to
 	 * the reference sequence involved.
 	 */
-	void append(ostream& o, const Hit& h) {
+	virtual void append(ostream& o, const Hit& h) {
 		BinaryHitSink::append(o, h, this->_refnames, this->offBase_);
 	}
 
@@ -2337,47 +2333,15 @@ public:
 	 * Report a single hit to the appropriate output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
+		ostringstream ss;
+		append(ss, h);
 		lock(h.h.first);
-		append(out(h.h.first), h);
+		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
-		mainunlock();
-	}
-
-	/**
-	 * Report a list of hits to the appropriate output stream.
-	 */
-	virtual void reportHits(vector<Hit>& hs) {
-		size_t hssz = hs.size();
-		if(hssz == 0) return;
-		bool paired = hs[0].mate > 0;
-		// Sort the hits in order of
-		if(_outs.size() > 1 && hssz > 2) {
-			sort(hs.begin(), hs.end());
-		}
-		for(size_t i = 0; i < hssz; i++) {
-			const Hit& h = hs[i];
-			if(i == 0) {
-				// Lock the first stream
-				lock(h.h.first);
-			} else if(refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first)) {
-				// Move to the next stream; be sure to unlock before
-				// locking the next one
-				unlock(hs[i-1].h.first);
-				lock(h.h.first);
-			}
-			// Actually write the hit
-			append(out(h.h.first), h);
-		}
-		// Unlock the last stream
-		unlock(hs[hssz-1].h.first);
-		mainlock();
-		first_ = false;
-		if(paired) numReportedPaired_ += hssz;
-		else       numReported_       += hssz;
 		mainunlock();
 	}
 
@@ -2392,9 +2356,9 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(cout, "", "", "", "", NULL) { }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", NULL) { quiet_ = true; }
 	virtual void reportHit(const Hit& h) { }
-	virtual void finish() {	}
+	virtual void append(ostream& o, const Hit& h) { }
 };
 
 #endif /*HIT_H_*/
