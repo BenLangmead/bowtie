@@ -328,6 +328,7 @@ public:
 		bool firstStretch = true;
 		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
+			ASSERT_ONLY(uint32_t origBufOff = bufOff);
 			assert_geq(toff, off);
 			off += recs_[i].off;
 			assert_gt(count, 0);
@@ -347,7 +348,6 @@ public:
 			}
 			off += recs_[i].len;
 			if(toff < off) {
-				//if(false) {
 				if(firstStretch) {
 					if(toff + 8 < off && count > 8) {
 						// We already added some Ns, so we have to do
@@ -361,8 +361,11 @@ public:
 						if(bufOff & 3) {
 							const uint32_t bufElt = (bufOff) >> 2;
 							const int low2 = bufOff & 3;
-							destU32[curU32] = 0x04040404;
-							destU32[curU32++] = byteToU32_[buf_[bufElt]];
+							destU32[curU32] = byteToU32_[buf_[bufElt]];
+							for(int j = 0; j < low2; j++) {
+								((char *)(&destU32[curU32]))[j] = 4;
+							}
+							curU32++;
 							offset += low2;
 							const int chars = 4 - low2;
 							count -= chars;
@@ -413,6 +416,7 @@ public:
 				}
 			}
 			if(count == 0) break;
+			assert_eq(recs_[i].len, bufOff - origBufOff);
 			assert_geq(toff, off);
 		} // end for loop over records
 		// In any chars are left after scanning all the records,
