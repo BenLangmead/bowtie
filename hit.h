@@ -223,12 +223,7 @@ public:
 	 *
 	 */
 	virtual ~HitSink() {
-		// Flush and close all non-NULL output streams
-		for(size_t i = 0; i < _outs.size(); i++) {
-			if(_outs[i] != NULL) {
-				_outs[i]->close();
-			}
-		}
+		closeOuts();
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
 			for(size_t i = 0; i < _outs.size(); i++) {
@@ -304,6 +299,7 @@ public:
 
 	/// Called when all alignments are complete
 	void finish() {
+		closeOuts();
 		if(quiet_) return;
 		if(first_) {
 			assert_eq(0llu, numReported_);
@@ -469,6 +465,18 @@ public:
 	}
 
 protected:
+
+	/**
+	 * Close (and flush) all OutFileBufs.
+	 */
+	void closeOuts() {
+		// Flush and close all non-NULL output streams
+		for(size_t i = 0; i < _outs.size(); i++) {
+			if(_outs[i] != NULL && !_outs[i]->closed()) {
+				_outs[i]->close();
+			}
+		}
+	}
 
 	/**
 	 * Lock the output buffer for the output stream for reference with

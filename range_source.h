@@ -653,10 +653,6 @@ public:
 		assert_eq(0, gaveBack_);
 		RangeState& r = ranges_[len_];
 		int ret = 0;
-		assert_neq(0, r.bots[0]);
-		assert_neq(0, r.bots[1]);
-		assert_neq(0, r.bots[2]);
-		assert_neq(0, r.bots[3]);
 		r.eliminated_ = true; // start with everything eliminated
 		r.eq.eliminate();
 		r.eq.flags.qual = q;

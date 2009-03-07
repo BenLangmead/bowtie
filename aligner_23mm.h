@@ -222,6 +222,7 @@ public:
 	Paired23mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool two,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			bool mate1fw,
@@ -242,6 +243,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			two_(two),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			mate1fw_(mate1fw),
@@ -273,127 +275,214 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *r1Fw_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *r1Fw_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & forward read
+		GreedyDFSRangeSource *r1Fw_BwHalf = new GreedyDFSRangeSource(
+		     ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			 true, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr1Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Fw, true, sink_, sinkPt,
-			0,          // seedLen
+			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right-hand half alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
+		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * dr1Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Bw, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_LEN, // allow 1 mismatch in rest of read
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
+			os_, verbose_, seed_);
+		// Driver wrapper for rFw_Fw
+		GreedyDFSRangeSourceDriver * dr1Fw_BwHalf = new GreedyDFSRangeSourceDriver(
+			*params, r1Fw_BwHalf, true, sink_, sinkPt,
+			0,          // seedLen (0 = whole read is seed)
+			true,       // nudgeLeft (true for Fw index, false for Bw)
+			PIN_TO_BEGINNING,    // nothing's unrevisitable
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr1FwVec;
-		dr1FwVec.push_back(dr1Fw_Fw); dr1FwVec.push_back(dr1Fw_Bw);
+		dr1FwVec.push_back(dr1Fw_Fw);
+		dr1FwVec.push_back(dr1Fw_Bw);
+		dr1FwVec.push_back(dr1Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
 
+		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r1Rc_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & reverse-complement read
 		GreedyDFSRangeSource *r1Rc_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from forward index & reverse-complement read
+		GreedyDFSRangeSource *r1Rc_FwHalf = new GreedyDFSRangeSource(
+		    &ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+
+		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * dr1Rc_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_Fw, false, sink_, sinkPt,
-			0,          // seedLen
+			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right-hand half alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
+		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * dr1Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_Bw, false, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_LEN, // allow 1 mismatch in rest of read
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
+			os_, verbose_, seed_);
+		// Driver wrapper for rRc_Fw
+		GreedyDFSRangeSourceDriver * dr1Rc_FwHalf = new GreedyDFSRangeSourceDriver(
+			*params, r1Rc_FwHalf, false, sink_, sinkPt,
+			0,          // seedLen (0 = whole read is seed)
+			true,       // nudgeLeft (true for Fw index, false for Bw)
+			PIN_TO_BEGINNING,    // nothing's unrevisitable
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr1RcVec;
-		dr1RcVec.push_back(dr1Rc_Fw); dr1RcVec.push_back(dr1Rc_Bw);
+		dr1RcVec.push_back(dr1Rc_Fw);
+		dr1RcVec.push_back(dr1Rc_Bw);
+		dr1RcVec.push_back(dr1Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
 
+		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *r2Fw_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *r2Fw_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & forward read
+		GreedyDFSRangeSource *r2Fw_BwHalf = new GreedyDFSRangeSource(
+		     ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			 true, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr2Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Fw, true, sink_, sinkPt,
-			0,          // seedLen
+			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right-hand half alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
+		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * dr2Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Bw, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_LEN, // allow 1 mismatch in rest of read
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
+			os_, verbose_, seed_);
+		// Driver wrapper for rFw_Fw
+		GreedyDFSRangeSourceDriver * dr2Fw_BwHalf = new GreedyDFSRangeSourceDriver(
+			*params, r2Fw_BwHalf, true, sink_, sinkPt,
+			0,          // seedLen (0 = whole read is seed)
+			true,       // nudgeLeft (true for Fw index, false for Bw)
+			PIN_TO_BEGINNING,    // nothing's unrevisitable
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr2FwVec;
-		dr2FwVec.push_back(dr2Fw_Fw); dr2FwVec.push_back(dr2Fw_Bw);
+		dr2FwVec.push_back(dr2Fw_Fw);
+		dr2FwVec.push_back(dr2Fw_Bw);
+		dr2FwVec.push_back(dr2Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
 
+		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r2Rc_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from mirror index & reverse-complement read
 		GreedyDFSRangeSource *r2Rc_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			false, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+		// Source for ranges from forward index & reverse-complement read
+		GreedyDFSRangeSource *r2Rc_FwHalf = new GreedyDFSRangeSource(
+		    &ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+
+		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * dr2Rc_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_Fw, false, sink_, sinkPt,
-			0,          // seedLen
+			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right-hand half alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
+		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * dr2Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_Bw, false, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_LEN, // allow 1 mismatch in rest of read
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
+			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
+			os_, verbose_, seed_);
+		// Driver wrapper for rRc_Fw
+		GreedyDFSRangeSourceDriver * dr2Rc_FwHalf = new GreedyDFSRangeSourceDriver(
+			*params, r2Rc_FwHalf, false, sink_, sinkPt,
+			0,          // seedLen (0 = whole read is seed)
+			true,       // nudgeLeft (true for Fw index, false for Bw)
+			PIN_TO_BEGINNING,    // nothing's unrevisitable
+			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr2RcVec;
-		dr2RcVec.push_back(dr2Rc_Fw); dr2RcVec.push_back(dr2Rc_Bw);
+		dr2RcVec.push_back(dr2Rc_Fw);
+		dr2RcVec.push_back(dr2Rc_Bw);
+		dr2RcVec.push_back(dr2Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 
-		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
+		RefAligner<String<Dna5> >* refAligner;
+		if(two_) {
+			refAligner = new TwoMMRefAligner<String<Dna5> >(0);
+		} else {
+			refAligner = new ThreeMMRefAligner<String<Dna5> >(0);
+		}
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -409,6 +498,7 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool two_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	const bool mate1fw_;

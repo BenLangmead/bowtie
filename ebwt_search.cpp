@@ -1151,10 +1151,6 @@ static void parseOptions(int argc, char **argv) {
 		cerr << "Paired-end mode is not yet compatible with -n mode; use -v 0 or -v 1 instead." << endl;
 		exit(1);
 	}
-	if((mates1.size() > 0 || mates2.size() > 0) && !maqLike && mismatches > 2) {
-		cerr << "Paired-end mode is not yet compatible with -v " << mismatches << "; use -v 0, -v 1 or -v 2 instead." << endl;
-		exit(1);
-	}
 	if(!fullIndex) {
 		bool error = false;
 		if(khits > 1) {
@@ -2361,6 +2357,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			two,
 			_sink,
 			*sinkFact,
 			mate1fw,

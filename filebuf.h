@@ -244,7 +244,9 @@ public:
 	/**
 	 * Open a new output stream to a file with given name.
 	 */
-	OutFileBuf(const char *out, bool binary = false) : name_(out), cur_(0) {
+	OutFileBuf(const char *out, bool binary = false) :
+		name_(out), cur_(0), closed_(false)
+	{
 		assert(out != NULL);
 		out_ = fopen(out, binary ? "wb" : "w");
 		if(out_ == NULL) {
@@ -256,7 +258,7 @@ public:
 	/**
 	 * Open a new output stream to a file with given name.
 	 */
-	OutFileBuf() : name_("cout"), cur_(0) {
+	OutFileBuf() : name_("cout"), cur_(0), closed_(false) {
 		out_ = stdout;
 	}
 
@@ -265,6 +267,7 @@ public:
 	 * necessary, flush.
 	 */
 	void write(int c) {
+		assert(!closed_);
 		if(cur_ == BUF_SZ) {
 			// Flush the buffer
 			if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
@@ -281,6 +284,7 @@ public:
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
 	void writeString(const string& s) {
+		assert(!closed_);
 		size_t slen = s.length();
 		if(cur_ + slen > BUF_SZ) {
 			// Flush the buffer
@@ -300,6 +304,7 @@ public:
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
 	void writeChars(const char * s, size_t len) {
+		assert(!closed_);
 		if(cur_ + len > BUF_SZ) {
 			// Flush the buffer
 			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
@@ -318,15 +323,24 @@ public:
 	 * Write any remaining bitpairs and then close the input
 	 */
 	void close() {
+		if(closed_) return;
 		if(cur_ > 0) {
 			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
 				cerr << "Error while flushing and closing output" << endl;
 				exit(1);
 			}
 		}
+		closed_ = true;
 		if(out_ != stdout) {
 			fclose(out_);
 		}
+	}
+
+	/**
+	 * Return true iff this stream is closed.
+	 */
+	bool closed() const {
+		return closed_;
 	}
 
 	/**
@@ -338,12 +352,13 @@ public:
 
 private:
 
-	static const size_t BUF_SZ = 256 * 1024;
+	static const size_t BUF_SZ = 16 * 1024;
 
 	const char *name_;
 	FILE       *out_;
 	uint32_t    cur_;
 	char        buf_[BUF_SZ]; // (large) input buffer
+	bool        closed_;
 };
 
 #endif /*ndef FILEBUF_H_*/
