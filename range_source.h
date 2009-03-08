@@ -1777,6 +1777,7 @@ public:
 					rss_[i] = rss_[i+1];
 				}
 				rss_[rssSz-1] = p;
+				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
 			} else if(precost != rss_[0]->minCost) {
 				assert_gt(rss_[0]->minCost, precost);
 				// Remove and re-insert
