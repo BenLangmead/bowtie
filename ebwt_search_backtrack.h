@@ -412,7 +412,7 @@ public:
 			// Shouldn't be curtailed or exhausted
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
-			if(_verbose) {
+			if(true || _verbose) {
 				br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 			}
 			assert(br->repOk(_qlen));
@@ -435,8 +435,13 @@ public:
 				assert_leq(br->numEdits_, _reportPartials);
 			}
 
+			// Compiler complains if our goto's jump over these
+			// initializations, so stick them here
 			bool backtrackDespiteMatch = false;
 			bool reportedPartial = false;
+			bool invalidExact = false;
+			bool empty = false;
+			bool hit = false;
 
 			if(_halfAndHalf && !hhCheckTop(br, depth, 0 /*iham*/)) {
 				// Stop extending this branch because it violates a half-
@@ -545,8 +550,8 @@ public:
 				assert_eq(_qlen, depth);
 				cur = 0;
 			}
-			bool empty = (br->top_ == br->bot_);
-			bool hit = (cur == 0 && !empty);
+			empty = (br->top_ == br->bot_);
+			hit = (cur == 0 && !empty);
 
 			// Is this a potential partial-alignment range?
 			if(hit && _reportPartials > 0) {
@@ -565,7 +570,7 @@ public:
 
 			// Check whether we've obtained an exact alignment when
 			// we've been instructed not to report exact alignments
-			bool invalidExact = (hit && br->numEdits_ == 0 && !_reportExacts);
+			invalidExact = (hit && br->numEdits_ == 0 && !_reportExacts);
 
 			// Set this to true if the only way to make legal progress
 			// is via one or more additional backtracks.
@@ -580,7 +585,7 @@ public:
 			   !invalidExact &&  // not disqualified by no-exact-hits setting
 			   !reportedPartial) // not an already-reported partial alignment
 			{
-				if(_verbose) {
+				if(true || _verbose) {
 					br->len_++;
 					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 					br->len_--;
