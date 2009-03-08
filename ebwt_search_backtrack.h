@@ -581,8 +581,9 @@ public:
 			   !reportedPartial) // not an already-reported partial alignment
 			{
 				if(_verbose) {
-					br->extend();
+					br->len_++;
 					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
+					br->len_--;
 				}
 				_curRange.top     = br->top_;
 				_curRange.bot     = br->bot_;
