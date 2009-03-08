@@ -426,7 +426,6 @@ protected:
 		const uint32_t spread = bot - top;
 		SideLocus tloc, bloc;
 		SideLocus::initFromTopBot(top, bot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
-		SideLocus::prefetchTopBot(tloc, bloc);
 		uint32_t newtop = top, newbot = bot;
 		uint32_t jumps = 0;
 		// Walk left through the tunnel
@@ -483,7 +482,6 @@ protected:
 				// Save this range
 				tops.push_back(newtop);
 				SideLocus::initFromTopBot(newtop, newbot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
-				SideLocus::prefetchTopBot(tloc, bloc);
 			} else {
 				// Not all the suffixes were preserved, so we can't
 				// link the source range's cached result to this

@@ -429,7 +429,8 @@ public:
 #define Ebwt_STAT_INITS \
 	,mapLFExs_(0llu), \
 	mapLFs_(0llu), \
-	mapLFcs_(0llu)
+	mapLFcs_(0llu), \
+	mapLF1cs_(0llu)
 #else
 #define Ebwt_STAT_INITS
 #endif
@@ -1406,7 +1407,6 @@ struct SideLocus {
 	 */
 	SideLocus(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
 		initFromRow(row, ep, ebwt);
-		prefetch();
 	}
 
 	/**
@@ -1460,24 +1460,10 @@ struct SideLocus {
 		__builtin_prefetch((const void *)_side,
 		                   0 /* prepare for read */,
 		                   PREFETCH_LOCALITY);
-		__builtin_prefetch((const void *)(_side + 32),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY);
-		__builtin_prefetch((const void *)(_side + 64),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY);
-		__builtin_prefetch((const void *)(_side + 96),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY);
 #endif
 		// prefetch tjside too
 		_fw = _sideNum & 1;   // odd-numbered sides are forward
 		_oside = _side + (_fw? (-128) : (128));
-#ifndef NO_PREFETCH
-		__builtin_prefetch((const void *)(_oside + 96),
-		                   0 /* prepare for read */,
-		                   PREFETCH_LOCALITY);
-#endif
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
 		_bp = _charOff & 3;  // bit-pair within byte
@@ -1495,44 +1481,6 @@ struct SideLocus {
 	/// Make this look like an invalid SideLocus
 	void invalidate() {
 		_side = NULL;
-	}
-
-	/**
-	 * Prefetch the relevant cache lines associated with this locus.
-	 */
-	void prefetch() {
-		assert(valid());
-#ifndef NO_PREFETCH
-		// prefetch the other 3/4 of this side
-//		__builtin_prefetch((const void *)(_side + 32),
-//		                   0 /* prepare for read */,
-//		                   PREFETCH_LOCALITY /* no locality */);
-//		__builtin_prefetch((const void *)(_side + 64),
-//		                   0 /* prepare for read */,
-//		                   PREFETCH_LOCALITY /* no locality */);
-//		__builtin_prefetch((const void *)(_side + 96),
-//		                   0 /* prepare for read */,
-//		                   PREFETCH_LOCALITY /* no locality */);
-		// prefetch the half of the opposite side that contains the
-		// cumulative character occurrence counts
-
-		// prefetch this side
-		//__builtin_prefetch((const void *)_side,
-		//                   0 /* prepare for read */,
-		//                   PREFETCH_LOCALITY /* no locality */);
-#endif
-	}
-
-	/**
-	 * Prefetch relevant cache lines for top and bot arrows.  Try not
-	 * to redundantly prefetch the same lines twice.
-	 */
-	static void prefetchTopBot(SideLocus& ltop, SideLocus& lbot) {
-		assert(ltop.valid() && lbot.valid());
-		ltop.prefetch();
-		if(ltop._sideNum != lbot._sideNum) {
-			lbot.prefetch();
-		}
 	}
 
     uint32_t _sideByteOff; // offset of top side within ebwt[]
@@ -2543,7 +2491,6 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	if(l == NULL) {
 		l = &myl;
 		l->initFromRow(i, this->_eh, this->_ebwt);
-		l->prefetch();
 	}
 	assert(l != NULL);
 	assert(l->valid());
@@ -2554,7 +2501,6 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_neq(newi, i);
 		i = newi;                                  // update row
 		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
-		l->prefetch();
 		jumps++;
 	}
 	// This is a marked row
@@ -2616,7 +2562,6 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	if(l == NULL) {
 		l = &myl;
 		myl.initFromRow(i, this->_eh, this->_ebwt);
-		myl.prefetch();
 	}
 	assert(l != NULL);
 	clear(lbuf); clear(rbuf);
@@ -2689,7 +2634,6 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 			i = newi;                                  // update row
 			assert_neq(i, _zOff);
 			l->initFromRow(i, this->_eh, this->_ebwt); // update locus
-			l->prefetch();
 			jumps++;
 		}
 		assert_eq(textoff, jumps);
@@ -2716,7 +2660,6 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
 	uint32_t right_steps = ref_right - (off + qlen);
 	l->initFromRow(i, this->_eh, this->_ebwt); // update locus
-	l->prefetch();
 	for(size_t j = 0; j < right_steps_rounded; j++) {
 		// Not a marked row; walk left one more char
 		int c = rowL(*l); // unpack_2b_from_8b(l->_side[l->_by], l->_bp);
@@ -2730,7 +2673,6 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		i = newi;                                  // update row
 		assert_neq(i, _zOff);
 		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
-		l->prefetch();
 		jumps++;
 	}
 	if(right_steps_rounded > right_steps) {
@@ -2774,7 +2716,6 @@ void Ebwt<TStr>::restore(TStr& s) const {
 		s[this->_eh._len - jumps - 1] = rowL(l);
 		i = newi;
 		l.initFromRow(i, this->_eh, this->_ebwt);
-		l.prefetch();
 		jumps++;
 	}
 	assert_eq(jumps, this->_eh._len);

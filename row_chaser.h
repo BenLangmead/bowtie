@@ -131,7 +131,6 @@ public:
 			assert(!sideloc_.valid());
 			assert_leq(row_, eh_->_len);
 			sideloc_.initFromRow(row_, *eh_, (const uint8_t*)ebwt_->_ebwt);
-			sideloc_.prefetch();
 			assert(sideloc_.valid());
 		}
 		prepped_ = true;
