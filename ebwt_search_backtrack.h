@@ -442,6 +442,7 @@ public:
 			bool invalidExact = false;
 			bool empty = false;
 			bool hit = false;
+			uint32_t cur = 0;
 
 			if(_halfAndHalf && !hhCheckTop(br, depth, 0 /*iham*/)) {
 				// Stop extending this branch because it violates a half-
@@ -450,7 +451,7 @@ public:
 				goto bail;
 			}
 
-			uint32_t cur = _qlen - depth - 1; // current offset into _qry
+			cur = _qlen - depth - 1; // current offset into _qry
 			if(depth < _qlen) {
 				// Determine whether ranges at this location are candidates
 				// for backtracking
