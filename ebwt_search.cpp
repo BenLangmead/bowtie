@@ -188,7 +188,6 @@ static struct option long_options[] = {
 	{"qsamelen",     no_argument,       &qSameLen,    1},
 	{"reportopps",   no_argument,       &reportOpps,  1},
 	{"version",      no_argument,       &showVersion, 1},
-	{"maq",          no_argument,       &maqLike,     1},
 	{"ntoa",         no_argument,       &nsPolicy,    NS_TO_AS},
 	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{"revcomp",      no_argument,       0,            'r'},
@@ -1082,7 +1081,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
 	   		case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
 	   		case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
-	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); break;
+	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
 	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
 	   		case 'h': printLongUsage(cout); exit(0); break;
 	   		case '?': printUsage(cerr); exit(1); break;
@@ -1172,6 +1171,10 @@ static void parseOptions(int argc, char **argv) {
 		}
 		if(error) exit(1);
 	}
+	//if(!maqLike && onlyBest) {
+	//	onlyBest = false;
+	//	stateful = true;
+	//}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
 		maxBts = INT_MAX;
