@@ -1853,12 +1853,12 @@ protected:
 		}
 		// Selection sort outer loop
 		for(size_t i = 0; i < rssSz-1; i++) {
-			if(rss_[i]->done) continue;
+			if(rss_[i]->done) break;
 			uint16_t minCost = rss_[i]->minCost;
 			size_t minOff = i;
 			// Selection sort inner loop
 			for(size_t j = i+1; j < rssSz; j++) {
-				if(rss_[j]->done) continue;
+				if(rss_[j]->done) break;
 				if(rss_[j]->minCost < minCost) {
 					minCost = rss_[j]->minCost;
 					minOff = j;
@@ -1893,10 +1893,12 @@ protected:
 		// Selection sort outer loop
 		const size_t rssSz = rss_.size();
 		for(size_t i = 0; i < rssSz-1; i++) {
-			if(rss_[i]->done) continue;
 			for(size_t j = i+1; j < rssSz; j++) {
-				if(rss_[j]->done) continue;
-				assert_leq(rss_[i]->minCost, rss_[j]->minCost);
+				if(rss_[i]->done) assert(rss_[j]->done);
+				else {
+					if(rss_[j]->done) break;
+					assert_leq(rss_[i]->minCost, rss_[j]->minCost);
+				}
 			}
 		}
 		uint32_t minCostTmp = max(rss_[0]->minCost, this->minCostAdjustment_);
