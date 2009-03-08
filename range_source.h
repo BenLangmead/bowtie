@@ -1742,6 +1742,7 @@ public:
 				rss_[i] = rss_[i+1];
 			}
 			rss_[rssSz-1] = p;
+			assert(sortedRss());
 			// Move on to next RangeSourceDriver
 			if(!rss_[0]->done) {
 				this->foundRange = rss_[0]->foundRange;
@@ -1796,6 +1797,8 @@ public:
 					rss_[rssSz-1] = p;
 				}
 				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				assert(sortedRss());
+			} else {
 				assert(sortedRss());
 			}
 		}
