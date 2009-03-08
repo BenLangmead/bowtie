@@ -8,193 +8,13 @@
 #include "range_source.h"
 
 /**
- * All information needed to resume an in-progress backtracking search.
- */
-struct GreedyDFSContinuation {
-	GreedyDFSContinuation() : inited(false) { }
-
-	/**
-	 * Initialize a continuation given alignment state.  ltop and lbot
-	 * are intitialized lazily using prep(), so they aren't assigned
-	 * here.
-	 */
-	void init(
-			uint32_t qlen,
-			uint32_t _stackDepth,
-			uint32_t _depth,
-			uint32_t _unrevOff,
-			uint32_t _oneRevOff,
-			uint32_t _twoRevOff,
-			uint32_t _threeRevOff,
-			uint32_t _top,
-			uint32_t _bot,
-			uint32_t _ham,
-			uint32_t _iham,
-			uint32_t* _pairs,
-			uint8_t* _elims,
-			const std::vector<uint32_t>* _mms,
-			const std::vector<uint8_t>* _refcs,
-			uint32_t _disableFtab)
-	{
-		stackDepth = _stackDepth;
-		depth = _depth;
-		unrevOff = _unrevOff;
-		oneRevOff = _oneRevOff;
-		twoRevOff = _twoRevOff;
-		threeRevOff = _threeRevOff;
-		top = _top;
-		bot = _bot;
-		ham = _ham;
-		iham = _iham;
-		pairs = _pairs;
-		elims = _elims;
-		if(_mms != NULL)   mms = *_mms;
-		else               mms.clear();
-		if(_refcs != NULL) refcs = *_refcs;
-		else               refcs.resize(qlen);
-		disableFtab = _disableFtab;
-		prepped = false;
-		inited = true;
-	}
-
-	/**
-	 * Prepare this continuation to be resumed.  Involves calculating
-	 * top and bottom loci given rows 'top' and 'bot' and prefetching
-	 * the relevant cache lines.
-	 */
-	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
-		assert(inited);
-		if(top != bot) {
-			// Calculate the loci based on the top and bot pointers
-			assert_leq(top, ep._len);
-			assert_leq(bot, ep._len);
-			SideLocus::initFromTopBot(top, bot, ep, ebwt, ltop, lbot);
-			// Prefetch the cache lines at the top and bot loci
-			SideLocus::prefetchTopBot(ltop, lbot);
-		} else {
-			// top == bot, so we don't care about their loci and cache
-			// lines
-		}
-		prepped = true;
-	}
-
-	uint32_t  stackDepth;  // depth of the recursion stack; = # mismatches so far
-	uint32_t  depth;       // next depth where a post-pair needs to be calculated
-	uint32_t  unrevOff;    // depths < unrevOff are unrevisitable
-	uint32_t  oneRevOff;   // depths < oneRevOff are 1-revisitable
-	uint32_t  twoRevOff;   // depths < twoRevOff are 2-revisitable
-	uint32_t  threeRevOff; // depths < threeRevOff are 3-revisitable
-	uint32_t  top;         // top arrow in pair prior to 'depth'
-	uint32_t  bot;         // bottom arrow in pair prior to 'depth'
-	SideLocus ltop;        // locus for top
-	SideLocus lbot;        // locus for bottom
-	uint32_t  ham;         // weighted hamming distance so far
-	uint32_t  iham;        // initial weighted hamming distance
-	uint32_t  cost;        // the cost of proceeding down this path
-	uint32_t* pairs;       // portion of pairs array to be used for this backtrack frame
-	uint8_t*  elims;       // portion of elims array to be used for this backtrack frame
-	std::vector<uint32_t> mms; // mismatches
-	std::vector<uint8_t> refcs; // reference characters
-	bool      disableFtab; // whether to disable ftab skipping
-	bool      prepped;     // ready to be continued
-	bool      inited;      // true = init() has been called
-};
-
-/**
- * Container/dispenser for continuations for the greedy depth-first
- * backtracker.
- */
-class GreedyDFSContinuationManager : public ContinuationManager<GreedyDFSContinuation> {
-public:
-	GreedyDFSContinuationManager() :
-		ContinuationManager<GreedyDFSContinuation>(),
-		conts_(), cur_(0)
-	{
-		// Reserve plenty of space to avoid untimely reallocations
-		conts_.reserve(4096);
-	}
-
-	virtual ~GreedyDFSContinuationManager() { }
-
-	/**
-	 * Return the frontmost continuation (usually this is the
-	 * currently active one).
-	 */
-	virtual GreedyDFSContinuation* front() {
-		assert_gt(size(), 0);
-		return &conts_[cur_];
-	}
-
-	/**
-	 * Return the backmost continuation.
-	 */
-	virtual GreedyDFSContinuation* back() {
-		assert_gt(size(), 0);
-		return &conts_[conts_.size()-1];
-	}
-
-	/**
-	 * Prepare for the next continuation by prepping the frontmost.
-	 */
-	virtual void prep(const EbwtParams& ep, const uint8_t* ebwt) {
-		if(conts_.size() > cur_) {
-			conts_[cur_].prep(ep, ebwt);
-		}
-	}
-
-	/**
-	 * Remove the frontmost continuation.
-	 */
-	virtual void pop() {
-		// Don't actually destroy any objects or trigger any memory
-		// deallocation.
-		cur_++;
-	}
-
-	/**
-	 * Add a new uninitialized continuation to the back of the queue.
-	 */
-	virtual void expand1() {
-		conts_.resize(conts_.size() + 1);
-	}
-
-	/**
-	 * Return the number of continuations in the queue.
-	 */
-	virtual size_t size() const {
-		return conts_.size() - cur_;
-	}
-
-	/**
-	 * Return true iff there are no continuations to process.
-	 */
-	virtual bool empty() const {
-		return conts_.size() == cur_;
-	}
-
-	/**
-	 * Remove all continuations and reset.
-	 */
-	virtual void clear() {
-		conts_.clear();
-		cur_ = 0;
-		assert_eq(0, conts_.size());
-	}
-
-protected:
-
-	std::vector<GreedyDFSContinuation> conts_;
-	uint32_t cur_;
-};
-
-/**
  * Class that coordinates quality- and quantity-aware backtracking over
  * some range of a read sequence.
  *
  * The creator can configure the BacktrackManager to treat different
  * stretches of the read differently.
  */
-class GreedyDFSRangeSource : public RangeSource<GreedyDFSContinuationManager> {
+class GreedyDFSRangeSource : public RangeSource {
 	typedef std::pair<int, int> TIntPair;
 public:
 	GreedyDFSRangeSource(
@@ -213,7 +33,7 @@ public:
 			bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
 			bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
 			bool __maqPenalty = true) :
-	    RangeSource<GreedyDFSContinuationManager>(),
+	    RangeSource(),
 	    _started(false),
 		_qry(NULL),
 		_qlen(0),
@@ -491,86 +311,6 @@ public:
 	 * immediately jump to a valid range using the ftab).
 	 */
 	virtual void
-	initConts(GreedyDFSContinuationManager& contMan, uint32_t ham) {
-		assert(curEbwt_ != NULL);
-		assert_gt(length(*_qry), 0);
-		assert_leq(_qlen, length(*_qry));
-		assert_geq(length(*_qual), length(*_qry));
-		const Ebwt<String<Dna> >& ebwt = *_ebwt;
-		int ftabChars = ebwt._eh._ftabChars;
-		this->foundRange = false;
-		int nsInSeed = 0; int nsInFtab = 0;
-		if(!tallyNs(nsInSeed, nsInFtab)) {
-			// No alignments are possible because of the distribution
-			// of Ns in the read in combination with the backtracking
-			// constraints.
-			return;
-		}
-		contMan.clear();
-		// m = depth beyond which ftab must not extend or else we might
-		// miss some legitimate paths
-		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
-		contMan.expand1();
-		GreedyDFSContinuation* cont = contMan.back();
-		// Let skipInvalidExact = true if using the ftab would be a
-		// waste because it would jump directly to an alignment we
-		// couldn't use.
-		bool ftabSkipsToEnd = (_qlen == (uint32_t)ftabChars);
-		bool skipInvalidExact = (!_reportExacts && ftabSkipsToEnd);
-		bool skipInvalidPartial = (_reportPartials > 0 && ftabSkipsToEnd);
-		// If it's OK to use the ftab...
-		if(nsInFtab == 0 && m >= (uint32_t)ftabChars &&
-		   !skipInvalidExact && !skipInvalidPartial)
-		{
-			// Use the ftab to jump 'ftabChars' chars into the read
-			// from the right
-			uint32_t ftabOff = calcFtabOff();
-			uint32_t top = ebwt.ftabHi(ftabOff);
-			uint32_t bot = ebwt.ftabLo(ftabOff+1);
-			if(_qlen == (uint32_t)ftabChars && bot > top) {
-				// We found a range with 0 mismatches immediately.  Set
-				// fields to indicate we found a range.
-				assert_eq(0, _reportPartials);
-				assert(_reportExacts);
-				_curRange.top     = top;
-				_curRange.bot     = bot;
-				_curRange.stratum = calcStratum(_mms, 0);
-				_curRange.numMms  = 0;
-				_curRange.fw      = _params.fw();
-				_curRange.mms.clear(); // no mismatches
-				// no need to do anything with _curRange.refcs
-				this->foundRange  = true;
-				return;
-			} else if (bot > top) {
-				// We have a range to extend
-				assert_leq(top, ebwt._eh._len);
-				assert_leq(bot, ebwt._eh._len);
-				cont->init(_qlen, 0, ftabChars, _unrevOff, _1revOff, _2revOff,
-				         _3revOff, top, bot, ham, ham, _pairs,
-				         _elims, NULL, NULL, nsInFtab > 0);
-			} else {
-				// The arrows are already closed within the
-				// unrevisitable region; give up
-				contMan.pop();
-			}
-		} else {
-			// We can't use the ftab, so we start from the rightmost
-			// position and use _fchr
-			cont->init(_qlen, 0, 0, _unrevOff, _1revOff, _2revOff,
-			         _3revOff, 0, 0, ham, ham, _pairs,
-			         _elims, NULL, NULL, nsInFtab > 0);
-		}
-		return;
-	}
-
-	/**
-	 * Initiate continuations so that the next call to advance() begins
-	 * a new search.  Note that contMan is empty upon return if there
-	 * are no valid continuations to begin with.  Also note that
-	 * calling initConts() may result in finding a range (i.e., if we
-	 * immediately jump to a valid range using the ftab).
-	 */
-	virtual void
 	initBranch(PathManager& pm, uint32_t ham) {
 		assert(curEbwt_ != NULL);
 		assert_gt(length(*_qry), 0);
@@ -580,6 +320,7 @@ public:
 		int ftabChars = ebwt._eh._ftabChars;
 		this->foundRange = false;
 		int nsInSeed = 0; int nsInFtab = 0;
+		ASSERT_ONLY(allTops_.clear());
 		if(!tallyNs(nsInSeed, nsInFtab)) {
 			// No alignments are possible because of the distribution
 			// of Ns in the read in combination with the backtracking
@@ -613,6 +354,7 @@ public:
 				_curRange.bot     = bot;
 				_curRange.stratum = calcStratum(_mms, 0);
 				_curRange.numMms  = 0;
+				_curRange.ebwt    = _ebwt;
 				_curRange.fw      = _params.fw();
 				_curRange.mms.clear(); // no mismatches
 				// no need to do anything with _curRange.refcs
@@ -644,275 +386,6 @@ public:
 		return;
 	}
 
-	/**
-	 * Recursive routine for progressing to the next backtracking
-	 * decision given some initial conditions.  If a hit is found, it
-	 * is recorded and true is returned.  Otherwise, if there are more
-	 * backtracking opportunities, the function will call itself
-	 * recursively and return the result.  As soon as there is a
-	 * mismatch and no backtracking opporunities, false is returned.
-	 *
-	 * Continuations provide a way to resume the search at a lower
-	 * stack frame.  When we might otherwise return false to indicate
-	 * we're done and we didn't find any hits, we instead will dequeue
-	 * a continuation and prefetch its top/bot loci.
-	 */
-	virtual void
-	advance(GreedyDFSContinuationManager& contMan) {
-		// Restore alignment state from the frontmost continuation.
-		// The frontmost continuation should in principle be the most
-		// promising partial alignment found so far.  In the case of
-		// the greedy DFS backtracker, which partial alignment is most
-		// promising is determined in a greedy, depth-first, non-
-		// optimal fashion.
-		assert(curEbwt_ != NULL);
-		assert_gt(contMan.size(), 0);
-		GreedyDFSContinuation* cont = contMan.front();
-		assert(cont->prepped); // must have been prepped
-
-		// Let this->foundRange = false; we'll set it to true iff this call
-		// to advance yielded a new valid-alignment range.
-		this->foundRange = false;
-
-		// Can't have already exceeded weighted hamming distance threshold
-		assert_leq(cont->stackDepth, cont->depth);
-		assert_gt(length(*_qry), 0);
-		assert_leq(_qlen, length(*_qry));
-		assert_geq(length(*_qual), length(*_qry));
-		assert_leq(cont->ham, _qualThresh);
-		assert_geq(cont->bot, cont->top);
-		assert_leq(cont->stackDepth, _qlen);
-		const Ebwt<String<Dna> >& ebwt = *_ebwt;
-		if(_halfAndHalf) {
-			assert_eq(0, _reportPartials);
-			assert_gt(_3depth, _5depth);
-		}
-		if(_reportPartials) {
-			assert(!_halfAndHalf);
-			assert_leq(cont->stackDepth, _reportPartials);
-		}
-		if(_verbose) {
-			cout << "  advance(stackDepth=" << cont->stackDepth << ", "
-                 << "depth=" << cont->depth << ", "
-                 << "top=" << cont->top << ", "
-                 << "bot=" << cont->bot << ", "
-                 << "ham=" << cont->ham << ", "
-                 << "iham=" << cont->iham << ", "
-                 << "pairs=" << cont->pairs << ", "
-                 << "elims=" << (void*)cont->elims << "): \"";
-			cout << "\"" << endl;
-		}
-		// We can't have already processed the entire read
-		assert_leq(cont->depth, _qlen);
-
-		// If we're searching for a half-and-half solution, then
-		// enforce the boundary-crossing constraints here.
-		if(_halfAndHalf &&
-		   !hhCheckTop(cont->stackDepth, cont->depth, cont->iham, cont->mms))
-		{
-			// Continuation is rejected because it violates a boundary-
-			// crossing constraint.
-			contMan.pop();
-			return;
-		}
-		uint32_t cur = _qlen - cont->depth - 1; // current offset into _qry
-		if(cont->depth < _qlen) {
-			// Determine whether ranges at this location are candidates
-			// for backtracking
-			int c = (int)(*_qry)[cur]; // get char at this position
-			assert_leq(c, 4);
-			uint8_t q = qualAt(cur);   // get qual at this position
-
-			// The current query position is a legit alternative if it a) is
-			// not in the unrevisitable region, and b) its selection would
-			// not cause the quality ceiling (if one exists) to be exceeded
-			bool curIsAlternative =
-				 (cont->depth >= cont->unrevOff) &&
-				 (!_considerQuals ||
-				  (cont->ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
-			if(_verbose) {
-				cout << " alternative: " << curIsAlternative << endl;
-			}
-
-			// If c is 'N', then it's a mismatch
-			if(c == 4 && cont->depth > 0) {
-				// Force the 'else if(curIsAlternative)' or 'else'
-				// branches below
-				cont->top = cont->bot = 1;
-			} else if(c == 4) {
-				// We'll take the 'if(top == 0 && bot == 0)' branch below
-				assert_eq(0, cont->top);
-				assert_eq(0, cont->bot);
-			}
-
-			// Calculate the ranges for this position
-			if(cont->top == 0 && cont->bot == 0) {
-				// Calculate first quartet of ranges using the _fchr[]
-				// array
-							        cont->pairs[0 + 0] = ebwt._fchr[0];
-				cont->pairs[0 + 4] = cont->pairs[1 + 0] = ebwt._fchr[1];
-				cont->pairs[1 + 4] = cont->pairs[2 + 0] = ebwt._fchr[2];
-				cont->pairs[2 + 4] = cont->pairs[3 + 0] = ebwt._fchr[3];
-				cont->pairs[3 + 4]                     = ebwt._fchr[4];
-				// Update top and bot
-				if(c < 4) {
-					cont->top = pairTop(cont->pairs, cont->depth, c);
-					cont->bot = pairBot(cont->pairs, cont->depth, c);
-				}
-			} else if(curIsAlternative) {
-				// Clear pairs
-				memset(&cont->pairs[cont->depth*8], 0, 8 * 4);
-				// Calculate next quartet of ranges.  We hope that the
-				// appropriate cache lines are prefetched before now;
-				// otherwise, we're about to take an expensive cache
-				// miss.
-				assert(cont->ltop.valid());
-				assert(cont->lbot.valid());
-				ebwt.mapLFEx(cont->ltop, cont->lbot,
-							 &cont->pairs[cont->depth*8],
-							 &cont->pairs[(cont->depth*8)+4]);
-				// Update top and bot
-				if(c < 4) {
-					cont->top = pairTop(cont->pairs, cont->depth, c);
-					cont->bot = pairBot(cont->pairs, cont->depth, c);
-				}
-			} else {
-				// This read position is not a legitimate backtracking
-				// alternative.  No need to do the bookkeeping for the
-				// entire quartet, just do c.  We hope that the
-				// appropriate cache lines are prefetched before now;
-				// otherwise, we're about to take an expensive cache
-				// miss.
-				assert(cont->ltop.valid());
-				assert(cont->lbot.valid());
-				if(c < 4) {
-					cont->top = ebwt.mapLF(cont->ltop, c);
-					cont->bot = ebwt.mapLF(cont->lbot, c);
-				}
-			}
-
-			// Calculate alternative paths emanating from this position
-			// and push them onto the continuation list
-			if(curIsAlternative) {
-				// Given the just-calculated range quartet, update
-				// elims, altNum, eligibleNum, eligibleSz
-				for(int i = 0; i < 4; i++) {
-					if(i == c) continue; // skip the actual query character
-					uint32_t atop = pairTop(cont->pairs, cont->depth, i);
-					uint32_t abot = pairBot(cont->pairs, cont->depth, i);
-					assert_leq(atop, abot);
-					if(abot == atop) continue;
-					// Add a new continuation on the back
-					contMan.expand1();
-					cont = contMan.front();
-					GreedyDFSContinuation* back = contMan.back();
-					// Update revisitability boundaries
-					uint32_t btUnrevOff    = cont->unrevOff;
-					uint32_t btOneRevOff   = cont->oneRevOff;
-					uint32_t btTwoRevOff   = cont->twoRevOff;
-					uint32_t btThreeRevOff = cont->threeRevOff;
-					if(cont->depth < cont->oneRevOff)   btUnrevOff = cont->oneRevOff;
-					if(cont->depth < cont->twoRevOff)   btOneRevOff = cont->twoRevOff;
-					if(cont->depth < cont->threeRevOff) btTwoRevOff = cont->threeRevOff;
-					// Get a new stretch of the pairs and elims arrays
-					uint32_t *newPairs = cont->pairs + (_qlen*8);
-					uint8_t  *newElims = cont->elims + (_qlen);
-					assert_leq(atop, ebwt._eh._len);
-					assert_leq(abot, ebwt._eh._len);
-					back->init(_qlen,
-					          cont->stackDepth+1,  // adding a mismatch
-							  cont->depth+1,
-							  btUnrevOff,
-							  btOneRevOff,
-							  btTwoRevOff,
-							  btThreeRevOff,
-							  atop,
-							  abot,
-							  cont->ham + mmPenalty(_maqPenalty, q),
-							  cont->iham,
-							  newPairs,
-							  newElims,
-							  &cont->mms,
-							  &cont->refcs,
-							  cont->disableFtab);
-#ifndef NDEBUG
-					for(uint32_t j = 0; j < cont->stackDepth; j++) {
-						assert_neq(cont->mms[j], cur);
-					}
-#endif
-					back->mms.push_back(cur);
-					back->refcs[cont->stackDepth] = (uint8_t)("ACGT"[i]);
-					assert_neq((int)charToDna5[back->refcs[cont->stackDepth]], (int)(*_qry)[cur]);
-				}
-			}
-		} else {
-			// The continuation had already processed the whole read
-			cont->depth--;
-			cur = 0;
-		}
-		bool empty = (cont->top == cont->bot);
-		bool hit = (cur == 0 && !empty);
-
-		// Is this a potential partial-alignment range?
-		bool backtrackDespiteMatch = false;
-		bool reportedPartial = false;
-		if(hit && _reportPartials > 0) {
-			// This is a potential alignment range; set
-			// backtrackDespiteMatch to 'true' so that we keep looking
-			backtrackDespiteMatch = true;
-			// We don't care to report exact partial alignments, only
-			// ones with mismatches.
-			if(cont->stackDepth > 0) {
-				reportPartial(cont->stackDepth);
-				reportedPartial = true;
-			}
-			// Now continue on to find legitimate partial
-			// mismatches
-		}
-
-		// Check whether we've obtained an exact alignment when
-		// we've been instructed not to report exact alignments
-		bool invalidExact = (hit && cont->stackDepth == 0 && !_reportExacts);
-
-		// Set this to true if the only way to make legal progress
-		// is via one or more additional backtracks.
-		if(_halfAndHalf &&
-		   !hhCheck(cont->stackDepth, cont->depth, cont->mms, empty))
-		{
-			// This alignment doesn't satisfy the half-and-half
-			// requirements; reject it
-			contMan.pop();
-			return;
-		}
-
-		if(hit &&            // there are alignments to report
-		   !invalidExact &&  // not disqualified by no-exact-hits setting
-		   !reportedPartial) // not an already-reported partial alignment
-		{
-			_curRange.top     = cont->top;
-			_curRange.bot     = cont->bot;
-			_curRange.stratum = calcStratum(cont->mms, cont->stackDepth);
-			_curRange.numMms  = cont->stackDepth;
-			_curRange.mms     = cont->mms;
-			_curRange.refcs   = cont->refcs;
-			_curRange.ebwt    = _ebwt;
-			_curRange.fw      = _params.fw();
-			this->foundRange  = true;
-			contMan.pop();
-			return;
-		} else if(empty || cur == 0) {
-			// This continuation hit a dead end so pop it off
-			contMan.pop();
-			// The next continuation to be processed is whichever is
-			// now returned by front().
-		} else {
-			// Push the front continuation forward by one position
-			assert_neq(0, cur);
-			cont->depth++;
-		}
-		return;
-	}
-
 	virtual void
 	advanceBranch(PathManager& pm) {
 		// Restore alignment state from the frontmost continuation.
@@ -927,33 +400,10 @@ public:
 		// queue in 'pm'
 		Branch* br = pm.front();
 		assert(!br->exhausted_);
-		if(br->curtailed_) {
-			uint16_t origCost = br->cost_;
-			Branch* newbr = pm.splitBranch(br, _rand, _qlen, _3depth, _ebwt->_eh, _ebwt->_ebwt);
-			if(br->exhausted_) {
-				// br->splitBranch should have removed br from the
-				// PathManager
-				assert(br == pm.front());
-				pm.pop();
-				assert(!pm.contains(br));
-				// br is allocated from a pool; it'll get freed later
-			} else if(br->cost_ > origCost) {
-				// br's cost changed so we need to re-insert it into
-				// the priority queue
-				Branch *popped = pm.pop();
-				assert(popped == br); // should be br!
-				pm.push(popped); // re-insert
-			}
-			assert(newbr != NULL);
-			pm.push(newbr);
-			assert(newbr == pm.front());
-			br = newbr;
-		}
+		assert(!br->curtailed_);
 		if(_verbose) {
 			br->print((*_qry), (*_qual), cout, _params.fw(), _ebwt->fw());
 		}
-		assert(!br->curtailed_);
-		assert(!br->exhausted_);
 		assert(br->repOk(_qlen));
 
 		// Let this->foundRange = false; we'll set it to true iff this call
@@ -983,11 +433,14 @@ public:
 			assert_leq(br->numEdits_, _reportPartials);
 		}
 
+		bool backtrackDespiteMatch = false;
+		bool reportedPartial = false;
+
 		if(_halfAndHalf && !hhCheckTop(br, depth, 0 /*iham*/)) {
 			// Stop extending this branch because it violates a half-
 			// and-half constraint
 			pm.curtail(br, _3depth);
-			return;
+			goto bail;
 		}
 
 		uint32_t cur = _qlen - depth - 1; // current offset into _qry
@@ -1074,10 +527,17 @@ public:
 				rs->eliminated_ = true; // eliminate all alternatives leaving this node
 				assert(br->eliminated(br->len_));
 				if(c < 4) {
-					br->top_ = ebwt.mapLF(br->ltop_, c);
-					br->bot_ = ebwt.mapLF(br->lbot_, c);
+					if(br->top_ + 1 == br->bot_) {
+						br->top_ = ebwt.mapLF1(br->ltop_, c);
+						if(br->top_ == 0xffffffff) br->bot_ = 0xffffffff;
+						else br->bot_ = br->top_ + 1;
+					} else {
+						br->top_ = ebwt.mapLF(br->ltop_, c);
+						br->bot_ = ebwt.mapLF(br->lbot_, c);
+					}
 				}
 			}
+			// br->top_ and br->bot_ now contain the next top and bot
 		} else {
 			// The continuation had already processed the whole read
 			assert_eq(_qlen, depth);
@@ -1087,8 +547,6 @@ public:
 		bool hit = (cur == 0 && !empty);
 
 		// Is this a potential partial-alignment range?
-		bool backtrackDespiteMatch = false;
-		bool reportedPartial = false;
 		if(hit && _reportPartials > 0) {
 			// This is a potential alignment range; set
 			// backtrackDespiteMatch to 'true' so that we keep looking
@@ -1113,7 +571,7 @@ public:
 			// This alignment doesn't satisfy the half-and-half
 			// requirements; reject it
 			pm.curtail(br, _3depth);
-			return;
+			goto bail;
 		}
 
 		if(hit &&            // there is a range to report
@@ -1137,6 +595,14 @@ public:
 			}
 			_curRange.ebwt    = _ebwt;
 			this->foundRange  = true;
+#ifndef NDEBUG
+			int64_t top2 = (int64_t)br->top_;
+			top2++; // ensure it's not 0
+			if(_ebwt->fw()) top2 = -top2;
+			assert(allTops_.find(top2) == allTops_.end());
+			allTops_.insert(top2);
+#endif
+			// Must curtail because we've consumed the whole pattern
 			pm.curtail(br, _3depth);
 		} else if(empty || cur == 0) {
 			// The branch couldn't be extended further
@@ -1148,6 +614,10 @@ public:
 			assert_neq(0, cur);
 			br->extend();
 		}
+	bail:
+		// Make sure the front element of the priority queue is
+		// extendable (i.e. not curtailed) and then prep it.
+		pm.splitAndPrep(_rand, _qlen, _3depth, _ebwt->_eh, _ebwt->_ebwt);
 	}
 
 	/**
@@ -1424,8 +894,14 @@ public:
 				// our mismatch quality budget), so no need to do the
 				// bookkeeping for the entire quartet, just do c
 				if(c < 4) {
-					top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c);
-					assert_geq(bot, top);
+					if(top+1 == bot) {
+						top = ebwt.mapLF1(ltop, c);
+						if(top == 0xffffffff) bot = 0xffffffff;
+						else bot = top+1;
+					} else {
+						top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c);
+						assert_geq(bot, top);
+					}
 				}
 			}
 			if(top != bot) {
@@ -3110,6 +2586,9 @@ protected:
 	vector<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
+#ifndef NDEBUG
+	std::set<int64_t>   allTops_;
+#endif
 };
 
 /**
@@ -3129,8 +2608,7 @@ enum SearchConstraintExtent {
  * parameters when initializing it;
  */
 class GreedyDFSRangeSourceDriver :
-	public SingleRangeSourceDriver<GreedyDFSRangeSource,
-	                               GreedyDFSContinuationManager>
+	public SingleRangeSourceDriver<GreedyDFSRangeSource>
 {
 public:
 	GreedyDFSRangeSourceDriver(
@@ -3148,7 +2626,7 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			uint32_t seed) :
-			SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+			SingleRangeSourceDriver<GreedyDFSRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose, seed),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),

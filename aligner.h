@@ -284,9 +284,9 @@ protected:
  * tries the forward-oriented version of the read before the reverse-
  * oriented read.
  */
-template<typename TRangeSource, typename TContMan>
+template<typename TRangeSource>
 class UnpairedAlignerV2 : public Aligner {
-	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
+	typedef RangeSourceDriver<TRangeSource> TDriver;
 public:
 	UnpairedAlignerV2(
 		EbwtSearchParams<String<Dna> >* params,
@@ -328,7 +328,7 @@ public:
 		Aligner::setQuery(patsrc); // set fields & random seed
 		driver_->setQuery(patsrc);
 		rchase_->initRand(qseed_);
-		this->done = false;
+		this->done = driver_->done;
 		doneFirst_ = false;
 		firstIsFw_ = ((qseed_ & 0x10) == 0);
 		chase_ = false;
@@ -443,9 +443,9 @@ protected:
  * tries the forward-oriented version of the read before the reverse-
  * oriented read.
  */
-template<typename TRangeSource, typename TContMan>
+template<typename TRangeSource>
 class UnpairedAlignerV1 : public Aligner {
-	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
+	typedef RangeSourceDriver<TRangeSource> TDriver;
 public:
 	UnpairedAlignerV1(
 		EbwtSearchParams<String<Dna> >* params,
@@ -655,13 +655,13 @@ protected:
  * An aligner for finding paired alignments while operating entirely
  * within the Burrows-Wheeler domain.
  */
-template<typename TRangeSource, typename TContMan>
+template<typename TRangeSource>
 class PairedBWAlignerV1 : public Aligner {
 
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 	typedef std::vector<U32Pair> U32PairVec;
 	typedef std::vector<Range> TRangeVec;
-	typedef RangeSourceDriver<TRangeSource, TContMan> TDriver;
+	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
 	typedef std::set<TU64Pair> TSetPairs;
 

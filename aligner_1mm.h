@@ -18,9 +18,9 @@
  * Concrete factory class for constructing unpaired exact aligners.
  */
 class Unpaired1mmAlignerV1Factory : public AlignerFactory {
-	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
-	typedef ListRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TListRangeSrcDr;
-	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TCostAwareRangeSrcDr;
+	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef ListRangeSourceDriver<GreedyDFSRangeSource> TListRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Unpaired1mmAlignerV1Factory(
@@ -129,7 +129,7 @@ public:
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
 		// Set up the aligner
-		return new UnpairedAlignerV2<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new UnpairedAlignerV2<GreedyDFSRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
 	}
@@ -152,8 +152,8 @@ private:
  * Concrete factory class for constructing unpaired exact aligners.
  */
 class Paired1mmAlignerV1Factory : public AlignerFactory {
-	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
-	typedef ListRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TListRangeSrcDr;
+	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef ListRangeSourceDriver<GreedyDFSRangeSource> TListRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Paired1mmAlignerV1Factory(
@@ -336,7 +336,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,

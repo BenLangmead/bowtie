@@ -15,42 +15,11 @@
 #include "ref_aligner.h"
 
 /**
- *
- */
-class Two3mmRangeSourceDriver {
-	typedef GreedyDFSRangeSourceDriver TDriver;
-
-public:
-	Two3mmRangeSourceDriver(TDriver * drFw_Fw,
-	                        TDriver * drFw_Bw,
-	                        TDriver * drFw_BwHalf,
-	                        TDriver * drRc_Fw,
-	                        TDriver * drRc_Bw,
-	                        TDriver * drRc_FwHalf) :
-	                        drFw_Fw_(drFw_Fw),
-	                        drFw_Bw_(drFw_Fw),
-	                        drFw_BwHalf_(drFw_Fw),
-	                        drRc_Fw_(drFw_Fw),
-	                        drRc_Bw_(drFw_Fw),
-	                        drRc_FwHalf_(drFw_Fw)
-	{ }
-
-protected:
-	TDriver * drFw_Fw_;
-	TDriver * drFw_Bw_;
-	TDriver * drFw_BwHalf_;
-
-	TDriver * drRc_Fw_;
-	TDriver * drRc_Bw_;
-	TDriver * drRc_FwHalf_;
-};
-
-/**
- * Concrete factory class for constructing unpaired exact aligners.
+ * Concrete factory for constructing unpaired 2- or 3-mismatch aligners.
  */
 class Unpaired23mmAlignerV1Factory : public AlignerFactory {
-	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
-	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TCostAwareRangeSrcDr;
+	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Unpaired23mmAlignerV1Factory(
@@ -191,7 +160,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV2<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new UnpairedAlignerV2<GreedyDFSRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
 	}
@@ -212,11 +181,12 @@ private:
 };
 
 /**
- * Concrete factory class for constructing unpaired exact aligners.
+ * Concrete factory for constructing paired 2- or 3-mismatch aligners.
  */
 class Paired23mmAlignerV1Factory : public AlignerFactory {
-	typedef SingleRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TRangeSrcDr;
-	typedef ListRangeSourceDriver<GreedyDFSRangeSource, GreedyDFSContinuationManager> TListRangeSrcDr;
+	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef ListRangeSourceDriver<GreedyDFSRangeSource> TListRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Paired23mmAlignerV1Factory(
@@ -278,7 +248,7 @@ public:
 		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *r1Fw_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
-			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
+			true,  false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
 		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *r1Fw_Bw = new GreedyDFSRangeSource(
 			 ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
@@ -286,7 +256,7 @@ public:
 		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *r1Fw_BwHalf = new GreedyDFSRangeSource(
 		     ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
-			 true, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr1Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Fw, true, sink_, sinkPt,
@@ -311,7 +281,7 @@ public:
 		GreedyDFSRangeSourceDriver * dr1Fw_BwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_BwHalf, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
+			false,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
@@ -323,7 +293,7 @@ public:
 		dr1FwVec.push_back(dr1Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
-		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
+		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, dr1FwVec);
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r1Rc_Fw = new GreedyDFSRangeSource(
@@ -374,7 +344,7 @@ public:
 		dr1RcVec.push_back(dr1Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
-		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
+		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, dr1RcVec);
 
 		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *r2Fw_Fw = new GreedyDFSRangeSource(
@@ -387,7 +357,7 @@ public:
 		// Source for ranges from mirror index & forward read
 		GreedyDFSRangeSource *r2Fw_BwHalf = new GreedyDFSRangeSource(
 		     ebwtBw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
-			 true, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
+			false, false, NULL, NULL, verbose_, seed_, &os_, false, true /*half-and-half*/, false);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr2Fw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Fw, true, sink_, sinkPt,
@@ -412,7 +382,7 @@ public:
 		GreedyDFSRangeSourceDriver * dr2Fw_BwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_BwHalf, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
+			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
@@ -424,7 +394,7 @@ public:
 		dr2FwVec.push_back(dr2Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
-		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
+		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, dr2FwVec);
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r2Rc_Fw = new GreedyDFSRangeSource(
@@ -475,7 +445,7 @@ public:
 		dr2RcVec.push_back(dr2Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
-		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
+		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, dr2RcVec);
 
 		RefAligner<String<Dna5> >* refAligner;
 		if(two_) {
@@ -488,7 +458,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,

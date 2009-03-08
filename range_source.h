@@ -334,7 +334,7 @@ protected:
  */
 class Branch {
 public:
-	Branch() : curtailed_(false), exhausted_(false) { }
+	Branch() : curtailed_(false), exhausted_(false), prepped_(false) { }
 
 	/**
 	 * Initialize a new branch object with an empty path.
@@ -377,6 +377,7 @@ public:
 #endif
 		curtailed_ = false;
 		exhausted_ = false;
+		prepped_ = true;
 		if(numEdits > 0) {
 			assert(edits != NULL);
 			for(size_t i = 0; i < numEdits; i++) {
@@ -421,6 +422,7 @@ public:
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
+		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		assert(curtailed_);
 		int tiedPositions[3];
@@ -627,12 +629,15 @@ public:
 	}
 
 	/**
-	 * Prep this branch for the next extension.
+	 * Prep this branch for the next extension by calculating the
+	 * SideLocus information and prefetching cache lines from the
+	 * appropriate loci.
 	 */
 	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
 		if(bot_ > top_) {
 			SideLocus::initFromTopBot(top_, bot_, ep, ebwt, ltop_, lbot_);
 		}
+		prepped_ = true;
 	}
 
 	/**
@@ -695,9 +700,13 @@ public:
 		return ret;
 	}
 
+	/**
+	 * Extend this branch by one position.
+	 */
 	void extend() {
 		assert(ranges_ != NULL);
 		assert(repOk());
+		prepped_ = false;
 		len_++;
 	}
 
@@ -754,6 +763,7 @@ public:
 
 	bool curtailed_;  // can't be extended anymore without using edits
 	bool exhausted_;  // all outgoing edges exhausted, including all edits
+	bool prepped_;    // whether SideLocus's are inited
 
 protected:
 
@@ -1034,6 +1044,7 @@ public:
 	 * Return the "front" (highest-priority) branch in the collection.
 	 */
 	Branch* front() {
+		assert(!empty());
 		return branchQ_.front();
 	}
 
@@ -1085,14 +1096,6 @@ public:
 		minCost = 0;
 	}
 
-	/**
-	 * TODO: always have the next outgoing path lined up in the Branch
-	 * object so that we can prefetch it here.
-	 */
-	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
-		if(!branchQ_.empty()) branchQ_.front()->prep(ep, ebwt);
-	}
-
 #ifndef NDEBUG
 	/**
 	 * Return true iff Branch b is in the priority queue;
@@ -1139,16 +1142,67 @@ public:
 			ASSERT_ONLY(Branch *popped =) pop();
 			assert(popped == br);
 			// br is allocated from a pool; it'll get freed later
+#ifndef NDEBUG
+			if(!empty()) {
+				assert(!front()->exhausted_);
+				assert(br != front());
+			}
+#endif
 		} else if(br->cost_ != origCost) {
 			assert(br == front());
 			Branch *popped = pop();
 			assert(popped == br);
 			push(popped);
+#ifndef NDEBUG
+			if(!empty()) assert(!front()->exhausted_);
+#endif
 		}
+#ifndef NDEBUG
+		if(!empty()) assert(!front()->exhausted_);
+#endif
 	}
 
 	/**
-	 *
+	 * If the frontmost branch is a curtailed branch, split off an
+	 * extendable branch and add it to the queue.
+	 */
+	void splitAndPrep(RandomSource& rand, uint32_t qlen, int seedLen,
+	                  const EbwtParams& ep, const uint8_t* ebwt)
+	{
+		if(empty()) return;
+		Branch *f = front();
+		assert(!f->exhausted_);
+		if(f->curtailed_) {
+			uint16_t origCost = f->cost_;
+			Branch* newbr = splitBranch(f, rand, qlen, seedLen, ep, ebwt);
+			if(f->exhausted_) {
+				pop();
+				assert(!contains(f));
+			} else if(f->cost_ > origCost) {
+				// br's cost changed so we need to re-insert it into
+				// the priority queue
+				Branch *popped = pop();
+				assert(popped == f); // should be br!
+				push(popped); // re-insert
+			}
+			assert(newbr != NULL);
+			push(newbr);
+			assert(newbr == front());
+		}
+		prep(ep, ebwt);
+	}
+
+	/**
+	 * Return true iff the front element of the queue is prepped.
+	 */
+	bool prepped() {
+		return front()->prepped_;
+	}
+
+protected:
+
+	/**
+	 * Split off an extendable branch from a curtailed branch.
 	 */
 	Branch* splitBranch(Branch* src, RandomSource& rand, uint32_t qlen,
 	                    int seedLen, const EbwtParams& ep,
@@ -1160,7 +1214,14 @@ public:
 		return dst;
 	}
 
-protected:
+	/**
+	 * Prep the next branch to be extended in advanceBranch().
+	 */
+	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
+		if(!branchQ_.empty()) {
+			branchQ_.front()->prep(ep, ebwt);
+		}
+	}
 
 	BranchQueue branchQ_; // priority queue for selecting lowest-cost Branch
 	// set of branches in priority queue, for sanity checks
@@ -1181,7 +1242,6 @@ public:
  * higher authority is responsible for reporting hits out of those
  * ranges, and stopping when the consumer is satisfied.
  */
-template<typename TContinuationManager>
 class RangeSource {
 	typedef Ebwt<String<Dna> > TEbwt;
 public:
@@ -1194,11 +1254,6 @@ public:
 	virtual void setQuery(seqan::String<Dna5>* qry,
 	                      seqan::String<char>* qual,
 	                      seqan::String<char>* name) = 0;
-	/// Set up the range search.
-	virtual void initConts(TContinuationManager& conts, uint32_t ham) = 0;
-	/// Advance the range search by one memory op
-	virtual void advance(TContinuationManager& conts) = 0;
-
 	/// Set up the range search.
 	virtual void initBranch(PathManager& pm, uint32_t ham) = 0;
 	/// Advance the range search by one memory op
@@ -1218,24 +1273,10 @@ protected:
 	const TEbwt *curEbwt_;
 };
 
-template<typename TCont>
-class ContinuationManager {
-public:
-	virtual ~ContinuationManager() { }
-	virtual TCont* front() = 0;
-	virtual TCont* back() = 0;
-	virtual void   prep(const EbwtParams& ep, const uint8_t* ebwt) = 0;
-	virtual void   pop() = 0;
-	virtual void   expand1() = 0;
-	virtual size_t size() const = 0;
-	virtual bool   empty() const = 0;
-	virtual void   clear() = 0;
-};
-
 /**
  * Abstract parent of RangeSourceDrivers.
  */
-template<typename TRangeSource, typename TContMan>
+template<typename TRangeSource>
 class RangeSourceDriver {
 	typedef Ebwt<String<Dna> > TEbwt;
 public:
@@ -1327,8 +1368,8 @@ protected:
 /**
  * A concrete driver wrapper for a single RangeSource.
  */
-template<typename TRangeSource, typename TContMan>
-class SingleRangeSourceDriver : public RangeSourceDriver<TRangeSource, TContMan> {
+template<typename TRangeSource>
+class SingleRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;
 
@@ -1343,8 +1384,8 @@ public:
 		bool verbose,
 		uint32_t seed,
 		uint32_t minCostAdjustment = 0) :
-		RangeSourceDriver<TRangeSource, TContMan>(true, minCostAdjustment),
-		first_(true), len_(0),
+		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
+		len_(0),
 		pat_(NULL), qual_(NULL), name_(NULL), sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
@@ -1387,14 +1428,16 @@ public:
 		len_ = seqan::length(*pat_);
 		assert_gt(len_, 0);
 		this->done = false;
-		first_ = true;
 		initRangeSource();
 		if(this->done) return;
 		pm_.reset();
 		rs_->setQuery(pat_, qual_, name_);
-		rs_->initBranch(pm_, 0); // set up initial continuation
+		ASSERT_ONLY(allTops_.clear());
+		if(!rs_->done) {
+			rs_->initBranch(pm_, 0); // set up initial branch
+		}
 		this->minCost = max<uint16_t>(0, this->minCostAdjustment_);
-		this->done = rs_->done;
+		this->done = rs_->done || pm_.empty();
 		this->foundRange = rs_->foundRange;
 	}
 
@@ -1405,24 +1448,30 @@ public:
 	virtual void advanceImpl() {
 		assert(!this->done);
 		assert(pat_ != NULL);
+		assert(!pm_.empty());
 		params_.setFw(fw_);
-		if(first_) {
-			// Set up the RangeSource for the forward read
-			first_ = false;
-		} else {
-			// Advance the RangeSource for the forward-oriented read
-			rs_->advanceBranch(pm_);
-		}
+		// Advance the RangeSource for the forward-oriented read
+		rs_->advanceBranch(pm_);
 		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
 		this->done = pm_.empty();
 		this->foundRange = rs_->foundRange;
-		if(!this->done) {
-			// Hopefully, this will prefetch enough so that when we
-			// resume, stuff is already in cache
-			const TEbwt* ebwt = rs_->curEbwt();
-			assert(ebwt != NULL);
-			pm_.prep(ebwt->_eh, ebwt->_ebwt);
+#ifndef NDEBUG
+		if(this->foundRange) {
+			// Assert that we have not yet dished out a range with this
+			// top offset
+			assert_gt(range().bot, range().top);
+			assert(range().ebwt != NULL);
+			int64_t top = (int64_t)range().top;
+			top++; // ensure it's not 0
+			if(!range().ebwt->fw()) top = -top;
+			assert(allTops_.find(top) == allTops_.end());
+			allTops_.insert(top);
 		}
+		if(!this->done) {
+			assert(!pm_.front()->curtailed_);
+			assert(!pm_.front()->exhausted_);
+		}
+#endif
 	}
 
 	/**
@@ -1442,7 +1491,6 @@ protected:
 	virtual void initRangeSource() = 0;
 
 	// Progress state
-	bool first_;
 	uint32_t len_;
 	String<Dna5>* pat_;
 	String<char>* qual_;
@@ -1455,11 +1503,8 @@ protected:
 	EbwtSearchParams<String<Dna> >& params_;
 	bool                            fw_;
 	TRangeSource*                   rs_; // delete this in destructor
-#ifdef USE_CONTS
-	TContMan                        cm_;
-#else
 	PathManager pm_;
-#endif
+	ASSERT_ONLY(std::set<int64_t> allTops_);
 };
 
 /**
@@ -1468,16 +1513,16 @@ protected:
  * higher authority is responsible for reporting hits out of those
  * ranges, and stopping when the consumer is satisfied.
  */
-template<typename TRangeSource, typename TContMan>
-class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource, TContMan> {
+template<typename TRangeSource>
+class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef std::vector<SingleRangeSourceDriver<TRangeSource, TContMan>*> TRangeSrcDrPtrVec;
+	typedef std::vector<SingleRangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
 
 	ListRangeSourceDriver(const TRangeSrcDrPtrVec& rss) :
-		RangeSourceDriver<TRangeSource, TContMan>(false),
+		RangeSourceDriver<TRangeSource>(false),
 		cur_(0), ham_(0), rss_(rss) /* copy */,
 		patsrc_(NULL), mate1_(true)
 	{
@@ -1553,17 +1598,17 @@ protected:
  * the alignment policy for the underlying RangeSource might force
  * mismatches.
  */
-template<typename TRangeSource, typename TContMan>
-class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource, TContMan> {
+template<typename TRangeSource>
+class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef SingleRangeSourceDriver<TRangeSource, TContMan>* TRangeSrcDrPtr;
+	typedef SingleRangeSourceDriver<TRangeSource>* TRangeSrcDrPtr;
 	typedef std::vector<TRangeSrcDrPtr> TRangeSrcDrPtrVec;
 
 public:
 
 	CostAwareRangeSourceDriver(uint32_t qseed, const TRangeSrcDrPtrVec& rss) :
-		RangeSourceDriver<TRangeSource, TContMan>(false),
+		RangeSourceDriver<TRangeSource>(false),
 		rss_(rss), rand_(qseed)
 	{
 		assert_gt(rss_.size(), 0);
@@ -1586,7 +1631,6 @@ public:
 		for(size_t i = 0; i < rssSz; i++) {
 			rss_[i]->setQuery(patsrc, mate1);
 		}
-		this->done = rss_[0]->done;
 		this->foundRange = rss_[0]->foundRange;
 		lastRange_ = NULL;
 		if(this->foundRange) {
@@ -1597,10 +1641,19 @@ public:
 		assert(sortedRss());
 	}
 
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 */
+	virtual void advance() {
+		advanceImpl();
+	}
+
 	/// Advance the range search by one memory op
 	virtual void advanceImpl() {
 		assert(!this->done);
 		const size_t rssSz = rss_.size();
+		assert(sortedRss());
 		if(rss_[0]->done) {
 			TRangeSrcDrPtr p = rss_[0];
 			// If this RangeSourceDriver is done, rotate it to the back
@@ -1614,6 +1667,7 @@ public:
 				this->foundRange = rss_[0]->foundRange;
 				if(this->foundRange) {
 					lastRange_ = &rss_[0]->range();
+					rss_[0]->foundRange = false; // so we don't see it again later
 				} else {
 					lastRange_ = NULL;
 				}
@@ -1630,6 +1684,7 @@ public:
 			this->foundRange = rss_[0]->foundRange;
 			if(this->foundRange) {
 				lastRange_ = &rss_[0]->range();
+				rss_[0]->foundRange = false; // so we don't see it again later
 			} else {
 				lastRange_ = NULL;
 			}
@@ -1666,8 +1721,15 @@ public:
 		}
 #ifndef NDEBUG
 		if(this->foundRange) {
+			// Assert that we have not yet dished out a range with this
+			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
+			int64_t top = (int64_t)range().top;
+			top++; // ensure it's not 0
+			if(!range().ebwt->fw()) top = -top;
+			assert(this->allTops_.find(top) == this->allTops_.end());
+			this->allTops_.insert(top);
 		}
 #endif
 	}
@@ -1690,6 +1752,25 @@ protected:
 	 */
 	void sortRss() {
 		const size_t rssSz = rss_.size();
+		// Move all done drivers to the end
+		size_t front = 0;
+		size_t back = rssSz-1;
+		while(front < back) {
+			// Skip over already-done guys at the back
+			if(rss_[back]->done) {
+				back--;
+				continue;
+			}
+			assert(!rss_[back]->done);
+			if(rss_[front]->done) {
+				// Swap front and back
+				TRangeSrcDrPtr tmp = rss_[front];
+				rss_[front] = rss_[back];
+				rss_[back] = tmp;
+				back--;
+			}
+			front++;
+		}
 		// Selection sort outer loop
 		for(size_t i = 0; i < rssSz-1; i++) {
 			if(rss_[i]->done) continue;

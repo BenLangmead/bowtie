@@ -92,7 +92,7 @@ static bool useSpinlock         = true;  // false -> don't use of spinlocks even
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
 static bool stateful            = false; // use stateful aligners
-static uint32_t prefetchWidth   = 2;     // number of reads to process in parallel w/ --stateful
+static uint32_t prefetchWidth   = 1;     // number of reads to process in parallel w/ --stateful
 static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
 static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP = 600)
 static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand

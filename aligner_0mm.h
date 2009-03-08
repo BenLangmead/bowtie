@@ -80,7 +80,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new UnpairedAlignerV1<GreedyDFSRangeSource>(
 			params, driverFw, driverRc, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
 			seed_);
@@ -212,7 +212,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<GreedyDFSRangeSource, GreedyDFSContinuationManager>(
+		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
 			params,
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
