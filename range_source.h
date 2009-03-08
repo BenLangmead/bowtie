@@ -1769,7 +1769,15 @@ public:
 			} else {
 				lastRange_ = NULL;
 			}
-			if(precost != rss_[0]->minCost) {
+			if(rss_[0]->done) {
+				TRangeSrcDrPtr p = rss_[0];
+				// If this RangeSourceDriver is done, rotate it to the back
+				// of the vector
+				for(size_t i = 0; i < rssSz-1; i++) {
+					rss_[i] = rss_[i+1];
+				}
+				rss_[rssSz-1] = p;
+			} else if(precost != rss_[0]->minCost) {
 				assert_gt(rss_[0]->minCost, precost);
 				// Remove and re-insert
 				TRangeSrcDrPtr p = rss_[0];
@@ -1797,10 +1805,8 @@ public:
 					rss_[rssSz-1] = p;
 				}
 				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-				assert(sortedRss());
-			} else {
-				assert(sortedRss());
 			}
+			assert(sortedRss());
 		}
 #ifndef NDEBUG
 		if(this->foundRange) {
