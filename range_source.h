@@ -1711,14 +1711,14 @@ public:
 		for(size_t i = 0; i < rssSz; i++) {
 			rss_[i]->setQuery(patsrc, mate1);
 		}
+		sortRss();
+		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+		assert(sortedRss());
 		this->foundRange = rss_[0]->foundRange;
 		lastRange_ = NULL;
 		if(this->foundRange) {
 			lastRange_ = &rss_[0]->range();
 		}
-		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-		sortRss();
-		assert(sortedRss());
 	}
 
 	/**
