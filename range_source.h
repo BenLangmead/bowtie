@@ -523,6 +523,7 @@ public:
 	void print(const String<Dna5>& qry,
 	           const String<char>& quals,
 	           std::ostream& out,
+	           bool halfAndHalf,
 	           bool fw,
 	           bool ebwtFw)
 	{
@@ -534,8 +535,8 @@ public:
 		else                out << "  ";
 		if(ebwtFw) out << "<";
 		else       out << ">";
-		if(fw)     out << "F";
-		else       out << "R";
+		if(fw)     out << "F ";
+		else       out << "R ";
 		std::stringstream ss;
 		ss << cost_;
 		string s = ss.str();
@@ -545,6 +546,8 @@ public:
 			}
 		}
 		out << s;
+		if(halfAndHalf) ss << " h";
+		else            ss << "  ";
 		std::stringstream ss2;
 		ss2 << " ";
 		if(rdepth_ > 0) {
@@ -561,7 +564,7 @@ public:
 		}
 		for(size_t i = 0; i < len_; i++) {
 			if(editidx < numEdits_ && edits_[editidx].pos == printed) {
-				ss2 << " " << "acgt"[edits_[editidx].chr];
+				ss2 << "acgt"[edits_[editidx].chr] << " ";
 				editidx++;
 			} else {
 				ss2 << qry[qlen - printed - 1] << " ";
@@ -886,6 +889,7 @@ public:
 	}
 };
 
+#if 1
 /**
  * A priority queue for Branch objects; makes it easy to process
  * branches in a best-first manner by prioritizing branches with lower
@@ -1004,6 +1008,81 @@ protected:
 	uint32_t sz_;
 	TBranchQueue branchQ_; // priority queue of branches
 };
+#else
+/**
+ * A priority queue for Branch objects; makes it easy to process
+ * branches in a best-first manner by prioritizing branches with lower
+ * cumulative costs over branches with higher cumulative costs.
+ */
+class BranchQueue {
+
+	typedef std::pair<int, int> TIntPair;
+
+public:
+
+	BranchQueue() : branchQ_() { }
+
+	/**
+	 * Return the front (highest-priority) element of the queue.
+	 */
+	Branch *front() {
+		assert(!branchQ_.empty());
+		return branchQ_.back();
+	}
+
+	/**
+	 * Remove and return the front (highest-priority) element of the
+	 * queue.
+	 */
+	Branch *pop() {
+		assert(!branchQ_.empty());
+		Branch *b = branchQ_.back();
+		branchQ_.pop_back();
+		return b;
+	}
+
+	/**
+	 * Insert a new Branch into the sorted priority queue.
+	 */
+	void push(Branch *b) {
+		branchQ_.push_back(b);
+	}
+
+	/**
+	 * Empty the priority queue and reset the count.
+	 */
+	void reset() {
+		branchQ_.clear();
+	}
+
+	/**
+	 * Return true iff the priority queue of branches is empty.
+	 */
+	bool empty() const {
+		return branchQ_.empty();
+	}
+
+	/**
+	 * Return the number of Branches in the queue.
+	 */
+	uint32_t size() const {
+		return branchQ_.size();
+	}
+
+#ifndef NDEBUG
+	/**
+	 * Consistency check.
+	 */
+	bool repOk(std::set<Branch*>& bset) {
+		return true;
+	}
+#endif
+
+protected:
+
+	std::vector<Branch*> branchQ_; // priority queue of branches
+};
+#endif
 
 /**
  * A class that both contains Branches and determines how those

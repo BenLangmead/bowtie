@@ -413,7 +413,7 @@ public:
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
 			if(_verbose) {
-				br->print((*_qry), (*_qual), cout, _params.fw(), _ebwt->fw());
+				br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 			}
 			assert(br->repOk(_qlen));
 
@@ -582,7 +582,7 @@ public:
 			{
 				if(_verbose) {
 					br->extend();
-					br->print((*_qry), (*_qual), cout, _params.fw(), _ebwt->fw());
+					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 				}
 				_curRange.top     = br->top_;
 				_curRange.bot     = br->bot_;
