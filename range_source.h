@@ -546,10 +546,9 @@ public:
 			}
 		}
 		out << s;
-		if(halfAndHalf) ss << " h";
-		else            ss << "  ";
+		if(halfAndHalf) out << " h";
+		else            out << "  ";
 		std::stringstream ss2;
-		ss2 << " ";
 		if(rdepth_ > 0) {
 			for(size_t i = 0; i < rdepth_; i++) {
 				if(editidx < numEdits_ && edits_[editidx].pos == i) {
@@ -561,6 +560,8 @@ public:
 				printed++;
 			}
 			ss2 << "|";
+		} else {
+			ss2 << " ";
 		}
 		for(size_t i = 0; i < len_; i++) {
 			if(editidx < numEdits_ && edits_[editidx].pos == printed) {
