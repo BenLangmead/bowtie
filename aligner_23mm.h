@@ -288,12 +288,16 @@ public:
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr1FwVec;
-		dr1FwVec.push_back(dr1Fw_Fw);
 		dr1FwVec.push_back(dr1Fw_Bw);
+		dr1FwVec.push_back(dr1Fw_Fw);
 		dr1FwVec.push_back(dr1Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
+#if 0
+		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
+#else
 		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, dr1FwVec);
+#endif
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r1Rc_Fw = new GreedyDFSRangeSource(
@@ -344,7 +348,11 @@ public:
 		dr1RcVec.push_back(dr1Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
+#if 0
+		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
+#else
 		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, dr1RcVec);
+#endif
 
 		// Source for ranges from forward index & forward read
 		GreedyDFSRangeSource *r2Fw_Fw = new GreedyDFSRangeSource(
@@ -389,12 +397,16 @@ public:
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec dr2FwVec;
-		dr2FwVec.push_back(dr2Fw_Fw);
 		dr2FwVec.push_back(dr2Fw_Bw);
+		dr2FwVec.push_back(dr2Fw_Fw);
 		dr2FwVec.push_back(dr2Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
+#if 0
+		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
+#else
 		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, dr2FwVec);
+#endif
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *r2Rc_Fw = new GreedyDFSRangeSource(
@@ -445,7 +457,11 @@ public:
 		dr2RcVec.push_back(dr2Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
+#if 0
+		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
+#else
 		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, dr2RcVec);
+#endif
 
 		RefAligner<String<Dna5> >* refAligner;
 		if(two_) {

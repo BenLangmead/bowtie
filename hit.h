@@ -394,28 +394,44 @@ public:
 		if(!dumpUnalign_) return;
 		if(!p.paired()) {
 			if(!dumpUnalFaBase_.empty()) {
-				assert(dumpUnalFa_ != NULL);
 				MUTEX_LOCK(dumpUnalignFaLock_);
+				if(dumpUnalFa_ == NULL) {
+					dumpUnalFa_ = openOf(dumpUnalFaBase_, 0, true);
+					assert(dumpUnalFa_ != NULL);
+				}
 				printFastaRecord(*dumpUnalFa_, p.bufa().name, p.bufa().patFw);
 				MUTEX_UNLOCK(dumpUnalignFaLock_);
 			}
 			if(!dumpUnalFqBase_.empty()) {
-				assert(dumpUnalFq_ != NULL);
 				MUTEX_LOCK(dumpUnalignFqLock_);
+				if(dumpUnalFq_ == NULL) {
+					dumpUnalFq_ = openOf(dumpUnalFqBase_, 0, false);
+					assert(dumpUnalFq_ != NULL);
+				}
 				printFastqRecord(*dumpUnalFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				MUTEX_UNLOCK(dumpUnalignFqLock_);
 			}
 		} else {
 			if(!dumpUnalFaBase_.empty()) {
-				assert(dumpUnalFa_1_ != NULL && dumpUnalFa_2_ != NULL);
 				MUTEX_LOCK(dumpUnalignFaLockPE_);
+				if(dumpUnalFa_1_ == NULL) {
+					assert(dumpUnalFa_2_ == NULL);
+					dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
+					dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
+					assert(dumpUnalFa_1_ != NULL && dumpUnalFa_2_ != NULL);
+				}
 				printFastaRecord(*dumpUnalFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpUnalFa_2_, p.bufb().name, p.bufb().patFw);
 				MUTEX_UNLOCK(dumpUnalignFaLockPE_);
 			}
 			if(!dumpUnalFqBase_.empty()) {
-				assert(dumpUnalFq_1_ != NULL && dumpUnalFq_2_ != NULL);
 				MUTEX_LOCK(dumpUnalignFqLockPE_);
+				if(dumpUnalFq_1_ == NULL) {
+					assert(dumpUnalFq_2_ == NULL);
+					dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
+					dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
+					assert(dumpUnalFq_1_ != NULL && dumpUnalFq_2_ != NULL);
+				}
 				printFastqRecord(*dumpUnalFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				printFastqRecord(*dumpUnalFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
 				MUTEX_UNLOCK(dumpUnalignFqLockPE_);
@@ -435,28 +451,44 @@ public:
 		}
 		if(!p.paired()) {
 			if(!dumpMaxFaBase_.empty()) {
-				assert(dumpMaxFa_ != NULL);
 				MUTEX_LOCK(dumpMaxedFaLock_);
+				if(dumpMaxFa_ == NULL) {
+					dumpMaxFa_ = openOf(dumpMaxFaBase_, 0, true);
+		    		assert(dumpMaxFa_ != NULL);
+				}
 				printFastaRecord(*dumpMaxFa_, p.bufa().name, p.bufa().patFw);
 				MUTEX_UNLOCK(dumpMaxedFaLock_);
 			}
 			if(!dumpMaxFqBase_.empty()) {
-				assert(dumpMaxFq_ != NULL);
 				MUTEX_LOCK(dumpMaxedFqLock_);
+				if(dumpMaxFq_ == NULL) {
+		    		dumpMaxFq_ = openOf(dumpMaxFqBase_, 0, false);
+		    		assert(dumpMaxFq_ != NULL);
+				}
 				printFastqRecord(*dumpMaxFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				MUTEX_UNLOCK(dumpMaxedFqLock_);
 			}
 		} else {
 			if(!dumpMaxFaBase_.empty()) {
-				assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
 				MUTEX_LOCK(dumpMaxedFaLockPE_);
+				if(dumpMaxFa_1_ == NULL) {
+					assert(dumpMaxFa_2_ == NULL);
+		    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
+		    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
+		    		assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
+				}
 				printFastaRecord(*dumpMaxFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpMaxFa_2_, p.bufb().name, p.bufb().patFw);
 				MUTEX_UNLOCK(dumpMaxedFaLockPE_);
 			}
 			if(!dumpMaxFqBase_.empty()) {
-				assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
 				MUTEX_LOCK(dumpMaxedFqLockPE_);
+				if(dumpMaxFq_1_ == NULL) {
+					assert(dumpMaxFq_2_ == NULL);
+		    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
+		    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
+		    		assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
+				}
 				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
 				MUTEX_UNLOCK(dumpMaxedFqLockPE_);
@@ -573,26 +605,26 @@ protected:
     	               !dumpUnalFqBase_.empty();
     	dumpMaxed_   = !dumpMaxFaBase_.empty() ||
     	               !dumpMaxFqBase_.empty();
-    	if(!dumpUnalFaBase_.empty()) {
-    		dumpUnalFa_   = openOf(dumpUnalFaBase_, 0, true);
-    		dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
-    		dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
-    	}
-    	if(!dumpUnalFqBase_.empty()) {
-    		dumpUnalFq_   = openOf(dumpUnalFqBase_, 0, false);
-    		dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
-    		dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
-    	}
-    	if(!dumpMaxFaBase_.empty()) {
-    		dumpMaxFa_   = openOf(dumpMaxFaBase_, 0, true);
-    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
-    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
-    	}
-    	if(!dumpMaxFqBase_.empty()) {
-    		dumpMaxFq_   = openOf(dumpMaxFqBase_, 0, false);
-    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
-    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
-    	}
+//    	if(!dumpUnalFaBase_.empty()) {
+//    		dumpUnalFa_   = openOf(dumpUnalFaBase_, 0, true);
+//    		dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
+//    		dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
+//    	}
+//    	if(!dumpUnalFqBase_.empty()) {
+//    		dumpUnalFq_   = openOf(dumpUnalFqBase_, 0, false);
+//    		dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
+//    		dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
+//    	}
+//    	if(!dumpMaxFaBase_.empty()) {
+//    		dumpMaxFa_   = openOf(dumpMaxFaBase_, 0, true);
+//    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
+//    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
+//    	}
+//    	if(!dumpMaxFqBase_.empty()) {
+//    		dumpMaxFq_   = openOf(dumpMaxFqBase_, 0, false);
+//    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
+//    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
+//    	}
    		MUTEX_INIT(dumpUnalignFaLock_);
    		MUTEX_INIT(dumpUnalignFaLockPE_);
    		MUTEX_INIT(dumpUnalignFqLock_);
