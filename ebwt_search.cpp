@@ -105,6 +105,8 @@ static uint32_t cacheSize       = 0;     // # words per range cache
 static int offBase              = 0;     // offsets are 0-based by default, but configurable
 static bool tryHard             = false; // set very high maxBts, mixedAttemptLim
 static uint32_t skipReads       = 0;     // # reads/read pairs to skip
+static bool nofw                = false; // don't align fw orientation of read
+static bool norc                = false; // don't align rc orientation of read
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -155,6 +157,8 @@ enum {
 	ARG_NO_RECONCILE,
 	ARG_CACHE_LIM,
 	ARG_CACHE_SZ,
+	ARG_NO_FW,
+	ARG_NO_RC,
 	ARG_SKIP
 };
 
@@ -231,6 +235,8 @@ static struct option long_options[] = {
 	{"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
 	{"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
 	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
+	{"nofw",         no_argument,       0,            ARG_NO_FW},
+	{"norc",         no_argument,       0,            ARG_NO_RC},
 	{"offbase",      required_argument, 0,            'B'},
 	{"tryhard",      no_argument,       0,            'y'},
 	{"skip",         required_argument, 0,            's'},
@@ -1093,6 +1099,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_QUIET: quiet = true; break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case 't': timing = true; break;
+	   		case ARG_NO_FW: nofw = true; break;
+	   		case ARG_NO_RC: norc = true; break;
 			case ARG_MAXBTS:  maxBts  = parseInt(0, "--maxbts must be positive");  break;
 			case ARG_MAXBTS0: maxBts0 = parseInt(0, "--maxbts0 must be positive"); break;
 			case ARG_MAXBTS1: maxBts1 = parseInt(0, "--maxbts1 must be positive"); break;
@@ -2348,6 +2356,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			ebwtFw,
 			&ebwtBw,
 			two,
+			!nofw,
+			!norc,
 			_sink,
 			*sinkFact,
 			NULL, //&cacheFw,

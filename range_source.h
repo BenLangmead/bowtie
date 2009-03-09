@@ -365,6 +365,7 @@ public:
 		} else if(ibot > itop) {
 			// Only care about top
 			ltop_.initFromRow(itop, ep, ebwt);
+			lbot_.invalidate();
 		}
 		numEdits_ = numEdits;
 		if(qlen - rdepth_ > 0) {
@@ -651,6 +652,7 @@ public:
 			SideLocus::initFromTopBot(top_, bot_, ep, ebwt, ltop_, lbot_);
 		} else if(bot_ > top_) {
 			ltop_.initFromRow(top_, ep, ebwt);
+			lbot_.invalidate();
 		}
 		prepped_ = true;
 	}

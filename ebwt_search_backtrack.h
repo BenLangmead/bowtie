@@ -469,6 +469,11 @@ public:
 					 (!_considerQuals ||
 					  (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
 
+#ifndef NDEBUG
+				uint32_t obot = br->bot_;
+#endif
+				uint32_t otop = br->top_;
+
 				// If c is 'N', then it's a mismatch
 				if(c == 4 && depth > 0) {
 					// Force the 'else if(curIsAlternative)' or 'else'
@@ -505,7 +510,7 @@ public:
 						br->top_ = rs->tops[c];
 						br->bot_ = rs->bots[c];
 					}
-				} else if(curIsAlternative) {
+				} else if(curIsAlternative && (br->bot_ > br->top_ || c == 4)) {
 					// Calculate next quartet of ranges.  We hope that the
 					// appropriate cache lines are prefetched.
 					assert(br->ltop_.valid());
@@ -514,15 +519,31 @@ public:
 					rs->bots[1] = rs->tops[2] =
 					rs->bots[2] = rs->tops[3] =
 					rs->bots[3]               = 0;
-					if(br->bot_ > br->top_+1) {
-						assert(br->lbot_.valid());
+					if(br->lbot_.valid()) {
 						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
 					} else {
-						int cc = ebwt.mapLF1(br->top_, br->ltop_);
+#ifndef NDEBUG
+						uint32_t tmptops[] = {0, 0, 0, 0};
+						uint32_t tmpbots[] = {0, 0, 0, 0};
+						SideLocus ltop, lbot;
+						ltop.initFromRow(otop, _ebwt->_eh, _ebwt->_ebwt);
+						lbot.initFromRow(obot, _ebwt->_eh, _ebwt->_ebwt);
+						ebwt.mapLFEx(ltop, lbot, tmptops, tmpbots);
+#endif
+						int cc = ebwt.mapLF1(otop, br->ltop_);
+						br->top_ = otop;
+						assert(cc == -1 || (cc >= 0 && cc < 4));
 						if(cc >= 0) {
+							assert_lt(cc, 4);
 							rs->tops[cc] = br->top_;
-							rs->bots[cc] = br->top_ + 1;
+							rs->bots[cc] = (br->top_ + 1);
 						}
+#ifndef NDEBUG
+						for(int i = 0; i < 4; i++) {
+							assert_eq(tmpbots[i] - tmptops[i],
+							          rs->bots[i] - rs->tops[i]);
+						}
+#endif
 					}
 					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
 					assert(r < 4 || c == 4);
@@ -531,9 +552,9 @@ public:
 						br->top_ = rs->tops[c];
 						br->bot_ = rs->bots[c];
 					} else {
-						br->bot_ = br->top_;
+						br->top_ = br->bot_ = 1;
 					}
-				} else {
+				} else if(br->bot_ > br->top_) {
 					// This read position is not a legitimate backtracking
 					// alternative.  No need to do the bookkeeping for the
 					// entire quartet, just do c.  We hope that the
@@ -553,6 +574,8 @@ public:
 							br->bot_ = ebwt.mapLF(br->lbot_, c);
 						}
 					}
+				} else {
+					rs->eliminated_ = true;
 				}
 				// br->top_ and br->bot_ now contain the next top and bot
 			} else {
@@ -600,6 +623,7 @@ public:
 					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 					br->len_--;
 				}
+				assert_gt(br->bot_, br->top_);
 				_curRange.top     = br->top_;
 				_curRange.bot     = br->bot_;
 				_curRange.stratum = (br->cost_ >> 14);

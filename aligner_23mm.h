@@ -26,6 +26,8 @@ public:
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
 			bool two,
+			bool doFw,
+			bool doRc,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			RangeCache *cacheFw,
@@ -38,6 +40,7 @@ public:
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
 			two_(two),
+			doFw_(doFw), doRc_(doRc),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			cacheFw_(cacheFw),
@@ -105,9 +108,11 @@ public:
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
 		TRangeSrcDrPtrVec drVec;
-		drVec.push_back(drFw_Fw);
-		drVec.push_back(drFw_Bw);
-		drVec.push_back(drFw_FwHalf);
+		if(doFw_) {
+			drVec.push_back(drFw_Fw);
+			drVec.push_back(drFw_Bw);
+			drVec.push_back(drFw_FwHalf);
+		}
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Fw = new GreedyDFSRangeSource(
@@ -151,9 +156,11 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_);
-		drVec.push_back(drRc_Fw);
-		drVec.push_back(drRc_Bw);
-		drVec.push_back(drRc_FwHalf);
+		if(doRc_) {
+			drVec.push_back(drRc_Fw);
+			drVec.push_back(drRc_Bw);
+			drVec.push_back(drRc_FwHalf);
+		}
 		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
 
 		// Set up a RangeChaser
@@ -169,6 +176,8 @@ private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
 	bool two_;
+	bool doFw_;
+	bool doRc_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	RangeCache *cacheFw_;
