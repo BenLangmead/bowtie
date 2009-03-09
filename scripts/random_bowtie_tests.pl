@@ -491,6 +491,8 @@ sub search {
 		close(UNFQ);
 	}
 	
+	system("rm -f .tmp.un$seed*.fa .tmp.un$seed*.fq");
+	
 	# Success
 	return 1;
 }
