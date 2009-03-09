@@ -491,8 +491,8 @@ sub search {
 		close(UNFQ);
 	}
 	
-	system("rm -f .tmp.un$seed.fa .tmp.un$seed_1.fa .tmp.un$seed_2.fa");
-	system("rm -f .tmp.un$seed.fq .tmp.un$seed_1.fq .tmp.un$seed_2.fq");
+	system("rm -f .tmp.un$seed".".fa .tmp.un$seed"."_1.fa .tmp.un$seed"."_2.fa");
+	system("rm -f .tmp.un$seed".".fq .tmp.un$seed"."_1.fq .tmp.un$seed"."_2.fq");
 	
 	# Success
 	return 1;
