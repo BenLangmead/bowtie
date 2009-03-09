@@ -412,7 +412,7 @@ public:
 			// Shouldn't be curtailed or exhausted
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
-			if(true || _verbose) {
+			if(_verbose) {
 				br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 			}
 			assert(br->repOk(_qlen));
@@ -509,19 +509,29 @@ public:
 					// Calculate next quartet of ranges.  We hope that the
 					// appropriate cache lines are prefetched.
 					assert(br->ltop_.valid());
-					assert(br->lbot_.valid());
 								  rs->tops[0] =
 					rs->bots[0] = rs->tops[1] =
 					rs->bots[1] = rs->tops[2] =
 					rs->bots[2] = rs->tops[3] =
 					rs->bots[3]               = 0;
-					ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
+					if(br->bot_ > br->top_+1) {
+						assert(br->lbot_.valid());
+						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
+					} else {
+						int cc = ebwt.mapLF1(br->top_, br->ltop_);
+						if(cc >= 0) {
+							rs->tops[cc] = br->top_;
+							rs->bots[cc] = br->top_ + 1;
+						}
+					}
 					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
 						br->top_ = rs->tops[c];
 						br->bot_ = rs->bots[c];
+					} else {
+						br->bot_ = br->top_;
 					}
 				} else {
 					// This read position is not a legitimate backtracking
@@ -531,16 +541,15 @@ public:
 					// otherwise, we're about to take an expensive cache
 					// miss.
 					assert(br->ltop_.valid());
-					assert(br->lbot_.valid());
 					rs->eliminated_ = true; // eliminate all alternatives leaving this node
 					assert(br->eliminated(br->len_));
 					if(c < 4) {
 						if(br->top_ + 1 == br->bot_) {
-							br->top_ = ebwt.mapLF1(br->ltop_, c);
-							if(br->top_ == 0xffffffff) br->bot_ = 0xffffffff;
-							else br->bot_ = br->top_ + 1;
+							br->bot_ = br->top_ = ebwt.mapLF1(br->top_, br->ltop_, c);
+							if(br->bot_ != 0xffffffff) br->bot_++;
 						} else {
 							br->top_ = ebwt.mapLF(br->ltop_, c);
+							assert(br->lbot_.valid());
 							br->bot_ = ebwt.mapLF(br->lbot_, c);
 						}
 					}
@@ -586,7 +595,7 @@ public:
 			   !invalidExact &&  // not disqualified by no-exact-hits setting
 			   !reportedPartial) // not an already-reported partial alignment
 			{
-				if(true || _verbose) {
+				if(_verbose) {
 					br->len_++;
 					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
 					br->len_--;
@@ -905,9 +914,8 @@ public:
 				// bookkeeping for the entire quartet, just do c
 				if(c < 4) {
 					if(top+1 == bot) {
-						top = ebwt.mapLF1(ltop, c);
-						if(top == 0xffffffff) bot = 0xffffffff;
-						else bot = top+1;
+						bot = top = ebwt.mapLF1(top, ltop, c);
+						if(bot != 0xffffffff) bot++;
 					} else {
 						top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c);
 						assert_geq(bot, top);

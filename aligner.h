@@ -359,7 +359,8 @@ public:
 				tlen,                     // textlen
 				alen_,                    // qlen
 				ra.stratum,               // alignment stratum
-				ra.bot - ra.top - 1);     // # other hits
+				ra.bot - ra.top - 1,      // # other hits
+				patsrc_->patid());
 	}
 
 	/**
@@ -523,7 +524,8 @@ public:
 				tlen,                     // textlen
 				alen_,                    // qlen
 				ra.stratum,               // alignment stratum
-				ra.bot - ra.top - 1);     // # other hits
+				ra.bot - ra.top - 1,      // # other hits
+				patsrc_->patid());
 	}
 
 	/**
@@ -537,6 +539,7 @@ public:
 			assert(!rangeMode_);
 			assert(driverFw_->foundRange);
 			if(!rchase_->foundOff() && !rchase_->done) {
+				params_->setFw(true);
 				rchase_->advance();
 				return false;
 			}
@@ -555,6 +558,7 @@ public:
 			assert(!rangeMode_);
 			assert(driverRc_->foundRange);
 			if(!rchase_->foundOff() && !rchase_->done) {
+				params_->setFw(false);
 				rchase_->advance();
 				return false;
 			}
@@ -574,6 +578,7 @@ public:
 		if(!this->done && !chaseFw_ && !chaseRc_) {
 			bool fw = (doneFirst_ != firstIsFw_);
 			if(fw) {
+				params_->setFw(true);
 				driverFw_->advance();
 				if(driverFw_->foundRange) {
 					const Range& ra = driverFw_->range();
@@ -598,6 +603,7 @@ public:
 					else            doneFirst_ = true;
 				}
 			} else {
+				params_->setFw(false);
 				driverRc_->advance();
 				// Advance the RangeSource for the reverse-complement read
 				if(driverRc_->foundRange) {

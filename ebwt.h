@@ -430,7 +430,8 @@ public:
 	,mapLFExs_(0llu), \
 	mapLFs_(0llu), \
 	mapLFcs_(0llu), \
-	mapLF1cs_(0llu)
+	mapLF1cs_(0llu), \
+	mapLF1s_(0llu)
 #else
 #define Ebwt_STAT_INITS
 #endif
@@ -800,6 +801,7 @@ public:
 		cout << "  mapLF:     " << mapLFs_   << endl;
 		cout << "  mapLF(c):  " << mapLFcs_  << endl;
 		cout << "  mapLF1(c): " << mapLF1cs_ << endl;
+		cout << "  mapLF(c):  " << mapLF1s_  << endl;
 #endif
 	}
 
@@ -1102,7 +1104,8 @@ public:
 	inline void mapLFEx(const SideLocus& l, uint32_t *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline uint32_t mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline uint32_t mapLF1(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline uint32_t mapLF1(uint32_t row, const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline int mapLF1(uint32_t& row, const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -2220,14 +2223,14 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
  * i to on character c.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
+inline uint32_t Ebwt<TStr>::mapLF1(uint32_t row, const SideLocus& l, int c
                                    ASSERT_ONLY(, bool overrideSanity)
                                    ) const
 {
 #ifdef EBWT_STATS
 	const_cast<Ebwt<TStr>*>(this)->mapLF1cs_++;
 #endif
-	if(rowL(l) != c) return 0xffffffff;
+	if(rowL(l) != c || row == _zOff) return 0xffffffff;
 	uint32_t ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
@@ -2245,6 +2248,38 @@ inline uint32_t Ebwt<TStr>::mapLF1(const SideLocus& l, int c
 	}
 #endif
 	return ret;
+}
+
+/**
+ * Given row i and character c, return the row that the LF mapping maps
+ * i to on character c.
+ */
+template<typename TStr>
+inline int Ebwt<TStr>::mapLF1(uint32_t& row, const SideLocus& l
+                              ASSERT_ONLY(, bool overrideSanity)
+                              ) const
+{
+#ifdef EBWT_STATS
+	const_cast<Ebwt<TStr>*>(this)->mapLF1s_++;
+#endif
+	if(row == _zOff) return -1;
+	int c = rowL(l);
+	assert_lt(c, 4);
+	assert_geq(c, 0);
+	if(l._fw) row = countFwSide(l, c); // Forward side
+	else      row = countBwSide(l, c); // Backward side
+	assert_lt(row, this->_eh._bwtLen);
+#ifndef NDEBUG
+	if(_sanity && !overrideSanity) {
+		// Make sure results match up with results from mapLFEx;
+		// be sure to override sanity-checking in the callee, or we'll
+		// have infinite recursion
+		uint32_t arrs[] = { 0, 0, 0, 0 };
+		mapLFEx(l, arrs, true);
+		assert_eq(arrs[c], row);
+	}
+#endif
+	return c;
 }
 
 /**

@@ -359,8 +359,12 @@ public:
 		cost_ = cost;
 		top_ = itop;
 		bot_ = ibot;
-		if(ibot > itop) {
+		if(ibot > itop+1) {
+			// Care about both top and bot
 			SideLocus::initFromTopBot(itop, ibot, ep, ebwt, ltop_, lbot_);
+		} else if(ibot > itop) {
+			// Only care about top
+			ltop_.initFromRow(itop, ep, ebwt);
 		}
 		numEdits_ = numEdits;
 		if(qlen - rdepth_ > 0) {
@@ -432,9 +436,11 @@ public:
 		uint16_t bestCost = 0xffff;
 		// Next-lowest
 		uint16_t nextCost = 0xffff;
-		int numNotEliminated = 0;;
-		// Iterate over positions in the path
-		for(int i = 0; i <= len_; i++) {
+		int numNotEliminated = 0;
+		int i = (int)depth0_;
+		i = max(0, i - rdepth_);
+		// Iterate over revisitable positions in the path
+		for(; i <= len_; i++) {
 			// If there are still valid options for leaving out of this
 			// position
 			if(!eliminated(i)) {
@@ -484,6 +490,7 @@ public:
 		uint16_t newRdepth = rdepth_ + pos + 1;
 		assert_lt((bestCost >> 14), 4);
 		uint16_t depth = pos + rdepth_;
+		assert_geq(depth, depth0_);
 		uint16_t newDepth0 = depth0_;
 		uint16_t newDepth1 = depth1_;
 		uint16_t newDepth2 = depth2_;
@@ -599,7 +606,9 @@ public:
 		// Iterate over positions in the path looking for the cost of
 		// the lowest-cost non-eliminated position
 		uint32_t eliminatedStretch = 0;
-		for(int i = 0; i <= len_; i++) {
+		int i = (int)depth0_;
+		i = max(0, i - rdepth_);
+		for(; i <= len_; i++) {
 			if(!eliminated(i)) {
 				eliminatedStretch = 0;
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
@@ -638,8 +647,10 @@ public:
 	 * appropriate loci.
 	 */
 	void prep(const EbwtParams& ep, const uint8_t* ebwt) {
-		if(bot_ > top_) {
+		if(bot_ > top_+1) {
 			SideLocus::initFromTopBot(top_, bot_, ep, ebwt, ltop_, lbot_);
+		} else if(bot_ > top_) {
+			ltop_.initFromRow(top_, ep, ebwt);
 		}
 		prepped_ = true;
 	}
@@ -1526,7 +1537,7 @@ public:
 	 * done with this read.
 	 */
 	virtual void advanceImpl() {
-		assert(!this->done);
+		if(this->done) return;
 		assert(pat_ != NULL);
 		assert(!pm_.empty());
 		params_.setFw(fw_);
@@ -1558,6 +1569,7 @@ public:
 	 * Return the range found.
 	 */
 	virtual Range& range() {
+		rs_->range().fw = fw_;
 		return rs_->range();
 	}
 
@@ -1719,6 +1731,7 @@ public:
 		if(this->foundRange) {
 			lastRange_ = &rss_[0]->range();
 		}
+		ASSERT_ONLY(allTopsRc_.clear());
 	}
 
 	/**
@@ -1818,8 +1831,13 @@ public:
 			int64_t top = (int64_t)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
-			assert(this->allTops_.find(top) == this->allTops_.end());
-			this->allTops_.insert(top);
+			if(range().fw) {
+				assert(this->allTops_.find(top) == this->allTops_.end());
+				this->allTops_.insert(top);
+			} else {
+				assert(this->allTopsRc_.find(top) == this->allTopsRc_.end());
+				this->allTopsRc_.insert(top);
+			}
 		}
 #endif
 	}
@@ -1922,6 +1940,7 @@ protected:
 	/// The random seed from the Aligner, which we use to randomly break ties
 	RandomSource rand_;
 	Range *lastRange_;
+	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
 };
 
 #endif /* RANGE_SOURCE_H_ */

@@ -38,7 +38,15 @@ my @policies = (
 
 sub pickPolicy {
 	my $r = int(rand($#policies + 1));
-	return $policies[$r];
+	my $pol = $policies[$r];
+	# If it's an end-to-end policy, then perhaps add "--stateful" to
+	# activate the branching best-first search
+	if($pol =~ /-v/) {
+		if(int(rand(2)) == 0) {
+			$pol .= " --stateful";
+		}
+	}
+	return $pol;
 }
 
 my $seed = 0;

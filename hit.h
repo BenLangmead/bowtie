@@ -2119,7 +2119,8 @@ public:
 	              const std::string& dumpMaxFa,
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
-	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
+	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
 	}
