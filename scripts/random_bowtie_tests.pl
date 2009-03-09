@@ -274,8 +274,16 @@ sub build {
 	return $ret;
 }
 
-# Search for a pattern in an existing Ebwt
 sub search {
+	my($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
+	my $ret = doSearch($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate);
+	system("rm -f .tmp.un$seed".".fa .tmp.un$seed"."_1.fa .tmp.un$seed"."_2.fa");
+	system("rm -f .tmp.un$seed".".fq .tmp.un$seed"."_1.fq .tmp.un$seed"."_2.fq");
+	return $ret;
+}
+
+# Search for a pattern in an existing Ebwt
+sub doSearch {
 	my($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
 	
 	my $patarg = "-c";
@@ -498,9 +506,6 @@ sub search {
 		}
 		close(UNFQ);
 	}
-	
-	system("rm -f .tmp.un$seed".".fa .tmp.un$seed"."_1.fa .tmp.un$seed"."_2.fa");
-	system("rm -f .tmp.un$seed".".fq .tmp.un$seed"."_1.fq .tmp.un$seed"."_2.fq");
 	
 	# Success
 	return 1;
