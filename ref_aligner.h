@@ -223,26 +223,6 @@ protected:
 #endif
 			}
 			if(match) {
-				if(pairs != NULL) {
-					TU64Pair p;
-					if(ri < aoff) {
-						// By convention, the upstream ("low") mate's
-						// coordinates go in the 'first' field
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-					} else {
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
-					}
-					if(pairs->find(p) != pairs->end()) {
-						// We already found this hit!  Continue.
-						continue;
-					} else {
-						// *Don't* record this hit - this is just a
-						// sanity check
-						//pairs->insert(p);
-					}
-				}
 				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
 				range.stratum = 0;
@@ -250,7 +230,6 @@ protected:
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
 				results.push_back(ri);
-				if(--numToFind == 0) return;
 			}
 		}
 		return; // no match
@@ -275,6 +254,8 @@ protected:
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
+		ASSERT_ONLY(uint32_t duplicates = 0);
+		ASSERT_ONLY(uint32_t r2i = 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -444,28 +425,31 @@ protected:
 					}
 					if(pairs->find(p) != pairs->end()) {
 						// We already found this hit!  Continue.
+						ASSERT_ONLY(duplicates++);
+						ASSERT_ONLY(r2i++);
 						continue;
 					} else {
 						// Record this hit
 						pairs->insert(p);
 					}
 				}
-				ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
-				assert_lt(added, r2.size());
-				assert_eq(re2[added], ri);
+				assert_lt(r2i, r2.size());
+				assert_eq(re2[r2i], ri);
 				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
 				range.stratum = 0;
 				range.numMms = 0;
 				assert_eq(0, range.mms.size());
 				assert_eq(0, range.refcs.size());
+				ASSERT_ONLY(r2i++);
 				results.push_back(ri);
 				if(--numToFind == 0) return;
 			} else {
 				// Keep scanning
 			}
 		}
-		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		assert_leq(duplicates, r2.size());
+		assert_geq(r2.size() - duplicates, ranges.size() - rangesInitSz);
 		return; // no hit
 	}
 };
@@ -573,26 +557,6 @@ protected:
 				}
 	 		}
 			if(match) {
-				if(pairs != NULL) {
-					TU64Pair p;
-					if(ri < aoff) {
-						// By convention, the upstream ("low") mate's
-						// coordinates go in the 'first' field
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-					} else {
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
-					}
-					if(pairs->find(p) != pairs->end()) {
-						// We already found this hit!  Continue.
-						continue;
-					} else {
-						// *Don't* record this hit - this is just a
-						// sanity check
-						// pairs->insert(p);
-					}
-				}
 				assert_leq(mms, 1);
 				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
@@ -606,7 +570,6 @@ protected:
 					range.refcs.push_back(refc);
 				}
 				results.push_back(ri);
-				if(--numToFind == 0) return;
 			}
 		}
 		return;
@@ -631,6 +594,8 @@ protected:
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
+		ASSERT_ONLY(uint32_t duplicates = 0);
+		ASSERT_ONLY(uint32_t r2i = 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -860,6 +825,8 @@ protected:
 				}
 				if(pairs->find(p) != pairs->end()) {
 					// We already found this hit!  Continue.
+					ASSERT_ONLY(duplicates++);
+					ASSERT_ONLY(r2i++);
 					continue;
 				} else {
 					// Record this hit
@@ -867,28 +834,29 @@ protected:
 				}
 			}
 			assert_leq(diffs, 1);
-			ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
-			assert_lt(added, r2.size());
-			assert_eq(re2[added], ri);
+			assert_lt(r2i, r2.size());
+			assert_eq(re2[r2i], ri);
 			ranges.resize(ranges.size()+1);
 			Range& range = ranges.back();
-			assert_eq(diffs, r2[added].numMms);
+			assert_eq(diffs, r2[r2i].numMms);
 			range.stratum = diffs;
 			range.numMms = diffs;
 			assert_eq(0, range.mms.size());
 			assert_eq(0, range.refcs.size());
 			if(diffs == 1) {
 				assert_neq(mmpos, 0xffffffff);
-				assert_eq(mmpos, r2[added].mms[0]);
+				assert_eq(mmpos, r2[r2i].mms[0]);
 				assert_neq(-1, refc);
-				assert_eq(refc, r2[added].refcs[0]);
+				assert_eq(refc, r2[r2i].refcs[0]);
 				range.mms.push_back(mmpos);
 				range.refcs.push_back(refc);
 			}
+			ASSERT_ONLY(r2i++);
 			results.push_back(ri);
 			if(--numToFind == 0) return;
 		}
-		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		assert_leq(duplicates, r2.size());
+		assert_geq(r2.size() - duplicates, ranges.size() - rangesInitSz);
 		return; // no hit
 	}
 };
@@ -996,25 +964,6 @@ protected:
 				}
 			}
 			if(match) {
-				if(pairs != NULL) {
-					TU64Pair p;
-					if(ri < aoff) {
-						// By convention, the upstream ("low") mate's
-						// coordinates go in the 'first' field
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-					} else {
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
-					}
-					if(pairs->find(p) != pairs->end()) {
-						// We already found this hit!  Continue.
-						continue;
-					} else {
-						// *Don't* record this hit - this is just a
-						// sanity check
-					}
-				}
 				assert_leq(mms, 2);
 				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
@@ -1036,7 +985,6 @@ protected:
 					}
 				}
 				results.push_back(ri);
-				if(--numToFind == 0) return;
 			}
 		}
 		return;
@@ -1061,6 +1009,8 @@ protected:
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
+		ASSERT_ONLY(uint32_t duplicates = 0);
+		ASSERT_ONLY(uint32_t r2i = 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -1116,7 +1066,6 @@ protected:
 				if(++nsInSeed > 2) {
 					// More than two 'N's in the seed region; can't
 					// possibly have a 2-mismatch hit anywhere
-					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return;   // can't match if query has Ns
 				} else if(nsInSeed == 2) {
 					nPos2 = (int)i;
@@ -1141,7 +1090,6 @@ protected:
 		for(uint32_t i = seedBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				if(++nsInSeed > 2) {
-					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return; // can't match if query has Ns
 				}
 			}
@@ -1158,7 +1106,8 @@ protected:
 		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
-		for(uint32_t i = 1; i <= lim + 1; i++) {
+		uint32_t i;
+		for(i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			uint64_t diff;
 			assert_lt(skipLeftToRights, qlen);
@@ -1208,8 +1157,8 @@ protected:
 				diff = (bufbw ^ seed) | diffMask;
 			}
 			if((diff & 0xfffff00000000000llu) &&
-			   (diff & 0x00000fffff800000llu) &&
-			   (diff & 0x00000000007fffffllu)) continue;
+			   (diff & 0x00000ffffff00000llu) &&
+			   (diff & 0x00000000000fffffllu)) continue;
 			uint32_t ri  = hi ? riLo  : riHi;
 			uint32_t rir = hi ? rirLo : rirHi;
 			// Could use pop count
@@ -1342,6 +1291,8 @@ protected:
 				}
 				if(pairs->find(p) != pairs->end()) {
 					// We already found this hit!  Continue.
+					ASSERT_ONLY(duplicates++);
+					ASSERT_ONLY(r2i++);
 					continue;
 				} else {
 					// Record this hit
@@ -1349,36 +1300,37 @@ protected:
 				}
 			}
 			assert_leq(diffs, 2);
-			ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
-			assert_lt(added, r2.size());
-			assert_eq(re2[added], ri);
+			assert_lt(r2i, r2.size());
+			assert_eq(re2[r2i], ri);
 			ranges.resize(ranges.size()+1);
 			Range& range = ranges.back();
-			assert_eq(diffs, r2[added].numMms);
+			assert_eq(diffs, r2[r2i].numMms);
 			range.stratum = diffs;
 			range.numMms = diffs;
 			assert_eq(0, range.mms.size());
 			assert_eq(0, range.refcs.size());
 			if(diffs > 0) {
 				assert_neq(mmpos1, 0xffffffff);
-				assert_eq(mmpos1, r2[added].mms[0]);
+				assert_eq(mmpos1, r2[r2i].mms[0]);
 				assert_neq(-1, refc1);
-				assert_eq(refc1, r2[added].refcs[0]);
+				assert_eq(refc1, r2[r2i].refcs[0]);
 				range.mms.push_back(mmpos1);
 				range.refcs.push_back(refc1);
 				if(diffs > 1) {
 					assert_neq(mmpos2, 0xffffffff);
-					assert_eq(mmpos2, r2[added].mms[1]);
+					assert_eq(mmpos2, r2[r2i].mms[1]);
 					assert_neq(-1, refc2);
-					assert_eq(refc2, r2[added].refcs[1]);
+					assert_eq(refc2, r2[r2i].refcs[1]);
 					range.mms.push_back(mmpos2);
 					range.refcs.push_back(refc2);
 				}
 			}
+			ASSERT_ONLY(r2i++);
 			results.push_back(ri);
 			if(--numToFind == 0) return;
 		}
-		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		assert_leq(duplicates, r2.size());
+		assert_geq(r2.size() - duplicates, ranges.size() - rangesInitSz);
 		return; // no hit
 	}
 };
@@ -1492,25 +1444,6 @@ protected:
 				}
 			}
 			if(match) {
-				if(pairs != NULL) {
-					TU64Pair p;
-					if(ri < aoff) {
-						// By convention, the upstream ("low") mate's
-						// coordinates go in the 'first' field
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-					} else {
-						p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
-						p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
-					}
-					if(pairs->find(p) != pairs->end()) {
-						// We already found this hit!  Continue.
-						continue;
-					} else {
-						// *Don't* record this hit - this is just a
-						// sanity check
-					}
-				}
 				assert_leq(mms, 3);
 				ranges.resize(ranges.size()+1);
 				Range& range = ranges.back();
@@ -1538,7 +1471,6 @@ protected:
 					}
 				}
 				results.push_back(ri);
-				if(--numToFind == 0) return;
 			}
 		}
 		return;
@@ -1563,6 +1495,8 @@ protected:
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
+		ASSERT_ONLY(uint32_t duplicates = 0);
+		ASSERT_ONLY(uint32_t r2i = 0);
 		const uint32_t qlen = seqan::length(qry);
 		assert_geq(end - begin, qlen); // caller should have checked this
 		assert_gt(end, begin);
@@ -1898,6 +1832,8 @@ protected:
 				}
 				if(pairs->find(p) != pairs->end()) {
 					// We already found this hit!  Continue.
+					ASSERT_ONLY(duplicates++);
+					ASSERT_ONLY(r2i++);
 					continue;
 				} else {
 					// Record this hit
@@ -1905,44 +1841,45 @@ protected:
 				}
 			}
 			assert_leq(diffs, 3);
-			ASSERT_ONLY(uint32_t added = ranges.size() - rangesInitSz);
-			assert_lt(added, r2.size());
-			assert_eq(re2[added], ri);
+			assert_lt(r2i, r2.size());
+			assert_eq(re2[r2i], ri);
 			ranges.resize(ranges.size()+1);
 			Range& range = ranges.back();
-			assert_eq(diffs, r2[added].numMms);
+			assert_eq(diffs, r2[r2i].numMms);
 			range.stratum = diffs;
 			range.numMms = diffs;
 			assert_eq(0, range.mms.size());
 			assert_eq(0, range.refcs.size());
 			if(diffs > 0) {
 				assert_neq(mmpos1, 0xffffffff);
-				assert_eq(mmpos1, r2[added].mms[0]);
+				assert_eq(mmpos1, r2[r2i].mms[0]);
 				assert_neq(-1, refc1);
-				assert_eq(refc1, r2[added].refcs[0]);
+				assert_eq(refc1, r2[r2i].refcs[0]);
 				range.mms.push_back(mmpos1);
 				range.refcs.push_back(refc1);
 				if(diffs > 1) {
 					assert_neq(mmpos2, 0xffffffff);
-					assert_eq(mmpos2, r2[added].mms[1]);
+					assert_eq(mmpos2, r2[r2i].mms[1]);
 					assert_neq(-1, refc2);
-					assert_eq(refc2, r2[added].refcs[1]);
+					assert_eq(refc2, r2[r2i].refcs[1]);
 					range.mms.push_back(mmpos2);
 					range.refcs.push_back(refc2);
 					if(diffs > 2) {
 						assert_neq(mmpos3, 0xffffffff);
-						assert_eq(mmpos3, r2[added].mms[2]);
+						assert_eq(mmpos3, r2[r2i].mms[2]);
 						assert_neq(-1, refc3);
-						assert_eq(refc3, r2[added].refcs[2]);
+						assert_eq(refc3, r2[r2i].refcs[2]);
 						range.mms.push_back(mmpos3);
 						range.refcs.push_back(refc3);
 					}
 				}
 			}
+			ASSERT_ONLY(r2i++);
 			results.push_back(ri);
 			if(--numToFind == 0) return;
 		}
-		assert_eq(r2.size(), ranges.size() - rangesInitSz);
+		assert_leq(duplicates, r2.size());
+		assert_geq(r2.size() - duplicates, ranges.size() - rangesInitSz);
 		return; // no hit
 	}
 };
