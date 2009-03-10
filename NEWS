@@ -20,9 +20,17 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.9.1 - February ?, 2009
+Version 0.9.9.1 - March 9, 2009
+   * Added paired-end alignment for -v 2 and -v 3 alignment modes (-n
+     modes coming soon).
+   * Minor bug fixes and speed improvements for all paired-end modes.
    * Added -s/--skip <int> option to skip over the first <int> reads or
      pairs in the input.
+   * --unfq/--unfa/--maxfq/--maxfa modes no longer create empty output
+     files. 
+   * All Bowtie tools now compile under GCC 4.3.3.
+   * Fixed bug whereby bowtie -b would sometimes write garbage into the
+     reference offset field.
 
 Version 0.9.9 - February 19, 2009
    * Added some preliminary support for paired-end alignment in -v 0

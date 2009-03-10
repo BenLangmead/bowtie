@@ -8,20 +8,19 @@ Bowtie Manual
 
  Bowtie is an ultrafast, memory-efficient short read aligner geared
  toward quickly aligning large sets of short DNA sequences (reads) to
- mammalian genomes. It aligns 35-base-pair reads to the human genome at
- a rate of 25 million reads per hour on a typical workstation with 2
- gigabytes of memory. Bowtie indexes the genome with a Burrows-Wheeler
- index to keep its memory footprint small: for the human genome, the
- index is as small as 1.1 GB (using -z), and typically about 2.2 GB
- (not using -z) or 2.9 GB (for paired-end alignment).  Bowtie supports
- alignment policies equivalent to Maq and SOAP but is substantially
- faster: about 35x faster than Maq and over 250x faster than SOAP when
- aligning 35-bp reads to the human genome.  Multiple processor cores
- can be used simultaneously to achieve greater alignment speed.
- Bowtie's output format can be converted to the format used by Maq,
- allowing users to rapidly align reads with Bowtie then identify
- variations with Maq. The Bowtie tools run on the command line under
- Windows XP, Mac OS X, and Linux.
+ large genomes. It aligns 35-base-pair reads to the human genome at a
+ rate of 25 million reads per hour on a typical workstation. Bowtie
+ indexes the genome with a Burrows-Wheeler index to keep its memory
+ footprint small: for the human genome, the index is as small as 1.1 GB
+ (using -z), and typically about 2.2 GB (not using -z) or 2.9 GB (for
+ paired-end alignment).  Bowtie supports alignment policies equivalent
+ to Maq and SOAP but is substantially faster: about 35x faster than Maq
+ and over 250x faster than SOAP when aligning 35-bp reads to the human
+ genome.  Multiple processor cores can be used simultaneously to
+ achieve greater alignment speed.  Bowtie's output format can be
+ converted to the format used by Maq, allowing users to rapidly align
+ reads with Bowtie then identify variations with Maq. The Bowtie tools
+ run on the command line under Windows XP, Mac OS X, and Linux.
 
  What isn't Bowtie?
  ------------------
@@ -58,7 +57,8 @@ Bowtie Manual
  MinGW, first install MinGW and MSYS (http://www.mingw.org/), the zlib
  library (http://cygwin.com/packages/mingw-zlib/), and the pthreads
  library (http://sourceware.org/pthreads-win32/).  You may also need
- the GnuWin32 core (http://gnuwin32.sf.net/packages/coreutils.htm).
+ the GnuWin32 core (http://gnuwin32.sf.net/packages/coreutils.htm) and
+ other utilities to drive the build process.
 
  Bowtie depends on code from Maq (http://maq.sf.net) and from the SeqAn
  library (http://www.seqan.de).  However, all supporting code is
@@ -85,9 +85,10 @@ Bowtie Manual
 
  The 'bowtie' aligner takes an index and a set of reads as input and
  outputs a list of alignments.  Alignments are selected according to a
- combination of the -v/-n/-e/-l options, which define which alignments
- are legal, and the -k/-a/-m/--best/--nostrata options which define
- which and how many legal alignments should be reported.
+ combination of the -v/-n/-e/-l options (plus the -I/-X/--lr/--rl/--ll
+ options for paired-end alignment), which define which alignments are
+ legal, and the -k/-a/-m/--best/--nostrata options which define which
+ and how many legal alignments should be reported.
 
  By default, Bowtie enforces an alignment policy equivalent to Maq's
  quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it
@@ -122,6 +123,17 @@ Bowtie Manual
  please contact us and tell us the nature of your research application
  and the parameters you are using to run Bowtie.  We are eager to hear
  your feedback.
+ 
+ A result of Bowtie's indexing strategy is that alignments involving
+ one or more ambiguous reference characters ('N', '-', 'R' 'Y', etc.)
+ are considered invalid by Bowtie, regardless of the alignment policy.
+ This is true only for ambiguous characters in the reference;
+ alignments involving ambiguous characters in the read are legal,
+ subject to the alignment policy.
+ 
+ Also, alignments that "fall off" the reference sequence are not
+ considered legal by Bowtie, though some such alignments will become
+ legal once gapped alignment is implemented.
 
   Maq-like Policy
   ---------------
@@ -150,14 +162,15 @@ Bowtie Manual
   with Maq, Bowtie does the same.
  
   Also note that bowtie is not fully sensitive in -n 2 and -n 3
-  modes.  In those modes, bowtie imposes a "backtracking limit" to
-  limit the amount of effort spent trying to find valid alignments for
-  low-quality reads that are unlikely have any.  Since the limit is
-  arbitrary, it may cause bowtie to miss some legal 2- and 3-mismatch
-  alignments.  We have set the limit to what we consider a reasonable
-  default (125), but the user may decrease or increase the limit using
-  the --maxbts option.  Setting the limit to a very large number
-  (>10000) guarantees full sensitivity.
+  modes by default.  Rather, in those modes bowtie imposes a
+  "backtracking limit" to limit the amount of effort spent trying to
+  find valid alignments for low-quality reads that are unlikely have
+  any.  Since the limit is arbitrary, it may cause bowtie to miss some
+  legal 2- and 3-mismatch alignments.  We have set the limit to what we
+  consider a reasonable default (125), but the user may decrease or
+  increase the limit using the --maxbts and/or -y options.  Setting the
+  --maxbts limit to a very large number (>10000) or specifying -y will
+  guarantee full sensitivity.
  
   End-to-end k-difference Policy
   ------------------------------
@@ -171,15 +184,15 @@ Bowtie Manual
   
   As of version 0.9.9, Bowtie contains preliminary support for
   paired-end alignment.  Support is described as "preliminary" because
-  paired-end alignment only works under -v 0 or -v 1 alignment policies
-  and because performance has not been thoroughly optimized.  Also,
-  there is currently no way to get Bowtie to report a mix of paired-end
-  alignments and singleton alignments (for unpaired mates) in one run;
-  if a mix of alignments is desired, the user must first perform a
-  paired-end run using the --unfa or --unfq option to write unaligned
-  pairs to files, then run Bowtie again in single-ended mode using
-  those files as input.  Future versions of Bowtie will expand paired-
-  end support and, hopefully, improve performance as well.
+  paired-end alignment only works under the -v alignment policies.
+  Also, there is currently no way to get Bowtie to report a mix of
+  paired-end alignments and singleton alignments (for unpaired mates
+  and/or single-ended reads) in one run; if a mix of alignments is
+  desired, the user must first perform a paired-end run using the
+  --unfa or --unfq option to write unaligned pairs to files, then run
+  Bowtie again in single-ended mode using those files as input.  Future
+  versions of Bowtie will expand paired-end support and, hopefully,
+  improve performance as well.
   
   A valid paired-end alignment satisfies the following criteria:
   
@@ -294,10 +307,10 @@ Bowtie Manual
                      correspond file-for-file and read-for-read with
                      those specified in <mates2>.  Reads may be a mix
                      of different lengths.  Note that as of version
-                     0.9.9, bowtie can perform paired-end alignment
-                     only when the alignment policy is -v 0 or -v 1.
-                     Paired-end support will be expanded in future
-                     versions. 
+                     0.9.9.1, bowtie can perform paired-end alignment
+                     only under the -v alignment policies; paired-end
+                     alignment under the -n alignment policies is
+                     future work.
 
   <mates2>           Comma-separated list of files containing the #2
                      mates (filename usually includes "_2"), or, if -c
@@ -308,10 +321,10 @@ Bowtie Manual
                      correspond file-for-file and read-for-read with
                      those specified in <mates1>.  Reads may be a mix
                      of different lengths.  Note that as of version
-                     0.9.9, bowtie can perform paired-end alignment
-                     only when the alignment policy is -v 0 or -v 1.
-                     Paired-end support will be expanded in future
-                     versions. 
+                     0.9.9.1, bowtie can perform paired-end alignment
+                     only under the -v alignment policies; paired-end
+                     alignment under the -n alignment policies is
+                     future work.
 
   <singles>          A comma-separated list of files containing the
                      reads to be aligned, or, if -c is specified, the
