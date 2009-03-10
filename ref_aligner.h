@@ -225,7 +225,7 @@ protected:
 			if(match) {
 				if(pairs != NULL) {
 					TU64Pair p;
-					if(low) {
+					if(ri < aoff) {
 						// By convention, the upstream ("low") mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -350,7 +350,7 @@ protected:
 		for(uint32_t i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			assert_lt(skipLeftToRights, qlen);
-			assert_lt(skipRightToLefts, qlen);
+			assert_leq(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
@@ -433,7 +433,7 @@ protected:
 			if(foundHit) {
 				if(pairs != NULL) {
 					TU64Pair p;
-					if(low) {
+					if(ri < aoff) {
 						// By convention, the upstream ("low") mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -575,7 +575,7 @@ protected:
 			if(match) {
 				if(pairs != NULL) {
 					TU64Pair p;
-					if(low) {
+					if(ri < aoff) {
 						// By convention, the upstream ("low") mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -723,7 +723,7 @@ protected:
 			int r;       // new reference char
 			uint64_t diff;
 			assert_lt(skipLeftToRights, qlen);
-			assert_lt(skipRightToLefts, qlen);
+			assert_leq(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
@@ -849,7 +849,7 @@ protected:
 			if(!foundHit) continue;
 			if(pairs != NULL) {
 				TU64Pair p;
-				if(low) {
+				if(ri < aoff) {
 					// By convention, the upstream ("low") mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -998,7 +998,7 @@ protected:
 			if(match) {
 				if(pairs != NULL) {
 					TU64Pair p;
-					if(low) {
+					if(ri < aoff) {
 						// By convention, the upstream ("low") mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -1162,7 +1162,7 @@ protected:
 			int r;       // new reference char
 			uint64_t diff;
 			assert_lt(skipLeftToRights, qlen);
-			assert_lt(skipRightToLefts, qlen);
+			assert_leq(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
@@ -1260,7 +1260,9 @@ protected:
 				refc1 = "ACGT"[(int)ref[rir + mmpos1]];
 				if(diffs > 1) {
 					// Figure out the second mismatched position
-					diff2 &= ~(0xc000000000000000llu >> (uint64_t)(mmpos1 << 1));
+					ASSERT_ONLY(uint64_t origDiff2 = diff2);
+					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1+seedCushion) << 1));
+					assert_neq(diff2, origDiff2);
 					mmpos2 = 31;
 					if((diff2 & 0xffffffffllu) == 0) { diff2 >>= 32llu; mmpos2 -= 16; }
 					assert_neq(0, diff2);
@@ -1274,8 +1276,8 @@ protected:
 					assert_neq(0, diff2);
 					assert_geq(mmpos2, 0);
 					assert_lt(mmpos2, 32);
-					assert_neq(mmpos1, mmpos2);
 					mmpos2 -= seedCushion;
+					assert_neq(mmpos1, mmpos2);
 					refc2 = "ACGT"[(int)ref[rir + mmpos2]];
 					if(mmpos2 < mmpos1) {
 						uint32_t mmtmp = mmpos1;
@@ -1329,7 +1331,7 @@ protected:
 			if(!foundHit) continue;
 			if(pairs != NULL) {
 				TU64Pair p;
-				if(low) {
+				if(ri < aoff) {
 					// By convention, the upstream ("low") mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -1492,7 +1494,7 @@ protected:
 			if(match) {
 				if(pairs != NULL) {
 					TU64Pair p;
-					if(low) {
+					if(ri < aoff) {
 						// By convention, the upstream ("low") mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
@@ -1666,7 +1668,7 @@ protected:
 			int r;       // new reference char
 			uint64_t diff;
 			assert_lt(skipLeftToRights, qlen);
-			assert_lt(skipRightToLefts, qlen);
+			assert_leq(skipRightToLefts, qlen);
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
@@ -1771,7 +1773,7 @@ protected:
 				refc1 = "ACGT"[(int)ref[rir + mmpos1]];
 				if(diffs > 1) {
 					// Figure out the second mismatched position
-					diff2 &= ~(0xc000000000000000llu >> (uint64_t)(mmpos1 << 1));
+					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1 + seedCushion) << 1));
 					uint64_t diff3 = diff2;
 					mmpos2 = 31;
 					if((diff2 & 0xffffffffllu) == 0) { diff2 >>= 32llu; mmpos2 -= 16; }
@@ -1801,7 +1803,7 @@ protected:
 					assert_lt(mmpos1, mmpos2);
 					if(diffs > 2) {
 						// Figure out the second mismatched position
-						diff3 &= ~(0xc000000000000000llu >> (uint64_t)(mmpos2orig << 1));
+						diff3 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos2orig + seedCushion) << 1));
 						mmpos3 = 31;
 						if((diff3 & 0xffffffffllu) == 0) { diff3 >>= 32llu; mmpos3 -= 16; }
 						assert_neq(0, diff3);
@@ -1885,7 +1887,7 @@ protected:
 			if(!foundHit) continue;
 			if(pairs != NULL) {
 				TU64Pair p;
-				if(low) {
+				if(ri < aoff) {
 					// By convention, the upstream ("low") mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;

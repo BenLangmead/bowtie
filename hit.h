@@ -747,6 +747,7 @@ public:
 			size_t len = _hits.size();
 			size_t lookBack = 256;
 			if(lookBack > len) lookBack = len;
+			if(h.mate > 0) lookBack = 0;
 			for(size_t i = 0; i < lookBack; i++) {
 				if(h.patId    == _hits[len-i-1].patId &&
 				   h.h.first  == _hits[len-i-1].h.first &&
@@ -1819,6 +1820,11 @@ public:
 		for(size_t i = 0; i < readNameLen; i++) {
 			patName[i] = readName[i];
 		}
+		h.mate = 0;
+		if(readNameLen >= 2 && patName[readNameLen-2] == '/') {
+			if     (patName[readNameLen-1] == '1') h.mate = 1;
+			else if(patName[readNameLen-1] == '2') h.mate = 2;
+		}
 
 		// Parse orientation
 		assert(*cur == '+' || *cur == '-');
@@ -2158,7 +2164,8 @@ public:
 		o.write((const char *)&pnamelen, 2);
 		o.write(begin(h.patName), pnamelen);
 		// Write fw/refname flags
-		uint8_t flags = (h.fw ? 1 : 0) | (refName? 2 : 0);
+		assert_lt(h.mate, 3);
+		uint8_t flags = (h.fw ? 1 : 0) | (refName? 2 : 0) | (h.mate << 2);
 		o.write((const char *)&flags, 1);
 		if(refName) {
 			// Write reference name as string
@@ -2241,6 +2248,10 @@ public:
 		// Parse read name
 		h.patId = 0;
 		for(int i = 0; i < pnamelen; i++) {
+			// Skip over mate designation
+			if(h.patName[i] == '/' && i == pnamelen-2) break;
+			// Check whether we can continue interpreting this as a
+			// number
 			if(h.patName[i] < '0' || h.patName[i] > '9') {
 				h.patId = 0;
 				break;
@@ -2254,6 +2265,7 @@ public:
 		in.read((char *)&flags, 1);
 		h.fw         = ((flags & 1) != 0);
 		bool refName = ((flags & 2) != 0);
+		h.mate       = (flags >> 2) & 3;
 		if(verbose) cout << "fw=" << (h.fw ? "true":"false") << ", ";
 		if(refName) {
 			// Read and ignore reference name
