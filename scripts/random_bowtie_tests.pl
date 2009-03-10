@@ -37,10 +37,14 @@ my @policies = (
 );
 
 sub pickPolicy {
+	my $pe = shift;
 	my $r = int(rand($#policies + 1));
 	my $pol = $policies[$r];
 	# If it's an end-to-end policy, then perhaps add "--stateful" to
 	# activate the branching best-first search
+	if($pe) {
+		$pol =~ s/n/v/g;
+	}
 	if($pol =~ /-v/) {
 		if(int(rand(2)) == 0) {
 			$pol .= " --stateful";
@@ -69,6 +73,11 @@ my $pbase = 10;
 $pbase = int $ARGV[5] if defined($ARGV[5]);
 my $prand = 30;
 $prand = int $ARGV[6] if defined($ARGV[6]);
+
+my $ibase = 50;
+$ibase = int $ARGV[7] if defined($ARGV[7]);
+my $irand = 250;
+$irand = int $ARGV[8] if defined($ARGV[8]);
 
 my $verbose = 0;
 my $exitOnFail = 1;
@@ -214,13 +223,8 @@ sub build {
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
 	}
-	
-	my $rArg = "-r";
-	if(int(rand(3)) == 0) {
-		$rArg = "";
-	}
 
-	my $args = "-q $rArg $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
+	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";
@@ -275,8 +279,8 @@ sub build {
 }
 
 sub search {
-	my($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
-	my $ret = doSearch($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate);
+	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
+	my $ret = doSearch($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate);
 	system("rm -f .tmp.un$seed".".fa .tmp.un$seed"."_1.fa .tmp.un$seed"."_2.fa");
 	system("rm -f .tmp.un$seed".".fq .tmp.un$seed"."_1.fq .tmp.un$seed"."_2.fq");
 	return $ret;
@@ -284,10 +288,11 @@ sub search {
 
 # Search for a pattern in an existing Ebwt
 sub doSearch {
-	my($t, $p, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
+	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
 	
 	my $patarg = "-c";
-	my $patstr = "\"$p\"";
+	my $patstr = "\"$p1\"";
+	$patstr = "-1 \"$p1\" -2 \"$p2\"" if $pe;
 	my $outformat = int(rand(3));
 	my $maptool_cmd = "";
 	my $outfile = ".tmp$seed.out";
@@ -304,7 +309,7 @@ sub doSearch {
 	if($format == 0) {
 		# FASTA
 		open FA, ">.randread$seed.fa" || die "Could not open temporary fasta file";
-		my @cs = split /[,]/, $p;
+		my @cs = split /[,]/, $p1;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
 			print FA ">\n$cms[0]\n";
@@ -312,10 +317,22 @@ sub doSearch {
 		close FA;
 		$patarg = "-f";
 		$patstr = ".randread$seed.fa";
+		if($pe) {
+			system("mv .randread$seed.fa .randread$seed"."_1.fa");
+			$patstr = "-1 .randread$seed"."_1.fa";
+			open FA, ">.randread$seed"."_2.fa" || die "Could not open temporary fasta file";
+			@cs = split /[,]/, $p2;
+			foreach my $c (@cs) {
+				my @cms = split /[:]/, $c;
+				print FA ">\n$cms[0]\n";
+			}
+			close FA;
+			$patstr .= " -2 .randread$seed"."_2.fa";
+		}
 	} elsif($format == 1) {
 		# FASTQ with ASCII qualities
 		open FQ, ">.randread$seed.fq" || die "Could not open temporary fastq file";
-		my @cs = split /[,]/, $p;
+		my @cs = split /[,]/, $p1;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
 			print FQ "@\n$cms[0]\n+\n$cms[1]\n";
@@ -323,10 +340,22 @@ sub doSearch {
 		close FQ;
 		$patarg = "-q";
 		$patstr = ".randread$seed.fq";
+		if($pe) {
+			system("mv .randread$seed.fq .randread$seed"."_1.fq");
+			$patstr = "-1 .randread$seed"."_1.fq";
+			open FQ, ">.randread$seed"."_2.fq" || die "Could not open temporary fastq file";
+			@cs = split /[,]/, $p2;
+			foreach my $c (@cs) {
+				my @cms = split /[:]/, $c;
+				print FQ "@\n$cms[0]\n+\n$cms[1]\n";
+			}
+			close FQ;
+			$patstr .= " -2 .randread$seed"."_2.fq";
+		}
 	} elsif($format == 2) {
 		# FASTQ with integer qualities
 		open FQ, ">.randread$seed.integer.fq" || die "Could not open temporary solexa fastq file";
-		my @cs = split /[,]/, $p;
+		my @cs = split /[,]/, $p1;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
 			print FQ "@\n$cms[0]\n+\n";
@@ -340,10 +369,28 @@ sub doSearch {
 		close FQ;
 		$patarg = "-q --integer-quals";
 		$patstr = ".randread$seed.integer.fq";
+		if($pe) {
+			system("mv .randread$seed.integer.fq .randread$seed.integer_1.fq");
+			$patstr = "-1 .randread$seed.integer_1.fq";
+			open FQ, ">.randread$seed.integer_2.fq" || die "Could not open temporary fastq file";
+			@cs = split /[,]/, $p2;
+			foreach my $c (@cs) {
+				my @cms = split /[:]/, $c;
+				print FQ "@\n$cms[0]\n+\n";
+				for(my $i = 0; $i < length($cms[1]); $i++) {
+					my $q = substr($cms[1], $i, 1);
+					$q = ord($q) - 33;
+					print FQ "$q ";
+				}
+				print FQ "\n";
+			}
+			close FQ;
+			$patstr .= " -2 .randread$seed.integer_2.fq";
+		}
 	} elsif($format == 3) {
 		# Raw
 		open RAW, ">.randread$seed.raw" || die "Could not open temporary raw file";
-		my @cs = split /[,]/, $p;
+		my @cs = split /[,]/, $p1;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
 			print RAW "$cms[0]\n";
@@ -351,6 +398,18 @@ sub doSearch {
 		close RAW;
 		$patarg = "-r";
 		$patstr = ".randread$seed.raw";
+		if($pe) {
+			system("mv .randread$seed.raw .randread$seed"."_1.raw");
+			$patstr = "-1 .randread$seed"."_1.raw";
+			open RAW, ">.randread$seed"."_2.raw" || die "Could not open temporary fastq file";
+			@cs = split /[,]/, $p2;
+			foreach my $c (@cs) {
+				my @cms = split /[:]/, $c;
+				print RAW "$cms[0]\n";
+			}
+			close RAW;
+			$patstr .= " -2 .randread$seed"."_2.raw";
+		}
 	}
 	
 	# Perhaps dump unaligned reads using --unfa and/opr --unfq arguments
@@ -369,7 +428,7 @@ sub doSearch {
 	}
 	
 	my $phased = "";
-	if(int(rand(2)) == 0) {
+	if(!$pe && int(rand(2)) == 0) {
 		$phased = "-z";
 	}
 	
@@ -391,10 +450,10 @@ sub doSearch {
 			$requireResult = 0;
 			$mhits = (int(rand(20))+2);
 		}
-		if(int(rand(2)) == 0) {
+		if(!$pe && int(rand(2)) == 0) {
 			$khits .= " --best";
 		}
-		if(int(rand(2)) == 0) {
+		if(!$pe && int(rand(2)) == 0) {
 			$khits .= " --nostrata";
 		}
 	}
@@ -452,15 +511,28 @@ sub doSearch {
 	my %outhash = ();
 	my %readcount = ();
 	my $lastread = "";
-	foreach(@outlines) {
-		chomp;
-		print "$_\n";
+	for(my $i = 0; $i <= $#outlines; $i++) {
+		my $l = $outlines[$i];
+		next if $l =~ /^Reported/; # skip the summary line
+		chomp($l);
+		my $key = "$l";
+		if($pe) {
+			my $l2 = $outlines[++$i];
+			defined($l2) || die "Odd number of output lines";
+			chomp($l2);
+			$key .= ", $l2";
+		}
+		print "$key\n";
 		# No two results should be the same
-		!defined($outhash{$_}) || die "Result $_ appears in output twice";
-		$outhash{$_} = 1;
-		next if /^Reported/; # skip the summary line
+		if(!$pe) {
+			!defined($outhash{$key}) || die "Result $key appears in output twice";
+		}
+		$outhash{$key} = 1;
 		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
-		unless(m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) {
+		my $wellFormed = 0;
+		$wellFormed = ($l =~ m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) unless $pe;
+		$wellFormed = ($l =~ m/^[01-9]+\/[12][+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) if $pe;
+		unless($wellFormed) {
 			print "Results malformed\n";
 			print "$out\n";
 			if($exitOnFail) {
@@ -470,7 +542,8 @@ sub doSearch {
 			return 0;
 		}
 		# Parse out the read id
-		/^([01-9]+)[+-]?[:]/;
+		$l =~ /^([01-9]+)[+-]?[:]/ unless $pe;
+		$l =~ /^([01-9]+)\/[12][+-]?[:]/ if $pe;
 		my $read = $1;
 		if(($read ne $lastread) && ($phased eq "")) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
@@ -485,26 +558,34 @@ sub doSearch {
 	
 	# If we dumped the unplaced reads, then sanity-check them.
 	if($unalign == 0 || $unalign == 2) {
-		open UNFA, ".tmp.un$seed.fa";
-		while(<UNFA>) {
-			if(/^>(.*)/) {
-				my $read = $1;
-				!defined($readcount{$read}) || die "$read appeared in unplaced file (.tmp.un$seed.fa) and in alignment";
+		my @fs = (".tmp.un$seed.fa");
+		if($pe) { @fs = (".tmp.un$seed"."_1.fa", ".tmp.un$seed"."_2.fa"); }
+		for my $f (@fs) {
+			open UNFA, "$f";
+			while(<UNFA>) {
+				if(/^>(.*)/) {
+					my $read = $1;
+					!defined($readcount{$read}) || die "$read appeared in unplaced file ($f) and in alignment";
+				}
 			}
+			close(UNFA);
 		}
-		close(UNFA);
 	}
 	if($unalign == 1 || $unalign == 2) {
-		open UNFQ, ".tmp.un$seed.fq";
-		my $c = 0;
-		while(<UNFQ>) {
-			if(/^@(.*)/ && (($c % 4) == 0)) {
-				my $read = $1;
-				!defined($readcount{$read}) || die "$read appeared in unplaced file (.tmp.un$seed.fq) and in alignment";
+		my @fs = (".tmp.un$seed.fq");
+		if($pe) { @fs = (".tmp.un$seed"."_1.fq", ".tmp.un$seed"."_2.fq"); }
+		for my $f (@fs) {
+			open UNFQ, "$f";
+			my $c = 0;
+			while(<UNFQ>) {
+				if(/^@(.*)/ && (($c % 4) == 0)) {
+					my $read = $1;
+					!defined($readcount{$read}) || die "$read appeared in unplaced file ($f) and in alignment";
+				}
+				$c++;
 			}
-			$c++;
+			close(UNFQ);
 		}
-		close(UNFQ);
 	}
 	
 	# Success
@@ -549,82 +630,135 @@ for(; $outer > 0; $outer--) {
 
 	my $in = $inner;
 	for(; $in >= 0; $in--) {
+		# Paired-end?
+		my $pe = (int(rand(2)) == 0);
 		# Generate random pattern(s) based on text
-		my $pfinal = '';
+		my $pfinal1 = '';
+		my $pfinal2 = '';
+		# Decide number of patterns to generate
 		my $np = int(rand(30)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
+			# Pick a text
 			my $tt = $tts[int(rand($#tts))];
-			my $pl = int(rand(length($tt))) - 10;
-			$pl = max($pl, 4);
-			$pl = min($pl, length($tt));
-			my $plen = int(rand($prand)) + $pbase;
-			my $pr = min($pl + $plen, length($tt));
-			my $p = substr $tt, $pl, $pr - $pl;
-			# Check for empty patter or pattern that spans a comma
-			if(length($p) == 0 || index($p, ",") != -1) {
+			# Pick a length
+			my $pl;
+			my $plen;
+			my $pr;
+			my $p1;
+			my $p2;
+			if($pe) {
+				# Pick a left-hand offset for the insert
+				my $il = int(rand(length($tt))) - 10;
+				# Pick a length for the insert
+				my $ilen = int(rand($irand)) + $ibase;
+				$il = min($il, length($tt)-$ilen);
+				my $ir = min($il + $ilen, length($tt));
+				my $is = substr $tt, $il, $ir - $il;
+				# Pick a length for the #1 mate
+				my $plen1 = int(rand($prand)) + $pbase;
+				# Pick a length for the #2 mate
+				my $plen2 = int(rand($prand)) + $pbase;
+				$p1 = substr $is, 0, $plen1;
+				$is = reverse $is;
+				$p2 = substr $is, 0, $plen2;
+				$p2 = reverse $p2;
+				$p2 = reverseComp($p2);
+			} else {
+				# Pick a length for the read
+				$plen = int(rand($prand)) + $pbase;
+				$pl = int(rand(length($tt))) - 10;
+				$pl = max($pl, 4);
+				$pl = min($pl, length($tt));
+				$pr = min($pl + $plen, length($tt));
+				$p1 = substr $tt, $pl, $pr - $pl;
+			}
+			# Check for empty pattern or pattern that spans a comma
+			if(length($p1) < 4 || index($p1, ",") != -1) {
+				$i--; next;
+			}
+			if($pe && (length($p2) < 4 || index($p2, ",") != -1)) {
 				$i--; next;
 			}
 			# Optionally add mutations to pattern (but not the first)
 			if($i > 0) {
 				my $nummms = int(rand(4));
 				for(my $j = 0; $j < $nummms; $j++) {
-					substr($p, int(rand(length($p))), 1, randDna(1));
+					substr($p1, int(rand(length($p1))), 1, randDna(1));
+				}
+				if($pe) {
+					$nummms = int(rand(4));
+					for(my $j = 0; $j < $nummms; $j++) {
+						substr($p2, int(rand(length($p2))), 1, randDna(1));
+					}
 				}
 			}
-			if(0) {
-				# Add some random padding on either side
-				my $lpad = randDna(max(0, int(rand(20)) - 10));
-				my $rpad = randDna(max(0, int(rand(20)) - 10));
-				$p = $lpad . $p . $rpad;
-			}
+			# Possibly reverse complement it
 			if((int(rand(2)) == 0)) {
-				$p = reverseComp($p);
+				$p1 = reverseComp($p1);
+				if($pe) {
+					$p2 = reverseComp($p2);
+					my $ptmp = $p1;
+					$p1 = $p2;
+					$p2 = $ptmp;
+				}
 			}
-			$p = addQual($p);
-			$pfinal .= $p;
-			if($i < $np-1) {
-				$pfinal .= ","
+			# Add valid random quality values
+			$p1 = addQual($p1);
+			$pfinal1 .= $p1;
+			$pfinal1 .= "," if($i < $np-1);
+			if($pe) {
+				$p2 = addQual($p2);
+				$pfinal2 .= $p2;
+				$pfinal2 .= "," if($i < $np-1);
 			}
 		}
 		
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
-		my $policy = pickPolicy();
+		my $policy = pickPolicy($pe);
 		my $expectResult = 1;
-		for(my $i = 0; $i < length($pfinal); $i++) {
-			my $c = substr($pfinal, $i, 1);
-			last if($c eq ',');
-			if($c ne 'A' && $c ne 'C' && $c ne 'G' && $c ne 'T') {
-				$expectResult = 0;
-				last;
+		if(!$pe) {
+			for(my $i = 0; $i < length($pfinal1); $i++) {
+				my $c = substr($pfinal1, $i, 1);
+				last if($c eq ',');
+				if($c ne 'A' && $c ne 'C' && $c ne 'G' && $c ne 'T') {
+					$expectResult = 0;
+					last;
+				}
 			}
+		} else {
+			$expectResult = 0;
 		}
-		$pass += search($t, $pfinal, $policy, $oneHit, $expectResult, $offRate, $isaRate); # require 1 or more results
+		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate, $isaRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
 	$in = $inner;
 	for(; $in >= 0; $in--) {
+		my $pe = (int(rand(2)) == 0);
 		# Generate random pattern *not* based on text
-		my $pfinal = '';
+		my $pfinal1 = '';
+		my $pfinal2 = '';
 		my $np = int(rand(10)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
 			my $plen = int(rand($prand)) + $pbase;
-			my $p = randDna($plen);
-			if(int(rand(2)) == 0) {
-				$p = reverseComp($p);
-			}
-			$p = addQual($p);
-			$pfinal .= $p;
+			my $p1 = randDna($plen);
+			$plen = int(rand($prand)) + $pbase;
+			my $p2 = randDna($plen);
+			$p1 = addQual($p1);
+			$p2 = addQual($p2) if $pe;
+			$pfinal1 .= $p1;
+			$pfinal2 .= $p2 if $pe;
 			if($i < $np-1) {
-				$pfinal .= ","
+				$pfinal1 .= ",";
+				$pfinal2 .= "," if $pe;
 			}
 		}
 
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
-		my $policy = pickPolicy();
-		$pass += search($t, $pfinal, $policy, $oneHit, 0, $offRate, $isaRate); # do not require any results
+		my $policy = pickPolicy($pe);
+		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate, $isaRate); # do not require any results
 		last if(++$tests > $limit);
 	}
 }
