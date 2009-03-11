@@ -1180,7 +1180,7 @@ protected:
 			if(diffs > 2) {
 				// Too many differences
 				continue;
-			} else if(diffs == nPoss) {
+			} else if(nPoss > 1 && diffs == nPoss) {
 				// There was one difference, but there was also one N,
 				// so we already know where the difference is
 				mmpos1 = nPos1;
@@ -1674,7 +1674,7 @@ protected:
 			if(diffs > 3) {
 				// Too many differences
 				continue;
-			} else if(diffs == nPoss) {
+			} else if(nPoss > 1 && diffs == nPoss) {
 				// There was one difference, but there was also one N,
 				// so we already know where the difference is
 				mmpos1 = nPos1;
