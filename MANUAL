@@ -125,7 +125,7 @@ Bowtie Manual
  your feedback.
  
  A result of Bowtie's indexing strategy is that alignments involving
- one or more ambiguous reference characters ('N', '-', 'R' 'Y', etc.)
+ one or more ambiguous reference characters ('N', '-', 'R', 'Y', etc.)
  are considered invalid by Bowtie, regardless of the alignment policy.
  This is true only for ambiguous characters in the reference;
  alignments involving ambiguous characters in the read are legal,
