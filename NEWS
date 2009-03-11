@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.9.1 - March 9, 2009
+Version 0.9.9.1 - March 10, 2009
    * Added paired-end alignment for -v 2 and -v 3 alignment modes (-n
      modes coming soon).
    * Minor bug fixes and speed improvements for all paired-end modes.
@@ -31,6 +31,9 @@ Version 0.9.9.1 - March 9, 2009
    * All Bowtie tools now compile under GCC 4.3.3.
    * Fixed bug whereby bowtie -b would sometimes write garbage into the
      reference offset field.
+   * Paired-end info is now persisted in the -b format, allowing
+     bowtie-maptool output to add "/1" and "/2" suffixes as
+     appropriate.
 
 Version 0.9.9 - February 19, 2009
    * Added some preliminary support for paired-end alignment in -v 0
