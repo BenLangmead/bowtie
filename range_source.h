@@ -1592,6 +1592,13 @@ public:
 		return mate1_;
 	}
 
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	bool fw() const {
+		return fw_;
+	}
+
 protected:
 
 	virtual void initRangeSource() = 0;
@@ -1765,12 +1772,19 @@ public:
 			TRangeSrcDrPtr p = rss_[0];
 			// If this RangeSourceDriver is done, rotate it to the back
 			// of the vector
+			bool fwsLeft = false;
+			bool rcsLeft = false;
 			for(size_t i = 0; i < rssSz-1; i++) {
 				rss_[i] = rss_[i+1];
+				if(!rss_[i]->done) {
+					if(rss_[i]->fw()) fwsLeft = true;
+					else rcsLeft = true;
+				}
 			}
 			rss_[rssSz-1] = p;
 			// Move on to next RangeSourceDriver
-			if(!rss_[0]->done) {
+			if(!rss_[0]->done && fwsLeft && rcsLeft) {
+				assert(fwsLeft || rcsLeft);
 				this->foundRange = rss_[0]->foundRange;
 				if(this->foundRange) {
 					lastRange_ = &rss_[0]->range();
@@ -1781,6 +1795,7 @@ public:
 				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
 				assert(sortedRss());
 			} else {
+				// All RangeSourceDrivers are done
 				this->foundRange = false;
 				lastRange_ = NULL;
 				this->done = true;
@@ -1800,10 +1815,17 @@ public:
 				TRangeSrcDrPtr p = rss_[0];
 				// If this RangeSourceDriver is done, rotate it to the back
 				// of the vector
+				bool fwsLeft = false;
+				bool rcsLeft = false;
 				for(size_t i = 0; i < rssSz-1; i++) {
 					rss_[i] = rss_[i+1];
+					if(!rss_[i]->done) {
+						if(rss_[i]->fw()) fwsLeft = true;
+						else rcsLeft = true;
+					}
 				}
 				rss_[rssSz-1] = p;
+				this->done = !(fwsLeft && rcsLeft);
 				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
 			} else if(precost != rss_[0]->minCost) {
 				assert_gt(rss_[0]->minCost, precost);
