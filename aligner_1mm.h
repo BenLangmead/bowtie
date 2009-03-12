@@ -235,7 +235,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-#if 0
+#if 1
 		TRangeSrcDrPtrVec dr1FwVec;
 		dr1FwVec.push_back(dr1Fw_Fw); dr1FwVec.push_back(dr1Fw_Bw);
 		// Overall range source driver for the forward orientation of
@@ -270,7 +270,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-#if 0
+#if 1
 		TRangeSrcDrPtrVec dr1RcVec;
 		dr1RcVec.push_back(dr1Rc_Fw);
 		dr1RcVec.push_back(dr1Rc_Bw);
@@ -306,7 +306,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, false);
-#if 0
+#if 1
 		TRangeSrcDrPtrVec dr2FwVec;
 		dr2FwVec.push_back(dr2Fw_Fw);
 		dr2FwVec.push_back(dr2Fw_Bw);
@@ -342,7 +342,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, false);
-#if 0
+#if 1
 		TRangeSrcDrPtrVec dr2RcVec;
 		dr2RcVec.push_back(dr2Rc_Fw);
 		dr2RcVec.push_back(dr2Rc_Bw);
@@ -361,7 +361,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-#if 0
+#if 1
 		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
