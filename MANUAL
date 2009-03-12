@@ -227,15 +227,31 @@ Bowtie Manual
   
   High Performance Tips
   ---------------------
+
+  Tip 1: If your processor(s) is (are) 64-bit, use 64-bit bowtie
+
+  The 64-bit version of Bowtie is substantially faster (usually more
+  than 50% faster) than the 32-bit version, due to Bowtie's use of
+  64-bit arithmetic when searching both in the index and in the
+  reference.  If possible, download the 64-bit binaries for Bowtie and
+  run them on a 64-bit machine.  If you are building Bowtie from
+  sources, you may need to specify the -m64 option to g++ to compile
+  the 64-bit version; you can do this by supplying argument
+  EXTRA_FLAGS="-m64" to the 'make' command; e.g.:
+  'make EXTRA_FLAGS="-m64" bowtie'.  To determine whether your version
+  of bowtie is 64-bit or 32-bit, run 'bowtie --version' and check the
+  'Sizeof' line; if the last expression on that line is {4, 4, 8, 4},
+  then your binary is 32-bit; if the last expression is {4, 8, 8, 8},
+  then your binary is 64-bit.
   
-  Tip 1: If your computer has multiple processors/cores, try -p
+  Tip 2: If your computer has multiple processors/cores, try -p
    
   The -p <int> option causes Bowtie to launch <int> parallel search
   threads.  Each thread runs on a different processor/core and all
   threads find alignments in parallel, increasing alignment throughput
   by approximately a multiple of <int>.
   
-  Tip 2: If reporting many alignments per read, try tweaking
+  Tip 3: If reporting many alignments per read, try tweaking
          'bowtie-build --offrate'
    
   If you are using the -k, -a or -m options and Bowtie is reporting
@@ -259,7 +275,7 @@ Bowtie Manual
   by 1 doubles the memory taken by the SA sample, and decreasing by 2
   quadruples the memory taken, etc.
   
-  Tip 3: If bowtie "thrashes", try tweaking 'bowtie --offrate'
+  Tip 4: If bowtie "thrashes", try tweaking 'bowtie --offrate'
   
   If 'bowtie' is very slow and consistently triggers more than a few
   page faults per second (as observed via top or vmstat on Mac/Linux,
