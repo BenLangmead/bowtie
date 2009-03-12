@@ -65,7 +65,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		GreedyDFSRangeSourceDriver * driverRc = new GreedyDFSRangeSourceDriver(
 			*params, rRc, false, sink_, sinkPt,
 			0,          // seedLen
@@ -74,7 +74,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -170,7 +170,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		GreedyDFSRangeSourceDriver * driver1Rc = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc, false, sink_, sinkPt,
 			0,          // seedLen
@@ -179,7 +179,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 
 		GreedyDFSRangeSource *r2Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
@@ -195,7 +195,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		GreedyDFSRangeSourceDriver * driver2Rc = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc, false, sink_, sinkPt,
 			0,          // seedLen
@@ -204,7 +204,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 
 		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
 

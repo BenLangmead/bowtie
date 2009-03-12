@@ -78,7 +78,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		//
 		GreedyDFSRangeSourceDriver * drFw_Fw = new GreedyDFSRangeSourceDriver(
 			*params, rFw_Fw, true, sink_, sinkPt,
@@ -88,7 +88,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec drVec;
 		drVec.push_back(drFw_Bw);
 		drVec.push_back(drFw_Fw);
@@ -110,7 +110,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		//
 		GreedyDFSRangeSourceDriver * drRc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, rRc_Bw, false, sink_, sinkPt,
@@ -120,7 +120,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		drVec.push_back(drRc_Fw); drVec.push_back(drRc_Bw);
 		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
 
@@ -154,6 +154,7 @@ private:
 class Paired1mmAlignerV1Factory : public AlignerFactory {
 	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
 	typedef ListRangeSourceDriver<GreedyDFSRangeSource> TListRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	Paired1mmAlignerV1Factory(
@@ -224,7 +225,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		GreedyDFSRangeSourceDriver * dr1Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Bw, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -233,13 +234,18 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
+#if 0
 		TRangeSrcDrPtrVec dr1FwVec;
 		dr1FwVec.push_back(dr1Fw_Fw); dr1FwVec.push_back(dr1Fw_Bw);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
-
+#else
+		TRangeSrcDrPtrVec drVec;
+		drVec.push_back(dr1Fw_Fw);
+		drVec.push_back(dr1Fw_Bw);
+#endif
 		GreedyDFSRangeSource *r1Rc_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
 			true, false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
@@ -254,7 +260,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		GreedyDFSRangeSourceDriver * dr1Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_Bw, false, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -263,12 +269,18 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
+#if 0
 		TRangeSrcDrPtrVec dr1RcVec;
-		dr1RcVec.push_back(dr1Rc_Fw); dr1RcVec.push_back(dr1Rc_Bw);
+		dr1RcVec.push_back(dr1Rc_Fw);
+		dr1RcVec.push_back(dr1Rc_Bw);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
+#else
+		drVec.push_back(dr1Rc_Fw);
+		drVec.push_back(dr1Rc_Bw);
+#endif
 
 		GreedyDFSRangeSource *r2Fw_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
@@ -284,7 +296,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		GreedyDFSRangeSourceDriver * dr2Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Bw, true, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -293,12 +305,18 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
+#if 0
 		TRangeSrcDrPtrVec dr2FwVec;
-		dr2FwVec.push_back(dr2Fw_Fw); dr2FwVec.push_back(dr2Fw_Bw);
+		dr2FwVec.push_back(dr2Fw_Fw);
+		dr2FwVec.push_back(dr2Fw_Bw);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
+#else
+		drVec.push_back(dr2Fw_Fw);
+		drVec.push_back(dr2Fw_Bw);
+#endif
 
 		GreedyDFSRangeSource *r2Rc_Fw = new GreedyDFSRangeSource(
 			&ebwtFw_, *params, 0xffffffff /*max dist*/, BacktrackLimits(), 0 /*reportPartials*/,
@@ -314,7 +332,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		GreedyDFSRangeSourceDriver * dr2Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_Bw, false, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -323,12 +341,19 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
+#if 0
 		TRangeSrcDrPtrVec dr2RcVec;
-		dr2RcVec.push_back(dr2Rc_Fw); dr2RcVec.push_back(dr2Rc_Bw);
+		dr2RcVec.push_back(dr2Rc_Fw);
+		dr2RcVec.push_back(dr2Rc_Bw);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
+#else
+		drVec.push_back(dr2Rc_Fw);
+		drVec.push_back(dr2Rc_Bw);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
+#endif
 
 		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
 
@@ -336,11 +361,19 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
+#if 0
 		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_);
+#else
+		return new PairedBWAlignerV2<GreedyDFSRangeSource>(
+			params, dr, refAligner, rchase,
+			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+			peInner_, peOuter_,
+			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_);
+#endif
 	}
 
 private:

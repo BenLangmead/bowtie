@@ -86,7 +86,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * drFw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, rFw_Bw, true, sink_, sinkPt,
@@ -96,7 +96,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * drFw_FwHalf = new GreedyDFSRangeSourceDriver(
 			*params, rFw_FwHalf, true, sink_, sinkPt,
@@ -106,7 +106,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec drVec;
 		if(doFw_) {
 			drVec.push_back(drFw_Fw);
@@ -135,7 +135,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * drRc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, rRc_Bw, false, sink_, sinkPt,
@@ -145,7 +145,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * drRc_FwHalf = new GreedyDFSRangeSourceDriver(
 			*params, rRc_FwHalf, false, sink_, sinkPt,
@@ -155,7 +155,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		if(doRc_) {
 			drVec.push_back(drRc_Fw);
 			drVec.push_back(drRc_Bw);
@@ -275,7 +275,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * dr1Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_Bw, true, sink_, sinkPt,
@@ -285,7 +285,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr1Fw_BwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r1Fw_BwHalf, true, sink_, sinkPt,
@@ -295,7 +295,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec dr1FwVec;
 		dr1FwVec.push_back(dr1Fw_Bw);
 		dr1FwVec.push_back(dr1Fw_Fw);
@@ -330,7 +330,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * dr1Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_Bw, false, sink_, sinkPt,
@@ -340,7 +340,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * dr1Rc_FwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r1Rc_FwHalf, false, sink_, sinkPt,
@@ -350,7 +350,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec dr1RcVec;
 		dr1RcVec.push_back(dr1Rc_Fw);
 		dr1RcVec.push_back(dr1Rc_Bw);
@@ -384,7 +384,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		// Driver wrapper for rFw_Bw
 		GreedyDFSRangeSourceDriver * dr2Fw_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_Bw, true, sink_, sinkPt,
@@ -394,7 +394,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		// Driver wrapper for rFw_Fw
 		GreedyDFSRangeSourceDriver * dr2Fw_BwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r2Fw_BwHalf, true, sink_, sinkPt,
@@ -404,7 +404,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		TRangeSrcDrPtrVec dr2FwVec;
 		dr2FwVec.push_back(dr2Fw_Bw);
 		dr2FwVec.push_back(dr2Fw_Fw);
@@ -439,7 +439,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		// Driver wrapper for rRc_Bw
 		GreedyDFSRangeSourceDriver * dr2Rc_Bw = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_Bw, false, sink_, sinkPt,
@@ -449,7 +449,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		// Driver wrapper for rRc_Fw
 		GreedyDFSRangeSourceDriver * dr2Rc_FwHalf = new GreedyDFSRangeSourceDriver(
 			*params, r2Rc_FwHalf, false, sink_, sinkPt,
@@ -459,7 +459,7 @@ public:
 			two_ ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, seed_);
+			os_, verbose_, seed_, false);
 		TRangeSrcDrPtrVec dr2RcVec;
 		dr2RcVec.push_back(dr2Rc_Fw);
 		dr2RcVec.push_back(dr2Rc_Bw);

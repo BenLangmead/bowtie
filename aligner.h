@@ -230,37 +230,69 @@ public:
 	 */
 	void run(bool verbose = false) {
 		bool done = false;
-		while(!done) {
-			done = true;
-			for(uint32_t i = 0; i < n_; i++) {
-				Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
-				                           (*alignersPE_)[i];
+		if(n_ == 1) {
+			Aligner *al = seOrPe_[0] ? (*alignersSE_)[0] : (*alignersPE_)[0];
+			PatternSourcePerThread *ps = (*patsrcs_)[0];
+			while(!done) {
+				done = true;
 				if(!al->done) {
 					// Advance an aligner already in progress; this is
 					// the common case
 					done = false;
 					al->advance();
 				} else {
-					// Feed a new read to a vacant aligner
-					PatternSourcePerThread *ps = (*patsrcs_)[i];
 					// Get a new read
 					ps->nextReadPair();
 					if(ps->patid() < qUpto_ && !ps->empty()) {
 						if(ps->paired()) {
 							// Read currently in buffer is paired-end
-							if(verbose) cout << "Paired input: " << ps->bufa().patFw << "," << ps->bufb().patFw << endl;
-							(*alignersPE_)[i]->setQuery(ps);
-							seOrPe_[i] = false; // false -> paired
+							(*alignersPE_)[0]->setQuery(ps);
+							al = (*alignersPE_)[0];
+							seOrPe_[0] = false; // false -> paired
 						} else {
 							// Read currently in buffer is single-end
-							if(verbose) cout << "Unpaired input: " << ps->bufa().patFw << endl;
-							(*alignersSE_)[i]->setQuery(ps);
-							seOrPe_[i] = true; // true = unpaired
+							(*alignersSE_)[0]->setQuery(ps);
+							al = (*alignersSE_)[0];
+							seOrPe_[0] = true; // true = unpaired
 						}
 						done = false;
 					} else {
 						// No more reads; if done == true, it remains
 						// true
+					}
+				}
+			}
+		} else {
+			while(!done) {
+				done = true;
+				for(uint32_t i = 0; i < n_; i++) {
+					Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
+											   (*alignersPE_)[i];
+					if(!al->done) {
+						// Advance an aligner already in progress; this is
+						// the common case
+						done = false;
+						al->advance();
+					} else {
+						// Feed a new read to a vacant aligner
+						PatternSourcePerThread *ps = (*patsrcs_)[i];
+						// Get a new read
+						ps->nextReadPair();
+						if(ps->patid() < qUpto_ && !ps->empty()) {
+							if(ps->paired()) {
+								// Read currently in buffer is paired-end
+								(*alignersPE_)[i]->setQuery(ps);
+								seOrPe_[i] = false; // false -> paired
+							} else {
+								// Read currently in buffer is single-end
+								(*alignersSE_)[i]->setQuery(ps);
+								seOrPe_[i] = true; // true = unpaired
+							}
+							done = false;
+						} else {
+							// No more reads; if done == true, it remains
+							// true
+						}
 					}
 				}
 			}
@@ -787,10 +819,10 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
-		driver1Fw_->setQuery(patsrc, true  /* mate1 */);
-		driver1Rc_->setQuery(patsrc, true  /* mate1 */);
-		driver2Fw_->setQuery(patsrc, false /* mate2 */);
-		driver2Rc_->setQuery(patsrc, false /* mate2 */);
+		driver1Fw_->setQuery(patsrc);
+		driver1Rc_->setQuery(patsrc);
+		driver2Fw_->setQuery(patsrc);
+		driver2Rc_->setQuery(patsrc);
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;
@@ -1047,7 +1079,7 @@ protected:
 	 * This function picks up to 'pick' anchors at random from the
 	 * 'offs' array.  It returns the number that it actually picked.
 	 */
-	bool resolveOutstandingInRef(const bool offs1,
+	bool resolveOutstandingInRef(const bool off1,
 	                             const U32Pair& off,
 	                             const uint32_t tlen,
 	                             const Range& range)
@@ -1057,25 +1089,25 @@ protected:
 		// If matchRight is true, then we're trying to align the other
 		// mate to the right of the already-aligned mate.  Otherwise,
 		// to the left.
-		bool matchRight = (offs1 ? !doneFw_ : doneFw_);
+		bool matchRight = (off1 ? !doneFw_ : doneFw_);
 		// Sequence and quals for mate to be matched
-		bool fw = offs1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
+		bool fw = off1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
 		if(doneFw_) fw = !fw;
 		// 'seq' gets sequence of outstanding mate w/r/t the forward
 		// reference strand
-		const String<Dna5>& seq  = fw ? (offs1 ? patsrc_->bufb().patFw   :
-		                                         patsrc_->bufa().patFw)  :
-		                                (offs1 ? patsrc_->bufb().patRc   :
-		                                         patsrc_->bufa().patRc);
+		const String<Dna5>& seq  = fw ? (off1 ? patsrc_->bufb().patFw   :
+		                                        patsrc_->bufa().patFw)  :
+		                                (off1 ? patsrc_->bufb().patRc   :
+		                                        patsrc_->bufa().patRc);
 		// 'seq' gets qualities of outstanding mate w/r/t the forward
 		// reference strand
-		const String<char>& qual = fw ? (offs1 ? patsrc_->bufb().qualFw  :
-		                                         patsrc_->bufa().qualFw) :
-		                                (offs1 ? patsrc_->bufb().qualRc  :
-		                                         patsrc_->bufa().qualRc);
+		const String<char>& qual = fw ? (off1 ? patsrc_->bufb().qualFw  :
+		                                        patsrc_->bufa().qualFw) :
+		                                (off1 ? patsrc_->bufb().qualRc  :
+		                                        patsrc_->bufa().qualRc);
 		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
-		uint32_t alen = (offs1 ? patsrc_->bufa().length() :
-		                         patsrc_->bufb().length());
+		uint32_t alen = (off1 ? patsrc_->bufa().length() :
+		                        patsrc_->bufb().length());
 		// Don't even try if either of the mates is longer than the
 		// maximum insert size; this seems to be compatible with what
 		// Maq does.
@@ -1113,6 +1145,7 @@ protected:
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
 			r.fw = fw;
+			r.mate1 = !off1;
 			const uint32_t result = offs[i];
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
@@ -1497,6 +1530,360 @@ protected:
 #endif
 
 	bool verbose2_;
+};
+
+/**
+ * An aligner for finding paired alignments while operating entirely
+ * within the Burrows-Wheeler domain.
+ */
+template<typename TRangeSource>
+class PairedBWAlignerV2 : public Aligner {
+
+	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::vector<Range> TRangeVec;
+	typedef RangeSourceDriver<TRangeSource> TDriver;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
+
+public:
+	PairedBWAlignerV2(
+		EbwtSearchParams<String<Dna> >* params,
+		TDriver* driver,
+		RefAligner<String<Dna5> >* refAligner,
+		RangeChaser<String<Dna> >* rchase,
+		HitSink& sink,
+		const HitSinkPerThreadFactory& sinkPtFactory,
+		HitSinkPerThread* sinkPt,
+		bool fw1, bool fw2,
+		uint32_t minInsert,
+		uint32_t maxInsert,
+		uint32_t mixedAttemptLim,
+		const BitPairReference* refs,
+		bool rangeMode,
+		bool verbose,
+		uint32_t seed) :
+		Aligner(true, rangeMode, seed),
+		refs_(refs), patsrc_(NULL),
+		chase_(false),
+		refAligner_(refAligner),
+		sinkPtFactory_(sinkPtFactory),
+		sinkPt_(sinkPt),
+		params_(params),
+		minInsert_(minInsert),
+		maxInsert_(maxInsert),
+		mixedAttemptLim_(mixedAttemptLim),
+		mixedAttempts_(0),
+		fw1_(fw1), fw2_(fw2),
+		rchase_(rchase),
+		driver_(driver)
+	{
+		assert(sinkPt_ != NULL);
+		assert(params_ != NULL);
+		assert(driver_ != NULL);
+	}
+
+	virtual ~PairedBWAlignerV2() {
+		delete driver_; driver_ = NULL;
+		delete params_; params_ = NULL;
+		delete rchase_; rchase_ = NULL;
+		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
+	}
+
+	/**
+	 * Prepare this aligner for the next read.
+	 */
+	virtual void setQuery(PatternSourcePerThread* patsrc) {
+		assert(!patsrc->bufa().empty());
+		Aligner::setQuery(patsrc); // set fields & random seed
+		assert(!patsrc->bufb().empty());
+		// Give all of the drivers pointers to the relevant read info
+		patsrc_ = patsrc;
+		driver_->setQuery(patsrc);
+		mixedAttempts_ = 0;
+		// Neither orientation is done
+		this->done = false;
+		// No ranges are being chased yet
+		chase_ = false;
+		rchase_->initRand(qseed_);
+		pairs_fw_.clear();
+		pairs_rc_.clear();
+	}
+
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 *
+	 * A call to this function does one of many things:
+	 * 1. Advance a RangeSourceDriver and check if it found a new range
+	 * 2. Advance a RowChaseDriver and check if it found a reference
+	 *    offset for a an alignment in a range
+	 */
+	virtual bool advance() {
+		assert(!this->done);
+
+		if(chase_) {
+			assert(!rangeMode_); // chasing ranges
+			assert(driver_->foundRange);
+			if(!rchase_->foundOff() && !rchase_->done) {
+				rchase_->advance();
+				return false;
+			}
+			assert(rchase_->foundOff() || rchase_->done);
+			if(rchase_->foundOff()) {
+				const Range& r = driver_->range();
+				this->done = resolveOutstandingInRef(
+						r.mate1, rchase_->off(),
+						r.ebwt->_plen[rchase_->off().first], r);
+				if(++mixedAttempts_ > mixedAttemptLim_) {
+					// Give up on this pair
+					this->done = true;
+				} else {
+					rchase_->reset();
+				}
+			} else {
+				assert(rchase_->done);
+				// Forget this range; keep looking for ranges
+				chase_ = false;
+				this->done = driver_->done;
+			}
+		}
+
+		if(!this->done && !chase_) {
+			// Search for more ranges for whichever mate currently has
+			// fewer candidate alignments
+			if(!driver_->done) {
+				// If there are no more ranges for the other mate and
+				// there are no candidate alignments either, then we're
+				// not going to find a paired alignment in this
+				// orientation.
+				driver_->advance();
+				if(driver_->foundRange) {
+					// Use Burrows-Wheeler for this pair (as usual)
+					chase_ = true;
+					const Range& r = driver_->range();
+					rchase_->setTopBot(r.top, r.bot, driver_->qlen(), r.ebwt);
+				}
+			} else {
+				this->done = true;
+			}
+		}
+
+		if(this->done) {
+			sinkPt_->finishRead(*patsrc_, true);
+		}
+		return this->done;
+	}
+
+protected:
+
+	/**
+	 * Helper for reporting a pair of alignments.  As of now, we report
+	 * a paired alignment by reporting two consecutive alignments, one
+	 * for each mate.
+	 */
+	bool report(const Range& rL, // range for upstream mate
+	            const Range& rR, // range for downstream mate
+	            uint32_t first,  // ref idx
+	            uint32_t upstreamOff, // offset for upstream mate
+	            uint32_t dnstreamOff, // offset for downstream mate
+	            uint32_t tlen, // length of ref
+	            bool pairFw,   // whether the pair is being mapped to fw strand
+	            bool ebwtFwL,
+	            bool ebwtFwR)
+	{
+		assert_lt(upstreamOff, dnstreamOff);
+		uint32_t spreadL = rL.bot - rL.top;
+		uint32_t spreadR = rR.bot - rR.top;
+		uint32_t oms = min(spreadL, spreadR) - 1;
+		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
+		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
+		uint32_t lenL = pairFw ? alen_ : blen_;
+		uint32_t lenR = pairFw ? blen_ : alen_;
+		bool ret;
+		assert(!params_->sink().exceededOverThresh());
+		params_->setFw(rL.fw);
+		// Print upstream mate first
+		ret = params_->reportHit(
+				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
+					    (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
+				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
+					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
+				&bufL->name,
+				ebwtFwL,
+				rL.mms,                       // mismatch positions
+				rL.refcs,                     // reference characters for mms
+				rL.numMms,                    // # mismatches
+				make_pair(first, upstreamOff),// position
+				make_pair(rL.top, rL.bot),    // arrows
+				tlen,                         // textlen
+				lenL,                         // qlen
+				rL.stratum,                   // alignment stratum
+				oms,                          // # other hits
+				bufL->patid,
+				pairFw ? 1 : 2);
+		if(ret) {
+			return true; // can happen when -m is set
+		}
+		params_->setFw(rR.fw);
+		ret = params_->reportHit(
+				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
+					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
+				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
+					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
+				&bufR->name,
+				ebwtFwR,
+				rR.mms,                       // mismatch positions
+				rR.refcs,                     // reference characters for mms
+				rR.numMms,                    // # mismatches
+				make_pair(first, dnstreamOff),// position
+				make_pair(rR.top, rR.bot),    // arrows
+				tlen,                         // textlen
+				lenR,                         // qlen
+				rR.stratum,                   // alignment stratum
+				oms,                          // # other hits
+				bufR->patid,
+				pairFw ? 2 : 1);
+		return ret;
+	}
+
+	/**
+	 * Given a vector of reference positions where one of the two mates
+	 * (the "anchor" mate) has aligned, look directly at the reference
+	 * sequence for instances where the other mate (the "outstanding"
+	 * mate) aligns such that mating constraint is satisfied.
+	 *
+	 * This function picks up to 'pick' anchors at random from the
+	 * 'offs' array.  It returns the number that it actually picked.
+	 */
+	bool resolveOutstandingInRef(const bool off1,
+	                             const U32Pair& off,
+	                             const uint32_t tlen,
+	                             const Range& range)
+	{
+		assert(refs_->loaded());
+		assert_lt(off.first, refs_->numRefs());
+		// If matchRight is true, then we're trying to align the other
+		// mate to the right of the already-aligned mate.  Otherwise,
+		// to the left.
+		bool orFw;
+		if(off1) {
+			orFw = (fw1_ == range.fw);
+		} else {
+			orFw = (fw2_ == range.fw);
+		}
+		bool matchRight = (off1 ? orFw : !orFw);
+		// Sequence and quals for mate to be matched
+		bool fw = !range.fw;
+		// 'seq' gets sequence of outstanding mate w/r/t the forward
+		// reference strand
+		const String<Dna5>& seq  = fw ? (off1 ? patsrc_->bufb().patFw   :
+		                                        patsrc_->bufa().patFw)  :
+		                                (off1 ? patsrc_->bufb().patRc   :
+		                                        patsrc_->bufa().patRc);
+		// 'seq' gets qualities of outstanding mate w/r/t the forward
+		// reference strand
+		const String<char>& qual = fw ? (off1 ? patsrc_->bufb().qualFw  :
+		                                        patsrc_->bufa().qualFw) :
+		                                (off1 ? patsrc_->bufb().qualRc  :
+		                                        patsrc_->bufa().qualRc);
+		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t alen = (off1 ? patsrc_->bufa().length() :
+		                        patsrc_->bufb().length());
+		// Don't even try if either of the mates is longer than the
+		// maximum insert size; this seems to be compatible with what
+		// Maq does.
+		if(maxInsert_ <= max(qlen, alen)) {
+			return false;
+		}
+		const uint32_t tidx = off.first;
+		const uint32_t toff = off.second;
+		// Set begin/end to be a range of all reference
+		// positions that are legally permitted to be involved in
+		// the alignment of the outstanding mate.  It's up to the
+		// callee to worry about how to scan these positions.
+		uint32_t begin, end;
+		if(matchRight) {
+			begin = toff + 1;
+			end = toff + maxInsert_;
+			end = min<uint32_t>(refs_->approxLen(tidx), end);
+		} else {
+			if(toff + alen < maxInsert_) {
+				begin = 0;
+			} else {
+				begin = toff + alen - maxInsert_;
+			}
+			end = toff + min<uint32_t>(alen, qlen) - 1;
+		}
+		// Check if there's not enough space in the range to fit an
+		// alignment for the outstanding mate.
+		if(end - begin < qlen) return false;
+		std::vector<Range> ranges;
+		std::vector<uint32_t> offs;
+		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
+		                  offs, orFw ? &pairs_fw_ : &pairs_rc_,
+		                  toff, !matchRight);
+		assert_eq(ranges.size(), offs.size());
+		for(size_t i = 0; i < ranges.size(); i++) {
+			Range& r = ranges[i];
+			r.fw = fw;
+			r.mate1 = !off1;
+			const uint32_t result = offs[i];
+			// Just copy the known range's top and bot for now
+			r.top = range.top;
+			r.bot = range.bot;
+			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
+			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
+			if(report(
+					matchRight ? range : r, // range for upstream mate
+			        matchRight ? r : range, // range for downstream mate
+				    tidx,                   // ref idx
+				    matchRight ? toff : result, // upstream offset
+			        matchRight ? result : toff, // downstream offset
+				    tlen,       // length of ref
+				    orFw,       // whether the pair is being mapped to fw strand
+				    ebwtLFw,
+				    ebwtRFw)) return true;
+		}
+		return false;
+	}
+
+	const BitPairReference* refs_;
+	PatternSourcePerThread *patsrc_;
+	bool chase_;
+
+	// For searching for outstanding mates
+	RefAligner<String<Dna5> >* refAligner_;
+
+	// Temporary HitSink; to be deleted
+	const HitSinkPerThreadFactory& sinkPtFactory_;
+	HitSinkPerThread* sinkPt_;
+
+	// State for alignment
+	EbwtSearchParams<String<Dna> >* params_;
+
+	// Paired-end boundaries
+	const uint32_t minInsert_;
+	const uint32_t maxInsert_;
+
+	const uint32_t mixedAttemptLim_;
+	uint32_t mixedAttempts_;
+
+	// Orientation of upstream/downstream mates when aligning to
+	// forward strand
+	const bool fw1_;
+	const bool fw2_;
+
+	// State for getting alignments from ranges statefully
+	RangeChaser<String<Dna> >* rchase_;
+
+	// Range-finding state for first mate
+	TDriver*      driver_;
+
+	/// For keeping track of paired alignments that have already been
+	/// found for the forward and reverse-comp pair orientations
+	TSetPairs   pairs_fw_;
+	TSetPairs   pairs_rc_;
 };
 
 #endif /* ALIGNER_H_ */

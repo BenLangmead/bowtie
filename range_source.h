@@ -1384,16 +1384,16 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQuery(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		// Clear our buffer of previously-dished-out top offsets
 		ASSERT_ONLY(allTops_.clear());
-		setQueryImpl(patsrc, mate1);
+		setQueryImpl(patsrc);
 	}
 
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) = 0;
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc) = 0;
 
 	/**
 	 * Advance the aligner by one memory op.  Return true iff we're
@@ -1476,9 +1476,10 @@ public:
 		vector<String<Dna5> >& os,
 		bool verbose,
 		uint32_t seed,
+		bool mate1,
 		uint32_t minCostAdjustment = 0) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
-		len_(0),
+		len_(0), mate1_(mate1),
 		pat_(NULL), qual_(NULL), name_(NULL), sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
@@ -1494,26 +1495,28 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
 		bool ebwtFw = rs_->curEbwt()->fw();
-		if(mate1) {
+		if(mate1_) {
+			ReadBuf& buf = patsrc->bufa();
 			if(fw_) {
-				pat_  = (ebwtFw ? &patsrc->bufa().patFw  : &patsrc->bufa().patFwRev);
-				qual_ = (ebwtFw ? &patsrc->bufa().qualFw : &patsrc->bufa().qualFwRev);
+				pat_  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
+				qual_ = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
 			} else {
-				pat_  = (ebwtFw ? &patsrc->bufa().patRc  : &patsrc->bufa().patRcRev);
-				qual_ = (ebwtFw ? &patsrc->bufa().qualRc : &patsrc->bufa().qualRcRev);
+				pat_  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
+				qual_ = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
 			}
-			name_ = &patsrc->bufa().name;
+			name_ = &buf.name;
 		} else {
+			ReadBuf& buf = patsrc->bufb();
 			if(fw_) {
-				pat_  = (ebwtFw ? &patsrc->bufb().patFw  : &patsrc->bufb().patFwRev);
-				qual_ = (ebwtFw ? &patsrc->bufb().qualFw : &patsrc->bufb().qualFwRev);
+				pat_  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
+				qual_ = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
 			} else {
-				pat_  = (ebwtFw ? &patsrc->bufb().patRc  : &patsrc->bufb().patRcRev);
-				qual_ = (ebwtFw ? &patsrc->bufb().qualRc : &patsrc->bufb().qualRcRev);
+				pat_  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
+				qual_ = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
 			}
-			name_ = &patsrc->bufb().name;
+			name_ = &buf.name;
 		}
 		assert(pat_ != NULL);
 		assert(qual_ != NULL);
@@ -1572,6 +1575,7 @@ public:
 	 */
 	virtual Range& range() {
 		rs_->range().fw = fw_;
+		rs_->range().mate1 = mate1_;
 		return rs_->range();
 	}
 
@@ -1580,12 +1584,21 @@ public:
 		return len_;
 	}
 
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	bool mate1() const {
+		return mate1_;
+	}
+
 protected:
 
 	virtual void initRangeSource() = 0;
 
 	// Progress state
 	uint32_t len_;
+	bool mate1_;
 	String<Dna5>* pat_;
 	String<char>* qual_;
 	String<char>* name_;
@@ -1618,7 +1631,7 @@ public:
 	ListRangeSourceDriver(const TRangeSrcDrPtrVec& rss) :
 		RangeSourceDriver<TRangeSource>(false),
 		cur_(0), ham_(0), rss_(rss) /* copy */,
-		patsrc_(NULL), mate1_(true)
+		patsrc_(NULL)
 	{
 		assert_gt(rss_.size(), 0);
 		assert(!this->done);
@@ -1631,12 +1644,11 @@ public:
 	}
 
 	/// Set query to find ranges for
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
 		cur_ = 0; // go back to first RangeSource in list
 		this->done = false;
-		rss_[cur_]->setQuery(patsrc, mate1);
+		rss_[cur_]->setQuery(patsrc);
 		patsrc_ = patsrc; // so that we can call setQuery on the other elements later
-		mate1_ = mate1;   // so that we can call setQuery on the other elements later
 		this->done = (cur_ == rss_.size()-1) && rss_[cur_]->done;
 		this->minCost = max(rss_[cur_]->minCost, this->minCostAdjustment_);
 		this->foundRange = rss_[cur_]->foundRange;
@@ -1649,7 +1661,7 @@ public:
 		if(rss_[cur_]->done) {
 			// Move on to next RangeSourceDriver
 			if(cur_ < rss_.size()-1) {
-				rss_[++cur_]->setQuery(patsrc_, mate1_);
+				rss_[++cur_]->setQuery(patsrc_);
 				this->minCost = max(rss_[cur_]->minCost, this->minCostAdjustment_);
 				this->foundRange = rss_[cur_]->foundRange;
 			} else {
@@ -1680,7 +1692,6 @@ protected:
 	uint32_t ham_;
 	TRangeSrcDrPtrVec rss_;
 	PatternSourcePerThread* patsrc_;
-	bool mate1_;
 };
 
 /**
@@ -1719,11 +1730,12 @@ public:
 	}
 
 	/// Set query to find ranges for
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc, bool mate1 = true) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
 		this->done = false;
 		const size_t rssSz = rss_.size();
 		for(size_t i = 0; i < rssSz; i++) {
-			rss_[i]->setQuery(patsrc, mate1);
+			// Assuming that all
+			rss_[i]->setQuery(patsrc);
 		}
 		sortRss();
 		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);

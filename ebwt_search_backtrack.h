@@ -2665,9 +2665,10 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
-			uint32_t seed) :
+			uint32_t seed,
+			bool mate1) :
 			SingleRangeSourceDriver<GreedyDFSRangeSource>(
-					params, rs, fw, sink, sinkPt, os, verbose, seed),
+					params, rs, fw, sink, sinkPt, os, verbose, seed, mate1),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
