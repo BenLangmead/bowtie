@@ -16,6 +16,11 @@
  * Concrete factory class for constructing unpaired exact aligners.
  */
 class UnpairedExactAlignerV1Factory : public AlignerFactory {
+
+	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
+	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
+
 public:
 	UnpairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
@@ -26,6 +31,7 @@ public:
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -37,6 +43,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -75,13 +82,17 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
+		TRangeSrcDrPtrVec drVec;
+		drVec.push_back(driverFw);
+		drVec.push_back(driverRc);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV1<GreedyDFSRangeSource>(
-			params, driverFw, driverRc, rchase,
+		return new UnpairedAlignerV2<GreedyDFSRangeSource>(
+			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
 			seed_);
 	}
@@ -95,6 +106,7 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	vector<String<Dna5> >& os_;
+	bool strandFix_;
 	bool rangeMode_;
 	bool verbose_;
 	uint32_t seed_;
@@ -123,6 +135,7 @@ public:
 			uint32_t cacheLimit,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -141,6 +154,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			refs_(refs), os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -238,6 +252,7 @@ private:
 	const uint32_t cacheLimit_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
+	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
 	const uint32_t seed_;

@@ -107,6 +107,7 @@ static bool tryHard             = false; // set very high maxBts, mixedAttemptLi
 static uint32_t skipReads       = 0;     // # reads/read pairs to skip
 static bool nofw                = false; // don't align fw orientation of read
 static bool norc                = false; // don't align rc orientation of read
+static bool strandFix           = false; // attempt to fix strand bias
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -159,7 +160,8 @@ enum {
 	ARG_CACHE_SZ,
 	ARG_NO_FW,
 	ARG_NO_RC,
-	ARG_SKIP
+	ARG_SKIP,
+	ARG_STRAND_FIX
 };
 
 static struct option long_options[] = {
@@ -240,6 +242,7 @@ static struct option long_options[] = {
 	{"offbase",      required_argument, 0,            'B'},
 	{"tryhard",      no_argument,       0,            'y'},
 	{"skip",         required_argument, 0,            's'},
+	{"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -285,6 +288,7 @@ static void printUsage(ostream& out) {
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
 	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
+	    << "  --strandfix        attempt to fix strand biases" << endl
 	    << "Output:" << endl
 	    << "  --concise          write hits in concise format" << endl
 	    << "  -b/--binout        write hits in binary format (<hits> argument not optional)" << endl
@@ -1106,6 +1110,7 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_MAXBTS1: maxBts1 = parseInt(0, "--maxbts1 must be positive"); break;
 			case ARG_MAXBTS2: maxBts2 = parseInt(0, "--maxbts2 must be positive"); break;
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
+	   		case ARG_STRAND_FIX: strandFix = true; break;
 	   		case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
 	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
@@ -1413,6 +1418,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -1433,6 +1439,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
