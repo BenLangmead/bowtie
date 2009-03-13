@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <iostream>
 #include <seqan/sequence.h>
+#include "alphabet.h"
 #include "assert_helpers.h"
 
 /**
@@ -13,12 +14,12 @@
  * a subset.  Returns the index in sa of the smallest suffix of host
  * that is larger than qry, or length(sa) if all suffixes of host are
  * less than qry.
- * 
+ *
  * We use the Manber and Myers optimization of maintaining a pair of
  * counters for the longest lcp observed so far on the left- and right-
  * hand sides and using the min of the two as a way of skipping over
  * characters at the beginning of a new round.
- * 
+ *
  * Returns 0xffffffff if the query suffix matches an element of sa.
  */
 template<typename TStr, typename TSufElt> inline
@@ -42,7 +43,11 @@ uint32_t binarySASearch(const TStr& host,
 		uint32_t suf = sa[m-1];
 		if(suf == qry) return 0xffffffff; // query matches an elt of sa
 		uint32_t lcp = min(lLcp, rLcp);
-		assert_eq(prefix(suffix(host, qry), lcp), prefix(suffix(host, suf), lcp));
+#ifndef NDEBUG
+		if(prefix(suffix(host, qry), lcp) != prefix(suffix(host, suf), lcp)) {
+			assert(0);
+		}
+#endif
 		// Keep advancing lcp, but stop when query mismatches host or
 		// when the counter falls off either the query or the suffix
 		while(suf+lcp < hostLen && qry+lcp < hostLen && host[suf+lcp] == host[qry+lcp]) {

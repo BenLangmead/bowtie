@@ -9,6 +9,7 @@
 #include <vector>
 #include <set>
 #include <sstream>
+#include <errno.h>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
 #ifdef BOWTIE_SHARED_MEM

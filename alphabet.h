@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <seqan/sequence.h>
+#include <seqan/file.h>
 #include <sstream>
 #include "assert_helpers.h"
 
@@ -140,6 +141,20 @@ dollarGt(const TStr& l, const TStr& r) {
 	return !dollarLt(l, r);
 }
 
+/**
+ * Return a copy of the suffix of l starting at 'off'.
+ */
+template <typename TStr>
+static inline std::string
+suffixStr(const TStr& l, size_t off) {
+	typedef typename Value<TStr>::Type TVal;
+	std::string ret;
+	size_t len = seqan::length(l);
+	for(size_t i = off; i < len; i++) {
+		ret.push_back((char)(TVal)l[i]);
+	}
+	return ret;
+}
 
 extern uint8_t dna4Cat[];
 extern uint8_t charToDna5[];

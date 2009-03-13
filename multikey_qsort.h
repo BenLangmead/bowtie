@@ -331,11 +331,13 @@ void sanityCheckOrderedSufs(const T& host,
 		if(upto == 0xffffffff) {
 			assert(dollarLt(suffix(host, s[i]), suffix(host, s[i+1])));
 		} else {
+#ifndef NDEBUG
 			if(prefix(suffix(host, s[i]), upto) > prefix(suffix(host, s[i+1]), upto)) {
 				// operator > treats shorter strings as
 				// lexicographically smaller, but we want to opposite
 				assert(isPrefix(suffix(host, s[i+1]), suffix(host, s[i])));
 			}
+#endif
 		}
 	}
 }
@@ -617,9 +619,11 @@ bool sufDcLt(const T1& host,
 		}
 	}
 	bool ret = dc.breakTie(s1+diff, s2+diff) < 0;
+#ifndef NDEBUG
 	if(sanityCheck && ret != dollarLt(suffix(host, s1), suffix(host, s2))) {
 		assert(false);
 	}
+#endif
 	return ret;
 }
 
@@ -709,11 +713,13 @@ bool sufDcLtU8(const T1& seqanHost,
 	}
 	bool ret = dc.breakTie(s1+diff, s2+diff) < 0;
 	// Sanity-check return value using dollarLt
+#ifndef NDEBUG
 	if(sanityCheck &&
 	   ret != dollarLt(suffix(seqanHost, s1), suffix(seqanHost, s2)))
 	{
 		assert(false);
 	}
+#endif
 	return ret;
 }
 
@@ -746,9 +752,11 @@ void qsortSufDcU8(const T1& seqanHost,
 	size_t cur = 0;
 	for(size_t i = begin; i < end-1; i++) {
 		if(sufDcLtU8(seqanHost, host, hlen, s[i], s[end-1], dc, sanityCheck)) {
+#ifndef NDEBUG
 			if(sanityCheck)
 				assert(dollarLt(suffix(seqanHost, s[i]), suffix(seqanHost, s[end-1])));
 			assert_lt(begin + cur, end-1);
+#endif
 			SWAP(s, i, begin + cur);
 			cur++;
 		}
@@ -818,8 +826,8 @@ static void selectionSortSufDcU8(
 	if(sanityCheck && \
 	   !dollarLt(suffix(seqanHost, s[l]), \
 	             suffix(seqanHost, s[r]))) { \
-		cout << "l: " << suffix(seqanHost, s[l]) << endl; \
-		cout << "r: " << suffix(seqanHost, s[r]) << endl; \
+		cout << "l: " << suffixStr(seqanHost, s[l]) << endl; \
+		cout << "r: " << suffixStr(seqanHost, s[r]) << endl; \
 		assert(false); \
 	}
 

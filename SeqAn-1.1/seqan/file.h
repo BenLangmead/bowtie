@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: file.h,v 1.3 2009/03/03 18:41:38 langmead Exp $
+  $Id: file.h,v 1.4 2009/03/13 14:51:00 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_FILE_H
@@ -78,7 +78,7 @@
 #include <seqan/file/file_base.h>
 #include <seqan/file/file_array.h>
 
-#include <seqan/system.h>	// async file (default file type of File<>)
+//#include <seqan/system.h>	// async file (default file type of File<>)
 /*#include <seqan/system/file_sync.h>
 #include <seqan/system/system_event.h>
 #include <seqan/system/file_async.h>

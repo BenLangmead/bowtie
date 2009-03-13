@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index.h,v 1.3 2009/03/13 14:31:49 langmead Exp $
+  $Id: index.h,v 1.6 2009/03/13 14:46:42 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_H
@@ -26,10 +26,10 @@
 
 #include <seqan/sequence.h>
 //#include <seqan/pipe.h>
-#include <seqan/modifier.h>
+//#include <seqan/modifier.h>
 
 #include <seqan/find/find_base.h>
-#include <seqan/misc/misc_set.h>
+//#include <seqan/misc/misc_set.h>
 
 #include <climits>
 #include <functional>
@@ -57,10 +57,10 @@
 //____________________________________________________________________________
 // suffix array creators
 
-#include <seqan/index/radix.h>
+//#include <seqan/index/radix.h>
 //#include <seqan/index/index_sa_btree.h>
 #include <seqan/index/index_sa_lss.h>
-#include <seqan/index/index_sa_mm.h>
+//#include <seqan/index/index_sa_mm.h>
 //#include <seqan/index/index_sa_qsort.h>
 //
 //#include <seqan/index/pump_extender3.h>
@@ -69,7 +69,7 @@
 //#include <seqan/index/pump_extender7.h>
 //#include <seqan/index/pipe_merger7.h>
 
-#include <seqan/index/pump_separator7.h>
+//#include <seqan/index/pump_separator7.h>
 
 //____________________________________________________________________________
 // enhanced table creators
@@ -108,6 +108,6 @@
 //____________________________________________________________________________
 // Shawarma interface (suffix array creators)
 
-#include <seqan/index/index_shawarma.h>
+//#include <seqan/index/index_shawarma.h>
 
 #endif //#ifndef SEQAN_HEADER_...
