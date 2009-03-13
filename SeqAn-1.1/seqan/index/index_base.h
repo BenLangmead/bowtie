@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index_base.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: index_base.h,v 1.3 2009/03/13 14:34:32 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_BASE_H
@@ -68,7 +68,7 @@ namespace SEQAN_NAMESPACE_MAIN
 /**
 .Metafunction.DefaultIndexStringSpec:
 ..cat:Index
-..summary:Default @Class.String@ specialization type of the @Metafunction.Fibre@ of an @Class.Index@. 
+..summary:Default @Class.String@ specialization type of the @Metafunction.Fibre@ of an @Class.Index@.
 ..signature:DefaultIndexStringSpec<TIndex>::Type
 ..param.TIndex:An @Class.Index@ Type.
 ..returns:If the underlying text is a @Class.String@ or a set of Strings (see @Class.StringSet@) the String's spec. type is returned.
@@ -79,10 +79,10 @@ namespace SEQAN_NAMESPACE_MAIN
         typedef Alloc<> Type;
     };
 
-    template < typename TValue, typename TSpec >
-    struct DefaultIndexStringSpec< String<TValue, External<TSpec> > > {
-        typedef External<TSpec> Type;
-    };
+//    template < typename TValue, typename TSpec >
+//    struct DefaultIndexStringSpec< String<TValue, External<TSpec> > > {
+//        typedef External<TSpec> Type;
+//    };
 
 	template < typename TString, typename TSpec >
 	struct DefaultIndexStringSpec< StringSet<TString, TSpec> >:
@@ -108,9 +108,9 @@ namespace SEQAN_NAMESPACE_MAIN
 ///.Function.setHaystack.param.haystack.type:Class.Index
 
 	// index as a haystack
-	template < 
-        typename TObject, 
-        typename TSpec = typename DefaultIndexSpec<TObject>::Type > 
+	template <
+        typename TObject,
+        typename TSpec = typename DefaultIndexSpec<TObject>::Type >
 	class Index;
 
 	template <typename TObject, typename TSpec>
@@ -265,7 +265,7 @@ namespace SEQAN_NAMESPACE_MAIN
 ...type:Class.String
 ...type:Class.StringSet
 ...type:Class.Index
-..returns:A type to store a position. 
+..returns:A type to store a position.
 ...text:If $TObject$ is a @Class.String@, it is a single integer value. By default this is the @Metafunction.Size@ type of $TObject$.
 ...text:If $TObject$ is a @Class.StringSet@, it could be a single integer too (called global position, see @Spec.ConcatDirect@) or a @Class.Pair@ (called local position, see @Spec.Owner@).
 Currently SeqAn defaults to a local position for @Class.StringSet@ classes (index_base.h):
@@ -279,18 +279,18 @@ struct SAValue< StringSet<TString, TSpec> > {
 };
 ..note:SAValue is the return type of various function, e.g. @Function.position@ for the @Class.Index@ @Class.Finder@ class, @Function.getOccurrence@, @Function.getOccurrences@ etc.
 You should always use the type of this meta-function to store the return values.
-If you want to write algorithms for both variants (local and global positions) you 
+If you want to write algorithms for both variants (local and global positions) you
 should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Function.getSeqNo@ and @Function.getSeqOffset@.
 ..note:If $TObject$ is an @Class.Index@, @Metafunction.Position@ returns the same value as $SAValue$. You can change the position type of an index by overloading $SAValue$, not @Metafunction.Position@.
 */
 	template <typename TObject>
 	struct SAValue:
 		Size<TObject> {};
-	
+
 	template <typename TObject>
 	struct SAValue<TObject const>:
 		SAValue<TObject> {};
-	
+
 	// to speed up sequence number computation
 	// we use a pair of seqNo and localPosition
 	template < typename TString, typename TSpec >
@@ -308,7 +308,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 		typedef Pair<
 			typename Size< StringSet<TString, TSpec> >::Type,
 			typename SAValue<TString>::Type,
-			CutCompressed<4>						// max. 4 sequences 
+			CutCompressed<4>						// max. 4 sequences
 		> Type;										// max. 2^30 characters each
 	};
 */
@@ -326,14 +326,14 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 	template < typename TText, typename TSpec >
     struct Value< Index<TText, TSpec> > {
 		typedef typename Value<
-			typename Fibre< Index<TText, TSpec>, Fibre_RawText>::Type 
+			typename Fibre< Index<TText, TSpec>, Fibre_RawText>::Type
 		>::Type Type;
     };
 
 	template < typename TText, typename TSpec >
     struct Size< Index<TText, TSpec> > {
 		typedef typename Size<
-			typename Fibre< Index<TText, TSpec>, Fibre_RawText>::Type 
+			typename Fibre< Index<TText, TSpec>, Fibre_RawText>::Type
 		>::Type Type;
     };
 
@@ -346,9 +346,9 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 
 	template < typename TObject, typename TSpec, typename TFibre >
 	struct Fibre< Index<TObject, TSpec>, Tag<TFibre> const > {
-		typedef String< 
+		typedef String<
 			typename Size< Index<TObject, TSpec> >::Type,
-			typename DefaultIndexStringSpec< Index<TObject, TSpec> >::Type 
+			typename DefaultIndexStringSpec< Index<TObject, TSpec> >::Type
 		> Type;
 	};
 
@@ -375,7 +375,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 	struct Fibre< Index<TText, TSpec>, Fibre_SA> {
 		typedef String<
 			typename SAValue< Index<TText, TSpec> >::Type,
-			typename DefaultIndexStringSpec< Index<TText, TSpec> >::Type 
+			typename DefaultIndexStringSpec< Index<TText, TSpec> >::Type
 		> Type;
 	};
 
@@ -398,16 +398,16 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 // raw suffix array contains integer offsets relative to raw text
 
 	template < typename TString, typename TSSetSpec, typename TSpec >
-	struct Fibre< Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawSA> 
+	struct Fibre< Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawSA>
 	{
 		typedef Index< StringSet<TString, TSSetSpec>, TSpec> TIndex;
-		typedef ModifiedString<
-			typename Fibre<TIndex, Fibre_SA>::Type,
-			ModView< FunctorGlobalize< 
-				typename Value< typename Fibre<TIndex, Fibre_SA>::Type >::Type,
-				typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type >
-			>
-		> Type;
+//		typedef ModifiedString<
+//			typename Fibre<TIndex, Fibre_SA>::Type,
+//			ModView< FunctorGlobalize<
+//				typename Value< typename Fibre<TIndex, Fibre_SA>::Type >::Type,
+//				typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type >
+//			>
+//		> Type;
 	};
 
 //////////////////////////////////////////////////////////////////////////////
@@ -472,12 +472,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_Text>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_Text>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_Text) {
 		return value(index.text);
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_Text>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_Text>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_Text) {
 		return value(index.text);
 	}
@@ -485,12 +485,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_RawText>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_RawText>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_RawText) {
 		return concat(value(index.text));
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_RawText>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_RawText>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_RawText) {
 		return concat(value(index.text));
 	}
@@ -498,12 +498,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_SA>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_SA>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_SA) {
 		return index.sa;
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_SA) {
 		return index.sa;
 	}
@@ -511,32 +511,32 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_RawSA) {
 		return indexSA(index);
 	}
 /*
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_SA>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_RawSA) {
 		return indexSA(index);
 	}
 */
 	template <typename TString, typename TSSetSpec, typename TSpec>
 	inline typename Fibre<Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawSA>::Type
-	getFibre(Index<StringSet<TString, TSSetSpec>, TSpec> &index, Fibre_RawSA) 
+	getFibre(Index<StringSet<TString, TSSetSpec>, TSpec> &index, Fibre_RawSA)
 	{
 		typedef Index< StringSet<TString, TSSetSpec>, TSpec> TIndex;
-		
+
 		typedef FunctorGlobalize<
 			typename Value< typename Fibre<TIndex, Fibre_SA>::Type >::Type,
 			typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type
 		> TFunctor;
-		
-		typedef ModifiedString<
-			typename Fibre<Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_SA>::Type,
-			ModView< TFunctor >
-		> ModString;
+
+//		typedef ModifiedString<
+//			typename Fibre<Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_SA>::Type,
+//			ModView< TFunctor >
+//		> ModString;
 
 		return ModString(indexSA(index), TFunctor(stringSetLimits(indexText(index))));
 	}
@@ -544,12 +544,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_LCP>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_LCP>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_LCP) {
 		return index.lcp;
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_LCP>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_LCP>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_LCP) {
 		return index.lcp;
 	}
@@ -557,12 +557,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_LCPE>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_LCPE>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_LCPE) {
 		return index.lcpe;
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_LCPE>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_LCPE>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_LCPE) {
 		return index.lcpe;
 	}
@@ -570,12 +570,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_ChildTab>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_ChildTab>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_ChildTab) {
 		return index.childtab;
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_ChildTab>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_ChildTab>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_ChildTab) {
 		return index.childtab;
 	}
@@ -583,12 +583,12 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec>, Fibre_BWT>::Type & 
+	inline typename Fibre<Index<TText, TSpec>, Fibre_BWT>::Type &
 	getFibre(Index<TText, TSpec> &index, Fibre_BWT) {
 		return index.bwt;
 	}
 	template <typename TText, typename TSpec>
-	inline typename Fibre<Index<TText, TSpec> const, Fibre_BWT>::Type & 
+	inline typename Fibre<Index<TText, TSpec> const, Fibre_BWT>::Type &
 	getFibre(Index<TText, TSpec> const &index, Fibre_BWT) {
 		return index.bwt;
 	}
@@ -597,7 +597,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 ///.Function.length.param.object.type:Class.Index
 
 	template <typename TText, typename TSpec>
-	inline typename Size<Index<TText, TSpec> >::Type 
+	inline typename Size<Index<TText, TSpec> >::Type
 	length(Index<TText, TSpec> const &index) {
 		return length(indexRawText(index));
 	}
@@ -605,7 +605,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TText, typename TSpec>
-	inline typename Size<TText>::Type 
+	inline typename Size<TText>::Type
 	countSequences(Index<TText, TSpec> const &index) {
 		return countSequences(indexText(index));
 	}
@@ -613,7 +613,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TSeqNo, typename TText, typename TSpec>
-	inline typename Size<Index<TText, TSpec> >::Type 
+	inline typename Size<Index<TText, TSpec> >::Type
 	sequenceLength(TSeqNo seqNo, Index<TText, TSpec> const &index) {
 		return sequenceLength(seqNo, indexText(index));
 	}
@@ -621,7 +621,7 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 //////////////////////////////////////////////////////////////////////////////
 
 	template <typename TPos, typename TText, typename TSpec>
-	inline typename Size<Index<TText, TSpec> >::Type 
+	inline typename Size<Index<TText, TSpec> >::Type
 	suffixLength(TPos pos, Index<TText, TSpec> const &index) {
 		return sequenceLength(getSeqNo(pos, stringSetLimits(index)), index) - getSeqOffset(pos, stringSetLimits(index));
 	}
@@ -631,17 +631,17 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 // unified textAt interface
 
 	template <typename TPos, typename TIndex>
-	inline typename Reference<typename Fibre<TIndex, Fibre_RawText>::Type>::Type 
+	inline typename Reference<typename Fibre<TIndex, Fibre_RawText>::Type>::Type
 	textAt(TPos i, TIndex &index) {
 		return value(getFibre(index, Fibre_RawText()), i);
 	}
 	template <typename TPos, typename TString, typename TSSetSpec, typename TSpec>
-	inline typename Reference<typename Fibre< Index< StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawText>::Type>::Type 
+	inline typename Reference<typename Fibre< Index< StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawText>::Type>::Type
 	textAt(TPos i, Index< StringSet<TString, TSSetSpec>, TSpec> &index) {
 		return value(getFibre(index, Fibre_RawText()), posGlobalize(i, stringSetLimits(index)));
 	}
 	template <typename TPos, typename TString, typename TSpec>
-	inline typename Reference<typename Fibre< Index< StringSet<TString, Owner<Default> >, TSpec>, Fibre_RawText>::Type>::Type 
+	inline typename Reference<typename Fibre< Index< StringSet<TString, Owner<Default> >, TSpec>, Fibre_RawText>::Type>::Type
 	textAt(TPos i, Index< StringSet<TString, Owner<Default> >, TSpec> &index) {
 		Pair <
 			typename Size< StringSet<TString, Owner<Default> > >::Type,
@@ -815,26 +815,26 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 
 	template <typename TText, typename TSpec>
 	inline typename StringSetLimits<TText const>::Type
-	stringSetLimits(Index<TText, TSpec> &) { 
-		return Nothing(); 
+	stringSetLimits(Index<TText, TSpec> &) {
+		return Nothing();
 	}
 
 	template <typename TText, typename TSpec>
 	inline typename StringSetLimits<TText const>::Type
-	stringSetLimits(Index<TText, TSpec> const &) { 
-		return Nothing(); 
+	stringSetLimits(Index<TText, TSpec> const &) {
+		return Nothing();
 	}
 
 	template <typename TString, typename TSSetSpec, typename TSpec>
-	inline typename StringSetLimits< StringSet<TString, TSSetSpec> const >::Type & 
+	inline typename StringSetLimits< StringSet<TString, TSSetSpec> const >::Type &
 	stringSetLimits(Index<StringSet<TString, TSSetSpec>, TSpec> &index) {
-		return stringSetLimits(indexText(index)); 
+		return stringSetLimits(indexText(index));
 	}
 
 	template <typename TString, typename TSSetSpec, typename TSpec>
-	inline typename StringSetLimits< StringSet<TString, TSSetSpec> const >::Type & 
+	inline typename StringSetLimits< StringSet<TString, TSSetSpec> const >::Type &
 	stringSetLimits(Index<StringSet<TString, TSSetSpec>, TSpec> const &index) {
-		return stringSetLimits(indexText(index)); 
+		return stringSetLimits(indexText(index));
 	}
 
 //////////////////////////////////////////////////////////////////////////////

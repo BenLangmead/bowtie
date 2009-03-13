@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
+  $Id: index.h,v 1.4 2009/03/13 14:34:32 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_H
@@ -25,8 +25,8 @@
 // prerequisites
 
 #include <seqan/sequence.h>
-#include <seqan/pipe.h>
-#include <seqan/modifier.h>
+//#include <seqan/pipe.h>
+//#include <seqan/modifier.h>
 
 #include <seqan/find/find_base.h>
 #include <seqan/misc/misc_set.h>
@@ -58,23 +58,23 @@
 // suffix array creators
 
 #include <seqan/index/radix.h>
-#include <seqan/index/index_sa_btree.h>
+//#include <seqan/index/index_sa_btree.h>
 #include <seqan/index/index_sa_lss.h>
 #include <seqan/index/index_sa_mm.h>
-#include <seqan/index/index_sa_qsort.h>
-
-#include <seqan/index/pump_extender3.h>
-#include <seqan/index/pipe_merger3.h>
-
-#include <seqan/index/pump_extender7.h>
-#include <seqan/index/pipe_merger7.h>
+//#include <seqan/index/index_sa_qsort.h>
+//
+//#include <seqan/index/pump_extender3.h>
+//#include <seqan/index/pipe_merger3.h>
+//
+//#include <seqan/index/pump_extender7.h>
+//#include <seqan/index/pipe_merger7.h>
 
 #include <seqan/index/pump_separator7.h>
 
 //____________________________________________________________________________
 // enhanced table creators
 
-#include <seqan/index/pump_lcp_core.h>
+//#include <seqan/index/pump_lcp_core.h>
 
 //____________________________________________________________________________
 // q-gram index creator

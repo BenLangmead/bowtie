@@ -100,7 +100,7 @@ struct _Context_LSS
 	inline TValue choose_pivot(TValue *p, TValue n) {
 	   TValue *pl, *pm, *pn;
 	   TValue s;
-	   
+
 	   pm=p+(n>>1);                 /* small arrays, middle element.*/
 	   if (n>7) {
 		  pl=p;
@@ -183,7 +183,7 @@ struct _Context_LSS
 
 	   Output: x is V and p is I after the initial sorting stage of the refined
 	   suffix sorting algorithm.*/
-	      
+
 	inline void bucketsort(TValue *x, TValue *p, TValue n, TValue k)
 	{
 	   TValue *pi, i, c, d, g;
@@ -220,7 +220,7 @@ struct _Context_LSS
 	   for any symbol during transformation: q must be at least k-l; if q<=n,
 	   compaction is guaranteed; if k-l>n, compaction is never done; if q is
 	   INT_MAX, the maximum number of symbols are aggregated into one.
-	   
+
 	   Output: Returns an integer j in the range 1...q representing the size of the
 	   new alphabet. If j<=n+1, the alphabet is compacted. The global variable r is
 	   set to the number of old symbols grouped into one. Only x[n] is 0.*/
@@ -229,7 +229,7 @@ struct _Context_LSS
 	{
 	   TValue b, c, d, e, i, j, m, s;
 	   TValue *pi, *pj;
-	   
+
 	   for (s=0, i=k-l; i; i>>=1)
 		  ++s;                      /* s is number of bits in old symbol.*/
 	   e=SupremumValue<TValue>::VALUE>>s; /* e is for overflow checking.*/
@@ -285,10 +285,10 @@ struct _Context_LSS
 	{
 	   TValue *pi, *pk;
 	   TValue i, j, s, sl;
-	   
+
 	   V=x;                         /* set global values.*/
 	   I=p;
-	   
+
 	   if (n>=k-l) {                /* if bucketing possible,*/
 		  j=transform(V, I, n, k, l, n);
 		  bucketsort(V, I, n, j);   /* bucketsort on first r positions.*/
@@ -300,7 +300,7 @@ struct _Context_LSS
 		  sort_split(I, n+1);       /* quicksort on first r positions.*/
 	   }
 	   h=r;                         /* number of symbols aggregated by transform.*/
-	   
+
 	   while (*I>=-n) {
 		  pi=I;                     /* pi is first position of group.*/
 		  sl=0;                     /* sl is negated length of sorted groups.*/
@@ -325,7 +325,7 @@ struct _Context_LSS
 
 	   for (i=0; i<=n; ++i)         /* reconstruct suffix array from inverse.*/
 		  I[V[i]]=i;
-	}  
+	}
 };
 
 
@@ -363,64 +363,64 @@ struct _Context_LSS
 
     //////////////////////////////////////////////////////////////////////////////
     // qsufsort pipe
-    template < typename TInput >
-    struct Pipe< TInput, LarssonSadakane >
-    {
-		typedef typename SAValue<TInput>::Type	TValue;
-		typedef String<TValue, Alloc<> >		TText;
-		typedef String<TValue, Alloc<> >		TSA;
-		typedef Pipe<TSA, Source<> >			TSource;
+//    template < typename TInput >
+//    struct Pipe< TInput, LarssonSadakane >
+//    {
+//		typedef typename SAValue<TInput>::Type	TValue;
+//		typedef String<TValue, Alloc<> >		TText;
+//		typedef String<TValue, Alloc<> >		TSA;
+//		typedef Pipe<TSA, Source<> >			TSource;
+//
+//		TSA		sa;
+//		TSource	in;
+//
+//		Pipe(TInput &_textIn):
+//			in(sa)
+//		{
+//	        typedef typename Iterator<TText, Standard>::Type TIter;
+//
+//			TValue len = length(_textIn);
+//			TText text;
+//			resize(text, len + 1, Exact());
+//
+//			TIter	it = begin(text);
+//			TIter	itEnd = begin(text) + len;
+//			TValue	maxChar = 0;
+//
+//			beginRead(_textIn);
+//			for(; it != itEnd; ++it, ++_textIn) {
+//				TValue val = (*it = 1 + (TValue)*_textIn);
+//				if (val > maxChar)
+//					maxChar = val;
+//			}
+//			endRead(_textIn);
+//
+//			resize(sa, len + 1, Exact());
+//			createSuffixArray(sa, text, LarssonSadakane(), maxChar + 1);
+//		}
+//
+//		inline typename Value<TSource>::Type const & operator*() {
+//            return *in;
+//        }
+//
+//        inline Pipe& operator++() {
+//            ++in;
+//            return *this;
+//        }
+//	};
 
-		TSA		sa;
-		TSource	in;
+//	template < typename TInput >
+//	inline bool control(Pipe< TInput, LarssonSadakane > &me, ControlBeginRead const &command) {
+//		control(me.in, command);
+//		++me.in;
+//		return true;
+//	}
 
-		Pipe(TInput &_textIn):
-			in(sa)
-		{
-	        typedef typename Iterator<TText, Standard>::Type TIter;
-
-			TValue len = length(_textIn);
-			TText text;
-			resize(text, len + 1, Exact());
-
-			TIter	it = begin(text);
-			TIter	itEnd = begin(text) + len;
-			TValue	maxChar = 0;
-
-			beginRead(_textIn);
-			for(; it != itEnd; ++it, ++_textIn) {
-				TValue val = (*it = 1 + (TValue)*_textIn);
-				if (val > maxChar)
-					maxChar = val;
-			}
-			endRead(_textIn);
-
-			resize(sa, len + 1, Exact());
-			createSuffixArray(sa, text, LarssonSadakane(), maxChar + 1);
-		}
-
-		inline typename Value<TSource>::Type const & operator*() {
-            return *in;
-        }
-        
-        inline Pipe& operator++() {
-            ++in;
-            return *this;
-        }        
-	};
-
-	template < typename TInput >
-	inline bool control(Pipe< TInput, LarssonSadakane > &me, ControlBeginRead const &command) {
-		control(me.in, command);
-		++me.in;
-		return true;
-	}
-	
-    template < typename TInput >
-    inline typename Size< Pipe< TInput, LarssonSadakane > >::Type
-	length(Pipe< TInput, LarssonSadakane > const &me) {
-        return length(me.in) - 1;
-    }
+//    template < typename TInput >
+//    inline typename Size< Pipe< TInput, LarssonSadakane > >::Type
+//	length(Pipe< TInput, LarssonSadakane > const &me) {
+//        return length(me.in) - 1;
+//    }
 
 }
 
