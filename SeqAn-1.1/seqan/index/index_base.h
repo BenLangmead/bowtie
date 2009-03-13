@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index_base.h,v 1.3 2009/03/13 14:34:32 langmead Exp $
+  $Id: index_base.h,v 1.2 2009/03/13 14:31:50 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_BASE_H
@@ -401,13 +401,13 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 	struct Fibre< Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_RawSA>
 	{
 		typedef Index< StringSet<TString, TSSetSpec>, TSpec> TIndex;
-//		typedef ModifiedString<
-//			typename Fibre<TIndex, Fibre_SA>::Type,
-//			ModView< FunctorGlobalize<
-//				typename Value< typename Fibre<TIndex, Fibre_SA>::Type >::Type,
-//				typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type >
-//			>
-//		> Type;
+		typedef ModifiedString<
+			typename Fibre<TIndex, Fibre_SA>::Type,
+			ModView< FunctorGlobalize<
+				typename Value< typename Fibre<TIndex, Fibre_SA>::Type >::Type,
+				typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type >
+			>
+		> Type;
 	};
 
 //////////////////////////////////////////////////////////////////////////////
@@ -533,10 +533,10 @@ should use the functions @Function.posLocalize@, @Function.posGlobalize@, @Funct
 			typename StringSetLimits<StringSet<TString, TSSetSpec> >::Type
 		> TFunctor;
 
-//		typedef ModifiedString<
-//			typename Fibre<Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_SA>::Type,
-//			ModView< TFunctor >
-//		> ModString;
+		typedef ModifiedString<
+			typename Fibre<Index<StringSet<TString, TSSetSpec>, TSpec>, Fibre_SA>::Type,
+			ModView< TFunctor >
+		> ModString;
 
 		return ModString(indexSA(index), TFunctor(stringSetLimits(indexText(index))));
 	}

@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: index.h,v 1.4 2009/03/13 14:34:32 langmead Exp $
+  $Id: index.h,v 1.3 2009/03/13 14:31:49 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_INDEX_H
@@ -26,7 +26,7 @@
 
 #include <seqan/sequence.h>
 //#include <seqan/pipe.h>
-//#include <seqan/modifier.h>
+#include <seqan/modifier.h>
 
 #include <seqan/find/find_base.h>
 #include <seqan/misc/misc_set.h>
