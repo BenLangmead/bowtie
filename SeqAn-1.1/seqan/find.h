@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: find.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: find.h,v 1.2 2009/03/13 14:44:34 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_FIND_H
@@ -46,14 +46,14 @@
 // exact pattern matching
 
 #include <seqan/find/find_horspool.h>
-#include <seqan/find/find_shiftand.h>
-#include <seqan/find/find_shiftor.h>
-#include <seqan/find/find_bndm.h>
-#include <seqan/find/find_quasar.h>
+//#include <seqan/find/find_shiftand.h>
+//#include <seqan/find/find_shiftor.h>
+//#include <seqan/find/find_bndm.h>
+//#include <seqan/find/find_quasar.h>
 
 //____________________________________________________________________________
 // exact pattern matching
-#include <seqan/find/find_wild_shiftand.h>
+//#include <seqan/find/find_wild_shiftand.h>
 
 //____________________________________________________________________________
 //multiple pattern search
@@ -69,8 +69,8 @@
 // approximate pattern matching
 
 #include <seqan/find/find_score.h>
-#include <seqan/find/find_myers_ukkonen.h>
-#include <seqan/find/find_abndm.h>
+//#include <seqan/find/find_myers_ukkonen.h>
+//#include <seqan/find/find_abndm.h>
 //#include <seqan/find/find_pex.h>
 
 //#include <seqan/find/find_bom.h>
