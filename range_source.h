@@ -1725,6 +1725,14 @@ public:
 	{
 		assert_gt(rss_.size(), 0);
 		assert(!this->done);
+		bool saw1 = false;
+		bool saw2 = false;
+		for(size_t i = 0; i < rss_.size(); i++) {
+			if(rss_[i]->mate1()) saw1 = true;
+			else saw2 = true;
+		}
+		assert(saw1 || saw2);
+		paired_ = saw1 && saw2;
 		sortRss();
 	}
 
@@ -1772,8 +1780,8 @@ public:
 			TRangeSrcDrPtr p = rss_[0];
 			// If this RangeSourceDriver is done, rotate it to the back
 			// of the vector
-			bool fwsLeft = false;
-			bool rcsLeft = false;
+			bool fwsLeft = !paired_;
+			bool rcsLeft = !paired_;
 			for(size_t i = 0; i < rssSz-1; i++) {
 				rss_[i] = rss_[i+1];
 				if(!rss_[i]->done) {
@@ -1815,8 +1823,8 @@ public:
 				TRangeSrcDrPtr p = rss_[0];
 				// If this RangeSourceDriver is done, rotate it to the back
 				// of the vector
-				bool fwsLeft = false;
-				bool rcsLeft = false;
+				bool fwsLeft = !paired_;
+				bool rcsLeft = !paired_;
 				for(size_t i = 0; i < rssSz-1; i++) {
 					rss_[i] = rss_[i+1];
 					if(!rss_[i]->done) {
@@ -1973,6 +1981,8 @@ protected:
 
 	/// List of all the drivers
 	TRangeSrcDrPtrVec rss_;
+	/// Whether the list of drivers contains drivers for both mates 1 and 2
+	bool paired_;
 	/// The random seed from the Aligner, which we use to randomly break ties
 	RandomSource rand_;
 	Range *lastRange_;
