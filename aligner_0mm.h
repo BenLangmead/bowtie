@@ -17,9 +17,9 @@
  */
 class UnpairedExactAlignerV1Factory : public AlignerFactory {
 
-	typedef SingleRangeSourceDriver<GreedyDFSRangeSource> TRangeSrcDr;
+	typedef SingleRangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
-	typedef CostAwareRangeSourceDriver<GreedyDFSRangeSource> TCostAwareRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 
 public:
 	UnpairedExactAlignerV1Factory(
@@ -61,13 +61,13 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
-		GreedyDFSRangeSource *rFw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSource *rRc = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSourceDriver * driverFw = new GreedyDFSRangeSourceDriver(
+
+		EbwtRangeSource *rFw = new EbwtRangeSource(
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+		EbwtRangeSource *rRc = new EbwtRangeSource(
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+
+		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 			*params, rFw, true, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -76,7 +76,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-		GreedyDFSRangeSourceDriver * driverRc = new GreedyDFSRangeSourceDriver(
+		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
 			*params, rRc, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -94,7 +94,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new UnpairedAlignerV2<GreedyDFSRangeSource>(
+		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
 			seed_);
@@ -175,13 +175,12 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
-		GreedyDFSRangeSource *r1Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSource *r1Rc = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSourceDriver * driver1Fw = new GreedyDFSRangeSourceDriver(
+		EbwtRangeSource *r1Fw = new EbwtRangeSource(
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+		EbwtRangeSource *r1Rc = new EbwtRangeSource(
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+
+		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
 			*params, r1Fw, true, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -190,7 +189,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-		GreedyDFSRangeSourceDriver * driver1Rc = new GreedyDFSRangeSourceDriver(
+		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
 			*params, r1Rc, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -200,13 +199,12 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 
-		GreedyDFSRangeSource *r2Fw = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSource *r2Rc = new GreedyDFSRangeSource(
-			&ebwtFw_, *params, 0xffffffff, BacktrackLimits(), 0, true,
-			false, NULL, NULL, verbose_, seed_, &os_, false, false, false);
-		GreedyDFSRangeSourceDriver * driver2Fw = new GreedyDFSRangeSourceDriver(
+		EbwtRangeSource *r2Fw = new EbwtRangeSource(
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+		EbwtRangeSource *r2Rc = new EbwtRangeSource(
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+
+		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
 			*params, r2Fw, true, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -215,7 +213,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, false);
-		GreedyDFSRangeSourceDriver * driver2Rc = new GreedyDFSRangeSourceDriver(
+		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
 			*params, r2Rc, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
@@ -231,7 +229,7 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<GreedyDFSRangeSource>(
+		return new PairedBWAlignerV1<EbwtRangeSource>(
 			params,
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,

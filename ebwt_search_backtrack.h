@@ -14,8 +14,10 @@
  * The creator can configure the BacktrackManager to treat different
  * stretches of the read differently.
  */
-class GreedyDFSRangeSource : public RangeSource {
+class GreedyDFSRangeSource {
+
 	typedef std::pair<int, int> TIntPair;
+
 public:
 	GreedyDFSRangeSource(
 			const Ebwt<String<Dna> >* __ebwt,
@@ -33,8 +35,6 @@ public:
 			bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
 			bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
 			bool __maqPenalty = true) :
-	    RangeSource(),
-	    _started(false),
 		_qry(NULL),
 		_qlen(0),
 		_qual(NULL),
@@ -69,18 +69,13 @@ public:
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
-		_maxBts0(__maxBts.maxBts0),
-		_maxBts1(__maxBts.maxBts1),
-		_maxBts2(__maxBts.maxBts2),
 		_rand(seed),
 		_randSeed(seed),
 		_verbose(__verbose),
 		_ihits(0llu)
-	{
-		curEbwt_ = __ebwt;
-	}
+	{ }
 
-	virtual ~GreedyDFSRangeSource() {
+	~GreedyDFSRangeSource() {
 		if(_pairs != NULL)          delete[] _pairs;
 		if(_elims != NULL)          delete[] _elims;
 		if(_chars != NULL)          delete[] _chars;
@@ -89,7 +84,7 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	virtual void setQuery(String<Dna5>* __qry,
+	void setQuery(String<Dna5>* __qry,
 	                      String<char>* __qual,
 	                      String<char>* __name)
 	{
@@ -133,9 +128,6 @@ public:
 		if(_verbose) {
 			cout << "setQuery(_qry=" << (*_qry) << ", _qual=" << (*_qual) << ")" << endl;
 		}
-		_started = false;
-		this->done = false;
-		this->foundRange = false;
 		// Initialize the random source using new read as part of the
 		// seed.
 		_rand.init(genRandSeed(*_qry, *_qual, *_name) + _randSeed);
@@ -191,20 +183,12 @@ public:
 		_reportExacts = stratum;
 	}
 
-	/**
-	 * Return true iff this RangeSource is allowed to report exact
-	 * alignments (exact = no edits).
-	 */
-	bool reportExats() const {
-		return _reportExacts;
-	}
-
 	void setEbwt(const Ebwt<String<Dna> >* ebwt) {
 		_ebwt = ebwt;
 	}
 
 	/// Return the current range
-	virtual Range& range() {
+	Range& range() {
 		return _curRange;
 	}
 
@@ -221,14 +205,6 @@ public:
 	/// to backtrack()
 	uint32_t maxBacktracks() {
 		return _maxBts;
-	}
-
-	/**
-	 * Set whether this manager will report hits as matrix ranges
-	 * (true) or as fully-resolved hits (false).
-	 */
-	void setreportRanges(bool a) {
-		_reportRanges = a;
 	}
 
 	/**
@@ -298,378 +274,8 @@ public:
 			                // than 1 N in it
 			                nsInFtab > 0);
 		}
-		this->done = true;
 		if(finalize()) ret = true;
 		return ret;
-	}
-
-	/**
-	 * Initiate continuations so that the next call to advance() begins
-	 * a new search.  Note that contMan is empty upon return if there
-	 * are no valid continuations to begin with.  Also note that
-	 * calling initConts() may result in finding a range (i.e., if we
-	 * immediately jump to a valid range using the ftab).
-	 */
-	virtual void
-	initBranch(PathManager& pm, uint32_t ham) {
-		assert(curEbwt_ != NULL);
-		assert_gt(length(*_qry), 0);
-		assert_leq(_qlen, length(*_qry));
-		assert_geq(length(*_qual), length(*_qry));
-		const Ebwt<String<Dna> >& ebwt = *_ebwt;
-		int ftabChars = ebwt._eh._ftabChars;
-		this->foundRange = false;
-		int nsInSeed = 0; int nsInFtab = 0;
-		ASSERT_ONLY(allTops_.clear());
-		if(!tallyNs(nsInSeed, nsInFtab)) {
-			// No alignments are possible because of the distribution
-			// of Ns in the read in combination with the backtracking
-			// constraints.
-			return;
-		}
-		// m = depth beyond which ftab must not extend or else we might
-		// miss some legitimate paths
-		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
-		// Let skipInvalidExact = true if using the ftab would be a
-		// waste because it would jump directly to an alignment we
-		// couldn't use.
-		bool ftabSkipsToEnd = (_qlen == (uint32_t)ftabChars);
-		bool skipInvalidExact = (!_reportExacts && ftabSkipsToEnd);
-		bool skipInvalidPartial = (_reportPartials > 0 && ftabSkipsToEnd);
-		// If it's OK to use the ftab...
-		if(nsInFtab == 0 && m >= (uint32_t)ftabChars &&
-		   !skipInvalidExact && !skipInvalidPartial)
-		{
-			// Use the ftab to jump 'ftabChars' chars into the read
-			// from the right
-			uint32_t ftabOff = calcFtabOff();
-			uint32_t top = ebwt.ftabHi(ftabOff);
-			uint32_t bot = ebwt.ftabLo(ftabOff+1);
-			if(_qlen == (uint32_t)ftabChars && bot > top) {
-				// We found a range with 0 mismatches immediately.  Set
-				// fields to indicate we found a range.
-				assert_eq(0, _reportPartials);
-				assert(_reportExacts);
-				_curRange.top     = top;
-				_curRange.bot     = bot;
-				_curRange.stratum = calcStratum(_mms, 0);
-				_curRange.cost    = _curRange.stratum << 14;
-				_curRange.numMms  = 0;
-				_curRange.ebwt    = _ebwt;
-				_curRange.fw      = _params.fw();
-				_curRange.mms.clear(); // no mismatches
-				// no need to do anything with _curRange.refcs
-				this->foundRange  = true;
-				return;
-			} else if (bot > top) {
-				// We have a range to extend
-				assert_leq(top, ebwt._eh._len);
-				assert_leq(bot, ebwt._eh._len);
-				Branch *b = pm.bpool.alloc();
-				b->init(pm.rpool, _qlen,
-				        _unrevOff, _1revOff, _2revOff, _3revOff,
-				        0, ftabChars, ham, top, bot,
-				        ebwt._eh, ebwt._ebwt, 0);
-				pm.push(b); // insert into priority queue
-			} else {
-				// The arrows are already closed within the
-				// unrevisitable region; give up
-			}
-		} else {
-			// We can't use the ftab, so we start from the rightmost
-			// position and use _fchr
-			Branch *b = pm.bpool.alloc();
-			b->init(pm.rpool, _qlen,
-			        _unrevOff, _1revOff, _2revOff, _3revOff,
-			        0, 0, ham, 0, 0, ebwt._eh, ebwt._ebwt, 0);
-			pm.push(b); // insert into priority queue
-		}
-		return;
-	}
-
-	virtual void
-	advanceBranch(int until, PathManager& pm) {
-		// Restore alignment state from the frontmost continuation.
-		// The frontmost continuation should in principle be the most
-		// promising partial alignment found so far.  In the case of
-		// the greedy DFS backtracker, which partial alignment is most
-		// promising is determined in a greedy, depth-first, non-
-		// optimal fashion.
-		assert(curEbwt_ != NULL);
-
-		// Let this->foundRange = false; we'll set it to true iff this call
-		// to advance yielded a new valid-alignment range.
-		this->foundRange = false;
-
-		// Can't have already exceeded weighted hamming distance threshold
-		assert_gt(length(*_qry), 0);
-		assert_leq(_qlen, length(*_qry));
-		assert_geq(length(*_qual), length(*_qry));
-
-		do {
-			// Get the highest-priority branch according to the priority
-			// queue in 'pm'
-			Branch* br = pm.front();
-			// Shouldn't be curtailed or exhausted
-			assert(!br->exhausted_);
-			assert(!br->curtailed_);
-			if(_verbose) {
-				br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
-			}
-			assert(br->repOk(_qlen));
-
-			ASSERT_ONLY(int stratum = br->cost_ >> 14); // shift the stratum over
-			assert_lt(stratum, 4);
-			uint16_t ham = br->cost_ & ~0xc000; // AND off the stratum
-			assert_leq(ham, 0x3000);
-			assert_leq(ham, _qualThresh);
-			uint32_t depth = br->tipDepth();
-
-			const Ebwt<String<Dna> >& ebwt = *_ebwt;
-
-			if(_halfAndHalf) {
-				assert_eq(0, _reportPartials);
-				assert_gt(_3depth, _5depth);
-			}
-			if(_reportPartials) {
-				assert(!_halfAndHalf);
-				assert_leq(br->numEdits_, _reportPartials);
-			}
-
-			// Compiler complains if our goto's jump over these
-			// initializations, so stick them here
-			bool backtrackDespiteMatch = false;
-			bool reportedPartial = false;
-			bool invalidExact = false;
-			bool empty = false;
-			bool hit = false;
-			uint32_t cur = 0;
-
-			if(_halfAndHalf && !hhCheckTop(br, depth, 0 /*iham*/)) {
-				// Stop extending this branch because it violates a half-
-				// and-half constraint
-				pm.curtail(br, _3depth);
-				goto bail;
-			}
-
-			cur = _qlen - depth - 1; // current offset into _qry
-			if(depth < _qlen) {
-				// Determine whether ranges at this location are candidates
-				// for backtracking
-				int c = (int)(*_qry)[cur]; // get char at this position
-				int nextc = -1;
-				if(cur < _qlen-1) nextc = (int)(*_qry)[cur+1];
-				assert_leq(c, 4);
-				uint8_t q = qualAt(cur);   // get qual at this position
-
-				// The current query position is a legit alternative if it a) is
-				// not in the unrevisitable region, and b) its selection would
-				// not cause the quality ceiling (if one exists) to be exceeded
-				bool curIsAlternative =
-					 (depth >= br->depth0_) &&
-					 (!_considerQuals ||
-					  (ham + mmPenalty(_maqPenalty, q) <= _qualThresh));
-
-#ifndef NDEBUG
-				uint32_t obot = br->bot_;
-#endif
-				uint32_t otop = br->top_;
-
-				// If c is 'N', then it's a mismatch
-				if(c == 4 && depth > 0) {
-					// Force the 'else if(curIsAlternative)' or 'else'
-					// branches below
-					br->top_ = br->bot_ = 1;
-				} else if(c == 4) {
-					// We'll take the 'if(br->top == 0 && br->bot == 0)'
-					// branch below
-					assert_eq(0, br->top_);
-					assert_eq(0, br->bot_);
-				}
-
-				// Get the range state for the current position
-				RangeState *rs = br->rangeState();
-				// Should be all 0s
-				assert_eq(0, rs->tops[0]); assert_eq(0, rs->bots[0]);
-				assert_eq(0, rs->tops[1]); assert_eq(0, rs->bots[1]);
-				assert_eq(0, rs->tops[2]); assert_eq(0, rs->bots[2]);
-				assert_eq(0, rs->tops[3]); assert_eq(0, rs->bots[3]);
-
-				// Calculate the ranges for this position
-				if(br->top_ == 0 && br->bot_ == 0) {
-					// Calculate first quartet of ranges using the _fchr[]
-					// array
-								  rs->tops[0] = ebwt._fchr[0];
-					rs->bots[0] = rs->tops[1] = ebwt._fchr[1];
-					rs->bots[1] = rs->tops[2] = ebwt._fchr[2];
-					rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
-					rs->bots[3]               = ebwt._fchr[4];
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
-					assert(r < 4 || c == 4);
-					// Update top and bot
-					if(c < 4) {
-						br->top_ = rs->tops[c];
-						br->bot_ = rs->bots[c];
-					}
-				} else if(curIsAlternative && (br->bot_ > br->top_ || c == 4)) {
-					// Calculate next quartet of ranges.  We hope that the
-					// appropriate cache lines are prefetched.
-					assert(br->ltop_.valid());
-								  rs->tops[0] =
-					rs->bots[0] = rs->tops[1] =
-					rs->bots[1] = rs->tops[2] =
-					rs->bots[2] = rs->tops[3] =
-					rs->bots[3]               = 0;
-					if(br->lbot_.valid()) {
-						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
-					} else {
-#ifndef NDEBUG
-						uint32_t tmptops[] = {0, 0, 0, 0};
-						uint32_t tmpbots[] = {0, 0, 0, 0};
-						SideLocus ltop, lbot;
-						ltop.initFromRow(otop, _ebwt->_eh, _ebwt->_ebwt);
-						lbot.initFromRow(obot, _ebwt->_eh, _ebwt->_ebwt);
-						ebwt.mapLFEx(ltop, lbot, tmptops, tmpbots);
-#endif
-						int cc = ebwt.mapLF1(otop, br->ltop_);
-						br->top_ = otop;
-						assert(cc == -1 || (cc >= 0 && cc < 4));
-						if(cc >= 0) {
-							assert_lt(cc, 4);
-							rs->tops[cc] = br->top_;
-							rs->bots[cc] = (br->top_ + 1);
-						}
-#ifndef NDEBUG
-						for(int i = 0; i < 4; i++) {
-							assert_eq(tmpbots[i] - tmptops[i],
-							          rs->bots[i] - rs->tops[i]);
-						}
-#endif
-					}
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
-					assert(r < 4 || c == 4);
-					// Update top and bot
-					if(c < 4) {
-						br->top_ = rs->tops[c];
-						br->bot_ = rs->bots[c];
-					} else {
-						br->top_ = br->bot_ = 1;
-					}
-				} else if(br->bot_ > br->top_) {
-					// This read position is not a legitimate backtracking
-					// alternative.  No need to do the bookkeeping for the
-					// entire quartet, just do c.  We hope that the
-					// appropriate cache lines are prefetched before now;
-					// otherwise, we're about to take an expensive cache
-					// miss.
-					assert(br->ltop_.valid());
-					rs->eliminated_ = true; // eliminate all alternatives leaving this node
-					assert(br->eliminated(br->len_));
-					if(c < 4) {
-						if(br->top_ + 1 == br->bot_) {
-							br->bot_ = br->top_ = ebwt.mapLF1(br->top_, br->ltop_, c);
-							if(br->bot_ != 0xffffffff) br->bot_++;
-						} else {
-							br->top_ = ebwt.mapLF(br->ltop_, c);
-							assert(br->lbot_.valid());
-							br->bot_ = ebwt.mapLF(br->lbot_, c);
-						}
-					}
-				} else {
-					rs->eliminated_ = true;
-				}
-				// br->top_ and br->bot_ now contain the next top and bot
-			} else {
-				// The continuation had already processed the whole read
-				assert_eq(_qlen, depth);
-				cur = 0;
-			}
-			empty = (br->top_ == br->bot_);
-			hit = (cur == 0 && !empty);
-
-			// Is this a potential partial-alignment range?
-			if(hit && _reportPartials > 0) {
-				// This is a potential alignment range; set
-				// backtrackDespiteMatch to 'true' so that we keep looking
-				backtrackDespiteMatch = true;
-				// We don't care to report exact partial alignments, only
-				// ones with mismatches.
-				if(br->numEdits_ > 0) {
-					reportPartial(br->numEdits_);
-					reportedPartial = true;
-				}
-				// Now continue on to find legitimate partial
-				// mismatches
-			}
-
-			// Check whether we've obtained an exact alignment when
-			// we've been instructed not to report exact alignments
-			invalidExact = (hit && br->numEdits_ == 0 && !_reportExacts);
-
-			// Set this to true if the only way to make legal progress
-			// is via one or more additional backtracks.
-			if(_halfAndHalf && !hhCheck(br, depth, empty)) {
-				// This alignment doesn't satisfy the half-and-half
-				// requirements; reject it
-				pm.curtail(br, _3depth);
-				goto bail;
-			}
-
-			uint16_t cost = br->cost_;
-
-			if(hit &&            // there is a range to report
-			   !invalidExact &&  // not disqualified by no-exact-hits setting
-			   !reportedPartial) // not an already-reported partial alignment
-			{
-				if(_verbose) {
-					br->len_++;
-					br->print((*_qry), (*_qual), cout, _halfAndHalf, _params.fw(), _ebwt->fw());
-					br->len_--;
-				}
-				assert_gt(br->bot_, br->top_);
-				_curRange.top     = br->top_;
-				_curRange.bot     = br->bot_;
-				_curRange.cost    = br->cost_;
-				_curRange.stratum = (br->cost_ >> 14);
-				_curRange.numMms  = br->numEdits_;
-				_curRange.fw      = _params.fw();
-				_curRange.mms.clear();
-				_curRange.refcs.clear();
-				for(size_t i = 0; i < br->numEdits_; i++) {
-					_curRange.mms.push_back(_qlen - br->edits_[i].pos - 1);
-					_curRange.refcs.push_back("ACGTN"[br->edits_[i].chr]);
-				}
-				_curRange.ebwt    = _ebwt;
-				this->foundRange  = true;
-	#ifndef NDEBUG
-				int64_t top2 = (int64_t)br->top_;
-				top2++; // ensure it's not 0
-				if(_ebwt->fw()) top2 = -top2;
-				assert(allTops_.find(top2) == allTops_.end());
-				allTops_.insert(top2);
-	#endif
-				// Must curtail because we've consumed the whole pattern
-				pm.curtail(br, _3depth);
-			} else if(empty || cur == 0) {
-				// The branch couldn't be extended further
-				pm.curtail(br, _3depth);
-			} else {
-				// Extend the branch by one position; no change to its cost
-				// so there's no need to reconsider where it lies in the
-				// priority queue
-				assert_neq(0, cur);
-				br->extend();
-			}
-		bail:
-			// Make sure the front element of the priority queue is
-			// extendable (i.e. not curtailed) and then prep it.
-			pm.splitAndPrep(_rand, _qlen, _3depth, _ebwt->_eh, _ebwt->_ebwt);
-			if(pm.empty()) break;
-
-			if(until == ADV_COST_CHANGES && pm.front()->cost_ != cost) break;
-			else if(until == ADV_STEP) break;
-
-		} while(!this->foundRange);
 	}
 
 	/**
@@ -1580,55 +1186,6 @@ protected:
 	}
 
 	/**
-	 * Return true iff we're OK to continue after considering which
-	 * half-seed boundary we're passing through, together with the
-	 * number of mismatches accumulated so far.  Return false if we
-	 * should stop because a half-and-half constraint is violated.  If
-	 * we're not currently passing a half-seed boundary, just return
-	 * true.
-	 */
-	bool hhCheck(Branch *b, uint32_t depth, bool empty) {
-		ASSERT_ONLY(uint32_t lim = (_3revOff == _2revOff)? 2 : 3);
-		if((depth == (_5depth-1)) && !empty) {
-			// We're crossing the boundary separating the hi-half
-			// from the non-seed portion of the read.
-			// We should induce a mismatch if we haven't mismatched
-			// yet, so that we don't waste time pursuing a match
-			// that was covered by a previous phase
-			assert_eq(0, _reportPartials);
-			assert_leq(b->numEdits_, lim-1);
-			return b->numEdits_ > 0;
-		} else if((depth == (_3depth-1)) && !empty) {
-			// We're crossing the boundary separating the lo-half
-			// from the non-seed portion of the read
-			assert_eq(0, _reportPartials);
-			assert_leq(b->numEdits_, lim);
-			assert_gt(b->numEdits_, 0);
-			// Count the mismatches in the lo and hi halves
-			uint32_t loHalfMms = 0, hiHalfMms = 0;
-			for(size_t i = 0; i < b->numEdits_; i++) {
-				uint32_t depth = b->edits_[i].pos;
-				if     (depth < _5depth) hiHalfMms++;
-				else if(depth < _3depth) loHalfMms++;
-				else assert(false);
-			}
-			assert_leq(loHalfMms + hiHalfMms, lim);
-			bool invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
-			return (b->numEdits_ >= 2 && !invalidHalfAndHalf);
-		}
-#ifndef NDEBUG
-		if(depth < _5depth-1) {
-			assert_leq(b->numEdits_, lim-1);
-		}
-		else if(depth >= _5depth && depth < _3depth-1) {
-			assert_gt(b->numEdits_, 0);
-			assert_leq(b->numEdits_, lim);
-		}
-#endif
-		return true;
-	}
-
-	/**
 	 * Calculate the stratum of the partial (or full) alignment
 	 * currently under consideration.  Stratum is equal to the number
 	 * of mismatches in the seed portion of the alignment.
@@ -1771,117 +1328,6 @@ protected:
 				assert_geq(stackDepth, 1);
 			} else if(d >= _3depth) {
 				assert_geq(stackDepth, 2);
-			}
-		}
-		return true;
-	}
-
-	/**
-	 * Return true iff the state of the backtracker as encoded by
-	 * stackDepth, d and iham is compatible with the current half-and-
-	 * half alignment mode.  prehits is for sanity checking when
-	 * bailing.
-	 */
-	bool hhCheckTop(Branch* b,
-	                uint32_t d,
-	                uint32_t iham,
-	                uint64_t prehits = 0xffffffffffffffffllu)
-	{
-		HitSinkPerThread& sink = _params.sink();
-		assert_eq(0, _reportPartials);
-		// Crossing from the hi-half into the lo-half
-		if(d == _5depth) {
-			if(_3revOff == _2revOff) {
-				// Total of 2 mismatches allowed: 1 hi, 1 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than once into this region
-				assert_leq(b->numEdits_, 1);
-				// Reject if we haven't encountered mismatch by this point
-				if(b->numEdits_ == 0) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits)
-					{
-						// We're returning from the bottommost frame
-						// without having reported any hits; let's
-						// sanity-check that there really aren't any
-						confirmNoHit(iham);
-					}
-					return false;
-				}
-			} else { // if(_3revOff != _2revOff)
-				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice into this region
-				assert_leq(b->numEdits_, 2);
-				// Reject if we haven't encountered mismatch by this point
-				if(b->numEdits_ < 1) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits)
-					{
-						// We're returning from the bottommost frame
-						// without having found any hits; let's
-						// sanity-check that there really aren't any
-						confirmNoHit(iham);
-					}
-					return false;
-				}
-			}
-		} else if(d == _3depth) {
-			// Crossing from lo-half to outside of the seed
-			if(_3revOff == _2revOff) {
-				// Total of 2 mismatches allowed: 1 hi, 1 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice within this region
-				assert_leq(b->numEdits_, 2);
-				// Must have encountered two mismatches by this point
-				if(b->numEdits_ < 2) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits &&
-					   b->numEdits_ == 0)
-					{
-						confirmNoHit(iham);
-					}
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					return false;
-				}
-			} else { // if(_3revOff != _2revOff)
-				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
-				// Count the mismatches in the lo and hi halves
-				int loHalfMms = 0, hiHalfMms = 0;
-				for(size_t i = 0; i < b->numEdits_; i++) {
-					uint32_t d = b->edits_[i].pos;
-					if     (d < _5depth) hiHalfMms++;
-					else if(d < _3depth) loHalfMms++;
-					else assert(false);
-				}
-				assert_leq(loHalfMms + hiHalfMms, 3);
-				assert_gt(hiHalfMms, 0);
-				if(loHalfMms == 0) {
-					// Didn't encounter any mismatches in the lo-half
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits &&
-					   b->numEdits_ == 0)
-					{
-						confirmNoHit(iham);
-					}
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					return false;
-				}
-				assert_geq(b->numEdits_, 2);
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice within this region
-				assert_leq(b->numEdits_, 3);
-			}
-		} else {
-			// We didn't just cross a boundary, so do an in-between check
-			if(d >= _5depth) {
-				assert_geq(b->numEdits_, 1);
-			} else if(d >= _3depth) {
-				assert_geq(b->numEdits_, 2);
 			}
 		}
 		return true;
@@ -2544,7 +1990,6 @@ protected:
 		            false);
 	}
 
-	bool                _started;
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry
@@ -2564,8 +2009,6 @@ protected:
 	uint8_t            *_elims;  // which ranges have been
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
-	uint8_t            *_bts;    // how many backtracks remain in each
-	                             // equivalence class
 	std::vector<uint32_t> _mms;  // array for holding mismatches
 	std::vector<uint8_t> _refcs;  // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
@@ -2611,15 +2054,6 @@ protected:
 	SideLocus           _preLtop;
 	/// Precalculated bot locus
 	SideLocus           _preLbot;
-	/// Number of backtracks permitted w/ stackDepth 0 before giving up
-	/// in halfAndHalf mode
-	uint32_t            _maxBts0;
-	/// Number of backtracks permitted w/ stackDepth 1 before giving up
-	/// in halfAndHalf mode
-	uint32_t            _maxBts1;
-	/// Number of backtracks permitted w/ stackDepth 2 before giving up
-	/// in halfAndHalf mode
-	uint32_t            _maxBts2;
 	/// Flag to record whether a 'false' return from backtracker is due
 	/// to having exceeded one or more backrtacking limits
 	bool                _bailedOnBacktracks;
@@ -2634,6 +2068,699 @@ protected:
 	vector<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
+#ifndef NDEBUG
+	std::set<int64_t>   allTops_;
+#endif
+};
+
+/**
+ * Class that coordinates quality- and quantity-aware backtracking over
+ * some range of a read sequence.
+ *
+ * The creator can configure the BacktrackManager to treat different
+ * stretches of the read differently.
+ */
+class EbwtRangeSource : public RangeSource {
+	typedef Ebwt<String<Dna> > TEbwt;
+	typedef std::pair<int, int> TIntPair;
+public:
+	EbwtRangeSource(
+			const TEbwt* ebwt,
+			bool         fw,
+			uint32_t     qualThresh,
+			bool         reportExacts = true,
+			bool         verbose = true,
+			uint32_t     seed = 0,
+			bool         halfAndHalf = false,
+			bool         maqPenalty = true) :
+	    RangeSource(),
+		qry_(NULL),
+		qlen_(0),
+		qual_(NULL),
+		name_(NULL),
+		ebwt_(ebwt),
+		fw_(fw),
+		unrevOff_(0),
+		offRev1_(0),
+		offRev2_(0),
+		offRev3_(0),
+		maqPenalty_(maqPenalty),
+		qualThresh_(qualThresh),
+		reportExacts_(reportExacts),
+		halfAndHalf_(halfAndHalf),
+		depth5_(0),
+		depth3_(0),
+		rand_(seed),
+		randSeed_(seed),
+		verbose_(verbose)
+	{ curEbwt_ = ebwt_; }
+
+	/**
+	 * Set a new query read.
+	 */
+	virtual void setQuery(String<Dna5>* qry,
+	                      String<char>* qual,
+	                      String<char>* name)
+	{
+		qry_ = qry;
+		qual_ = qual;
+		name_ = name;
+		assert(qry_ != NULL);
+		assert(qual_ != NULL);
+		assert(name_ != NULL);
+		// Make sure every qual is a valid qual ASCII character (>= 33)
+		for(size_t i = 0; i < length(*qual_); i++) {
+			assert_geq((*qual_)[i], 33);
+		}
+		qlen_ = length(*qry_);
+		assert_geq(length(*qual_), qlen_);
+		this->done = false;
+		this->foundRange = false;
+		// Initialize the random source using new read as part of the
+		// seed.
+		rand_.init(genRandSeed(*qry_, *qual_, *name_) + randSeed_);
+	}
+
+	/**
+	 * Set backtracking constraints.
+	 */
+	void setOffs(uint32_t depth5,   // depth of far edge of hi-half
+	             uint32_t depth3,   // depth of far edge of lo-half
+	             uint32_t unrevOff, // depth above which we cannot backtrack
+	             uint32_t revOff1,  // depth above which we may backtrack just once
+	             uint32_t revOff2,  // depth above which we may backtrack just twice
+	             uint32_t revOff3)  // depth above which we may backtrack just three times
+	{
+		depth5_   = depth5;
+		depth3_   = depth3;
+		assert_geq(depth3_, depth5_);
+		unrevOff_ = unrevOff;
+		offRev1_  = revOff1;
+		offRev2_  = revOff2;
+		offRev3_  = revOff3;
+	}
+
+	/**
+	 * Return true iff this RangeSource is allowed to report exact
+	 * alignments (exact = no edits).
+	 */
+	bool reportExacts() const {
+		return reportExacts_;
+	}
+
+	/// Return the current range
+	virtual Range& range() {
+		return curRange_;
+	}
+
+	/**
+	 * Set qlen_ according to parameter, except don't let it fall below
+	 * the length of the query.
+	 */
+	void setQlen(uint32_t qlen) {
+		assert(qry_ != NULL);
+		qlen_ = min<uint32_t>(length(*qry_), qlen);
+	}
+
+	/**
+	 * Initiate continuations so that the next call to advance() begins
+	 * a new search.  Note that contMan is empty upon return if there
+	 * are no valid continuations to begin with.  Also note that
+	 * calling initConts() may result in finding a range (i.e., if we
+	 * immediately jump to a valid range using the ftab).
+	 */
+	virtual void
+	initBranch(PathManager& pm, uint32_t ham) {
+		assert(curEbwt_ != NULL);
+		assert_gt(length(*qry_), 0);
+		assert_leq(qlen_, length(*qry_));
+		assert_geq(length(*qual_), length(*qry_));
+		const Ebwt<String<Dna> >& ebwt = *ebwt_;
+		int ftabChars = ebwt._eh._ftabChars;
+		this->foundRange = false;
+		int nsInSeed = 0; int nsInFtab = 0;
+		ASSERT_ONLY(allTops_.clear());
+		if(!tallyNs(nsInSeed, nsInFtab)) {
+			// No alignments are possible because of the distribution
+			// of Ns in the read in combination with the backtracking
+			// constraints.
+			return;
+		}
+		// m = depth beyond which ftab must not extend or else we might
+		// miss some legitimate paths
+		uint32_t m = min<uint32_t>(unrevOff_, qlen_);
+		// Let skipInvalidExact = true if using the ftab would be a
+		// waste because it would jump directly to an alignment we
+		// couldn't use.
+		bool ftabSkipsToEnd = (qlen_ == (uint32_t)ftabChars);
+		bool skipInvalidExact = (!reportExacts_ && ftabSkipsToEnd);
+
+		// If it's OK to use the ftab...
+		if(nsInFtab == 0 && m >= (uint32_t)ftabChars && !skipInvalidExact) {
+			// Use the ftab to jump 'ftabChars' chars into the read
+			// from the right
+			uint32_t ftabOff = calcFtabOff();
+			uint32_t top = ebwt.ftabHi(ftabOff);
+			uint32_t bot = ebwt.ftabLo(ftabOff+1);
+			if(qlen_ == (uint32_t)ftabChars && bot > top) {
+				// We found a range with 0 mismatches immediately.  Set
+				// fields to indicate we found a range.
+				assert(reportExacts_);
+				curRange_.top     = top;
+				curRange_.bot     = bot;
+				curRange_.stratum = 0;
+				curRange_.cost    = curRange_.stratum << 14;
+				curRange_.numMms  = 0;
+				curRange_.ebwt    = ebwt_;
+				curRange_.fw      = fw_;
+				curRange_.mms.clear(); // no mismatches
+				// no need to do anything with curRange_.refcs
+				this->foundRange  = true;
+				return;
+			} else if (bot > top) {
+				// We have a range to extend
+				assert_leq(top, ebwt._eh._len);
+				assert_leq(bot, ebwt._eh._len);
+				Branch *b = pm.bpool.alloc();
+				b->init(pm.rpool, qlen_,
+				        unrevOff_, offRev1_, offRev2_, offRev3_,
+				        0, ftabChars, ham, top, bot,
+				        ebwt._eh, ebwt._ebwt, 0);
+				pm.push(b); // insert into priority queue
+			} else {
+				// The arrows are already closed within the
+				// unrevisitable region; give up
+			}
+		} else {
+			// We can't use the ftab, so we start from the rightmost
+			// position and use _fchr
+			Branch *b = pm.bpool.alloc();
+			b->init(pm.rpool, qlen_,
+			        unrevOff_, offRev1_, offRev2_, offRev3_,
+			        0, 0, ham, 0, 0, ebwt._eh, ebwt._ebwt, 0);
+			pm.push(b); // insert into priority queue
+		}
+		return;
+	}
+
+	virtual void
+	advanceBranch(int until, PathManager& pm) {
+		// Restore alignment state from the frontmost continuation.
+		// The frontmost continuation should in principle be the most
+		// promising partial alignment found so far.  In the case of
+		// the greedy DFS backtracker, which partial alignment is most
+		// promising is determined in a greedy, depth-first, non-
+		// optimal fashion.
+		assert(curEbwt_ != NULL);
+
+		// Let this->foundRange = false; we'll set it to true iff this call
+		// to advance yielded a new valid-alignment range.
+		this->foundRange = false;
+
+		// Can't have already exceeded weighted hamming distance threshold
+		assert_gt(length(*qry_), 0);
+		assert_leq(qlen_, length(*qry_));
+		assert_geq(length(*qual_), length(*qry_));
+
+		do {
+			// Get the highest-priority branch according to the priority
+			// queue in 'pm'
+			Branch* br = pm.front();
+			// Shouldn't be curtailed or exhausted
+			assert(!br->exhausted_);
+			assert(!br->curtailed_);
+			if(verbose_) {
+				br->print((*qry_), (*qual_), cout, halfAndHalf_, fw_, ebwt_->fw());
+			}
+			assert(br->repOk(qlen_));
+
+			ASSERT_ONLY(int stratum = br->cost_ >> 14); // shift the stratum over
+			assert_lt(stratum, 4);
+			uint16_t ham = br->cost_ & ~0xc000; // AND off the stratum
+			assert_leq(ham, 0x3000);
+			assert_leq(ham, qualThresh_);
+			uint32_t depth = br->tipDepth();
+
+			const Ebwt<String<Dna> >& ebwt = *ebwt_;
+
+			if(halfAndHalf_) assert_gt(depth3_, depth5_);
+
+			// Compiler complains if our goto's jump over these
+			// initializations, so stick them here
+			bool reportedPartial = false;
+			bool invalidExact = false;
+			bool empty = false;
+			bool hit = false;
+			uint16_t cost = br->cost_;
+			uint32_t cur = 0;
+
+			if(halfAndHalf_ && !hhCheckTop(br, depth, 0 /*iham*/)) {
+				// Stop extending this branch because it violates a half-
+				// and-half constraint
+				pm.curtail(br, depth3_);
+				goto bail;
+			}
+
+			cur = qlen_ - depth - 1; // current offset into qry_
+			if(depth < qlen_) {
+				// Determine whether ranges at this location are candidates
+				// for backtracking
+				int c = (int)(*qry_)[cur]; // get char at this position
+				int nextc = -1;
+				if(cur < qlen_-1) nextc = (int)(*qry_)[cur+1];
+				assert_leq(c, 4);
+				uint8_t q = qualAt(cur);   // get qual at this position
+
+				// The current query position is a legit alternative if it a) is
+				// not in the unrevisitable region, and b) its selection would
+				// not cause the quality ceiling (if one exists) to be exceeded
+				bool curIsAlternative =
+					 (depth >= br->depth0_) &&
+					 (ham + mmPenalty(maqPenalty_, q) <= qualThresh_);
+
+#ifndef NDEBUG
+				uint32_t obot = br->bot_;
+#endif
+				uint32_t otop = br->top_;
+
+				// If c is 'N', then it's a mismatch
+				if(c == 4 && depth > 0) {
+					// Force the 'else if(curIsAlternative)' or 'else'
+					// branches below
+					br->top_ = br->bot_ = 1;
+				} else if(c == 4) {
+					// We'll take the 'if(br->top == 0 && br->bot == 0)'
+					// branch below
+					assert_eq(0, br->top_);
+					assert_eq(0, br->bot_);
+				}
+
+				// Get the range state for the current position
+				RangeState *rs = br->rangeState();
+				// Should be all 0s
+				assert_eq(0, rs->tops[0]); assert_eq(0, rs->bots[0]);
+				assert_eq(0, rs->tops[1]); assert_eq(0, rs->bots[1]);
+				assert_eq(0, rs->tops[2]); assert_eq(0, rs->bots[2]);
+				assert_eq(0, rs->tops[3]); assert_eq(0, rs->bots[3]);
+
+				// Calculate the ranges for this position
+				if(br->top_ == 0 && br->bot_ == 0) {
+					// Calculate first quartet of ranges using the _fchr[]
+					// array
+								  rs->tops[0] = ebwt._fchr[0];
+					rs->bots[0] = rs->tops[1] = ebwt._fchr[1];
+					rs->bots[1] = rs->tops[2] = ebwt._fchr[2];
+					rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
+					rs->bots[3]               = ebwt._fchr[4];
+					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
+					assert(r < 4 || c == 4);
+					// Update top and bot
+					if(c < 4) {
+						br->top_ = rs->tops[c];
+						br->bot_ = rs->bots[c];
+					}
+				} else if(curIsAlternative && (br->bot_ > br->top_ || c == 4)) {
+					// Calculate next quartet of ranges.  We hope that the
+					// appropriate cache lines are prefetched.
+					assert(br->ltop_.valid());
+								  rs->tops[0] =
+					rs->bots[0] = rs->tops[1] =
+					rs->bots[1] = rs->tops[2] =
+					rs->bots[2] = rs->tops[3] =
+					rs->bots[3]               = 0;
+					if(br->lbot_.valid()) {
+						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
+					} else {
+#ifndef NDEBUG
+						uint32_t tmptops[] = {0, 0, 0, 0};
+						uint32_t tmpbots[] = {0, 0, 0, 0};
+						SideLocus ltop, lbot;
+						ltop.initFromRow(otop, ebwt_->_eh, ebwt_->_ebwt);
+						lbot.initFromRow(obot, ebwt_->_eh, ebwt_->_ebwt);
+						ebwt.mapLFEx(ltop, lbot, tmptops, tmpbots);
+#endif
+						int cc = ebwt.mapLF1(otop, br->ltop_);
+						br->top_ = otop;
+						assert(cc == -1 || (cc >= 0 && cc < 4));
+						if(cc >= 0) {
+							assert_lt(cc, 4);
+							rs->tops[cc] = br->top_;
+							rs->bots[cc] = (br->top_ + 1);
+						}
+#ifndef NDEBUG
+						for(int i = 0; i < 4; i++) {
+							assert_eq(tmpbots[i] - tmptops[i],
+							          rs->bots[i] - rs->tops[i]);
+						}
+#endif
+					}
+					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
+					assert(r < 4 || c == 4);
+					// Update top and bot
+					if(c < 4) {
+						br->top_ = rs->tops[c];
+						br->bot_ = rs->bots[c];
+					} else {
+						br->top_ = br->bot_ = 1;
+					}
+				} else if(br->bot_ > br->top_) {
+					// This read position is not a legitimate backtracking
+					// alternative.  No need to do the bookkeeping for the
+					// entire quartet, just do c.  We hope that the
+					// appropriate cache lines are prefetched before now;
+					// otherwise, we're about to take an expensive cache
+					// miss.
+					assert(br->ltop_.valid());
+					rs->eliminated_ = true; // eliminate all alternatives leaving this node
+					assert(br->eliminated(br->len_));
+					if(c < 4) {
+						if(br->top_ + 1 == br->bot_) {
+							br->bot_ = br->top_ = ebwt.mapLF1(br->top_, br->ltop_, c);
+							if(br->bot_ != 0xffffffff) br->bot_++;
+						} else {
+							br->top_ = ebwt.mapLF(br->ltop_, c);
+							assert(br->lbot_.valid());
+							br->bot_ = ebwt.mapLF(br->lbot_, c);
+						}
+					}
+				} else {
+					rs->eliminated_ = true;
+				}
+				// br->top_ and br->bot_ now contain the next top and bot
+			} else {
+				// The continuation had already processed the whole read
+				assert_eq(qlen_, depth);
+				cur = 0;
+			}
+			empty = (br->top_ == br->bot_);
+			hit = (cur == 0 && !empty);
+
+			// Check whether we've obtained an exact alignment when
+			// we've been instructed not to report exact alignments
+			invalidExact = (hit && br->numEdits_ == 0 && !reportExacts_);
+
+			// Set this to true if the only way to make legal progress
+			// is via one or more additional backtracks.
+			if(halfAndHalf_ && !hhCheck(br, depth, empty)) {
+				// This alignment doesn't satisfy the half-and-half
+				// requirements; reject it
+				pm.curtail(br, depth3_);
+				goto bail;
+			}
+
+			if(hit &&            // there is a range to report
+			   !invalidExact &&  // not disqualified by no-exact-hits setting
+			   !reportedPartial) // not an already-reported partial alignment
+			{
+				if(verbose_) {
+					br->len_++;
+					br->print((*qry_), (*qual_), cout, halfAndHalf_, fw_, ebwt_->fw());
+					br->len_--;
+				}
+				assert_gt(br->bot_, br->top_);
+				curRange_.top     = br->top_;
+				curRange_.bot     = br->bot_;
+				curRange_.cost    = br->cost_;
+				curRange_.stratum = (br->cost_ >> 14);
+				curRange_.numMms  = br->numEdits_;
+				curRange_.fw      = fw_;
+				curRange_.mms.clear();
+				curRange_.refcs.clear();
+				for(size_t i = 0; i < br->numEdits_; i++) {
+					curRange_.mms.push_back(qlen_ - br->edits_[i].pos - 1);
+					curRange_.refcs.push_back("ACGTN"[br->edits_[i].chr]);
+				}
+				curRange_.ebwt    = ebwt_;
+				this->foundRange  = true;
+	#ifndef NDEBUG
+				int64_t top2 = (int64_t)br->top_;
+				top2++; // ensure it's not 0
+				if(ebwt_->fw()) top2 = -top2;
+				assert(allTops_.find(top2) == allTops_.end());
+				allTops_.insert(top2);
+	#endif
+				// Must curtail because we've consumed the whole pattern
+				pm.curtail(br, depth3_);
+			} else if(empty || cur == 0) {
+				// The branch couldn't be extended further
+				pm.curtail(br, depth3_);
+			} else {
+				// Extend the branch by one position; no change to its cost
+				// so there's no need to reconsider where it lies in the
+				// priority queue
+				assert_neq(0, cur);
+				br->extend();
+			}
+		bail:
+			// Make sure the front element of the priority queue is
+			// extendable (i.e. not curtailed) and then prep it.
+			pm.splitAndPrep(rand_, qlen_, depth3_, ebwt_->_eh, ebwt_->_ebwt);
+			if(pm.empty()) break;
+
+			if(until == ADV_COST_CHANGES && pm.front()->cost_ != cost) break;
+			else if(until == ADV_STEP) break;
+
+		} while(!this->foundRange);
+	}
+
+	/**
+	 * Return true iff we're enforcing a half-and-half constraint
+	 * (forced edits in both seed halves).
+	 */
+	bool halfAndHalf() const {
+		return halfAndHalf_;
+	}
+
+protected:
+
+	/**
+	 * Return true iff we're OK to continue after considering which
+	 * half-seed boundary we're passing through, together with the
+	 * number of mismatches accumulated so far.  Return false if we
+	 * should stop because a half-and-half constraint is violated.  If
+	 * we're not currently passing a half-seed boundary, just return
+	 * true.
+	 */
+	bool hhCheck(Branch *b, uint32_t depth, bool empty) {
+		ASSERT_ONLY(uint32_t lim = (offRev3_ == offRev2_)? 2 : 3);
+		if((depth == (depth5_-1)) && !empty) {
+			// We're crossing the boundary separating the hi-half
+			// from the non-seed portion of the read.
+			// We should induce a mismatch if we haven't mismatched
+			// yet, so that we don't waste time pursuing a match
+			// that was covered by a previous phase
+			assert_leq(b->numEdits_, lim-1);
+			return b->numEdits_ > 0;
+		} else if((depth == (depth3_-1)) && !empty) {
+			// We're crossing the boundary separating the lo-half
+			// from the non-seed portion of the read
+			assert_leq(b->numEdits_, lim);
+			assert_gt(b->numEdits_, 0);
+			// Count the mismatches in the lo and hi halves
+			uint32_t loHalfMms = 0, hiHalfMms = 0;
+			for(size_t i = 0; i < b->numEdits_; i++) {
+				uint32_t depth = b->edits_[i].pos;
+				if     (depth < depth5_) hiHalfMms++;
+				else if(depth < depth3_) loHalfMms++;
+				else assert(false);
+			}
+			assert_leq(loHalfMms + hiHalfMms, lim);
+			bool invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
+			return (b->numEdits_ >= 2 && !invalidHalfAndHalf);
+		}
+#ifndef NDEBUG
+		if(depth < depth5_-1) {
+			assert_leq(b->numEdits_, lim-1);
+		}
+		else if(depth >= depth5_ && depth < depth3_-1) {
+			assert_gt(b->numEdits_, 0);
+			assert_leq(b->numEdits_, lim);
+		}
+#endif
+		return true;
+	}
+
+	/**
+	 * Return true iff the state of the backtracker as encoded by
+	 * stackDepth, d and iham is compatible with the current half-and-
+	 * half alignment mode.  prehits is for sanity checking when
+	 * bailing.
+	 */
+	bool hhCheckTop(Branch* b,
+	                uint32_t d,
+	                uint32_t iham,
+	                uint64_t prehits = 0xffffffffffffffffllu)
+	{
+		// Crossing from the hi-half into the lo-half
+		if(d == depth5_) {
+			if(offRev3_ == offRev2_) {
+				// Total of 2 mismatches allowed: 1 hi, 1 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than once into this region
+				assert_leq(b->numEdits_, 1);
+				// Reject if we haven't encountered mismatch by this point
+				if(b->numEdits_ == 0) {
+					return false;
+				}
+			} else { // if(offRev3_ != offRev2_)
+				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice into this region
+				assert_leq(b->numEdits_, 2);
+				// Reject if we haven't encountered mismatch by this point
+				if(b->numEdits_ < 1) {
+					return false;
+				}
+			}
+		} else if(d == depth3_) {
+			// Crossing from lo-half to outside of the seed
+			if(offRev3_ == offRev2_) {
+				// Total of 2 mismatches allowed: 1 hi, 1 lo
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice within this region
+				assert_leq(b->numEdits_, 2);
+				// Must have encountered two mismatches by this point
+				if(b->numEdits_ < 2) {
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
+					return false;
+				}
+			} else { // if(offRev3_ != offRev2_)
+				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
+				// Count the mismatches in the lo and hi halves
+				int loHalfMms = 0, hiHalfMms = 0;
+				for(size_t i = 0; i < b->numEdits_; i++) {
+					uint32_t d = b->edits_[i].pos;
+					if     (d < depth5_) hiHalfMms++;
+					else if(d < depth3_) loHalfMms++;
+					else assert(false);
+				}
+				assert_leq(loHalfMms + hiHalfMms, 3);
+				assert_gt(hiHalfMms, 0);
+				if(loHalfMms == 0) {
+					// We're returning from the bottommost frame
+					// without having found any hits; let's
+					// sanity-check that there really aren't any
+					return false;
+				}
+				assert_geq(b->numEdits_, 2);
+				// The backtracking logic should have prevented us from
+				// backtracking more than twice within this region
+				assert_leq(b->numEdits_, 3);
+			}
+		} else {
+			// We didn't just cross a boundary, so do an in-between check
+			if(d >= depth5_) {
+				assert_geq(b->numEdits_, 1);
+			} else if(d >= depth3_) {
+				assert_geq(b->numEdits_, 2);
+			}
+		}
+		return true;
+	}
+
+	/**
+	 *
+	 */
+	inline uint8_t qualAt(size_t off) {
+		return phredCharToPhredQual((*qual_)[off]);
+	}
+
+	/**
+	 * Tally how many Ns occur in the seed region and in the ftab-
+	 * jumpable region of the read.  Check whether the mismatches
+	 * induced by the Ns already violates the current policy.  Return
+	 * false if the policy is already violated, true otherwise.
+	 */
+	bool tallyNs(int& nsInSeed, int& nsInFtab) {
+		const Ebwt<String<Dna> >& ebwt = *ebwt_;
+		int ftabChars = ebwt._eh._ftabChars;
+		// Count Ns in the seed region of the read and short-circuit if
+		// the configuration of Ns guarantees that there will be no
+		// valid alignments given the backtracking constraints.
+		for(size_t i = 0; i < offRev3_; i++) {
+			if((int)(*qry_)[qlen_-i-1] == 4) {
+				nsInSeed++;
+				if(nsInSeed == 1) {
+					if(i < unrevOff_) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 2) {
+					if(i < offRev1_) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else if(nsInSeed == 3) {
+					if(i < offRev2_) {
+						return false; // Exceeded mm budget on Ns alone
+					}
+				} else {
+					assert_gt(nsInSeed, 3);
+					return false;     // Exceeded mm budget on Ns alone
+				}
+			}
+		}
+		// Calculate the number of Ns there are in the region that
+		// would get jumped over if the ftab were used.
+		for(size_t i = 0; i < (size_t)ftabChars && i < qlen_; i++) {
+			if((int)(*qry_)[qlen_-i-1] == 4) nsInFtab++;
+		}
+		return true;
+	}
+
+	/**
+	 * Calculate the offset into the ftab for the rightmost 'ftabChars'
+	 * characters of the current query. Rightmost char gets least
+	 * significant bit-pair.
+	 */
+	uint32_t calcFtabOff() {
+		const Ebwt<String<Dna> >& ebwt = *ebwt_;
+		int ftabChars = ebwt._eh._ftabChars;
+		uint32_t ftabOff = (*qry_)[qlen_ - ftabChars];
+		assert_lt(ftabOff, 4);
+		assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		for(int i = ftabChars - 1; i > 0; i--) {
+			ftabOff <<= 2;
+			assert_lt((uint32_t)(*qry_)[qlen_-i], 4);
+			ftabOff |= (uint32_t)(*qry_)[qlen_-i];
+			assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		}
+		assert_lt(ftabOff, ebwt._eh._ftabLen-1);
+		return ftabOff;
+	}
+
+	String<Dna5>*       qry_;    // query (read) sequence
+	size_t              qlen_;   // length of _qry
+	String<char>*       qual_;   // quality values for _qry
+	String<char>*       name_;   // name of _qry
+	const Ebwt<String<Dna> >*   ebwt_;   // Ebwt to search in
+	bool                fw_;
+	uint32_t            unrevOff_; // unrevisitable chunk
+	uint32_t            offRev1_;  // 1-revisitable chunk
+	uint32_t            offRev2_;  // 2-revisitable chunk
+	uint32_t            offRev3_;  // 3-revisitable chunk
+	/// Whether to round qualities off Maq-style when calculating penalties
+	bool                maqPenalty_;
+	uint32_t            qualThresh_; // only accept hits with weighted
+	                             // hamming distance <= _qualThresh
+	/// Do not report alignments with stratum < this limit
+	bool                reportExacts_;
+	/// Whether to use the _os array together with a naive matching
+	/// algorithm to double-check reported alignments (or the lack
+	/// thereof)
+	bool                halfAndHalf_;
+	/// Depth of 5'-seed-half border
+	uint32_t            depth5_;
+	/// Depth of 3'-seed-half border
+	uint32_t            depth3_;
+	/// Source of pseudo-random numbers
+	RandomSource        rand_;
+	/// Seed for random number generator
+	uint32_t            randSeed_;
+	/// Be talkative
+	bool                verbose_;
+	// Current range to expose to consumers
+	Range               curRange_;
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;
 #endif
@@ -2655,13 +2782,13 @@ enum SearchConstraintExtent {
  * GreedyDFSRangeSource by calling setOffs() with the appropriate
  * parameters when initializing it;
  */
-class GreedyDFSRangeSourceDriver :
-	public SingleRangeSourceDriver<GreedyDFSRangeSource>
+class EbwtRangeSourceDriver :
+	public SingleRangeSourceDriver<EbwtRangeSource>
 {
 public:
-	GreedyDFSRangeSourceDriver(
+	EbwtRangeSourceDriver(
 			EbwtSearchParams<String<Dna> >& params,
-			GreedyDFSRangeSource* rs,
+			EbwtRangeSource* rs,
 			bool fw,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
@@ -2675,7 +2802,7 @@ public:
 			bool verbose,
 			uint32_t seed,
 			bool mate1) :
-			SingleRangeSourceDriver<GreedyDFSRangeSource>(
+			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose, seed, mate1),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
@@ -2683,7 +2810,7 @@ public:
 			rev2Off_(rev2Off), rev3Off_(rev3Off)
 	{ }
 
-	virtual ~GreedyDFSRangeSourceDriver() { }
+	virtual ~EbwtRangeSourceDriver() { }
 
 protected:
 
@@ -2724,7 +2851,7 @@ protected:
 		// If there are any Ns in the unrevisitable region, then this
 		// driver is guaranteed to yield no fruit.
 		uint16_t minCost = 0;
-		if(rs_->reportExats()) {
+		if(rs_->reportExacts()) {
 			// Keep minCost at 0
 		} else if (!rs_->halfAndHalf()) {
 			// Exacts not allowed, so there must be at least 1 mismatch
@@ -2771,7 +2898,7 @@ protected:
 		             rev3Off); // depth above which we may backtrack just three times
 	}
 
-	GreedyDFSRangeSource* rs_;
+	EbwtRangeSource* rs_;
 	uint32_t seedLen_;
 	bool nudgeLeft_;
 	SearchConstraintExtent rev0Off_;

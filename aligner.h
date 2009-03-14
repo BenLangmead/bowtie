@@ -427,6 +427,7 @@ public:
 				const Range& ra = driver_->range();
 				if(rangeMode_) {
 					this->done = report(ra, ra.top, ra.bot, 0);
+					driver_->foundRange = false;
 				} else {
 					rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
 					if(rchase_->foundOff()) {
@@ -438,6 +439,8 @@ public:
 					if(!rchase_->done) {
 						// Keep chasing this range
 						chase_ = true;
+					} else {
+						driver_->foundRange = false;
 					}
 				}
 			} else {
