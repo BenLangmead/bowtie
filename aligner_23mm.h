@@ -34,6 +34,7 @@ public:
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -47,6 +48,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -161,7 +163,7 @@ public:
 			drVec.push_back(drRc_Bw);
 			drVec.push_back(drRc_FwHalf);
 		}
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -184,8 +186,9 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	vector<String<Dna5> >& os_;
-	bool rangeMode_;
-	bool verbose_;
+	const bool strandFix_;
+	const bool rangeMode_;
+	const bool verbose_;
 	uint32_t seed_;
 };
 
@@ -217,6 +220,7 @@ public:
 			uint32_t cacheLimit,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -237,6 +241,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			refs_(refs), os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -305,7 +310,7 @@ public:
 #if 0
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
 #else
-		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, dr1FwVec);
+		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1FwVec);
 #endif
 
 		// Source for ranges from forward index & reverse-complement read
@@ -360,7 +365,7 @@ public:
 #if 0
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
 #else
-		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, dr1RcVec);
+		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1RcVec);
 #endif
 
 		// Source for ranges from forward index & forward read
@@ -414,7 +419,7 @@ public:
 #if 0
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
 #else
-		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, dr2FwVec);
+		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2FwVec);
 #endif
 
 		// Source for ranges from forward index & reverse-complement read
@@ -469,7 +474,7 @@ public:
 #if 0
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 #else
-		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, dr2RcVec);
+		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2RcVec);
 #endif
 
 		RefAligner<String<Dna5> >* refAligner;
@@ -509,6 +514,7 @@ private:
 	const uint32_t cacheLimit_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
+	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
 	const uint32_t seed_;

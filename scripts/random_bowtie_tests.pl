@@ -48,6 +48,9 @@ sub pickPolicy {
 	if($pol =~ /-v/) {
 		if(int(rand(2)) == 0) {
 			$pol .= " --stateful";
+			if(int(rand(2)) == 0) {
+				$pol .= " --strandfix";
+			}
 		}
 	}
 	return $pol;
@@ -561,7 +564,7 @@ sub doSearch {
 		my @fs = (".tmp.un$seed.fa");
 		if($pe) { @fs = (".tmp.un$seed"."_1.fa", ".tmp.un$seed"."_2.fa"); }
 		for my $f (@fs) {
-			open UNFA, "$f";
+			open(UNFA, "$f") or next;
 			while(<UNFA>) {
 				if(/^>(.*)/) {
 					my $read = $1;
@@ -575,7 +578,7 @@ sub doSearch {
 		my @fs = (".tmp.un$seed.fq");
 		if($pe) { @fs = (".tmp.un$seed"."_1.fq", ".tmp.un$seed"."_2.fq"); }
 		for my $f (@fs) {
-			open UNFQ, "$f";
+			open(UNFQ, "$f") or next;
 			my $c = 0;
 			while(<UNFQ>) {
 				if(/^@(.*)/ && (($c % 4) == 0)) {

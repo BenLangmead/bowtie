@@ -12,12 +12,17 @@
  * A range along with the alignment it represents.
  */
 struct Range {
-	Range() : top(0), bot(0), stratum(0), numMms(0), ebwt(NULL) {
+	Range() :
+		top(0), bot(0), cost(0), stratum(0), numMms(0),
+		fw(true), mate1(true), ebwt(NULL)
+	{
 		mms.clear();
 		refcs.clear();
 	}
+
 	uint32_t top;     // top of range
 	uint32_t bot;     // bottom of range
+	uint16_t cost;    // cost
 	uint32_t stratum; // stratum
 	uint32_t numMms;  // # mismatches
 	bool fw;          // the forward orientation of read aligned?

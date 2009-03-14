@@ -353,6 +353,7 @@ public:
 				_curRange.top     = top;
 				_curRange.bot     = bot;
 				_curRange.stratum = calcStratum(_mms, 0);
+				_curRange.cost    = _curRange.stratum << 14;
 				_curRange.numMms  = 0;
 				_curRange.ebwt    = _ebwt;
 				_curRange.fw      = _params.fw();
@@ -387,7 +388,7 @@ public:
 	}
 
 	virtual void
-	advanceBranch(PathManager& pm) {
+	advanceBranch(int until, PathManager& pm) {
 		// Restore alignment state from the frontmost continuation.
 		// The frontmost continuation should in principle be the most
 		// promising partial alignment found so far.  In the case of
@@ -614,6 +615,8 @@ public:
 				goto bail;
 			}
 
+			uint16_t cost = br->cost_;
+
 			if(hit &&            // there is a range to report
 			   !invalidExact &&  // not disqualified by no-exact-hits setting
 			   !reportedPartial) // not an already-reported partial alignment
@@ -626,6 +629,7 @@ public:
 				assert_gt(br->bot_, br->top_);
 				_curRange.top     = br->top_;
 				_curRange.bot     = br->bot_;
+				_curRange.cost    = br->cost_;
 				_curRange.stratum = (br->cost_ >> 14);
 				_curRange.numMms  = br->numEdits_;
 				_curRange.fw      = _params.fw();
@@ -660,8 +664,12 @@ public:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
 			pm.splitAndPrep(_rand, _qlen, _3depth, _ebwt->_eh, _ebwt->_ebwt);
+			if(pm.empty()) break;
 
-		} while(!this->foundRange && !pm.empty());
+			if(until == ADV_COST_CHANGES && pm.front()->cost_ != cost) break;
+			else if(until == ADV_STEP) break;
+
+		} while(!this->foundRange);
 	}
 
 	/**

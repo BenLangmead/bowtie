@@ -25,6 +25,8 @@ public:
 	UnpairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool doFw,
+			bool doRc,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			RangeCache* cacheFw,
@@ -37,6 +39,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			doFw_(doFw), doRc_(doRc),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			cacheFw_(cacheFw),
@@ -83,9 +86,9 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec drVec;
-		drVec.push_back(driverFw);
-		drVec.push_back(driverRc);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
+		if(doFw_) drVec.push_back(driverFw);
+		if(doRc_) drVec.push_back(driverRc);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -100,6 +103,8 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool doFw_;
+	bool doRc_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	RangeCache *cacheFw_;

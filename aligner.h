@@ -416,13 +416,13 @@ public:
 				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				chase_ = false;
+				driver_->foundRange = false;
 				this->done = driver_->done;
 			}
 		}
 		// Still advancing a
 		if(!this->done && !chase_) {
 			assert(!driver_->done);
-			driver_->advance();
 			if(driver_->foundRange) {
 				const Range& ra = driver_->range();
 				if(rangeMode_) {
@@ -440,6 +440,8 @@ public:
 						chase_ = true;
 					}
 				}
+			} else {
+				driver_->advance(ADV_FOUND_RANGE);
 			}
 			if(driver_->done && !chase_) {
 				this->done = true;
@@ -1284,7 +1286,7 @@ protected:
 					return;
 				}
 				assert(!*delayedchaseL_);
-				drL_->advance();
+				drL_->advance(ADV_FOUND_RANGE);
 				if(drL_->foundRange) {
 #ifndef NDEBUG
 					{
@@ -1345,7 +1347,7 @@ protected:
 					return;
 				}
 				assert(!*delayedchaseR_);
-				drR_->advance();
+				drR_->advance(ADV_FOUND_RANGE);
 				if(drR_->foundRange) {
 #ifndef NDEBUG
 					{
@@ -1621,7 +1623,6 @@ public:
 	 */
 	virtual bool advance() {
 		assert(!this->done);
-
 		if(chase_) {
 			assert(!rangeMode_); // chasing ranges
 			assert(driver_->foundRange);

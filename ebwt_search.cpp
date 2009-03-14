@@ -1412,6 +1412,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
+			!nofw,
+			!norc,
 			_sink,
 			*sinkFact,
 			NULL, //&cacheFw,
@@ -1439,7 +1441,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
-			strandFix,
+			false, // strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -1782,12 +1784,15 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
+			!nofw,
+			!norc,
 			_sink,
 			*sinkFact,
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -1808,6 +1813,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			false, // strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -2371,6 +2377,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -2392,6 +2399,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			false, //strandFix,
 			rangeMode,
 			verbose,
 			seed);

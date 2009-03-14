@@ -26,23 +26,29 @@ public:
 	Unpaired1mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool doFw,
+			bool doRc,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			doFw_(doFw),
+			doRc_(doRc),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -90,8 +96,10 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		TRangeSrcDrPtrVec drVec;
-		drVec.push_back(drFw_Bw);
-		drVec.push_back(drFw_Fw);
+		if(doFw_) {
+			drVec.push_back(drFw_Bw);
+			drVec.push_back(drFw_Fw);
+		}
 
 		// Source for ranges from forward index & reverse-complement read
 		GreedyDFSRangeSource *rRc_Fw = new GreedyDFSRangeSource(
@@ -121,8 +129,11 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-		drVec.push_back(drRc_Fw); drVec.push_back(drRc_Bw);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
+		if(doRc_) {
+			drVec.push_back(drRc_Fw);
+			drVec.push_back(drRc_Bw);
+		}
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -137,12 +148,15 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool doFw_;
+	bool doRc_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	vector<String<Dna5> >& os_;
+	bool strandFix_;
 	bool rangeMode_;
 	bool verbose_;
 	uint32_t seed_;
@@ -175,6 +189,7 @@ public:
 			uint32_t cacheLimit,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
+			bool strandFix,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -194,6 +209,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			refs_(refs), os_(os),
+			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
 			seed_(seed)
@@ -352,7 +368,7 @@ public:
 #else
 		drVec.push_back(dr2Rc_Fw);
 		drVec.push_back(dr2Rc_Bw);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, drVec);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
 #endif
 
 		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
@@ -394,6 +410,7 @@ private:
 	const uint32_t cacheLimit_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
+	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
 	const uint32_t seed_;
