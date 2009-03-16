@@ -358,7 +358,7 @@ public:
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		Aligner::setQuery(patsrc); // set fields & random seed
-		driver_->setQuery(patsrc);
+		driver_->setQuery(patsrc, NULL);
 		rchase_->initRand(qseed_);
 		this->done = driver_->done;
 		doneFirst_ = false;
@@ -824,10 +824,10 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
-		driver1Fw_->setQuery(patsrc);
-		driver1Rc_->setQuery(patsrc);
-		driver2Fw_->setQuery(patsrc);
-		driver2Rc_->setQuery(patsrc);
+		driver1Fw_->setQuery(patsrc, NULL);
+		driver1Rc_->setQuery(patsrc, NULL);
+		driver2Fw_->setQuery(patsrc, NULL);
+		driver2Rc_->setQuery(patsrc, NULL);
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;

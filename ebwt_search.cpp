@@ -23,6 +23,7 @@
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
 #include "aligner_23mm.h"
+#include "aligner_seed_mm.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -1159,8 +1160,8 @@ static void parseOptions(int argc, char **argv) {
 	if(mates1.size() > 0 || mates2.size() > 0) {
 		spanStrata = true;
 	}
-	if((mates1.size() > 0 || mates2.size() > 0) && maqLike) {
-		cerr << "Paired-end mode is not yet compatible with -n mode; use -v 0 or -v 1 instead." << endl;
+	if((mates1.size() > 0 || mates2.size() > 0) && maqLike && seedMms > 0) {
+		cerr << "Paired-end mode is not yet compatible with -n 1, -n 2 or -n 3." << endl;
 		exit(1);
 	}
 	if(!fullIndex) {
@@ -2586,16 +2587,17 @@ static void twoOrThreeMismatchSearchFull(
 	return;
 }
 
-static PairedPatternSource*           seededQualSearch_patsrc;
-static HitSink*                       seededQualSearch_sink;
-static Ebwt<String<Dna> >*            seededQualSearch_ebwtFw;
-static Ebwt<String<Dna> >*            seededQualSearch_ebwtBw;
-static vector<String<Dna5> >*         seededQualSearch_os;
-static SyncBitset*                    seededQualSearch_doneMask;
-static SyncBitset*                    seededQualSearch_hitMask;
-static PartialAlignmentManager*       seededQualSearch_pamFw;
-static PartialAlignmentManager*       seededQualSearch_pamRc;
-static int                            seededQualSearch_qualCutoff;
+static PairedPatternSource*     seededQualSearch_patsrc;
+static HitSink*                 seededQualSearch_sink;
+static Ebwt<String<Dna> >*      seededQualSearch_ebwtFw;
+static Ebwt<String<Dna> >*      seededQualSearch_ebwtBw;
+static vector<String<Dna5> >*   seededQualSearch_os;
+static SyncBitset*              seededQualSearch_doneMask;
+static SyncBitset*              seededQualSearch_hitMask;
+static PartialAlignmentManager* seededQualSearch_pamFw;
+static PartialAlignmentManager* seededQualSearch_pamRc;
+static int                      seededQualSearch_qualCutoff;
+static BitPairReference*        seededQualSearch_refs;
 
 #define SEEDEDQUAL_WORKER_SETUP() \
 	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;    \
@@ -3034,6 +3036,83 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	WORKER_EXIT();
 }
 
+static void* seededQualSearchWorkerFullStateful(void *vp) {
+	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	HitSink&                 _sink      = *seededQualSearch_sink;
+	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
+	Ebwt<String<Dna> >&      ebwtBw     = *seededQualSearch_ebwtBw;
+	vector<String<Dna5> >&   os         = *seededQualSearch_os;
+	int                      qualCutoff = seededQualSearch_qualCutoff;
+	BitPairReference*        refs       = seededQualSearch_refs;
+
+	// Global initialization
+	bool sanity = sanityCheck && !os.empty();
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+
+	UnpairedSeedAlignerV1Factory alSEfact(
+			ebwtFw,
+			&ebwtBw,
+			!nofw,
+			!norc,
+			seedMms,
+			seedLen,
+			qualCutoff,
+			_sink,
+			*sinkFact,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
+			cacheLimit,
+			os,
+			strandFix,
+			rangeMode,
+			verbose,
+			seed);
+	PairedSeedAlignerV1Factory alPEfact(
+			ebwtFw,
+			&ebwtBw,
+			!nofw,
+			!norc,
+			seedMms,
+			seedLen,
+			qualCutoff,
+			_sink,
+			*sinkFact,
+			mate1fw,
+			mate2fw,
+			minInsert,
+			maxInsert,
+			dontReconcileMates,
+			mhits,       // for symCeiling
+			mixedThresh,
+			mixedAttemptLim,
+			NULL, //&cacheFw,
+			NULL, //&cacheBw,
+			cacheLimit,
+			refs, os,
+			false, // strandFix,
+			rangeMode,
+			verbose,
+			seed);
+	{
+		MixedMultiAligner multi(
+				prefetchWidth,
+				qUpto,
+				alSEfact,
+				alPEfact,
+				*patsrcFact);
+		// Run that mother
+		multi.run();
+		// MultiAligner must be destroyed before patsrcFact
+	}
+
+	delete patsrcFact;
+	delete sinkFact;
+#ifdef BOWTIE_PTHREADS
+	if((long)vp != 0L) pthread_exit(NULL);
+#endif
+	return NULL;
+}
 
 /**
  * Search for a good alignments for each read using criteria that
@@ -3271,6 +3350,15 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_pamRc    = NULL;
 	seededQualSearch_qualCutoff = qualCutoff;
 
+	// Create range caches, which are shared among all aligners
+	BitPairReference *refs = NULL;
+	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+		Timer _t(cout, "Time loading reference: ", timing);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		if(!refs->loaded()) exit(1);
+	}
+	seededQualSearch_refs = refs;
+
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
@@ -3290,10 +3378,16 @@ static void seededQualCutoffSearchFull(
 		Timer _t(cout, "Seeded quality full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerFull, (void *)(long)(i+1));
+			if(stateful) pthread_create(&threads[i], &pt_attr,
+			                            seededQualSearchWorkerFullStateful,
+			                            (void *)(long)(i+1));
+			else         pthread_create(&threads[i], &pt_attr,
+			                            seededQualSearchWorkerFull,
+			                            (void *)(long)(i+1));
 		}
 #endif
-		seededQualSearchWorkerFull((void*)0L);
+		if(stateful) seededQualSearchWorkerFullStateful((void*)0L);
+		else         seededQualSearchWorkerFull((void*)0L);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;

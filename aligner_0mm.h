@@ -17,7 +17,7 @@
  */
 class UnpairedExactAlignerV1Factory : public AlignerFactory {
 
-	typedef SingleRangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
+	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 
@@ -68,7 +68,7 @@ public:
 			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
 
 		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
-			*params, rFw, true, sink_, sinkPt,
+			*params, rFw, true, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -77,7 +77,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
-			*params, rRc, false, sink_, sinkPt,
+			*params, rRc, false, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -181,7 +181,7 @@ public:
 			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
 
 		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
-			*params, r1Fw, true, sink_, sinkPt,
+			*params, r1Fw, true, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -190,7 +190,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
-			*params, r1Rc, false, sink_, sinkPt,
+			*params, r1Rc, false, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -205,7 +205,7 @@ public:
 			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
 
 		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
-			*params, r2Fw, true, sink_, sinkPt,
+			*params, r2Fw, true, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -214,7 +214,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, false);
 		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
-			*params, r2Rc, false, sink_, sinkPt,
+			*params, r2Rc, false, false, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable

@@ -85,8 +85,8 @@ public:
 	 * Set a new query read.
 	 */
 	void setQuery(String<Dna5>* __qry,
-	                      String<char>* __qual,
-	                      String<char>* __name)
+	              String<char>* __qual,
+	              String<char>* __name)
 	{
 		_qry = __qry;
 		_qual = __qual;
@@ -2120,19 +2120,37 @@ public:
 	 */
 	virtual void setQuery(String<Dna5>* qry,
 	                      String<char>* qual,
-	                      String<char>* name)
+	                      String<char>* name,
+	                      Range *seedRange)
 	{
 		qry_ = qry;
 		qual_ = qual;
 		name_ = name;
+		seedRange_ = seedRange;
 		assert(qry_ != NULL);
 		assert(qual_ != NULL);
 		assert(name_ != NULL);
+		qlen_ = length(*qry_);
+		// Apply edits from the partial alignment to the query pattern
+		if(seedRange_ != NULL) {
+			qryBuf_ = *qry_;
+			const size_t srSz = seedRange_->mms.size();
+			assert_gt(srSz, 0);
+			assert_eq(srSz, seedRange_->refcs.size());
+			for(size_t i = 0; i < srSz; i++) {
+				assert_lt(seedRange_->mms[i], qlen_);
+				char rc = (char)seedRange_->refcs[i];
+				assert(rc == 'A' || rc == 'C' || rc == 'G' || rc == 'T');
+				ASSERT_ONLY(char oc = (char)qryBuf_[qlen_ - seedRange_->mms[i] - 1]);
+				assert_neq(rc, oc);
+				qryBuf_[qlen_ - seedRange_->mms[i] - 1] = (Dna5)rc;
+			}
+			qry_ = &qryBuf_;
+		}
 		// Make sure every qual is a valid qual ASCII character (>= 33)
 		for(size_t i = 0; i < length(*qual_); i++) {
 			assert_geq((*qual_)[i], 33);
 		}
-		qlen_ = length(*qry_);
 		assert_geq(length(*qual_), qlen_);
 		this->done = false;
 		this->foundRange = false;
@@ -2190,7 +2208,7 @@ public:
 	 * immediately jump to a valid range using the ftab).
 	 */
 	virtual void
-	initBranch(PathManager& pm, uint32_t ham) {
+	initBranch(PathManager& pm, uint16_t icost) {
 		assert(curEbwt_ != NULL);
 		assert_gt(length(*qry_), 0);
 		assert_leq(qlen_, length(*qry_));
@@ -2228,12 +2246,14 @@ public:
 				assert(reportExacts_);
 				curRange_.top     = top;
 				curRange_.bot     = bot;
-				curRange_.stratum = 0;
-				curRange_.cost    = curRange_.stratum << 14;
-				curRange_.numMms  = 0;
+				curRange_.stratum = (icost >> 14);
+				curRange_.cost    = icost;
+				curRange_.numMms  = (icost >> 14);
 				curRange_.ebwt    = ebwt_;
 				curRange_.fw      = fw_;
 				curRange_.mms.clear(); // no mismatches
+				// Lump in the edits from the partial alignment
+				addPartialEdits();
 				// no need to do anything with curRange_.refcs
 				this->foundRange  = true;
 				return;
@@ -2244,7 +2264,7 @@ public:
 				Branch *b = pm.bpool.alloc();
 				b->init(pm.rpool, qlen_,
 				        unrevOff_, offRev1_, offRev2_, offRev3_,
-				        0, ftabChars, ham, top, bot,
+				        0, ftabChars, icost, top, bot,
 				        ebwt._eh, ebwt._ebwt, 0);
 				pm.push(b); // insert into priority queue
 			} else {
@@ -2257,12 +2277,17 @@ public:
 			Branch *b = pm.bpool.alloc();
 			b->init(pm.rpool, qlen_,
 			        unrevOff_, offRev1_, offRev2_, offRev3_,
-			        0, 0, ham, 0, 0, ebwt._eh, ebwt._ebwt, 0);
+			        0, 0, icost, 0, 0, ebwt._eh, ebwt._ebwt, 0);
 			pm.push(b); // insert into priority queue
 		}
 		return;
 	}
 
+	/**
+	 * Advance along the lowest-cost branch managed by the given
+	 * PathManager.  Keep advancing until some stopping condition
+	 * 'until' is satisfied.
+	 */
 	virtual void
 	advanceBranch(int until, PathManager& pm) {
 		// Restore alignment state from the frontmost continuation.
@@ -2298,7 +2323,8 @@ public:
 			assert_lt(stratum, 4);
 			uint16_t ham = br->cost_ & ~0xc000; // AND off the stratum
 			assert_leq(ham, 0x3000);
-			assert_leq(ham, qualThresh_);
+			// Not necessarily true with rounding
+			//assert_leq(ham, qualThresh_);
 			uint32_t depth = br->tipDepth();
 
 			const Ebwt<String<Dna> >& ebwt = *ebwt_;
@@ -2329,18 +2355,15 @@ public:
 				int nextc = -1;
 				if(cur < qlen_-1) nextc = (int)(*qry_)[cur+1];
 				assert_leq(c, 4);
-				uint8_t q = qualAt(cur);   // get qual at this position
+				uint8_t q = qualAt(cur); // get (unrounded) phred qual at this position
+				uint8_t qq = mmPenalty(maqPenalty_, q);
 
 				// The current query position is a legit alternative if it a) is
 				// not in the unrevisitable region, and b) its selection would
 				// not cause the quality ceiling (if one exists) to be exceeded
-				bool curIsAlternative =
-					 (depth >= br->depth0_) &&
-					 (ham + mmPenalty(maqPenalty_, q) <= qualThresh_);
-
-#ifndef NDEBUG
-				uint32_t obot = br->bot_;
-#endif
+				bool curIsAlternative = (depth >= br->depth0_) &&
+				                        (ham + qq <= qualThresh_);
+				ASSERT_ONLY(uint32_t obot = br->bot_);
 				uint32_t otop = br->top_;
 
 				// If c is 'N', then it's a mismatch
@@ -2372,7 +2395,7 @@ public:
 					rs->bots[1] = rs->tops[2] = ebwt._fchr[2];
 					rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
 					rs->bots[3]               = ebwt._fchr[4];
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
+					ASSERT_ONLY(int r =) br->installRanges(c, nextc, qq);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2414,7 +2437,7 @@ public:
 						}
 #endif
 					}
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, q);
+					ASSERT_ONLY(int r =) br->installRanges(c, nextc, qq);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2490,6 +2513,7 @@ public:
 					curRange_.mms.push_back(qlen_ - br->edits_[i].pos - 1);
 					curRange_.refcs.push_back("ACGTN"[br->edits_[i].chr]);
 				}
+				addPartialEdits();
 				curRange_.ebwt    = ebwt_;
 				this->foundRange  = true;
 	#ifndef NDEBUG
@@ -2532,6 +2556,23 @@ public:
 	}
 
 protected:
+
+	/**
+	 * Lump all the seed-alignment edits from the seedRange_ range
+	 * found previously to the curRange_ range just found.
+	 */
+	void addPartialEdits() {
+		// Lump in the edits from the partial alignment
+		if(seedRange_ != NULL) {
+			const size_t srSz = seedRange_->mms.size();
+			for(size_t i = 0; i < srSz; i++) {
+				curRange_.mms.push_back(qlen_ - seedRange_->mms[i] - 1);
+				curRange_.refcs.push_back(seedRange_->refcs[i]);
+			}
+			curRange_.numMms += srSz;
+			curRange_.stratum += srSz;
+		}
+	}
 
 	/**
 	 * Return true iff we're OK to continue after considering which
@@ -2730,6 +2771,7 @@ protected:
 	}
 
 	String<Dna5>*       qry_;    // query (read) sequence
+	String<Dna5>        qryBuf_; // for composing modified qry_ strings
 	size_t              qlen_;   // length of _qry
 	String<char>*       qual_;   // quality values for _qry
 	String<char>*       name_;   // name of _qry
@@ -2761,6 +2803,9 @@ protected:
 	bool                verbose_;
 	// Current range to expose to consumers
 	Range               curRange_;
+	// Range for the partial alignment we're extending (NULL if we
+	// aren't extending a partial)
+	Range*              seedRange_;
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;
 #endif
@@ -2790,6 +2835,7 @@ public:
 			EbwtSearchParams<String<Dna> >& params,
 			EbwtRangeSource* rs,
 			bool fw,
+			bool seed,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
 			uint32_t seedLen,
@@ -2800,17 +2846,98 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
-			uint32_t seed,
+			uint32_t randSeed,
 			bool mate1) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
-					params, rs, fw, sink, sinkPt, os, verbose, seed, mate1),
+					params, rs, fw, sink, sinkPt, os, verbose, randSeed, mate1),
+			seed_(seed),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
 			rev2Off_(rev2Off), rev3Off_(rev3Off)
-	{ }
+	{
+		if(seed_) assert_gt(seedLen, 0);
+	}
 
 	virtual ~EbwtRangeSourceDriver() { }
+
+	bool seed() const { return seed_; }
+
+	bool ebwtFw() const { return rs_->curEbwt()->fw(); }
+
+	/**
+	 * Called every time setQuery() is called in the parent class,
+	 * after setQuery() has been called on the RangeSource but before
+	 * initConts() has been called.
+	 */
+	virtual void initRangeSource(const String<char>& qual) {
+		// If seedLen_ is huge, then it will always cover the whole
+		// alignment
+		uint32_t s = (seedLen_ > 0 ? min(seedLen_, len_) : len_);
+		uint32_t sLeft  = s >> 1;
+		uint32_t sRight = s >> 1;
+		// If seed has odd length, then nudge appropriate half up by 1
+		if((s & 1) != 0) { if(nudgeLeft_) sLeft++; else sRight++; }
+		uint32_t rev0Off = cextToDepth(rev0Off_, sRight, s, len_);
+		uint32_t rev1Off = cextToDepth(rev1Off_, sRight, s, len_);
+		uint32_t rev2Off = cextToDepth(rev2Off_, sRight, s, len_);
+		uint32_t rev3Off = cextToDepth(rev3Off_, sRight, s, len_);
+		// Truncate the pattern if necessary
+		if(seed_) {
+			if(len_ > s) {
+				rs_->setQlen(s);
+			}
+			assert(!rs_->reportExacts());
+		}
+		// If there are any Ns in the unrevisitable region, then this
+		// driver is guaranteed to yield no fruit.
+		uint16_t minCost = 0;
+		if(rs_->reportExacts()) {
+			// Keep minCost at 0
+		} else if (!rs_->halfAndHalf()) {
+			// Exacts not allowed, so there must be at least 1 mismatch
+			// outside of the unrevisitable area
+			minCost = 1 << 14;
+			uint8_t lowQual = 0xff;
+			for(uint32_t d = rev0Off; d < s; d++) {
+				if(qual[s - d - 1] < lowQual) {
+					lowQual = qual[s - d - 1];
+				}
+			}
+			assert_lt(lowQual, 0xff);
+			assert_geq(lowQual, 33);
+			minCost += (lowQual - 33);
+		} else {
+			// Half-and-half constraints are active, so there must be
+			// at least 1 mismatch in both halves of the seed
+			assert(rs_->halfAndHalf());
+			minCost = 2 << 14;
+			uint8_t lowQual1 = 0xff;
+			for(uint32_t d = 0; d < sRight; d++) {
+				if(qual[s - d - 1] < lowQual1) {
+					lowQual1 = qual[s - d - 1];
+				}
+			}
+			assert_lt(lowQual1, 0xff);
+			assert_geq(lowQual1, 33);
+			uint8_t lowQual2 = 0xff;
+			for(uint32_t d = sRight; d < s; d++) {
+				if(qual[s - d - 1] < lowQual2) {
+					lowQual2 = qual[s - d - 1];
+				}
+			}
+			assert_lt(lowQual2, 0xff);
+			assert_geq(lowQual2, 33);
+			minCost += (lowQual1 + lowQual2 - 66);
+		}
+		this->minCostAdjustment_ = minCost;
+		rs_->setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)
+		             s,        // depth of far edge of lo-half (only matters where half-and-half is possible)
+		             rev0Off,  // depth above which we cannot backtrack
+		             rev1Off,  // depth above which we may backtrack just once
+		             rev2Off,  // depth above which we may backtrack just twice
+		             rev3Off); // depth above which we may backtrack just three times
+	}
 
 protected:
 
@@ -2831,73 +2958,7 @@ protected:
 		exit(1);
 	}
 
-	/**
-	 * Called every time setQuery() is called in the parent class,
-	 * after setQuery() has been called on the RangeSource but before
-	 * initConts() has been called.
-	 */
-	virtual void initRangeSource() {
-		// If seedLen_ is huge, then it will always cover the whole
-		// alignment
-		uint32_t s = (seedLen_ > 0 ? min(seedLen_, len_) : len_);
-		uint32_t sLeft  = s >> 1;
-		uint32_t sRight = s >> 1;
-		// If seed has odd length, then nudge appropriate half up by 1
-		if((s & 1) != 0) { if(nudgeLeft_) sLeft++; else sRight++; }
-		uint32_t rev0Off = cextToDepth(rev0Off_, sRight, s, len_);
-		uint32_t rev1Off = cextToDepth(rev1Off_, sRight, s, len_);
-		uint32_t rev2Off = cextToDepth(rev2Off_, sRight, s, len_);
-		uint32_t rev3Off = cextToDepth(rev3Off_, sRight, s, len_);
-		// If there are any Ns in the unrevisitable region, then this
-		// driver is guaranteed to yield no fruit.
-		uint16_t minCost = 0;
-		if(rs_->reportExacts()) {
-			// Keep minCost at 0
-		} else if (!rs_->halfAndHalf()) {
-			// Exacts not allowed, so there must be at least 1 mismatch
-			// outside of the unrevisitable area
-			minCost = 1 << 14;
-			uint8_t lowQual = 0xff;
-			for(uint32_t d = rev0Off; d < s; d++) {
-				if((*this->qual_)[len_ - d - 1] < lowQual) {
-					lowQual = (*this->qual_)[len_ - d - 1];
-				}
-			}
-			assert_lt(lowQual, 0xff);
-			assert_geq(lowQual, 33);
-			minCost += (lowQual - 33);
-		} else {
-			// Half-and-half constraints are active, so there must be
-			// at least 1 mismatch in both halves of the seed
-			assert(rs_->halfAndHalf());
-			minCost = 2 << 14;
-			uint8_t lowQual1 = 0xff;
-			for(uint32_t d = 0; d < sRight; d++) {
-				if((*this->qual_)[len_ - d - 1] < lowQual1) {
-					lowQual1 = (*this->qual_)[len_ - d - 1];
-				}
-			}
-			assert_lt(lowQual1, 0xff);
-			assert_geq(lowQual1, 33);
-			uint8_t lowQual2 = 0xff;
-			for(uint32_t d = sRight; d < s; d++) {
-				if((*this->qual_)[len_ - d - 1] < lowQual2) {
-					lowQual2 = (*this->qual_)[len_ - d - 1];
-				}
-			}
-			assert_lt(lowQual2, 0xff);
-			assert_geq(lowQual2, 33);
-			minCost += (lowQual1 + lowQual2 - 66);
-		}
-		this->minCostAdjustment_ = minCost;
-		rs_->setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)
-		             s,        // depth of far edge of lo-half (only matters where half-and-half is possible)
-		             rev0Off,  // depth above which we cannot backtrack
-		             rev1Off,  // depth above which we may backtrack just once
-		             rev2Off,  // depth above which we may backtrack just twice
-		             rev3Off); // depth above which we may backtrack just three times
-	}
-
+	bool seed_;
 	EbwtRangeSource* rs_;
 	uint32_t seedLen_;
 	bool nudgeLeft_;
@@ -2905,6 +2966,137 @@ protected:
 	SearchConstraintExtent rev1Off_;
 	SearchConstraintExtent rev2Off_;
 	SearchConstraintExtent rev3Off_;
+};
+
+/**
+ * A RangeSourceDriver that manages two child EbwtRangeSourceDrivers,
+ * one for searching for seed strings with mismatches in the hi-half,
+ * and one for extending those seed strings toward the 3' end.
+ */
+class EbwtSeededRangeSourceDriver : public RangeSourceDriver<EbwtRangeSource> {
+public:
+	EbwtSeededRangeSourceDriver(
+			EbwtRangeSourceDriver* rs,
+			EbwtRangeSourceDriver* rsSeed,
+			bool fw,
+			uint32_t seedLen,
+			bool verbose,
+			bool mate1) :
+			RangeSourceDriver<EbwtRangeSource>(true, 0),
+			rsFull_(rs), rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen),
+			fw_(fw), mate1_(mate1), generating_(true), seedRange_(0)
+	{
+		assert(rsSeed_->seed());
+		assert(!rsFull_->seed());
+	}
+
+	virtual ~EbwtSeededRangeSourceDriver() { }
+
+	/**
+	 * Prepare this aligner for the next read.
+	 */
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *partial) {
+		this->done = false;
+		generating_ = true;
+		rsFull_->setQuery(patsrc, partial);
+		rsSeed_->setQuery(patsrc, partial);
+		patsrc_ = patsrc;
+		// The minCostAdjustment comes from the seed range source
+		// driver, based on Ns and quals in the hi-half
+		rsFull_->minCostAdjustment_ = rsSeed_->minCostAdjustment_;
+		this->minCostAdjustment_ = rsSeed_->minCostAdjustment_;
+		ASSERT_ONLY(allTops_.clear());
+		this->minCost = this->minCostAdjustment_;
+		this->foundRange = rsSeed_->foundRange;
+	}
+
+	/**
+	 * Advance the aligner by one memory op.  Return true iff we're
+	 * done with this read.
+	 */
+	virtual void advanceImpl(int until) {
+		if(this->done) return;
+		if(generating_) {
+			// Advance the seed range source
+			if(rsSeed_->done) {
+				// If the partial-alignment generator is done but
+				// generating_ is true, then we must be totally done
+				this->done = true;
+				return;
+			}
+			// Advance the partial-alignment generator
+			rsSeed_->advance(ADV_FOUND_RANGE);
+			if(rsSeed_->foundRange) {
+				seedRange_ = &rsSeed_->range();
+				rsSeed_->foundRange = false;
+				assert_gt(seedRange_->numMms, 0);
+				// Keep the range for the hi-half partial alignment so
+				// that the driver can (a) modify the pattern string
+				// and (b) modify results from the RangeSource to
+				// include these edits.
+				rsFull_->setQuery(patsrc_, seedRange_);
+				this->minCost = max(rsFull_->minCost, this->minCostAdjustment_);
+				this->foundRange = rsFull_->foundRange;
+				generating_ = false;
+			}
+		} else {
+			if(!rsFull_->done) rsFull_->advance(until);
+			this->minCost = max(rsFull_->minCost, this->minCostAdjustment_);
+			this->foundRange = rsFull_->foundRange;
+			if(rsFull_->done) {
+				if(rsSeed_->done) {
+					// No more full or partial alignments; done
+					this->done = true;
+					return;
+				}
+				// Keep generating partial alignments that we can extend
+				generating_ = true;
+			}
+		}
+	}
+
+	/**
+	 * Return the range found.
+	 */
+	virtual Range& range() {
+		Range& r = rsFull_->range();
+		r.fw = fw_;
+		r.mate1 = mate1_;
+		return r;
+	}
+
+	/// Return length of current query
+	virtual uint32_t qlen() const {
+		return rsFull_->qlen();
+	}
+
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	virtual bool mate1() const {
+		return mate1_;
+	}
+
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	virtual bool fw() const {
+		return fw_;
+	}
+
+protected:
+
+	EbwtRangeSourceDriver* rsFull_;
+	EbwtRangeSourceDriver* rsSeed_;
+	PatternSourcePerThread* patsrc_;
+	PathManager pm_;
+	PathManager pmSeed_;
+	uint32_t seedLen_;
+	bool fw_;
+	bool mate1_;
+	bool generating_;
+	Range *seedRange_;
 };
 
 #endif /*EBWT_SEARCH_BACKTRACK_H_*/

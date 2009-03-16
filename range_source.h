@@ -1352,9 +1352,10 @@ public:
 	/// Set query to find ranges for
 	virtual void setQuery(seqan::String<Dna5>* qry,
 	                      seqan::String<char>* qual,
-	                      seqan::String<char>* name) = 0;
+	                      seqan::String<char>* name,
+	                      Range *partial) = 0;
 	/// Set up the range search.
-	virtual void initBranch(PathManager& pm, uint32_t ham) = 0;
+	virtual void initBranch(PathManager& pm, uint16_t icost) = 0;
 	/// Advance the range search by one memory op
 	virtual void advanceBranch(int until, PathManager& pm) = 0;
 
@@ -1390,16 +1391,16 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQuery(PatternSourcePerThread* patsrc) {
+	virtual void setQuery(PatternSourcePerThread* patsrc, Range *r) {
 		// Clear our buffer of previously-dished-out top offsets
 		ASSERT_ONLY(allTops_.clear());
-		setQueryImpl(patsrc);
+		setQueryImpl(patsrc, r);
 	}
 
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc) = 0;
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) = 0;
 
 	/**
 	 * Advance the aligner by one memory op.  Return true iff we're
@@ -1433,6 +1434,17 @@ public:
 
 	virtual uint32_t qlen() const = 0;
 
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	virtual bool mate1() const = 0;
+
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	virtual bool fw() const = 0;
+
 	/// Set to true iff we just found a range.
 	bool foundRange;
 
@@ -1448,8 +1460,6 @@ public:
 	 */
 	uint16_t minCost;
 
-protected:
-
 	/**
 	 * Adjustment to the minCost given by the caller that constructed
 	 * the object.  This is useful if we know the lowest-cost branch is
@@ -1458,6 +1468,8 @@ protected:
 	 * mismatch somewhere down the line).
 	 */
 	uint16_t minCostAdjustment_;
+
+protected:
 
 #ifndef NDEBUG
 	std::set<int64_t> allTops_;
@@ -1486,7 +1498,7 @@ public:
 		uint32_t minCostAdjustment = 0) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
-		pat_(NULL), qual_(NULL), name_(NULL), sinkPt_(sinkPt),
+		sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
 		pm_()
@@ -1501,44 +1513,45 @@ public:
 	/**
 	 * Prepare this aligner for the next read.
 	 */
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		bool ebwtFw = rs_->curEbwt()->fw();
+		String<Dna5> *pat;
+		String<char> *qual;
+		String<char> *name;
 		if(mate1_) {
 			ReadBuf& buf = patsrc->bufa();
 			if(fw_) {
-				pat_  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
-				qual_ = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
+				pat  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
+				qual = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
 			} else {
-				pat_  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
-				qual_ = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
+				pat  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
+				qual = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
 			}
-			name_ = &buf.name;
+			name = &buf.name;
 		} else {
 			ReadBuf& buf = patsrc->bufb();
 			if(fw_) {
-				pat_  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
-				qual_ = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
+				pat  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
+				qual = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
 			} else {
-				pat_  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
-				qual_ = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
+				pat  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
+				qual = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
 			}
-			name_ = &buf.name;
+			name = &buf.name;
 		}
-		assert(pat_ != NULL);
-		assert(qual_ != NULL);
-		assert(name_ != NULL);
-		len_ = seqan::length(*pat_);
+		len_ = seqan::length(*pat);
 		assert_gt(len_, 0);
 		this->done = false;
-		initRangeSource();
-		if(this->done) return;
 		pm_.reset();
-		rs_->setQuery(pat_, qual_, name_);
+		rs_->setQuery(pat, qual, name, r);
+		initRangeSource(*qual);
+		if(this->done) return;
 		ASSERT_ONLY(allTops_.clear());
+		uint16_t icost = (r != NULL) ? r->cost : 0;
 		if(!rs_->done) {
-			rs_->initBranch(pm_, 0); // set up initial branch
+			rs_->initBranch(pm_, icost); // set up initial branch
 		}
-		this->minCost = max<uint16_t>(0, this->minCostAdjustment_);
+		this->minCost = max<uint16_t>(icost, this->minCostAdjustment_);
 		this->done = rs_->done || pm_.empty();
 		this->foundRange = rs_->foundRange;
 	}
@@ -1549,7 +1562,6 @@ public:
 	 */
 	virtual void advanceImpl(int until) {
 		if(this->done) return;
-		assert(pat_ != NULL);
 		assert(!pm_.empty());
 		params_.setFw(fw_);
 		// Advance the RangeSource for the forward-oriented read
@@ -1605,16 +1617,13 @@ public:
 		return fw_;
 	}
 
-protected:
+	virtual void initRangeSource(const String<char>& qual) = 0;
 
-	virtual void initRangeSource() = 0;
+protected:
 
 	// Progress state
 	uint32_t len_;
 	bool mate1_;
-	String<Dna5>* pat_;
-	String<char>* qual_;
-	String<char>* name_;
 
 	// Temporary HitSink; to be deleted
 	HitSinkPerThread* sinkPt_;
@@ -1637,14 +1646,14 @@ template<typename TRangeSource>
 class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef std::vector<SingleRangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
+	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
 
 public:
 
 	ListRangeSourceDriver(const TRangeSrcDrPtrVec& rss) :
 		RangeSourceDriver<TRangeSource>(false),
 		cur_(0), ham_(0), rss_(rss) /* copy */,
-		patsrc_(NULL)
+		patsrc_(NULL), seedRange_(NULL)
 	{
 		assert_gt(rss_.size(), 0);
 		assert(!this->done);
@@ -1657,11 +1666,12 @@ public:
 	}
 
 	/// Set query to find ranges for
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		cur_ = 0; // go back to first RangeSource in list
 		this->done = false;
-		rss_[cur_]->setQuery(patsrc);
+		rss_[cur_]->setQuery(patsrc, r);
 		patsrc_ = patsrc; // so that we can call setQuery on the other elements later
+		seedRange_ = r;
 		this->done = (cur_ == rss_.size()-1) && rss_[cur_]->done;
 		this->minCost = max(rss_[cur_]->minCost, this->minCostAdjustment_);
 		this->foundRange = rss_[cur_]->foundRange;
@@ -1674,7 +1684,7 @@ public:
 		if(rss_[cur_]->done) {
 			// Move on to next RangeSourceDriver
 			if(cur_ < rss_.size()-1) {
-				rss_[++cur_]->setQuery(patsrc_);
+				rss_[++cur_]->setQuery(patsrc_, seedRange_);
 				this->minCost = max(rss_[cur_]->minCost, this->minCostAdjustment_);
 				this->foundRange = rss_[cur_]->foundRange;
 			} else {
@@ -1699,12 +1709,28 @@ public:
 		return rss_[cur_]->qlen();
 	}
 
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	virtual bool mate1() const {
+		return rss_[0]->mate1();
+	}
+
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	virtual bool fw() const {
+		return rss_[0]->fw();
+	}
+
 protected:
 
 	uint32_t cur_;
 	uint32_t ham_;
 	TRangeSrcDrPtrVec rss_;
 	PatternSourcePerThread* patsrc_;
+	Range *seedRange_;
 };
 
 /**
@@ -1720,7 +1746,7 @@ template<typename TRangeSource>
 class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef SingleRangeSourceDriver<TRangeSource>* TRangeSrcDrPtr;
+	typedef RangeSourceDriver<TRangeSource>* TRangeSrcDrPtr;
 	typedef std::vector<TRangeSrcDrPtr> TRangeSrcDrPtrVec;
 
 public:
@@ -1766,12 +1792,12 @@ public:
 	}
 
 	/// Set query to find ranges for
-	virtual void setQueryImpl(PatternSourcePerThread* patsrc) {
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
 		const size_t rssSz = rss_.size();
 		for(size_t i = 0; i < rssSz; i++) {
 			// Assuming that all
-			rss_[i]->setQuery(patsrc);
+			rss_[i]->setQuery(patsrc, r);
 		}
 		sortRss();
 		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
@@ -1908,6 +1934,21 @@ public:
 	/// Return length of current query
 	virtual uint32_t qlen() const {
 		return rss_[0]->qlen();
+	}
+
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	virtual bool mate1() const {
+		return rss_[0]->mate1();
+	}
+
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	virtual bool fw() const {
+		return rss_[0]->fw();
 	}
 
 protected:
