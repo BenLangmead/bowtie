@@ -303,22 +303,22 @@ public:
 		if(quiet_) return;
 		if(first_) {
 			assert_eq(0llu, numReported_);
-			cout << "No results" << endl;
+			cerr << "No results" << endl;
 		}
 		else if(numReportedPaired_ > 0 && numReported_ == 0) {
-			cout << "Reported " << (numReportedPaired_ >> 1)
+			cerr << "Reported " << (numReportedPaired_ >> 1)
 			     << " paired-end alignments to " << _outs.size()
 			     << " output stream(s)" << endl;
 		}
 		else if(numReported_ > 0 && numReportedPaired_ == 0) {
-			cout << "Reported " << numReported_
+			cerr << "Reported " << numReported_
 			     << " alignments to " << _outs.size()
 			     << " output stream(s)" << endl;
 		}
 		else {
 			assert_gt(numReported_, 0);
 			assert_gt(numReportedPaired_, 0);
-			cout << "Reported " << (numReportedPaired_ >> 1)
+			cerr << "Reported " << (numReportedPaired_ >> 1)
 			     << " paired-end alignments and " << numReported_
 			     << " singleton alignments to " << _outs.size()
 			     << " output stream(s)" << endl;
