@@ -30,6 +30,13 @@ struct Range {
 	std::vector<uint32_t> mms;   // list of positions with mismatches
 	std::vector<uint8_t>  refcs; // reference characters at mismatch positions
 	const Ebwt<seqan::String<seqan::Dna> > *ebwt;
+
+	bool repOk() const {
+		assert_eq(refcs.size(), mms.size());
+		assert_eq(numMms, mms.size());
+		assert_leq(stratum, numMms);
+		return true;
+	}
 };
 
 #endif /* RANGE_H_ */

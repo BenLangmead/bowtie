@@ -425,6 +425,7 @@ public:
 			assert(!driver_->done);
 			if(driver_->foundRange) {
 				const Range& ra = driver_->range();
+				assert(ra.repOk());
 				if(rangeMode_) {
 					this->done = report(ra, ra.top, ra.bot, 0);
 					driver_->foundRange = false;
@@ -619,6 +620,7 @@ public:
 				driverFw_->advance();
 				if(driverFw_->foundRange) {
 					const Range& ra = driverFw_->range();
+					assert(ra.repOk());
 					assert(ra.fw == fw);
 					if(rangeMode_) {
 						this->done = report(ra, ra.top, ra.bot, 0);
@@ -645,6 +647,7 @@ public:
 				// Advance the RangeSource for the reverse-complement read
 				if(driverRc_->foundRange) {
 					const Range& ra = driverRc_->range();
+					assert(ra.repOk());
 					if(rangeMode_) {
 						this->done = report(ra, ra.top, ra.bot, 0);
 					} else {
@@ -1198,6 +1201,7 @@ protected:
 					// our threshold, we're now operating in "mixed
 					// mode"
 					const Range& r = drL_->range();
+					assert(r.repOk());
 					this->done = resolveOutstandingInRef(
 							pairFw, rchase_->off(),
 					        r.ebwt->_plen[rchase_->off().first], r);
@@ -1218,6 +1222,7 @@ protected:
 					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
 					assert(drR_->foundRange);
 					const Range& r = drR_->range();
+					assert(r.repOk());
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
 					rchase_->setTopBot(top, bot, drR_->qlen(), r.ebwt);
@@ -1265,6 +1270,7 @@ protected:
 					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
 					assert(drL_->foundRange);
 					const Range& r = drL_->range();
+					assert(r.repOk());
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
 					rchase_->setTopBot(top, bot, drL_->qlen(), r.ebwt);
@@ -1327,6 +1333,7 @@ protected:
 							*delayedchaseL_ = true;
 							*chaseR_ = true;
 							const Range& r = drR_->range();
+							assert(r.repOk());
 							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
@@ -1388,12 +1395,14 @@ protected:
 							*delayedchaseR_ = true;
 							*chaseL_ = true;
 							const Range& r = drL_->range();
+							assert(r.repOk());
 							rchase_->setTopBot(r.top, r.bot, drL_->qlen(), r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseR_ = true;
 							const Range& r = drR_->range();
+							assert(r.repOk());
 							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
 						}
 					}
@@ -1636,6 +1645,7 @@ public:
 			assert(rchase_->foundOff() || rchase_->done);
 			if(rchase_->foundOff()) {
 				const Range& r = driver_->range();
+				assert(r.repOk());
 				this->done = resolveOutstandingInRef(
 						r.mate1, rchase_->off(),
 						r.ebwt->_plen[rchase_->off().first], r);
@@ -1666,6 +1676,7 @@ public:
 					// Use Burrows-Wheeler for this pair (as usual)
 					chase_ = true;
 					const Range& r = driver_->range();
+					assert(r.repOk());
 					rchase_->setTopBot(r.top, r.bot, driver_->qlen(), r.ebwt);
 				}
 			} else {
@@ -1826,7 +1837,7 @@ protected:
 		std::vector<uint32_t> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, orFw ? &pairs_fw_ : &pairs_rc_,
-		                  toff, !matchRight);
+		                  toff, fw);
 		assert_eq(ranges.size(), offs.size());
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];

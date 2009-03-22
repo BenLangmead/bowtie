@@ -1,30 +1,39 @@
 #!/usr/bin/perl -w
 
 #
-# Throw lots of random but interesting test cases at the extended
-# Burrows-Wheeler transform builder.
+# Generate and run a series of random (but non-trivial) test cases at
+# the Bowtie suite of tools, including bowtie, bowtie-build,
+# bowtie-maptool, and bowtie-inspect.
 #
-# Usage: perl random_tester.pl [rand seed] [# outer iters] [# inner iters]
+# Usage: perl random_tester.pl [rand seed] \
+#                              [# outer iters] \
+#                              [# inner iters] \
+#                              [min # text bases] \
+#                              [max text bases to add to min] \
+#                              [min # read bases] \
+#                              [max read bases to add to min]
 #
 
 use List::Util qw[min max];
 use Getopt::Std;
 
 my %options=();
-getopts("mhno",\%options);
-
-my $old_args = 0;
-$old_args = 1 if defined $options{o};
+getopts("mhnop:",\%options);
 
 if(defined $options{h}) {
-	print "Usage: perl random_bowtie_tests.pl.pl seed outer inner tbase trand pbase prand\n";
+	print "Usage: perl random_bowtie_tests.pl seed outer inner tbase trand pbase prand\n";
 	exit 0;
 }
+
+# Let user specify a policy that will always override pickPolicy()
+my $setPolicy;
+$setPolicy = $options{p} if defined($options{p});
 
 unless(defined $options{n}) {
 	system("make bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
 
+# Alignment policies
 my @policies = (
 	"-n 3",
 	"-n 2",
@@ -40,6 +49,7 @@ sub pickPolicy {
 	my $pe = shift;
 	my $r = int(rand($#policies + 1));
 	my $pol = $policies[$r];
+	return $setPolicy if defined($setPolicy);
 	# If it's an end-to-end policy, then perhaps add "--stateful" to
 	# activate the branching best-first search
 	if($pe) {
@@ -488,24 +498,14 @@ sub doSearch {
 		return 0;
 	}
 	my $err = trim(`cat .tmp$seed.stderr 2> /dev/null`);
-	
-	# Yielded no results when we were expecting some?
-	if($out eq "No results" && $requireResult) {
+
+	# No output?
+	if($out eq "" && $requireResult) {
 		print "Expected results but got \"No Results\"\n";
 		if($exitOnFail) {
 			print "Stdout:\n$out\nStderr:\n$err\n";
 			exit 1;
 		}
-		return 0;
-	} elsif($out eq "No results") {
-		# Yielded no results, but that's OK
-		return 1;
-	}
-	
-	# No output?
-	if($out eq "") {
-		print "Expected some output but got none\n";
-		exit 1 if($exitOnFail);
 		return 0;
 	}
 	
@@ -588,6 +588,28 @@ sub doSearch {
 				$c++;
 			}
 			close(UNFQ);
+		}
+	}
+	
+	if($pe) {
+		# If search was for paired-end alignments, then verify the
+		# outcome using pe_verify.pl
+		$policy =~ s/--.*//;
+		$patstr =~ s/-1//;
+		$patstr =~ s/-2//;
+		$cmd = "perl scripts/pe_verify.pl -d $policy .tmp$seed $patstr";
+		print "$cmd\n";
+		$out = trim(`$cmd 2>.tmp$seed.pe_verify.stderr`);
+		
+		# Bad exitlevel?
+		if($? != 0) {
+			print "scripts/pe_verify.pl exitlevel: $?\n";
+			if($exitOnFail) {
+				my $err = trim(`cat .tmp$seed.pe_verify.stderr 2> /dev/null`);
+				print "Stdout:\n$out\nStderr:\n$err\n";
+				exit 1;
+			}
+			return 0;
 		}
 	}
 	

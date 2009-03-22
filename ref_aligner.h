@@ -34,9 +34,14 @@ class RefAligner {
 	typedef std::set<TU64Pair> TSetPairs;
 
 public:
-	RefAligner(uint32_t seedLen) :
-		seedLen_(seedLen), refbuf_(buf_), refbufSz_(REF_ALIGNER_BUFSZ),
-		freeRefbuf_(false) { }
+	RefAligner(bool verbose = false,
+	           uint32_t seedLen = 0,
+	           uint32_t qualMax = 0xffffffff,
+	           bool maqPenalty = false) :
+		verbose_(verbose), seedLen_(seedLen), qualMax_(qualMax),
+		maqPenalty_(maqPenalty), refbuf_(buf_),
+		refbufSz_(REF_ALIGNER_BUFSZ), freeRefbuf_(false)
+		{ }
 
 	/**
 	 * Free the reference-space alignment buffer if this object
@@ -63,7 +68,7 @@ public:
 	                  TU32Vec& results,
 	                  TSetPairs* pairs = NULL,
 	                  uint32_t aoff = 0xffffffff,
-	                  bool low = false)
+	                  bool seedOnLeft = false)
 	{
 		assert_gt(numToFind, 0);
 		uint32_t spread = end - begin;
@@ -76,11 +81,24 @@ public:
 		int offset = refs->getStretch(this->refbuf_, tidx, begin, spread);
 		uint8_t *buf = ((uint8_t*)this->refbuf_) + offset;
 		// Look for alignments
-		return seed64Find(numToFind, tidx, buf, qry, quals, begin,
-		                  end, ranges, results, pairs, aoff, low);
+		ASSERT_ONLY(uint32_t irsz = ranges.size());
+		anchor64Find(numToFind, tidx, buf, qry, quals, begin,
+		             end, ranges, results, pairs, aoff, seedOnLeft);
+#ifndef NDEBUG
+		for(size_t i = irsz; i < results.size(); i++) {
+			assert_eq(ranges[i].numMms, ranges[i].mms.size());
+			assert_eq(ranges[i].numMms, ranges[i].refcs.size());
+		}
+#endif
 	}
 
-	virtual void seed64Find(uint32_t numToFind,
+	/**
+	 * Find one alignment of qry:quals in the range begin-end in
+	 * reference string ref.  Store the alignment details in range.
+	 * Uses a combination of the anchor bases and 64-bit arithmetic to
+	 * find anchors quickly.
+	 */
+	virtual void anchor64Find(uint32_t numToFind,
 	                uint32_t tidx,
 	                uint8_t* ref,
                     const TDna5Str& qry,
@@ -91,7 +109,7 @@ public:
 	                TU32Vec& results,
 	                TSetPairs* pairs = NULL,
 	                uint32_t aoff = 0xffffffff,
-	                bool low = false) const = 0;
+	                bool seedOnLeft = false) const = 0;
 
 	/**
 	 * Set a new reference-sequence buffer.
@@ -124,7 +142,10 @@ public:
 	}
 
 protected:
+	bool      verbose_;   /// be talkative
 	uint32_t  seedLen_;   /// length of seed region for read
+	uint32_t  qualMax_;   /// maximum sum of quality penalties
+	bool      maqPenalty_;/// whether to round as in Maq
 	uint32_t *refbuf_;    /// pointer to current reference buffer
 	uint32_t  refbufSz_;  /// size of current reference buffer
 	uint32_t  buf_[REF_ALIGNER_BUFSZ / 4]; /// built-in reference buffer (may be superseded)
@@ -146,7 +167,10 @@ class ExactRefAligner : public RefAligner<TStr> {
 	typedef std::set<TU64Pair> TSetPairs;
 
 public:
-	ExactRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
+
+	ExactRefAligner(bool verbose) :
+		RefAligner<TStr>(verbose) { }
+
 	virtual ~ExactRefAligner() { }
 
 protected:
@@ -165,7 +189,7 @@ protected:
 	               TU32Vec& results,
 	               TSetPairs* pairs,
 	               uint32_t aoff,
-	               bool low) const
+	               bool seedOnLeft) const
 	{
 		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
@@ -239,7 +263,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	virtual void seed64Find(uint32_t numToFind,
+	virtual void anchor64Find(uint32_t numToFind,
                     uint32_t tidx,
 	                uint8_t *ref,
                     const TDna5Str& qry,
@@ -250,7 +274,7 @@ protected:
 	                TU32Vec& results,
 	                TSetPairs* pairs,
 	                uint32_t aoff, // offset of anchor mate
-	                bool low) const
+	                bool seedOnLeft) const
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
@@ -264,30 +288,31 @@ protected:
 		// Get all naive hits
 		TRangeVec r2; TU32Vec re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
-		          re2, pairs, aoff, low);
+		          re2, pairs, aoff, seedOnLeft);
 #endif
-		const uint32_t seedBitPairs = min<int>(qlen, 32);
-		const uint32_t seedOverhang = qlen <= 32 ? 0 : qlen - 32;
+		const uint32_t anchorBitPairs = min<int>(qlen, 32);
+		// anchorOverhang = # read bases not included in the anchor
+		const uint32_t anchorOverhang = qlen <= 32 ? 0 : qlen - 32;
 		const uint32_t lim = end - qlen - begin;
 		const uint32_t halfway = begin + (lim >> 1);
-		uint64_t seed = 0llu;
+		uint64_t anchor = 0llu;
 		uint64_t buffw = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
-		// to discard bits that were rotated out of the seed area
+		// to discard bits that were rotated out of the anchor area
 		uint64_t clearMask = 0xffffffffffffffffllu;
 		bool useMask = false;
-		if(seedBitPairs < 32) {
-			clearMask >>= ((32-seedBitPairs) << 1);
+		if(anchorBitPairs < 32) {
+			clearMask >>= ((32-anchorBitPairs) << 1);
 			useMask = true;
 		}
-		const int lhsShift = ((seedBitPairs - 1) << 1);
-		// Build the contents of the 'seed' dword and the initial
+		const int lhsShift = ((anchorBitPairs - 1) << 1);
+		// Build the contents of the 'anchor' dword and the initial
 		// contents of the 'buffw' dword.  If there are fewer than 32
-		// seedBitPairs, the content will be packed into the least
+		// anchorBitPairs, the content will be packed into the least
 		// significant bits of the word.
 		uint32_t skipLeftToRights = 0;
 		uint32_t skipRightToLefts = 0;
-		for(uint32_t i = 0; i < seedBitPairs; i++) {
+		for(uint32_t i = 0; i < anchorBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			assert_leq(c, 4);
 			if(c & 4) {
@@ -301,31 +326,31 @@ protected:
 				// alignment based at 'halfway'; so skipLeftToRights is
 				// i, not i+1
 				skipLeftToRights = max(skipLeftToRights, i);
-				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+				skipRightToLefts = max(skipRightToLefts, anchorBitPairs - i);
 			}
 			assert_lt(r, 4);
 			assert_lt(c, 4);
-			seed  = ((seed  << 2llu) | c);
+			anchor  = ((anchor  << 2llu) | c);
 			buffw = ((buffw << 2llu) | r);
 		}
-		// Check whether read is disqualified by Ns outside of the seed
+		// Check whether read is disqualified by Ns outside of the anchor
 		// region
-		for(uint32_t i = seedBitPairs; i < qlen; i++) {
+		for(uint32_t i = anchorBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				assert_eq(r2.size(), ranges.size() - rangesInitSz);
 				return; // can't match if query has Ns
 			}
 		}
 		uint64_t bufbw = buffw;
-		// We're moving the right-hand edge of the seed along until
-		// it's 'seedOverhang' chars from the end of the target region.
+		// We're moving the right-hand edge of the anchor along until
+		// it's 'anchorOverhang' chars from the end of the target region.
 		// Note that we're not making a 3'/5' distinction here; if we
-		// were, we might need to make the 'seedOverhang' adjustment on
+		// were, we might need to make the 'anchorOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
 		uint32_t riHi  = halfway;
 		uint32_t rirHi = halfway - begin;
-		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
 		for(uint32_t i = 1; i <= lim + 1; i++) {
@@ -335,11 +360,11 @@ protected:
 			if(hi) {
 				hi = false;
 				// Moving left-to-right
-				riHi++; rirHi++; rirHiSeed++;
-				r = (int)ref[rirHiSeed];
+				riHi++; rirHi++; rirHiAnchor++;
+				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = seedBitPairs;
+					skipLeftToRights = anchorBitPairs;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -350,7 +375,7 @@ protected:
 					skipLeftToRights--;
 					continue;
 				}
-				if(buffw != seed) {
+				if(buffw != anchor) {
 					continue;
 				}
 			} else {
@@ -373,7 +398,7 @@ protected:
 					skipRightToLefts--;
 					continue;
 				}
-				if(bufbw != seed) {
+				if(bufbw != anchor) {
 					continue;
 				}
 			}
@@ -381,13 +406,13 @@ protected:
 			bool foundHit = true;
 			uint32_t ri = hi ? riLo : riHi;
 			uint32_t rir = hi ? rirLo : rirHi;
-			if(seedOverhang > 0) {
-				// Does the non-seed part of the alignment (the
+			if(anchorOverhang > 0) {
+				// Does the non-anchor part of the alignment (the
 				// "overhang") ruin it?
 				bool skipCandidate = false;
-				for(uint32_t j = 0; j < seedOverhang; j++) {
-					assert_lt(ri + seedBitPairs + j, end);
-					int rc = (int)ref[rir + seedBitPairs + j];
+				for(uint32_t j = 0; j < anchorOverhang; j++) {
+					assert_lt(ri + anchorBitPairs + j, end);
+					int rc = (int)ref[rir + anchorBitPairs + j];
 					if(rc == 4) {
 						// Oops, encountered an N in the reference in
 						// the overhang portion of the candidate
@@ -395,10 +420,10 @@ protected:
 						// (Note that we inverted hi earlier)
 						if(hi) {
 							// Right-to-left
-							skipRightToLefts = seedOverhang - j - 1;
+							skipRightToLefts = anchorOverhang - j - 1;
 						} else {
 							// Left-to-right
-							skipLeftToRights = seedBitPairs + j;
+							skipLeftToRights = anchorBitPairs + j;
 						}
 						skipCandidate = true;
 						break; // Skip this candidate
@@ -415,7 +440,7 @@ protected:
 				if(pairs != NULL) {
 					TU64Pair p;
 					if(ri < aoff) {
-						// By convention, the upstream ("low") mate's
+						// By convention, the upstream mate's
 						// coordinates go in the 'first' field
 						p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
 						p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
@@ -476,7 +501,10 @@ class OneMMRefAligner : public RefAligner<TStr> {
 	typedef std::set<TU64Pair> TSetPairs;
 
 public:
-	OneMMRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
+
+	OneMMRefAligner(bool verbose) :
+		RefAligner<TStr>(verbose) { }
+
 	virtual ~OneMMRefAligner() { }
 
 protected:
@@ -495,7 +523,7 @@ protected:
 	               TU32Vec& results,
 	               TSetPairs* pairs,
 	               uint32_t aoff,
-	               bool low) const
+	               bool seedOnLeft) const
 	{
 		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
@@ -579,7 +607,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	virtual void seed64Find(uint32_t numToFind,
+	virtual void anchor64Find(uint32_t numToFind,
 	                uint32_t tidx,
 	                uint8_t* ref,
                     const TDna5Str& qry,
@@ -590,7 +618,7 @@ protected:
 	                TU32Vec& results,
 	                TSetPairs* pairs = NULL,
 	                uint32_t aoff = 0xffffffff,
-	                bool low = false) const
+	                bool seedOnLeft = false) const
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
@@ -604,34 +632,35 @@ protected:
 		// Get results from the naive matcher for sanity-checking
 		TRangeVec r2; TU32Vec re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
-		          re2, pairs, aoff, low);
+		          re2, pairs, aoff, seedOnLeft);
 #endif
-		const uint32_t seedBitPairs = min<int>(qlen, 32);
-		const int lhsShift = ((seedBitPairs - 1) << 1);
-		const uint32_t seedCushion  = 32 - seedBitPairs;
-		const uint32_t seedOverhang = (qlen <= 32 ? 0 : (qlen - 32));
+		const uint32_t anchorBitPairs = min<int>(qlen, 32);
+		const int lhsShift = ((anchorBitPairs - 1) << 1);
+		const uint32_t anchorCushion  = 32 - anchorBitPairs;
+		// anchorOverhang = # read bases not included in the anchor
+		const uint32_t anchorOverhang = (qlen <= 32 ? 0 : (qlen - 32));
 		const uint32_t lim = end - qlen - begin;
 		const uint32_t halfway = begin + (lim >> 1);
-		uint64_t seed = 0llu;
+		uint64_t anchor = 0llu;
 		uint64_t buffw = 0llu;  // rotating ref sequence buffer
 		// OR the 'diff' buffer with this so that we can always count
 		// 'N's as mismatches
 		uint64_t diffMask = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
-		// to discard bits that were rotated out of the seed area
+		// to discard bits that were rotated out of the anchor area
 		uint64_t clearMask = 0xffffffffffffffffllu;
 		bool useMask = false;
-		if(seedBitPairs < 32) {
-			clearMask >>= ((32-seedBitPairs) << 1);
+		if(anchorBitPairs < 32) {
+			clearMask >>= ((32-anchorBitPairs) << 1);
 			useMask = true;
 		}
-		int nsInSeed = 0;
+		int nsInAnchor = 0;
 		int nPos = -1;
 		uint32_t skipLeftToRights = 0;
 		uint32_t skipRightToLefts = 0;
-		// Construct the 'seed' 64-bit buffer so that it holds all of
-		// the first 'seedBitPairs' bit pairs of the query.
-		for(uint32_t i = 0; i < seedBitPairs; i++) {
+		// Construct the 'anchor' 64-bit buffer so that it holds all of
+		// the first 'anchorBitPairs' bit pairs of the query.
+		for(uint32_t i = 0; i < anchorBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r & 4) {
@@ -640,48 +669,48 @@ protected:
 				// alignment based at 'halfway'; so skipLeftToRights is
 				// i, not i+1
 				skipLeftToRights = max(skipLeftToRights, i);
-				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+				skipRightToLefts = max(skipRightToLefts, anchorBitPairs - i);
 			}
 			assert_leq(c, 4);
 			assert_lt(r, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
-				if(++nsInSeed > 1) {
-					// More than one 'N' in the seed region; can't
+				if(++nsInAnchor > 1) {
+					// More than one 'N' in the anchor region; can't
 					// possibly have a 1-mismatch hit anywhere
 					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return;   // can't match if query has Ns
 				}
 				nPos = (int)i;
-				// Make it look like an 'A' in the seed
+				// Make it look like an 'A' in the anchor
 				c = 0;
 				diffMask = (diffMask << 2llu) | 1llu;
 			} else {
 				diffMask <<= 2llu;
 			}
-			seed  = ((seed  << 2llu) | c);
+			anchor  = ((anchor  << 2llu) | c);
 			buffw = ((buffw << 2llu) | r);
 		}
-		// Check whether read is disqualified by Ns outside of the seed
+		// Check whether read is disqualified by Ns outside of the anchor
 		// region
-		for(uint32_t i = seedBitPairs; i < qlen; i++) {
+		for(uint32_t i = anchorBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
-				if(++nsInSeed > 1) {
+				if(++nsInAnchor > 1) {
 					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return; // can't match if query has Ns
 				}
 			}
 		}
 		uint64_t bufbw = buffw;
-		// We're moving the right-hand edge of the seed along until
-		// it's 'seedOverhang' chars from the end of the target region.
+		// We're moving the right-hand edge of the anchor along until
+		// it's 'anchorOverhang' chars from the end of the target region.
 		// Note that we're not making a 3'/5' distinction here; if we
-		// were, we might need to make the 'seedOverhang' adjustment on
+		// were, we might need to make the 'anchorOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
 		uint32_t riHi  = halfway;
 		uint32_t rirHi = halfway - begin;
-		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
 		for(uint32_t i = 1; i <= lim + 1; i++) {
@@ -694,11 +723,11 @@ protected:
 				// Moving left-to-right
 				riHi++;
 				rirHi++;
-				rirHiSeed++;
-				r = (int)ref[rirHiSeed];
+				rirHiAnchor++;
+				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = seedBitPairs;
+					skipLeftToRights = anchorBitPairs;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -709,7 +738,7 @@ protected:
 					skipLeftToRights--;
 					continue;
 				}
-				diff = (buffw ^ seed) | diffMask;
+				diff = (buffw ^ anchor) | diffMask;
 			} else {
 				hi = true;
 				// Moving right-to-left
@@ -731,7 +760,7 @@ protected:
 					skipRightToLefts--;
 					continue;
 				}
-				diff = (bufbw ^ seed) | diffMask;
+				diff = (bufbw ^ anchor) | diffMask;
 			}
 			if((diff & 0xffffffff00000000llu) &&
 			   (diff & 0x00000000ffffffffllu)) continue;
@@ -740,7 +769,7 @@ protected:
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
 			// As a first cut, see if there are too many mismatches in
-			// the first and last parts of the seed
+			// the first and last parts of the anchor
 			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
 			if(diffs > 1) continue;
 			diffs += u8toMms[(int)diff8[1]] +
@@ -774,15 +803,15 @@ protected:
 				assert_neq(0, diff);
 				assert_geq(mmpos, 0);
 				assert_lt(mmpos, 32);
-				mmpos -= seedCushion;
+				mmpos -= anchorCushion;
 				refc = "ACGT"[(int)ref[rir + mmpos]];
 			}
-			// Now extend the seed into a longer alignment
+			// Now extend the anchor into a longer alignment
 			bool foundHit = true;
-			if(seedOverhang > 0) {
-				assert_leq(ri + seedBitPairs + seedOverhang, end);
+			if(anchorOverhang > 0) {
+				assert_leq(ri + anchorBitPairs + anchorOverhang, end);
 				bool skipCandidate = false;
-				for(uint32_t j = 0; j < seedOverhang; j++) {
+				for(uint32_t j = 0; j < anchorOverhang; j++) {
 					int rc = (int)ref[rir + 32 + j];
 					if(rc == 4) {
 						// Oops, encountered an N in the reference in
@@ -791,10 +820,10 @@ protected:
 						// (Note that we inverted hi earlier)
 						if(hi) {
 							// Right-to-left
-							skipRightToLefts = seedOverhang - j - 1;
+							skipRightToLefts = anchorOverhang - j - 1;
 						} else {
 							// Left-to-right
-							skipLeftToRights = seedBitPairs + j;
+							skipLeftToRights = anchorBitPairs + j;
 						}
 						skipCandidate = true; // Skip this candidate
 						break;
@@ -815,7 +844,7 @@ protected:
 			if(pairs != NULL) {
 				TU64Pair p;
 				if(ri < aoff) {
-					// By convention, the upstream ("low") mate's
+					// By convention, the upstream mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
 					p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
@@ -876,7 +905,10 @@ class TwoMMRefAligner : public RefAligner<TStr> {
 	typedef std::set<TU64Pair> TSetPairs;
 
 public:
-	TwoMMRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
+
+	TwoMMRefAligner(bool verbose) :
+		RefAligner<TStr>(verbose) { }
+
 	virtual ~TwoMMRefAligner() { }
 
 protected:
@@ -895,7 +927,7 @@ protected:
 				   TU32Vec& results,
 				   TSetPairs* pairs,
 				   uint32_t aoff,
-				   bool low) const
+				   bool seedOnLeft) const
 	{
 		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
@@ -994,7 +1026,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	virtual void seed64Find(uint32_t numToFind,
+	virtual void anchor64Find(uint32_t numToFind,
 					uint32_t tidx,
 					uint8_t* ref,
 					const TDna5Str& qry,
@@ -1005,7 +1037,7 @@ protected:
 					TU32Vec& results,
 					TSetPairs* pairs = NULL,
 					uint32_t aoff = 0xffffffff,
-					bool low = false) const
+					bool seedOnLeft = false) const
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
@@ -1019,36 +1051,37 @@ protected:
 		// Get results from the naive matcher for sanity-checking
 		TRangeVec r2; TU32Vec re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
-				  re2, pairs, aoff, low);
+				  re2, pairs, aoff, seedOnLeft);
 #endif
-		const uint32_t seedBitPairs = min<int>(qlen, 32);
-		const int lhsShift = ((seedBitPairs - 1) << 1);
-		const uint32_t seedCushion  = 32 - seedBitPairs;
-		const uint32_t seedOverhang = (qlen <= 32 ? 0 : (qlen - 32));
+		const uint32_t anchorBitPairs = min<int>(qlen, 32);
+		const int lhsShift = ((anchorBitPairs - 1) << 1);
+		const uint32_t anchorCushion  = 32 - anchorBitPairs;
+		// anchorOverhang = # read bases not included in the anchor
+		const uint32_t anchorOverhang = (qlen <= 32 ? 0 : (qlen - 32));
 		const uint32_t lim = end - qlen - begin;
 		const uint32_t halfway = begin + (lim >> 1);
-		uint64_t seed = 0llu;
+		uint64_t anchor = 0llu;
 		uint64_t buffw = 0llu;  // rotating ref sequence buffer
 		// OR the 'diff' buffer with this so that we can always count
 		// 'N's as mismatches
 		uint64_t diffMask = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
-		// to discard bits that were rotated out of the seed area
+		// to discard bits that were rotated out of the anchor area
 		uint64_t clearMask = 0xffffffffffffffffllu;
 		bool useMask = false;
-		if(seedBitPairs < 32) {
-			clearMask >>= ((32-seedBitPairs) << 1);
+		if(anchorBitPairs < 32) {
+			clearMask >>= ((32-anchorBitPairs) << 1);
 			useMask = true;
 		}
-		int nsInSeed = 0;
+		int nsInAnchor = 0;
 		uint32_t nPoss = 0;
 		int nPos1 = -1;
 		int nPos2 = -1;
 		uint32_t skipLeftToRights = 0;
 		uint32_t skipRightToLefts = 0;
-		// Construct the 'seed' 64-bit buffer so that it holds all of
-		// the first 'seedBitPairs' bit pairs of the query.
-		for(uint32_t i = 0; i < seedBitPairs; i++) {
+		// Construct the 'anchor' 64-bit buffer so that it holds all of
+		// the first 'anchorBitPairs' bit pairs of the query.
+		for(uint32_t i = 0; i < anchorBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r & 4) {
@@ -1057,53 +1090,53 @@ protected:
 				// alignment based at 'halfway'; so skipLeftToRights is
 				// i, not i+1
 				skipLeftToRights = max(skipLeftToRights, i);
-				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+				skipRightToLefts = max(skipRightToLefts, anchorBitPairs - i);
 			}
 			assert_leq(c, 4);
 			assert_lt(r, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
-				if(++nsInSeed > 2) {
-					// More than two 'N's in the seed region; can't
+				if(++nsInAnchor > 2) {
+					// More than two 'N's in the anchor region; can't
 					// possibly have a 2-mismatch hit anywhere
 					return;   // can't match if query has Ns
-				} else if(nsInSeed == 2) {
+				} else if(nsInAnchor == 2) {
 					nPos2 = (int)i;
 					nPoss++;
 				} else {
-					assert_eq(1, nsInSeed);
+					assert_eq(1, nsInAnchor);
 					nPos1 = (int)i;
 					nPoss++;
 				}
-				// Make it look like an 'A' in the seed
+				// Make it look like an 'A' in the anchor
 				c = 0;
 				diffMask = (diffMask << 2llu) | 1llu;
 			} else {
 				diffMask <<= 2llu;
 			}
-			seed  = ((seed  << 2llu) | c);
+			anchor  = ((anchor  << 2llu) | c);
 			buffw = ((buffw << 2llu) | r);
 		}
 		assert_leq(nPoss, 2);
-		// Check whether read is disqualified by Ns outside of the seed
+		// Check whether read is disqualified by Ns outside of the anchor
 		// region
-		for(uint32_t i = seedBitPairs; i < qlen; i++) {
+		for(uint32_t i = anchorBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
-				if(++nsInSeed > 2) {
+				if(++nsInAnchor > 2) {
 					return; // can't match if query has Ns
 				}
 			}
 		}
 		uint64_t bufbw = buffw;
-		// We're moving the right-hand edge of the seed along until
-		// it's 'seedOverhang' chars from the end of the target region.
+		// We're moving the right-hand edge of the anchor along until
+		// it's 'anchorOverhang' chars from the end of the target region.
 		// Note that we're not making a 3'/5' distinction here; if we
-		// were, we might need to make the 'seedOverhang' adjustment on
+		// were, we might need to make the 'anchorOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
 		uint32_t riHi  = halfway;
 		uint32_t rirHi = halfway - begin;
-		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
 		uint32_t i;
@@ -1117,11 +1150,11 @@ protected:
 				// Moving left-to-right
 				riHi++;
 				rirHi++;
-				rirHiSeed++;
-				r = (int)ref[rirHiSeed];
+				rirHiAnchor++;
+				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = seedBitPairs;
+					skipLeftToRights = anchorBitPairs;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -1132,7 +1165,7 @@ protected:
 					skipLeftToRights--;
 					continue;
 				}
-				diff = (buffw ^ seed) | diffMask;
+				diff = (buffw ^ anchor) | diffMask;
 			} else {
 				hi = true;
 				// Moving right-to-left
@@ -1154,7 +1187,7 @@ protected:
 					skipRightToLefts--;
 					continue;
 				}
-				diff = (bufbw ^ seed) | diffMask;
+				diff = (bufbw ^ anchor) | diffMask;
 			}
 			if((diff & 0xfffff00000000000llu) &&
 			   (diff & 0x00000ffffff00000llu) &&
@@ -1164,7 +1197,7 @@ protected:
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
 			// As a first cut, see if there are too many mismatches in
-			// the first and last parts of the seed
+			// the first and last parts of the anchor
 			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
 			if(diffs > 2) continue;
 			diffs += u8toMms[(int)diff8[1]] +
@@ -1205,12 +1238,12 @@ protected:
 				assert_neq(0, diff);
 				assert_geq(mmpos1, 0);
 				assert_lt(mmpos1, 32);
-				mmpos1 -= seedCushion;
+				mmpos1 -= anchorCushion;
 				refc1 = "ACGT"[(int)ref[rir + mmpos1]];
 				if(diffs > 1) {
 					// Figure out the second mismatched position
 					ASSERT_ONLY(uint64_t origDiff2 = diff2);
-					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1+seedCushion) << 1));
+					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1+anchorCushion) << 1));
 					assert_neq(diff2, origDiff2);
 					mmpos2 = 31;
 					if((diff2 & 0xffffffffllu) == 0) { diff2 >>= 32llu; mmpos2 -= 16; }
@@ -1225,7 +1258,7 @@ protected:
 					assert_neq(0, diff2);
 					assert_geq(mmpos2, 0);
 					assert_lt(mmpos2, 32);
-					mmpos2 -= seedCushion;
+					mmpos2 -= anchorCushion;
 					assert_neq(mmpos1, mmpos2);
 					refc2 = "ACGT"[(int)ref[rir + mmpos2]];
 					if(mmpos2 < mmpos1) {
@@ -1239,12 +1272,12 @@ protected:
 					assert_lt(mmpos1, mmpos2);
 				}
 			}
-			// Now extend the seed into a longer alignment
+			// Now extend the anchor into a longer alignment
 			bool foundHit = true;
-			if(seedOverhang > 0) {
-				assert_leq(ri + seedBitPairs + seedOverhang, end);
+			if(anchorOverhang > 0) {
+				assert_leq(ri + anchorBitPairs + anchorOverhang, end);
 				bool skipCandidate = false;
-				for(uint32_t j = 0; j < seedOverhang; j++) {
+				for(uint32_t j = 0; j < anchorOverhang; j++) {
 					int rc = (int)ref[rir + 32 + j];
 					if(rc == 4) {
 						// Oops, encountered an N in the reference in
@@ -1253,10 +1286,10 @@ protected:
 						// (Note that we inverted hi earlier)
 						if(hi) {
 							// Right-to-left
-							skipRightToLefts = seedOverhang - j - 1;
+							skipRightToLefts = anchorOverhang - j - 1;
 						} else {
 							// Left-to-right
-							skipLeftToRights = seedBitPairs + j;
+							skipLeftToRights = anchorBitPairs + j;
 						}
 						skipCandidate = true; // Skip this candidate
 						break;
@@ -1281,7 +1314,7 @@ protected:
 			if(pairs != NULL) {
 				TU64Pair p;
 				if(ri < aoff) {
-					// By convention, the upstream ("low") mate's
+					// By convention, the upstream mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
 					p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
@@ -1350,7 +1383,10 @@ class ThreeMMRefAligner : public RefAligner<TStr> {
 	typedef std::set<TU64Pair> TSetPairs;
 
 public:
-	ThreeMMRefAligner(uint32_t seedLen) : RefAligner<TStr>(seedLen) { }
+
+	ThreeMMRefAligner(bool verbose) :
+		RefAligner<TStr>(verbose) { }
+
 	virtual ~ThreeMMRefAligner() { }
 
 protected:
@@ -1369,7 +1405,7 @@ protected:
 				   TU32Vec& results,
 				   TSetPairs* pairs,
 				   uint32_t aoff,
-				   bool low) const
+				   bool seedOnLeft) const
 	{
 		assert_gt(numToFind, 0);
 		const uint32_t qlen = seqan::length(qry);
@@ -1480,7 +1516,7 @@ protected:
 	 * Because we're doing end-to-end exact, we don't care which end of
 	 * 'qry' is the 5' end.
 	 */
-	virtual void seed64Find(uint32_t numToFind,
+	virtual void anchor64Find(uint32_t numToFind,
 					uint32_t tidx,
 					uint8_t* ref,
 					const TDna5Str& qry,
@@ -1491,7 +1527,7 @@ protected:
 					TU32Vec& results,
 					TSetPairs* pairs = NULL,
 					uint32_t aoff = 0xffffffff,
-					bool low = false) const
+					bool seedOnLeft = false) const
 	{
 		assert_gt(numToFind, 0);
 		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
@@ -1505,37 +1541,38 @@ protected:
 		// Get results from the naive matcher for sanity-checking
 		TRangeVec r2; TU32Vec re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
-				  re2, pairs, aoff, low);
+				  re2, pairs, aoff, seedOnLeft);
 #endif
-		const uint32_t seedBitPairs = min<int>(qlen, 32);
-		const int lhsShift = ((seedBitPairs - 1) << 1);
-		const uint32_t seedCushion  = 32 - seedBitPairs;
-		const uint32_t seedOverhang = (qlen <= 32 ? 0 : (qlen - 32));
+		const uint32_t anchorBitPairs = min<int>(qlen, 32);
+		const int lhsShift = ((anchorBitPairs - 1) << 1);
+		const uint32_t anchorCushion  = 32 - anchorBitPairs;
+		// anchorOverhang = # read bases not included in the anchor
+		const uint32_t anchorOverhang = (qlen <= 32 ? 0 : (qlen - 32));
 		const uint32_t lim = end - qlen - begin;
 		const uint32_t halfway = begin + (lim >> 1);
-		uint64_t seed = 0llu;
+		uint64_t anchor = 0llu;
 		uint64_t buffw = 0llu;  // rotating ref sequence buffer
 		// OR the 'diff' buffer with this so that we can always count
 		// 'N's as mismatches
 		uint64_t diffMask = 0llu;
 		// Set up a mask that we'll apply to the two bufs every round
-		// to discard bits that were rotated out of the seed area
+		// to discard bits that were rotated out of the anchor area
 		uint64_t clearMask = 0xffffffffffffffffllu;
 		bool useMask = false;
-		if(seedBitPairs < 32) {
-			clearMask >>= ((32-seedBitPairs) << 1);
+		if(anchorBitPairs < 32) {
+			clearMask >>= ((32-anchorBitPairs) << 1);
 			useMask = true;
 		}
-		int nsInSeed = 0;
+		int nsInAnchor = 0;
 		uint32_t nPoss = 0;
 		int nPos1 = -1;
 		int nPos2 = -1;
 		int nPos3 = -1;
 		uint32_t skipLeftToRights = 0;
 		uint32_t skipRightToLefts = 0;
-		// Construct the 'seed' 64-bit buffer so that it holds all of
-		// the first 'seedBitPairs' bit pairs of the query.
-		for(uint32_t i = 0; i < seedBitPairs; i++) {
+		// Construct the 'anchor' 64-bit buffer so that it holds all of
+		// the first 'anchorBitPairs' bit pairs of the query.
+		for(uint32_t i = 0; i < anchorBitPairs; i++) {
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfway - begin + i]; // next reference character
 			if(r & 4) {
@@ -1544,58 +1581,58 @@ protected:
 				// alignment based at 'halfway'; so skipLeftToRights is
 				// i, not i+1
 				skipLeftToRights = max(skipLeftToRights, i);
-				skipRightToLefts = max(skipRightToLefts, seedBitPairs - i);
+				skipRightToLefts = max(skipRightToLefts, anchorBitPairs - i);
 			}
 			assert_leq(c, 4);
 			assert_lt(r, 4);
 			// Special case: query has an 'N'
 			if(c == 4) {
-				if(++nsInSeed > 3) {
-					// More than two 'N's in the seed region; can't
+				if(++nsInAnchor > 3) {
+					// More than two 'N's in the anchor region; can't
 					// possibly have a 2-mismatch hit anywhere
 					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return;   // can't match if query has Ns
-				} else if(nsInSeed == 3) {
+				} else if(nsInAnchor == 3) {
 					nPos3 = (int)i;
 					nPoss++;
-				} else if(nsInSeed == 2) {
+				} else if(nsInAnchor == 2) {
 					nPos2 = (int)i;
 					nPoss++;
 				} else {
-					assert_eq(1, nsInSeed);
+					assert_eq(1, nsInAnchor);
 					nPos1 = (int)i;
 					nPoss++;
 				}
-				// Make it look like an 'A' in the seed
+				// Make it look like an 'A' in the anchor
 				c = 0;
 				diffMask = (diffMask << 2llu) | 1llu;
 			} else {
 				diffMask <<= 2llu;
 			}
-			seed  = ((seed  << 2llu) | c);
+			anchor  = ((anchor  << 2llu) | c);
 			buffw = ((buffw << 2llu) | r);
 		}
 		assert_leq(nPoss, 3);
-		// Check whether read is disqualified by Ns outside of the seed
+		// Check whether read is disqualified by Ns outside of the anchor
 		// region
-		for(uint32_t i = seedBitPairs; i < qlen; i++) {
+		for(uint32_t i = anchorBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
-				if(++nsInSeed > 3) {
+				if(++nsInAnchor > 3) {
 					assert_eq(r2.size(), ranges.size() - rangesInitSz);
 					return; // can't match if query has Ns
 				}
 			}
 		}
 		uint64_t bufbw = buffw;
-		// We're moving the right-hand edge of the seed along until
-		// it's 'seedOverhang' chars from the end of the target region.
+		// We're moving the right-hand edge of the anchor along until
+		// it's 'anchorOverhang' chars from the end of the target region.
 		// Note that we're not making a 3'/5' distinction here; if we
-		// were, we might need to make the 'seedOverhang' adjustment on
+		// were, we might need to make the 'anchorOverhang' adjustment on
 		// the left end of the range rather than the right.
 		bool hi = false;
 		uint32_t riHi  = halfway;
 		uint32_t rirHi = halfway - begin;
-		uint32_t rirHiSeed = rirHi + seedBitPairs - 1;
+		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
 		for(uint32_t i = 1; i <= lim + 1; i++) {
@@ -1608,11 +1645,11 @@ protected:
 				// Moving left-to-right
 				riHi++;
 				rirHi++;
-				rirHiSeed++;
-				r = (int)ref[rirHiSeed];
+				rirHiAnchor++;
+				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = seedBitPairs;
+					skipLeftToRights = anchorBitPairs;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -1623,7 +1660,7 @@ protected:
 					skipLeftToRights--;
 					continue;
 				}
-				diff = (buffw ^ seed) | diffMask;
+				diff = (buffw ^ anchor) | diffMask;
 			} else {
 				hi = true;
 				// Moving right-to-left
@@ -1645,7 +1682,7 @@ protected:
 					skipRightToLefts--;
 					continue;
 				}
-				diff = (bufbw ^ seed) | diffMask;
+				diff = (bufbw ^ anchor) | diffMask;
 			}
 			if((diff & 0xffff000000000000llu) &&
 			   (diff & 0x0000ffff00000000llu) &&
@@ -1656,7 +1693,7 @@ protected:
 			// Could use pop count
 			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
 			// As a first cut, see if there are too many mismatches in
-			// the first and last parts of the seed
+			// the first and last parts of the anchor
 			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
 			if(diffs > 3) continue;
 			diffs += u8toMms[(int)diff8[1]] +
@@ -1703,11 +1740,11 @@ protected:
 				assert_neq(0, diff);
 				assert_geq(mmpos1, 0);
 				assert_lt(mmpos1, 32);
-				mmpos1 -= seedCushion;
+				mmpos1 -= anchorCushion;
 				refc1 = "ACGT"[(int)ref[rir + mmpos1]];
 				if(diffs > 1) {
 					// Figure out the second mismatched position
-					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1 + seedCushion) << 1));
+					diff2 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos1 + anchorCushion) << 1));
 					uint64_t diff3 = diff2;
 					mmpos2 = 31;
 					if((diff2 & 0xffffffffllu) == 0) { diff2 >>= 32llu; mmpos2 -= 16; }
@@ -1720,7 +1757,7 @@ protected:
 					assert_neq(0, diff2);
 					if((diff2 & 0x3llu) == 0)        { mmpos2--; }
 					assert_neq(0, diff2);
-					mmpos2 -= seedCushion;
+					mmpos2 -= anchorCushion;
 					assert_geq(mmpos2, 0);
 					assert_lt(mmpos2, 32);
 					assert_neq(mmpos1, mmpos2);
@@ -1737,7 +1774,7 @@ protected:
 					assert_lt(mmpos1, mmpos2);
 					if(diffs > 2) {
 						// Figure out the second mismatched position
-						diff3 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos2orig + seedCushion) << 1));
+						diff3 &= ~(0xc000000000000000llu >> (uint64_t)((mmpos2orig + anchorCushion) << 1));
 						mmpos3 = 31;
 						if((diff3 & 0xffffffffllu) == 0) { diff3 >>= 32llu; mmpos3 -= 16; }
 						assert_neq(0, diff3);
@@ -1749,7 +1786,7 @@ protected:
 						assert_neq(0, diff3);
 						if((diff3 & 0x3llu) == 0)        { mmpos3--; }
 						assert_neq(0, diff3);
-						mmpos3 -= seedCushion;
+						mmpos3 -= anchorCushion;
 						assert_geq(mmpos3, 0);
 						assert_lt(mmpos3, 32);
 						assert_neq(mmpos1, mmpos3);
@@ -1777,12 +1814,12 @@ protected:
 					}
 				}
 			}
-			// Now extend the seed into a longer alignment
+			// Now extend the anchor into a longer alignment
 			bool foundHit = true;
-			if(seedOverhang > 0) {
-				assert_leq(ri + seedBitPairs + seedOverhang, end);
+			if(anchorOverhang > 0) {
+				assert_leq(ri + anchorBitPairs + anchorOverhang, end);
 				bool skipCandidate = false;
-				for(uint32_t j = 0; j < seedOverhang; j++) {
+				for(uint32_t j = 0; j < anchorOverhang; j++) {
 					int rc = (int)ref[rir + 32 + j];
 					if(rc == 4) {
 						// Oops, encountered an N in the reference in
@@ -1791,10 +1828,10 @@ protected:
 						// (Note that we inverted hi earlier)
 						if(hi) {
 							// Right-to-left
-							skipRightToLefts = seedOverhang - j - 1;
+							skipRightToLefts = anchorOverhang - j - 1;
 						} else {
 							// Left-to-right
-							skipLeftToRights = seedBitPairs + j;
+							skipLeftToRights = anchorBitPairs + j;
 						}
 						skipCandidate = true; // Skip this candidate
 						break;
@@ -1822,7 +1859,7 @@ protected:
 			if(pairs != NULL) {
 				TU64Pair p;
 				if(ri < aoff) {
-					// By convention, the upstream ("low") mate's
+					// By convention, the upstream mate's
 					// coordinates go in the 'first' field
 					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
 					p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
@@ -1883,5 +1920,731 @@ protected:
 		return; // no hit
 	}
 };
+
+/**
+ * Concrete RefAligner for finding nearby 1-mismatch hits given an
+ * anchor hit.
+ */
+template<typename TStr>
+class Seed1RefAligner : public RefAligner<TStr> {
+
+	typedef seqan::String<seqan::Dna5> TDna5Str;
+	typedef seqan::String<char> TCharStr;
+	typedef std::vector<Range> TRangeVec;
+	typedef std::vector<uint32_t> TU32Vec;
+	typedef std::pair<uint64_t, uint64_t> TU64Pair;
+	typedef std::set<TU64Pair> TSetPairs;
+
+public:
+
+	Seed1RefAligner(bool verbose, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
+		RefAligner<TStr>(verbose, seedLen, qualMax, maqPenalty) { }
+
+	virtual ~Seed1RefAligner() { }
+
+protected:
+	/**
+	 * This schematic shows the roles played by the begin, qbegin, end,
+	 * qend, halfway, slen, qlen, and lim variables:
+	 *
+	 * seedOnLeft == true:
+	 *
+	 * |<                   lim                   >|<     qlen       >|
+	 *  --------------------------------------------------------------
+	 * |                     | slen | qlen-slen |  | slen | qlen-slen |
+	 *  --------------------------------------------------------------
+	 * ^                     ^                     ^                  ^
+	 * begin & qbegin     halfway                qend               end
+	 *
+	 * seedOnLeft == false:
+	 *
+	 * |<     qlen       >|<                   lim                   >|
+	 *  --------------------------------------------------------------
+	 * | qlen-slen | slen |  | qlen-slen | slen |                     |
+	 *  --------------------------------------------------------------
+	 * ^                  ^                     ^                     ^
+	 * begin            qbegin             halfway           qend & end
+	 *
+	 * Note that, for seeds longer than 32 base-pairs, the seed is
+	 * further subdivided into a 32-bit anchor and a seed overhang of
+	 * length > 0.
+	 */
+	void naiveFind(uint32_t numToFind,
+				   uint32_t tidx,
+				   uint8_t* ref,
+				   const TDna5Str& qry,
+				   const TCharStr& quals,
+				   uint32_t begin,
+				   uint32_t end,
+				   TRangeVec& ranges,
+				   TU32Vec& results,
+				   TSetPairs* pairs,
+				   uint32_t aoff,
+				   bool seedOnLeft) const
+	{
+		assert_gt(numToFind, 0);
+		assert_gt(end, begin);
+		const uint32_t qlen = seqan::length(qry);
+		assert_gt(qlen, 0);
+		assert_geq(end - begin, qlen); // caller should have checked this
+		assert_gt(this->seedLen_, 0);
+		const uint32_t slen = min(qlen, this->seedLen_);
+		uint32_t qend = end;
+		uint32_t qbegin = begin;
+		// If the seed is on the left-hand side of the alignment, then
+		// leave a gap at the right-hand side of the interval;
+		// otherwise, do the opposite
+		if(seedOnLeft) {
+			// Leave gap on right-hand side of the interval
+			qend -= qlen;
+		} else {
+			// Leave gap on left-hand side of the interval
+			qbegin += qlen;
+		}
+		// lim = number of alignments to try
+		const uint32_t lim = qend - qbegin;
+		// halfway = position in the reference to start at (and then
+		// we work our way out to the right and to the left).
+		const uint32_t halfway = qbegin + (lim >> 1);
+		// Vectors for holding edit information
+		std::vector<uint32_t> nonSeedMms;
+		std::vector<uint8_t> nonSeedRefcs;
+		bool hi = false;
+		for(uint32_t i = 1; i <= lim+1; i++) {
+			uint32_t ri;  // leftmost position in candidate alignment
+			uint32_t rir; // same, minus begin; for indexing into ref[]
+			if(hi) {
+				ri = halfway + (i >> 1); rir = ri - begin;
+				assert_leq(ri, qend);
+			} else {
+				ri = halfway - (i >> 1); rir = ri - begin;
+				assert_geq(ri, begin);
+			}
+			hi = !hi;
+			// Do the naive comparison
+			bool match = true;
+			int refc = -1;
+			uint32_t mmOff = 0xffffffff;
+			int mms = 0;
+			int seedMms = 0;
+			unsigned int ham = 0;
+			// Walk through each position of the alignment
+			for(uint32_t jj = 0; jj < qlen; jj++) {
+				uint32_t j = jj;
+				if(!seedOnLeft) {
+					// If seed is on the right, scan right-to-left
+					j = qlen - jj - 1;
+				} else {
+					// Go left-to-right
+				}
+				uint32_t rirj = rir + j;
+				if(!seedOnLeft) {
+					assert_geq(rir, jj);
+					rirj = rir - jj - 1;
+				}
+#if 0
+				// Count Ns in the reference as mismatches
+				const int q = (int)qry[j];
+				const int r = (int)ref[rirj];
+				assert_leq(q, 4);
+				assert_leq(r, 4);
+				if(q == 4 || r == 4 || q != r) {
+#else
+				// Disallow alignments that involve an N in the
+				// reference
+				const int r = (int)ref[rirj];
+				if(r & 4) {
+					// N in reference; bail on this alignment
+					match = false;
+					break;
+				}
+				const int q = (int)qry[j];
+				assert_leq(q, 4);
+				assert_lt(r, 4);
+				if(q != r) {
+#endif
+					// Mismatch!
+					if(++mms > 1 && jj < slen) {
+						// More than one mismatch in the anchor; reject
+						match = false;
+						break;
+					}
+					uint8_t qual = phredCharToPhredQual(quals[j]);
+					ham += mmPenalty(this->maqPenalty_, qual);
+					if(ham > this->qualMax_) {
+						// Exceeded quality ceiling; reject
+						match = false;
+						break;
+					} else if(jj < slen) {
+						// First mismatch in the anchor; remember offset
+						// and ref char
+						refc = "ACGTN"[r];
+						mmOff = j;
+						seedMms = 1;
+					} else {
+						// Legal mismatch outside of the anchor; record it
+						nonSeedMms.push_back(j);
+						nonSeedRefcs.push_back("ACGTN"[r]);
+					}
+				}
+			}
+			if(match) {
+				ranges.resize(ranges.size()+1);
+				Range& range = ranges.back();
+				assert_leq(seedMms, mms);
+				range.stratum = seedMms;
+				range.numMms = mms;
+				assert_eq(0, range.mms.size());
+				assert_eq(0, range.refcs.size());
+				if(mms >= 1) {
+					// Be careful to add edits in left-to-right order
+					// with respect to the read/alignment
+					if(seedOnLeft && seedMms) {
+						assert_lt(mmOff, qlen);
+						range.mms.push_back(mmOff);
+						range.refcs.push_back(refc);
+					}
+					const size_t nonSeedMmsSz = nonSeedMms.size();
+					if(nonSeedMmsSz > 0) {
+						if(seedOnLeft) {
+							for(size_t k = 0; k < nonSeedMmsSz; k++) {
+								range.mms.push_back(nonSeedMms[k]);
+								range.refcs.push_back(nonSeedRefcs[k]);
+							}
+						} else {
+							for(size_t k = nonSeedMmsSz; k > 0; k--) {
+								range.mms.push_back(nonSeedMms[k-1]);
+								range.refcs.push_back(nonSeedRefcs[k-1]);
+							}
+						}
+					}
+					if(!seedOnLeft && seedMms) {
+						assert_lt(mmOff, qlen);
+						range.mms.push_back(mmOff);
+						range.refcs.push_back(refc);
+					}
+				}
+				assert_eq((size_t)mms, range.mms.size());
+				assert_eq((size_t)mms, range.refcs.size());
+				if(seedOnLeft) {
+					results.push_back(ri);
+				} else {
+					results.push_back(ri - qlen);
+				}
+			}
+		}
+		return;
+	}
+
+	/**
+	 * This schematic shows the roles played by the begin, qbegin, end,
+	 * qend, halfway, slen, qlen, and lim variables:
+	 *
+	 * seedOnLeft == true:
+	 *
+	 * |<                   lim                   >|<     qlen       >|
+	 *  --------------------------------------------------------------
+	 * |                     | slen | qlen-slen |  | slen | qlen-slen |
+	 *  --------------------------------------------------------------
+	 * ^                     ^                     ^                  ^
+	 * begin & qbegin     halfway                qend               end
+	 *
+	 * seedOnLeft == false:
+	 *
+	 *             |<                   lim                   >|
+	 *  --------------------------------------------------------------
+	 * | qlen-slen |         | qlen-slen | slen |              | slen |
+	 *  --------------------------------------------------------------
+	 * ^           ^                     ^                     ^      ^
+	 * begin       qbegin             halfway                qend   end
+	 *
+	 * Note that, for seeds longer than 32 base-pairs, the seed is
+	 * further subdivided into a 32-bit anchor and a seed overhang of
+	 * length > 0.
+	 */
+	virtual void anchor64Find(uint32_t numToFind,
+					uint32_t tidx,
+					uint8_t* ref,
+					const TDna5Str& qry,
+					const TCharStr& quals,
+					uint32_t begin,
+					uint32_t end,
+					TRangeVec& ranges,
+					TU32Vec& results,
+					TSetPairs* pairs = NULL,
+					uint32_t aoff = 0xffffffff,
+					bool seedOnLeft = false) const
+	{
+		assert_gt(numToFind, 0);
+		ASSERT_ONLY(const uint32_t rangesInitSz = ranges.size());
+		ASSERT_ONLY(uint32_t duplicates = 0);
+		ASSERT_ONLY(uint32_t r2i = 0);
+		const uint32_t qlen = seqan::length(qry);
+		assert_gt(qlen, 0);
+		assert_gt(end, begin);
+		assert_geq(end - begin, qlen); // caller should have checked this
+		assert_gt(this->seedLen_, 0);
+		uint32_t slen = min(qlen, this->seedLen_);
+#ifndef NDEBUG
+		// Get results from the naive matcher for sanity-checking
+		TRangeVec r2; TU32Vec re2;
+		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
+				  re2, pairs, aoff, seedOnLeft);
+#endif
+		const uint32_t anchorBitPairs = min<int>(slen, 32);
+		const int lhsShift = ((anchorBitPairs - 1) << 1);
+		const uint32_t anchorCushion  = 32 - anchorBitPairs;
+		// seedAnchorOverhang = # seed bases not included in the anchor
+		const uint32_t seedAnchorOverhang = (slen <= anchorBitPairs ? 0 : (slen - anchorBitPairs));
+		// seedAnchorOverhang = # seed bases not included in the anchor
+		const uint32_t readSeedOverhang = (slen == qlen ? 0 : (qlen - slen));
+		assert(anchorCushion == 0 || seedAnchorOverhang == 0);
+		assert_eq(qlen, readSeedOverhang + slen);
+		uint32_t qend = end;
+		uint32_t qbegin = begin;
+		if(seedOnLeft) {
+			// Leave read-sized gap on right-hand side of the interval
+			qend -= qlen;
+		} else {
+			// Leave seed-sized gap on right-hand side and
+			// non-seed-sized gap on the left-hand side
+			qbegin += readSeedOverhang;
+			qend -= slen;
+		}
+		// lim = # possible alignments in the range
+		const uint32_t lim = qend - qbegin;
+		// halfway = point on the genome to radiate out from
+		const uint32_t halfway = qbegin + (lim >> 1);
+		uint64_t anchor = 0llu;
+		uint64_t buffw = 0llu;  // rotating ref sequence buffer
+		// OR the 'diff' buffer with this so that we can always count
+		// 'N's as mismatches
+		uint64_t diffMask = 0llu;
+		// Set up a mask that we'll apply to the two bufs every round
+		// to discard bits that were rotated out of the anchor area
+		uint64_t clearMask = 0xffffffffffffffffllu;
+		bool useMask = false;
+		if(anchorBitPairs < 32) {
+			clearMask >>= ((32-anchorBitPairs) << 1);
+			useMask = true;
+		}
+		int nsInSeed = 0;
+		int nPos = -1;
+		uint32_t skipLeftToRights = 0;
+		uint32_t skipRightToLefts = 0;
+		const uint32_t halfwayRi = halfway - begin;
+		// Construct the 'anchor' 64-bit buffer so that it holds all of
+		// the first 'anchorBitPairs' bit pairs of the query.
+		for(uint32_t ii = 0; ii < anchorBitPairs; ii++) {
+			uint32_t i = ii;
+			if(!seedOnLeft) {
+				// Fill in the anchor using characters from the right-
+				// hand side of the query (but take the characters in
+				// left-to-right order)
+				i = qlen - anchorBitPairs + ii;
+			}
+			int c = (int)qry[i]; // next query character
+			int r = (int)ref[halfwayRi + ii]; // next reference character
+			if(r & 4) {
+				// The reference character is an N; to mimic the
+				// behavior of BW alignment, we have to skip all
+				// alignments that involve an N in the reference.  Set
+				// the skip* variables accordingly.
+				r = 0;
+				uint32_t lrSkips = ii;
+				uint32_t rlSkips = qlen - ii;
+				if(!seedOnLeft && readSeedOverhang) {
+					lrSkips += readSeedOverhang;
+					assert_geq(rlSkips, readSeedOverhang);
+					rlSkips -= readSeedOverhang;
+				}
+				// The right-to-left direction absorbs the candidate
+				// alignment based at 'halfway'
+				skipLeftToRights = max(skipLeftToRights, lrSkips);
+				skipRightToLefts = max(skipRightToLefts, rlSkips);
+				assert_leq(skipLeftToRights, qlen);
+				assert_leq(skipRightToLefts, qlen);
+			}
+			assert_leq(c, 4);
+			assert_lt(r, 4);
+			// Special case: query has an 'N'
+			if(c == 4) {
+				if(++nsInSeed > 1) {
+					// More than one 'N' in the anchor region; can't
+					// possibly have a 1-mismatch hit anywhere
+					assert_eq(r2.size(), ranges.size() - rangesInitSz);
+					return;   // can't match if query has Ns
+				}
+				nPos = (int)ii; // w/r/t LHS of anchor
+				// Make it look like an 'A' in the anchor
+				c = 0;
+				diffMask = (diffMask << 2llu) | 1llu;
+			} else {
+				diffMask <<= 2llu;
+			}
+			anchor = ((anchor << 2llu) | c);
+			buffw = ((buffw << 2llu) | r);
+		}
+		// Check whether read is disqualified by Ns inside the seed
+		// region but outside the anchor region
+		if(seedAnchorOverhang) {
+			assert_lt(anchorBitPairs, slen);
+			for(uint32_t ii = anchorBitPairs; ii < slen; ii++) {
+				uint32_t i = ii;
+				if(!seedOnLeft) {
+					i = qlen - slen + ii;
+				}
+				if((int)qry[i] == 4) {
+					if(++nsInSeed > 1) {
+						assert_eq(r2.size(), ranges.size() - rangesInitSz);
+						return; // can't match if query has Ns
+					}
+				}
+			}
+		} else {
+			assert_eq(anchorBitPairs, slen);
+		}
+		uint64_t bufbw = buffw;
+		// Slide the anchor out in either direction, alternating
+		// between right-to-left and left-to-right shifts, until all of
+		// the positions from qbegin to qend have been covered.
+		bool hi = false;
+		uint32_t riHi  = halfway;
+		uint32_t rirHi = halfway - begin;
+		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
+		uint32_t riLo  = halfway + 1;
+		uint32_t rirLo = halfway - begin + 1;
+		for(uint32_t i = 1; i <= lim + 1; i++) {
+			int r;       // new reference char
+			uint64_t diff;
+			assert_leq(skipLeftToRights, qlen);
+			assert_leq(skipRightToLefts, qlen);
+			if(hi) {
+				hi = false;
+				// Moving left-to-right
+				riHi++;
+				rirHi++;
+				rirHiAnchor++;
+				r = (int)ref[rirHiAnchor];
+				if(r & 4) {
+					r = 0;
+					skipLeftToRights = anchorBitPairs;
+				}
+				assert_lt(r, 4);
+				// Bring in new base pair at the least significant
+				// position
+				buffw = ((buffw << 2llu) | r);
+				if(useMask) buffw &= clearMask;
+				if(skipLeftToRights > 0) {
+					skipLeftToRights--;
+					continue;
+				}
+				diff = (buffw ^ anchor) | diffMask;
+			} else {
+				hi = true;
+				// Moving right-to-left
+				riLo--;
+				rirLo--;
+				r = (int)ref[rirLo];
+				if(r & 4) {
+					r = 0;
+					skipRightToLefts = qlen;
+				}
+				assert_lt(r, 4);
+				if(i >= 2) {
+					bufbw >>= 2llu;
+					// Bring in new base pair at the most significant
+					// position
+					bufbw |= ((uint64_t)r << lhsShift);
+				}
+				if(skipRightToLefts > 0) {
+					skipRightToLefts--;
+					continue;
+				}
+				diff = (bufbw ^ anchor) | diffMask;
+			}
+			if((diff & 0xffffffff00000000llu) &&
+			   (diff & 0x00000000ffffffffllu)) continue;
+			uint32_t ri  = hi ? riLo  : riHi;
+			uint32_t rir = hi ? rirLo : rirHi;
+			// Could use pop count
+			uint8_t *diff8 = reinterpret_cast<uint8_t*>(&diff);
+			// As a first cut, see if there are too many mismatches in
+			// the first and last parts of the anchor
+			uint32_t diffs = u8toMms[(int)diff8[0]] + u8toMms[(int)diff8[7]];
+			if(diffs > 1) continue;
+			diffs += u8toMms[(int)diff8[1]] +
+					 u8toMms[(int)diff8[2]] +
+					 u8toMms[(int)diff8[3]] +
+					 u8toMms[(int)diff8[4]] +
+					 u8toMms[(int)diff8[5]] +
+					 u8toMms[(int)diff8[6]];
+			uint32_t mmpos = 0xffffffff;
+			int refc = -1;
+			unsigned int ham = 0;
+			if(diffs > 1) {
+				// Too many differences in the seed; stop
+				continue;
+			} else if(diffs == 1 && nPos != -1) {
+				// There was one difference, but there was also one N,
+				// so we already know where the difference is
+				mmpos = nPos;
+				assert_lt(mmpos, anchorBitPairs);
+				refc = "ACGT"[(int)ref[rir + nPos]];
+				if(!seedOnLeft) {
+					mmpos += readSeedOverhang;
+				}
+				char q = quals[mmpos];
+				ham += mmPenalty(this->maqPenalty_, phredCharToPhredQual(q));
+				if(ham > this->qualMax_) {
+					// Exceeded quality limit
+					continue;
+				}
+			} else if(diffs == 1) {
+				// Figure out which position mismatched
+				mmpos = 31;
+				if((diff & 0xffffffffllu) == 0) { diff >>= 32llu; mmpos -= 16; }
+				assert_neq(0, diff);
+				if((diff & 0xffffllu) == 0)     { diff >>= 16llu; mmpos -=  8; }
+				assert_neq(0, diff);
+				if((diff & 0xffllu) == 0)       { diff >>= 8llu;  mmpos -=  4; }
+				assert_neq(0, diff);
+				if((diff & 0xfllu) == 0)        { diff >>= 4llu;  mmpos -=  2; }
+				assert_neq(0, diff);
+				if((diff & 0x3llu) == 0)        { mmpos--; }
+				assert_neq(0, diff);
+				assert_geq(mmpos, 0);
+				assert_lt(mmpos, 32);
+				mmpos -= anchorCushion;
+				assert_lt(mmpos, anchorBitPairs);
+				refc = "ACGT"[(int)ref[rir + mmpos]];
+				if(!seedOnLeft) {
+					mmpos += readSeedOverhang;
+				}
+				char q = quals[mmpos];
+				ham += mmPenalty(this->maqPenalty_, phredCharToPhredQual(q));
+				if(ham > this->qualMax_) {
+					// Exceeded quality limit
+					continue;
+				}
+			}
+			// If the seed is longer than the anchor, then scan the
+			// rest of the seed characters
+			bool foundHit = true;
+			if(seedAnchorOverhang) {
+				for(uint32_t j = 0; j < seedAnchorOverhang; j++) {
+					int rc = (int)ref[rir + anchorBitPairs + j];
+					if(rc == 4) {
+						// Oops, encountered an N in the reference in
+						// the overhang portion of the candidate
+						// alignment
+						// (Note that we inverted hi earlier)
+						if(hi) {
+							// Right-to-left
+							// Skip out of the seedAnchorOverhang
+							assert_eq(0, skipRightToLefts);
+							skipRightToLefts = seedAnchorOverhang - j - 1;
+							if(seedOnLeft) {
+								// ...and skip out of the rest of the read
+								skipRightToLefts += readSeedOverhang;
+							}
+						} else {
+							// Left-to-right
+							// Skip out of the seedAnchorOverhang
+							assert_eq(0, skipLeftToRights);
+							skipLeftToRights = anchorBitPairs + j;
+							if(!seedOnLeft) {
+								// ...and skip out of the rest of the read
+								skipLeftToRights += readSeedOverhang;
+							}
+						}
+						foundHit = false; // Skip this candidate
+						break;
+					}
+					uint32_t qoff = anchorBitPairs + j;
+					if(!seedOnLeft) {
+						qoff += readSeedOverhang;
+					}
+					assert_lt(qoff, qlen);
+					if((int)qry[qoff] != rc) {
+						if(++diffs > 1) {
+							foundHit = false;
+							break;
+						} else {
+							assert_eq(0xffffffff, mmpos);
+							mmpos = qoff;
+							assert_eq(-1, refc);
+							refc = "ACGT"[(int)ref[rir + anchorBitPairs + j]];
+							char q = phredCharToPhredQual(quals[qoff]);
+							ham += mmPenalty(this->maqPenalty_, q);
+							if(ham > this->qualMax_) {
+								// Exceeded quality limit
+								foundHit = false;
+								break;
+							}
+						}
+					}
+				}
+				if(!foundHit) continue;
+			}
+			// If the read is longer than the seed, then scan the rest
+			// of the read characters; mismatches no longer count
+			// toward the stratum or the 1-mm limit.
+			// Vectors for holding edit information
+			std::vector<uint32_t> nonSeedMms;
+			std::vector<uint8_t> nonSeedRefcs;
+			int mms = diffs; // start counting total mismatches
+			if((qlen - slen) > 0) {
+				// Going left-to-right
+				for(uint32_t j = 0; j < readSeedOverhang; j++) {
+					uint32_t roff = rir + slen + j;
+					uint32_t qoff = slen + j;
+					if(!seedOnLeft) {
+						assert_geq(roff, qlen);
+						roff -= qlen;
+						qoff = j;
+					}
+					int rc = (int)ref[roff];
+					if(rc == 4) {
+						// Oops, encountered an N in the reference in
+						// the overhang portion of the candidate
+						// alignment
+						// (Note that we inverted hi earlier)
+						if(hi) {
+							// Right-to-left
+							// Skip what's left of the readSeedOverhang
+							skipRightToLefts = readSeedOverhang - j - 1;
+							if(!seedOnLeft) {
+								// ...and skip the seed if it's on the right
+								skipRightToLefts += slen;
+							}
+						} else {
+							// Left-to-right
+							// Skip what we've matched of the overhang
+							skipLeftToRights = j;
+							if(seedOnLeft) {
+								// ...and skip the seed if it's on the left
+								skipLeftToRights += slen;
+							}
+						}
+						foundHit = false; // Skip this candidate
+						break;
+					}
+					if((int)qry[qoff] != rc) {
+						// Calculate quality of mismatched base
+						char q = phredCharToPhredQual(quals[qoff]);
+						ham += mmPenalty(this->maqPenalty_, q);
+						if(ham > this->qualMax_) {
+							// Exceeded quality limit
+							foundHit = false;
+							break;
+						}
+						// Legal mismatch outside of the anchor; record it
+						mms++;
+						nonSeedMms.push_back(qoff);
+						nonSeedRefcs.push_back("ACGTN"[rc]);
+					}
+				}
+				if(!foundHit) continue;
+			}
+			assert(foundHit);
+			// Adjust ri if seed is on the right-hand side
+			if(!seedOnLeft) {
+				ri -= readSeedOverhang;
+				rir -= readSeedOverhang;
+			}
+			if(pairs != NULL) {
+				TU64Pair p;
+				if(ri < aoff) {
+					// By convention, the upstream mate's
+					// coordinates go in the 'first' field
+					p.first  = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					p.second = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+				} else {
+					p.second = ((uint64_t)tidx << 32) | (uint64_t)ri;
+					p.first  = ((uint64_t)tidx << 32) | (uint64_t)aoff;
+				}
+				if(pairs->find(p) != pairs->end()) {
+					// We already found this hit!  Continue.
+					ASSERT_ONLY(duplicates++);
+					ASSERT_ONLY(r2i++);
+					continue;
+				} else {
+					// Record this hit
+					pairs->insert(p);
+				}
+			}
+			if(this->verbose_) {
+				cout << "About to report:" << endl;
+				cout << "  ";
+				for(size_t i = 0; i < qlen; i++) {
+					cout << (char)qry[i];
+				}
+				cout << endl;
+				cout << "  ";
+				for(size_t i = 0; i < qlen; i++) {
+					cout << "ACGT"[ref[rir+i]];
+				}
+				cout << endl;
+			}
+			assert_leq(diffs, 1);
+			assert_geq((size_t)mms, diffs);
+			assert_lt(r2i, r2.size());
+			assert_eq(re2[r2i], ri);
+			ranges.resize(ranges.size()+1);
+			Range& range = ranges.back();
+			assert_eq((size_t)mms, r2[r2i].numMms);
+			range.stratum = diffs;
+			range.numMms = mms;
+			assert_eq(0, range.mms.size());
+			assert_eq(0, range.refcs.size());
+			if(mms > 0) {
+				ASSERT_ONLY(size_t mmcur = 0);
+				if(seedOnLeft && diffs > 0) {
+					assert_neq(mmpos, 0xffffffff);
+					assert_lt(mmpos, qlen);
+					assert_lt(mmcur, (size_t)mms);
+					assert_eq(mmpos, r2[r2i].mms[mmcur]);
+					assert_neq(-1, refc);
+					assert_eq(refc, r2[r2i].refcs[mmcur]);
+					ASSERT_ONLY(mmcur++);
+					range.mms.push_back(mmpos);
+					range.refcs.push_back(refc);
+				}
+				const size_t nonSeedMmsSz = nonSeedMms.size();
+				for(size_t i = 0; i < nonSeedMmsSz; i++) {
+					assert_neq(0xffffffff, nonSeedMms[i]);
+					assert_lt(mmcur, (size_t)mms);
+					assert_eq(nonSeedMms[i], r2[r2i].mms[mmcur]);
+					range.mms.push_back(nonSeedMms[i]);
+					assert_eq(nonSeedRefcs[i], r2[r2i].refcs[mmcur]);
+					ASSERT_ONLY(mmcur++);
+					range.refcs.push_back(nonSeedRefcs[i]);
+				}
+				if(!seedOnLeft && diffs > 0) {
+					assert_neq(mmpos, 0xffffffff);
+					assert_lt(mmpos, qlen);
+					assert_lt(mmcur, (size_t)mms);
+					assert_eq(mmpos, r2[r2i].mms[mmcur]);
+					assert_neq(-1, refc);
+					assert_eq(refc, r2[r2i].refcs[mmcur]);
+					ASSERT_ONLY(mmcur++);
+					range.mms.push_back(mmpos);
+					range.refcs.push_back(refc);
+				}
+				assert_eq(mmcur, r2[r2i].mms.size());
+			}
+			assert_eq((size_t)mms, range.mms.size());
+			assert_eq((size_t)mms, range.refcs.size());
+			ASSERT_ONLY(r2i++);
+			results.push_back(ri);
+			if(--numToFind == 0) return;
+		}
+		assert_leq(duplicates, r2.size());
+		assert_geq(r2.size() - duplicates, ranges.size() - rangesInitSz);
+		return; // no hit
+	}
+};
+
 
 #endif /* REF_ALIGNER_H_ */

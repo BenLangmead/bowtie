@@ -1260,6 +1260,8 @@ public:
 	               uint8_t mate = 0) const
 	{
 		// The search functions should not have allowed us to get here
+		assert_eq(mmui32.size(), refcs.size());
+		assert_leq(numMms, mmui32.size());
 		String<Dna5> pat;
 		uint32_t qlen = length(query);
 		assert_gt(qlen, 0);

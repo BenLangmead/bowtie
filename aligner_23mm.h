@@ -48,6 +48,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			os_(os),
+			maqPenalty_(false),
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -76,7 +77,7 @@ public:
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
-			*params, rFw_Bw, true, false, sink_, sinkPt,
+			*params, rFw_Bw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -86,7 +87,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * drFw_Fw = new EbwtRangeSourceDriver(
-			*params, rFw_Fw, true, false, sink_, sinkPt,
+			*params, rFw_Fw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -96,7 +97,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * drFw_FwHalf = new EbwtRangeSourceDriver(
-			*params, rFw_FwHalf, true, false, sink_, sinkPt,
+			*params, rFw_FwHalf, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -121,7 +122,7 @@ public:
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
-			*params, rRc_Fw, false, false, sink_, sinkPt,
+			*params, rRc_Fw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -131,7 +132,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * drRc_Bw = new EbwtRangeSourceDriver(
-			*params, rRc_Bw, false, false, sink_, sinkPt,
+			*params, rRc_Bw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -141,7 +142,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
-			*params, rRc_FwHalf, false, false, sink_, sinkPt,
+			*params, rRc_FwHalf, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -177,6 +178,7 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	vector<String<Dna5> >& os_;
+	const bool maqPenalty_;
 	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
@@ -232,6 +234,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			refs_(refs), os_(os),
+			maqPenalty_(false),
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -259,7 +262,7 @@ public:
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
-			*params, r1Fw_Bw, true, false, sink_, sinkPt,
+			*params, r1Fw_Bw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -269,7 +272,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
-			*params, r1Fw_Fw, true, false, sink_, sinkPt,
+			*params, r1Fw_Fw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -279,7 +282,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr1Fw_BwHalf = new EbwtRangeSourceDriver(
-			*params, r1Fw_BwHalf, true, false, sink_, sinkPt,
+			*params, r1Fw_BwHalf, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -308,7 +311,7 @@ public:
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
-			*params, r1Rc_Fw, false, false, sink_, sinkPt,
+			*params, r1Rc_Fw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -318,7 +321,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
-			*params, r1Rc_Bw, false, false, sink_, sinkPt,
+			*params, r1Rc_Bw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -328,7 +331,7 @@ public:
 			os_, verbose_, seed_, true);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr1Rc_FwHalf = new EbwtRangeSourceDriver(
-			*params, r1Rc_FwHalf, false, false, sink_, sinkPt,
+			*params, r1Rc_FwHalf, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -357,7 +360,7 @@ public:
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
-			*params, r2Fw_Bw, true, false, sink_, sinkPt,
+			*params, r2Fw_Bw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -367,7 +370,7 @@ public:
 			os_, verbose_, seed_, false);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
-			*params, r2Fw_Fw, true, false, sink_, sinkPt,
+			*params, r2Fw_Fw, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -377,7 +380,7 @@ public:
 			os_, verbose_, seed_, false);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr2Fw_BwHalf = new EbwtRangeSourceDriver(
-			*params, r2Fw_BwHalf, true, false, sink_, sinkPt,
+			*params, r2Fw_BwHalf, true, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -406,7 +409,7 @@ public:
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
-			*params, r2Rc_Fw, false, false, sink_, sinkPt,
+			*params, r2Rc_Fw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -416,7 +419,7 @@ public:
 			os_, verbose_, seed_, false);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
-			*params, r2Rc_Bw, false, false, sink_, sinkPt,
+			*params, r2Rc_Bw, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			false,      // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
@@ -426,7 +429,7 @@ public:
 			os_, verbose_, seed_, false);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr2Rc_FwHalf = new EbwtRangeSourceDriver(
-			*params, r2Rc_FwHalf, false, false, sink_, sinkPt,
+			*params, r2Rc_FwHalf, false, false, maqPenalty_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
 			true,       // nudgeLeft (true for Fw index, false for Bw)
 			PIN_TO_BEGINNING,    // nothing's unrevisitable
@@ -483,6 +486,7 @@ private:
 	const uint32_t cacheLimit_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
+	const bool maqPenalty_;
 	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;

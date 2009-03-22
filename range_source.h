@@ -10,6 +10,7 @@
 #include "seqan/sequence.h"
 #include "ebwt.h"
 #include "range.h"
+#include "pool.h"
 
 enum AdvanceUntil {
 	ADV_FOUND_RANGE = 1,
@@ -26,6 +27,109 @@ struct Edit {
 	uint16_t pos       : 10; // position w/r/t search root
 	uint16_t chr       :  2; // character involved (for subst and ins)
 	uint16_t reserved  :  2; // reserved
+};
+
+/**
+ * Expandable list of Edits.  One can:
+ * - Add an Edit, which might trigger an expansion
+ * -
+ */
+struct EditList {
+
+	EditList() : sz_(0), moreEdits_(NULL), yetMoreEdits_(NULL) { }
+
+	/**
+	 * Add an edit to the edit list.
+	 */
+	void add(const Edit& e, AllocOnlyPool<Edit>& pool_, size_t qlen) {
+		assert_lt(sz_, qlen+3);
+		if(sz_ < numEdits) {
+			assert(moreEdits_ == NULL);
+			assert(yetMoreEdits_ == NULL);
+			edits_[sz_++] = e;
+		} else if(sz_ == numEdits) {
+			assert(moreEdits_ == NULL);
+			assert(yetMoreEdits_ == NULL);
+			moreEdits_ = pool_.alloc(numMoreEdits);
+			assert(moreEdits_ != NULL);
+			moreEdits_[0] = e;
+			sz_++;
+		} else if(sz_ < (numEdits + numMoreEdits)) {
+			assert(moreEdits_ != NULL);
+			assert(yetMoreEdits_ == NULL);
+			moreEdits_[sz_ - numEdits] = e;
+			sz_++;
+		} else if(sz_ == (numEdits + numMoreEdits)) {
+			assert(moreEdits_ != NULL);
+			assert(yetMoreEdits_ == NULL);
+			yetMoreEdits_ = pool_.alloc(qlen+3 - numMoreEdits - numEdits);
+			assert(yetMoreEdits_ != NULL);
+			yetMoreEdits_[0] = e;
+			sz_++;
+		} else {
+			assert(moreEdits_ != NULL);
+			assert(yetMoreEdits_ != NULL);
+			yetMoreEdits_[sz_ - numEdits - numMoreEdits] = e;
+			sz_++;
+		}
+	}
+
+	/**
+	 * Return a const reference to the ith Edit in the list.
+	 */
+	const Edit& get(size_t i) const {
+		assert_lt(i, sz_);
+		if(i < numEdits) {
+			return edits_[i];
+		} else if(i < (numEdits + numMoreEdits)) {
+			assert(moreEdits_ != NULL);
+			return moreEdits_[i-numEdits];
+		} else {
+			assert(moreEdits_ != NULL);
+			assert(yetMoreEdits_ != NULL);
+			return yetMoreEdits_[i-numEdits-numMoreEdits];
+		}
+	}
+
+	/**
+	 * Set a particular element of the EditList.
+	 */
+	void set(size_t i, const Edit& e) {
+		assert_lt(i, sz_);
+		if(i < numEdits) {
+			edits_[i] = e;
+		} else if(i < (numEdits + numMoreEdits)) {
+			assert(moreEdits_ != NULL);
+			moreEdits_[i-numEdits] = e;
+		} else {
+			assert(moreEdits_ != NULL);
+			assert(yetMoreEdits_ != NULL);
+			yetMoreEdits_[i-numEdits-numMoreEdits] = e;
+		}
+	}
+
+	/**
+	 * Remove all Edits from the list.
+	 */
+	void clear() {
+		sz_ = 0;
+		moreEdits_ = NULL;
+		yetMoreEdits_ = NULL;
+	}
+
+	/**
+	 * Return number of Edits in the List.
+	 */
+	size_t size() const {
+		return sz_;
+	}
+
+	const static size_t numEdits = 6;
+	const static size_t numMoreEdits = 16;
+	size_t sz_;          // number of Edits stored in the EditList
+	Edit edits_[numEdits]; // first 4 edits; typically, no more are needed
+	Edit *moreEdits_;    // if used, size is dictated by numMoreEdits
+	Edit *yetMoreEdits_; // if used, size is dictated by length of read
 };
 
 /**
@@ -94,6 +198,7 @@ struct RangeState {
 		Edit ret;
 		ret.type = EDIT_TYPE_MM;
 		ret.pos = pos;
+		assert(!eliminated_);
 		assert(!eq.flags.mmA || !eq.flags.mmC || !eq.flags.mmG || !eq.flags.mmT);
 		int num = !eq.flags.mmA + !eq.flags.mmC + !eq.flags.mmG + !eq.flags.mmT;
 		assert_leq(num, 4);
@@ -198,9 +303,10 @@ struct RangeState {
 	 * internally consistent.
 	 */
 	bool repOk() {
-		// Something has to be eliminated
-		assert(eq.flags.mmA || eq.flags.mmC || eq.flags.mmG || eq.flags.mmT);
-		assert(eq.flags.insA || eq.flags.insC || eq.flags.insG || eq.flags.insT);
+		// Something has to be eliminated (except when we just matched an N)
+		//assert(eliminated_ || eq.flags.mmA || eq.flags.mmC || eq.flags.mmG || eq.flags.mmT);
+		//assert(eliminated_ || eq.flags.insA || eq.flags.insC || eq.flags.insG || eq.flags.insT);
+		if(eliminated_) return true;
 		// Uneliminated chars must have non-empty ranges
 		if(!eq.flags.mmA || !eq.flags.insA) assert_gt(bots[0], tops[0]);
 		if(!eq.flags.mmC || !eq.flags.insC) assert_gt(bots[1], tops[1]);
@@ -345,16 +451,16 @@ public:
 	/**
 	 * Initialize a new branch object with an empty path.
 	 */
-	void init(RangeStatePool& pool, uint32_t qlen,
+	void init(RangeStatePool& pool, AllocOnlyPool<Edit>& epool,
+	          uint32_t qlen,
 	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
 	          uint16_t depth3, uint16_t rdepth, uint16_t len,
 	          uint16_t cost, uint32_t itop, uint32_t ibot,
 	          const EbwtParams& ep, const uint8_t* ebwt,
-	          uint16_t numEdits, Edit *edits = NULL)
+	          const EditList* edits = NULL)
 	{
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
-		assert_lt(numEdits, 4);
 		depth0_ = depth0;
 		depth1_ = depth1;
 		depth2_ = depth2;
@@ -373,7 +479,6 @@ public:
 			ltop_.initFromRow(itop, ep, ebwt);
 			lbot_.invalidate();
 		}
-		numEdits_ = numEdits;
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.alloc(qlen - rdepth_); // allocated from the RangeStatePool
 		} else {
@@ -389,10 +494,11 @@ public:
 		curtailed_ = false;
 		exhausted_ = false;
 		prepped_ = true;
-		if(numEdits > 0) {
-			assert(edits != NULL);
+		edits_.clear();
+		if(edits != NULL) {
+			const size_t numEdits = edits->size();
 			for(size_t i = 0; i < numEdits; i++) {
-				edits_[i] = edits[i];
+				edits_.add(edits->get(i), epool, qlen);
 			}
 		}
 		// If we're starting with a non-zero length, that means we're
@@ -429,7 +535,8 @@ public:
 	 * into the priority queue.  Mark that outgoing path from the
 	 * parent branch as eliminated
 	 */
-	Branch* splitBranch(RangeStatePool& rpool, Branch *newBranch,
+	Branch* splitBranch(RangeStatePool& rpool, AllocOnlyPool<Edit>& epool,
+	                    Branch *newBranch,
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
@@ -506,13 +613,11 @@ public:
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
 		newBranch->init(
-				rpool, qlen,
+				rpool, epool, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
-				newRdepth, 0, cost_, top, bot, ep, ebwt,
-				numEdits_,
-				edits_);
+				newRdepth, 0, cost_, top, bot, ep, ebwt, &edits_);
 		// Add the new edit
-		newBranch->edits_[newBranch->numEdits_++] = e;
+		newBranch->edits_.add(e, epool, qlen);
 		if(numNotEliminated == 1 && last) {
 			// This branch is totally exhausted; there are no more
 			// valid outgoing paths from any positions within it.
@@ -563,10 +668,11 @@ public:
 		if(halfAndHalf) out << " h";
 		else            out << "  ";
 		std::stringstream ss2;
+		const size_t numEdits = edits_.size();
 		if(rdepth_ > 0) {
 			for(size_t i = 0; i < rdepth_; i++) {
-				if(editidx < numEdits_ && edits_[editidx].pos == i) {
-					ss2 << " " << "acgt"[edits_[editidx].chr];
+				if(editidx < numEdits && edits_.get(editidx).pos == i) {
+					ss2 << " " << "acgt"[edits_.get(editidx).chr];
 					editidx++;
 				} else {
 					ss2 << " " << qry[qlen - i - 1];
@@ -578,15 +684,15 @@ public:
 			ss2 << " ";
 		}
 		for(size_t i = 0; i < len_; i++) {
-			if(editidx < numEdits_ && edits_[editidx].pos == printed) {
-				ss2 << "acgt"[edits_[editidx].chr] << " ";
+			if(editidx < numEdits && edits_.get(editidx).pos == printed) {
+				ss2 << "acgt"[edits_.get(editidx).chr] << " ";
 				editidx++;
 			} else {
 				ss2 << qry[qlen - printed - 1] << " ";
 			}
 			printed++;
 		}
-		assert_eq(editidx, numEdits_);
+		assert_eq(editidx, edits_.size());
 		for(size_t i = printed; i < qlen; i++) {
 			ss2 << "- ";
 		}
@@ -740,9 +846,8 @@ public:
 		assert_leq(depth0_, depth1_);
 		assert_leq(depth1_, depth2_);
 		assert_leq(depth2_, depth3_);
-		assert_lt(numEdits_, 4);
 		if(qlen > 0) {
-			assert_leq(numEdits_, qlen); // might have to relax this with inserts
+			assert_leq(edits_.size(), qlen); // might have to relax this with inserts
 			assert_leq(rdepth_, qlen);
 		}
 		for(int i = 0; i < len_; i++) {
@@ -751,11 +856,12 @@ public:
 				assert(ranges_[i].repOk());
 			}
 		}
-		for(size_t i = 0; i < numEdits_; i++) {
-			for(size_t j = i+1; j < numEdits_; j++) {
+		const size_t numEdits = edits_.size();
+		for(size_t i = 0; i < numEdits; i++) {
+			for(size_t j = i+1; j < numEdits; j++) {
 				// No two edits should be at the same position (might
 				// have to relax this with inserts)
-				assert_neq(edits_[i].pos, edits_[j].pos);
+				assert_neq(edits_.get(i).pos, edits_.get(j).pos);
 			}
 		}
 		assert_lt((cost_ >> 14), 4);
@@ -781,8 +887,7 @@ public:
 	uint32_t bot_;    // bot offset leading to the root of this subtree
 	SideLocus ltop_;
 	SideLocus lbot_;
-	uint16_t numEdits_;// number of edits
-	Edit edits_[12];   // edits leading to the root of the branch
+	EditList edits_;   // edits leading to the root of the branch
 
 	bool curtailed_;  // can't be extended anymore without using edits
 	bool exhausted_;  // all outgoing edges exhausted, including all edits
@@ -831,7 +936,7 @@ public:
 	void reset() {
 #ifndef NDEBUG
 		for(size_t i = 0; i < pools_.size(); i++) {
-			memset(pools_[i], 0, (lim_) * sizeof(RangeState));
+			memset(pools_[i], 0, (lim_) * sizeof(Branch));
 		}
 #endif
 		cur_ = 0;
@@ -1131,7 +1236,8 @@ class PathManager {
 public:
 
 	PathManager() :
-		bpool(1 * 1024 * 1024), rpool(1 * 1024 * 1024), minCost(0)
+		bpool(1 * 1024 * 1024), rpool(1 * 1024 * 1024),
+		epool(1 * 1024 * 1024, "edit"), minCost(0)
 	{ }
 
 	~PathManager() {
@@ -1192,6 +1298,7 @@ public:
 		ASSERT_ONLY(branchSet_.clear());
 		rpool.reset();
 		bpool.reset();
+		epool.reset() ;
 		minCost = 0;
 	}
 
@@ -1308,7 +1415,7 @@ protected:
 	                    const uint8_t* ebwt)
 	{
 		Branch *dst = bpool.alloc();
-		src->splitBranch(rpool, dst, rand, qlen, seedLen, ep, ebwt);
+		src->splitBranch(rpool, epool, dst, rand, qlen, seedLen, ep, ebwt);
 		assert(dst->repOk());
 		return dst;
 	}
@@ -1330,6 +1437,7 @@ public:
 
 	BranchPool bpool;     // pool for allocating Branches
 	RangeStatePool rpool; // pool for allocating RangeStates
+	AllocOnlyPool<Edit> epool; // pool for allocating Edits
 	/// The minimum possible cost for any alignments obtained by
 	/// advancing further
 	uint16_t minCost;
@@ -1872,6 +1980,7 @@ public:
 			// Advance current RangeSource
 			uint16_t precost = rss_[0]->minCost;
 			rss_[0]->advance(until);
+			assert_geq(rss_[0]->minCost, precost);
 			lastRange_ = NULL;
 			this->foundRange = false;
 			if(rss_[0]->foundRange) {
@@ -1974,7 +2083,9 @@ protected:
 #endif
 
 	/**
-	 *
+	 * We found a range; check whether we should attempt to find a
+	 * range of equal quality from the opposite strand so that we can
+	 * resolve the strand bias.
 	 */
 	void foundFirstRange(Range* r) {
 		assert(r != NULL);

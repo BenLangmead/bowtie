@@ -109,6 +109,7 @@ static uint32_t skipReads       = 0;     // # reads/read pairs to skip
 static bool nofw                = false; // don't align fw orientation of read
 static bool norc                = false; // don't align rc orientation of read
 static bool strandFix           = false; // attempt to fix strand bias
+static bool randomizeQuals      = false; // randomize quality values
 // mating constraints
 
 static const char *short_options = "fqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -162,7 +163,8 @@ enum {
 	ARG_NO_FW,
 	ARG_NO_RC,
 	ARG_SKIP,
-	ARG_STRAND_FIX
+	ARG_STRAND_FIX,
+	ARG_RANDOMIZE_QUALS
 };
 
 static struct option long_options[] = {
@@ -244,6 +246,7 @@ static struct option long_options[] = {
 	{"tryhard",      no_argument,       0,            'y'},
 	{"skip",         required_argument, 0,            's'},
 	{"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
+	{"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -1112,6 +1115,7 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_MAXBTS2: maxBts2 = parseInt(0, "--maxbts2 must be positive"); break;
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
 	   		case ARG_STRAND_FIX: strandFix = true; break;
+	   		case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
 	   		case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
 	   		case ARG_ORIG:
    				if(optarg == NULL || strlen(optarg) == 0) {
@@ -1159,10 +1163,6 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(mates1.size() > 0 || mates2.size() > 0) {
 		spanStrata = true;
-	}
-	if((mates1.size() > 0 || mates2.size() > 0) && maqLike && seedMms > 0) {
-		cerr << "Paired-end mode is not yet compatible with -n 1, -n 2 or -n 3." << endl;
-		exit(1);
 	}
 	if(!fullIndex) {
 		bool error = false;
@@ -3412,22 +3412,26 @@ static PatternSource*
 patsrcFromStrings(int format, const vector<string>& qs) {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (qs, false, useSpinlock,
+			return new FastaPatternSource (qs, false, randomizeQuals,
+			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, forgiveInput,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (qs, false, useSpinlock,
+			return new RawPatternSource   (qs, false, randomizeQuals,
+			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, skipReads);
 		case FASTQ:
-			return new FastqPatternSource (qs, false, useSpinlock,
+			return new FastqPatternSource (qs, false, randomizeQuals,
+			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, forgiveInput,
 			                               solexa_quals,
 			                               integer_quals, skipReads);
 		case CMDLINE:
-			return new VectorPatternSource(qs, false, useSpinlock,
+			return new VectorPatternSource(qs, false, randomizeQuals,
+			                               useSpinlock,
 			                               patDumpfile, trim3,
 			                               trim5, nsPolicy, skipReads);
 		case RANDOM:
