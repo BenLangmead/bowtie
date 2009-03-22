@@ -898,93 +898,6 @@ protected:
 };
 
 /**
- * Class for managing a pool of memory from which Branches are
- * allocated.
- */
-class BranchPool {
-public:
-	/**
-	 * Initialize a new pool with an initial size of about 'bytes'
-	 * bytes.  Exit with an error message if we can't allocate it.
-	 */
-	BranchPool(uint32_t bytes) : curPool_(0), cur_(0) {
-		lim_ = bytes / sizeof(Branch);
-		Branch *pool;
-		try {
-			pool = new Branch[lim_];
-			if(pool == NULL) throw std::bad_alloc();
-		} catch(std::bad_alloc& e) {
-			cerr << "Error: Could not allocate BranchPool #1 of " << bytes << " bytes";
-			exit(1);
-		}
-		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(Branch)));
-		pools_.push_back(pool);
-	}
-
-	/**
-	 * Delete all the pools.
-	 */
-	~BranchPool() {
-		for(size_t i = 0; i < pools_.size(); i++) {
-			delete[] pools_[i];
-		}
-	}
-
-	/**
-	 * Reset the pool, freeing all arrays that had been given out.
-	 */
-	void reset() {
-#ifndef NDEBUG
-		for(size_t i = 0; i < pools_.size(); i++) {
-			memset(pools_[i], 0, (lim_) * sizeof(Branch));
-		}
-#endif
-		cur_ = 0;
-		curPool_ = 0;
-		lastAlloc_ = NULL;
-	}
-
-	/**
-	 * Return the last RangeState allocated from the pool.
-	 */
-	Branch* lastAlloc() {
-		return lastAlloc_;
-	}
-
-	/**
-	 * Allocate another array of RangeStates from the pool.
-	 */
-	Branch* alloc() {
-		if(cur_ + 1 >= lim_) {
-			if(curPool_ >= pools_.size()-1) {
-				Branch *pool;
-				try {
-					pool = new Branch[lim_];
-					if(pool == NULL) throw std::bad_alloc();
-				} catch(std::bad_alloc& e) {
-					cerr << "Error: Could not allocate BranchPool #" << (curPool_+2) << " of " << (lim_ * sizeof(Branch)) << " bytes";
-					exit(1);
-				}
-				ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(Branch)));
-				pools_.push_back(pool);
-			}
-			curPool_++;
-			cur_ = 0;
-		}
-		lastAlloc_ = &pools_[curPool_][cur_];
-		cur_ ++;
-		return lastAlloc_;
-	}
-
-protected:
-	std::vector<Branch*> pools_; /// the memory pools
-	uint32_t    curPool_; /// pool we're current allocating from
-	uint32_t    lim_;  /// # elements held in pool_
-	uint32_t    cur_;  /// index of next free element of pool_
-	Branch *    lastAlloc_; /// last RangeState array allocated
-};
-
-/**
  * Order two Branches based on cost.
  */
 class CostCompare {
@@ -1236,7 +1149,7 @@ class PathManager {
 public:
 
 	PathManager() :
-		bpool(1 * 1024 * 1024), rpool(1 * 1024 * 1024),
+		bpool(1 * 1024 * 1024, "branch"), rpool(1 * 1024 * 1024),
 		epool(1 * 1024 * 1024, "edit"), minCost(0)
 	{ }
 
@@ -1435,7 +1348,7 @@ protected:
 
 public:
 
-	BranchPool bpool;     // pool for allocating Branches
+	AllocOnlyPool<Branch> bpool; // pool for allocating Branches
 	RangeStatePool rpool; // pool for allocating RangeStates
 	AllocOnlyPool<Edit> epool; // pool for allocating Edits
 	/// The minimum possible cost for any alignments obtained by

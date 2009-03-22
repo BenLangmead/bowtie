@@ -65,7 +65,7 @@ elsif($reads1 =~ /\.raw/) {
 	$extra_args .= " -c ";
 }
 
-my $inner = 0;
+my $inner = 1;
 my $outer = 250;
 
 my $sesMustHavePes = 0; # force se pairs to have corresponding pe pairs 
@@ -194,6 +194,7 @@ while(<BOWTIE_SE2>) {
 			if($ooff > $off) {
 				# The #1 mate is on the right
 				$diff = $ooff - $off + $olen;
+				next if $ooff == $off;
 				next if ($diff < $inner || $diff > $outer);
 				# The #1 mate is on the right
 				next if $ofw == $m1fw;
@@ -202,6 +203,7 @@ while(<BOWTIE_SE2>) {
 			} else {
 				# The #1 mate is on the left
 				$diff = $off - $ooff + $len;
+				next if $ooff == $off;
 				next if ($diff < $inner || $diff > $outer);
 				# The #1 mate is on the left
 				next if $fw != $m2fw;
