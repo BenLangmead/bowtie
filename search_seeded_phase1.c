@@ -49,7 +49,7 @@
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
 	btf1.setQuery(&patFw, &qualFw, &name);
-	btf1.setOffs(0, 0, plen, plen, plen, plen);
+	btf1.setOffs(0, plen, plen, plen, plen, plen);
 	if(btf1.backtrack()) {
 		DONEMASK_SET(patid);
 		continue;

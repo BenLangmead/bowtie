@@ -78,10 +78,10 @@ system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
 system("make -C $simreads_dir $simreads_exe") == 0 || die;
 
 # Run Bowtie not in paired-end mode for first mate file
-my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode $extra_args -a --refidx --nostrata $index $reads1";
+my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx --nostrata $index $reads1";
 
 # Run Bowtie not in paired-end mode for second mate file
-my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode $extra_args -a --refidx --nostrata $index $reads2";
+my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx --nostrata $index $reads2";
 
 # Run Bowtie in paired-end mode
 my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode $thorough_arg $extra_args --refidx $index -1 $reads1 -2 $reads2";

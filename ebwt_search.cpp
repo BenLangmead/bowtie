@@ -63,9 +63,6 @@ static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBts               = 125; // max # backtracks allowed in half-and-half mode
-static int maxBts0              = 28; // max # backtracks allowed in half-and-half mode
-static int maxBts1              = 16; // max # backtracks allowed in half-and-half mode
-static int maxBts2              = 12; // max # backtracks allowed in half-and-half mode
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;     // number of pthreads operating concurrently
 static output_types outType		= FULL;  // style of output
@@ -122,9 +119,6 @@ enum {
 	ARG_CONCISE,
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
-	ARG_MAXBTS0,
-	ARG_MAXBTS1,
-	ARG_MAXBTS2,
 	ARG_VERBOSE,
 	ARG_QUIET,
 	ARG_RANDOM_READS,
@@ -216,9 +210,6 @@ static struct option long_options[] = {
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
 	{"range",        no_argument,       0,            ARG_RANGE},
 	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
-	{"maxbts0",      required_argument, 0,            ARG_MAXBTS0},
-	{"maxbts1",      required_argument, 0,            ARG_MAXBTS1},
-	{"maxbts2",      required_argument, 0,            ARG_MAXBTS2},
 	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{"phased",       no_argument,       0,            'z'},
@@ -1110,9 +1101,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_NO_FW: nofw = true; break;
 	   		case ARG_NO_RC: norc = true; break;
 			case ARG_MAXBTS:  maxBts  = parseInt(0, "--maxbts must be positive");  break;
-			case ARG_MAXBTS0: maxBts0 = parseInt(0, "--maxbts0 must be positive"); break;
-			case ARG_MAXBTS1: maxBts1 = parseInt(0, "--maxbts1 must be positive"); break;
-			case ARG_MAXBTS2: maxBts2 = parseInt(0, "--maxbts2 must be positive"); break;
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
 	   		case ARG_STRAND_FIX: strandFix = true; break;
 	   		case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
@@ -2119,7 +2107,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	GreedyDFSRangeSource btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2157,7 +2144,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	GreedyDFSRangeSource bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
@@ -2195,7 +2181,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2210,7 +2195,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2431,7 +2415,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr1(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2446,7 +2429,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt2(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (no)
@@ -2461,7 +2443,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2476,7 +2457,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bthh3(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        //BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),
 	        // Do not impose maximums in 2/3-mismatch mode
 	        BacktrackLimits(), // max backtracks
 	        0,              // reportPartials (don't)
@@ -2628,7 +2608,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2641,7 +2621,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2680,7 +2660,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2695,7 +2675,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2737,7 +2717,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2753,7 +2733,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2768,7 +2748,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2812,7 +2792,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2827,7 +2807,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2873,7 +2853,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2886,7 +2866,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2901,7 +2881,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2916,7 +2896,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2931,7 +2911,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2947,7 +2927,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2962,7 +2942,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2), // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2979,7 +2959,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0),  // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2994,7 +2974,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, maxBts0, maxBts1, maxBts2),  // max backtracks
+	        BacktrackLimits(maxBts, 0, 0, 0),  // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -3058,6 +3038,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			seedMms,
 			seedLen,
 			qualCutoff,
+			maxBts,
 			_sink,
 			*sinkFact,
 			NULL, //&cacheFw,
@@ -3076,6 +3057,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			seedMms,
 			seedLen,
 			qualCutoff,
+			maxBts,
 			_sink,
 			*sinkFact,
 			mate1fw,

@@ -36,7 +36,7 @@
 			uint8_t oldQuals =
 				PartialAlignmentManager::toMutsString(
 						pals[i], patFw, qualFw, muts, !noMaqRound);
-
+			assert_leq(oldQuals, qualThresh);
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable

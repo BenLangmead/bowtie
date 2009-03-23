@@ -289,6 +289,11 @@ public:
 			// _partialBuf and install them in the _partials database
 			assert(_partials != NULL);
 			if(_partialsBuf.size() > 0) {
+#ifndef NDEBUG
+				for(size_t i = 0; i < _partialsBuf.size(); i++) {
+					assert(_partialsBuf[i].repOk(_qualThresh, _qlen, (*_qual), _maqPenalty));
+				}
+#endif
 				_partials->addPartials(_params.patId(), _partialsBuf);
 				_partialsBuf.clear();
 				ret = true;
@@ -943,6 +948,7 @@ public:
 						ret = false;
 					} else {
 						assert(!_precalcedSideLocus);
+						assert_leq(iham, _qualThresh);
 						ret = backtrack(stackDepth+1,
 						                ebwt._eh._ftabChars,
 					                    btUnrevOff,  // new unrevisitable boundary
@@ -960,6 +966,7 @@ public:
 					// We already called initFromTopBot for the range
 					// we're going to continue from
 					_precalcedSideLocus = true;
+					assert_leq(iham, _qualThresh);
 					// Continue from selected alternative range
 					ret = backtrack(stackDepth+1,// added 1 mismatch to alignment
 				                    i+1,         // start from next position after
@@ -1670,7 +1677,7 @@ protected:
 			al.entry.char1 = c;
 		} else {
 			// Signal that the '1' slot is empty
-			al.entry.pos1 = 0xff;
+			al.entry.pos1 = 0xffff;
 		}
 
 		if(stackDepth > 2) {
@@ -1689,10 +1696,12 @@ protected:
 			al.entry.char2 = c;
 		} else {
 			// Signal that the '2' slot is empty
-			al.entry.pos2 = 0xff;
+			al.entry.pos2 = 0xffff;
 		}
+		assert_leq(qualTot, _qualThresh);
 		assert(validPartialAlignment(al));
 #ifndef NDEBUG
+		assert(al.repOk(_qualThresh, _qlen, (*_qual), _maqPenalty));
 		for(size_t i = 0; i < _partialsBuf.size(); i++) {
 			assert(validPartialAlignment(_partialsBuf[i]));
 			assert(!samePartialAlignment(_partialsBuf[i], al));
@@ -2574,7 +2583,9 @@ public:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
 			pm.splitAndPrep(rand_, qlen_, depth3_, ebwt_->_eh, ebwt_->_ebwt);
-			if(pm.empty()) break;
+			if(pm.empty()) {
+				break;
+			}
 
 			if(until == ADV_COST_CHANGES && pm.front()->cost_ != cost) break;
 			else if(until == ADV_STEP) break;

@@ -126,12 +126,12 @@
 		assert_lt(pos0, s5);
 		uint8_t oldChar = (uint8_t)patFw[pos0];
 		assert_neq(oldChar, partials[i].entry.char0);
-		if(partials[i].entry.pos1 != 0xff) {
+		if(partials[i].entry.pos1 != 0xffff) {
 			uint32_t pos1 = partials[i].entry.pos1;
 			assert_lt(pos1, s5);
 			oldChar = (uint8_t)patFw[pos1];
 			assert_neq(oldChar, partials[i].entry.char1);
-			if(partials[i].entry.pos2 != 0xff) {
+			if(partials[i].entry.pos2 != 0xffff) {
 				uint32_t pos2 = partials[i].entry.pos2;
 				assert_lt(pos2, s5);
 				oldChar = (uint8_t)patFw[pos2];

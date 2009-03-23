@@ -30,6 +30,7 @@ public:
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
+			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			RangeCache* cacheFw,
@@ -46,6 +47,7 @@ public:
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
+			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			cacheFw_(cacheFw),
@@ -322,6 +324,7 @@ private:
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
+	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	RangeCache *cacheFw_;
@@ -351,6 +354,7 @@ public:
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
+			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			bool mate1fw,
@@ -377,6 +381,7 @@ public:
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
+			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			mate1fw_(mate1fw),
@@ -409,7 +414,15 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 		RefAligner<String<Dna5> >* refAligner = NULL;
-		refAligner = new Seed1RefAligner<String<Dna5> >(verbose_, seedLen_, qualCutoff_, maqPenalty_);
+		if(seedMms_ == 0) {
+			refAligner = new Seed0RefAligner<String<Dna5> >(verbose_, seedLen_, qualCutoff_, maqPenalty_);
+		} else if(seedMms_ == 1) {
+			refAligner = new Seed1RefAligner<String<Dna5> >(verbose_, seedLen_, qualCutoff_, maqPenalty_);
+		} else if(seedMms_ == 2) {
+			refAligner = new Seed2RefAligner<String<Dna5> >(verbose_, seedLen_, qualCutoff_, maqPenalty_);
+		} else {
+			refAligner = new Seed3RefAligner<String<Dna5> >(verbose_, seedLen_, qualCutoff_, maqPenalty_);
+		}
 		bool do1Fw = true;
 		bool do1Rc = true;
 		bool do2Fw = true;
@@ -902,6 +915,7 @@ private:
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
+	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	const bool mate1fw_;

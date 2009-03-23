@@ -1216,6 +1216,7 @@ protected:
 				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				*chaseL_ = false;
+				drL_->foundRange = false;
 				if(verbose) cout << "Done with case for first mate" << endl;
 				if(*delayedchaseR_) {
 					// Start chasing the delayed range
@@ -1264,6 +1265,7 @@ protected:
 				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
 				*chaseR_ = false;
+				drR_->foundRange = false;
 				if(verbose) cout << "Done with case for second mate" << endl;
 				if(*delayedchaseL_) {
 					// Start chasing the delayed range
@@ -1295,7 +1297,7 @@ protected:
 					return;
 				}
 				assert(!*delayedchaseL_);
-				drL_->advance(ADV_FOUND_RANGE);
+				if(!drL_->foundRange) drL_->advance(ADV_FOUND_RANGE);
 				if(drL_->foundRange) {
 #ifndef NDEBUG
 					{
@@ -1357,7 +1359,7 @@ protected:
 					return;
 				}
 				assert(!*delayedchaseR_);
-				drR_->advance(ADV_FOUND_RANGE);
+				if(!drR_->foundRange) drR_->advance(ADV_FOUND_RANGE);
 				if(drR_->foundRange) {
 #ifndef NDEBUG
 					{

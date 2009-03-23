@@ -61,13 +61,36 @@ typedef union {
 	struct {
 		uint64_t u64   : 64;
 	} u64;
+
+	/**
+	 *
+	 */
+	bool repOk(uint32_t qualMax, uint32_t slen, const String<char>& quals, bool maqPenalty) {
+		uint32_t qual = 0;
+		assert_leq(slen, seqan::length(quals));
+		if(entry.pos0 != 0xffff) {
+			assert_lt(entry.pos0, slen);
+			qual += mmPenalty(maqPenalty, phredCharToPhredQual(quals[entry.pos0]));
+		}
+		if(entry.pos1 != 0xffff) {
+			assert_lt(entry.pos1, slen);
+			qual += mmPenalty(maqPenalty, phredCharToPhredQual(quals[entry.pos1]));
+		}
+		if(entry.pos2 != 0xffff) {
+			assert_lt(entry.pos2, slen);
+			qual += mmPenalty(maqPenalty, phredCharToPhredQual(quals[entry.pos2]));
+		}
+		assert_leq(qual, qualMax);
+		return true;
+	}
+
 } PartialAlignment;
 
 #ifndef NDEBUG
 static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 	if(pa1.unk.type == 1 || pa2.unk.type == 1) return false;
-	assert_neq(0xff, pa1.entry.pos0);
-	assert_neq(0xff, pa2.entry.pos0);
+	assert_neq(0xffff, pa1.entry.pos0);
+	assert_neq(0xffff, pa2.entry.pos0);
 
 	// Make sure pa1's pos0 is represented in pa1
 	if(pa1.entry.pos0 == pa2.entry.pos0) {
@@ -79,7 +102,7 @@ static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2)
 	} else {
 		return false;
 	}
-	if(pa1.entry.pos1 != 0xff) {
+	if(pa1.entry.pos1 != 0xffff) {
 		if       (pa1.entry.pos1 == pa2.entry.pos0) {
 			if(pa1.entry.char1 != pa2.entry.char0) return false;
 		} else if(pa1.entry.pos1 == pa2.entry.pos1) {
@@ -90,7 +113,7 @@ static bool sameHalfPartialAlignment(PartialAlignment pa1, PartialAlignment pa2)
 			return false;
 		}
 	}
-	if(pa1.entry.pos2 != 0xff) {
+	if(pa1.entry.pos2 != 0xffff) {
 		if       (pa1.entry.pos2 == pa2.entry.pos0) {
 			if(pa1.entry.char2 != pa2.entry.char0) return false;
 		} else if(pa1.entry.pos2 == pa2.entry.pos1) {
@@ -109,18 +132,18 @@ static bool samePartialAlignment(PartialAlignment pa1, PartialAlignment pa2) {
 }
 
 static bool validPartialAlignment(PartialAlignment pa) {
-	if(pa.entry.pos0 != 0xff) {
+	if(pa.entry.pos0 != 0xffff) {
 		if(pa.entry.pos0 == pa.entry.pos1) return false;
 		if(pa.entry.pos0 == pa.entry.pos2) return false;
 	} else {
-		if(pa.entry.pos1 != 0xff) return false;
-		if(pa.entry.pos2 != 0xff) return false;
+		if(pa.entry.pos1 != 0xffff) return false;
+		if(pa.entry.pos2 != 0xffff) return false;
 	}
 
-	if(pa.entry.pos1 != 0xff) {
+	if(pa.entry.pos1 != 0xffff) {
 		if(pa.entry.pos1 == pa.entry.pos2) return false;
 	} else {
-		if(pa.entry.pos2 != 0xff) return false;
+		if(pa.entry.pos2 != 0xffff) return false;
 	}
 	return true;
 }
@@ -324,9 +347,9 @@ public:
 				ASSERT_ONLY(uint32_t pos0 = ps.back().entry.pos0);
 				ASSERT_ONLY(uint32_t pos1 = ps.back().entry.pos1);
 				ASSERT_ONLY(uint32_t pos2 = ps.back().entry.pos2);
-				assert(pos1 == 0xff || pos0 != pos1);
-				assert(pos2 == 0xff || pos0 != pos2);
-				assert(pos2 == 0xff || pos1 != pos2);
+				assert(pos1 == 0xffff || pos0 != pos1);
+				assert(pos2 == 0xffff || pos0 != pos2);
+				assert(pos2 == 0xffff || pos1 != pos2);
 			} while(_partialsList[off++].entry.type == 2);
 			assert_eq(3, _partialsList[off-1].entry.type);
 		}
@@ -364,23 +387,26 @@ public:
 		// Do first mutation
 		uint8_t oldQuals = 0;
 		uint32_t pos0 = pal.entry.pos0;
+		assert_lt(pos0, plen);
 		uint16_t tpos0 = plen-1-pos0;
 		uint32_t chr0 = pal.entry.char0;
 		uint8_t oldChar = (uint8_t)seq[tpos0];
 		oldQuals += mmPenalty(maqPenalty, quals[tpos0]-33); // take quality hit
 		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
-		if(pal.entry.pos1 != 0xff) {
+		if(pal.entry.pos1 != 0xffff) {
 			// Do second mutation
 			uint32_t pos1 = pal.entry.pos1;
+			assert_lt(pos1, plen);
 			uint16_t tpos1 = plen-1-pos1;
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
 			oldQuals += mmPenalty(maqPenalty, quals[tpos1]-33); // take quality hit
 			assert_neq(tpos1, tpos0);
 			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
-			if(pal.entry.pos2 != 0xff) {
+			if(pal.entry.pos2 != 0xffff) {
 				// Do second mutation
 				uint32_t pos2 = pal.entry.pos2;
+				assert_lt(pos2, plen);
 				uint16_t tpos2 = plen-1-pos2;
 				uint32_t chr2 = pal.entry.char2;
 				oldChar = (uint8_t)seq[tpos2];
