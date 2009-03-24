@@ -32,7 +32,7 @@ $match_mode = "-v " . $options{v} if defined($options{v});
 $match_mode = "-n " . $options{n} if defined($options{n});
 
 my $thorough_arg = "";
-$thorough_arg = "--mixatts 999999 " if defined($options{t});
+$thorough_arg = "-y" if defined($options{t});
 
 my $extra_args = "";
 $extra_args = $options{e} if defined($options{e});
@@ -53,11 +53,11 @@ $reads1 = $ARGV[1] if (defined($ARGV[1]));
 my $reads2 = "reads/e_coli_1000_2.fq";
 $reads2 = $ARGV[2] if (defined($ARGV[2]));
 
+# Infer input type so we can provide Bowtie with appropriate option
 if($reads1 =~ /\.fa/) {
 	$reads2 =~ /\.fa/ || die "Reads files $reads1 and $reads2 have different extensions";
 	$extra_args .= " -f ";
-}
-elsif($reads1 =~ /\.raw/) {
+} elsif($reads1 =~ /\.raw/) {
 	$reads2 =~ /\.raw/ || die "Reads files $reads1 and $reads2 have different extensions";
 	$extra_args .= " -r ";
 } elsif(!($reads1 =~ /\.fq/)) {
@@ -65,6 +65,8 @@ elsif($reads1 =~ /\.raw/) {
 	$extra_args .= " -c ";
 }
 
+# Inner and outer differences to use when determining whether two
+# single-end alignments satisfy the mating constraint
 my $inner = 1;
 my $outer = 250;
 

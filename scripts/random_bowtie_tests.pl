@@ -1,9 +1,14 @@
 #!/usr/bin/perl -w
 
 #
-# Generate and run a series of random (but non-trivial) test cases at
+# Generate and run a series of random (but non-trivial) test cases for
 # the Bowtie suite of tools, including bowtie, bowtie-build,
-# bowtie-maptool, and bowtie-inspect.
+# bowtie-maptool, and bowtie-inspect.  Most of the problems turned up
+# this way are in the form of assertions in the tools.  However, we
+# also do some sanity-checking of the results; e.g. we use the
+# pe_verify.pl script to verify that paired-end alignments are
+# consistent with matched-up single-end alignments.  This script does
+# not compare single-ended results against an oracle.
 #
 # Usage: perl random_tester.pl [rand seed] \
 #                              [# outer iters] \
@@ -12,6 +17,11 @@
 #                              [max text bases to add to min] \
 #                              [min # read bases] \
 #                              [max read bases to add to min]
+#
+# Options:
+#   -n         don't attempt to compile binaries; use existing binaries
+#   -p "<pol>" use only the specified alignment policy (e.g. "-n 3")
+#   
 #
 
 use List::Util qw[min max];
@@ -29,6 +39,7 @@ if(defined $options{h}) {
 my $setPolicy;
 $setPolicy = $options{p} if defined($options{p});
 
+#
 unless(defined $options{n}) {
 	system("make bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
@@ -49,19 +60,18 @@ sub pickPolicy {
 	my $pe = shift;
 	my $r = int(rand($#policies + 1));
 	my $pol = $policies[$r];
-	return $setPolicy if defined($setPolicy);
-	# If it's an end-to-end policy, then perhaps add "--stateful" to
-	# activate the branching best-first search
-	if($pe) {
-		$pol =~ s/n/v/g;
-	}
-	if($pol =~ /-v/) {
+	$pol = $setPolicy if defined($setPolicy);
+	if(!$pe && int(rand(2)) == 0) {
+		# Possibly ask for best alignments
+		$pol .= " --best";
 		if(int(rand(2)) == 0) {
-			$pol .= " --stateful";
-			if(int(rand(2)) == 0) {
-				$pol .= " --strandfix";
-			}
+			$pol .= " --strandfix";
 		}
+	} elsif(!$pe && int(rand(2)) == 0) {
+		$pol .= " --better";
+	}
+	if($pol =~ /-n/ && int(rand(2)) == 0) {
+		$pol .= " --nomaqround";
 	}
 	return $pol;
 }
@@ -464,9 +474,6 @@ sub doSearch {
 			$mhits = (int(rand(20))+2);
 		}
 		if(!$pe && int(rand(2)) == 0) {
-			$khits .= " --best";
-		}
-		if(!$pe && int(rand(2)) == 0) {
 			$khits .= " --nostrata";
 		}
 	}
@@ -594,10 +601,11 @@ sub doSearch {
 	if($pe) {
 		# If search was for paired-end alignments, then verify the
 		# outcome using pe_verify.pl
-		$policy =~ s/--.*//;
+		my $pol = $policy;
+		$pol =~ s/--.*//;
 		$patstr =~ s/-1//;
 		$patstr =~ s/-2//;
-		$cmd = "perl scripts/pe_verify.pl -d $policy .tmp$seed $patstr";
+		$cmd = "perl scripts/pe_verify.pl -d $pol .tmp$seed $patstr";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>.tmp$seed.pe_verify.stderr`);
 		
@@ -606,6 +614,23 @@ sub doSearch {
 			print "scripts/pe_verify.pl exitlevel: $?\n";
 			if($exitOnFail) {
 				my $err = trim(`cat .tmp$seed.pe_verify.stderr 2> /dev/null`);
+				print "Stdout:\n$out\nStderr:\n$err\n";
+				exit 1;
+			}
+			return 0;
+		}
+	}
+	
+	if(!$pe && $policy =~ /--best|--better/) {
+		$cmd = "perl scripts/best_verify.pl -d $policy .tmp$seed $patstr";
+		print "$cmd\n";
+		$out = trim(`$cmd 2>.tmp$seed.best_verify.stderr`);
+		
+		# Bad exitlevel?
+		if($? != 0) {
+			print "scripts/best_verify.pl exitlevel: $?\n";
+			if($exitOnFail) {
+				my $err = trim(`cat .tmp$seed.best_verify.stderr 2> /dev/null`);
 				print "Stdout:\n$out\nStderr:\n$err\n";
 				exit 1;
 			}
