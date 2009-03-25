@@ -10,6 +10,10 @@
 	btf1.setReportExacts(true);
 	bt1.setReportExacts(true);
 
+	if(verbose) {
+		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
+	}
+
 	if(plen < 2 && seedMms >= 1) {
 		cerr << "Error: Read (" << name << ") is less than 2 characters long" << endl;
 		exit(1);

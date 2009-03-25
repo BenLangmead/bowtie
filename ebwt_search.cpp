@@ -79,7 +79,7 @@ static string dumpMaxFaBase     = "";    // basename of FASTA files to dump read
 static string dumpMaxFqBase     = "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
-static bool onlyBest			= false; // true -> guarantee alignments from best possible stratum
+static bool better				= false; // true -> guarantee alignments from best possible stratum
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
@@ -133,6 +133,7 @@ enum {
 	ARG_DUMP_NOHIT,
 	ARG_DUMP_HHHIT,
 	ARG_SANITY,
+	ARG_BETTER,
 	ARG_BEST,
 	ARG_SPANSTRATA,
 	ARG_REFOUT,
@@ -205,6 +206,7 @@ static struct option long_options[] = {
 	{"minins",       required_argument, 0,            'I'},
 	{"maxins",       required_argument, 0,            'X'},
 	{"best",         no_argument,       0,            ARG_BEST},
+	{"better",       no_argument,       0,            ARG_BETTER},
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
@@ -281,7 +283,8 @@ static void printUsage(ostream& out) {
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
-	    << "  --best             guarantee reported alignments are at best possible stratum" << endl
+	    << "  --better           alignments guaranteed best possible stratum (old --best)" << endl
+	    << "  --best             alignments guaranteed best stratum; tries broken by quality" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
 	    << "  --strandfix        attempt to fix strand biases" << endl
 	    << "Output:" << endl
@@ -1092,7 +1095,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
-	   		case ARG_BEST: onlyBest = true; break;
+	   		case ARG_BETTER: better = true; break;
+	   		case ARG_BEST: stateful = true; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
 	   		case ARG_QUIET: quiet = true; break;
@@ -1158,8 +1162,8 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "When -z/--phased is used, -k X for X > 1 is unavailable" << endl;
 			error = true;
 		}
-		if(onlyBest) {
-			cerr << "When -z/--phased is used, --best is unavailable" << endl;
+		if(better) {
+			cerr << "When -z/--phased is used, --better is unavailable" << endl;
 			error = true;
 		}
 		if(allHits && !spanStrata) {
@@ -1173,10 +1177,6 @@ static void parseOptions(int argc, char **argv) {
 		}
 		if(error) exit(1);
 	}
-	//if(!maqLike && onlyBest) {
-	//	onlyBest = false;
-	//	stateful = true;
-	//}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
 		maxBts = INT_MAX;
@@ -1303,7 +1303,7 @@ createSinkFactory(HitSink& _sink, bool sanity) {
     HitSinkPerThreadFactory *sink = NULL;
     if(spanStrata) {
 		if(!allHits) {
-			if(onlyBest) {
+			if(better) {
 				// First N best, spanning strata
 				sink = new FirstNBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
@@ -1316,7 +1316,7 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 		}
     } else {
 		if(!allHits) {
-			if(onlyBest) {
+			if(better) {
 				// First N best, not spanning strata
 				sink = new FirstNBestStratifiedHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {

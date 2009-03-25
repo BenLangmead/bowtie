@@ -391,7 +391,9 @@ public:
 		uint16_t tpos0 = plen-1-pos0;
 		uint32_t chr0 = pal.entry.char0;
 		uint8_t oldChar = (uint8_t)seq[tpos0];
-		oldQuals += mmPenalty(maqPenalty, quals[tpos0]-33); // take quality hit
+		uint8_t oldQual0 = mmPenalty(maqPenalty, phredCharToPhredQual(quals[tpos0]));
+		assert_leq(oldQual0, 99);
+		oldQuals += oldQual0; // take quality hit
 		appendValue(muts, QueryMutation(tpos0, oldChar, chr0)); // apply mutation
 		if(pal.entry.pos1 != 0xffff) {
 			// Do second mutation
@@ -400,7 +402,9 @@ public:
 			uint16_t tpos1 = plen-1-pos1;
 			uint32_t chr1 = pal.entry.char1;
 			oldChar = (uint8_t)seq[tpos1];
-			oldQuals += mmPenalty(maqPenalty, quals[tpos1]-33); // take quality hit
+			uint8_t oldQual1 = mmPenalty(maqPenalty, phredCharToPhredQual(quals[tpos1]));
+			assert_leq(oldQual1, 99);
+			oldQuals += oldQual1; // take quality hit
 			assert_neq(tpos1, tpos0);
 			appendValue(muts, QueryMutation(tpos1, oldChar, chr1)); // apply mutation
 			if(pal.entry.pos2 != 0xffff) {
@@ -410,7 +414,9 @@ public:
 				uint16_t tpos2 = plen-1-pos2;
 				uint32_t chr2 = pal.entry.char2;
 				oldChar = (uint8_t)seq[tpos2];
-				oldQuals += mmPenalty(maqPenalty, quals[tpos2]-33); // take quality hit
+				uint8_t oldQual2 = mmPenalty(maqPenalty, phredCharToPhredQual(quals[tpos2]));
+				assert_leq(oldQual2, 99);
+				oldQuals += oldQual2; // take quality hit
 				assert_neq(tpos2, tpos0);
 				assert_neq(tpos2, tpos1);
 				append(muts, QueryMutation(tpos2, oldChar, chr2)); // apply mutation

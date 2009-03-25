@@ -13,6 +13,10 @@
 	btf2.setReportExacts(false);
 	btr2.setReportExacts(false);
 
+	if(verbose) {
+		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
+	}
+
 	btf2.setQuery(&patFw, &qualFw, &name);
 	// Set up seed bounds
 	if(qs < s) {

@@ -727,7 +727,7 @@ public:
 	                      const char *dumpfile = NULL,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(reverse, useSpinlock, dumpfile),
+		PatternSource(reverse, randomizeQuals, useSpinlock, dumpfile),
 		trim3_(trim3),
 		trim5_(trim5) { }
 protected:

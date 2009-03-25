@@ -9,6 +9,10 @@
 	params.setFw(true);
 	btf4.setReportExacts(true);
 
+	if(verbose) {
+		cout << patFw << ":" << qualFw << endl;
+	}
+
 	btf4.setQuery(&patFw, &qualFw, &name);
 	// Get all partial alignments for this read's reverse
 	// complement

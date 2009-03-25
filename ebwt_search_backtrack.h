@@ -1652,7 +1652,8 @@ protected:
 		assert_lt(_mms[0], _qlen);
 		// First, append the mismatch position in the read
 		al.entry.pos0 = (uint16_t)_mms[0]; // pos
-		ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[0]] - 33)));
+		uint8_t qual0 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[0]]));
+		ASSERT_ONLY(qualTot += qual0);
 		uint32_t ci = _qlen - _mms[0] - 1;
 		// _chars[] is index in terms of RHS-relative depth
 		int c = (int)(Dna5)_chars[ci];
@@ -1667,7 +1668,8 @@ protected:
 			assert_lt(_mms[1], _qlen);
 			// First, append the mismatch position in the read
 			al.entry.pos1 = (uint16_t)_mms[1]; // pos
-			ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[1]] - 33)));
+			uint8_t qual1 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[1]]));
+			ASSERT_ONLY(qualTot += qual1);
 			ci = _qlen - _mms[1] - 1;
 			// _chars[] is index in terms of RHS-relative depth
 			c = (int)(Dna5)_chars[ci];
@@ -1675,29 +1677,30 @@ protected:
 			assert_neq(c, (int)(*_qry)[_mms[1]]);
 			// Second, append the substituted character for the position
 			al.entry.char1 = c;
+			if(stackDepth > 2) {
+				assert_gt(_mms.size(), 2);
+				// Second mismatch
+				assert_lt(_mms[2], _qlen);
+				// First, append the mismatch position in the read
+				al.entry.pos2 = (uint16_t)_mms[2]; // pos
+				uint8_t qual2 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[2]]));
+				ASSERT_ONLY(qualTot += qual2);
+				ci = _qlen - _mms[2] - 1;
+				// _chars[] is index in terms of RHS-relative depth
+				c = (int)(Dna5)_chars[ci];
+				assert_lt(c, 4);
+				assert_neq(c, (int)(*_qry)[_mms[2]]);
+				// Second, append the substituted character for the position
+				al.entry.char2 = c;
+			} else {
+				// Signal that the '2' slot is empty
+				al.entry.pos2 = 0xffff;
+			}
 		} else {
 			// Signal that the '1' slot is empty
 			al.entry.pos1 = 0xffff;
 		}
 
-		if(stackDepth > 2) {
-			assert_gt(_mms.size(), 2);
-			// Second mismatch
-			assert_lt(_mms[2], _qlen);
-			// First, append the mismatch position in the read
-			al.entry.pos2 = (uint16_t)_mms[2]; // pos
-			ASSERT_ONLY(qualTot += mmPenalty(_maqPenalty, ((*_qual)[_mms[2]] - 33)));
-			ci = _qlen - _mms[2] - 1;
-			// _chars[] is index in terms of RHS-relative depth
-			c = (int)(Dna5)_chars[ci];
-			assert_lt(c, 4);
-			assert_neq(c, (int)(*_qry)[_mms[2]]);
-			// Second, append the substituted character for the position
-			al.entry.char2 = c;
-		} else {
-			// Signal that the '2' slot is empty
-			al.entry.pos2 = 0xffff;
-		}
 		assert_leq(qualTot, _qualThresh);
 		assert(validPartialAlignment(al));
 #ifndef NDEBUG

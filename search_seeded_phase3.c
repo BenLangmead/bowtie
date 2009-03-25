@@ -9,6 +9,10 @@
 	params.setFw(false);
 	btr3.setReportExacts(true);
 
+	if(verbose) {
+		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
+	}
+
 	btr3.setQuery(&patRc, &qualRc, &name);
 	// Get all partial alignments for this read's reverse
 	// complement
