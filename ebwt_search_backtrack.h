@@ -2996,9 +2996,11 @@ public:
 		uint32_t rev2Off = cextToDepth(rev2Off_, sRight, s, len_);
 		uint32_t rev3Off = cextToDepth(rev3Off_, sRight, s, len_);
 		// Truncate the pattern if necessary
+		uint32_t qlen = seqan::length(qual);
 		if(seed_) {
 			if(len_ > s) {
 				rs_->setQlen(s);
+				qlen = s;
 			}
 			assert(!rs_->reportExacts());
 		}
@@ -3013,8 +3015,8 @@ public:
 			minCost = 1 << 14;
 			uint8_t lowQual = 0xff;
 			for(uint32_t d = rev0Off; d < s; d++) {
-				if(qual[s - d - 1] < lowQual) {
-					lowQual = qual[s - d - 1];
+				if(qual[qlen - d - 1] < lowQual) {
+					lowQual = qual[qlen - d - 1];
 				}
 			}
 			assert_lt(lowQual, 0xff);
@@ -3027,8 +3029,8 @@ public:
 			minCost = 2 << 14;
 			uint8_t lowQual1 = 0xff;
 			for(uint32_t d = 0; d < sRight; d++) {
-				if(qual[s - d - 1] < lowQual1) {
-					lowQual1 = qual[s - d - 1];
+				if(qual[qlen - d - 1] < lowQual1) {
+					lowQual1 = qual[qlen - d - 1];
 				}
 			}
 			assert_lt(lowQual1, 0xff);
@@ -3036,8 +3038,8 @@ public:
 			minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
 			uint8_t lowQual2 = 0xff;
 			for(uint32_t d = sRight; d < s; d++) {
-				if(qual[s - d - 1] < lowQual2) {
-					lowQual2 = qual[s - d - 1];
+				if(qual[qlen - d - 1] < lowQual2) {
+					lowQual2 = qual[qlen - d - 1];
 				}
 			}
 			assert_lt(lowQual2, 0xff);
