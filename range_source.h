@@ -641,8 +641,10 @@ public:
 	 */
 	void print(const String<Dna5>& qry,
 	           const String<char>& quals,
+	           uint16_t minCost,
 	           std::ostream& out,
 	           bool halfAndHalf,
+	           bool seeded,
 	           bool fw,
 	           bool ebwtFw)
 	{
@@ -664,39 +666,49 @@ public:
 				out << "0";
 			}
 		}
+		out << s << " ";
+		std::stringstream ss2;
+		ss2 << minCost;
+		s = ss2.str();
+		if(s.length() < 6) {
+			for(size_t i = 0; i < 6 - s.length(); i++) {
+				out << "0";
+			}
+		}
 		out << s;
 		if(halfAndHalf) out << " h";
+		else if(seeded) out << " s";
 		else            out << "  ";
-		std::stringstream ss2;
+		std::stringstream ss3;
 		const size_t numEdits = edits_.size();
 		if(rdepth_ > 0) {
 			for(size_t i = 0; i < rdepth_; i++) {
 				if(editidx < numEdits && edits_.get(editidx).pos == i) {
-					ss2 << " " << "acgt"[edits_.get(editidx).chr];
+					ss3 << " " << "acgt"[edits_.get(editidx).chr];
 					editidx++;
 				} else {
-					ss2 << " " << qry[qlen - i - 1];
+					ss3 << " " << qry[qlen - i - 1];
 				}
 				printed++;
 			}
-			ss2 << "|";
+			ss3 << "|";
 		} else {
-			ss2 << " ";
+			ss3 << " ";
 		}
 		for(size_t i = 0; i < len_; i++) {
 			if(editidx < numEdits && edits_.get(editidx).pos == printed) {
-				ss2 << "acgt"[edits_.get(editidx).chr] << " ";
+				ss3 << "acgt"[edits_.get(editidx).chr] << " ";
 				editidx++;
 			} else {
-				ss2 << qry[qlen - printed - 1] << " ";
+				ss3 << qry[qlen - printed - 1] << " ";
 			}
 			printed++;
 		}
 		assert_eq(editidx, edits_.size());
 		for(size_t i = printed; i < qlen; i++) {
-			ss2 << "- ";
+			ss3 << "- ";
 		}
-		s = ss2.str();
+		s = ss3.str();
 		if(ebwtFw) {
 			std::reverse(s.begin(), s.end());
 		}
@@ -1378,7 +1390,7 @@ public:
 	/// Set up the range search.
 	virtual void initBranch(PathManager& pm, uint16_t icost) = 0;
 	/// Advance the range search by one memory op
-	virtual void advanceBranch(int until, PathManager& pm) = 0;
+	virtual void advanceBranch(int until, uint16_t minCost, PathManager& pm) = 0;
 
 	/// Return the last valid range found
 	virtual Range& range() = 0;
@@ -1452,8 +1464,6 @@ public:
 	 * Return the range found.
 	 */
 	virtual Range& range() = 0;
-
-	virtual uint32_t qlen() const = 0;
 
 	/**
 	 * Return whether we're generating ranges for the first or the
@@ -1573,7 +1583,7 @@ public:
 			rs_->initBranch(pm_, icost); // set up initial branch
 		}
 		this->minCost = max<uint16_t>(icost, this->minCostAdjustment_);
-		this->done = rs_->done || pm_.empty();
+		this->done = rs_->done;
 		this->foundRange = rs_->foundRange;
 	}
 
@@ -1582,11 +1592,14 @@ public:
 	 * done with this read.
 	 */
 	virtual void advanceImpl(int until) {
-		if(this->done) return;
+		if(this->done || pm_.empty()) {
+			this->done = true;
+			return;
+		}
 		assert(!pm_.empty());
 		params_.setFw(fw_);
 		// Advance the RangeSource for the forward-oriented read
-		rs_->advanceBranch(until, pm_);
+		rs_->advanceBranch(until, this->minCost, pm_);
 		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
 		this->done = pm_.empty();
 		this->foundRange = rs_->foundRange;
@@ -1616,11 +1629,6 @@ public:
 		rs_->range().fw = fw_;
 		rs_->range().mate1 = mate1_;
 		return rs_->range();
-	}
-
-	/// Return length of current query
-	virtual uint32_t qlen() const {
-		return len_;
 	}
 
 	/**
@@ -1725,11 +1733,6 @@ public:
 	/// Return the last valid range found
 	virtual Range& range() { return rss_[cur_]->range(); }
 
-	/// Return length of current query
-	virtual uint32_t qlen() const {
-		return rss_[cur_]->qlen();
-	}
-
 	/**
 	 * Return whether we're generating ranges for the first or the
 	 * second mate.
@@ -1772,12 +1775,26 @@ class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 public:
 
-	CostAwareRangeSourceDriver(uint32_t qseed, bool strandFix, const TRangeSrcDrPtrVec& rss) :
+	CostAwareRangeSourceDriver(
+			uint32_t qseed,
+			bool strandFix,
+			const TRangeSrcDrPtrVec* rss,
+			bool verbose) :
 		RangeSourceDriver<TRangeSource>(false),
-		rss_(rss), strandFix_(strandFix), rand_(qseed), delayedRange_(NULL)
+		rss_(), strandFix_(strandFix), rand_(qseed),
+		delayedRange_(NULL), patsrc_(NULL),
+		r_(NULL), verbose_(verbose)
 	{
-		const size_t rssSz = rss.size();
-		assert_gt(rssSz, 0);
+		if(rss != NULL) {
+			rss_ = (*rss);
+		}
+		const size_t rssSz = rss_.size();
+		if(rssSz == 0) {
+			// Set some defaults; wait until more RangeSources are
+			// added to determine final settings
+			paired_ = false;
+			return;
+		}
 		assert(!this->done);
 		bool saw1 = false;
 		bool saw2 = false;
@@ -1815,7 +1832,11 @@ public:
 	/// Set query to find ranges for
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
+		ASSERT_ONLY(allTopsRc_.clear());
 		const size_t rssSz = rss_.size();
+		patsrc_ = patsrc;
+		r_ = r;
+		if(rssSz == 0) return;
 		for(size_t i = 0; i < rssSz; i++) {
 			// Assuming that all
 			rss_[i]->setQuery(patsrc, r);
@@ -1826,12 +1847,74 @@ public:
 		this->foundRange = false;
 		lastRange_ = NULL;
 		delayedRange_ = NULL;
-		if(rss_[0]->foundRange) {
-			foundFirstRange(&rss_[0]->range());
-			rss_[0]->foundRange = false;
-		}
 		assert(!this->foundRange || lastRange_ != NULL);
-		ASSERT_ONLY(allTopsRc_.clear());
+	}
+
+	/**
+	 * Add a new RangeSource to the list and re-sort it.  TODO: slide
+	 * it directly into the right spot instead.
+	 */
+	void addSource(TRangeSrcDrPtr p) {
+		assert(!this->foundRange);
+		rss_.push_back(p);
+		if(patsrc_ != NULL) {
+			p->setQuery(patsrc_, r_);
+		}
+		const size_t rssSz = rss_.size();
+		if(rssSz > 1) sortRss();
+		bool saw1 = false;
+		bool saw2 = false;
+		for(size_t i = 0; i < rssSz; i++) {
+			if(rss_[i]->mate1()) saw1 = true;
+			else saw2 = true;
+		}
+		assert(saw1 || saw2);
+		paired_ = saw1 && saw2;
+		this->done = p->done;
+		if(p->minCost > this->minCost) {
+#ifndef NDEBUG
+			// The only case where the minCost should go up is if all
+			// the existing entries are done
+			for(size_t i = 0; i < rss_.size(); i++) {
+				assert(rss_[i]->done);
+			}
+#endif
+		}
+		this->minCost = p->minCost;
+		if(p->foundRange) {
+			Range *r = &p->range();
+			foundFirstRange(r);
+			assert(lastRange_ != NULL);
+			p->foundRange = false;
+		}
+		if(this->foundRange) {
+			assert(range().repOk());
+		}
+	}
+
+	/**
+	 * Free and remove all contained RangeSources.
+	 */
+	void clearSources() {
+		const size_t rssSz = rss_.size();
+		for(size_t i = 0; i < rssSz; i++) {
+			delete rss_[i];
+		}
+		rss_.clear();
+	}
+
+	/**
+	 * Return the number of RangeSources contained within.
+	 */
+	size_t size() const {
+		return rss_.size();
+	}
+
+	/**
+	 * Return true iff no RangeSources are contained within.
+	 */
+	bool empty() const {
+		return rss_.empty();
 	}
 
 	/**
@@ -1839,8 +1922,16 @@ public:
 	 * done with this read.
 	 */
 	virtual void advance(int until) {
+		ASSERT_ONLY(uint16_t preCost = this->minCost);
+		assert(!this->foundRange);
 		advanceImpl(until);
 		assert(!this->foundRange || lastRange_ != NULL);
+		if(this->foundRange) {
+			assert_geq(range().cost, preCost);
+			if(until >= ADV_COST_CHANGES) {
+				assert_eq(range().cost, preCost);
+			}
+		}
 	}
 
 	/// Advance the range search by one memory op
@@ -1848,6 +1939,7 @@ public:
 		assert(!this->done);
 		const size_t rssSz = rss_.size();
 		assert(sortedRss());
+		assert_gt(rssSz, 0);
 		// RangeSourceDrivers should return from advance at least as
 		// often as the cost of the best path changes
 		until = max<int>(until, ADV_COST_CHANGES);
@@ -1855,6 +1947,16 @@ public:
 			lastRange_ = delayedRange_;
 			delayedRange_ = NULL;
 			this->foundRange = true;
+			assert_geq(range().cost, this->minCost);
+			this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+			return;
+		}
+		if(rss_[0]->foundRange) {
+			// Should only happen on the very first call to advance()
+			Range *r = &rss_[0]->range();
+			assert_eq(this->minCost, r->cost);
+			foundFirstRange(r);
+			rss_[0]->foundRange = false;
 			return;
 		}
 		if(rss_[0]->done) {
@@ -1881,7 +1983,12 @@ public:
 					assert(lastRange_ != NULL);
 					rss_[0]->foundRange = false;
 				}
-				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				if(delayedRange_ == NULL) {
+					// If there's a delayed range, then we shouldn't
+					// increase the minCost yet because there's another
+					// equal-cost range to hand out
+					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				}
 				assert(sortedRss());
 			} else {
 				// All RangeSourceDrivers are done
@@ -1897,7 +2004,9 @@ public:
 			lastRange_ = NULL;
 			this->foundRange = false;
 			if(rss_[0]->foundRange) {
-				foundFirstRange(&rss_[0]->range());
+				Range *r = &rss_[0]->range();
+				assert_eq(r->cost, precost);
+				foundFirstRange(r);
 				assert(lastRange_ != NULL);
 				rss_[0]->foundRange = false;
 			}
@@ -1916,7 +2025,12 @@ public:
 				}
 				rss_[rssSz-1] = p;
 				this->done = !(fwsLeft && rcsLeft);
-				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				if(delayedRange_ == NULL) {
+					// If there's a delayed range, then we shouldn't
+					// increase the minCost yet because there's another
+					// equal-cost range to hand out
+					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				}
 			} else if(precost != rss_[0]->minCost) {
 				assert_gt(rss_[0]->minCost, precost);
 				// Remove and re-insert
@@ -1944,18 +2058,21 @@ public:
 				if(!reinserted) {
 					rss_[rssSz-1] = p;
 				}
-				this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				if(delayedRange_ == NULL) {
+					// If there's a delayed range, then we shouldn't
+					// increase the minCost yet because there's another
+					// equal-cost range to hand out
+					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
+				}
 			}
 			assert(sortedRss());
 		}
 	}
 
 	/// Return the last valid range found
-	virtual Range& range() { assert(lastRange_ != NULL); return *lastRange_; }
-
-	/// Return length of current query
-	virtual uint32_t qlen() const {
-		return rss_[0]->qlen();
+	virtual Range& range() {
+		assert(lastRange_ != NULL);
+		return *lastRange_;
 	}
 
 	/**
@@ -2010,8 +2127,9 @@ protected:
 			// on the other strand; let's try to get it.
 			const size_t rssSz = rss_.size();
 			for(size_t i = 1; i < rssSz; i++) {
-				// Same mate, different orientation?
+				// Ignore exhausted sources
 				if(rss_[i]->done) break;
+				// Same mate, different orientation?
 				if(rss_[i]->mate1() == r->mate1 && rss_[i]->fw() != r->fw) {
 					// Yes; see if it has the same cost
 					TRangeSrcDrPtr p = rss_[i];
@@ -2022,6 +2140,7 @@ protected:
 					assert_eq(minCost, r->cost); // can't be better
 					// Advance it until it's done, we've found a range,
 					// or its cost increases
+					if(this->verbose_) cout << " Looking for opposite range to avoid strand bias:" << endl;
 					while(!p->done && !p->foundRange) {
 						p->advance(ADV_COST_CHANGES);
 						if(p->minCost > minCost) break;
@@ -2138,17 +2257,25 @@ protected:
 	bool sortedRss() {
 		// Selection sort outer loop
 		const size_t rssSz = rss_.size();
-		for(size_t i = 0; i < rssSz-1; i++) {
-			for(size_t j = i+1; j < rssSz; j++) {
-				if(rss_[i]->done) assert(rss_[j]->done);
-				else {
-					if(rss_[j]->done) break;
-					assert_leq(rss_[i]->minCost, rss_[j]->minCost);
+		if(rssSz == 0) return true;
+		if(rssSz > 1) {
+			for(size_t i = 0; i < rssSz-1; i++) {
+				for(size_t j = i+1; j < rssSz; j++) {
+					if(rss_[i]->done) assert(rss_[j]->done);
+					else {
+						if(rss_[j]->done) break;
+						assert_leq(rss_[i]->minCost, rss_[j]->minCost);
+					}
 				}
 			}
 		}
-		uint32_t minCostTmp = max(rss_[0]->minCost, this->minCostAdjustment_);
-		assert_eq(this->minCost, minCostTmp);
+		if(delayedRange_ == NULL) {
+			// Only assert this if there's no delayed range; if there's
+			// a delayed range, the minCost is its cost, not the 0th
+			// element's cost
+			uint32_t minCostTmp = max(rss_[0]->minCost, this->minCostAdjustment_);
+			assert_eq(this->minCost, minCostTmp);
+		}
 		return true;
 	}
 #endif
@@ -2165,6 +2292,9 @@ protected:
 	RandomSource rand_;
 	Range *lastRange_;
 	Range *delayedRange_;
+	PatternSourcePerThread* patsrc_;
+	Range *r_;
+	bool verbose_;
 	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
 };
 

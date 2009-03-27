@@ -68,10 +68,14 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool halfAndHalf = false;
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *rFw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 			*params, rFw_Bw, true, false, maqPenalty_, sink_, sinkPt,
@@ -92,16 +96,16 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-		TRangeSrcDrPtrVec drVec;
+		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) {
-			drVec.push_back(drFw_Bw);
-			drVec.push_back(drFw_Fw);
+			drVec->push_back(drFw_Bw);
+			drVec->push_back(drFw_Fw);
 		}
 
 		EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *rRc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 			*params, rRc_Fw, false, false, maqPenalty_, sink_, sinkPt,
@@ -123,10 +127,10 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		if(doRc_) {
-			drVec.push_back(drRc_Fw);
-			drVec.push_back(drRc_Bw);
+			drVec->push_back(drRc_Fw);
+			drVec->push_back(drRc_Bw);
 		}
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec, verbose_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -222,10 +226,14 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool halfAndHalf = false;
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
 			*params, r1Fw_Bw, true, false, maqPenalty_, sink_, sinkPt,
@@ -254,15 +262,15 @@ public:
 		// the first mate
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
 #else
-		TRangeSrcDrPtrVec drVec;
-		drVec.push_back(dr1Fw_Bw);
-		drVec.push_back(dr1Fw_Fw);
+		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
+		drVec->push_back(dr1Fw_Bw);
+		drVec->push_back(dr1Fw_Fw);
 #endif
 
 		EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
 			*params, r1Rc_Fw, false, false, maqPenalty_, sink_, sinkPt,
@@ -290,14 +298,14 @@ public:
 		// of the first mate
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
 #else
-		drVec.push_back(dr1Rc_Fw);
-		drVec.push_back(dr1Rc_Bw);
+		drVec->push_back(dr1Rc_Fw);
+		drVec->push_back(dr1Rc_Bw);
 #endif
 
 		EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
 			*params, r2Fw_Bw, true, false, maqPenalty_, sink_, sinkPt,
@@ -325,14 +333,14 @@ public:
 		// the first mate
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
 #else
-		drVec.push_back(dr2Fw_Bw);
-		drVec.push_back(dr2Fw_Fw);
+		drVec->push_back(dr2Fw_Bw);
+		drVec->push_back(dr2Fw_Fw);
 #endif
 
 		EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
 			*params, r2Rc_Fw, false, false, maqPenalty_, sink_, sinkPt,
@@ -360,9 +368,9 @@ public:
 		// of the first mate
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 #else
-		drVec.push_back(dr2Rc_Fw);
-		drVec.push_back(dr2Rc_Bw);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
+		drVec->push_back(dr2Rc_Fw);
+		drVec->push_back(dr2Rc_Bw);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec, verbose_);
 #endif
 
 		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);

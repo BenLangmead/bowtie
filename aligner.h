@@ -733,7 +733,7 @@ public:
 		bool verbose,
 		uint32_t seed) :
 		Aligner(true, rangeMode, seed),
-		refs_(refs), patsrc_(NULL), doneFw_(true),
+		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
@@ -752,6 +752,7 @@ public:
 		mixedAttempts_(0),
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rchase),
+		verbose_(verbose),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
 		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
@@ -831,6 +832,8 @@ public:
 		driver1Rc_->setQuery(patsrc, NULL);
 		driver2Fw_->setQuery(patsrc, NULL);
 		driver2Rc_->setQuery(patsrc, NULL);
+		qlen1_ = patsrc_->bufa().length();
+		qlen2_ = patsrc_->bufb().length();
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;
@@ -890,7 +893,6 @@ public:
 	 */
 	virtual bool advance() {
 		assert(!this->done);
-		bool verbose = false;
 		if(doneFw_ && doneFwFirst_) {
 			if(verbose2_) cout << "--" << endl;
 			chaseL_        = &chaseL_rc_;
@@ -916,7 +918,7 @@ public:
 			rchase_->advance();
 			return false;
 		}
-		advanceOrientation(!doneFw_, verbose);
+		advanceOrientation(!doneFw_);
 		if(this->done) {
 			if(verbose2_) cout << "----" << endl;
 			sinkPt_->finishRead(*patsrc_, true);
@@ -1177,7 +1179,7 @@ protected:
 	/**
 	 * Advance paired-end alignment.
 	 */
-	void advanceOrientation(bool pairFw, bool verbose = false) {
+	void advanceOrientation(bool pairFw) {
 		assert(!this->done);
 		assert(!*donePair_);
 		assert(!*chaseL_ || !*chaseR_);
@@ -1194,7 +1196,7 @@ protected:
 					this->done = reconcileAndAdd(
 							rchase_->off(), true /* new entry is from 1 */,
 							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
-							*drL_, *drR_, pairFw, verbose);
+							*drL_, *drR_, pairFw, verbose_);
 				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
@@ -1217,16 +1219,17 @@ protected:
 				// Forget this range; keep looking for ranges
 				*chaseL_ = false;
 				drL_->foundRange = false;
-				if(verbose) cout << "Done with case for first mate" << endl;
+				if(verbose_) cout << "Done with case for first mate" << endl;
 				if(*delayedchaseR_) {
 					// Start chasing the delayed range
-					if(verbose) cout << "Resuming delayed chase for second mate" << endl;
+					if(verbose_) cout << "Resuming delayed chase for second mate" << endl;
 					assert(drR_->foundRange);
 					const Range& r = drR_->range();
 					assert(r.repOk());
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
-					rchase_->setTopBot(top, bot, drR_->qlen(), r.ebwt);
+					uint32_t qlen = doneFw_? qlen1_ : qlen2_;
+					rchase_->setTopBot(top, bot, qlen, r.ebwt);
 					*chaseR_ = true;
 					*delayedchaseR_ = false;
 				}
@@ -1244,7 +1247,7 @@ protected:
 					this->done = reconcileAndAdd(
 							rchase_->off(), false /* new entry is from 2 */,
 							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
-							*drL_, *drR_, pairFw, verbose);
+							*drL_, *drR_, pairFw, verbose_);
 				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
@@ -1266,16 +1269,17 @@ protected:
 				// Forget this range; keep looking for ranges
 				*chaseR_ = false;
 				drR_->foundRange = false;
-				if(verbose) cout << "Done with case for second mate" << endl;
+				if(verbose_) cout << "Done with case for second mate" << endl;
 				if(*delayedchaseL_) {
 					// Start chasing the delayed range
-					if(verbose) cout << "Resuming delayed chase for first mate" << endl;
+					if(verbose_) cout << "Resuming delayed chase for first mate" << endl;
 					assert(drL_->foundRange);
 					const Range& r = drL_->range();
 					assert(r.repOk());
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
-					rchase_->setTopBot(top, bot, drL_->qlen(), r.ebwt);
+					uint32_t qlen = doneFw_? qlen2_ : qlen1_;
+					rchase_->setTopBot(top, bot, qlen, r.ebwt);
 					*chaseL_ = true;
 					*delayedchaseL_ = false;
 				}
@@ -1291,7 +1295,7 @@ protected:
 				// orientation.
 				if(drR_->done && *offsRsz_ == 0) {
 					// Give up on this orientation
-					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
+					if(verbose_) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 1" << endl;
 					*donePair_ = true;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
 					return;
@@ -1315,12 +1319,12 @@ protected:
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
 						// anywhere
-						if(verbose) cout << "Delaying a chase for first mate" << endl;
+						if(verbose_) cout << "Delaying a chase for first mate" << endl;
 						*delayedchaseL_ = true;
 					} else {
 						// Start chasing this range
 						if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << " " << drL_->range().top << endl;
-						if(verbose) cout << "Chasing a range for first mate" << endl;
+						if(verbose_) cout << "Chasing a range for first mate" << endl;
 						if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
 							// Too many candidates for both mates; abort
 							// without any more searching
@@ -1336,13 +1340,15 @@ protected:
 							*chaseR_ = true;
 							const Range& r = drR_->range();
 							assert(r.repOk());
-							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
+							uint32_t qlen = doneFw_? qlen1_ : qlen2_;
+							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseL_ = true;
 							const Range& r = drL_->range();
-							rchase_->setTopBot(r.top, r.bot, drL_->qlen(), r.ebwt);
+							uint32_t qlen = doneFw_? qlen2_ : qlen1_;
+							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
 						}
 					}
 				}
@@ -1353,7 +1359,7 @@ protected:
 				// orientation.
 				if(drL_->done && *offsLsz_ == 0) {
 					// Give up on this orientation
-					if(verbose) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
+					if(verbose_) cout << "Giving up on paired orientation " << (pairFw? "fw" : "rc") << " in mate 2" << endl;
 					if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << endl;
 					*donePair_ = true;
 					return;
@@ -1377,12 +1383,12 @@ protected:
 						// needlessly chasing rows in this range when
 						// the other mate doesn't end up aligning
 						// anywhere
-						if(verbose) cout << "Delaying a chase for second mate" << endl;
+						if(verbose_) cout << "Delaying a chase for second mate" << endl;
 						*delayedchaseR_ = true;
 					} else {
 						// Start chasing this range
 						if(verbose2_) cout << *offsLsz_ << " " << *offsRsz_ << " " << drR_->range().top << endl;
-						if(verbose) cout << "Chasing a range for second mate" << endl;
+						if(verbose_) cout << "Chasing a range for second mate" << endl;
 						if(*offsLsz_ > symCeiling_ && *offsRsz_ > symCeiling_) {
 							// Too many candidates for both mates; abort
 							// without any more searching
@@ -1398,14 +1404,16 @@ protected:
 							*chaseL_ = true;
 							const Range& r = drL_->range();
 							assert(r.repOk());
-							rchase_->setTopBot(r.top, r.bot, drL_->qlen(), r.ebwt);
+							uint32_t qlen = doneFw_? qlen2_ : qlen1_;
+							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseR_ = true;
 							const Range& r = drR_->range();
 							assert(r.repOk());
-							rchase_->setTopBot(r.top, r.bot, drR_->qlen(), r.ebwt);
+							uint32_t qlen = doneFw_? qlen1_ : qlen2_;
+							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
 						}
 					}
 				}
@@ -1420,6 +1428,8 @@ protected:
 	const BitPairReference* refs_;
 
 	PatternSourcePerThread *patsrc_;
+	uint32_t qlen1_;
+	uint32_t qlen2_;
 
 	// Progress state
 	bool doneFw_;   // finished with forward orientation of both mates?
@@ -1470,6 +1480,9 @@ protected:
 
 	// State for getting alignments from ranges statefully
 	RangeChaser<String<Dna> >* rchase_;
+
+	// true -> be talkative
+	bool verbose_;
 
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;
@@ -1580,7 +1593,7 @@ public:
 		bool verbose,
 		uint32_t seed) :
 		Aligner(true, rangeMode, seed),
-		refs_(refs), patsrc_(NULL),
+		refs_(refs), patsrc_(NULL), qlen_(0),
 		chase_(false),
 		refAligner_(refAligner),
 		sinkPtFactory_(sinkPtFactory),
@@ -1615,6 +1628,7 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
+		qlen_ = patsrc_->bufa().length();
 		driver_->setQuery(patsrc);
 		mixedAttempts_ = 0;
 		// Neither orientation is done
@@ -1679,7 +1693,7 @@ public:
 					chase_ = true;
 					const Range& r = driver_->range();
 					assert(r.repOk());
-					rchase_->setTopBot(r.top, r.bot, driver_->qlen(), r.ebwt);
+					rchase_->setTopBot(r.top, r.bot, qlen_, r.ebwt);
 				}
 			} else {
 				this->done = true;
@@ -1867,6 +1881,7 @@ protected:
 
 	const BitPairReference* refs_;
 	PatternSourcePerThread *patsrc_;
+	uint32_t qlen_;
 	bool chase_;
 
 	// For searching for outstanding mates

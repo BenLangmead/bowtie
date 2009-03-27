@@ -21,7 +21,6 @@
 # Options:
 #   -n         don't attempt to compile binaries; use existing binaries
 #   -p "<pol>" use only the specified alignment policy (e.g. "-n 3")
-#   
 #
 
 use List::Util qw[min max];
@@ -39,9 +38,10 @@ if(defined $options{h}) {
 my $setPolicy;
 $setPolicy = $options{p} if defined($options{p});
 
-#
+# make all the relevant binaries, unless we were asked not to
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
+	system("make bowtie-debug bowtie-build-debug ".
+	       "bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
 
 # Alignment policies
@@ -453,6 +453,9 @@ sub doSearch {
 	my $phased = "";
 	if(!$pe && int(rand(2)) == 0) {
 		$phased = "-z";
+		# These aren't available in -z mode
+		$policy =~ s/--best//;
+		$policy =~ s/--better//;
 	}
 	
 	my $khits = "-k 1";

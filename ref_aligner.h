@@ -2174,7 +2174,7 @@ protected:
 #endif
 		const uint32_t anchorBitPairs = min<int>(slen, 32);
 		const int lhsShift = ((anchorBitPairs - 1) << 1);
-		const uint32_t anchorCushion  = 32 - anchorBitPairs;
+		ASSERT_ONLY(const uint32_t anchorCushion  = 32 - anchorBitPairs);
 		// seedAnchorOverhang = # seed bases not included in the anchor
 		const uint32_t seedAnchorOverhang = (slen <= anchorBitPairs ? 0 : (slen - anchorBitPairs));
 		// seedAnchorOverhang = # seed bases not included in the anchor

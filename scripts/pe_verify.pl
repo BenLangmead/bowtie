@@ -251,6 +251,7 @@ $die && die "Found $die paired-end reads with no corresponding single-end mates"
 
 if($unmatchedSes > 0) {
 	print "Total of $unmatchedSes unmatched single-end alignments found for $unmatchedSes distinct pairs\n";
+	print "Ref orientation off len seq quals mms\n";
 	system("cat .unmatched.se");
 	die;
 }

@@ -68,12 +68,15 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true, false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *rFw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *rFw_FwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  false);
+			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
@@ -106,19 +109,19 @@ public:
 			PIN_TO_LEN,
 			os_, verbose_, seed_, true);
 
-		TRangeSrcDrPtrVec drVec;
+		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) {
-			drVec.push_back(drFw_Bw);
-			drVec.push_back(drFw_Fw);
-			drVec.push_back(drFw_FwHalf);
+			drVec->push_back(drFw_Bw);
+			drVec->push_back(drFw_Fw);
+			drVec->push_back(drFw_FwHalf);
 		}
 
 		EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *rRc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  false);
+			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
@@ -151,11 +154,11 @@ public:
 			PIN_TO_LEN,
 			os_, verbose_, seed_, true);
 		if(doRc_) {
-			drVec.push_back(drRc_Fw);
-			drVec.push_back(drRc_Bw);
-			drVec.push_back(drRc_FwHalf);
+			drVec->push_back(drRc_Fw);
+			drVec->push_back(drRc_Bw);
+			drVec->push_back(drRc_FwHalf);
 		}
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec, verbose_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -253,12 +256,15 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r1Fw_BwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  false);
+			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
@@ -290,24 +296,24 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_, true);
-		TRangeSrcDrPtrVec dr1FwVec;
-		dr1FwVec.push_back(dr1Fw_Bw);
-		dr1FwVec.push_back(dr1Fw_Fw);
-		dr1FwVec.push_back(dr1Fw_BwHalf);
+		TRangeSrcDrPtrVec *dr1FwVec = new TRangeSrcDrPtrVec();
+		dr1FwVec->push_back(dr1Fw_Bw);
+		dr1FwVec->push_back(dr1Fw_Fw);
+		dr1FwVec->push_back(dr1Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 #if 0
 		TListRangeSrcDr* dr1Fw = new TListRangeSrcDr(dr1FwVec);
 #else
-		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1FwVec);
+		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1FwVec, verbose_);
 #endif
 
 		EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r1Rc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  false);
+			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
@@ -339,24 +345,24 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_, true);
-		TRangeSrcDrPtrVec dr1RcVec;
-		dr1RcVec.push_back(dr1Rc_Fw);
-		dr1RcVec.push_back(dr1Rc_Bw);
-		dr1RcVec.push_back(dr1Rc_FwHalf);
+		TRangeSrcDrPtrVec *dr1RcVec = new TRangeSrcDrPtrVec();
+		dr1RcVec->push_back(dr1Rc_Fw);
+		dr1RcVec->push_back(dr1Rc_Bw);
+		dr1RcVec->push_back(dr1Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 #if 0
 		TListRangeSrcDr* dr1Rc = new TListRangeSrcDr(dr1RcVec);
 #else
-		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1RcVec);
+		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr1RcVec, verbose_);
 #endif
 
 		EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, false);
+			 ebwtBw_, true, 0xffffffff, true,  false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, false);
+			&ebwtFw_, true, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r2Fw_BwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  false);
+			 ebwtBw_, true, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rFw_Bw
 		EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
@@ -388,24 +394,24 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_, false);
-		TRangeSrcDrPtrVec dr2FwVec;
-		dr2FwVec.push_back(dr2Fw_Bw);
-		dr2FwVec.push_back(dr2Fw_Fw);
-		dr2FwVec.push_back(dr2Fw_BwHalf);
+		TRangeSrcDrPtrVec *dr2FwVec = new TRangeSrcDrPtrVec();
+		dr2FwVec->push_back(dr2Fw_Bw);
+		dr2FwVec->push_back(dr2Fw_Fw);
+		dr2FwVec->push_back(dr2Fw_BwHalf);
 		// Overall range source driver for the forward orientation of
 		// the first mate
 #if 0
 		TListRangeSrcDr* dr2Fw = new TListRangeSrcDr(dr2FwVec);
 #else
-		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2FwVec);
+		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2FwVec, verbose_);
 #endif
 
 		EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true,  false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, false);
+			 ebwtBw_, false, 0xffffffff, false, false, seed_, false, seeded, maqPenalty);
 		EbwtRangeSource *r2Rc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  false);
+			&ebwtFw_, false, 0xffffffff, false, false, seed_, true,  seeded, maqPenalty);
 
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
@@ -437,16 +443,16 @@ public:
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, seed_, false);
-		TRangeSrcDrPtrVec dr2RcVec;
-		dr2RcVec.push_back(dr2Rc_Fw);
-		dr2RcVec.push_back(dr2Rc_Bw);
-		dr2RcVec.push_back(dr2Rc_FwHalf);
+		TRangeSrcDrPtrVec *dr2RcVec = new TRangeSrcDrPtrVec();
+		dr2RcVec->push_back(dr2Rc_Fw);
+		dr2RcVec->push_back(dr2Rc_Bw);
+		dr2RcVec->push_back(dr2Rc_FwHalf);
 		// Overall range source driver for the reverse-comp orientation
 		// of the first mate
 #if 0
 		TListRangeSrcDr* dr2Rc = new TListRangeSrcDr(dr2RcVec);
 #else
-		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2RcVec);
+		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(seed_, strandFix_, dr2RcVec, verbose_);
 #endif
 
 		RefAligner<String<Dna5> >* refAligner;

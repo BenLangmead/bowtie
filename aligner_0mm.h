@@ -63,10 +63,14 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool halfAndHalf = false;
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *rFw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *rRc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 			*params, rFw, true, false, maqPenalty_, sink_, sinkPt,
@@ -86,10 +90,10 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
-		TRangeSrcDrPtrVec drVec;
-		if(doFw_) drVec.push_back(driverFw);
-		if(doRc_) drVec.push_back(driverRc);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec);
+		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
+		if(doFw_) drVec->push_back(driverFw);
+		if(doRc_) drVec->push_back(driverRc);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec, verbose_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -178,10 +182,14 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
+		const bool halfAndHalf = false;
+		const bool seeded = false;
+		const bool maqPenalty = false;
+
 		EbwtRangeSource *r1Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r1Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
 			*params, r1Fw, true, false, maqPenalty_, sink_, sinkPt,
@@ -203,9 +211,9 @@ public:
 			os_, verbose_, seed_, true);
 
 		EbwtRangeSource *r2Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 		EbwtRangeSource *r2Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, false, false);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
 
 		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
 			*params, r2Fw, true, false, maqPenalty_, sink_, sinkPt,

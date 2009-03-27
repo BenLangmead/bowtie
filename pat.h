@@ -1472,6 +1472,109 @@ private:
 	RandomSource rand_;
 };
 
+/**
+ * Synchronized concrete pattern source for a list of FASTA files where
+ * reads need to be extracted from long continuous sequences.
+ */
+class FastaContinuousPatternSource : public BufferedFilePatternSource {
+public:
+	FastaContinuousPatternSource(
+			const vector<string>& infiles,
+			size_t length,
+			size_t freq,
+	        bool reverse = false,
+	        bool useSpinlock = true,
+	        const char *dumpfile = NULL,
+	        int npolicy = NS_TO_NS,
+	        uint32_t skip = 0,
+	        uint32_t seed = 0) :
+		BufferedFilePatternSource(infiles, false, false, useSpinlock,
+		                          false, dumpfile, 0, 0, skip),
+		length_(length), freq_(freq), reverse_(reverse),
+		policy_(npolicy), eat_(length_), bufCur_(0), rand_(seed)
+	{
+		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
+	}
+
+	virtual void reset() {
+		BufferedFilePatternSource::reset();
+	}
+protected:
+	/// Read another pattern from a FASTA input file
+	virtual void read(ReadBuf& r, uint32_t& patid) {
+		while(true) {
+			int c = filebuf_.get();
+			if(c < 0) {
+				seqan::clear(r.patFw);
+				return;
+			} if(c == '>') {
+				resetForNextFile();
+			} else {
+				int cat = dna4Cat[c];
+				if(cat == 2) {
+					eat_ = length_;
+				} else if(cat == 0) {
+					continue;
+				} else {
+					buf_[bufCur_++] = c;
+					if(bufCur_ == 1024) bufCur_ = 0;
+					if(eat_ > 0) eat_--;
+					if(eat_ == 0) {
+						for(size_t i = 0; i < length_; i++) {
+							if(i >= bufCur_) {
+								c = buf_[bufCur_ - i - 1];
+							} else {
+								c = buf_[bufCur_ - i + 1023];
+							}
+							r.patBufFw [i] = charToDna5[c];
+							r.qualBufFw[i] = 'I';
+							r.patBufRc [length_-i-1] = rcCharToDna5[c];
+							r.qualBufRc[length_-i-1] = 'I';
+						}
+						_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+						_setLength(r.patFw,  length_);
+						_setBegin (r.qualFw, r.qualBufFw);
+						_setLength(r.qualFw, length_);
+						_setBegin (r.patRc,  (Dna5*)r.patBufRc);
+						_setLength(r.patRc,  length_);
+						_setBegin (r.qualRc, r.qualBufRc);
+						_setLength(r.qualRc, length_);
+						// Set up a default name if one hasn't been set
+						itoa10(readCnt_, r.nameBuf);
+						_setBegin(r.name, r.nameBuf);
+						_setLength(r.name, strlen(r.nameBuf));
+						readCnt_++;
+						patid = readCnt_-1;
+						break;
+					}
+				}
+			}
+		}
+	}
+	/**
+	 * Reset state to be read for the next file.
+	 */
+	virtual void resetForNextFile() {
+		eat_ = length_;
+		bufCur_ = 0;
+	}
+private:
+	size_t length_;     /// length of reads to generate
+	size_t freq_;       /// frequency to sample reads
+	bool reverse_;      /// reverse reads on read-in
+	int policy_;        /// policy for handling Ns
+
+	size_t eat_;        /// number of characters we need to skip before
+	                    /// we have flushed all of the ambiguous or
+	                    /// non-existent characters out of our read
+	                    /// window
+	char buf_[1024];    /// read buffer
+	size_t bufCur_;     /// buffer cursor; points to where we should
+	                    /// insert the next character
+
+	RandomSource rand_;
+};
+
 extern void wrongQualityScale();
 extern void wrongQualityFormat();
 extern void tooFewQualities(const String<char>& read_name);

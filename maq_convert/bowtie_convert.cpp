@@ -278,7 +278,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		}
 
 		aln_t<MAXLEN> *m1 = mm->mapped_reads + mm->n_mapped_reads;
-		strncpy(m1->name, name, max_read_name-1);
+		// If the read name exceeds the maximum, cut characters off
+		// the beginning rather than the end so that the /1,/2 suffix
+		// is maintained.
+		size_t name_off = 0;
+		if(strlen(name) > max_read_name-1) {
+			name_off += (strlen(name) - max_read_name + 1);
+		}
+		strncpy(m1->name, name + name_off, max_read_name-1);
 		m1->name[max_read_name-1] = 0;
 
 		text_name[buf_size-1] = '\0';

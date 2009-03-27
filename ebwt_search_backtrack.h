@@ -1652,7 +1652,7 @@ protected:
 		assert_lt(_mms[0], _qlen);
 		// First, append the mismatch position in the read
 		al.entry.pos0 = (uint16_t)_mms[0]; // pos
-		uint8_t qual0 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[0]]));
+		ASSERT_ONLY(uint8_t qual0 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[0]])));
 		ASSERT_ONLY(qualTot += qual0);
 		uint32_t ci = _qlen - _mms[0] - 1;
 		// _chars[] is index in terms of RHS-relative depth
@@ -1668,7 +1668,7 @@ protected:
 			assert_lt(_mms[1], _qlen);
 			// First, append the mismatch position in the read
 			al.entry.pos1 = (uint16_t)_mms[1]; // pos
-			uint8_t qual1 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[1]]));
+			ASSERT_ONLY(uint8_t qual1 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[1]])));
 			ASSERT_ONLY(qualTot += qual1);
 			ci = _qlen - _mms[1] - 1;
 			// _chars[] is index in terms of RHS-relative depth
@@ -1683,7 +1683,7 @@ protected:
 				assert_lt(_mms[2], _qlen);
 				// First, append the mismatch position in the read
 				al.entry.pos2 = (uint16_t)_mms[2]; // pos
-				uint8_t qual2 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[2]]));
+				ASSERT_ONLY(uint8_t qual2 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[2]])));
 				ASSERT_ONLY(qualTot += qual2);
 				ci = _qlen - _mms[2] - 1;
 				// _chars[] is index in terms of RHS-relative depth
@@ -2110,11 +2110,12 @@ public:
 			const TEbwt* ebwt,
 			bool         fw,
 			uint32_t     qualThresh,
-			bool         reportExacts = true,
-			bool         verbose = true,
-			uint32_t     seed = 0,
-			bool         halfAndHalf = false,
-			bool         maqPenalty = true) :
+			bool         reportExacts,
+			bool         verbose,
+			uint32_t     seed,
+			bool         halfAndHalf,
+			bool         partial,
+			bool         maqPenalty) :
 	    RangeSource(),
 		qry_(NULL),
 		qlen_(0),
@@ -2130,6 +2131,7 @@ public:
 		qualThresh_(qualThresh),
 		reportExacts_(reportExacts),
 		halfAndHalf_(halfAndHalf),
+		partial_(partial),
 		depth5_(0),
 		depth3_(0),
 		rand_(seed),
@@ -2299,7 +2301,7 @@ public:
 				assert(curRange_.repOk());
 				// no need to do anything with curRange_.refcs
 				this->foundRange  = true;
-				this->done = true;
+				//this->done = true;
 				return;
 			} else if (bot > top) {
 				// We have a range to extend
@@ -2333,7 +2335,7 @@ public:
 	 * 'until' is satisfied.
 	 */
 	virtual void
-	advanceBranch(int until, PathManager& pm) {
+	advanceBranch(int until, uint16_t minCost, PathManager& pm) {
 		// Restore alignment state from the frontmost continuation.
 		// The frontmost continuation should in principle be the most
 		// promising partial alignment found so far.  In the case of
@@ -2359,7 +2361,7 @@ public:
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
 			if(verbose_) {
-				br->print((*qry_), (*qual_), cout, halfAndHalf_, fw_, ebwt_->fw());
+				br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
 			}
 			assert(br->repOk(qlen_));
 
@@ -2542,9 +2544,15 @@ public:
 			   !reportedPartial) // not an already-reported partial alignment
 			{
 				if(verbose_) {
+					if(partial_) {
+						cout << " Partial alignment:" << endl;
+					} else {
+						cout << " Final alignment:" << endl;
+					}
 					br->len_++;
-					br->print((*qry_), (*qual_), cout, halfAndHalf_, fw_, ebwt_->fw());
+					br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
 					br->len_--;
+					cout << endl;
 				}
 				assert_gt(br->bot_, br->top_);
 				curRange_.top     = br->top_;
@@ -2841,6 +2849,9 @@ protected:
 	/// algorithm to double-check reported alignments (or the lack
 	/// thereof)
 	bool                halfAndHalf_;
+	/// Whether we're generating partial alignments for a longer
+	/// alignment in the opposite index.
+	bool                partial_;
 	/// Depth of 5'-seed-half border
 	uint32_t            depth5_;
 	/// Depth of 3'-seed-half border
@@ -2862,6 +2873,53 @@ protected:
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;
 #endif
+};
+
+/**
+ * Concrete factory for EbwtRangeSource objects.
+ */
+class EbwtRangeSourceFactory {
+	typedef Ebwt<String<Dna> > TEbwt;
+public:
+	EbwtRangeSourceFactory(
+			const TEbwt* ebwt,
+			bool         fw,
+			uint32_t     qualThresh,
+			bool         reportExacts,
+			bool         verbose,
+			uint32_t     seed,
+			bool         halfAndHalf,
+			bool         seeded,
+			bool         maqPenalty) :
+			ebwt_(ebwt),
+			fw_(fw),
+			qualThresh_(qualThresh),
+			reportExacts_(reportExacts),
+			verbose_(verbose),
+			seed_(seed),
+			halfAndHalf_(halfAndHalf),
+			seeded_(seeded),
+			maqPenalty_(maqPenalty) { }
+
+	/**
+	 *
+	 */
+	EbwtRangeSource *create() {
+		return new EbwtRangeSource(ebwt_, fw_, qualThresh_,
+		                           reportExacts_, verbose_, seed_,
+		                           halfAndHalf_, seeded_, maqPenalty_);
+	}
+
+protected:
+	const TEbwt* ebwt_;
+	bool         fw_;
+	uint32_t     qualThresh_;
+	bool         reportExacts_;
+	bool         verbose_;
+	uint32_t     seed_;
+	bool         halfAndHalf_;
+	bool         seeded_;
+	bool         maqPenalty_;
 };
 
 /**
@@ -3026,25 +3084,103 @@ protected:
 };
 
 /**
+ * Concrete RangeSourceDriver that deals properly with
+ * GreedyDFSRangeSource by calling setOffs() with the appropriate
+ * parameters when initializing it;
+ */
+class EbwtRangeSourceDriverFactory {
+public:
+	EbwtRangeSourceDriverFactory(
+			EbwtSearchParams<String<Dna> >& params,
+			EbwtRangeSourceFactory* rs,
+			bool fw,
+			bool seed,
+			bool maqPenalty,
+			HitSink& sink,
+			HitSinkPerThread* sinkPt,
+			uint32_t seedLen,
+			bool nudgeLeft,
+			SearchConstraintExtent rev0Off,
+			SearchConstraintExtent rev1Off,
+			SearchConstraintExtent rev2Off,
+			SearchConstraintExtent rev3Off,
+			vector<String<Dna5> >& os,
+			bool verbose,
+			uint32_t randSeed,
+			bool mate1) :
+			params_(params),
+			rs_(rs),
+			fw_(fw),
+			seed_(seed),
+			maqPenalty_(maqPenalty),
+			sink_(sink),
+			sinkPt_(sinkPt),
+			seedLen_(seedLen),
+			nudgeLeft_(nudgeLeft),
+			rev0Off_(rev0Off),
+			rev1Off_(rev1Off),
+			rev2Off_(rev2Off),
+			rev3Off_(rev3Off),
+			os_(os),
+			verbose_(verbose),
+			randSeed_(randSeed),
+			mate1_(mate1)
+	{ }
+
+	/**
+	 * Return a newly-allocated EbwtRangeSourceDriver with the given
+	 * parameters.
+	 */
+	EbwtRangeSourceDriver *create() const {
+		return new EbwtRangeSourceDriver(
+				params_, rs_->create(), fw_, seed_, maqPenalty_,
+				sink_, sinkPt_, seedLen_, nudgeLeft_, rev0Off_,
+				rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
+				randSeed_, mate1_);
+	}
+
+protected:
+	EbwtSearchParams<String<Dna> >& params_;
+	EbwtRangeSourceFactory* rs_;
+	bool fw_;
+	bool seed_;
+	bool maqPenalty_;
+	HitSink& sink_;
+	HitSinkPerThread* sinkPt_;
+	uint32_t seedLen_;
+	bool nudgeLeft_;
+	SearchConstraintExtent rev0Off_;
+	SearchConstraintExtent rev1Off_;
+	SearchConstraintExtent rev2Off_;
+	SearchConstraintExtent rev3Off_;
+	vector<String<Dna5> >& os_;
+	bool verbose_;
+	uint32_t randSeed_;
+	bool mate1_;
+};
+
+/**
  * A RangeSourceDriver that manages two child EbwtRangeSourceDrivers,
  * one for searching for seed strings with mismatches in the hi-half,
  * and one for extending those seed strings toward the 3' end.
  */
 class EbwtSeededRangeSourceDriver : public RangeSourceDriver<EbwtRangeSource> {
+	typedef RangeSourceDriver<EbwtRangeSourceDriver>* TRangeSrcDrPtr;
+	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 public:
 	EbwtSeededRangeSourceDriver(
-			EbwtRangeSourceDriver* rs,
+			EbwtRangeSourceDriverFactory* rsFact,
 			EbwtRangeSourceDriver* rsSeed,
 			bool fw,
 			uint32_t seedLen,
 			bool verbose,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFull_(rs), rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen),
-			fw_(fw), mate1_(mate1), generating_(true), seedRange_(0)
+			rsFact_(rsFact), rsFull_(0, false, NULL, verbose), rsSeed_(rsSeed),
+			patsrc_(NULL), seedLen_(seedLen), fw_(fw), mate1_(mate1),
+			seedRange_(0)
 	{
 		assert(rsSeed_->seed());
-		assert(!rsFull_->seed());
 	}
 
 	virtual ~EbwtSeededRangeSourceDriver() { }
@@ -3054,16 +3190,19 @@ public:
 	 */
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *partial) {
 		this->done = false;
-		generating_ = true;
-		rsFull_->setQuery(patsrc, partial);
 		rsSeed_->setQuery(patsrc, partial);
+		this->minCostAdjustment_ = max(rsSeed_->minCostAdjustment_, rsSeed_->minCost);
+		this->minCost = this->minCostAdjustment_;
+		rsFull_.clearSources();
+		rsFull_.setQuery(patsrc, partial);
+		rsFull_.minCost = this->minCost;
+		assert_gt(rsFull_.minCost, 0);
 		patsrc_ = patsrc;
 		// The minCostAdjustment comes from the seed range source
 		// driver, based on Ns and quals in the hi-half
-		this->minCostAdjustment_ = rsSeed_->minCostAdjustment_;
-		this->minCost = this->minCostAdjustment_;
 		this->foundRange = false;
 		ASSERT_ONLY(allTops_.clear());
+		assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
 	}
 
 	/**
@@ -3072,7 +3211,12 @@ public:
 	 */
 	virtual void advance(int until) {
 		assert(!this->foundRange);
+		until = max<int>(until, ADV_COST_CHANGES);
+		ASSERT_ONLY(uint16_t preCost = this->minCost);
 		advanceImpl(until);
+		if(this->foundRange) {
+			assert_eq(range().cost, preCost);
+		}
 #ifndef NDEBUG
 		if(this->foundRange) {
 			// Assert that we have not yet dished out a range with this
@@ -3094,49 +3238,104 @@ public:
 	 */
 	virtual void advanceImpl(int until) {
 		if(this->done) return;
-		if(generating_) {
-			// Advance the seed range source
-			if(rsSeed_->done) {
-				// If the partial-alignment generator is done but
-				// generating_ is true, then we must be totally done
-				this->done = true;
-				return;
-			}
+		assert_gt(rsFull_.minCost, 0);
+		if(rsFull_.done && !rsFull_.empty()) {
+			rsFull_.clearSources();
+			assert(rsFull_.empty());
+		}
+		// Advance the seed range source
+		if(rsSeed_->done && rsFull_.empty()) {
+			this->done = true;
+			return;
+		}
+		if(rsSeed_->done && !rsSeed_->foundRange) {
+			rsSeed_->minCost = 0xffff;
+		}
+		// Extend a partial alignment
+		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
+		if(rsFull_.done || rsFull_.empty()) rsFull_.minCost = 0xffff;
+		assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
+		if(rsSeed_->minCost < rsFull_.minCost || rsFull_.empty()) {
 			// Advance the partial-alignment generator
-			ASSERT_ONLY(uint16_t oldMinCost = rsSeed_->minCost);
-			rsSeed_->advance(ADV_FOUND_RANGE);
-			assert_geq(rsSeed_->minCost, oldMinCost);
+			assert_eq(rsSeed_->minCost, this->minCost);
+			if(!rsSeed_->foundRange) rsSeed_->advance(until);
 			if(rsSeed_->foundRange) {
+				assert_eq(this->minCost, rsSeed_->range().cost);
+				assert_eq(oldMinCost, rsSeed_->range().cost);
 				seedRange_ = &rsSeed_->range();
+				rsSeed_->foundRange = false;
 				assert_geq(seedRange_->cost, this->minCostAdjustment_);
 				this->minCostAdjustment_ = seedRange_->cost;
-				rsSeed_->foundRange = false;
 				assert_gt(seedRange_->numMms, 0);
 				// Keep the range for the hi-half partial alignment so
 				// that the driver can (a) modify the pattern string
 				// and (b) modify results from the RangeSource to
 				// include these edits.
-				rsFull_->setQuery(patsrc_, seedRange_);
-				this->minCost = max(rsFull_->minCost, this->minCost);
-				this->foundRange = rsFull_->foundRange;
-				rsFull_->foundRange = false;
-				if(!rsFull_->done) generating_ = false;
+				EbwtRangeSourceDriver *partial = rsFact_->create();
+				partial->minCost = seedRange_->cost;
+				rsFull_.minCost = seedRange_->cost;
+				rsFull_.setQuery(patsrc_, seedRange_);
+				rsFull_.addSource(partial);
+				if(rsFull_.foundRange) {
+					this->foundRange = true;
+					rsFull_.foundRange = false;
+					assert(rsFull_.range().repOk());
+					assert_eq(range().cost, oldMinCost);
+				}
 			}
-		} else {
-			ASSERT_ONLY(uint16_t oldMinCost = rsFull_->minCost);
-			if(!rsFull_->done) rsFull_->advance(until);
-			assert_geq(rsFull_->minCost, oldMinCost);
-			this->minCost = max(rsFull_->minCost, this->minCost);
-			this->foundRange = rsFull_->foundRange;
-			rsFull_->foundRange = false;
-			if(rsFull_->done) {
+			if(rsSeed_->minCost > this->minCost) {
+				this->minCost = rsSeed_->minCost;
+				if(!rsFull_.done && !rsFull_.empty()) {
+					this->minCost = min(this->minCost, rsFull_.minCost);
+				}
+			}
+		}
+		// Extend a full alignment
+		else {
+			// Found a minimum-cost range
+			if(rsFull_.foundRange) {
+				this->foundRange = true;
+				rsFull_.foundRange = false;
+				assert(rsFull_.range().repOk());
+				assert_eq(range().cost, oldMinCost);
+			}
+			// Ran out of ranges?
+			if(rsFull_.done) {
 				if(rsSeed_->done) {
 					// No more full or partial alignments; done
 					this->done = true;
-					return;
 				}
-				// Keep generating partial alignments that we can extend
-				generating_ = true;
+				this->minCost = rsSeed_->minCost;
+			}
+			assert(!rsFull_.foundRange);
+			if(!rsFull_.done) {
+				ASSERT_ONLY(uint16_t oldFullCost = rsFull_.minCost);
+				rsFull_.advance(until);
+				if(rsFull_.foundRange) {
+					assert_eq(oldFullCost, rsFull_.range().cost);
+				}
+			}
+			assert_geq(rsFull_.minCost, oldMinCost);
+			// Did the min cost change?
+			if(!rsFull_.done && rsFull_.minCost > this->minCost) {
+				// If a range was found, hold on to it and save it for
+				// later.  Update the minCost.
+				this->minCost = min(rsFull_.minCost, rsSeed_->minCost);
+			}
+			// Found a minimum-cost range
+			if(rsFull_.foundRange) {
+				this->foundRange = true;
+				rsFull_.foundRange = false;
+				assert(rsFull_.range().repOk());
+				assert_eq(range().cost, oldMinCost);
+			}
+			// Ran out of ranges?
+			if(rsFull_.done) {
+				if(rsSeed_->done) {
+					// No more full or partial alignments; done
+					this->done = true;
+				}
+				this->minCost = rsSeed_->minCost;
 			}
 		}
 	}
@@ -3145,15 +3344,10 @@ public:
 	 * Return the range found.
 	 */
 	virtual Range& range() {
-		Range& r = rsFull_->range();
+		Range& r = rsFull_.range();
 		r.fw = fw_;
 		r.mate1 = mate1_;
 		return r;
-	}
-
-	/// Return length of current query
-	virtual uint32_t qlen() const {
-		return rsFull_->qlen();
 	}
 
 	/**
@@ -3173,7 +3367,8 @@ public:
 
 protected:
 
-	EbwtRangeSourceDriver* rsFull_;
+	EbwtRangeSourceDriverFactory* rsFact_;
+	TCostAwareRangeSrcDr rsFull_;
 	EbwtRangeSourceDriver* rsSeed_;
 	PatternSourcePerThread* patsrc_;
 	PathManager pm_;
