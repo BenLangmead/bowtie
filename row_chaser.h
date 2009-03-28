@@ -100,24 +100,26 @@ public:
 	void advance() {
 		// Advance by 1
 		assert(!done);
-		assert(prepped_);
-		prepped_ = false;
-		uint32_t newrow = ebwt_->mapLF(sideloc_);
-		ASSERT_ONLY(sideloc_.invalidate());
-		jumps_++;
-		assert_neq(newrow, row_);
-		// Update row_ field
-		row_ = newrow;
-		if(row_ == ebwt_->_zOff) {
-			// We arrived at the extreme left-hand end of the reference
-			off_ = jumps_;
-			done = true;
-		} else if((row_ & eh_->_offMask) == row_) {
-			// We arrived at a marked row
-			off_ = ebwt_->_offs[row_ >> eh_->_offRate] + jumps_;
-			done = true;
+		while(!done) {
+			assert(prepped_);
+			prepped_ = false;
+			uint32_t newrow = ebwt_->mapLF(sideloc_);
+			ASSERT_ONLY(sideloc_.invalidate());
+			jumps_++;
+			assert_neq(newrow, row_);
+			// Update row_ field
+			row_ = newrow;
+			if(row_ == ebwt_->_zOff) {
+				// We arrived at the extreme left-hand end of the reference
+				off_ = jumps_;
+				done = true;
+			} else if((row_ & eh_->_offMask) == row_) {
+				// We arrived at a marked row
+				off_ = ebwt_->_offs[row_ >> eh_->_offRate] + jumps_;
+				done = true;
+			}
+			prep();
 		}
-		prep();
 	}
 
 	/**
