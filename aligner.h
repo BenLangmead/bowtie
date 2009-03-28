@@ -367,7 +367,7 @@ public:
 		rchase_->initRand(qseed_);
 		this->done = driver_->done;
 		doneFirst_ = false;
-		*btCnt_ = maxBts_;
+		if(btCnt_ != NULL) *btCnt_ = maxBts_;
 		firstIsFw_ = ((qseed_ & 0x10) == 0);
 		chase_ = false;
 	}
@@ -848,7 +848,7 @@ public:
 		driver2Rc_->setQuery(patsrc, NULL);
 		qlen1_ = patsrc_->bufa().length();
 		qlen2_ = patsrc_->bufb().length();
-		(*btCnt_) = maxBts_;
+		if(btCnt_ != NULL) (*btCnt_) = maxBts_;
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;

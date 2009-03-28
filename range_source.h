@@ -1304,7 +1304,8 @@ public:
 		// This counts as a backtrack
 		if(btCnt_ != NULL && (*btCnt_ == 0)) {
 			// Abruptly end the search by removing all possibilities
-			reset();
+			branchQ_.reset();
+			ASSERT_ONLY(branchSet_.clear());
 			assert(empty());
 			return;
 		}
@@ -1317,7 +1318,8 @@ public:
 				if(--(*btCnt_) == 0) {
 					// Abruptly end the search by removing all
 					// possibilities
-					reset();
+					branchQ_.reset();
+					ASSERT_ONLY(branchSet_.clear());
 					assert(empty());
 					return;
 				}

@@ -31,9 +31,6 @@ my $match_mode = "-n 2";
 $match_mode = "-v " . $options{v} if defined($options{v});
 $match_mode = "-n " . $options{n} if defined($options{n});
 
-my $thorough_arg = "";
-$thorough_arg = "-y" if defined($options{t});
-
 my $extra_args = "";
 $extra_args = $options{e} if defined($options{e});
 
@@ -86,7 +83,7 @@ my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --re
 my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx --nostrata $index $reads2";
 
 # Run Bowtie in paired-end mode
-my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode $thorough_arg $extra_args --refidx $index -1 $reads1 -2 $reads2";
+my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args --refidx $index -1 $reads1 -2 $reads2";
 print "$bowtie_pe_cmd\n";
 open BOWTIE_PE, "$bowtie_pe_cmd |";
 
