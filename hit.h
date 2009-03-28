@@ -159,6 +159,8 @@ bool operator< (const Hit& a, const Hit& b);
 class HitSink {
 public:
 	HitSink(OutFileBuf* out,
+			const std::string& dumpAlignFaBasename,
+			const std::string& dumpAlignFqBasename,
 			const std::string& dumpUnalignFaBasename,
 			const std::string& dumpUnalignFqBasename,
 			const std::string& dumpMaxedFaBasename,
@@ -169,6 +171,8 @@ public:
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
+		dumpAlFaBase_(dumpAlignFaBasename),
+		dumpAlFqBase_(dumpAlignFqBasename),
 		dumpUnalFaBase_(dumpUnalignFaBasename),
 		dumpUnalFqBase_(dumpUnalignFqBasename),
 		dumpMaxFaBase_(dumpMaxedFaBasename),
@@ -193,6 +197,8 @@ public:
 	 * the name of the reference sequence in the filename somehow.
 	 */
 	HitSink(size_t numOuts,
+			const std::string& dumpAlignFaBasename,
+			const std::string& dumpAlignFqBasename,
 			const std::string& dumpUnalignFaBasename,
 			const std::string& dumpUnalignFqBasename,
 			const std::string& dumpMaxedFaBasename,
@@ -202,6 +208,8 @@ public:
 		_deleteOuts(true),
 		_refnames(refnames),
 		_locks(),
+		dumpAlFaBase_(dumpAlignFaBasename),
+		dumpAlFqBase_(dumpAlignFqBasename),
 		dumpUnalFaBase_(dumpUnalignFaBasename),
 		dumpUnalFqBase_(dumpUnalignFqBasename),
 		dumpMaxFaBase_(dumpUnalignFaBasename),
@@ -361,6 +369,14 @@ public:
 	}
 
 	/**
+	 * Return true iff this HitSink dumps aligned reads to an output
+	 * stream (i.e., iff --alfa or --alfq are specified).
+	 */
+	bool dumpsAlignedReads() {
+		return dumpAlign_;
+	}
+
+	/**
 	 * Return true iff this HitSink dumps unaligned reads to an output
 	 * stream (i.e., iff --unfa or --unfq are specified).
 	 */
@@ -382,7 +398,61 @@ public:
 	 * --unfq, or --maxfq are specified).
 	 */
 	bool dumpsReads() {
-		return dumpUnalign_ || dumpMaxed_;
+		return dumpAlign_ || dumpUnalign_ || dumpMaxed_;
+	}
+
+	/**
+	 * Dump an aligned read to all of the appropriate output streams.
+	 * Be careful to synchronize correctly - there may be multiple
+	 * simultaneous writers.
+	 */
+	void dumpAlign(PatternSourcePerThread& p) {
+		if(!dumpAlign_) return;
+		if(!p.paired()) {
+			if(!dumpAlFaBase_.empty()) {
+				MUTEX_LOCK(dumpAlignFaLock_);
+				if(dumpAlFa_ == NULL) {
+					dumpAlFa_ = openOf(dumpAlFaBase_, 0, true);
+					assert(dumpAlFa_ != NULL);
+				}
+				printFastaRecord(*dumpAlFa_, p.bufa().name, p.bufa().patFw);
+				MUTEX_UNLOCK(dumpAlignFaLock_);
+			}
+			if(!dumpAlFqBase_.empty()) {
+				MUTEX_LOCK(dumpAlignFqLock_);
+				if(dumpAlFq_ == NULL) {
+					dumpAlFq_ = openOf(dumpAlFqBase_, 0, false);
+					assert(dumpAlFq_ != NULL);
+				}
+				printFastqRecord(*dumpAlFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+				MUTEX_UNLOCK(dumpAlignFqLock_);
+			}
+		} else {
+			if(!dumpAlFaBase_.empty()) {
+				MUTEX_LOCK(dumpAlignFaLockPE_);
+				if(dumpAlFa_1_ == NULL) {
+					assert(dumpAlFa_2_ == NULL);
+					dumpAlFa_1_ = openOf(dumpAlFaBase_, 1, true);
+					dumpAlFa_2_ = openOf(dumpAlFaBase_, 2, true);
+					assert(dumpAlFa_1_ != NULL && dumpAlFa_2_ != NULL);
+				}
+				printFastaRecord(*dumpAlFa_1_, p.bufa().name, p.bufa().patFw);
+				printFastaRecord(*dumpAlFa_2_, p.bufb().name, p.bufb().patFw);
+				MUTEX_UNLOCK(dumpAlignFaLockPE_);
+			}
+			if(!dumpAlFqBase_.empty()) {
+				MUTEX_LOCK(dumpAlignFqLockPE_);
+				if(dumpAlFq_1_ == NULL) {
+					assert(dumpAlFq_2_ == NULL);
+					dumpAlFq_1_ = openOf(dumpAlFqBase_, 1, false);
+					dumpAlFq_2_ = openOf(dumpAlFqBase_, 2, false);
+					assert(dumpAlFq_1_ != NULL && dumpAlFq_2_ != NULL);
+				}
+				printFastqRecord(*dumpAlFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+				printFastqRecord(*dumpAlFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
+				MUTEX_UNLOCK(dumpAlignFqLockPE_);
+			}
+		}
 	}
 
 	/**
@@ -540,12 +610,20 @@ protected:
 	MUTEX_T             _mainlock;    /// pthreads mutexes for fields of this object
 
 	// Output filenames for dumping
+	std::string dumpAlFaBase_;
+	std::string dumpAlFqBase_;
 	std::string dumpUnalFaBase_;
 	std::string dumpUnalFqBase_;
 	std::string dumpMaxFaBase_;
 	std::string dumpMaxFqBase_;
 
 	// Output streams for dumping
+    std::ofstream *dumpAlFa_;   // for single-ended reads
+    std::ofstream *dumpAlFa_1_; // for first mates
+    std::ofstream *dumpAlFa_2_; // for second mates
+    std::ofstream *dumpAlFq_;   // for single-ended reads
+    std::ofstream *dumpAlFq_1_; // for first mates
+    std::ofstream *dumpAlFq_2_; // for second mates
     std::ofstream *dumpUnalFa_;   // for single-ended reads
     std::ofstream *dumpUnalFa_1_; // for first mates
     std::ofstream *dumpUnalFa_2_; // for second mates
@@ -584,9 +662,9 @@ protected:
     	std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
     	if(tmp->fail()) {
     		if(mateType == 0) {
-    			cerr << "Could not open single-ended unaligned-read file for writing: " << name << endl;
+    			cerr << "Could not open single-ended aligned/unaligned-read file for writing: " << name << endl;
     		} else {
-    			cerr << "Could not open paired-end unaligned-read file for writing: " << name << endl;
+    			cerr << "Could not open paired-end aligned/unaligned-read file for writing: " << name << endl;
     		}
     		exit(1);
     	}
@@ -597,34 +675,22 @@ protected:
      * Initialize all the locks for dumping.
      */
     void initDumps() {
+        dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_ = NULL;
+        dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_ = NULL;
         dumpUnalFa_   = dumpUnalFa_1_ = dumpUnalFa_2_ = NULL;
         dumpUnalFq_   = dumpUnalFq_1_ = dumpUnalFq_2_ = NULL;
         dumpMaxFa_    = dumpMaxFa_1_  = dumpMaxFa_2_  = NULL;
         dumpMaxFq_    = dumpMaxFq_1_  = dumpMaxFq_2_  = NULL;
-    	dumpUnalign_ = !dumpUnalFaBase_.empty() ||
-    	               !dumpUnalFqBase_.empty();
-    	dumpMaxed_   = !dumpMaxFaBase_.empty() ||
-    	               !dumpMaxFqBase_.empty();
-//    	if(!dumpUnalFaBase_.empty()) {
-//    		dumpUnalFa_   = openOf(dumpUnalFaBase_, 0, true);
-//    		dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
-//    		dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
-//    	}
-//    	if(!dumpUnalFqBase_.empty()) {
-//    		dumpUnalFq_   = openOf(dumpUnalFqBase_, 0, false);
-//    		dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
-//    		dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
-//    	}
-//    	if(!dumpMaxFaBase_.empty()) {
-//    		dumpMaxFa_   = openOf(dumpMaxFaBase_, 0, true);
-//    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
-//    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
-//    	}
-//    	if(!dumpMaxFqBase_.empty()) {
-//    		dumpMaxFq_   = openOf(dumpMaxFqBase_, 0, false);
-//    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
-//    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
-//    	}
+    	dumpAlign_    = !dumpAlFaBase_.empty() ||
+    	                !dumpAlFqBase_.empty();
+    	dumpUnalign_  = !dumpUnalFaBase_.empty() ||
+    	                !dumpUnalFqBase_.empty();
+    	dumpMaxed_    = !dumpMaxFaBase_.empty() ||
+    	                !dumpMaxFqBase_.empty();
+   		MUTEX_INIT(dumpAlignFaLock_);
+   		MUTEX_INIT(dumpAlignFaLockPE_);
+   		MUTEX_INIT(dumpAlignFqLock_);
+   		MUTEX_INIT(dumpAlignFqLockPE_);
    		MUTEX_INIT(dumpUnalignFaLock_);
    		MUTEX_INIT(dumpUnalignFaLockPE_);
    		MUTEX_INIT(dumpUnalignFqLock_);
@@ -636,6 +702,12 @@ protected:
     }
 
     void destroyDumps() {
+    	if(dumpAlFa_     != NULL) { dumpAlFa_->close();     delete dumpAlFa_; }
+    	if(dumpAlFa_1_   != NULL) { dumpAlFa_1_->close();   delete dumpAlFa_1_; }
+    	if(dumpAlFa_2_   != NULL) { dumpAlFa_2_->close();   delete dumpAlFa_2_; }
+    	if(dumpAlFq_     != NULL) { dumpAlFq_->close();     delete dumpAlFq_; }
+    	if(dumpAlFq_1_   != NULL) { dumpAlFq_1_->close();   delete dumpAlFq_1_; }
+    	if(dumpAlFq_2_   != NULL) { dumpAlFq_2_->close();   delete dumpAlFq_2_; }
     	if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
     	if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
     	if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
@@ -651,6 +723,10 @@ protected:
     }
 
     // Locks for dumping
+    MUTEX_T dumpAlignFaLock_;
+    MUTEX_T dumpAlignFaLockPE_; // _1 and _2
+    MUTEX_T dumpAlignFqLock_;
+    MUTEX_T dumpAlignFqLockPE_; // _1 and _2
     MUTEX_T dumpUnalignFaLock_;
     MUTEX_T dumpUnalignFaLockPE_; // _1 and _2
     MUTEX_T dumpUnalignFqLock_;
@@ -660,7 +736,8 @@ protected:
     MUTEX_T dumpMaxedFqLock_;
     MUTEX_T dumpMaxedFqLockPE_;   // _1 and _2
 
-    // false = there's no unaligned dumping
+    // false -> no dumping
+    bool dumpAlign_;
     bool dumpUnalign_;
     bool dumpMaxed_;
 
@@ -721,6 +798,7 @@ public:
 		if(_bufferedHits.size() > 0) {
 			// Flush buffered hits
 			_sink.reportHits(_bufferedHits);
+			_sink.dumpAlign(p);
 			ret = _bufferedHits.size();
 			_bufferedHits.clear();
 		} else {
@@ -1633,13 +1711,16 @@ public:
 	ConciseHitSink(
 			OutFileBuf*        __out,
 			int                offBase,
+			const std::string& dumpAlFa,
+			const std::string& dumpAlFq,
 			const std::string& dumpUnalFa,
 			const std::string& dumpUnalFq,
 			const std::string& dumpMaxFa,
 			const std::string& dumpMaxFq,
 			bool               __reportOpps = false,
 			vector<string>*    __refnames = NULL) :
-		HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+		HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+				dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
 		offBase_(offBase) { }
 
@@ -1650,13 +1731,16 @@ public:
 	ConciseHitSink(
 	        size_t             __numOuts,
 	        int                offBase,
+			const std::string& dumpAlFa,
+			const std::string& dumpAlFq,
 			const std::string& dumpUnalFa,
 			const std::string& dumpUnalFq,
 			const std::string& dumpMaxFa,
 			const std::string& dumpMaxFq,
 			bool               __reportOpps = false,
 			vector<string>*    __refnames = NULL) :
-		HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+		HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+				dumpMaxFa, dumpMaxFq, __refnames),
 		_reportOpps(__reportOpps),
 		offBase_(offBase) { }
 
@@ -1717,13 +1801,16 @@ public:
 	 */
 	VerboseHitSink(OutFileBuf*        __out,
 	               int                offBase,
+	               const std::string& dumpAlFa,
+	               const std::string& dumpAlFq,
 	               const std::string& dumpUnalFa,
 	               const std::string& dumpUnalFq,
 	               const std::string& dumpMaxFa,
 	               const std::string& dumpMaxFq,
 				   vector<string>*    __refnames = NULL,
 				   int                __partition = 0) :
-	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+	HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+			dumpMaxFa, dumpMaxFq, __refnames),
 	_partition(__partition),
 	offBase_(offBase)
 	{ }
@@ -1734,13 +1821,16 @@ public:
 	 */
 	VerboseHitSink(size_t          __numOuts,
 	               int                offBase,
+	               const std::string& dumpAlFa,
+	               const std::string& dumpAlFq,
 	               const std::string& dumpUnalFa,
 	               const std::string& dumpUnalFq,
 	               const std::string& dumpMaxFa,
 	               const std::string& dumpMaxFq,
 				   vector<string>* __refnames = NULL,
 				   int             __partition = 0) :
-	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+	HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+			dumpMaxFa, dumpMaxFq, __refnames),
 	_partition(__partition),
 	offBase_(offBase)
 	{ }
@@ -2120,12 +2210,15 @@ public:
 	 */
 	BinaryHitSink(OutFileBuf*        __out,
 	              int                offBase,
+	              const std::string& dumpAlFa,
+	              const std::string& dumpAlFq,
 	              const std::string& dumpUnalFa,
 	              const std::string& dumpUnalFq,
 	              const std::string& dumpMaxFa,
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
-	HitSink(__out, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames),
+	HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+			dumpMaxFa, dumpMaxFq, __refnames),
 	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
@@ -2137,12 +2230,15 @@ public:
 	 */
 	BinaryHitSink(size_t             __numOuts,
 	              int                offBase,
+	              const std::string& dumpAlFa,
+	              const std::string& dumpAlFq,
 	              const std::string& dumpUnalFa,
 	              const std::string& dumpUnalFq,
 	              const std::string& dumpMaxFa,
 	              const std::string& dumpMaxFq,
 				  vector<string>*    __refnames = NULL) :
-	HitSink(__numOuts, dumpUnalFa, dumpUnalFq, dumpMaxFa, dumpMaxFq, __refnames)
+	HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
+			dumpMaxFa, dumpMaxFq, __refnames)
 	{
 		ssmode_ |= ios_base::binary;
 	}
@@ -2409,7 +2505,7 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", NULL) { quiet_ = true; }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", NULL) { quiet_ = true; }
 	virtual void reportHit(const Hit& h) { }
 	virtual void append(ostream& o, const Hit& h) { }
 };

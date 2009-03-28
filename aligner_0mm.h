@@ -33,6 +33,8 @@ public:
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
 			vector<String<Dna5> >& os,
+			bool maqPenalty,
+			bool qualOrder,
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
@@ -46,7 +48,8 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			os_(os),
-			maqPenalty_(false),
+			maqPenalty_(maqPenalty),
+			qualOrder_(qualOrder),
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -65,15 +68,14 @@ public:
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
-		const bool maqPenalty = false;
 
 		EbwtRangeSource *rFw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
-			*params, rFw, true, false, maqPenalty_, sink_, sinkPt,
+			*params, rFw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -82,7 +84,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
-			*params, rRc, false, false, maqPenalty_, sink_, sinkPt,
+			*params, rRc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -117,6 +119,7 @@ private:
 	const uint32_t cacheLimit_;
 	vector<String<Dna5> >& os_;
 	bool maqPenalty_;
+	bool qualOrder_;
 	bool strandFix_;
 	bool rangeMode_;
 	bool verbose_;
@@ -146,7 +149,9 @@ public:
 			uint32_t cacheLimit,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
+			bool maqPenalty,
 			bool strandFix,
+			bool qualOrder,
 			bool rangeMode,
 			bool verbose,
 			uint32_t seed) :
@@ -165,7 +170,8 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			refs_(refs), os_(os),
-			maqPenalty_(false),
+			maqPenalty_(maqPenalty),
+			qualOrder_(qualOrder),
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
@@ -184,15 +190,14 @@ public:
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
-		const bool maqPenalty = false;
 
 		EbwtRangeSource *r1Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *r1Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
-			*params, r1Fw, true, false, maqPenalty_, sink_, sinkPt,
+			*params, r1Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -201,7 +206,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, true);
 		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
-			*params, r1Rc, false, false, maqPenalty_, sink_, sinkPt,
+			*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -211,12 +216,12 @@ public:
 			os_, verbose_, seed_, true);
 
 		EbwtRangeSource *r2Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *r2Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty);
+			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
-			*params, r2Fw, true, false, maqPenalty_, sink_, sinkPt,
+			*params, r2Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -225,7 +230,7 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, seed_, false);
 		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
-			*params, r2Rc, false, false, maqPenalty_, sink_, sinkPt,
+			*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
 			true,       // nudgeLeft (not applicable)
 			PIN_TO_LEN, // whole alignment is unrevisitable
@@ -267,6 +272,7 @@ private:
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool maqPenalty_;
+	const bool qualOrder_;
 	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;

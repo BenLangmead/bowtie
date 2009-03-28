@@ -436,30 +436,4 @@ private:
 	MUTEX_T _partialLock;
 };
 
-struct BacktrackLimits {
-
-	BacktrackLimits() {
-		maxBts  = 0;
-		maxBts0 = 0;
-		maxBts1 = 0;
-		maxBts2 = 0;
-	}
-
-	BacktrackLimits(uint32_t _maxBts,
-	                uint32_t _maxBts0,
-	                uint32_t _maxBts1,
-	                uint32_t _maxBts2)
-	{
-		maxBts  = _maxBts;
-		maxBts0 = _maxBts0;
-		maxBts1 = _maxBts1;
-		maxBts2 = _maxBts2;
-	}
-
-	uint32_t maxBts;  // limit on overall number of backtracks per read
-	uint32_t maxBts0; // limit on number of backtracks at depth 0
-	uint32_t maxBts1; // limit on number of backtracks at depth 1
-	uint32_t maxBts2; // limit on number of backtracks at depth 2
-};
-
 #endif /* EBWT_SEARCH_UTIL_H_ */

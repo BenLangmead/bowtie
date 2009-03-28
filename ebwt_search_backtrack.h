@@ -23,7 +23,7 @@ public:
 			const Ebwt<String<Dna> >* __ebwt,
 			const EbwtSearchParams<String<Dna> >& __params,
 			uint32_t __qualThresh,  /// max acceptable q-distance
-			const BacktrackLimits& __maxBts, /// maximum # backtracks allowed
+			const int maxBts, /// maximum # backtracks allowed
 			uint32_t __reportPartials = 0,
 			bool __reportExacts = true,
 			bool __reportRanges = false,
@@ -65,7 +65,7 @@ public:
 		_3depth(0),
 		_numBts(0),
 		_totNumBts(0),
-		_maxBts(__maxBts.maxBts),
+		_maxBts(maxBts),
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
@@ -2109,13 +2109,14 @@ public:
 	EbwtRangeSource(
 			const TEbwt* ebwt,
 			bool         fw,
-			uint32_t     qualThresh,
+			uint32_t     qualLim,
 			bool         reportExacts,
 			bool         verbose,
 			uint32_t     seed,
 			bool         halfAndHalf,
 			bool         partial,
-			bool         maqPenalty) :
+			bool         maqPenalty,
+			bool         qualOrder) :
 	    RangeSource(),
 		qry_(NULL),
 		qlen_(0),
@@ -2128,7 +2129,8 @@ public:
 		offRev2_(0),
 		offRev3_(0),
 		maqPenalty_(maqPenalty),
-		qualThresh_(qualThresh),
+		qualOrder_(qualOrder),
+		qualLim_(qualLim),
 		reportExacts_(reportExacts),
 		halfAndHalf_(halfAndHalf),
 		partial_(partial),
@@ -2235,7 +2237,7 @@ public:
 	 * immediately jump to a valid range using the ftab).
 	 */
 	virtual void
-	initBranch(PathManager& pm, uint16_t icost) {
+	initBranch(PathManager& pm) {
 		assert(curEbwt_ != NULL);
 		assert_gt(length(*qry_), 0);
 		assert_leq(qlen_, length(*qry_));
@@ -2267,6 +2269,8 @@ public:
 			// constraints.
 			return;
 		}
+		uint16_t icost = (seedRange_ != NULL) ? seedRange_->cost : 0;
+		uint16_t iham = partialEditsHam();
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
 		uint32_t m = min<uint32_t>(unrevOff_, qlen_);
@@ -2310,7 +2314,7 @@ public:
 				Branch *b = pm.bpool.alloc();
 				b->init(pm.rpool, pm.epool, qlen_,
 				        unrevOff_, offRev1_, offRev2_, offRev3_,
-				        0, ftabChars, icost, top, bot,
+				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt);
 				pm.push(b); // insert into priority queue
 			} else {
@@ -2323,7 +2327,7 @@ public:
 			Branch *b = pm.bpool.alloc();
 			b->init(pm.rpool, pm.epool, qlen_,
 			        unrevOff_, offRev1_, offRev2_, offRev3_,
-			        0, 0, icost, 0, 0, ebwt._eh, ebwt._ebwt);
+			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
 			pm.push(b); // insert into priority queue
 		}
 		return;
@@ -2360,6 +2364,7 @@ public:
 			// Shouldn't be curtailed or exhausted
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
+			assert_leq(br->ham_, qualLim_);
 			if(verbose_) {
 				br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
 			}
@@ -2367,10 +2372,7 @@ public:
 
 			ASSERT_ONLY(int stratum = br->cost_ >> 14); // shift the stratum over
 			assert_lt(stratum, 4);
-			uint16_t ham = br->cost_ & ~0xc000; // AND off the stratum
-			assert_leq(ham, 0x3000);
 			// Not necessarily true with rounding
-			//assert_leq(ham, qualThresh_);
 			uint32_t depth = br->tipDepth();
 
 			const Ebwt<String<Dna> >& ebwt = *ebwt_;
@@ -2386,10 +2388,10 @@ public:
 			uint16_t cost = br->cost_;
 			uint32_t cur = 0;
 
-			if(halfAndHalf_ && !hhCheckTop(br, depth, 0 /*iham*/)) {
+			if(halfAndHalf_ && !hhCheckTop(br, depth, 0)) {
 				// Stop extending this branch because it violates a half-
 				// and-half constraint
-				pm.curtail(br, depth3_);
+				pm.curtail(br, depth3_, qualOrder_);
 				goto bail;
 			}
 
@@ -2408,7 +2410,7 @@ public:
 				// not in the unrevisitable region, and b) its selection would
 				// not cause the quality ceiling (if one exists) to be exceeded
 				bool curIsAlternative = (depth >= br->depth0_) &&
-				                        (ham + qq <= qualThresh_);
+				                        (br->ham_ + qq <= qualLim_);
 				ASSERT_ONLY(uint32_t obot = br->bot_);
 				uint32_t otop = br->top_;
 
@@ -2535,7 +2537,7 @@ public:
 			if(halfAndHalf_ && !hhCheck(br, depth, empty)) {
 				// This alignment doesn't satisfy the half-and-half
 				// requirements; reject it
-				pm.curtail(br, depth3_);
+				pm.curtail(br, depth3_, qualOrder_);
 				goto bail;
 			}
 
@@ -2579,10 +2581,10 @@ public:
 	#endif
 				assert(curRange_.repOk());
 				// Must curtail because we've consumed the whole pattern
-				pm.curtail(br, depth3_);
+				pm.curtail(br, depth3_, qualOrder_);
 			} else if(empty || cur == 0) {
 				// The branch couldn't be extended further
-				pm.curtail(br, depth3_);
+				pm.curtail(br, depth3_, qualOrder_);
 			} else {
 				// Extend the branch by one position; no change to its cost
 				// so there's no need to reconsider where it lies in the
@@ -2593,7 +2595,8 @@ public:
 		bail:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
-			pm.splitAndPrep(rand_, qlen_, depth3_, ebwt_->_eh, ebwt_->_ebwt);
+			pm.splitAndPrep(rand_, qlen_, depth3_, qualOrder_,
+			                ebwt_->_eh, ebwt_->_ebwt);
 			if(pm.empty()) {
 				break;
 			}
@@ -2628,6 +2631,23 @@ protected:
 			}
 			curRange_.numMms += srSz;
 		}
+	}
+
+	/**
+	 * Calculate the quality-weighted hamming distance resulting from
+	 * all of the edits in the partial alignment.
+	 */
+	uint16_t partialEditsHam() {
+		uint16_t ret = 0;
+		if(seedRange_ != NULL) {
+			const size_t srSz = seedRange_->mms.size();
+			for(size_t i = 0; i < srSz; i++) {
+				int q = (*qual_)[qlen_ - seedRange_->mms[i] - 1];
+				q = phredCharToPhredQual(q);
+				ret += mmPenalty(maqPenalty_, q);
+			}
+		}
+		return ret;
 	}
 
 	/**
@@ -2841,9 +2861,15 @@ protected:
 	uint32_t            offRev3_;  // 3-revisitable chunk
 	/// Whether to round qualities off Maq-style when calculating penalties
 	bool                maqPenalty_;
-	uint32_t            qualThresh_; // only accept hits with weighted
-	                             // hamming distance <= _qualThresh
-	/// Do not report alignments with stratum < this limit
+	/// Whether to order paths on our search in a way that takes
+	/// qualities into account.  If this is false, the effect is that
+	/// the first path reported is guaranteed to be in the best
+	/// stratum, but it's not guaranteed to have the best quals.
+	bool                qualOrder_;
+	/// Reject alignments where sum of qualities at mismatched
+	/// positions is greater than qualLim_
+	uint32_t            qualLim_;
+	/// Report exact alignments iff this is true
 	bool                reportExacts_;
 	/// Whether to use the _os array together with a naive matching
 	/// algorithm to double-check reported alignments (or the lack
@@ -2890,7 +2916,8 @@ public:
 			uint32_t     seed,
 			bool         halfAndHalf,
 			bool         seeded,
-			bool         maqPenalty) :
+			bool         maqPenalty,
+			bool         qualOrder) :
 			ebwt_(ebwt),
 			fw_(fw),
 			qualThresh_(qualThresh),
@@ -2899,15 +2926,17 @@ public:
 			seed_(seed),
 			halfAndHalf_(halfAndHalf),
 			seeded_(seeded),
-			maqPenalty_(maqPenalty) { }
+			maqPenalty_(maqPenalty),
+			qualOrder_(qualOrder) { }
 
 	/**
-	 *
+	 * Return new EbwtRangeSource with predefined params.s
 	 */
 	EbwtRangeSource *create() {
 		return new EbwtRangeSource(ebwt_, fw_, qualThresh_,
 		                           reportExacts_, verbose_, seed_,
-		                           halfAndHalf_, seeded_, maqPenalty_);
+		                           halfAndHalf_, seeded_, maqPenalty_,
+		                           qualOrder_);
 	}
 
 protected:
@@ -2920,6 +2949,7 @@ protected:
 	bool         halfAndHalf_;
 	bool         seeded_;
 	bool         maqPenalty_;
+	bool         qualOrder_;
 };
 
 /**
@@ -2948,6 +2978,7 @@ public:
 			bool fw,
 			bool seed,
 			bool maqPenalty,
+			bool qualOrder,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
 			uint32_t seedLen,
@@ -2965,6 +2996,7 @@ public:
 					params, rs, fw, sink, sinkPt, os, verbose, randSeed, mate1, 0, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
+			qualOrder_(qualOrder),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
@@ -3014,38 +3046,42 @@ public:
 			// Exacts not allowed, so there must be at least 1 mismatch
 			// outside of the unrevisitable area
 			minCost = 1 << 14;
-			uint8_t lowQual = 0xff;
-			for(uint32_t d = rev0Off; d < s; d++) {
-				if(qual[qlen - d - 1] < lowQual) {
-					lowQual = qual[qlen - d - 1];
+			if(qualOrder_) {
+				uint8_t lowQual = 0xff;
+				for(uint32_t d = rev0Off; d < s; d++) {
+					if(qual[qlen - d - 1] < lowQual) {
+						lowQual = qual[qlen - d - 1];
+					}
 				}
+				assert_lt(lowQual, 0xff);
+				assert_geq(lowQual, 33);
+				minCost += mmPenalty(maqPenalty_, lowQual - 33);
 			}
-			assert_lt(lowQual, 0xff);
-			assert_geq(lowQual, 33);
-			minCost += mmPenalty(maqPenalty_, lowQual - 33);
 		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < s) {
 			// Half-and-half constraints are active, so there must be
 			// at least 1 mismatch in both halves of the seed
 			assert(rs_->halfAndHalf());
 			minCost = 2 << 14;
-			uint8_t lowQual1 = 0xff;
-			for(uint32_t d = 0; d < sRight; d++) {
-				if(qual[qlen - d - 1] < lowQual1) {
-					lowQual1 = qual[qlen - d - 1];
+			if(qualOrder_) {
+				uint8_t lowQual1 = 0xff;
+				for(uint32_t d = 0; d < sRight; d++) {
+					if(qual[qlen - d - 1] < lowQual1) {
+						lowQual1 = qual[qlen - d - 1];
+					}
 				}
-			}
-			assert_lt(lowQual1, 0xff);
-			assert_geq(lowQual1, 33);
-			minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
-			uint8_t lowQual2 = 0xff;
-			for(uint32_t d = sRight; d < s; d++) {
-				if(qual[qlen - d - 1] < lowQual2) {
-					lowQual2 = qual[qlen - d - 1];
+				assert_lt(lowQual1, 0xff);
+				assert_geq(lowQual1, 33);
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
+				uint8_t lowQual2 = 0xff;
+				for(uint32_t d = sRight; d < s; d++) {
+					if(qual[qlen - d - 1] < lowQual2) {
+						lowQual2 = qual[qlen - d - 1];
+					}
 				}
+				assert_lt(lowQual2, 0xff);
+				assert_geq(lowQual2, 33);
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2));
 			}
-			assert_lt(lowQual2, 0xff);
-			assert_geq(lowQual2, 33);
-			minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2));
 		}
 		this->minCostAdjustment_ = minCost;
 		rs_->setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)
@@ -3077,6 +3113,7 @@ protected:
 
 	bool seed_;
 	bool maqPenalty_;
+	bool qualOrder_;
 	EbwtRangeSource* rs_;
 	uint32_t seedLen_;
 	bool nudgeLeft_;
@@ -3099,6 +3136,7 @@ public:
 			bool fw,
 			bool seed,
 			bool maqPenalty,
+			bool qualOrder,
 			HitSink& sink,
 			HitSinkPerThread* sinkPt,
 			uint32_t seedLen,
@@ -3117,6 +3155,7 @@ public:
 			fw_(fw),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
+			qualOrder_(qualOrder),
 			sink_(sink),
 			sinkPt_(sinkPt),
 			seedLen_(seedLen),
@@ -3139,8 +3178,8 @@ public:
 	EbwtRangeSourceDriver *create() const {
 		return new EbwtRangeSourceDriver(
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
-				sink_, sinkPt_, seedLen_, nudgeLeft_, rev0Off_,
-				rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
+				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
+				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
 				randSeed_, mate1_, btCnt_);
 	}
 
@@ -3150,6 +3189,7 @@ protected:
 	bool fw_;
 	bool seed_;
 	bool maqPenalty_;
+	bool qualOrder_;
 	HitSink& sink_;
 	HitSinkPerThread* sinkPt_;
 	uint32_t seedLen_;

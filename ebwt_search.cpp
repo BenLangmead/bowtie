@@ -62,7 +62,8 @@ static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
-static int maxBts               = 125; // max # backtracks allowed in half-and-half mode
+static int maxBtsBetter         = 125; // max # backtracks allowed in half-and-half mode
+static int maxBts               = 800; // max # backtracks allowed in half-and-half mode
 static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;     // number of pthreads operating concurrently
 static output_types outType		= FULL;  // style of output
@@ -73,6 +74,8 @@ static bool fullIndex           = true;  // load halves one at a time and procee
 static bool noRefNames          = false; // true -> print reference indexes; not names
 static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
+static string dumpAlFaBase      = "";    // basename of FASTA files to dump aligned reads to
+static string dumpAlFqBase      = "";    // basename of FASTQ files to dump aligned reads to
 static string dumpUnalFaBase    = "";    // basename of FASTA files to dump unaligned reads to
 static string dumpUnalFqBase    = "";    // basename of FASTQ files to dump unaligned reads to
 static string dumpMaxFaBase     = "";    // basename of FASTA files to dump reads with more than -m valid alignments to
@@ -80,6 +83,7 @@ static string dumpMaxFqBase     = "";    // basename of FASTQ files to dump read
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool better				= false; // true -> guarantee alignments from best possible stratum
+static bool oldBest             = false; // true -> guarantee alignments from best possible stratum (the old way)
 static bool spanStrata			= false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
@@ -125,6 +129,8 @@ enum {
 	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
 	ARG_FAST,
+	ARG_ALFA,
+	ARG_ALFQ,
 	ARG_UNFA,
 	ARG_UNFQ,
 	ARG_MAXFA,
@@ -133,6 +139,7 @@ enum {
 	ARG_DUMP_NOHIT,
 	ARG_DUMP_HHHIT,
 	ARG_SANITY,
+	ARG_OLDBEST,
 	ARG_BETTER,
 	ARG_BEST,
 	ARG_SPANSTRATA,
@@ -182,6 +189,8 @@ static struct option long_options[] = {
 	{"trim5",        required_argument, 0,            '5'},
 	{"seed",         required_argument, 0,            ARG_SEED},
 	{"qupto",        required_argument, 0,            'u'},
+	{"alfa",         required_argument, 0,            ARG_ALFA},
+	{"alfq",         required_argument, 0,            ARG_ALFQ},
 	{"unfa",         required_argument, 0,            ARG_UNFA},
 	{"unfq",         required_argument, 0,            ARG_UNFQ},
 	{"maxfa",        required_argument, 0,            ARG_MAXFA},
@@ -207,6 +216,7 @@ static struct option long_options[] = {
 	{"maxins",       required_argument, 0,            'X'},
 	{"best",         no_argument,       0,            ARG_BEST},
 	{"better",       no_argument,       0,            ARG_BETTER},
+	{"oldbest",      no_argument,       0,            ARG_OLDBEST},
 	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{"refidx",       no_argument,       0,            ARG_REFIDX},
@@ -1017,6 +1027,8 @@ static void parseOptions(int argc, char **argv) {
 	   		}
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
+	   		case ARG_ALFA: dumpAlFaBase = optarg; break;
+	   		case ARG_ALFQ: dumpAlFqBase = optarg; break;
 	   		case ARG_UNFA: dumpUnalFaBase = optarg; break;
 	   		case ARG_UNFQ: dumpUnalFqBase = optarg; break;
 	   		case ARG_MAXFA: dumpMaxFaBase = optarg; break;
@@ -1095,7 +1107,8 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
-	   		case ARG_BETTER: better = true; break;
+	   		case ARG_BETTER: stateful = true; better = true; break;
+	   		case ARG_OLDBEST: oldBest = true; break;
 	   		case ARG_BEST: stateful = true; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
@@ -1104,7 +1117,11 @@ static void parseOptions(int argc, char **argv) {
 	   		case 't': timing = true; break;
 	   		case ARG_NO_FW: nofw = true; break;
 	   		case ARG_NO_RC: norc = true; break;
-			case ARG_MAXBTS:  maxBts  = parseInt(0, "--maxbts must be positive");  break;
+			case ARG_MAXBTS: {
+				maxBts  = parseInt(0, "--maxbts must be positive");
+				maxBtsBetter = maxBts;
+				break;
+			}
 	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
 	   		case ARG_STRAND_FIX: strandFix = true; break;
 	   		case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
@@ -1162,8 +1179,16 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "When -z/--phased is used, -k X for X > 1 is unavailable" << endl;
 			error = true;
 		}
-		if(better) {
+		if(oldBest) {
+			cerr << "When -z/--phased is used, --oldbest is unavailable" << endl;
+			error = true;
+		}
+		if(stateful && better) {
 			cerr << "When -z/--phased is used, --better is unavailable" << endl;
+			error = true;
+		}
+		else if(stateful) {
+			cerr << "When -z/--phased is used, --best is unavailable" << endl;
 			error = true;
 		}
 		if(allHits && !spanStrata) {
@@ -1179,7 +1204,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
-		maxBts = INT_MAX;
+		maxBts = maxBtsBetter = INT_MAX;
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
 	}
@@ -1303,7 +1328,7 @@ createSinkFactory(HitSink& _sink, bool sanity) {
     HitSinkPerThreadFactory *sink = NULL;
     if(spanStrata) {
 		if(!allHits) {
-			if(better) {
+			if(oldBest) {
 				// First N best, spanning strata
 				sink = new FirstNBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
@@ -1316,7 +1341,7 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 		}
     } else {
 		if(!allHits) {
-			if(better) {
+			if(oldBest) {
 				// First N best, not spanning strata
 				sink = new FirstNBestStratifiedHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
@@ -1363,7 +1388,7 @@ static void *exactSearchWorker(void *vp) {
 	GreedyDFSRangeSource bt(
 			&ebwt, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(), // max backtracks (no max)
+	        0xffffffff,    // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -1409,6 +1434,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			!noMaqRound,
+			!better,
 			strandFix,
 			rangeMode,
 			verbose,
@@ -1430,6 +1457,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			!noMaqRound,
+			!better,
 			false, // strandFix,
 			rangeMode,
 			verbose,
@@ -1573,7 +1602,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(), // max backtracks (no max)
+	        0xffffffff,    // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -1620,7 +1649,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	GreedyDFSRangeSource bt(
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(), // max backtracks (no max)
+	        0xffffffff,    // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -1781,6 +1810,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			!noMaqRound,
+			!better,
 			strandFix,
 			rangeMode,
 			verbose,
@@ -1802,6 +1833,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			!noMaqRound,
+			!better,
 			false, // strandFix,
 			rangeMode,
 			verbose,
@@ -1847,7 +1880,7 @@ static void* mismatchSearchWorkerFull(void *vp){
 	GreedyDFSRangeSource bt(
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
-	        BacktrackLimits(), // max backtracks (no max)
+	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2108,7 +2141,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2145,7 +2178,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2182,7 +2215,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2196,7 +2229,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2362,6 +2395,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			os,
+			!noMaqRound,
+			!better,
 			strandFix,
 			rangeMode,
 			verbose,
@@ -2384,6 +2419,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			refs, os,
+			!noMaqRound,
+			!better,
 			false, //strandFix,
 			rangeMode,
 			verbose,
@@ -2416,7 +2453,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2430,7 +2467,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			&ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (no)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2444,7 +2481,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2458,7 +2495,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			&ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
-	        BacktrackLimits(), // max backtracks
+	        0xffffffff,     // max backtracks (no limit)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2608,7 +2645,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2621,7 +2658,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2660,7 +2697,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2675,7 +2712,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2717,7 +2754,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2733,7 +2770,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2748,7 +2785,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2792,7 +2829,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2807,7 +2844,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2853,7 +2890,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2866,7 +2903,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt1(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2881,7 +2918,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2896,7 +2933,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr2(
 			&ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2911,7 +2948,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf3(
 			&ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
@@ -2927,7 +2964,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr3(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2942,7 +2979,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr23(
 			&ebwtFw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0), // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2959,7 +2996,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf4(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0),  // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -2974,7 +3011,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf24(
 			&ebwtBw, params,
 	        qualCutoff, // qualThresh
-	        BacktrackLimits(maxBts, 0, 0, 0),  // max backtracks
+	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
@@ -3046,6 +3083,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			cacheLimit,
 			os,
 			!noMaqRound,
+			!better,
 			strandFix,
 			rangeMode,
 			verbose,
@@ -3075,6 +3113,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			refs,
 			os,
 			!noMaqRound,
+			!better,
 			strandFix, // strandFix,
 			rangeMode,
 			verbose,
@@ -3588,23 +3627,51 @@ static void driver(const char * type,
 		switch(outType) {
 			case FULL:
 				if(refOut) {
-					sink = new VerboseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
+					sink = new VerboseHitSink(
+							ebwt.nPat(), offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase,
+							refnames, partitionSz);
 				} else {
-					sink = new VerboseHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames, partitionSz);
+					sink = new VerboseHitSink(
+							fout, offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase,
+							refnames, partitionSz);
 				}
 				break;
 			case CONCISE:
 				if(refOut) {
-					sink = new ConciseHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
+					sink = new ConciseHitSink(
+							ebwt.nPat(), offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase,
+							reportOpps, refnames);
 				} else {
-					sink = new ConciseHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, reportOpps, refnames);
+					sink = new ConciseHitSink(
+							fout, offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase,
+							reportOpps, refnames);
 				}
 				break;
 			case BINARY:
 				if(refOut) {
-					sink = new BinaryHitSink(ebwt.nPat(), offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
+					sink = new BinaryHitSink(
+							ebwt.nPat(), offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase, refnames);
 				} else {
-					sink = new BinaryHitSink(fout, offBase, dumpUnalFaBase, dumpUnalFqBase, dumpMaxFaBase, dumpMaxFqBase, refnames);
+					sink = new BinaryHitSink(
+							fout, offBase,
+							dumpAlFaBase, dumpAlFqBase,
+							dumpUnalFaBase, dumpUnalFqBase,
+							dumpMaxFaBase, dumpMaxFqBase, refnames);
 				}
 				break;
 			case NONE:

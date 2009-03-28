@@ -455,7 +455,8 @@ public:
 	          uint32_t qlen,
 	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
 	          uint16_t depth3, uint16_t rdepth, uint16_t len,
-	          uint16_t cost, uint32_t itop, uint32_t ibot,
+	          uint16_t cost, uint16_t ham,
+	          uint32_t itop, uint32_t ibot,
 	          const EbwtParams& ep, const uint8_t* ebwt,
 	          const EditList* edits = NULL)
 	{
@@ -469,6 +470,7 @@ public:
 		len_ = len;
 		gaveBack_ = 0;
 		cost_ = cost;
+		ham_ = ham;
 		top_ = itop;
 		bot_ = ibot;
 		if(ibot > itop+1) {
@@ -538,7 +540,8 @@ public:
 	Branch* splitBranch(RangeStatePool& rpool, AllocOnlyPool<Edit>& epool,
 	                    Branch *newBranch,
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
-	                    const EbwtParams& ep, const uint8_t* ebwt)
+	                    bool qualOrder, const EbwtParams& ep,
+	                    const uint8_t* ebwt)
 	{
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
@@ -560,7 +563,7 @@ public:
 			if(!eliminated(i)) {
 				numNotEliminated++;
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
-				uint16_t cost = ranges_[i].eq.join.qual | stratum;
+				uint16_t cost = (qualOrder ? ranges_[i].eq.join.qual : 0) | stratum;
 				if(cost < bestCost) {
 					// Demote the old best to the next-best
 					nextCost = bestCost;
@@ -589,7 +592,9 @@ public:
 		assert_gt(numTiedPositions, 0);
 		if(nextCost != 0xffff) assert_gt(nextCost, bestCost);
 		int r = 0;
-		if(numTiedPositions > 1) {
+		// Introduce a little randomness in which path we pick
+		if(false && numTiedPositions > 1) {
+			// Disabled for now
 			r = rand.nextU32() % numTiedPositions;
 			assert_geq(r, 0);
 			assert_lt(r, 3);
@@ -615,7 +620,8 @@ public:
 		newBranch->init(
 				rpool, epool, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
-				newRdepth, 0, cost_, top, bot, ep, ebwt, &edits_);
+				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
+				top, bot, ep, ebwt, &edits_);
 		// Add the new edit
 		newBranch->edits_.add(e, epool, qlen);
 		if(numNotEliminated == 1 && last) {
@@ -720,7 +726,7 @@ public:
 	 * empty range or some other constraint violation (e.g., a
 	 * half-and-half constraint).
 	 */
-	void curtail(RangeStatePool& rpool, int seedLen) {
+	void curtail(RangeStatePool& rpool, int seedLen, bool qualOrder) {
 		if(ranges_ == NULL) {
 			exhausted_ = true;
 			curtailed_ = true;
@@ -737,7 +743,7 @@ public:
 			if(!eliminated(i)) {
 				eliminatedStretch = 0;
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
-				uint16_t cost = ranges_[i].eq.join.qual | stratum;
+				uint16_t cost = (qualOrder ? ranges_[i].eq.join.qual : 0) | stratum;
 				if(cost < lowestCost) lowestCost = cost;
 			} else {
 				eliminatedStretch++;
@@ -894,6 +900,7 @@ public:
 	                  // branch; if the branch hasn't been fully
 	                  // extended yet, then that path will always be the
 	                  // one that extends it by one more
+	uint16_t ham_;    // quality-weighted hamming distance so far
 	RangeState *ranges_; // Allocated from the RangeStatePool
 	uint32_t top_;    // top offset leading to the root of this subtree
 	uint32_t bot_;    // bot offset leading to the root of this subtree
@@ -914,21 +921,32 @@ protected:
  */
 class CostCompare {
 public:
+	/**
+	 * true -> b before a
+	 * false -> a before b
+	 */
 	bool operator()(const Branch* a, const Branch* b) const {
 		// Branch with the best cost
 		if(a->cost_ == b->cost_) {
 			// If one or the other is curtailed, take the one that's
 			// still getting extended
 			if(b->curtailed_ && !a->curtailed_) {
+				// a still being extended, return false
 				return false;
 			}
 			if(a->curtailed_ && !b->curtailed_) {
+				// b still being extended, return true
 				return true;
 			}
 			// Either both are curtailed or both are still being
 			// extended, pick based on which one is deeper
-			if(a->tipDepth() == b->tipDepth()) return false;
-			return a->tipDepth() < b->tipDepth();
+			if(a->tipDepth() == b->tipDepth()) {
+				return false;
+			}
+			else {
+				// Expression is true if b is deeper
+				return a->tipDepth() < b->tipDepth();
+			}
 		} else {
 			return b->cost_ < a->cost_;
 		}
@@ -1261,11 +1279,11 @@ public:
 	 * Curtail the given branch, and possibly remove it from or
 	 * re-insert it into the priority queue.
 	 */
-	void curtail(Branch *br, int seedLen) {
+	void curtail(Branch *br, int seedLen, bool qualOrder) {
 		assert(!br->exhausted_);
 		assert(!br->curtailed_);
 		uint16_t origCost = br->cost_;
-		br->curtail(rpool, seedLen);
+		br->curtail(rpool, seedLen, qualOrder);
 		assert(br->curtailed_);
 		assert_geq(br->cost_, origCost);
 		if(br->exhausted_) {
@@ -1298,6 +1316,7 @@ public:
 	 * extendable branch and add it to the queue.
 	 */
 	void splitAndPrep(RandomSource& rand, uint32_t qlen, int seedLen,
+	                  bool qualOrder,
 	                  const EbwtParams& ep, const uint8_t* ebwt)
 	{
 		if(empty()) return;
@@ -1324,7 +1343,8 @@ public:
 					return;
 				}
 			}
-			Branch* newbr = splitBranch(f, rand, qlen, seedLen, ep, ebwt);
+			Branch* newbr = splitBranch(f, rand, qlen, seedLen,
+			                            qualOrder, ep, ebwt);
 			if(f->exhausted_) {
 				pop();
 				assert(!contains(f));
@@ -1355,11 +1375,12 @@ protected:
 	 * Split off an extendable branch from a curtailed branch.
 	 */
 	Branch* splitBranch(Branch* src, RandomSource& rand, uint32_t qlen,
-	                    int seedLen, const EbwtParams& ep,
-	                    const uint8_t* ebwt)
+	                    int seedLen, bool qualOrder,
+	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
 		Branch *dst = bpool.alloc();
-		src->splitBranch(rpool, epool, dst, rand, qlen, seedLen, ep, ebwt);
+		src->splitBranch(rpool, epool, dst, rand, qlen, seedLen,
+		                 qualOrder, ep, ebwt);
 		assert(dst->repOk());
 		return dst;
 	}
@@ -1412,7 +1433,7 @@ public:
 	                      seqan::String<char>* name,
 	                      Range *partial) = 0;
 	/// Set up the range search.
-	virtual void initBranch(PathManager& pm, uint16_t icost) = 0;
+	virtual void initBranch(PathManager& pm) = 0;
 	/// Advance the range search by one memory op
 	virtual void advanceBranch(int until, uint16_t minCost, PathManager& pm) = 0;
 
@@ -1603,10 +1624,10 @@ public:
 		initRangeSource(*qual);
 		if(this->done) return;
 		ASSERT_ONLY(allTops_.clear());
-		uint16_t icost = (r != NULL) ? r->cost : 0;
 		if(!rs_->done) {
-			rs_->initBranch(pm_, icost); // set up initial branch
+			rs_->initBranch(pm_); // set up initial branch
 		}
+		uint16_t icost = (r != NULL) ? r->cost : 0;
 		this->minCost = max<uint16_t>(icost, this->minCostAdjustment_);
 		this->done = rs_->done;
 		this->foundRange = rs_->foundRange;
