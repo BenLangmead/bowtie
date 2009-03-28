@@ -113,7 +113,7 @@ static bool strandFix           = false; // attempt to fix strand bias
 static bool randomizeQuals      = false; // randomize quality values
 // mating constraints
 
-static const char *short_options = "fqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
+static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
 
 enum {
 	ARG_ORIG = 256,
@@ -989,6 +989,7 @@ static void parseOptions(int argc, char **argv) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
 	   		case 'f': format = FASTA; break;
+	   		case 'F': format = FASTA_CONT; break;
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
@@ -3440,6 +3441,12 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               nsPolicy, forgiveInput,
+			                               skipReads);
+		case FASTA_CONT:
+			return new FastaContinuousPatternSource (
+			                               qs, 28, 1, false,
+			                               useSpinlock,
+			                               patDumpfile, nsPolicy,
 			                               skipReads);
 		case RAW:
 			return new RawPatternSource   (qs, false, randomizeQuals,

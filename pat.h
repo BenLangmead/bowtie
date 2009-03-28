@@ -1521,10 +1521,10 @@ protected:
 					if(eat_ > 0) eat_--;
 					if(eat_ == 0) {
 						for(size_t i = 0; i < length_; i++) {
-							if(i >= bufCur_) {
-								c = buf_[bufCur_ - i - 1];
+							if(length_ + i <= bufCur_) {
+								c = buf_[bufCur_ - length_ + i];
 							} else {
-								c = buf_[bufCur_ - i + 1023];
+								c = buf_[bufCur_ - length_ + i + 1024];
 							}
 							r.patBufFw [i] = charToDna5[c];
 							r.qualBufFw[i] = 'I';

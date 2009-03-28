@@ -24,11 +24,13 @@ my $debug = 0;
 my $round = "";
 my $nomaqround = 0;
 my $better = 0;
+my $oldbest = 0;
 my $result = GetOptions("v=i" => \$varg,
                         "n=i" => \$narg,
                         "e=s" => \$extra_args,
                         "d"   => \$debug,
                         "better" => \$better,
+                        "oldbest" => \$oldbest,
                         "nomaqround" => \$nomaqround);
 
 my $match_mode = "-n 2";
@@ -36,8 +38,9 @@ $match_mode = "-v " . $varg if defined($varg);
 $match_mode = "-n " . $narg if defined($narg);
 
 $best_arg = "--better" if $better;
+$best_arg = "--oldbest" if $oldbest;
+$better = $better || $oldbest;
 $round = "--nomaqround" if $nomaqround;
-$nomaqround = ($match_mode =~ /-v/);
 
 print "Maq-like rounding is: ".($nomaqround ? "off" : "on") . "\n";
 print "Using match mode: $match_mode\n";

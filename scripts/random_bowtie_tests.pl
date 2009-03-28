@@ -69,6 +69,8 @@ sub pickPolicy {
 		}
 	} elsif(!$pe && int(rand(2)) == 0) {
 		$pol .= " --better";
+	} elsif(!$pe && int(rand(2)) == 0) {
+		$pol .= " --oldbest";
 	}
 	if($pol =~ /-n/ && int(rand(2)) == 0) {
 		$pol .= " --nomaqround";
@@ -455,6 +457,7 @@ sub doSearch {
 		$phased = "-z";
 		# These aren't available in -z mode
 		$policy =~ s/--best//;
+		$policy =~ s/--oldbest//;
 		$policy =~ s/--better//;
 	}
 	
