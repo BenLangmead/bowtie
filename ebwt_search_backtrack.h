@@ -2959,9 +2959,10 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			uint32_t randSeed,
-			bool mate1) :
+			bool mate1,
+			int *btCnt = NULL) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
-					params, rs, fw, sink, sinkPt, os, verbose, randSeed, mate1),
+					params, rs, fw, sink, sinkPt, os, verbose, randSeed, mate1, 0, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			rs_(rs), seedLen_(seedLen),
@@ -3109,7 +3110,8 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			uint32_t randSeed,
-			bool mate1) :
+			bool mate1,
+			int *btCnt = NULL) :
 			params_(params),
 			rs_(rs),
 			fw_(fw),
@@ -3126,7 +3128,8 @@ public:
 			os_(os),
 			verbose_(verbose),
 			randSeed_(randSeed),
-			mate1_(mate1)
+			mate1_(mate1),
+			btCnt_(btCnt)
 	{ }
 
 	/**
@@ -3138,7 +3141,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				sink_, sinkPt_, seedLen_, nudgeLeft_, rev0Off_,
 				rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				randSeed_, mate1_);
+				randSeed_, mate1_, btCnt_);
 	}
 
 protected:
@@ -3159,6 +3162,7 @@ protected:
 	bool verbose_;
 	uint32_t randSeed_;
 	bool mate1_;
+	int *btCnt_;
 };
 
 /**

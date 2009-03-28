@@ -1160,9 +1160,9 @@ class PathManager {
 
 public:
 
-	PathManager() :
+	PathManager(int *btCnt = NULL) :
 		bpool(1 * 1024 * 1024, "branch"), rpool(1 * 1024 * 1024),
-		epool(1 * 1024 * 1024, "edit"), minCost(0)
+		epool(1 * 1024 * 1024, "edit"), minCost(0), btCnt_(btCnt)
 	{ }
 
 	~PathManager() {
@@ -1301,10 +1301,27 @@ public:
 	                  const EbwtParams& ep, const uint8_t* ebwt)
 	{
 		if(empty()) return;
+		// This counts as a backtrack
+		if(btCnt_ != NULL && (*btCnt_ == 0)) {
+			// Abruptly end the search by removing all possibilities
+			reset();
+			assert(empty());
+			return;
+		}
 		Branch *f = front();
 		assert(!f->exhausted_);
 		if(f->curtailed_) {
 			uint16_t origCost = f->cost_;
+			// This counts as a backtrack
+			if(btCnt_ != NULL) {
+				if(--(*btCnt_) == 0) {
+					// Abruptly end the search by removing all
+					// possibilities
+					reset();
+					assert(empty());
+					return;
+				}
+			}
 			Branch* newbr = splitBranch(f, rand, qlen, seedLen, ep, ebwt);
 			if(f->exhausted_) {
 				pop();
@@ -1366,6 +1383,11 @@ public:
 	/// The minimum possible cost for any alignments obtained by
 	/// advancing further
 	uint16_t minCost;
+
+protected:
+	/// Pointer to the aligner's per-read backtrack counter.  We
+	/// increment it in splitBranch.
+	int *btCnt_;
 };
 
 /**
@@ -1526,13 +1548,14 @@ public:
 		bool verbose,
 		uint32_t seed,
 		bool mate1,
-		uint32_t minCostAdjustment = 0) :
+		uint32_t minCostAdjustment = 0,
+		int *btCnt = NULL) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
 		sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
-		pm_()
+		pm_(btCnt)
 	{
 		assert(rs_ != NULL);
 	}

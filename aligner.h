@@ -330,7 +330,9 @@ public:
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
-		uint32_t seed) :
+		uint32_t seed,
+		int maxBts = INT_MAX,
+		int *btCnt = NULL) :
 		Aligner(true, rangeMode, seed),
 		doneFirst_(true),
 		firstIsFw_(true),
@@ -339,7 +341,9 @@ public:
 		sinkPt_(sinkPt),
 		params_(params),
 		rchase_(rchase),
-		driver_(driver)
+		driver_(driver),
+		maxBts_(maxBts),
+		btCnt_(btCnt)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
@@ -350,6 +354,7 @@ public:
 		delete driver_; driver_ = NULL;
 		delete params_; params_ = NULL;
 		delete rchase_; rchase_ = NULL;
+		delete btCnt_;  btCnt_ = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -362,6 +367,7 @@ public:
 		rchase_->initRand(qseed_);
 		this->done = driver_->done;
 		doneFirst_ = false;
+		*btCnt_ = maxBts_;
 		firstIsFw_ = ((qseed_ & 0x10) == 0);
 		chase_ = false;
 	}
@@ -475,6 +481,9 @@ protected:
 
 	// Range-finding state
 	TDriver* driver_;
+
+	const int maxBts_;
+	int *btCnt_;
 };
 
 /**
@@ -731,7 +740,9 @@ public:
 		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
-		uint32_t seed) :
+		uint32_t seed,
+		int maxBts = INT_MAX,
+		int *btCnt = NULL) :
 		Aligner(true, rangeMode, seed),
 		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
@@ -753,6 +764,8 @@ public:
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rchase),
 		verbose_(verbose),
+		maxBts_(maxBts),
+		btCnt_(btCnt),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
 		driver2Fw_(driver2Fw), driver2Rc_(driver2Rc),
@@ -816,6 +829,7 @@ public:
 		delete driver2Rc_; driver2Rc_ = NULL;
 		delete params_;    params_    = NULL;
 		delete rchase_;    rchase_    = NULL;
+		delete btCnt_;     btCnt_     = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -834,6 +848,7 @@ public:
 		driver2Rc_->setQuery(patsrc, NULL);
 		qlen1_ = patsrc_->bufa().length();
 		qlen2_ = patsrc_->bufb().length();
+		(*btCnt_) = maxBts_;
 		// Neither orientation is done
 		doneFw_   = false;
 		doneFwFirst_ = true;
@@ -1483,6 +1498,9 @@ protected:
 
 	// true -> be talkative
 	bool verbose_;
+
+	int maxBts_;
+	int *btCnt_;
 
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;
