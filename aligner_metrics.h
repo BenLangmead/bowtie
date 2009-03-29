@@ -76,6 +76,7 @@ public:
 		curIsLowEntropy_(false),
 		curIsHomoPoly_(false),
 		curHadRanges_(false),
+		curNumNs_(0),
 		reads_(0),
 		homoReads_(0),
 		lowEntReads_(0),
@@ -153,6 +154,7 @@ public:
 		cout << "  >2 Ns:" << endl;
 		cout << "    BWT ops:    avg: " << bwtOpsPer3orMoreNRead_.mean() << ", stddev: " << bwtOpsPer3orMoreNRead_.stddev() << endl;
 		cout << "    Backtracks: avg: " << backtracksPer3orMoreNRead_.mean() << ", stddev: " << backtracksPer3orMoreNRead_.stddev() << endl;
+		cout << endl;
 	}
 
 	/**
@@ -169,6 +171,12 @@ public:
 		curHadRanges_ = false;
 		curBwtOps_ = 0;
 		curBacktracks_ = 0;
+		// Count Ns
+		curNumNs_ = 0;
+		const size_t len = seqan::length(read);
+		for(size_t i = 0; i < len; i++) {
+			if((int)read[i] == 4) curNumNs_++;
+		}
 	}
 
 	/**
