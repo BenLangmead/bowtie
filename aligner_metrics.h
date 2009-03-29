@@ -125,8 +125,8 @@ public:
 		float hopct = (reads_ > 0) ? (((float)homoReads_)/((float)reads_)) : (0.0);
 		hopct *= 100.0;
 		cout << "  % homo-polymeric:    " << (hopct) << endl;
-		float unpct = (reads_ > 0) ? ((float)lowEntReads_/(float)(reads_)) : (0.0);
-		unpct *= 100.0;
+		float lopct = (reads_ > 0) ? ((float)lowEntReads_/(float)(reads_)) : (0.0);
+		lopct *= 100.0;
 		cout << "  % low-entropy:       " << (lopct) << endl;
 		float unpct = (reads_ > 0) ? ((float)unalignedReads_/(float)(reads_)) : (0.0);
 		unpct *= 100.0;
