@@ -19,6 +19,7 @@
 #include "range_chaser.h"
 #include "ref_aligner.h"
 #include "reference.h"
+#include "aligner_metrics.h"
 
 /**
  * State machine for carrying out an alignment, which usually consists
@@ -332,7 +333,8 @@ public:
 		bool verbose,
 		uint32_t seed,
 		int maxBts = INT_MAX,
-		int *btCnt = NULL) :
+		int *btCnt = NULL,
+		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode, seed),
 		doneFirst_(true),
 		firstIsFw_(true),
@@ -343,7 +345,8 @@ public:
 		rchase_(rchase),
 		driver_(driver),
 		maxBts_(maxBts),
-		btCnt_(btCnt)
+		btCnt_(btCnt),
+		metrics_(metrics)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
@@ -351,10 +354,13 @@ public:
 	}
 
 	virtual ~UnpairedAlignerV2() {
-		delete driver_; driver_ = NULL;
-		delete params_; params_ = NULL;
-		delete rchase_; rchase_ = NULL;
-		delete btCnt_;  btCnt_ = NULL;
+		delete driver_;  driver_  = NULL;
+		delete params_;  params_  = NULL;
+		delete rchase_;  rchase_  = NULL;
+		delete btCnt_;   btCnt_   = NULL;
+		if(metrics_ != NULL) {
+			 delete metrics_; metrics_ = NULL;
+		}
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -363,6 +369,7 @@ public:
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		Aligner::setQuery(patsrc); // set fields & random seed
+		if(metrics_ != NULL) metrics_->nextRead(patsrc->bufa().patFw);
 		driver_->setQuery(patsrc, NULL);
 		rchase_->initRand(qseed_);
 		this->done = driver_->done;
@@ -484,6 +491,7 @@ protected:
 
 	const int maxBts_;
 	int *btCnt_;
+	AlignerMetrics *metrics_;
 };
 
 /**
