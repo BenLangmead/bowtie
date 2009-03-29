@@ -24,6 +24,7 @@
 #include "aligner_1mm.h"
 #include "aligner_23mm.h"
 #include "aligner_seed_mm.h"
+#include "aligner_metrics.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -111,6 +112,7 @@ static bool nofw                = false; // don't align fw orientation of read
 static bool norc                = false; // don't align rc orientation of read
 static bool strandFix           = false; // attempt to fix strand bias
 static bool randomizeQuals      = false; // randomize quality values
+static bool stats               = false; // print performance stats
 // mating constraints
 
 static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -166,7 +168,8 @@ enum {
 	ARG_NO_RC,
 	ARG_SKIP,
 	ARG_STRAND_FIX,
-	ARG_RANDOMIZE_QUALS
+	ARG_RANDOMIZE_QUALS,
+	ARG_STATS
 };
 
 static struct option long_options[] = {
@@ -250,6 +253,7 @@ static struct option long_options[] = {
 	{"skip",         required_argument, 0,            's'},
 	{"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
 	{"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
+	{"stats",        no_argument,       0,            ARG_STATS},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -1118,6 +1122,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 't': timing = true; break;
 	   		case ARG_NO_FW: nofw = true; break;
 	   		case ARG_NO_RC: norc = true; break;
+	   		case ARG_STATS: stats = true; break;
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
@@ -3068,6 +3073,10 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
+	AlignerMetrics *metrics = NULL;
+	if(stats) {
+		metrics = new AlignerMetrics();
+	}
 	UnpairedSeedAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -3088,7 +3097,8 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
-			seed);
+			seed,
+			metrics);
 	PairedSeedAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -3129,6 +3139,10 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 		// Run that mother
 		multi.run();
 		// MultiAligner must be destroyed before patsrcFact
+	}
+	if(metrics != NULL) {
+		metrics->printSummary();
+		delete metrics;
 	}
 
 	delete patsrcFact;

@@ -6,6 +6,7 @@
 #include "ebwt_search_util.h"
 #include "range.h"
 #include "range_source.h"
+#include "aligner_metrics.h"
 
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
@@ -2116,7 +2117,8 @@ public:
 			bool         halfAndHalf,
 			bool         partial,
 			bool         maqPenalty,
-			bool         qualOrder) :
+			bool         qualOrder,
+			AlignerMetrics *metrics = NULL) :
 	    RangeSource(),
 		qry_(NULL),
 		qlen_(0),
@@ -2139,7 +2141,8 @@ public:
 		rand_(seed),
 		randSeed_(seed),
 		verbose_(verbose),
-		skippingThisRead_(false)
+		skippingThisRead_(false),
+		metrics_(metrics)
 	{ curEbwt_ = ebwt_; }
 
 	/**
@@ -2391,6 +2394,7 @@ public:
 			if(halfAndHalf_ && !hhCheckTop(br, depth, 0)) {
 				// Stop extending this branch because it violates a half-
 				// and-half constraint
+				if(metrics_ != NULL) metrics_->curBacktracks_++;
 				pm.curtail(br, depth3_, qualOrder_);
 				goto bail;
 			}
@@ -2460,6 +2464,7 @@ public:
 					rs->bots[2] = rs->tops[3] =
 					rs->bots[3]               = 0;
 					if(br->lbot_.valid()) {
+						if(metrics_ != NULL) metrics_->curBwtOps_++;
 						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
 					} else {
 #ifndef NDEBUG
@@ -2470,6 +2475,7 @@ public:
 						lbot.initFromRow(obot, ebwt_->_eh, ebwt_->_ebwt);
 						ebwt.mapLFEx(ltop, lbot, tmptops, tmpbots);
 #endif
+						if(metrics_ != NULL) metrics_->curBwtOps_++;
 						int cc = ebwt.mapLF1(otop, br->ltop_);
 						br->top_ = otop;
 						assert(cc == -1 || (cc >= 0 && cc < 4));
@@ -2506,11 +2512,14 @@ public:
 					assert(br->eliminated(br->len_));
 					if(c < 4) {
 						if(br->top_ + 1 == br->bot_) {
+							if(metrics_ != NULL) metrics_->curBwtOps_++;
 							br->bot_ = br->top_ = ebwt.mapLF1(br->top_, br->ltop_, c);
 							if(br->bot_ != 0xffffffff) br->bot_++;
 						} else {
+							if(metrics_ != NULL) metrics_->curBwtOps_++;
 							br->top_ = ebwt.mapLF(br->ltop_, c);
 							assert(br->lbot_.valid());
+							if(metrics_ != NULL) metrics_->curBwtOps_++;
 							br->bot_ = ebwt.mapLF(br->lbot_, c);
 						}
 					}
@@ -2537,6 +2546,7 @@ public:
 			if(halfAndHalf_ && !hhCheck(br, depth, empty)) {
 				// This alignment doesn't satisfy the half-and-half
 				// requirements; reject it
+				if(metrics_ != NULL) metrics_->curBacktracks_++;
 				pm.curtail(br, depth3_, qualOrder_);
 				goto bail;
 			}
@@ -2557,6 +2567,7 @@ public:
 					cout << endl;
 				}
 				assert_gt(br->bot_, br->top_);
+				if(metrics_ != NULL) metrics_->setReadHasRange();
 				curRange_.top     = br->top_;
 				curRange_.bot     = br->bot_;
 				curRange_.cost    = br->cost_;
@@ -2581,9 +2592,11 @@ public:
 	#endif
 				assert(curRange_.repOk());
 				// Must curtail because we've consumed the whole pattern
+				if(metrics_ != NULL) metrics_->curBacktracks_++;
 				pm.curtail(br, depth3_, qualOrder_);
 			} else if(empty || cur == 0) {
 				// The branch couldn't be extended further
+				if(metrics_ != NULL) metrics_->curBacktracks_++;
 				pm.curtail(br, depth3_, qualOrder_);
 			} else {
 				// Extend the branch by one position; no change to its cost
@@ -2896,6 +2909,8 @@ protected:
 	// Starts as false; set to true as soon as we know we want to skip
 	// all further processing of this read
 	bool                skippingThisRead_;
+	// Object encapsulating metrics
+	AlignerMetrics*     metrics_;
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;
 #endif
@@ -2917,7 +2932,8 @@ public:
 			bool         halfAndHalf,
 			bool         seeded,
 			bool         maqPenalty,
-			bool         qualOrder) :
+			bool         qualOrder,
+			AlignerMetrics *metrics = NULL) :
 			ebwt_(ebwt),
 			fw_(fw),
 			qualThresh_(qualThresh),
@@ -2927,7 +2943,8 @@ public:
 			halfAndHalf_(halfAndHalf),
 			seeded_(seeded),
 			maqPenalty_(maqPenalty),
-			qualOrder_(qualOrder) { }
+			qualOrder_(qualOrder),
+			metrics_(metrics) { }
 
 	/**
 	 * Return new EbwtRangeSource with predefined params.s
@@ -2936,7 +2953,7 @@ public:
 		return new EbwtRangeSource(ebwt_, fw_, qualThresh_,
 		                           reportExacts_, verbose_, seed_,
 		                           halfAndHalf_, seeded_, maqPenalty_,
-		                           qualOrder_);
+		                           qualOrder_, metrics_);
 	}
 
 protected:
@@ -2950,6 +2967,7 @@ protected:
 	bool         seeded_;
 	bool         maqPenalty_;
 	bool         qualOrder_;
+	AlignerMetrics *metrics_;
 };
 
 /**

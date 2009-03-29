@@ -10,7 +10,7 @@
 #include "random_source.h"
 #include "row_chaser.h"
 #include "range_cache.h"
-
+#include "aligner_metrics.h"
 
 /**
  * A class that statefully processes a range by picking one row
@@ -27,7 +27,8 @@ class RangeChaser {
 
 public:
 	RangeChaser(uint32_t seed, uint32_t cacheThresh,
-	            RangeCache* cacheFw, RangeCache* cacheBw) :
+	            RangeCache* cacheFw, RangeCache* cacheBw,
+	            AlignerMetrics *metrics = NULL) :
 		done(false),
 		ebwt_(NULL),
 		qlen_(0),
@@ -39,9 +40,10 @@ public:
 		row_(0xffffffff),
 		off_(make_pair(0xffffffff, 0)),
 		tlen_(0),
-		chaser_(),
+		chaser_(metrics),
 		cached_(false),
-		cacheFw_(cacheFw), cacheBw_(cacheBw)
+		cacheFw_(cacheFw), cacheBw_(cacheBw),
+		metrics_(metrics)
 	{ }
 
 	~RangeChaser() { }
@@ -296,6 +298,7 @@ protected:
 	bool cached_;          /// cacheEnt is active for current range?
 	RangeCache* cacheFw_; /// cache for the forward index
 	RangeCache* cacheBw_; /// cache for the backward index
+	AlignerMetrics *metrics_;
 };
 
 #endif /* RANGE_CHASER_H_ */

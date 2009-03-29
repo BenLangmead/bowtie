@@ -358,9 +358,6 @@ public:
 		delete params_;  params_  = NULL;
 		delete rchase_;  rchase_  = NULL;
 		delete btCnt_;   btCnt_   = NULL;
-		if(metrics_ != NULL) {
-			 delete metrics_; metrics_ = NULL;
-		}
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 

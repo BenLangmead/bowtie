@@ -8,6 +8,7 @@
 #include <iostream>
 #include "seqan/sequence.h"
 #include "ebwt.h"
+#include "aligner_metrics.h"
 
 /**
  * A class that statefully converts a row index to a reference
@@ -24,7 +25,7 @@ class RowChaser {
 	typedef Ebwt<TStr> TEbwt;
 
 public:
-	RowChaser() :
+	RowChaser(AlignerMetrics *metrics = NULL) :
 		done(false),
 		prepped_(false),
 		ebwt_(NULL),
@@ -34,7 +35,8 @@ public:
 		jumps_(0),
 		sideloc_(),
 		off_(0xffffffff),
-		tlen_(0)
+		tlen_(0),
+		metrics_(metrics)
 	{ }
 
 	/**
@@ -103,6 +105,7 @@ public:
 		while(!done) {
 			assert(prepped_);
 			prepped_ = false;
+			if(metrics_ != NULL) metrics_->curBwtOps_++;
 			uint32_t newrow = ebwt_->mapLF(sideloc_);
 			ASSERT_ONLY(sideloc_.invalidate());
 			jumps_++;
@@ -178,6 +181,7 @@ protected:
 	SideLocus sideloc_;      /// current side locus
 	uint32_t off_;           /// calculated offset (0xffffffff if not done)
 	uint32_t tlen_;          /// hit text length
+	AlignerMetrics *metrics_;
 };
 
 #endif /* ROW_CHASER_H_ */

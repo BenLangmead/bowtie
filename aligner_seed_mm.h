@@ -11,6 +11,7 @@
 #include "hit.h"
 #include "row_chaser.h"
 #include "range_chaser.h"
+#include "aligner_metrics.h"
 
 /**
  * Concrete factory class for constructing unpaired exact aligners.
@@ -42,7 +43,8 @@ public:
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
-			uint32_t seed) :
+			uint32_t seed,
+			AlignerMetrics *metrics) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
 			doFw_(doFw), doRc_(doRc),
@@ -61,7 +63,8 @@ public:
 			qualOrder_(qualOrder),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
-			seed_(seed)
+			seed_(seed),
+			metrics_(metrics)
 	{
 		assert(ebwtFw.isInMemory());
 	}
@@ -79,9 +82,9 @@ public:
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(seedMms_ == 0) {
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true,  qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_);
+				 ebwtBw_, true,  qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -109,11 +112,11 @@ public:
 			bool mate1 = true;
 
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -148,11 +151,11 @@ public:
 			fw = false;
 
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 				*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -199,13 +202,13 @@ public:
 			bool two = (seedMms_ == 2);
 
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_BwHalf = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -249,13 +252,13 @@ public:
 			fw = false;
 
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+				&ebwtFw_, fw, qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 				*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -313,12 +316,12 @@ public:
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
+			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_, metrics_);
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			seed_, maxBts_, btCnt);
+			seed_, maxBts_, btCnt, metrics_);
 	}
 
 private:
@@ -342,6 +345,7 @@ private:
 	bool rangeMode_;
 	bool verbose_;
 	uint32_t seed_;
+	AlignerMetrics *metrics_;
 };
 
 /**
