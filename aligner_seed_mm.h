@@ -76,6 +76,9 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 		int *btCnt = new int[1];
 		*btCnt = maxBts_;
 
@@ -93,7 +96,7 @@ public:
 				PIN_TO_SEED_EDGE, // "
 				PIN_TO_SEED_EDGE, // "
 				PIN_TO_SEED_EDGE, // "
-				os_, verbose_, seed_, true, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, true, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
 				*params, rRc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -102,7 +105,7 @@ public:
 				PIN_TO_SEED_EDGE, // "
 				PIN_TO_SEED_EDGE, // "
 				PIN_TO_SEED_EDGE, // "
-				os_, verbose_, seed_, true, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, true, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			if(doFw_) drVec->push_back(driverFw);
 			if(doRc_) drVec->push_back(driverRc);
 
@@ -126,7 +129,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 				*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -135,7 +138,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 				*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -144,7 +147,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 				drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 
@@ -165,7 +168,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 				*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -174,7 +177,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 				*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -183,7 +186,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 				drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, true);
 
@@ -218,7 +221,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 				*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -227,7 +230,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 				*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -236,7 +239,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 				drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 			EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
@@ -247,7 +250,7 @@ public:
 				two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 
 			fw = false;
 
@@ -268,7 +271,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 				*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -277,7 +280,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 				*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -286,7 +289,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 				drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, true);
 			EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
@@ -297,7 +300,7 @@ public:
 				two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
-				os_, verbose_, seed_, mate1, btCnt);
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 
 			if(doFw_) {
 				drVec->push_back(drFw_Bw);
@@ -321,7 +324,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			seed_, maxBts_, btCnt, metrics_);
+			seed_, maxBts_, bpool, rpool, epool, btCnt, metrics_);
 	}
 
 private:
@@ -427,6 +430,9 @@ public:
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 		RefAligner<String<Dna5> >* refAligner = NULL;
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 		int *btCnt = new int[1];
 		*btCnt = maxBts_;
 		if(seedMms_ == 0) {
@@ -472,7 +478,7 @@ public:
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				dr1FwVec->push_back(dr1Fw_Bw);
 			}
 			if(do2Fw) {
@@ -488,7 +494,7 @@ public:
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				dr2FwVec->push_back(dr2Fw_Bw);
 			}
 			if(do1Rc) {
@@ -504,7 +510,7 @@ public:
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				dr1RcVec->push_back(dr1Rc_Fw);
 			}
 			if(do2Rc) {
@@ -520,7 +526,7 @@ public:
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
 					PIN_TO_SEED_EDGE, // "
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				dr2RcVec->push_back(dr2Rc_Fw);
 			}
 		} else if(seedMms_ == 1) {
@@ -541,7 +547,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -550,7 +556,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 					*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -559,7 +565,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 				dr1FwVec->push_back(drFw_Bw);
@@ -582,7 +588,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -591,7 +597,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 					*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -600,7 +606,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 				dr2FwVec->push_back(drFw_Bw);
@@ -623,7 +629,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -632,7 +638,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 					*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -641,7 +647,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
 				dr1RcVec->push_back(drRc_Fw);
@@ -664,7 +670,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -673,7 +679,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 					*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -682,7 +688,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, NULL); // no backtrack limit for -n 1/2
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
 				dr2RcVec->push_back(drRc_Fw);
@@ -709,7 +715,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -718,7 +724,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 					*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -727,7 +733,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
@@ -738,7 +744,7 @@ public:
 					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr1FwVec->push_back(drFw_Bw);
 				dr1FwVec->push_back(drFw_Seed);
 				dr1FwVec->push_back(drFw_BwHalf);
@@ -763,7 +769,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -772,7 +778,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
 					*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -781,7 +787,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
@@ -792,7 +798,7 @@ public:
 					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr2FwVec->push_back(drFw_Bw);
 				dr2FwVec->push_back(drFw_Seed);
 				dr2FwVec->push_back(drFw_BwHalf);
@@ -817,7 +823,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -826,7 +832,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 					*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -835,7 +841,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
@@ -846,7 +852,7 @@ public:
 					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr1RcVec->push_back(drRc_Fw);
 				dr1RcVec->push_back(drRc_Seed);
 				dr1RcVec->push_back(drRc_FwHalf);
@@ -871,7 +877,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
 					*params, rRc_FwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -880,7 +886,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtRangeSourceDriver * drRc_BwSeedGen = new EbwtRangeSourceDriver(
 					*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -889,7 +895,7 @@ public:
 					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
@@ -900,7 +906,7 @@ public:
 					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
-					os_, verbose_, seed_, mate1, btCnt);
+					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr2RcVec->push_back(drRc_Fw);
 				dr2RcVec->push_back(drRc_Seed);
 				dr2RcVec->push_back(drRc_FwHalf);
@@ -923,7 +929,7 @@ public:
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_,
-			maxBts_, btCnt);
+			maxBts_, bpool, rpool, epool, btCnt);
 	}
 
 private:

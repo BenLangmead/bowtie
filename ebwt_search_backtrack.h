@@ -2314,12 +2314,15 @@ public:
 				// We have a range to extend
 				assert_leq(top, ebwt._eh._len);
 				assert_leq(bot, ebwt._eh._len);
-				Branch *b = pm.bpool.alloc();
-				b->init(pm.rpool, pm.epool, qlen_,
+				Branch *b = pm.bpool->alloc();
+				b->init(*pm.rpool, *pm.epool, qlen_,
 				        unrevOff_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt);
+				assert(!b->curtailed_);
+				assert(!b->exhausted_);
 				pm.push(b); // insert into priority queue
+				assert(!pm.empty());
 			} else {
 				// The arrows are already closed within the
 				// unrevisitable region; give up
@@ -2327,11 +2330,14 @@ public:
 		} else {
 			// We can't use the ftab, so we start from the rightmost
 			// position and use _fchr
-			Branch *b = pm.bpool.alloc();
-			b->init(pm.rpool, pm.epool, qlen_,
+			Branch *b = pm.bpool->alloc();
+			b->init(*pm.rpool, *pm.epool, qlen_,
 			        unrevOff_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
+			assert(!b->curtailed_);
+			assert(!b->exhausted_);
 			pm.push(b); // insert into priority queue
+			assert(!pm.empty());
 		}
 		return;
 	}
@@ -2359,6 +2365,7 @@ public:
 		assert_gt(length(*qry_), 0);
 		assert_leq(qlen_, length(*qry_));
 		assert_geq(length(*qual_), length(*qry_));
+		assert(!pm.empty());
 
 		do {
 			// Get the highest-priority branch according to the priority
@@ -2367,6 +2374,7 @@ public:
 			// Shouldn't be curtailed or exhausted
 			assert(!br->exhausted_);
 			assert(!br->curtailed_);
+			assert_gt(br->depth3_, 0);
 			assert_leq(br->ham_, qualLim_);
 			if(verbose_) {
 				br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
@@ -2613,11 +2621,17 @@ public:
 			if(pm.empty()) {
 				break;
 			}
+			assert(!pm.front()->curtailed_);
+			assert(!pm.front()->exhausted_);
 
 			if(until == ADV_COST_CHANGES && pm.front()->cost_ != cost) break;
 			else if(until == ADV_STEP) break;
 
 		} while(!this->foundRange);
+		if(!pm.empty()) {
+			assert(!pm.front()->curtailed_);
+			assert(!pm.front()->exhausted_);
+		}
 	}
 
 	/**
@@ -3009,9 +3023,13 @@ public:
 			bool verbose,
 			uint32_t randSeed,
 			bool mate1,
-			int *btCnt = NULL) :
+			AllocOnlyPool<Branch>* bpool,
+			RangeStatePool* rpool,
+			AllocOnlyPool<Edit>* epool,
+			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
-					params, rs, fw, sink, sinkPt, os, verbose, randSeed, mate1, 0, btCnt),
+					params, rs, fw, sink, sinkPt, os, verbose,
+					randSeed, mate1, 0, bpool, rpool, epool, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -3167,6 +3185,9 @@ public:
 			bool verbose,
 			uint32_t randSeed,
 			bool mate1,
+			AllocOnlyPool<Branch>* bpool,
+			RangeStatePool* rpool,
+			AllocOnlyPool<Edit>* epool,
 			int *btCnt = NULL) :
 			params_(params),
 			rs_(rs),
@@ -3186,6 +3207,9 @@ public:
 			verbose_(verbose),
 			randSeed_(randSeed),
 			mate1_(mate1),
+			bpool_(bpool),
+			rpool_(rpool),
+			epool_(epool),
 			btCnt_(btCnt)
 	{ }
 
@@ -3198,7 +3222,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
 				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				randSeed_, mate1_, btCnt_);
+				randSeed_, mate1_, bpool_, rpool_, epool_, btCnt_);
 	}
 
 protected:
@@ -3220,6 +3244,9 @@ protected:
 	bool verbose_;
 	uint32_t randSeed_;
 	bool mate1_;
+	AllocOnlyPool<Branch>* bpool_;
+	RangeStatePool* rpool_;
+	AllocOnlyPool<Edit>* epool_;
 	int *btCnt_;
 };
 
@@ -3435,8 +3462,6 @@ protected:
 	TCostAwareRangeSrcDr rsFull_;
 	EbwtRangeSourceDriver* rsSeed_;
 	PatternSourcePerThread* patsrc_;
-	PathManager pm_;
-	PathManager pmSeed_;
 	uint32_t seedLen_;
 	bool fw_;
 	bool mate1_;

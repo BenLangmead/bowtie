@@ -65,6 +65,9 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
@@ -82,7 +85,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
 			*params, rRc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -91,7 +94,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) drVec->push_back(driverFw);
 		if(doRc_) drVec->push_back(driverRc);
@@ -104,7 +107,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			seed_);
+			seed_, INT_MAX, bpool, rpool, epool, NULL, NULL);
 	}
 
 private:
@@ -187,6 +190,13 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
+
+		AllocOnlyPool<Branch> *bpool2 = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool2 = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool2 = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
@@ -204,7 +214,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
 			*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -213,7 +223,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 
 		EbwtRangeSource *r2Fw = new EbwtRangeSource(
 			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
@@ -228,7 +238,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool2, rpool2, epool2, NULL);
 		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
 			*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -237,7 +247,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool2, rpool2, epool2, NULL);
 
 		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
 
@@ -250,7 +260,8 @@ public:
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_);
+			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_,
+			INT_MAX, bpool, rpool, epool, NULL);
 	}
 
 private:

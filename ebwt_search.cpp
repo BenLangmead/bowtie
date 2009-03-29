@@ -1310,6 +1310,13 @@ static char *argv0 = NULL;
 	return NULL;
 #endif
 
+#ifdef CHUD_PROFILING
+#define CHUD_START() chudStartRemotePerfMonitor("Bowtie");
+#define CHUD_STOP()  chudStopRemotePerfMonitor();
+#else
+#define CHUD_START()
+#define CHUD_STOP()
+#endif
 
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
@@ -1540,7 +1547,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
 #endif
-
+	CHUD_START();
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
 #ifdef BOWTIE_PTHREADS
@@ -1727,9 +1734,8 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
-
     _patsrc.setReverse(false); // don't reverse patterns
-
+    CHUD_START();
 	// Phase 1
     {
 		Timer _t(cout, "Time for 1-mismatch Phase 1 of 2: ", timing);
@@ -1960,8 +1966,8 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
-
     _patsrc.setReverse(false); // don't reverse patterns
+    CHUD_START();
     {
 		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
@@ -2581,7 +2587,7 @@ static void twoOrThreeMismatchSearchFull(
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
-
+    CHUD_START();
     {
 		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
@@ -3412,6 +3418,7 @@ static void seededQualCutoffSearchFull(
 		Timer _t(cout, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
+    CHUD_START();
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cout, "Seeded quality full-index search: ", timing);
@@ -3702,9 +3709,6 @@ static void driver(const char * type,
 				cerr << "Invalid output type: " << outType << endl;
 				exit(1);
 		}
-#ifdef CHUD_PROFILING
-		chudStartRemotePerfMonitor("Bowtie");
-#endif
 		if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
@@ -3750,9 +3754,6 @@ static void driver(const char * type,
 			// we're only loading half of the index anyway
 			exactSearch(patsrc, *sink, ebwt, os, paired);
 		}
-#ifdef CHUD_PROFILING
-		chudStopRemotePerfMonitor();
-#endif
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
 			ebwt.evictFromMemory();
@@ -3876,6 +3877,7 @@ int main(int argc, char **argv) {
 			getchar();
 		}
 		driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
+		CHUD_STOP();
 	}
 #ifdef CHUD_PROFILING
 	chudReleaseRemoteAccess();

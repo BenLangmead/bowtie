@@ -49,14 +49,6 @@ ifeq (1,$(WINDOWS))
 SHMEM_DEF =
 endif
 
-CHUD=0
-CHUD_DEF =
-ifeq (1,$(CHUD))
-ifeq (1,$(MACOS))
-CHUD_DEF = -F/System/Library/PrivateFrameworks -weak_framework CHUD -DCHUD_PROFILING
-endif
-endif
-
 PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
@@ -81,6 +73,14 @@ VERSION = $(shell cat VERSION)
 # For a 64-bit x86 binary on Linux (if not the default):
 # EXTRA_FLAGS="-m64"
 EXTRA_FLAGS =
+CHUD=0
+CHUD_DEF =
+ifeq (1,$(CHUD))
+EXTRA_FLAGS += -g3
+ifeq (1,$(MACOS))
+CHUD_DEF = -F/System/Library/PrivateFrameworks -weak_framework CHUD -DCHUD_PROFILING
+endif
+endif
 DEBUG_FLAGS = -O0 -g3
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS)\""
 RELEASE_FLAGS = -O3

@@ -70,6 +70,9 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
@@ -87,7 +90,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		//
 		EbwtRangeSourceDriver * drFw_Fw = new EbwtRangeSourceDriver(
 			*params, rFw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -97,7 +100,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) {
 			drVec->push_back(drFw_Bw);
@@ -117,7 +120,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		//
 		EbwtRangeSourceDriver * drRc_Bw = new EbwtRangeSourceDriver(
 			*params, rRc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -127,7 +130,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		if(doRc_) {
 			drVec->push_back(drRc_Fw);
 			drVec->push_back(drRc_Bw);
@@ -141,7 +144,8 @@ public:
 		// Set up the aligner
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, seed_);
+			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
+			seed_, INT_MAX, bpool, rpool, epool, NULL, NULL);
 	}
 
 private:
@@ -231,6 +235,9 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		AllocOnlyPool<Branch> *bpool = new AllocOnlyPool<Branch>((1 << 20), "branch");
+		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
+		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
 		const bool halfAndHalf = false;
 		const bool seeded = false;
@@ -248,7 +255,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
 			*params, r1Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -257,7 +264,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 
 #if 1
 		TRangeSrcDrPtrVec dr1FwVec;
@@ -285,7 +292,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
 			*params, r1Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -294,7 +301,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true);
+			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
 #if 1
 		TRangeSrcDrPtrVec dr1RcVec;
 		dr1RcVec.push_back(dr1Rc_Fw);
@@ -320,7 +327,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
 			*params, r2Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -329,7 +336,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool, rpool, epool, NULL);
 #if 1
 		TRangeSrcDrPtrVec dr2FwVec;
 		dr2FwVec.push_back(dr2Fw_Bw);
@@ -355,7 +362,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
 			*params, r2Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -364,7 +371,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false);
+			os_, verbose_, seed_, false, bpool, rpool, epool, NULL);
 #if 1
 		TRangeSrcDrPtrVec dr2RcVec;
 		dr2RcVec.push_back(dr2Rc_Fw);
@@ -389,7 +396,8 @@ public:
 			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_);
+			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_,
+			INT_MAX, bpool, rpool, epool, NULL);
 #else
 		return new PairedBWAlignerV2<EbwtRangeSource>(
 			params, dr, refAligner, rchase,

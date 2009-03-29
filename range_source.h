@@ -363,14 +363,14 @@ public:
 	 * This can happen when a Branch is curtailed and some number of
 	 * trailing RangeState's are all eliminated.
 	 */
-	void giveBack(uint32_t elts) {
-		assert_leq(elts, lastAllocSz_);
-		assert_leq(elts, cur_);
-		cur_ -= elts;
-#ifndef NDEBUG
-		memset(&pools_[curPool_][cur_], 0, elts * sizeof(RangeState));
-#endif
-	}
+//	void giveBack(uint32_t elts) {
+//		assert_leq(elts, lastAllocSz_);
+//		assert_leq(elts, cur_);
+//		cur_ -= elts;
+//#ifndef NDEBUG
+//		memset(&pools_[curPool_][cur_], 0, elts * sizeof(RangeState));
+//#endif
+//	}
 
 	/**
 	 * Reset the pool, freeing all arrays that had been given out.
@@ -468,7 +468,6 @@ public:
 		depth3_ = depth3;
 		rdepth_ = rdepth;
 		len_ = len;
-		gaveBack_ = 0;
 		cost_ = cost;
 		ham_ = ham;
 		top_ = itop;
@@ -483,6 +482,7 @@ public:
 		}
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.alloc(qlen - rdepth_); // allocated from the RangeStatePool
+			assert(ranges_ != NULL);
 		} else {
 			ranges_ = NULL;
 		}
@@ -524,7 +524,7 @@ public:
 	 * eliminated.
 	 */
 	inline bool eliminated(int i) const {
-		if(i <= (len_ - gaveBack_)) {
+		if(i <= len_) {
 			assert(ranges_ != NULL);
 			return ranges_[i].eliminated_;
 		}
@@ -733,7 +733,6 @@ public:
 			return;
 		}
 		uint16_t lowestCost = 0xffff;
-		assert(ranges_ == rpool.lastAlloc());
 		// Iterate over positions in the path looking for the cost of
 		// the lowest-cost non-eliminated position
 		uint32_t eliminatedStretch = 0;
@@ -748,12 +747,6 @@ public:
 			} else {
 				eliminatedStretch++;
 			}
-		}
-		if(eliminatedStretch > 0) {
-			// This many positions were eliminated from off the end of
-			// the path.
-			rpool.giveBack(eliminatedStretch);
-			gaveBack_ = eliminatedStretch;
 		}
 		if(lowestCost > 0 && lowestCost != 0xffff) {
 			// This branch's cost will change when curtailed; the
@@ -792,7 +785,6 @@ public:
 	 */
 	RangeState* rangeState() {
 		assert(ranges_ != NULL);
-		assert_eq(0, gaveBack_);
 		return &ranges_[len_];
 	}
 
@@ -802,7 +794,6 @@ public:
 	 */
 	int installRanges(int c, int nextc, uint8_t q) {
 		assert(ranges_ != NULL);
-		assert_eq(0, gaveBack_);
 		RangeState& r = ranges_[len_];
 		int ret = 0;
 		r.eliminated_ = true; // start with everything eliminated
@@ -870,7 +861,7 @@ public:
 		}
 		for(int i = 0; i < len_; i++) {
 			if(!eliminated(i)) {
-				assert_lt(i, (int)(len_ - gaveBack_));
+				assert_lt(i, (int)(len_));
 				assert(ranges_[i].repOk());
 			}
 		}
@@ -893,7 +884,6 @@ public:
 
 	uint16_t rdepth_; // offset in read space from root of search space
 	uint16_t len_;    // length of the branch
-	uint16_t gaveBack_; // number of eliminated positions shaved off the end
 	uint16_t cost_;   // top 2 bits = stratum, bottom 14 = qual ham
 	                  // it's up to Branch to keep this updated with the
 	                  // cumulative cost of the best path leaving the
@@ -1178,10 +1168,18 @@ class PathManager {
 
 public:
 
-	PathManager(int *btCnt = NULL) :
-		bpool(1 * 1024 * 1024, "branch"), rpool(1 * 1024 * 1024),
-		epool(1 * 1024 * 1024, "edit"), minCost(0), btCnt_(btCnt)
-	{ }
+	PathManager(AllocOnlyPool<Branch> *bpool_,
+	            RangeStatePool *rpool_,
+	            AllocOnlyPool<Edit> *epool_,
+	            int *btCnt = NULL) :
+	            branchQ_(),
+	            bpool(bpool_), rpool(rpool_), epool(epool_),
+	            minCost(0), btCnt_(btCnt)
+	{
+		assert(bpool != NULL);
+		assert(rpool != NULL);
+		assert(epool != NULL);
+	}
 
 	~PathManager() {
 		// All the RangeState's and Branch's are dropped at this point
@@ -1239,9 +1237,13 @@ public:
 	void reset() {
 		branchQ_.reset();
 		ASSERT_ONLY(branchSet_.clear());
-		rpool.reset();
-		bpool.reset();
-		epool.reset() ;
+		// These are now reset at the Aligner level
+//		assert(rpool != NULL);
+//		assert(bpool != NULL);
+//		assert(epool != NULL);
+//		rpool->reset();
+//		bpool->reset();
+//		epool->reset();
 		minCost = 0;
 	}
 
@@ -1283,7 +1285,7 @@ public:
 		assert(!br->exhausted_);
 		assert(!br->curtailed_);
 		uint16_t origCost = br->cost_;
-		br->curtail(rpool, seedLen, qualOrder);
+		br->curtail(*rpool, seedLen, qualOrder);
 		assert(br->curtailed_);
 		assert_geq(br->cost_, origCost);
 		if(br->exhausted_) {
@@ -1378,8 +1380,8 @@ protected:
 	                    int seedLen, bool qualOrder,
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
-		Branch *dst = bpool.alloc();
-		src->splitBranch(rpool, epool, dst, rand, qlen, seedLen,
+		Branch *dst = bpool->alloc();
+		src->splitBranch(*rpool, *epool, dst, rand, qlen, seedLen,
 		                 qualOrder, ep, ebwt);
 		assert(dst->repOk());
 		return dst;
@@ -1400,9 +1402,9 @@ protected:
 
 public:
 
-	AllocOnlyPool<Branch> bpool; // pool for allocating Branches
-	RangeStatePool rpool; // pool for allocating RangeStates
-	AllocOnlyPool<Edit> epool; // pool for allocating Edits
+	AllocOnlyPool<Branch> *bpool; // pool for allocating Branches
+	RangeStatePool *rpool; // pool for allocating RangeStates
+	AllocOnlyPool<Edit> *epool; // pool for allocating Edits
 	/// The minimum possible cost for any alignments obtained by
 	/// advancing further
 	uint16_t minCost;
@@ -1571,14 +1573,17 @@ public:
 		bool verbose,
 		uint32_t seed,
 		bool mate1,
-		uint32_t minCostAdjustment = 0,
-		int *btCnt = NULL) :
+		uint32_t minCostAdjustment,
+		AllocOnlyPool<Branch>* bpool,
+		RangeStatePool* rpool,
+		AllocOnlyPool<Edit>* epool,
+		int *btCnt) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
 		sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
-		pm_(btCnt)
+		pm_(bpool, rpool, epool, btCnt)
 	{
 		assert(rs_ != NULL);
 	}
@@ -1631,6 +1636,10 @@ public:
 		this->minCost = max<uint16_t>(icost, this->minCostAdjustment_);
 		this->done = rs_->done;
 		this->foundRange = rs_->foundRange;
+		if(!pm_.empty()) {
+			assert(!pm_.front()->curtailed_);
+			assert(!pm_.front()->exhausted_);
+		}
 	}
 
 	/**
@@ -1643,6 +1652,8 @@ public:
 			return;
 		}
 		assert(!pm_.empty());
+		assert(!pm_.front()->curtailed_);
+		assert(!pm_.front()->exhausted_);
 		params_.setFw(fw_);
 		// Advance the RangeSource for the forward-oriented read
 		rs_->advanceBranch(until, this->minCost, pm_);
@@ -1661,7 +1672,7 @@ public:
 			assert(allTops_.find(top) == allTops_.end());
 			allTops_.insert(top);
 		}
-		if(!this->done) {
+		if(!pm_.empty()) {
 			assert(!pm_.front()->curtailed_);
 			assert(!pm_.front()->exhausted_);
 		}

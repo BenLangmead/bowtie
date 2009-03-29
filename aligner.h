@@ -332,7 +332,10 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed,
-		int maxBts = INT_MAX,
+		int maxBts,
+		AllocOnlyPool<Branch> *bpool,
+		RangeStatePool *rpool,
+		AllocOnlyPool<Edit> *epool,
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode, seed),
@@ -345,12 +348,18 @@ public:
 		rchase_(rchase),
 		driver_(driver),
 		maxBts_(maxBts),
+		bpool_(bpool),
+		rpool_(rpool),
+		epool_(epool),
 		btCnt_(btCnt),
 		metrics_(metrics)
 	{
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
 		assert(driver_ != NULL);
+		assert(bpool_ != NULL);
+		assert(rpool_ != NULL);
+		assert(epool_ != NULL);
 	}
 
 	virtual ~UnpairedAlignerV2() {
@@ -358,6 +367,9 @@ public:
 		delete params_;  params_  = NULL;
 		delete rchase_;  rchase_  = NULL;
 		delete btCnt_;   btCnt_   = NULL;
+		if(bpool_ != NULL) { delete bpool_; bpool_ = NULL; }
+		if(rpool_ != NULL) { delete rpool_; rpool_ = NULL; }
+		if(epool_ != NULL) { delete epool_; epool_ = NULL; }
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -367,6 +379,9 @@ public:
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		Aligner::setQuery(patsrc); // set fields & random seed
 		if(metrics_ != NULL) metrics_->nextRead(patsrc->bufa().patFw);
+		rpool_->reset();
+		bpool_->reset();
+		epool_->reset();
 		driver_->setQuery(patsrc, NULL);
 		rchase_->initRand(qseed_);
 		this->done = driver_->done;
@@ -487,6 +502,9 @@ protected:
 	TDriver* driver_;
 
 	const int maxBts_;
+	AllocOnlyPool<Branch> *bpool_;
+	RangeStatePool *rpool_;
+	AllocOnlyPool<Edit> *epool_;
 	int *btCnt_;
 	AlignerMetrics *metrics_;
 };
@@ -746,8 +764,11 @@ public:
 		bool rangeMode,
 		bool verbose,
 		uint32_t seed,
-		int maxBts = INT_MAX,
-		int *btCnt = NULL) :
+		int maxBts,
+		AllocOnlyPool<Branch> *bpool,
+		RangeStatePool *rpool,
+		AllocOnlyPool<Edit> *epool,
+		int *btCnt) :
 		Aligner(true, rangeMode, seed),
 		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
@@ -770,6 +791,9 @@ public:
 		rchase_(rchase),
 		verbose_(verbose),
 		maxBts_(maxBts),
+		bpool_(bpool),
+		rpool_(rpool),
+		epool_(epool),
 		btCnt_(btCnt),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
@@ -825,6 +849,9 @@ public:
 		assert(driver1Rc_ != NULL);
 		assert(driver2Fw_ != NULL);
 		assert(driver2Rc_ != NULL);
+		assert(rpool_ != NULL);
+		assert(bpool_ != NULL);
+		assert(epool_ != NULL);
 	}
 
 	virtual ~PairedBWAlignerV1() {
@@ -835,6 +862,9 @@ public:
 		delete params_;    params_    = NULL;
 		delete rchase_;    rchase_    = NULL;
 		delete btCnt_;     btCnt_     = NULL;
+		if(bpool_ != NULL) { delete bpool_; bpool_ = NULL; }
+		if(rpool_ != NULL) { delete rpool_; rpool_ = NULL; }
+		if(epool_ != NULL) { delete epool_; epool_ = NULL; }
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -847,6 +877,9 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
+		rpool_->reset();
+		bpool_->reset();
+		epool_->reset();
 		driver1Fw_->setQuery(patsrc, NULL);
 		driver1Rc_->setQuery(patsrc, NULL);
 		driver2Fw_->setQuery(patsrc, NULL);
@@ -1505,6 +1538,9 @@ protected:
 	bool verbose_;
 
 	int maxBts_;
+	AllocOnlyPool<Branch> *bpool_;
+	RangeStatePool *rpool_;
+	AllocOnlyPool<Edit> *epool_;
 	int *btCnt_;
 
 	// Range-finding state for first mate
