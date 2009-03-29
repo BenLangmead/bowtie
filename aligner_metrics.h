@@ -74,14 +74,18 @@ public:
 		curBwtOps_(0),
 		first_(true),
 		curIsLowEntropy_(false),
+		curIsHomoPoly_(false),
 		curHadRanges_(false),
 		reads_(0),
+		homoReads_(0),
 		lowEntReads_(0),
 		hiEntReads_(0),
 		alignedReads_(0),
 		unalignedReads_(0),
 		bwtOpsPerRead_(),
 		backtracksPerRead_(),
+		bwtOpsPerHomoRead_(),
+		backtracksPerHomoRead_(),
 		bwtOpsPerLoEntRead_(),
 		backtracksPerLoEntRead_(),
 		bwtOpsPerHiEntRead_(),
@@ -93,9 +97,12 @@ public:
 		{ }
 
 	void printSummary() {
+		if(!first_) {
+			finishRead();
+		}
 		cout << "AlignerMetrics:" << endl;
 		cout << "  # Reads:         " << reads_ << endl;
-		float lopct = (reads_ > 0) ? ((float)lowEntReads_/((float)lowEntReads_+hiEntReads_)) : (0.0);
+		float lopct = (reads_ > 0) ? ((float)lowEntReads_+(float)homoReads_/((float)lowEntReads_+hiEntReads_)) : (0.0);
 		lopct *= 100.0;
 		cout << "  % low-entropy:   " << (lopct) << endl;
 		float unpct = (reads_ > 0) ? ((float)unalignedReads_/((float)unalignedReads_+alignedReads_)) : (0.0);
@@ -103,6 +110,9 @@ public:
 		cout << "  % unaligned:     " << (unpct) << endl;
 		cout << "  BWT ops:    avg: " << bwtOpsPerRead_.mean() << ", stddev: " << bwtOpsPerRead_.stddev() << endl;
 		cout << "  Backtracks: avg: " << backtracksPerRead_.mean() << ", stddev: " << backtracksPerRead_.stddev() << endl;
+		cout << "  Homo-poly:" << endl;
+		cout << "    BWT ops:    avg: " << bwtOpsPerHomoRead_.mean() << ", stddev: " << bwtOpsPerLoEntRead_.stddev() << endl;
+		cout << "    Backtracks: avg: " << backtracksPerHomoRead_.mean() << ", stddev: " << backtracksPerLoEntRead_.stddev() << endl;
 		cout << "  Low-entropy:" << endl;
 		cout << "    BWT ops:    avg: " << bwtOpsPerLoEntRead_.mean() << ", stddev: " << bwtOpsPerLoEntRead_.stddev() << endl;
 		cout << "    Backtracks: avg: " << backtracksPerLoEntRead_.mean() << ", stddev: " << backtracksPerLoEntRead_.stddev() << endl;
@@ -125,7 +135,9 @@ public:
 			finishRead();
 		}
 		first_ = false;
-		curIsLowEntropy_ = (entropyDna5(read) < 0.9f);
+		float ent = entropyDna5(read);
+		curIsLowEntropy_ = (ent < 0.75f);
+		curIsHomoPoly_ = (ent < 0.001f);
 		curHadRanges_ = false;
 		curBwtOps_ = 0;
 		curBacktracks_ = 0;
@@ -143,19 +155,25 @@ public:
 	 */
 	void finishRead() {
 		reads_++;
-		if(curIsLowEntropy_) lowEntReads_++;
+		if(curIsHomoPoly_) homoReads_++;
+		else if(curIsLowEntropy_) lowEntReads_++;
 		else hiEntReads_++;
 		if(curHadRanges_) alignedReads_++;
 		else unalignedReads_++;
 		bwtOpsPerRead_.push((float)curBwtOps_);
 		backtracksPerRead_.push((float)curBacktracks_);
-		if(curIsLowEntropy_) {
+		// Drill down by entropy
+		if(curIsHomoPoly_) {
+			bwtOpsPerHomoRead_.push((float)curBwtOps_);
+			backtracksPerHomoRead_.push((float)curBacktracks_);
+		} else if(curIsLowEntropy_) {
 			bwtOpsPerLoEntRead_.push((float)curBwtOps_);
 			backtracksPerLoEntRead_.push((float)curBacktracks_);
 		} else {
 			bwtOpsPerHiEntRead_.push((float)curBwtOps_);
 			backtracksPerHiEntRead_.push((float)curBacktracks_);
 		}
+		// Drill down by whether it aligned
 		if(curHadRanges_) {
 			bwtOpsPerAlignedRead_.push((float)curBwtOps_);
 			backtracksPerAlignedRead_.push((float)curBacktracks_);
@@ -176,11 +194,15 @@ protected:
 
 	// true iff the current read is low entropy
 	bool curIsLowEntropy_;
+	// true if current read is all 1 char (or very close)
+	bool curIsHomoPoly_;
 	// true iff the current read has had one or more ranges reported
 	bool curHadRanges_;
 
 	// # reads
 	uint32_t reads_;
+	// # homo-poly reads
+	uint32_t homoReads_;
 	// # low-entropy reads
 	uint32_t lowEntReads_;
 	// # high-entropy reads
@@ -193,6 +215,10 @@ protected:
 	// Distribution of BWT operations per read
 	RunningStat bwtOpsPerRead_;
 	RunningStat backtracksPerRead_;
+
+	// Distribution of BWT operations per homo-poly read
+	RunningStat bwtOpsPerHomoRead_;
+	RunningStat backtracksPerHomoRead_;
 
 	// Distribution of BWT operations per low-entropy read
 	RunningStat bwtOpsPerLoEntRead_;
