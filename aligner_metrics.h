@@ -9,6 +9,7 @@
 #include <iostream>
 #include <seqan/sequence.h>
 #include "alphabet.h"
+#include "timer.h"
 
 using namespace std;
 
@@ -18,14 +19,16 @@ using namespace std;
  */
 class RunningStat {
 public:
-	RunningStat() : m_n(0) { }
+	RunningStat() : m_n(0), m_tot(0.0) { }
 
 	void clear() {
 		m_n = 0;
+		m_tot = 0.0;
 	}
 
 	void push(float x) {
 		m_n++;
+		m_tot += x;
 		// See Knuth TAOCP vol 2, 3rd edition, page 232
 		if (m_n == 1) {
 			m_oldM = m_newM = x;
@@ -43,6 +46,10 @@ public:
 		return m_n;
 	}
 
+	double tot() const {
+		return m_tot;
+	}
+
 	double mean() const {
 		return (m_n > 0) ? m_newM : 0.0;
 	}
@@ -57,6 +64,7 @@ public:
 
 private:
 	int m_n;
+	double m_tot;
 	double m_oldM, m_newM, m_oldS, m_newS;
 };
 
@@ -104,7 +112,8 @@ public:
 		bwtOpsPer2nRead_(),
 		backtracksPer2nRead_(),
 		bwtOpsPer3orMoreNRead_(),
-		backtracksPer3orMoreNRead_()
+		backtracksPer3orMoreNRead_(),
+		timer_(cout, "", false)
 		{ }
 
 	void printSummary() {
@@ -122,8 +131,12 @@ public:
 		float npct = (reads_ > 0) ? ((float)threeOrMoreNReads_/(float)(reads_)) : (0.0);
 		npct *= 100.0;
 		cout << "  % with 3 or more Ns: " << (npct) << endl;
-		cout << "  BWT ops:    avg: " << bwtOpsPerRead_.mean() << ", stddev: " << bwtOpsPerRead_.stddev() << endl;
-		cout << "  Backtracks: avg: " << backtracksPerRead_.mean() << ", stddev: " << backtracksPerRead_.stddev() << endl;
+		cout << endl;
+		cout << "  Total BWT ops:    avg: " << bwtOpsPerRead_.mean() << ", stddev: " << bwtOpsPerRead_.stddev() << endl;
+		cout << "  Total Backtracks: avg: " << backtracksPerRead_.mean() << ", stddev: " << backtracksPerRead_.stddev() << endl;
+		time_t elapsed = timer_.elapsed();
+		cout << "  BWT ops per second:    " << (bwtOpsPerRead_.tot()/elapsed) << endl;
+		cout << "  Backtracks per second: " << (backtracksPerRead_.tot()/elapsed) << endl;
 		cout << endl;
 		cout << "  Homo-poly:" << endl;
 		cout << "    BWT ops:    avg: " << bwtOpsPerHomoRead_.mean() << ", stddev: " << bwtOpsPerHomoRead_.stddev() << endl;
@@ -313,6 +326,8 @@ protected:
 	// more Ns
 	RunningStat bwtOpsPer3orMoreNRead_;
 	RunningStat backtracksPer3orMoreNRead_;
+
+	Timer timer_;
 };
 
 #endif /* ALIGNER_METRICS_H_ */
