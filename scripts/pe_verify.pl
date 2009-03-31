@@ -40,9 +40,6 @@ my $bowtie_dir = ".";
 my $bowtie_exe = "bowtie";
 $bowtie_exe .= "-debug" if $debug;
 
-my $simreads_dir = "../bowtie_aux";
-my $simreads_exe = "simreads";
-
 my $index  = "e_coli";
 $index = $ARGV[0] if defined($ARGV[0]);
 my $reads1 = "reads/e_coli_1000_1.fq";
@@ -74,7 +71,6 @@ my $m1fw = 1;
 my $m2fw = 0;
 
 system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
-system("make -C $simreads_dir $simreads_exe") == 0 || die;
 
 # Run Bowtie not in paired-end mode for first mate file
 my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx --nostrata $index $reads1";
