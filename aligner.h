@@ -1257,6 +1257,7 @@ protected:
 					// mode"
 					const Range& r = drL_->range();
 					assert(r.repOk());
+					if(verbose_) cout << "Making an attempt to find the outstanding mate" << endl;
 					this->done = resolveOutstandingInRef(
 							pairFw, rchase_->off(),
 					        r.ebwt->_plen[rchase_->off().first], r);
@@ -1272,7 +1273,7 @@ protected:
 				// Forget this range; keep looking for ranges
 				*chaseL_ = false;
 				drL_->foundRange = false;
-				if(verbose_) cout << "Done with case for first mate" << endl;
+				if(verbose_) cout << "Done with chase for first mate" << endl;
 				if(*delayedchaseR_) {
 					// Start chasing the delayed range
 					if(verbose_) cout << "Resuming delayed chase for second mate" << endl;
@@ -1307,6 +1308,7 @@ protected:
 					// our threshold, we're now operating in "mixed
 					// mode"
 					const Range& r = drR_->range();
+					if(verbose_) cout << "Making an attempt to find the outstanding mate" << endl;
 					this->done = resolveOutstandingInRef(
 							!pairFw, rchase_->off(),
 					        r.ebwt->_plen[rchase_->off().first], r);
@@ -1322,7 +1324,7 @@ protected:
 				// Forget this range; keep looking for ranges
 				*chaseR_ = false;
 				drR_->foundRange = false;
-				if(verbose_) cout << "Done with case for second mate" << endl;
+				if(verbose_) cout << "Done with chase for second mate" << endl;
 				if(*delayedchaseL_) {
 					// Start chasing the delayed range
 					if(verbose_) cout << "Resuming delayed chase for first mate" << endl;

@@ -69,7 +69,7 @@ public:
 		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
 		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
-		const bool halfAndHalf = false;
+		const int halfAndHalf = 0;
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw = new EbwtRangeSource(
@@ -198,7 +198,7 @@ public:
 		RangeStatePool *rpool2 = new RangeStatePool(1 * 1024 * 1024);
 		AllocOnlyPool<Edit> *epool2 = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
-		const bool halfAndHalf = false;
+		const int halfAndHalf = 0;
 		const bool seeded = false;
 
 		EbwtRangeSource *r1Fw = new EbwtRangeSource(

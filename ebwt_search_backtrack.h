@@ -2114,7 +2114,7 @@ public:
 			bool         reportExacts,
 			bool         verbose,
 			uint32_t     seed,
-			bool         halfAndHalf,
+			int          halfAndHalf,
 			bool         partial,
 			bool         maqPenalty,
 			bool         qualOrder,
@@ -2126,7 +2126,7 @@ public:
 		name_(NULL),
 		ebwt_(ebwt),
 		fw_(fw),
-		unrevOff_(0),
+		offRev0_(0),
 		offRev1_(0),
 		offRev2_(0),
 		offRev3_(0),
@@ -2204,7 +2204,7 @@ public:
 		depth5_   = depth5;
 		depth3_   = depth3;
 		assert_geq(depth3_, depth5_);
-		unrevOff_ = unrevOff;
+		offRev0_ = unrevOff;
 		offRev1_  = revOff1;
 		offRev2_  = revOff2;
 		offRev3_  = revOff3;
@@ -2256,9 +2256,9 @@ public:
 		}
 		if(qlen_ < 4) {
 			uint32_t maxmms = 0;
-			if(unrevOff_ != offRev1_) maxmms = 1;
-			if(offRev1_  != offRev2_) maxmms = 2;
-			if(offRev2_  != offRev3_) maxmms = 3;
+			if(offRev0_ != offRev1_) maxmms = 1;
+			if(offRev1_ != offRev2_) maxmms = 2;
+			if(offRev2_ != offRev3_) maxmms = 3;
 			if(qlen_ <= maxmms) {
 				cerr << "Warning: Read (" << (*name_) << ") is less than " << (maxmms+1) << " characters long; skipping..." << endl;
 				this->done = true;
@@ -2276,7 +2276,7 @@ public:
 		uint16_t iham = partialEditsHam();
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
-		uint32_t m = min<uint32_t>(unrevOff_, qlen_);
+		uint32_t m = min<uint32_t>(offRev0_, qlen_);
 		// Let skipInvalidExact = true if using the ftab would be a
 		// waste because it would jump directly to an alignment we
 		// couldn't use.
@@ -2316,7 +2316,7 @@ public:
 				assert_leq(bot, ebwt._eh._len);
 				Branch *b = pm.bpool->alloc();
 				b->init(*pm.rpool, *pm.epool, qlen_,
-				        unrevOff_, offRev1_, offRev2_, offRev3_,
+				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt);
 				assert(!b->curtailed_);
@@ -2332,7 +2332,7 @@ public:
 			// position and use _fchr
 			Branch *b = pm.bpool->alloc();
 			b->init(*pm.rpool, *pm.epool, qlen_,
-			        unrevOff_, offRev1_, offRev2_, offRev3_,
+			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
 			assert(!b->curtailed_);
 			assert(!b->exhausted_);
@@ -2377,7 +2377,7 @@ public:
 			assert_gt(br->depth3_, 0);
 			assert_leq(br->ham_, qualLim_);
 			if(verbose_) {
-				br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
+				br->print((*qry_), (*qual_), minCost, cout, (halfAndHalf_>0), partial_, fw_, ebwt_->fw());
 			}
 			assert(br->repOk(qlen_));
 
@@ -2388,7 +2388,7 @@ public:
 
 			const Ebwt<String<Dna> >& ebwt = *ebwt_;
 
-			if(halfAndHalf_) assert_gt(depth3_, depth5_);
+			if(halfAndHalf_ > 0) assert_gt(depth3_, depth5_);
 
 			// Compiler complains if our goto's jump over these
 			// initializations, so stick them here
@@ -2570,7 +2570,7 @@ public:
 						cout << " Final alignment:" << endl;
 					}
 					br->len_++;
-					br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_, partial_, fw_, ebwt_->fw());
+					br->print((*qry_), (*qual_), minCost, cout, halfAndHalf_ > 0, partial_, fw_, ebwt_->fw());
 					br->len_--;
 					cout << endl;
 				}
@@ -2638,7 +2638,7 @@ public:
 	 * Return true iff we're enforcing a half-and-half constraint
 	 * (forced edits in both seed halves).
 	 */
-	bool halfAndHalf() const {
+	int halfAndHalf() const {
 		return halfAndHalf_;
 	}
 
@@ -2687,19 +2687,20 @@ protected:
 	 */
 	bool hhCheck(Branch *b, uint32_t depth, bool empty) {
 		const uint32_t nedits = b->edits_.size();
-		ASSERT_ONLY(uint32_t lim = (offRev3_ == offRev2_)? 2 : 3);
+		ASSERT_ONLY(uint32_t lim3 = (offRev3_ == offRev2_)? 2 : 3);
+		ASSERT_ONLY(uint32_t lim5 = (offRev1_ == offRev0_)? 2 : 1);
 		if((depth == (depth5_-1)) && !empty) {
 			// We're crossing the boundary separating the hi-half
 			// from the non-seed portion of the read.
 			// We should induce a mismatch if we haven't mismatched
 			// yet, so that we don't waste time pursuing a match
 			// that was covered by a previous phase
-			assert_leq(nedits, lim-1);
+			assert_leq(nedits, lim5);
 			return nedits > 0;
 		} else if((depth == (depth3_-1)) && !empty) {
 			// We're crossing the boundary separating the lo-half
 			// from the non-seed portion of the read
-			assert_leq(nedits, lim);
+			assert_leq(nedits, lim3);
 			assert_gt(nedits, 0);
 			// Count the mismatches in the lo and hi halves
 			uint32_t loHalfMms = 0, hiHalfMms = 0;
@@ -2709,17 +2710,17 @@ protected:
 				else if(depth < depth3_) loHalfMms++;
 				else assert(false);
 			}
-			assert_leq(loHalfMms + hiHalfMms, lim);
+			assert_leq(loHalfMms + hiHalfMms, lim3);
 			bool invalidHalfAndHalf = (loHalfMms == 0 || hiHalfMms == 0);
-			return (nedits >= 2 && !invalidHalfAndHalf);
+			return (nedits >= (uint32_t)halfAndHalf_ && !invalidHalfAndHalf);
 		}
 #ifndef NDEBUG
 		if(depth < depth5_-1) {
-			assert_leq(nedits, lim-1);
+			assert_leq(nedits, lim5);
 		}
 		else if(depth >= depth5_ && depth < depth3_-1) {
 			assert_gt(nedits, 0);
-			assert_leq(nedits, lim);
+			assert_leq(nedits, lim3);
 		}
 #endif
 		return true;
@@ -2737,72 +2738,30 @@ protected:
 	                uint64_t prehits = 0xffffffffffffffffllu)
 	{
 		// Crossing from the hi-half into the lo-half
+		ASSERT_ONLY(uint32_t lim3 = (offRev3_ == offRev2_)? 2 : 3);
+		ASSERT_ONLY(uint32_t lim5 = (offRev1_ == offRev0_)? 2 : 1);
 		const uint32_t nedits = b->edits_.size();
 		if(d == depth5_) {
-			if(offRev3_ == offRev2_) {
-				// Total of 2 mismatches allowed: 1 hi, 1 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than once into this region
-				assert_leq(nedits, 1);
-				// Reject if we haven't encountered mismatch by this point
-				if(nedits == 0) {
-					return false;
-				}
-			} else { // if(offRev3_ != offRev2_)
-				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice into this region
-				assert_leq(nedits, 2);
-				// Reject if we haven't encountered mismatch by this point
-				if(nedits < 1) {
-					return false;
-				}
+			assert_leq(nedits, lim5);
+			if(nedits == 0) {
+				return false;
 			}
 		} else if(d == depth3_) {
-			// Crossing from lo-half to outside of the seed
-			if(offRev3_ == offRev2_) {
-				// Total of 2 mismatches allowed: 1 hi, 1 lo
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice within this region
-				assert_leq(nedits, 2);
-				// Must have encountered two mismatches by this point
-				if(nedits < 2) {
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					return false;
-				}
-			} else { // if(offRev3_ != offRev2_)
-				// Total of 3 mismatches allowed: 1 hi, 1 or 2 lo
-				// Count the mismatches in the lo and hi halves
-				int loHalfMms = 0, hiHalfMms = 0;
-				for(size_t i = 0; i < nedits; i++) {
-					uint32_t d = b->edits_.get(i).pos;
-					if     (d < depth5_) hiHalfMms++;
-					else if(d < depth3_) loHalfMms++;
-					else assert(false);
-				}
-				assert_leq(loHalfMms + hiHalfMms, 3);
-				assert_gt(hiHalfMms, 0);
-				if(loHalfMms == 0) {
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					return false;
-				}
-				assert_geq(nedits, 2);
-				// The backtracking logic should have prevented us from
-				// backtracking more than twice within this region
-				assert_leq(nedits, 3);
+			assert_leq(nedits, lim3);
+			if(nedits < (uint32_t)halfAndHalf_) {
+				return false;
 			}
-		} else {
+		}
+#ifndef NDEBUG
+		else {
 			// We didn't just cross a boundary, so do an in-between check
 			if(d >= depth5_) {
 				assert_geq(nedits, 1);
 			} else if(d >= depth3_) {
-				assert_geq(nedits, 2);
+				assert_geq(nedits, lim3);
 			}
 		}
+#endif
 		return true;
 	}
 
@@ -2829,7 +2788,7 @@ protected:
 			if((int)(*qry_)[qlen_-i-1] == 4) {
 				nsInSeed++;
 				if(nsInSeed == 1) {
-					if(i < unrevOff_) {
+					if(i < offRev0_) {
 						return false; // Exceeded mm budget on Ns alone
 					}
 				} else if(nsInSeed == 2) {
@@ -2882,7 +2841,7 @@ protected:
 	String<char>*       name_;   // name of _qry
 	const Ebwt<String<Dna> >*   ebwt_;   // Ebwt to search in
 	bool                fw_;
-	uint32_t            unrevOff_; // unrevisitable chunk
+	uint32_t            offRev0_; // unrevisitable chunk
 	uint32_t            offRev1_;  // 1-revisitable chunk
 	uint32_t            offRev2_;  // 2-revisitable chunk
 	uint32_t            offRev3_;  // 3-revisitable chunk
@@ -2901,7 +2860,7 @@ protected:
 	/// Whether to use the _os array together with a naive matching
 	/// algorithm to double-check reported alignments (or the lack
 	/// thereof)
-	bool                halfAndHalf_;
+	int                 halfAndHalf_;
 	/// Whether we're generating partial alignments for a longer
 	/// alignment in the opposite index.
 	bool                partial_;
@@ -3093,12 +3052,13 @@ public:
 				assert_geq(lowQual, 33);
 				minCost += mmPenalty(maqPenalty_, lowQual - 33);
 			}
-		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < s) {
+		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < (s-1)) {
 			// Half-and-half constraints are active, so there must be
 			// at least 1 mismatch in both halves of the seed
 			assert(rs_->halfAndHalf());
-			minCost = 2 << 14;
+			minCost = (seed_ ? 3 : 2) << 14;
 			if(qualOrder_) {
+				assert(rs_->halfAndHalf() == 2 || rs_->halfAndHalf() == 3);
 				uint8_t lowQual1 = 0xff;
 				for(uint32_t d = 0; d < sRight; d++) {
 					if(qual[qlen - d - 1] < lowQual1) {
@@ -3108,15 +3068,24 @@ public:
 				assert_lt(lowQual1, 0xff);
 				assert_geq(lowQual1, 33);
 				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
-				uint8_t lowQual2 = 0xff;
+				uint8_t lowQual2_1 = 0xff;
+				uint8_t lowQual2_2 = 0xff;
 				for(uint32_t d = sRight; d < s; d++) {
-					if(qual[qlen - d - 1] < lowQual2) {
-						lowQual2 = qual[qlen - d - 1];
+					if(qual[qlen - d - 1] < lowQual2_1) {
+						if(lowQual2_1 != 0xff) {
+							lowQual2_2 = lowQual2_1;
+						}
+						lowQual2_1 = qual[qlen - d - 1];
+					} else if(qual[qlen - d - 1] < lowQual2_2) {
+						lowQual2_2 = qual[qlen - d - 1];
 					}
 				}
-				assert_lt(lowQual2, 0xff);
-				assert_geq(lowQual2, 33);
-				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2));
+				assert_lt(lowQual2_1, 0xff);
+				assert_geq(lowQual2_1, 33);
+				assert_lt(lowQual2_2, 0xff);
+				assert_geq(lowQual2_2, 33);
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_1));
+				if(rs_->halfAndHalf() > 2) minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_2));
 			}
 		}
 		this->minCostAdjustment_ = minCost;

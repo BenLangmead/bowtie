@@ -84,10 +84,13 @@ public:
 
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(seedMms_ == 0) {
+			const int halfAndHalf = 0;
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true,  qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, true,  qualCutoff_, true, false, seed_,
+				 halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, false, qualCutoff_, true, false, seed_,
+				halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -110,20 +113,23 @@ public:
 			if(doRc_) drVec->push_back(driverRc);
 
 		} else if(seedMms_ == 1) {
-
+			const int halfAndHalf = 0;
 			bool fw = true;
 			bool mate1 = true;
 
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				 halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				 halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+				halfAndHalf, true,  maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
-				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-				seedLen_,   // seedLen
+				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
 				true,       // nudgeLeft
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
@@ -131,8 +137,8 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
-				*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-				seedLen_,   // seedLen
+				*params, rFw_BwSeed, fw, false, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
 				true,       // nudgeLeft
 				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
@@ -140,8 +146,8 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtRangeSourceDriver * drFw_FwSeedGen = new EbwtRangeSourceDriver(
-				*params, rFw_FwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
-				seedLen_,   // seedLen
+				*params, rFw_FwSeedGen, fw, true, maqPenalty_,
+				qualOrder_, sink_, sinkPt, seedLen_,
 				false,      // nudgeLeft
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_SEED_EDGE,
@@ -154,11 +160,14 @@ public:
 			fw = false;
 
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_,
+				halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_,
+				halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_,
+				halfAndHalf, true,  maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 				*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -198,20 +207,19 @@ public:
 				drVec->push_back(drRc_Fw);
 				drVec->push_back(drRc_Seed);
 			}
-		} else if(seedMms_ > 1) {
+		} else if(seedMms_ == 2) {
 
 			bool fw = true;
 			bool mate1 = true;
-			bool two = (seedMms_ == 2);
 
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_BwHalf = new EbwtRangeSource(
-				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -219,7 +227,7 @@ public:
 				true,       // nudgeLeft
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_HI_HALF_EDGE,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriverFactory * drFw_BwSeed = new EbwtRangeSourceDriverFactory(
@@ -237,7 +245,7 @@ public:
 				false,      // nudgeLeft
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_HI_HALF_EDGE,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
@@ -247,29 +255,29 @@ public:
 				seedLen_,   // seedLen
 				true,       // nudgeLeft
 				PIN_TO_BEGINNING,    // nothing's unrevisitable
-				two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 
 			fw = false;
 
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw, qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_, metrics_);
+				 ebwtBw_, fw, qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-				&ebwtFw_, fw, qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_, metrics_);
+				&ebwtFw_, fw, qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 				*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
 				true,       // nudgeLeft
+				PIN_TO_HI_HALF_EDGE, // no mismatches in hi half
 				PIN_TO_HI_HALF_EDGE,
-				PIN_TO_HI_HALF_EDGE,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,    // up to 2 in lo half
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtRangeSourceDriverFactory * drRc_FwSeed = new EbwtRangeSourceDriverFactory(
@@ -285,9 +293,9 @@ public:
 				*params, rRc_BwSeedGen, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
 				false,      // nudgeLeft
+				PIN_TO_HI_HALF_EDGE, // no mismatches in lo half
 				PIN_TO_HI_HALF_EDGE,
-				PIN_TO_HI_HALF_EDGE,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,    // up to 2 in hi half
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
@@ -297,8 +305,8 @@ public:
 				seedLen_,   // seedLen
 				true,       // nudgeLeft
 				PIN_TO_BEGINNING,    // nothing's unrevisitable
-				two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
-				two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 
@@ -311,6 +319,206 @@ public:
 				drVec->push_back(drRc_Fw);
 				drVec->push_back(drRc_Seed);
 				drVec->push_back(drRc_FwHalf);
+			}
+		} else if(seedMms_ > 2) {
+
+			bool fw = true;
+			bool mate1 = true;
+
+			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				 0, false, maqPenalty_, qualOrder_, metrics_);
+
+			// Partial and full aligners for alignments with 0
+			// mismatches in the lo-half and up to 3 mismatches in the
+			// hi-half
+			EbwtRangeSourceFactory *rFw_BwSeed03 = new EbwtRangeSourceFactory(
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				 0, false, maqPenalty_, qualOrder_, metrics_);
+			EbwtRangeSource *rFw_FwSeedGen03 = new EbwtRangeSource(
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+				 0, true,  maqPenalty_, qualOrder_, metrics_);
+
+			// Partial and full aligners for alignments with 1
+			// mismatch in the lo-half and up to 2 mismatches in the
+			// hi-half
+			EbwtRangeSourceFactory *rFw_BwSeed12 = new EbwtRangeSourceFactory(
+				 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				 0, false, maqPenalty_, qualOrder_, metrics_);
+			// Note: the following is half-and-half (unlike the 03 version)
+			EbwtRangeSource *rFw_FwSeedGen12 = new EbwtRangeSource(
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+				 3,  true,  maqPenalty_, qualOrder_, metrics_);
+
+			EbwtRangeSource *rFw_BwHalf12 = new EbwtRangeSource(
+				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_,
+				 2,  false, maqPenalty_, qualOrder_, metrics_);
+
+			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
+				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
+				true,       // nudgeLeft
+				PIN_TO_HI_HALF_EDGE, // 0 mismatches in hi-half
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,    // up to 3 mismatches in lo-half
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+
+			EbwtRangeSourceDriverFactory * drFw_BwSeed03 = new EbwtRangeSourceDriverFactory(
+				*params, rFw_BwSeed03, fw, false, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
+				true,       // nudgeLeft
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtRangeSourceDriver * drFw_FwSeedGen03 = new EbwtRangeSourceDriver(
+				*params, rFw_FwSeedGen03, fw, true, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
+				false,      // nudgeLeft
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtSeededRangeSourceDriver * drFw_Seed03 = new EbwtSeededRangeSourceDriver(
+				drFw_BwSeed03, drFw_FwSeedGen03, fw, seedLen_, verbose_, mate1);
+
+			EbwtRangeSourceDriverFactory * drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
+				*params, rFw_BwSeed12, fw, false, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
+				true,       // nudgeLeft
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtRangeSourceDriver * drFw_FwSeedGen12 = new EbwtRangeSourceDriver(
+				*params, rFw_FwSeedGen12, fw, true, maqPenalty_, qualOrder_,
+				sink_, sinkPt, seedLen_,
+				false,      // nudgeLeft
+				PIN_TO_BEGINNING,
+				PIN_TO_HI_HALF_EDGE, // 1-mismatch in lo-half
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,    // 1 or 2 mismatches in hi-half
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtSeededRangeSourceDriver * drFw_Seed12 = new EbwtSeededRangeSourceDriver(
+				drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+
+			EbwtRangeSourceDriver * drFw_BwHalf12 = new EbwtRangeSourceDriver(
+				*params, rFw_BwHalf12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				true,       // nudgeLeft
+				PIN_TO_BEGINNING,    // nothing's unrevisitable
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+
+			fw = false;
+
+			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
+				&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				0, false, maqPenalty_, qualOrder_, metrics_);
+
+			// Partial and full aligners for alignments with 0
+			// mismatches in the lo-half and up to 3 mismatches in the
+			// hi-half
+			EbwtRangeSourceFactory *rRc_FwSeed03 = new EbwtRangeSourceFactory(
+				&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				0, false, maqPenalty_, qualOrder_, metrics_);
+			EbwtRangeSource *rRc_BwSeedGen03 = new EbwtRangeSource(
+				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_,
+				0, true,  maqPenalty_, qualOrder_, metrics_);
+
+			// Partial and full aligners for alignments with 1
+			// mismatch in the lo-half and up to 2 mismatches in the
+			// hi-half
+			EbwtRangeSourceFactory *rRc_FwSeed12 = new EbwtRangeSourceFactory(
+				&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+				0, false, maqPenalty_, qualOrder_, metrics_);
+			EbwtRangeSource *rRc_BwSeedGen12 = new EbwtRangeSource(
+				 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_,
+				3,  true,  maqPenalty_, qualOrder_, metrics_);
+
+			EbwtRangeSource *rRc_FwHalf12 = new EbwtRangeSource(
+				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+				2,  false, maqPenalty_, qualOrder_, metrics_);
+
+			EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
+				*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				true,       // nudgeLeft
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+
+			EbwtRangeSourceDriverFactory * drRc_FwSeed03 = new EbwtRangeSourceDriverFactory(
+				*params, rRc_FwSeed03, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				true,       // nudgeLeft
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtRangeSourceDriver * drRc_BwSeedGen03 = new EbwtRangeSourceDriver(
+				*params, rRc_BwSeedGen03, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				false,      // nudgeLeft
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtSeededRangeSourceDriver * drRc_Seed03 = new EbwtSeededRangeSourceDriver(
+				drRc_FwSeed03, drRc_BwSeedGen03, fw, seedLen_, verbose_, mate1);
+
+			EbwtRangeSourceDriverFactory * drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
+				*params, rRc_FwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				true,       // nudgeLeft
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtRangeSourceDriver * drRc_BwSeedGen12 = new EbwtRangeSourceDriver(
+				*params, rRc_BwSeedGen12, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				false,      // nudgeLeft
+				PIN_TO_BEGINNING,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+			EbwtSeededRangeSourceDriver * drRc_Seed12 = new EbwtSeededRangeSourceDriver(
+				drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+
+			EbwtRangeSourceDriver * drRc_FwHalf12 = new EbwtRangeSourceDriver(
+				*params, rRc_FwHalf12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				seedLen_,   // seedLen
+				true,       // nudgeLeft
+				PIN_TO_BEGINNING,    // nothing's unrevisitable
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_HI_HALF_EDGE,
+				PIN_TO_SEED_EDGE,
+				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+
+			if(doFw_) {
+				drVec->push_back(drFw_Bw);
+				drVec->push_back(drFw_Seed03);
+				drVec->push_back(drFw_Seed12);
+				drVec->push_back(drFw_BwHalf12);
+			}
+			if(doRc_) {
+				drVec->push_back(drRc_Fw);
+				drVec->push_back(drRc_Seed03);
+				drVec->push_back(drRc_Seed12);
+				drVec->push_back(drRc_FwHalf12);
 			}
 		} else {
 			cerr << "Unsupported --stateful mode: " << seedMms_ << endl;
@@ -465,11 +673,13 @@ public:
 		TRangeSrcDrPtrVec *dr2FwVec = new TRangeSrcDrPtrVec();
 		TRangeSrcDrPtrVec *dr2RcVec = new TRangeSrcDrPtrVec();
 		if(seedMms_ == 0) {
+			const int halfAndHalf = 0;
 			if(do1Fw) {
 				bool mate1 = true;
 				bool fw = true;
 				EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, true, false, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true, false, seed_,
+					 halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver *dr1Fw_Bw = new EbwtRangeSourceDriver(
 					*params, r1Fw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -501,7 +711,8 @@ public:
 				bool mate1 = true;
 				bool fw = false;
 				EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true, verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true, verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver *dr1Rc_Fw = new EbwtRangeSourceDriver(
 					*params, r1Rc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -517,7 +728,8 @@ public:
 				bool mate1 = false;
 				bool fw = false;
 				EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true, verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true, verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver *dr2Rc_Fw = new EbwtRangeSourceDriver(
 					*params, r2Rc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -530,15 +742,19 @@ public:
 				dr2RcVec->push_back(dr2Rc_Fw);
 			}
 		} else if(seedMms_ == 1) {
+			const int halfAndHalf = 0;
 			if(do1Fw) {
 				bool mate1 = true;
 				bool fw = true;
 				EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+					halfAndHalf, true,  maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 					*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -575,11 +791,14 @@ public:
 				bool mate1 = false;
 				bool fw = true;
 				EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
+					halfAndHalf, true,  maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 					*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -616,11 +835,14 @@ public:
 				bool mate1 = true;
 				bool fw = false;
 				EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_,
+					halfAndHalf, true,  maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 					*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -657,11 +879,14 @@ public:
 				bool mate1 = false;
 				bool fw = false;
 				EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_,
+					halfAndHalf, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_,
+					halfAndHalf, true,  maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 					*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -700,13 +925,17 @@ public:
 				bool mate1 = true;
 				bool fw = true;
 				EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_);
+				EbwtRangeSourceFactory *rFw_BwSeed12 = new EbwtRangeSourceFactory(
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
+				EbwtRangeSource *rFw_FwSeedGen12 = new EbwtRangeSource(
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 3,  true,  maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_BwHalf = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 					*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
@@ -736,30 +965,66 @@ public:
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+				EbwtRangeSourceDriverFactory * drFw_BwSeed12 = NULL;
+				if(!two) {
+					drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
+						*params, rFw_BwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						true,       // nudgeLeft
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtRangeSourceDriver * drFw_FwSeedGen12 = NULL;
+				if(!two) {
+					drFw_FwSeedGen12 = new EbwtRangeSourceDriver(
+						*params, rFw_FwSeedGen12, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						false,      // nudgeLeft
+						PIN_TO_BEGINNING,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtSeededRangeSourceDriver * drFw_Seed12 = NULL;
+				if(!two) {
+					drFw_Seed12 = new EbwtSeededRangeSourceDriver(
+						drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+				}
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 					*params, rFw_BwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
 					true,       // nudgeLeft
 					PIN_TO_BEGINNING,    // nothing's unrevisitable
-					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr1FwVec->push_back(drFw_Bw);
 				dr1FwVec->push_back(drFw_Seed);
+				if(drFw_Seed12 != NULL) {
+					dr1FwVec->push_back(drFw_Seed12);
+				}
 				dr1FwVec->push_back(drFw_BwHalf);
 			}
 			if(do2Fw) {
 				bool mate1 = false;
 				bool fw = true;
 				EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rFw_BwSeed = new EbwtRangeSourceFactory(
-					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_);
+				EbwtRangeSourceFactory *rFw_BwSeed12 = new EbwtRangeSourceFactory(
+					 ebwtBw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
+				EbwtRangeSource *rFw_FwSeedGen12 = new EbwtRangeSource(
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 3,  true,  maqPenalty_, qualOrder_);
 				EbwtRangeSource *rFw_BwHalf = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_);
 
 				EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 					*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -790,30 +1055,66 @@ public:
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
 					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+				EbwtRangeSourceDriverFactory * drFw_BwSeed12 = NULL;
+				if(!two) {
+					drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
+						*params, rFw_BwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						true,       // nudgeLeft
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtRangeSourceDriver * drFw_FwSeedGen12 = NULL;
+				if(!two) {
+					drFw_FwSeedGen12 = new EbwtRangeSourceDriver(
+						*params, rFw_FwSeedGen12, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						false,      // nudgeLeft
+						PIN_TO_BEGINNING,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtSeededRangeSourceDriver * drFw_Seed12 = NULL;
+				if(!two) {
+					drFw_Seed12 = new EbwtSeededRangeSourceDriver(
+						drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+				}
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 					*params, rFw_BwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
 					true,       // nudgeLeft
 					PIN_TO_BEGINNING,    // nothing's unrevisitable
-					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr2FwVec->push_back(drFw_Bw);
 				dr2FwVec->push_back(drFw_Seed);
+				if(drFw_Seed12 != NULL) {
+					dr2FwVec->push_back(drFw_Seed12);
+				}
 				dr2FwVec->push_back(drFw_BwHalf);
 			}
 			if(do1Rc) {
 				bool mate1 = true;
 				bool fw = false;
 				EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_);
+				EbwtRangeSourceFactory *rRc_FwSeed12 = new EbwtRangeSourceFactory(
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
+				EbwtRangeSource *rRc_BwSeedGen12 = new EbwtRangeSource(
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 3,  true,  maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_);
 
 				EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 					*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -844,30 +1145,66 @@ public:
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+				EbwtRangeSourceDriverFactory * drRc_FwSeed12 = NULL;
+				if(!two) {
+					drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
+						*params, rRc_FwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						true,       // nudgeLeft
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtRangeSourceDriver * drRc_BwSeedGen12 = NULL;
+				if(!two) {
+					drRc_BwSeedGen12 = new EbwtRangeSourceDriver(
+						*params, rRc_BwSeedGen12, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						false,      // nudgeLeft
+						PIN_TO_BEGINNING,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtSeededRangeSourceDriver * drRc_Seed12 = NULL;
+				if(!two) {
+					drRc_Seed12 = new EbwtSeededRangeSourceDriver(
+						drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+				}
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 					*params, rRc_FwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
 					true,       // nudgeLeft
 					PIN_TO_BEGINNING,    // nothing's unrevisitable
-					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr1RcVec->push_back(drRc_Fw);
 				dr1RcVec->push_back(drRc_Seed);
+				if(drRc_Seed12 != NULL) {
+					dr1RcVec->push_back(drRc_Seed12);
+				}
 				dr1RcVec->push_back(drRc_FwHalf);
 			}
 			if(do2Rc) {
 				bool mate1 = false;
 				bool fw = false;
 				EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSourceFactory *rRc_FwSeed = new EbwtRangeSourceFactory(
-					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, false, false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_BwSeedGen = new EbwtRangeSource(
-					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, false, true,  maqPenalty_, qualOrder_);
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 0, true,  maqPenalty_, qualOrder_);
+				EbwtRangeSourceFactory *rRc_FwSeed12 = new EbwtRangeSourceFactory(
+					&ebwtFw_, fw,  qualCutoff_, true,  verbose_, seed_, 0, false, maqPenalty_, qualOrder_);
+				EbwtRangeSource *rRc_BwSeedGen12 = new EbwtRangeSource(
+					 ebwtBw_, fw,  qualCutoff_, false, verbose_, seed_, 3,  true,  maqPenalty_, qualOrder_);
 				EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, true,  false, maqPenalty_, qualOrder_);
+					&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_, 2,  false, maqPenalty_, qualOrder_);
 
 				EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 					*params, rRc_Fw, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -898,17 +1235,49 @@ public:
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
 					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+				EbwtRangeSourceDriverFactory * drRc_FwSeed12 = NULL;
+				if(!two) {
+					drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
+						*params, rRc_FwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						true,       // nudgeLeft
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtRangeSourceDriver * drRc_BwSeedGen12 = NULL;
+				if(!two) {
+					drRc_BwSeedGen12 = new EbwtRangeSourceDriver(
+						*params, rRc_BwSeedGen12, fw, true, maqPenalty_, qualOrder_, sink_, sinkPt,
+						seedLen_,   // seedLen
+						false,      // nudgeLeft
+						PIN_TO_BEGINNING,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_HI_HALF_EDGE,
+						PIN_TO_SEED_EDGE,
+						os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
+				}
+				EbwtSeededRangeSourceDriver * drRc_Seed12 = NULL;
+				if(!two) {
+					drRc_Seed12 = new EbwtSeededRangeSourceDriver(
+						drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+				}
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 					*params, rRc_FwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 					seedLen_,   // seedLen
 					true,       // nudgeLeft
 					PIN_TO_BEGINNING,    // nothing's unrevisitable
-					two ? PIN_TO_HI_HALF_EDGE : PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
 					two ? PIN_TO_SEED_EDGE : PIN_TO_HI_HALF_EDGE,
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				dr2RcVec->push_back(drRc_Fw);
 				dr2RcVec->push_back(drRc_Seed);
+				if(drRc_Seed12 != NULL) {
+					dr2RcVec->push_back(drRc_Seed12);
+				}
 				dr2RcVec->push_back(drRc_FwHalf);
 			}
 		} else {
