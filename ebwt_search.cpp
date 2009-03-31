@@ -110,7 +110,7 @@ static bool tryHard             = false; // set very high maxBts, mixedAttemptLi
 static uint32_t skipReads       = 0;     // # reads/read pairs to skip
 static bool nofw                = false; // don't align fw orientation of read
 static bool norc                = false; // don't align rc orientation of read
-static bool strandFix           = false; // attempt to fix strand bias
+static bool strandFix           = true;  // attempt to fix strand bias
 static bool randomizeQuals      = false; // randomize quality values
 static bool stats               = false; // print performance stats
 // mating constraints
