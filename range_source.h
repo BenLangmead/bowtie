@@ -359,20 +359,6 @@ public:
 	}
 
 	/**
-	 * Give back some number of elements from the last allocation.
-	 * This can happen when a Branch is curtailed and some number of
-	 * trailing RangeState's are all eliminated.
-	 */
-//	void giveBack(uint32_t elts) {
-//		assert_leq(elts, lastAllocSz_);
-//		assert_leq(elts, cur_);
-//		cur_ -= elts;
-//#ifndef NDEBUG
-//		memset(&pools_[curPool_][cur_], 0, elts * sizeof(RangeState));
-//#endif
-//	}
-
-	/**
 	 * Reset the pool, freeing all arrays that had been given out.
 	 */
 	void reset() {
@@ -1841,7 +1827,7 @@ public:
 		RangeSourceDriver<TRangeSource>(false),
 		rss_(), active_(), strandFix_(strandFix), rand_(qseed),
 		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
-		r_(NULL), verbose_(verbose)
+		verbose_(verbose)
 	{
 		if(rss != NULL) {
 			rss_ = (*rss);
@@ -1876,7 +1862,6 @@ public:
 		delayedRange_ = NULL;
 		ASSERT_ONLY(allTopsRc_.clear());
 		patsrc_ = patsrc;
-		r_ = r;
 		const size_t rssSz = rss_.size();
 		if(rssSz == 0) return;
 		for(size_t i = 0; i < rssSz; i++) {
@@ -1891,12 +1876,13 @@ public:
 	/**
 	 * Add a new RangeSource to the list and re-sort it.
 	 */
-	void addSource(TRangeSrcDrPtr p) {
+	void addSource(TRangeSrcDrPtr p, Range *r) {
 		assert(!this->foundRange);
 		this->lastRange_ = NULL;
 		this->delayedRange_ = NULL;
+		this->done = false;
 		if(patsrc_ != NULL) {
-			p->setQuery(patsrc_, r_);
+			p->setQuery(patsrc_, r);
 		}
 		rss_.push_back(p);
 		active_.push_back(p);
@@ -2212,7 +2198,7 @@ protected:
 				assert_leq(vec[i]->minCost, vec[j]->minCost);
 			}
 		}
-		if(delayedRange_ == NULL) {
+		if(delayedRange_ == NULL && sz > 0) {
 			// Only assert this if there's no delayed range; if there's
 			// a delayed range, the minCost is its cost, not the 0th
 			// element's cost
@@ -2237,7 +2223,6 @@ protected:
 	Range *lastRange_;
 	Range *delayedRange_;
 	PatternSourcePerThread* patsrc_;
-	Range *r_;
 	bool verbose_;
 	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
 };
