@@ -2398,6 +2398,7 @@ public:
 			bool hit = false;
 			uint16_t cost = br->cost_;
 			uint32_t cur = 0;
+			uint32_t nedits = 0;
 
 			if(halfAndHalf_ && !hhCheckTop(br, depth, 0)) {
 				// Stop extending this branch because it violates a half-
@@ -2546,7 +2547,7 @@ public:
 
 			// Check whether we've obtained an exact alignment when
 			// we've been instructed not to report exact alignments
-			const uint32_t nedits = br->edits_.size();
+			nedits = br->edits_.size();
 			invalidExact = (hit && nedits == 0 && !reportExacts_);
 
 			// Set this to true if the only way to make legal progress
