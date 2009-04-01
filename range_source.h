@@ -1963,7 +1963,7 @@ public:
 		}
 		// Advance lowest-cost RangeSourceDriver
 		TRangeSrcDrPtr p = active_[0];
-		ASSERT_ONLY(uint16_t precost = p->minCost);
+		uint16_t precost = p->minCost;
 		assert(!p->done || p->foundRange);
 		if(!p->foundRange) {
 			p->advance(until);

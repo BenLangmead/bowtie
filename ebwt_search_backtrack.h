@@ -3297,25 +3297,23 @@ public:
 	 * done with this read.
 	 */
 	virtual void advanceImpl(int until) {
-		if(this->done) return;
+		assert(!this->done);
+		assert(!this->foundRange);
 		assert_gt(rsFull_.minCost, 0);
-		if(rsFull_.done && !rsFull_.empty()) {
-			rsFull_.clearSources();
-			assert(rsFull_.empty());
-		}
 		// Advance the seed range source
-		if(rsSeed_->done && rsFull_.empty()) {
+		if(rsSeed_->done && rsFull_.done) {
 			this->done = true;
 			return;
 		}
 		if(rsSeed_->done && !rsSeed_->foundRange) {
 			rsSeed_->minCost = 0xffff;
 		}
+		if(rsFull_.done) rsFull_.minCost = 0xffff;
+		assert(!rsSeed_->done || !rsFull_.done);
 		// Extend a partial alignment
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
-		if(rsFull_.done || rsFull_.empty()) rsFull_.minCost = 0xffff;
 		assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
-		if(rsSeed_->minCost < rsFull_.minCost || rsFull_.empty()) {
+		if(rsSeed_->minCost < rsFull_.minCost) {
 			// Advance the partial-alignment generator
 			assert_eq(rsSeed_->minCost, this->minCost);
 			if(!rsSeed_->foundRange) rsSeed_->advance(until);
@@ -3334,8 +3332,7 @@ public:
 				EbwtRangeSourceDriver *partial = rsFact_->create();
 				partial->minCost = seedRange_->cost;
 				rsFull_.minCost = seedRange_->cost;
-				rsFull_.setQuery(patsrc_, seedRange_);
-				rsFull_.addSource(partial);
+				rsFull_.addSource(partial, seedRange_);
 				if(rsFull_.foundRange) {
 					this->foundRange = true;
 					rsFull_.foundRange = false;
@@ -3345,8 +3342,9 @@ public:
 			}
 			if(rsSeed_->minCost > this->minCost) {
 				this->minCost = rsSeed_->minCost;
-				if(!rsFull_.done && !rsFull_.empty()) {
+				if(!rsFull_.done) {
 					this->minCost = min(this->minCost, rsFull_.minCost);
+					assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
 				}
 			}
 		}
@@ -3391,11 +3389,15 @@ public:
 			}
 			// Ran out of ranges?
 			if(rsFull_.done) {
+				rsFull_.minCost = 0xffff;
 				if(rsSeed_->done) {
 					// No more full or partial alignments; done
 					this->done = true;
 				}
 				this->minCost = rsSeed_->minCost;
+			}
+			if(!this->done) {
+				assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
 			}
 		}
 	}
