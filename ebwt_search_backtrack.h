@@ -3319,7 +3319,7 @@ public:
 		// Extend a partial alignment
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
 		assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
-		bool doFull = rsFull_.foundRange || rsFull_.minCost <= rsSeed_->minCost;
+		bool doFull = rsFull_.minCost <= rsSeed_->minCost;
 		if(!doFull) {
 			// Advance the partial-alignment generator
 			assert_eq(rsSeed_->minCost, this->minCost);
