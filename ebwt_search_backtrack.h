@@ -3309,11 +3309,19 @@ public:
 		}
 		if(rsSeed_->done && !rsSeed_->foundRange) {
 			rsSeed_->minCost = 0xffff;
-			this->minCost = rsFull_.minCost;
+			if(rsFull_.minCost > this->minCost) {
+				this->minCost = rsFull_.minCost;
+				// Cost changed, so return
+				return;
+			}
 		}
 		if(rsFull_.done && !rsFull_.foundRange) {
 			rsFull_.minCost = 0xffff;
-			this->minCost = rsSeed_->minCost;
+			if(rsSeed_->minCost > this->minCost) {
+				this->minCost = rsSeed_->minCost;
+				// Cost changed, so return
+				return;
+			}
 		}
 		assert(rsSeed_->minCost != 0xffff || rsFull_.minCost != 0xffff);
 		// Extend a partial alignment
