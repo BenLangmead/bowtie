@@ -3356,6 +3356,12 @@ public:
 			}
 		} else {
 			// Extend a full alignment
+			assert(!rsFull_.done);
+			assert(!rsFull_.foundRange);
+			uint16_t oldFullCost = rsFull_.minCost;
+			if(!rsFull_.foundRange) {
+				rsFull_.advance(until);
+			}
 			// Found a minimum-cost range
 			if(rsFull_.foundRange) {
 				this->foundRange = true;
@@ -3364,15 +3370,6 @@ public:
 				assert_eq(range().cost, oldMinCost);
 				return;
 			}
-			assert(!rsFull_.done);
-			assert(!rsFull_.foundRange);
-			uint16_t oldFullCost = rsFull_.minCost;
-			rsFull_.advance(until);
-#ifndef NDEBUG
-			if(rsFull_.foundRange) {
-				assert_eq(oldFullCost, rsFull_.range().cost);
-			}
-#endif
 			assert_geq(rsFull_.minCost, oldFullCost);
 			// Did the min cost change?
 			if(rsFull_.minCost > oldFullCost) {
