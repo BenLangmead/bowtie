@@ -2239,6 +2239,7 @@ protected:
 							rss_[rssSz-1] = p;
 						}
 					}
+					break;
 				}
 			}
 			// OK, now we have a choice of two equally good ranges from

@@ -1160,7 +1160,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(maqLike) {
 		revcomp = true;
-	} else if(mismatches == 3 && !fullIndex) {
+	} else if(mismatches == 3 && fullIndex) {
 		// Much faster than normal 3-mismatch mode
 		stateful = true;
 	}
