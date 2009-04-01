@@ -297,7 +297,7 @@ static void printUsage(ostream& out) {
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
-	    << "  --better           alignments guaranteed best possible stratum (old --best)" << endl
+	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
 	    << "  --best             alignments guaranteed best stratum; tries broken by quality" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
 	    << "  --strandfix        attempt to fix strand biases" << endl
@@ -1160,6 +1160,9 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(maqLike) {
 		revcomp = true;
+	} else if(mismatches == 3 && !fullIndex) {
+		// Much faster than normal 3-mismatch mode
+		stateful = true;
 	}
 	if(mates1.size() != mates2.size()) {
 		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << mates2.size() << endl
