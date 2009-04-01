@@ -1900,6 +1900,7 @@ public:
 			delete rss_[i];
 		}
 		rss_.clear();
+		active_.clear();
 		paired_ = false;
 	}
 
