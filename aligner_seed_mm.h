@@ -125,7 +125,7 @@ public:
 				 halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rFw_FwSeedGen = new EbwtRangeSource(
 				&ebwtFw_, fw,  qualCutoff_, false, verbose_, seed_,
-				halfAndHalf, true,  maqPenalty_, qualOrder_, metrics_);
+				 halfAndHalf, true,  maqPenalty_, qualOrder_, metrics_);
 
 			EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, fw, false, maqPenalty_, qualOrder_,

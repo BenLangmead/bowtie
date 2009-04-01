@@ -3236,9 +3236,9 @@ public:
 			bool verbose,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFact_(rsFact), rsFull_(0, false, NULL, verbose), rsSeed_(rsSeed),
-			patsrc_(NULL), seedLen_(seedLen), fw_(fw), mate1_(mate1),
-			seedRange_(0)
+			rsFact_(rsFact), rsFull_(0, false, NULL, verbose, true),
+			rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen), fw_(fw),
+			mate1_(mate1), seedRange_(0)
 	{
 		assert(rsSeed_->seed());
 	}

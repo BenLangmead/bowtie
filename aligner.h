@@ -447,7 +447,7 @@ public:
 		}
 		// Still advancing a
 		if(!this->done && !chase_) {
-			assert(!driver_->done);
+			assert(!driver_->done || driver_->foundRange);
 			if(driver_->foundRange) {
 				const Range& ra = driver_->range();
 				assert(ra.repOk());
@@ -472,7 +472,7 @@ public:
 			} else {
 				driver_->advance(ADV_FOUND_RANGE);
 			}
-			if(driver_->done && !chase_) {
+			if(driver_->done && !driver_->foundRange && !chase_) {
 				this->done = true;
 			}
 		}

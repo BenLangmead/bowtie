@@ -1461,7 +1461,7 @@ class RangeSourceDriver {
 	typedef Ebwt<String<Dna> > TEbwt;
 public:
 	RangeSourceDriver(bool _done, uint32_t minCostAdjustment = 0) :
-		done(_done), minCostAdjustment_(minCostAdjustment)
+		foundRange(false), done(_done), minCostAdjustment_(minCostAdjustment)
 	{
 		minCost = minCostAdjustment_;
 	}
@@ -1836,46 +1836,26 @@ public:
 			uint32_t qseed,
 			bool strandFix,
 			const TRangeSrcDrPtrVec* rss,
-			bool verbose) :
+			bool verbose,
+			bool deleteOnDone = false) :
 		RangeSourceDriver<TRangeSource>(false),
-		rss_(), strandFix_(strandFix), rand_(qseed),
-		delayedRange_(NULL), patsrc_(NULL),
+		rss_(), active_(), strandFix_(strandFix), rand_(qseed),
+		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
 		r_(NULL), verbose_(verbose)
 	{
 		if(rss != NULL) {
 			rss_ = (*rss);
 		}
-		const size_t rssSz = rss_.size();
-		if(rssSz == 0) {
-			// Set some defaults; wait until more RangeSources are
-			// added to determine final settings
-			paired_ = false;
+		paired_ = false;
+		this->foundRange = false;
+		this->done = false;
+		if(rss_.empty()) {
 			return;
 		}
-		assert(!this->done);
-		bool saw1 = false;
-		bool saw2 = false;
-		for(size_t i = 0; i < rssSz; i++) {
-			if(rss_[i]->mate1()) saw1 = true;
-			else saw2 = true;
-		}
-		assert(saw1 || saw2);
-		paired_ = saw1 && saw2;
-		sortRss();
-		// Randomly swap consecutive elements with equal cost to
-		// remove bias present in the order in which drivers were
-		// added to the list
-		for(size_t i = 0; i < rssSz-1; i++) {
-			if(rss_[i]->minCost == rss_[i+1]->minCost) {
-				if((rand_.nextU32() & 0x10) == 0) {
-					TRangeSrcDrPtr p = rss_[i];
-					rss_[i] = rss_[i+1];
-					rss_[i+1] = p;
-					i++;
-				}
-			}
-		}
-		this->foundRange = false;
+		calcPaired();
+		active_ = rss_;
+		this->minCost = 0;
+		sortActives();
 	}
 
 	/// Destroy all underlying RangeSourceDrivers
@@ -1884,69 +1864,45 @@ public:
 		for(size_t i = 0; i < rssSz; i++) {
 			delete rss_[i];
 		}
+		rss_.clear();
+		active_.clear();
 	}
 
 	/// Set query to find ranges for
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
+		this->foundRange = false;
+		lastRange_ = NULL;
+		delayedRange_ = NULL;
 		ASSERT_ONLY(allTopsRc_.clear());
-		const size_t rssSz = rss_.size();
 		patsrc_ = patsrc;
 		r_ = r;
+		const size_t rssSz = rss_.size();
 		if(rssSz == 0) return;
 		for(size_t i = 0; i < rssSz; i++) {
 			// Assuming that all
 			rss_[i]->setQuery(patsrc, r);
 		}
-		sortRss();
-		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-		assert(sortedRss());
-		this->foundRange = false;
-		lastRange_ = NULL;
-		delayedRange_ = NULL;
-		assert(!this->foundRange || lastRange_ != NULL);
+		active_ = rss_;
+		this->minCost = 0;
+		sortActives();
 	}
 
 	/**
-	 * Add a new RangeSource to the list and re-sort it.  TODO: slide
-	 * it directly into the right spot instead.
+	 * Add a new RangeSource to the list and re-sort it.
 	 */
 	void addSource(TRangeSrcDrPtr p) {
 		assert(!this->foundRange);
-		rss_.push_back(p);
+		this->lastRange_ = NULL;
+		this->delayedRange_ = NULL;
 		if(patsrc_ != NULL) {
 			p->setQuery(patsrc_, r_);
 		}
-		const size_t rssSz = rss_.size();
-		if(rssSz > 1) sortRss();
-		bool saw1 = false;
-		bool saw2 = false;
-		for(size_t i = 0; i < rssSz; i++) {
-			if(rss_[i]->mate1()) saw1 = true;
-			else saw2 = true;
-		}
-		assert(saw1 || saw2);
-		paired_ = saw1 && saw2;
-		this->done = p->done;
-		if(p->minCost > this->minCost) {
-#ifndef NDEBUG
-			// The only case where the minCost should go up is if all
-			// the existing entries are done
-			for(size_t i = 0; i < rss_.size(); i++) {
-				assert(rss_[i]->done);
-			}
-#endif
-		}
-		this->minCost = p->minCost;
-		if(p->foundRange) {
-			Range *r = &p->range();
-			foundFirstRange(r);
-			assert(lastRange_ != NULL);
-			p->foundRange = false;
-		}
-		if(this->foundRange) {
-			assert(range().repOk());
-		}
+		rss_.push_back(p);
+		active_.push_back(p);
+		calcPaired();
+		this->minCost = 0;
+		sortActives();
 	}
 
 	/**
@@ -1958,6 +1914,7 @@ public:
 			delete rss_[i];
 		}
 		rss_.clear();
+		paired_ = false;
 	}
 
 	/**
@@ -1979,151 +1936,71 @@ public:
 	 * done with this read.
 	 */
 	virtual void advance(int until) {
-		ASSERT_ONLY(uint16_t preCost = this->minCost);
+		ASSERT_ONLY(uint16_t precost = this->minCost);
+		assert(!this->done);
 		assert(!this->foundRange);
+		until = max<int>(until, ADV_COST_CHANGES);
 		advanceImpl(until);
 		assert(!this->foundRange || lastRange_ != NULL);
 		if(this->foundRange) {
-			assert_geq(range().cost, preCost);
-			if(until >= ADV_COST_CHANGES) {
-				assert_eq(range().cost, preCost);
-			}
+			assert_eq(range().cost, precost);
 		}
 	}
 
-	/// Advance the range search by one memory op
+	/// Advance the range search
 	virtual void advanceImpl(int until) {
-		assert(!this->done);
-		const size_t rssSz = rss_.size();
-		assert(sortedRss());
-		assert_gt(rssSz, 0);
-		// RangeSourceDrivers should return from advance at least as
-		// often as the cost of the best path changes
-		until = max<int>(until, ADV_COST_CHANGES);
+		lastRange_ = NULL;
+		ASSERT_ONLY(uint16_t iminCost = this->minCost);
+		const size_t actSz = active_.size();
+		assert(sortedActives());
 		if(delayedRange_ != NULL) {
+			assert_eq(iminCost, delayedRange_->cost);
 			lastRange_ = delayedRange_;
 			delayedRange_ = NULL;
 			this->foundRange = true;
-			assert_geq(range().cost, this->minCost);
-			this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-			return;
-		}
-		if(rss_[0]->foundRange) {
-			// Should only happen on the very first call to advance()
-			Range *r = &rss_[0]->range();
-			assert_eq(this->minCost, r->cost);
-			foundFirstRange(r);
-			rss_[0]->foundRange = false;
-			return;
-		}
-		if(rss_[0]->done) {
-			TRangeSrcDrPtr p = rss_[0];
-			// If this RangeSourceDriver is done, rotate it to the back
-			// of the vector
-			bool fwsLeft = !paired_;
-			bool rcsLeft = !paired_;
-			for(size_t i = 0; i < rssSz-1; i++) {
-				rss_[i] = rss_[i+1];
-				if(!rss_[i]->done) {
-					if(rss_[i]->fw()) fwsLeft = true;
-					else rcsLeft = true;
-				}
-			}
-			rss_[rssSz-1] = p;
-			// Move on to next RangeSourceDriver
-			if(!rss_[0]->done && fwsLeft && rcsLeft) {
-				assert(fwsLeft || rcsLeft);
-				lastRange_ = NULL;
-				this->foundRange = false;
-				if(rss_[0]->foundRange) {
-					foundFirstRange(&rss_[0]->range());
-					assert(lastRange_ != NULL);
-					rss_[0]->foundRange = false;
-				}
-				if(delayedRange_ == NULL) {
-					// If there's a delayed range, then we shouldn't
-					// increase the minCost yet because there's another
-					// equal-cost range to hand out
-					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-				}
-				assert(sortedRss());
+			assert_eq(range().cost, iminCost);
+			if(!active_.empty()) {
+				assert_geq(active_[0]->minCost, this->minCost);
+				this->minCost = max(active_[0]->minCost, this->minCost);
 			} else {
-				// All RangeSourceDrivers are done
-				this->foundRange = false;
-				lastRange_ = NULL;
 				this->done = true;
 			}
-		} else {
-			// Advance current RangeSource
-			uint16_t precost = rss_[0]->minCost;
-			rss_[0]->advance(until);
-			assert_geq(rss_[0]->minCost, precost);
-			lastRange_ = NULL;
-			this->foundRange = false;
-			if(rss_[0]->foundRange) {
-				Range *r = &rss_[0]->range();
-				assert_eq(r->cost, precost);
-				foundFirstRange(r);
-				assert(lastRange_ != NULL);
-				rss_[0]->foundRange = false;
-			}
-			if(rss_[0]->done) {
-				TRangeSrcDrPtr p = rss_[0];
-				// If this RangeSourceDriver is done, rotate it to the back
-				// of the vector
-				bool fwsLeft = !paired_;
-				bool rcsLeft = !paired_;
-				for(size_t i = 0; i < rssSz-1; i++) {
-					rss_[i] = rss_[i+1];
-					if(!rss_[i]->done) {
-						if(rss_[i]->fw()) fwsLeft = true;
-						else rcsLeft = true;
-					}
-				}
-				rss_[rssSz-1] = p;
-				this->done = !(fwsLeft && rcsLeft);
-				if(delayedRange_ == NULL) {
-					// If there's a delayed range, then we shouldn't
-					// increase the minCost yet because there's another
-					// equal-cost range to hand out
-					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-				}
-			} else if(precost != rss_[0]->minCost) {
-				assert_gt(rss_[0]->minCost, precost);
-				// Remove and re-insert
-				TRangeSrcDrPtr p = rss_[0];
-				bool reinserted = false;
-				for(size_t i = 0; i < rssSz-1; i++) {
-					if(p->minCost > rss_[i+1]->minCost && !rss_[i+1]->done) {
-						// Keep shifting
-						rss_[i] = rss_[i+1];
-					} else {
-						// Stop here
-						rss_[i] = p;
-#ifndef NDEBUG
-						if(i > 0 && !rss_[i-1]->done) {
-							assert_geq(rss_[i]->minCost, rss_[i-1]->minCost);
-						}
-						if(!rss_[i+1]->done) {
-							assert_leq(rss_[i]->minCost, rss_[i+1]->minCost);
-						}
-#endif
-						reinserted = true;
-						break;
-					}
-				}
-				if(!reinserted) {
-					rss_[rssSz-1] = p;
-				}
-				if(delayedRange_ == NULL) {
-					// If there's a delayed range, then we shouldn't
-					// increase the minCost yet because there's another
-					// equal-cost range to hand out
-					this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-				}
-			}
-			assert(sortedRss());
+			return; // found a range
 		}
+		assert(delayedRange_ == NULL);
+		if(mateEliminated() || actSz == 0) {
+			// No more alternatoves; clear the active set and signal
+			// we're done
+			active_.clear();
+			this->done = true;
+			return;
+		}
+		// Advance lowest-cost RangeSourceDriver
+		TRangeSrcDrPtr p = active_[0];
+		ASSERT_ONLY(uint16_t precost = p->minCost);
+		assert(!p->done || p->foundRange);
+		if(!p->foundRange) {
+			p->advance(until);
+		}
+		bool needsSort = false;
+		if(p->foundRange) {
+			Range *r = &p->range();
+			assert_eq(r->cost, iminCost);
+			needsSort = foundFirstRange(r); // may set delayedRange_; re-sorts active_
+			assert_eq(lastRange_->cost, iminCost);
+			if(delayedRange_ != NULL) assert_eq(delayedRange_->cost, iminCost);
+			p->foundRange = false;
+		}
+		if(p->done || (precost != p->minCost) || needsSort) {
+			sortActives();
+			if(mateEliminated() || active_.empty()) {
+				active_.clear();
+				this->done = (delayedRange_ == NULL);
+			}
+		}
+		assert(sortedActives());
+		assert(lastRange_ == NULL || lastRange_->cost == iminCost);
+		assert(delayedRange_ == NULL || delayedRange_->cost == iminCost);
 	}
 
 	/// Return the last valid range found
@@ -2149,7 +2026,45 @@ public:
 
 protected:
 
+	/**
+	 * Set paired_ to true iff there are mate1 and mate2 range sources
+	 * in the rss_ vector.
+	 */
+	void calcPaired() {
+		const size_t rssSz = rss_.size();
+		bool saw1 = false;
+		bool saw2 = false;
+		for(size_t i = 0; i < rssSz; i++) {
+			if(rss_[i]->mate1()) saw1 = true;
+			else saw2 = true;
+		}
+		assert(saw1 || saw2);
+		paired_ = saw1 && saw2;
+	}
+
+	/**
+	 * Return true iff one mate or the other has been eliminated.
+	 */
+	bool mateEliminated() {
+		if(!paired_) return false;
+		bool mate1sLeft = false;
+		bool mate2sLeft = false;
+		// If this RangeSourceDriver is done, shift everyone else
+		// up and delete it
+		const size_t rssSz = active_.size();
+		for(size_t i = 0; i < rssSz-1; i++) {
+			if(!active_[i]->done) {
+				if(active_[i]->mate1()) mate1sLeft = true;
+				else mate2sLeft = true;
+			}
+		}
+		return !mate1sLeft || !mate2sLeft;
+	}
+
 #ifndef NDEBUG
+	/**
+	 * Check that the given range has not yet been reported.
+	 */
 	bool checkRange(Range* r) {
 		// Assert that we have not yet dished out a range with this
 		// top offset
@@ -2172,9 +2087,10 @@ protected:
 	/**
 	 * We found a range; check whether we should attempt to find a
 	 * range of equal quality from the opposite strand so that we can
-	 * resolve the strand bias.
+	 * resolve the strand bias.  Return true iff we modified the cost
+	 * of one or more items after the first item.
 	 */
-	void foundFirstRange(Range* r) {
+	bool foundFirstRange(Range* r) {
 		assert(r != NULL);
 		assert(checkRange(r));
 		this->foundRange = true;
@@ -2182,15 +2098,12 @@ protected:
 		if(strandFix_) {
 			// We found a range but there may be an equally good range
 			// on the other strand; let's try to get it.
-			const size_t rssSz = rss_.size();
-			for(size_t i = 1; i < rssSz; i++) {
-				// Ignore exhausted sources
-				if(rss_[i]->done) break;
+			const size_t sz = active_.size();
+			for(size_t i = 1; i < sz; i++) {
 				// Same mate, different orientation?
 				if(rss_[i]->mate1() == r->mate1 && rss_[i]->fw() != r->fw) {
 					// Yes; see if it has the same cost
-					TRangeSrcDrPtr p = rss_[i];
-					uint16_t origMinCost = p->minCost;
+					TRangeSrcDrPtr p = active_[i];
 					uint16_t minCost = max(this->minCost, p->minCost);
 					if(minCost > r->cost) break;
 					// Yes, it has the same cost
@@ -2200,6 +2113,7 @@ protected:
 					if(this->verbose_) cout << " Looking for opposite range to avoid strand bias:" << endl;
 					while(!p->done && !p->foundRange) {
 						p->advance(ADV_COST_CHANGES);
+						assert_geq(p->minCost, minCost);
 						if(p->minCost > minCost) break;
 					}
 					if(p->foundRange) {
@@ -2219,32 +2133,14 @@ protected:
 						}
 						p->foundRange = false;
 					}
-					if(p->done || p->minCost > origMinCost) {
-						// We modified the cost of this element, so we
-						// may have to re-insert it in order
-						bool reinserted = false;
-						// Put it where it belongs in the order
-						for(size_t j = i; j < rssSz-1; j++) {
-							if(p->done || (p->minCost > rss_[j+1]->minCost && !rss_[j+1]->done)) {
-								// Keep shifting
-								rss_[j] = rss_[j+1];
-							} else {
-								// Stop here
-								rss_[j] = p;
-								reinserted = true;
-								break;
-							}
-						}
-						if(!reinserted) {
-							rss_[rssSz-1] = p;
-						}
-					}
-					break;
+					// Return true iff we need to force a re-sort
+					return true;
 				}
 			}
 			// OK, now we have a choice of two equally good ranges from
 			// each strand.
 		}
+		return false;
 	}
 
 	/**
@@ -2253,58 +2149,51 @@ protected:
 	 * ties randomly.  Just do selection sort for now; we don't expect
 	 * the list to be long.
 	 */
-	void sortRss() {
-		const size_t rssSz = rss_.size();
-		// Move all done drivers to the end
-		size_t front = 0;
-		size_t back = rssSz-1;
-		while(front < back) {
-			// Skip over already-done guys at the back
-			if(rss_[back]->done) {
-				back--;
+	void sortActives() {
+		TRangeSrcDrPtrVec& vec = active_;
+		size_t sz = vec.size();
+		// Selection sort / removal outer loop
+		for(size_t i = 0; i < sz;) {
+			// Remove elements that we're done with
+			if(vec[i]->done && !vec[i]->foundRange) {
+				vec.erase(vec.begin() + i);
+				if(sz == 0) break;
+				else sz--;
 				continue;
 			}
-			assert(!rss_[back]->done);
-			if(rss_[front]->done) {
-				// Swap front and back
-				TRangeSrcDrPtr tmp = rss_[front];
-				rss_[front] = rss_[back];
-				rss_[back] = tmp;
-				back--;
-			}
-			front++;
-		}
-		// Selection sort outer loop
-		for(size_t i = 0; i < rssSz-1; i++) {
-			if(rss_[i]->done) break;
-			uint16_t minCost = rss_[i]->minCost;
+			uint16_t minCost = vec[i]->minCost;
 			size_t minOff = i;
 			// Selection sort inner loop
-			for(size_t j = i+1; j < rssSz; j++) {
-				if(rss_[j]->done) break;
-				if(rss_[j]->minCost < minCost) {
-					minCost = rss_[j]->minCost;
+			for(size_t j = i+1; j < sz; j++) {
+				if(vec[j]->done && !vec[j]->foundRange) {
+					// We'll get rid of this guy later
+					continue;
+				}
+				if(vec[j]->minCost < minCost) {
+					minCost = vec[j]->minCost;
 					minOff = j;
-				} else if(rss_[j]->minCost == minCost) {
+				} else if(vec[j]->minCost == minCost) {
 					// Possibly randomly pick the other
 					if(rand_.nextU32() & 0x1000) {
-						// TODO: how even is this?
 						minOff = j;
 					}
 				}
 			}
 			// Do the swap, if necessary
 			if(i != minOff) {
-				assert_leq(minCost, rss_[i]->minCost);
-				TRangeSrcDrPtr tmp = rss_[i];
-				rss_[i] = rss_[minOff];
-				rss_[minOff] = tmp;
-			} else {
-				assert_eq(minCost, rss_[i]->minCost);
+				assert_leq(minCost, vec[i]->minCost);
+				TRangeSrcDrPtr tmp = vec[i];
+				vec[i] = vec[minOff];
+				vec[minOff] = tmp;
 			}
+			i++;
 		}
-		this->minCost = max(rss_[0]->minCost, this->minCostAdjustment_);
-		assert(sortedRss());
+		if(delayedRange_ == NULL) {
+			assert_geq(this->minCost, this->minCostAdjustment_);
+			assert_geq(vec[0]->minCost, this->minCost);
+			this->minCost = vec[0]->minCost;
+		}
+		assert(sortedActives());
 	}
 
 #ifndef NDEBUG
@@ -2312,27 +2201,22 @@ protected:
 	 * Check that the rss_ array is sorted by minCost; assert if it's
 	 * not.
 	 */
-	bool sortedRss() {
+	bool sortedActives() const {
 		// Selection sort outer loop
-		const size_t rssSz = rss_.size();
-		if(rssSz == 0) return true;
-		if(rssSz > 1) {
-			for(size_t i = 0; i < rssSz-1; i++) {
-				for(size_t j = i+1; j < rssSz; j++) {
-					if(rss_[i]->done) assert(rss_[j]->done);
-					else {
-						if(rss_[j]->done) break;
-						assert_leq(rss_[i]->minCost, rss_[j]->minCost);
-					}
-				}
+		const TRangeSrcDrPtrVec& vec = active_;
+		const size_t sz = vec.size();
+		for(size_t i = 0; i < sz; i++) {
+			assert(!vec[i]->done || vec[i]->foundRange);
+			for(size_t j = i+1; j < sz; j++) {
+				assert(!vec[j]->done || vec[j]->foundRange);
+				assert_leq(vec[i]->minCost, vec[j]->minCost);
 			}
 		}
 		if(delayedRange_ == NULL) {
 			// Only assert this if there's no delayed range; if there's
 			// a delayed range, the minCost is its cost, not the 0th
 			// element's cost
-			uint32_t minCostTmp = max(rss_[0]->minCost, this->minCostAdjustment_);
-			assert_eq(this->minCost, minCostTmp);
+			assert_leq(vec[0]->minCost, this->minCost);
 		}
 		return true;
 	}
@@ -2340,6 +2224,8 @@ protected:
 
 	/// List of all the drivers
 	TRangeSrcDrPtrVec rss_;
+	/// List of all the as-yet-uneliminated drivers
+	TRangeSrcDrPtrVec active_;
 	/// Whether the list of drivers contains drivers for both mates 1 and 2
 	bool paired_;
 	/// If true, this driver will make an attempt to dish out ranges in
