@@ -3301,19 +3301,26 @@ public:
 		assert(!this->foundRange);
 		assert_gt(rsFull_.minCost, 0);
 		// Advance the seed range source
-		if(rsSeed_->done && rsFull_.done) {
+		if(rsSeed_->done && rsFull_.done &&
+		   !rsSeed_->foundRange && !rsFull_.foundRange)
+		{
 			this->done = true;
 			return;
 		}
 		if(rsSeed_->done && !rsSeed_->foundRange) {
 			rsSeed_->minCost = 0xffff;
+			this->minCost = rsFull_.minCost;
 		}
-		if(rsFull_.done) rsFull_.minCost = 0xffff;
-		assert(!rsSeed_->done || !rsFull_.done);
+		if(rsFull_.done && !rsFull_.foundRange) {
+			rsFull_.minCost = 0xffff;
+			this->minCost = rsSeed_->minCost;
+		}
+		assert(rsSeed_->minCost != 0xffff || rsFull_.minCost != 0xffff);
 		// Extend a partial alignment
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
 		assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
-		if(rsSeed_->minCost < rsFull_.minCost) {
+		bool doFull = rsFull_.foundRange || rsFull_.minCost <= rsSeed_->minCost;
+		if(!doFull) {
 			// Advance the partial-alignment generator
 			assert_eq(rsSeed_->minCost, this->minCost);
 			if(!rsSeed_->foundRange) rsSeed_->advance(until);
@@ -3347,57 +3354,32 @@ public:
 					assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
 				}
 			}
-		}
-		// Extend a full alignment
-		else {
+		} else {
+			// Extend a full alignment
 			// Found a minimum-cost range
 			if(rsFull_.foundRange) {
 				this->foundRange = true;
 				rsFull_.foundRange = false;
 				assert(rsFull_.range().repOk());
 				assert_eq(range().cost, oldMinCost);
+				return;
 			}
-			// Ran out of ranges?
-			if(rsFull_.done) {
-				if(rsSeed_->done) {
-					// No more full or partial alignments; done
-					this->done = true;
-				}
-				this->minCost = rsSeed_->minCost;
-			}
+			assert(!rsFull_.done);
 			assert(!rsFull_.foundRange);
-			if(!rsFull_.done) {
-				ASSERT_ONLY(uint16_t oldFullCost = rsFull_.minCost);
-				rsFull_.advance(until);
-				if(rsFull_.foundRange) {
-					assert_eq(oldFullCost, rsFull_.range().cost);
-				}
+			uint16_t oldFullCost = rsFull_.minCost;
+			rsFull_.advance(until);
+#ifndef NDEBUG
+			if(rsFull_.foundRange) {
+				assert_eq(oldFullCost, rsFull_.range().cost);
 			}
-			assert_geq(rsFull_.minCost, oldMinCost);
+#endif
+			assert_geq(rsFull_.minCost, oldFullCost);
 			// Did the min cost change?
-			if(!rsFull_.done && rsFull_.minCost > this->minCost) {
+			if(rsFull_.minCost > oldFullCost) {
 				// If a range was found, hold on to it and save it for
 				// later.  Update the minCost.
+				assert(!rsSeed_->done || rsSeed_->minCost == 0xffff);
 				this->minCost = min(rsFull_.minCost, rsSeed_->minCost);
-			}
-			// Found a minimum-cost range
-			if(rsFull_.foundRange) {
-				this->foundRange = true;
-				rsFull_.foundRange = false;
-				assert(rsFull_.range().repOk());
-				assert_eq(range().cost, oldMinCost);
-			}
-			// Ran out of ranges?
-			if(rsFull_.done) {
-				rsFull_.minCost = 0xffff;
-				if(rsSeed_->done) {
-					// No more full or partial alignments; done
-					this->done = true;
-				}
-				this->minCost = rsSeed_->minCost;
-			}
-			if(!this->done) {
-				assert_eq(this->minCost, min<uint16_t>(rsSeed_->minCost, rsFull_.minCost));
 			}
 		}
 	}
