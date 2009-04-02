@@ -36,6 +36,47 @@ enum {
 };
 
 /**
+ * Calculate a per-read random seed based on a combination of
+ * the read data (incl. sequence, name, quals) and the global
+ * seed in '_randSeed'.
+ */
+static inline uint32_t genRandSeed(const String<Dna5>& qry,
+                                   const String<char>& qual,
+                                   const String<char>& name)
+{
+	// Calculate a per-read random seed based on a combination of
+	// the read data (incl. sequence, name, quals) and the global
+	// seed
+	uint32_t rseed = 0;
+	size_t qlen = seqan::length(qry);
+	// Throw all the characters of the read into the random seed
+	for(size_t i = 0; i < qlen; i++) {
+		int p = (int)qry[i];
+		assert_leq(p, 4);
+		size_t off = ((i & 15) << 1);
+		rseed |= (p << off);
+	}
+	// Throw all the quality values for the read into the random
+	// seed
+	for(size_t i = 0; i < qlen; i++) {
+		int p = (int)qual[i];
+		assert_leq(p, 255);
+		size_t off = ((i & 3) << 3);
+		rseed |= (p << off);
+	}
+	// Throw all the characters in the read name into the random
+	// seed
+	size_t namelen = seqan::length(name);
+	for(size_t i = 0; i < namelen; i++) {
+		int p = (int)name[i];
+		assert_leq(p, 255);
+		size_t off = ((i & 3) << 3);
+		rseed |= (p << off);
+	}
+	return rseed;
+}
+
+/**
  * A buffer for keeping all relevant information about a single read.
  * Each search thread has one.
  */
@@ -182,14 +223,7 @@ struct ReadBuf {
 	char          nameBuf[BUF_SIZE];   // read name buffer
 	uint32_t      patid;               // unique 0-based id based on order in read file(s)
 	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
-};
-
-/**
- * Struct encapsulating a pair of mates.
- */
-struct ReadBufPair {
-	ReadBuf a; // first mate (from -1 arg)
-	ReadBuf b; // second mate (from -2 arg)
+	uint32_t      seed;                // random seed
 };
 
 /**
@@ -266,6 +300,7 @@ public:
 			// Construct the reversed versions of the fw and rc seqs
 			// and quals
 			r.constructReverse();
+			r.seed = genRandSeed(r.patFw, r.qualFw, r.name);
 			// If it's this class's responsibility to reverse the pattern,
 			// do so here.  Usually it's the responsibility of one of the
 			// concrete subclasses, since they can usually do it more

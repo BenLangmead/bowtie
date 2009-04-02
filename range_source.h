@@ -1825,7 +1825,8 @@ public:
 			bool verbose,
 			bool deleteOnDone = false) :
 		RangeSourceDriver<TRangeSource>(false),
-		rss_(), active_(), strandFix_(strandFix), rand_(qseed),
+		rss_(), active_(), strandFix_(strandFix), randSeed_(qseed),
+		rand_(qseed),
 		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
 		verbose_(verbose)
 	{
@@ -1869,6 +1870,7 @@ public:
 			rss_[i]->setQuery(patsrc, r);
 		}
 		active_ = rss_;
+		rand_.init(patsrc->bufa().seed);
 		this->minCost = 0;
 		sortActives();
 	}
@@ -2219,6 +2221,7 @@ protected:
 	/// a way that approaches the right distribution based on the
 	/// number of hits on both strands.
 	bool strandFix_;
+	uint32_t randSeed_;
 	/// The random seed from the Aligner, which we use to randomly break ties
 	RandomSource rand_;
 	Range *lastRange_;

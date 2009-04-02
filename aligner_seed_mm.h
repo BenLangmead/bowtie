@@ -155,7 +155,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-				drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+				drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 
 			fw = false;
 
@@ -197,7 +197,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 			EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-				drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, true);
+				drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, true);
 
 			if(doFw_) {
 				drVec->push_back(drFw_Bw);
@@ -249,7 +249,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-				drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+				drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 			EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 				*params, rFw_BwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -299,7 +299,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-				drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, true);
+				drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, true);
 			EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 				*params, rRc_FwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				seedLen_,   // seedLen
@@ -383,7 +383,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drFw_Seed03 = new EbwtSeededRangeSourceDriver(
-				drFw_BwSeed03, drFw_FwSeedGen03, fw, seedLen_, verbose_, mate1);
+				drFw_BwSeed03, drFw_FwSeedGen03, seed_, fw, seedLen_, verbose_, mate1);
 
 			EbwtRangeSourceDriverFactory * drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
 				*params, rFw_BwSeed12, fw, false, maqPenalty_, qualOrder_,
@@ -404,7 +404,7 @@ public:
 				PIN_TO_SEED_EDGE,    // 1 or 2 mismatches in hi-half
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drFw_Seed12 = new EbwtSeededRangeSourceDriver(
-				drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+				drFw_BwSeed12, drFw_FwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 
 			EbwtRangeSourceDriver * drFw_BwHalf12 = new EbwtRangeSourceDriver(
 				*params, rFw_BwHalf12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -475,7 +475,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drRc_Seed03 = new EbwtSeededRangeSourceDriver(
-				drRc_FwSeed03, drRc_BwSeedGen03, fw, seedLen_, verbose_, mate1);
+				drRc_FwSeed03, drRc_BwSeedGen03, seed_, fw, seedLen_, verbose_, mate1);
 
 			EbwtRangeSourceDriverFactory * drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
 				*params, rRc_FwSeed12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -496,7 +496,7 @@ public:
 				PIN_TO_SEED_EDGE,
 				os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 			EbwtSeededRangeSourceDriver * drRc_Seed12 = new EbwtSeededRangeSourceDriver(
-				drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+				drRc_FwSeed12, drRc_BwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 
 			EbwtRangeSourceDriver * drRc_FwHalf12 = new EbwtRangeSourceDriver(
 				*params, rRc_FwHalf12, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -783,7 +783,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+					drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				dr1FwVec->push_back(drFw_Bw);
 				dr1FwVec->push_back(drFw_Seed);
 			}
@@ -827,7 +827,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+					drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				dr2FwVec->push_back(drFw_Bw);
 				dr2FwVec->push_back(drFw_Seed);
 			}
@@ -871,7 +871,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+					drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				dr1RcVec->push_back(drRc_Fw);
 				dr1RcVec->push_back(drRc_Seed);
 			}
@@ -915,7 +915,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, NULL); // no backtrack limit for -n 1/2
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+					drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				dr2RcVec->push_back(drRc_Fw);
 				dr2RcVec->push_back(drRc_Seed);
 			}
@@ -964,7 +964,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+					drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriverFactory * drFw_BwSeed12 = NULL;
 				if(!two) {
 					drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
@@ -992,7 +992,7 @@ public:
 				EbwtSeededRangeSourceDriver * drFw_Seed12 = NULL;
 				if(!two) {
 					drFw_Seed12 = new EbwtSeededRangeSourceDriver(
-						drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+						drFw_BwSeed12, drFw_FwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 				}
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 					*params, rFw_BwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -1054,7 +1054,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drFw_Seed = new EbwtSeededRangeSourceDriver(
-					drFw_BwSeed, drFw_FwSeedGen, fw, seedLen_, verbose_, mate1);
+					drFw_BwSeed, drFw_FwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriverFactory * drFw_BwSeed12 = NULL;
 				if(!two) {
 					drFw_BwSeed12 = new EbwtRangeSourceDriverFactory(
@@ -1082,7 +1082,7 @@ public:
 				EbwtSeededRangeSourceDriver * drFw_Seed12 = NULL;
 				if(!two) {
 					drFw_Seed12 = new EbwtSeededRangeSourceDriver(
-						drFw_BwSeed12, drFw_FwSeedGen12, fw, seedLen_, verbose_, mate1);
+						drFw_BwSeed12, drFw_FwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 				}
 				EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 					*params, rFw_BwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -1144,7 +1144,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+					drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriverFactory * drRc_FwSeed12 = NULL;
 				if(!two) {
 					drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
@@ -1172,7 +1172,7 @@ public:
 				EbwtSeededRangeSourceDriver * drRc_Seed12 = NULL;
 				if(!two) {
 					drRc_Seed12 = new EbwtSeededRangeSourceDriver(
-						drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+						drRc_FwSeed12, drRc_BwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 				}
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 					*params, rRc_FwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -1234,7 +1234,7 @@ public:
 					PIN_TO_SEED_EDGE,
 					os_, verbose_, seed_, mate1, bpool, rpool, epool, btCnt);
 				EbwtSeededRangeSourceDriver * drRc_Seed = new EbwtSeededRangeSourceDriver(
-					drRc_FwSeed, drRc_BwSeedGen, fw, seedLen_, verbose_, mate1);
+					drRc_FwSeed, drRc_BwSeedGen, seed_, fw, seedLen_, verbose_, mate1);
 				EbwtRangeSourceDriverFactory * drRc_FwSeed12 = NULL;
 				if(!two) {
 					drRc_FwSeed12 = new EbwtRangeSourceDriverFactory(
@@ -1262,7 +1262,7 @@ public:
 				EbwtSeededRangeSourceDriver * drRc_Seed12 = NULL;
 				if(!two) {
 					drRc_Seed12 = new EbwtSeededRangeSourceDriver(
-						drRc_FwSeed12, drRc_BwSeedGen12, fw, seedLen_, verbose_, mate1);
+						drRc_FwSeed12, drRc_BwSeedGen12, seed_, fw, seedLen_, verbose_, mate1);
 				}
 				EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 					*params, rRc_FwHalf, fw, false, maqPenalty_, qualOrder_, sink_, sinkPt,

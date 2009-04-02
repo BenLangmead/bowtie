@@ -3232,12 +3232,13 @@ public:
 	EbwtSeededRangeSourceDriver(
 			EbwtRangeSourceDriverFactory* rsFact,
 			EbwtRangeSourceDriver* rsSeed,
+			uint32_t qseed,
 			bool fw,
 			uint32_t seedLen,
 			bool verbose,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFact_(rsFact), rsFull_(0, false, NULL, verbose, true),
+			rsFact_(rsFact), rsFull_(qseed, false, NULL, verbose, true),
 			rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen), fw_(fw),
 			mate1_(mate1), seedRange_(0)
 	{

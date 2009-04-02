@@ -149,47 +149,6 @@ static bool validPartialAlignment(PartialAlignment pa) {
 }
 #endif
 
-/**
- * Calculate a per-read random seed based on a combination of
- * the read data (incl. sequence, name, quals) and the global
- * seed in '_randSeed'.
- */
-static inline uint32_t genRandSeed(const String<Dna5>& qry,
-                                   const String<char>& qual,
-                                   const String<char>& name)
-{
-	// Calculate a per-read random seed based on a combination of
-	// the read data (incl. sequence, name, quals) and the global
-	// seed
-	uint32_t rseed = 0;
-	size_t qlen = seqan::length(qry);
-	// Throw all the characters of the read into the random seed
-	for(size_t i = 0; i < qlen; i++) {
-		int p = (int)qry[i];
-		assert_leq(p, 4);
-		size_t off = ((i & 15) << 1);
-		rseed |= (p << off);
-	}
-	// Throw all the quality values for the read into the random
-	// seed
-	for(size_t i = 0; i < qlen; i++) {
-		int p = (int)qual[i];
-		assert_leq(p, 255);
-		size_t off = ((i & 3) << 3);
-		rseed |= (p << off);
-	}
-	// Throw all the characters in the read name into the random
-	// seed
-	size_t namelen = seqan::length(name);
-	for(size_t i = 0; i < namelen; i++) {
-		int p = (int)name[i];
-		assert_leq(p, 255);
-		size_t off = ((i & 3) << 3);
-		rseed |= (p << off);
-	}
-	return rseed;
-}
-
 extern
 void printHit(const vector<String<Dna5> >& os,
 			  const Hit& h,
