@@ -3708,7 +3708,8 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  */
 template<typename TStr>
 TStr Ebwt<TStr>::join(vector<TStr>& l, int32_t chunkRate, uint32_t seed) {
-	RandomSource rand(seed); // reproducible given same seed
+	RandomSource rand; // reproducible given same seed
+	rand.init(seed);
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
@@ -3763,7 +3764,8 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
                       int32_t chunkRate,
                       uint32_t seed)
 {
-	RandomSource rand(seed); // reproducible given same seed
+	RandomSource rand; // reproducible given same seed
+	rand.init(seed);
 	RefReadInParams rpcp = refparams;
 	uint32_t chunkLen = 1 << chunkRate;
 	uint32_t chunkMask = 0xffffffff << chunkRate;
@@ -3844,7 +3846,8 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
                             ostream& out2,
                             uint32_t seed = 0)
 {
-	RandomSource rand(seed); // reproducible given same seed
+	RandomSource rand; // reproducible given same seed
+	rand.init(seed);
 	const EbwtParams& eh = this->_eh;
 	RefReadInParams rpcp = refparams;
 	assert_gt(szs.size(), 0);
