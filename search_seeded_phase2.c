@@ -17,7 +17,7 @@
 		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
 	}
 
-	btf2.setQuery(&patFw, &qualFw, &name);
+	btf2.setQuery(patsrc->bufa());
 	// Set up seed bounds
 	if(qs < s) {
 		btf2.setOffs(0, 0,
@@ -68,7 +68,7 @@
 					(seedMms > 2)? s3 : s,
 					(seedMms > 3)? s3 : s);
 	}
-	btr2.setQuery(&patRc, &qualRc, &name);
+	btr2.setQuery(patsrc->bufa());
 	btr2.setQlen(s); // just look at the seed
 	// Find partial alignments for case 4R
 	ASSERT_ONLY(bool done =) btr2.backtrack();

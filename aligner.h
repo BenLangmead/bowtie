@@ -30,9 +30,9 @@
  */
 class Aligner {
 public:
-	Aligner(bool _done, bool rangeMode, uint32_t seed) :
+	Aligner(bool _done, bool rangeMode) :
 		done(_done), patsrc_(NULL), bufa_(NULL), bufb_(NULL),
-		rangeMode_(rangeMode), seed_(seed)
+		rangeMode_(rangeMode)
 	{ }
 
 	virtual ~Aligner() { }
@@ -48,8 +48,7 @@ public:
 		bufb_ = &patsrc->bufb();
 		alen_ = bufa_->length();
 		blen_ = (bufb_ != NULL) ? bufb_->length() : 0;
-		qseed_ = seed_ + genRandSeed(bufa_->patFw, bufa_->qualFw, bufa_->name);
-		rand_.init(qseed_);
+		rand_.init(bufa_->seed);
 	}
 
 	/**
@@ -66,10 +65,7 @@ protected:
 	uint32_t alen_;
 	ReadBuf* bufb_;
 	uint32_t blen_;
-	// RandomSource for choosing alignments to report from ranges
 	bool rangeMode_;
-	uint32_t seed_;
-	uint32_t qseed_; // query-specific seed
 	RandomSource rand_;
 };
 
@@ -331,14 +327,13 @@ public:
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
-		uint32_t seed,
 		int maxBts,
 		AllocOnlyPool<Branch> *bpool,
 		RangeStatePool *rpool,
 		AllocOnlyPool<Edit> *epool,
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
-		Aligner(true, rangeMode, seed),
+		Aligner(true, rangeMode),
 		doneFirst_(true),
 		firstIsFw_(true),
 		chase_(false),
@@ -383,11 +378,10 @@ public:
 		bpool_->reset();
 		epool_->reset();
 		driver_->setQuery(patsrc, NULL);
-		rchase_->initRand(qseed_);
 		this->done = driver_->done;
 		doneFirst_ = false;
 		if(btCnt_ != NULL) *btCnt_ = maxBts_;
-		firstIsFw_ = ((qseed_ & 0x10) == 0);
+		firstIsFw_ = ((patsrc->bufa().seed & 0x10) == 0);
 		chase_ = false;
 	}
 
@@ -455,7 +449,7 @@ public:
 					this->done = report(ra, ra.top, ra.bot, 0);
 					driver_->foundRange = false;
 				} else {
-					rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
+					rchase_->setTopBot(ra.top, ra.bot, alen_, rand_, ra.ebwt);
 					if(rchase_->foundOff()) {
 						this->done = report(
 								ra, rchase_->off().first,
@@ -527,9 +521,8 @@ public:
 		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
 		bool rangeMode,
-		bool verbose,
-		uint32_t seed) :
-		Aligner(true, rangeMode, seed),
+		bool verbose) :
+		Aligner(true, rangeMode),
 		doneFirst_(true),
 		firstIsFw_(true),
 		chaseFw_(false), chaseRc_(false),
@@ -561,10 +554,9 @@ public:
 		Aligner::setQuery(patsrc); // set fields & random seed
 		driverFw_->setQuery(patsrc);
 		driverRc_->setQuery(patsrc);
-		rchase_->initRand(qseed_);
 		this->done = false;
 		doneFirst_ = false;
-		firstIsFw_ = ((qseed_ & 0x10) == 0);
+		firstIsFw_ = ((patsrc->bufa().seed & 0x10) == 0);
 		chaseFw_ = false;
 		chaseRc_ = false;
 	}
@@ -763,13 +755,12 @@ public:
 		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
-		uint32_t seed,
 		int maxBts,
 		AllocOnlyPool<Branch> *bpool,
 		RangeStatePool *rpool,
 		AllocOnlyPool<Edit> *epool,
 		int *btCnt) :
-		Aligner(true, rangeMode, seed),
+		Aligner(true, rangeMode),
 		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
 		chase1Fw_(false), chase1Rc_(false),
@@ -900,7 +891,6 @@ public:
 		delayedChase1Rc_ = false;
 		delayedChase2Fw_ = false;
 		delayedChase2Rc_ = false;
-		rchase_->initRand(qseed_);
 		// Clear all intermediate ranges
 		for(size_t i = 0; i < 32; i++) {
 			offs1FwArr_[i].clear();   offs1RcArr_[i].clear();
@@ -1283,7 +1273,7 @@ protected:
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
 					uint32_t qlen = doneFw_? qlen1_ : qlen2_;
-					rchase_->setTopBot(top, bot, qlen, r.ebwt);
+					rchase_->setTopBot(top, bot, qlen, rand_, r.ebwt);
 					*chaseR_ = true;
 					*delayedchaseR_ = false;
 				}
@@ -1334,7 +1324,7 @@ protected:
 					uint32_t top = r.top;
 					uint32_t bot = r.bot;
 					uint32_t qlen = doneFw_? qlen2_ : qlen1_;
-					rchase_->setTopBot(top, bot, qlen, r.ebwt);
+					rchase_->setTopBot(top, bot, qlen, rand_, r.ebwt);
 					*chaseL_ = true;
 					*delayedchaseL_ = false;
 				}
@@ -1396,14 +1386,14 @@ protected:
 							const Range& r = drR_->range();
 							assert(r.repOk());
 							uint32_t qlen = doneFw_? qlen1_ : qlen2_;
-							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
+							rchase_->setTopBot(r.top, r.bot, qlen, rand_, r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
 							*chaseL_ = true;
 							const Range& r = drL_->range();
 							uint32_t qlen = doneFw_? qlen2_ : qlen1_;
-							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
+							rchase_->setTopBot(r.top, r.bot, qlen, rand_, r.ebwt);
 						}
 					}
 				}
@@ -1460,7 +1450,7 @@ protected:
 							const Range& r = drL_->range();
 							assert(r.repOk());
 							uint32_t qlen = doneFw_? qlen2_ : qlen1_;
-							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
+							rchase_->setTopBot(r.top, r.bot, qlen, rand_, r.ebwt);
 						} else {
 							// Use Burrows-Wheeler for this pair (as
 							// usual)
@@ -1468,7 +1458,7 @@ protected:
 							const Range& r = drR_->range();
 							assert(r.repOk());
 							uint32_t qlen = doneFw_? qlen1_ : qlen2_;
-							rchase_->setTopBot(r.top, r.bot, qlen, r.ebwt);
+							rchase_->setTopBot(r.top, r.bot, qlen, rand_, r.ebwt);
 						}
 					}
 				}
@@ -1651,9 +1641,8 @@ public:
 		uint32_t mixedAttemptLim,
 		const BitPairReference* refs,
 		bool rangeMode,
-		bool verbose,
-		uint32_t seed) :
-		Aligner(true, rangeMode, seed),
+		bool verbose) :
+		Aligner(true, rangeMode),
 		refs_(refs), patsrc_(NULL), qlen_(0),
 		chase_(false),
 		refAligner_(refAligner),
@@ -1696,7 +1685,6 @@ public:
 		this->done = false;
 		// No ranges are being chased yet
 		chase_ = false;
-		rchase_->initRand(qseed_);
 		pairs_fw_.clear();
 		pairs_rc_.clear();
 	}

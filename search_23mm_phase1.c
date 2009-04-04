@@ -21,7 +21,7 @@
 	}
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	btr1.setQuery(&patFw, &qualFw, &name);
+	btr1.setQuery(patsrc->bufa());
 	btr1.setOffs(0, 0, plen, plen, plen, plen);
 	if(btr1.backtrack()) {
 		DONEMASK_SET(patid);
@@ -29,7 +29,7 @@
 	}
 	// Set up backtracker with reverse complement
 	params.setFw(false);
-	btr1.setQuery(&patRc, &qualRc, &name);
+	btr1.setQuery(patsrc->bufa());
 	// Set up the revisitability of the halves
 	btr1.setOffs(0, 0, s5, s5, two ? s : s5, s);
 	if(btr1.backtrack()) {

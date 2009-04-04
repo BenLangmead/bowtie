@@ -9,7 +9,7 @@
 	params.setFw(true);
 	bt2.setReportExacts(false);
 
-	bt2.setQuery(&patFw, &qualFw, &name);
+	bt2.setQuery(patsrc->bufa());
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s5, s5, two? s : s5, s);
 	if(bt2.backtrack()) {
@@ -24,7 +24,7 @@
 
 	// Try 2/3 backtracks in the 3' half of the reverse complement read
 	params.setFw(false);  // looking at reverse complement
-	bt2.setQuery(&patRc, &qualRc, &name);
+	bt2.setQuery(patsrc->bufa());
 	// Set up the revisitability of the halves
 	bt2.setOffs(0, 0, s3, s3, two? s : s3, s);
 	if(bt2.backtrack()) {

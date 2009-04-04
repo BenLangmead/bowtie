@@ -13,7 +13,7 @@
 		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
 	}
 
-	btr3.setQuery(&patRc, &qualRc, &name);
+	btr3.setQuery(patsrc->bufa());
 	// Get all partial alignments for this read's reverse
 	// complement
 	pals.clear();
@@ -68,7 +68,7 @@
 	// halves of the seed.
 	bool gaveUp = false;
 	if(seedMms >= 2) {
-		btr23.setQuery(&patRc, &qualRc, &name);
+		btr23.setQuery(patsrc->bufa());
 		// Set up special seed bounds
 		if(qs < s) {
 			btr23.setOffs(qs5, qs,
@@ -101,7 +101,7 @@
 	// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, 3R and
 	// 4R have been eliminated leaving only 4F.
 	params.setFw(true);  // looking at forward strand
-	btf3.setQuery(&patFw, &qualFw, &name);
+	btf3.setQuery(patsrc->bufa());
 	btf3.setQlen(seedLen); // just look at the seed
 	// Set up seed bounds
 	if(qs < s) {

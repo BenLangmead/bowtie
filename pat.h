@@ -28,13 +28,6 @@ using namespace seqan;
 /// Constructs string base-10 representation of integer 'value'
 extern char* itoa10(int value, char* result);
 
-/// Wildcard policies
-enum {
-	NS_TO_NS    = 1, // Ns stay Ns and don't match anything
-	NS_TO_AS    = 2, // Ns become As
-	NS_TO_RANDS = 3  // Ns become random characters
-};
-
 /**
  * Calculate a per-read random seed based on a combination of
  * the read data (incl. sequence, name, quals) and the global
@@ -789,13 +782,13 @@ public:
 		numReads_(numReads),
 		length_(length),
 		seed_(seed),
-		rand_(seed),
 		reverse_(false)
 	{
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << length_ << endl;
 			exit(1);
 		}
+		rand_.init(seed_);
 	}
 
 	/** Get the next random read and set patid */
@@ -888,14 +881,14 @@ public:
 		length_(length),
 		numthreads_(numthreads),
 		thread_(thread),
-		reverse_(reverse),
-		rand_(thread_)
+		reverse_(reverse)
 	{
 		patid_ = thread_;
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSourcePerThread may not exceed 1024; got " << length_ << endl;
 			exit(1);
 		}
+		rand_.init(thread_);
 	}
 
 	virtual void nextReadPair() {
@@ -1039,12 +1032,10 @@ public:
 	                    const char *dumpfile = NULL,
 	                    int trim3 = 0,
 	                    int trim5 = 0,
-		                int npolicy = NS_TO_NS,
-		                uint32_t skip = 0,
-	                    uint32_t seed = 0) :
+		                uint32_t skip = 0) :
 		TrimmingPatternSource(false, randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
 		reverse_(reverse), cur_(skip), skip_(skip),
-		v_(), vrev_(), vrc_(), vrcrev_(), quals_(), qualsrev_(), rand_(seed)
+		v_(), vrev_(), vrc_(), vrcrev_(), quals_(), qualsrev_()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
@@ -1064,19 +1055,6 @@ public:
 				// Trim on 3' (low-quality) end
 				if(trim3_ > 0) {
 					s.erase(s.length()-trim3_);
-				}
-			}
-			// Count Ns and possibly reject
-			for(size_t j = 0; j < s.length(); j++) {
-				if(s[j] == 'N' || s[j] == 'n') {
-					if(npolicy == NS_TO_NS) {
-						// Leave s[j] == 'N'
-					} else if(npolicy == NS_TO_RANDS) {
-						s[j] = "ACGT"[rand_.nextU32() & 3];
-					} else {
-						assert_eq(NS_TO_AS, npolicy);
-						s[j] = 'A';
-					}
 				}
 			}
 			//  Initialize vq
@@ -1183,7 +1161,6 @@ private:
 	vector<String<char> > quals_;    /// quality values parallel to v_
 	vector<String<char> > qualsrev_; /// quality values parallel to vrev_
 	vector<String<char> > names_;    /// names
-	RandomSource rand_;
 };
 
 /**
@@ -1325,14 +1302,12 @@ public:
 	                   const char *dumpfile = NULL,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   int npolicy = NS_TO_NS,
 	                   bool __forgiveInput = false,
-	                   uint32_t skip = 0,
-	                   uint32_t seed = 0) :
+	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, false, randomizeQuals, useSpinlock,
 		                          __forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
-		first_(true), reverse_(reverse), policy_(npolicy), rand_(seed)
+		first_(true), reverse_(reverse)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -1416,16 +1391,6 @@ protected:
 							 << "reads and re-run Bowtie";
 						exit(1);
 					}
-					if(c == 'N' || c == 'n') {
-						if(policy_ == NS_TO_NS) {
-							// Leave c = 'N'
-						} else if(policy_ == NS_TO_RANDS) {
-							c = "ACGT"[rand_.nextU32() & 3];
-						} else {
-							assert_eq(NS_TO_AS, policy_);
-							c = 'A';
-						}
-					}
 					r.patBufFw [dstLen] = charToDna5[c];
 					r.qualBufFw[dstLen] = 'I';
 					r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
@@ -1452,16 +1417,6 @@ protected:
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 							 << "reads and re-run Bowtie";
 						exit(1);
-					}
-					if(c == 'N' || c == 'n') {
-						if(policy_ == NS_TO_NS) {
-							// Leave c = 'N'
-						} else if(policy_ == NS_TO_RANDS) {
-							c = "ACGT"[rand_.nextU32() & 3];
-						} else {
-							assert_eq(NS_TO_AS, policy_);
-							c = 'A';
-						}
 					}
 					r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
 					r.qualBufFw[bufSz-dstLen-1] = 'I';
@@ -1507,7 +1462,6 @@ private:
 	bool first_;
 	bool reverse_;
 	int policy_;
-	RandomSource rand_;
 };
 
 /**
@@ -1523,13 +1477,12 @@ public:
 	        bool reverse = false,
 	        bool useSpinlock = true,
 	        const char *dumpfile = NULL,
-	        int npolicy = NS_TO_NS,
 	        uint32_t skip = 0,
 	        uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, false, useSpinlock,
 		                          false, dumpfile, 0, 0, skip),
 		length_(length), freq_(freq), reverse_(reverse),
-		policy_(npolicy), eat_(length_), bufCur_(0), rand_(seed)
+		eat_(length_), bufCur_(0)
 	{
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
 	}
@@ -1609,8 +1562,6 @@ private:
 	char buf_[1024];    /// read buffer
 	size_t bufCur_;     /// buffer cursor; points to where we should
 	                    /// insert the next character
-
-	RandomSource rand_;
 };
 
 extern void wrongQualityScale();
@@ -1630,20 +1581,16 @@ public:
 	                   const char *dumpfile = NULL,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   int npolicy = NS_TO_NS,
 	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
 					   bool integer_quals = true,
-					   uint32_t skip = 0,
-	                   uint32_t seed = 0) :
+					   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, false, randomizeQuals, useSpinlock,
 		                          __forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
 		first_(true), reverse_(reverse),
 		solQuals_(solexa_quals),
-		intQuals_(integer_quals),
-		policy_(npolicy),
-		rand_(seed)
+		intQuals_(integer_quals)
 	{
 		for (int l = 0; l != 128; ++l) {
 			table_[l] = (int)(10.0 * log(1.0 + pow(10.0, (l - 64) / 10.0)) / log(10.0) + .499);
@@ -1780,17 +1727,6 @@ protected:
 								 << "reads and re-run Bowtie";
 							exit(1);
 						}
-						// Add it to the read buffer
-						if(c == 'N' || c == 'n') {
-							if(policy_ == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(policy_ == NS_TO_RANDS) {
-								c = "ACGT"[rand_.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, policy_);
-								c = 'A';
-							}
-						}
 						r.patBufFw[dstLen] = charToDna5[c];
 						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
 						dstLen++;
@@ -1820,17 +1756,6 @@ protected:
 							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 								 << "reads and re-run Bowtie";
 							exit(1);
-						}
-						// Add it to the read buffer
-						if(c == 'N' || c == 'n') {
-							if(policy_ == NS_TO_NS) {
-								// Leave c = 'N'
-							} else if(policy_ == NS_TO_RANDS) {
-								c = "ACGT"[rand_.nextU32() & 3];
-							} else {
-								assert_eq(NS_TO_AS, policy_);
-								c = 'A';
-							}
 						}
 						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
 						r.patBufRc[dstLen] = rcCharToDna5[c];
@@ -2116,7 +2041,6 @@ private:
 	bool intQuals_;
 	int policy_;
 	int table_[128];
-	RandomSource rand_;
 };
 
 /**
@@ -2131,12 +2055,10 @@ public:
 	                 const char *dumpfile = NULL,
 	                 int trim3 = 0,
 	                 int trim5 = 0,
-	                 int npolicy = NS_TO_NS,
-	                 uint32_t skip = 0,
-	                 uint32_t seed = 0) :
+	                 uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, false, randomizeQuals, false, useSpinlock,
 		                          dumpfile, trim3, trim5, skip),
-		first_(true), reverse_(reverse), policy_(npolicy), rand_(seed)
+		first_(true), reverse_(reverse)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -2180,16 +2102,6 @@ protected:
 							 << "Please truncate reads and and re-run Bowtie";
 						exit(1);
 					}
-					if(c == 'N' || c == 'n') {
-						if(policy_ == NS_TO_NS) {
-							// Leave c = 'N'
-						} else if(policy_ == NS_TO_RANDS) {
-							c = "ACGT"[rand_.nextU32() & 3];
-						} else {
-							assert_eq(NS_TO_AS, policy_);
-							c = 'A';
-						}
-					}
 					r.patBufFw [len] = charToDna5[c];
 					r.qualBufFw[len] = 'I';
 					r.patBufRc [bufSz-len-1] = rcCharToDna5[c];
@@ -2219,16 +2131,6 @@ protected:
 						cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
 							 << "Please truncate reads and and re-run Bowtie";
 						exit(1);
-					}
-					if(c == 'N' || c == 'n') {
-						if(policy_ == NS_TO_NS) {
-							// Leave c = 'N'
-						} else if(policy_ == NS_TO_RANDS) {
-							c = "ACGT"[rand_.nextU32() & 3];
-						} else {
-							assert_eq(NS_TO_AS, policy_);
-							c = 'A';
-						}
 					}
 					r.patBufFw [bufSz-len-1] = charToDna5[c];
 					r.qualBufFw[bufSz-len-1] = 'I';
@@ -2281,7 +2183,6 @@ private:
 	bool first_;
 	bool reverse_;
 	int policy_;
-	RandomSource rand_;
 };
 
 #endif /*PAT_H_*/

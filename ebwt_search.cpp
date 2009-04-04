@@ -65,7 +65,6 @@ static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
 static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
 static int maxBtsBetter         = 125; // max # backtracks allowed in half-and-half mode
 static int maxBts               = 800; // max # backtracks allowed in half-and-half mode
-static int nsPolicy             = NS_TO_NS; // policy for handling no-confidence bases
 static int nthreads             = 1;     // number of pthreads operating concurrently
 static output_types outType		= FULL;  // style of output
 static bool randReadsNoSync     = false; // true -> generate reads from per-thread random source
@@ -204,7 +203,6 @@ static struct option long_options[] = {
 	{"qsamelen",     no_argument,       &qSameLen,    1},
 	{"reportopps",   no_argument,       &reportOpps,  1},
 	{"version",      no_argument,       &showVersion, 1},
-	{"ntoa",         no_argument,       &nsPolicy,    NS_TO_AS},
 	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{"revcomp",      no_argument,       0,            'r'},
 	{"maqerr",       required_argument, 0,            'e'},
@@ -1269,16 +1267,17 @@ static char *argv0 = NULL;
 	if(p->empty() || p->patid() >= qUpto) break; \
 	assert(!empty(p->bufa().patFw)); \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
+	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patRc  = p->bufa().patRc;  \
+	patRc.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& qualFw = p->bufa().qualFw; \
+	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& qualRc = p->bufa().qualRc; \
+	qualRc.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
+	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();       \
-	params.setPatId(patid); \
-	if(lastLen == 0) lastLen = seqan::length(patFw); \
-	if(qSameLen && seqan::length(patFw) != lastLen) { \
-		throw runtime_error("All reads must be the same length"); \
-	}
+	params.setPatId(patid);
 
 /// Macro for getting the forward oriented version of next read,
 /// possibly aborting depending on whether the result is empty or the
@@ -1290,13 +1289,12 @@ static char *argv0 = NULL;
 	params.setPatId(p->patid()); \
 	assert(!empty(p->bufa().patFw)); \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
+	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& qualFw = p->bufa().qualFw; \
+	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
-	uint32_t      patid  = p->patid();     \
-	if(lastLen == 0) lastLen = seqan::length(patFw); \
-	if(qSameLen && seqan::length(patFw) != lastLen) { \
-		throw runtime_error("All reads must be the same length"); \
-	}
+	name.data_begin += 0; /* suppress "unused" compiler warning */ \
+	uint32_t      patid  = p->patid();
 
 #ifdef BOWTIE_PTHREADS
 #define WORKER_EXIT() \
@@ -1391,7 +1389,6 @@ static void *exactSearchWorker(void *vp) {
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
 	// Per-thread initialization
-	uint32_t lastLen = 0;
 	PatternSourcePerThread *patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
@@ -1411,7 +1408,6 @@ static void *exactSearchWorker(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -1605,7 +1601,6 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
@@ -1625,7 +1620,6 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -1652,7 +1646,6 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
@@ -1672,7 +1665,6 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed+1,         // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -1882,7 +1874,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	uint32_t lastLen = 0; // for checking if all reads have same length
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
 	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
 	EbwtSearchParams<String<Dna> > params(
@@ -1902,7 +1893,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -2135,7 +2125,6 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
-	uint32_t lastLen = 0; \
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
 	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
 	/* Per-thread initialization */ \
@@ -2163,7 +2152,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
@@ -2200,7 +2188,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
 	bool skipped = false;
@@ -2237,7 +2224,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
@@ -2251,7 +2237,6 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+5,         // seed
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
@@ -2475,7 +2460,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 	        NULL,           // mutations
 	        verbose,        // verbose
-	        seed,           // seed
 	        &os,
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt2(
@@ -2489,7 +2473,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+1,         // seed
 		    &os,
 		    false);         // considerQuals
 	GreedyDFSRangeSource bt3(
@@ -2503,7 +2486,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+3,         // seed
 		    &os,
 		    false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
@@ -2517,7 +2499,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        NULL,           // seedlings
 		    NULL,           // mutations
 	        verbose,        // verbose
-		    seed+5,         // seed
 		    &os,
 		    false,          // considerQuals
 		    true);          // halfAndHalf
@@ -2636,7 +2617,6 @@ static BitPairReference*        seededQualSearch_refs;
 	HitSink&                 _sink      = *seededQualSearch_sink;      \
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;        \
 	int                      qualCutoff = seededQualSearch_qualCutoff; \
-	uint32_t lastLen = 0; \
 	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
 	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
 	/* Per-thread initialization */ \
@@ -2667,7 +2647,6 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        NULL,                  // partials
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
@@ -2680,7 +2659,6 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        NULL,                  // partials
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        seed,                  // seed
 	        &os,
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2719,7 +2697,6 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+1,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2734,7 +2711,6 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+2,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2776,7 +2752,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+3,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2792,7 +2767,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-		    seed+4,  // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2807,7 +2781,6 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
 		    true,    // halfAndHalf
@@ -2851,7 +2824,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        seed+6,  // seed
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
@@ -2866,7 +2838,6 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals
 	        true,    // halfAndHalf
@@ -2912,7 +2883,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        seed,                  // seed
 	        &os,
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
@@ -2925,7 +2895,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // seedlings
 	        NULL,                  // mutations
 	        verbose,               // verbose
-	        seed,                  // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2940,7 +2909,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,                  // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+1,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2955,7 +2923,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        pamRc,                 // partial alignment manager
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+2,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2970,7 +2937,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        pamFw,                 // seedlings
 		    NULL,                  // mutations
 	        verbose,               // verbose
-		    seed+3,                // seed
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
@@ -2986,7 +2952,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-		    seed+4,  // seed
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
@@ -3001,7 +2966,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-		    seed+5,  // seed
 		    &os,
 		    true,    // considerQuals
 		    true,    // halfAndHalf
@@ -3018,7 +2982,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        seed+6,  // seed
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
@@ -3033,7 +2996,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        NULL,    // seedlings
 		    NULL,    // mutations
 	        verbose, // verbose
-	        seed+7,  // seed
 	        &os,
 	        true,    // considerQuals
 	        true,    // halfAndHalf
@@ -3464,31 +3426,31 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			return new FastaPatternSource (qs, false, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, forgiveInput,
+			                               forgiveInput,
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
 			                               qs, 28, 1, false,
 			                               useSpinlock,
-			                               patDumpfile, nsPolicy,
+			                               patDumpfile,
 			                               skipReads);
 		case RAW:
 			return new RawPatternSource   (qs, false, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, skipReads);
+			                               skipReads);
 		case FASTQ:
 			return new FastqPatternSource (qs, false, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
-			                               nsPolicy, forgiveInput,
+			                               forgiveInput,
 			                               solexa_quals,
 			                               integer_quals, skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(qs, false, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3,
-			                               trim5, nsPolicy, skipReads);
+			                               trim5, skipReads);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,

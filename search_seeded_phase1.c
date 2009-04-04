@@ -28,31 +28,29 @@
 	}
 	// Check and see if the distribution of Ns disqualifies
 	// this read right off the bat
-	if(nsPolicy == NS_TO_NS) {
-		size_t slen = min<size_t>(plen, seedLen);
-		int ns = 0;
-		bool done = false;
-		for(size_t i = 0; i < slen; i++) {
-			if((int)(Dna5)patFw[i] == 4) {
-				if(++ns > seedMms) {
-					// Set 'done' so that
-					done = true;
-					break;
-				}
+	size_t slen = min<size_t>(plen, seedLen);
+	int ns = 0;
+	bool done = false;
+	for(size_t i = 0; i < slen; i++) {
+		if((int)(Dna5)patFw[i] == 4) {
+			if(++ns > seedMms) {
+				// Set 'done' so that
+				done = true;
+				break;
 			}
 		}
-		if(done) {
-			ASSERT_NO_HITS_FW(true);
-			ASSERT_NO_HITS_RC(true);
-			DONEMASK_SET(patid);
-			skipped = true;
-			sink->finishRead(*patsrc, true);
-			continue;
-		}
+	}
+	if(done) {
+		ASSERT_NO_HITS_FW(true);
+		ASSERT_NO_HITS_RC(true);
+		DONEMASK_SET(patid);
+		skipped = true;
+		sink->finishRead(*patsrc, true);
+		continue;
 	}
 	// Do an exact-match search on the forward pattern, just in
 	// case we can pick it off early here
-	btf1.setQuery(&patFw, &qualFw, &name);
+	btf1.setQuery(patsrc->bufa());
 	btf1.setOffs(0, plen, plen, plen, plen, plen);
 	if(btf1.backtrack()) {
 		DONEMASK_SET(patid);
@@ -73,7 +71,7 @@
 						  (seedMms > 2)? s5 : s,
 						  (seedMms > 3)? s5 : s);
 	}
-	bt1.setQuery(&patRc, &qualRc, &name);
+	bt1.setQuery(patsrc->bufa());
 	if(bt1.backtrack()) {
 		// If we reach here, then we obtained a hit for case
 		// 1R, 2R or 3R and can stop considering this read

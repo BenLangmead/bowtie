@@ -10,7 +10,7 @@
 	bt3.setReportExacts(false);
 
 	// Try 2/3 backtracks in the 3' half of the forward read
-	bt3.setQuery(&patFw, &qualFw, &name);
+	bt3.setQuery(patsrc->bufa());
 	bt3.setOffs(0, 0,
 	            s3,
 	            s3,
@@ -26,7 +26,7 @@
 
 	// Try a half-and-half on the forward read
 	bool gaveUp = false;
-	bthh3.setQuery(&patFw, &qualFw, &name);
+	bthh3.setQuery(patsrc->bufa());
 	// Processing the forward pattern with the forward index;
 	// s3 ("lo") half is on the right
 	bthh3.setOffs(s3, s,
@@ -49,7 +49,7 @@
 	// Try a half-and-half on the reverse complement read
 	gaveUp = false;
 	params.setFw(false);
-	bthh3.setQuery(&patRc, &qualRc, &name);
+	bthh3.setQuery(patsrc->bufa());
 	// Processing the forward pattern with the forward index;
 	// s5 ("hi") half is on the right
 	bthh3.setOffs(s5, s,

@@ -5,10 +5,10 @@
  * paired and unpaired alignment.
  */
 {
-	uint32_t plen = length(patFw);
+	uint32_t plen = length(patsrc->bufa().patFw);
 	// Process forward-oriented read
 	bt.setOffs(0, 0, plen, plen, plen, plen);
-	bt.setQuery(&patFw, &qualFw, &name);
+	bt.setQuery(patsrc->bufa());
 	bool hit = bt.backtrack();
 	// If the forward direction matched exactly, ignore the
 	// reverse complement
@@ -18,7 +18,7 @@
 	if(!revcomp) continue;
 	// Process reverse-complement read
 	params.setFw(false);
-	bt.setQuery(&patRc, &qualRc, &name);
+	bt.setQuery(patsrc->bufa());
 	bt.backtrack();
 	params.setFw(true);
 }

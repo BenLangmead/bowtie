@@ -73,9 +73,9 @@ public:
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 			*params, rFw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -85,7 +85,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
+			os_, verbose_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
 			*params, rRc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -94,20 +94,20 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
+			os_, verbose_, true, bpool, rpool, epool, NULL);
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) drVec->push_back(driverFw);
 		if(doRc_) drVec->push_back(driverRc);
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(seed_, strandFix_, drVec, verbose_);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
+			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			seed_, INT_MAX, bpool, rpool, epool, NULL, NULL);
+			INT_MAX, bpool, rpool, epool, NULL, NULL);
 	}
 
 private:
@@ -194,17 +194,13 @@ public:
 		RangeStatePool *rpool = new RangeStatePool(1 * 1024 * 1024);
 		AllocOnlyPool<Edit> *epool = new AllocOnlyPool<Edit>((1 << 20), "edit");
 
-		AllocOnlyPool<Branch> *bpool2 = new AllocOnlyPool<Branch>((1 << 20), "branch");
-		RangeStatePool *rpool2 = new RangeStatePool(1 * 1024 * 1024);
-		AllocOnlyPool<Edit> *epool2 = new AllocOnlyPool<Edit>((1 << 20), "edit");
-
 		const int halfAndHalf = 0;
 		const bool seeded = false;
 
 		EbwtRangeSource *r1Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *r1Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
 			*params, r1Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -214,7 +210,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
+			os_, verbose_, true, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
 			*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -223,12 +219,12 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, true, bpool, rpool, epool, NULL);
+			os_, verbose_, true, bpool, rpool, epool, NULL);
 
 		EbwtRangeSource *r2Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *r2Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, seed_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
 			*params, r2Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -238,7 +234,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false, bpool2, rpool2, epool2, NULL);
+			os_, verbose_, false, bpool, rpool, epool, NULL);
 		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
 			*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -247,20 +243,20 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, seed_, false, bpool2, rpool2, epool2, NULL);
+			os_, verbose_, false, bpool, rpool, epool, NULL);
 
 		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
-			new RangeChaser<String<Dna> >(seed_, cacheLimit_, cacheFw_, cacheBw_);
+			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
 		return new PairedBWAlignerV1<EbwtRangeSource>(
 			params,
 			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_, seed_,
+			mixedAttemptLim_, refs_, rangeMode_, verbose_,
 			INT_MAX, bpool, rpool, epool, NULL);
 	}
 

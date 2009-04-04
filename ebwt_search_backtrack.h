@@ -31,7 +31,6 @@ public:
 			PartialAlignmentManager* __partials = NULL,
 			String<QueryMutation>* __muts = NULL,
 			bool __verbose = true,
-			uint32_t seed = 0,
 			vector<String<Dna5> >* __os = NULL,
 			bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
 			bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
@@ -70,8 +69,6 @@ public:
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
-		_rand(seed),
-		_randSeed(seed),
 		_verbose(__verbose),
 		_ihits(0llu)
 	{ }
@@ -85,13 +82,17 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	void setQuery(String<Dna5>* __qry,
-	              String<char>* __qual,
-	              String<char>* __name)
-	{
-		_qry = __qry;
-		_qual = __qual;
-		_name = __name;
+	void setQuery(ReadBuf& r) {
+		const bool fw = _params.fw();
+		const bool ebwtFw = _ebwt->fw();
+		if(ebwtFw) {
+			_qry  = fw ? &r.patFw : &r.patRc;
+			_qual = fw ? &r.qualFw : &r.qualRc;
+		} else {
+			_qry  = fw ? &r.patFwRev : &r.patRcRev;
+			_qual = fw ? &r.qualFwRev : &r.qualRcRev;
+		}
+		_name = &r.name;
 		assert(_qry != NULL);
 		assert(_qual != NULL);
 		assert(_name != NULL);
@@ -131,7 +132,7 @@ public:
 		}
 		// Initialize the random source using new read as part of the
 		// seed.
-		_rand.init(genRandSeed(*_qry, *_qual, *_name) + _randSeed);
+		_rand.init(r.seed);
 	}
 
 	/**
@@ -2016,7 +2017,7 @@ protected:
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry
-	String<char>*       _name;   // name of _qry
+	String<char>* _name;         // name of _qry
 	const Ebwt<String<Dna> >*   _ebwt;   // Ebwt to search in
 	const EbwtSearchParams<String<Dna> >& _params;   // Ebwt to search in
 	uint32_t            _unrevOff; // unrevisitable chunk
@@ -2082,8 +2083,6 @@ protected:
 	bool                _bailedOnBacktracks;
 	/// Source of pseudo-random numbers
 	RandomSource        _rand;
-	/// Seed for random number generator
-	uint32_t            _randSeed;
 	/// Be talkative
 	bool                _verbose;
 	uint64_t            _ihits;
@@ -2113,7 +2112,6 @@ public:
 			uint32_t     qualLim,
 			bool         reportExacts,
 			bool         verbose,
-			uint32_t     seed,
 			int          halfAndHalf,
 			bool         partial,
 			bool         maqPenalty,
@@ -2138,8 +2136,6 @@ public:
 		partial_(partial),
 		depth5_(0),
 		depth3_(0),
-		rand_(seed),
-		randSeed_(seed),
 		verbose_(verbose),
 		skippingThisRead_(false),
 		metrics_(metrics)
@@ -2148,14 +2144,16 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	virtual void setQuery(String<Dna5>* qry,
-	                      String<char>* qual,
-	                      String<char>* name,
-	                      Range *seedRange)
-	{
-		qry_ = qry;
-		qual_ = qual;
-		name_ = name;
+	virtual void setQuery(ReadBuf& r, Range *seedRange) {
+		const bool ebwtFw = ebwt_->fw();
+		if(ebwtFw) {
+			qry_  = fw_ ? &r.patFw : &r.patRc;
+			qual_ = fw_ ? &r.qualFw : &r.qualRc;
+		} else {
+			qry_  = fw_ ? &r.patFwRev : &r.patRcRev;
+			qual_ = fw_ ? &r.qualFwRev : &r.qualRcRev;
+		}
+		name_ = &r.name;
 		seedRange_ = seedRange;
 		assert(qry_ != NULL);
 		assert(qual_ != NULL);
@@ -2186,9 +2184,7 @@ public:
 		assert_geq(length(*qual_), qlen_);
 		this->done = false;
 		this->foundRange = false;
-		// Initialize the random source using new read as part of the
-		// seed.
-		rand_.init(genRandSeed(*qry_, *qual_, *name_) + randSeed_);
+		rand_.init(r.seed);
 	}
 
 	/**
@@ -2871,8 +2867,6 @@ protected:
 	uint32_t            depth3_;
 	/// Source of pseudo-random numbers
 	RandomSource        rand_;
-	/// Seed for random number generator
-	uint32_t            randSeed_;
 	/// Be talkative
 	bool                verbose_;
 	// Current range to expose to consumers
@@ -2902,7 +2896,6 @@ public:
 			uint32_t     qualThresh,
 			bool         reportExacts,
 			bool         verbose,
-			uint32_t     seed,
 			bool         halfAndHalf,
 			bool         seeded,
 			bool         maqPenalty,
@@ -2913,7 +2906,6 @@ public:
 			qualThresh_(qualThresh),
 			reportExacts_(reportExacts),
 			verbose_(verbose),
-			seed_(seed),
 			halfAndHalf_(halfAndHalf),
 			seeded_(seeded),
 			maqPenalty_(maqPenalty),
@@ -2925,7 +2917,7 @@ public:
 	 */
 	EbwtRangeSource *create() {
 		return new EbwtRangeSource(ebwt_, fw_, qualThresh_,
-		                           reportExacts_, verbose_, seed_,
+		                           reportExacts_, verbose_,
 		                           halfAndHalf_, seeded_, maqPenalty_,
 		                           qualOrder_, metrics_);
 	}
@@ -2936,7 +2928,6 @@ protected:
 	uint32_t     qualThresh_;
 	bool         reportExacts_;
 	bool         verbose_;
-	uint32_t     seed_;
 	bool         halfAndHalf_;
 	bool         seeded_;
 	bool         maqPenalty_;
@@ -2981,7 +2972,6 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
-			uint32_t randSeed,
 			bool mate1,
 			AllocOnlyPool<Branch>* bpool,
 			RangeStatePool* rpool,
@@ -2989,7 +2979,7 @@ public:
 			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose,
-					randSeed, mate1, 0, bpool, rpool, epool, btCnt),
+					mate1, 0, bpool, rpool, epool, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -3015,6 +3005,7 @@ public:
 	virtual void initRangeSource(const String<char>& qual) {
 		// If seedLen_ is huge, then it will always cover the whole
 		// alignment
+		assert_eq(len_, seqan::length(qual));
 		uint32_t s = (seedLen_ > 0 ? min(seedLen_, len_) : len_);
 		uint32_t sLeft  = s >> 1;
 		uint32_t sRight = s >> 1;
@@ -3051,7 +3042,7 @@ public:
 				}
 				assert_lt(lowQual, 0xff);
 				assert_geq(lowQual, 33);
-				minCost += mmPenalty(maqPenalty_, lowQual - 33);
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual));
 			}
 		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < (s-1)) {
 			// Half-and-half constraints are active, so there must be
@@ -3153,7 +3144,6 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
-			uint32_t randSeed,
 			bool mate1,
 			AllocOnlyPool<Branch>* bpool,
 			RangeStatePool* rpool,
@@ -3175,7 +3165,6 @@ public:
 			rev3Off_(rev3Off),
 			os_(os),
 			verbose_(verbose),
-			randSeed_(randSeed),
 			mate1_(mate1),
 			bpool_(bpool),
 			rpool_(rpool),
@@ -3192,7 +3181,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
 				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				randSeed_, mate1_, bpool_, rpool_, epool_, btCnt_);
+				mate1_, bpool_, rpool_, epool_, btCnt_);
 	}
 
 protected:
@@ -3212,7 +3201,6 @@ protected:
 	SearchConstraintExtent rev3Off_;
 	vector<String<Dna5> >& os_;
 	bool verbose_;
-	uint32_t randSeed_;
 	bool mate1_;
 	AllocOnlyPool<Branch>* bpool_;
 	RangeStatePool* rpool_;
@@ -3232,13 +3220,12 @@ public:
 	EbwtSeededRangeSourceDriver(
 			EbwtRangeSourceDriverFactory* rsFact,
 			EbwtRangeSourceDriver* rsSeed,
-			uint32_t qseed,
 			bool fw,
 			uint32_t seedLen,
 			bool verbose,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFact_(rsFact), rsFull_(qseed, false, NULL, verbose, true),
+			rsFact_(rsFact), rsFull_(false, NULL, verbose, true),
 			rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen), fw_(fw),
 			mate1_(mate1), seedRange_(0)
 	{
@@ -3333,7 +3320,9 @@ public:
 		if(!doFull) {
 			// Advance the partial-alignment generator
 			assert_eq(rsSeed_->minCost, this->minCost);
-			if(!rsSeed_->foundRange) rsSeed_->advance(until);
+			if(!rsSeed_->foundRange) {
+				rsSeed_->advance(until);
+			}
 			if(rsSeed_->foundRange) {
 				assert_eq(this->minCost, rsSeed_->range().cost);
 				assert_eq(oldMinCost, rsSeed_->range().cost);
@@ -3378,7 +3367,6 @@ public:
 				rsFull_.foundRange = false;
 				assert(rsFull_.range().repOk());
 				assert_eq(range().cost, oldMinCost);
-				return;
 			}
 			assert_geq(rsFull_.minCost, oldFullCost);
 			// Did the min cost change?

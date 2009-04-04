@@ -16,7 +16,7 @@
 	}
 
 	// First, try exact hits for the forward-oriented read
-	bt.setQuery(&patFw, &qualFw, &name);
+	bt.setQuery(patsrc->bufa());
 	bt.setOffs(0, 0, s, s, s, s);
 	if(bt.backtrack()) {
 		DONEMASK_SET(patid);
@@ -26,7 +26,7 @@
 	params.setFw(false);
 
 	// Next, try exact hits for the reverse-complement read
-	bt.setQuery(&patRc, &qualRc, &name);
+	bt.setQuery(patsrc->bufa());
 	bt.setOffs(0, 0, s, s, s, s);
 	if(bt.backtrack()) {
 		DONEMASK_SET(patid);
@@ -40,7 +40,7 @@
 	bt.setReportExacts(false);
 
 	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	bt.setQuery(&patRc, &qualRc, &name);
+	bt.setQuery(patsrc->bufa());
 	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
 		DONEMASK_SET(patid);
@@ -50,7 +50,7 @@
 	params.setFw(true);
 
 	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	bt.setQuery(&patFw, &qualFw, &name);
+	bt.setQuery(patsrc->bufa());
 	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
 	if(bt.backtrack()) {
 		DONEMASK_SET(patid);

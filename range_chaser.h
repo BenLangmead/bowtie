@@ -26,14 +26,13 @@ class RangeChaser {
 	typedef RowChaser<TStr> TRowChaser;
 
 public:
-	RangeChaser(uint32_t seed, uint32_t cacheThresh,
+	RangeChaser(uint32_t cacheThresh,
 	            RangeCache* cacheFw, RangeCache* cacheBw,
 	            AlignerMetrics *metrics = NULL) :
 		done(false),
 		ebwt_(NULL),
 		qlen_(0),
 		cacheThresh_(cacheThresh),
-		rand_(seed),
 		top_(0xffffffff),
 		bot_(0xffffffff),
 		irow_(0xffffffff),
@@ -153,6 +152,7 @@ public:
 	void setTopBot(uint32_t top,
 	               uint32_t bot,
 	               uint32_t qlen,
+	               RandomSource& rand,
 	               const TEbwt* ebwt)
 	{
 		assert_neq(0xffffffff, top);
@@ -165,7 +165,7 @@ public:
 		top_ = top;
 		bot_ = bot;
 		uint32_t spread = bot - top;
-		irow_ = top + (rand_.nextU32() % spread); // initial row
+		irow_ = top + (rand.nextU32() % spread); // initial row
 		done = false;
 		cached_ = false;
 		reset();
@@ -272,13 +272,6 @@ public:
 		return tlen_;
 	}
 
-	/**
-	 * Re-initialize pseudo-random number generator.
-	 */
-	void initRand(uint32_t seed) {
-		rand_.init(seed);
-	}
-
 	bool done;             /// true = chase is done & answer is in off_
 
 protected:
@@ -286,7 +279,6 @@ protected:
 	const TEbwt* ebwt_;    /// index to resolve row in
 	uint32_t qlen_;        /// length of read; needed to convert to ref. coordinates
 	uint32_t cacheThresh_; /// ranges wider than thresh use cacheing
-	RandomSource rand_;    /// pseudo-random number generator
 	uint32_t top_;         /// range top
 	uint32_t bot_;         /// range bottom
 	uint32_t irow_;        /// initial randomly-chosen row within range

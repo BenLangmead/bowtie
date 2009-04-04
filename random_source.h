@@ -10,22 +10,25 @@ public:
 	static const uint32_t DEFUALT_A = 1664525;
 	static const uint32_t DEFUALT_C = 1013904223;
 
-	RandomSource(uint32_t seed = 0) :
-		a(DEFUALT_A), c(DEFUALT_C), last(a * seed + c), lastOff(0) { }
-	RandomSource(uint32_t _a, uint32_t _c, uint32_t seed = 0) :
-		a(_a), c(_c), last(seed), lastOff(0) { }
+	RandomSource() :
+		a(DEFUALT_A), c(DEFUALT_C), inited_(false) { }
+	RandomSource(uint32_t _a, uint32_t _c) :
+		a(_a), c(_c), inited_(false) { }
 
 	void init(uint32_t seed = 0) {
 		last = seed;
+		inited_ = true;
 	}
 
 	uint32_t nextU32() {
+		assert(inited_);
 		last = a * last + c;
 		lastOff = 0;
 		return last;
 	}
 
 	uint32_t nextU2() {
+		assert(inited_);
 		if(lastOff > 30) {
 			nextU32();
 		}
@@ -46,6 +49,7 @@ private:
 	uint32_t c;
 	uint32_t last;
 	uint32_t lastOff;
+	bool inited_;
 };
 
 #endif /*RANDOM_GEN_H_*/

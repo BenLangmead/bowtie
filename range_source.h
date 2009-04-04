@@ -1416,10 +1416,7 @@ public:
 	virtual ~RangeSource() { }
 
 	/// Set query to find ranges for
-	virtual void setQuery(seqan::String<Dna5>* qry,
-	                      seqan::String<char>* qual,
-	                      seqan::String<char>* name,
-	                      Range *partial) = 0;
+	virtual void setQuery(ReadBuf& r, Range *partial) = 0;
 	/// Set up the range search.
 	virtual void initBranch(PathManager& pm) = 0;
 	/// Advance the range search by one memory op
@@ -1557,7 +1554,6 @@ public:
 		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
 		bool verbose,
-		uint32_t seed,
 		bool mate1,
 		uint32_t minCostAdjustment,
 		AllocOnlyPool<Branch>* bpool,
@@ -1569,6 +1565,7 @@ public:
 		sinkPt_(sinkPt),
 		params_(params),
 		fw_(fw), rs_(rs),
+		ebwtFw_(rs_->curEbwt()->fw()),
 		pm_(bpool, rpool, epool, btCnt)
 	{
 		assert(rs_ != NULL);
@@ -1582,37 +1579,20 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
-		bool ebwtFw = rs_->curEbwt()->fw();
-		String<Dna5> *pat;
-		String<char> *qual;
-		String<char> *name;
-		if(mate1_) {
-			ReadBuf& buf = patsrc->bufa();
-			if(fw_) {
-				pat  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
-				qual = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
-			} else {
-				pat  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
-				qual = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
-			}
-			name = &buf.name;
-		} else {
-			ReadBuf& buf = patsrc->bufb();
-			if(fw_) {
-				pat  = (ebwtFw ? &buf.patFw  : &buf.patFwRev);
-				qual = (ebwtFw ? &buf.qualFw : &buf.qualFwRev);
-			} else {
-				pat  = (ebwtFw ? &buf.patRc  : &buf.patRcRev);
-				qual = (ebwtFw ? &buf.qualRc : &buf.qualRcRev);
-			}
-			name = &buf.name;
-		}
-		len_ = seqan::length(*pat);
-		assert_gt(len_, 0);
 		this->done = false;
 		pm_.reset();
-		rs_->setQuery(pat, qual, name, r);
-		initRangeSource(*qual);
+		if(mate1_) {
+			ReadBuf& buf = patsrc->bufa();
+			len_ = buf.length();
+			rs_->setQuery(buf, r);
+			initRangeSource((fw_ == ebwtFw_) ? buf.qualFw : buf.qualRc);
+		} else {
+			ReadBuf& buf = patsrc->bufb();
+			len_ = buf.length();
+			rs_->setQuery(buf, r);
+			initRangeSource((fw_ == ebwtFw_) ? buf.qualFw : buf.qualRc);
+		}
+		assert_gt(len_, 0);
 		if(this->done) return;
 		ASSERT_ONLY(allTops_.clear());
 		if(!rs_->done) {
@@ -1642,12 +1622,15 @@ public:
 		assert(!pm_.front()->exhausted_);
 		params_.setFw(fw_);
 		// Advance the RangeSource for the forward-oriented read
+		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
 		rs_->advanceBranch(until, this->minCost, pm_);
 		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
+		assert_geq(this->minCost, oldMinCost);
 		this->done = pm_.empty();
 		this->foundRange = rs_->foundRange;
 #ifndef NDEBUG
 		if(this->foundRange) {
+			if(until >= ADV_COST_CHANGES) assert_eq(oldMinCost, range().cost);
 			// Assert that we have not yet dished out a range with this
 			// top offset
 			assert_gt(range().bot, range().top);
@@ -1704,6 +1687,7 @@ protected:
 	EbwtSearchParams<String<Dna> >& params_;
 	bool                            fw_;
 	TRangeSource*                   rs_; // delete this in destructor
+	bool ebwtFw_;
 	PathManager pm_;
 	ASSERT_ONLY(std::set<int64_t> allTops_);
 };
@@ -1819,14 +1803,12 @@ class CostAwareRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 public:
 
 	CostAwareRangeSourceDriver(
-			uint32_t qseed,
 			bool strandFix,
 			const TRangeSrcDrPtrVec* rss,
 			bool verbose,
 			bool deleteOnDone = false) :
 		RangeSourceDriver<TRangeSource>(false),
-		rss_(), active_(), strandFix_(strandFix), randSeed_(qseed),
-		rand_(qseed),
+		rss_(), active_(), strandFix_(strandFix),
 		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
 		verbose_(verbose)
 	{
@@ -1842,7 +1824,6 @@ public:
 		calcPaired();
 		active_ = rss_;
 		this->minCost = 0;
-		sortActives();
 	}
 
 	/// Destroy all underlying RangeSourceDrivers
@@ -1863,6 +1844,7 @@ public:
 		delayedRange_ = NULL;
 		ASSERT_ONLY(allTopsRc_.clear());
 		patsrc_ = patsrc;
+		rand_.init(patsrc->bufa().seed);
 		const size_t rssSz = rss_.size();
 		if(rssSz == 0) return;
 		for(size_t i = 0; i < rssSz; i++) {
@@ -1870,7 +1852,6 @@ public:
 			rss_[i]->setQuery(patsrc, r);
 		}
 		active_ = rss_;
-		rand_.init(patsrc->bufa().seed);
 		this->minCost = 0;
 		sortActives();
 	}

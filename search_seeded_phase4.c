@@ -13,7 +13,7 @@
 		cout << patFw << ":" << qualFw << endl;
 	}
 
-	btf4.setQuery(&patFw, &qualFw, &name);
+	btf4.setQuery(patsrc->bufa());
 	// Get all partial alignments for this read's reverse
 	// complement
 	pals.clear();
@@ -71,7 +71,7 @@
 	// the seed.
 	bool gaveUp = false;
 	if(seedMms >= 2) {
-		btf24.setQuery(&patFw, &qualFw, &name);
+		btf24.setQuery(patsrc->bufa());
 		// Set up seed bounds
 		if(qs < s) {
 			btf24.setOffs(qs5, qs,

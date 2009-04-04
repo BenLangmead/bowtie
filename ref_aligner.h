@@ -2025,6 +2025,8 @@ protected:
 			bool match = true;
 			int mms = 0;
 			unsigned int ham = 0;
+			nonSeedMms.clear();
+			nonSeedRefcs.clear();
 			// Walk through each position of the alignment
 			for(uint32_t jj = 0; jj < qlen; jj++) {
 				uint32_t j = jj;
@@ -2076,6 +2078,7 @@ protected:
 						// Legal mismatch outside of the anchor; record it
 						mms++;
 						nonSeedMms.push_back(j);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[r]);
 					}
 				}
@@ -2433,6 +2436,7 @@ protected:
 						// Legal mismatch outside of the anchor; record it
 						mms++;
 						nonSeedMms.push_back(qoff);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[rc]);
 					}
 				}
@@ -2600,7 +2604,9 @@ protected:
 		const uint32_t halfway = qbegin + (lim >> 1);
 		// Vectors for holding edit information
 		std::vector<uint32_t> nonSeedMms;
+		assert_eq(0, nonSeedMms.size());
 		std::vector<uint8_t> nonSeedRefcs;
+		assert_eq(0, nonSeedRefcs.size());
 		bool hi = false;
 		for(uint32_t i = 1; i <= lim+1; i++) {
 			uint32_t ri;  // leftmost position in candidate alignment
@@ -2620,6 +2626,8 @@ protected:
 			int mms = 0;
 			int seedMms = 0;
 			unsigned int ham = 0;
+			nonSeedMms.clear();
+			nonSeedRefcs.clear();
 			// Walk through each position of the alignment
 			for(uint32_t jj = 0; jj < qlen; jj++) {
 				uint32_t j = jj;
@@ -2656,7 +2664,8 @@ protected:
 				if(q != r) {
 #endif
 					// Mismatch!
-					if(++mms > 1 && jj < slen) {
+					mms++;
+					if(mms > 1 && jj < slen) {
 						// More than one mismatch in the anchor; reject
 						match = false;
 						break;
@@ -2676,6 +2685,7 @@ protected:
 					} else {
 						// Legal mismatch outside of the anchor; record it
 						nonSeedMms.push_back(j);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[r]);
 					}
 				}
@@ -3134,6 +3144,7 @@ protected:
 						// Legal mismatch outside of the anchor; record it
 						mms++;
 						nonSeedMms.push_back(qoff);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[rc]);
 					}
 				}
@@ -3347,6 +3358,8 @@ protected:
 			int mms = 0;
 			int seedMms = 0;
 			unsigned int ham = 0;
+			nonSeedMms.clear();
+			nonSeedRefcs.clear();
 			// Walk through each position of the alignment
 			for(uint32_t jj = 0; jj < qlen; jj++) {
 				uint32_t j = jj;
@@ -3383,7 +3396,8 @@ protected:
 				if(q != r) {
 #endif
 					// Mismatch!
-					if(++mms > 2 && jj < slen) {
+					mms++;
+					if(mms > 2 && jj < slen) {
 						// More than one mismatch in the anchor; reject
 						match = false;
 						break;
@@ -3409,6 +3423,7 @@ protected:
 					} else {
 						// Legal mismatch outside of the anchor; record it
 						nonSeedMms.push_back(j);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[r]);
 					}
 				}
@@ -3952,6 +3967,7 @@ protected:
 						// Legal mismatch outside of the anchor; record it
 						mms++;
 						nonSeedMms.push_back(qoff);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[rc]);
 					}
 				}
@@ -4191,6 +4207,8 @@ protected:
 			int mms = 0;
 			int seedMms = 0;
 			unsigned int ham = 0;
+			nonSeedMms.clear();
+			nonSeedRefcs.clear();
 			// Walk through each position of the alignment
 			for(uint32_t jj = 0; jj < qlen; jj++) {
 				uint32_t j = jj;
@@ -4227,7 +4245,8 @@ protected:
 				if(q != r) {
 #endif
 					// Mismatch!
-					if(++mms > 3 && jj < slen) {
+					mms++;
+					if(mms > 3 && jj < slen) {
 						// More than one mismatch in the anchor; reject
 						match = false;
 						break;
@@ -4259,6 +4278,7 @@ protected:
 					} else {
 						// Legal mismatch outside of the anchor; record it
 						nonSeedMms.push_back(j);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[r]);
 					}
 				}
@@ -4891,6 +4911,7 @@ protected:
 						// Legal mismatch outside of the anchor; record it
 						mms++;
 						nonSeedMms.push_back(qoff);
+						assert_leq(nonSeedMms.size(), (size_t)mms);
 						nonSeedRefcs.push_back("ACGTN"[rc]);
 					}
 				}
