@@ -300,6 +300,9 @@ public:
 			// Construct the reversed versions of the fw and rc seqs
 			// and quals
 			r.constructReverse();
+			// Fill in the random-seed field using a combination of
+			// information from the user-specified seed and the read
+			// sequence, qualities, and name
 			r.seed = genRandSeed(r.patFw, r.qualFw, r.name);
 			// If it's this class's responsibility to reverse the pattern,
 			// do so here.  Usually it's the responsibility of one of the
