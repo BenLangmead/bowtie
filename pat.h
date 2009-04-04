@@ -297,16 +297,6 @@ public:
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
 			r.seed = genRandSeed(r.patFw, r.qualFw, r.name);
-			// If it's this class's responsibility to reverse the pattern,
-			// do so here.  Usually it's the responsibility of one of the
-			// concrete subclasses, since they can usually do it more
-			// efficiently.
-			if(reverse_) {
-				::reverseInPlace(r.patFw);
-				::reverseInPlace(r.patRc);
-				::reverseInPlace(r.qualFw);
-				::reverseInPlace(r.qualRc);
-			}
 		}
 		// Output it, if desired
 		if(dumpfile_ != NULL) {
@@ -322,18 +312,6 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) = 0;
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
-	/**
-	 * Whether to reverse reads as they're read in (useful when using
-	 * the mirror index)
-	 */
-	virtual bool reverse() const { return reverse_; }
-	/**
-	 * Set whether to reverse reads as they're read in (useful when
-	 * using the mirror index.
-	 */
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
-	}
 
 	/**
 	 * Concrete subclasses call lock() to enter a critical region.
@@ -464,22 +442,22 @@ public:
 	 * Set whether to reverse reads as they're read in (useful when
 	 * using the mirror index).
 	 */
-	void setReverse(bool r) {
-		for(size_t i = 0; i < srca_.size(); i++) {
-			srca_[i]->setReverse(r);
-			if(srcb_[i] != NULL) {
-				srcb_[i]->setReverse(r);
-			}
-		}
-	}
+//	void setReverse(bool r) {
+//		for(size_t i = 0; i < srca_.size(); i++) {
+//			srca_[i]->setReverse(r);
+//			if(srcb_[i] != NULL) {
+//				srcb_[i]->setReverse(r);
+//			}
+//		}
+//	}
 
 	/**
 	 * Return true iff the contained PatternSources are currently
 	 * reversing their output.
 	 */
-	bool reverse() {
-		return srca_[0]->reverse();
-	}
+//	bool reverse() {
+//		return srca_[0]->reverse();
+//	}
 
 	/**
 	 * The main member function for dispensing pairs of reads or
@@ -703,7 +681,7 @@ public:
 	 * Return true iff the reads in the buffers bufa and bufb are
 	 * reversed from their original representation in the input reads.
 	 */
-	virtual bool reverse() { return reverse_ != patsrc_.reverse(); }
+//	virtual bool reverse() { return reverse_ != patsrc_.reverse(); }
 
 private:
 

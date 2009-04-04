@@ -1274,6 +1274,14 @@ static char *argv0 = NULL;
 	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& qualRc = p->bufa().qualRc; \
 	qualRc.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
+	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<Dna5>& patRcRev  = p->bufa().patRcRev;  \
+	patRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qualFwRev = p->bufa().qualFwRev; \
+	qualFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qualRcRev = p->bufa().qualRcRev; \
+	qualRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();       \
@@ -1292,6 +1300,10 @@ static char *argv0 = NULL;
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& qualFw = p->bufa().qualFw; \
 	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
+	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qualFwRev = p->bufa().qualFwRev; \
+	qualFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();
@@ -1729,7 +1741,6 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
-    _patsrc.setReverse(false); // don't reverse patterns
     CHUD_START();
 	// Phase 1
     {
@@ -1760,7 +1771,6 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		ebwtBw.loadIntoMemory();
 	}
     _patsrc.reset();          // reset pattern source to 1st pattern
-    _patsrc.setReverse(true); // reverse patterns
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
 		ebwtBw.checkOrigs(os, true);
@@ -1905,7 +1915,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 		#define DONEMASK_SET(p)
 		#include "search_1mm_phase1.c"
-		patsrc->reverseRead();
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
@@ -1959,7 +1968,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
 #endif
-    _patsrc.setReverse(false); // don't reverse patterns
     CHUD_START();
     {
 		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
@@ -2001,7 +2009,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
-	_patsrc.setReverse(false); /* tell pattern source not to reverse patterns */ \
 }
 
 #define SWITCH_TO_BW_INDEX() { \
@@ -2015,7 +2022,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	} \
 	assert(ebwtBw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
-	_patsrc.setReverse(true); /* tell pattern source to reverse patterns */ \
 }
 
 #define ASSERT_NO_HITS_FW(ebwtfw) \
@@ -2513,9 +2519,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
 		#define DONEMASK_SET(p)
 		#include "search_23mm_phase1.c"
-		patsrc->reverseRead();
 		#include "search_23mm_phase2.c"
-		patsrc->reverseRead();
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
@@ -3014,11 +3018,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
 		#define DONEMASK_SET(p)
 		#include "search_seeded_phase1.c"
-		patsrc->reverseRead();
 		#include "search_seeded_phase2.c"
-		patsrc->reverseRead();
 		#include "search_seeded_phase3.c"
-		patsrc->reverseRead();
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }

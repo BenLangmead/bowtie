@@ -8,11 +8,6 @@
 {
 	params.setFw(true);
 	btf4.setReportExacts(true);
-
-	if(verbose) {
-		cout << patFw << ":" << qualFw << endl;
-	}
-
 	btf4.setQuery(patsrc->bufa());
 	// Get all partial alignments for this read's reverse
 	// complement
@@ -39,16 +34,16 @@
 			seqan::clear(muts);
 			uint8_t oldQuals =
 				PartialAlignmentManager::toMutsString(
-						pals[i], patFw, qualFw, muts, !noMaqRound);
+						pals[i], patFwRev, qualFwRev, muts, !noMaqRound);
 			assert_leq(oldQuals, qualThresh);
 			// Set the backtracking thresholds appropriately
 			// Now begin the backtracking, treating the first
 			// 24 bases as unrevisitable
-			ASSERT_ONLY(String<Dna5> tmp = patFw);
+			ASSERT_ONLY(String<Dna5> tmp = patFwRev);
 			btf4.setMuts(&muts);
 			done = btf4.backtrack(oldQuals);
 			btf4.setMuts(NULL);
-			assert_eq(tmp, patFw); // assert mutations were undone
+			assert_eq(tmp, patFwRev); // assert mutations were undone
 			if(done) {
 				// Got a hit; stop processing partial
 				// alignments
@@ -92,13 +87,13 @@
 		}
 		if(done) {
 			if(dumpHHHits != NULL) {
-				(*dumpHHHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;
+				(*dumpHHHits) << patFw << endl << qualFw << endl << btf24.numBacktracks() << endl;
 			}
 			btf24.resetNumBacktracks();
 			continue;
 		} else {
 			if(dumpNoHits != NULL) {
-				(*dumpNoHits) << reverseCopy(patFw) << endl << reverseCopy(qualFw) << endl << btf24.numBacktracks() << endl;
+				(*dumpNoHits) << patFw << endl << qualFw << endl << btf24.numBacktracks() << endl;
 			}
 		}
 		btf24.resetNumBacktracks();
