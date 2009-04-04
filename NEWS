@@ -30,7 +30,7 @@ Version 0.9.9.2 - April 4, 2009
      Stratum always trumps quality when determining best alignments.
      Also, --best mode resolves the strand bias issue (see manual for a
      discussion of the issue).
-   * Speed improvements for --best mode in all alignment modes.
+   * Speed improvements for --best mode in most alignment modes.
    * Major speed improvement for the -v 3 alignment mode (except when
      -z is also used)
    * The "Reported X alignments..." message is now printed to stderr
