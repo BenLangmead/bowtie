@@ -20,7 +20,7 @@ Bowtie Manual
  achieve greater alignment speed.  Bowtie's output format can be
  converted to the format used by Maq, allowing users to rapidly align
  reads with Bowtie then identify variations with Maq. The Bowtie tools
- run on the command line under Windows XP, Mac OS X, and Linux.
+ run on the command line under Windows, Mac OS X, and Linux.
 
  What isn't Bowtie?
  ------------------
@@ -36,7 +36,7 @@ Bowtie Manual
  observed in other contexts.
 
  Bowtie does not yet work in ABI "color space," and does not yet report
- gapped alignments.  These featuers are future work.
+ gapped alignments.  These features are future work.
 
  Obtaining Bowtie Binaries
  -------------------------
@@ -95,21 +95,6 @@ Bowtie Manual
  can also be made to enforce an end-to-end k-difference policy
  equivalent to SOAP's (http://soap.genomics.org.cn/) (-v 2).
 
- The process by which bowtie chooses an alignment to report is
- randomized in order to avoid "mapping bias" - the phenomenon whereby
- an aligner systematically fails to report a particular class of good
- alignments, causing spurious "holes" in the comparative assembly.
- Whenever bowtie reports a subset of the valid alignments that exist,
- it makes an effort to sample them randomly.  This randomness flows
- from a simple seeded pseudo-random number generator and is
- "deterministic" in the sense that Bowtie will always produce the same
- results when run with the same initial "seed" value (see documentation
- for --seed option).
-
- Gapped alignments are not currently supported, but we do plan to
- implement this in the future.  Alignment in ABI "color space" is also
- not currently supported.
-
  Bowtie is designed to be very fast for read sets where a) many of the
  reads have at least one good, valid alignment, b) many of the reads
  are relatively high-quality, c) the number of alignments reported per
@@ -135,6 +120,37 @@ Bowtie Manual
  considered legal by Bowtie, though some such alignments will become
  legal once gapped alignment is implemented.
 
+ The process by which bowtie chooses an alignment to report is
+ randomized in order to avoid "mapping bias" - the phenomenon whereby
+ an aligner systematically fails to report a particular class of good
+ alignments, causing spurious "holes" in the comparative assembly.
+ Whenever bowtie reports a subset of the valid alignments that exist,
+ it makes an effort to sample them randomly.  This randomness flows
+ from a simple seeded pseudo-random number generator and is
+ "deterministic" in the sense that Bowtie will always produce the same
+ results for the same read when run with the same initial "seed" value
+ (see documentation for --seed option).
+ 
+ In the default mode, bowtie can exhibit strand bias.  Strand bias
+ occurs when input reference and reads are such that (a) some reads
+ align equally well to sites on the forward and reverse strands of the
+ reference, and (b) the number of such sites on one strand is different
+ from the number on the other strand.  When this happens for a given
+ read, bowtie effectively chooses one strand or the other with 50%
+ probability, then reports a randomly-selected alignment for that read
+ from among the sites on the selected strand.  This tends to overassign
+ alignments to the sites on the strand with fewer sites and underassign
+ to sites on the strand with more sites.  The effect is mitigated,
+ though it may not be eliminated, when reads are longer or when paired-
+ end reads are used.  Running Bowtie in --best mode eliminates strand
+ bias by forcing Bowtie to select one strand or the other with a
+ probability that is proportional to the number of best sites on the
+ strand. 
+
+ Gapped alignments are not currently supported, but we do plan to
+ implement this in the future.  Alignment in ABI "color space" is also
+ not currently supported.
+
   Maq-like Policy
   ---------------
 
@@ -152,25 +168,28 @@ Bowtie Manual
   The N, L and E parameters are configured using Bowtie's -n, -l and
   -e options.
  
-  If there are many possible alignments that satisfy both criteria,
-  Bowtie will make an effort to give preference to alignments with
-  where the sum from criterion 2 is smaller.  Bowtie does not guarantee
-  that it will report the minimum-sum alignment.
-  
+  If there are many possible alignments satisfying these criteria,
+  Bowtie will prefer to report alignments with fewer mismatches and
+  where the sum from criterion 2 is smaller.  However, Bowtie does not
+  guarantee that the reported alignment(s) are "best" in terms of the
+  number of mismatches (i.e. the alignment "stratum") or in terms of
+  the quality values at the mismatched positions unless the --best
+  option is specified.  Bowtie is about 1 to 2.5 times slower when
+  --best is specified.
+
   Note that Maq internally rounds base qualities to the nearest 10 and
-  truncates qualities greater than 30 to 30.  To maintain compatibility
-  with Maq, Bowtie does the same.
+  rounds qualities greater than 30 to 30.  To maintain compatibility
+  with Maq, Bowtie does the same.  Rounding can be suppressed with the
+  --nomaqround option.
  
-  Also note that bowtie is not fully sensitive in -n 2 and -n 3
-  modes by default.  Rather, in those modes bowtie imposes a
-  "backtracking limit" to limit the amount of effort spent trying to
-  find valid alignments for low-quality reads that are unlikely have
-  any.  Since the limit is arbitrary, it may cause bowtie to miss some
-  legal 2- and 3-mismatch alignments.  We have set the limit to what we
-  consider a reasonable default (125), but the user may decrease or
-  increase the limit using the --maxbts and/or -y options.  Setting the
-  --maxbts limit to a very large number (>10000) or specifying -y will
-  guarantee full sensitivity.
+  Bowtie is not fully sensitive in -n 2 and -n 3 modes by default.  In
+  these modes Bowtie imposes a "backtracking limit" to limit effort
+  spent trying to find valid alignments for low-quality reads that are
+  unlikely to have any.  This may cause bowtie to miss some legal 2-
+  and 3-mismatch alignments.  The limit is set to a reasonable default
+  (125 without --best, 800 with --best), but the user may decrease or
+  increase the limit using the --maxbts and/or -y options.  -y mode is
+  slow but guarantees full sensitivity.
  
   End-to-end k-difference Policy
   ------------------------------
@@ -178,23 +197,20 @@ Bowtie Manual
   The policy has one criterion: Alignments may have no more than V
   mismatches.  Quality values are ignored.  The number of mismatches
   permitted is configurable with the -v option.
+
+  If there are many possible alignments satisfying this criterion,
+  Bowtie will prefer to report alignments with fewer mismatches.
+  However, for reads where the "best" alignment has one or more
+  mismatches, Bowtie does not guarantee that the reported alignment(s)
+  will be best unless the --best option is specified.  Bowtie is
+  typically about 1 to 2.5 times slower when --best is specified.
   
   Paired-end Alignment
   --------------------
   
-  As of version 0.9.9, Bowtie contains preliminary support for
-  paired-end alignment.  Support is described as "preliminary" because
-  paired-end alignment only works under the -v alignment policies.
-  Also, there is currently no way to get Bowtie to report a mix of
-  paired-end alignments and singleton alignments (for unpaired mates
-  and/or single-ended reads) in one run; if a mix of alignments is
-  desired, the user must first perform a paired-end run using the
-  --unfa or --unfq option to write unaligned pairs to files, then run
-  Bowtie again in single-ended mode using those files as input.  Future
-  versions of Bowtie will expand paired-end support and, hopefully,
-  improve performance as well.
-  
-  A valid paired-end alignment satisfies the following criteria:
+  Bowtie can align paired-end reads when paired read files are
+  specified using the -1 and -2 options.  A valid paired-end alignment
+  satisfies the following criteria:
   
   1. Both mates have a valid alignment according to the alignment
      policy specified by the -v/-n/-e/-l options.
@@ -223,26 +239,39 @@ Bowtie Manual
   nearby alignment for the other.  The default limit is 100.  This
   causes Bowtie to miss some valid paired-end alignments where both
   mates lie in repetitive regions, but the user may use the --pairtries
-  or -y options to increase Bowtie's sensitivity as desired.  
+  or -y options to increase Bowtie's sensitivity as desired.
+  
+  There is currently no way for Bowtie to report a mix of paired-end
+  alignments and singleton alignments (for unpaired mates and/or
+  single-ended reads) in one run of the tool; if a mix of alignments is
+  desired, the user must first perform a paired-end run using the
+  --unfa or --unfq option to write unaligned pairs to files, then run
+  Bowtie again in single-ended mode using those files as input.
+ 
+  Because Bowtie uses an in-memory representation of the original
+  reference string when finding paired-end alignments, its memory
+  footprint is larger when aligning paired-end reads.  For example, the
+  human index has a memory footprint of about 2.2 GB in single-end mode
+  and 2.9 GB in paired-end mode.
   
   High Performance Tips
   ---------------------
 
-  Tip 1: If your processor(s) is (are) 64-bit, use 64-bit bowtie
+  Tip 1: Use 64-bit bowtie if possible
 
   The 64-bit version of Bowtie is substantially faster (usually more
   than 50% faster) than the 32-bit version, due to Bowtie's use of
   64-bit arithmetic when searching both in the index and in the
   reference.  If possible, download the 64-bit binaries for Bowtie and
   run them on a 64-bit machine.  If you are building Bowtie from
-  sources, you may need to specify the -m64 option to g++ to compile
-  the 64-bit version; you can do this by supplying argument
+  sources, you may need to pass the -m64 option to g++ to compile the
+  64-bit version; you can do this by supplying argument
   EXTRA_FLAGS="-m64" to the 'make' command; e.g.:
   'make EXTRA_FLAGS="-m64" bowtie'.  To determine whether your version
   of bowtie is 64-bit or 32-bit, run 'bowtie --version' and check the
   'Sizeof' line; if the last expression on that line is {4, 4, 8, 4},
-  then your binary is 32-bit; if the last expression is {4, 8, 8, 8},
-  then your binary is 64-bit.
+  your binary is 32-bit; if the last expression is {4, 8, 8, 8}, your
+  binary is 64-bit.
   
   Tip 2: If your computer has multiple processors/cores, try -p
    
@@ -322,11 +351,7 @@ Bowtie Manual
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
                      those specified in <mates2>.  Reads may be a mix
-                     of different lengths.  Note that as of version
-                     0.9.9.1, bowtie can perform paired-end alignment
-                     only under the -v alignment policies; paired-end
-                     alignment under the -n alignment policies is
-                     future work.
+                     of different lengths.
 
   <mates2>           Comma-separated list of files containing the #2
                      mates (filename usually includes "_2"), or, if -c
@@ -336,11 +361,7 @@ Bowtie Manual
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
                      those specified in <mates1>.  Reads may be a mix
-                     of different lengths.  Note that as of version
-                     0.9.9.1, bowtie can perform paired-end alignment
-                     only under the -v alignment policies; paired-end
-                     alignment under the -n alignment policies is
-                     future work.
+                     of different lengths.
 
   <singles>          A comma-separated list of files containing the
                      reads to be aligned, or, if -c is specified, the
@@ -475,17 +496,18 @@ Bowtie Manual
 
   --maxbts           The maximum number of backtracks permitted when
                      aligning a read in -n 2 or -n 3 mode (default:
-                     125).  A "backtrack" is the introduction of a
-                     speculative substitution into the alignment.
-                     Without this limit, the default parameters will
-                     sometimes require that 'bowtie' try 100s or 1,000s
-                     of backtracks to align a read, especially if the
-                     read has many low-quality bases and/or has no
-                     valid alignments, slowing bowtie down
-                     significantly.  The drawback of having a limit is
-                     that some valid alignments may be missed.  Higher
-                     limits yield greater sensitivity at the expensive
-                     of longer running times.  See also: -y/--tryhard.
+                     125 without --best, 800 with --best).  A
+                     "backtrack" is the introduction of a speculative
+                     substitution into the alignment.  Without this
+                     limit, the default parameters will sometimes
+                     require that 'bowtie' try 100s or 1,000s of
+                     backtracks to align a read, especially if the read
+                     has many low-quality bases and/or has no valid
+                     alignments, slowing bowtie down significantly.
+                     However, this limit may cause some valid
+                     alignments to be missed.  Higher limits yield
+                     greater sensitivity at the expensive of longer
+                     running times.  See also: -y/--tryhard.
 
   --pairtries <int>  For paired-end alignment, this is the maximum
                      number of attempts Bowtie will make to match an
@@ -553,17 +575,21 @@ Bowtie Manual
                      small -m but BOWTIE CAN BECOME VERY SLOW AS -m
                      INCREASES.
 
-  --best             Reported singleton alignments must belong to the
-                     best possible alignment "stratum" (default: off).
-                     A stratum is a category defined by the number of
-                     mismatches present in the alignment (for -n, the
-                     number of mismatches present in the seed region of
-                     the alignment).  E.g., if --best is not specified,
-                     Bowtie may sometimes report an alignment with 2
-                     mismatches in the seed even though there exists an
-                     unreported alignment with 1 mismatch in the seed.
-                     BOWTIE IS ABOUT 3-5 TIMES SLOWER WHEN --best IS
-                     SPECIFIED.
+  --best             Make Bowtie guarantee that reported singleton
+                     alignments are "best" in terms of stratum (i.e.
+                     number of mismatches, or mismatches in the seed in
+                     the case of -n mode) and in terms of the quality
+                     values at the mismatched position(s).  Stratum
+                     always trumps quality; e.g. a 1-mismatch alignment
+                     where the mismatched position has Phred quality 40
+                     is preferred over a 2-mismatch alignment where the
+                     mismatched positions both have Phred quality 10.
+                     When --best is not specified, Bowtie may report
+                     alignments that are sub-optimal in terms of
+                     stratum and/or quality (though an effort is made
+                     to report the best alignment).  --best mode also
+                     removes all strand bias.  Bowtie is about 1-2.5
+                     times slower when --best is specified.
 
   --nostrata         If many valid singleton alignments exist and are
                      reportable (according to the --best and -k
@@ -615,6 +641,22 @@ Bowtie Manual
                      (its offset into the list of references that were
                      indexed) rather than by name.
 
+  --alfa <filename>  Write all reads for which at least one alignment
+                     was reported to a FASTA file with name <filename>.
+                     Paired-end reads will be written to two parallel
+                     files with "_1" and "_2" inserted in the filename,
+                     e.g., if <filename> is aligned.fa, the #1 and #2
+                     mates that fail to align will be written to
+                     aligned_1.fa and aligned_2.fa respectively.
+
+  --alfq <filename>  Write all reads for which at least one alignment
+                     was reported to a FASTQ file with name <filename>.
+                     Paired-end reads will be written to two parallel
+                     files with "_1" and "_2" inserted in the filename,
+                     e.g., if <filename> is aligned.fq, the #1 and #2
+                     mates that fail to align will be written to
+                     aligned_1.fq and aligned_2.fq respectively.
+
   --unfa <filename>  Write all reads that fail to align to a FASTA file
                      with name <filename>.  Paired-end reads will be
                      written to two parallel files with "_1" and "_2"
@@ -659,12 +701,14 @@ Bowtie Manual
   -p/--threads <int> Launch <int> parallel search threads (default: 1).
                      Threads will run on separate processors/cores and
                      synchronize when grabbing reads and outputting
-                     alignments.  Searching for alignments is almost
-                     totally parallel, and speedup is close to linear.
-                     Speedup suffers somewhat in -z mode.  This option
-                     is only available if bowtie is linked with the
-                     pthreads library (i.e. if BOWTIE_PTHREADS=0 is not
-                     specified at build time).
+                     alignments.  Searching for alignments is highly
+                     parallel, and speedup is fairly close to linear.
+                     Speedup suffers somewhat in -z mode because
+                     switching between indexes is a time-consuming
+                     serial operation.  This option is only available
+                     if bowtie is linked with the pthreads library
+                     (i.e. if BOWTIE_PTHREADS=0 is not specified at
+                     build time).
 
   -z/--phased        Alternate between using the forward and mirror
                      indexes in a series of phases such that only one
@@ -674,7 +718,8 @@ Bowtie Manual
                      mirror indexes resident in memory at once), but is
                      somewhat slower, scales worse (see -p), and is
                      incompatible with use of --best or -k greater than
-                     1.
+                     1.  It is also incompatible with paired-end
+                     alignment.
 
   -o/--offrate <int> Override the offrate of the index with <int>.  If
                      <int> is greater than the offrate used to build
