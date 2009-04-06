@@ -2283,6 +2283,13 @@ protected:
 		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
+		uint32_t lrSkips = anchorBitPairs;
+		uint32_t rlSkips = qlen;
+		if(!seedOnLeft && readSeedOverhang) {
+			lrSkips += readSeedOverhang;
+			assert_geq(rlSkips, readSeedOverhang);
+			rlSkips -= readSeedOverhang;
+		}
 		for(uint32_t i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			uint64_t diff;
@@ -2297,7 +2304,7 @@ protected:
 				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = anchorBitPairs;
+					skipLeftToRights = lrSkips;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -2317,7 +2324,7 @@ protected:
 				r = (int)ref[rirLo];
 				if(r & 4) {
 					r = 0;
-					skipRightToLefts = qlen;
+					skipRightToLefts = rlSkips;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -2916,6 +2923,13 @@ protected:
 		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
+		uint32_t lrSkips = anchorBitPairs;
+		uint32_t rlSkips = qlen;
+		if(!seedOnLeft && readSeedOverhang) {
+			lrSkips += readSeedOverhang;
+			assert_geq(rlSkips, readSeedOverhang);
+			rlSkips -= readSeedOverhang;
+		}
 		for(uint32_t i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			uint64_t diff;
@@ -2930,7 +2944,7 @@ protected:
 				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = anchorBitPairs;
+					skipLeftToRights = lrSkips;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -2950,7 +2964,7 @@ protected:
 				r = (int)ref[rirLo];
 				if(r & 4) {
 					r = 0;
-					skipRightToLefts = qlen;
+					skipRightToLefts = rlSkips;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -3674,6 +3688,13 @@ protected:
 		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
+		uint32_t lrSkips = anchorBitPairs;
+		uint32_t rlSkips = qlen;
+		if(!seedOnLeft && readSeedOverhang) {
+			lrSkips += readSeedOverhang;
+			assert_geq(rlSkips, readSeedOverhang);
+			rlSkips -= readSeedOverhang;
+		}
 		for(uint32_t i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			uint64_t diff;
@@ -3688,7 +3709,7 @@ protected:
 				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = anchorBitPairs;
+					skipLeftToRights = lrSkips;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -3708,7 +3729,7 @@ protected:
 				r = (int)ref[rirLo];
 				if(r & 4) {
 					r = 0;
-					skipRightToLefts = qlen;
+					skipRightToLefts = rlSkips;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -3726,6 +3747,9 @@ protected:
 			if((diff & 0xf00f00f00f00f00fllu) &&
 			   (diff & 0x0f00f00f00f00f00llu) &&
 			   (diff & 0x00f00f00f00f00f0llu)) continue;
+			if((diff & 0xc30c30c30c30c30cllu) &&
+			   (diff & 0x30c30c30c30c30c3llu) &&
+			   (diff & 0x0c30c30c30c30c30llu)) continue;
 			uint32_t ri  = hi ? riLo  : riHi;
 			uint32_t rir = hi ? rirLo : rirHi;
 			// Could use pop count
@@ -4545,6 +4569,13 @@ protected:
 		uint32_t rirHiAnchor = rirHi + anchorBitPairs - 1;
 		uint32_t riLo  = halfway + 1;
 		uint32_t rirLo = halfway - begin + 1;
+		uint32_t lrSkips = anchorBitPairs;
+		uint32_t rlSkips = qlen;
+		if(!seedOnLeft && readSeedOverhang) {
+			lrSkips += readSeedOverhang;
+			assert_geq(rlSkips, readSeedOverhang);
+			rlSkips -= readSeedOverhang;
+		}
 		for(uint32_t i = 1; i <= lim + 1; i++) {
 			int r;       // new reference char
 			uint64_t diff;
@@ -4559,7 +4590,7 @@ protected:
 				r = (int)ref[rirHiAnchor];
 				if(r & 4) {
 					r = 0;
-					skipLeftToRights = anchorBitPairs;
+					skipLeftToRights = lrSkips;
 				}
 				assert_lt(r, 4);
 				// Bring in new base pair at the least significant
@@ -4579,7 +4610,7 @@ protected:
 				r = (int)ref[rirLo];
 				if(r & 4) {
 					r = 0;
-					skipRightToLefts = qlen;
+					skipRightToLefts = rlSkips;
 				}
 				assert_lt(r, 4);
 				if(i >= 2) {
@@ -4598,6 +4629,10 @@ protected:
 			   (diff & 0x0f000f000f000f00llu) &&
 			   (diff & 0x00f000f000f000f0llu) &&
 			   (diff & 0x000f000f000f000fllu)) continue;
+			if((diff & 0xc003c003c003c003llu) &&
+			   (diff & 0x3c003c003c003c00llu) &&
+			   (diff & 0x03c003c003c003c0llu) &&
+			   (diff & 0x003c003c003c003cllu)) continue;
 			uint32_t ri  = hi ? riLo  : riHi;
 			uint32_t rir = hi ? rirLo : rirHi;
 			// Could use pop count

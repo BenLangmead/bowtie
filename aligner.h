@@ -649,7 +649,7 @@ public:
 					if(rangeMode_) {
 						this->done = report(ra, ra.top, ra.bot, 0);
 					} else {
-						rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
+						rchase_->setTopBot(ra.top, ra.bot, alen_, rand_, ra.ebwt);
 						if(rchase_->foundOff()) {
 							this->done = report(ra, rchase_->off().first,
 							               rchase_->off().second, rchase_->tlen());
@@ -675,7 +675,7 @@ public:
 					if(rangeMode_) {
 						this->done = report(ra, ra.top, ra.bot, 0);
 					} else {
-						rchase_->setTopBot(ra.top, ra.bot, alen_, ra.ebwt);
+						rchase_->setTopBot(ra.top, ra.bot, alen_, rand_, ra.ebwt);
 						if(rchase_->foundOff()) {
 							this->done = report(ra, rchase_->off().first,
 							               rchase_->off().second, rchase_->tlen());
@@ -1742,7 +1742,7 @@ public:
 					chase_ = true;
 					const Range& r = driver_->range();
 					assert(r.repOk());
-					rchase_->setTopBot(r.top, r.bot, qlen_, r.ebwt);
+					rchase_->setTopBot(r.top, r.bot, qlen_, rand_, r.ebwt);
 				}
 			} else {
 				this->done = true;
