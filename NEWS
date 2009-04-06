@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.9.9.2 - April 4, 2009
+Version 0.9.9.2 - April 6, 2009
    * Paired-end alignment is now available in all alignment modes,
      including all -n modes.
    * --best now provides better guarantees.  Reported alignments are
