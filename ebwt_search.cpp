@@ -7,6 +7,7 @@
 #include <seqan/find.h>
 #include <getopt.h>
 #include <vector>
+#include <pthread.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian_swap.h"
