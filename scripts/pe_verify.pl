@@ -189,18 +189,22 @@ while(<BOWTIE_SE2>) {
 			if($ooff > $off) {
 				# The #1 mate is on the right
 				$diff = $ooff - $off + $olen;
+				# upstream mate contains downstream one?
+				#next if $off + $len >= $ooff + $olen;
+				# mates are at the same position?
 				next if $ooff == $off;
 				next if ($diff < $inner || $diff > $outer);
-				# The #1 mate is on the right
 				next if $ofw == $m1fw;
 				next if $fw == $m2fw;
 				$peKey .= "0 $ref $off $ooff $readShort:$qualShort $oreadShort:$oqualShort $mms $omms";
 			} else {
 				# The #1 mate is on the left
 				$diff = $off - $ooff + $len;
+				# upstream mate contains downstream one?
+				#next if $ooff + $olen >= $off + $len;
+				# mates are at the same position?
 				next if $ooff == $off;
 				next if ($diff < $inner || $diff > $outer);
-				# The #1 mate is on the left
 				next if $fw != $m2fw;
 				next if $ofw != $m1fw;
 				$peKey .= "1 $ref $ooff $off $oreadShort:$oqualShort $readShort:$qualShort $omms $mms";

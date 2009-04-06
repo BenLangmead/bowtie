@@ -27,7 +27,7 @@ use List::Util qw[min max];
 use Getopt::Std;
 
 my %options=();
-getopts("mhnop:",\%options);
+getopts("mhnop:we",\%options);
 
 if(defined $options{h}) {
 	print "Usage: perl random_bowtie_tests.pl seed outer inner tbase trand pbase prand\n";
@@ -688,6 +688,7 @@ for(; $outer > 0; $outer--) {
 	for(; $in >= 0; $in--) {
 		# Paired-end?
 		my $pe = (int(rand(2)) == 0);
+		$pe = 1 if defined($options{e});
 		# Generate random pattern(s) based on text
 		my $pfinal1 = '';
 		my $pfinal2 = '';
