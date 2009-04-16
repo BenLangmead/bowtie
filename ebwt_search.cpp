@@ -3487,6 +3487,10 @@ static void seededQualCutoffSearchFull(
 		}
 #endif
 	}
+	if(refs != NULL) {
+		delete refs;
+	}
+	ebwtBw.evictFromMemory();
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
 #endif

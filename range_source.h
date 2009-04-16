@@ -565,6 +565,7 @@ public:
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);
+			lastBestCost_ = 0xffff;
 		}
 		int tiedPositions[3];
 		int numTiedPositions = 0;
@@ -637,8 +638,8 @@ public:
 		if(depth < depth1_) newDepth0 = depth1_;
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
+		lastBestCost_ = bestCost;
 		if(bestCost == 0) {
-			lastBestCost_ = bestCost;
 			lastRpool_ = rpool.getPos();
 			lastEpool_ = epool.getPos();
 			lastBpool_ = bpool.getPos();

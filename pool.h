@@ -19,6 +19,7 @@
  */
 template<typename T>
 class AllocOnlyPool {
+	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
 	/**
 	 * Initialize a new pool with an initial size of about 'bytes'
@@ -63,6 +64,23 @@ public:
 		curPool_ = 0;
 		lastAlloc_ = NULL;
 		lastAllocSz_ = 0;
+	}
+
+	/**
+	 * Rewind to a an old position, essentially freeing everything past
+	 * it.
+	 */
+	void rewind(U32Pair pos) {
+		curPool_ = pos.first;
+		cur_ = pos.second;
+		ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, (lim_-cur_) * sizeof(T)));
+	}
+
+	/**
+	 * Return our current position.
+	 */
+	U32Pair getPos() {
+		return make_pair(curPool_, cur_);
 	}
 
 	/**
@@ -124,6 +142,7 @@ public:
 			}
 			curPool_++;
 			cur_ = 0;
+			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(T)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
 		lastAllocSz_ = num;
