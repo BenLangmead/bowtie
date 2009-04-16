@@ -455,8 +455,9 @@ protected:
 class Branch {
 	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
-	Branch() : lastBestCost_(0xffff), curtailed_(false),
-	           exhausted_(false), prepped_(false) { }
+	Branch() : lastBestCost_(0xffff), delayedCost_(0),
+	           curtailed_(false), exhausted_(false), prepped_(false),
+	           delayedIncrease_(false) { }
 
 	/**
 	 * Initialize a new branch object with an empty path.
@@ -473,6 +474,7 @@ public:
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
 		lastBestCost_ = 0xffff;
+		delayedCost_ = 0;
 		depth0_ = depth0;
 		depth1_ = depth1;
 		depth2_ = depth2;
@@ -662,8 +664,13 @@ public:
 			// cost; update the best cost to be the next-best
 			assert_neq(0xffff, nextCost);
 			if(bestCost != nextCost) {
-				cost_ -= bestCost;
-				cost_ += nextCost;
+				if(bestCost == 0) {
+					delayedCost_ = (cost_ - bestCost + nextCost);
+					delayedIncrease_ = true;
+				} else {
+					cost_ -= bestCost;
+					cost_ += nextCost;
+				}
 			}
 		}
 		return newBranch;
@@ -676,7 +683,6 @@ public:
 	              AllocOnlyPool<Edit>& epool,
 	              AllocOnlyPool<Branch>& bpool)
 	{
-		assert(exhausted_);
 		if(lastBestCost_ == 0) {
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
@@ -945,9 +951,12 @@ public:
 	U32Pair lastEpool_;
 	U32Pair lastBpool_;
 
+	uint16_t delayedCost_;
+
 	bool curtailed_;  // can't be extended anymore without using edits
 	bool exhausted_;  // all outgoing edges exhausted, including all edits
 	bool prepped_;    // whether SideLocus's are inited
+	bool delayedIncrease_;
 
 protected:
 
@@ -1366,10 +1375,21 @@ public:
 			return;
 		}
 		Branch *f = front();
-		while(f->exhausted_) {
-			f->finalize(*rpool, *epool, *bpool);
-			pop();
-			if(empty()) return;
+		while(f->exhausted_ || f->delayedIncrease_) {
+			if(f->exhausted_) {
+				f->finalize(*rpool, *epool, *bpool);
+				pop();
+				if(empty()) return;
+			} else if(f->delayedIncrease_) {
+				assert_neq(0, f->delayedCost_);
+				f->cost_ = f->delayedCost_;
+				f->delayedIncrease_ = false;
+				f->delayedCost_ = 0;
+				f->finalize(*rpool, *epool, *bpool);
+				pop();
+				push(f);
+				assert(!empty());
+			}
 			f = front();
 		}
 		if(f->curtailed_) {
