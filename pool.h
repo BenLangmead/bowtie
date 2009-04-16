@@ -116,6 +116,7 @@ public:
 			}
 			curPool_++;
 			cur_ = 0;
+			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(T)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
 		lastAllocSz_ = 1;
