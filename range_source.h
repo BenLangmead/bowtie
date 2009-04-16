@@ -330,12 +330,15 @@ struct RangeState {
  * allocated.
  */
 class RangeStatePool {
+	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
 	/**
 	 * Initialize a new pool with an initial size of about 'bytes'
 	 * bytes.  Exit with an error message if we can't allocate it.
 	 */
-	RangeStatePool(uint32_t bytes) : curPool_(0), cur_(0) {
+	RangeStatePool(uint32_t bytes) :
+		curPool_(0), cur_(0), lastAlloc_(NULL), lastAllocSz_(0)
+	{
 		lim_ = bytes / sizeof(RangeState);
 		RangeState *pool;
 		try {
@@ -373,6 +376,24 @@ public:
 		lastAllocSz_ = 0;
 	}
 
+
+	/**
+	 * Rewind to a an old position, essentially freeing everything past
+	 * it.
+	 */
+	void rewind(U32Pair pos) {
+		curPool_ = pos.first;
+		cur_ = pos.second;
+		ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, (lim_-cur_) * sizeof(RangeState)));
+	}
+
+	/**
+	 * Return our current position.
+	 */
+	U32Pair getPos() {
+		return make_pair(curPool_, cur_);
+	}
+
 	/**
 	 * Return the last RangeState allocated from the pool.
 	 */
@@ -400,6 +421,7 @@ public:
 			}
 			curPool_++;
 			cur_ = 0;
+			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(RangeState)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
 		lastAllocSz_ = elts;
@@ -431,8 +453,10 @@ protected:
  * path.
  */
 class Branch {
+	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
-	Branch() : curtailed_(false), exhausted_(false), prepped_(false) { }
+	Branch() : lastBestCost_(0xffff), curtailed_(false),
+	           exhausted_(false), prepped_(false) { }
 
 	/**
 	 * Initialize a new branch object with an empty path.
@@ -448,6 +472,7 @@ public:
 	{
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
+		lastBestCost_ = 0xffff;
 		depth0_ = depth0;
 		depth1_ = depth1;
 		depth2_ = depth2;
@@ -521,9 +546,13 @@ public:
 	 * Split off a new branch by selecting a good outgoing path and
 	 * creating a new Branch object for it and inserting that branch
 	 * into the priority queue.  Mark that outgoing path from the
-	 * parent branch as eliminated
+	 * parent branch as eliminated.  If the second-best outgoing path
+	 * cost more, add the different to the cost of this branch (since
+	 * that's the best we can do starting from here from now on).
 	 */
-	Branch* splitBranch(RangeStatePool& rpool, AllocOnlyPool<Edit>& epool,
+	Branch* splitBranch(RangeStatePool& rpool,
+	                    AllocOnlyPool<Edit>& epool,
+	                    AllocOnlyPool<Branch>& bpool,
 	                    Branch *newBranch,
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
 	                    bool qualOrder, const EbwtParams& ep,
@@ -532,6 +561,11 @@ public:
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		assert(curtailed_);
+		if(lastBestCost_ == 0) {
+			rpool.rewind(lastRpool_);
+			epool.rewind(lastEpool_);
+			bpool.rewind(lastBpool_);
+		}
 		int tiedPositions[3];
 		int numTiedPositions = 0;
 		// Lowest marginal cost incurred by any of the positions with
@@ -603,6 +637,12 @@ public:
 		if(depth < depth1_) newDepth0 = depth1_;
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
+		if(bestCost == 0) {
+			lastBestCost_ = bestCost;
+			lastRpool_ = rpool.getPos();
+			lastEpool_ = epool.getPos();
+			lastBpool_ = bpool.getPos();
+		}
 		newBranch->init(
 				rpool, epool, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
@@ -626,6 +666,21 @@ public:
 			}
 		}
 		return newBranch;
+	}
+
+	/**
+	 * Finalize an exhausted branch.
+	 */
+	void finalize(RangeStatePool& rpool,
+	              AllocOnlyPool<Edit>& epool,
+	              AllocOnlyPool<Branch>& bpool)
+	{
+		assert(exhausted_);
+		if(lastBestCost_ == 0) {
+			rpool.rewind(lastRpool_);
+			epool.rewind(lastEpool_);
+			bpool.rewind(lastBpool_);
+		}
 	}
 
 	/**
@@ -883,6 +938,11 @@ public:
 	SideLocus ltop_;
 	SideLocus lbot_;
 	EditList edits_;   // edits leading to the root of the branch
+	uint16_t lastBestCost_; // cost of the last split-off branch;
+	                        // 0xffff if there haven't been splits yet
+	U32Pair lastRpool_;
+	U32Pair lastEpool_;
+	U32Pair lastBpool_;
 
 	bool curtailed_;  // can't be extended anymore without using edits
 	bool exhausted_;  // all outgoing edges exhausted, including all edits
@@ -1279,24 +1339,12 @@ public:
 			ASSERT_ONLY(Branch *popped =) pop();
 			assert(popped == br);
 			// br is allocated from a pool; it'll get freed later
-#ifndef NDEBUG
-			if(!empty()) {
-				assert(!front()->exhausted_);
-				assert(br != front());
-			}
-#endif
 		} else if(br->cost_ != origCost) {
 			assert(br == front());
 			Branch *popped = pop();
 			assert(popped == br);
 			push(popped);
-#ifndef NDEBUG
-			if(!empty()) assert(!front()->exhausted_);
-#endif
 		}
-#ifndef NDEBUG
-		if(!empty()) assert(!front()->exhausted_);
-#endif
 	}
 
 	/**
@@ -1317,7 +1365,12 @@ public:
 			return;
 		}
 		Branch *f = front();
-		assert(!f->exhausted_);
+		while(f->exhausted_) {
+			f->finalize(*rpool, *epool, *bpool);
+			pop();
+			if(empty()) return;
+			f = front();
+		}
 		if(f->curtailed_) {
 			uint16_t origCost = f->cost_;
 			// This counts as a backtrack
@@ -1333,10 +1386,7 @@ public:
 			}
 			Branch* newbr = splitBranch(f, rand, qlen, seedLen,
 			                            qualOrder, ep, ebwt);
-			if(f->exhausted_) {
-				pop();
-				assert(!contains(f));
-			} else if(f->cost_ > origCost) {
+			if(f->cost_ > origCost) {
 				// br's cost changed so we need to re-insert it into
 				// the priority queue
 				Branch *popped = pop();
@@ -1367,8 +1417,8 @@ protected:
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
 		Branch *dst = bpool->alloc();
-		src->splitBranch(*rpool, *epool, dst, rand, qlen, seedLen,
-		                 qualOrder, ep, ebwt);
+		src->splitBranch(*rpool, *epool, *bpool, dst, rand, qlen,
+		                 seedLen, qualOrder, ep, ebwt);
 		assert(dst->repOk());
 		return dst;
 	}
