@@ -2310,8 +2310,8 @@ public:
 				// We have a range to extend
 				assert_leq(top, ebwt._eh._len);
 				assert_leq(bot, ebwt._eh._len);
-				Branch *b = pm.bpool->alloc();
-				b->init(*pm.rpool, *pm.epool, qlen_,
+				Branch *b = pm.bpool.alloc();
+				b->init(pm.rpool, pm.epool, qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt);
@@ -2326,8 +2326,8 @@ public:
 		} else {
 			// We can't use the ftab, so we start from the rightmost
 			// position and use _fchr
-			Branch *b = pm.bpool->alloc();
-			b->init(*pm.rpool, *pm.epool, qlen_,
+			Branch *b = pm.bpool.alloc();
+			b->init(pm.rpool, pm.epool, qlen_,
 			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
 			assert(!b->curtailed_);
@@ -2973,13 +2973,10 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			bool mate1,
-			AllocOnlyPool<Branch>* bpool,
-			RangeStatePool* rpool,
-			AllocOnlyPool<Edit>* epool,
 			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose,
-					mate1, 0, bpool, rpool, epool, btCnt),
+					mate1, 0, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -3145,9 +3142,6 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			bool mate1,
-			AllocOnlyPool<Branch>* bpool,
-			RangeStatePool* rpool,
-			AllocOnlyPool<Edit>* epool,
 			int *btCnt = NULL) :
 			params_(params),
 			rs_(rs),
@@ -3166,9 +3160,6 @@ public:
 			os_(os),
 			verbose_(verbose),
 			mate1_(mate1),
-			bpool_(bpool),
-			rpool_(rpool),
-			epool_(epool),
 			btCnt_(btCnt)
 	{ }
 
@@ -3181,7 +3172,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
 				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				mate1_, bpool_, rpool_, epool_, btCnt_);
+				mate1_, btCnt_);
 	}
 
 protected:
@@ -3202,9 +3193,6 @@ protected:
 	vector<String<Dna5> >& os_;
 	bool verbose_;
 	bool mate1_;
-	AllocOnlyPool<Branch>* bpool_;
-	RangeStatePool* rpool_;
-	AllocOnlyPool<Edit>* epool_;
 	int *btCnt_;
 };
 

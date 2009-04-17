@@ -23,6 +23,8 @@ enum AdvanceUntil {
  * sequence.
  */
 struct Edit {
+	ASSERT_ONLY(uint32_t allocPool);
+	ASSERT_ONLY(uint32_t allocCur);
 	uint16_t type      :  2; // 1 -> subst, 2 -> ins, 3 -> del, 0 -> empty
 	uint16_t pos       : 10; // position w/r/t search root
 	uint16_t chr       :  2; // character involved (for subst and ins)
@@ -315,6 +317,9 @@ struct RangeState {
 		return true;
 	}
 
+	ASSERT_ONLY(uint32_t allocPool);
+	ASSERT_ONLY(uint32_t allocCur);
+
 	// Outgoing ranges; if the position being described is not a
 	// legitimate jumping-off point for a branch, tops[] and bots[]
 	// will be filled with 0s and all possibilities in eq will be
@@ -424,6 +429,8 @@ public:
 			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(RangeState)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
+		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
+		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
 		lastAllocSz_ = elts;
 		cur_ += elts;
 #ifndef NDEBUG
@@ -435,6 +442,14 @@ public:
 		}
 #endif
 		return lastAlloc_;
+	}
+
+	uint32_t curPool() const {
+		return curPool_;
+	}
+
+	uint32_t cur() const {
+		return cur_;
 	}
 
 protected:
@@ -455,7 +470,7 @@ protected:
 class Branch {
 	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
-	Branch() : lastBestCost_(0xffff), delayedCost_(0),
+	Branch() : lastPmSz_(0), delayedCost_(0),
 	           curtailed_(false), exhausted_(false), prepped_(false),
 	           delayedIncrease_(false) { }
 
@@ -473,7 +488,7 @@ public:
 	{
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
-		lastBestCost_ = 0xffff;
+		lastPmSz_ = 0;
 		delayedCost_ = 0;
 		depth0_ = depth0;
 		depth1_ = depth1;
@@ -555,20 +570,65 @@ public:
 	Branch* splitBranch(RangeStatePool& rpool,
 	                    AllocOnlyPool<Edit>& epool,
 	                    AllocOnlyPool<Branch>& bpool,
-	                    Branch *newBranch,
+	                    uint32_t pmSz,
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
 	                    bool qualOrder, const EbwtParams& ep,
-	                    const uint8_t* ebwt)
+	                    const uint8_t* ebwt
+	                    ASSERT_ONLY(, std::set<Branch*> branchSet))
 	{
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		assert(curtailed_);
-		if(lastBestCost_ == 0) {
+		assert_gt(pmSz, 0);
+		if(lastPmSz_ == pmSz) {
+#ifndef NDEBUG
+			if(branchSet != branchSet_) {
+				std::set<Branch*>::iterator it;
+				cout << "Current branch set:" << endl;
+				for(it = branchSet.begin(); it != branchSet.end(); it++) {
+					Branch *b = *it;
+					int stratum = b->cost_ >> 14;
+					assert_lt(stratum, 4);
+					int qual = b->cost_ & ~0xc000;
+					cout << "  " << b << ": " << b->cost_ << ", (" << stratum
+					     << ", " << qual << ")";
+					if(b->curtailed_) {
+						cout << " C";
+					}
+					if(b->exhausted_) {
+						cout << " E";
+					}
+					cout << endl;
+				}
+				cout << "Saved branch set:" << endl;
+				for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
+					Branch *b = *it;
+					int stratum = b->cost_ >> 14;
+					assert_lt(stratum, 4);
+					int qual = b->cost_ & ~0xc000;
+					cout << "  " << b << ": " << b->cost_ << ", (" << stratum
+					     << ", " << qual << ")";
+					if(b->curtailed_) {
+						cout << " C";
+					}
+					if(b->exhausted_) {
+						cout << " E";
+					}
+					cout << endl;
+				}
+				assert(false);
+			}
+#endif
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);
-			lastBestCost_ = 0xffff;
+			lastPmSz_ = 0;
 		}
+		assert_leq(allocPool, bpool.curPool());
+		assert(allocPool < bpool.curPool() || allocCur < bpool.cur());
+		assert_leq(ranges_->allocPool, rpool.curPool());
+		assert(ranges_->allocPool < rpool.curPool() || ranges_->allocCur < rpool.cur());
+		Branch *newBranch = bpool.alloc();
 		int tiedPositions[3];
 		int numTiedPositions = 0;
 		// Lowest marginal cost incurred by any of the positions with
@@ -640,17 +700,22 @@ public:
 		if(depth < depth1_) newDepth0 = depth1_;
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
-		lastBestCost_ = bestCost;
-		if(bestCost == 0) {
-			lastRpool_ = rpool.getPos();
-			lastEpool_ = epool.getPos();
-			lastBpool_ = bpool.getPos();
-		}
 		newBranch->init(
 				rpool, epool, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
 				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
 				top, bot, ep, ebwt, &edits_);
+		lastPmSz_ = pmSz;
+		lastRpool_ = rpool.getPos();
+		lastEpool_ = epool.getPos();
+		lastBpool_ = bpool.getPos();
+		ASSERT_ONLY(branchSet_ = branchSet);
+#ifndef NDEBUG
+		for(std::set<Branch*>::iterator it = branchSet_.begin(); it != branchSet_.end(); it++) {
+			Branch *b = *it;
+			assert_geq(b->cost_, this->cost_);
+		}
+#endif
 		// Add the new edit
 		newBranch->edits_.add(e, epool, qlen);
 		if(numNotEliminated == 1 && last) {
@@ -664,13 +729,13 @@ public:
 			// cost; update the best cost to be the next-best
 			assert_neq(0xffff, nextCost);
 			if(bestCost != nextCost) {
-				if(bestCost == 0) {
-					delayedCost_ = (cost_ - bestCost + nextCost);
-					delayedIncrease_ = true;
-				} else {
-					cost_ -= bestCost;
-					cost_ += nextCost;
-				}
+				assert_gt(nextCost, bestCost);
+				delayedCost_ = (cost_ - bestCost + nextCost);
+				delayedIncrease_ = true;
+				// TODO: Is this right?
+				// Invalidate the queue size measurement, since we're
+				// about to move elsewhere in the queue
+				//lastPmSz_ = 0;
 			}
 		}
 		return newBranch;
@@ -681,13 +746,16 @@ public:
 	 */
 	void finalize(RangeStatePool& rpool,
 	              AllocOnlyPool<Edit>& epool,
-	              AllocOnlyPool<Branch>& bpool)
+	              AllocOnlyPool<Branch>& bpool,
+	              uint32_t pmSz)
 	{
-		if(lastBestCost_ == 0) {
+		assert_gt(pmSz, 0);
+		if(lastPmSz_ == pmSz) {
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);
 		}
+		lastPmSz_ = 0;
 	}
 
 	/**
@@ -775,6 +843,8 @@ public:
 	 * half-and-half constraint).
 	 */
 	void curtail(RangeStatePool& rpool, int seedLen, bool qualOrder) {
+		assert(!curtailed_);
+		assert(!exhausted_);
 		if(ranges_ == NULL) {
 			exhausted_ = true;
 			curtailed_ = true;
@@ -925,6 +995,9 @@ public:
 		return true;
 	}
 
+	ASSERT_ONLY(uint32_t allocPool);
+	ASSERT_ONLY(uint32_t allocCur);
+
 	uint16_t depth0_; // no edits at depths < depth0
 	uint16_t depth1_; // at most 1 edit at depths < depth1
 	uint16_t depth2_; // at most 2 edits at depths < depth2
@@ -945,8 +1018,7 @@ public:
 	SideLocus ltop_;
 	SideLocus lbot_;
 	EditList edits_;   // edits leading to the root of the branch
-	uint16_t lastBestCost_; // cost of the last split-off branch;
-	                        // 0xffff if there haven't been splits yet
+	uint16_t lastPmSz_;
 	U32Pair lastRpool_;
 	U32Pair lastEpool_;
 	U32Pair lastBpool_;
@@ -960,6 +1032,7 @@ public:
 
 protected:
 
+	ASSERT_ONLY(std::set<Branch*> branchSet_);
 };
 
 /**
@@ -972,27 +1045,27 @@ public:
 	 * false -> a before b
 	 */
 	bool operator()(const Branch* a, const Branch* b) const {
+		bool aUnextendable = a->curtailed_ || a->exhausted_;
+		bool bUnextendable = b->curtailed_ || b->exhausted_;
 		// Branch with the best cost
 		if(a->cost_ == b->cost_) {
 			// If one or the other is curtailed, take the one that's
 			// still getting extended
-			if(b->curtailed_ && !a->curtailed_) {
+			if(bUnextendable && !aUnextendable) {
 				// a still being extended, return false
 				return false;
 			}
-			if(a->curtailed_ && !b->curtailed_) {
+			if(aUnextendable && !bUnextendable) {
 				// b still being extended, return true
 				return true;
 			}
 			// Either both are curtailed or both are still being
 			// extended, pick based on which one is deeper
-			if(a->tipDepth() == b->tipDepth()) {
-				return false;
-			}
-			else {
+			if(a->tipDepth() != b->tipDepth()) {
 				// Expression is true if b is deeper
 				return a->tipDepth() < b->tipDepth();
 			}
+			return a < b;
 		} else {
 			return b->cost_ < a->cost_;
 		}
@@ -1224,18 +1297,13 @@ class PathManager {
 
 public:
 
-	PathManager(AllocOnlyPool<Branch> *bpool_,
-	            RangeStatePool *rpool_,
-	            AllocOnlyPool<Edit> *epool_,
-	            int *btCnt = NULL) :
-	            branchQ_(),
-	            bpool(bpool_), rpool(rpool_), epool(epool_),
-	            minCost(0), btCnt_(btCnt)
-	{
-		assert(bpool != NULL);
-		assert(rpool != NULL);
-		assert(epool != NULL);
-	}
+	PathManager(int *btCnt = NULL) :
+		branchQ_(),
+		bpool((1 << 19), "branch"),
+		rpool(1 << 19),
+		epool((1 << 19), "edit"),
+		minCost(0), btCnt_(btCnt)
+	{ }
 
 	~PathManager() {
 		// All the RangeState's and Branch's are dropped at this point
@@ -1259,7 +1327,9 @@ public:
 #ifndef NDEBUG
 		// Also remove it from the set
 		assert(branchSet_.find(b) != branchSet_.end());
+		ASSERT_ONLY(size_t setSz = branchSet_.size());
 		branchSet_.erase(branchSet_.find(b));
+		assert_eq(setSz-1, branchSet_.size());
 		if(!branchQ_.empty()) {
 			// Top shouldn't be b any more
 			Branch *newtop = branchQ_.front();
@@ -1276,6 +1346,7 @@ public:
 	 * Push a new element onto the priority queue.
 	 */
 	void push(Branch *b) {
+		assert(!b->exhausted_);
 		branchQ_.push(b);
 #ifndef NDEBUG
 		// Also insert it into the set
@@ -1287,19 +1358,23 @@ public:
 	}
 
 	/**
+	 * Return the number of active branches in the best-first
+	 * BranchQueue.
+	 */
+	uint32_t size() {
+		return branchQ_.size();
+	}
+
+	/**
 	 * Reset the PathManager, clearing out the priority queue and
 	 * resetting the RangeStatePool.
 	 */
 	void reset() {
 		branchQ_.reset();
+		bpool.reset();
+		epool.reset();
+		rpool.reset();
 		ASSERT_ONLY(branchSet_.clear());
-		// These are now reset at the Aligner level
-//		assert(rpool != NULL);
-//		assert(bpool != NULL);
-//		assert(epool != NULL);
-//		rpool->reset();
-//		bpool->reset();
-//		epool->reset();
 		minCost = 0;
 	}
 
@@ -1341,7 +1416,7 @@ public:
 		assert(!br->exhausted_);
 		assert(!br->curtailed_);
 		uint16_t origCost = br->cost_;
-		br->curtail(*rpool, seedLen, qualOrder);
+		br->curtail(rpool, seedLen, qualOrder);
 		assert(br->curtailed_);
 		assert_geq(br->cost_, origCost);
 		if(br->exhausted_) {
@@ -1377,16 +1452,16 @@ public:
 		Branch *f = front();
 		while(f->exhausted_ || f->delayedIncrease_) {
 			if(f->exhausted_) {
-				f->finalize(*rpool, *epool, *bpool);
+				f->finalize(rpool, epool, bpool, size());
 				pop();
 				if(empty()) return;
 			} else if(f->delayedIncrease_) {
 				assert_neq(0, f->delayedCost_);
+				f->finalize(rpool, epool, bpool, size());
+				pop();
 				f->cost_ = f->delayedCost_;
 				f->delayedIncrease_ = false;
 				f->delayedCost_ = 0;
-				f->finalize(*rpool, *epool, *bpool);
-				pop();
 				push(f);
 				assert(!empty());
 			}
@@ -1407,13 +1482,7 @@ public:
 			}
 			Branch* newbr = splitBranch(f, rand, qlen, seedLen,
 			                            qualOrder, ep, ebwt);
-			if(f->cost_ > origCost) {
-				// br's cost changed so we need to re-insert it into
-				// the priority queue
-				Branch *popped = pop();
-				assert(popped == f); // should be br!
-				push(popped); // re-insert
-			}
+			assert_eq(origCost, f->cost_);
 			assert(newbr != NULL);
 			push(newbr);
 			assert(newbr == front());
@@ -1437,9 +1506,10 @@ protected:
 	                    int seedLen, bool qualOrder,
 	                    const EbwtParams& ep, const uint8_t* ebwt)
 	{
-		Branch *dst = bpool->alloc();
-		src->splitBranch(*rpool, *epool, *bpool, dst, rand, qlen,
-		                 seedLen, qualOrder, ep, ebwt);
+		Branch* dst = src->splitBranch(
+				rpool, epool, bpool, size(), rand,
+		        qlen, seedLen, qualOrder, ep, ebwt
+		        ASSERT_ONLY(, branchSet_));
 		assert(dst->repOk());
 		return dst;
 	}
@@ -1459,9 +1529,9 @@ protected:
 
 public:
 
-	AllocOnlyPool<Branch> *bpool; // pool for allocating Branches
-	RangeStatePool *rpool; // pool for allocating RangeStates
-	AllocOnlyPool<Edit> *epool; // pool for allocating Edits
+	AllocOnlyPool<Branch> bpool; // pool for allocating Branches
+	RangeStatePool rpool; // pool for allocating RangeStates
+	AllocOnlyPool<Edit> epool; // pool for allocating Edits
 	/// The minimum possible cost for any alignments obtained by
 	/// advancing further
 	uint16_t minCost;
@@ -1627,9 +1697,6 @@ public:
 		bool verbose,
 		bool mate1,
 		uint32_t minCostAdjustment,
-		AllocOnlyPool<Branch>* bpool,
-		RangeStatePool* rpool,
-		AllocOnlyPool<Edit>* epool,
 		int *btCnt) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
@@ -1637,7 +1704,7 @@ public:
 		params_(params),
 		fw_(fw), rs_(rs),
 		ebwtFw_(rs_->curEbwt()->fw()),
-		pm_(bpool, rpool, epool, btCnt)
+		pm_(btCnt)
 	{
 		assert(rs_ != NULL);
 	}

@@ -119,6 +119,8 @@ public:
 			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(T)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
+		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
+		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
 		lastAllocSz_ = 1;
 		cur_ ++;
 		return lastAlloc_;
@@ -146,9 +148,25 @@ public:
 			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(T)));
 		}
 		lastAlloc_ = &pools_[curPool_][cur_];
+		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
+		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
 		lastAllocSz_ = num;
 		cur_ += num;
 		return lastAlloc_;
+	}
+
+	/**
+	 * Return the current pool.
+	 */
+	uint32_t curPool() const {
+		return curPool_;
+	}
+
+	/**
+	 * Return the current position within the current pool.
+	 */
+	uint32_t cur() const {
+		return cur_;
 	}
 
 protected:
