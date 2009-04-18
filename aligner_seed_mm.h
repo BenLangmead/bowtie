@@ -82,10 +82,10 @@ public:
 		if(seedMms_ == 0) {
 			const int halfAndHalf = 0;
 			EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true,  qualCutoff_, true, false,
+				 ebwtBw_, true,  qualCutoff_, true, verbose_,
 				 halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, qualCutoff_, true, false,
+				&ebwtFw_, false, qualCutoff_, true, verbose_,
 				halfAndHalf, false, maqPenalty_, qualOrder_, metrics_);
 			EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 				*params, rFw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,

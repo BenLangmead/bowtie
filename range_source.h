@@ -622,7 +622,14 @@ public:
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);
+#ifndef NDEBUG
+			std::set<Branch*>::iterator it;
+			for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
+				Branch *b = *it;
+				assert_gt(b->cost_, 0);
+			}
 			lastPmSz_ = 0;
+#endif
 		}
 		assert_leq(allocPool, bpool.curPool());
 		assert(allocPool < bpool.curPool() || allocCur < bpool.cur());
@@ -754,6 +761,13 @@ public:
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);
+#ifndef NDEBUG
+			std::set<Branch*>::iterator it;
+			for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
+				Branch *b = *it;
+				assert_gt(b->cost_, 0);
+			}
+#endif
 		}
 		lastPmSz_ = 0;
 	}
@@ -1305,10 +1319,7 @@ public:
 		minCost(0), btCnt_(btCnt)
 	{ }
 
-	~PathManager() {
-		// All the RangeState's and Branch's are dropped at this point
-		// as their respective Pools are dropped
-	}
+	~PathManager() { }
 
 	/**
 	 * Return the "front" (highest-priority) branch in the collection.
@@ -1451,24 +1462,29 @@ public:
 		}
 		Branch *f = front();
 		while(f->exhausted_ || f->delayedIncrease_) {
+			uint32_t sz = size();
 			if(f->exhausted_) {
-				f->finalize(rpool, epool, bpool, size());
-				pop();
+				assert(!f->delayedIncrease_);
+				ASSERT_ONLY(Branch *popped =) pop();
+				assert(popped == f);
+				f->finalize(rpool, epool, bpool, sz);
 				if(empty()) return;
 			} else if(f->delayedIncrease_) {
 				assert_neq(0, f->delayedCost_);
-				f->finalize(rpool, epool, bpool, size());
-				pop();
+				ASSERT_ONLY(Branch *popped =) pop();
+				assert(popped == f);
+				f->finalize(rpool, epool, bpool, sz);
 				f->cost_ = f->delayedCost_;
 				f->delayedIncrease_ = false;
 				f->delayedCost_ = 0;
+				assert_eq(0, f->lastPmSz_);
 				push(f);
 				assert(!empty());
 			}
 			f = front();
 		}
 		if(f->curtailed_) {
-			uint16_t origCost = f->cost_;
+			ASSERT_ONLY(uint16_t origCost = f->cost_);
 			// This counts as a backtrack
 			if(btCnt_ != NULL) {
 				if(--(*btCnt_) == 0) {
