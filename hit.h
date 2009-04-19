@@ -789,11 +789,8 @@ public:
 			// reportable hits exceeded the -m limit specified by the
 			// user
 			assert(ret == 0 || ret > _max);
-			bool rev = false;
-			if(p.reverse()) { rev = true; p.reverseRead(); }
 			if(ret > 0) _sink.dumpMaxed(p);
 			else        _sink.dumpUnalign(p);
-			if(rev) p.reverseRead();
 		}
 		if(_bufferedHits.size() > 0) {
 			// Flush buffered hits

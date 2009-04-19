@@ -115,17 +115,6 @@ struct ReadBuf {
 		seqan::clear(name);
 	}
 
-	void reverseAll() {
-		::reverseInPlace(patFw);
-		::reverseInPlace(patRc);
-		::reverseInPlace(qualFw);
-		::reverseInPlace(qualRc);
-		::reverseInPlace(patFwRev);
-		::reverseInPlace(patRcRev);
-		::reverseInPlace(qualFwRev);
-		::reverseInPlace(qualRcRev);
-	}
-
 	/// Return true iff the read (pair) is empty
 	bool empty() {
 		return seqan::empty(patFw);
@@ -136,24 +125,43 @@ struct ReadBuf {
 		return seqan::length(patFw);
 	}
 
-	void constructReverse() {
+	/**
+	 * Given patFw and qualFw, construct patRc and qualRc in place.
+	 */
+	void constructRevComps() {
 		uint32_t len = length();
+		assert_gt(len, 0);
+		_setBegin(patRc,  (Dna5*)patBufRc);
+		_setBegin(qualRc, (char*)qualBufRc);
+		_setLength(patRc,  len);
+		_setLength(qualRc, len);
+		_setCapacity(patRc,  BUF_SIZE);
+		_setCapacity(qualRc, BUF_SIZE);
+		for(uint32_t i = 0; i < len; i++) {
+			patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
+			qualBufRc[i] = qualBufFw[len-i-1];
+		}
+	}
 
+	/**
+	 * Given patFw, patRc, qualFw and qualRc, construct the *Rev
+	 * versions in place.
+	 */
+	void constructReverses() {
+		uint32_t len = length();
+		assert_gt(len, 0);
 		_setBegin(patFwRev,  (Dna5*)patBufFwRev);
 		_setBegin(patRcRev,  (Dna5*)patBufRcRev);
 		_setBegin(qualFwRev, (char*)qualBufFwRev);
 		_setBegin(qualRcRev, (char*)qualBufRcRev);
-
 		_setLength(patFwRev,  len);
 		_setLength(patRcRev,  len);
 		_setLength(qualFwRev, len);
 		_setLength(qualRcRev, len);
-
 		_setCapacity(patFwRev,  BUF_SIZE);
 		_setCapacity(patRcRev,  BUF_SIZE);
 		_setCapacity(qualFwRev, BUF_SIZE);
 		_setCapacity(qualRcRev, BUF_SIZE);
-
 		for(uint32_t i = 0; i < len; i++) {
 			patFwRev[i]  = patFw[len-i-1];
 			patRcRev[i]  = patRc[len-i-1];
@@ -192,8 +200,6 @@ struct ReadBuf {
 
 	static const int BUF_SIZE = 1024;
 
-	bool          reversed;
-
 	String<Dna5>  patFw;               // forward-strand sequence
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
 	String<Dna5>  patRc;               // reverse-complement sequence
@@ -229,12 +235,10 @@ struct ReadBuf {
  */
 class PatternSource {
 public:
-	PatternSource(bool reverse = false,
-	              bool randomizeQuals = false,
+	PatternSource(bool randomizeQuals = false,
 	              bool useSpinlock = true,
 	              const char *dumpfile = NULL) :
 	    readCnt_(0),
-	    reverse_(reverse),
 		dumpfile_(dumpfile),
 		numWrappers_(0),
 		doLocking_(true),
@@ -267,6 +271,43 @@ public:
 	/**
 	 * The main member function for dispensing patterns.
 	 */
+	virtual void nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// nextPatternImpl does the reading from the ultimate source;
+		// it is implemented in concrete subclasses
+		nextReadPairImpl(ra, rb, patid);
+		if(!ra.empty()) {
+			assert(!rb.empty());
+			// Possibly randomize the qualities so that they're more
+			// scattered throughout the range of possible values
+			if(randomizeQuals_) {
+				randomizeQuals(ra);
+				randomizeQuals(rb);
+			}
+			// TODO: Perhaps bundle all of the following up into a
+			// finalize() member in the ReadBuf class?
+
+			// Construct the reversed versions of the fw and rc seqs
+			// and quals
+			ra.constructRevComps();
+			ra.constructReverses();
+			rb.constructRevComps();
+			rb.constructReverses();
+			// Fill in the random-seed field using a combination of
+			// information from the user-specified seed and the read
+			// sequence, qualities, and name
+			ra.seed = genRandSeed(ra.patFw, ra.qualFw, ra.name);
+			rb.seed = genRandSeed(rb.patFw, rb.qualFw, rb.name);
+		}
+		// Output it, if desired
+		if(dumpfile_ != NULL) {
+			dumpBuf(ra);
+			dumpBuf(rb);
+		}
+	}
+
+	/**
+	 * The main member function for dispensing patterns.
+	 */
 	virtual void nextRead(ReadBuf& r, uint32_t& patid) {
 		// nextPatternImpl does the reading from the ultimate source;
 		// it is implemented in concrete subclasses
@@ -275,24 +316,12 @@ public:
 			// Possibly randomize the qualities so that they're more
 			// scattered throughout the range of possible values
 			if(randomizeQuals_) {
-				const size_t rlen = r.length();
-				for(size_t i = 0; i < rlen; i++) {
-					if(i < rlen-1) {
-						r.qualFw[i] *= (r.qualFw[i+1] + 7);
-					}
-					if(i > 0) {
-						r.qualFw[i] *= (r.qualFw[i-1] + 11);
-					}
-					if(r.qualFw[i] < 0) r.qualFw[i] = -(r.qualFw[i]+1);
-					r.qualFw[i] %= 41;
-					assert_leq(r.qualFw[i], 40);
-					r.qualFw[i] += 33;
-					r.qualRc[rlen-i-1] = r.qualFw[i];
-				}
+				randomizeQuals(r);
 			}
 			// Construct the reversed versions of the fw and rc seqs
 			// and quals
-			r.constructReverse();
+			r.constructRevComps();
+			r.constructReverses();
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
@@ -300,16 +329,28 @@ public:
 		}
 		// Output it, if desired
 		if(dumpfile_ != NULL) {
-			dump(out_, r.patFw,
-			     empty(r.qualFw) ? String<char>("(empty)") : r.qualFw,
-			     empty(r.name)   ? String<char>("(empty)") : r.name);
-			dump(out_, r.patRc,
-			     empty(r.qualRc) ? String<char>("(empty)") : r.qualRc,
-			     empty(r.name)   ? String<char>("(empty)") : r.name);
+			dumpBuf(r);
 		}
 	}
-	/// Implementation to be provided by concrete subclasses
+
+	/**
+	 * Implementation to be provided by concrete subclasses.  An
+	 * implementation for this member is only relevant for formats that
+	 * can read in a pair of reads in a single transaction with a
+	 * single input source.  If paired-end input is given as a pair of
+	 * parallel files, this member should throw an error and exit.
+	 */
+	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+
+	/**
+	 * Implementation to be provided by concrete subclasses.  An
+	 * implementation for this member is only relevant for formats
+	 * where individual input sources look like single-end-read
+	 * sources, e.g., formats where paired-end reads are specified in
+	 * parallel read files.
+	 */
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) = 0;
+
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
 
@@ -354,6 +395,40 @@ public:
 protected:
 
 	/**
+	 * Mix up the quality values for ReadBuf r.  There's probably a
+	 * more (pseudo-)randomly rigorous way to do this; the output looks
+	 * pretty cyclic.
+	 */
+	void randomizeQuals(ReadBuf& r) {
+		const size_t rlen = r.length();
+		for(size_t i = 0; i < rlen; i++) {
+			if(i < rlen-1) {
+				r.qualFw[i] *= (r.qualFw[i+1] + 7);
+			}
+			if(i > 0) {
+				r.qualFw[i] *= (r.qualFw[i-1] + 11);
+			}
+			if(r.qualFw[i] < 0) r.qualFw[i] = -(r.qualFw[i]+1);
+			r.qualFw[i] %= 41;
+			assert_leq(r.qualFw[i], 40);
+			r.qualFw[i] += 33;
+		}
+	}
+
+	/**
+	 * Dump the contents of the ReadBuf to the dump file.
+	 */
+	void dumpBuf(const ReadBuf& r) {
+		assert(dumpfile_ != NULL);
+		dump(out_, r.patFw,
+		     empty(r.qualFw) ? String<char>("(empty)") : r.qualFw,
+		     empty(r.name)   ? String<char>("(empty)") : r.name);
+		dump(out_, r.patRc,
+		     empty(r.qualRc) ? String<char>("(empty)") : r.qualRc,
+		     empty(r.name)   ? String<char>("(empty)") : r.name);
+	}
+
+	/**
 	 * Default format for dumping a read to an output stream.  Concrete
 	 * subclasses might want to do something fancier.
 	 */
@@ -368,7 +443,6 @@ protected:
 	/// The number of reads read by this PatternSource
 	uint32_t readCnt_;
 
-	bool reverse_;         /// reverse patterns before returning them
 	const char *dumpfile_; /// dump patterns to this file before returning them
 	ofstream out_;         /// output stream for dumpfile
 	int numWrappers_;      /// # threads that own a wrapper for this PatternSource
@@ -385,15 +459,136 @@ protected:
 };
 
 /**
- * Encapsulates a synchronized source of both paired-end patterns and
- * unpaired patterns.
+ * Abstract parent class for synhconized sources of paired-end reads
+ * (and possibly also single-end reads).
  */
 class PairedPatternSource {
+public:
+	PairedPatternSource() {
+		MUTEX_INIT(lock_);
+	}
+	virtual ~PairedPatternSource() { }
+
+	virtual void addWrapper() = 0;
+	virtual void reset() = 0;
+	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+
+	/**
+	 * Lock this PairedPatternSource, usually because one of its shared
+	 * fields is being updated.
+	 */
+	void lock() {
+#ifdef USE_SPINLOCK
+		spinlock_.Enter();
+#else
+		MUTEX_LOCK(lock_);
+#endif
+	}
+
+	/**
+	 * Unlock this PairedPatternSource.
+	 */
+	void unlock() {
+#ifdef USE_SPINLOCK
+		spinlock_.Leave();
+#else
+		MUTEX_UNLOCK(lock_);
+#endif
+	}
+
+protected:
+
+#ifdef USE_SPINLOCK
+	SpinLock spinlock_;
+#endif
+	MUTEX_T lock_; /// mutex for locking critical regions
+};
+
+/**
+ * Encapsulates a synchronized source of both paired-end reads and
+ * unpaired reads, where the paired-end must come from parallel files.
+ */
+class PairedSoloPatternSource : public PairedPatternSource {
 
 public:
 
-	PairedPatternSource(const vector<PatternSource*>& srca,
-	                    const vector<PatternSource*>& srcb) :
+	PairedSoloPatternSource(const vector<PatternSource*>& src) :
+		cur_(0), src_(src)
+	{
+	    for(size_t i = 0; i < src_.size(); i++) {
+	    	assert(src_[i] != NULL);
+	    }
+	}
+
+	virtual ~PairedSoloPatternSource() { }
+
+	/**
+	 * Call this whenever this PairedPatternSource is wrapped by a new
+	 * WrappedPatternSourcePerThread.  This helps us keep track of
+	 * whether locks within PatternSources will be contended.
+	 */
+	virtual void addWrapper() {
+		for(size_t i = 0; i < src_.size(); i++) {
+			src_[i]->addWrapper();
+		}
+	}
+
+	/**
+	 * Reset this object and all the PatternSources under it so that
+	 * the next call to nextReadPair gets the very first read pair.
+	 */
+	virtual void reset() {
+		for(size_t i = 0; i < src_.size(); i++) {
+			src_[i]->reset();
+		}
+		cur_ = 0;
+	}
+
+	/**
+	 * The main member function for dispensing pairs of reads or
+	 * singleton reads.  Returns true iff ra and rb contain a new
+	 * pair; returns false if ra contains a new unpaired read.
+	 */
+	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		uint32_t cur = cur_;
+		while(cur < src_.size()) {
+			// Patterns from srca_[cur_] are unpaired
+			src_[cur]->nextReadPair(ra, rb, patid);
+			if(seqan::empty(ra.patFw)) {
+				// If patFw is empty, that's our signal that the
+				// input dried up
+				lock();
+				if(cur + 1 > cur_) cur_++;
+				cur = cur_;
+				unlock();
+				continue; // on to next pair of PatternSources
+			}
+			ra.fixMateName(1);
+			rb.fixMateName(2);
+			ra.patid = patid;
+			ra.mate  = 1;
+			rb.mate  = 2;
+			return true; // paired
+		}
+		return false;
+	}
+
+protected:
+
+	volatile uint32_t cur_; // current element in parallel srca_, srcb_ vectors
+	vector<PatternSource*> src_; /// PatternSources for paired-end reads
+};
+
+/**
+ * Encapsulates a synchronized source of both paired-end reads and
+ * unpaired reads, where the paired-end must come from parallel files.
+ */
+class PairedDualPatternSource : public PairedPatternSource {
+
+public:
+
+	PairedDualPatternSource(const vector<PatternSource*>& srca,
+	                        const vector<PatternSource*>& srcb) :
 		cur_(0), srca_(srca), srcb_(srcb)
 	{
 	    // srca_ and srcb_ must be parallel
@@ -407,15 +602,16 @@ public:
 		    	assert_neq(srca_[i], srcb_[j]);
 		    }
 	    }
-		MUTEX_INIT(lock_);
 	}
+
+	virtual ~PairedDualPatternSource() { }
 
 	/**
 	 * Call this whenever this PairedPatternSource is wrapped by a new
 	 * WrappedPatternSourcePerThread.  This helps us keep track of
 	 * whether locks within PatternSources will be contended.
 	 */
-	void addWrapper() {
+	virtual void addWrapper() {
 		for(size_t i = 0; i < srca_.size(); i++) {
 			srca_[i]->addWrapper();
 			if(srcb_[i] != NULL) {
@@ -428,7 +624,7 @@ public:
 	 * Reset this object and all the PatternSources under it so that
 	 * the next call to nextReadPair gets the very first read pair.
 	 */
-	void reset() {
+	virtual void reset() {
 		for(size_t i = 0; i < srca_.size(); i++) {
 			srca_[i]->reset();
 			if(srcb_[i] != NULL) {
@@ -439,32 +635,11 @@ public:
 	}
 
 	/**
-	 * Set whether to reverse reads as they're read in (useful when
-	 * using the mirror index).
-	 */
-//	void setReverse(bool r) {
-//		for(size_t i = 0; i < srca_.size(); i++) {
-//			srca_[i]->setReverse(r);
-//			if(srcb_[i] != NULL) {
-//				srcb_[i]->setReverse(r);
-//			}
-//		}
-//	}
-
-	/**
-	 * Return true iff the contained PatternSources are currently
-	 * reversing their output.
-	 */
-//	bool reverse() {
-//		return srca_[0]->reverse();
-//	}
-
-	/**
 	 * The main member function for dispensing pairs of reads or
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
-	bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		uint32_t cur = cur_;
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
@@ -537,37 +712,11 @@ public:
 		return false;
 	}
 
-	/**
-	 * Lock this PairedPatternSource, usually because one of its shared
-	 * fields is being updated.
-	 */
-	void lock() {
-#ifdef USE_SPINLOCK
-		spinlock_.Enter();
-#else
-		MUTEX_LOCK(lock_);
-#endif
-	}
-
-	/**
-	 * Unlock this PairedPatternSource.
-	 */
-	void unlock() {
-#ifdef USE_SPINLOCK
-		spinlock_.Leave();
-#else
-		MUTEX_UNLOCK(lock_);
-#endif
-	}
-
 protected:
+
 	volatile uint32_t cur_; // current element in parallel srca_, srcb_ vectors
 	vector<PatternSource*> srca_; /// PatternSources for 1st mates and/or unpaired reads
 	vector<PatternSource*> srcb_; /// PatternSources for 2nd mates
-#ifdef USE_SPINLOCK
-	SpinLock spinlock_;
-#endif
-	MUTEX_T lock_; /// mutex for locking critical regions
 };
 
 /**
@@ -580,24 +729,20 @@ protected:
 class PatternSourcePerThread {
 public:
 	PatternSourcePerThread() :
-		buf1_(), buf2_(), patid_(0xffffffff), reverse_(false) { }
+		buf1_(), buf2_(), patid_(0xffffffff) { }
 
 	virtual ~PatternSourcePerThread() { }
 
 	/**
-	 * Read the next read pair.  Reset reverse_ to indicate that this
-	 * object hasn't yet been used to reverse the sequence and quals.
+	 * Read the next read pair.
 	 */
-	virtual void nextReadPair() { reverse_ = false; }
+	virtual void nextReadPair() { }
 
 	ReadBuf& bufa()        { return buf1_;         }
 	ReadBuf& bufb()        { return buf2_;         }
 
 	uint32_t      patid()  { return patid_;        }
 	virtual void  reset()  { patid_ = 0xffffffff;  }
-	void    reverseRead()  { buf1_.reverseAll();
-	                         buf2_.reverseAll();
-	                         reverse_ = !reverse_;     }
 	bool          empty()  { return buf1_.empty();     }
 
 	/**
@@ -609,17 +754,10 @@ public:
 	    return ret;
 	}
 
-	/**
-	 * Return true iff the reads in the buffers bufa and bufb are
-	 * reversed from their original representation in the input reads.
-	 */
-	virtual bool reverse() { return reverse_; }
-
 protected:
 	ReadBuf  buf1_;    // read buffer for mate a
 	ReadBuf  buf2_;    // read buffer for mate b
 	uint32_t patid_;   // index of read just read
-	bool     reverse_; // whether the read is reversed
 };
 
 /**
@@ -677,12 +815,6 @@ public:
 		assert(buf1_.empty() || patid_ != lastPatid);
 	}
 
-	/**
-	 * Return true iff the reads in the buffers bufa and bufb are
-	 * reversed from their original representation in the input reads.
-	 */
-//	virtual bool reverse() { return reverse_ != patsrc_.reverse(); }
-
 private:
 
 	/// Container for obtaining paired reads from PatternSources
@@ -730,13 +862,12 @@ private:
  */
 class TrimmingPatternSource : public PatternSource {
 public:
-	TrimmingPatternSource(bool reverse = false,
-	                      bool randomizeQuals = false,
+	TrimmingPatternSource(bool randomizeQuals = false,
 	                      bool useSpinlock = true,
 	                      const char *dumpfile = NULL,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(reverse, randomizeQuals, useSpinlock, dumpfile),
+		PatternSource(randomizeQuals, useSpinlock, dumpfile),
 		trim3_(trim3),
 		trim5_(trim5) { }
 protected:
@@ -756,11 +887,10 @@ public:
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
 	                    uint32_t seed = 0) :
-		PatternSource(false, false, useSpinlock, dumpfile),
+		PatternSource(false, useSpinlock, dumpfile),
 		numReads_(numReads),
 		length_(length),
-		seed_(seed),
-		reverse_(false)
+		seed_(seed)
 	{
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << length_ << endl;
@@ -782,43 +912,45 @@ public:
 		patid = readCnt_;
 		readCnt_++;
 		unlock();
-		fillRandomRead(r, ra, length_, patid, reverse_);
+		fillRandomRead(r, ra, length_, patid);
 	}
+
+	/** Get the next random read and set patid */
+	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// Begin critical section
+		lock();
+		if(readCnt_ >= numReads_) {
+			ra.clearAll();
+			rb.clearAll();
+			unlock();
+			return;
+		}
+		uint32_t rna = rand_.nextU32();
+		uint32_t rnb = rand_.nextU32();
+		patid = readCnt_;
+		readCnt_++;
+		unlock();
+		fillRandomRead(ra, rna, length_, patid);
+		fillRandomRead(rb, rnb, length_, patid);
+	}
+
 	/** */
 	static void fillRandomRead(ReadBuf& r,
 	                           uint32_t ra,
 	                           int length,
-	                           uint32_t patid,
-	                           bool reverse)
+	                           uint32_t patid)
 	{
 		// End critical section
-		if(!reverse) {
-			for(int i = 0; i < length; i++) {
-				ra = RandomSource::nextU32(ra) >> 8;
-				r.patBufFw[i]           = (ra & 3);
-				r.patBufRc[length-i-1]  = (ra & 3) ^ 3;
-				char c                  = 'I' - ((ra >> 2) & 31);
-				r.qualBufFw[i]          = c;
-				r.qualBufRc[length-i-1] = c;
-			}
-		} else {
-			for(int i = 0; i < length; i++) {
-				ra = RandomSource::nextU32(ra) >> 8;
-				r.patBufFw[length-i-1]  = (ra & 3);
-				r.patBufRc[i]           = (ra & 3) ^ 3;
-				char c                  = 'I' - ((ra >> 2) & 31);
-				r.qualBufFw[length-i-1] = c;
-				r.qualBufRc[i]          = c;
-			}
+		for(int i = 0; i < length; i++) {
+			ra = RandomSource::nextU32(ra) >> 8;
+			r.patBufFw[i]           = (ra & 3);
+			char c                  = 'I' - ((ra >> 2) & 31);
+			r.qualBufFw[i]          = c;
 		}
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, length);
-		_setBegin (r.patRc, (Dna5*)r.patBufRc);
-		_setLength(r.patRc, length);
 		_setBegin (r.qualFw, r.qualBufFw);
 		_setLength(r.qualFw, length);
-		_setBegin (r.qualRc, r.qualBufRc);
-		_setLength(r.qualRc, length);
 		itoa10(patid, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, strlen(r.nameBuf));
@@ -831,16 +963,11 @@ public:
 		// nextU32() will return same pseudo-randoms as the last
 		rand_.init(seed_);
 	}
-	virtual bool reverse() const { return reverse_; }
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
-	}
 private:
 	uint32_t     numReads_; /// number of reads to dish out
 	int          length_;   /// length of reads
 	uint32_t     seed_;     /// seed for pseudo-randoms
 	RandomSource rand_;     /// pseudo-random generator
-	bool         reverse_;  /// whether to reverse reads
 };
 
 /**
@@ -852,14 +979,12 @@ public:
 	RandomPatternSourcePerThread(uint32_t numreads,
 	                             int length,
 	                             int numthreads,
-	                             int thread,
-	                             bool reverse) :
+	                             int thread) :
 		PatternSourcePerThread(),
 		numreads_(numreads),
 		length_(length),
 		numthreads_(numthreads),
-		thread_(thread),
-		reverse_(reverse)
+		thread_(thread)
 	{
 		patid_ = thread_;
 		if(length_ > 1024) {
@@ -877,9 +1002,9 @@ public:
 			return;
 		}
 		RandomPatternSource::fillRandomRead(
-			buf1_, rand_.nextU32(), length_, patid_, reverse_);
+			buf1_, rand_.nextU32(), length_, patid_);
 		RandomPatternSource::fillRandomRead(
-			buf2_, rand_.nextU32(), length_, patid_, reverse_);
+			buf2_, rand_.nextU32(), length_, patid_);
 		patid_ += numthreads_;
 	}
 
@@ -894,7 +1019,6 @@ private:
 	int          length_;
 	int          numthreads_;
 	int          thread_;
-	bool         reverse_;
 	RandomSource rand_;
 };
 
@@ -907,20 +1031,18 @@ public:
 			uint32_t numreads,
             int length,
             int numthreads,
-            int thread,
-            bool reverse) :
+            int thread) :
             numreads_(numreads),
             length_(length),
             numthreads_(numthreads),
-            thread_(thread),
-            reverse_(reverse) { }
+            thread_(thread) { }
 
 	/**
 	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
 		return new RandomPatternSourcePerThread(
-			numreads_, length_, numthreads_, thread_, reverse_);
+			numreads_, length_, numthreads_, thread_);
 	}
 
 	/**
@@ -931,7 +1053,7 @@ public:
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
 			v->push_back(new RandomPatternSourcePerThread(
-				numreads_, length_, numthreads_, thread_, reverse_));
+				numreads_, length_, numthreads_, thread_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -942,7 +1064,6 @@ private:
     int length_;
     int numthreads_;
     int thread_;
-    bool reverse_;
 };
 
 /// Skip to the end of the current string of newline chars and return
@@ -1004,16 +1125,14 @@ static inline void peekToEndOfLine(FileBuf& in) {
 class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(const vector<string>& v,
-	                    bool reverse = false,
 	                    bool randomizeQuals = false,
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
 	                    int trim3 = 0,
 	                    int trim5 = 0,
 		                uint32_t skip = 0) :
-		TrimmingPatternSource(false, randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
-		reverse_(reverse), cur_(skip), skip_(skip),
-		v_(), vrev_(), vrc_(), vrcrev_(), quals_(), qualsrev_()
+		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
+		cur_(skip), skip_(skip), paired_(false), v_(), quals_()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
@@ -1063,24 +1182,11 @@ public:
 			assert_eq(vq.length(), length(s));
 			v_.push_back(s);
 			quals_.push_back(vq);
-			{
-				vrev_.push_back(s);
-				::reverseInPlace(vrev_.back());
-				qualsrev_.push_back(vq);
-				::reverseInPlace(qualsrev_.back());
-			}
-			vrc_.push_back(reverseComplement(String<Dna5>(s)));
-			{
-				vrcrev_.push_back(reverseComplement(String<Dna5>(s)));
-				::reverseInPlace(vrcrev_.back());
-			}
 			ostringstream os;
 			os << (names_.size());
 			names_.push_back(os.str());
 		}
-		assert_eq(v_.size(), vrev_.size());
 		assert_eq(v_.size(), quals_.size());
-		assert_eq(v_.size(), qualsrev_.size());
 	}
 	virtual ~VectorPatternSource() { }
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
@@ -1091,27 +1197,13 @@ public:
 			unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
-			clear(r.patFw);
-			clear(r.patRc);
-			clear(r.qualFw);
-			clear(r.qualRc);
-			clear(r.name);
+			r.clearAll();
+			assert(r.empty());
 			return;
 		}
 		// Copy v_*, quals_* strings into the respective Strings
-		if(!reverse_) {
-			// not reversed
-			r.patFw  = v_[cur_];
-			r.patRc  = vrc_[cur_];
-			r.qualFw = quals_[cur_];
-			r.qualRc = qualsrev_[cur_];
-		} else {
-			// reversed
-			r.patFw  = vrev_[cur_];
-			r.patRc  = vrcrev_[cur_];
-			r.qualFw = qualsrev_[cur_];
-			r.qualRc = quals_[cur_];
-		}
+		r.patFw  = v_[cur_];
+		r.qualFw = quals_[cur_];
 		ostringstream os;
 		os << cur_;
 		r.name = os.str();
@@ -1120,36 +1212,63 @@ public:
 		patid = readCnt_;
 		unlock();
 	}
+	/**
+	 * This is unused, but implementation is given for completeness.
+	 */
+	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// Let Strings begin at the beginning of the respective bufs
+		ra.reset();
+		rb.reset();
+		if(!paired_) {
+			paired_ = true;
+			cur_ <<= 1;
+		}
+		lock();
+		if(cur_ >= v_.size()-1) {
+			unlock();
+			// Clear all the Strings, as a signal to the caller that
+			// we're out of reads
+			ra.clearAll();
+			rb.clearAll();
+			assert(ra.empty());
+			assert(rb.empty());
+			return;
+		}
+		// Copy v_*, quals_* strings into the respective Strings
+		ra.patFw  = v_[cur_];
+		ra.qualFw = quals_[cur_];
+		cur_++;
+		rb.patFw  = v_[cur_];
+		rb.qualFw = quals_[cur_];
+		ostringstream os;
+		os << readCnt_;
+		ra.name = os.str();
+		rb.name = os.str();
+		cur_++;
+		readCnt_++;
+		patid = readCnt_;
+		unlock();
+	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
 		cur_ = skip_;
-	}
-	virtual bool reverse() const { return reverse_; }
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
+		paired_ = false;
 	}
 private:
-	bool   reverse_;
 	size_t cur_;
 	uint32_t skip_;
+	bool paired_;
 	vector<String<Dna5> > v_;        /// forward sequences
-	vector<String<Dna5> > vrev_;     /// reversed forward sequences
-	vector<String<Dna5> > vrc_;      /// rev-comp sequences
-	vector<String<Dna5> > vrcrev_;   /// reversed rev-comp sequences
 	vector<String<char> > quals_;    /// quality values parallel to v_
-	vector<String<char> > qualsrev_; /// quality values parallel to vrev_
 	vector<String<char> > names_;    /// names
 };
 
 /**
- * Supports reversing all strings as they're read in.  Also supports
- * returning reverse complements interspersed with forward versions of
- * patterns.
+ *
  */
 class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
 	BufferedFilePatternSource(const vector<string>& infiles,
-	                          bool reverse = false,
 	                          bool randomizeQuals = false,
 	                          bool useSpinlock = true,
 	                          bool __forgiveInput = false,
@@ -1157,7 +1276,7 @@ public:
 	                          int trim3 = 0,
 	                          int trim5 = 0,
 	                          uint32_t skip = 0) :
-		TrimmingPatternSource(reverse, randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
+		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
 		filebuf_(),
@@ -1223,6 +1342,52 @@ public:
 		// finished with the reads
 	}
 	/**
+	 *
+	 */
+	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// We are entering a critical region, because we're
+		// manipulating our file handle and filecur_ state
+		lock();
+		bool notDone = true;
+		do {
+			readPair(ra, rb, patid);
+			// Try again if ra is empty (indicating an error) and input
+			// is not yet exhausted, OR if we have more reads to skip
+			// over
+			notDone = seqan::empty(ra.patFw) && !filebuf_.eof();
+		} while(notDone || (!filebuf_.eof() && patid < skip_));
+		if(patid < skip_) {
+			unlock();
+			ra.clearAll();
+			rb.clearAll();
+			assert(seqan::empty(ra.patFw));
+			return;
+		}
+		if(first_ && seqan::empty(ra.patFw) && !forgiveInput_) {
+			// No reads could be extracted from the first _infile
+			cerr << "Warning: Could not find any read pairs in \"" << infiles_[0] << "\"" << endl;
+		}
+		first_ = false;
+		while(seqan::empty(ra.patFw) && filecur_ < infiles_.size()) {
+			// Open next file
+			open();
+			resetForNextFile(); // reset state to handle a fresh file
+			do {
+				readPair(ra, rb, patid);
+			} while((seqan::empty(ra.patFw) && !filebuf_.eof()));
+			assert_geq(patid, skip_);
+			if(seqan::empty(ra.patFw) && !forgiveInput_) {
+				// No reads could be extracted from this _infile
+				cerr << "Warning: Could not find any reads in \"" << infiles_[filecur_] << "\"" << endl;
+			}
+			filecur_++;
+		}
+		// Leaving critical region
+		unlock();
+		// If ra.patFw is empty, then the caller knows that we are
+		// finished with the reads
+	}
+	/**
 	 * Reset state so that we read start reading again from the
 	 * beginning of the first file.  Should only be called by the
 	 * master thread.
@@ -1236,9 +1401,12 @@ public:
 protected:
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
-	virtual void read(ReadBuf& r, uint32_t& patid) = 0; // length of name
+	virtual void read(ReadBuf& r, uint32_t& patid) = 0;
+	/// Read another pattern pair from the input file; this is
+	/// overridden to deal with specific file formats
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
 	/// Reset state to handle a fresh file
-	virtual void resetForNextFile() = 0;
+	virtual void resetForNextFile() { }
 	void open() {
 		if(filebuf_.isOpen()) filebuf_.close();
 		while(filecur_ < infiles_.size()) {
@@ -1274,7 +1442,6 @@ protected:
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
 	FastaPatternSource(const vector<string>& infiles,
-	                   bool reverse = false,
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
@@ -1282,18 +1449,14 @@ public:
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, false, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
 		                          __forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
-		first_(true), reverse_(reverse)
+		first_(true)
 	{ }
 	virtual void reset() {
 		first_ = true;
 		BufferedFilePatternSource::reset();
-	}
-	virtual bool reverse() const { return reverse_; }
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
 	}
 protected:
 	/**
@@ -1309,7 +1472,6 @@ protected:
 	}
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		const int bufSz = ReadBuf::BUF_SIZE;
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
@@ -1359,61 +1521,26 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
-		if(!reverse_) {
-			while(c != '>' && c != '#') {
-				// Note: can't have a comment in the middle of a sequence,
-				// though a comment can end a sequence
-				if(isalpha(c) && begin++ >= this->trim5_) {
-					if(dstLen + 1 > 1024) {
-						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							 << "reads and re-run Bowtie";
-						exit(1);
-					}
-					r.patBufFw [dstLen] = charToDna5[c];
-					r.qualBufFw[dstLen] = 'I';
-					r.patBufRc [bufSz-dstLen-1] = rcCharToDna5[c];
-					r.qualBufRc[bufSz-dstLen-1] = 'I';
-					dstLen++;
+		while(c != '>' && c != '#') {
+			// Note: can't have a comment in the middle of a sequence,
+			// though a comment can end a sequence
+			if(isalpha(c) && begin++ >= this->trim5_) {
+				if(dstLen + 1 > 1024) {
+					cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+						 << "reads and re-run Bowtie";
+					exit(1);
 				}
-				if((c = filebuf_.get()) < 0) break;
+				r.patBufFw [dstLen] = charToDna5[c];
+				r.qualBufFw[dstLen] = 'I';
+				dstLen++;
 			}
-			dstLen -= this->trim3_;
-			_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-			_setLength(r.patFw,  dstLen);
-			_setBegin (r.qualFw, r.qualBufFw);
-			_setLength(r.qualFw, dstLen);
-			_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
-			_setLength(r.patRc,  dstLen);
-			_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
-			_setLength(r.qualRc, dstLen);
-		} else {
-			while(c != '>' && c != '#') {
-				// Note: can't have a comment in the middle of a sequence,
-				// though a comment can end a sequence
-				if(isalpha(c) && begin++ >= this->trim5_) {
-					if(dstLen + 1 > 1024) {
-						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							 << "reads and re-run Bowtie";
-						exit(1);
-					}
-					r.patBufFw [bufSz-dstLen-1] = charToDna5[c];
-					r.qualBufFw[bufSz-dstLen-1] = 'I';
-					r.patBufRc [dstLen] = rcCharToDna5[c];
-					r.qualBufRc[dstLen] = 'I';
-					dstLen++;
-				}
-				if((c = filebuf_.get()) < 0) break;
-			}
-			dstLen -= this->trim3_;
-			_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
-			_setLength(r.patFw,  dstLen);
-			_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
-			_setLength(r.qualFw, dstLen);
-			_setBegin (r.patRc,  (Dna5*)r.patBufRc);
-			_setLength(r.patRc,  dstLen);
-			_setBegin (r.qualRc, r.qualBufRc);
-			_setLength(r.qualRc, dstLen);
+			if((c = filebuf_.get()) < 0) break;
 		}
+		dstLen -= this->trim3_;
+		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+		_setLength(r.patFw,  dstLen);
+		_setBegin (r.qualFw, r.qualBufFw);
+		_setLength(r.qualFw, dstLen);
 
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
@@ -1425,6 +1552,15 @@ protected:
 		assert_gt(nameLen, 0);
 		readCnt_++;
 		patid = readCnt_-1;
+	}
+	/// Read another pair of patterns from a FASTA input file
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// (For now, we shouldn't ever be here)
+		cerr << "In FastaPatternSource.readPair()" << endl;
+		exit(1);
+		read(ra, patid);
+		readCnt_--;
+		read(rb, patid);
 	}
 	virtual void resetForNextFile() {
 		first_ = true;
@@ -1438,7 +1574,332 @@ protected:
 	}
 private:
 	bool first_;
-	bool reverse_;
+	int policy_;
+};
+
+extern void wrongQualityScale();
+extern void wrongQualityFormat();
+extern void tooFewQualities(const String<char>& read_name);
+
+/**
+ * Synchronized concrete pattern source for a list of files with tab-
+ * delimited name, seq, qual fields (or, for paired-end reads,
+ * basename, seq1, qual1, seq2, qual2).
+ */
+class TabbedPatternSource : public BufferedFilePatternSource {
+public:
+	TabbedPatternSource(const vector<string>& infiles,
+	                   bool randomizeQuals = false,
+	                   bool useSpinlock = true,
+	                   const char *dumpfile = NULL,
+	                   int trim3 = 0,
+	                   int trim5 = 0,
+	                   bool __forgiveInput = false,
+					   bool solQuals = false,
+					   bool intQuals = false,
+	                   uint32_t skip = 0) :
+		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
+		                          __forgiveInput, dumpfile,
+		                          trim3, trim5, skip),
+		solQuals_(solQuals),
+		intQuals_(intQuals)
+	{ }
+
+protected:
+
+	/// Read another pattern from a FASTA input file
+	virtual void read(ReadBuf& r, uint32_t& patid) {
+		// filebuf_ is about to dish out the first character of the
+		// name field
+		if(parseName(r, NULL, '\t') == -1) {
+			r.clearAll(); return;
+		}
+		assert_neq('\t', filebuf_.peek());
+
+		// filebuf_ is about to dish out the first character of the
+		// sequence field
+		int charsRead = 0;
+		int dstLen = parseSeq(r, charsRead, '\t');
+		assert_neq('\t', filebuf_.peek());
+		if(dstLen <= 0) {
+			r.clearAll(); return;
+		}
+
+		// filebuf_ is about to dish out the first character of the
+		// quality-string field
+		if(parseQuals(r, charsRead, dstLen, '\n') <= 0) {
+			r.clearAll(); return;
+		}
+		assert_neq('\n', filebuf_.peek());
+		// The last character read in parseQuals should have been a
+		// '\n'
+
+		readCnt_++;
+		patid = readCnt_-1;
+	}
+
+	/// Read another pair of patterns from a FASTA input file
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// filebuf_ is about to dish out the first character of the
+		// name field
+		if(parseName(ra, &rb, '\t') == -1) {
+			ra.clearAll();
+			rb.clearAll();
+			return;
+		}
+		assert_neq('\t', filebuf_.peek());
+
+		// filebuf_ is about to dish out the first character of the
+		// sequence field for the first mate
+		int charsRead1 = 0;
+		int dstLen1 = parseSeq(ra, charsRead1, '\t');
+		if(dstLen1 <= -1) {
+			ra.clearAll();
+			rb.clearAll();
+			return;
+		}
+		assert_neq('\t', filebuf_.peek());
+
+		// filebuf_ is about to dish out the first character of the
+		// quality-string field
+		if(parseQuals(ra, charsRead1, dstLen1, '\t') <= 0) {
+			ra.clearAll();
+			rb.clearAll();
+			return;
+		}
+		assert_neq('\t', filebuf_.peek());
+		// The last character read in parseQuals should have been a
+		// '\n'
+
+		// filebuf_ is about to dish out the first character of the
+		// sequence field for the second mate
+		int charsRead2 = 0;
+		int dstLen2 = parseSeq(rb, charsRead2, '\t');
+		if(dstLen2 <= 0) {
+			ra.clearAll();
+			rb.clearAll();
+			return;
+		}
+		assert_neq('\t', filebuf_.peek());
+
+		// filebuf_ is about to dish out the first character of the
+		// quality-string field
+		if(parseQuals(rb, charsRead2, dstLen2, '\n') <= 0) {
+			ra.clearAll();
+			rb.clearAll();
+			return;
+		}
+		assert_neq('\n', filebuf_.peek());
+		// The last character read in parseQuals should have been a
+		// '\n'
+
+		readCnt_++;
+		patid = readCnt_-1;
+	}
+
+	/**
+	 * Dump a FASTQ-style record for the read.
+	 */
+	virtual void dump(ostream& out,
+	                  const String<Dna5>& seq,
+	                  const String<char>& qual,
+	                  const String<char>& name)
+	{
+		out << "@" << name << endl << seq << endl
+		    << "+" << endl << qual << endl;
+	}
+private:
+
+	/**
+	 * Parse a name from filebuf_ and store in r.  Assume that the next
+	 * character obtained via filebuf_.get() is the first character of
+	 * the sequence and the string stops at the next char upto (could
+	 * be tab, newline, etc.).
+	 */
+	int parseName(ReadBuf& r, ReadBuf* r2, char upto = '\t') {
+		// Read the name out of the first field
+		int c = 0;
+		int nameLen = 0;
+		while(true) {
+			if((c = filebuf_.get()) < 0) {
+				return -1;
+			}
+			if(c == upto) {
+				// Finished with first field
+				break;
+			}
+			if(r2 != NULL) (*r2).nameBuf[nameLen] = c;
+			r.nameBuf[nameLen++] = c;
+		}
+		_setBegin(r.name, r.nameBuf);
+		_setLength(r.name, nameLen);
+		if(r2 != NULL) {
+			_setBegin((*r2).name, (*r2).nameBuf);
+			_setLength((*r2).name, nameLen);
+		}
+		// Set up a default name if one hasn't been set
+		if(nameLen == 0) {
+			itoa10(readCnt_, r.nameBuf);
+			_setBegin(r.name, r.nameBuf);
+			nameLen = strlen(r.nameBuf);
+			_setLength(r.name, nameLen);
+			if(r2 != NULL) {
+				itoa10(readCnt_, (*r2).nameBuf);
+				_setBegin((*r2).name, (*r2).nameBuf);
+				_setLength((*r2).name, nameLen);
+			}
+		}
+		assert_gt(nameLen, 0);
+		return nameLen;
+	}
+
+	/**
+	 * Parse a single sequence from filebuf_ and store in r.  Assume
+	 * that the next character obtained via filebuf_.get() is the first
+	 * character of the sequence and the sequence stops at the next
+	 * char upto (could be tab, newline, etc.).
+	 */
+	int parseSeq(ReadBuf& r, int& charsRead, char upto = '\t') {
+		int begin = 0;
+		int dstLen = 0;
+		int c = filebuf_.get();
+		assert(c != upto);
+		while(c != upto) {
+			// Note: can't have a comment in the middle of a sequence,
+			// though a comment can end a sequence
+			if(isalpha(c)) {
+				if(begin++ >= this->trim5_) {
+					assert_neq(0, dna4Cat[c]);
+					if(dstLen + 1 > 1024) {
+						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							 << "reads and re-run Bowtie";
+						exit(1);
+					}
+					r.patBufFw[dstLen] = charToDna5[c];
+					dstLen++;
+				}
+				charsRead++;
+			}
+			if((c = filebuf_.get()) < 0) {
+				r.clearAll(); return -1;
+			}
+		}
+		dstLen -= this->trim3_;
+		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+		_setLength(r.patFw,  dstLen);
+		return dstLen;
+	}
+
+	/**
+	 * Parse a single quality string from filebuf_ and store in r.
+	 * Assume that the next character obtained via filebuf_.get() is
+	 * the first character of the quality string and the string stops
+	 * at the next char upto (could be tab, newline, etc.).
+	 */
+	int parseQuals(ReadBuf& r, int charsRead, int dstLen, char upto = '\t') {
+		int qualsRead = 0;
+		int c = 0;
+		if (intQuals_) {
+			char buf[4096];
+			while (qualsRead < charsRead) {
+				size_t rd = filebuf_.gets(buf, sizeof(buf));
+				if(rd == 0) break;
+				assert(NULL == strrchr(buf, '\n'));
+				vector<string> s_quals;
+				tokenize(string(buf), " ", s_quals);
+				for (unsigned int j = 0; j < s_quals.size(); ++j) {
+					int iQ = atoi(s_quals[j].c_str());
+					int pQ;
+					if (solQuals_) {
+						// Convert from solexa quality to phred
+						// quality and translate to ASCII
+						// http://maq.sourceforge.net/qual.shtml
+						pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+					}
+					else {
+						// Keep the phred quality and translate
+						// to ASCII
+						pQ = (iQ <= 93 ? iQ : 93) + 33;
+						if (pQ < 33)
+						{
+							cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
+							wrongQualityScale();
+							exit(1);
+						}
+					}
+
+					if (qualsRead >= trim5_) {
+						size_t off = qualsRead - trim5_;
+						if(off + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+								 << "Please truncate reads and quality values and and re-run Bowtie";
+							exit(1);
+						}
+						c = (char)(pQ);
+						assert_geq(c, 33);
+						assert_leq(c, 73);
+						r.qualBufFw[off] = c;
+					}
+					++qualsRead;
+				}
+			} // done reading integer quality lines
+			if (charsRead > qualsRead) {
+				tooFewQualities(r.name);
+				exit(1);
+			}
+		} else {
+			// Non-integer qualities
+			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
+				c = filebuf_.get();
+				if (c == ' ') {
+					wrongQualityFormat();
+					exit(1);
+				}
+				if(c < 0) {
+					// EOF occurred in the middle of a read - abort
+					seqan::clear(r.patFw);
+					return -1;
+				}
+				if(!isspace(c) && c != upto) {
+					if (qualsRead >= trim5_) {
+						size_t off = qualsRead - trim5_;
+						if(off + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+								 << "Please truncate reads and quality values and and re-run Bowtie";
+							exit(1);
+						}
+
+						if (solQuals_) {
+							// Convert solexa-scaled chars to phred
+							// http://maq.sourceforge.net/fastq.shtml
+							int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+							c = (char)(pQ);
+						} else {
+							// Keep the phred quality
+							if (c < 33) {
+								cerr << "Saw ASCII character " << ((int)c) << "." << endl;
+								wrongQualityScale();
+								exit(1);
+							}
+						}
+						assert_geq(c, 33);
+						r.qualBufFw[off] = c;
+					}
+					qualsRead++;
+				} else {
+					break;
+				}
+			}
+			assert_eq(qualsRead, dstLen + this->trim5_);
+		}
+		_setBegin (r.qualFw, (char*)r.qualBufFw);
+		_setLength(r.qualFw, dstLen);
+		while(c != upto) { c = filebuf_.get(); }
+		return qualsRead;
+	}
+
+	bool solQuals_;
+	bool intQuals_;
 	int policy_;
 };
 
@@ -1452,14 +1913,13 @@ public:
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
-	        bool reverse = false,
 	        bool useSpinlock = true,
 	        const char *dumpfile = NULL,
 	        uint32_t skip = 0,
 	        uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, false, useSpinlock,
+		BufferedFilePatternSource(infiles, false, useSpinlock,
 		                          false, dumpfile, 0, 0, skip),
-		length_(length), freq_(freq), reverse_(reverse),
+		length_(length), freq_(freq),
 		eat_(length_), bufCur_(0)
 	{
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
@@ -1497,17 +1957,11 @@ protected:
 							}
 							r.patBufFw [i] = charToDna5[c];
 							r.qualBufFw[i] = 'I';
-							r.patBufRc [length_-i-1] = rcCharToDna5[c];
-							r.qualBufRc[length_-i-1] = 'I';
 						}
 						_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 						_setLength(r.patFw,  length_);
 						_setBegin (r.qualFw, r.qualBufFw);
 						_setLength(r.qualFw, length_);
-						_setBegin (r.patRc,  (Dna5*)r.patBufRc);
-						_setLength(r.patRc,  length_);
-						_setBegin (r.qualRc, r.qualBufRc);
-						_setLength(r.qualRc, length_);
 						// Set up a default name if one hasn't been set
 						itoa10(readCnt_, r.nameBuf);
 						_setBegin(r.name, r.nameBuf);
@@ -1520,6 +1974,12 @@ protected:
 			}
 		}
 	}
+	/// Shouldn't ever be here; it's not sensible to obtain read pairs
+	// from a continuous input.
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		cerr << "In FastaContinuousPatternSource.readPair()" << endl;
+		exit(1);
+	}
 	/**
 	 * Reset state to be read for the next file.
 	 */
@@ -1530,7 +1990,6 @@ protected:
 private:
 	size_t length_;     /// length of reads to generate
 	size_t freq_;       /// frequency to sample reads
-	bool reverse_;      /// reverse reads on read-in
 	int policy_;        /// policy for handling Ns
 
 	size_t eat_;        /// number of characters we need to skip before
@@ -1542,10 +2001,6 @@ private:
 	                    /// insert the next character
 };
 
-extern void wrongQualityScale();
-extern void wrongQualityFormat();
-extern void tooFewQualities(const String<char>& read_name);
-
 /**
  * Read a FASTQ-format file.
  * See: http://maq.sourceforge.net/fastq.shtml
@@ -1553,7 +2008,6 @@ extern void tooFewQualities(const String<char>& read_name);
 class FastqPatternSource : public BufferedFilePatternSource {
 public:
 	FastqPatternSource(const vector<string>& infiles,
-	                   bool reverse = false,
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
@@ -1561,12 +2015,12 @@ public:
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
-					   bool integer_quals = true,
+					   bool integer_quals = false,
 					   uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, false, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
 		                          __forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
-		first_(true), reverse_(reverse),
+		first_(true),
 		solQuals_(solexa_quals),
 		intQuals_(integer_quals)
 	{
@@ -1579,10 +2033,6 @@ public:
 	virtual void reset() {
 		first_ = true;
 		BufferedFilePatternSource::reset();
-	}
-	virtual bool reverse() const { return reverse_; }
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
 	}
 protected:
 	/**
@@ -1695,67 +2145,32 @@ protected:
 		// filebuf_ now points just past the first character of a
 		// sequence line, and c holds the first character
 		int charsRead = 0;
-		if(!reverse_) {
-			while(c != '+') {
-				if(isalpha(c)) {
-					// If it's past the 5'-end trim point
-					if(charsRead >= this->trim5_) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-								 << "reads and re-run Bowtie";
-							exit(1);
-						}
-						r.patBufFw[dstLen] = charToDna5[c];
-						r.patBufRc[bufSz-dstLen-1] = rcCharToDna5[c];
-						dstLen++;
+		while(c != '+') {
+			if(isalpha(c)) {
+				// If it's past the 5'-end trim point
+				if(charsRead >= this->trim5_) {
+					if(dstLen + 1 > 1024) {
+						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
+							 << "reads and re-run Bowtie";
+						exit(1);
 					}
-					charsRead++;
+					r.patBufFw[dstLen] = charToDna5[c];
+					dstLen++;
 				}
-				c = filebuf_.get();
-				if(c < 0) {
-					// EOF occurred in the middle of a read - abort
-					seqan::clear(r.patFw);
-					return;
-				}
+				charsRead++;
 			}
-			// Trim from 3' end
-			dstLen -= this->trim3_;
-			// Set trimmed bounds of buffers
-			_setBegin(r.patFw, (Dna5*)r.patBufFw);
-			_setLength(r.patFw, dstLen);
-			_setBegin(r.patRc, (Dna5*)&r.patBufRc[bufSz-dstLen]);
-			_setLength(r.patRc, dstLen);
-		} else {
-			while(c != '+') {
-				if(isalpha(c)) {
-					// If it's past the 5'-end trim point
-					if(charsRead >= this->trim5_) {
-						if(dstLen + 1 > 1024) {
-							cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-								 << "reads and re-run Bowtie";
-							exit(1);
-						}
-						r.patBufFw[bufSz-dstLen-1] = charToDna5[c];
-						r.patBufRc[dstLen] = rcCharToDna5[c];
-						dstLen++;
-					}
-					charsRead++;
-				}
-				c = filebuf_.get();
-				if(c < 0) {
-					// EOF occurred in the middle of a read - abort
-					seqan::clear(r.patFw);
-					return;
-				}
+			c = filebuf_.get();
+			if(c < 0) {
+				// EOF occurred in the middle of a read - abort
+				seqan::clear(r.patFw);
+				return;
 			}
-			// Trim from 3' end
-			dstLen -= this->trim3_;
-			// Set trimmed bounds of buffers
-			_setBegin(r.patFw, (Dna5*)&r.patBufFw[bufSz-dstLen]);
-			_setLength(r.patFw, dstLen);
-			_setBegin(r.patRc, (Dna5*)r.patBufRc);
-			_setLength(r.patRc, dstLen);
 		}
+		// Trim from 3' end
+		dstLen -= this->trim3_;
+		// Set trimmed bounds of buffers
+		_setBegin(r.patFw, (Dna5*)r.patBufFw);
+		_setLength(r.patFw, dstLen);
 		assert_eq('+', c);
 
 		// Chew up the optional name on the '+' line
@@ -1771,87 +2186,44 @@ protected:
 				assert(NULL == strrchr(buf, '\n'));
 				vector<string> s_quals;
 				tokenize(string(buf), " ", s_quals);
-				if(!reverse_) {
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
+				for (unsigned int j = 0; j < s_quals.size(); ++j)
+				{
+					int iQ = atoi(s_quals[j].c_str());
+					int pQ;
+					if (solQuals_)
 					{
-						int iQ = atoi(s_quals[j].c_str());
-						int pQ;
-						if (solQuals_)
+						// Convert from solexa quality to phred
+						// quality and translate to ASCII
+						// http://maq.sourceforge.net/qual.shtml
+						pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+					}
+					else
+					{
+						// Keep the phred quality and translate
+						// to ASCII
+						pQ = (iQ <= 93 ? iQ : 93) + 33;
+						if (pQ < 33)
 						{
-							// Convert from solexa quality to phred
-							// quality and translate to ASCII
-							// http://maq.sourceforge.net/qual.shtml
-							pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+							cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
+							wrongQualityScale();
+							exit(1);
 						}
-						else
-						{
-							// Keep the phred quality and translate
-							// to ASCII
-							pQ = (iQ <= 93 ? iQ : 93) + 33;
-							if (pQ < 33)
-							{
-								cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-								wrongQualityScale();
-								exit(1);
-							}
-						}
+					}
 
-						if (qualsRead >= trim5_)
-						{
-							size_t off = qualsRead - trim5_;
-							if(off + 1 > 1024) {
-								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									 << "Please truncate reads and quality values and and re-run Bowtie";
-								exit(1);
-							}
-							c = (char)(pQ);
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							r.qualBufFw[off] = c;
-							r.qualBufRc[bufSz - off - 1] = c;
-						}
-						++qualsRead;
-					}
-				} else {
-					for (unsigned int j = 0; j < s_quals.size(); ++j)
+					if (qualsRead >= trim5_)
 					{
-						int iQ = atoi(s_quals[j].c_str());
-						int pQ;
-						if (solQuals_)
-						{
-							// Convert from solexa quality to phred
-							// quality and translate to ASCII
-							// http://maq.sourceforge.net/qual.shtml
-							pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+						size_t off = qualsRead - trim5_;
+						if(off + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+								 << "Please truncate reads and quality values and and re-run Bowtie";
+							exit(1);
 						}
-						else
-						{
-							// Keep the phred quality and translate
-							// to ASCII
-							pQ = (iQ <= 93 ? iQ : 93) + 33;
-							if (pQ < 33)
-							{
-								cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-								wrongQualityScale();
-								exit(1);
-							}
-						}
-						if (qualsRead >= trim5_)
-						{
-							size_t off = qualsRead - trim5_;
-							if(off + 1 > 1024) {
-								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									 << "Please truncate reads and quality values and and re-run Bowtie";
-								exit(1);
-							}
-							c = (char)(pQ);
-							assert_geq(c, 33);
-							assert_leq(c, 73);
-							r.qualBufFw[bufSz - off - 1] = c;
-							r.qualBufRc[off] = c;
-						}
-						++qualsRead;
+						c = (char)(pQ);
+						assert_geq(c, 33);
+						assert_leq(c, 73);
+						r.qualBufFw[off] = c;
 					}
+					++qualsRead;
 				}
 			} // done reading integer quality lines
 			//assert_eq(charsRead, qualsRead);
@@ -1860,129 +2232,62 @@ protected:
 				tooFewQualities(r.name);
 				exit(1);
 			}
-			if(!reverse_) {
-				_setBegin(r.qualFw, (char*)r.qualBufFw);
-				_setLength(r.qualFw, dstLen);
-				_setBegin(r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
-				_setLength(r.qualRc, dstLen);
-			} else {
-				_setBegin(r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
-				_setLength(r.qualFw, dstLen);
-				_setBegin(r.qualRc, (char*)r.qualBufRc);
-				_setLength(r.qualRc, dstLen);
-			}
+			_setBegin(r.qualFw, (char*)r.qualBufFw);
+			_setLength(r.qualFw, dstLen);
 			c = filebuf_.get();
 		}
 		else
 		{
 			// Non-integer qualities
-			if(!reverse_) {
-				while((qualsRead < dstLen + this->trim5_) && c >= 0) {
-					c = filebuf_.get();
-					if (c == ' ') {
-						wrongQualityFormat();
-						exit(1);
-					}
-					if(c < 0) {
-						// EOF occurred in the middle of a read - abort
-						seqan::clear(r.patFw);
-						return;
-					}
-					if (c != '\r' && c != '\n') {
-						if (qualsRead >= trim5_) {
-							size_t off = qualsRead - trim5_;
-							if(off + 1 > 1024) {
-								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									 << "Please truncate reads and quality values and and re-run Bowtie";
+			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
+				c = filebuf_.get();
+				if (c == ' ') {
+					wrongQualityFormat();
+					exit(1);
+				}
+				if(c < 0) {
+					// EOF occurred in the middle of a read - abort
+					seqan::clear(r.patFw);
+					return;
+				}
+				if (c != '\r' && c != '\n') {
+					if (qualsRead >= trim5_) {
+						size_t off = qualsRead - trim5_;
+						if(off + 1 > 1024) {
+							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+								 << "Please truncate reads and quality values and and re-run Bowtie";
+							exit(1);
+						}
+
+						if (solQuals_)
+						{
+							// Convert solexa-scaled chars to phred
+							// http://maq.sourceforge.net/fastq.shtml
+							int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+							c = (char)(pQ);
+						}
+						else
+						{
+							// Keep the phred quality
+							if (c < 33)
+							{
+								cerr << "Saw ASCII character " << ((int)c) << "." << endl;
+								wrongQualityScale();
 								exit(1);
 							}
-
-							if (solQuals_)
-							{
-								// Convert solexa-scaled chars to phred
-								// http://maq.sourceforge.net/fastq.shtml
-								int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-								c = (char)(pQ);
-							}
-							else
-							{
-								// Keep the phred quality
-								if (c < 33)
-								{
-									cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-									wrongQualityScale();
-									exit(1);
-								}
-							}
-
-							assert_geq(c, 33);
-							r.qualBufFw[off] = c;
-							r.qualBufRc[bufSz - off - 1] = c;
 						}
-						qualsRead++;
-					} else {
-						break;
-					}
-				}
-				assert_eq(qualsRead, dstLen + this->trim5_);
-				_setBegin (r.qualFw, (char*)r.qualBufFw);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.qualRc, (char*)&r.qualBufRc[bufSz-dstLen]);
-				_setLength(r.qualRc, dstLen);
-			} else {
-				while((qualsRead < dstLen + this->trim5_) && c >= 0) {
-					c = filebuf_.get();
-					if (c == ' ') {
-						wrongQualityFormat();
-						exit(1);
-					}
-					if(c < 0) {
-						// EOF occurred in the middle of a read - abort
-						seqan::clear(r.patFw);
-						return;
-					}
-					if (c != '\r' && c != '\n') {
-						if (qualsRead >= trim5_) {
-							size_t off = qualsRead - trim5_;
-							if(off + 1 > 1024) {
-								cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-									 << "Please truncate reads and quality values and and re-run Bowtie";
-								exit(1);
-							}
 
-							if (solQuals_)
-							{
-								// Convert solexa-scaled chars to phred
-								// http://maq.sourceforge.net/fastq.shtml
-								int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-								c = (char)(pQ);
-							}
-							else
-							{
-								// Keep the phred quality
-								if (c < 33)
-								{
-									cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-									wrongQualityScale();
-									exit(1);
-								}
-							}
-
-							assert_geq(c, 33);
-							r.qualBufFw[bufSz - off - 1] = c;
-							r.qualBufRc[off] = c;
-						}
-						qualsRead++;
-					} else {
-						break;
+						assert_geq(c, 33);
+						r.qualBufFw[off] = c;
 					}
+					qualsRead++;
+				} else {
+					break;
 				}
-				assert_eq(qualsRead, dstLen + this->trim5_);
-				_setBegin (r.qualFw, (char*)&r.qualBufFw[bufSz-dstLen]);
-				_setLength(r.qualFw, dstLen);
-				_setBegin (r.qualRc, (char*)r.qualBufRc);
-				_setLength(r.qualRc, dstLen);
 			}
+			assert_eq(qualsRead, dstLen + this->trim5_);
+			_setBegin (r.qualFw, (char*)r.qualBufFw);
+			_setLength(r.qualFw, dstLen);
 			if(c == '\r' || c == '\n') {
 				c = getOverNewline(filebuf_);
 			} else {
@@ -2002,6 +2307,15 @@ protected:
 		readCnt_++;
 		patid = readCnt_-1;
 	}
+	/// Read another read pair from a FASTQ input file
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// (For now, we shouldn't ever be here)
+		cerr << "In FastqPatternSource.readPair()" << endl;
+		exit(1);
+		read(ra, patid);
+		readCnt_--;
+		read(rb, patid);
+	}
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
@@ -2014,7 +2328,6 @@ protected:
 	}
 private:
 	bool first_;
-	bool reverse_;
 	bool solQuals_;
 	bool intQuals_;
 	int policy_;
@@ -2027,29 +2340,23 @@ private:
 class RawPatternSource : public BufferedFilePatternSource {
 public:
 	RawPatternSource(const vector<string>& infiles,
-	                 bool reverse = false,
 	                 bool randomizeQuals = false,
 	                 bool useSpinlock = true,
 	                 const char *dumpfile = NULL,
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, false, randomizeQuals, false, useSpinlock,
+		BufferedFilePatternSource(infiles, randomizeQuals, false, useSpinlock,
 		                          dumpfile, trim3, trim5, skip),
-		first_(true), reverse_(reverse)
+		first_(true)
 	{ }
 	virtual void reset() {
 		first_ = true;
 		BufferedFilePatternSource::reset();
 	}
-	virtual bool reverse() const { return reverse_; }
-	virtual void setReverse(bool reverse) {
-		reverse_ = reverse;
-	}
 protected:
 	/// Read another pattern from a Raw input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		const int bufSz = ReadBuf::BUF_SIZE;
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
@@ -2071,67 +2378,29 @@ protected:
 
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
-		if(!reverse_) {
-			while(!isspace(c) && c >= 0) {
-				if(isalpha(c) && dstLen >= this->trim5_) {
-					size_t len = dstLen - this->trim5_;
-					if(len + 1 > 1024) {
-						cerr << "Reads file contained a pattern with more than 1024 characters." << endl
-							 << "Please truncate reads and and re-run Bowtie";
-						exit(1);
-					}
-					r.patBufFw [len] = charToDna5[c];
-					r.qualBufFw[len] = 'I';
-					r.patBufRc [bufSz-len-1] = rcCharToDna5[c];
-					r.qualBufRc[bufSz-len-1] = 'I';
-					dstLen++;
-				} else if(isalpha(c)) dstLen++;
-				c = filebuf_.get();
-			}
-			if(dstLen >= (this->trim3_ + this->trim5_)) {
-				dstLen -= (this->trim3_ + this->trim5_);
-			} else {
-				dstLen = 0;
-			}
-			_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-			_setLength(r.patFw,  dstLen);
-			_setBegin (r.qualFw, r.qualBufFw);
-			_setLength(r.qualFw, dstLen);
-			_setBegin (r.patRc,  (Dna5*)&r.patBufRc[bufSz-dstLen]);
-			_setLength(r.patRc,  dstLen);
-			_setBegin (r.qualRc, &r.qualBufRc[bufSz-dstLen]);
-			_setLength(r.qualRc, dstLen);
-		} else {
-			while(!isspace(c) && c >= 0) {
-				if(isalpha(c) && dstLen >= this->trim5_) {
-					size_t len = dstLen - this->trim5_;
-					if(len + 1 > 1024) {
-						cerr << "Reads file contained a pattern with more than 1024 characters.." << endl
-							 << "Please truncate reads and and re-run Bowtie";
-						exit(1);
-					}
-					r.patBufFw [bufSz-len-1] = charToDna5[c];
-					r.qualBufFw[bufSz-len-1] = 'I';
-					r.patBufRc [len] = rcCharToDna5[c];
-					r.qualBufRc[len] = 'I';
-					dstLen++;
-				} else if(isalpha(c)) dstLen++;
-				c = filebuf_.get();
-			}
-			if(dstLen >= (this->trim3_ + this->trim5_)) {
-				dstLen -= (this->trim3_ + this->trim5_);
-			} else {
-				dstLen = 0;
-			}
-			_setBegin (r.patFw,  (Dna5*)&r.patBufFw[bufSz-dstLen]);
-			_setLength(r.patFw,  dstLen);
-			_setBegin (r.qualFw, &r.qualBufFw[bufSz-dstLen]);
-			_setLength(r.qualFw, dstLen);
-			_setBegin (r.patRc,  (Dna5*)r.patBufRc);
-			_setLength(r.patRc,  dstLen);
-			_setBegin (r.qualRc, r.qualBufRc);
-			_setLength(r.qualRc, dstLen);
+		while(!isspace(c) && c >= 0) {
+			if(isalpha(c) && dstLen >= this->trim5_) {
+				size_t len = dstLen - this->trim5_;
+				if(len + 1 > 1024) {
+					cerr << "Reads file contained a pattern with more than 1024 characters." << endl
+						 << "Please truncate reads and and re-run Bowtie";
+					exit(1);
+				}
+				r.patBufFw [len] = charToDna5[c];
+				r.qualBufFw[len] = 'I';
+				dstLen++;
+			} else if(isalpha(c)) dstLen++;
+			c = filebuf_.get();
 		}
+		if(dstLen >= (this->trim3_ + this->trim5_)) {
+			dstLen -= (this->trim3_ + this->trim5_);
+		} else {
+			dstLen = 0;
+		}
+		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+		_setLength(r.patFw,  dstLen);
+		_setBegin (r.qualFw, r.qualBufFw);
+		_setLength(r.qualFw, dstLen);
 
 		// Set up name
 		itoa10(readCnt_, r.nameBuf);
@@ -2147,6 +2416,15 @@ protected:
 		}
 		patid = readCnt_-1;
 	}
+	/// Read another read pair from a FASTQ input file
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// (For now, we shouldn't ever be here)
+		cerr << "In RawPatternSource.readPair()" << endl;
+		exit(1);
+		read(ra, patid);
+		readCnt_--;
+		read(rb, patid);
+	}
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
@@ -2159,7 +2437,6 @@ protected:
 	}
 private:
 	bool first_;
-	bool reverse_;
 	int policy_;
 };
 

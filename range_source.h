@@ -580,7 +580,7 @@ public:
 		assert(ranges_ != NULL);
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
-		if(lastPmSz_ == pmSz) {
+		if(false && lastPmSz_ == pmSz) {
 #ifndef NDEBUG
 			if(branchSet != branchSet_) {
 				std::set<Branch*>::iterator it;
@@ -757,7 +757,7 @@ public:
 	              uint32_t pmSz)
 	{
 		assert_gt(pmSz, 0);
-		if(lastPmSz_ == pmSz) {
+		if(false && lastPmSz_ == pmSz) {
 			rpool.rewind(lastRpool_);
 			epool.rewind(lastEpool_);
 			bpool.rewind(lastBpool_);

@@ -12,6 +12,7 @@ enum file_format {
 	FASTA = 1,
 	FASTA_CONT,
 	FASTQ,
+	TAB_MATE,
 	RAW,
 	CMDLINE,
 	RANDOM
@@ -22,6 +23,7 @@ static const std::string file_format_names[] = {
 	"FASTA",
 	"FASTA sampling",
 	"FASTQ",
+	"Tabbed mated",
 	"Raw",
 	"Random",
 	"Command line"

@@ -35,6 +35,7 @@ using namespace seqan;
 
 static vector<string> mates1; // mated reads (first mate)
 static vector<string> mates2; // mated reads (second mate)
+static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase = "";
 static int verbose				= 0; // be talkative
 static bool quiet				= false; // print nothing but the alignments
@@ -169,7 +170,8 @@ enum {
 	ARG_SKIP,
 	ARG_STRAND_FIX,
 	ARG_RANDOMIZE_QUALS,
-	ARG_STATS
+	ARG_STATS,
+	ARG_ONETWO,
 };
 
 static struct option long_options[] = {
@@ -253,6 +255,7 @@ static struct option long_options[] = {
 	{"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
 	{"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
 	{"stats",        no_argument,       0,            ARG_STATS},
+	{"12",           required_argument, 0,            ARG_ONETWO},
 	{0, 0, 0, 0} // terminator
 };
 
@@ -1067,6 +1070,7 @@ static void parseOptions(int argc, char **argv) {
 		switch (next_option) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
+			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
 	   		case 'f': format = FASTA; break;
 	   		case 'F': format = FASTA_CONT; break;
 	   		case 'q': format = FASTQ; break;
@@ -1254,7 +1258,7 @@ static void parseOptions(int argc, char **argv) {
 			}
 		}
 	}
-	if(mates1.size() > 0 || mates2.size() > 0) {
+	if(mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0) {
 		spanStrata = true;
 	}
 	if(!fullIndex) {
@@ -1280,7 +1284,7 @@ static void parseOptions(int argc, char **argv) {
 			     << "Stratified all-hits search cannot be combined with phased search." << endl;
 			error = true;
 		}
-		if(mates1.size() > 0 || mates2.size() > 0) {
+		if(mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0) {
 			cerr << "When -z/--phased is used, paired-end mode is unavailable" << endl;
 			error = true;
 		}
@@ -1414,7 +1418,7 @@ static PatternSourcePerThreadFactory*
 createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 	PatternSourcePerThreadFactory *patsrcFact;
 	if(randReadsNoSync) {
-		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid, false);
+		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
 	} else {
 		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
 	}
@@ -1621,7 +1625,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	}
 
 	BitPairReference *refs = NULL;
-	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
 		if(!refs->loaded()) exit(1);
@@ -2031,7 +2035,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
 		if(!refs->loaded()) exit(1);
@@ -2631,7 +2635,7 @@ static void twoOrThreeMismatchSearchFull(
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
 		if(!refs->loaded()) exit(1);
@@ -3440,7 +3444,7 @@ static void seededQualCutoffSearchFull(
 
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if(mates1.size() > 0 && mixedThresh < 0xffffffff) {
+	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
 		if(!refs->loaded()) exit(1);
@@ -3505,31 +3509,38 @@ static PatternSource*
 patsrcFromStrings(int format, const vector<string>& qs) {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (qs, false, randomizeQuals,
+			return new FastaPatternSource (qs, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               forgiveInput,
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               qs, 28, 1, false,
+			                               qs, 28, 1,
 			                               useSpinlock,
 			                               patDumpfile,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (qs, false, randomizeQuals,
+			return new RawPatternSource   (qs, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               skipReads);
 		case FASTQ:
-			return new FastqPatternSource (qs, false, randomizeQuals,
+			return new FastqPatternSource (qs, randomizeQuals,
+			                               useSpinlock,
+			                               patDumpfile, trim3, trim5,
+			                               forgiveInput,
+			                               solexa_quals,
+			                               integer_quals, skipReads);
+		case TAB_MATE:
+			return new TabbedPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               forgiveInput,
 			                               solexa_quals,
 			                               integer_quals, skipReads);
 		case CMDLINE:
-			return new VectorPatternSource(qs, false, randomizeQuals,
+			return new VectorPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3,
 			                               trim5, skipReads);
@@ -3578,11 +3589,30 @@ static void driver(const char * type,
 
 	vector<PatternSource*> patsrcs_a;
 	vector<PatternSource*> patsrcs_b;
+	vector<PatternSource*> patsrcs_ab;
 
 	// If there were any first-mates specified, we will operate in
 	// stateful mode
-	bool paired = mates1.size() > 0;
+	bool paired = mates1.size() > 0 || mates12.size() > 0;
 	if(paired) stateful = true;
+
+	// Create list of pattern sources for paired reads appearing
+	// interleaved in a single file
+	for(size_t i = 0; i < mates12.size(); i++) {
+		const vector<string>* qs = &mates12;
+		vector<string> tmp;
+		if(fileParallel) {
+			// Feed query files one to each PatternSource
+			qs = &tmp;
+			tmp.push_back(mates12[i]);
+			assert_eq(1, tmp.size());
+		}
+		patsrcs_ab.push_back(patsrcFromStrings(format, *qs));
+		if(!fileParallel) {
+			break;
+		}
+	}
+
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
 		const vector<string>* qs = &mates1;
@@ -3636,8 +3666,12 @@ static void driver(const char * type,
 			break;
 		}
 	}
-	assert_gt(patsrcs_a.size(), 0);
-	PairedPatternSource patsrc(patsrcs_a, patsrcs_b);
+	PairedPatternSource *patsrc = NULL;
+	if(mates12.size() > 0) {
+		patsrc = new PairedSoloPatternSource(patsrcs_ab);
+	} else {
+		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b);
+	}
 
 	if(skipSearch) return;
 	// Open hit output file
@@ -3761,7 +3795,7 @@ static void driver(const char * type,
 				seededQualCutoffSearch(seedLen,
 									   qualThresh,
 									   seedMms,
-									   patsrc,
+									   *patsrc,
 									   *sink,
 									   ebwt,    // forward index
 									   *ebwtBw, // mirror index (not optional)
@@ -3770,7 +3804,7 @@ static void driver(const char * type,
 				seededQualCutoffSearchFull(seedLen,
 				                           qualThresh,
 				                           seedMms,
-				                           patsrc,
+				                           *patsrc,
 				                           *sink,
 				                           ebwt,    // forward index
 				                           *ebwtBw, // mirror index (not optional)
@@ -3780,16 +3814,16 @@ static void driver(const char * type,
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
 				if(!fullIndex) {
-					mismatchSearch(patsrc, *sink, ebwt, *ebwtBw, os);
+					mismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os);
 				} else {
 					assert(ebwtBw != NULL);
-					mismatchSearchFull(patsrc, *sink, ebwt, *ebwtBw, os);
+					mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
 				}
 			} else if(mismatches == 2 || mismatches == 3) {
 				if(!fullIndex) {
-					twoOrThreeMismatchSearch(patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				} else {
-					twoOrThreeMismatchSearchFull(patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
+					twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
@@ -3799,7 +3833,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(patsrc, *sink, ebwt, os, paired);
+			exactSearch(*patsrc, *sink, ebwt, os, paired);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
@@ -3865,14 +3899,14 @@ int main(int argc, char **argv) {
 
 		// Get query filename
 		if(optind >= argc) {
-			if(mates1.size() > 0) {
+			if(mates1.size() > 0 || mates12.size() > 0) {
 				query = "";
 			} else {
 				cerr << "No query or output file specified!" << endl;
 				printUsage(cerr);
 				return 1;
 			}
-		} else if (mates1.size() == 0) {
+		} else if (mates1.size() == 0 && mates12.size() == 0) {
 			query = argv[optind++];
 			// Tokenize the list of query files
 			tokenize(query, ",", queries);
