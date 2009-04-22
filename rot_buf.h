@@ -22,11 +22,17 @@ private:
  * column of the multiple alignment.
  */
 struct SNPMass {
-	SNPMass() : totalMass(0) { memset(perCharMass, 0, 4 * 4); }
-	uint8_t refChar;
-	uint32_t totalMass;
-	uint32_t totalNonRefMass;
-	uint32_t perCharMass[4];
+	SNPMass() : totalMass(0), totalNonRefMass(0) {
+		perCharMass[0] = perCharMass[1] = perCharMass[2] = perCharMass[3] = 0;
+		perCharCoverage[0] = perCharCoverage[1] = perCharCoverage[2] = perCharCoverage[3] = 0;
+		perCharAmbCoverage[0] = perCharAmbCoverage[1] = perCharAmbCoverage[2] = perCharAmbCoverage[3] = 0;
+	}
+	uint8_t refChar;      // reference character at this position
+	uint32_t totalMass;   // total Phred mass covering this position
+	uint32_t totalNonRefMass; // total Phtred mass from characters other than refChar covering this position
+	uint32_t perCharMass[4];     // Phred mass supporting A/C/G/T
+	uint32_t perCharCoverage[4]; // # reads supporting A/C/G/T
+	uint32_t perCharAmbCoverage[4]; // # ambiguous reads supporting A/C/G/T
 };
 
 /**
@@ -53,26 +59,48 @@ public:
 	{
 		assert_eq(1, col.size());
 		const SNPMass& m = col.front();
-		uint32_t maxSnpMass = 0;
+		const uint32_t totalMassThresh = m.totalMass >> 2;
 		// If the total mass exceeds a sufficient threshold
-		if(m.totalNonRefMass > 300) {
+		if(m.totalMass > 120 && m.totalNonRefMass > totalMassThresh) {
 			// Sufficient evidence to try to make a call
-			uint8_t maxi = 0xff;
-			for(uint8_t i = 0; i < 4; i++) {
-				// Find the largest per-A/C/G/T mass
-				if(m.perCharMass[i] > maxSnpMass) {
-					maxSnpMass = m.perCharMass[i];
-					maxi = i;
+//			uint8_t maxi = 0xff;
+//			uint8_t maxi2 = 0xff;
+//			for(uint8_t i = 0; i < 4; i++) {
+//				// Find the largest per-A/C/G/T mass
+//				if(m.perCharMass[i] > maxSnpMass) {
+//					maxSnpMass = m.perCharMass[i];
+//					maxi = i;
+//				} else if(m.perCharMass[i] > maxSnpMass) {
+//
+//				}
+//			}
+//			if(maxi != 0xff && maxi != m.refChar) {
+//				// Take ratio of highest-mass character to the total
+//				// mass
+//				double ratio = m.perCharMass[maxi] / (double)m.totalMass;
+//				if(ratio > 0.85) {
+//					// 85% is the threshold
+//					out_ << refidx << " " << refoff << " "
+//					     << "ACGT"[m.refChar] << " " << "ACGT"[maxi] << endl;
+//				}
+//			}
+
+			// Identify reference position
+			out_ << refidx << " " << refoff << " " << "ACGT"[m.refChar] << " ";
+			for(int i = 0; i < 4; i++) {
+				if(m.perCharCoverage[i] == 0) {
+					assert_eq(0, m.perCharAmbCoverage[i]);
+					assert_eq(0, m.perCharMass[i]);
+					out_ << "0";
+				} else {
+					out_ << m.perCharCoverage[i] << ","
+						 << m.perCharAmbCoverage[i] << ","
+						 << m.perCharMass[i];
 				}
-			}
-			if(maxi != 0xff && maxi != m.refChar) {
-				// Take ratio of highest-mass character to the total
-				// mass
-				double ratio = m.perCharMass[maxi] / (double)m.totalMass;
-				if(ratio > 0.85) {
-					// 85% is the threshold
-					out_ << refidx << " " << refoff << " "
-					     << "ACGT"[m.refChar] << " " << "ACGT"[maxi] << endl;
+				if(i < 3) {
+					out_ << " ";
+				} else {
+					out_ << endl;
 				}
 			}
 		}
@@ -407,9 +435,13 @@ protected:
 			int readc = (int)h.patSeq[ii];
 			if(readc == 4) continue; // no evidence inherent in Ns
 			size_t i = ii;
-			if(!h.fw) i = len - ii - 1;
+			if(!h.fw) {
+				i = len - ii - 1;
+			}
 			char q = h.quals[ii];
 			if(h.oms > 0) {
+				// Divide Phred mass by the number of other elements in
+				// the Burrows-Wheeler range
 				q /= (h.oms+1);
 			}
 			vector<SNPMass>& col = this->buf_.get(h.h.second + ii);
@@ -423,9 +455,12 @@ protected:
 			} else {
 				c = readc;
 			}
+			// 'c' is the character we observe
 			assert_lt(c, 4);
 			if(col.empty()) {
 				col.resize(1);
+				// Add the Phred qualiy of this position to the total
+				// mass
 				col.front().totalMass = q;
 				if(snp) {
 					col.front().totalNonRefMass = q;
@@ -433,6 +468,8 @@ protected:
 					col.front().totalNonRefMass = 0;
 				}
 				col.front().perCharMass[readc] = q;
+				col.front().perCharCoverage[readc] = 1;
+				col.front().perCharAmbCoverage[readc] = (h.oms > 0) ? 1 : 0;
 				col.front().refChar = c;
 			} else {
 				assert_eq(1, col.size());
@@ -441,6 +478,10 @@ protected:
 					col.front().totalNonRefMass += q;
 				}
 				col.front().perCharMass[readc] += q;
+				col.front().perCharCoverage[readc]++;
+				if(h.oms > 0) {
+					col.front().perCharAmbCoverage[readc]++;
+				}
 				assert_eq(col.front().refChar, c);
 			}
 			// Done
