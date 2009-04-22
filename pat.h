@@ -297,11 +297,11 @@ public:
 			// sequence, qualities, and name
 			ra.seed = genRandSeed(ra.patFw, ra.qualFw, ra.name);
 			rb.seed = genRandSeed(rb.patFw, rb.qualFw, rb.name);
-		}
-		// Output it, if desired
-		if(dumpfile_ != NULL) {
-			dumpBuf(ra);
-			dumpBuf(rb);
+			// Output it, if desired
+			if(dumpfile_ != NULL) {
+				dumpBuf(ra);
+				dumpBuf(rb);
+			}
 		}
 	}
 
@@ -326,10 +326,10 @@ public:
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
 			r.seed = genRandSeed(r.patFw, r.qualFw, r.name);
-		}
-		// Output it, if desired
-		if(dumpfile_ != NULL) {
-			dumpBuf(r);
+			// Output it, if desired
+			if(dumpfile_ != NULL) {
+				dumpBuf(r);
+			}
 		}
 	}
 
@@ -1612,7 +1612,9 @@ protected:
 		// filebuf_ is about to dish out the first character of the
 		// name field
 		if(parseName(r, NULL, '\t') == -1) {
-			r.clearAll(); return;
+			peekOverNewline(filebuf_); // skip rest of line
+			r.clearAll();
+			return;
 		}
 		assert_neq('\t', filebuf_.peek());
 
@@ -1622,13 +1624,17 @@ protected:
 		int dstLen = parseSeq(r, charsRead, '\t');
 		assert_neq('\t', filebuf_.peek());
 		if(dstLen <= 0) {
-			r.clearAll(); return;
+			peekOverNewline(filebuf_); // skip rest of line
+			r.clearAll();
+			return;
 		}
 
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
 		if(parseQuals(r, charsRead, dstLen, '\n') <= 0) {
-			r.clearAll(); return;
+			peekOverNewline(filebuf_); // skip rest of line
+			r.clearAll();
+			return;
 		}
 		assert_neq('\n', filebuf_.peek());
 		// The last character read in parseQuals should have been a
@@ -1643,6 +1649,7 @@ protected:
 		// filebuf_ is about to dish out the first character of the
 		// name field
 		if(parseName(ra, &rb, '\t') == -1) {
+			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
@@ -1654,6 +1661,7 @@ protected:
 		int charsRead1 = 0;
 		int dstLen1 = parseSeq(ra, charsRead1, '\t');
 		if(dstLen1 <= -1) {
+			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
@@ -1663,6 +1671,7 @@ protected:
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
 		if(parseQuals(ra, charsRead1, dstLen1, '\t') <= 0) {
+			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
@@ -1676,6 +1685,7 @@ protected:
 		int charsRead2 = 0;
 		int dstLen2 = parseSeq(rb, charsRead2, '\t');
 		if(dstLen2 <= 0) {
+			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
@@ -1685,11 +1695,17 @@ protected:
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
 		if(parseQuals(rb, charsRead2, dstLen2, '\n') <= 0) {
+			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
 		}
-		assert_neq('\n', filebuf_.peek());
+		if(filebuf_.peek() == '\n') {
+			if(!forgiveInput_) {
+				assert(false);
+			}
+		}
+
 		// The last character read in parseQuals should have been a
 		// '\n'
 
@@ -1727,6 +1743,9 @@ private:
 			if(c == upto) {
 				// Finished with first field
 				break;
+			}
+			if(c == '\n' || c == '\r') {
+				return -1;
 			}
 			if(r2 != NULL) (*r2).nameBuf[nameLen] = c;
 			r.nameBuf[nameLen++] = c;
@@ -1769,7 +1788,13 @@ private:
 			// though a comment can end a sequence
 			if(isalpha(c)) {
 				if(begin++ >= this->trim5_) {
-					assert_neq(0, dna4Cat[c]);
+					if(dna4Cat[c] == 0) {
+						if(forgiveInput_) {
+							return -1;
+						} else {
+							assert(false);
+						}
+					}
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 							 << "reads and re-run Bowtie";
@@ -1781,7 +1806,7 @@ private:
 				charsRead++;
 			}
 			if((c = filebuf_.get()) < 0) {
-				r.clearAll(); return -1;
+				return -1;
 			}
 		}
 		dstLen -= this->trim3_;
@@ -1857,7 +1882,6 @@ private:
 				}
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
-					seqan::clear(r.patFw);
 					return -1;
 				}
 				if(!isspace(c) && c != upto) {
@@ -1890,7 +1914,13 @@ private:
 					break;
 				}
 			}
-			assert_eq(qualsRead, dstLen + this->trim5_);
+			if(qualsRead != dstLen + this->trim5_) {
+				if(forgiveInput_) {
+					return -1;
+				} else {
+					assert(false);
+				}
+			}
 		}
 		_setBegin (r.qualFw, (char*)r.qualBufFw);
 		_setLength(r.qualFw, dstLen);
