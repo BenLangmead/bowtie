@@ -1627,7 +1627,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	exactSearch_refs   = refs;
@@ -2037,7 +2037,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	mismatchSearch_refs = refs;
@@ -2637,7 +2637,7 @@ static void twoOrThreeMismatchSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3446,7 +3446,7 @@ static void seededQualCutoffSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	seededQualSearch_refs = refs;

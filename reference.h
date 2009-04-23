@@ -32,11 +32,14 @@ public:
 	                 std::vector<string>* infiles = NULL,
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
-	                 bool useShmem = false) :
+	                 bool useShmem = false,
+	                 bool verbose = false) :
 	buf_(NULL),
 	loaded_(true),
 	sanity_(sanity),
-	useShmem_(useShmem)
+	useShmem_(useShmem),
+	bufIsShmem_(false),
+	verbose_(verbose)
 	{
 		string s3 = in + ".3.ebwt";
 		string s4 = in + ".4.ebwt";
@@ -106,36 +109,138 @@ public:
 			cumsz += (4 - (cumsz & 3));
 		}
 		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
-		FILE *f4 = fopen(s4.c_str(), "rb");
-		if(f4 == NULL) {
-			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
-			cerr << "This is most likely because your index was built with an older version" << endl
-			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
-			     << "index (or download one from the Bowtie website) and try again." << endl;
-			loaded_ = false;
-			return;
-		}
+		bool loadedBuf = true;
 		try {
-			// Allocate a buffer to hold the whole reference string
-			buf_ = new uint8_t[cumsz >> 2];
-			if(buf_ == NULL) throw std::bad_alloc();
+#ifdef BOWTIE_SHARED_MEM
+			if(useShmem_) {
+				int shmid = -1;
+				// Calculate key given string
+				key_t key = (key_t)hash_string(s4);
+				shmid_ds ds;
+				// Reserve 4 bytes at the end of the shared memory chunk
+				// for silly synchronization
+				size_t shmemLen = (cumsz >> 2) + 4;
+				bufIsShmem_ = true;
+				int ret;
+				while(true) {
+					// Create the shrared-memory block
+					if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {
+						if(errno == ENOMEM) {
+							cerr << "Out of memory allocating shared reference buffer for the Bowtie index." << endl;
+						} else if(errno == EACCES) {
+							cerr << "EACCES" << endl;
+						} else if(errno == EEXIST) {
+							cerr << "EEXIST" << endl;
+						} else if(errno == EINVAL) {
+							cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << (shmemLen) << ")" << endl
+								 << "Deleteing old shared memory block and trying again." << endl;
+							shmid = shmget(key, 0, 0);
+							if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+								cerr << "shmctl returned " << ret
+									 << " for IPC_RMID, errno is " << errno
+									 << ", shmid is " << shmid << endl;
+								exit(1);
+							} else {
+								cerr << "Deleted shared mem chunk with shmid " << shmid << endl;
+							}
+							continue;
+						} else if(errno == ENOENT) {
+							cerr << "ENOENT" << endl;
+						} else if(errno == ENOSPC) {
+							cerr << "ENOSPC" << endl;
+						} else {
+							cerr << "shmget returned " << shmid << " for and errno is " << errno << endl;
+						}
+						exit(1);
+					}
+					buf_ = (uint8_t*)shmat(shmid, 0, 0);
+					this->bufIsShmem_ = true;
+					if(buf_ == (uint8_t*)-1) {
+						cerr << "BitPairReference: Failed to attach buf_ pointer to shared memory with shmat()." << endl;
+						exit(1);
+					}
+					if(buf_ == NULL) {
+						cerr << "BitPairReference: buf_ pointer returned by shmat() was NULL." << endl;
+						exit(1);
+					}
+					// Did I create it, or did I just attach to one created by
+					// another process?
+					if((ret = shmctl(shmid, IPC_STAT, &ds)) < 0) {
+						cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
+						exit(1);
+					}
+					if(ds.shm_segsz != shmemLen) {
+						cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
+							 << ") doesn't match expected size (" << shmemLen << ")" << endl
+							 << "Deleteing old shared memory block and trying again." << endl;
+						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
+							cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
+							exit(1);
+						}
+					} else {
+						break;
+					}
+				} // while(true)
+				if(ds.shm_cpid == getpid()) {
+					if(verbose_) {
+						cout << "  I (pid = " << getpid() << ") created the shared memory for buf_" << endl;
+					}
+					// Set this value just off the end of _ebwt[] array to
+					// indicate that the data hasn't been read yet.
+					((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] = 0xffffffff;
+				} else {
+					if(verbose_) {
+						cout << "  I (pid = " << getpid() << ") did not create the shared memory for buf_.  Pid " << ds.shm_cpid << " did." << endl;
+					}
+					loadedBuf = false;
+				}
+			} else {
+#endif
+				// Allocate a buffer to hold the whole reference string
+				buf_ = new uint8_t[cumsz >> 2];
+				if(buf_ == NULL) throw std::bad_alloc();
+#ifdef BOWTIE_SHARED_MEM
+			}
+#endif
 		} catch(std::bad_alloc& e) {
 			cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
 			     << "re-run on a computer with more memory." << endl;
 			exit(1);
 		}
-		// Read the whole thing in
-		size_t ret = fread(buf_, 1, cumsz >> 2, f4);
-		// Didn't read all of it?
-		if(ret != (cumsz >> 2)) {
-			cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
-			exit(1);
+		if(loadedBuf) {
+			// Open the bitpair-encoded reference file
+			FILE *f4 = fopen(s4.c_str(), "rb");
+			if(f4 == NULL) {
+				cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
+				cerr << "This is most likely because your index was built with an older version" << endl
+				     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+				     << "index (or download one from the Bowtie website) and try again." << endl;
+				loaded_ = false;
+				return;
+			}
+			// Read the whole thing in
+			size_t ret = fread(buf_, 1, cumsz >> 2, f4);
+			// Didn't read all of it?
+			if(ret != (cumsz >> 2)) {
+				cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
+				exit(1);
+			}
+			// Make sure there's no more
+			char c;
+			ret = fread(&c, 1, 1, f4);
+			assert_eq(0, ret); // should have failed
+			fclose(f4);
+			if(useShmem_) {
+				// I'm the shmem writer - set this flag just off the
+				// end of the buf_[] array to indicate we're done
+				// writing
+				assert_eq(0xffffffff, ((volatile uint32_t*)(&buf_[cumsz >> 2]))[0]);
+				((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] = 0xf0f0f0f0;
+			}
+		} else {
+			// Spin until the shmem writer is finished writing
+			while(((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] != 0xf0f0f0f0) ; // spin
 		}
-		char c;
-		// Make sure there's no more
-		ret = fread(&c, 1, 1, f4);
-		assert_eq(0, ret); // should have failed
-		fclose(f4);
 
 		// Populate byteToU32_
 		bool big = currentlyBigEndian();
@@ -198,7 +303,7 @@ public:
 	}
 
 	~BitPairReference() {
-		if(buf_ != NULL) delete[] buf_;
+		if(buf_ != NULL && !bufIsShmem_) delete[] buf_;
 	}
 
 	/**
@@ -462,6 +567,8 @@ protected:
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
 	bool     useShmem_; /// put the cache memory in shared memory
+	bool     bufIsShmem_;
+	bool     verbose_;
 };
 
 #endif
