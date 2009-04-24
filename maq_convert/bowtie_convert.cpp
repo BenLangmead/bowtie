@@ -9,6 +9,7 @@
 #include <set>
 #include <map>
 #include <stdio.h>
+#include <inttypes.h>
 #include <seqan/sequence.h>
 #include <algorithm>
 #include "maqmap.h"
@@ -400,9 +401,8 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 	algo_sort(mm->n_mapped_reads, mm->mapped_reads);
 
-	if (verbose)
-	{
-		fprintf(stderr, "Converted %llu alignments, writing Maq map\n", mm->n_mapped_reads);
+	if (verbose) {
+		cerr << "Converted " << mm->n_mapped_reads << " alignments, writing Maq map" << endl;
 	}
 	// Write out the header
 	maq_write_header(maqf, mm);
