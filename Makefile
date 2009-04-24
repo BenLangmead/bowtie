@@ -140,68 +140,72 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      $(PREF_DEF) \
      $(CHUD_DEF)
 
+define checksum
+  cat $^ | cksum | sed 's/[01-9][01-9] .*//' | awk '{print $1}' > .$@.cksum
+endef
+    
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
 bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_BUILD_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS) $(BUILD_LIBS)
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 # 'bowtie' forced to be 32-bit using -m32
 bowtie32: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m32 -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 # 'bowtie' forced to be 64-bit using -m64
 bowtie64: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m64 -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 bowtie_prof0: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) -fno-inline $(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_SEARCH_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) $(LIBS) $(SEARCH_LIBS)
 
 bowtie-asm: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 # 'bowtie-asm' forced to be 32-bit using -m32
 bowtie-asm32: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m32 -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 # 'bowtie-asm' forced to be 64-bit using -m64
 bowtie-asm64: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) -m64 -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-asm-debug: ebwt_asm.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_ASM_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-maptool: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_MAPTOOL_HASH=`cat .$@.cksum` $(DEFS) $(NOASSERT_FLAGS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-maptool-debug: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_MAPTOOL_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-maqconvert: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MAQ_CPP)
@@ -211,11 +215,11 @@ bowtie-maqconvert-debug: maq_convert/bowtie_convert.cpp $(HEADERS) $(MAQ_H) $(MA
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) $(DEFS) -Wall $(INC) -I . -o $@ $< $(MAQ_CPP) $(LIBS) $(MAQ_LIB)
 
 bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
-	cat $^ | cksum | sed 's/[01-9][01-9] .*//' > .$@.cksum
+	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(OTHER_CPPS) $(LIBS)
 
 bowtie-src.zip: $(SRC_PKG_LIST)
