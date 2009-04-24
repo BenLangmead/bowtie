@@ -141,7 +141,7 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      $(CHUD_DEF)
 
 define checksum
-  cat $^ | cksum | sed 's/[01-9][01-9] .*//' | awk '{print $1}' > .$@.cksum
+  cat $^ | cksum | sed 's/[01-9][01-9] .*//' | awk '{print $$1}' > .$@.cksum
 endef
     
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)

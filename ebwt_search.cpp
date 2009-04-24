@@ -3879,7 +3879,7 @@ int main(int argc, char **argv) {
 		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *) << "}" << endl;
-		cout << "Source hash: " << EBWT_SEARCH_HASH << endl;
+		cout << "Source hash: " << (int)(EBWT_SEARCH_HASH) << endl;
 		return 0;
 	}
 #ifdef CHUD_PROFILING

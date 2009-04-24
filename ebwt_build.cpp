@@ -649,7 +649,7 @@ int main(int argc, char **argv) {
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *)
 		     << ", " << sizeof(size_t) << "}" << endl;
-		cout << "Source hash: " << EBWT_BUILD_HASH << endl;
+		cout << "Source hash: " << (int)(EBWT_BUILD_HASH) << endl;
 		return 0;
 	}
 
