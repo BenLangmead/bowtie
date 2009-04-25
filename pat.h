@@ -408,7 +408,11 @@ protected:
 			if(i > 0) {
 				r.qualFw[i] *= (r.qualFw[i-1] + 11);
 			}
-			if(r.qualFw[i] < 0) r.qualFw[i] = -(r.qualFw[i]+1);
+			// A user says that g++ complained here about "comparison
+			// is always false due to limited range of data type", but
+			// I can't see why.  I added the (int) cast to try to avoid
+			// the warning.
+			if((int)r.qualFw[i] < 0) r.qualFw[i] = -(r.qualFw[i]+1);
 			r.qualFw[i] %= 41;
 			assert_leq(r.qualFw[i], 40);
 			r.qualFw[i] += 33;
