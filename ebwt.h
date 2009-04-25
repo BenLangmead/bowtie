@@ -3109,6 +3109,15 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			// Read ebwt from primary stream
 			_in1.read((char *)this->_ebwt, eh->_ebwtTotLen);
 			assert_eq(eh->_ebwtTotLen, (uint32_t)_in1.gcount());
+			if(switchEndian) {
+				uint8_t *side = this->_ebwt;
+				for(size_t i = 0; i < eh->_numSides; i++) {
+					uint32_t *cums = reinterpret_cast<uint32_t*>(side + eh->_sideSz - 8);
+					cums[0] = endianSwapU32(cums[0]);
+					cums[1] = endianSwapU32(cums[1]);
+					side += this->_eh._sideSz;
+				}
+			}
 			if(useShmem) {
 				// I'm the shmem writer - set this flag just off the
 				// end of the ebwt[] array to indicate we're done
