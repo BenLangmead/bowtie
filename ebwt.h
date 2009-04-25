@@ -2820,7 +2820,7 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 template<typename TStr>
 void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	bool useShmem = _offsIsShmem || _ebwtIsShmem;
-	bool be; // dummy; caller doesnn't care
+	bool switchEndian; // dummy; caller doesn't care
 	if(_in1Str.length() > 0) {
 		// Initialize our primary and secondary input-stream fields
 		if(!_in1.is_open()) {
@@ -2854,30 +2854,30 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	if(_verbose) cout << "  Reading header" << endl;
 
 	// Read endianness hints from both streams
-	be = false;
-	uint32_t one = readU32(_in1, be); // 1st word of primary stream
+	switchEndian = false;
+	uint32_t one = readU32(_in1, switchEndian); // 1st word of primary stream
 	#ifndef NDEBUG
-	assert_eq(one, readU32(_in2, be)); // should match!
+	assert_eq(one, readU32(_in2, switchEndian)); // should match!
 	#else
-	readU32(_in2, be);
+	readU32(_in2, switchEndian);
 	#endif
 	if(one != 1) {
 		assert_eq((1u<<24), one);
 		assert_eq(1, endianSwapU32(one));
-		be = true;
+		switchEndian = true;
 	}
 
 	// Reads header entries one by one from primary stream
-	uint32_t len          = readU32(_in1, be);
-	int32_t  lineRate     = readI32(_in1, be);
-	int32_t  linesPerSide = readI32(_in1, be);
-	int32_t  offRate      = readI32(_in1, be);
+	uint32_t len          = readU32(_in1, switchEndian);
+	int32_t  lineRate     = readI32(_in1, switchEndian);
+	int32_t  linesPerSide = readI32(_in1, switchEndian);
+	int32_t  offRate      = readI32(_in1, switchEndian);
 	// TODO: add isaRate to the actual file format (right now, the
 	// user has to tell us whether there's an ISA sample and what the
 	// sampling rate is.
 	int32_t  isaRate      = _overrideIsaRate;
-	int32_t  ftabChars    = readI32(_in1, be);
-	int32_t  chunkRate    = readI32(_in1, be);
+	int32_t  ftabChars    = readI32(_in1, switchEndian);
+	int32_t  chunkRate    = readI32(_in1, switchEndian);
 
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams *eh;
@@ -2920,7 +2920,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	}
 
 	// Read nPat from primary stream
-	this->_nPat = readI32(_in1, be);
+	this->_nPat = readI32(_in1, switchEndian);
 	if(this->_plen != NULL) {
 		// Delete it so that we can re-read it
 		delete[] this->_plen;
@@ -2930,9 +2930,9 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		// Read plen from primary stream
 		if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
 		this->_plen = new uint32_t[this->_nPat];
-		if(be) {
+		if(switchEndian) {
 			for(uint32_t i = 0; i < this->_nPat; i++) {
-				this->_plen[i] = readU32(_in1, be);
+				this->_plen[i] = readU32(_in1, switchEndian);
 			}
 		} else {
 			_in1.read((char *)this->_plen, this->_nPat*4);
@@ -2956,12 +2956,12 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			uint32_t pmapEnts = eh->_numChunks*4;
 			if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
 			this->_pmap = new uint32_t[pmapEnts];
-			if(be) {
+			if(switchEndian) {
 				for(uint32_t i = 0; i < pmapEnts; i += 4) {
-					this->_pmap[i]   = readU32(_in1, be); // pat #
-					this->_pmap[i+1] = readU32(_in1, be); // sequence offset
-					this->_pmap[i+2] = readU32(_in1, be); // fragment offset
-					this->_pmap[i+3] = readU32(_in1, be); // fragment length
+					this->_pmap[i]   = readU32(_in1, switchEndian); // pat #
+					this->_pmap[i+1] = readU32(_in1, switchEndian); // sequence offset
+					this->_pmap[i+2] = readU32(_in1, switchEndian); // fragment offset
+					this->_pmap[i+3] = readU32(_in1, switchEndian); // fragment length
 				}
 			} else {
 				_in1.read((char *)this->_pmap, pmapEnts*4);
@@ -2979,17 +2979,17 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			throw e;
 		}
 	} else {
-		this->_nFrag = readU32(_in1, be);
+		this->_nFrag = readU32(_in1, switchEndian);
 		if(_verbose) cout << "Reading rstarts (" << this->_nFrag*3 << ")" << endl;
 		assert_geq(this->_nFrag, this->_nPat);
 		this->_rstarts = new uint32_t[this->_nFrag*3];
-		if(be) {
+		if(switchEndian) {
 			for(uint32_t i = 0; i < this->_nFrag*3; i += 3) {
 				// fragment starting position in joined reference
 				// string, text id, and fragment offset within text
-				this->_rstarts[i]   = readU32(_in1, be);
-				this->_rstarts[i+1] = readU32(_in1, be);
-				this->_rstarts[i+2] = readU32(_in1, be);
+				this->_rstarts[i]   = readU32(_in1, switchEndian);
+				this->_rstarts[i+1] = readU32(_in1, switchEndian);
+				this->_rstarts[i+2] = readU32(_in1, switchEndian);
 			}
 		} else {
 			_in1.read((char *)this->_rstarts, this->_nFrag*4*3);
@@ -3139,7 +3139,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	}
 
 	// Read zOff from primary stream
-	_zOff = readU32(_in1, be);
+	_zOff = readU32(_in1, switchEndian);
 	assert_lt(_zOff, len);
 
 	try {
@@ -3147,7 +3147,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		if(_verbose) cout << "Reading fchr (5)" << endl;
 		this->_fchr = new uint32_t[5];
 		for(int i = 0; i < 5; i++) {
-			this->_fchr[i] = readU32(_in1, be);
+			this->_fchr[i] = readU32(_in1, switchEndian);
 			assert_leq(this->_fchr[i], len);
 			if(i > 0) assert_geq(this->_fchr[i], this->_fchr[i-1]);
 		}
@@ -3155,9 +3155,9 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		// Read ftab from primary stream
 		if(_verbose) cout << "Reading ftab (" << eh->_ftabLen << ")" << endl;
 		this->_ftab = new uint32_t[eh->_ftabLen];
-		if(be) {
+		if(switchEndian) {
 			for(uint32_t i = 0; i < eh->_ftabLen; i++)
-				this->_ftab[i] = readU32(_in1, be);
+				this->_ftab[i] = readU32(_in1, switchEndian);
 		} else {
 			_in1.read((char *)this->_ftab, eh->_ftabLen*4);
 			assert_eq(eh->_ftabLen*4, (uint32_t)_in1.gcount());
@@ -3165,9 +3165,9 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		// Read etab from primary stream
 		if(_verbose) cout << "Reading eftab (" << eh->_eftabLen << ")" << endl;
 		this->_eftab = new uint32_t[eh->_eftabLen];
-		if(be) {
+		if(switchEndian) {
 			for(uint32_t i = 0; i < eh->_eftabLen; i++)
-				this->_eftab[i] = readU32(_in1, be);
+				this->_eftab[i] = readU32(_in1, switchEndian);
 		} else {
 			_in1.read((char *)this->_eftab, eh->_eftabLen*4);
 			assert_eq(eh->_eftabLen*4, (uint32_t)_in1.gcount());
@@ -3313,7 +3313,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		}
 #endif
 		if(readFromStream) {
-			if(be || offRateDiff > 0) {
+			if(switchEndian || offRateDiff > 0) {
 				const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
 				const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
 				char *buf = new char[blockMaxSz];
@@ -3325,7 +3325,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
 						assert_lt(idx, offsLenSampled);
 						this->_offs[idx] = ((uint32_t*)buf)[j];
-						if(be != currentlyBigEndian()) {
+						if(switchEndian) {
 							this->_offs[idx] = endianSwapU32(this->_offs[idx]);
 						}
 						idx++;
@@ -3402,7 +3402,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		exit(1);
 	}
 	// Read _isa[]
-	if(be || isaRateDiff > 0) {
+	if(switchEndian || isaRateDiff > 0) {
 		for(uint32_t i = 0; i < isaLen; i++) {
 			if((i & ~(0xffffffff << isaRateDiff)) != 0) {
 				char tmp[4];
@@ -3410,7 +3410,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			} else {
 				uint32_t idx = i >> isaRateDiff;
 				assert_lt(idx, isaLenSampled);
-				this->_isa[idx] = readU32(_in2, be);
+				this->_isa[idx] = readU32(_in2, switchEndian);
 			}
 		}
 	} else {
@@ -3455,25 +3455,25 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	assert_eq((streamoff)in.tellg(), ios::beg);
 
 	// Read endianness hints from both streams
-	bool be = false;
-	uint32_t one = readU32(in, be); // 1st word of primary stream
+	bool switchEndian = false;
+	uint32_t one = readU32(in, switchEndian); // 1st word of primary stream
 	if(one != 1) {
 		assert_eq((1u<<24), one);
-		be = true;
+		switchEndian = true;
 	}
 
 	// Reads header entries one by one from primary stream
-	uint32_t len          = readU32(in, be);
-	int32_t  lineRate     = readI32(in, be);
-	int32_t  linesPerSide = readI32(in, be);
-	int32_t  offRate      = readI32(in, be);
-	int32_t  ftabChars    = readI32(in, be);
-	int32_t  chunkRate    = readI32(in, be);
+	uint32_t len          = readU32(in, switchEndian);
+	int32_t  lineRate     = readI32(in, switchEndian);
+	int32_t  linesPerSide = readI32(in, switchEndian);
+	int32_t  offRate      = readI32(in, switchEndian);
+	int32_t  ftabChars    = readI32(in, switchEndian);
+	int32_t  chunkRate    = readI32(in, switchEndian);
 
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, chunkRate);
 
-	uint32_t nPat = readI32(in, be); // nPat
+	uint32_t nPat = readI32(in, switchEndian); // nPat
 	in.seekg(nPat*4, ios_base::cur); // skip plen
 
 	if(chunkRate >= 0) {
@@ -3482,7 +3482,7 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 		in.seekg(pmapEnts*4, ios_base::cur);
 	} else {
 		// Skip rstarts
-		uint32_t nFrag = readU32(in, be);
+		uint32_t nFrag = readU32(in, switchEndian);
 		in.seekg(nFrag*4*3, ios_base::cur);
 	}
 
@@ -3490,7 +3490,7 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	in.seekg(eh._ebwtTotLen, ios_base::cur);
 
 	// Skip zOff from primary stream
-	readU32(in, be);
+	readU32(in, switchEndian);
 
 	// Skip fchr
 	in.seekg(5 * 4, ios_base::cur);

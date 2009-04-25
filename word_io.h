@@ -47,22 +47,30 @@ static inline void writeI32(std::ostream& out, int32_t x) {
  * Read a 32-bit unsigned from an input stream, inverting endianness
  * if necessary.
  */
-static inline uint32_t readU32(std::istream& in, bool toBigEndian) {
+static inline uint32_t readU32(std::istream& in, bool swap) {
 	uint32_t x;
 	in.read((char *)&x, 4);
 	assert_eq(4, in.gcount());
-	return endianizeU32(x, toBigEndian);
+	if(swap) {
+		return endianSwapU32(x);
+	} else {
+		return x;
+	}
 }
 
 /**
  * Read a 32-bit signed from an input stream, inverting endianness
  * if necessary.
  */
-static inline int32_t readI32(std::istream& in, bool toBigEndian) {
+static inline int32_t readI32(std::istream& in, bool swap) {
 	int32_t x;
 	in.read((char *)&x, 4);
 	assert_eq(4, in.gcount());
-	return endianizeI32(x, toBigEndian);
+	if(swap) {
+		return endianSwapI32(x);
+	} else {
+		return x;
+	}
 }
 
 #endif /*WORD_IO_H_*/

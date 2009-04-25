@@ -38,13 +38,6 @@ struct RefRecord {
 		off(_off), len(_len), first(_first)
 	{ }
 
-	RefRecord(std::istream& in, bool be) {
-		assert(in.good());
-		off = readU32(in, be);
-		len = readU32(in, be);
-		first = in.get() ? true : false;
-	}
-
 	RefRecord(FILE *in, bool swap) {
 		assert(in != NULL);
 		if(!fread(&off, 4, 1, in)) {
