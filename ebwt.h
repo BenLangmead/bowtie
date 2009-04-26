@@ -713,6 +713,7 @@ public:
 				assert_eq(bsa.size(), length(s)+1);
 				VMSG_NL("Converting suffix-array elements to index image");
 				buildToDisk(bsa, s, out1, out2);
+				out1.flush(); out2.flush();
 				if(out1.fail() || out2.fail()) {
 					cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
 					exit(1);
@@ -737,6 +738,7 @@ public:
 
 		}
 		out1 << '\0';
+		out1.flush(); out2.flush();
 		if(out1.fail() || out2.fail()) {
 			cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
 			exit(1);
