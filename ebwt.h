@@ -633,115 +633,114 @@ public:
 		}
 		// Succesfully obtained joined reference string
 		assert_geq(length(s), jlen);
-		//if(useBlockwise) {
-			if(bmax != 0xffffffff) {
-				VMSG_NL("bmax according to bmax setting: " << bmax);
+		if(bmax != 0xffffffff) {
+			VMSG_NL("bmax according to bmax setting: " << bmax);
+		}
+		else if(bmaxSqrtMult != 0xffffffff) {
+			bmax *= bmaxSqrtMult;
+			VMSG_NL("bmax according to bmaxSqrtMult setting: " << bmax);
+		}
+		else if(bmaxDivN != 0xffffffff) {
+			bmax = max<uint32_t>(jlen / bmaxDivN, 1);
+			VMSG_NL("bmax according to bmaxDivN setting: " << bmax);
+		}
+		else {
+			bmax = (uint32_t)sqrt(length(s));
+			VMSG_NL("bmax defaulted to: " << bmax);
+		}
+		int iter = 0;
+		bool first = true;
+		// Look for bmax/dcv parameters that work.
+		while(true) {
+			if(!first && bmax < 40 && _passMemExc) {
+				cerr << "Could not find approrpiate bmax/dcv settings for building this index." << endl;
+				if(!isPacked()) {
+					// Throw an exception exception so that we can
+					// retry using a packed string representation
+					throw bad_alloc();
+				} else {
+					cerr << "Already tried a packed string representation." << endl;
+				}
+				cerr << "Please try indexing this reference on a computer with more memory." << endl;
+				if(sizeof(void*) == 4) {
+					cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
+						 << "this executable is 32-bit." << endl;
+				}
+				exit(1);
 			}
-			else if(bmaxSqrtMult != 0xffffffff) {
-				bmax *= bmaxSqrtMult;
-				VMSG_NL("bmax according to bmaxSqrtMult setting: " << bmax);
+			if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
+				dcv <<= 1; // double difference-cover period
+			} else {
+				bmax -= (bmax >> 2); // reduce by 25%
 			}
-			else if(bmaxDivN != 0xffffffff) {
-				bmax = max<uint32_t>(jlen / bmaxDivN, 1);
-				VMSG_NL("bmax according to bmaxDivN setting: " << bmax);
+			VMSG("Using parameters --bmax " << bmax);
+			if(dcv == 0) {
+				VMSG_NL(" and *no difference cover*");
+			} else {
+				VMSG_NL(" --dcv " << dcv);
 			}
-			else {
-				bmax = (uint32_t)sqrt(length(s));
-				VMSG_NL("bmax defaulted to: " << bmax);
-			}
-			int iter = 0;
-			bool first = true;
-			// Look for bmax/dcv parameters that work.
-			while(true) {
-				if(!first && bmax < 40 && _passMemExc) {
-					cerr << "Could not find approrpiate bmax/dcv settings for building this index." << endl;
-					if(!isPacked()) {
-						// Throw an exception exception so that we can
-						// retry using a packed string representation
-						throw bad_alloc();
-					} else {
-						cerr << "Already tried a packed string representation." << endl;
+			iter++;
+			try {
+				{
+					VMSG_NL("  Doing ahead-of-time memory usage test");
+					// Make a quick-and-dirty attempt to force a bad_alloc iff
+					// we would have thrown one eventually as part of
+					// constructing the DifferenceCoverSample
+					size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
+					uint8_t *tmp = new uint8_t[sz];
+					// Likewise with the KarkkainenBlockwiseSA
+					sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
+					uint8_t *tmp2 = new uint8_t[sz];
+					// Now throw in the 'ftab' and 'isaSample' structures
+					// that we'll eventually allocate in buildToDisk
+					uint32_t *ftab = new uint32_t[_eh._ftabLen];
+					uint32_t *isaSample = new uint32_t[_eh._isaLen];
+					// If we made it here without throwing bad_alloc, then we
+					// passed the memory-usage stress test
+					delete[] tmp;
+					delete[] tmp2;
+					delete[] ftab;
+					delete[] isaSample;
+					VMSG("  Passed!  Constructing with these parameters: --bmax " << bmax << " --dcv " << dcv);
+					if(isPacked()) {
+						VMSG(" --packed");
 					}
-					cerr << "Please try indexing this reference on a computer with more memory." << endl;
-					if(sizeof(void*) == 4) {
-						cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
-						     << "this executable is 32-bit." << endl;
-					}
+					VMSG_NL("");
+				}
+				VMSG_NL("Constructing suffix-array element generator");
+				KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _passMemExc, _verbose);
+				assert(bsa.suffixItrIsReset());
+				assert_eq(bsa.size(), length(s)+1);
+				VMSG_NL("Converting suffix-array elements to index image");
+				buildToDisk(bsa, s, out1, out2);
+				if(out1.bad() || out2.bad()) {
+					cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
 					exit(1);
 				}
-				if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
-					dcv <<= 1; // double difference-cover period
+				break;
+			} catch(bad_alloc& e) {
+				if(_passMemExc) {
+					VMSG_NL("  Ran out of memory; automatically trying more memory-economical parameters.");
 				} else {
-					bmax -= (bmax >> 2); // reduce by 25%
+					cerr << "Out of memory while constructing suffix array.  Please try using a smaller" << endl
+						 << "number of blocks by specifying a smaller --bmax or a larger --bmaxdivn" << endl;
+					exit(1);
 				}
-				VMSG("Using parameters --bmax " << bmax);
-				if(dcv == 0) {
-					VMSG_NL(" and *no difference cover*");
-				} else {
-					VMSG_NL(" --dcv " << dcv);
-				}
-				iter++;
-				try { {
-						VMSG_NL("  Doing ahead-of-time memory usage test");
-						// Make a quick-and-dirty attempt to force a bad_alloc iff
-						// we would have thrown one eventually as part of
-						// constructing the DifferenceCoverSample
-						size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
-						uint8_t *tmp = new uint8_t[sz];
-						// Likewise with the KarkkainenBlockwiseSA
-						sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
-						uint8_t *tmp2 = new uint8_t[sz];
-						// Now throw in the 'ftab' and 'isaSample' structures
-						// that we'll eventually allocate in buildToDisk
-						uint32_t *ftab = new uint32_t[_eh._ftabLen];
-						uint32_t *isaSample = new uint32_t[_eh._isaLen];
-						// If we made it here without throwing bad_alloc, then we
-						// passed the memory-usage stress test
-						delete[] tmp;
-						delete[] tmp2;
-						delete[] ftab;
-						delete[] isaSample;
-						VMSG("  Passed!  Constructing with these parameters: --bmax " << bmax << " --dcv " << dcv);
-						if(isPacked()) {
-							VMSG(" --packed");
-						}
-						VMSG_NL("");
-					}
-					VMSG_NL("Constructing suffix-array element generator");
-					KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _passMemExc, _verbose);
-					assert(bsa.suffixItrIsReset());
-					assert_eq(bsa.size(), length(s)+1);
-					VMSG_NL("Converting suffix-array elements to index image");
-					buildToDisk(bsa, s, out1, out2);
-					break;
-				} catch(bad_alloc& e) {
-					if(_passMemExc) {
-						VMSG_NL("  Ran out of memory; automatically trying more memory-economical parameters.");
-					} else {
-						cerr << "Out of memory while constructing suffix array.  Please try using a smaller" << endl
-						     << "number of blocks by specifying a smaller --bmax or a larger --bmaxdivn" << endl;
-						exit(1);
-					}
-				}
-				first = false;
 			}
-#if 0
-		} else {
-			VMSG_NL("Using entire SA");
-			SillyBlockwiseDnaSA<TStr> bsa(s, 32, _sanity, _passMemExc, _verbose);
-			assert(bsa.suffixItrIsReset());
-			assert_eq(bsa.size(), length(s)+1);
-			// Build Ebwt; doing so initializes everything else
-			buildToDisk(bsa, s, out1, out2);
-#endif
-		//}
+			first = false;
+		}
 		assert(repOk());
 		// Now write reference sequence names on the end
 		assert_eq(this->_refnames.size(), this->_nPat);
 		for(size_t i = 0; i < this->_refnames.size(); i++) {
 			out1 << this->_refnames[i] << endl;
+
 		}
 		out1 << '\0';
+		if(out1.bad() || out2.bad()) {
+			cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
+			exit(1);
+		}
 		VMSG_NL("Returning from initFromVector");
 	}
 
