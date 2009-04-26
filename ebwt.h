@@ -380,6 +380,19 @@ public:
 		std::runtime_error(msg) { }
 };
 
+/**
+ *
+ */
+static inline int fileSize(const char* name) {
+  std::ifstream f;
+  f.open(name, std::ios_base::binary | std::ios_base::in);
+  if (!f.good() || f.eof() || !f.is_open()) { return 0; }
+  f.seekg(0, std::ios_base::beg);
+  std::ifstream::pos_type begin_pos = f.tellg();
+  f.seekg(0, std::ios_base::end);
+  return static_cast<int>(f.tellg() - begin_pos);
+}
+
 // Forward declarations for Ebwt class
 class SideLocus;
 template<typename TStr> class EbwtSearchParams;
@@ -530,11 +543,28 @@ public:
 		               seed);
 		// Close output files
 		fout1.flush();
+		int64_t tellpSz1 = (int64_t)fout1.tellp();
 		VMSG_NL("Wrote " << fout1.tellp() << " bytes to primary EBWT file: " << file1);
 		fout1.close();
+		bool err = false;
+		if(tellpSz1 > fileSize(file1.c_str())) {
+			err = true;
+			cerr << "Index is corrupt: File size for " << file1 << " should have been " << tellpSz1
+			     << " but is actually " << fileSize(file1.c_str()) << "." << endl;
+		}
 		fout2.flush();
+		int64_t tellpSz2 = (int64_t)fout2.tellp();
 		VMSG_NL("Wrote " << fout2.tellp() << " bytes to secondary EBWT file: " << file2);
 		fout2.close();
+		if(tellpSz2 > fileSize(file2.c_str())) {
+			err = true;
+			cerr << "Index is corrupt: File size for " << file2 << " should have been " << tellpSz2
+			     << " but is actually " << fileSize(file2.c_str()) << "." << endl;
+		}
+		if(err) {
+			cerr << "Please check if there is a problem with the disk or if disk is full." << endl;
+			exit(1);
+		}
 		// Reopen as input streams
 		VMSG_NL("Re-opening _in1 and _in2 as input streams");
 		_in1.open(file1.c_str(), ios_base::in | ios::binary);
