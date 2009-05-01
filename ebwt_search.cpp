@@ -3877,7 +3877,7 @@ int main(int argc, char **argv) {
 		} else if(sizeof(void*) == 8) {
 			cout << "64-bit" << endl;
 		} else {
-			cout << "??-bit (sizeof(void*) = " << sizeof(void*) << ")" << endl;
+			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
 		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
