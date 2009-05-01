@@ -3872,13 +3872,22 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		if(sizeof(void*) == 4) {
+			cout << "32-bit" << endl;
+		} else if(sizeof(void*) == 8) {
+			cout << "64-bit" << endl;
+		} else {
+			cout << "??-bit (sizeof(void*) = " << sizeof(void*) << ")" << endl;
+		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+		     << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << "}" << endl;
+		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
+		     << ", " << sizeof(off_t) << "}" << endl;
 		cout << "Source hash: " << (int)(EBWT_SEARCH_HASH) << endl;
 		return 0;
 	}

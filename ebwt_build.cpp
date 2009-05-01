@@ -507,8 +507,7 @@ static void driver(const string& infile,
 		// Adapt sequence files to ifstreams
 		for(size_t i = 0; i < infiles.size(); i++) {
 			FILE *f = fopen(infiles[i].c_str(), "r");
-			if (f == NULL)
-			{
+			if (f == NULL) {
 				cerr << "Error: could not open "<< infiles[i] << endl;
 				exit(1);
 			}
@@ -641,15 +640,23 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		if(sizeof(void*) == 4) {
+			cout << "32-bit" << endl;
+		} else if(sizeof(void*) == 8) {
+			cout << "64-bit" << endl;
+		} else {
+			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+		     << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *)
-		     << ", " << sizeof(size_t) << "}" << endl;
-		cout << "Source hash: " << (int)(EBWT_BUILD_HASH) << endl;
+		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
+		     << ", " << sizeof(off_t) << "}" << endl;
+		cout << "Source hash: " << (int)(EBWT_SEARCH_HASH) << endl;
 		return 0;
 	}
 
