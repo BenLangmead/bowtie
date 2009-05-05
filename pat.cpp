@@ -6,24 +6,14 @@
 using namespace std;
 using namespace seqan;
 
-void wrongQualityScale() {
-	cerr << "Encounterd negative quality value, but Phred qualities can't be negative."<<endl
-	<<  "These qualities appear to use the Solexa scale." << endl
-	<< "Please re-run Bowtie with the --solexa-quals option.";
-}
-
 void wrongQualityFormat() {
 	cerr << "Encounterd space-separated qualities"<<endl
-	<<  "This appears to be an FASTQ-int file" << endl
-	<< "Please re-run Bowtie with the --integer-quals option.";
+	     <<  "This appears to be an FASTQ-int file" << endl
+	     << "Please re-run Bowtie with the --integer-quals option.";
 }
 
 void tooFewQualities(const String<char>& read_name) {
-	string s;
-	for(size_t i = 0; i < seqan::length(read_name); i++) {
-		s.push_back(read_name[i]);
-	}
-	cerr << "Too few quality values for read: " << s << endl
+	cerr << "Too few quality values for read: " << read_name << endl
 		 << "\tare you sure this is a FASTQ-int file?" << endl;
 }
 

@@ -2,10 +2,27 @@
 #define QUAL_H_
 
 extern unsigned char qualRounds[];
+extern unsigned char solToPhred[];
 
 /// Translate a Phred-encoded ASCII character into a Phred quality
 static inline uint8_t phredCharToPhredQual(char c) {
 	return ((uint8_t)c >= 33 ? ((uint8_t)c - 33) : 0);
+}
+
+/**
+ * Convert a Solexa-scaled quality value into a Phred-scale quality
+ * value.
+ *
+ * p = probability that base is miscalled
+ * Qphred = -10 * log10 (p)
+ * Qsolexa = -10 * log10 (p / (1 - p))
+ * See: http://en.wikipedia.org/wiki/FASTQ_format
+ *
+ */
+static inline uint8_t solexaToPhred(int sol) {
+	assert_lt(sol, 256);
+	if(sol < -10) return 0;
+	return solToPhred[sol+10];
 }
 
 class SimplePhredPenalty {
@@ -71,8 +88,7 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
 	if (solQuals) {
 		// Convert solexa-scaled chars to phred
 		// http://maq.sourceforge.net/fastq.shtml
-		int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-		char cc = (char)(pQ);
+		char cc = solexaToPhred((int)c - 64) + 33;
 		if (cc < 33) {
 			cerr << "Saw ASCII character "
 			     << ((int)c)
@@ -119,7 +135,7 @@ inline static char intToPhred33(int iQ, bool solQuals) {
 		// Convert from solexa quality to phred
 		// quality and translate to ASCII
 		// http://maq.sourceforge.net/qual.shtml
-		pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+		pQ = solexaToPhred((int)iQ) + 33;
 	} else {
 		// Keep the phred quality and translate
 		// to ASCII

@@ -1582,7 +1582,6 @@ private:
 	int policy_;
 };
 
-extern void wrongQualityScale();
 extern void wrongQualityFormat();
 extern void tooFewQualities(const String<char>& read_name);
 
@@ -2031,13 +2030,7 @@ public:
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals)
-	{
-		for (int l = 0; l != 128; ++l) {
-			table_[l] = (int)(10.0 * log(1.0 + pow(10.0, (l - 64) / 10.0)) / log(10.0) + .499);
-			if (table_[l] >= 63) table_[l] = 63;
-			if (table_[l] == 0) table_[l] = 1;
-		}
-	}
+	{ }
 	virtual void reset() {
 		first_ = true;
 		BufferedFilePatternSource::reset();
@@ -2302,7 +2295,6 @@ private:
 	bool phred64Quals_;
 	bool intQuals_;
 	int policy_;
-	int table_[128];
 };
 
 /**
