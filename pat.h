@@ -17,6 +17,7 @@
 #include "spinlock.h"
 #include "threading.h"
 #include "filebuf.h"
+#include "qual.h"
 
 /**
  * Classes and routines for reading reads from various input sources.
@@ -1600,12 +1601,14 @@ public:
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
 					   bool solQuals = false,
+					   bool phred64Quals = false,
 					   bool intQuals = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
 		                          __forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
 		solQuals_(solQuals),
+		phred64Quals_(phred64Quals),
 		intQuals_(intQuals)
 	{ }
 
@@ -1838,25 +1841,7 @@ private:
 				tokenize(string(buf), " ", s_quals);
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
 					int iQ = atoi(s_quals[j].c_str());
-					int pQ;
-					if (solQuals_) {
-						// Convert from solexa quality to phred
-						// quality and translate to ASCII
-						// http://maq.sourceforge.net/qual.shtml
-						pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
-					}
-					else {
-						// Keep the phred quality and translate
-						// to ASCII
-						pQ = (iQ <= 93 ? iQ : 93) + 33;
-						if (pQ < 33)
-						{
-							cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-							wrongQualityScale();
-							exit(1);
-						}
-					}
-
+					char c = intToPhred33(iQ, solQuals_);
 					if (qualsRead >= trim5_) {
 						size_t off = qualsRead - trim5_;
 						if(off + 1 > 1024) {
@@ -1864,7 +1849,6 @@ private:
 								 << "Please truncate reads and quality values and and re-run Bowtie";
 							exit(1);
 						}
-						c = (char)(pQ);
 						assert_geq(c, 33);
 						assert_leq(c, 73);
 						r.qualBufFw[off] = c;
@@ -1896,20 +1880,7 @@ private:
 								 << "Please truncate reads and quality values and and re-run Bowtie";
 							exit(1);
 						}
-
-						if (solQuals_) {
-							// Convert solexa-scaled chars to phred
-							// http://maq.sourceforge.net/fastq.shtml
-							int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-							c = (char)(pQ);
-						} else {
-							// Keep the phred quality
-							if (c < 33) {
-								cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-								wrongQualityScale();
-								exit(1);
-							}
-						}
+						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
 						r.qualBufFw[off] = c;
 					}
@@ -1933,6 +1904,7 @@ private:
 	}
 
 	bool solQuals_;
+	bool phred64Quals_;
 	bool intQuals_;
 	int policy_;
 };
@@ -2049,6 +2021,7 @@ public:
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
 					   bool solexa_quals = false,
+					   bool phred64Quals = false,
 					   bool integer_quals = false,
 					   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
@@ -2056,6 +2029,7 @@ public:
 		                          trim3, trim5, skip),
 		first_(true),
 		solQuals_(solexa_quals),
+		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals)
 	{
 		for (int l = 0; l != 128; ++l) {
@@ -2112,6 +2086,7 @@ protected:
 			c = in.get();
 		}
 	}
+
 	/// Read another pattern from a FASTQ input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		const int bufSz = ReadBuf::BUF_SIZE;
@@ -2223,27 +2198,7 @@ protected:
 				for (unsigned int j = 0; j < s_quals.size(); ++j)
 				{
 					int iQ = atoi(s_quals[j].c_str());
-					int pQ;
-					if (solQuals_)
-					{
-						// Convert from solexa quality to phred
-						// quality and translate to ASCII
-						// http://maq.sourceforge.net/qual.shtml
-						pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
-					}
-					else
-					{
-						// Keep the phred quality and translate
-						// to ASCII
-						pQ = (iQ <= 93 ? iQ : 93) + 33;
-						if (pQ < 33)
-						{
-							cerr << "Saw ASCII character " << ((int)pQ) << "." << endl;
-							wrongQualityScale();
-							exit(1);
-						}
-					}
-
+					char c = intToPhred33(iQ, solQuals_);
 					if (qualsRead >= trim5_)
 					{
 						size_t off = qualsRead - trim5_;
@@ -2252,7 +2207,6 @@ protected:
 								 << "Please truncate reads and quality values and and re-run Bowtie";
 							exit(1);
 						}
-						c = (char)(pQ);
 						assert_geq(c, 33);
 						assert_leq(c, 73);
 						r.qualBufFw[off] = c;
@@ -2292,25 +2246,7 @@ protected:
 								 << "Please truncate reads and quality values and and re-run Bowtie";
 							exit(1);
 						}
-
-						if (solQuals_)
-						{
-							// Convert solexa-scaled chars to phred
-							// http://maq.sourceforge.net/fastq.shtml
-							int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
-							c = (char)(pQ);
-						}
-						else
-						{
-							// Keep the phred quality
-							if (c < 33)
-							{
-								cerr << "Saw ASCII character " << ((int)c) << "." << endl;
-								wrongQualityScale();
-								exit(1);
-							}
-						}
-
+						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
 						r.qualBufFw[off] = c;
 					}
@@ -2363,6 +2299,7 @@ protected:
 private:
 	bool first_;
 	bool solQuals_;
+	bool phred64Quals_;
 	bool intQuals_;
 	int policy_;
 	int table_[128];

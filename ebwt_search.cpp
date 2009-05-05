@@ -59,8 +59,9 @@ static int offRate				= -1; // keep default offRate
 static int isaRate				= -1; // keep default isaRate
 static int mismatches			= 0; // allow 0 mismatches by default
 static char *patDumpfile		= NULL; // filename to dump patterns to
-static bool solexa_quals		= false; //quality strings are solexa qualities, instead of phred
-static bool integer_quals		= false; //quality strings are space-separated strings of integers, instead of ASCII
+static bool solexaQuals			= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
+static bool phred64Quals        = false; // quality chars are phred, but must subtract 64 (not 33)
+static bool integerQuals		= false; // quality strings are space-separated strings of integers, not ASCII
 static int maqLike				= 1; // do maq-like searching
 static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
 static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
@@ -124,7 +125,7 @@ enum {
 	ARG_DUMP_PATS,
 	ARG_RANGE,
 	ARG_CONCISE,
-	ARG_SOLEXA_QUALS,
+	ARG_solexaQuals,
 	ARG_MAXBTS,
 	ARG_VERBOSE,
 	ARG_QUIET,
@@ -150,7 +151,7 @@ enum {
 	ARG_ISARATE,
 	ARG_SEED_EXTEND,
 	ARG_PARTITION,
-	ARG_INTEGER_QUALS,
+	ARG_integerQuals,
 	ARG_FORGIVE_INPUT,
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
@@ -172,91 +173,96 @@ enum {
 	ARG_RANDOMIZE_QUALS,
 	ARG_STATS,
 	ARG_ONETWO,
+	ARG_PHRED64,
+	ARG_PHRED33
 };
 
 static struct option long_options[] = {
-	{"verbose",      no_argument,       0,            ARG_VERBOSE},
-	{"quiet",        no_argument,       0,            ARG_QUIET},
-	{"sanity",       no_argument,       0,            ARG_SANITY},
-	{"exact",        no_argument,       0,            '0'},
-	{"1mm",          no_argument,       0,            '1'},
-	{"2mm",          no_argument,       0,            '2'},
-	{"pause",        no_argument,       &ipause,      1},
-	{"orig",         required_argument, 0,            ARG_ORIG},
-	{"all",          no_argument,       0,            'a'},
-	{"concise",      no_argument,       0,            ARG_CONCISE},
-	{"binout",       no_argument,       0,            'b'},
-	{"noout",        no_argument,       0,            ARG_NOOUT},
-	{"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
-	{"integer-quals",no_argument,       0,            ARG_INTEGER_QUALS},
-	{"time",         no_argument,       0,            't'},
-	{"trim3",        required_argument, 0,            '3'},
-	{"trim5",        required_argument, 0,            '5'},
-	{"seed",         required_argument, 0,            ARG_SEED},
-	{"qupto",        required_argument, 0,            'u'},
-	{"alfa",         required_argument, 0,            ARG_ALFA},
-	{"alfq",         required_argument, 0,            ARG_ALFQ},
-	{"unfa",         required_argument, 0,            ARG_UNFA},
-	{"unfq",         required_argument, 0,            ARG_UNFQ},
-	{"maxfa",        required_argument, 0,            ARG_MAXFA},
-	{"maxfq",        required_argument, 0,            ARG_MAXFQ},
-	{"offrate",      required_argument, 0,            'o'},
-	{"isarate",      required_argument, 0,            ARG_ISARATE},
-	{"skipsearch",   no_argument,       &skipSearch,  1},
-	{"qsamelen",     no_argument,       &qSameLen,    1},
-	{"reportopps",   no_argument,       &reportOpps,  1},
-	{"version",      no_argument,       &showVersion, 1},
-	{"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
-	{"revcomp",      no_argument,       0,            'r'},
-	{"maqerr",       required_argument, 0,            'e'},
-	{"seedlen",      required_argument, 0,            'l'},
-	{"seedmms",      required_argument, 0,            'n'},
-	{"filepar",      no_argument,       0,            ARG_FILEPAR},
-	{"help",         no_argument,       0,            'h'},
-	{"threads",      required_argument, 0,            'p'},
-	{"khits",        required_argument, 0,            'k'},
-	{"mhits",        required_argument, 0,            'm'},
-	{"minins",       required_argument, 0,            'I'},
-	{"maxins",       required_argument, 0,            'X'},
-	{"best",         no_argument,       0,            ARG_BEST},
-	{"better",       no_argument,       0,            ARG_BETTER},
-	{"oldbest",      no_argument,       0,            ARG_OLDBEST},
-	{"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
-	{"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
-	{"refidx",       no_argument,       0,            ARG_REFIDX},
-	{"range",        no_argument,       0,            ARG_RANGE},
-	{"maxbts",       required_argument, 0,            ARG_MAXBTS},
-	{"randread",     no_argument,       0,            ARG_RANDOM_READS},
-	{"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
-	{"phased",       no_argument,       0,            'z'},
-	{"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
-	{"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
-	{"refout",       no_argument,       0,            ARG_REFOUT},
-	{"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
-	{"partition",    required_argument, 0,            ARG_PARTITION},
-	{"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
-	{"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
-	{"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
-	{"stateful",     no_argument,       0,            ARG_STATEFUL},
-	{"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
-	{"ff",           no_argument,       0,            ARG_FF},
-	{"fr",           no_argument,       0,            ARG_FR},
-	{"rf",           no_argument,       0,            ARG_RF},
-	{"mixthresh",    required_argument, 0,            'x'},
-	{"pairtries",    required_argument, 0,            ARG_MIXED_ATTEMPTS},
-	{"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
-	{"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
-	{"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
-	{"nofw",         no_argument,       0,            ARG_NO_FW},
-	{"norc",         no_argument,       0,            ARG_NO_RC},
-	{"offbase",      required_argument, 0,            'B'},
-	{"tryhard",      no_argument,       0,            'y'},
-	{"skip",         required_argument, 0,            's'},
-	{"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
-	{"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
-	{"stats",        no_argument,       0,            ARG_STATS},
-	{"12",           required_argument, 0,            ARG_ONETWO},
-	{0, 0, 0, 0} // terminator
+	{(char*)"verbose",      no_argument,       0,            ARG_VERBOSE},
+	{(char*)"quiet",        no_argument,       0,            ARG_QUIET},
+	{(char*)"sanity",       no_argument,       0,            ARG_SANITY},
+	{(char*)"exact",        no_argument,       0,            '0'},
+	{(char*)"1mm",          no_argument,       0,            '1'},
+	{(char*)"2mm",          no_argument,       0,            '2'},
+	{(char*)"pause",        no_argument,       &ipause,      1},
+	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
+	{(char*)"all",          no_argument,       0,            'a'},
+	{(char*)"concise",      no_argument,       0,            ARG_CONCISE},
+	{(char*)"binout",       no_argument,       0,            'b'},
+	{(char*)"noout",        no_argument,       0,            ARG_NOOUT},
+	{(char*)"solexa-quals", no_argument,       0,            ARG_solexaQuals},
+	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
+	{(char*)"time",         no_argument,       0,            't'},
+	{(char*)"trim3",        required_argument, 0,            '3'},
+	{(char*)"trim5",        required_argument, 0,            '5'},
+	{(char*)"seed",         required_argument, 0,            ARG_SEED},
+	{(char*)"qupto",        required_argument, 0,            'u'},
+	{(char*)"alfa",         required_argument, 0,            ARG_ALFA},
+	{(char*)"alfq",         required_argument, 0,            ARG_ALFQ},
+	{(char*)"unfa",         required_argument, 0,            ARG_UNFA},
+	{(char*)"unfq",         required_argument, 0,            ARG_UNFQ},
+	{(char*)"maxfa",        required_argument, 0,            ARG_MAXFA},
+	{(char*)"maxfq",        required_argument, 0,            ARG_MAXFQ},
+	{(char*)"offrate",      required_argument, 0,            'o'},
+	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
+	{(char*)"skipsearch",   no_argument,       &skipSearch,  1},
+	{(char*)"qsamelen",     no_argument,       &qSameLen,    1},
+	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
+	{(char*)"version",      no_argument,       &showVersion, 1},
+	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
+	{(char*)"revcomp",      no_argument,       0,            'r'},
+	{(char*)"maqerr",       required_argument, 0,            'e'},
+	{(char*)"seedlen",      required_argument, 0,            'l'},
+	{(char*)"seedmms",      required_argument, 0,            'n'},
+	{(char*)"filepar",      no_argument,       0,            ARG_FILEPAR},
+	{(char*)"help",         no_argument,       0,            'h'},
+	{(char*)"threads",      required_argument, 0,            'p'},
+	{(char*)"khits",        required_argument, 0,            'k'},
+	{(char*)"mhits",        required_argument, 0,            'm'},
+	{(char*)"minins",       required_argument, 0,            'I'},
+	{(char*)"maxins",       required_argument, 0,            'X'},
+	{(char*)"best",         no_argument,       0,            ARG_BEST},
+	{(char*)"better",       no_argument,       0,            ARG_BETTER},
+	{(char*)"oldbest",      no_argument,       0,            ARG_OLDBEST},
+	{(char*)"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
+	{(char*)"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
+	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
+	{(char*)"range",        no_argument,       0,            ARG_RANGE},
+	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
+	{(char*)"randread",     no_argument,       0,            ARG_RANDOM_READS},
+	{(char*)"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
+	{(char*)"phased",       no_argument,       0,            'z'},
+	{(char*)"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
+	{(char*)"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
+	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
+	{(char*)"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
+	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
+	{(char*)"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
+	{(char*)"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
+	{(char*)"sharedmem",    no_argument,       0,            ARG_SHARED_MEM},
+	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
+	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
+	{(char*)"ff",           no_argument,       0,            ARG_FF},
+	{(char*)"fr",           no_argument,       0,            ARG_FR},
+	{(char*)"rf",           no_argument,       0,            ARG_RF},
+	{(char*)"mixthresh",    required_argument, 0,            'x'},
+	{(char*)"pairtries",    required_argument, 0,            ARG_MIXED_ATTEMPTS},
+	{(char*)"noreconcile",  no_argument,       0,            ARG_NO_RECONCILE},
+	{(char*)"cachelim",     required_argument, 0,            ARG_CACHE_LIM},
+	{(char*)"cachesz",      required_argument, 0,            ARG_CACHE_SZ},
+	{(char*)"nofw",         no_argument,       0,            ARG_NO_FW},
+	{(char*)"norc",         no_argument,       0,            ARG_NO_RC},
+	{(char*)"offbase",      required_argument, 0,            'B'},
+	{(char*)"tryhard",      no_argument,       0,            'y'},
+	{(char*)"skip",         required_argument, 0,            's'},
+	{(char*)"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
+	{(char*)"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
+	{(char*)"stats",        no_argument,       0,            ARG_STATS},
+	{(char*)"12",           required_argument, 0,            ARG_ONETWO},
+	{(char*)"phred33-quals", no_argument,      0,            ARG_PHRED33},
+	{(char*)"phred64-quals", no_argument,      0,            ARG_PHRED64},
+	{(char*)"solexa1.3-quals", no_argument,    0,            ARG_PHRED64},
+	{(char*)0, 0, 0, 0} // terminator
 };
 
 /**
@@ -281,7 +287,10 @@ static void printUsage(ostream& out) {
 	    << "  -u/--qupto <int>   stop after first <int> reads/pairs (excl. skipped reads)" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
 	    << "  -3/--trim3 <int>   trim <int> bases from 3' (right) end of reads" << endl
-		<< "  --solexa-quals     convert quals from solexa (can be < 0) to phred (can't)" << endl
+		<< "  --phred33-quals    input quals are Phred+33 (default)" << endl
+		<< "  --phred64-quals    input quals are Phred+64 (same as --solexa1.3-quals)" << endl
+		<< "  --solexa-quals     input quals are from GA Pipeline ver. < 1.3" << endl
+		<< "  --solexa1.3-quals  input quals are from GA Pipeline ver. >= 1.3" << endl
 		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
 	    << "Alignment:" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: -n 2)" << endl
@@ -292,7 +301,7 @@ static void printUsage(ostream& out) {
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
-	    << "  --maxbts <int>     max number of backtracks allowed for -n 2/3 (default: 125)" << endl
+	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
 	    << "Reporting:" << endl
@@ -678,16 +687,31 @@ static void printLongUsage(ostream& out) {
 	"  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of\n"
 	"                     each read before alignment (default: 0).\n"
 	"\n"
+	"  --phred33-quals    FASTQ qualities are ASCII chars equal to the Phred\n"
+	"                     quality plus 33.  Default: on.\n"
+	"\n"
+	"  --phred64-quals    FASTQ qualities are ASCII chars equal to the Phred\n"
+	"                     quality plus 64.  Default: off.\n"
+	"\n"
 	"  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which\n"
 	"                     can be negative) to phred-scaled (which can't).\n"
 	"                     The formula for conversion is phred-qual =\n"
 	"                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).\n"
-	"                     Used with -q.  Default: off.\n"
+	"                     This is usually the right option for use with\n"
+	"                     (unconverted) reads emitted by GA Pipeline\n"
+	"                     versions prior to 1.3.  Default: off.\n"
+	"\n"
+	"  --solexa1.3-quals  Same as --phred64-quals.  This is usually the\n"
+	"                     right option for use with (unconverted) reads\n"
+	"                     emitted by GA Pipeline version 1.3 or later.\n"
+	"                     Default: off.\n"
 	"\n"
 	"  --integer-quals    Quality values are represented in the FASTQ file\n"
 	"                     as space-separated ASCII integers, e.g.,\n"
 	"                     \"40 40 30 40...\", rather than ASCII characters,\n"
-	"                     e.g., \"II?I...\".  Used with -q.  Default: off.\n"
+	"                     e.g., \"II?I...\".  Integers are treated as being on\n"
+	"                     the Phred scale unless --solexa-quals is also\n"
+	"                     specified.  Default: off.\n"
 	"\n"
 	"   Alignment:\n"
 	"   ----------\n"
@@ -1117,8 +1141,10 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_UNFQ: dumpUnalFqBase = optarg; break;
 	   		case ARG_MAXFA: dumpMaxFaBase = optarg; break;
 	   		case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
-			case ARG_SOLEXA_QUALS: solexa_quals = true; break;
-			case ARG_INTEGER_QUALS: integer_quals = true; break;
+			case ARG_solexaQuals: solexaQuals = true; break;
+			case ARG_integerQuals: integerQuals = true; break;
+			case ARG_PHRED64: phred64Quals = true; break;
+			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
 			case ARG_FORGIVE_INPUT: forgiveInput = true; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case 'z': fullIndex = false; break;
@@ -3530,15 +3556,15 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               forgiveInput,
-			                               solexa_quals,
-			                               integer_quals, skipReads);
+			                               solexaQuals, phred64Quals,
+			                               integerQuals, skipReads);
 		case TAB_MATE:
 			return new TabbedPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               forgiveInput,
-			                               solexa_quals,
-			                               integer_quals, skipReads);
+			                               solexaQuals,
+			                               integerQuals, skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
@@ -3888,7 +3914,7 @@ int main(int argc, char **argv) {
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
 		     << ", " << sizeof(off_t) << "}" << endl;
-		cout << "Source hash: " << (int)(EBWT_SEARCH_HASH) << endl;
+		cout << "Source hash: " << INT64_C(EBWT_SEARCH_HASH) << endl;
 		return 0;
 	}
 #ifdef CHUD_PROFILING

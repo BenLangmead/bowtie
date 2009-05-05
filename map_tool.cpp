@@ -138,20 +138,20 @@ enum {
 };
 
 static struct option long_options[] = {
-	{"indef",      no_argument, 0, 'd'},
-	{"inbin",      no_argument, 0, 'b'},
-	{"outdef",     no_argument, 0, 'D'},
-	{"outbin",     no_argument, 0, 'B'},
-	{"outconcise", no_argument, 0, 'C'},
-	{"outfastq",   no_argument, 0, 'Q'},
-	{"outfasta",   no_argument, 0, 'F'},
-	{"sort ",      no_argument, 0, 's'},
-	{"verbose",    no_argument, 0, 'v'},
-	{"names",      no_argument, 0, 'n'},
-	{"help",       no_argument, 0, 'h'},
-	{"refidx",     no_argument, 0, ARG_REFIDX},
-	{"version",    no_argument, 0, ARG_VERSION},
-	{0, 0, 0, 0} // terminator
+	{(char*)"indef",      no_argument, 0, 'd'},
+	{(char*)"inbin",      no_argument, 0, 'b'},
+	{(char*)"outdef",     no_argument, 0, 'D'},
+	{(char*)"outbin",     no_argument, 0, 'B'},
+	{(char*)"outconcise", no_argument, 0, 'C'},
+	{(char*)"outfastq",   no_argument, 0, 'Q'},
+	{(char*)"outfasta",   no_argument, 0, 'F'},
+	{(char*)"sort ",      no_argument, 0, 's'},
+	{(char*)"verbose",    no_argument, 0, 'v'},
+	{(char*)"names",      no_argument, 0, 'n'},
+	{(char*)"help",       no_argument, 0, 'h'},
+	{(char*)"refidx",     no_argument, 0, ARG_REFIDX},
+	{(char*)"version",    no_argument, 0, ARG_VERSION},
+	{(char*)0, 0, 0, 0} // terminator
 };
 
 /**
@@ -212,6 +212,8 @@ static void fastaAppend(ostream& out, Hit& h) {
 	out << ">" << h.patName << endl << h.patSeq << endl;
 }
 
+static char *argv0 = NULL;
+
 /**
  * Parse command-line options, iterate through input alignments and
  * output appropriate converted alignment.
@@ -220,19 +222,28 @@ int main(int argc, char **argv) {
 	string infile;
 	vector<string> infiles;
 	string outfile;
+	argv0 = argv[0];
 	parseOptions(argc, argv);
 	ostream *out = &cout;
 	if(showVersion) {
-		cout << argv[0] << " version " << BOWTIE_VERSION << endl;
+		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		if(sizeof(void*) == 4) {
+			cout << "32-bit" << endl;
+		} else if(sizeof(void*) == 8) {
+			cout << "64-bit" << endl;
+		} else {
+			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+		     << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *)
-		     << ", " << sizeof(size_t) << "}" << endl;
-		cout << "Source hash: " << EBWT_MAPTOOL_HASH << endl;
+		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
+		     << ", " << sizeof(off_t) << "}" << endl;
+		cout << "Source hash: " << INT64_C(EBWT_MAPTOOL_HASH) << endl;
 		return 0;
 	}
 

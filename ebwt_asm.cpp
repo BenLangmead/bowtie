@@ -50,15 +50,15 @@ enum {
 };
 
 static struct option long_options[] = {
-	{"verbose",   no_argument, 0, 'v'},
-	{"sorted",    no_argument, 0, 's'},
-	{"upto",      required_argument, 0, 'u'},
-	{"threads",   required_argument, 0, 'p'},
-	{"partition", required_argument, 0, 't'},
-	{"sanity",    no_argument, 0, ARG_SANITY},
-	{"help",      no_argument, 0, 'h'},
-	{"version",   no_argument, 0, ARG_VERSION},
-	{0, 0, 0, 0} // terminator
+	{(char*)"verbose",   no_argument, 0, 'v'},
+	{(char*)"sorted",    no_argument, 0, 's'},
+	{(char*)"upto",      required_argument, 0, 'u'},
+	{(char*)"threads",   required_argument, 0, 'p'},
+	{(char*)"partition", required_argument, 0, 't'},
+	{(char*)"sanity",    no_argument, 0, ARG_SANITY},
+	{(char*)"help",      no_argument, 0, 'h'},
+	{(char*)"version",   no_argument, 0, ARG_VERSION},
+	{(char*)0, 0, 0, 0} // terminator
 };
 
 /**
@@ -352,15 +352,23 @@ int main(int argc, char **argv) {
 	argv0 = argv[0];
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		if(sizeof(void*) == 4) {
+			cout << "32-bit" << endl;
+		} else if(sizeof(void*) == 8) {
+			cout << "64-bit" << endl;
+		} else {
+			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+		     << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *)
-		     << ", " << sizeof(size_t) << "}" << endl;
-		cout << "Source hash: " << EBWT_ASM_HASH << endl;
+		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
+		     << ", " << sizeof(off_t) << "}" << endl;
+		cout << "Source hash: " << INT64_C(EBWT_ASM_HASH) << endl;
 		return 0;
 	}
 

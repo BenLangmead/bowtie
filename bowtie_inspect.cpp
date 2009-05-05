@@ -10,19 +10,22 @@
 using namespace std;
 using namespace seqan;
 
-static int showVersion = 0;  // just print version and quit?
+static bool showVersion = false; // just print version and quit?
 static int verbose     = 0;  // be talkative
 static int names_only  = 0;  // just print the sequence names in the index
 static int across      = 60; // number of characters across in FASTA output
 
 static const char *short_options = "vh?na:";
 
+static const int ARG_VERSION = 256;
+
 static struct option long_options[] = {
-	{"verbose", no_argument,       0, 'v'},
-	{"names",   no_argument,       0, 'n'},
-	{"help",    no_argument,       0, 'h'},
-	{"across",  required_argument, 0, 'a'},
-	{0, 0, 0, 0} // terminator
+	{(char*)"verbose", no_argument,       0, 'v'},
+	{(char*)"version", no_argument,       0, ARG_VERSION},
+	{(char*)"names",   no_argument,       0, 'n'},
+	{(char*)"help",    no_argument,       0, 'h'},
+	{(char*)"across",  required_argument, 0, 'a'},
+	{(char*)0, 0, 0, 0} // terminator
 };
 
 /**
@@ -127,6 +130,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?':
 	   			printLongUsage(cout); exit(0); break;
 	   		case 'v': verbose = true; break;
+	   		case ARG_VERSION: showVersion = true; break;
 			case 'n': names_only = true; break;
 			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
 			case -1: break; /* Done with options. */
@@ -269,14 +273,23 @@ int main(int argc, char **argv) {
 	parseOptions(argc, argv);
 	if(showVersion) {
 		cout << argv0 << " version " << BOWTIE_VERSION << endl;
+		if(sizeof(void*) == 4) {
+			cout << "32-bit" << endl;
+		} else if(sizeof(void*) == 8) {
+			cout << "64-bit" << endl;
+		} else {
+			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+		}
 		cout << "Built on " << BUILD_HOST << endl;
 		cout << BUILD_TIME << endl;
 		cout << "Compiler: " << COMPILER_VERSION << endl;
 		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*}: {" << sizeof(int)
+		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+		     << sizeof(int)
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << "}" << endl;
-		cout << "Source hash: " << EBWT_INSPECT_HASH << endl;
+		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
+		     << ", " << sizeof(off_t) << "}" << endl;
+		cout << "Source hash: " << INT64_C(EBWT_INSPECT_HASH) << endl;
 		return 0;
 	}
 

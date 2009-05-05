@@ -331,33 +331,33 @@ static void printLongUsage(ostream& out) {
 static const char *short_options = "qraph?nscfl:i:o:t:h:3";
 
 static struct option long_options[] = {
-	{"quiet",        no_argument,       0,            'q'},
-	{"sanity",       no_argument,       0,            's'},
-	{"packed",       no_argument,       0,            'p'},
-	{"little",       no_argument,       &bigEndian,   0},
-	{"big",          no_argument,       &bigEndian,   1},
-	{"bmax",         required_argument, 0,            ARG_BMAX},
-	{"bmaxmultsqrt", required_argument, 0,            ARG_BMAX_MULT},
-	{"bmaxdivn",     required_argument, 0,            ARG_BMAX_DIV},
-	{"dcv",          required_argument, 0,            ARG_DCV},
-	{"nodc",         no_argument,       &noDc,        1},
-	{"seed",         required_argument, 0,            ARG_SEED},
-	{"entiresa",     no_argument,       &entireSA,    1},
-	{"version",      no_argument,       &showVersion, 1},
-	{"noauto",       no_argument,       0,            'a'},
-	{"noblocks",     required_argument, 0,            'n'},
-	{"linerate",     required_argument, 0,            'l'},
-	{"linesperside", required_argument, 0,            'i'},
-	{"offrate",      required_argument, 0,            'o'},
-	{"isarate",      required_argument, 0,            ARG_ISARATE},
-	{"ftabchars",    required_argument, 0,            't'},
-	{"help",         no_argument,       0,            'h'},
-	{"cutoff",       required_argument, 0,            ARG_CUTOFF},
-	{"ntoa",         no_argument,       0,            ARG_NTOA},
-	{"oldpmap",      no_argument,       0,            ARG_PMAP},
-	{"justref",      no_argument,       0,            '3'},
-	{"noref",        no_argument,       0,            'r'},
-	{0, 0, 0, 0} // terminator
+	{(char*)"quiet",        no_argument,       0,            'q'},
+	{(char*)"sanity",       no_argument,       0,            's'},
+	{(char*)"packed",       no_argument,       0,            'p'},
+	{(char*)"little",       no_argument,       &bigEndian,   0},
+	{(char*)"big",          no_argument,       &bigEndian,   1},
+	{(char*)"bmax",         required_argument, 0,            ARG_BMAX},
+	{(char*)"bmaxmultsqrt", required_argument, 0,            ARG_BMAX_MULT},
+	{(char*)"bmaxdivn",     required_argument, 0,            ARG_BMAX_DIV},
+	{(char*)"dcv",          required_argument, 0,            ARG_DCV},
+	{(char*)"nodc",         no_argument,       &noDc,        1},
+	{(char*)"seed",         required_argument, 0,            ARG_SEED},
+	{(char*)"entiresa",     no_argument,       &entireSA,    1},
+	{(char*)"version",      no_argument,       &showVersion, 1},
+	{(char*)"noauto",       no_argument,       0,            'a'},
+	{(char*)"noblocks",     required_argument, 0,            'n'},
+	{(char*)"linerate",     required_argument, 0,            'l'},
+	{(char*)"linesperside", required_argument, 0,            'i'},
+	{(char*)"offrate",      required_argument, 0,            'o'},
+	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
+	{(char*)"ftabchars",    required_argument, 0,            't'},
+	{(char*)"help",         no_argument,       0,            'h'},
+	{(char*)"cutoff",       required_argument, 0,            ARG_CUTOFF},
+	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
+	{(char*)"oldpmap",      no_argument,       0,            ARG_PMAP},
+	{(char*)"justref",      no_argument,       0,            '3'},
+	{(char*)"noref",        no_argument,       0,            'r'},
+	{(char*)0, 0, 0, 0} // terminator
 };
 
 /**
@@ -656,7 +656,7 @@ int main(int argc, char **argv) {
 		     << ", " << sizeof(long) << ", " << sizeof(long long)
 		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
 		     << ", " << sizeof(off_t) << "}" << endl;
-		cout << "Source hash: " << (int)(EBWT_BUILD_HASH) << endl;
+		cout << "Source hash: " << INT64_C(EBWT_BUILD_HASH) << endl;
 		return 0;
 	}
 

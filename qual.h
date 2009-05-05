@@ -58,4 +58,75 @@ static inline uint8_t insPenalty(bool maq, uint8_t qual_left, uint8_t qual_right
 	}
 }
 
+/**
+ * Take an ASCII-encoded quality value and convert it to a Phred33
+ * ASCII char.
+ */
+inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
+	if(c == ' ') {
+		cerr << "Saw a space but expected an ASCII-encoded quality value." << endl
+		     << "Are quality values formatted as integers?  If so, try --integer-quals." << endl;
+		exit(1);
+	}
+	if (solQuals) {
+		// Convert solexa-scaled chars to phred
+		// http://maq.sourceforge.net/fastq.shtml
+		int pQ = (int)(10.0 * log(1.0 + pow(10.0, ((int)c - 64) / 10.0)) / log(10.0) + .499) + 33;
+		char cc = (char)(pQ);
+		if (cc < 33) {
+			cerr << "Saw ASCII character "
+			     << ((int)c)
+			     << " but expected 64-based Solexa qual (converts to " << (int)cc << ")." << endl
+			     << "Try not specifying --solexa-quals." << endl;
+			exit(1);
+		}
+		c = cc;
+	}
+	else if(phred64Quals) {
+		if (c < 64) {
+			cerr << "Saw ASCII character "
+			     << ((int)c)
+			     << " but expected 64-based Phred qual." << endl
+			     << "Try not specifying --solexa1.3-quals/--phred64-quals." << endl;
+			exit(1);
+		}
+		// Convert to 33-based phred
+		c -= (64-33);
+	}
+	else {
+		// Keep the phred quality
+		if (c < 33) {
+			cerr << "Saw ASCII character "
+			     << ((int)c)
+			     << " but expected 33-based Phred qual." << endl;
+			exit(1);
+		}
+	}
+	return c;
+}
+
+/**
+ * Take an integer quality value and convert it to a Phred33 ASCII
+ * char.
+ */
+inline static char intToPhred33(int iQ, bool solQuals) {
+	int pQ;
+	if (iQ < 0) {
+		cerr << "Saw integer quality " << ((int)iQ) << "." << endl;
+		exit(1);
+	}
+	if (solQuals) {
+		// Convert from solexa quality to phred
+		// quality and translate to ASCII
+		// http://maq.sourceforge.net/qual.shtml
+		pQ = (int)(10.0 * log(1.0 + pow(10.0, (iQ) / 10.0)) / log(10.0) + .499) + 33;
+	} else {
+		// Keep the phred quality and translate
+		// to ASCII
+		pQ = (iQ <= 93 ? iQ : 93) + 33;
+	}
+	assert_geq(pQ, 0);
+	return (int)pQ;
+}
+
 #endif /*QUAL_H_*/
