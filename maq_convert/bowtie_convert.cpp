@@ -273,8 +273,12 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 		if (mm->n_mapped_reads == (bit64_t)max)
 		{
+			int next_max = max + max_incr;
+			if(next_max < max) {
+				next_max = INT_MAX;
+			}
 			aln_t<MAXLEN>* tmp =
-				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (max + max_incr));
+				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (next_max));
 			if(tmp == NULL) {
 				cerr << "Memory exhausted" << endl;
 				exit(1);
@@ -282,8 +286,8 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			memcpy(tmp, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * (max));
 			free(mm->mapped_reads);
 			mm->mapped_reads = tmp;
-			max += max_incr;
-			if(max_incr <  (max_incr >> 1)) {
+			max = next_max;
+			if(max_incr < (max_incr + (max_incr >> 1))) {
 				max_incr += (max_incr >> 1); // Add 50%
 			}
 		}
