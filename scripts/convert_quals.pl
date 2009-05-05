@@ -37,11 +37,6 @@ if($inphred > 0) {
 } else {
 	$insolexa >= 33 || die "Input base must be >= 33, was $insolexa";
 }
-if($outphred > 0) {
-	$outphred >= 33 || die "Output base must be >= 33, was $outphred";
-} else {
-	$outsolexa >= 33 || die "Output base must be >= 33, was $outsolexa";
-}
 
 sub log10($) {
 	return log(shift) / log(10.0);
@@ -80,6 +75,7 @@ sub pToPhred($) {
 sub pToSol($) {
 	my $p = shift;
 	($p >= 0.0 && $p <= 1.0) || die "Bad prob: $p";
+	return 0.0 if $p == 1.0;
 	return round(-10.0 * log10($p / (1.0 - $p)));
 }
 
@@ -111,7 +107,7 @@ while(<>) {
 			$co = pToSol($p);
 			$co += $outsolexa;
 		}
-		$co >= 33 || die "Error: Output qual " . $co . " char is less than 33";
+		$co >= 33 || die "Error: Output qual " . $co . " char is less than 33.  Try a larger output base.";
 		print chr($co);
 	}
 	print "\n";
