@@ -224,6 +224,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	char *mismatches = NULL;
 
 	int max = 0;
+	uint32_t max_incr = 0x100000;
 
 	while (fgets(bwt_buf, 2048, bwtf))
 	{
@@ -272,7 +273,8 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 		if (mm->n_mapped_reads == (bit64_t)max)
 		{
-			aln_t<MAXLEN>* tmp = (aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (max + 0x100000));
+			aln_t<MAXLEN>* tmp =
+				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (max + max_incr));
 			if(tmp == NULL) {
 				cerr << "Memory exhausted" << endl;
 				exit(1);
@@ -280,7 +282,10 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			memcpy(tmp, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * (max));
 			free(mm->mapped_reads);
 			mm->mapped_reads = tmp;
-			max += 0x100000;
+			max += max_incr;
+			if(max_incr <  (max_incr >> 1)) {
+				max_incr += (max_incr >> 1); // Add 50%
+			}
 		}
 
 		aln_t<MAXLEN> *m1 = mm->mapped_reads + mm->n_mapped_reads;
