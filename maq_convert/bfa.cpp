@@ -12,7 +12,7 @@ nst_bfa1_t *nst_new_bfa1()
 	nst_bfa1_t *bfa1;
 	bfa1 = (nst_bfa1_t*)malloc(sizeof(nst_bfa1_t));
 	if(bfa1 == NULL) {
-		cerr << "Exhausted memory allocating space for the .bfa file";
+		cerr << "Exhausted memory allocating space for the .bfa file" << endl;
 		exit(1);
 	}
 	bfa1->name = 0;
@@ -40,7 +40,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	bfa1 = nst_new_bfa1();
 	bfa1->name = (char*)malloc(sizeof(char) * len);
 	if(bfa1->name == NULL) {
-		cerr << "Exhausted memory allocating space for the .bfa file name";
+		cerr << "Exhausted memory allocating space for the .bfa file name" << endl;
 		exit(1);
 	}
 	/*
@@ -58,7 +58,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	}
 	bfa1->seq = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
 	if(bfa1->seq == NULL) {
-		cerr << "Exhausted memory allocating space for the .bfa file sequence";
+		cerr << "Exhausted memory allocating space for the .bfa file sequence" << endl;
 		exit(1);
 	}
 	if(fread(bfa1->seq, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {
@@ -66,7 +66,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	}
 	bfa1->mask = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
 	if(bfa1->mask == NULL) {
-		cerr << "Exhausted memory allocating space for the .bfa file mask";
+		cerr << "Exhausted memory allocating space for the .bfa file mask" << endl;
 		exit(1);
 	}
 	if(fread(bfa1->mask, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {

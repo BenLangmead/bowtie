@@ -61,7 +61,7 @@ OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/const.c \
-		  maq_convert/bfa.c
+		  maq_convert/bfa.cpp
 # bowtie-maqconvert requires zlib because maq's format is compressed
 MAQ_LIB = -lz
 VERSION = $(shell cat VERSION)

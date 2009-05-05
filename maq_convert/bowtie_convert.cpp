@@ -280,7 +280,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 			aln_t<MAXLEN>* tmp =
 				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (next_max));
 			if(tmp == NULL) {
-				cerr << "Memory exhausted" << endl;
+				cerr << "Memory exhausted allocating space for alignments." << endl;
 				exit(1);
 			}
 			memcpy(tmp, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * (max));
