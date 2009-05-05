@@ -6,7 +6,7 @@
 #define MAQMAP_FORMAT_OLD 0
 #define MAQMAP_FORMAT_NEW -1
 
-
+#include <iostream>
 #include <string.h>
 #include <zlib.h>
 #include <stdint.h>
@@ -47,6 +47,10 @@ template<int MAXLEN>
 header_t<MAXLEN>* maq_init_header()
 {
 	header_t<MAXLEN>* mm = (header_t<MAXLEN>*)calloc(1, sizeof(header_t<MAXLEN>));
+	if(mm == NULL) {
+		std::cerr << "Exhausted memory allocating maqmap header" << std::endl;
+		exit(1);
+	}
 	mm->format = MAQMAP_FORMAT_NEW;
 	return mm;
 }
@@ -89,9 +93,17 @@ header_t<MAXLEN>* maq_read_header(gzFile fp)
 	}
 	gzread(fp, &mm->n_ref, sizeof(int));
 	mm->ref_name = (char**)calloc(mm->n_ref, sizeof(char*));
+	if(mm->ref_name == NULL) {
+		std::cerr << "Exhausted memory allocating reference name list" << std::endl;
+		exit(1);
+	}
 	for (k = 0; k != mm->n_ref; ++k) {
 		gzread(fp, &len, 4);
 		mm->ref_name[k] = (char*)malloc(len);
+		if(mm->ref_name[k] == NULL) {
+			std::cerr << "Exhausted memory allocating reference name" << std::endl;
+			exit(1);
+		}
 		gzread(fp, mm->ref_name[k], len);
 	}
 	gzread(fp, &mm->n_mapped_reads, 8);

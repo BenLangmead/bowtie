@@ -404,6 +404,10 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 
 	mm->n_ref = names_to_ids.size();
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
+	if(mm->ref_name == NULL) {
+		cerr << "Exhausted memory allocating reference name" << endl;
+		exit(1);
+	}
 
 	for (map<string, unsigned int>::const_iterator i = names_to_ids.begin();
 		 i != names_to_ids.end(); ++i)
