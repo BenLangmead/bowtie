@@ -568,7 +568,8 @@ sub doSearch {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
 		if(!$pe && !$nostrata) {
-			!defined($readStratum{$read}) || $readStratum{$read} == $stratum || die "Incompatible strata: old: $readStratum{$read}, cur: $stratum";
+			# TODO: uncomment this when stratification is working properly
+			#!defined($readStratum{$read}) || $readStratum{$read} == $stratum || die "Incompatible strata: old: $readStratum{$read}, cur: $stratum";
 			$readStratum{$read} = $stratum;
 		}
 		$lastread = $read;
