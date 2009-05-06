@@ -199,6 +199,15 @@ public:
 	}
 
 	/**
+	 * Allocate a single T from the pool and clear it.
+	 */
+	T* allocC() {
+		T* t = alloc();
+		memset(t, 0, sizeof(T));
+		return t;
+	}
+
+	/**
 	 * Allocate an array of Ts from the pool.
 	 */
 	T* alloc(uint32_t num) {
@@ -212,6 +221,15 @@ public:
 		lastAllocSz_ = num;
 		cur_ += num;
 		return lastAlloc_;
+	}
+
+	/**
+	 * Allocate an array of Ts and clear them.
+	 */
+	T* allocC(uint32_t num) {
+		T* t = alloc(num);
+		memset(t, 0, sizeof(T) * num);
+		return t;
 	}
 
 	/**

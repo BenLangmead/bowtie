@@ -313,9 +313,6 @@ struct RangeState {
 	 * internally consistent.
 	 */
 	bool repOk() {
-		// Something has to be eliminated (except when we just matched an N)
-		//assert(eliminated_ || eq.flags.mmA || eq.flags.mmC || eq.flags.mmG || eq.flags.mmT);
-		//assert(eliminated_ || eq.flags.insA || eq.flags.insC || eq.flags.insG || eq.flags.insT);
 		if(eliminated_) return true;
 		// Uneliminated chars must have non-empty ranges
 		if(!eq.flags.mmA || !eq.flags.insA) assert_gt(bots[0], tops[0]);
@@ -385,7 +382,7 @@ public:
 			lbot_.invalidate();
 		}
 		if(qlen - rdepth_ > 0) {
-			ranges_ = pool.alloc(qlen - rdepth_); // allocated from the RangeStatePool
+			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
 			assert(ranges_ != NULL);
 		} else {
 			ranges_ = NULL;
@@ -393,7 +390,8 @@ public:
 #ifndef NDEBUG
 		for(size_t i = 0; i < (qlen - rdepth_); i++) {
 			for(int j = 0; j < 4; j++) {
-				assert_eq(0, ranges_[i].tops[j]); assert_eq(0, ranges_[i].bots[j]);
+				assert_eq(0, ranges_[i].tops[j]);
+				assert_eq(0, ranges_[i].bots[j]);
 			}
 		}
 #endif
