@@ -1463,10 +1463,10 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, spanning strata
-				sink = new FirstNBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
+				sink = new NBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
+				sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, spanning strata
@@ -1476,14 +1476,14 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, not spanning strata
-				sink = new FirstNBestStratifiedHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
+				sink = new NBestStratHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
 				// First N good; "good" inherently ignores strata
-				sink = new FirstNGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
+				sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			}
 		} else {
 			// All hits, not spanning strata
-			sink = new AllStratifiedHitSinkPerThreadFactory(_sink, mhits, sanity);
+			sink = new AllStratHitSinkPerThreadFactory(_sink, mhits, sanity);
 		}
     }
     assert(sink != NULL);

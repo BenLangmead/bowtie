@@ -463,11 +463,13 @@ sub doSearch {
 	
 	my $khits = "-k 1";
 	my $mhits = 0;
+	my $nostrata = 0;
 	if($phased eq "-z") {
 		# A phased search may optionally be a non-stratified all-hits
 		# search
 		if(int(rand(2)) == 0) {
 			$khits = "-a --nostrata";
+			$nostrata = 1;
 		}
 	} else {
 		if(int(rand(2)) == 0) {
@@ -481,6 +483,7 @@ sub doSearch {
 		}
 		if(!$pe && int(rand(2)) == 0) {
 			$khits .= " --nostrata";
+			$nostrata = 1;
 		}
 	}
 	if($mhits > 0) {
@@ -526,6 +529,7 @@ sub doSearch {
 	my @outlines = split('\n', $out);
 	my %outhash = ();
 	my %readcount = ();
+	my %readStratum = ();
 	my $lastread = "";
 	for(my $i = 0; $i <= $#outlines; $i++) {
 		my $l = $outlines[$i];
@@ -544,10 +548,10 @@ sub doSearch {
 			!defined($outhash{$key}) || die "Result $key appears in output twice";
 		}
 		$outhash{$key} = 1;
-		# Result should look like "4+:<4,231,0>,<7,111,0>,<7,112,1>,<4,234,0>"
+		# Result should look like "4+:<4,231,0>"
 		my $wellFormed = 0;
-		$wellFormed = ($l =~ m/^[01-9]+[+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) unless $pe;
-		$wellFormed = ($l =~ m/^[01-9]+\/[12][+-]?[:](?:<[01-9]+,[01-9]+,[01-9]+>[,]?)+\s*$/) if $pe;
+		$wellFormed = ($l =~ m/^([01-9]+)[+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/) unless $pe;
+		$wellFormed = ($l =~ m/^([01-9]+)\/[12][+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/) if $pe;
 		unless($wellFormed) {
 			print "Results malformed\n";
 			print "$out\n";
@@ -558,11 +562,14 @@ sub doSearch {
 			return 0;
 		}
 		# Parse out the read id
-		$l =~ /^([01-9]+)[+-]?[:]/ unless $pe;
-		$l =~ /^([01-9]+)\/[12][+-]?[:]/ if $pe;
 		my $read = $1;
+		my $stratum = $2;
 		if(($read ne $lastread) && ($phased eq "")) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
+		}
+		if(!$pe && !$nostrata) {
+			!defined($readStratum{$read}) || $readStratum{$read} == $stratum || die "Incompatible strata: old: $readStratum{$read}, cur: $stratum";
+			$readStratum{$read} = $stratum;
 		}
 		$lastread = $read;
 		$readcount{$read}++ if defined($readcount{$read});

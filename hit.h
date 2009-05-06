@@ -763,7 +763,7 @@ public:
 		_hits(),
 		_bufferedHits(),
 		_strata(),
-		_hitsForThisRead(),
+		hitsForThisRead_(),
 		_max(__max)
 	{
 		_sink.addWrapper();
@@ -889,7 +889,7 @@ public:
 
 	/// Whether this thread, for this read, knows that we have already
 	/// exceeded the mhits maximum
-	bool exceededOverThresh() { return _hitsForThisRead > _max; }
+	bool exceededOverThresh() { return hitsForThisRead_ > _max; }
 
 	/// Return whether we span strata
 	virtual bool spanStrata() = 0;
@@ -922,7 +922,7 @@ protected:
 
 	// Following variables are declared in the parent but maintained in
 	// the concrete subcalsses
-	uint32_t _hitsForThisRead; /// # hits for this read so far
+	uint32_t hitsForThisRead_; /// # hits for this read so far
 	uint32_t _max;             /// don't report any hits if there were > _max
 };
 
@@ -948,10 +948,10 @@ public:
  * to try alignments in something approximating a best-first order.
  * Best used in combination with a stringent alignment policy.
  */
-class FirstNGoodHitSinkPerThread : public HitSinkPerThread {
+class NGoodHitSinkPerThread : public HitSinkPerThread {
 
 public:
-	FirstNGoodHitSinkPerThread(
+	NGoodHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t __n,
 	        uint32_t __max,
@@ -974,8 +974,8 @@ public:
 
 	/// Finalize current read
 	virtual uint32_t finishReadImpl() {
-		uint32_t ret = _hitsForThisRead;
-		_hitsForThisRead = 0;
+		uint32_t ret = hitsForThisRead_;
+		hitsForThisRead_ = 0;
 		return ret;
 	}
 
@@ -986,16 +986,16 @@ public:
 	 */
 	virtual bool reportHit(const Hit& h, int stratum) {
 		HitSinkPerThread::reportHit(h, stratum);
-		_hitsForThisRead++;
-		if(_hitsForThisRead > _max) {
+		hitsForThisRead_++;
+		if(hitsForThisRead_ > _max) {
 			if(!_bufferedHits.empty()) _bufferedHits.clear();
 			return true; // done - report nothing
 		}
-		if(_hitsForThisRead <= _n) {
+		if(hitsForThisRead_ <= _n) {
 			// Only report hit if we haven't
 			reportHitImpl(h, stratum);
 		}
-		if(_hitsForThisRead == _n &&
+		if(hitsForThisRead_ == _n &&
 		   (_max == 0xffffffff || _max < _n))
 		{
 			return true; // already reported N good hits and max isn't set; stop!
@@ -1016,9 +1016,9 @@ private:
 /**
  * Concrete factory for FirstNGoodHitSinkPerThreads.
  */
-class FirstNGoodHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+class NGoodHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
-	FirstNGoodHitSinkPerThreadFactory(
+	NGoodHitSinkPerThreadFactory(
 			HitSink& sink,
 			uint32_t n,
 			uint32_t max = 0xffffffff,
@@ -1030,14 +1030,14 @@ public:
 	{ }
 
 	/**
-	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_, max_, keep_);
+		return new NGoodHitSinkPerThread(sink_, n_, max_, keep_);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNGoodHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+		return new NGoodHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1053,10 +1053,10 @@ private:
  * search routine collaborate to ensure that there exists no
  * alignment that's better than the ones reported.
  */
-class FirstNBestHitSinkPerThread : public HitSinkPerThread {
+class NBestHitSinkPerThread : public HitSinkPerThread {
 
 public:
-	FirstNBestHitSinkPerThread(
+	NBestHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t __n,
 	        uint32_t __max = 0xffffffff,
@@ -1086,15 +1086,15 @@ public:
 		if(stratum == _bestRemainingStratum) {
 			// This hit is within th best possible remaining stratum,
 			// so it should definitely count
-			_hitsForThisRead++;
-			if(_hitsForThisRead > _max) {
+			hitsForThisRead_++;
+			if(hitsForThisRead_ > _max) {
 				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
-			if(_hitsForThisRead <= _n) {
+			if(hitsForThisRead_ <= _n) {
 				reportHitImpl(h, stratum);
 			}
-			if(_hitsForThisRead == _n &&
+			if(hitsForThisRead_ == _n &&
 			   (_max == 0xffffffff || _max < _n))
 			{
 				return true; // already reported N good hits; stop!
@@ -1103,7 +1103,7 @@ public:
 			// The alignment is not guaranteed to be in the best
 			// stratum, but it might be, so save it for possible
 			// future reporting
-			_hitStrata[stratum].push_back(h);
+			hitStrata_[stratum].push_back(h);
 		}
 		return false; // not at N yet; keep going
 	}
@@ -1114,26 +1114,26 @@ public:
 	 * N
 	 */
 	virtual uint32_t finishReadImpl() {
-		if(_hitsForThisRead == _n || _hitsForThisRead > _max) {
-			uint32_t ret = _hitsForThisRead;
+		if(hitsForThisRead_ == _n || hitsForThisRead_ > _max) {
+			uint32_t ret = hitsForThisRead_;
 			reset();
 			return ret; // already reported N good hits; stop!
 		}
 		bool done = false;
 		for(int j = 0; j < 4; j++) {
-			for(size_t i = 0; i < _hitStrata[j].size(); i++) {
+			for(size_t i = 0; i < hitStrata_[j].size(); i++) {
 				// This hit is within th best possible remaining stratum,
 				// so it should definitely count
-				_hitsForThisRead++;
-				if(_hitsForThisRead > _max) {
+				hitsForThisRead_++;
+				if(hitsForThisRead_ > _max) {
 					_bufferedHits.clear();
 					done = true;
 					break; // done - report nothing
 				}
-				if(_hitsForThisRead <= _n) {
-					reportHitImpl(_hitStrata[j][i], j);
+				if(hitsForThisRead_ <= _n) {
+					reportHitImpl(hitStrata_[j][i], j);
 				}
-				if(_hitsForThisRead == _n &&
+				if(hitsForThisRead_ == _n &&
 				   (_max == 0xffffffff || _max < _n))
 				{
 					done = true;
@@ -1141,9 +1141,9 @@ public:
 				}
 			}
 			if(done) break;
-			_hitStrata[j].clear();
+			hitStrata_[j].clear();
 		}
-		uint32_t ret = _hitsForThisRead;
+		uint32_t ret = hitsForThisRead_;
 		reset();
 		return ret;
 	}
@@ -1155,32 +1155,32 @@ public:
 	virtual bool finishedWithStratumImpl(int stratum) {
 #ifndef NDEBUG
 		for(int j = 0; j < stratum; j++) {
-			assert_eq(0, _hitStrata[j].size());
+			assert_eq(0, hitStrata_[j].size());
 		}
 #endif
-		if(_hitsForThisRead == _n) {
+		if(hitsForThisRead_ == _n) {
 			return true; // already reported N good hits; stop!
 		}
 		for(int j = stratum; j <= stratum+1; j++) {
-			for(size_t i = 0; i < _hitStrata[j].size(); i++) {
+			for(size_t i = 0; i < hitStrata_[j].size(); i++) {
 				// This hit is within the best possible remaining stratum,
 				// so it should definitely count
-				_hitsForThisRead++;
-				if(_hitsForThisRead > _max) {
+				hitsForThisRead_++;
+				if(hitsForThisRead_ > _max) {
 					_bufferedHits.clear();
 					return true; // done - report nothing
 				}
-				if(_hitsForThisRead <= _n) {
-					reportHitImpl(_hitStrata[j][i], j);
+				if(hitsForThisRead_ <= _n) {
+					reportHitImpl(hitStrata_[j][i], j);
 				}
-				if(_hitsForThisRead == _n &&
+				if(hitsForThisRead_ == _n &&
 				   (_max == 0xffffffff || _max < _n))
 				{
-					_hitStrata[j].clear();
+					hitStrata_[j].clear();
 					return true; // already reported N good hits; stop!
 				}
 			}
-			_hitStrata[j].clear();
+			hitStrata_[j].clear();
 		}
 		return false; // keep going
 	}
@@ -1188,25 +1188,25 @@ public:
 private:
 	void reset() {
 		clearAll();
-		_hitsForThisRead = 0;
+		hitsForThisRead_ = 0;
 	}
 
 	void clearAll() {
 		for(int j = 0; j < 4; j++) {
-			_hitStrata[j].clear();
+			hitStrata_[j].clear();
 		}
 	}
 
 	uint32_t _n;               /// max # hits to report
-	vector<Hit> _hitStrata[4]; /// lower numbered strata are better
+	vector<Hit> hitStrata_[4]; /// lower numbered strata are better
 };
 
 /**
- * Concrete factory for FirstNBestHitSinkPerThreads.
+ * Concrete factory for NBestHitSinkPerThreads.
  */
-class FirstNBestHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+class NBestHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
-	FirstNBestHitSinkPerThreadFactory(
+	NBestHitSinkPerThreadFactory(
 			HitSink& sink,
 			uint32_t n,
 			uint32_t max = 0xffffffff,
@@ -1218,14 +1218,14 @@ public:
 	{ }
 
 	/**
-	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new FirstNBestHitSinkPerThread(sink_, n_, max_, keep_);
+		return new NBestHitSinkPerThread(sink_, n_, max_, keep_);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNBestHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+		return new NBestHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1242,17 +1242,17 @@ private:
  * that there exists no alignment that's better than the ones
  * reported.
  */
-class FirstNBestStratifiedHitSinkPerThread : public HitSinkPerThread {
+class NBestStratHitSinkPerThread : public HitSinkPerThread {
 
 public:
-	FirstNBestStratifiedHitSinkPerThread(
+	NBestStratHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t __n,
 	        uint32_t __max = 0xffffffff,
 	        bool __keep = false) :
 	        HitSinkPerThread(sink, __max, __keep),
 	        _n(__n),
-	        _bestStratumReported(999)
+	        bestStratumReported_(999)
 	{
 		assert_gt(_n, 0);
 	}
@@ -1274,27 +1274,27 @@ public:
 		HitSinkPerThread::reportHit(h, stratum);
 		assert_geq(stratum, _bestRemainingStratum);
 		if(stratum == _bestRemainingStratum &&
-		   stratum <= _bestStratumReported)
+		   stratum <= bestStratumReported_)
 		{
 			// This hit is within th best possible remaining stratum,
 			// so it should definitely count
-			_hitsForThisRead++;
-			if(_hitsForThisRead > _max) {
+			hitsForThisRead_++;
+			if(hitsForThisRead_ > _max) {
 				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
-			if(_hitsForThisRead <= _n) {
+			if(hitsForThisRead_ <= _n) {
 				reportHitImpl(h, stratum);
 			}
-			_bestStratumReported = stratum;
-			if(_hitsForThisRead == _n &&
+			bestStratumReported_ = stratum;
+			if(hitsForThisRead_ == _n &&
 			   (_max == 0xffffffff || _max < _n))
 			{
 				return true; // already reported N good hits; stop!
 			}
-		} else if(stratum <= _bestStratumReported) {
-			_hitStrata[stratum].push_back(h);
-			_bestStratumReported = stratum;
+		} else if(stratum <= bestStratumReported_) {
+			hitStrata_[stratum].push_back(h);
+			bestStratumReported_ = stratum;
 		} else {
 			// No need to buffer the hit because we're guaranteed not
 			// to report it
@@ -1308,45 +1308,45 @@ public:
 	 * N
 	 */
 	virtual uint32_t finishReadImpl() {
-		if(_bestStratumReported < 999 &&
-		   _hitsForThisRead < _n &&
-		   _hitsForThisRead <= _max)
+		if(bestStratumReported_ < 999 &&
+		   hitsForThisRead_ < _n &&
+		   hitsForThisRead_ <= _max)
 		{
-			assert_leq(_bestStratumReported, 3);
+			assert_leq(bestStratumReported_, 3);
 #ifndef NDEBUG
 			// All better strata should be empty
-			for(int j = 0; j < _bestStratumReported; j++) {
-				assert_eq(0, _hitStrata[j].size());
+			for(int j = 0; j < bestStratumReported_; j++) {
+				assert_eq(0, hitStrata_[j].size());
 			}
 #endif
-			for(size_t i = 0; i < _hitStrata[_bestStratumReported].size(); i++) {
+			for(size_t i = 0; i < hitStrata_[bestStratumReported_].size(); i++) {
 				// This hit is within th best possible remaining stratum,
 				// so it should definitely count
-				_hitsForThisRead++;
-				if(_hitsForThisRead > _max) {
+				hitsForThisRead_++;
+				if(hitsForThisRead_ > _max) {
 					_bufferedHits.clear();
 					break; // done - report nothing
 				}
-				if(_hitsForThisRead <= _n) {
-					reportHitImpl(_hitStrata[_bestStratumReported][i], _bestStratumReported);
+				if(hitsForThisRead_ <= _n) {
+					reportHitImpl(hitStrata_[bestStratumReported_][i], bestStratumReported_);
 				}
-				if(_hitsForThisRead == _n &&
+				if(hitsForThisRead_ == _n &&
 				   (_max == 0xffffffff || _max < _n))
 				{
-					_hitStrata[_bestStratumReported].clear();
+					hitStrata_[bestStratumReported_].clear();
 					break; // already reported N good hits; stop!
 				}
 			}
-			_hitStrata[_bestStratumReported].clear();
-		} else if(_bestStratumReported == 999) {
+			hitStrata_[bestStratumReported_].clear();
+		} else if(bestStratumReported_ == 999) {
 #ifndef NDEBUG
 			// All strata should be empty
 			for(int j = 0; j < 4; j++) {
-				assert_eq(0, _hitStrata[j].size());
+				assert_eq(0, hitStrata_[j].size());
 			}
 #endif
 		}
-		uint32_t ret = _hitsForThisRead;
+		uint32_t ret = hitsForThisRead_;
 		reset();
 		return ret;
 	}
@@ -1356,33 +1356,33 @@ public:
 	 * already reported N hits.
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) {
-		if(_hitsForThisRead == _n &&
+		if(hitsForThisRead_ == _n &&
 		   (_max == 0xffffffff || _max < _n))
 		{
 			return true; // already reported N good hits; stop!
 		}
-		for(size_t i = 0; i < _hitStrata[stratum].size(); i++) {
+		for(size_t i = 0; i < hitStrata_[stratum].size(); i++) {
 			// This hit is within the best possible remaining stratum,
 			// so it should definitely count
-			_hitsForThisRead++;
-			if(_hitsForThisRead > _max) {
+			hitsForThisRead_++;
+			if(hitsForThisRead_ > _max) {
 				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
-			if(_hitsForThisRead <= _n) {
-				reportHitImpl(_hitStrata[stratum][i], stratum);
+			if(hitsForThisRead_ <= _n) {
+				reportHitImpl(hitStrata_[stratum][i], stratum);
 			}
-			if(_hitsForThisRead == _n &&
+			if(hitsForThisRead_ == _n &&
 			   (_max == 0xffffffff || _max < _n))
 			{
-				_hitStrata[stratum].clear();
+				hitStrata_[stratum].clear();
 				return true; // already reported N good hits; stop!
 			}
 		}
-		_hitStrata[stratum].clear();
+		hitStrata_[stratum].clear();
 		// reported at least once in this stratum; do not move to the
 		// next stratum
-		if(_hitsForThisRead > 0) return true;
+		if(hitsForThisRead_ > 0) return true;
 		// didn't report; move to next stratum
 		return false;
 	}
@@ -1391,27 +1391,27 @@ private:
 
 	void reset() {
 		clearAll();
-		_hitsForThisRead = 0;
-		_bestStratumReported = 999;
+		hitsForThisRead_ = 0;
+		bestStratumReported_ = 999;
 	}
 
 	void clearAll() {
 		for(int j = 0; j < 4; j++) {
-			_hitStrata[j].clear();
+			hitStrata_[j].clear();
 		}
 	}
 
 	uint32_t _n;               /// max # hits to report
-	int _bestStratumReported;  /// stratum of best reported hit thus far
-	vector<Hit> _hitStrata[4];
+	int bestStratumReported_;  /// stratum of best reported hit thus far
+	vector<Hit> hitStrata_[4];
 };
 
 /**
- * Concrete factory for FirstNBestStratifiedHitSinkPerThread.
+ * Concrete factory for NBestStratHitSinkPerThread.
  */
-class FirstNBestStratifiedHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+class NBestStratHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
-	FirstNBestStratifiedHitSinkPerThreadFactory(
+	NBestStratHitSinkPerThreadFactory(
 			HitSink& sink,
 			uint32_t n,
 			uint32_t max = 0xffffffff,
@@ -1423,14 +1423,14 @@ public:
 	{ }
 
 	/**
-	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_, max_, keep_);
+		return new NBestStratHitSinkPerThread(sink_, n_, max_, keep_);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new FirstNBestStratifiedHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+		return new NBestStratHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
 	}
 
 private:
@@ -1468,8 +1468,8 @@ public:
 	 */
 	virtual bool reportHit(const Hit& h, int stratum) {
 		HitSinkPerThread::reportHit(h, stratum);
-		_hitsForThisRead++;
-		if(_hitsForThisRead > _max) {
+		hitsForThisRead_++;
+		if(hitsForThisRead_ > _max) {
 			if(!_bufferedHits.empty()) _bufferedHits.clear();
 			return true; // done - report nothing
 		}
@@ -1481,8 +1481,8 @@ public:
 	 * Finalize; do nothing because we haven't buffered anything
 	 */
 	virtual uint32_t finishReadImpl() {
-		uint32_t ret = _hitsForThisRead;
-		_hitsForThisRead = 0;
+		uint32_t ret = hitsForThisRead_;
+		hitsForThisRead_ = 0;
 		return ret;
 	}
 
@@ -1507,7 +1507,7 @@ public:
 	{ }
 
 	/**
-	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
@@ -1527,16 +1527,16 @@ private:
  * Report all alignments encountered in the best alignment stratum
  * for which there were any alignments.
  */
-class AllStratifiedHitSinkPerThread : public HitSinkPerThread {
+class AllStratHitSinkPerThread : public HitSinkPerThread {
 
 public:
-	AllStratifiedHitSinkPerThread(
+	AllStratHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t __max = 0xffffffff,
 	        bool __keep = false) :
 	        HitSinkPerThread(sink, __max, __keep),
-	        _bestStratumReported(999),
-	        _reported(false) { }
+	        bestStratumReported_(999),
+	        reported_(false) { }
 
 	virtual uint32_t maxHits() { return 0xffffffff; }
 
@@ -1555,21 +1555,21 @@ public:
 		HitSinkPerThread::reportHit(h, stratum);
 		assert_geq(stratum, _bestRemainingStratum);
 		if(stratum == _bestRemainingStratum &&
-		   stratum <= _bestStratumReported)
+		   stratum <= bestStratumReported_)
 		{
 			// This hit is within the best possible remaining stratum,
 			// so it should definitely be reported
-			_hitsForThisRead++;
-			if(_hitsForThisRead > _max) {
+			hitsForThisRead_++;
+			if(hitsForThisRead_ > _max) {
 				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			reportHitImpl(h, stratum);
-			_reported = true;
-			_bestStratumReported = stratum;
-		} else if(stratum <= _bestStratumReported) {
-			_hitStrata[stratum].push_back(h);
-			_bestStratumReported = stratum;
+			reported_ = true;
+			bestStratumReported_ = stratum;
+		} else if(stratum <= bestStratumReported_) {
+			hitStrata_[stratum].push_back(h);
+			bestStratumReported_ = stratum;
 		} else {
 			// No need to buffer the hit because we're guaranteed not
 			// to report it
@@ -1583,32 +1583,32 @@ public:
 	 * N
 	 */
 	virtual uint32_t finishReadImpl() {
-		if(_bestStratumReported < 999) {
+		if(bestStratumReported_ < 999) {
 #ifndef NDEBUG
 			// All better strata should be empty
-			for(int j = 0; j < _bestStratumReported; j++) {
-				assert_eq(0, _hitStrata[j].size());
+			for(int j = 0; j < bestStratumReported_; j++) {
+				assert_eq(0, hitStrata_[j].size());
 			}
 #endif
-			for(size_t i = 0; i < _hitStrata[_bestStratumReported].size(); i++) {
+			for(size_t i = 0; i < hitStrata_[bestStratumReported_].size(); i++) {
 				// This hit is within th best possible remaining stratum,
 				// so it should definitely count
-				_hitsForThisRead++;
-				if(_hitsForThisRead > _max) {
+				hitsForThisRead_++;
+				if(hitsForThisRead_ > _max) {
 					_bufferedHits.clear();
 					break; // done - report nothing
 				}
-				reportHitImpl(_hitStrata[_bestStratumReported][i], _bestStratumReported);
+				reportHitImpl(hitStrata_[bestStratumReported_][i], bestStratumReported_);
 			}
 		} else {
 #ifndef NDEBUG
 			// All strata should be empty
 			for(int j = 0; j < 4; j++) {
-				assert_eq(0, _hitStrata[j].size());
+				assert_eq(0, hitStrata_[j].size());
 			}
 #endif
 		}
-		uint32_t ret = _hitsForThisRead;
+		uint32_t ret = hitsForThisRead_;
 		reset();
 		return ret;
 	}
@@ -1621,24 +1621,24 @@ public:
 #ifndef NDEBUG
 		// All better strata should be empty
 		for(int j = 0; j < stratum; j++) {
-			assert_eq(0, _hitStrata[j].size());
+			assert_eq(0, hitStrata_[j].size());
 		}
 #endif
-		for(size_t i = 0; i < _hitStrata[stratum].size(); i++) {
+		for(size_t i = 0; i < hitStrata_[stratum].size(); i++) {
 			// This hit is within the best possible remaining stratum,
 			// so it should definitely count
-			_hitsForThisRead++;
-			if(_hitsForThisRead > _max) {
+			hitsForThisRead_++;
+			if(hitsForThisRead_ > _max) {
 				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
-			reportHitImpl(_hitStrata[stratum][i], stratum);
-			_reported = true;
+			reportHitImpl(hitStrata_[stratum][i], stratum);
+			reported_ = true;
 		}
-		_hitStrata[stratum].clear();
+		hitStrata_[stratum].clear();
 		// reported at least once in this stratum; do not move to the
 		// next stratum
-		if(_reported) return true; // stop
+		if(reported_) return true; // stop
 		// didn't report; move to next stratum
 		return false;
 	}
@@ -1647,28 +1647,28 @@ private:
 
 	void reset() {
 		clearAll();
-		_reported = false;
-		_bestStratumReported = 999;
-		_hitsForThisRead = 0;
+		reported_ = false;
+		bestStratumReported_ = 999;
+		hitsForThisRead_ = 0;
 	}
 
 	void clearAll() {
 		for(int j = 0; j < 4; j++) {
-			_hitStrata[j].clear();
+			hitStrata_[j].clear();
 		}
 	}
 
-	int _bestStratumReported;          /// stratum of best reported hit thus far
-	bool _reported;
-	vector<Hit> _hitStrata[4];
+	int bestStratumReported_;          /// stratum of best reported hit thus far
+	bool reported_;
+	vector<Hit> hitStrata_[4];
 };
 
 /**
- * Concrete factory for AllStratifiedHitSinkPerThread.
+ * Concrete factory for AllStratHitSinkPerThread.
  */
-class AllStratifiedHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+class AllStratHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
-	AllStratifiedHitSinkPerThreadFactory(
+	AllStratHitSinkPerThreadFactory(
 			HitSink& sink,
 			uint32_t max = 0xffffffff,
 			bool keep = false) :
@@ -1678,14 +1678,14 @@ public:
 	{ }
 
 	/**
-	 * Allocate a new FirstNGoodHitSinkPerThread object on the heap,
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new AllStratifiedHitSinkPerThread(sink_, max_, keep_);
+		return new AllStratHitSinkPerThread(sink_, max_, keep_);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new AllStratifiedHitSinkPerThread(sink_, max_ * m, keep_);
+		return new AllStratHitSinkPerThread(sink_, max_ * m, keep_);
 	}
 
 private:
