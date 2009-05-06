@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <seqan/sequence.h>
+#include <seqan/file.h>
 
 using namespace std;
 using namespace seqan;
