@@ -220,19 +220,28 @@ struct RangeState {
 			if(!eq.flags.mmA) {
 				assert_gt(bots[0], tops[0]);
 				tot += (bots[0] - tops[0]);
+				assert_gt(num, 0);
+				ASSERT_ONLY(num--);
 			}
 			if(!eq.flags.mmC) {
 				assert_gt(bots[1], tops[1]);
 				tot += (bots[1] - tops[1]);
+				assert_gt(num, 0);
+				ASSERT_ONLY(num--);
 			}
 			if(!eq.flags.mmG) {
 				assert_gt(bots[2], tops[2]);
 				tot += (bots[2] - tops[2]);
+				assert_gt(num, 0);
+				ASSERT_ONLY(num--);
 			}
 			if(!eq.flags.mmT) {
 				assert_gt(bots[3], tops[3]);
 				tot += (bots[3] - tops[3]);
+				assert_gt(num, 0);
+				ASSERT_ONLY(num--);
 			}
+			assert_eq(0, num);
 			// Throw a dart randomly that hits one of the possible
 			// substitutions, with likelihoods weighted by range size
 			uint32_t dart = rand.nextU32() % tot;
@@ -383,6 +392,10 @@ public:
 		}
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
+			if(ranges_ == NULL) {
+				cerr << "Ran out of memory allocating an array of RangeStates" << endl;
+				exit(1);
+			}
 			rangesSz_ = qlen - rdepth_;
 			assert(ranges_ != NULL);
 		} else {

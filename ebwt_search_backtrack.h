@@ -2437,6 +2437,7 @@ public:
 
 				// Get the range state for the current position
 				RangeState *rs = br->rangeState();
+				assert(rs != NULL);
 				// Should be all 0s
 				assert_eq(0, rs->tops[0]); assert_eq(0, rs->bots[0]);
 				assert_eq(0, rs->tops[1]); assert_eq(0, rs->bots[1]);
