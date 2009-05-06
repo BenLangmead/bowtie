@@ -129,9 +129,9 @@ struct EditList {
 	/**
 	 *
 	 */
-	void free(AllocOnlyPool<Edit>& epool) {
-		if(yetMoreEdits_ != NULL) epool.free(yetMoreEdits_);
-		if(moreEdits_ != NULL) epool.free(moreEdits_);
+	void free(AllocOnlyPool<Edit>& epool, size_t qlen) {
+		if(yetMoreEdits_ != NULL) epool.free(yetMoreEdits_, qlen+3 - numMoreEdits - numEdits);
+		if(moreEdits_ != NULL) epool.free(moreEdits_, numMoreEdits);
 	}
 
 	const static size_t numEdits = 6;
@@ -383,9 +383,11 @@ public:
 		}
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
+			rangesSz_ = qlen - rdepth_;
 			assert(ranges_ != NULL);
 		} else {
 			ranges_ = NULL;
+			rangesSz_ = 0;
 		}
 #ifndef NDEBUG
 		for(size_t i = 0; i < (qlen - rdepth_); i++) {
@@ -566,13 +568,15 @@ public:
 	/**
 	 * Free a branch and all its contents.
 	 */
-	void free(AllocOnlyPool<RangeState>& rpool,
+	void free(uint32_t qlen,
+	          AllocOnlyPool<RangeState>& rpool,
 	          AllocOnlyPool<Edit>& epool,
 	          AllocOnlyPool<Branch>& bpool)
 	{
-		edits_.free(epool);
+		edits_.free(epool, qlen);
 		if(ranges_ != NULL) {
-			rpool.free(ranges_);
+			assert_gt(rangesSz_, 0);
+			rpool.free(ranges_, rangesSz_);
 		}
 		bpool.free(this);
 	}
@@ -832,6 +836,7 @@ public:
 	                  // one that extends it by one more
 	uint16_t ham_;    // quality-weighted hamming distance so far
 	RangeState *ranges_; // Allocated from the RangeStatePool
+	uint16_t rangesSz_;
 	uint32_t top_;    // top offset leading to the root of this subtree
 	uint32_t bot_;    // bot offset leading to the root of this subtree
 	SideLocus ltop_;
@@ -1156,7 +1161,7 @@ public:
 	 * Curtail the given branch, and possibly remove it from or
 	 * re-insert it into the priority queue.
 	 */
-	void curtail(Branch *br, int seedLen, bool qualOrder) {
+	void curtail(Branch *br, uint32_t qlen, int seedLen, bool qualOrder) {
 		assert(!br->exhausted_);
 		assert(!br->curtailed_);
 		uint16_t origCost = br->cost_;
@@ -1167,7 +1172,7 @@ public:
 			assert(br == front());
 			ASSERT_ONLY(Branch *popped =) pop();
 			assert(popped == br);
-			br->free(rpool, epool, bpool);
+			br->free(qlen, rpool, epool, bpool);
 		} else if(br->cost_ != origCost) {
 			assert(br == front());
 			Branch *popped = pop();

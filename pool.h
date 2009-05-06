@@ -246,14 +246,27 @@ public:
 		return cur_;
 	}
 
+	/**
+	 * Free a pointer allocated from this pool.  Fow, we only know how
+	 * to free the topmost element.
+	 */
 	void free(T* t) {
 		assert(t != NULL);
-		if(t == lastAlloc_ && cur_ >= lastAllocSz_) {
-			assert(lastAllocSz_ != 0);
-			cur_ -= lastAllocSz_;
-			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, (lastAllocSz_) * sizeof(T)));
-			lastAlloc_ = 0;
-			lastAllocSz_ = 0;
+		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
+			cur_--;
+			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
+		}
+	}
+
+	/**
+	 * Free an array of pointers allocated from this pool.  For now, we
+	 * only know how to free the topmost array.
+	 */
+	void free(T* t, uint32_t num) {
+		assert(t != NULL);
+		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
+			cur_ -= num;
+			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
 		}
 	}
 
@@ -274,8 +287,9 @@ protected:
 		if(curPool_ >= pools_.size()-1) {
 			T *pool;
 			try {
-				pool = new T[lim_];
-				if((pool = (T*)pool_->alloc()) == NULL) throw std::bad_alloc();
+				if((pool = (T*)pool_->alloc()) == NULL) {
+					throw std::bad_alloc();
+				}
 			} catch(std::bad_alloc& e) {
 				cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+2) << " of " << (lim_ * sizeof(T)) << " bytes";
 				exit(1);

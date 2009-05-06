@@ -2400,7 +2400,7 @@ public:
 				// Stop extending this branch because it violates a half-
 				// and-half constraint
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, depth3_, qualOrder_);
+				pm.curtail(br, qlen_, depth3_, qualOrder_);
 				goto bail;
 			}
 
@@ -2552,7 +2552,7 @@ public:
 				// This alignment doesn't satisfy the half-and-half
 				// requirements; reject it
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, depth3_, qualOrder_);
+				pm.curtail(br, qlen_, depth3_, qualOrder_);
 				goto bail;
 			}
 
@@ -2598,11 +2598,11 @@ public:
 				assert(curRange_.repOk());
 				// Must curtail because we've consumed the whole pattern
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, depth3_, qualOrder_);
+				pm.curtail(br, qlen_, depth3_, qualOrder_);
 			} else if(empty || cur == 0) {
 				// The branch couldn't be extended further
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, depth3_, qualOrder_);
+				pm.curtail(br, qlen_, depth3_, qualOrder_);
 			} else {
 				// Extend the branch by one position; no change to its cost
 				// so there's no need to reconsider where it lies in the
