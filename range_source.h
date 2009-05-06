@@ -126,6 +126,14 @@ struct EditList {
 		return sz_;
 	}
 
+	/**
+	 *
+	 */
+	void free(AllocOnlyPool<Edit>& epool) {
+		if(yetMoreEdits_ != NULL) epool.free(yetMoreEdits_);
+		if(moreEdits_ != NULL) epool.free(moreEdits_);
+	}
+
 	const static size_t numEdits = 6;
 	const static size_t numMoreEdits = 16;
 	size_t sz_;          // number of Edits stored in the EditList
@@ -331,137 +339,6 @@ struct RangeState {
 };
 
 /**
- * Class for managing a pool of memory from which RangeState arrays are
- * allocated.
- */
-class RangeStatePool {
-	typedef std::pair<uint32_t, uint32_t> U32Pair;
-public:
-	/**
-	 * Initialize a new pool with an initial size of about 'bytes'
-	 * bytes.  Exit with an error message if we can't allocate it.
-	 */
-	RangeStatePool(uint32_t bytes) :
-		curPool_(0), cur_(0), lastAlloc_(NULL), lastAllocSz_(0)
-	{
-		lim_ = bytes / sizeof(RangeState);
-		RangeState *pool;
-		try {
-			pool = new RangeState[lim_];
-			if(pool == NULL) throw std::bad_alloc();
-		} catch(std::bad_alloc& e) {
-			cerr << "Error: Could not allocate RangeStatePool #1 of " << bytes << " bytes";
-			exit(1);
-		}
-		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(RangeState)));
-		pools_.push_back(pool);
-	}
-
-	/**
-	 * Delete all the pools.
-	 */
-	~RangeStatePool() {
-		for(size_t i = 0; i < pools_.size(); i++) {
-			delete[] pools_[i];
-		}
-	}
-
-	/**
-	 * Reset the pool, freeing all arrays that had been given out.
-	 */
-	void reset() {
-#ifndef NDEBUG
-		for(size_t i = 0; i < pools_.size(); i++) {
-			memset(pools_[i], 0, lim_ * sizeof(RangeState));
-		}
-#endif
-		cur_ = 0;
-		curPool_ = 0;
-		lastAlloc_ = NULL;
-		lastAllocSz_ = 0;
-	}
-
-
-	/**
-	 * Rewind to a an old position, essentially freeing everything past
-	 * it.
-	 */
-	void rewind(U32Pair pos) {
-		curPool_ = pos.first;
-		cur_ = pos.second;
-		ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, (lim_-cur_) * sizeof(RangeState)));
-	}
-
-	/**
-	 * Return our current position.
-	 */
-	U32Pair getPos() {
-		return make_pair(curPool_, cur_);
-	}
-
-	/**
-	 * Return the last RangeState allocated from the pool.
-	 */
-	RangeState* lastAlloc() {
-		return lastAlloc_;
-	}
-
-	/**
-	 * Allocate another array of RangeStates from the pool.
-	 */
-	RangeState* alloc(uint32_t elts) {
-		assert_gt(elts, 0);
-		if(cur_ + elts >= lim_) {
-			if(curPool_ >= pools_.size()-1) {
-				RangeState *pool;
-				try {
-					pool = new RangeState[lim_];
-					if(pool == NULL) throw std::bad_alloc();
-				} catch(std::bad_alloc& e) {
-					cerr << "Error: Could not allocate RangeStatePool #" << (curPool_+2) << " of " << (lim_ * sizeof(RangeState)) << " bytes";
-					exit(1);
-				}
-				ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(RangeState)));
-				pools_.push_back(pool);
-			}
-			curPool_++;
-			cur_ = 0;
-			ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(RangeState)));
-		}
-		lastAlloc_ = &pools_[curPool_][cur_];
-		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
-		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
-		lastAllocSz_ = elts;
-		cur_ += elts;
-#ifndef NDEBUG
-		for(uint32_t i = 0; i < elts; i++) {
-			for(int j = 0; j < 4; j++) {
-				assert_eq(0, lastAlloc_[i].tops[j]);
-				assert_eq(0, lastAlloc_[i].bots[j]);
-			}
-		}
-#endif
-		return lastAlloc_;
-	}
-
-	uint32_t curPool() const {
-		return curPool_;
-	}
-
-	uint32_t cur() const {
-		return cur_;
-	}
-
-protected:
-	std::vector<RangeState*> pools_; /// the memory pools
-	uint32_t    curPool_; /// pool we're current allocating from
-	uint32_t    lim_;  /// # elements held in pool_
-	uint32_t    cur_;  /// index of next free element of pool_
-	RangeState *lastAlloc_; /// last RangeState array allocated
-	uint32_t    lastAllocSz_; /// size of last array allocated
-};
-
-/**
  * Encapsulates a "branch" of the search space; i.e. all of the
  * information deduced by walking along a path with only matches, along
  * with information about the decisions that lead to the root of that
@@ -470,14 +347,14 @@ protected:
 class Branch {
 	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
-	Branch() : lastPmSz_(0), delayedCost_(0),
+	Branch() : delayedCost_(0),
 	           curtailed_(false), exhausted_(false), prepped_(false),
 	           delayedIncrease_(false) { }
 
 	/**
 	 * Initialize a new branch object with an empty path.
 	 */
-	void init(RangeStatePool& pool, AllocOnlyPool<Edit>& epool,
+	void init(AllocOnlyPool<RangeState>& pool, AllocOnlyPool<Edit>& epool,
 	          uint32_t qlen,
 	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
 	          uint16_t depth3, uint16_t rdepth, uint16_t len,
@@ -488,7 +365,6 @@ public:
 	{
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
-		lastPmSz_ = 0;
 		delayedCost_ = 0;
 		depth0_ = depth0;
 		depth1_ = depth1;
@@ -567,7 +443,7 @@ public:
 	 * cost more, add the different to the cost of this branch (since
 	 * that's the best we can do starting from here from now on).
 	 */
-	Branch* splitBranch(RangeStatePool& rpool,
+	Branch* splitBranch(AllocOnlyPool<RangeState>& rpool,
 	                    AllocOnlyPool<Edit>& epool,
 	                    AllocOnlyPool<Branch>& bpool,
 	                    uint32_t pmSz,
@@ -580,57 +456,6 @@ public:
 		assert(ranges_ != NULL);
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
-		if(false && lastPmSz_ == pmSz) {
-#ifndef NDEBUG
-			if(branchSet != branchSet_) {
-				std::set<Branch*>::iterator it;
-				cout << "Current branch set:" << endl;
-				for(it = branchSet.begin(); it != branchSet.end(); it++) {
-					Branch *b = *it;
-					int stratum = b->cost_ >> 14;
-					assert_lt(stratum, 4);
-					int qual = b->cost_ & ~0xc000;
-					cout << "  " << b << ": " << b->cost_ << ", (" << stratum
-					     << ", " << qual << ")";
-					if(b->curtailed_) {
-						cout << " C";
-					}
-					if(b->exhausted_) {
-						cout << " E";
-					}
-					cout << endl;
-				}
-				cout << "Saved branch set:" << endl;
-				for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
-					Branch *b = *it;
-					int stratum = b->cost_ >> 14;
-					assert_lt(stratum, 4);
-					int qual = b->cost_ & ~0xc000;
-					cout << "  " << b << ": " << b->cost_ << ", (" << stratum
-					     << ", " << qual << ")";
-					if(b->curtailed_) {
-						cout << " C";
-					}
-					if(b->exhausted_) {
-						cout << " E";
-					}
-					cout << endl;
-				}
-				assert(false);
-			}
-#endif
-			rpool.rewind(lastRpool_);
-			epool.rewind(lastEpool_);
-			bpool.rewind(lastBpool_);
-#ifndef NDEBUG
-			std::set<Branch*>::iterator it;
-			for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
-				Branch *b = *it;
-				assert_gt(b->cost_, 0);
-			}
-			lastPmSz_ = 0;
-#endif
-		}
 		assert_leq(allocPool, bpool.curPool());
 		assert(allocPool < bpool.curPool() || allocCur < bpool.cur());
 		assert_leq(ranges_->allocPool, rpool.curPool());
@@ -712,10 +537,6 @@ public:
 				newDepth0, newDepth1, newDepth2, newDepth3,
 				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
 				top, bot, ep, ebwt, &edits_);
-		lastPmSz_ = pmSz;
-		lastRpool_ = rpool.getPos();
-		lastEpool_ = epool.getPos();
-		lastBpool_ = bpool.getPos();
 		ASSERT_ONLY(branchSet_ = branchSet);
 #ifndef NDEBUG
 		for(std::set<Branch*>::iterator it = branchSet_.begin(); it != branchSet_.end(); it++) {
@@ -739,37 +560,23 @@ public:
 				assert_gt(nextCost, bestCost);
 				delayedCost_ = (cost_ - bestCost + nextCost);
 				delayedIncrease_ = true;
-				// TODO: Is this right?
-				// Invalidate the queue size measurement, since we're
-				// about to move elsewhere in the queue
-				//lastPmSz_ = 0;
 			}
 		}
 		return newBranch;
 	}
 
 	/**
-	 * Finalize an exhausted branch.
+	 * Free a branch and all its contents.
 	 */
-	void finalize(RangeStatePool& rpool,
-	              AllocOnlyPool<Edit>& epool,
-	              AllocOnlyPool<Branch>& bpool,
-	              uint32_t pmSz)
+	void free(AllocOnlyPool<RangeState>& rpool,
+	          AllocOnlyPool<Edit>& epool,
+	          AllocOnlyPool<Branch>& bpool)
 	{
-		assert_gt(pmSz, 0);
-		if(false && lastPmSz_ == pmSz) {
-			rpool.rewind(lastRpool_);
-			epool.rewind(lastEpool_);
-			bpool.rewind(lastBpool_);
-#ifndef NDEBUG
-			std::set<Branch*>::iterator it;
-			for(it = branchSet_.begin(); it != branchSet_.end(); it++) {
-				Branch *b = *it;
-				assert_gt(b->cost_, 0);
-			}
-#endif
+		edits_.free(epool);
+		if(ranges_ != NULL) {
+			rpool.free(ranges_);
 		}
-		lastPmSz_ = 0;
+		bpool.free(this);
 	}
 
 	/**
@@ -856,7 +663,7 @@ public:
 	 * empty range or some other constraint violation (e.g., a
 	 * half-and-half constraint).
 	 */
-	void curtail(RangeStatePool& rpool, int seedLen, bool qualOrder) {
+	void curtail(AllocOnlyPool<RangeState>& rpool, int seedLen, bool qualOrder) {
 		assert(!curtailed_);
 		assert(!exhausted_);
 		if(ranges_ == NULL) {
@@ -1032,10 +839,6 @@ public:
 	SideLocus ltop_;
 	SideLocus lbot_;
 	EditList edits_;   // edits leading to the root of the branch
-	uint16_t lastPmSz_;
-	U32Pair lastRpool_;
-	U32Pair lastEpool_;
-	U32Pair lastBpool_;
 
 	uint16_t delayedCost_;
 
@@ -1090,7 +893,6 @@ public:
 	}
 };
 
-#if 1
 /**
  * A priority queue for Branch objects; makes it easy to process
  * branches in a best-first manner by prioritizing branches with lower
@@ -1209,81 +1011,6 @@ protected:
 	uint32_t sz_;
 	TBranchQueue branchQ_; // priority queue of branches
 };
-#else
-/**
- * A priority queue for Branch objects; makes it easy to process
- * branches in a best-first manner by prioritizing branches with lower
- * cumulative costs over branches with higher cumulative costs.
- */
-class BranchQueue {
-
-	typedef std::pair<int, int> TIntPair;
-
-public:
-
-	BranchQueue() : branchQ_() { }
-
-	/**
-	 * Return the front (highest-priority) element of the queue.
-	 */
-	Branch *front() {
-		assert(!branchQ_.empty());
-		return branchQ_.back();
-	}
-
-	/**
-	 * Remove and return the front (highest-priority) element of the
-	 * queue.
-	 */
-	Branch *pop() {
-		assert(!branchQ_.empty());
-		Branch *b = branchQ_.back();
-		branchQ_.pop_back();
-		return b;
-	}
-
-	/**
-	 * Insert a new Branch into the sorted priority queue.
-	 */
-	void push(Branch *b) {
-		branchQ_.push_back(b);
-	}
-
-	/**
-	 * Empty the priority queue and reset the count.
-	 */
-	void reset() {
-		branchQ_.clear();
-	}
-
-	/**
-	 * Return true iff the priority queue of branches is empty.
-	 */
-	bool empty() const {
-		return branchQ_.empty();
-	}
-
-	/**
-	 * Return the number of Branches in the queue.
-	 */
-	uint32_t size() const {
-		return branchQ_.size();
-	}
-
-#ifndef NDEBUG
-	/**
-	 * Consistency check.
-	 */
-	bool repOk(std::set<Branch*>& bset) {
-		return true;
-	}
-#endif
-
-protected:
-
-	std::vector<Branch*> branchQ_; // priority queue of branches
-};
-#endif
 
 /**
  * A class that both contains Branches and determines how those
@@ -1311,11 +1038,12 @@ class PathManager {
 
 public:
 
-	PathManager(int *btCnt = NULL) :
+	PathManager(ChunkPool* cpool_, int *btCnt = NULL) :
 		branchQ_(),
-		bpool((1 << 19), "branch"),
-		rpool(1 << 19),
-		epool((1 << 19), "edit"),
+		cpool(cpool_),
+		bpool(cpool, "branch"),
+		rpool(cpool, "range state"),
+		epool(cpool, "edit"),
 		minCost(0), btCnt_(btCnt)
 	{ }
 
@@ -1326,6 +1054,7 @@ public:
 	 */
 	Branch* front() {
 		assert(!empty());
+		assert_gt(branchQ_.front()->depth3_, 0);
 		return branchQ_.front();
 	}
 
@@ -1335,6 +1064,7 @@ public:
 	 */
 	Branch* pop() {
 		Branch* b = branchQ_.pop();
+		assert_gt(b->depth3_, 0);
 #ifndef NDEBUG
 		// Also remove it from the set
 		assert(branchSet_.find(b) != branchSet_.end());
@@ -1358,6 +1088,7 @@ public:
 	 */
 	void push(Branch *b) {
 		assert(!b->exhausted_);
+		assert_gt(b->depth3_, 0);
 		branchQ_.push(b);
 #ifndef NDEBUG
 		// Also insert it into the set
@@ -1381,10 +1112,14 @@ public:
 	 * resetting the RangeStatePool.
 	 */
 	void reset() {
-		branchQ_.reset();
-		bpool.reset();
-		epool.reset();
-		rpool.reset();
+		branchQ_.reset(); // reset the priority queue
+		assert(branchQ_.empty());
+		bpool.reset();    // reset the Branch pool
+		epool.reset();    // reset the Edit pool
+		rpool.reset();    // reset the RangeState pool
+		assert(bpool.empty());
+		assert(epool.empty());
+		assert(rpool.empty());
 		ASSERT_ONLY(branchSet_.clear());
 		minCost = 0;
 	}
@@ -1434,7 +1169,7 @@ public:
 			assert(br == front());
 			ASSERT_ONLY(Branch *popped =) pop();
 			assert(popped == br);
-			// br is allocated from a pool; it'll get freed later
+			br->free(rpool, epool, bpool);
 		} else if(br->cost_ != origCost) {
 			assert(br == front());
 			Branch *popped = pop();
@@ -1462,22 +1197,18 @@ public:
 		}
 		Branch *f = front();
 		while(f->exhausted_ || f->delayedIncrease_) {
-			uint32_t sz = size();
 			if(f->exhausted_) {
 				assert(!f->delayedIncrease_);
 				ASSERT_ONLY(Branch *popped =) pop();
 				assert(popped == f);
-				f->finalize(rpool, epool, bpool, sz);
 				if(empty()) return;
 			} else if(f->delayedIncrease_) {
 				assert_neq(0, f->delayedCost_);
 				ASSERT_ONLY(Branch *popped =) pop();
 				assert(popped == f);
-				f->finalize(rpool, epool, bpool, sz);
 				f->cost_ = f->delayedCost_;
 				f->delayedIncrease_ = false;
 				f->delayedCost_ = 0;
-				assert_eq(0, f->lastPmSz_);
 				push(f);
 				assert(!empty());
 			}
@@ -1545,8 +1276,9 @@ protected:
 
 public:
 
+	ChunkPool *cpool; // pool for generic chunks of memory
 	AllocOnlyPool<Branch> bpool; // pool for allocating Branches
-	RangeStatePool rpool; // pool for allocating RangeStates
+	AllocOnlyPool<RangeState> rpool; // pool for allocating RangeStates
 	AllocOnlyPool<Edit> epool; // pool for allocating Edits
 	/// The minimum possible cost for any alignments obtained by
 	/// advancing further
@@ -1713,6 +1445,7 @@ public:
 		bool verbose,
 		bool mate1,
 		uint32_t minCostAdjustment,
+		ChunkPool* pool,
 		int *btCnt) :
 		RangeSourceDriver<TRangeSource>(true, minCostAdjustment),
 		len_(0), mate1_(mate1),
@@ -1720,7 +1453,7 @@ public:
 		params_(params),
 		fw_(fw), rs_(rs),
 		ebwtFw_(rs_->curEbwt()->fw()),
-		pm_(btCnt)
+		pm_(pool, btCnt)
 	{
 		assert(rs_ != NULL);
 	}

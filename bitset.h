@@ -350,4 +350,130 @@ private:
 	uint32_t _words[(LEN>>5)+1]; // storage
 };
 
+/**
+ * A simple fixed-length unsynchronized bitset class.
+ */
+class FixedBitset2 {
+
+public:
+	FixedBitset2(uint32_t len) : len_(len), _cnt(0), _size(0) {
+		_words = new uint32_t[((len_ >> 5)+1)];
+		memset(_words, 0, ((len_ >> 5)+1) * 4);
+	}
+
+	~FixedBitset2() { delete _words; }
+
+	/**
+	 * Unset all bits.
+	 */
+	void clear() {
+		memset(_words, 0, ((len_ >> 5)+1) * 4);
+		_cnt = 0;
+		_size = 0;
+	}
+
+	/**
+	 * Return true iff the bit at offset i has been set.
+	 */
+	bool test(uint32_t i) const {
+		bool ret = false;
+		assert_lt(i, len_);
+		ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
+		return ret;
+	}
+
+	/**
+	 * Set the bit at offset i.  Assert if the bit was already set.
+	 */
+	void set(uint32_t i) {
+		// Fast path
+		assert_lt(i, len_);
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		_words[i >> 5] |= (1 << (i & 0x1f));
+		_cnt++;
+		if(i >= _size) {
+			_size = i+1;
+		}
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+	}
+
+	/**
+	 * Clear the bit at offset i.  Assert if the bit was not already set.
+	 */
+	void clear(uint32_t i) {
+		// Fast path
+		assert_lt(i, len_);
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+		_words[i >> 5] &= ~(1 << (i & 0x1f));
+		_cnt--;
+		if(i >= _size) {
+			_size = i+1;
+		}
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+	}
+
+	/**
+	 * Set the bit at offset i.  Do not assert if the bit was already
+	 * set.
+	 */
+	void setOver(uint32_t i) {
+		// Fast path
+		assert_lt(i, len_);
+		if(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0) {
+			_words[i >> 5] |= (1 << (i & 0x1f));
+			_cnt++;
+		}
+		if(i >= _size) {
+			_size = i+1;
+		}
+		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+	}
+
+	uint32_t count() const { return _cnt; }
+	uint32_t size() const  { return _size; }
+
+	/**
+	 * Return true iff this FixedBitset has the same bits set as
+	 * FixedBitset 'that'.
+	 */
+	bool operator== (const FixedBitset2& that) const {
+		for(uint32_t i = 0; i < (len_>>5)+1; i++) {
+			if(_words[i] != that._words[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Return true iff this FixedBitset does not have the same bits set
+	 * as FixedBitset 'that'.
+	 */
+	bool operator!= (const FixedBitset2& that) const {
+		for(uint32_t i = 0; i < (len_>>5)+1; i++) {
+			if(_words[i] != that._words[i]) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Return a string-ized version of this FixedBitset.
+	 */
+	std::string str() const {
+		std::ostringstream oss;
+		for(int i = (int)size()-1; i >= 0; i--) {
+			oss << (test(i)? "1" : "0");
+		}
+		return oss.str();
+	}
+
+private:
+	const uint32_t len_;
+	uint32_t _cnt;
+	uint32_t _size;
+	uint32_t *_words; // storage
+};
+
 #endif /* BITSET_H_ */

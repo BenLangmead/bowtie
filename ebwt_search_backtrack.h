@@ -2973,10 +2973,11 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			bool mate1,
+			ChunkPool* pool,
 			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose,
-					mate1, 0, btCnt),
+					mate1, 0, pool, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -3142,6 +3143,7 @@ public:
 			vector<String<Dna5> >& os,
 			bool verbose,
 			bool mate1,
+			ChunkPool* pool,
 			int *btCnt = NULL) :
 			params_(params),
 			rs_(rs),
@@ -3160,6 +3162,7 @@ public:
 			os_(os),
 			verbose_(verbose),
 			mate1_(mate1),
+			pool_(pool),
 			btCnt_(btCnt)
 	{ }
 
@@ -3172,7 +3175,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
 				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				mate1_, btCnt_);
+				mate1_, pool_, btCnt_);
 	}
 
 protected:
@@ -3193,6 +3196,7 @@ protected:
 	vector<String<Dna5> >& os_;
 	bool verbose_;
 	bool mate1_;
+	ChunkPool* pool_;
 	int *btCnt_;
 };
 

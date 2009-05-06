@@ -328,6 +328,7 @@ public:
 		bool rangeMode,
 		bool verbose,
 		int maxBts,
+		ChunkPool *pool,
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode),
@@ -340,15 +341,18 @@ public:
 		rchase_(rchase),
 		driver_(driver),
 		maxBts_(maxBts),
+		pool_(pool),
 		btCnt_(btCnt),
 		metrics_(metrics)
 	{
+		assert(pool_   != NULL);
 		assert(sinkPt_ != NULL);
 		assert(params_ != NULL);
 		assert(driver_ != NULL);
 	}
 
 	virtual ~UnpairedAlignerV2() {
+		delete pool_;    pool_    = NULL;
 		delete driver_;  driver_  = NULL;
 		delete params_;  params_  = NULL;
 		delete rchase_;  rchase_  = NULL;
@@ -362,6 +366,7 @@ public:
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
 		Aligner::setQuery(patsrc); // set fields & random seed
 		if(metrics_ != NULL) metrics_->nextRead(patsrc->bufa().patFw);
+		pool_->reset();
 		driver_->setQuery(patsrc, NULL);
 		this->done = driver_->done;
 		doneFirst_ = false;
@@ -481,6 +486,7 @@ protected:
 	TDriver* driver_;
 
 	const int maxBts_;
+	ChunkPool *pool_;
 	int *btCnt_;
 	AlignerMetrics *metrics_;
 };
@@ -738,6 +744,7 @@ public:
 		bool rangeMode,
 		bool verbose,
 		int maxBts,
+		ChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
 		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
@@ -761,6 +768,7 @@ public:
 		rchase_(rchase),
 		verbose_(verbose),
 		maxBts_(maxBts),
+		pool_(pool),
 		btCnt_(btCnt),
 		driver1Fw_(driver1Fw), driver1Rc_(driver1Rc),
 		offs1FwSz_(0), offs1RcSz_(0),
@@ -810,8 +818,9 @@ public:
 		fwR_(fw2),
 		verbose2_(false)
 	{
-		assert(sinkPt_ != NULL);
-		assert(params_ != NULL);
+		assert(pool_      != NULL);
+		assert(sinkPt_    != NULL);
+		assert(params_    != NULL);
 		assert(driver1Fw_ != NULL);
 		assert(driver1Rc_ != NULL);
 		assert(driver2Fw_ != NULL);
@@ -819,6 +828,7 @@ public:
 	}
 
 	virtual ~PairedBWAlignerV1() {
+		delete pool_;      pool_      = NULL;
 		delete driver1Fw_; driver1Fw_ = NULL;
 		delete driver1Rc_; driver1Rc_ = NULL;
 		delete driver2Fw_; driver2Fw_ = NULL;
@@ -838,6 +848,7 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
+		pool_->reset();
 		driver1Fw_->setQuery(patsrc, NULL);
 		driver1Rc_->setQuery(patsrc, NULL);
 		driver2Fw_->setQuery(patsrc, NULL);
@@ -1497,6 +1508,7 @@ protected:
 	bool verbose_;
 
 	int maxBts_;
+	ChunkPool *pool_;
 	int *btCnt_;
 
 	// Range-finding state for first mate

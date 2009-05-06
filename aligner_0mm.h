@@ -63,6 +63,7 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
+		ChunkPool *pool = new ChunkPool(16 * 1024, 1 * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -82,7 +83,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, NULL);
+			os_, verbose_, true, pool, NULL);
 		EbwtRangeSourceDriver * driverRc = new EbwtRangeSourceDriver(
 			*params, rRc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -91,7 +92,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, NULL);
+			os_, verbose_, true, pool, NULL);
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) drVec->push_back(driverFw);
 		if(doRc_) drVec->push_back(driverRc);
@@ -104,7 +105,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			INT_MAX, NULL, NULL);
+			INT_MAX, pool, NULL, NULL);
 	}
 
 private:
@@ -185,6 +186,7 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
+		ChunkPool *pool = new ChunkPool(16 * 1024, 1 * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -204,7 +206,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, NULL);
+			os_, verbose_, true, pool, NULL);
 		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
 			*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -213,7 +215,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, NULL);
+			os_, verbose_, true, pool, NULL);
 
 		EbwtRangeSource *r2Fw = new EbwtRangeSource(
 			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
@@ -228,7 +230,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, false, NULL);
+			os_, verbose_, false, pool, NULL);
 		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
 			*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen
@@ -237,7 +239,7 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, false, NULL);
+			os_, verbose_, false, pool, NULL);
 
 		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
 
@@ -251,7 +253,7 @@ public:
 			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			INT_MAX, NULL);
+			INT_MAX, pool, NULL);
 	}
 
 private:

@@ -1,6 +1,6 @@
  /*==========================================================================
                 SeqAn - The Library for Sequence Analysis
-                          http://www.seqan.de 
+                          http://www.seqan.de
  ============================================================================
   Copyright (C) 2007
 
@@ -15,7 +15,7 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: basic.h,v 1.1 2008/08/25 16:20:06 langmead Exp $
+  $Id: basic.h,v 1.2 2009/05/06 20:32:59 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_BASIC_H
@@ -66,7 +66,7 @@
 #include <seqan/basic/basic_allocator_simple.h>
 #include <seqan/basic/basic_allocator_singlepool.h>
 #include <seqan/basic/basic_allocator_multipool.h>
-#include <seqan/basic/basic_allocator_chunkpool.h>
+//#include <seqan/basic/basic_allocator_chunkpool.h>
 
 //____________________________________________________________________________
 
