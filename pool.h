@@ -136,6 +136,7 @@ public:
 	{
 		assert(pool != NULL);
 		lim_ = pool->chunkSize() / sizeof(T);
+		lastCurInPrevPool_ = lim_;
 		assert_gt(lim_, 0);
 	}
 
@@ -213,6 +214,11 @@ public:
 		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
 			cur_--;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
+			if(cur_ == 0 && curPool_ > 0) {
+				curPool_--;
+				cur_ = lastCurInPrevPool_;
+				lastCurInPrevPool_ = lim_;
+			}
 		}
 	}
 
@@ -225,6 +231,11 @@ public:
 		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
 			cur_ -= num;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
+			if(cur_ == 0 && curPool_ > 0) {
+				curPool_--;
+				cur_ = lastCurInPrevPool_;
+				lastCurInPrevPool_ = lim_;
+			}
 		}
 	}
 
@@ -240,6 +251,7 @@ public:
 protected:
 
 	void allocNextPool() {
+		lastCurInPrevPool_ = cur_;
 		if(curPool_ >= pools_.size()-1) {
 			T *pool;
 			try {
@@ -278,6 +290,7 @@ protected:
 	const char     *name_;
 	std::vector<T*> pools_; /// the memory pools
 	uint32_t        curPool_; /// pool we're current allocating from
+	uint32_t        lastCurInPrevPool_;
 	uint32_t        lim_;  /// # elements held in pool_
 	uint32_t        cur_;  /// index of next free element of pool_
 };

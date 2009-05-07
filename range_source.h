@@ -465,8 +465,7 @@ public:
 	                    uint32_t pmSz,
 	                    RandomSource& rand, uint32_t qlen, int seedLen,
 	                    bool qualOrder, const EbwtParams& ep,
-	                    const uint8_t* ebwt
-	                    ASSERT_ONLY(, std::set<Branch*> branchSet))
+	                    const uint8_t* ebwt)
 	{
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
@@ -553,13 +552,6 @@ public:
 				newDepth0, newDepth1, newDepth2, newDepth3,
 				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
 				top, bot, ep, ebwt, &edits_);
-		ASSERT_ONLY(branchSet_ = branchSet);
-#ifndef NDEBUG
-		for(std::set<Branch*>::iterator it = branchSet_.begin(); it != branchSet_.end(); it++) {
-			Branch *b = *it;
-			assert_geq(b->cost_, this->cost_);
-		}
-#endif
 		// Add the new edit
 		newBranch->edits_.add(e, epool, qlen);
 		if(numNotEliminated == 1 && last) {
@@ -862,10 +854,6 @@ public:
 	bool exhausted_;  // all outgoing edges exhausted, including all edits
 	bool prepped_;    // whether SideLocus's are inited
 	bool delayedIncrease_;
-
-protected:
-
-	ASSERT_ONLY(std::set<Branch*> branchSet_);
 };
 
 /**
@@ -1271,8 +1259,7 @@ protected:
 	{
 		Branch* dst = src->splitBranch(
 				rpool, epool, bpool, size(), rand,
-		        qlen, seedLen, qualOrder, ep, ebwt
-		        ASSERT_ONLY(, branchSet_));
+		        qlen, seedLen, qualOrder, ep, ebwt);
 		assert(dst->repOk());
 		return dst;
 	}
