@@ -74,13 +74,22 @@ public:
 	 * Allocate a single T from the pool.
 	 */
 	void* alloc() {
-		assert_leq(cur_, lim_);
-		if(cur_ == lim_) {
-			return NULL;
+		assert_lt(cur_, lim_);
+		uint32_t cur = cur_;
+		while(bits_.test(cur)) {
+			cur++;
+			if(cur >= lim_) {
+				cur = 0;
+			}
+			if(cur == cur_) {
+				// Wrapped all the way around without finding a free
+				// chunk
+				return NULL;
+			}
 		}
-		bits_.set(cur_);
-		void * ptr = (void *)(&pool_[cur_ * chunkSz_]);
-		cur_++;
+		void * ptr = (void *)(&pool_[cur * chunkSz_]);
+		bits_.set(cur);
+		cur_ = cur + 1;
 		return ptr;
 	}
 
@@ -215,6 +224,9 @@ public:
 			cur_--;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
+				assert_eq(curPool_, pools_.size());
+				pool_->free(pools_.back());
+				pools_.pop_back();
 				curPool_--;
 				cur_ = lastCurInPrevPool_;
 				lastCurInPrevPool_ = lim_;
@@ -232,6 +244,9 @@ public:
 			cur_ -= num;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
+				assert_eq(curPool_+1, pools_.size());
+				pool_->free(pools_.back());
+				pools_.pop_back();
 				curPool_--;
 				cur_ = lastCurInPrevPool_;
 				lastCurInPrevPool_ = lim_;
