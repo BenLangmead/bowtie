@@ -89,7 +89,7 @@ public:
 		}
 		void * ptr = (void *)(&pool_[cur * chunkSz_]);
 		bits_.set(cur);
-		cur_ = cur + 1;
+		cur_ = cur;
 		return ptr;
 	}
 
