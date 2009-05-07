@@ -115,6 +115,7 @@ static bool norc                = false; // don't align rc orientation of read
 static bool strandFix           = true;  // attempt to fix strand bias
 static bool randomizeQuals      = false; // randomize quality values
 static bool stats               = false; // print performance stats
+static int chunkPoolMegabytes   = 32;    // max MB to dedicate to best-first search frames per thread
 // mating constraints
 
 static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -174,7 +175,8 @@ enum {
 	ARG_STATS,
 	ARG_ONETWO,
 	ARG_PHRED64,
-	ARG_PHRED33
+	ARG_PHRED33,
+	ARG_CHUNKMBS
 };
 
 static struct option long_options[] = {
@@ -262,6 +264,7 @@ static struct option long_options[] = {
 	{(char*)"phred33-quals", no_argument,      0,            ARG_PHRED33},
 	{(char*)"phred64-quals", no_argument,      0,            ARG_PHRED64},
 	{(char*)"solexa1.3-quals", no_argument,    0,            ARG_PHRED64},
+	{(char*)"chunkmbs",     required_argument, 0,            ARG_CHUNKMBS},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -304,6 +307,7 @@ static void printUsage(ostream& out) {
 	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
+	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def.: 32)" << endl
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
@@ -1217,6 +1221,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
+	   		case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
 	   		case ARG_BETTER: stateful = true; better = true; break;
 	   		case ARG_OLDBEST: oldBest = true; break;
 	   		case ARG_BEST: stateful = true; break;
@@ -1564,6 +1569,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			os,
 			!noMaqRound,
 			!better,
@@ -1587,6 +1593,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -1933,6 +1940,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			os,
 			!noMaqRound,
 			!better,
@@ -1956,6 +1964,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -2507,6 +2516,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			os,
 			!noMaqRound,
 			!better,
@@ -2531,6 +2541,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -3170,6 +3181,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			os,
 			!noMaqRound,
 			!better,
@@ -3200,6 +3212,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
+			chunkPoolMegabytes,
 			refs,
 			os,
 			!noMaqRound,

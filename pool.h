@@ -175,7 +175,9 @@ public:
 	 */
 	T* allocC() {
 		T* t = alloc();
-		memset(t, 0, sizeof(T));
+		if(t != NULL) {
+			memset(t, 0, sizeof(T));
+		}
 		return t;
 	}
 
@@ -196,7 +198,9 @@ public:
 	 */
 	T* allocC(uint32_t num) {
 		T* t = alloc(num);
-		memset(t, 0, sizeof(T) * num);
+		if(t != NULL) {
+			memset(t, 0, sizeof(T) * num);
+		}
 		return t;
 	}
 

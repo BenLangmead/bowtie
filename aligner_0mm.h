@@ -32,6 +32,7 @@ public:
 			RangeCache* cacheFw,
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
+			int chunkPoolMegabytes,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
 			bool qualOrder,
@@ -47,6 +48,7 @@ public:
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
+			chunkPoolMegabytes_(chunkPoolMegabytes),
 			os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -63,7 +65,7 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
-		ChunkPool *pool = new ChunkPool(16 * 1024, 1 * 1024 * 1024);
+		ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes_ * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -118,6 +120,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
+	const int chunkPoolMegabytes_;
 	vector<String<Dna5> >& os_;
 	bool maqPenalty_;
 	bool qualOrder_;
@@ -148,6 +151,7 @@ public:
 			RangeCache* cacheFw,
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
+			int chunkPoolMegabytes,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
@@ -170,6 +174,7 @@ public:
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
+			chunkPoolMegabytes_(chunkPoolMegabytes),
 			refs_(refs), os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -186,7 +191,7 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
-		ChunkPool *pool = new ChunkPool(16 * 1024, 1 * 1024 * 1024);
+		ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes_ * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -272,6 +277,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
+	const int chunkPoolMegabytes_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool maqPenalty_;
