@@ -1559,6 +1559,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
+	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024);
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
@@ -1569,7 +1570,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			os,
 			!noMaqRound,
 			!better,
@@ -1593,7 +1594,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -1615,6 +1616,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 
 	delete patsrcFact;
 	delete sinkFact;
+	delete pool;
 #ifdef BOWTIE_PTHREADS
 	if((long)vp != 0L) pthread_exit(NULL);
 #endif
@@ -1929,6 +1931,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
@@ -1940,7 +1943,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			os,
 			!noMaqRound,
 			!better,
@@ -1964,7 +1967,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -1986,6 +1989,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 
 	delete patsrcFact;
 	delete sinkFact;
+	delete pool;
 #ifdef BOWTIE_PTHREADS
 	if((long)vp != 0L) pthread_exit(NULL);
 #endif
@@ -2505,6 +2509,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
+	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024);
 	Unpaired23mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -2516,7 +2521,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			os,
 			!noMaqRound,
 			!better,
@@ -2541,7 +2546,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			refs, os,
 			!noMaqRound,
 			!better,
@@ -2563,6 +2568,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 
 	delete patsrcFact;
 	delete sinkFact;
+	delete pool;
 #ifdef BOWTIE_PTHREADS
 	if((long)vp != 0L) pthread_exit(NULL);
 #endif
@@ -3162,6 +3168,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024);
 
 	AlignerMetrics *metrics = NULL;
 	if(stats) {
@@ -3181,7 +3188,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			os,
 			!noMaqRound,
 			!better,
@@ -3212,7 +3219,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheFw,
 			NULL, //&cacheBw,
 			cacheLimit,
-			chunkPoolMegabytes,
+			pool,
 			refs,
 			os,
 			!noMaqRound,
@@ -3239,6 +3246,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 
 	delete patsrcFact;
 	delete sinkFact;
+	delete pool;
 #ifdef BOWTIE_PTHREADS
 	if((long)vp != 0L) pthread_exit(NULL);
 #endif

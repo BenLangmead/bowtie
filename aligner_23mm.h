@@ -33,7 +33,7 @@ public:
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			int chunkPoolMegabytes,
+			ChunkPool *pool,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
 			bool qualOrder,
@@ -50,7 +50,7 @@ public:
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
-			chunkPoolMegabytes_(chunkPoolMegabytes),
+			pool_(pool),
 			os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -70,7 +70,6 @@ public:
 	virtual Aligner* create() const {
 
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
-		ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes_ * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -97,7 +96,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * drFw_Fw = new EbwtRangeSourceDriver(
 			*params, rFw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -107,7 +106,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * drFw_BwHalf = new EbwtRangeSourceDriver(
 			*params, rFw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -117,7 +116,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * drFw_FwHalf = NULL;
 		if(!two_) {
@@ -129,7 +128,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_LEN,
-				os_, verbose_, true, pool, NULL);
+				os_, verbose_, true, pool_, NULL);
 		}
 
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
@@ -163,7 +162,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * drRc_Bw = new EbwtRangeSourceDriver(
 			*params, rRc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -173,7 +172,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * drRc_FwHalf = new EbwtRangeSourceDriver(
 			*params, rRc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -183,7 +182,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		EbwtRangeSourceDriver * drRc_BwHalf = NULL;
 		if(!two_) {
 			drRc_BwHalf = new EbwtRangeSourceDriver(
@@ -194,7 +193,7 @@ public:
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_HI_HALF_EDGE,
 				PIN_TO_LEN,
-				os_, verbose_, true, pool, NULL);
+				os_, verbose_, true, pool_, NULL);
 		}
 		if(doRc_) {
 			drVec->push_back(drRc_Fw);
@@ -213,7 +212,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			INT_MAX, pool, NULL, NULL);
+			INT_MAX, pool_, NULL, NULL);
 	}
 
 private:
@@ -227,7 +226,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	const int chunkPoolMegabytes_;
+	ChunkPool *pool_;
 	vector<String<Dna5> >& os_;
 	const bool maqPenalty_;
 	const bool qualOrder_;
@@ -263,7 +262,7 @@ public:
 			RangeCache *cacheFw,
 			RangeCache *cacheBw,
 			uint32_t cacheLimit,
-			int chunkPoolMegabytes,
+			ChunkPool *pool,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
@@ -288,7 +287,7 @@ public:
 			cacheFw_(cacheFw),
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
-			chunkPoolMegabytes_(chunkPoolMegabytes),
+			pool_(pool),
 			refs_(refs), os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -307,7 +306,6 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
-		ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes_ * 1024 * 1024);
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
 
@@ -331,7 +329,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
 			*params, r1Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -341,7 +339,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr1Fw_BwHalf = new EbwtRangeSourceDriver(
 			*params, r1Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -351,7 +349,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr1Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
 			*params, r1Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -361,7 +359,7 @@ public:
 			PIN_TO_BEGINNING,
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		TRangeSrcDrPtrVec *dr1FwVec = new TRangeSrcDrPtrVec();
 		dr1FwVec->push_back(dr1Fw_Bw);
 		dr1FwVec->push_back(dr1Fw_Fw);
@@ -391,7 +389,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
 			*params, r1Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -401,7 +399,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr1Rc_FwHalf = new EbwtRangeSourceDriver(
 			*params, r1Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -411,7 +409,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * dr1Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
 			*params, r1Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -421,7 +419,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, true, pool, NULL);
+			os_, verbose_, true, pool_, NULL);
 		TRangeSrcDrPtrVec *dr1RcVec = new TRangeSrcDrPtrVec();
 		dr1RcVec->push_back(dr1Rc_Fw);
 		dr1RcVec->push_back(dr1Rc_Bw);
@@ -451,7 +449,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
 			*params, r2Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -461,7 +459,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		// Driver wrapper for rFw_Fw
 		EbwtRangeSourceDriver * dr2Fw_BwHalf = new EbwtRangeSourceDriver(
 			*params, r2Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -471,7 +469,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		EbwtRangeSourceDriver * dr2Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
 			*params, r2Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -480,7 +478,7 @@ public:
 			PIN_TO_BEGINNING,
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		TRangeSrcDrPtrVec *dr2FwVec = new TRangeSrcDrPtrVec();
 		dr2FwVec->push_back(dr2Fw_Bw);
 		dr2FwVec->push_back(dr2Fw_Fw);
@@ -510,7 +508,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		// Driver wrapper for rRc_Bw
 		EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
 			*params, r2Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -520,7 +518,7 @@ public:
 			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		// Driver wrapper for rRc_Fw
 		EbwtRangeSourceDriver * dr2Rc_FwHalf = new EbwtRangeSourceDriver(
 			*params, r2Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -530,7 +528,7 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		EbwtRangeSourceDriver * dr2Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
 			*params, r2Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 			0,          // seedLen (0 = whole read is seed)
@@ -539,7 +537,7 @@ public:
 			PIN_TO_BEGINNING,
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
-			os_, verbose_, false, pool, NULL);
+			os_, verbose_, false, pool_, NULL);
 		TRangeSrcDrPtrVec *dr2RcVec = new TRangeSrcDrPtrVec();
 		dr2RcVec->push_back(dr2Rc_Fw);
 		dr2RcVec->push_back(dr2Rc_Bw);
@@ -567,7 +565,7 @@ public:
 			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			INT_MAX, pool, NULL);
+			INT_MAX, pool_, NULL);
 	}
 
 private:
@@ -587,7 +585,7 @@ private:
 	RangeCache *cacheFw_;
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
-	const int chunkPoolMegabytes_;
+	ChunkPool *pool_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	const bool maqPenalty_;
