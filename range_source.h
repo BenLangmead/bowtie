@@ -23,8 +23,6 @@ enum AdvanceUntil {
  * sequence.
  */
 struct Edit {
-	ASSERT_ONLY(uint32_t allocPool);
-	ASSERT_ONLY(uint32_t allocCur);
 	uint16_t type      :  2; // 1 -> subst, 2 -> ins, 3 -> del, 0 -> empty
 	uint16_t pos       : 10; // position w/r/t search root
 	uint16_t chr       :  2; // character involved (for subst and ins)
@@ -53,6 +51,10 @@ struct EditList {
 			assert(moreEdits_ == NULL);
 			assert(yetMoreEdits_ == NULL);
 			moreEdits_ = pool_.alloc(numMoreEdits);
+			if(moreEdits_ == NULL) {
+				cerr << "Exhausted chunk memory trying to allocate moreEdits array" << endl;
+				exit(1);
+			}
 			assert(moreEdits_ != NULL);
 			moreEdits_[0] = e;
 			sz_++;
@@ -65,6 +67,10 @@ struct EditList {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
 			yetMoreEdits_ = pool_.alloc(qlen+3 - numMoreEdits - numEdits);
+			if(yetMoreEdits_ == NULL) {
+				cerr << "Exhausted chunk memory trying to allocate yetMoreEdits array" << endl;
+				exit(1);
+			}
 			assert(yetMoreEdits_ != NULL);
 			yetMoreEdits_[0] = e;
 			sz_++;
@@ -331,9 +337,6 @@ struct RangeState {
 		return true;
 	}
 
-	ASSERT_ONLY(uint32_t allocPool);
-	ASSERT_ONLY(uint32_t allocCur);
-
 	// Outgoing ranges; if the position being described is not a
 	// legitimate jumping-off point for a branch, tops[] and bots[]
 	// will be filled with 0s and all possibilities in eq will be
@@ -474,6 +477,10 @@ public:
 		assert_leq(ranges_->allocPool, rpool.curPool());
 		assert(ranges_->allocPool < rpool.curPool() || ranges_->allocCur < rpool.cur());
 		Branch *newBranch = bpool.alloc();
+		if(newBranch == NULL) {
+			cerr << "Exhausted chunk memory trying to allocate a new Branch" << endl;
+			exit(1);
+		}
 		int tiedPositions[3];
 		int numTiedPositions = 0;
 		// Lowest marginal cost incurred by any of the positions with
@@ -830,9 +837,6 @@ public:
 		assert_lt((cost_ >> 14), 4);
 		return true;
 	}
-
-	ASSERT_ONLY(uint32_t allocPool);
-	ASSERT_ONLY(uint32_t allocCur);
 
 	uint16_t depth0_; // no edits at depths < depth0
 	uint16_t depth1_; // at most 1 edit at depths < depth1

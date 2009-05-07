@@ -147,39 +147,6 @@ public:
 #endif
 		cur_ = 0;
 		curPool_ = 0;
-		lastAlloc_ = NULL;
-		lastAllocSz_ = 0;
-	}
-
-	/**
-	 * Rewind to a an old position, essentially freeing everything past
-	 * it.
-	 */
-	void rewind(U32Pair pos) {
-		curPool_ = pos.first;
-		cur_ = pos.second;
-		ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, (lim_-cur_) * sizeof(T)));
-	}
-
-	/**
-	 * Return our current position.
-	 */
-	U32Pair getPos() {
-		return make_pair(curPool_, cur_);
-	}
-
-	/**
-	 * Return the last RangeState allocated from the pool.
-	 */
-	T* lastAlloc() {
-		return lastAlloc_;
-	}
-
-	/**
-	 * Return the size of the last array of Ts allocated.
-	 */
-	uint32_t lastAllocSz() const {
-		return lastAllocSz_;
 	}
 
 	/**
@@ -190,12 +157,8 @@ public:
 		if(cur_ + 1 >= lim_) {
 			allocNextPool();
 		}
-		lastAlloc_ = &pools_[curPool_][cur_];
-		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
-		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
-		lastAllocSz_ = 1;
 		cur_ ++;
-		return lastAlloc_;
+		return &pools_[curPool_][cur_-1];
 	}
 
 	/**
@@ -215,12 +178,8 @@ public:
 		if(cur_ + num >= lim_) {
 			allocNextPool();
 		}
-		lastAlloc_ = &pools_[curPool_][cur_];
-		ASSERT_ONLY(lastAlloc_->allocPool = curPool_);
-		ASSERT_ONLY(lastAlloc_->allocCur  = cur_);
-		lastAllocSz_ = num;
 		cur_ += num;
-		return lastAlloc_;
+		return &pools_[curPool_][cur_-num];
 	}
 
 	/**
@@ -275,8 +234,6 @@ public:
 		assert(pools_.empty());
 		assert_eq(0, cur_);
 		assert_eq(0, curPool_);
-		assert_eq(0, lastAllocSz_);
-		assert(lastAlloc_ == NULL);
 		return true;
 	}
 #endif
@@ -324,8 +281,6 @@ protected:
 	uint32_t        curPool_; /// pool we're current allocating from
 	uint32_t        lim_;  /// # elements held in pool_
 	uint32_t        cur_;  /// index of next free element of pool_
-	T *             lastAlloc_; /// last T array allocated
-	uint32_t        lastAllocSz_; /// size of last T array allocated
 };
 
 #endif /* POOL_H_ */
