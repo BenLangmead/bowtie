@@ -79,7 +79,9 @@ public:
 			return NULL;
 		}
 		bits_.set(cur_);
-		return (void *)&pool_[cur_++ * chunkSz_];
+		void * ptr = (void *)(&pool_[cur_ * chunkSz_]);
+		cur_++;
+		return ptr;
 	}
 
 	/**
@@ -108,7 +110,6 @@ public:
 
 protected:
 	int8_t*  pool_; /// the memory pools
-	uint32_t curPool_; /// pool we're current allocating from
 	uint32_t cur_;  /// index of next free element of pool_
 	const uint32_t chunkSz_;
 	const uint32_t totSz_;
@@ -142,9 +143,7 @@ public:
 	 * Reset the pool, freeing all arrays that had been given out.
 	 */
 	void reset() {
-#ifndef NDEBUG
 		pools_.clear();
-#endif
 		cur_ = 0;
 		curPool_ = 0;
 	}
