@@ -472,10 +472,6 @@ public:
 		assert(ranges_ != NULL);
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
-		assert_leq(allocPool, bpool.curPool());
-		assert(allocPool < bpool.curPool() || allocCur < bpool.cur());
-		assert_leq(ranges_->allocPool, rpool.curPool());
-		assert(ranges_->allocPool < rpool.curPool() || ranges_->allocCur < rpool.cur());
 		Branch *newBranch = bpool.alloc();
 		if(newBranch == NULL) {
 			cerr << "Exhausted chunk memory trying to allocate a new Branch" << endl;
