@@ -228,7 +228,7 @@ public:
 			cur_--;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
-				assert_eq(curPool_, pools_.size());
+				assert_eq(curPool_+1, pools_.size());
 				pool_->free(pools_.back());
 				pools_.pop_back();
 				curPool_--;
@@ -271,35 +271,35 @@ protected:
 
 	void allocNextPool() {
 		lastCurInPrevPool_ = cur_;
-		if(curPool_ >= pools_.size()-1) {
+		assert_eq(curPool_+1, pools_.size());
+		T *pool;
+		try {
+			if((pool = (T*)pool_->alloc()) == NULL) {
+				throw std::bad_alloc();
+			}
+		} catch(std::bad_alloc& e) {
+			cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+2) << " of " << (lim_ * sizeof(T)) << " bytes";
+			exit(1);
+		}
+		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
+		pools_.push_back(pool);
+		curPool_++;
+		cur_ = 0;
+	}
+
+	void lazyInit() {
+		if(cur_ == 0 && pools_.empty()) {
 			T *pool;
 			try {
 				if((pool = (T*)pool_->alloc()) == NULL) {
 					throw std::bad_alloc();
 				}
 			} catch(std::bad_alloc& e) {
-				cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+2) << " of " << (lim_ * sizeof(T)) << " bytes";
+				std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
 				exit(1);
 			}
 			ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 			pools_.push_back(pool);
-		}
-		curPool_++;
-		cur_ = 0;
-		ASSERT_ONLY(memset(pools_[curPool_], 0, lim_ * sizeof(T)));
-	}
-
-	void lazyInit() {
-		if(cur_ == 0 && pools_.empty()) {
-			T *tpool;
-			try {
-				if((tpool = (T*)pool_->alloc()) == NULL) throw std::bad_alloc();
-			} catch(std::bad_alloc& e) {
-				std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
-				exit(1);
-			}
-			ASSERT_ONLY(memset(tpool, 0, lim_ * sizeof(T)));
-			pools_.push_back(tpool);
 			assert_eq(1, pools_.size());
 		}
 		assert(!pools_.empty());
