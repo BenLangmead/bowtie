@@ -361,7 +361,7 @@ public:
 		memset(_words, 0, ((len_ >> 5)+1) * 4);
 	}
 
-	~FixedBitset2() { delete _words; }
+	~FixedBitset2() { delete[] _words; }
 
 	/**
 	 * Unset all bits.

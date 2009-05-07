@@ -352,7 +352,6 @@ public:
 	}
 
 	virtual ~UnpairedAlignerV2() {
-		delete pool_;    pool_    = NULL;
 		delete driver_;  driver_  = NULL;
 		delete params_;  params_  = NULL;
 		delete rchase_;  rchase_  = NULL;
@@ -828,7 +827,6 @@ public:
 	}
 
 	virtual ~PairedBWAlignerV1() {
-		delete pool_;      pool_      = NULL;
 		delete driver1Fw_; driver1Fw_ = NULL;
 		delete driver1Rc_; driver1Rc_ = NULL;
 		delete driver2Fw_; driver2Fw_ = NULL;
