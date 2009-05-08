@@ -1,6 +1,8 @@
 #ifndef THREADING_H_
 #define THREADING_H_
 
+#include "spinlock.h"
+
 // Note that USE_SPINLOCK trumps BOWTIE_PTHREADS
 
 #ifdef USE_SPINLOCK
