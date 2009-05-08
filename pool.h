@@ -25,8 +25,9 @@ public:
 	 * bytes.  Exit with an error message if we can't allocate it.
 	 */
 	ChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
-		verbose(verbose_), pool_(NULL), cur_(0), chunkSz_(chunkSz),
-		totSz_(totSz), lim_(totSz/chunkSz), bits_(lim_)
+		verbose(verbose_), patid(0), pool_(NULL), cur_(0),
+		chunkSz_(chunkSz), totSz_(totSz), lim_(totSz/chunkSz),
+		bits_(lim_)
 	{
 		assert_gt(lim_, 0);
 		try {
@@ -50,7 +51,8 @@ public:
 	/**
 	 * Reset the pool, freeing all arrays that had been given out.
 	 */
-	void reset() {
+	void reset(uint32_t patid_) {
+		patid = patid_;
 		cur_ = 0;
 		bits_.clear();
 		assert_eq(0, bits_.test(0));
@@ -92,7 +94,7 @@ public:
 		bits_.set(cur);
 		if(verbose) {
 			stringstream ss;
-			ss << "Allocating chunk with offset: " << cur;
+			ss << patid << ": Allocating chunk with offset: " << cur;
 			glog.msg(ss.str());
 		}
 		cur_ = cur;
@@ -108,7 +110,7 @@ public:
 		off /= chunkSz_;
 		if(verbose) {
 			stringstream ss;
-			ss << "Freeing chunk with offset: " << cur_;
+			ss << patid << ": Freeing chunk with offset: " << cur_;
 			glog.msg(ss.str());
 		}
 		bits_.clear(off);
@@ -129,8 +131,10 @@ public:
 	}
 
 	bool verbose;
+	uint32_t patid;
 
 protected:
+
 	int8_t*  pool_; /// the memory pools
 	uint32_t cur_;  /// index of next free element of pool_
 	const uint32_t chunkSz_;
@@ -239,7 +243,7 @@ public:
 		assert(t != NULL);
 		if(pool_->verbose) {
 			stringstream ss;
-			ss << "Freeing a " << name_;
+			ss << pool_->patid << ": Freeing a " << name_;
 			glog.msg(ss.str());
 		}
 		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
@@ -249,7 +253,7 @@ public:
 				assert_eq(curPool_+1, pools_.size());
 				if(pool_->verbose) {
 					stringstream ss;
-					ss << "Freeing a " << name_ << " pool";
+					ss << pool_->patid << ": Freeing a " << name_ << " pool";
 					glog.msg(ss.str());
 				}
 				pool_->free(pools_.back());
@@ -269,7 +273,7 @@ public:
 		assert(t != NULL);
 		if(pool_->verbose) {
 			stringstream ss;
-			ss << "Freeing " << num << " " << name_ << "s";
+			ss << pool_->patid << ": Freeing " << num << " " << name_ << "s";
 			glog.msg(ss.str());
 		}
 		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
@@ -279,7 +283,7 @@ public:
 				assert_eq(curPool_+1, pools_.size());
 				if(pool_->verbose) {
 					stringstream ss;
-					ss << "Freeing a " << name_ << " pool";
+					ss << pool_->patid << ": Freeing a " << name_ << " pool";
 					glog.msg(ss.str());
 				}
 				pool_->free(pools_.back());
