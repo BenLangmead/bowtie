@@ -41,7 +41,7 @@ struct EditList {
 	/**
 	 * Add an edit to the edit list.
 	 */
-	void add(const Edit& e, AllocOnlyPool<Edit>& pool_, size_t qlen) {
+	void add(const Edit& e, AllocOnlyPool<Edit>& pool, size_t qlen) {
 		assert_lt(sz_, qlen+3);
 		if(sz_ < numEdits) {
 			assert(moreEdits_ == NULL);
@@ -50,7 +50,7 @@ struct EditList {
 		} else if(sz_ == numEdits) {
 			assert(moreEdits_ == NULL);
 			assert(yetMoreEdits_ == NULL);
-			moreEdits_ = pool_.alloc(numMoreEdits);
+			moreEdits_ = pool.alloc(numMoreEdits);
 			if(moreEdits_ == NULL) {
 				cerr << "Exhausted chunk memory trying to allocate moreEdits array" << endl;
 				exit(1);
@@ -66,7 +66,7 @@ struct EditList {
 		} else if(sz_ == (numEdits + numMoreEdits)) {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
-			yetMoreEdits_ = pool_.alloc(qlen+3 - numMoreEdits - numEdits);
+			yetMoreEdits_ = pool.alloc(qlen+3 - numMoreEdits - numEdits);
 			if(yetMoreEdits_ == NULL) {
 				cerr << "Exhausted chunk memory trying to allocate yetMoreEdits array" << endl;
 				exit(1);
@@ -136,8 +136,10 @@ struct EditList {
 	 *
 	 */
 	void free(AllocOnlyPool<Edit>& epool, size_t qlen) {
-		if(yetMoreEdits_ != NULL) epool.free(yetMoreEdits_, qlen+3 - numMoreEdits - numEdits);
-		if(moreEdits_ != NULL) epool.free(moreEdits_, numMoreEdits);
+		if(yetMoreEdits_ != NULL)
+			epool.free(yetMoreEdits_, qlen+3 - numMoreEdits - numEdits);
+		if(moreEdits_ != NULL)
+			epool.free(moreEdits_, numMoreEdits);
 	}
 
 	const static size_t numEdits = 6;
@@ -364,7 +366,7 @@ public:
 	 * Initialize a new branch object with an empty path.
 	 */
 	void init(AllocOnlyPool<RangeState>& pool, AllocOnlyPool<Edit>& epool,
-	          uint32_t qlen,
+	          uint32_t id, uint32_t qlen,
 	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
 	          uint16_t depth3, uint16_t rdepth, uint16_t len,
 	          uint16_t cost, uint16_t ham,
@@ -374,6 +376,7 @@ public:
 	{
 		// No guarantee that there's room in the edits array for all
 		// edits; eventually need to do dynamic allocation for them.
+		id_ = id;
 		delayedCost_ = 0;
 		depth0_ = depth0;
 		depth1_ = depth1;
@@ -472,6 +475,7 @@ public:
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
 		Branch *newBranch = bpool.alloc();
+		uint32_t id = bpool.lastId();
 		if(newBranch == NULL) {
 			cerr << "Exhausted chunk memory trying to allocate a new Branch" << endl;
 			exit(1);
@@ -548,7 +552,7 @@ public:
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
 		newBranch->init(
-				rpool, epool, qlen,
+				rpool, epool, id, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
 				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
 				top, bot, ep, ebwt, &edits_);
@@ -826,11 +830,14 @@ public:
 		return true;
 	}
 
+	uint32_t id_;     // branch id; needed to make the ordering of
+	                  // branches that are tied in the priority queue
+	                  // totally unambiguous.  Otherwise, things start
+	                  // getting non-deterministic.
 	uint16_t depth0_; // no edits at depths < depth0
 	uint16_t depth1_; // at most 1 edit at depths < depth1
 	uint16_t depth2_; // at most 2 edits at depths < depth2
 	uint16_t depth3_; // at most 3 edits at depths < depth3
-
 	uint16_t rdepth_; // offset in read space from root of search space
 	uint16_t len_;    // length of the branch
 	uint16_t cost_;   // top 2 bits = stratum, bottom 14 = qual ham
@@ -886,7 +893,9 @@ public:
 				// Expression is true if b is deeper
 				return a->tipDepth() < b->tipDepth();
 			}
-			return true;
+			// Keep things deterministic by providing an unambiguous
+			// order using the id_ field
+			return b->id_ < a->id_;
 		} else {
 			return b->cost_ < a->cost_;
 		}

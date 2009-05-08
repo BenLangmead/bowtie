@@ -258,6 +258,15 @@ public:
 		}
 	}
 
+	/**
+	 * Return a unique (with respect to every other object allocated
+	 * from this pool) identifier for the last object that was just
+	 * allocated.
+	 */
+	uint32_t lastId() const {
+		return (curPool_ << 16) | cur_;
+	}
+
 #ifndef NDEBUG
 	bool empty() const {
 		assert(pools_.empty());

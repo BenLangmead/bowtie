@@ -2315,7 +2315,7 @@ public:
 					cerr << "Ran out of memory allocating a branch" << endl;
 					exit(1);
 				}
-				b->init(pm.rpool, pm.epool, qlen_,
+				b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt);
@@ -2336,7 +2336,7 @@ public:
 				cerr << "Ran out of memory allocating a branch" << endl;
 				exit(1);
 			}
-			b->init(pm.rpool, pm.epool, qlen_,
+			b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
 			assert(!b->curtailed_);
