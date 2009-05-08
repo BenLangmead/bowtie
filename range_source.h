@@ -919,7 +919,9 @@ class BranchQueue {
 
 public:
 
-	BranchQueue() : sz_(0), branchQ_() { }
+	BranchQueue(bool verbose) :
+		sz_(0), branchQ_(), patid_(0), verbose_(verbose)
+	{ }
 
 	/**
 	 * Return the front (highest-priority) element of the queue.
@@ -935,6 +937,11 @@ public:
 	Branch *pop() {
 		Branch *b = branchQ_.top(); // get it
 		branchQ_.pop(); // remove it
+		if(verbose_) {
+			stringstream ss;
+			ss << patid_ << ": Popping " << b->id_ << ", " << b->cost_;
+			glog.msg(ss.str());
+		}
 		sz_--;
 		return b;
 	}
@@ -946,6 +953,11 @@ public:
 #ifndef NDEBUG
 		bool bIsBetter = empty() || !CostCompare()(b, branchQ_.top());
 #endif
+		if(verbose_) {
+			stringstream ss;
+			ss << patid_ << ": Pushing " << b->id_ << ", " << b->cost_;
+			glog.msg(ss.str());
+		}
 		branchQ_.push(b);
 #ifndef NDEBUG
 		assert(bIsBetter  || branchQ_.top() != b || CostCompare::equal(branchQ_.top(), b));
@@ -957,7 +969,8 @@ public:
 	/**
 	 * Empty the priority queue and reset the count.
 	 */
-	void reset() {
+	void reset(uint32_t patid) {
+		patid_ = patid;
 		while(!branchQ_.empty()) {
 			branchQ_.pop();
 			assert_gt(sz_, 0);
@@ -1024,6 +1037,8 @@ protected:
 
 	uint32_t sz_;
 	TBranchQueue branchQ_; // priority queue of branches
+	uint32_t patid_;
+	bool verbose_;
 };
 
 /**
@@ -1053,7 +1068,7 @@ class PathManager {
 public:
 
 	PathManager(ChunkPool* cpool_, int *btCnt = NULL) :
-		branchQ_(),
+		branchQ_(false),
 		cpool(cpool_),
 		bpool(cpool, "branch"),
 		rpool(cpool, "range state"),
@@ -1125,8 +1140,8 @@ public:
 	 * Reset the PathManager, clearing out the priority queue and
 	 * resetting the RangeStatePool.
 	 */
-	void reset() {
-		branchQ_.reset(); // reset the priority queue
+	void reset(uint32_t patid) {
+		branchQ_.reset(patid); // reset the priority queue
 		assert(branchQ_.empty());
 		bpool.reset();    // reset the Branch pool
 		epool.reset();    // reset the Edit pool
@@ -1204,7 +1219,7 @@ public:
 		// This counts as a backtrack
 		if(btCnt_ != NULL && (*btCnt_ == 0)) {
 			// Abruptly end the search by removing all possibilities
-			branchQ_.reset();
+			branchQ_.reset(0);
 			ASSERT_ONLY(branchSet_.clear());
 			assert(empty());
 			return;
@@ -1235,7 +1250,7 @@ public:
 				if(--(*btCnt_) == 0) {
 					// Abruptly end the search by removing all
 					// possibilities
-					branchQ_.reset();
+					branchQ_.reset(0);
 					ASSERT_ONLY(branchSet_.clear());
 					assert(empty());
 					return;
@@ -1480,7 +1495,7 @@ public:
 	 */
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
-		pm_.reset();
+		pm_.reset(patsrc->patid());
 		if(mate1_) {
 			ReadBuf& buf = patsrc->bufa();
 			len_ = buf.length();
