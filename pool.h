@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "bitset.h"
+#include "log.h"
 
 /**
  * Very simple allocator for fixed-size chunks of memory.  Chunk size
@@ -89,7 +90,11 @@ public:
 		}
 		void * ptr = (void *)(&pool_[cur * chunkSz_]);
 		bits_.set(cur);
-		if(verbose) cout << "Freeing chunk with offset: " << cur << endl;
+		if(verbose) {
+			stringstream ss;
+			ss << "Allocating chunk with offset: " << cur;
+			glog.msg(ss.str());
+		}
 		cur_ = cur;
 		return ptr;
 	}
@@ -101,7 +106,11 @@ public:
 		uint32_t off = (uint32_t)((int8_t*)ptr - pool_);
 		assert_eq(0, off % chunkSz_);
 		off /= chunkSz_;
-		if(verbose) cout << "Freeing chunk with offset: " << off << endl;
+		if(verbose) {
+			stringstream ss;
+			ss << "Freeing chunk with offset: " << cur_;
+			glog.msg(ss.str());
+		}
 		bits_.clear(off);
 	}
 
@@ -229,7 +238,9 @@ public:
 	void free(T* t) {
 		assert(t != NULL);
 		if(pool_->verbose) {
-			cout << "Freeing a " << name_ << endl;
+			stringstream ss;
+			ss << "Freeing a " << name_;
+			glog.msg(ss.str());
 		}
 		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
 			cur_--;
@@ -237,7 +248,9 @@ public:
 			if(cur_ == 0 && curPool_ > 0) {
 				assert_eq(curPool_+1, pools_.size());
 				if(pool_->verbose) {
-					cout << "Freeing a pool" << endl;
+					stringstream ss;
+					ss << "Freeing a " << name_ << " pool";
+					glog.msg(ss.str());
 				}
 				pool_->free(pools_.back());
 				pools_.pop_back();
@@ -255,7 +268,9 @@ public:
 	void free(T* t, uint32_t num) {
 		assert(t != NULL);
 		if(pool_->verbose) {
-			cout << "Freeing a " << name_ << "; num " << num << endl;
+			stringstream ss;
+			ss << "Freeing " << num << " " << name_ << "s";
+			glog.msg(ss.str());
 		}
 		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
 			cur_ -= num;
@@ -263,7 +278,9 @@ public:
 			if(cur_ == 0 && curPool_ > 0) {
 				assert_eq(curPool_+1, pools_.size());
 				if(pool_->verbose) {
-					cout << "Freeing a pool" << endl;
+					stringstream ss;
+					ss << "Freeing a " << name_ << " pool";
+					glog.msg(ss.str());
 				}
 				pool_->free(pools_.back());
 				pools_.pop_back();
