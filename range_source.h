@@ -939,7 +939,7 @@ public:
 		branchQ_.pop(); // remove it
 		if(verbose_) {
 			stringstream ss;
-			ss << patid_ << ": Popping " << b->id_ << ", " << b << ", " << b->cost_ << ", " << b->exhausted_ << ", " << b->curtailed_;
+			ss << patid_ << ": Popping " << b->id_ << ", " << b << ", " << b->cost_ << ", " << b->exhausted_ << ", " << b->curtailed_ << ", " << sz_ << "->" << (sz_-1);
 			glog.msg(ss.str());
 		}
 		sz_--;
@@ -955,7 +955,7 @@ public:
 #endif
 		if(verbose_) {
 			stringstream ss;
-			ss << patid_ << ": Pushing " << b->id_ << ", " << b << ", " << b->cost_ << ", " << b->exhausted_ << ", " << b->curtailed_;
+			ss << patid_ << ": Pushing " << b->id_ << ", " << b << ", " << b->cost_ << ", " << b->exhausted_ << ", " << b->curtailed_ << ", " << sz_ << "->" << (sz_+1);
 			glog.msg(ss.str());
 		}
 		branchQ_.push(b);
