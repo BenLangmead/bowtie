@@ -971,12 +971,8 @@ public:
 	 */
 	void reset(uint32_t patid) {
 		patid_ = patid;
-		while(!branchQ_.empty()) {
-			branchQ_.pop();
-			assert_gt(sz_, 0);
-			sz_--;
-		}
-		assert_eq(0, sz_);
+		branchQ_ = TBranchQueue();
+		sz_ = 0;
 	}
 
 	/**
