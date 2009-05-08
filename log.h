@@ -8,6 +8,7 @@ class SyncLogger {
 public:
 	SyncLogger() {
 		MUTEX_INIT(lock_);
+		MUTEX_UNLOCK(lock_);
 	}
 
 	void msg(const char *s) {
