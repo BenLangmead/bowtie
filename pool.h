@@ -23,9 +23,9 @@ public:
 	 * Initialize a new pool with an initial size of about 'bytes'
 	 * bytes.  Exit with an error message if we can't allocate it.
 	 */
-	ChunkPool(uint32_t chunkSz, uint32_t totSz) :
-		pool_(NULL), cur_(0), chunkSz_(chunkSz), totSz_(totSz),
-		lim_(totSz/chunkSz), bits_(lim_)
+	ChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
+		verbose(verbose_), pool_(NULL), cur_(0), chunkSz_(chunkSz),
+		totSz_(totSz), lim_(totSz/chunkSz), bits_(lim_)
 	{
 		assert_gt(lim_, 0);
 		try {
@@ -89,6 +89,7 @@ public:
 		}
 		void * ptr = (void *)(&pool_[cur * chunkSz_]);
 		bits_.set(cur);
+		if(verbose) cout << "Freeing chunk with offset: " << cur << endl;
 		cur_ = cur;
 		return ptr;
 	}
@@ -100,6 +101,7 @@ public:
 		uint32_t off = (uint32_t)((int8_t*)ptr - pool_);
 		assert_eq(0, off % chunkSz_);
 		off /= chunkSz_;
+		if(verbose) cout << "Freeing chunk with offset: " << off << endl;
 		bits_.clear(off);
 	}
 
@@ -116,6 +118,8 @@ public:
 	uint32_t totalSize() const {
 		return totSz_;
 	}
+
+	bool verbose;
 
 protected:
 	int8_t*  pool_; /// the memory pools
@@ -224,11 +228,17 @@ public:
 	 */
 	void free(T* t) {
 		assert(t != NULL);
+		if(pool_->verbose) {
+			cout << "Freeing a " << name_ << endl;
+		}
 		if(cur_ > 0 && t == &pools_[curPool_][cur_-1]) {
 			cur_--;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
 				assert_eq(curPool_+1, pools_.size());
+				if(pool_->verbose) {
+					cout << "Freeing a pool" << endl;
+				}
 				pool_->free(pools_.back());
 				pools_.pop_back();
 				curPool_--;
@@ -244,11 +254,17 @@ public:
 	 */
 	void free(T* t, uint32_t num) {
 		assert(t != NULL);
+		if(pool_->verbose) {
+			cout << "Freeing a " << name_ << "; num " << num << endl;
+		}
 		if(num <= cur_ && t == &pools_[curPool_][cur_ - num]) {
 			cur_ -= num;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
 				assert_eq(curPool_+1, pools_.size());
+				if(pool_->verbose) {
+					cout << "Freeing a pool" << endl;
+				}
 				pool_->free(pools_.back());
 				pools_.pop_back();
 				curPool_--;
