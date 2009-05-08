@@ -895,6 +895,7 @@ public:
 			}
 			// Keep things deterministic by providing an unambiguous
 			// order using the id_ field
+			assert_neq(b->id_, a->id_);
 			return b->id_ < a->id_;
 		} else {
 			return b->cost_ < a->cost_;
