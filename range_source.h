@@ -886,7 +886,7 @@ public:
 				// Expression is true if b is deeper
 				return a->tipDepth() < b->tipDepth();
 			}
-			return a < b;
+			return true;
 		} else {
 			return b->cost_ < a->cost_;
 		}
