@@ -1863,11 +1863,11 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 #else
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
-		cCnt += cCntLUT_4[0][c][(int)side[i]];
+		cCnt += cCntLUT_4[0][c][side[i]];
 	}
 	// Count occurences of c in the rest of the byte
 	if(l._bp > 0) {
-		cCnt += cCntLUT_4[l._bp][c][(int)side[i]];
+		cCnt += cCntLUT_4[(int)l._bp][c][side[i]];
 	}
 #endif
 	return cCnt;
@@ -1905,17 +1905,17 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
 #else
 	// Count occurences of c in the rest of the side (using LUT)
 	for(; i < l._by; i++) {
-		arrs[0] += cCntLUT_4[0][0][(int)side[i]];
-		arrs[1] += cCntLUT_4[0][1][(int)side[i]];
-		arrs[2] += cCntLUT_4[0][2][(int)side[i]];
-		arrs[3] += cCntLUT_4[0][3][(int)side[i]];
+		arrs[0] += cCntLUT_4[0][0][side[i]];
+		arrs[1] += cCntLUT_4[0][1][side[i]];
+		arrs[2] += cCntLUT_4[0][2][side[i]];
+		arrs[3] += cCntLUT_4[0][3][side[i]];
 	}
 	// Count occurences of c in the rest of the byte
 	if(l._bp > 0) {
-		arrs[0] += cCntLUT_4[l._bp][0][(int)side[i]];
-		arrs[1] += cCntLUT_4[l._bp][1][(int)side[i]];
-		arrs[2] += cCntLUT_4[l._bp][2][(int)side[i]];
-		arrs[3] += cCntLUT_4[l._bp][3][(int)side[i]];
+		arrs[0] += cCntLUT_4[(int)l._bp][0][side[i]];
+		arrs[1] += cCntLUT_4[(int)l._bp][1][side[i]];
+		arrs[2] += cCntLUT_4[(int)l._bp][2][side[i]];
+		arrs[3] += cCntLUT_4[(int)l._bp][3][side[i]];
 	}
 #endif
 }
