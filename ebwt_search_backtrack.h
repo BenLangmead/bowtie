@@ -2311,10 +2311,7 @@ public:
 				assert_leq(top, ebwt._eh._len);
 				assert_leq(bot, ebwt._eh._len);
 				Branch *b = pm.bpool.alloc();
-				if(b == NULL) {
-					cerr << "Ran out of memory allocating a branch" << endl;
-					exit(1);
-				}
+				assert(b != NULL);
 				b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
@@ -2332,10 +2329,7 @@ public:
 			// We can't use the ftab, so we start from the rightmost
 			// position and use _fchr
 			Branch *b = pm.bpool.alloc();
-			if(b == NULL) {
-				cerr << "Ran out of memory allocating a branch" << endl;
-				exit(1);
-			}
+			assert(b != NULL);
 			b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
