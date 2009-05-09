@@ -51,10 +51,6 @@ struct EditList {
 			assert(moreEdits_ == NULL);
 			assert(yetMoreEdits_ == NULL);
 			moreEdits_ = pool.alloc(numMoreEdits);
-			if(moreEdits_ == NULL) {
-				cerr << "Exhausted chunk memory trying to allocate moreEdits array" << endl;
-				exit(1);
-			}
 			assert(moreEdits_ != NULL);
 			moreEdits_[0] = e;
 			sz_++;
@@ -67,10 +63,6 @@ struct EditList {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
 			yetMoreEdits_ = pool.alloc(qlen+3 - numMoreEdits - numEdits);
-			if(yetMoreEdits_ == NULL) {
-				cerr << "Exhausted chunk memory trying to allocate yetMoreEdits array" << endl;
-				exit(1);
-			}
 			assert(yetMoreEdits_ != NULL);
 			yetMoreEdits_[0] = e;
 			sz_++;
@@ -398,10 +390,6 @@ public:
 		}
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
-			if(ranges_ == NULL) {
-				cerr << "Ran out of memory allocating an array of RangeStates" << endl;
-				exit(1);
-			}
 			rangesSz_ = qlen - rdepth_;
 		} else {
 			ranges_ = NULL;
@@ -475,10 +463,7 @@ public:
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
 		Branch *newBranch = bpool.alloc();
-		if(newBranch == NULL) {
-			cerr << "Exhausted chunk memory trying to allocate a new Branch" << endl;
-			exit(1);
-		}
+		assert(newBranch != NULL);
 		uint32_t id = bpool.lastId();
 		int tiedPositions[3];
 		int numTiedPositions = 0;

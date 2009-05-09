@@ -37,7 +37,7 @@ public:
 		} catch(std::bad_alloc& e) {
 			std::cerr << "Error: Could not allocate ChunkPool of "
 			          << totSz << " bytes" << std::endl;
-			exit(1);
+			exhausted();
 		}
 	}
 
@@ -130,6 +130,15 @@ public:
 	 */
 	uint32_t totalSize() const {
 		return totSz_;
+	}
+
+	/**
+	 * Utility function to call when memory has been exhausted.
+	 * Currently just prints a friendly message and quits.
+	 */
+	void exhausted() {
+		std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
+		exit(1);
 	}
 
 	bool verbose;
@@ -326,8 +335,8 @@ protected:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
-			cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+2) << " of " << (lim_ * sizeof(T)) << " bytes";
-			exit(1);
+			std::cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+1) << " of " << (lim_ * sizeof(T)) << " bytes" << std::endl;
+			pool_->exhausted();
 		}
 		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 		pools_.push_back(pool);
@@ -344,7 +353,7 @@ protected:
 				}
 			} catch(std::bad_alloc& e) {
 				std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
-				exit(1);
+				pool_->exhausted();
 			}
 			ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 			pools_.push_back(pool);
