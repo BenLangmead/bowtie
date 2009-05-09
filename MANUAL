@@ -19,8 +19,8 @@ Bowtie Manual
  genome.  Multiple processor cores can be used simultaneously to
  achieve greater alignment speed.  Bowtie's output format can be
  converted to the format used by Maq, allowing users to rapidly align
- reads with Bowtie then identify variations with Maq. The Bowtie tools
- run on the command line under Windows, Mac OS X, and Linux.
+ reads with Bowtie then identify variations with Maq.  The Bowtie tools
+ run on the command line under Windows, Mac OS X, Linux, and Solaris.
 
  What isn't Bowtie?
  ------------------
@@ -43,7 +43,8 @@ Bowtie Manual
 
  Obtain Bowtie binaries for your platform from the Download section of
  the Sourceforge project site.  Binaries are currently available for
- Linux, Windows, and Mac OS X.
+ Intel architectures (i386 and x86_64) running Linux, Windows, and Mac
+ OS X.
 
  https://sourceforge.net/project/showfiles.php?group_id=236897&package_id=288231
 
@@ -347,7 +348,9 @@ Bowtie Manual
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
                      those specified in <mates2>.  Reads may be a mix
-                     of different lengths.
+                     of different lengths.  If "-" is specified, Bowtie
+                     will read the #1 mates from stdin.  "-" is not
+                     compatible with "-z/--phased".
 
   <mates2>           Comma-separated list of files containing the #2
                      mates (filename usually includes "_2"), or, if -c
@@ -357,14 +360,18 @@ Bowtie Manual
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
                      those specified in <mates1>.  Reads may be a mix
-                     of different lengths.
+                     of different lengths.  If "-" is specified, Bowtie
+                     will read the #2 mates from stdin.  "-" is not
+                     compatible with "-z/--phased".
 
   <singles>          A comma-separated list of files containing the
                      reads to be aligned, or, if -c is specified, the
                      sequences themselves. E.g., this might be
                      "lane1.fq,lane2.fq,lane3.fq,lane4.fq", or, if -c
                      is specified, this might be "GGTCATCCT,ACGGGTCGT".
-                     Reads may be a mix of different lengths.
+                     Reads may be a mix of different lengths.  If "-"
+                     is specified, Bowtie gets the reads from stdin.
+                     "-" is not compatible with "-z/--phased".
 
   <hits>             File to write alignments to.  By default,
                      alignments are written to stdout (the console),
@@ -611,8 +618,11 @@ Bowtie Manual
                      alignments that are sub-optimal in terms of
                      stratum and/or quality (though an effort is made
                      to report the best alignment).  --best mode also
-                     removes all strand bias.  Bowtie is about 1-2.5
-                     times slower when --best is specified.
+                     removes all strand bias.  Note that --best does
+                     not affect which alignments are considered "valid"
+                     by Bowtie, only which valid alignments are
+                     reported by Bowtie.  Bowtie is about 1-2.5 times
+                     slower when --best is specified.
 
   --nostrata         If many valid singleton alignments exist and are
                      reportable (according to the --best and -k
@@ -780,8 +790,8 @@ Bowtie Manual
    3. Name of reference sequence where alignment occurs, or ordinal ID
       if no name was provided
 
-   4. 0-based offset into the reference sequence where leftmost
-      character of the alignment occurs
+   4. 1-based offset into the forward reference strand where leftmost
+      character of the alignment occurs.
 
    5. Read sequence (reverse-complemented if orientation is '-')
 

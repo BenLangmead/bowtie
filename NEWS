@@ -34,12 +34,14 @@ Version 0.9.9.3 - May 10, 2009
      Pipeline versions prior to 1.3.
    * bowtie-build now checks output files for obvious corruption due,
      for example, to disk exhaustion.
+   * Specifying "-" (meaning stdin) as an input to bowtie is now
+     supported and documented.
    * Fixed a bug whereby bowtie-maqconvert could fail to notice that it
      had exhausted memory and output a corrupt Maq map file.
    * Fixed a bug whereby bowtie would crash when trying to use an index
      built on a machine with different endianness.
    * Fixed several issues that prevented Bowtie from compiling on
-     Solaris.
+     Solaris.  I confirm that Bowtie builds and runs on Solaris.
    * Moderate speed improvements in --best mode.
 
 Version 0.9.9.2 - April 6, 2009
