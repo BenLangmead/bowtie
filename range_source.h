@@ -403,7 +403,6 @@ public:
 				exit(1);
 			}
 			rangesSz_ = qlen - rdepth_;
-			assert(ranges_ != NULL);
 		} else {
 			ranges_ = NULL;
 			rangesSz_ = 0;
@@ -419,6 +418,7 @@ public:
 		curtailed_ = false;
 		exhausted_ = false;
 		prepped_ = true;
+		delayedIncrease_ = false;
 		edits_.clear();
 		if(edits != NULL) {
 			const size_t numEdits = edits->size();
@@ -475,11 +475,11 @@ public:
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
 		Branch *newBranch = bpool.alloc();
-		uint32_t id = bpool.lastId();
 		if(newBranch == NULL) {
 			cerr << "Exhausted chunk memory trying to allocate a new Branch" << endl;
 			exit(1);
 		}
+		uint32_t id = bpool.lastId();
 		int tiedPositions[3];
 		int numTiedPositions = 0;
 		// Lowest marginal cost incurred by any of the positions with
@@ -927,7 +927,13 @@ public:
 	 * Return the front (highest-priority) element of the queue.
 	 */
 	Branch *front() {
-		return branchQ_.top();
+		Branch *b = branchQ_.top();
+		if(verbose_) {
+			stringstream ss;
+			ss << patid_ << ": Fronting " << b->id_ << ", " << b << ", " << b->cost_ << ", " << b->exhausted_ << ", " << b->curtailed_ << ", " << sz_ << "->" << (sz_-1);
+			glog.msg(ss.str());
+		}
+		return b;
 	}
 
 	/**

@@ -91,7 +91,9 @@ public:
 			}
 		}
 		void * ptr = (void *)(&pool_[cur * chunkSz_]);
+		assert(!bits_.test(cur));
 		bits_.set(cur);
+		assert(bits_.test(cur));
 		if(verbose) {
 			stringstream ss;
 			ss << patid << ": Allocating chunk with offset: " << cur;
