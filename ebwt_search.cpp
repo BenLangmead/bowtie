@@ -276,14 +276,14 @@ static struct option long_options[] = {
  */
 static void printUsage(ostream& out) {
 	out << "Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]" << endl
-	    << "  <ebwt>    base filename for index files (minus trailing .1.ebwt/.2.ebwt/etc.)" << endl
-	    << "  <mates1>  comma-separated list of files containing upstream mates (or the" << endl
+	    << "  <ebwt>    Base filename for index files (minus trailing .1.ebwt/.2.ebwt/etc.)" << endl
+	    << "  <mates1>  Comma-separated list of files containing upstream mates (or the" << endl
 	    << "            sequences themselves, if -c is set) paired with mates in <mates2>" << endl
-	    << "  <mates2>  comma-separated list of files containing downstream mates (or" << endl
+	    << "  <mates2>  Comma-separated list of files containing downstream mates (or" << endl
 	    << "            sequences themselves if -c is set) paired with mates in <mates1>" << endl
-	    << "  <singles> comma-separated list of files containing unpaired reads, or the" << endl
-	    << "            sequences themselves, if -c is set" << endl
-	    << "  <hits>    file to write hits to (default: stdout)" << endl
+	    << "  <singles> Comma-separated list of files containing unpaired reads, or the" << endl
+	    << "            sequences themselves, if -c is set.  Specify \"-\" for stdin." << endl
+	    << "  <hits>    File to write hits to (default: stdout)" << endl
 	    << "Input:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -310,11 +310,11 @@ static void printUsage(ostream& out) {
 	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
-	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def.: 32)" << endl
+	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 32)" << endl
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
-	    << "  -m <int>           suppress all alignments if > <int> exist (def.: no limit)" << endl
+	    << "  -m <int>           suppress all alignments if > <int> exist (def: no limit)" << endl
 	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
 	    << "  --best             alignments guaranteed best stratum; tries broken by quality" << endl
 	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
@@ -3650,6 +3650,10 @@ static void driver(const char * type,
 	// Create list of pattern sources for paired reads appearing
 	// interleaved in a single file
 	for(size_t i = 0; i < mates12.size(); i++) {
+		if(mates12[i] == "-" && !fullIndex) {
+			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
+			exit(1);
+		}
 		const vector<string>* qs = &mates12;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -3666,6 +3670,10 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
+		if(mates1[i] == "-" && !fullIndex) {
+			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
+			exit(1);
+		}
 		const vector<string>* qs = &mates1;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -3682,6 +3690,10 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates2.size(); i++) {
+		if(mates2[i] == "-" && !fullIndex) {
+			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
+			exit(1);
+		}
 		const vector<string>* qs = &mates2;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -3700,6 +3712,10 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for the unpaired reads
 	for(size_t i = 0; i < queries.size(); i++) {
+		if(queries[i] == "-" && !fullIndex) {
+			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
+			exit(1);
+		}
 		const vector<string>* qs = &queries;
 		PatternSource* patsrc = NULL;
 		vector<string> tmp;
@@ -3717,6 +3733,7 @@ static void driver(const char * type,
 			break;
 		}
 	}
+
 	PairedPatternSource *patsrc = NULL;
 	if(mates12.size() > 0) {
 		patsrc = new PairedSoloPatternSource(patsrcs_ab);
