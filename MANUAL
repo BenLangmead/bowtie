@@ -265,13 +265,9 @@ Bowtie Manual
   reference.  If possible, download the 64-bit binaries for Bowtie and
   run them on a 64-bit machine.  If you are building Bowtie from
   sources, you may need to pass the -m64 option to g++ to compile the
-  64-bit version; you can do this by supplying argument
-  EXTRA_FLAGS="-m64" to the 'make' command; e.g.:
-  'make EXTRA_FLAGS="-m64" bowtie'.  To determine whether your version
-  of bowtie is 64-bit or 32-bit, run 'bowtie --version' and check the
-  'Sizeof' line; if the last expression on that line is {4, 4, 8, 4},
-  your binary is 32-bit; if the last expression is {4, 8, 8, 8}, your
-  binary is 64-bit.
+  64-bit version; you can do this by supplying argument BITS=64 to the
+  'make' command; e.g.: 'make BITS=64 bowtie'.  To determine whether
+  your version of bowtie is 64-bit or 32-bit, run 'bowtie --version'.
   
   Tip 2: If your computer has multiple processors/cores, try -p
    
@@ -546,6 +542,18 @@ Bowtie Manual
                      reference is very repetitive, (b) the reads are
                      low quality, or (c) not many reads have valid
                      alignments.
+
+  --chunkmbs <int>   The number of megabytes of memory a given thread
+                     is given to store path descriptors in --best mode.
+                     Best-first search must keep track of many paths at
+                     once to ensure it is always extending the path
+                     with the lowest cumulative cost.  Bowtie tries to
+                     minimize the memory impact of the descriptors, but
+                     they can still grow very large in some cases.  If
+                     you receive an error message saying that chunk
+                     memory has been exhausted in --best mode, try
+                     adjusting this parameter up to dedicate more
+                     memory to the descriptors.  Default: 32.
 
    Reporting:
    ----------
@@ -1157,6 +1165,8 @@ Bowtie Manual
                      sequence.
 
   -v/--verbose       Print verbose output (for debugging).
+
+  --version          Print version information and quit.
 
   -h/--help          Print detailed description of tool and its options
                      (from MANUAL).

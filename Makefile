@@ -66,12 +66,14 @@ MAQ_CPP	= maq_convert/const.c \
 MAQ_LIB = -lz
 VERSION = $(shell cat VERSION)
 
-# For a universal 32/64-bit x86 Mac binary compatible w/ Tiger:
-# EXTRA_FLAGS="-arch i386 -arch x86_64 -mmacosx-version-min=10.4"
-# For a 32-bit x86 binary on Linux (if not the default):
-# EXTRA_FLAGS="-m32"
-# For a 64-bit x86 binary on Linux (if not the default):
-# EXTRA_FLAGS="-m64"
+BITS_FLAG =
+ifeq (32,$(BITS))
+BITS_FLAG = -m32
+endif
+ifeq (64,$(BITS))
+BITS_FLAG = -m64
+endif
+
 EXTRA_FLAGS =
 CHUD=0
 CHUD_DEF =
@@ -81,11 +83,12 @@ ifeq (1,$(MACOS))
 CHUD_DEF = -F/System/Library/PrivateFrameworks -weak_framework CHUD -DCHUD_PROFILING
 endif
 endif
-DEBUG_FLAGS = -O0 -g3
+DEBUG_FLAGS = -O0 -g3 $(BITS_FLAG)
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS)\""
-RELEASE_FLAGS = -O3
+RELEASE_FLAGS = -O3 $(BITS_FLAG)
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS)\""
 NOASSERT_FLAGS = -DNDEBUG
+
 BIN_LIST = bowtie-build \
            bowtie \
            bowtie-maqconvert \
