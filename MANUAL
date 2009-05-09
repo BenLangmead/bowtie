@@ -791,7 +791,7 @@ Bowtie Manual
       if no name was provided
 
    4. 1-based offset into the forward reference strand where leftmost
-      character of the alignment occurs.
+      character of the alignment occurs
 
    5. Read sequence (reverse-complemented if orientation is '-')
 
