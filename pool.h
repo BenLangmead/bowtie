@@ -173,7 +173,6 @@ public:
 	{
 		assert(pool != NULL);
 		lim_ = pool->chunkSize() / sizeof(T);
-		lastCurInPrevPool_ = lim_;
 		assert_gt(lim_, 0);
 	}
 
@@ -182,6 +181,7 @@ public:
 	 */
 	void reset() {
 		pools_.clear();
+		lastCurInPool_.clear();
 		cur_ = 0;
 		curPool_ = 0;
 	}
@@ -195,7 +195,7 @@ public:
 			allocNextPool();
 		}
 		cur_ ++;
-		return &pools_[curPool_][cur_-1];
+		return &pools_[curPool_][cur_ - 1];
 	}
 
 	/**
@@ -218,7 +218,7 @@ public:
 			allocNextPool();
 		}
 		cur_ += num;
-		return &pools_[curPool_][cur_-num];
+		return &pools_[curPool_][cur_ - num];
 	}
 
 	/**
@@ -261,17 +261,7 @@ public:
 			cur_--;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
-				assert_eq(curPool_+1, pools_.size());
-				if(pool_->verbose) {
-					stringstream ss;
-					ss << pool_->patid << ": Freeing a " << name_ << " pool";
-					glog.msg(ss.str());
-				}
-				pool_->free(pools_.back());
-				pools_.pop_back();
-				curPool_--;
-				cur_ = lastCurInPrevPool_;
-				lastCurInPrevPool_ = lim_;
+				rewindPool();
 			}
 		}
 	}
@@ -280,7 +270,7 @@ public:
 	 * Free an array of pointers allocated from this pool.  For now, we
 	 * only know how to free the topmost array.
 	 */
-	void free(T* t, uint32_t num) {
+	bool free(T* t, uint32_t num) {
 		assert(t != NULL);
 		if(pool_->verbose) {
 			stringstream ss;
@@ -291,19 +281,11 @@ public:
 			cur_ -= num;
 			ASSERT_ONLY(memset(&pools_[curPool_][cur_], 0, num * sizeof(T)));
 			if(cur_ == 0 && curPool_ > 0) {
-				assert_eq(curPool_+1, pools_.size());
-				if(pool_->verbose) {
-					stringstream ss;
-					ss << pool_->patid << ": Freeing a " << name_ << " pool";
-					glog.msg(ss.str());
-				}
-				pool_->free(pools_.back());
-				pools_.pop_back();
-				curPool_--;
-				cur_ = lastCurInPrevPool_;
-				lastCurInPrevPool_ = lim_;
+				rewindPool();
 			}
+			return true; // deallocated
 		}
+		return false; // didn't deallocate
 	}
 
 	/**
@@ -327,7 +309,6 @@ public:
 protected:
 
 	void allocNextPool() {
-		lastCurInPrevPool_ = cur_;
 		assert_eq(curPool_+1, pools_.size());
 		T *pool;
 		try {
@@ -340,6 +321,7 @@ protected:
 		}
 		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 		pools_.push_back(pool);
+		lastCurInPool_.push_back(cur_);
 		curPool_++;
 		cur_ = 0;
 	}
@@ -362,11 +344,27 @@ protected:
 		assert(!pools_.empty());
 	}
 
+	void rewindPool() {
+		assert_eq(curPool_+1, pools_.size());
+		assert_eq(curPool_, lastCurInPool_.size());
+		if(pool_->verbose) {
+			stringstream ss;
+			ss << pool_->patid << ": Freeing a " << name_ << " pool";
+			glog.msg(ss.str());
+		}
+		pool_->free(pools_.back());
+		pools_.pop_back();
+		curPool_--;
+		assert_gt(lastCurInPool_.size(), 0);
+		cur_ = lastCurInPool_.back();
+		lastCurInPool_.pop_back();
+	}
+
 	ChunkPool*      pool_;
 	const char     *name_;
 	std::vector<T*> pools_; /// the memory pools
 	uint32_t        curPool_; /// pool we're current allocating from
-	uint32_t        lastCurInPrevPool_;
+	std::vector<uint32_t> lastCurInPool_;
 	uint32_t        lim_;  /// # elements held in pool_
 	uint32_t        cur_;  /// index of next free element of pool_
 };

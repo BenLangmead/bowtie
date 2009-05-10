@@ -380,6 +380,7 @@ public:
 		ham_ = ham;
 		top_ = itop;
 		bot_ = ibot;
+
 		if(ibot > itop+1) {
 			// Care about both top and bot
 			SideLocus::initFromTopBot(itop, ibot, ep, ebwt, ltop_, lbot_);
@@ -435,6 +436,7 @@ public:
 	 * eliminated.
 	 */
 	inline bool eliminated(int i) const {
+		assert(!exhausted_);
 		if(i <= len_) {
 			assert(ranges_ != NULL);
 			return ranges_[i].eliminated_;
@@ -549,6 +551,13 @@ public:
 			// Remove it from the PathManager and mark it as exhausted.
 			// The caller should delete it.
 			exhausted_ = true;
+			if(ranges_ != NULL) {
+				assert_gt(rangesSz_, 0);
+				if(rpool.free(ranges_, rangesSz_)) {
+					ranges_ = NULL;
+					rangesSz_ = 0;
+				}
+			}
 		} else if(numTiedPositions == 1 && last) {
 			// We exhausted the last outgoing edge at the current best
 			// cost; update the best cost to be the next-best
@@ -574,6 +583,8 @@ public:
 		if(ranges_ != NULL) {
 			assert_gt(rangesSz_, 0);
 			rpool.free(ranges_, rangesSz_);
+			ranges_ = NULL;
+			rangesSz_ = 0;
 		}
 		bpool.free(this);
 	}
@@ -697,6 +708,13 @@ public:
 			// Remove it from the PathManager and mark it as exhausted.
 			// The caller should delete it.
 			exhausted_ = true;
+			if(ranges_ != NULL) {
+				assert_gt(rangesSz_, 0);
+				if(rpool.free(ranges_, rangesSz_)) {
+					ranges_ = NULL;
+					rangesSz_ = 0;
+				}
+			}
 		} else {
 			// Just mark it as curtailed and keep the same cost
 		}
@@ -722,6 +740,7 @@ public:
 	 * Get the furthest-out RangeState.
 	 */
 	RangeState* rangeState() {
+		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		return &ranges_[len_];
 	}
@@ -731,6 +750,7 @@ public:
 	 * calculated by the caller.  Only does mismatches for now.
 	 */
 	int installRanges(int c, int nextc, uint8_t q) {
+		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		RangeState& r = ranges_[len_];
 		int ret = 0;
@@ -780,6 +800,8 @@ public:
 	 * Extend this branch by one position.
 	 */
 	void extend() {
+		assert(!exhausted_);
+		assert(!curtailed_);
 		assert(ranges_ != NULL);
 		assert(repOk());
 		prepped_ = false;
