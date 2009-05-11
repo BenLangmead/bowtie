@@ -331,7 +331,7 @@ protected:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
-			std::cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+1) << " of " << (lim_ * sizeof(T)) << " bytes" << std::endl;
+			//std::cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+1) << " of " << (lim_ * sizeof(T)) << " bytes" << std::endl;
 			pool_->exhausted();
 			return false;
 		}
@@ -351,7 +351,7 @@ protected:
 					throw std::bad_alloc();
 				}
 			} catch(std::bad_alloc& e) {
-				std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
+				//std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
 				pool_->exhausted();
 				return false;
 			}
