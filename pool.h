@@ -27,7 +27,8 @@ public:
 	ChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
 		verbose(verbose_), patid(0), pool_(NULL), cur_(0),
 		chunkSz_(chunkSz), totSz_(totSz), lim_(totSz/chunkSz),
-		bits_(lim_), exhaustCrash_(false), readName_(NULL)
+		bits_(lim_), exhaustCrash_(false),
+		lastSkippedRead_(0xffffffff), readName_(NULL)
 	{
 		assert_gt(lim_, 0);
 		try {
@@ -139,14 +140,17 @@ public:
 	 * Currently just prints a friendly message and quits.
 	 */
 	void exhausted() {
-		if(!exhaustCrash_) {
-			std::cerr << "Warning: ";
+		if(patid != lastSkippedRead_) {
+			if(!exhaustCrash_) {
+				std::cerr << "Warning: ";
+			}
+			std::cerr << "Exhausted best-first chunk memory for read " << (*readName_) << " (patid " << patid << "); skipping read" << std::endl;
 		}
-		std::cerr << "Exhausted best-first chunk memory for read " << readName_ << " (patid " << patid << "); skipping read" << std::endl;
 		if(exhaustCrash_) {
 			std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
 			exit(1);
 		}
+		lastSkippedRead_ = patid;
 	}
 
 	bool verbose;
@@ -161,6 +165,7 @@ protected:
 	uint32_t lim_;  /// # elements held in pool_
 	FixedBitset2 bits_;
 	bool exhaustCrash_; /// abort hard when memory's exhausted?
+	uint32_t lastSkippedRead_;
 	String<char>* readName_;
 };
 
