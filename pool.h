@@ -27,7 +27,7 @@ public:
 	ChunkPool(uint32_t chunkSz, uint32_t totSz, bool verbose_) :
 		verbose(verbose_), patid(0), pool_(NULL), cur_(0),
 		chunkSz_(chunkSz), totSz_(totSz), lim_(totSz/chunkSz),
-		bits_(lim_)
+		bits_(lim_), exhaustCrash_(false), readName_(NULL)
 	{
 		assert_gt(lim_, 0);
 		try {
@@ -38,6 +38,7 @@ public:
 			std::cerr << "Error: Could not allocate ChunkPool of "
 			          << totSz << " bytes" << std::endl;
 			exhausted();
+			exit(1); // Exit if we haven't already
 		}
 	}
 
@@ -51,8 +52,9 @@ public:
 	/**
 	 * Reset the pool, freeing all arrays that had been given out.
 	 */
-	void reset(uint32_t patid_) {
+	void reset(String<char>* name, uint32_t patid_) {
 		patid = patid_;
+		readName_ = name;
 		cur_ = 0;
 		bits_.clear();
 		assert_eq(0, bits_.test(0));
@@ -137,8 +139,14 @@ public:
 	 * Currently just prints a friendly message and quits.
 	 */
 	void exhausted() {
-		std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
-		exit(1);
+		if(!exhaustCrash_) {
+			std::cerr << "Warning: ";
+		}
+		std::cerr << "Exhausted best-first chunk memory for read " << readName_ << " (patid " << patid << "); skipping read" << std::endl;
+		if(exhaustCrash_) {
+			std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
+			exit(1);
+		}
 	}
 
 	bool verbose;
@@ -152,6 +160,8 @@ protected:
 	const uint32_t totSz_;
 	uint32_t lim_;  /// # elements held in pool_
 	FixedBitset2 bits_;
+	bool exhaustCrash_; /// abort hard when memory's exhausted?
+	String<char>* readName_;
 };
 
 /**
@@ -190,9 +200,9 @@ public:
 	 * Allocate a single T from the pool.
 	 */
 	T* alloc() {
-		lazyInit();
+		if(!lazyInit()) return NULL;
 		if(cur_ + 1 >= lim_) {
-			allocNextPool();
+			if(!allocNextPool()) return NULL;
 		}
 		cur_ ++;
 		return &pools_[curPool_][cur_ - 1];
@@ -213,9 +223,9 @@ public:
 	 * Allocate an array of Ts from the pool.
 	 */
 	T* alloc(uint32_t num) {
-		lazyInit();
+		if(!lazyInit()) return NULL;
 		if(cur_ + num >= lim_) {
-			allocNextPool();
+			if(!allocNextPool()) return NULL;
 		}
 		cur_ += num;
 		return &pools_[curPool_][cur_ - num];
@@ -308,7 +318,7 @@ public:
 
 protected:
 
-	void allocNextPool() {
+	bool allocNextPool() {
 		assert_eq(curPool_+1, pools_.size());
 		T *pool;
 		try {
@@ -318,15 +328,17 @@ protected:
 		} catch(std::bad_alloc& e) {
 			std::cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+1) << " of " << (lim_ * sizeof(T)) << " bytes" << std::endl;
 			pool_->exhausted();
+			return false;
 		}
 		ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 		pools_.push_back(pool);
 		lastCurInPool_.push_back(cur_);
 		curPool_++;
 		cur_ = 0;
+		return true;
 	}
 
-	void lazyInit() {
+	bool lazyInit() {
 		if(cur_ == 0 && pools_.empty()) {
 			T *pool;
 			try {
@@ -336,12 +348,14 @@ protected:
 			} catch(std::bad_alloc& e) {
 				std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
 				pool_->exhausted();
+				return false;
 			}
 			ASSERT_ONLY(memset(pool, 0, lim_ * sizeof(T)));
 			pools_.push_back(pool);
 			assert_eq(1, pools_.size());
 		}
 		assert(!pools_.empty());
+		return true;
 	}
 
 	void rewindPool() {

@@ -367,7 +367,7 @@ public:
 		if(metrics_ != NULL) {
 			metrics_->nextRead(patsrc->bufa().patFw);
 		}
-		pool_->reset(patsrc->patid());
+		pool_->reset(&patsrc->bufa().name, patsrc->patid());
 		driver_->setQuery(patsrc, NULL);
 		this->done = driver_->done;
 		doneFirst_ = false;
@@ -848,7 +848,7 @@ public:
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
-		pool_->reset(patsrc->patid());
+		pool_->reset(&patsrc->bufa().name, patsrc->patid());
 		driver1Fw_->setQuery(patsrc, NULL);
 		driver1Rc_->setQuery(patsrc, NULL);
 		driver2Fw_->setQuery(patsrc, NULL);

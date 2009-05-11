@@ -1,6 +1,7 @@
 #ifndef EBWT_SEARCH_BACKTRACK_H_
 #define EBWT_SEARCH_BACKTRACK_H_
 
+#include <seqan/sequence.h>
 #include "pat.h"
 #include "qual.h"
 #include "ebwt_search_util.h"
@@ -18,11 +19,12 @@
 class GreedyDFSRangeSource {
 
 	typedef std::pair<int, int> TIntPair;
+	typedef seqan::String<seqan::Dna> DnaString;
 
 public:
 	GreedyDFSRangeSource(
-			const Ebwt<String<Dna> >* __ebwt,
-			const EbwtSearchParams<String<Dna> >& __params,
+			const Ebwt<DnaString>* __ebwt,
+			const EbwtSearchParams<DnaString>& __params,
 			uint32_t __qualThresh,  /// max acceptable q-distance
 			const int maxBts, /// maximum # backtracks allowed
 			uint32_t __reportPartials = 0,
@@ -2311,11 +2313,18 @@ public:
 				assert_leq(top, ebwt._eh._len);
 				assert_leq(bot, ebwt._eh._len);
 				Branch *b = pm.bpool.alloc();
-				assert(b != NULL);
-				b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+				if(b == NULL) {
+					assert(pm.empty());
+					return;
+				}
+				if(!b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
-				        ebwt._eh, ebwt._ebwt);
+				        ebwt._eh, ebwt._ebwt))
+				{
+					assert(pm.empty());
+					return;
+				}
 				assert(!b->curtailed_);
 				assert(!b->exhausted_);
 				assert_gt(b->depth3_, 0);
@@ -2329,10 +2338,17 @@ public:
 			// We can't use the ftab, so we start from the rightmost
 			// position and use _fchr
 			Branch *b = pm.bpool.alloc();
-			assert(b != NULL);
-			b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+			if(b == NULL) {
+				assert(pm.empty());
+				return;
+			}
+			if(!b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 			        offRev0_, offRev1_, offRev2_, offRev3_,
-			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt);
+			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt))
+			{
+				assert(pm.empty());
+				return;
+			}
 			assert(!b->curtailed_);
 			assert(!b->exhausted_);
 			assert_gt(b->depth3_, 0);
@@ -2618,8 +2634,12 @@ public:
 		bail:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
-			pm.splitAndPrep(rand_, qlen_, depth3_, qualOrder_,
-			                ebwt_->_eh, ebwt_->_ebwt);
+			if(!pm.splitAndPrep(rand_, qlen_, depth3_, qualOrder_,
+			                    ebwt_->_eh, ebwt_->_ebwt))
+			{
+				pm.reset(0);
+				assert(pm.empty());
+			}
 			if(pm.empty()) {
 				break;
 			}

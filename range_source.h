@@ -41,7 +41,7 @@ struct EditList {
 	/**
 	 * Add an edit to the edit list.
 	 */
-	void add(const Edit& e, AllocOnlyPool<Edit>& pool, size_t qlen) {
+	bool add(const Edit& e, AllocOnlyPool<Edit>& pool, size_t qlen) {
 		assert_lt(sz_, qlen+3);
 		if(sz_ < numEdits) {
 			assert(moreEdits_ == NULL);
@@ -51,6 +51,9 @@ struct EditList {
 			assert(moreEdits_ == NULL);
 			assert(yetMoreEdits_ == NULL);
 			moreEdits_ = pool.alloc(numMoreEdits);
+			if(moreEdits_ == NULL) {
+				return false;
+			}
 			assert(moreEdits_ != NULL);
 			moreEdits_[0] = e;
 			sz_++;
@@ -63,6 +66,9 @@ struct EditList {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
 			yetMoreEdits_ = pool.alloc(qlen+3 - numMoreEdits - numEdits);
+			if(yetMoreEdits_ == NULL) {
+				return false;
+			}
 			assert(yetMoreEdits_ != NULL);
 			yetMoreEdits_[0] = e;
 			sz_++;
@@ -72,6 +78,7 @@ struct EditList {
 			yetMoreEdits_[sz_ - numEdits - numMoreEdits] = e;
 			sz_++;
 		}
+		return true;
 	}
 
 	/**
@@ -357,7 +364,7 @@ public:
 	/**
 	 * Initialize a new branch object with an empty path.
 	 */
-	void init(AllocOnlyPool<RangeState>& pool, AllocOnlyPool<Edit>& epool,
+	bool init(AllocOnlyPool<RangeState>& pool, AllocOnlyPool<Edit>& epool,
 	          uint32_t id, uint32_t qlen,
 	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
 	          uint16_t depth3, uint16_t rdepth, uint16_t len,
@@ -391,6 +398,9 @@ public:
 		}
 		if(qlen - rdepth_ > 0) {
 			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
+			if(ranges_ == NULL) {
+				return false;
+			}
 			rangesSz_ = qlen - rdepth_;
 		} else {
 			ranges_ = NULL;
@@ -422,6 +432,7 @@ public:
 			assert(eliminated(i));
 		}
 		assert(repOk(qlen));
+		return true;
 	}
 
 	/**
@@ -465,6 +476,9 @@ public:
 		assert(curtailed_);
 		assert_gt(pmSz, 0);
 		Branch *newBranch = bpool.alloc();
+		if(newBranch == NULL) {
+			return NULL;
+		}
 		assert(newBranch != NULL);
 		uint32_t id = bpool.lastId();
 		int tiedPositions[3];
@@ -538,11 +552,14 @@ public:
 		if(depth < depth1_) newDepth0 = depth1_;
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
-		newBranch->init(
+		if(!newBranch->init(
 				rpool, epool, id, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
 				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
-				top, bot, ep, ebwt, &edits_);
+				top, bot, ep, ebwt, &edits_))
+		{
+			return NULL;
+		}
 		// Add the new edit
 		newBranch->edits_.add(e, epool, qlen);
 		if(numNotEliminated == 1 && last) {
@@ -756,6 +773,7 @@ public:
 	RangeState* rangeState() {
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
+		assert_lt(len_, rangesSz_);
 		return &ranges_[len_];
 	}
 
@@ -1235,18 +1253,15 @@ public:
 	 * If the frontmost branch is a curtailed branch, split off an
 	 * extendable branch and add it to the queue.
 	 */
-	void splitAndPrep(RandomSource& rand, uint32_t qlen, int seedLen,
+	bool splitAndPrep(RandomSource& rand, uint32_t qlen, int seedLen,
 	                  bool qualOrder,
 	                  const EbwtParams& ep, const uint8_t* ebwt)
 	{
-		if(empty()) return;
+		if(empty()) return true;
 		// This counts as a backtrack
 		if(btCnt_ != NULL && (*btCnt_ == 0)) {
-			// Abruptly end the search by removing all possibilities
-			branchQ_.reset(0);
-			ASSERT_ONLY(branchSet_.clear());
-			assert(empty());
-			return;
+			// Abruptly end search
+			return false;
 		}
 		Branch *f = front();
 		assert(!f->exhausted_);
@@ -1270,16 +1285,15 @@ public:
 			// This counts as a backtrack
 			if(btCnt_ != NULL) {
 				if(--(*btCnt_) == 0) {
-					// Abruptly end the search by removing all
-					// possibilities
-					branchQ_.reset(0);
-					ASSERT_ONLY(branchSet_.clear());
-					assert(empty());
-					return;
+					// Abruptly end search
+					return false;
 				}
 			}
-			Branch* newbr = splitBranch(f, rand, qlen, seedLen,
-			                            qualOrder, ep, ebwt);
+			Branch* newbr = splitBranch(
+					f, rand, qlen, seedLen, qualOrder, ep, ebwt);
+			if(newbr == NULL) {
+				return false;
+			}
 			// If f is exhausted, get rid of it immediately
 			if(f->exhausted_) {
 				assert(!f->delayedIncrease_);
@@ -1293,6 +1307,7 @@ public:
 			assert(newbr == front());
 		}
 		prep(ep, ebwt);
+		return true;
 	}
 
 	/**
