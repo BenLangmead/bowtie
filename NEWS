@@ -42,6 +42,8 @@ Version 0.9.9.3 - May 10, 2009
      built on a machine with different endianness.
    * Fixed several issues that prevented Bowtie from compiling on
      Solaris.  I confirm that Bowtie builds and runs on Solaris.
+   * Clarified column 7 in the manual.  We received many queries from
+     users curious about this number.
    * Moderate speed improvements in --best mode.
 
 Version 0.9.9.2 - April 6, 2009

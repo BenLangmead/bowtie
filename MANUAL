@@ -804,7 +804,7 @@ Bowtie Manual
       column is generally not a good proxy for that number (e.g., the
       number in this column may be '0' while the number of other
       alignments with the same number of mismatches might be large).
-      This column was previously described as "Reserved". 
+      This column was previously described as "Reserved".
 
    8. Comma-separated list of mismatch descriptors.  If there are no
       mismatches in the alignment, this field is empty.  A single
