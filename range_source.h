@@ -1223,6 +1223,7 @@ public:
 			assert(popped == br);
 			br->free(qlen, rpool, epool, bpool);
 		} else if(br->cost_ != origCost) {
+			// Re-insert the newly-curtailed branch
 			assert(br == front());
 			Branch *popped = pop();
 			assert(popped == br);
@@ -1248,13 +1249,10 @@ public:
 			return;
 		}
 		Branch *f = front();
-		while(f->exhausted_ || f->delayedIncrease_) {
-			if(f->exhausted_) {
-				assert(!f->delayedIncrease_);
-				ASSERT_ONLY(Branch *popped =) pop();
-				assert(popped == f);
-				if(empty()) return;
-			} else if(f->delayedIncrease_) {
+		assert(!f->exhausted_);
+		while(f->delayedIncrease_) {
+			assert(!f->exhausted_);
+			if(f->delayedIncrease_) {
 				assert_neq(0, f->delayedCost_);
 				ASSERT_ONLY(Branch *popped =) pop();
 				assert(popped == f);
@@ -1265,6 +1263,7 @@ public:
 				assert(!empty());
 			}
 			f = front();
+			assert(!f->exhausted_);
 		}
 		if(f->curtailed_) {
 			ASSERT_ONLY(uint16_t origCost = f->cost_);
@@ -1281,6 +1280,13 @@ public:
 			}
 			Branch* newbr = splitBranch(f, rand, qlen, seedLen,
 			                            qualOrder, ep, ebwt);
+			// If f is exhausted, get rid of it immediately
+			if(f->exhausted_) {
+				assert(!f->delayedIncrease_);
+				ASSERT_ONLY(Branch *popped =) pop();
+				assert(popped == f);
+				f->free(qlen, rpool, epool, bpool);
+			}
 			assert_eq(origCost, f->cost_);
 			assert(newbr != NULL);
 			push(newbr);
