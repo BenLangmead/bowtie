@@ -797,7 +797,14 @@ Bowtie Manual
 
    6. Read qualities (reversed if orientation is '-')
 
-   7. Reserved
+   7. Number of other instances where the same read aligns against the
+      same reference characters as were aligned against in this
+      alignment.  This is *not* the number of other places the read
+      aligns with the same number of mismatches.  The number in this
+      column is generally not a good proxy for that number (e.g., the
+      number in this column may be '0' while the number of other
+      alignments with the same number of mismatches might be large).
+      This column was previously described as "Reserved". 
 
    8. Comma-separated list of mismatch descriptors.  If there are no
       mismatches in the alignment, this field is empty.  A single
