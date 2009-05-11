@@ -116,6 +116,7 @@ static bool strandFix           = true;  // attempt to fix strand bias
 static bool randomizeQuals      = false; // randomize quality values
 static bool stats               = false; // print performance stats
 static int chunkPoolMegabytes   = 32;    // max MB to dedicate to best-first search frames per thread
+static int chunkSz              = 16;    // size of single chunk disbursed by ChunkPool
 static bool chunkVerbose        = false; // have chunk allocator output status messages?
 // mating constraints
 
@@ -178,6 +179,7 @@ enum {
 	ARG_PHRED64,
 	ARG_PHRED33,
 	ARG_CHUNKMBS,
+	ARG_CHUNKSZ,
 	ARG_CHUNKVERBOSE
 };
 
@@ -267,6 +269,7 @@ static struct option long_options[] = {
 	{(char*)"phred64-quals", no_argument,      0,            ARG_PHRED64},
 	{(char*)"solexa1.3-quals", no_argument,    0,            ARG_PHRED64},
 	{(char*)"chunkmbs",     required_argument, 0,            ARG_CHUNKMBS},
+	{(char*)"chunksz",      required_argument, 0,            ARG_CHUNKSZ},
 	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -1225,6 +1228,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
 	   		case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
+	   		case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
 	   		case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
 	   		case ARG_BETTER: stateful = true; better = true; break;
 	   		case ARG_OLDBEST: oldBest = true; break;
@@ -1563,7 +1567,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
-	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
@@ -1935,7 +1939,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
-	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
@@ -2513,7 +2517,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
-	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	Unpaired23mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
@@ -3172,7 +3176,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
-	ChunkPool *pool = new ChunkPool(16 * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
+	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	AlignerMetrics *metrics = NULL;
 	if(stats) {

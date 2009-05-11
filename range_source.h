@@ -437,7 +437,7 @@ public:
 	 */
 	inline bool eliminated(int i) const {
 		assert(!exhausted_);
-		if(i <= len_) {
+		if(i <= len_ && i < rangesSz_) {
 			assert(ranges_ != NULL);
 			return ranges_[i].eliminated_;
 		}
@@ -693,7 +693,7 @@ public:
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
 				uint16_t cost = (qualOrder ? ranges_[i].eq.join.qual : 0) | stratum;
 				if(cost < lowestCost) lowestCost = cost;
-			} else {
+			} else if(i < rangesSz_) {
 				eliminatedStretch++;
 			}
 		}
@@ -717,6 +717,20 @@ public:
 			}
 		} else {
 			// Just mark it as curtailed and keep the same cost
+		}
+		if(ranges_ != NULL) {
+			// Try to trim off no-longer-relevant elements of the
+			// ranges_ array
+			assert(!exhausted_);
+			assert_gt(rangesSz_, 0);
+			uint32_t trim = (rangesSz_ - len_ - 1) + eliminatedStretch;
+			assert_leq(trim, rangesSz_);
+			if(rpool.free(ranges_ + rangesSz_ - trim, trim)) {
+				rangesSz_ -= trim;
+				if(rangesSz_ == 0) {
+					ranges_ = NULL;
+				}
+			}
 		}
 		curtailed_ = true;
 	}
