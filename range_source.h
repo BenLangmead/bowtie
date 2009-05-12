@@ -1589,16 +1589,18 @@ public:
 		{
 			bool error = false;
 			if(pm_.minCost != 0 && pm_.minCost < oldPmMinCost) {
-				cerr << "PathManager's cost went down from "
-					 << oldPmMinCost << " to " << pm_.minCost << endl;
+				cerr << "PathManager's cost went down" << endl;
 				error = true;
 			}
 			if(this->minCost < oldMinCost) {
-				cerr << "this->minCost cost went down from "
-					 << oldMinCost << " to " << this->minCost << endl;
+				cerr << "this->minCost cost went down" << endl;
 				error = true;
 			}
 			if(error) {
+				cerr << "pm.minCost went from " << oldPmMinCost
+				     << " to " << pm_.minCost << endl;
+				cerr << "this->minCost went from " << oldMinCost
+				     << " to " << this->minCost << endl;
 				cerr << "this->minCostAdjustment_ == "
 				     << this->minCostAdjustment_ << endl;
 			}
