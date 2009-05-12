@@ -88,6 +88,7 @@ DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS)\""
 RELEASE_FLAGS = -O3 $(BITS_FLAG)
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS)\""
 NOASSERT_FLAGS = -DNDEBUG
+FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
 BIN_LIST = bowtie-build \
            bowtie \
@@ -138,6 +139,7 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DBUILD_HOST="\"`hostname`\"" \
      -DBUILD_TIME="\"`date`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
+     $(FILE_FLAGS) \
      $(PTHREAD_DEF) \
      $(SHMEM_DEF) \
      $(PREF_DEF) \
