@@ -1584,7 +1584,13 @@ public:
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
 		ASSERT_ONLY(uint16_t oldPmMinCost = pm_.minCost);
 		rs_->advanceBranch(until, this->minCost, pm_);
-		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
+		this->done = pm_.empty();
+		if(pm_.minCost != 0) {
+			this->minCost = max(pm_.minCost, this->minCostAdjustment_);
+		} else {
+			// pm_.minCost is 0 because we reset it due to exceptional
+			// circumstances
+		}
 #ifndef NDEBUG
 		{
 			bool error = false;
@@ -1607,7 +1613,6 @@ public:
 			assert(!error);
 		}
 #endif
-		this->done = pm_.empty();
 		this->foundRange = rs_->foundRange;
 #ifndef NDEBUG
 		if(this->foundRange) {
