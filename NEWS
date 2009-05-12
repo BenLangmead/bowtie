@@ -44,6 +44,9 @@ Version 0.9.9.3 - May 12, 2009
      built on a machine with different endianness.
    * Fixed several issues that prevented Bowtie from compiling on
      Solaris.  I confirm that Bowtie builds and runs on Solaris.
+   * Added _LARGEFILE_SOURCE _FILE_OFFSET_BITS=64 _GNU_SOURCE to the
+     default build options in an attempt to resolve some of the large-
+     file issues users are having.
    * Clarified column 7 in the manual.  We received many queries from
      users curious about this number.
    * Moderate speed improvements in --best mode.
