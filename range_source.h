@@ -1600,7 +1600,7 @@ public:
 			}
 			if(error) {
 				cerr << "this->minCostAdjustment_ == "
-				     << minCostAdjustment_ << endl;
+				     << this->minCostAdjustment_ << endl;
 			}
 			assert(!error);
 		}
