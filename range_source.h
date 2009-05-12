@@ -1582,7 +1582,9 @@ public:
 		params_.setFw(fw_);
 		// Advance the RangeSource for the forward-oriented read
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
+		ASSERT_ONLY(uint16_t oldPmMinCost = pm_.minCost);
 		rs_->advanceBranch(until, this->minCost, pm_);
+		assert_geq(pm_.minCost, oldPmMinCost);
 		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
 		assert_geq(this->minCost, oldMinCost);
 		this->done = pm_.empty();
