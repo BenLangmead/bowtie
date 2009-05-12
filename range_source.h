@@ -1584,9 +1584,27 @@ public:
 		ASSERT_ONLY(uint16_t oldMinCost = this->minCost);
 		ASSERT_ONLY(uint16_t oldPmMinCost = pm_.minCost);
 		rs_->advanceBranch(until, this->minCost, pm_);
-		assert_geq(pm_.minCost, oldPmMinCost);
 		this->minCost = max(pm_.minCost, this->minCostAdjustment_);
-		assert_geq(this->minCost, oldMinCost);
+#ifndef NDEBUG
+		{
+			bool error = false;
+			if(pm_.minCost != 0 && pm_.minCost < oldPmMinCost) {
+				cerr << "PathManager's cost went down from "
+					 << oldPmMinCost << " to " << pm_.minCost << endl;
+				error = true;
+			}
+			if(this->minCost < oldMinCost) {
+				cerr << "this->minCost cost went down from "
+					 << oldMinCost << " to " << this->minCost << endl;
+				error = true;
+			}
+			if(error) {
+				cerr << "this->minCostAdjustment_ == "
+				     << minCostAdjustment_ << endl;
+			}
+			assert(!error);
+		}
+#endif
 		this->done = pm_.empty();
 		this->foundRange = rs_->foundRange;
 #ifndef NDEBUG
