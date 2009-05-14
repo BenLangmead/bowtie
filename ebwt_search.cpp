@@ -310,6 +310,7 @@ static void printUsage(ostream& out) {
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
+	    >> "  --nofw/--norc      do not align to forward/reverse-complement reference strand" << endl
 	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
@@ -788,6 +789,18 @@ static void printLongUsage(ostream& out) {
 	"                     upstream mate1 and a downstream mate2 to be\n"
 	"                     forward-oriented.  Default: --fr (appropriate for\n"
 	"                     the Illumina short insert library). \n"
+	"\n"
+	"  --nofw/--norc      If --nofw is specified, Bowtie will not attempt to\n"
+	"                     align against the forward reference strand.  If\n"
+	"                     --norc is specified, Bowtie will not attempt to\n"
+	"                     align against the reverse-complement reference\n"
+	"                     strand.  For paired-end reads using --fr or --rf\n"
+	"                     modes, --nofw and --norc apply to the forward and\n"
+	"                     reverse-complement mate orientations.  I.e.\n"
+	"                     specifying --nofw and --fr will only find reads in\n"
+	"                     the R/F orientation where mate 2 occurs upstream\n"
+	"                     of mate 1 with respect to the forward reference\n"
+	"                     strand.\n"
 	"\n"
 	"  --maxbts           The maximum number of backtracks permitted when\n"
 	"                     aligning a read in -n 2 or -n 3 mode (default:\n"
