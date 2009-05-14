@@ -6,7 +6,6 @@
  * situations.
  */
 {
-	params.setFw(true);
 	bt.setEbwt(&ebwtFw);
 	bt.setReportExacts(true);
 
@@ -15,45 +14,54 @@
 		exit(1);
 	}
 
-	// First, try exact hits for the forward-oriented read
-	bt.setQuery(patsrc->bufa());
-	bt.setOffs(0, 0, s, s, s, s);
-	if(bt.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+	if(!nofw) {
+		// First, try exact hits for the forward-oriented read
+		params.setFw(true);
+		bt.setQuery(patsrc->bufa());
+		bt.setOffs(0, 0, s, s, s, s);
+		if(bt.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
-	params.setFw(false);
+	if(!norc) {
+		params.setFw(false);
 
-	// Next, try exact hits for the reverse-complement read
-	bt.setQuery(patsrc->bufa());
-	bt.setOffs(0, 0, s, s, s, s);
-	if(bt.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+		// Next, try exact hits for the reverse-complement read
+		bt.setQuery(patsrc->bufa());
+		bt.setOffs(0, 0, s, s, s, s);
+		if(bt.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
 	if(sink->finishedWithStratum(0)) { // no more exact hits are possible
+		// the sink tells us we needn't try 1-mismatch alignments
 		DONEMASK_SET(patid);
 		continue;
 	}
 	bt.setReportExacts(false);
 
-	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	bt.setQuery(patsrc->bufa());
-	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
-	if(bt.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+	if(!norc) {
+		// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+		bt.setQuery(patsrc->bufa());
+		bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
+		if(bt.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
-	params.setFw(true);
-
-	// Next, try hits with one mismatch on the 3' end for the reverse-complement read
-	bt.setQuery(patsrc->bufa());
-	bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
-	if(bt.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+	if(!nofw) {
+		params.setFw(true);
+		// Next, try hits with one mismatch on the 3' end for the reverse-complement read
+		bt.setQuery(patsrc->bufa());
+		bt.setOffs(0, 0, s5, s, s, s); // 1 mismatch allowed in 3' half
+		if(bt.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 }

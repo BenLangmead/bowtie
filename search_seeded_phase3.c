@@ -6,96 +6,99 @@
  * memory situations.
  */
 {
-	params.setFw(false);
-	btr3.setReportExacts(true);
+	if(!norc) {
+		params.setFw(false);
+		btr3.setReportExacts(true);
 
-	if(verbose) {
-		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
-	}
-
-	btr3.setQuery(patsrc->bufa());
-	// Get all partial alignments for this read's reverse
-	// complement
-	pals.clear();
-	if(pamRc != NULL && pamRc->size() > 0) {
-		// We can get away with an unsynchronized call because there
-		// are no writers for pamRc in this phase
-		pamRc->getPartialsUnsync(patid, pals);
-		if(fullIndex) {
-			pamRc->clear(patid);
-			assert_eq(0, pamRc->size());
+		btr3.setQuery(patsrc->bufa());
+		// Get all partial alignments for this read's reverse
+		// complement
+		pals.clear();
+		if(pamRc != NULL && pamRc->size() > 0) {
+			// We can get away with an unsynchronized call because there
+			// are no writers for pamRc in this phase
+			pamRc->getPartialsUnsync(patid, pals);
+			if(fullIndex) {
+				pamRc->clear(patid);
+				assert_eq(0, pamRc->size());
+			}
 		}
-	}
-	bool done = false;
-	if(pals.size() > 0) {
-		// Partial alignments exist - extend them
-		// Set up seed bounds
-		if(qs < s) {
-			btr3.setOffs(0, 0, qs, qs, qs, qs);
-		} else {
-			btr3.setOffs(0, 0, s, s, s, s);
-		}
-		for(size_t i = 0; i < pals.size(); i++) {
-			seqan::clear(muts);
-			uint8_t oldQuals =
-				PartialAlignmentManager::toMutsString(
-						pals[i], patRc, qualRc, muts, !noMaqRound);
+		bool done = false;
+		if(pals.size() > 0) {
+			// Partial alignments exist - extend them
+			// Set up seed bounds
+			if(qs < s) {
+				btr3.setOffs(0, 0, qs, qs, qs, qs);
+			} else {
+				btr3.setOffs(0, 0, s, s, s, s);
+			}
+			for(size_t i = 0; i < pals.size(); i++) {
+				seqan::clear(muts);
+				uint8_t oldQuals =
+					PartialAlignmentManager::toMutsString(
+							pals[i], patRc, qualRc, muts, !noMaqRound);
 
-			// Set the backtracking thresholds appropriately
-			// Now begin the backtracking, treating the first
-			// 24 bases as unrevisitable
-			ASSERT_ONLY(String<Dna5> tmp = patRc);
-			btr3.setMuts(&muts);
-			done = btr3.backtrack(oldQuals);
-			btr3.setMuts(NULL);
-			assert_eq(tmp, patRc); // assert mutations were undone
+				// Set the backtracking thresholds appropriately
+				// Now begin the backtracking, treating the first
+				// 24 bases as unrevisitable
+				ASSERT_ONLY(String<Dna5> tmp = patRc);
+				btr3.setMuts(&muts);
+				done = btr3.backtrack(oldQuals);
+				btr3.setMuts(NULL);
+				assert_eq(tmp, patRc); // assert mutations were undone
+				if(done) {
+					// The reverse complement hit, so we're done with this
+					// read
+					DONEMASK_SET(patid);
+					// Got a hit; stop processing partial
+					// alignments
+					break;
+				}
+			} // Loop over partial alignments
+		}
+		seqan::clear(muts);
+		// Case 4R yielded a hit continue to next pattern
+		if(done) continue;
+		// If we're in two-mismatch mode, then now is the time to
+		// try the final case that might apply to the reverse
+		// complement pattern: 1 mismatch in each of the 3' and 5'
+		// halves of the seed.
+		bool gaveUp = false;
+		if(seedMms >= 2) {
+			btr23.setQuery(patsrc->bufa());
+			// Set up special seed bounds
+			if(qs < s) {
+				btr23.setOffs(qs5, qs,
+							  0,                         // unrevOff
+							  (seedMms <= 2)? qs5 : 0,   // 1revOff
+							  (seedMms < 3 )? qs  : qs5, // 2revOff
+							  qs);                       // 3revOff
+			} else {
+				btr23.setOffs(s5, s,
+							  0,                       // unrevOff
+							  (seedMms <= 2)? s5 : 0,  // 1revOff
+							  (seedMms < 3 )? s  : s5, // 2revOff
+							  s);                      // 3revOff
+			}
+			done = btr23.backtrack();
+			if(btr23.numBacktracks() == btr23.maxBacktracks()) {
+				gaveUp = true;
+			}
 			if(done) {
-				// The reverse complement hit, so we're done with this
-				// read
+				if(dumpHHHits != NULL) {
+					(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;
+				}
 				DONEMASK_SET(patid);
-				// Got a hit; stop processing partial
-				// alignments
-				break;
+				btr23.resetNumBacktracks();
+				continue;
 			}
-		} // Loop over partial alignments
-	}
-	seqan::clear(muts);
-	// Case 4R yielded a hit continue to next pattern
-	if(done) continue;
-	// If we're in two-mismatch mode, then now is the time to
-	// try the final case that might apply to the reverse
-	// complement pattern: 1 mismatch in each of the 3' and 5'
-	// halves of the seed.
-	bool gaveUp = false;
-	if(seedMms >= 2) {
-		btr23.setQuery(patsrc->bufa());
-		// Set up special seed bounds
-		if(qs < s) {
-			btr23.setOffs(qs5, qs,
-						  0,                         // unrevOff
-						  (seedMms <= 2)? qs5 : 0,   // 1revOff
-						  (seedMms < 3 )? qs  : qs5, // 2revOff
-						  qs);                       // 3revOff
-		} else {
-			btr23.setOffs(s5, s,
-						  0,                       // unrevOff
-						  (seedMms <= 2)? s5 : 0,  // 1revOff
-						  (seedMms < 3 )? s  : s5, // 2revOff
-						  s);                      // 3revOff
-		}
-		done = btr23.backtrack();
-		if(btr23.numBacktracks() == btr23.maxBacktracks()) {
-			gaveUp = true;
-		}
-		if(done) {
-			if(dumpHHHits != NULL) {
-				(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;
-			}
-			DONEMASK_SET(patid);
 			btr23.resetNumBacktracks();
-			continue;
 		}
-		btr23.resetNumBacktracks();
+	}
+
+	if(nofw) { // no more 1-mm-in-seed hits are possible
+		DONEMASK_SET(patid);
+		continue;
 	}
 
 	// If we reach here, then cases 1F, 2F, 3F, 1R, 2R, 3R and
@@ -124,7 +127,6 @@
 #ifndef NDEBUG
 	vector<PartialAlignment> partials;
 	pamFw->getPartials(patid, partials);
-	if(done) assert_gt(partials.size(), 0);
 	for(size_t i = 0; i < partials.size(); i++) {
 		uint32_t pos0 = partials[i].entry.pos0;
 		assert_lt(pos0, s5);

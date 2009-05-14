@@ -6,7 +6,6 @@
  * memory situations.
  */
 {
-	params.setFw(true);
 	btf1.setReportExacts(true);
 	bt1.setReportExacts(true);
 
@@ -48,37 +47,48 @@
 		sink->finishRead(*patsrc, true);
 		continue;
 	}
-	// Do an exact-match search on the forward pattern, just in
-	// case we can pick it off early here
-	btf1.setQuery(patsrc->bufa());
-	btf1.setOffs(0, plen, plen, plen, plen, plen);
-	if(btf1.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+
+	if(!nofw) {
+		// Do an exact-match search on the forward pattern, just in
+		// case we can pick it off early here
+		params.setFw(true);
+		btf1.setQuery(patsrc->bufa());
+		btf1.setOffs(0, plen, plen, plen, plen, plen);
+		if(btf1.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
-	// Set up backtracker with reverse complement
-	params.setFw(false);
-	// Set up special seed bounds
-	if(qs < s) {
-		bt1.setOffs(0, 0, (seedMms > 0)? qs5 : qs,
-						  (seedMms > 1)? qs5 : qs,
-						  (seedMms > 2)? qs5 : qs,
-						  (seedMms > 3)? qs5 : qs);
-	} else {
-		bt1.setOffs(0, 0, (seedMms > 0)? s5 : s,
-						  (seedMms > 1)? s5 : s,
-						  (seedMms > 2)? s5 : s,
-						  (seedMms > 3)? s5 : s);
+	if(!norc) {
+		// Set up backtracker with reverse complement
+		params.setFw(false);
+		// Set up special seed bounds
+		if(qs < s) {
+			bt1.setOffs(0, 0, (seedMms > 0)? qs5 : qs,
+							  (seedMms > 1)? qs5 : qs,
+							  (seedMms > 2)? qs5 : qs,
+							  (seedMms > 3)? qs5 : qs);
+		} else {
+			bt1.setOffs(0, 0, (seedMms > 0)? s5 : s,
+							  (seedMms > 1)? s5 : s,
+							  (seedMms > 2)? s5 : s,
+							  (seedMms > 3)? s5 : s);
+		}
+		bt1.setQuery(patsrc->bufa());
+		if(bt1.backtrack()) {
+			// If we reach here, then we obtained a hit for case
+			// 1R, 2R or 3R and can stop considering this read
+			DONEMASK_SET(patid);
+			continue;
+		}
+		// If we reach here, then cases 1R, 2R, and 3R have
+		// been eliminated and the read needs further
+		// examination
 	}
-	bt1.setQuery(patsrc->bufa());
-	if(bt1.backtrack()) {
-		// If we reach here, then we obtained a hit for case
-		// 1R, 2R or 3R and can stop considering this read
+
+	if(nofw && sink->finishedWithStratum(0)) { // no more exact hits are possible
 		DONEMASK_SET(patid);
 		continue;
 	}
-	// If we reach here, then cases 1R, 2R, and 3R have
-	// been eliminated and the read needs further
-	// examination
 }

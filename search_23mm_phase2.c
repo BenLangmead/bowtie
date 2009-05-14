@@ -6,28 +6,37 @@
  * situations.
  */
 {
-	params.setFw(true);
 	bt2.setReportExacts(false);
 
-	bt2.setQuery(patsrc->bufa());
-	// Set up the revisitability of the halves
-	bt2.setOffs(0, 0, s5, s5, two? s : s5, s);
-	if(bt2.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+	if(!nofw) {
+		// Set up the revisitability of the halves
+		params.setFw(true);
+		bt2.setQuery(patsrc->bufa());
+		bt2.setOffs(0, 0, s5, s5, two? s : s5, s);
+		if(bt2.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
+		// if nofw is true, then we already did this
+		if(sink->finishedWithStratum(0)) { // no more exact hits are possible
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
-	if(sink->finishedWithStratum(0)) { // no more exact hits are possible
-		DONEMASK_SET(patid);
-		continue;
+	if(!norc) {
+		// Try 2/3 backtracks in the 3' half of the reverse complement read
+		params.setFw(false);  // looking at reverse complement
+		// Set up the revisitability of the halves
+		bt2.setQuery(patsrc->bufa());
+		bt2.setOffs(0, 0, s3, s3, two? s : s3, s);
+		if(bt2.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
 
-	// Try 2/3 backtracks in the 3' half of the reverse complement read
-	params.setFw(false);  // looking at reverse complement
-	bt2.setQuery(patsrc->bufa());
-	// Set up the revisitability of the halves
-	bt2.setOffs(0, 0, s3, s3, two? s : s3, s);
-	if(bt2.backtrack()) {
+	if(nofw && sink->finishedWithStratum(1)) {
 		DONEMASK_SET(patid);
 		continue;
 	}

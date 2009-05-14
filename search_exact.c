@@ -6,19 +6,20 @@
  */
 {
 	uint32_t plen = length(patsrc->bufa().patFw);
-	// Process forward-oriented read
 	bt.setOffs(0, 0, plen, plen, plen, plen);
 	bt.setQuery(patsrc->bufa());
-	bool hit = bt.backtrack();
-	// If the forward direction matched exactly, ignore the
-	// reverse complement
-	if(hit) {
-		continue;
+	if(!nofw) {
+		// Match against forward strand
+		params.setFw(true);
+		// If we matched on the forward strand, ignore the reverse-
+		// complement strand
+		if(bt.backtrack()) {
+			continue;
+		}
 	}
-	if(!revcomp) continue;
-	// Process reverse-complement read
-	params.setFw(false);
-	bt.setQuery(patsrc->bufa());
-	bt.backtrack();
-	params.setFw(true);
+	if(!norc) {
+		// Process reverse-complement read
+		params.setFw(false);
+		bt.backtrack();
+	}
 }

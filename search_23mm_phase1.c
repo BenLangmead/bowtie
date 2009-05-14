@@ -8,7 +8,6 @@
 {
 	// If requested, check that this read has the same length
 	// as all the previous ones
-	params.setFw(true);
 	btr1.setReportExacts(true);
 
 	if(plen < 3 && two) {
@@ -19,20 +18,29 @@
 		cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
 		exit(1);
 	}
-	// Do an exact-match search on the forward pattern, just in
-	// case we can pick it off early here
-	btr1.setQuery(patsrc->bufa());
-	btr1.setOffs(0, 0, plen, plen, plen, plen);
-	if(btr1.backtrack()) {
-		DONEMASK_SET(patid);
-		continue;
+	if(!nofw) {
+		// Do an exact-match search on the forward pattern, just in
+		// case we can pick it off early here
+		params.setFw(true);
+		btr1.setQuery(patsrc->bufa());
+		btr1.setOffs(0, 0, plen, plen, plen, plen);
+		if(btr1.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
 	}
-	// Set up backtracker with reverse complement
-	params.setFw(false);
-	btr1.setQuery(patsrc->bufa());
-	// Set up the revisitability of the halves
-	btr1.setOffs(0, 0, s5, s5, two ? s : s5, s);
-	if(btr1.backtrack()) {
+	if(!norc) {
+		// Set up backtracker with reverse complement
+		params.setFw(false);
+		// Set up the revisitability of the halves
+		btr1.setQuery(patsrc->bufa());
+		btr1.setOffs(0, 0, s5, s5, two ? s : s5, s);
+		if(btr1.backtrack()) {
+			DONEMASK_SET(patid);
+			continue;
+		}
+	}
+	if(nofw && sink->finishedWithStratum(0)) { // no more exact hits are possible
 		DONEMASK_SET(patid);
 		continue;
 	}
