@@ -310,7 +310,7 @@ static void printUsage(ostream& out) {
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
-	    >> "  --nofw/--norc      do not align to forward/reverse-complement reference strand" << endl
+	    << "  --nofw/--norc      do not align to forward/reverse-complement reference strand" << endl
 	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
@@ -839,6 +839,18 @@ static void printLongUsage(ostream& out) {
 	"                     reference is very repetitive, (b) the reads are\n"
 	"                     low quality, or (c) not many reads have valid\n"
 	"                     alignments.\n"
+	"\n"
+	"  --chunkmbs <int>   The number of megabytes of memory a given thread\n"
+	"                     is given to store path descriptors in --best mode.\n"
+	"                     Best-first search must keep track of many paths at\n"
+	"                     once to ensure it is always extending the path\n"
+	"                     with the lowest cumulative cost.  Bowtie tries to\n"
+	"                     minimize the memory impact of the descriptors, but\n"
+	"                     they can still grow very large in some cases.  If\n"
+	"                     you receive an error message saying that chunk\n"
+	"                     memory has been exhausted in --best mode, try\n"
+	"                     adjusting this parameter up to dedicate more\n"
+	"                     memory to the descriptors.  Default: 32.\n"
 	"\n"
 	"   Reporting:\n"
 	"   ----------\n"

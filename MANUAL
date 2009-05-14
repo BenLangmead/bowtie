@@ -510,7 +510,19 @@ Bowtie Manual
                      mate2 be forward-oriented.  --ll requires both an
                      upstream mate1 and a downstream mate2 to be
                      forward-oriented.  Default: --fr (appropriate for
-                     the Illumina short insert library). 
+                     the Illumina short insert library).
+
+  --nofw/--norc      If --nofw is specified, Bowtie will not attempt to
+                     align against the forward reference strand.  If
+                     --norc is specified, Bowtie will not attempt to
+                     align against the reverse-complement reference
+                     strand.  For paired-end reads using --fr or --rf
+                     modes, --nofw and --norc apply to the forward and
+                     reverse-complement mate orientations.  I.e.
+                     specifying --nofw and --fr will only find reads in
+                     the R/F orientation where mate 2 occurs upstream
+                     of mate 1 with respect to the forward reference
+                     strand.
 
   --maxbts           The maximum number of backtracks permitted when
                      aligning a read in -n 2 or -n 3 mode (default:
