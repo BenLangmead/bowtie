@@ -96,6 +96,7 @@ static bool forgiveInput        = false; // let read input be a little wrong w/o
 static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
+static bool useMm               = false; // use memory-mapped files to hold the index
 static bool stateful            = false; // use stateful aligners
 static uint32_t prefetchWidth   = 1;     // number of reads to process in parallel w/ --stateful
 static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
@@ -118,6 +119,10 @@ static bool stats               = false; // print performance stats
 static int chunkPoolMegabytes   = 32;    // max MB to dedicate to best-first search frames per thread
 static int chunkSz              = 16;    // size of single chunk disbursed by ChunkPool
 static bool chunkVerbose        = false; // have chunk allocator output status messages?
+static bool recal               = false;
+static int recalMaxCycle        = 64;
+static int recalMaxQual         = 40;
+static int recalQualShift       = 2;
 // mating constraints
 
 static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -160,6 +165,7 @@ enum {
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
 	ARG_SHARED_MEM,
+	ARG_MM,
 	ARG_STATEFUL,
 	ARG_PREFETCH_WIDTH,
 	ARG_FF,
@@ -180,7 +186,8 @@ enum {
 	ARG_PHRED33,
 	ARG_CHUNKMBS,
 	ARG_CHUNKSZ,
-	ARG_CHUNKVERBOSE
+	ARG_CHUNKVERBOSE,
+	ARG_RECAL
 };
 
 static struct option long_options[] = {
@@ -271,6 +278,8 @@ static struct option long_options[] = {
 	{(char*)"chunkmbs",     required_argument, 0,            ARG_CHUNKMBS},
 	{(char*)"chunksz",      required_argument, 0,            ARG_CHUNKSZ},
 	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
+	{(char*)"mm",           no_argument,       0,            ARG_MM},
+	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1161,12 +1170,19 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
 	   		case ARG_SHARED_MEM: {
 #ifdef BOWTIE_SHARED_MEM
-	   			useShmem = true; break;
+	   			useMm = false;
+	   			useShmem = true;
+	   			break;
 #else
 	   			cerr << "Shared-memory mode is disabled because bowtie was not compiled with the" << endl
 	   			     << "BOWTIE_SHARED_MEM option." << endl;
 	   			exit(1);
 #endif
+	   		}
+	   		case ARG_MM: {
+	   			useMm = true;
+	   			useShmem = false;
+	   			break;
 	   		}
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
@@ -1252,6 +1268,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
+	   		case ARG_RECAL: recal = true; break;
 	   		case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
 	   		case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
 	   		case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
@@ -1695,7 +1712,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	exactSearch_refs   = refs;
@@ -2109,7 +2126,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	mismatchSearch_refs = refs;
@@ -2713,7 +2730,7 @@ static void twoOrThreeMismatchSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3526,7 +3543,7 @@ static void seededQualCutoffSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	seededQualSearch_refs = refs;
@@ -3793,6 +3810,7 @@ static void driver(const char * type,
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
                     useShmem, // whether to use shared memory
+                    useMm,    // whether to use memory-mapped files
                     verbose,  // whether to be talkative
                     false /*passMemExc*/,
                     sanityCheck);
@@ -3804,6 +3822,7 @@ static void driver(const char * type,
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
     	                        useShmem, // whether to use shared memory
+    	                        useMm,    // whether to use memory-mapped files
     	                        verbose,  // whether to be talkative
     	                        false /*passMemExc*/,
     	                        sanityCheck);
@@ -3828,6 +3847,10 @@ static void driver(const char * type,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
+		RecalTable *table = NULL;
+		if(recal) {
+			table = new RecalTable(recalMaxCycle, recalMaxQual, recalQualShift);
+		}
 		vector<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
 		switch(outType) {
@@ -3838,14 +3861,14 @@ static void driver(const char * type,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
 							dumpMaxFaBase, dumpMaxFqBase,
-							refnames, partitionSz);
+							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
 							dumpMaxFaBase, dumpMaxFqBase,
-							refnames, partitionSz);
+							table, refnames, partitionSz);
 				}
 				break;
 			case CONCISE:
@@ -3855,14 +3878,14 @@ static void driver(const char * type,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
 							dumpMaxFaBase, dumpMaxFqBase,
-							reportOpps, refnames);
+							table, refnames, reportOpps);
 				} else {
 					sink = new ConciseHitSink(
 							fout, offBase,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
 							dumpMaxFaBase, dumpMaxFqBase,
-							reportOpps, refnames);
+							table, refnames, reportOpps);
 				}
 				break;
 			case BINARY:
@@ -3871,13 +3894,15 @@ static void driver(const char * type,
 							ebwt.nPat(), offBase,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase, refnames);
+							dumpMaxFaBase, dumpMaxFqBase,
+							table, refnames);
 				} else {
 					sink = new BinaryHitSink(
 							fout, offBase,
 							dumpAlFaBase, dumpAlFqBase,
 							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase, refnames);
+							dumpMaxFaBase, dumpMaxFqBase,
+							table, refnames);
 				}
 				break;
 			case NONE:

@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
+#include <sys/mman.h>
 #ifdef BOWTIE_SHARED_MEM
 #include <sys/shm.h>
 #endif
@@ -437,6 +438,7 @@ public:
 	    _isa(NULL), \
 	    _ebwt(NULL), \
 	    _ebwtIsShmem(false), \
+	    _useMm(false), \
 	    _refnames()
 
 #ifdef EBWT_STATS
@@ -456,12 +458,15 @@ public:
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
 	     bool __useShmem = false,
+	     bool __useMm = false,
 	     bool __verbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS
 	{
+		_useMm = __useMm;
+		assert(!__useShmem || !__useMm);
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
 		_ebwtIsShmem = _offsIsShmem = __useShmem;
@@ -799,27 +804,29 @@ public:
 
 	/// Destruct an Ebwt
 	~Ebwt() {
-		// Delete everything that was allocated in read(false, ...)
-		if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
-		if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
-		if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
-		if(_offs != NULL && !_offsIsShmem) {
-			delete[] _offs; _offs = NULL;
-		} else if(_offs != NULL) {
+		if(!_useMm) {
+			// Delete everything that was allocated in read(false, ...)
+			if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
+			if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
+			if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
+			if(_offs != NULL && !_offsIsShmem) {
+				delete[] _offs; _offs = NULL;
+			} else if(_offs != NULL) {
 #ifdef BOWTIE_SHARED_MEM
-			shmdt(_offs);
+				shmdt(_offs);
 #endif
-		}
-		if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
-		if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
-		if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
-		if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
-		if(_ebwt != NULL && !_ebwtIsShmem) {
-			delete[] _ebwt; _ebwt = NULL;
-		} else if(_ebwt != NULL) {
+			}
+			if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
+			if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
+			if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
+			if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
+			if(_ebwt != NULL && !_ebwtIsShmem) {
+				delete[] _ebwt; _ebwt = NULL;
+			} else if(_ebwt != NULL) {
 #ifdef BOWTIE_SHARED_MEM
-			shmdt(_ebwt);
+				shmdt(_ebwt);
 #endif
+			}
 		}
 		try {
 			if(_in1.is_open()) _in1.close();
@@ -912,6 +919,7 @@ public:
 	 */
 	void evictFromMemory() {
 		assert(isInMemory());
+		if(_useMm) return;
 		delete[] _fchr;  _fchr  = NULL;
 		delete[] _ftab;  _ftab  = NULL;
 		delete[] _eftab; _eftab = NULL;
@@ -1210,6 +1218,7 @@ public:
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
 	bool       _ebwtIsShmem;  /// allocated in shared memory; don't delete
+	bool       _useMm;        /// use memory-mapped files to hold the index
 	vector<string> _refnames; /// names of the reference sequences
 	EbwtParams _eh;
 

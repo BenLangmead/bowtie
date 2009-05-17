@@ -152,6 +152,123 @@ public:
 bool operator< (const Hit& a, const Hit& b);
 
 /**
+ * Table for holding recalibration counts, along the lines of the table
+ * presented in the SOAPsnp paper in Genome Res.  Each element maps a
+ * read allele (o), quality score (q), cycle (c), and reference allele
+ * (H), to a count of how many times that combination is observed in a
+ * reported alignment.
+ *
+ * RecalTable is not synchronized, so it's assumed that threads are
+ * incrementing the counters from within critical sections.
+ */
+class RecalTable {
+public:
+	RecalTable(int maxCycle,
+	           int maxQual,
+	           int qualShift) : maxCycle_(maxCycle),
+	                            maxQual_(maxQual),
+	                            qualShift_(qualShift),
+	                            shift1_(6 - qualShift_),
+	                            shift2_(shift1_ + 2),
+	                            shift3_(shift2_ + 2),
+	                            ents_(NULL), len_(0)
+	{
+		if(maxCycle == 0) {
+			cerr << "Warning: maximum cycle for recalibration table is 0" << endl;
+		} else if(maxQual >> qualShift == 0) {
+			cerr << "Warning: maximum quality value " << maxQual << ", when shifted, is 0" << endl;
+		} else if(qualShift > 5) {
+			cerr << "Warning: quality shift value " << qualShift << " exceeds ceiling of 5" << endl;
+		} else {
+			try {
+				len_ = maxCycle_ * 4 /* subj alleles*/ * 4 /* ref alleles */ * 64 /* quals */;
+				ents_ = new uint32_t[len_];
+				if(ents_ == NULL) {
+					throw std::bad_alloc();
+				}
+				memset(ents_, 0, len_ << 2);
+			} catch(std::bad_alloc& e) {
+				cerr << "Error allocating recalibration table with " << len_ << " entries" << endl;
+				exit(1);
+			}
+		}
+	}
+
+	~RecalTable() {
+		if(ents_ != NULL) delete[] ents_;
+	}
+
+	/**
+	 * Factor a new alignment into the recalibration table.
+	 */
+	void commitHit(const Hit& h) {
+		// Iterate through the pattern from 5' to 3', calculate the
+		// shifted quality value, obtain the reference character, and
+		// increment the appropriate counter
+		for(int i = 0; i < (int)h.length(); i++) {
+			int ii = i;
+			if(!h.fw) {
+				ii = h.length() - ii - 1;
+			}
+			int qc = (int)h.patSeq[ii];
+			int rc = qc;
+			if(h.mms.test(i)) {
+				rc = charToDna5[(int)h.refcs[i]];
+				assert_neq(rc, qc);
+			}
+			int q = (int)h.quals[ii]-33;
+			assert_lt(q, 64);
+			q >>= qualShift_;
+			ents_[calcIdx(i, qc, rc, q)]++;
+		}
+	}
+
+	/**
+	 * Print the contents of the recalibration table.
+	 */
+	void print (std::ostream& out) const {
+		if(ents_ == NULL) return;
+		const int lim = maxCycle_;
+		for(int i = 0; i < lim; i++) {
+			out << "t" << i << "\t";
+			// Iterate over subject alleles
+			for(int j = 0; j < 4; j++) {
+				// Iterate over reference alleles
+				for(int k = 0; k < 4; k++) {
+					// Iterate over qualities
+					int lim2 = maxQual_ >> qualShift_;
+					for(int l = 0; l < lim2; l++) {
+						out << ents_[calcIdx(i, j, k, l)] << '\t';
+					}
+				}
+			}
+			out << endl;
+		}
+	}
+
+protected:
+
+	/**
+	 * Calculate index into the ents_ array given cycle, subject
+	 * allele, reference allele, and (shifted) quality.
+	 */
+	int calcIdx(int cyc, int sa, int ra, int q) const {
+		int ret = q | (ra << shift1_) | (sa << shift2_) | (cyc << shift3_);
+		assert_lt(ret, len_);
+		return ret;
+	}
+
+	const int maxCycle_;
+	const int maxQual_;
+	const int qualShift_;
+	const int shift1_;
+	const int shift2_;
+	const int shift3_;
+	uint32_t *ents_;
+	int len_;
+};
+
+/**
  * Encapsulates an object that accepts hits, optionally retains them in
  * a vector, and does something else with them according to
  * descendent's implementation of pure virtual member reportHitImpl().
@@ -165,9 +282,11 @@ public:
 			const std::string& dumpUnalignFqBasename,
 			const std::string& dumpMaxedFaBasename,
 			const std::string& dumpMaxedFqBasename,
+			RecalTable *table,
 	        vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(false),
+		recalTable_(table),
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
@@ -203,9 +322,11 @@ public:
 			const std::string& dumpUnalignFqBasename,
 			const std::string& dumpMaxedFaBasename,
 			const std::string& dumpMaxedFqBasename,
+			RecalTable *table,
 	        vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(true),
+		recalTable_(table),
 		_refnames(refnames),
 		_locks(),
 		dumpAlFaBase_(dumpAlignFaBasename),
@@ -299,37 +420,64 @@ public:
 		}
 		unlock(hs[hssz-1].h.first);
 		mainlock();
+		commitHits(hs);
 		first_ = false;
 		if(paired) numReportedPaired_ += hssz;
 		else       numReported_ += hssz;
 		mainunlock();
 	}
 
-	/// Called when all alignments are complete
+	void commitHit(const Hit& hit) {
+		if(recalTable_ != NULL) {
+			recalTable_->commitHit(hit);
+		}
+	}
+
+	void commitHits(const std::vector<Hit>& hits) {
+		if(recalTable_ != NULL) {
+			const size_t sz = hits.size();
+			for(size_t i = 0; i < sz; i++) {
+				commitHit(hits[i]);
+			}
+		}
+	}
+
+	/**
+	 * Called when all alignments are complete.  It is assumed that no
+	 * synchronization is necessary.
+	 */
 	void finish() {
+		// Close output streams
 		closeOuts();
-		if(quiet_) return;
-		if(first_) {
-			assert_eq(0llu, numReported_);
-			cerr << "No results" << endl;
+		if(!quiet_) {
+			// Print information about how many unpaired and/or paired
+			// reads were aligned.
+			if(first_) {
+				assert_eq(0llu, numReported_);
+				cerr << "No results" << endl;
+			}
+			else if(numReportedPaired_ > 0 && numReported_ == 0) {
+				cerr << "Reported " << (numReportedPaired_ >> 1)
+					 << " paired-end alignments to " << _outs.size()
+					 << " output stream(s)" << endl;
+			}
+			else if(numReported_ > 0 && numReportedPaired_ == 0) {
+				cerr << "Reported " << numReported_
+					 << " alignments to " << _outs.size()
+					 << " output stream(s)" << endl;
+			}
+			else {
+				assert_gt(numReported_, 0);
+				assert_gt(numReportedPaired_, 0);
+				cerr << "Reported " << (numReportedPaired_ >> 1)
+					 << " paired-end alignments and " << numReported_
+					 << " singleton alignments to " << _outs.size()
+					 << " output stream(s)" << endl;
+			}
 		}
-		else if(numReportedPaired_ > 0 && numReported_ == 0) {
-			cerr << "Reported " << (numReportedPaired_ >> 1)
-			     << " paired-end alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else if(numReported_ > 0 && numReportedPaired_ == 0) {
-			cerr << "Reported " << numReported_
-			     << " alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
-		}
-		else {
-			assert_gt(numReported_, 0);
-			assert_gt(numReportedPaired_, 0);
-			cerr << "Reported " << (numReportedPaired_ >> 1)
-			     << " paired-end alignments and " << numReported_
-			     << " singleton alignments to " << _outs.size()
-			     << " output stream(s)" << endl;
+		// Print the recalibration table.
+		if(recalTable_ != NULL) {
+			recalTable_->print(cout);
 		}
 	}
 
@@ -604,6 +752,7 @@ protected:
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
 	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
+	RecalTable         *recalTable_;  /// recalibration table
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
 	vector<MUTEX_T>     _locks;       /// pthreads mutexes for per-file critical sections
@@ -1694,6 +1843,26 @@ private:
     bool keep_;
 };
 
+#define DECL_HIT_DUMPS \
+	const std::string& dumpAlFa, \
+	const std::string& dumpAlFq, \
+	const std::string& dumpUnalFa, \
+	const std::string& dumpUnalFq, \
+	const std::string& dumpMaxFa, \
+	const std::string& dumpMaxFq, \
+	RecalTable *recalTable, \
+	std::vector<std::string>* refnames
+
+#define PASS_HIT_DUMPS \
+	dumpAlFa, \
+	dumpAlFq, \
+	dumpUnalFa, \
+	dumpUnalFq, \
+	dumpMaxFa, \
+	dumpMaxFq, \
+	recalTable, \
+	refnames
+
 /**
  * Sink that prints lines like this:
  * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
@@ -1705,40 +1874,24 @@ public:
 	/**
 	 * Construct a single-stream ConciseHitSink (default)
 	 */
-	ConciseHitSink(
-			OutFileBuf*        __out,
-			int                offBase,
-			const std::string& dumpAlFa,
-			const std::string& dumpAlFq,
-			const std::string& dumpUnalFa,
-			const std::string& dumpUnalFq,
-			const std::string& dumpMaxFa,
-			const std::string& dumpMaxFq,
-			bool               __reportOpps = false,
-			vector<string>*    __refnames = NULL) :
-		HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-				dumpMaxFa, dumpMaxFq, __refnames),
-		_reportOpps(__reportOpps),
+	ConciseHitSink(OutFileBuf* out,
+			       int offBase,
+	               DECL_HIT_DUMPS,
+	               bool reportOpps = false) :
+		HitSink(out, PASS_HIT_DUMPS),
+		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
 	/**
 	 * Construct a multi-stream ConciseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	ConciseHitSink(
-	        size_t             __numOuts,
-	        int                offBase,
-			const std::string& dumpAlFa,
-			const std::string& dumpAlFq,
-			const std::string& dumpUnalFa,
-			const std::string& dumpUnalFq,
-			const std::string& dumpMaxFa,
-			const std::string& dumpMaxFq,
-			bool               __reportOpps = false,
-			vector<string>*    __refnames = NULL) :
-		HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-				dumpMaxFa, dumpMaxFq, __refnames),
-		_reportOpps(__reportOpps),
+	ConciseHitSink(size_t numOuts,
+	               int offBase,
+	               DECL_HIT_DUMPS,
+	               bool reportOpps = false) :
+		HitSink(numOuts, PASS_HIT_DUMPS),
+		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
 	/**
@@ -1774,6 +1927,7 @@ public:
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
+		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
@@ -1781,10 +1935,10 @@ public:
 	}
 
 private:
-	bool     _reportOpps;
-	int      offBase_;     /// Add this to reference offsets before outputting.
-	                       /// (An easy way to make things 1-based instead of
-	                       /// 0-based)
+	bool _reportOpps;
+	int  offBase_;     /// Add this to reference offsets before outputting.
+	                   /// (An easy way to make things 1-based instead of
+	                   /// 0-based)
 };
 
 /**
@@ -1796,19 +1950,12 @@ public:
 	/**
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
-	VerboseHitSink(OutFileBuf*        __out,
-	               int                offBase,
-	               const std::string& dumpAlFa,
-	               const std::string& dumpAlFq,
-	               const std::string& dumpUnalFa,
-	               const std::string& dumpUnalFq,
-	               const std::string& dumpMaxFa,
-	               const std::string& dumpMaxFq,
-				   vector<string>*    __refnames = NULL,
-				   int                __partition = 0) :
-	HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-			dumpMaxFa, dumpMaxFq, __refnames),
-	_partition(__partition),
+	VerboseHitSink(OutFileBuf* out,
+	               int offBase,
+	               DECL_HIT_DUMPS,
+				   int partition = 0) :
+	HitSink(out, PASS_HIT_DUMPS),
+	_partition(partition),
 	offBase_(offBase)
 	{ }
 
@@ -1816,19 +1963,12 @@ public:
 	 * Construct a multi-stream VerboseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	VerboseHitSink(size_t          __numOuts,
-	               int                offBase,
-	               const std::string& dumpAlFa,
-	               const std::string& dumpAlFq,
-	               const std::string& dumpUnalFa,
-	               const std::string& dumpUnalFq,
-	               const std::string& dumpMaxFa,
-	               const std::string& dumpMaxFq,
-				   vector<string>* __refnames = NULL,
-				   int             __partition = 0) :
-	HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-			dumpMaxFa, dumpMaxFq, __refnames),
-	_partition(__partition),
+	VerboseHitSink(size_t numOuts,
+	               int offBase,
+	               DECL_HIT_DUMPS,
+				   int partition = 0) :
+	HitSink(numOuts, PASS_HIT_DUMPS),
+	_partition(partition),
 	offBase_(offBase)
 	{ }
 
@@ -2183,6 +2323,7 @@ public:
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
+		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
@@ -2205,17 +2346,10 @@ public:
 	/**
 	 * Construct a single-stream BinaryHitSink (default)
 	 */
-	BinaryHitSink(OutFileBuf*        __out,
-	              int                offBase,
-	              const std::string& dumpAlFa,
-	              const std::string& dumpAlFq,
-	              const std::string& dumpUnalFa,
-	              const std::string& dumpUnalFq,
-	              const std::string& dumpMaxFa,
-	              const std::string& dumpMaxFq,
-				  vector<string>*    __refnames = NULL) :
-	HitSink(__out, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-			dumpMaxFa, dumpMaxFq, __refnames),
+	BinaryHitSink(OutFileBuf* out,
+	              int offBase,
+	              DECL_HIT_DUMPS) :
+	HitSink(out, PASS_HIT_DUMPS),
 	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
@@ -2225,17 +2359,11 @@ public:
 	 * Construct a multi-stream BinaryHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	BinaryHitSink(size_t             __numOuts,
-	              int                offBase,
-	              const std::string& dumpAlFa,
-	              const std::string& dumpAlFq,
-	              const std::string& dumpUnalFa,
-	              const std::string& dumpUnalFq,
-	              const std::string& dumpMaxFa,
-	              const std::string& dumpMaxFq,
-				  vector<string>*    __refnames = NULL) :
-	HitSink(__numOuts, dumpAlFa, dumpAlFq, dumpUnalFa, dumpUnalFq,
-			dumpMaxFa, dumpMaxFq, __refnames)
+	BinaryHitSink(size_t numOuts,
+	              int offBase,
+	              DECL_HIT_DUMPS) :
+	HitSink(numOuts, PASS_HIT_DUMPS),
+	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
 	}
@@ -2485,6 +2613,7 @@ public:
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
 		mainlock();
+		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;

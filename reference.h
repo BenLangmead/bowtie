@@ -33,6 +33,7 @@ public:
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
 	                 bool useShmem = false,
+	                 bool useMm = false,
 	                 bool verbose = false) :
 	buf_(NULL),
 	loaded_(true),
