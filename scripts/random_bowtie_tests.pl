@@ -64,9 +64,6 @@ sub pickPolicy {
 	if(!$pe && int(rand(2)) == 0) {
 		# Possibly ask for best alignments
 		$pol .= " --best";
-		if(int(rand(2)) == 0) {
-			$pol .= " --strandfix";
-		}
 	} elsif(!$pe && int(rand(2)) == 0) {
 		$pol .= " --better";
 	} elsif(!$pe && int(rand(2)) == 0) {
@@ -463,13 +460,11 @@ sub doSearch {
 	
 	my $khits = "-k 1";
 	my $mhits = 0;
-	my $nostrata = 0;
 	if($phased eq "-z") {
 		# A phased search may optionally be a non-stratified all-hits
 		# search
 		if(int(rand(2)) == 0) {
-			$khits = "-a --nostrata";
-			$nostrata = 1;
+			$khits = "-a";
 		}
 	} else {
 		if(int(rand(2)) == 0) {
@@ -477,15 +472,17 @@ sub doSearch {
 		} else {
 			$khits = "-k " . (int(rand(20))+2);
 		}
+		if(int(rand(3)) == 0) {
+			$policy =~ s/--oldbest//;
+			$policy =~ s/--better//;
+			$khits .= " --strata --best";
+		}
 		if(int(rand(2)) == 0) {
 			$requireResult = 0;
 			$mhits = (int(rand(20))+2);
 		}
-		if(!$pe && int(rand(2)) == 0) {
-			$khits .= " --nostrata";
-			$nostrata = 1;
-		}
 	}
+	
 	if($mhits > 0) {
 		$khits .= " -m $mhits";
 	}
@@ -529,15 +526,20 @@ sub doSearch {
 	my @outlines = split('\n', $out);
 	my %outhash = ();
 	my %readcount = ();
-	my %readStratum = ();
+	my %readStratum = (); # for unpaired reads
+	my %readStratum1 = (); # for mate 1
+	my %readStratum2 = (); # for mate 2
 	my $lastread = "";
 	for(my $i = 0; $i <= $#outlines; $i++) {
+		# Get the alignment for the first mate (or the unpaired read)
 		my $l = $outlines[$i];
 		next if $l =~ /^Reported/; # skip the summary line
 		chomp($l);
 		my $key = "$l";
+		my $l2 = "";
 		if($pe) {
-			my $l2 = $outlines[++$i];
+			# Get the alignment for the second mate
+			$l2 = $outlines[++$i];
 			defined($l2) || die "Odd number of output lines";
 			chomp($l2);
 			$key .= ", $l2";
@@ -567,10 +569,39 @@ sub doSearch {
 		if(($read ne $lastread) && ($phased eq "")) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
-		if(!$pe && !$nostrata) {
-			# TODO: uncomment this when stratification is working properly
-			#!defined($readStratum{$read}) || $readStratum{$read} == $stratum || die "Incompatible strata: old: $readStratum{$read}, cur: $stratum";
+		if(!$pe && $policy =~ /--strata /) {
+			!defined($readStratum{$read}) ||
+				$readStratum{$read} == $stratum ||
+				die "Incompatible strata: old: $readStratum{$read}, cur: $stratum";
 			$readStratum{$read} = $stratum;
+		} elsif($policy =~ /--strata /) {
+			$l  =~ m/^([01-9]+\/[12])[+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/;
+			my $mate1 = $1;
+			my $stratum1 = $2;
+			$l2 ne "" || die;
+			$l2 =~ m/^([01-9]+\/[12])[+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/;
+			my $mate2 = $1;
+			my $stratum2 = $2;
+			if($mate2 =~ /\/1$/) {
+				# Swticheroo
+				my $tmp = $mate1;
+				$mate1 = $mate2;
+				$mate2 = $tmp;
+				$tmp = $stratum1;
+				$stratum1 = $stratum2;
+				$stratum2 = $tmp;
+			}
+			if(defined($readStratum1{$mate1})) {
+				# One or ther other mate has to have the same stratum as we recorded previously
+				defined($readStratum2{$mate2}) || die "$mate1 was seen before, but not $mate2";
+				$readStratum1{$mate1} == $stratum1 ||
+				$readStratum2{$mate2} == $stratum2 ||
+				$readStratum1{$mate1} == $stratum2 ||
+				$readStratum2{$mate2} == $stratum1 ||
+					die "Incompatible strata: old: <$readStratum1{$mate1}, $readStratum2{$mate2}> cur: <$stratum1, $stratum2>";
+			}
+			$readStratum1{$mate1} = $stratum1;
+			$readStratum2{$mate2} = $stratum2;
 		}
 		$lastread = $read;
 		$readcount{$read}++ if defined($readcount{$read});

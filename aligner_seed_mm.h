@@ -16,14 +16,14 @@
 /**
  * Concrete factory class for constructing unpaired exact aligners.
  */
-class UnpairedSeedAlignerV1Factory : public AlignerFactory {
+class UnpairedSeedAlignerFactory : public AlignerFactory {
 
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 
 public:
-	UnpairedSeedAlignerV1Factory(
+	UnpairedSeedAlignerFactory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
 			bool doFw,
@@ -561,14 +561,15 @@ private:
 /**
  * Concrete factory class for constructing unpaired exact aligners.
  */
-class PairedSeedAlignerV1Factory : public AlignerFactory {
+class PairedSeedAlignerFactory : public AlignerFactory {
 	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
 	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
 public:
-	PairedSeedAlignerV1Factory(
+	PairedSeedAlignerFactory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool v1,
 			bool doFw,
 			bool doRc,
 			uint32_t seedMms,
@@ -599,6 +600,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			v1_(v1),
 			doFw_(doFw),
 			doRc_(doRc),
 			seedMms_(seedMms),
@@ -666,9 +668,18 @@ public:
 			else         do2Fw = false;
 		}
 		TRangeSrcDrPtrVec *dr1FwVec = new TRangeSrcDrPtrVec();
-		TRangeSrcDrPtrVec *dr1RcVec = new TRangeSrcDrPtrVec();
-		TRangeSrcDrPtrVec *dr2FwVec = new TRangeSrcDrPtrVec();
-		TRangeSrcDrPtrVec *dr2RcVec = new TRangeSrcDrPtrVec();
+		TRangeSrcDrPtrVec *dr1RcVec;
+		TRangeSrcDrPtrVec *dr2FwVec;
+		TRangeSrcDrPtrVec *dr2RcVec;
+		if(v1_) {
+			dr1RcVec = new TRangeSrcDrPtrVec();
+			dr2FwVec = new TRangeSrcDrPtrVec();
+			dr2RcVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr1RcVec = dr1FwVec;
+			dr2FwVec = dr1FwVec;
+			dr2RcVec = dr1FwVec;
+		}
 		if(seedMms_ == 0) {
 			const int halfAndHalf = 0;
 			if(do1Fw) {
@@ -1280,27 +1291,37 @@ public:
 		} else {
 			cerr << "Unsupported --stateful mode: " << seedMms_ << endl;
 		}
-		TCostAwareRangeSrcDr* driver1Fw = new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_);
-		TCostAwareRangeSrcDr* driver1Rc = new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_);
-		TCostAwareRangeSrcDr* driver2Fw = new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_);
-		TCostAwareRangeSrcDr* driver2Rc = new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_);
-
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<EbwtRangeSource>(
-			params,
-			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
-			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			maxBts_, pool_, btCnt);
+		if(v1_) {
+			return new PairedBWAlignerV1<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_),
+				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
+				mate1fw_, mate2fw_, peInner_, peOuter_, dontReconcile_,
+				symCeil_, mixedThresh_, mixedAttemptLim_, refs_,
+				rangeMode_, verbose_, maxBts_, pool_, btCnt);
+		} else {
+			// We dumped all the drivers into dr1FwVec
+			return new PairedBWAlignerV2<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
+				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
+				mate1fw_, mate2fw_, peInner_, peOuter_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_, maxBts_,
+				pool_, btCnt);
+		}
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	const bool v1_; // whether to use V1 PairedAligner
 	const bool doFw_;
 	const bool doRc_;
 	const uint32_t seedMms_;

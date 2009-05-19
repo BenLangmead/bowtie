@@ -248,6 +248,7 @@ public:
 	Paired23mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool v1,
 			bool two,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -273,6 +274,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			v1_(v1),
 			two_(two),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -367,9 +369,6 @@ public:
 		if(!two_) {
 			dr1FwVec->push_back(dr1Fw_FwHalf);
 		}
-		// Overall range source driver for the forward orientation of
-		// the first mate
-		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_);
 
 		EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
 			&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
@@ -420,16 +419,18 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, true, pool_, NULL);
-		TRangeSrcDrPtrVec *dr1RcVec = new TRangeSrcDrPtrVec();
+		TRangeSrcDrPtrVec *dr1RcVec;
+		if(v1_) {
+			dr1RcVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr1RcVec = dr1FwVec;
+		}
 		dr1RcVec->push_back(dr1Rc_Fw);
 		dr1RcVec->push_back(dr1Rc_Bw);
 		dr1RcVec->push_back(dr1Rc_FwHalf);
 		if(!two_) {
 			dr1RcVec->push_back(dr1Rc_BwHalf);
 		}
-		// Overall range source driver for the reverse-comp orientation
-		// of the first mate
-		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_);
 
 		EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
 			 ebwtBw_, true, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
@@ -479,16 +480,18 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, false, pool_, NULL);
-		TRangeSrcDrPtrVec *dr2FwVec = new TRangeSrcDrPtrVec();
+		TRangeSrcDrPtrVec *dr2FwVec;
+		if(v1_) {
+			dr2FwVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr2FwVec = dr1FwVec;
+		}
 		dr2FwVec->push_back(dr2Fw_Bw);
 		dr2FwVec->push_back(dr2Fw_Fw);
 		dr2FwVec->push_back(dr2Fw_BwHalf);
 		if(!two_) {
 			dr2FwVec->push_back(dr2Fw_FwHalf);
 		}
-		// Overall range source driver for the forward orientation of
-		// the first mate
-		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_);
 
 		EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
 			&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
@@ -538,16 +541,18 @@ public:
 			PIN_TO_HI_HALF_EDGE,
 			PIN_TO_LEN,
 			os_, verbose_, false, pool_, NULL);
-		TRangeSrcDrPtrVec *dr2RcVec = new TRangeSrcDrPtrVec();
+		TRangeSrcDrPtrVec *dr2RcVec;
+		if(v1_) {
+			dr2RcVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr2RcVec = dr1FwVec;
+		}
 		dr2RcVec->push_back(dr2Rc_Fw);
 		dr2RcVec->push_back(dr2Rc_Bw);
 		dr2RcVec->push_back(dr2Rc_FwHalf);
 		if(!two_) {
 			dr2RcVec->push_back(dr2Rc_BwHalf);
 		}
-		// Overall range source driver for the reverse-comp orientation
-		// of the first mate
-		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_);
 
 		RefAligner<String<Dna5> >* refAligner;
 		if(two_) {
@@ -560,17 +565,34 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<EbwtRangeSource>(
-			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
-			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			INT_MAX, pool_, NULL);
+		if(v1_) {
+			return new PairedBWAlignerV1<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_),
+				refAligner, rchase,
+				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		} else {
+			return new PairedBWAlignerV2<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
+				refAligner, rchase,
+				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		}
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool v1_;
 	bool two_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;

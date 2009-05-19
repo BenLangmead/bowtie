@@ -277,12 +277,13 @@ public:
 		// it is implemented in concrete subclasses
 		nextReadPairImpl(ra, rb, patid);
 		if(!ra.empty()) {
-			assert(!rb.empty());
 			// Possibly randomize the qualities so that they're more
 			// scattered throughout the range of possible values
 			if(randomizeQuals_) {
 				randomizeQuals(ra);
-				randomizeQuals(rb);
+				if(!rb.empty()) {
+					randomizeQuals(rb);
+				}
 			}
 			// TODO: Perhaps bundle all of the following up into a
 			// finalize() member in the ReadBuf class?
@@ -291,17 +292,23 @@ public:
 			// and quals
 			ra.constructRevComps();
 			ra.constructReverses();
-			rb.constructRevComps();
-			rb.constructReverses();
+			if(!rb.empty()) {
+				rb.constructRevComps();
+				rb.constructReverses();
+			}
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
 			ra.seed = genRandSeed(ra.patFw, ra.qualFw, ra.name);
-			rb.seed = genRandSeed(rb.patFw, rb.qualFw, rb.name);
+			if(!rb.empty()) {
+				rb.seed = genRandSeed(rb.patFw, rb.qualFw, rb.name);
+			}
 			// Output it, if desired
 			if(dumpfile_ != NULL) {
 				dumpBuf(ra);
-				dumpBuf(rb);
+				if(!rb.empty()) {
+					dumpBuf(rb);
+				}
 			}
 		}
 	}
@@ -568,8 +575,10 @@ public:
 				unlock();
 				continue; // on to next pair of PatternSources
 			}
-			ra.fixMateName(1);
-			rb.fixMateName(2);
+			if(!rb.empty()) {
+				ra.fixMateName(1);
+				rb.fixMateName(2);
+			}
 			ra.patid = patid;
 			ra.mate  = 1;
 			rb.mate  = 2;
@@ -1598,13 +1607,13 @@ public:
 	                   const char *dumpfile = NULL,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   bool __forgiveInput = false,
+	                   bool forgiveInput = false,
 					   bool solQuals = false,
 					   bool phred64Quals = false,
 					   bool intQuals = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          __forgiveInput, dumpfile,
+		                          forgiveInput, dumpfile,
 		                          trim3, trim5, skip),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
@@ -1637,11 +1646,13 @@ protected:
 
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
-		if(parseQuals(r, charsRead, dstLen, '\n') <= 0) {
+		char ct = 0;
+		if(parseQuals(r, charsRead, dstLen, ct, '\n') <= 0) {
 			peekOverNewline(filebuf_); // skip rest of line
 			r.clearAll();
 			return;
 		}
+		assert_eq(ct, '\n');
 		assert_neq('\n', filebuf_.peek());
 		// The last character read in parseQuals should have been a
 		// '\n'
@@ -1676,15 +1687,21 @@ protected:
 
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
-		if(parseQuals(ra, charsRead1, dstLen1, '\t') <= 0) {
+		char ct = 0;
+		if(parseQuals(ra, charsRead1, dstLen1, ct, '\t', '\n') <= 0) {
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
 		}
+		assert(ct == '\t' || ct == '\n');
+		if(ct == '\n') {
+			rb.clearAll();
+			readCnt_++;
+			patid = readCnt_-1;
+			return;
+		}
 		assert_neq('\t', filebuf_.peek());
-		// The last character read in parseQuals should have been a
-		// '\n'
 
 		// filebuf_ is about to dish out the first character of the
 		// sequence field for the second mate
@@ -1700,12 +1717,13 @@ protected:
 
 		// filebuf_ is about to dish out the first character of the
 		// quality-string field
-		if(parseQuals(rb, charsRead2, dstLen2, '\n') <= 0) {
+		if(parseQuals(rb, charsRead2, dstLen2, ct, '\n') <= 0) {
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
 			return;
 		}
+		assert_eq('\n', ct);
 		if(filebuf_.peek() == '\n') {
 			if(!forgiveInput_) {
 				assert(false);
@@ -1827,12 +1845,15 @@ private:
 	 * the first character of the quality string and the string stops
 	 * at the next char upto (could be tab, newline, etc.).
 	 */
-	int parseQuals(ReadBuf& r, int charsRead, int dstLen, char upto = '\t') {
+	int parseQuals(ReadBuf& r, int charsRead, int dstLen, char& c2,
+	               char upto = '\t', char upto2 = -1)
+	{
 		int qualsRead = 0;
 		int c = 0;
 		if (intQuals_) {
 			char buf[4096];
 			while (qualsRead < charsRead) {
+				// TODO: fixme
 				size_t rd = filebuf_.gets(buf, sizeof(buf));
 				if(rd == 0) break;
 				assert(NULL == strrchr(buf, '\n'));
@@ -1863,6 +1884,7 @@ private:
 			// Non-integer qualities
 			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
 				c = filebuf_.get();
+				c2 = c;
 				if (c == ' ') {
 					wrongQualityFormat();
 					exit(1);
@@ -1871,7 +1893,7 @@ private:
 					// EOF occurred in the middle of a read - abort
 					return -1;
 				}
-				if(!isspace(c) && c != upto) {
+				if(!isspace(c) && c != upto && (upto2 == -1 || c != upto2)) {
 					if (qualsRead >= trim5_) {
 						size_t off = qualsRead - trim5_;
 						if(off + 1 > 1024) {
@@ -1898,7 +1920,10 @@ private:
 		}
 		_setBegin (r.qualFw, (char*)r.qualBufFw);
 		_setLength(r.qualFw, dstLen);
-		while(c != upto) { c = filebuf_.get(); }
+		while(c != upto && (upto2 == -1 || c != upto2)) {
+			c = filebuf_.get();
+			c2 = c;
+		}
 		return qualsRead;
 	}
 

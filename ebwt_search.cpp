@@ -87,7 +87,7 @@ static uint32_t khits           = 1;     // number of hits per read; >1 is much 
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool better				= false; // true -> guarantee alignments from best possible stratum
 static bool oldBest             = false; // true -> guarantee alignments from best possible stratum (the old way)
-static bool spanStrata			= false; // true -> don't stop at stratum boundaries
+static bool spanStrata			= true;  // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
@@ -123,6 +123,7 @@ static bool recal               = false;
 static int recalMaxCycle        = 64;
 static int recalMaxQual         = 40;
 static int recalQualShift       = 2;
+static bool useV1               = true;
 // mating constraints
 
 static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -187,7 +188,9 @@ enum {
 	ARG_CHUNKMBS,
 	ARG_CHUNKSZ,
 	ARG_CHUNKVERBOSE,
-	ARG_RECAL
+	ARG_RECAL,
+	ARG_STRATA,
+	ARG_PEV2
 };
 
 static struct option long_options[] = {
@@ -238,6 +241,7 @@ static struct option long_options[] = {
 	{(char*)"better",       no_argument,       0,            ARG_BETTER},
 	{(char*)"oldbest",      no_argument,       0,            ARG_OLDBEST},
 	{(char*)"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
+	{(char*)"strata",       no_argument,       0,            ARG_STRATA},
 	{(char*)"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
 	{(char*)"range",        no_argument,       0,            ARG_RANGE},
@@ -280,6 +284,7 @@ static struct option long_options[] = {
 	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
 	{(char*)"mm",           no_argument,       0,            ARG_MM},
 	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
+	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -329,8 +334,8 @@ static void printUsage(ostream& out) {
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def: no limit)" << endl
 	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
-	    << "  --best             alignments guaranteed best stratum; tries broken by quality" << endl
-	    << "  --nostrata         if reporting >1 alignment, don't quit at stratum boundaries" << endl
+	    << "  --best             hits guaranteed best stratum; ties broken by quality" << endl
+	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
 	    << "  --strandfix        attempt to fix strand biases" << endl
 	    << "Output:" << endl
 	    << "  --concise          write hits in concise format" << endl
@@ -1272,10 +1277,11 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
 	   		case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
 	   		case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
-	   		case ARG_BETTER: stateful = true; better = true; break;
-	   		case ARG_OLDBEST: oldBest = true; break;
-	   		case ARG_BEST: stateful = true; break;
+	   		case ARG_BETTER: stateful = true; better = true; oldBest = false; break;
+	   		case ARG_OLDBEST: oldBest = true; stateful = false; break;
+	   		case ARG_BEST: stateful = true; useV1 = false; oldBest = false; break;
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
+	   		case ARG_STRATA: spanStrata = false; break;
 	   		case ARG_VERBOSE: verbose = true; break;
 	   		case ARG_QUIET: quiet = true; break;
 	   		case ARG_SANITY: sanityCheck = true; break;
@@ -1283,6 +1289,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_NO_FW: nofw = true; break;
 	   		case ARG_NO_RC: norc = true; break;
 	   		case ARG_STATS: stats = true; break;
+	   		case ARG_PEV2: useV1 = false; break;
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
@@ -1311,6 +1318,7 @@ static void parseOptions(int argc, char **argv) {
 				exit(1);
 		}
 	} while(next_option != -1);
+	bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
 		// Tell the Ebwt loader to ignore the suffix-array portion of
 		// the index.  We don't need it because the user isn't asking
@@ -1330,6 +1338,7 @@ static void parseOptions(int argc, char **argv) {
 		     << "sequences must be specified with -1 and -2." << endl;
 		exit(1);
 	}
+	// Check for duplicate mate input files
 	if(format != CMDLINE) {
 		for(size_t i = 0; i < mates1.size(); i++) {
 			for(size_t j = 0; j < mates2.size(); j++) {
@@ -1339,13 +1348,16 @@ static void parseOptions(int argc, char **argv) {
 			}
 		}
 	}
-	if(mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0) {
-		spanStrata = true;
-	}
+	// Check for all the parameter combinations that aren't compatible
+	// with -z/--phased mode.
 	if(!fullIndex) {
 		bool error = false;
 		if(khits > 1) {
 			cerr << "When -z/--phased is used, -k X for X > 1 is unavailable" << endl;
+			error = true;
+		}
+		if(mhits != 0xffffffff) {
+			cerr << "When -z/--phased is used, -m is unavailable" << endl;
 			error = true;
 		}
 		if(oldBest) {
@@ -1361,11 +1373,11 @@ static void parseOptions(int argc, char **argv) {
 			error = true;
 		}
 		if(allHits && !spanStrata) {
-			cerr << "When -a/--all and -z/--phased are used, --nostrata must also be used." << endl
+			cerr << "When -a/--all and -z/--phased are used, --nostrata cannot also be used." << endl
 			     << "Stratified all-hits search cannot be combined with phased search." << endl;
 			error = true;
 		}
-		if(mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0) {
+		if(paired) {
 			cerr << "When -z/--phased is used, paired-end mode is unavailable" << endl;
 			error = true;
 		}
@@ -1376,6 +1388,14 @@ static void parseOptions(int argc, char **argv) {
 		maxBts = maxBtsBetter = INT_MAX;
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
+	}
+	if(fullIndex && !spanStrata && !stateful && !oldBest) {
+		cerr << "--strata must be combined with --best" << endl;
+		exit(1);
+	}
+	if(!spanStrata && !allHits && khits == 1 && mhits == 0xffffffff) {
+		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
+		exit(1);
 	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
 	// since it uses patid to know if we've reached the -u limit (and
@@ -1515,6 +1535,7 @@ static HitSinkPerThreadFactory*
 createSinkFactory(HitSink& _sink, bool sanity) {
     HitSinkPerThreadFactory *sink = NULL;
     if(spanStrata) {
+    	// Unstratified
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, spanning strata
@@ -1528,17 +1549,28 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 			sink = new AllHitSinkPerThreadFactory(_sink, mhits, sanity);
 		}
     } else {
+    	// Stratified
+    	assert(oldBest || stateful);
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, not spanning strata
 				sink = new NBestStratHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			} else {
-				// First N good; "good" inherently ignores strata
-				sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
+				assert(stateful);
+				// Buffer best hits, assuming they're arriving in best-
+				// to-worst order
+				sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
 			}
 		} else {
-			// All hits, not spanning strata
-			sink = new AllStratHitSinkPerThreadFactory(_sink, mhits, sanity);
+			if(oldBest) {
+				// All hits, not spanning strata
+				sink = new AllStratHitSinkPerThreadFactory(_sink, mhits, sanity);
+			} else {
+				assert(stateful);
+				// Buffer best hits, assuming they're arriving in best-
+				// to-worst order
+				sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits, sanity);
+			}
 		}
     }
     assert(sink != NULL);
@@ -1631,6 +1663,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
 			NULL,
+			useV1,
 			_sink,
 			*sinkFact,
 			mate1fw,
@@ -1648,7 +1681,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			refs, os,
 			!noMaqRound,
 			!better,
-			false, // strandFix,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -2004,6 +2037,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Paired1mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			useV1,
 			_sink,
 			*sinkFact,
 			mate1fw,
@@ -2021,7 +2055,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			refs, os,
 			!noMaqRound,
 			!better,
-			false, // strandFix,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -2582,6 +2616,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			useV1,
 			two,
 			_sink,
 			*sinkFact,
@@ -2600,7 +2635,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			refs, os,
 			!noMaqRound,
 			!better,
-			false, //strandFix,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);
@@ -3224,7 +3259,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	if(stats) {
 		metrics = new AlignerMetrics();
 	}
-	UnpairedSeedAlignerV1Factory alSEfact(
+	UnpairedSeedAlignerFactory alSEfact(
 			ebwtFw,
 			&ebwtBw,
 			!nofw,
@@ -3247,9 +3282,10 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			verbose,
 			seed,
 			metrics);
-	PairedSeedAlignerV1Factory alPEfact(
+	PairedSeedAlignerFactory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			useV1,
 			!nofw,
 			!norc,
 			seedMms,
@@ -3274,7 +3310,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			os,
 			!noMaqRound,
 			!better,
-			strandFix, // strandFix,
+			strandFix,
 			rangeMode,
 			verbose,
 			seed);

@@ -1792,11 +1792,11 @@ public:
 			bool strandFix,
 			const TRangeSrcDrPtrVec* rss,
 			bool verbose,
-			bool deleteOnDone = false) :
+			bool mixesReads = false) :
 		RangeSourceDriver<TRangeSource>(false),
 		rss_(), active_(), strandFix_(strandFix),
 		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
-		verbose_(verbose)
+		verbose_(verbose), mixesReads_(mixesReads)
 	{
 		if(rss != NULL) {
 			rss_ = (*rss);
@@ -2031,10 +2031,10 @@ protected:
 		if(!r->ebwt->fw()) top = -top;
 		if(r->fw) {
 			assert(this->allTops_.find(top) == this->allTops_.end());
-			this->allTops_.insert(top);
+			if(!mixesReads_) this->allTops_.insert(top);
 		} else {
 			assert(this->allTopsRc_.find(top) == this->allTopsRc_.end());
-			this->allTopsRc_.insert(top);
+			if(!mixesReads_) this->allTopsRc_.insert(top);
 		}
 		return true;
 	}
@@ -2195,6 +2195,7 @@ protected:
 	Range *delayedRange_;
 	PatternSourcePerThread* patsrc_;
 	bool verbose_;
+	bool mixesReads_;
 	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
 };
 

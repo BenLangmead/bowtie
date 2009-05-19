@@ -9,9 +9,11 @@
 #include <vector>
 #include <set>
 #include <sstream>
+#include <fcntl.h>
 #include <errno.h>
 #include <seqan/sequence.h>
 #include <seqan/index.h>
+#include <sys/stat.h>
 #include <sys/mman.h>
 #ifdef BOWTIE_SHARED_MEM
 #include <sys/shm.h>
@@ -420,8 +422,8 @@ public:
 	    _passMemExc(__passMemExc), \
 	    _sanity(__sanityCheck), \
 	    _fw(__fw), \
-	    _in1(), \
-	    _in2(), \
+	    _in1(-1), \
+	    _in2(-1), \
 	    _zOff(0xffffffff), \
 	    _zEbwtByteOff(0xffffffff), \
 	    _zEbwtBpOff(-1), \
@@ -516,19 +518,19 @@ public:
 	     Ebwt_STAT_INITS,
 	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate)
 	{
-		string file1 = file + ".1.ebwt";
-		string file2 = file + ".2.ebwt";
+		_in1Str = file + ".1.ebwt";
+		_in2Str = file + ".2.ebwt";
 		// Open output files
-		ofstream fout1(file1.c_str(), ios::binary);
+		ofstream fout1(_in1Str.c_str(), ios::binary);
 		if(!fout1.good()) {
-			cerr << "Could not open index file for writing: \"" << file1 << "\"" << endl
+			cerr << "Could not open index file for writing: \"" << _in1Str << "\"" << endl
 			     << "Please make sure the directory exists and that permissions allow writing by" << endl
 			     << "Bowtie." << endl;
 			exit(1);
 		}
-		ofstream fout2(file2.c_str(), ios::binary);
+		ofstream fout2(_in2Str.c_str(), ios::binary);
 		if(!fout2.good()) {
-			cerr << "Could not open index file for writing: \"" << file2 << "\"" << endl
+			cerr << "Could not open index file for writing: \"" << _in2Str << "\"" << endl
 			     << "Please make sure the directory exists and that permissions allow writing by" << endl
 			     << "Bowtie." << endl;
 			exit(1);
@@ -549,22 +551,22 @@ public:
 		// Close output files
 		fout1.flush();
 		int64_t tellpSz1 = (int64_t)fout1.tellp();
-		VMSG_NL("Wrote " << fout1.tellp() << " bytes to primary EBWT file: " << file1);
+		VMSG_NL("Wrote " << fout1.tellp() << " bytes to primary EBWT file: " << _in1Str);
 		fout1.close();
 		bool err = false;
-		if(tellpSz1 > fileSize(file1.c_str())) {
+		if(tellpSz1 > fileSize(_in1Str.c_str())) {
 			err = true;
-			cerr << "Index is corrupt: File size for " << file1 << " should have been " << tellpSz1
-			     << " but is actually " << fileSize(file1.c_str()) << "." << endl;
+			cerr << "Index is corrupt: File size for " << _in1Str << " should have been " << tellpSz1
+			     << " but is actually " << fileSize(_in1Str.c_str()) << "." << endl;
 		}
 		fout2.flush();
 		int64_t tellpSz2 = (int64_t)fout2.tellp();
-		VMSG_NL("Wrote " << fout2.tellp() << " bytes to secondary EBWT file: " << file2);
+		VMSG_NL("Wrote " << fout2.tellp() << " bytes to secondary EBWT file: " << _in2Str);
 		fout2.close();
-		if(tellpSz2 > fileSize(file2.c_str())) {
+		if(tellpSz2 > fileSize(_in2Str.c_str())) {
 			err = true;
-			cerr << "Index is corrupt: File size for " << file2 << " should have been " << tellpSz2
-			     << " but is actually " << fileSize(file2.c_str()) << "." << endl;
+			cerr << "Index is corrupt: File size for " << _in2Str << " should have been " << tellpSz2
+			     << " but is actually " << fileSize(_in2Str.c_str()) << "." << endl;
 		}
 		if(err) {
 			cerr << "Please check if there is a problem with the disk or if disk is full." << endl;
@@ -572,24 +574,13 @@ public:
 		}
 		// Reopen as input streams
 		VMSG_NL("Re-opening _in1 and _in2 as input streams");
-		_in1.open(file1.c_str(), ios_base::in | ios::binary);
-		_in2.open(file2.c_str(), ios_base::in | ios::binary);
-		assert_eq((streamoff)_in1.tellg(), ios::beg);
-		assert_eq((streamoff)_in2.tellg(), ios::beg);
-		assert(_in1.good());
-		assert(_in2.good());
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false /* not just header */,
-			               NULL);
+			readIntoMemory(false, NULL);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
-			assert(_in1.is_open()); assert(_in1.good());
-			assert(_in2.is_open()); assert(_in2.good());
-			assert_eq((streamoff)_in1.tellg(), ios::beg);
-			assert_eq((streamoff)_in2.tellg(), ios::beg);
 		}
 		VMSG_NL("Returning from Ebwt constructor");
 	}
@@ -804,6 +795,7 @@ public:
 
 	/// Destruct an Ebwt
 	~Ebwt() {
+		// Only free buffers if we're *not* using memory-mapped files
 		if(!_useMm) {
 			// Delete everything that was allocated in read(false, ...)
 			if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
@@ -828,12 +820,8 @@ public:
 #endif
 			}
 		}
-		try {
-			if(_in1.is_open()) _in1.close();
-			if(_in2.is_open()) _in2.close();
-		} catch(...) {
-			VMSG_NL("~Ebwt(): Caught an exception while closing streams!");
-		}
+		close(_in1);
+		close(_in2);
 #ifdef EBWT_STATS
 		cout << (_fw ? "Forward index:" : "Mirror index:") << endl;
 		cout << "  mapLFEx:   " << mapLFExs_ << endl;
@@ -888,8 +876,6 @@ public:
 			assert(_eftab == NULL);
 			assert(_fchr == NULL);
 			assert(_offs == NULL);
-			// Not necessarily; it's also NULL when there's no ISA
-			//assert(_isa == NULL);
 			if(_eh._chunkRate >= 0) {
 				assert(_pmap == NULL);
 			} else {
@@ -919,25 +905,35 @@ public:
 	 */
 	void evictFromMemory() {
 		assert(isInMemory());
-		if(_useMm) return;
-		delete[] _fchr;  _fchr  = NULL;
-		delete[] _ftab;  _ftab  = NULL;
-		delete[] _eftab; _eftab = NULL;
-		if(!_offsIsShmem) {
-			delete[] _offs;  _offs  = NULL;
+		if(!_useMm) {
+			delete[] _fchr;
+			delete[] _ftab;
+			delete[] _eftab;
+			if(!_offsIsShmem) delete[] _offs;
+			delete[] _isa;
+			// Keep plen; it's small and the client may want to query it
+			// even when the others are evicted.
+			//delete[] _plen;
+			if(_eh._chunkRate >= 0) {
+				delete[] _pmap;
+			} else {
+				delete[] _rstarts;
+			}
+			if(!_ebwtIsShmem) {
+				delete[] _ebwt;
+			}
 		}
-		delete[] _isa;   _isa   = NULL;
+		_fchr  = NULL;
+		_ftab  = NULL;
+		_eftab = NULL;
+		_offs  = NULL;
+		_isa   = NULL;
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
-		//delete[] _plen;  _plen  = NULL;
-		if(_eh._chunkRate >= 0) {
-			delete[] _pmap; _pmap  = NULL;
-		} else {
-			delete[] _rstarts; _rstarts = NULL;
-		}
-		if(!_ebwtIsShmem) {
-			delete[] _ebwt;  _ebwt  = NULL;
-		}
+		//_plen  = NULL;
+		_pmap    = NULL;
+		_rstarts = NULL;
+		_ebwt    = NULL;
 		_zEbwtByteOff = 0xffffffff;
 		_zEbwtBpOff = -1;
 	}
@@ -946,7 +942,8 @@ public:
 	 * Non-static facade for static function ftabHi.
 	 */
 	uint32_t ftabHi(uint32_t i) const {
-		return Ebwt::ftabHi(_ftab, _eftab, _eh._len, _eh._ftabLen, _eh._eftabLen, i);
+		return Ebwt::ftabHi(_ftab, _eftab, _eh._len, _eh._ftabLen,
+		                    _eh._eftabLen, i);
 	}
 
 	/**
@@ -979,7 +976,8 @@ public:
 	 * Non-static facade for static function ftabLo.
 	 */
 	uint32_t ftabLo(uint32_t i) const {
-		return Ebwt::ftabLo(_ftab, _eftab, _eh._len, _eh._ftabLen, _eh._eftabLen, i);
+		return Ebwt::ftabLo(_ftab, _eftab, _eh._len, _eh._ftabLen,
+		                    _eh._eftabLen, i);
 	}
 
 	/**
@@ -1188,8 +1186,8 @@ public:
 	bool       _passMemExc;
 	bool       _sanity;
 	bool       _fw;     // true iff this is a forward index
-	ifstream   _in1;    // input stream for primary index file
-	ifstream   _in2;    // input stream for secondary index file
+	int        _in1;    // input fd for primary index file
+	int        _in2;    // input fd for secondary index file
 	string     _in1Str; // filename for primary index file
 	string     _in2Str; // filename for secondary index file
 	uint32_t   _zOff;
@@ -1885,8 +1883,6 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 /**
  * Counts the number of occurrences of character 'c' in the given Ebwt
  * side up to (but not including) the given byte/bitpair (by/bp).
- *
- * Function gets 5.86% in the profile.
  */
 template<typename TStr>
 inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
@@ -2867,36 +2863,43 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 template<typename TStr>
 void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	bool useShmem = _offsIsShmem || _ebwtIsShmem;
+	assert(!useShmem || !_useMm);
 	bool switchEndian; // dummy; caller doesn't care
 	if(_in1Str.length() > 0) {
 		// Initialize our primary and secondary input-stream fields
-		if(!_in1.is_open()) {
-			if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
-			_in1.open(_in1Str.c_str(), ios_base::in | ios::binary);
-			if(!_in1.is_open()) {
-				throw EbwtFileOpenException("Cannot open file " + _in1Str);
-			}
+		close(_in1);
+		if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
+		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
+			cerr << "Could not open index file " << _in1Str << endl;
 		}
-		assert(_in1.is_open());
-		assert(_in1.good());
-		assert_eq((streamoff)_in1.tellg(), ios::beg);
-		if(!_in2.is_open()) {
-			if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
-			_in2.open(_in2Str.c_str(), ios_base::in | ios::binary);
-			if(!_in2.is_open()) {
-				throw EbwtFileOpenException("Cannot open file " + _in2Str);
-			}
+		close(_in2);
+		if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
+		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
+			cerr << "Could not open index file " << _in2Str << endl;
 		}
-		assert(_in2.is_open());
-		assert(_in2.good());
-		assert_eq((streamoff)_in2.tellg(), ios::beg);
-		// _in1 and _in2 must already be open with the get cursor at the
-		// beginning and no error flags set.
 	}
-	assert(_in1.is_open()); assert(_in1.good());
-	assert(_in2.is_open()); assert(_in2.good());
-	assert_eq((streamoff)_in1.tellg(), ios::beg);
-	assert_eq((streamoff)_in2.tellg(), ios::beg);
+
+	char *mmFile[] = { NULL, NULL };
+	if(_useMm) {
+		const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
+		int fds[] = { _in1, _in2 };
+		for(int i = 0; i < 2; i++) {
+			if(_verbose) cout << "  Memory-mapping input file " << (i+1) << endl;
+			struct stat sbuf;
+			if (stat(names[i], &sbuf) == -1) {
+				perror("stat");
+				cerr << "Error: Could not stat index file " << names[i] << " prior to memory-mapping" << endl;
+				exit(1);
+			}
+			mmFile[i] = (char*)mmap((void *)0, sbuf.st_size,
+			                        PROT_READ, MAP_SHARED, fds[i], 0);
+			if(mmFile == (void *)(-1)) {
+				perror("mmap");
+				cerr << "Error: Could not memory-map the index file " << names[i] << endl;
+				exit(1);
+			}
+		}
+	}
 
 	if(_verbose) cout << "  Reading header" << endl;
 
@@ -2912,6 +2915,15 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		assert_eq((1u<<24), one);
 		assert_eq(1, endianSwapU32(one));
 		switchEndian = true;
+	}
+
+	// Can't switch endianness and use memory-mapped files; in order to
+	// support this, someone has to modify the file to switch
+	// endiannesses appropriately, and we can't do this inside Bowtie
+	// or we might be setting up a race condition with other processes.
+	if(switchEndian && _useMm) {
+		cerr << "Error: Can't use memory-mapped files when the index is the opposite endianness" << endl;
+		exit(1);
 	}
 
 	// Reads header entries one by one from primary stream
@@ -2966,6 +2978,14 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		}
 	}
 
+	// Can't override the offrate or isarate and use memory-mapped
+	// files; ultimately, all processes need to copy the sparser sample
+	// into their own memory spaces.
+	if(_useMm && (offRateDiff || isaRateDiff)) {
+		cerr << "Error: Can't use memory-mapped files when the offrate or isarate is overridden" << endl;
+		exit(1);
+	}
+
 	// Read nPat from primary stream
 	this->_nPat = readI32(_in1, switchEndian);
 	if(this->_plen != NULL) {
@@ -2973,22 +2993,30 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		delete[] this->_plen;
 		this->_plen = NULL;
 	}
-	try {
-		// Read plen from primary stream
-		if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
-		this->_plen = new uint32_t[this->_nPat];
-		if(switchEndian) {
-			for(uint32_t i = 0; i < this->_nPat; i++) {
-				this->_plen[i] = readU32(_in1, switchEndian);
+
+	// Read plen from primary stream
+	if(_useMm) {
+
+	} else {
+		try {
+			if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
+			this->_plen = new uint32_t[this->_nPat];
+			if(switchEndian) {
+				for(uint32_t i = 0; i < this->_nPat; i++) {
+					this->_plen[i] = readU32(_in1, switchEndian);
+				}
+			} else {
+				ssize_t r = read(_in1, (void*)this->_plen, this->_nPat*4);
+				if(r != (ssize_t)(this->_nPat*4)) {
+					cerr << "Error reading _plen[] array: " << r << ", " << (this->_nPat*4) << endl;
+					exit(1);
+				}
 			}
-		} else {
-			_in1.read((char *)this->_plen, this->_nPat*4);
-			assert_eq(this->_nPat*4, (uint32_t)_in1.gcount());
+		} catch(bad_alloc& e) {
+			cerr << "Out of memory allocating plen[] in Ebwt::read()"
+				 << " at " << __FILE__ << ":" << __LINE__ << endl;
+			throw e;
 		}
-	} catch(bad_alloc& e) {
-		cerr << "Out of memory allocating plen[] in Ebwt::read()"
-			 << " at " << __FILE__ << ":" << __LINE__ << endl;
-		throw e;
 	}
 
 	// TODO: I'm not consistent on what "header" means.  Here I'm using
@@ -3011,8 +3039,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 					this->_pmap[i+3] = readU32(_in1, switchEndian); // fragment length
 				}
 			} else {
-				_in1.read((char *)this->_pmap, pmapEnts*4);
-				assert_eq(pmapEnts*4, (uint32_t)_in1.gcount());
+				ssize_t r = read(_in1, (void *)this->_pmap, pmapEnts*4);
+				if(r != (ssize_t)(pmapEnts*4)) {
+					cerr << "Error reading _pmap[] array: " << r << ", " << (pmapEnts*4) << endl;
+					exit(1);
+				}
 			}
 			for(uint32_t i = 0; i < pmapEnts; i += 4) {
 				assert_lt (this->_pmap[i],   this->_nPat);
@@ -3039,8 +3070,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 				this->_rstarts[i+2] = readU32(_in1, switchEndian);
 			}
 		} else {
-			_in1.read((char *)this->_rstarts, this->_nFrag*4*3);
-			assert_eq(this->_nFrag*4*3, (uint32_t)_in1.gcount());
+			ssize_t r = read(_in1, (void *)this->_rstarts, this->_nFrag*4*3);
+			if(r != (ssize_t)(this->_nFrag*4*3)) {
+				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*4*3) << endl;
+				exit(1);
+			}
 		}
 	}
 	{ // Load _ebwt[]
@@ -3154,8 +3188,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 #endif
 		if(readFromStream) {
 			// Read ebwt from primary stream
-			_in1.read((char *)this->_ebwt, eh->_ebwtTotLen);
-			assert_eq(eh->_ebwtTotLen, (uint32_t)_in1.gcount());
+			ssize_t r = read(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
+			if(r != (ssize_t)eh->_ebwtTotLen) {
+				cerr << "Error reading _ebwt[] array: " << r << ", " << (eh->_ebwtTotLen) << endl;
+				exit(1);
+			}
 			if(switchEndian) {
 				uint8_t *side = this->_ebwt;
 				for(size_t i = 0; i < eh->_numSides; i++) {
@@ -3181,15 +3218,18 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			for(size_t i = 0; i < eh->_ebwtTotLen; i += 4096) {
 				uint8_t buf[4096];
 				size_t amt = min<size_t>(4096, eh->_ebwtTotLen-i);
-				_in1.read((char *)buf, amt);
-				assert_eq(amt, (size_t)_in1.gcount());
+				ssize_t r = read(_in1, (void *)buf, amt);
+				if(r != (ssize_t)amt) {
+					cerr << "Error reading _ebwt[] array: " << r << ", " << amt << endl;
+					exit(1);
+				}
 				for(size_t j = 0; j < amt; j++) {
 					assert_eq((int)buf[j], (int)this->_ebwt[i+j]);
 				}
 			}
 #else
 			// Seek past it, since it's already sitting in shared memory
-			_in1.seekg(eh->_ebwtTotLen, ios_base::cur);
+			lseek(_in1, eh->_ebwtTotLen, SEEK_CUR);
 #endif
 		}
 	}
@@ -3215,8 +3255,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			for(uint32_t i = 0; i < eh->_ftabLen; i++)
 				this->_ftab[i] = readU32(_in1, switchEndian);
 		} else {
-			_in1.read((char *)this->_ftab, eh->_ftabLen*4);
-			assert_eq(eh->_ftabLen*4, (uint32_t)_in1.gcount());
+			ssize_t r = read(_in1, (void *)this->_ftab, eh->_ftabLen*4);
+			if(r != (ssize_t)(eh->_ftabLen*4)) {
+				cerr << "Error reading _ftab[] array: " << r << ", " << (eh->_ftabLen*4) << endl;
+				exit(1);
+			}
 		}
 		// Read etab from primary stream
 		if(_verbose) cout << "Reading eftab (" << eh->_eftabLen << ")" << endl;
@@ -3225,8 +3268,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			for(uint32_t i = 0; i < eh->_eftabLen; i++)
 				this->_eftab[i] = readU32(_in1, switchEndian);
 		} else {
-			_in1.read((char *)this->_eftab, eh->_eftabLen*4);
-			assert_eq(eh->_eftabLen*4, (uint32_t)_in1.gcount());
+			ssize_t r = read(_in1, (void *)this->_eftab, eh->_eftabLen*4);
+			if(r != (ssize_t)(eh->_eftabLen*4)) {
+				cerr << "Error reading _eftab[] array: " << r << ", " << (eh->_eftabLen*4) << endl;
+				exit(1);
+			}
 		}
 		for(uint32_t i = 0; i < eh->_eftabLen; i++) {
 			if(i > 0 && this->_eftab[i] > 0) {
@@ -3246,8 +3292,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	// Read reference sequence names from primary index file
 	while(true) {
 		char c = '\0';
-		_in1.read(&c, 1);
-		if(_in1.eof()) break;
+		if(read(_in1, (void *)(&c), (size_t)1) != (ssize_t)1) break;
 		if(c == '\0') break;
 		else if(c == '\n') {
 			this->_refnames.push_back("");
@@ -3375,8 +3420,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 				char *buf = new char[blockMaxSz];
 				for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
 					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
-					_in2.read(buf, block << 2);
-					assert_eq((block << 2), (uint32_t)_in2.gcount());
+					ssize_t r = read(_in2, (void *)buf, block << 2);
+					if(r != (ssize_t)(block << 2)) {
+						cerr << "Error reading block of _offs[] array: " << r << ", " << (block << 2) << endl;
+						exit(1);
+					}
 					uint32_t idx = i >> offRateDiff;
 					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
 						assert_lt(idx, offsLenSampled);
@@ -3398,14 +3446,20 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 					// offsLen << 2 overflows, so do it in four reads
 					char *offs = (char *)this->_offs;
 					for(int i = 0; i < 4; i++) {
-						_in2.read(offs, offsLen);
-						assert_eq(offsLen, (uint32_t)_in2.gcount());
+						ssize_t r = read(_in2, (void*)offs, offsLen);
+						if(r != (ssize_t)(offsLen)) {
+							cerr << "Error reading block of _offs[] array: " << r << ", " << offsLen << endl;
+							exit(1);
+						}
 						offs += offsLen;
 					}
 				} else {
 					// Do it all in one read
-					_in2.read((char *)this->_offs, offsLen << 2);
-					assert_eq(offsLen*4, (uint32_t)_in2.gcount());
+					ssize_t r = read(_in2, (void*)this->_offs, offsLen << 2);
+					if(r != (ssize_t)(offsLen << 2)) {
+						cerr << "Error reading _offs[] array: " << r << ", " << (offsLen << 2) << endl;
+						exit(1);
+					}
 				}
 			}
 			if(useShmem) {
@@ -3424,15 +3478,18 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			for(size_t i = 0; i < offsLen; i += 1024) {
 				uint32_t buf[1024];
 				size_t amt = min<size_t>(1024, offsLen - i);
-				_in2.read((char*)buf, amt*4);
-				assert_eq(amt*4, (size_t)_in2.gcount());
+				ssize_t r = read(_in2, (void*)buf, amt*4);
+				if(r != (ssize_t)(amt*4)) {
+					cerr << "Error reading _offs[] array: " << r << ", " << (amt*4) << endl;
+					exit(1);
+				}
 				for(size_t j = 0; j < amt; j++) {
 					assert_eq(buf[j], this->_offs[i+j]);
 				}
 			}
 #else
 			// Seek past it, since it's already sitting in shared memory
-			_in2.seekg(offsLen*4, ios_base::cur);
+			lseek(_in2, offsLen*4, SEEK_CUR);
 #endif
 		}
 
@@ -3462,7 +3519,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		for(uint32_t i = 0; i < isaLen; i++) {
 			if((i & ~(0xffffffff << isaRateDiff)) != 0) {
 				char tmp[4];
-				_in2.read(tmp, 4);
+				ssize_t r = read(_in2, (void *)tmp, 4);
+				if(r != (ssize_t)4) {
+					cerr << "Error reading a word of the _isa[] array: " << r << ", 4" << endl;
+					exit(1);
+				}
 			} else {
 				uint32_t idx = i >> isaRateDiff;
 				assert_lt(idx, isaLenSampled);
@@ -3470,8 +3531,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			}
 		}
 	} else {
-		_in2.read((char *)this->_isa, isaLen*4);
-		assert_eq(isaLen*4, (uint32_t)_in2.gcount());
+		ssize_t r = read(_in2, (void *)this->_isa, isaLen*4);
+		if(r != (ssize_t)(isaLen*4)) {
+			cerr << "Error reading _isa[] array: " << r << ", " << (isaLen*4) << endl;
+			exit(1);
+		}
 	}
 	{
 		ASSERT_ONLY(Bitset isasSeen(len+1));
@@ -3493,10 +3557,8 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 
 	// Be kind
 	if(deleteEh) delete eh;
-	_in1.clear(); _in1.seekg(0, ios::beg);
-	_in2.clear(); _in2.seekg(0, ios::beg);
-	assert(_in1.is_open()); assert(_in1.good());
-	assert(_in2.is_open()); assert(_in2.good());
+	lseek(_in1, 0, SEEK_SET);
+	lseek(_in2, 0, SEEK_SET);
 }
 
 /**

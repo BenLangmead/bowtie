@@ -133,10 +133,14 @@ private:
  * Concrete factory class for constructing unpaired exact aligners.
  */
 class PairedExactAlignerV1Factory : public AlignerFactory {
+	typedef RangeSourceDriver<EbwtRangeSource> TRangeSrcDr;
+	typedef CostAwareRangeSourceDriver<EbwtRangeSource> TCostAwareRangeSrcDr;
+	typedef std::vector<TRangeSrcDr*> TRangeSrcDrPtrVec;
 public:
 	PairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool v1,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			bool mate1fw,
@@ -160,6 +164,7 @@ public:
 			bool verbose,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
+			v1_(v1),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			mate1fw_(mate1fw),
@@ -250,18 +255,35 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<EbwtRangeSource>(
-			params,
-			driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
-			rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			INT_MAX, pool_, NULL);
+		if(v1_) {
+			return new PairedBWAlignerV1<EbwtRangeSource>(
+				params,
+				driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
+				rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		} else {
+			TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
+			drVec->push_back(driver1Fw);
+			drVec->push_back(driver1Rc);
+			drVec->push_back(driver2Fw);
+			drVec->push_back(driver2Rc);
+			return new PairedBWAlignerV2<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_, true),
+				refAligner,
+				rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		}
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool v1_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	const bool mate1fw_;

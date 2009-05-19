@@ -177,6 +177,7 @@ public:
 	Paired1mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool v1,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
 			bool mate1fw,
@@ -201,6 +202,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			v1_(v1),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
 			mate1fw_(mate1fw),
@@ -263,10 +265,10 @@ public:
 			PIN_TO_LEN, // "
 			os_, verbose_, true, pool_, NULL);
 
-		TRangeSrcDrPtrVec dr1FwVec;
-		dr1FwVec.push_back(dr1Fw_Bw);
-		dr1FwVec.push_back(dr1Fw_Fw);
-		TCostAwareRangeSrcDr* dr1Fw = new TCostAwareRangeSrcDr(strandFix_, &dr1FwVec, verbose_);
+		TRangeSrcDrPtrVec *dr1FwVec;
+		dr1FwVec = new TRangeSrcDrPtrVec();
+		dr1FwVec->push_back(dr1Fw_Bw);
+		dr1FwVec->push_back(dr1Fw_Fw);
 
 		EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
 			&ebwtFw_, false, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
@@ -291,10 +293,14 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, true, pool_, NULL);
-		TRangeSrcDrPtrVec dr1RcVec;
-		dr1RcVec.push_back(dr1Rc_Fw);
-		dr1RcVec.push_back(dr1Rc_Bw);
-		TCostAwareRangeSrcDr* dr1Rc = new TCostAwareRangeSrcDr(strandFix_, &dr1RcVec, verbose_);
+		TRangeSrcDrPtrVec *dr1RcVec;
+		if(v1_) {
+			dr1RcVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr1RcVec = dr1FwVec;
+		}
+		dr1RcVec->push_back(dr1Rc_Fw);
+		dr1RcVec->push_back(dr1Rc_Bw);
 
 		EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
 			 ebwtBw_, true, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
@@ -319,10 +325,14 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, false, pool_, NULL);
-		TRangeSrcDrPtrVec dr2FwVec;
-		dr2FwVec.push_back(dr2Fw_Bw);
-		dr2FwVec.push_back(dr2Fw_Fw);
-		TCostAwareRangeSrcDr* dr2Fw = new TCostAwareRangeSrcDr(strandFix_, &dr2FwVec, verbose_);
+		TRangeSrcDrPtrVec *dr2FwVec;
+		if(v1_) {
+			dr2FwVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr2FwVec = dr1FwVec;
+		}
+		dr2FwVec->push_back(dr2Fw_Bw);
+		dr2FwVec->push_back(dr2Fw_Fw);
 
 		EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
 			&ebwtFw_, false, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
@@ -347,10 +357,14 @@ public:
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
 			os_, verbose_, false, pool_, NULL);
-		TRangeSrcDrPtrVec dr2RcVec;
-		dr2RcVec.push_back(dr2Rc_Fw);
-		dr2RcVec.push_back(dr2Rc_Bw);
-		TCostAwareRangeSrcDr* dr2Rc = new TCostAwareRangeSrcDr(strandFix_, &dr2RcVec, verbose_);
+		TRangeSrcDrPtrVec *dr2RcVec;
+		if(v1_) {
+			dr2RcVec = new TRangeSrcDrPtrVec();
+		} else {
+			dr2RcVec = dr1FwVec;
+		}
+		dr2RcVec->push_back(dr2Rc_Fw);
+		dr2RcVec->push_back(dr2Rc_Bw);
 
 		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
 
@@ -358,17 +372,34 @@ public:
 		RangeChaser<String<Dna> > *rchase =
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
-		return new PairedBWAlignerV1<EbwtRangeSource>(
-			params, dr1Fw, dr1Rc, dr2Fw, dr2Rc, refAligner, rchase,
-			sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
-			peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-			mixedAttemptLim_, refs_, rangeMode_, verbose_,
-			INT_MAX, pool_, NULL);
+		if(v1_) {
+			return new PairedBWAlignerV1<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_),
+				refAligner, rchase,
+				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		} else {
+			return new PairedBWAlignerV2<EbwtRangeSource>(
+				params,
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
+				refAligner, rchase,
+				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				peInner_, peOuter_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				INT_MAX, pool_, NULL);
+		}
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool v1_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	const bool mate1fw_;
