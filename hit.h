@@ -2371,64 +2371,81 @@ public:
 			assert(!spill);
 			if(partition > 0) {
 				// Output a partitioning key
-				// First component of the key is the reference index,
-				// followed by a space.  Note that Hadoop does *not*
-				// treat space as a field separator, so we're still in
-				// the first (key) field.
-				ss << h.h.first << " ";
-				ostringstream ss2;
-				// Next component of the key is the reference offset
+				// First component of the key is the reference index
+				ss << h.h.first << "\t";
+				ostringstream ss2, ss3;
+				// Next component of the key is the partition id
 				if(!dospill) {
-					pdiv = h.h.second / partition;
-					pmod = h.h.second % partition;
+					pdiv = (h.h.second + offBase) / partition;
+					pmod = (h.h.second + offBase) % partition;
 				}
 				assert_neq(0xffffffff, pdiv);
 				assert_neq(0xffffffff, pmod);
 				if(dospill) assert_gt(spillAmt, 0);
 				ss2 << (pdiv + (dospill ? spillAmt : 0));
-				if((pmod + h.length()) > ((uint32_t)partition * (spillAmt + 1))) {
+				if((pmod + h.length()) >= ((uint32_t)partition * (spillAmt + 1))) {
 					// Spills into the next partition so we need to
 					// output another alignment for that partition
 					spill = true;
 				}
+				// Print partition id with leading 0s so that Hadoop
+				// can do lexicographical sort (modern Hadoop versions
+				// seen to support numeric)
 				string s2 = ss2.str();
-				for(size_t i = s2.length(); i < 10; i++) {
+				size_t partDigits = 1;
+				if(partition >= 10) partDigits++;
+				if(partition >= 100) partDigits++;
+				if(partition >= 1000) partDigits++;
+				if(partition >= 10000) partDigits++;
+				if(partition >= 100000) partDigits++;
+				for(size_t i = s2.length(); i < (10-partDigits); i++) {
 					ss << "0";
 				}
 				ss << s2.c_str() << "\t";
+				// Print offset with leading 0s
+				ss3 << (h.h.second + offBase);
+				string s3 = ss3.str();
+				for(size_t i = s3.length(); i < 9; i++) {
+					ss << "0";
+				}
+				ss << s3;
+				ss << "\t" << (h.fw? "+":"-");
+				ss << "\t" << h.patSeq;
+				ss << "\t" << h.quals;
+				ss << "\t" << h.oms;
 			} else {
 				assert(!dospill);
-			}
-			ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
-			// .first is text id, .second is offset
-			if(refnames != NULL && h.h.first < refnames->size()) {
-				ss << (*refnames)[h.h.first];
-			} else {
-				ss << h.h.first;
-			}
-			ss << "\t" << (h.h.second + offBase);
-			ss << "\t" << h.patSeq;
-			ss << "\t" << h.quals;
-			ss << "\t" << h.oms;
-			ss << "\t";
-			// Output mismatch column
-			bool firstmiss = true;
-			size_t c = 0;
-			for (unsigned int i = 0; i < h.mms.size(); ++ i) {
-				if (h.mms.test(i)) {
-					if (!firstmiss) ss << ",";
-					ss << i;
-					if(h.refcs.size() > 0) {
-						assert_gt(h.refcs.size(), i);
-						ASSERT_ONLY(char cc = toupper(h.refcs[i]));
-						assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
-						char refChar = toupper(h.refcs[i]);
-						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-						assert_neq(refChar, qryChar);
-						ss << ":" << refChar << ">" << qryChar;
+				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
+				// .first is text id, .second is offset
+				if(refnames != NULL && h.h.first < refnames->size()) {
+					ss << (*refnames)[h.h.first];
+				} else {
+					ss << h.h.first;
+				}
+				ss << "\t" << (h.h.second + offBase);
+				ss << "\t" << h.patSeq;
+				ss << "\t" << h.quals;
+				ss << "\t" << h.oms;
+				ss << "\t";
+				// Output mismatch column
+				bool firstmiss = true;
+				size_t c = 0;
+				for (unsigned int i = 0; i < h.mms.size(); ++ i) {
+					if (h.mms.test(i)) {
+						if (!firstmiss) ss << ",";
+						ss << i;
+						if(h.refcs.size() > 0) {
+							assert_gt(h.refcs.size(), i);
+							ASSERT_ONLY(char cc = toupper(h.refcs[i]));
+							assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
+							char refChar = toupper(h.refcs[i]);
+							char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+							assert_neq(refChar, qryChar);
+							ss << ":" << refChar << ">" << qryChar;
+						}
+						firstmiss = false;
+						c++;
 					}
-					firstmiss = false;
-					c++;
 				}
 			}
 			ss << endl;
