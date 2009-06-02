@@ -47,20 +47,20 @@ sub round {
     return int($number + .5 * ($number <=> 0));
 }
 
-# Convert from solexa qual to probability of miscall
+# Convert from phred qual to probability of miscall
 sub phredToP($) {
-	my $sol = shift;
-	my $p = (10.0 ** (($sol) / -10.0));
-	($p >= 0.0 && $p <= 1.0) || die "Bad prob: $p, from sol $sol";
+	my $phred = shift;
+	my $p = (10.0 ** (($phred) / -10.0));
+	($p >= 0.0 && $p <= 1.0) || die "Bad prob: $p, from sol $phred";
 	return $p;
 }
 
-# Convert from phred qual to probability of miscall
+# Convert from solexa qual to probability of miscall
 sub solToP($) {
-	my $phred = shift;
-	my $x = (10.0 ** (($phred) / -10.0));
+	my $sol = shift;
+	my $x = (10.0 ** (($sol) / -10.0));
 	my $p = $x / (1.0 + $x);
-	($p >= 0.0 && $p <= 1.0) || die "Bad prob: $p, from x $x, phred $phred";
+	($p >= 0.0 && $p <= 1.0) || die "Bad prob: $p, from x $x, phred $sol";
 	return $p;
 }
 
