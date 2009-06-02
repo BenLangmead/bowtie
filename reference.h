@@ -36,16 +36,18 @@ public:
 	                 bool useMm = false,
 	                 bool verbose = false) :
 	buf_(NULL),
+	sanityBuf_(NULL),
 	loaded_(true),
 	sanity_(sanity),
 	useShmem_(useShmem),
+	useMm_(useMm),
 	bufIsShmem_(false),
 	verbose_(verbose)
 	{
 		string s3 = in + ".3.ebwt";
 		string s4 = in + ".4.ebwt";
-		FILE *f3 = fopen(s3.c_str(), "rb");
-		if(f3 == NULL) {
+		int f3, f4;
+		if((f3 = open(s3.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
 			cerr << "This is most likely because your index was built with an older version" << endl
 			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
@@ -53,26 +55,56 @@ public:
 			loaded_ = false;
 			return;
 		}
+		if((f4 = open(s4.c_str(), O_RDONLY)) < 0) {
+			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
+			loaded_ = false;
+			return;
+		}
+
+		char *mmFile = NULL;
+		if(useMm_) {
+			if(verbose_) {
+				cout << "  Memory-mapping reference index file " << s4 << endl;
+			}
+			struct stat sbuf;
+			if (stat(s4.c_str(), &sbuf) == -1) {
+				perror("stat");
+				cerr << "Error: Could not stat index file " << s4.c_str() << " prior to memory-mapping" << endl;
+				exit(1);
+			}
+			mmFile = (char*)mmap((void *)0, sbuf.st_size,
+			                     PROT_READ, MAP_SHARED, f4, 0);
+			if(mmFile == (void *)(-1) || mmFile == NULL) {
+				perror("mmap");
+				cerr << "Error: Could not memory-map the index file " << s4.c_str() << endl;
+				exit(1);
+			}
+		}
+
 		// Read endianness sentinel, set 'swap'
 		uint32_t one;
 		bool swap = false;
-		if(!fread(&one, 4, 1, f3)) {
-			cerr << "Error reading first word from reference-structure index file " << s3 << endl;
-			exit(1);
-		}
+		one = readU32(f3, swap);
 		if(one != 1) {
+			if(useMm_) {
+				cerr << "Error: Can't use memory-mapped files when the index is the opposite endianness" << endl;
+				exit(1);
+			}
 			assert_eq(0x1000000, one);
 			swap = true; // have to endian swap U32s
 		}
+
 		// Read # records
 		uint32_t sz;
-		if(!fread(&sz, 4, 1, f3)) {
-			cerr << "Error reading # records from reference-structure index file " << s3 << endl;
+		sz = readU32(f3, swap);
+		if(sz == 0) {
+			cerr << "Error: number of reference records is 0 in " << s3 << endl;
 			exit(1);
 		}
-		if(swap) sz = endianSwapU32(sz);
+
 		// Read records
 		nrefs_ = 0;
+
 		// Cumulative count of all unambiguous characters on a per-
 		// stretch 8-bit alignment (i.e. count of bytes we need to
 		// allocate in buf_)
@@ -92,10 +124,16 @@ public:
 				}
 				cumlen = 0;
 				nrefs_++;
+			} else if(i == 0) {
+				cerr << "First record in reference index file was not marked as 'first'" << endl;
+				exit(1);
 			}
 			cumsz += recs_.back().len;
 			cumlen += recs_.back().off;
 			cumlen += recs_.back().len;
+		}
+		if(verbose_) {
+			cout << "Read " << nrefs_ << " reference strings from " << sz << " records" << endl;
 		}
 		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back(recs_.size());
@@ -104,118 +142,45 @@ public:
 		bufSz_ = cumsz;
 		assert_eq(nrefs_, refLens_.size());
 		assert_eq(sz, recs_.size());
-		fclose(f3); // done with .3.ebwt file
+		close(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
 		if((cumsz & 3) != 0) {
 			cumsz += (4 - (cumsz & 3));
 		}
+		bufAllocSz_ = cumsz >> 2;
 		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
-		bool loadedBuf = true;
-		try {
-#ifdef BOWTIE_SHARED_MEM
-			if(useShmem_) {
-				int shmid = -1;
-				// Calculate key given string
-				key_t key = (key_t)hash_string(s4);
-				shmid_ds ds;
-				// Reserve 4 bytes at the end of the shared memory chunk
-				// for silly synchronization
-				size_t shmemLen = (cumsz >> 2) + 4;
-				bufIsShmem_ = true;
-				int ret;
-				while(true) {
-					// Create the shrared-memory block
-					if((shmid = shmget(key, shmemLen, IPC_CREAT | 0666)) < 0) {
-						if(errno == ENOMEM) {
-							cerr << "Out of memory allocating shared reference buffer for the Bowtie index." << endl;
-						} else if(errno == EACCES) {
-							cerr << "EACCES" << endl;
-						} else if(errno == EEXIST) {
-							cerr << "EEXIST" << endl;
-						} else if(errno == EINVAL) {
-							cerr << "Warning: shared-memory chunk's segment size doesn't match expected size (" << (shmemLen) << ")" << endl
-								 << "Deleteing old shared memory block and trying again." << endl;
-							shmid = shmget(key, 0, 0);
-							if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
-								cerr << "shmctl returned " << ret
-									 << " for IPC_RMID, errno is " << errno
-									 << ", shmid is " << shmid << endl;
-								exit(1);
-							} else {
-								cerr << "Deleted shared mem chunk with shmid " << shmid << endl;
-							}
-							continue;
-						} else if(errno == ENOENT) {
-							cerr << "ENOENT" << endl;
-						} else if(errno == ENOSPC) {
-							cerr << "ENOSPC" << endl;
-						} else {
-							cerr << "shmget returned " << shmid << " for and errno is " << errno << endl;
-						}
-						exit(1);
-					}
-					buf_ = (uint8_t*)shmat(shmid, 0, 0);
-					this->bufIsShmem_ = true;
-					if(buf_ == (uint8_t*)-1) {
-						cerr << "BitPairReference: Failed to attach buf_ pointer to shared memory with shmat()." << endl;
-						exit(1);
-					}
-					if(buf_ == NULL) {
-						cerr << "BitPairReference: buf_ pointer returned by shmat() was NULL." << endl;
-						exit(1);
-					}
-					// Did I create it, or did I just attach to one created by
-					// another process?
-					if((ret = shmctl(shmid, IPC_STAT, &ds)) < 0) {
-						cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
-						exit(1);
-					}
-					if(ds.shm_segsz != shmemLen) {
-						cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
-							 << ") doesn't match expected size (" << shmemLen << ")" << endl
-							 << "Deleteing old shared memory block and trying again." << endl;
-						if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
-							cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
-							exit(1);
-						}
-					} else {
-						break;
-					}
-				} // while(true)
-				if(ds.shm_cpid == getpid()) {
-					if(verbose_) {
-						cout << "  I (pid = " << getpid() << ") created the shared memory for buf_" << endl;
-					}
-					// Set this value just off the end of _ebwt[] array to
-					// indicate that the data hasn't been read yet.
-					((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] = 0xffffffff;
-				} else {
-					if(verbose_) {
-						cout << "  I (pid = " << getpid() << ") did not create the shared memory for buf_.  Pid " << ds.shm_cpid << " did." << endl;
-					}
-					loadedBuf = false;
+		if(useMm_) {
+			buf_ = (uint8_t*)mmFile;
+			if(sanity_) {
+				FILE *ftmp = fopen(s4.c_str(), "rb");
+				sanityBuf_ = new uint8_t[cumsz >> 2];
+				size_t ret = fread(sanityBuf_, 1, cumsz >> 2, ftmp);
+				if(ret != (cumsz >> 2)) {
+					cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
+					exit(1);
 				}
-			} else {
-#endif
-				// Allocate a buffer to hold the whole reference string
+				fclose(ftmp);
+				for(size_t i = 0; i < (cumsz >> 2); i++) {
+					assert_eq(sanityBuf_[i], buf_[i]);
+				}
+			}
+		} else {
+			// Allocate a buffer to hold the reference string
+			try {
 				buf_ = new uint8_t[cumsz >> 2];
 				if(buf_ == NULL) throw std::bad_alloc();
-#ifdef BOWTIE_SHARED_MEM
+			} catch(std::bad_alloc& e) {
+				cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
+				     << "re-run on a computer with more memory." << endl;
+				exit(1);
 			}
-#endif
-		} catch(std::bad_alloc& e) {
-			cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
-			     << "re-run on a computer with more memory." << endl;
-			exit(1);
-		}
-		if(loadedBuf) {
 			// Open the bitpair-encoded reference file
 			FILE *f4 = fopen(s4.c_str(), "rb");
 			if(f4 == NULL) {
 				cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
 				cerr << "This is most likely because your index was built with an older version" << endl
-				     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
-				     << "index (or download one from the Bowtie website) and try again." << endl;
+					 << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+					 << "index (or download one from the Bowtie website) and try again." << endl;
 				loaded_ = false;
 				return;
 			}
@@ -231,16 +196,6 @@ public:
 			ret = fread(&c, 1, 1, f4);
 			assert_eq(0, ret); // should have failed
 			fclose(f4);
-			if(useShmem_) {
-				// I'm the shmem writer - set this flag just off the
-				// end of the buf_[] array to indicate we're done
-				// writing
-				assert_eq(0xffffffff, ((volatile uint32_t*)(&buf_[cumsz >> 2]))[0]);
-				((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] = 0xf0f0f0f0;
-			}
-		} else {
-			// Spin until the shmem writer is finished writing
-			while(((volatile uint32_t*)(&buf_[cumsz >> 2]))[0] != 0xf0f0f0f0) ; // spin
 		}
 
 		// Populate byteToU32_
@@ -304,7 +259,8 @@ public:
 	}
 
 	~BitPairReference() {
-		if(buf_ != NULL && !bufIsShmem_) delete[] buf_;
+		if(buf_ != NULL && !bufIsShmem_ && !useMm_) delete[] buf_;
+		if(buf_ != NULL) delete[] sanityBuf_;
 	}
 
 	/**
@@ -322,6 +278,13 @@ public:
 		assert_gt(recf, reci);
 		uint32_t bufOff = refOffs_[tidx];
 		uint32_t off = 0;
+//
+//		if(useMm_ && sanity_) {
+//			for(size_t i = 0; i < bufAllocSz_; i++) {
+//				assert_eq(buf_[i], sanityBuf_[i]);
+//			}
+//		}
+//
 		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
@@ -365,6 +328,13 @@ public:
 		uint32_t cur = 0;
 		uint32_t bufOff = refOffs_[tidx];
 		uint32_t off = 0;
+//
+//		if(useMm_ && sanity_) {
+//			for(size_t i = 0; i < bufAllocSz_; i++) {
+//				assert_eq(buf_[i], sanityBuf_[i]);
+//			}
+//		}
+//
 		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
@@ -416,6 +386,13 @@ public:
 	{
 		ASSERT_ONLY(uint32_t origCount = count);
 		ASSERT_ONLY(uint32_t origToff = toff);
+//
+//		if(useMm_ && sanity_) {
+//			for(size_t i = 0; i < bufAllocSz_; i++) {
+//				assert_eq(buf_[i], sanityBuf_[i]);
+//			}
+//		}
+//
 		if(count == 0) return 0;
 		uint8_t *dest = (uint8_t*)destU32;
 #ifndef NDEBUG
@@ -563,11 +540,14 @@ protected:
 	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
 	std::vector<uint32_t>  refRecOffs_; /// record begin/end offsets per ref seq
 	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
+	uint8_t *sanityBuf_;/// for sanity-checking buf_
 	uint32_t bufSz_;    /// size of buf_
+	uint32_t bufAllocSz_;
 	uint32_t nrefs_;    /// the number of reference sequences
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
-	bool     useShmem_; /// put the cache memory in shared memory
+	bool     useShmem_; /// put the reference in shared memory
+	bool     useMm_;    /// load the reference as a memory-mapped file
 	bool     bufIsShmem_;
 	bool     verbose_;
 };

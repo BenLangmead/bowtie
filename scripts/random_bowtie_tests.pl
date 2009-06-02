@@ -40,7 +40,7 @@ $setPolicy = $options{p} if defined($options{p});
 
 # make all the relevant binaries, unless we were asked not to
 unless(defined $options{n}) {
-	system("make bowtie-debug bowtie-build-debug ".
+	system("make bowtie bowtie-debug bowtie-build-debug ".
 	       "bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
 }
 
@@ -641,6 +641,22 @@ sub doSearch {
 			}
 			close(UNFQ);
 		}
+	}
+
+	{
+		$cmd = "./bowtie $policy $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		print "$cmd\n";
+		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
+		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
+
+		$cmd = "./bowtie $policy $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		print "$cmd\n";
+		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
+
+		$cmd = "./bowtie --mm $policy $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		print "$cmd\n";
+		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
+		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
 	}
 	
 	if($pe) {
