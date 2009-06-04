@@ -1607,8 +1607,8 @@ public:
 	NBestFirstStratHitSinkPerThread(
 			HitSink& sink,
 	        uint32_t n,
-	        uint32_t max = 0xffffffff,
-	        bool keep = false,
+	        uint32_t max,
+	        bool keep,
 	        uint32_t mult) :
 	        HitSinkPerThread(sink, max * mult, keep),
 	        n_(n * mult), bestStratum_(999), mult_(mult)
