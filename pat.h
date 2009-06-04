@@ -219,6 +219,9 @@ struct ReadBuf {
 	String<char>  qualRcRev;              // reverse quality values reversed
 	char          qualBufRcRev[BUF_SIZE]; // reverse quality value buffer reversed
 
+	String<char>  qualOrig;              // original quality string
+	char          qualBufOrig[BUF_SIZE]; // original quality string buffer
+
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
 	uint32_t      patid;               // unique 0-based id based on order in read file(s)
@@ -2210,6 +2213,15 @@ protected:
 			while (qualsRead < charsRead) {
 				size_t rd = filebuf_.gets(buf, sizeof(buf));
 				if(rd == 0) break;
+				{
+					// Keep the original string in the 'qualOrig' buffer
+					size_t pos = 0;
+					for(size_t i = 0; i < rd; i++) {
+						if(!isspace(buf[i])) {
+							r.qualBufOrig[pos++] = buf[i];
+						}
+					}
+				}
 				assert(NULL == strrchr(buf, '\n'));
 				vector<string> s_quals;
 				tokenize(string(buf), " ", s_quals);
@@ -2323,7 +2335,9 @@ private:
 };
 
 /**
- * Read a Raw-format file (one sequence per line).
+ * Read a Raw-format file (one sequence per line).  No quality strings
+ * allowed.  All qualities are assumed to be 'I' (40 on the Phred-33
+ * scale).
  */
 class RawPatternSource : public BufferedFilePatternSource {
 public:
@@ -2375,7 +2389,7 @@ protected:
 					exit(1);
 				}
 				r.patBufFw [len] = charToDna5[c];
-				r.qualBufFw[len] = 'I';
+				r.qualBufFw[len] = r.qualBufOrig[len] = 'I';
 				dstLen++;
 			} else if(isalpha(c)) dstLen++;
 			c = filebuf_.get();
@@ -2389,6 +2403,8 @@ protected:
 		_setLength(r.patFw,  dstLen);
 		_setBegin (r.qualFw, r.qualBufFw);
 		_setLength(r.qualFw, dstLen);
+		_setBegin (r.qualOrig, r.qualBufOrig);
+		_setLength(r.qualOrig, dstLen);
 
 		// Set up name
 		itoa10(readCnt_, r.nameBuf);

@@ -1608,14 +1608,15 @@ public:
 			HitSink& sink,
 	        uint32_t n,
 	        uint32_t max = 0xffffffff,
-	        bool keep = false) :
-	        HitSinkPerThread(sink, max, keep),
-	        _n(n), bestStratum_(999)
+	        bool keep = false,
+	        uint32_t mult) :
+	        HitSinkPerThread(sink, max * mult, keep),
+	        n_(n * mult), bestStratum_(999), mult_(mult)
 	{
-		assert_gt(_n, 0);
+		assert_gt(n_, 0);
 	}
 
-	virtual uint32_t maxHits() { return _n; }
+	virtual uint32_t maxHits() { return n_; }
 
 	virtual bool spanStrata() {
 		return false; // we do not span strata
@@ -1641,11 +1642,11 @@ public:
 			_bufferedHits.clear();
 			return true; // done - report nothing
 		}
-		if(hitsForThisRead_ <= _n) {
+		if(hitsForThisRead_ <= n_) {
 			bufferHit(h, stratum);
 		}
-		if(hitsForThisRead_ == _n &&
-		   (_max == 0xffffffff || _max < _n))
+		if(hitsForThisRead_ == n_ &&
+		   (_max == 0xffffffff || _max < n_))
 		{
 			return true; // already reported N good hits; stop!
 		}
@@ -1661,6 +1662,12 @@ public:
 		uint32_t ret = hitsForThisRead_;
 		hitsForThisRead_ = 0;
 		bestStratum_ = 999;
+		const size_t sz = _bufferedHits.size();
+		for(size_t i = 0; i < sz; i++) {
+			// Set 'oms' according to the number of other alignments
+			// at this stratum
+			_bufferedHits[i].oms = (sz / mult_) - 1;
+		}
 		return ret;
 	}
 
@@ -1684,8 +1691,9 @@ public:
 
 private:
 
-	uint32_t _n; /// max # hits to report
+	uint32_t n_; /// max # hits to report
 	int bestStratum_;
+	uint32_t mult_;
 };
 
 /**
@@ -1709,10 +1717,10 @@ public:
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, keep_);
+		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, keep_, 1);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
-		return new NBestFirstStratHitSinkPerThread(sink_, n_ * m, max_ * m, keep_);
+		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, keep_, m);
 	}
 
 private:

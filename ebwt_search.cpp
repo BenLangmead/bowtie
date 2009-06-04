@@ -3670,7 +3670,7 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               useSpinlock,
 			                               patDumpfile, trim3, trim5,
 			                               forgiveInput,
-			                               solexaQuals,
+			                               solexaQuals, phred64Quals,
 			                               integerQuals, skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(qs, randomizeQuals,
