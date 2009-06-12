@@ -61,7 +61,7 @@ public:
 		int c = peek();
 		if(c != -1) {
 			_cur++;
-			_lastn_buf[_lastn_cur++] = c;
+			if(_lastn_cur < LASTN_BUF_SZ) _lastn_buf[_lastn_cur++] = c;
 		}
 		return c;
 	}
