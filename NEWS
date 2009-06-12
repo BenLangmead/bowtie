@@ -26,7 +26,9 @@ Version 0.10.0 - June 12, 2009
      default.  A --strata option has been added to override the default
      and force stratified reporting.  Reporting is stratified if and
      only if --strata is specified.  --strata now cannot be specified
-     without also specifying --best.
+     without also specifying --best.  Please note that, because of this
+     change, specifying the same arguments to this version of Bowtie
+     may yield different reported results.
    * Replaced the --unfa/--unfq options with a single --un option,
      which writes unaligned reads to an output file (or pair of output
      files) but keeps reads in their original form.  This is in

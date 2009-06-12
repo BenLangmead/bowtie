@@ -300,15 +300,18 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]" << endl
-	    << "  <ebwt>    Base filename for index files (minus trailing .1.ebwt/.2.ebwt/etc.)" << endl
-	    << "  <mates1>  Comma-separated list of files containing upstream mates (or the" << endl
-	    << "            sequences themselves, if -c is set) paired with mates in <mates2>" << endl
-	    << "  <mates2>  Comma-separated list of files containing downstream mates (or" << endl
-	    << "            sequences themselves if -c is set) paired with mates in <mates1>" << endl
-	    << "  <singles> Comma-separated list of files containing unpaired reads, or the" << endl
-	    << "            sequences themselves, if -c is set.  Specify \"-\" for stdin." << endl
-	    << "  <hits>    File to write hits to (default: stdout)" << endl
+	out << "Usage: " << endl
+        << "  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]" << endl
+        << endl
+	    << "  <m1>    Comma-separated list of files containing upstream mates (or the" << endl
+	    << "          sequences themselves, if -c is set) paired with mates in <m2>" << endl
+	    << "  <m2>    Comma-separated list of files containing downstream mates (or the" << endl
+	    << "          sequences themselves if -c is set) paired with mates in <m1>" << endl
+	    << "  <r>     Comma-separated list of files containing Crossbow-style reads.  Can be" << endl
+	    << "          a mixture of paired and unpaired.  Specify \"-\" for stdin." << endl
+	    << "  <s>     Comma-separated list of files containing unpaired reads, or the" << endl
+	    << "          sequences themselves, if -c is set.  Specify \"-\" for stdin." << endl
+	    << "  <hit>   File to write hits to (default: stdout)" << endl
 	    << "Input:" << endl
 	    << "  -q                 query input files are FASTQ .fq/.fastq (default)" << endl
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
@@ -362,6 +365,7 @@ static void printUsage(ostream& out) {
 #endif
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
+	    << "  --mm               use memory-mapped I/O for index; many 'bowtie's can share" << endl
 	    << "Other:" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
@@ -1229,6 +1233,15 @@ static void printLongUsage(ostream& out) {
 	"                     the memory footprint of the aligner but requires\n"
 	"                     more time to calculate text offsets.  <int> must\n"
 	"                     be greater than the value used to build the index.\n"
+	"\n"
+	"  --mm               Use memory-mapped I/O to load the index, rather\n"
+	"                     than normal POSIX/C file I/O.  Memory-mapping the\n"
+	"                     index allows many concurrent bowtie processes on\n"
+	"                     the same machine to share the same memory image of\n"
+	"                     the index (i.e. you pay the memory overhead just\n"
+	"                     once).  This facilitates memory-efficient\n"
+	"                     parallelization of Bowtie in situations where\n"
+	"                     using -p is not desirable.\n"
 	"\n"
 	"   Other:\n"
 	"   ------\n"

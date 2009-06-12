@@ -931,6 +931,15 @@ Bowtie Manual
                      more time to calculate text offsets.  <int> must
                      be greater than the value used to build the index.
 
+  --mm               Use memory-mapped I/O to load the index, rather
+                     than normal POSIX/C file I/O.  Memory-mapping the
+                     index allows many concurrent bowtie processes on
+                     the same machine to share the same memory image of
+                     the index (i.e. you pay the memory overhead just
+                     once).  This facilitates memory-efficient
+                     parallelization of Bowtie in situations where
+                     using -p is not desirable.
+
    Other:
    ------
 
