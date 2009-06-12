@@ -252,7 +252,7 @@ static void driver(const string& ebwtFileBase, const string& query) {
 		// Initialize Ebwt object
 		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1, false, verbose);
 	    // Load whole index into memory
-		ebwt.loadIntoMemory(); // no shmem
+		ebwt.loadIntoMemory();
 		print_index_sequences(cout, ebwt);
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {

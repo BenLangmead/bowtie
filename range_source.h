@@ -1685,6 +1685,55 @@ protected:
  * ranges, and stopping when the consumer is satisfied.
  */
 template<typename TRangeSource>
+class StubRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
+
+	typedef Ebwt<String<Dna> > TEbwt;
+	typedef std::vector<RangeSourceDriver<TRangeSource>*> TRangeSrcDrPtrVec;
+
+public:
+
+	StubRangeSourceDriver() :
+		RangeSourceDriver<TRangeSource>(false)
+	{
+		this->done = true;
+		this->foundRange = false;
+	}
+
+	virtual ~StubRangeSourceDriver() { }
+
+	/// Set query to find ranges for
+	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) { }
+
+	/// Advance the range search by one memory op
+	virtual void advanceImpl(int until) { }
+
+	/// Return the last valid range found
+	virtual Range& range() { exit(1); }
+
+	/**
+	 * Return whether we're generating ranges for the first or the
+	 * second mate.
+	 */
+	virtual bool mate1() const {
+		return true;
+	}
+
+	/**
+	 * Return true iff current pattern is forward-oriented.
+	 */
+	virtual bool fw() const {
+		return true;
+	}
+
+};
+
+/**
+ * Encapsulates an algorithm that navigates the Bowtie index to produce
+ * candidate ranges of alignments in the Burrows-Wheeler matrix.  A
+ * higher authority is responsible for reporting hits out of those
+ * ranges, and stopping when the consumer is satisfied.
+ */
+template<typename TRangeSource>
 class ListRangeSourceDriver : public RangeSourceDriver<TRangeSource> {
 
 	typedef Ebwt<String<Dna> > TEbwt;

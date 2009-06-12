@@ -88,8 +88,8 @@ Bowtie Manual
  outputs a list of alignments.  Alignments are selected according to a
  combination of the -v/-n/-e/-l options (plus the -I/-X/--lr/--rl/--ll
  options for paired-end alignment), which define which alignments are
- legal, and the -k/-a/-m/--best/--nostrata options which define which
- and how many legal alignments should be reported.
+ legal, and the -k/-a/-m/--best/--strata options which define which and
+ how many legal alignments should be reported.
 
  By default, Bowtie enforces an alignment policy equivalent to Maq's
  quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it
@@ -167,7 +167,8 @@ Bowtie Manual
      scale of 0 up to about 40).
 
   The N, L and E parameters are configured using Bowtie's -n, -l and
-  -e options.
+  -e options.  The -n (Maq-like) option is mutually exclusive with the
+  -v (end-to-end k-difference) option.
  
   If there are many possible alignments satisfying these criteria,
   Bowtie will prefer to report alignments with fewer mismatches and
@@ -197,7 +198,8 @@ Bowtie Manual
   
   The policy has one criterion: Alignments may have no more than V
   mismatches.  Quality values are ignored.  The number of mismatches
-  permitted is configurable with the -v option.
+  permitted is configurable with the -v option.  The -v (end-to-end)
+  option is mutually exclusive with the -n (Maq-like) option.
 
   If there are many possible alignments satisfying this criterion,
   Bowtie will prefer to report alignments with fewer mismatches.
@@ -206,12 +208,163 @@ Bowtie Manual
   will be best unless the --best option is specified.  Bowtie is
   typically about 1 to 2.5 times slower when --best is specified.
   
+  Reporting Modes
+  ---------------
+  
+  With the -k, -a, -m, --best and --strata options, Bowtie gives the
+  user a great deal of flexibility in selecting which alignments get
+  reported.  Here we give a few examples that demonstrate a few ways
+  they can be combined to achieve a desired result.  All examples are
+  using the e_coli index that comes packaged with Bowtie.
+  
+    Example 1: -a
+    -------------
+    
+    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,148810,2>
+    1-:<0,2852852,1>
+    1-:<0,4930433,2>
+    1-:<0,905664,2>
+    1+:<0,1093035,2>
+    Reported 5 alignments to 1 output stream(s)
+  
+    Specifying -a instructs bowtie to report all valid alignments,
+    subject to the alignment policy: -v 2.  In this case, bowtie finds
+    5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)
+    has 1 mismatch and 4 hits have 2 mismatches.  Note that they are
+    not necessarily listed in best-to-worst order.
+    
+    Example 2: -k 3
+    ---------------
+    
+    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,148810,2>
+    1-:<0,2852852,1>
+    1-:<0,4930433,2>
+    Reported 3 alignments to 1 output stream(s)
+  
+    Specifying -k 3 instructs bowtie to report up to 3 valid
+    alignments.  In this case, a total of 5 valid alignments exist (see
+    Example 1); bowtie reports 3 out of those 5.  -k can be set to any
+    integer greater than 0.
+
+    Example 3: -k 6
+    ---------------
+    
+    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,148810,2>
+    1-:<0,2852852,1>
+    1-:<0,4930433,2>
+    1-:<0,905664,2>
+    1+:<0,1093035,2>
+    Reported 5 alignments to 1 output stream(s)
+  
+    Specifying -k 6 instructs bowtie to report up to 6 valid
+    alignments.  In this case, a total of 5 valid alignments exist, so
+    bowtie reports all 5.
+    
+    Example 4: default (-k 1)
+    -------------------------
+    
+    $ ./bowtie -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,148810,2>
+    Reported 1 alignments to 1 output stream(s)
+    
+    Leaving the reporting options at their defaults causes Bowtie to
+    report the first valid alignment it encounters.  Because --best was
+    not specified, we are not guaranteed that bowtie will report the
+    best alignment, and in this case it does not (the 1-mismatch
+    alignment from the previous example would have been better).  The
+    default reporting mode is equivalent to -k 1.
+
+    Example 5: -a --best
+    --------------------
+    
+    $ ./bowtie -a --best -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,2852852,1>
+    1+:<0,1093035,2>
+    1-:<0,905664,2>
+    1-:<0,148810,2>
+    1-:<0,4930433,2>
+    Reported 5 alignments to 1 output stream(s)
+  
+    Specifying -a --best results in the same alignments being printed
+    as if just -a had been specified, but they are guarnteed to be
+    reported in best-to-worst order.
+
+    Example 6: -a --best --strata
+    -----------------------------
+    
+    $ ./bowtie -a --best --strata -v 2 e_coli --concise \
+               -c ATGCATCATGCGCCAT
+    1-:<0,2852852,1>
+    Reported 1 alignments to 1 output stream(s)
+  
+    Specifying --strata in addition to -a and --best causes Bowtie to
+    report only those alignments in the best alignment "stratum".  The
+    alignments in the best stratum are those having the least number of
+    mismatches (or mismatches just in the "seed" portion of the
+    alignment in the case of -n mode).  Note that if --strata is
+    specified, --best must also be specified.
+
+    Example 7: -a -m 3
+    ------------------
+    
+    $ ./bowtie -a -m 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    No results
+  
+    Specifying -m 3 instructs bowtie to refrain from reporting any
+    alignments for reads having more than 3 reportable alignments.  The
+    -m option is useful when the user would like to guarantee that
+    reported alignments are "unique", for some definition of unique.
+    
+    Example 1 showed that the read has 5 reportable alignments when -a
+    and -v 2 are specified, so the -m 3 limit causes bowtie to output
+    no alignments.
+
+    Example 8: -a -m 5
+    ------------------
+    
+    $ ./bowtie -a -m 5 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    1-:<0,148810,2>
+    1-:<0,2852852,1>
+    1-:<0,4930433,2>
+    1-:<0,905664,2>
+    1+:<0,1093035,2>
+    Reported 5 alignments to 1 output stream(s)
+  
+    Specifying -m 5 instructs bowtie to refrain from reporting any
+    alignments for reads having more than 5 reportable alignments.
+    Since the read has exactly 5 reportable alignments, the -m 5 limit
+    allows bowtie to print them as usual. 
+
+    Example 9: -a -m 3 --best --strata
+    ----------------------------------
+    
+    $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --concise \
+               -c ATGCATCATGCGCCAT
+    1-:<0,2852852,1>
+    Reported 1 alignments to 1 output stream(s)
+  
+    Specifying -m 3 instructs bowtie to refrain from reporting any
+    alignments for reads having more than 3 reportable alignments.
+    As we saw in Example 6, the read has only 1 reportable alignment
+    when -a, --best and --strata are specified, so the -m 3 limit
+    allows bowtie to print that alignment as usual.
+    
+    Intuitively, the -m option, when combined with the --best and
+    --strata options, guarntees a principled, though somewhat weaker
+    form of "uniqueness."  A stronger form of uniqueness is enforced
+    when -m is specified but --best --strata are not.
+  
   Paired-end Alignment
   --------------------
   
   Bowtie can align paired-end reads when paired read files are
-  specified using the -1 and -2 options.  A valid paired-end alignment
-  satisfies the following criteria:
+  specified using the -1 and -2 options (for pairs of raw, FASTA, or
+  FASTQ read files), or using the --12 option (for Crossbow read
+  files).  A valid paired-end alignment satisfies the following
+  criteria:
   
   1. Both mates have a valid alignment according to the alignment
      policy specified by the -v/-n/-e/-l options.
@@ -220,7 +373,7 @@ Bowtie Manual
   
   Policies governing which paired-end alignments are reported for a
   given read are specified using the -k, -a and -m options as usual.
-  The --nostrata and --best options do not apply in paired-end mode.
+  The --strata and --best options do not apply in paired-end mode.
   
   A paired-end alignment is reported as a pair of mate alignments, both
   on a separate line, where the alignment for each mate is formatted
@@ -241,13 +394,6 @@ Bowtie Manual
   causes Bowtie to miss some valid paired-end alignments where both
   mates lie in repetitive regions, but the user may use the --pairtries
   or -y options to increase Bowtie's sensitivity as desired.
-  
-  There is currently no way for Bowtie to report a mix of paired-end
-  alignments and singleton alignments (for unpaired mates and/or
-  single-ended reads) in one run of the tool; if a mix of alignments is
-  desired, the user must first perform a paired-end run using the
-  --unfa or --unfq option to write unaligned pairs to files, then run
-  Bowtie again in single-ended mode using those files as input.
  
   Because Bowtie uses an in-memory representation of the original
   reference string when finding paired-end alignments, its memory
@@ -328,7 +474,9 @@ Bowtie Manual
   The following is a detailed description of the options used to control
   the 'bowtie' aligner:
 
- Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]
+ Usage:
+ 
+  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
 
   <ebwt>             The basename of the index to be searched.  The
                      basename is the name of any of the index files up
@@ -340,7 +488,7 @@ Bowtie Manual
                      located, then looks in the directory specified in
                      the BOWTIE_INDEXES environment variable.
 
-  <mates1>           Comma-separated list of files containing the #1
+  <m1>               Comma-separated list of files containing the #1
                      mates (filename usually includes "_1"), or, if -c
                      is specified, the mate sequences themselves.
                      E.g., this might be "flyA_1.fq,flyB_1.fq", or, if
@@ -352,7 +500,7 @@ Bowtie Manual
                      will read the #1 mates from stdin.  "-" is not
                      compatible with "-z/--phased".
 
-  <mates2>           Comma-separated list of files containing the #2
+  <m2>               Comma-separated list of files containing the #2
                      mates (filename usually includes "_2"), or, if -c
                      is specified, the mate sequences themselves.
                      E.g., this might be "flyA_2.fq,flyB_2.fq", or, if
@@ -364,16 +512,31 @@ Bowtie Manual
                      will read the #2 mates from stdin.  "-" is not
                      compatible with "-z/--phased".
 
-  <singles>          A comma-separated list of files containing the
-                     reads to be aligned, or, if -c is specified, the
-                     sequences themselves. E.g., this might be
+  <r>                Comma-separated list of files containing a mix of
+                     unpaired and paired-end reads in Crossbow format.
+                     The Crossbow format is a 1-read-per-line format
+                     where an unpaired read consists of the read name,
+                     sequence and quality string separated by tabs.  A
+                     paired-end read consists of the read name, sequnce
+                     of the /1 mate, quality values of the /1 mate,
+                     sequence of the /2 mate, and quality values of the
+                     /2 mate separated by tabs.  Reads may be a mix of
+                     different lengths and paired-end and unpaired
+                     reads may be intermingled.  If "-" is specified,
+                     Bowtie will read the Crossbow-formatted reads from
+                     stdin.
+
+  <s>                A comma-separated list of files containing
+                     unpaired reads to be aligned, or, if -c is
+                     specified, the unpaired read sequences themselves.
+                     E.g., this might be
                      "lane1.fq,lane2.fq,lane3.fq,lane4.fq", or, if -c
                      is specified, this might be "GGTCATCCT,ACGGGTCGT".
                      Reads may be a mix of different lengths.  If "-"
                      is specified, Bowtie gets the reads from stdin.
                      "-" is not compatible with "-z/--phased".
 
-  <hits>             File to write alignments to.  By default,
+  <hit>              File to write alignments to.  By default,
                      alignments are written to stdout (the console),
                      but a <hits> file must be specified if the
                      -b/--binout option is also specified.
@@ -518,7 +681,7 @@ Bowtie Manual
                      align against the reverse-complement reference
                      strand.  For paired-end reads using --fr or --rf
                      modes, --nofw and --norc apply to the forward and
-                     reverse-complement mate orientations.  I.e.
+                     reverse-complement pair orientations.  I.e.
                      specifying --nofw and --fr will only find reads in
                      the R/F orientation where mate 2 occurs upstream
                      of mate 1 with respect to the forward reference
@@ -580,42 +743,50 @@ Bowtie Manual
   -k <int>           Report up to <int> valid alignments per read or
                      pair (default: 1).  Validity of alignments is
                      determined by the alignment policy (combined
-                     effects of -n, -v, -l, and -e).  If many
-                     alignments are reported, they may be subject to
-                     stratification; see --best, --nostrata.  Bowtie is
-                     designed to be very fast for small -k but BOWTIE
-                     CAN BECOME VERY SLOW AS -k INCREASES.  If you
-                     would like to use Bowtie for larger values of -k,
-                     consider building an index with a denser suffix-
-                     array sample, i.e. specify a smaller '--offrate'
-                     when invoking 'bowtie-build' for the relevant
-                     index.  This will increase the memory footprint of
-                     the index, but makes alignment much faster for
-                     large -k.
+                     effects of -n, -v, -l, and -e).  If more than one
+                     valid alignment exists and the --best and --strata
+                     options are specified, then only those alignments
+                     belonging to the best alignment "stratum" (i.e.
+                     those with the fewest mismatches) will be
+                     reported.  Bowtie is designed to be very fast for
+                     small -k but bowtie can become significantly
+                     slower as -k increases.  If you would like to use
+                     Bowtie for larger values of -k, consider building
+                     an index with a denser suffix-array sample, i.e.
+                     specify a smaller '--offrate' when invoking
+                     'bowtie-build' for the relevant index (see
+                     Performance Tips section for details).
 
   -a/--all           Report all valid alignments per read or pair
                      (default: off).  Validity of alignments is
                      determined by the alignment policy (combined
-                     effects of -n, -v, -l, and -e).  Reported
-                     alignments may be subject to stratification; see
-                     --best, --nostrata.  Bowtie is designed to be very
-                     fast for small -k; BOWTIE CAN BECOME VERY SLOW
-                     IF -a/--all IS SPECIFIED.  If you would like to
-                     use Bowtie with -a, consider building an index
-                     with a denser suffix-array sample, i.e. specify a
-                     smaller '--offrate' when invoking 'bowtie-build'
-                     for the relevant index.  This will increase the
-                     memory footprint of the index, but makes alignment
-                     much faster in -a mode.
+                     effects of -n, -v, -l, and -e).  If more than one
+                     valid alignment exists and the --best and --strata
+                     options are specified, then only those alignments
+                     belonging to the best alignment "stratum" (i.e.
+                     those with the fewest mismatches) will be
+                     reported.  Bowtie is designed to be very
+                     fast for small -k but bowtie can become
+                     significantly slower if -a/--all is specified.  If
+                     you would like to use Bowtie with -a, consider
+                     building an index with a denser suffix-array
+                     sample, i.e. specify a smaller '--offrate' when
+                     invoking 'bowtie-build' for the relevant index
+                     (see Performance Tips section for details).
 
   -m <int>           Suppress all alignments for a particular read or
                      pair if more than <int> reportable alignments
                      exist for it.  Reportable alignments are those
                      that would be reported given the -n, -v, -l, -e,
-                     -k, -a, --best, and --nostrata options.  Default:
+                     -k, -a, --best, and --strata options.  Default:
                      no limit.  Bowtie is designed to be very fast for
-                     small -m but BOWTIE CAN BECOME VERY SLOW AS -m
-                     INCREASES.
+                     small -m but bowtie can become significantly
+                     slower for larger values of -m.    If you would
+                     like to use Bowtie for larger values of -k,
+                     consider building an index with a denser suffix-
+                     array sample, i.e. specify a smaller '--offrate'
+                     when invoking 'bowtie-build' for the relevant
+                     index (see Performance Tips section for details).
 
   --best             Make Bowtie guarantee that reported singleton
                      alignments are "best" in terms of stratum (i.e.
@@ -633,18 +804,21 @@ Bowtie Manual
                      removes all strand bias.  Note that --best does
                      not affect which alignments are considered "valid"
                      by Bowtie, only which valid alignments are
-                     reported by Bowtie.  Bowtie is about 1-2.5 times
-                     slower when --best is specified.
+                     reported by Bowtie.  When --best is specified and
+                     multiple hits are allowed (via -k or -a), the
+                     alignments for a given read are guaranteed to
+                     appear in best-to-worst order in Bowtie's output.
+                     Bowtie is about 1-2.5 times slower when --best is
+                     specified.
 
-  --nostrata         If many valid singleton alignments exist and are
-                     reportable (according to the --best and -k
-                     options) and they fall into more than one
-                     alignment "stratum", report all of them.  By
-                     default, Bowtie only reports those alignments that
-                     fall into the best stratum for which alignments
-                     were found, i.e., the one with fewest mismatches.
-                     BOWTIE CAN BECOME VERY SLOW WHEN --nostrata IS
-                     COMBINED WITH -k OR -a.
+  --strata           If many valid alignments exist and are reportable
+                     (e.g. are not disallowed via the -k option) and
+                     they fall into more than one alignment "stratum",
+                     report only those alignments that fall into the
+                     best stratum.  By default, Bowtie reports all
+                     reportable alignments regardless of whether they
+                     fall into multiple strata.  When --strata is
+                     specified, --best must also be specified. 
 
    Output:
    -------
@@ -686,60 +860,43 @@ Bowtie Manual
                      (its offset into the list of references that were
                      indexed) rather than by name.
 
-  --alfa <filename>  Write all reads for which at least one alignment
-                     was reported to a FASTA file with name <filename>.
-                     Paired-end reads will be written to two parallel
-                     files with "_1" and "_2" inserted in the filename,
-                     e.g., if <filename> is aligned.fa, the #1 and #2
-                     mates that fail to align will be written to
-                     aligned_1.fa and aligned_2.fa respectively.
+  --al <filename>    Write all reads for which at least one alignment
+                     was reported to a file with name <filename>.
+                     Written reads will appear as they did in the
+                     input, without any of the trimming or translation
+                     of quality values that may have taken place within
+                     Bowtie.  Paired-end reads will be written to two
+                     parallel files with "_1" and "_2" inserted in the
+                     filename, e.g., if <filename> is aligned.fq, the
+                     #1 and #2 mates that fail to align will be written
+                     to aligned_1.fq and aligned_2.fq respectively.
 
-  --alfq <filename>  Write all reads for which at least one alignment
-                     was reported to a FASTQ file with name <filename>.
-                     Paired-end reads will be written to two parallel
-                     files with "_1" and "_2" inserted in the filename,
-                     e.g., if <filename> is aligned.fq, the #1 and #2
-                     mates that fail to align will be written to
-                     aligned_1.fq and aligned_2.fq respectively.
+  --un <filename>    Write all reads that could not be aligned to a
+                     file with name <filename>.  Written reads will
+                     appear as they did in the input, without any of
+                     the trimming or translation of quality values that
+                     may have taken place within Bowtie.  Paired-end
+                     reads will be written to two parallel files with
+                     "_1" and "_2" inserted in the filename, e.g., if
+                     <filename> is unaligned.fq, the #1 and #2 mates
+                     that fail to align will be written to
+                     unaligned_1.fq and unaligned_2.fq respectively.
+                     Unless --max is also specified, reads with a
+                     number of valid alignments exceeding the limit set
+                     with the -m option are also written to <filename>.
 
-  --unfa <filename>  Write all reads that fail to align to a FASTA file
-                     with name <filename>.  Paired-end reads will be
-                     written to two parallel files with "_1" and "_2"
-                     inserted in the filename, e.g., if <filename> is
-                     unaligned.fa, the #1 and #2 mates that fail to
-                     align will be written to unaligned_1.fa and
-                     unaligned_2.fa respectively.  Unless --maxfa is
-                     also specified, reads with a number of valid
-                     alignments exceeding the limit set with the -m
-                     option are also written to <filename>.
-
-  --unfq <filename>  Write all reads that fail to align to a FASTQ file
-                     with name <filename>.  Paired-end reads will be
-                     written to two parallel files with "_1" and "_2"
-                     inserted in the filename, e.g., if <filename> is
-                     unaligned.fq, the #1 and #2 mates that fail to
-                     align will be written to unaligned_1.fq and
-                     unaligned_2.fq respectively.  Unless --maxfq is
-                     also specified, reads with a number of valid
-                     alignments exceeding the limit set with the -m
-                     option are also written to <filename>.
-
-  --maxfa <filename> Write all reads with a number of valid alignments
+  --max <filename>   Write all reads with a number of valid alignments
                      exceeding the limit set with the -m option to a
-                     FASTA file with given name.  Paired-end reads that
-                     exceed the -m limit are written to parallel files
-                     with "_1" and "_2" inserted into the filename, in
-                     the same way as with --unfa.  These reads are not
-                     written to the file specified with --unfa.
-
-  --maxfq <filename> Write all reads with a number of valid alignments
-                     exceeding the limit set with the -m option to a
-                     FASTQ file with given name.  Paired-end reads that
-                     exceed the -m limit are written to parallel files
-                     with "_1" and "_2" inserted into the filename, in
-                     the same way as with --unfq.  These reads are not
-                     written to the file specified with --unfq.
-
+                     file with name <filename>.  Written reads will
+                     appear as they did in the input, without any of
+                     the trimming or translation of quality values that
+                     may have taken place within Bowtie.  Paired-end
+                     reads will be written to two parallel files with
+                     "_1" and "_2" inserted in the filename, e.g., if
+                     <filename> is max.fq, the #1 and #2 mates
+                     that fail to align will be written to
+                     max_1.fq and max_2.fq respectively.  These reads
+                     are not written to the file specified with --un.
    Performance:
    ------------
 

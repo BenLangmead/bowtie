@@ -140,6 +140,8 @@ public:
 	PairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool doFw,
+			bool doRc,
 			bool v1,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -164,6 +166,8 @@ public:
 			bool verbose,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
+			doFw_(doFw),
+			doRc_(doRc),
 			v1_(v1),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -201,53 +205,83 @@ public:
 		const int halfAndHalf = 0;
 		const bool seeded = false;
 
-		EbwtRangeSource *r1Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+		bool do1Fw = true;
+		bool do1Rc = true;
+		bool do2Fw = true;
+		bool do2Rc = true;
+		if(!doFw_) {
+			if(mate1fw_) do1Fw = false;
+			else         do1Rc = false;
+			if(mate2fw_) do2Fw = false;
+			else         do2Rc = false;
+		}
+		if(!doRc_) {
+			if(mate1fw_) do1Rc = false;
+			else         do1Fw = false;
+			if(mate2fw_) do2Rc = false;
+			else         do2Fw = false;
+		}
 
-		EbwtRangeSourceDriver * driver1Fw = new EbwtRangeSourceDriver(
-			*params, r1Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen
-			true,       // nudgeLeft (not applicable)
-			PIN_TO_LEN, // whole alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
-		EbwtRangeSourceDriver * driver1Rc = new EbwtRangeSourceDriver(
-			*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen
-			true,       // nudgeLeft (not applicable)
-			PIN_TO_LEN, // whole alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
-
-		EbwtRangeSource *r2Fw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Rc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
-
-		EbwtRangeSourceDriver * driver2Fw = new EbwtRangeSourceDriver(
-			*params, r2Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen
-			true,       // nudgeLeft (not applicable)
-			PIN_TO_LEN, // whole alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			os_, verbose_, false, pool_, NULL);
-		EbwtRangeSourceDriver * driver2Rc = new EbwtRangeSourceDriver(
-			*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen
-			true,       // nudgeLeft (not applicable)
-			PIN_TO_LEN, // whole alignment is unrevisitable
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			PIN_TO_LEN, // "
-			os_, verbose_, false, pool_, NULL);
+		EbwtRangeSource *r1Fw = NULL;
+		EbwtRangeSource *r1Rc = NULL;
+		TRangeSrcDr * driver1Fw = NULL;
+		TRangeSrcDr * driver1Rc = NULL;
+		EbwtRangeSource *r2Fw = NULL;
+		EbwtRangeSource *r2Rc = NULL;
+		TRangeSrcDr * driver2Fw = NULL;
+		TRangeSrcDr * driver2Rc = NULL;
+		if(do1Fw) {
+			r1Fw = new EbwtRangeSource(
+				&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			driver1Fw = new EbwtRangeSourceDriver(
+				*params, r1Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen
+				true,       // nudgeLeft (not applicable)
+				PIN_TO_LEN, // whole alignment is unrevisitable
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				os_, verbose_, true, pool_, NULL);
+		}
+		if(do2Fw) {
+			r2Fw = new EbwtRangeSource(
+				&ebwtFw_, true,  0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			driver2Fw = new EbwtRangeSourceDriver(
+				*params, r2Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen
+				true,       // nudgeLeft (not applicable)
+				PIN_TO_LEN, // whole alignment is unrevisitable
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				os_, verbose_, false, pool_, NULL);
+		}
+		if(do1Rc) {
+			r1Rc = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			driver1Rc = new EbwtRangeSourceDriver(
+				*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen
+				true,       // nudgeLeft (not applicable)
+				PIN_TO_LEN, // whole alignment is unrevisitable
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				os_, verbose_, true, pool_, NULL);
+		}
+		if(do2Rc) {
+			r2Rc = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, true, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			driver2Rc = new EbwtRangeSourceDriver(
+				*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen
+				true,       // nudgeLeft (not applicable)
+				PIN_TO_LEN, // whole alignment is unrevisitable
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				PIN_TO_LEN, // "
+				os_, verbose_, false, pool_, NULL);
+		}
 
 		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(0);
 
@@ -258,17 +292,21 @@ public:
 		if(v1_) {
 			return new PairedBWAlignerV1<EbwtRangeSource>(
 				params,
-				driver1Fw, driver1Rc, driver2Fw, driver2Rc, refAligner,
+				driver1Fw == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver1Fw,
+				driver1Rc == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver1Rc,
+				driver2Fw == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver2Fw,
+				driver2Rc == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver2Rc,
+				refAligner,
 				rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
 		} else {
 			TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
-			drVec->push_back(driver1Fw);
-			drVec->push_back(driver1Rc);
-			drVec->push_back(driver2Fw);
-			drVec->push_back(driver2Rc);
+			if(driver1Fw != NULL) drVec->push_back(driver1Fw);
+			if(driver1Rc != NULL) drVec->push_back(driver1Rc);
+			if(driver2Fw != NULL) drVec->push_back(driver2Fw);
+			if(driver2Rc != NULL) drVec->push_back(driver2Rc);
 			return new PairedBWAlignerV2<EbwtRangeSource>(
 				params,
 				new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_, true),
@@ -283,6 +321,8 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool doFw_;
+	bool doRc_;
 	bool v1_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;

@@ -7,25 +7,32 @@
 #include <stdint.h>
 
 /**
- * Simple wrapper for a FILE* that reads it in chunks (with fread) and
- * keeps those chunks in a buffer.  It also services calls to get(),
- * peek() and gets() from the buffer, reading in additional chunks when
- * necessary.  TODO: Implement asynchronous I/O.  Obstacle: neither
- * Cygwin nor MinGW seem to support POSIX aio.
+ * Simple wrapper for a FILE*, istream or ifstream that reads it in
+ * chunks (with fread) and keeps those chunks in a buffer.  It also
+ * services calls to get(), peek() and gets() from the buffer, reading
+ * in additional chunks when necessary.
  */
 class FileBuf {
 public:
-	FileBuf() : _in(NULL), _inf(NULL), _ins(NULL), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) { }
+	FileBuf() {
+		init();
+	}
 
-	FileBuf(FILE *__in) : _in(__in), _inf(NULL), _ins(NULL), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(FILE *in) {
+		init();
+		_in = in;
 		assert(_in != NULL);
 	}
 
-	FileBuf(ifstream *__inf) : _in(NULL), _inf(__inf), _ins(NULL), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(ifstream *inf) {
+		init();
+		_inf = inf;
 		assert(_inf != NULL);
 	}
 
-	FileBuf(istream *__ins) : _in(NULL), _inf(NULL), _ins(__ins), _cur(BUF_SZ), _buf_sz(BUF_SZ), _done(false) {
+	FileBuf(istream *ins) {
+		init();
+		_ins = ins;
 		assert(_ins != NULL);
 	}
 
@@ -33,6 +40,9 @@ public:
 		return _in != NULL || _inf != NULL || _ins != NULL;
 	}
 
+	/**
+	 * Close the input stream (if that's possible)
+	 */
 	void close() {
 		if(_in != NULL && _in != stdin) {
 			fclose(_in);
@@ -43,13 +53,22 @@ public:
 		}
 	}
 
+	/**
+	 * Get the next character of input and advance.
+	 */
 	int get() {
 		assert(_in != NULL || _inf != NULL || _ins != NULL);
 		int c = peek();
-		if(c != -1) _cur++;
+		if(c != -1) {
+			_cur++;
+			_lastn_buf[_lastn_cur++] = c;
+		}
 		return c;
 	}
 
+	/**
+	 * Return true iff all input is exhausted.
+	 */
 	bool eof() {
 		return (_cur == _buf_sz) && _done;
 	}
@@ -90,6 +109,10 @@ public:
 		_done = false;
 	}
 
+	/**
+	 * Restore state as though we just started reading the input
+	 * stream.
+	 */
 	void reset() {
 		if(_inf != NULL) {
 			_inf->clear();
@@ -105,11 +128,20 @@ public:
 		_done = false;
 	}
 
+	/**
+	 * Peek at the next character of the input stream without
+	 * advancing.  Typically we can simple read it from the buffer.
+	 * Occasionally we'll need to read in a new buffer's worth of data.
+	 */
 	int peek() {
 		assert(_in != NULL || _inf != NULL || _ins != NULL);
 		assert_leq(_cur, _buf_sz);
 		if(_cur == _buf_sz) {
-			if(_done) { return -1; }
+			if(_done) {
+				// We already exhausted the input stream
+				return -1;
+			}
+			// Read a new buffer's worth of data
 			else {
 				// Get the next chunk
 				if(_inf != NULL) {
@@ -124,9 +156,12 @@ public:
 				}
 				_cur = 0;
 				if(_buf_sz == 0) {
+					// Exhausted, and we have nothing to return to the
+					// caller
 					_done = true;
 					return -1;
 				} else if(_buf_sz < BUF_SZ) {
+					// Exhausted
 					_done = true;
 				}
 			}
@@ -134,20 +169,27 @@ public:
 		return (int)_buf[_cur];
 	}
 
+	/**
+	 * Store a string of characters from the input file into 'buf',
+	 * until we see a newline, EOF, or until 'len' characters have been
+	 * read.
+	 */
 	size_t gets(char *buf, size_t len) {
 		size_t stored = 0;
 		while(true) {
 			int c = get();
 			if(c == -1) {
+				// End-of-file
 				buf[stored] = '\0';
 				return stored;
 			}
 			if(stored == len-1 || c == '\n' || c == '\r') {
+				// End of string
 				buf[stored] = '\0';
 				// Skip over all end-of-line characters
 				int pc = peek();
 				while(pc == '\n' || pc == '\r') {
-					get();
+					get(); // discard
 					pc = peek();
 				}
 				// Next get() will be after all newline characters
@@ -156,7 +198,37 @@ public:
 			buf[stored++] = (char)c;
 		}
 	}
+
+	static const size_t LASTN_BUF_SZ = 8 * 1024;
+
+	/**
+	 * Reset to the beginning of the last-N-chars buffer.
+	 */
+	void resetLastN() {
+		_lastn_cur = 0;
+	}
+
+	/**
+	 * Copy the last several characters in the last-N-chars buffer
+	 * (since the last reset) into the provided buffer.
+	 */
+	size_t copyLastN(char *buf) {
+		memcpy(buf, _lastn_buf, _lastn_cur);
+		return _lastn_cur;
+	}
+
 private:
+
+	void init() {
+		_in = NULL;
+		_inf = NULL;
+		_ins = NULL;
+		_cur = _buf_sz = BUF_SZ;
+		_done = false;
+		_lastn_cur = 0;
+		// no need to clear _buf[]
+	}
+
 	static const size_t BUF_SZ = 256 * 1024;
 	FILE     *_in;
 	ifstream *_inf;
@@ -165,6 +237,8 @@ private:
 	size_t    _buf_sz;
 	bool      _done;
 	char      _buf[BUF_SZ]; // (large) input buffer
+	size_t    _lastn_cur;
+	char      _lastn_buf[LASTN_BUF_SZ]; // buffer of the last N chars dispensed
 };
 
 /**

@@ -32,16 +32,13 @@ public:
 	                 std::vector<string>* infiles = NULL,
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
-	                 bool useShmem = false,
 	                 bool useMm = false,
 	                 bool verbose = false) :
 	buf_(NULL),
 	sanityBuf_(NULL),
 	loaded_(true),
 	sanity_(sanity),
-	useShmem_(useShmem),
 	useMm_(useMm),
-	bufIsShmem_(false),
 	verbose_(verbose)
 	{
 		string s3 = in + ".3.ebwt";
@@ -259,7 +256,7 @@ public:
 	}
 
 	~BitPairReference() {
-		if(buf_ != NULL && !bufIsShmem_ && !useMm_) delete[] buf_;
+		if(buf_ != NULL && !useMm_) delete[] buf_;
 		if(buf_ != NULL) delete[] sanityBuf_;
 	}
 
@@ -546,9 +543,7 @@ protected:
 	uint32_t nrefs_;    /// the number of reference sequences
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
-	bool     useShmem_; /// put the reference in shared memory
 	bool     useMm_;    /// load the reference as a memory-mapped file
-	bool     bufIsShmem_;
 	bool     verbose_;
 };
 

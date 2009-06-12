@@ -248,6 +248,8 @@ public:
 	Paired23mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool doFw,
+			bool doRc,
 			bool v1,
 			bool two,
 			HitSink& sink,
@@ -274,6 +276,8 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			doFw_(doFw),
+			doRc_(doRc),
 			v1_(v1),
 			two_(two),
 			sink_(sink),
@@ -313,245 +317,274 @@ public:
 
 		const bool seeded = false;
 
-		EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Fw_BwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
-
-		// Driver wrapper for rFw_Bw
-		EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
-			*params, r1Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,      // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rFw_Fw
-		EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
-			*params, r1Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rFw_Fw
-		EbwtRangeSourceDriver * dr1Fw_BwHalf = new EbwtRangeSourceDriver(
-			*params, r1Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_HI_HALF_EDGE,
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rFw_Fw
-		EbwtRangeSourceDriver * dr1Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
-			*params, r1Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_BEGINNING,
-			PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		TRangeSrcDrPtrVec *dr1FwVec = new TRangeSrcDrPtrVec();
-		dr1FwVec->push_back(dr1Fw_Bw);
-		dr1FwVec->push_back(dr1Fw_Fw);
-		dr1FwVec->push_back(dr1Fw_BwHalf);
-		if(!two_) {
-			dr1FwVec->push_back(dr1Fw_FwHalf);
+		bool do1Fw = true;
+		bool do1Rc = true;
+		bool do2Fw = true;
+		bool do2Rc = true;
+		if(!doFw_) {
+			if(mate1fw_) do1Fw = false;
+			else         do1Rc = false;
+			if(mate2fw_) do2Fw = false;
+			else         do2Rc = false;
+		}
+		if(!doRc_) {
+			if(mate1fw_) do1Rc = false;
+			else         do1Fw = false;
+			if(mate2fw_) do2Rc = false;
+			else         do2Fw = false;
 		}
 
-		EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Rc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r1Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
+		TRangeSrcDrPtrVec *dr1FwVec = new TRangeSrcDrPtrVec();
 
-		// Driver wrapper for rRc_Fw
-		EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
-			*params, r1Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rRc_Bw
-		EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
-			*params, r1Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,      // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rRc_Fw
-		EbwtRangeSourceDriver * dr1Rc_FwHalf = new EbwtRangeSourceDriver(
-			*params, r1Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,
-			PIN_TO_HI_HALF_EDGE,
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
-		// Driver wrapper for rRc_Bw
-		EbwtRangeSourceDriver * dr1Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
-			*params, r1Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,
-			PIN_TO_HI_HALF_EDGE,
-			PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, true, pool_, NULL);
+		if(do1Fw) {
+			EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
+				 ebwtBw_, true, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
+				&ebwtFw_, true, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Fw_BwHalf = new EbwtRangeSource(
+				 ebwtBw_, true, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
+				&ebwtFw_, true, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
+
+			// Driver wrapper for rFw_Bw
+			EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
+				*params, r1Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,      // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			// Driver wrapper for rFw_Fw
+			EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
+				*params, r1Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				false,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			// Driver wrapper for rFw_Fw
+			EbwtRangeSourceDriver * dr1Fw_BwHalf = new EbwtRangeSourceDriver(
+				*params, r1Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_BEGINNING,    // nothing's unrevisitable
+				PIN_TO_HI_HALF_EDGE,
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			dr1FwVec->push_back(dr1Fw_Bw);
+			dr1FwVec->push_back(dr1Fw_Fw);
+			dr1FwVec->push_back(dr1Fw_BwHalf);
+			if(!two_) {
+				// Driver wrapper for rFw_Fw
+				EbwtRangeSourceDriver * dr1Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
+					*params, r1Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+					0,          // seedLen (0 = whole read is seed)
+					false,       // nudgeLeft (true for Fw index, false for Bw)
+					PIN_TO_BEGINNING,    // nothing's unrevisitable
+					PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
+					PIN_TO_LEN,
+					os_, verbose_, true, pool_, NULL);
+				dr1FwVec->push_back(dr1Fw_FwHalf);
+			}
+		}
+
 		TRangeSrcDrPtrVec *dr1RcVec;
 		if(v1_) {
 			dr1RcVec = new TRangeSrcDrPtrVec();
 		} else {
 			dr1RcVec = dr1FwVec;
 		}
-		dr1RcVec->push_back(dr1Rc_Fw);
-		dr1RcVec->push_back(dr1Rc_Bw);
-		dr1RcVec->push_back(dr1Rc_FwHalf);
-		if(!two_) {
-			dr1RcVec->push_back(dr1Rc_BwHalf);
+
+		if(do1Rc) {
+			EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
+				 ebwtBw_, false, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Rc_FwHalf = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r1Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
+				 ebwtBw_, false, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
+
+			// Driver wrapper for rRc_Fw
+			EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
+				*params, r1Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			// Driver wrapper for rRc_Bw
+			EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
+				*params, r1Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				false,      // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			// Driver wrapper for rRc_Fw
+			EbwtRangeSourceDriver * dr1Rc_FwHalf = new EbwtRangeSourceDriver(
+				*params, r1Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_BEGINNING,
+				PIN_TO_HI_HALF_EDGE,
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, true, pool_, NULL);
+			dr1RcVec->push_back(dr1Rc_Fw);
+			dr1RcVec->push_back(dr1Rc_Bw);
+			dr1RcVec->push_back(dr1Rc_FwHalf);
+			if(!two_) {
+				// Driver wrapper for rRc_Bw
+				EbwtRangeSourceDriver * dr1Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
+					*params, r1Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+					0,          // seedLen (0 = whole read is seed)
+					false,       // nudgeLeft (true for Fw index, false for Bw)
+					PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
+					PIN_TO_HI_HALF_EDGE,
+					PIN_TO_LEN,
+					os_, verbose_, true, pool_, NULL);
+				dr1RcVec->push_back(dr1Rc_BwHalf);
+			}
 		}
 
-		EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Fw_BwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
-
-		// Driver wrapper for rFw_Bw
-		EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
-			*params, r2Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		// Driver wrapper for rFw_Fw
-		EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
-			*params, r2Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,      // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		// Driver wrapper for rFw_Fw
-		EbwtRangeSourceDriver * dr2Fw_BwHalf = new EbwtRangeSourceDriver(
-			*params, r2Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_HI_HALF_EDGE,
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		EbwtRangeSourceDriver * dr2Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
-			*params, r2Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_BEGINNING,
-			PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
 		TRangeSrcDrPtrVec *dr2FwVec;
 		if(v1_) {
 			dr2FwVec = new TRangeSrcDrPtrVec();
 		} else {
 			dr2FwVec = dr1FwVec;
 		}
-		dr2FwVec->push_back(dr2Fw_Bw);
-		dr2FwVec->push_back(dr2Fw_Fw);
-		dr2FwVec->push_back(dr2Fw_BwHalf);
-		if(!two_) {
-			dr2FwVec->push_back(dr2Fw_FwHalf);
+
+		if(do2Fw) {
+			EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
+				 ebwtBw_, true, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
+				&ebwtFw_, true, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Fw_BwHalf = new EbwtRangeSource(
+				 ebwtBw_, true, 0xffffffff, false, false, 2, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
+				&ebwtFw_, true, 0xffffffff, false, false, 3, seeded, maqPenalty_, qualOrder_);
+
+			// Driver wrapper for rFw_Bw
+			EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
+				*params, r2Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			// Driver wrapper for rFw_Fw
+			EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
+				*params, r2Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				false,      // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			// Driver wrapper for rFw_Fw
+			EbwtRangeSourceDriver * dr2Fw_BwHalf = new EbwtRangeSourceDriver(
+				*params, r2Fw_BwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_BEGINNING,    // nothing's unrevisitable
+				PIN_TO_HI_HALF_EDGE,
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			dr2FwVec->push_back(dr2Fw_Bw);
+			dr2FwVec->push_back(dr2Fw_Fw);
+			dr2FwVec->push_back(dr2Fw_BwHalf);
+			if(!two_) {
+				EbwtRangeSourceDriver * dr2Fw_FwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
+					*params, r2Fw_FwHalf, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+					0,          // seedLen (0 = whole read is seed)
+					false,       // nudgeLeft (true for Fw index, false for Bw)
+					PIN_TO_BEGINNING,    // nothing's unrevisitable
+					PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
+					PIN_TO_LEN,
+					os_, verbose_, false, pool_, NULL);
+				dr2FwVec->push_back(dr2Fw_FwHalf);
+			}
 		}
 
-		EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Rc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, false, 2,  seeded, maqPenalty_, qualOrder_);
-		EbwtRangeSource *r2Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, 3,  seeded, maqPenalty_, qualOrder_);
-
-		// Driver wrapper for rRc_Fw
-		EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
-			*params, r2Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		// Driver wrapper for rRc_Bw
-		EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
-			*params, r2Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,      // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
-			PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		// Driver wrapper for rRc_Fw
-		EbwtRangeSourceDriver * dr2Rc_FwHalf = new EbwtRangeSourceDriver(
-			*params, r2Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			true,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_HI_HALF_EDGE,
-			two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
-		EbwtRangeSourceDriver * dr2Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
-			*params, r2Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
-			0,          // seedLen (0 = whole read is seed)
-			false,       // nudgeLeft (true for Fw index, false for Bw)
-			PIN_TO_BEGINNING,    // nothing's unrevisitable
-			PIN_TO_BEGINNING,
-			PIN_TO_HI_HALF_EDGE,
-			PIN_TO_LEN,
-			os_, verbose_, false, pool_, NULL);
 		TRangeSrcDrPtrVec *dr2RcVec;
 		if(v1_) {
 			dr2RcVec = new TRangeSrcDrPtrVec();
 		} else {
 			dr2RcVec = dr1FwVec;
 		}
-		dr2RcVec->push_back(dr2Rc_Fw);
-		dr2RcVec->push_back(dr2Rc_Bw);
-		dr2RcVec->push_back(dr2Rc_FwHalf);
-		if(!two_) {
-			dr2RcVec->push_back(dr2Rc_BwHalf);
+
+		if(do2Rc) {
+			EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, true,  false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
+				 ebwtBw_, false, 0xffffffff, false, false, 0, seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Rc_FwHalf = new EbwtRangeSource(
+				&ebwtFw_, false, 0xffffffff, false, false, 2,  seeded, maqPenalty_, qualOrder_);
+			EbwtRangeSource *r2Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
+				 ebwtBw_, false, 0xffffffff, false, false, 3,  seeded, maqPenalty_, qualOrder_);
+
+			// Driver wrapper for rRc_Fw
+			EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
+				*params, r2Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			// Driver wrapper for rRc_Bw
+			EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
+				*params, r2Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				false,      // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_HI_HALF_EDGE, // right half is unrevisitable
+				PIN_TO_HI_HALF_EDGE, // trumped by 0-mm
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			// Driver wrapper for rRc_Fw
+			EbwtRangeSourceDriver * dr2Rc_FwHalf = new EbwtRangeSourceDriver(
+				*params, r2Rc_FwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+				0,          // seedLen (0 = whole read is seed)
+				true,       // nudgeLeft (true for Fw index, false for Bw)
+				PIN_TO_BEGINNING,    // nothing's unrevisitable
+				PIN_TO_HI_HALF_EDGE,
+				two_ ? PIN_TO_LEN : PIN_TO_HI_HALF_EDGE,
+				PIN_TO_LEN,
+				os_, verbose_, false, pool_, NULL);
+			dr2RcVec->push_back(dr2Rc_Fw);
+			dr2RcVec->push_back(dr2Rc_Bw);
+			dr2RcVec->push_back(dr2Rc_FwHalf);
+			if(!two_) {
+				EbwtRangeSourceDriver * dr2Rc_BwHalf = two_ ? NULL : new EbwtRangeSourceDriver(
+					*params, r2Rc_BwHalf, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
+					0,          // seedLen (0 = whole read is seed)
+					false,       // nudgeLeft (true for Fw index, false for Bw)
+					PIN_TO_BEGINNING,    // nothing's unrevisitable
+					PIN_TO_BEGINNING,
+					PIN_TO_HI_HALF_EDGE,
+					PIN_TO_LEN,
+					os_, verbose_, false, pool_, NULL);
+				dr2RcVec->push_back(dr2Rc_BwHalf);
+			}
 		}
 
 		RefAligner<String<Dna5> >* refAligner;
@@ -592,6 +625,8 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool doFw_;
+	bool doRc_;
 	bool v1_;
 	bool two_;
 	HitSink& sink_;

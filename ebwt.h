@@ -70,26 +70,23 @@ class EbwtParams {
 public:
 	EbwtParams() { }
 
-	EbwtParams(uint32_t __len,
-	           int32_t __lineRate,
-	           int32_t __linesPerSide,
-	           int32_t __offRate,
-	           int32_t __isaRate,
-	           int32_t __ftabChars,
-	           int32_t __chunkRate)
+	EbwtParams(uint32_t len,
+	           int32_t lineRate,
+	           int32_t linesPerSide,
+	           int32_t offRate,
+	           int32_t isaRate,
+	           int32_t ftabChars)
 	{
-		init(__len, __lineRate, __linesPerSide, __offRate, __isaRate,
-		     __ftabChars, __chunkRate);
+		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
 	}
 
 	EbwtParams(const EbwtParams& eh) {
 		init(eh._len, eh._lineRate, eh._linesPerSide, eh._offRate,
-		     eh._isaRate, eh._ftabChars, eh._chunkRate);
+		     eh._isaRate, eh._ftabChars);
 	}
 
 	void init(uint32_t len, int32_t lineRate, int32_t linesPerSide,
-	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
-	          int32_t chunkRate)
+	          int32_t offRate, int32_t isaRate, int32_t ftabChars)
 	{
 		_len = len;
 		_bwtLen = _len + 1;
@@ -120,10 +117,6 @@ public:
 		_numLines = _numSides * _linesPerSide;
 		_ebwtTotLen = _numSidePairs * (2*_sideSz);
 		_ebwtTotSz = _ebwtTotLen;
-		_chunkRate = chunkRate;
-		_chunkLen = (_chunkRate >= 0) ? (1 << _chunkRate) : 0;
-		_chunkMask = (_chunkRate >= 0) ? (0xffffffff << _chunkRate) : 0;
-		_numChunks = (_chunkRate >= 0) ? ((_len + _chunkLen - 1) / _chunkLen) : 0;
 		assert(repOk());
 	}
 
@@ -156,109 +149,6 @@ public:
 	uint32_t numLines() const      { return _numLines; }
 	uint32_t ebwtTotLen() const    { return _ebwtTotLen; }
 	uint32_t ebwtTotSz() const     { return _ebwtTotSz; }
-	int32_t  chunkRate() const     { return _chunkRate; }
-	uint32_t chunkLen() const      { return _chunkLen; }
-	uint32_t chunkMask() const     { return _chunkMask; }
-	uint32_t numChunks() const     { return _numChunks; }
-
-	/// Given a list of RefRecords and a few Ebwt parameters, calculate
-	/// the chunkRate that minimizes total space taken by the index.
-	static int32_t calcBestChunkRate(const vector<RefRecord>& szs,
-	                                 int32_t offRate,
-	                                 int32_t lineRate,
-	                                 int32_t linesPerSide)
-	{
-		assert_geq(offRate, 0);
-		assert_gt(lineRate, 0);
-		assert_gt(linesPerSide, 0);
-		uint32_t ps[12];
-		memset(ps,  0, sizeof(uint32_t) * 12);
-		uint32_t len = 0;
-		for(size_t i = 0; i < szs.size(); i++) {
-			const RefRecord& rec = szs[i];
-			bool error = false;
-			if(len + rec.off < len) {
-				error = true; // overflowed
-			} else {
-				len += rec.off;
-				if(len + rec.len < len) {
-					error = true; // overflowed
-				}
-				else {
-					len += rec.len;
-				}
-			}
-			// If len overflowed, then bail
-			if(error) {
-				cerr << "The reference string is too long (>= 2^32 characters)." << endl;
-				cerr << "Please shorten or subdivide the reference(s)." << endl;
-				exit(1);
-			}
-			if(rec.len > 0) {
-				// Calculate amount of padding needed for a range of
-				// possible chunk rates
-				for(size_t j = 0; j < 12; j++) {
-					uint32_t masked = (rec.len & ~(0xffffffff << (j+6)));
-					if(masked > 0) {
-						// Factor in the padding due to this fragment.
-						uint32_t pad = ((1 << (j+6)) - masked);
-						if((ps[j] + pad) < ps[j]) {
-							// We've saturated ps[j]!
-							ps[j] = 0xffffffff;
-						} else {
-							ps[j] += pad;
-						}
-					}
-				}
-			}
-		}
-		// Calculate two penalties and add them together.  The first
-		// penalty is the space incurred by the chunk descriptors,
-		// which consist of 4 uint32_ts (16 bytes) per chunk.  The
-		// second penalty is the space taken by the padding needed for
-		// fragments.
-		uint32_t bestj   = 0xffffffff;
-		uint32_t bestpen = 0xffffffff;
-		for(size_t j = 0; j < 12; j++) {
-			if(ps[j] == 0xffffffff) {
-				continue; // The padding already overflowed
-			}
-			uint32_t jlen = len + ps[j];
-			if(jlen < len) {
-				continue; // overflowed!
-			}
-			uint32_t pen = (ps[j] >> 2);             // BWT contribution (bytes)
-			uint32_t offs = ((jlen >> offRate) * 4); // _offs contribution (bytes)
-			if(pen + offs < pen) {
-				continue; // overflowed!
-			}
-			pen += offs;
-			uint32_t chunks = ((jlen >> (j+6)) * 16); // chunks contribution (bytes)
-			if(pen + chunks < pen) {
-				continue; // overflowed!
-			}
-			pen += chunks;
-			// cumulative character occurrence counts contribution (2 uint32_ts per side)
-			uint32_t occs = ((jlen / ((1 << lineRate)*linesPerSide)) * 8);
-			if(pen + occs < pen) {
-				continue; // overflowed!
-			}
-			pen += occs;
-			if(pen < bestpen) {
-				bestpen = pen;
-				bestj = j;
-			}
-		}
-		if(bestj == 0xffffffff) {
-			// With padding, the
-			cerr << "The joined and padded reference string is too long." << endl;
-			cerr << "Please shorten or subdivide the reference(s)." << endl;
-			exit(1);
-		}
-		assert_neq(0xffffffff, bestj);
-		assert_neq(0xffffffff, bestpen);
-		return bestj+6;
-	}
 
 	/**
 	 * Set a new suffix-array sampling rate, which involves updating
@@ -289,10 +179,6 @@ public:
 		assert_geq(_offRate, 0);
 		assert_leq(_ftabChars, 16);
 		assert_geq(_ftabChars, 1);
-		if(_chunkRate != -1) {
-			assert_geq(_chunkRate, 1);
-			assert_lt(_chunkRate, 32);
-		}
 		assert_lt(_lineRate, 32);
 		assert_lt(_linesPerSide, 32);
 		assert_lt(_ftabChars, 32);
@@ -332,11 +218,7 @@ public:
 		    << "    numSides: "     << _numSides << endl
 		    << "    numLines: "     << _numLines << endl
 		    << "    ebwtTotLen: "   << _ebwtTotLen << endl
-		    << "    ebwtTotSz: "    << _ebwtTotSz << endl
-		    << "    chunkRate: "    << _chunkRate << endl
-		    << "    chunkLen: "     << _chunkLen << endl
-	        << "    chunkMask: "    << hex << _chunkMask << dec << endl
-            << "    numChunks: "    << _numChunks << endl;
+		    << "    ebwtTotSz: "    << _ebwtTotSz << endl;
 	}
 
     uint32_t _len;
@@ -368,10 +250,6 @@ public:
 	uint32_t _numLines;
 	uint32_t _ebwtTotLen;
 	uint32_t _ebwtTotSz;
-	int32_t  _chunkRate;
-	uint32_t _chunkLen;
-	uint32_t _chunkMask;
-	uint32_t _numChunks;
 };
 
 /**
@@ -430,16 +308,13 @@ public:
 	    _nPat(0), \
 	    _nFrag(0), \
 	    _plen(NULL), \
-	    _pmap(NULL), \
 	    _rstarts(NULL), \
 	    _fchr(NULL), \
 	    _ftab(NULL), \
 	    _eftab(NULL), \
 	    _offs(NULL), \
-	    _offsIsShmem(false), \
 	    _isa(NULL), \
 	    _ebwt(NULL), \
-	    _ebwtIsShmem(false), \
 	    _useMm(false), \
 	    _refnames()
 
@@ -459,7 +334,6 @@ public:
 	     bool __fw,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
-	     bool __useShmem = false,
 	     bool __useMm = false,
 	     bool __verbose = false,
 	     bool __passMemExc = false,
@@ -494,7 +368,6 @@ public:
 	     int32_t offRate,
 	     int32_t isaRate,
 	     int32_t ftabChars,
-	     int32_t chunkRate,
 	     const string& file,   // base filename for EBWT files
 	     bool __fw,
 	     bool useBlockwise,
@@ -514,7 +387,7 @@ public:
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS,
-	     _eh(joinedLen(szs, chunkRate), lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate)
+	     _eh(joinedLen(szs), lineRate, linesPerSide, offRate, isaRate, ftabChars)
 	{
 		_in1Str = file + ".1.ebwt";
 		_in2Str = file + ".2.ebwt";
@@ -608,12 +481,11 @@ public:
 	                    int dcv,
 	                    uint32_t seed)
 	{
-		// Compose text strings into single string; doing so
-		// initializes _plen, _pmap, _nPat
+		// Compose text strings into single string
 		VMSG_NL("Calculating joined length");
 		TStr s; // holds the entire joined reference after call to joinToDisk
 		uint32_t jlen;
-		jlen = joinedLen(szs, _eh._chunkRate);
+		jlen = joinedLen(szs);
 		assert_geq(jlen, sztot);
 		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " characters of padding)");
 		VMSG_NL("Writing header");
@@ -776,17 +648,10 @@ public:
 	 * fragments correspond to input sequences - it just cares about
 	 * the lengths of the fragments.
 	 */
-	uint32_t joinedLen(vector<RefRecord>& szs, int32_t chunkRate) {
+	uint32_t joinedLen(vector<RefRecord>& szs) {
 		uint32_t ret = 0;
-		if(chunkRate >= 0) {
-			uint32_t chunkLen = 1 << chunkRate;
-			for(unsigned int i = 0; i < szs.size(); i++) {
-				ret += ((szs[i].len + chunkLen - 1) / chunkLen) * chunkLen;
-			}
-		} else {
-			for(unsigned int i = 0; i < szs.size(); i++) {
-				ret += szs[i].len;
-			}
+		for(unsigned int i = 0; i < szs.size(); i++) {
+			ret += szs[i].len;
 		}
 		return ret;
 	}
@@ -799,7 +664,7 @@ public:
 			if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
 			if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
 			if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
-			if(_offs != NULL && !_offsIsShmem) {
+			if(_offs != NULL) {
 				delete[] _offs; _offs = NULL;
 			} else if(_offs != NULL) {
 #ifdef BOWTIE_SHARED_MEM
@@ -808,9 +673,8 @@ public:
 			}
 			if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 			if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
-			if(_pmap    != NULL) delete[] _pmap;    _pmap    = NULL;
 			if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
-			if(_ebwt != NULL && !_ebwtIsShmem) {
+			if(_ebwt != NULL) {
 				delete[] _ebwt; _ebwt = NULL;
 			} else if(_ebwt != NULL) {
 #ifdef BOWTIE_SHARED_MEM
@@ -843,7 +707,6 @@ public:
 	uint32_t*   offs() const         { return _offs; }
 	uint32_t*   isa() const          { return _isa; }
 	uint32_t*   plen() const         { return _plen; }
-	uint32_t*   pmap() const         { return _pmap; }
 	uint32_t*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
 	bool        toBe() const         { return _toBigEndian; }
@@ -861,11 +724,7 @@ public:
 			assert(_fchr != NULL);
 			assert(_offs != NULL);
 			assert(_isa != NULL);
-			if(_eh._chunkRate >= 0) {
-				assert(_pmap != NULL);
-			} else {
-				assert(_rstarts != NULL);
-			}
+			assert(_rstarts != NULL);
 			assert_neq(_zEbwtByteOff, 0xffffffff);
 			assert_neq(_zEbwtBpOff, -1);
 			return true;
@@ -874,11 +733,7 @@ public:
 			assert(_eftab == NULL);
 			assert(_fchr == NULL);
 			assert(_offs == NULL);
-			if(_eh._chunkRate >= 0) {
-				assert(_pmap == NULL);
-			} else {
-				assert(_rstarts == NULL);
-			}
+			assert(_rstarts == NULL);
 			assert_eq(_zEbwtByteOff, 0xffffffff);
 			assert_eq(_zEbwtBpOff, -1);
 			return false;
@@ -907,19 +762,13 @@ public:
 			delete[] _fchr;
 			delete[] _ftab;
 			delete[] _eftab;
-			if(!_offsIsShmem) delete[] _offs;
+			delete[] _offs;
 			delete[] _isa;
 			// Keep plen; it's small and the client may want to query it
 			// even when the others are evicted.
 			//delete[] _plen;
-			if(_eh._chunkRate >= 0) {
-				delete[] _pmap;
-			} else {
-				delete[] _rstarts;
-			}
-			if(!_ebwtIsShmem) {
-				delete[] _ebwt;
-			}
+			delete[] _rstarts;
+			delete[] _ebwt;
 		}
 		_fchr  = NULL;
 		_ftab  = NULL;
@@ -929,7 +778,6 @@ public:
 		// Keep plen; it's small and the client may want to query it
 		// even when the others are evicted.
 		//_plen  = NULL;
-		_pmap    = NULL;
 		_rstarts = NULL;
 		_ebwt    = NULL;
 		_zEbwtByteOff = 0xffffffff;
@@ -1053,12 +901,6 @@ public:
 		} else {
 			out << "non-NULL, [0] = " << _plen[0] << endl;
 		}
-		out << "    pmap: ";
-		if(_pmap == NULL) {
-			out << "NULL" << endl;
-		} else {
-			out << "non-NULL, [0] = " << _pmap[0] << endl;
-		}
 		out << "    rstarts: ";
 		if(_rstarts == NULL) {
 			out << "NULL" << endl;
@@ -1104,8 +946,8 @@ public:
 	}
 
 	// Building
-	static TStr join(vector<TStr>& l, int32_t chunkRate, uint32_t seed);
-	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, int32_t chunkRate, uint32_t seed);
+	static TStr join(vector<TStr>& l, uint32_t seed);
+	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t seed);
 	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
@@ -1124,8 +966,6 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	void joinedToTextOffPmap(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	void joinedToTextOffBsearch(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
@@ -1150,9 +990,8 @@ public:
 		assert_lt(_zEbwtBpOff, 4);
 		assert_lt(_zEbwtByteOff, eh._ebwtTotSz);
 		assert_lt(_zOff, eh._bwtLen);
-		assert(eh._chunkRate >= 0 || _rstarts != NULL);
-		assert(eh._chunkRate == -1 || _pmap != NULL);
-		if(eh._chunkRate == -1) assert_geq(_nFrag, _nPat);
+		assert(_rstarts != NULL);
+		assert_geq(_nFrag, _nPat);
 		return true;
 	}
 
@@ -1194,8 +1033,6 @@ public:
 	uint32_t   _nPat;  /// number of reference texts
 	uint32_t   _nFrag; /// number of fragments
 	uint32_t*  _plen;
-	// _plen ans e
-	uint32_t*  _pmap;
 	uint32_t*  _rstarts; // starting offset of fragments / text indexes
 	// _fchr, _ftab and _eftab are expected to be relatively small
 	// (usually < 1MB, perhaps a few MB if _fchr is particularly large
@@ -1208,12 +1045,10 @@ public:
 	// offset every 16 rows), the total size of _offs is the same as
 	// the total size of the input sequence
 	uint32_t*  _offs;
-	bool       _offsIsShmem;  /// allocated in shared memory; don't delete
 	uint32_t*  _isa;
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
-	bool       _ebwtIsShmem;  /// allocated in shared memory; don't delete
 	bool       _useMm;        /// use memory-mapped files to hold the index
 	vector<string> _refnames; /// names of the reference sequences
 	EbwtParams _eh;
@@ -1685,28 +1520,10 @@ void Ebwt<TStr>::sanityCheckAll() const {
 		assert_geq(this->_plen[i], 0);
 	}
 
-	if(eh._chunkRate >= 0) {
-		// Check pmap/plen
-		for(uint32_t i = 0; i < eh._numChunks*4; i += 4) {
-			// valid pattern id
-			assert_lt(this->_pmap[i], this->_nPat);
-			if(i > 0) {
-				// pattern id in order
-				assert_geq(this->_pmap[i], this->_pmap[i-4]);
-			}
-			// Fragment offset is less than fragment length
-			assert_lt(this->_pmap[i+1], this->_plen[this->_pmap[i]]);
-			// Fragment offset is less than fragment length
-			assert_lt(this->_pmap[i+2], this->_pmap[i+3]);
-			// Fragment length is less than or equal to sequence length
-			assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
-		}
-	} else {
-		// Check rstarts
-		for(uint32_t i = 0; i < this->_nFrag-1; i++) {
-			assert_gt(this->_rstarts[(i+1)*3], this->_rstarts[i*3]);
-			assert(this->_rstarts[(i*3)+1] <= this->_rstarts[((i+1)*3)+1]);
-		}
+	// Check rstarts
+	for(uint32_t i = 0; i < this->_nFrag-1; i++) {
+		assert_gt(this->_rstarts[(i+1)*3], this->_rstarts[i*3]);
+		assert(this->_rstarts[(i*3)+1] <= this->_rstarts[((i+1)*3)+1]);
 	}
 
 	// Check ebwt
@@ -2368,55 +2185,14 @@ inline int Ebwt<TStr>::mapLF1(uint32_t& row, const SideLocus& l
 /**
  * Take an offset into the joined text and translate it into the
  * reference of the index it falls on, the offset into the reference,
- * and the length of the reference.
- */
-template<typename TStr>
-void Ebwt<TStr>::joinedToTextOffPmap(uint32_t qlen, uint32_t off,
-                                     uint32_t& tidx,
-                                     uint32_t& textoff,
-                                     uint32_t& tlen) const
-{
-	assert_geq(this->_eh._chunkRate, 0);
-	uint32_t ptabOff = (off >> this->_eh._chunkRate)*4;
-	uint32_t coff = off & ~(this->_eh._chunkMask);   // offset into chunk
-	tidx = this->_pmap[ptabOff];                     // id of text matched
-	uint32_t toff = this->_pmap[ptabOff+1];          // offset into sequence
-	uint32_t foff = this->_pmap[ptabOff+2];          // offset into fragment
-	uint32_t flen = this->_pmap[ptabOff+3];          // fragment length
-	assert_lt(tidx, this->_nPat);
-	tlen = this->_plen[tidx];
-
-	// Reject if the alignment overlaps this fragment's padding or if
-	// it falls off the end of the sequence
-	if(foff + coff + qlen > flen) {
-		// Spurious result - overlaps with padding after fragment
-		tidx = 0xffffffff;
-		return;
-	}
-	// Genuine result
-	if(_verbose) {
-		cout << "report tidx=" << tidx << ", foff=" << foff << ", absoff=" << off << ", flen=" << flen << endl;
-	}
-	textoff = toff;
-	if(this->_fw) {
-		textoff += (coff+foff);
-	} else {
-		textoff += (flen - (coff+foff));
-		textoff -= qlen;
-	}
-}
-
-/**
- * Take an offset into the joined text and translate it into the
- * reference of the index it falls on, the offset into the reference,
  * and the length of the reference.  Use a binary search through the
  * sorted list of reference fragment ranges t
  */
 template<typename TStr>
-void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
-                                        uint32_t& tidx,
-                                        uint32_t& textoff,
-                                        uint32_t& tlen) const
+void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
+                                 uint32_t& tidx,
+                                 uint32_t& textoff,
+                                 uint32_t& tlen) const
 {
 	uint32_t top = 0;
 	uint32_t bot = _nFrag; // 1 greater than largest addressable element
@@ -2475,21 +2251,6 @@ void Ebwt<TStr>::joinedToTextOffBsearch(uint32_t qlen, uint32_t off,
 	tlen = this->_plen[tidx];
 }
 
-template<typename TStr>
-void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
-                                 uint32_t& tidx,
-                                 uint32_t& textoff,
-                                 uint32_t& tlen) const
-{
-	if(this->_eh._chunkRate >= 0) {
-		assert(_pmap != NULL);
-		joinedToTextOffPmap(qlen, off, tidx, textoff, tlen);
-	} else {
-		assert(_rstarts != NULL);
-		joinedToTextOffBsearch(qlen, off, tidx, textoff, tlen);
-	}
-}
-
 /**
  * Report a potential match at offset 'off' with pattern length
  * 'qlen'.  We must be careful to filter out spurious matches that
@@ -2530,24 +2291,6 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				bot-top-1);          // # other hits
 	}
 
-	//
-	// Sequences are aligned on chunk boundaries.  Chunk size is
-	// configurable with a default of 2K characters.  Sequences are
-	// padded to fill the chunks.  Alignments that overlap any padding
-	// are invalid and should be weeded out.
-	//
-	//                 Sequence 0                      Sequence 1
-	// -------------------------------------------- -----------------
-	// Chunk0   Chunk1   Chunk2   Chunk3   Chunk4   Chunk5   Chunk6
-	// ======== ======== ======== ======== ======== ======== ========
-	// -------- ----     -------- -------- -        --       -------
-	//  Fragment 0  ^^^^      Fragment 1    ^^^^^^^   ^^^^^^
-	//              Padding                    Padding
-	//
-	// To calculate a hit's offset, add the alignment's offset into the
-	// fragment containing it with that fragment's offset from the
-	// beginning of the sequence.
-	//
 	uint32_t tidx;
 	uint32_t textoff;
 	uint32_t tlen;
@@ -2878,12 +2621,6 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 		} else {
 			// Just jumped over a gap
 		}
-		if(_eh.chunkRate() >= 0) {
-			uint32_t leftover = (restOff & ~_eh.chunkMask());
-			uint32_t diff = _eh.chunkLen() - leftover;
-			if(leftover != 0) restOff += diff;
-			assert_eq(0, restOff & ~_eh.chunkMask());
-		}
 	}
 }
 
@@ -2978,18 +2715,19 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	int32_t  isaRate      = _overrideIsaRate;
 	int32_t  ftabChars    = readI32(_in1, switchEndian);
 	bytesRead += 4;
-	int32_t  chunkRate    = readI32(_in1, switchEndian);
+	// BTL: chunkRate is now deprecated
+	/*int32_t  chunkRate =*/ readI32(_in1, switchEndian);
 	bytesRead += 4;
 
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams *eh;
 	bool deleteEh = false;
 	if(params != NULL) {
-		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
+		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
 		if(_verbose) params->print(cout);
 		eh = params;
 	} else {
-		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, chunkRate);
+		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
 		deleteEh = true;
 	}
 
@@ -3071,69 +2809,29 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	// (i.e. everything up to and including join()).
 	if(justHeader) goto done;
 
-	if(chunkRate >= 0) {
-		uint32_t pmapEnts = eh->_numChunks*4;
-		if(_useMm) {
-			this->_pmap = (uint32_t*)(mmFile[0] + bytesRead);
-			bytesRead += pmapEnts*4;
-			lseek(_in1, pmapEnts*4, SEEK_CUR);
-		} else {
-			// Read pmap from primary stream
-			try {
-				if(_verbose) cout << "Reading pmap (" << pmapEnts << ")" << endl;
-				this->_pmap = new uint32_t[pmapEnts];
-				if(switchEndian) {
-					for(uint32_t i = 0; i < pmapEnts; i += 4) {
-						this->_pmap[i]   = readU32(_in1, switchEndian); // pat #
-						this->_pmap[i+1] = readU32(_in1, switchEndian); // sequence offset
-						this->_pmap[i+2] = readU32(_in1, switchEndian); // fragment offset
-						this->_pmap[i+3] = readU32(_in1, switchEndian); // fragment length
-					}
-				} else {
-					ssize_t r = read(_in1, (void *)this->_pmap, pmapEnts*4);
-					if(r != (ssize_t)(pmapEnts*4)) {
-						cerr << "Error reading _pmap[] array: " << r << ", " << (pmapEnts*4) << endl;
-						exit(1);
-					}
-				}
-			} catch(bad_alloc& e) {
-				cerr << "Out of memory allocating pmap[] in Ebwt::read()"
-					 << " at " << __FILE__ << ":" << __LINE__ << endl;
-				throw e;
-			}
-			// Sanity-check pmap entries
-			for(uint32_t i = 0; i < pmapEnts; i += 4) {
-				assert_lt (this->_pmap[i],   this->_nPat);
-				assert_lt (this->_pmap[i+1], this->_plen[this->_pmap[i]]);
-				assert_lt (this->_pmap[i+2], this->_pmap[i+3]);
-				assert_leq(this->_pmap[i+3], this->_plen[this->_pmap[i]]);
-			}
-		}
+	this->_nFrag = readU32(_in1, switchEndian);
+	bytesRead += 4;
+	if(_verbose) cout << "Reading rstarts (" << this->_nFrag*3 << ")" << endl;
+	assert_geq(this->_nFrag, this->_nPat);
+	if(_useMm) {
+		this->_rstarts = (uint32_t*)(mmFile[0] + bytesRead);
+		bytesRead += this->_nFrag*4*3;
+		lseek(_in1, this->_nFrag*4*3, SEEK_CUR);
 	} else {
-		this->_nFrag = readU32(_in1, switchEndian);
-		bytesRead += 4;
-		if(_verbose) cout << "Reading rstarts (" << this->_nFrag*3 << ")" << endl;
-		assert_geq(this->_nFrag, this->_nPat);
-		if(_useMm) {
-			this->_rstarts = (uint32_t*)(mmFile[0] + bytesRead);
-			bytesRead += this->_nFrag*4*3;
-			lseek(_in1, this->_nFrag*4*3, SEEK_CUR);
+		this->_rstarts = new uint32_t[this->_nFrag*3];
+		if(switchEndian) {
+			for(uint32_t i = 0; i < this->_nFrag*3; i += 3) {
+				// fragment starting position in joined reference
+				// string, text id, and fragment offset within text
+				this->_rstarts[i]   = readU32(_in1, switchEndian);
+				this->_rstarts[i+1] = readU32(_in1, switchEndian);
+				this->_rstarts[i+2] = readU32(_in1, switchEndian);
+			}
 		} else {
-			this->_rstarts = new uint32_t[this->_nFrag*3];
-			if(switchEndian) {
-				for(uint32_t i = 0; i < this->_nFrag*3; i += 3) {
-					// fragment starting position in joined reference
-					// string, text id, and fragment offset within text
-					this->_rstarts[i]   = readU32(_in1, switchEndian);
-					this->_rstarts[i+1] = readU32(_in1, switchEndian);
-					this->_rstarts[i+2] = readU32(_in1, switchEndian);
-				}
-			} else {
-				ssize_t r = read(_in1, (void *)this->_rstarts, this->_nFrag*4*3);
-				if(r != (ssize_t)(this->_nFrag*4*3)) {
-					cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*4*3) << endl;
-					exit(1);
-				}
+			ssize_t r = read(_in1, (void *)this->_rstarts, this->_nFrag*4*3);
+			if(r != (ssize_t)(this->_nFrag*4*3)) {
+				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*4*3) << endl;
+				exit(1);
 			}
 		}
 	}
@@ -3438,23 +3136,18 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	int32_t  linesPerSide = readI32(in, switchEndian);
 	int32_t  offRate      = readI32(in, switchEndian);
 	int32_t  ftabChars    = readI32(in, switchEndian);
-	int32_t  chunkRate    = readI32(in, switchEndian);
+	// BTL: chunkRate is now deprecated
+	/*int32_t  chunkRate    =*/ readI32(in, switchEndian);
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, chunkRate);
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars);
 
 	uint32_t nPat = readI32(in, switchEndian); // nPat
 	in.seekg(nPat*4, ios_base::cur); // skip plen
 
-	if(chunkRate >= 0) {
-		// Skip pmap
-		uint32_t pmapEnts = eh._numChunks*4;
-		in.seekg(pmapEnts*4, ios_base::cur);
-	} else {
-		// Skip rstarts
-		uint32_t nFrag = readU32(in, switchEndian);
-		in.seekg(nFrag*4*3, ios_base::cur);
-	}
+	// Skip rstarts
+	uint32_t nFrag = readU32(in, switchEndian);
+	in.seekg(nFrag*4*3, ios_base::cur);
 
 	// Skip ebwt
 	in.seekg(eh._ebwtTotLen, ios_base::cur);
@@ -3542,7 +3235,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	writeI32(out1, eh._linesPerSide, be); // not used
 	writeI32(out1, eh._offRate,      be); // every 2^offRate chars is "marked"
 	writeI32(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
-	writeI32(out1, eh._chunkRate,    be);
+	writeI32(out1, 0xffffffff, be); // BTL: chunkRate is now deprecated
 
 	if(!justHeader) {
 		assert(isInMemory());
@@ -3552,15 +3245,10 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		writeU32(out1, this->_nPat,      be);
 		for(uint32_t i = 0; i < this->_nPat; i++)
 		writeU32(out1, this->_plen[i], be);
-		if(eh._chunkRate >= 0) {
-			for(uint32_t i = 0; i < eh._numChunks*4; i++)
-				writeU32(out1, this->_pmap[i], be);
-		} else {
-			assert_geq(this->_nFrag, this->_nPat);
-			writeU32(out1, this->_nFrag, be);
-			for(uint32_t i = 0; i < this->_nFrag*3; i++)
-				writeU32(out1, this->_rstarts[i], be);
-		}
+		assert_geq(this->_nFrag, this->_nPat);
+		writeU32(out1, this->_nFrag, be);
+		for(uint32_t i = 0; i < this->_nFrag*3; i++)
+			writeU32(out1, this->_rstarts[i], be);
 
 		// These Ebwt parameters are discovered only as the Ebwt is being
 		// built (in buildToDisk()).  Of these, only 'offs' and 'ebwt' are
@@ -3628,21 +3316,15 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	    assert_eq(eh._isaRate,      copy.eh()._isaRate);
 	    assert_eq(eh._ftabChars,    copy.eh()._ftabChars);
 	    assert_eq(eh._len,          copy.eh()._len);
-	    assert_eq(eh._chunkRate,    copy.eh()._chunkRate);
 	    assert_eq(_zOff,             copy.zOff());
 	    assert_eq(_zEbwtBpOff,       copy.zEbwtBpOff());
 	    assert_eq(_zEbwtByteOff,     copy.zEbwtByteOff());
 		assert_eq(_nPat,             copy.nPat());
 		for(uint32_t i = 0; i < _nPat; i++)
 			assert_eq(this->_plen[i], copy.plen()[i]);
-		if(eh._chunkRate >= 0) {
-			for(uint32_t i = 0; i < eh._numChunks*4; i++)
-				assert_eq(this->_pmap[i], copy.pcap()[i]);
-		} else {
-			assert_eq(this->_nFrag, copy.nFrag());
-			for(uint32_t i = 0; i < this->nFrag*3; i++) {
-				assert_eq(this->_rstarts[i], copy.rstarts()[i]);
-			}
+		assert_eq(this->_nFrag, copy.nFrag());
+		for(uint32_t i = 0; i < this->nFrag*3; i++) {
+			assert_eq(this->_rstarts[i], copy.rstarts()[i]);
 		}
 		for(uint32_t i = 0; i < 5; i++)
 			assert_eq(this->_fchr[i], copy.fchr()[i]);
@@ -3677,43 +3359,19 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
  * and the original text strings.
  */
 template<typename TStr>
-TStr Ebwt<TStr>::join(vector<TStr>& l, int32_t chunkRate, uint32_t seed) {
+TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t seed) {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);
-	uint32_t chunkLen = 1 << chunkRate;
-	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
 	size_t guessLen = 0;
 	for(size_t i = 0; i < l.size(); i++) {
 		guessLen += length(l[i]);
-		if(pmap) guessLen += chunkLen;
 	}
 	reserve(ret, guessLen, Exact());
 	for(size_t i = 0; i < l.size(); i++) {
 		TStr& s = l[i];
 		assert_gt(length(s), 0);
 		append(ret, s);
-		if(chunkRate == -1) continue;
-		// s isn't the last pattern; padding between s and the next
-		// pattern may be necessary
-		uint32_t diff = 0;
-		uint32_t leftover = length(ret) & ~chunkMask;
-		if(leftover > 0) {
-			// The joined string currently ends in the middle of a
-			// chunk, so we have to pad it by 'diff'
-			diff = chunkLen - leftover;
-			assert_gt(diff, 0);
-		}
-		for(size_t j = 0; j < diff; j++) {
-			// Append random characters to fill the gap; note that
-			// the randomness is reproducible as long as the 'seed'
-			// argument is the same, which helps us to sanity-check
-			// the result.
-			appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
-			assert_lt((uint8_t)ret[length(ret)-1], 4);
-		}
-		// Padded pattern ends on a chunk boundary
-		assert_eq(length(ret), length(ret) & chunkMask);
 	}
 	return ret;
 }
@@ -3731,17 +3389,13 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
                       vector<RefRecord>& szs,
                       uint32_t sztot,
                       const RefReadInParams& refparams,
-                      int32_t chunkRate,
                       uint32_t seed)
 {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);
 	RefReadInParams rpcp = refparams;
-	uint32_t chunkLen = 1 << chunkRate;
-	uint32_t chunkMask = 0xffffffff << chunkRate;
 	TStr ret;
 	size_t guessLen = sztot;
-	if(chunkRate >= 0) guessLen += (szs.size() * chunkLen);
 	reserve(ret, guessLen, Exact());
 	ASSERT_ONLY(size_t szsi = 0);
 	for(size_t i = 0; i < l.size(); i++) {
@@ -3763,27 +3417,6 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
-			if(chunkRate == -1) continue;
-		    // insert padding
-			uint32_t diff = 0;
-			uint32_t rlen = length(ret);
-			uint32_t leftover = rlen & ~chunkMask;
-			if(leftover > 0) {
-				// The joined string currently ends in the middle of a
-				// chunk, so we have to pad it by 'diff'
-				diff = chunkLen - leftover;
-				assert_gt(diff, 0);
-			}
-			for(uint32_t i = 0; i < diff; i++) {
-				// Append random characters to fill the gap; note that
-				// the randomness is reproducible as long as the 'seed'
-				// argument is the same, which helps us to sanity-check
-				// the result.
-				appendValue(ret, (Dna)(rand.nextU32() & 3));
-				assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
-			}
-			// Pattern now ends on a chunk boundary
-			assert_eq(length(ret), length(ret) & chunkMask);
 		}
 	}
 	return ret;
@@ -3792,10 +3425,7 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 /**
  * Join several text strings together according to the text-chunking
  * scheme specified in the EbwtParams.  Ebwt fields calculated in this
- * function (_nPat, _plen, _pmap) are written directly to disk.  The
- * _nPat and _plen fields are also retained in the Ebwt, but the _pmap
- * field is not.  _pmap is relatively big, so we avoid keeping it in
- * memory unless the user specifically loads the Ebwt.
+ * function are written directly to disk.
  *
  * It is assumed, but not required, that the header values have already
  * been written to 'out1' before this function is called.
@@ -3818,7 +3448,6 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);
-	const EbwtParams& eh = this->_eh;
 	RefReadInParams rpcp = refparams;
 	assert_gt(szs.size(), 0);
 	assert_gt(l.size(), 0);
@@ -3835,11 +3464,8 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	}
 	assert_gt(this->_nPat, 0);
 	assert_geq(this->_nFrag, this->_nPat);
-	this->_pmap = NULL;
 	this->_rstarts = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
-	ASSERT_ONLY(uint32_t pmapEnts = eh._numChunks*4);
-	uint32_t pmapOff = 0;
 	// Allocate plen[]
 	try {
 		this->_plen = new uint32_t[this->_nPat];
@@ -3864,10 +3490,8 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	}
 	assert_eq((uint32_t)npat, this->_nPat-1);
 	writeU32(out1, this->_plen[npat], this->toBe());
-	if(eh._chunkRate == -1) {
-		// Write the number of fragments
-		writeU32(out1, this->_nFrag, this->toBe());
-	}
+	// Write the number of fragments
+	writeU32(out1, this->_nFrag, this->toBe());
 	size_t seqsRead = 0;
 	ASSERT_ONLY(uint32_t szsi = 0);
 	ASSERT_ONLY(uint32_t entsWritten = 0);
@@ -3917,50 +3541,10 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			assert_geq(rpcp.numSeqCutoff, -1);
 			assert_geq(rpcp.baseCutoff, -1);
 			uint32_t seq = seqsRead-1;
-			if(eh._chunkRate >= 0) {
-			    // insert padding
-				uint32_t diff = 0;
-				uint32_t rlen = length(ret);
-				uint32_t leftover = rlen & ~(eh._chunkMask);
-				if(leftover > 0) {
-					// The joined string currently ends in the middle of a
-					// chunk, so we have to pad it by 'diff'
-					diff = eh._chunkLen - leftover;
-					assert_gt(diff, 0);
-				}
-				if((sztot + diff) < sztot) {
-					cerr << "Error: The reference sequence, when padding is added, exceeds 2^32-1 characters." << endl
-					     << "This can happen when the reference itself is too long, or when the reference" << endl
-					     << "is divided into many separate sequences.  Please divide your reference sequences" << endl
-					     << "into smaller batches and build a separate index for each batch." << endl;
-					exit(1);
-				}
-				sztot += diff;
-				for(uint32_t i = 0; i < diff; i++) {
-					// Append random characters to fill the gap; note that
-					// the randomness is reproducible as long as the 'seed'
-					// argument is the same, which helps us to sanity-check
-					// the result.
-					appendValue(ret, (Dna)(rand.nextU32() & 3)); // append random junk
-					assert_lt((uint8_t)(Dna)ret[length(ret)-1], 4);
-				}
-				// Pattern now ends on a chunk boundary
-				assert_eq(length(ret), length(ret) & eh._chunkMask);
-				// Initialize elements of the pmap that cover this pattern
-				for(unsigned int j = 0; j < bases; j += eh._chunkLen) {
-					assert_lt(pmapOff+3, pmapEnts);
-					pmapOff += 4;
-					writeU32(out1, seq,    this->toBe()); // sequence id
-					writeU32(out1, patoff, this->toBe()); // offset into sequence
-					writeU32(out1, j,      this->toBe()); // offset into fragment
-					writeU32(out1, bases,  this->toBe()); // fragment length
-				}
-			} else {
-				ASSERT_ONLY(entsWritten++);
-				writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
-				writeU32(out1, seq,       this->toBe()); // sequence id
-				writeU32(out1, patoff,    this->toBe()); // offset into sequence
-			}
+			ASSERT_ONLY(entsWritten++);
+			writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
+			writeU32(out1, seq,       this->toBe()); // sequence id
+			writeU32(out1, patoff,    this->toBe()); // offset into sequence
 			patoff += bases;
 		}
 		assert_gt(szsi, 0);
@@ -3974,11 +3558,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 		assert(!l[i]->eof());
 		#endif
 	}
-	if(eh._chunkRate >= 0) {
-		assert_eq(pmapOff, pmapEnts); // initialized every pmap element
-	} else {
-		assert_eq(entsWritten, this->_nFrag);
-	}
+	assert_eq(entsWritten, this->_nFrag);
 }
 
 
@@ -3992,7 +3572,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
  * "to disk" and then read it back into memory later as necessary.
  *
  * It is assumed that the header values and join-related values (nPat,
- * plen, pmap) have already been written to 'out1' before this function
+ * plen) have already been written to 'out1' before this function
  * is called.  When this function is finished, it will have
  * additionally written ebwt, zOff, fchr, ftab and eftab to the primary
  * file and offs to the secondary file.

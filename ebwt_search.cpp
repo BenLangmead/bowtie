@@ -37,7 +37,7 @@ static vector<string> mates1; // mated reads (first mate)
 static vector<string> mates2; // mated reads (second mate)
 static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase = "";
-static int verbose				= 0; // be talkative
+static bool verbose				= 0; // be talkative
 static bool quiet				= false; // print nothing but the alignments
 static int sanityCheck			= 0;  // enable expensive sanity checks
 static int format				= FASTQ; // default read format is FASTQ
@@ -79,10 +79,13 @@ static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (f
 static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
 static string dumpAlFaBase      = "";    // basename of FASTA files to dump aligned reads to
 static string dumpAlFqBase      = "";    // basename of FASTQ files to dump aligned reads to
+static string dumpAlBase        = "";    // basename of same-format files to dump aligned reads to
 static string dumpUnalFaBase    = "";    // basename of FASTA files to dump unaligned reads to
 static string dumpUnalFqBase    = "";    // basename of FASTQ files to dump unaligned reads to
+static string dumpUnalBase      = "";    // basename of same-format files to dump unaligned reads to
 static string dumpMaxFaBase     = "";    // basename of FASTA files to dump reads with more than -m valid alignments to
 static string dumpMaxFqBase     = "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
+static string dumpMaxBase       = "";    // basename of same-format files to dump reads with more than -m valid alignments to
 static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool better				= false; // true -> guarantee alignments from best possible stratum
@@ -95,7 +98,6 @@ static bool noMaqRound          = false; // true -> don't round quals to nearest
 static bool forgiveInput        = false; // let read input be a little wrong w/o complaining or dying
 static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
-static bool useShmem            = false; // use shared memory to hold _ebwt[] and _offs[] arrays?
 static bool useMm               = false; // use memory-mapped files to hold the index
 static bool stateful            = false; // use stateful aligners
 static uint32_t prefetchWidth   = 1;     // number of reads to process in parallel w/ --stateful
@@ -134,7 +136,7 @@ enum {
 	ARG_DUMP_PATS,
 	ARG_RANGE,
 	ARG_CONCISE,
-	ARG_solexaQuals,
+	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
 	ARG_VERBOSE,
 	ARG_QUIET,
@@ -142,10 +144,13 @@ enum {
 	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
 	ARG_FAST,
+	ARG_AL,
 	ARG_ALFA,
 	ARG_ALFQ,
+	ARG_UN,
 	ARG_UNFA,
 	ARG_UNFQ,
+	ARG_MAXDUMP,
 	ARG_MAXFA,
 	ARG_MAXFQ,
 	ARG_REFIDX,
@@ -206,17 +211,20 @@ static struct option long_options[] = {
 	{(char*)"concise",      no_argument,       0,            ARG_CONCISE},
 	{(char*)"binout",       no_argument,       0,            'b'},
 	{(char*)"noout",        no_argument,       0,            ARG_NOOUT},
-	{(char*)"solexa-quals", no_argument,       0,            ARG_solexaQuals},
+	{(char*)"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
 	{(char*)"time",         no_argument,       0,            't'},
 	{(char*)"trim3",        required_argument, 0,            '3'},
 	{(char*)"trim5",        required_argument, 0,            '5'},
 	{(char*)"seed",         required_argument, 0,            ARG_SEED},
 	{(char*)"qupto",        required_argument, 0,            'u'},
+	{(char*)"al",           required_argument, 0,            ARG_AL},
 	{(char*)"alfa",         required_argument, 0,            ARG_ALFA},
 	{(char*)"alfq",         required_argument, 0,            ARG_ALFQ},
+	{(char*)"un",           required_argument, 0,            ARG_UN},
 	{(char*)"unfa",         required_argument, 0,            ARG_UNFA},
 	{(char*)"unfq",         required_argument, 0,            ARG_UNFQ},
+	{(char*)"max",          required_argument, 0,            ARG_MAXDUMP},
 	{(char*)"maxfa",        required_argument, 0,            ARG_MAXFA},
 	{(char*)"maxfq",        required_argument, 0,            ARG_MAXFQ},
 	{(char*)"offrate",      required_argument, 0,            'o'},
@@ -345,12 +353,9 @@ static void printUsage(ostream& out) {
 	    << "  --quiet            print nothing but the alignments" << endl
 	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
-	    << "  --alfa <fname>     write aligned reads to FASTA file(s) <fname>*.fa" << endl
-	    << "  --alfq <fname>     write aligned reads to FASTQ file(s) <fname>*.fq" << endl
-	    << "  --unfa <fname>     write unaligned reads to FASTA file(s) <fname>*.fa" << endl
-	    << "  --unfq <fname>     write unaligned reads to FASTQ file(s) <fname>*.fq" << endl
-	    << "  --maxfa <fname>    write reads exceeding -m limit to FASTA file(s) <fname>*.fa" << endl
-	    << "  --maxfq <fname>    write reads exceeding -m limit to FASTQ file(s) <fname>*.fq" << endl
+	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
+	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
+	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
 	    << "Performance:" << endl
 #ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of alignment threads to launch (default: 1)" << endl
@@ -369,7 +374,7 @@ static void printUsage(ostream& out) {
  * Print a detailed usage message to the provided output stream.
  *
  * Manual text converted to C++ string with something like:
- * cat MANUAL  | head -415 | tail -340 | sed -e 's/\"/\\\"/g' | \
+ * cat MANUAL  | head -1015 | tail -940 | sed -e 's/\"/\\\"/g' | \
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
  */
 static void printLongUsage(ostream& out) {
@@ -382,8 +387,8 @@ static void printLongUsage(ostream& out) {
 	" outputs a list of alignments.  Alignments are selected according to a\n"
 	" combination of the -v/-n/-e/-l options (plus the -I/-X/--lr/--rl/--ll\n"
 	" options for paired-end alignment), which define which alignments are\n"
-	" legal, and the -k/-a/-m/--best/--nostrata options which define which\n"
-	" and how many legal alignments should be reported.\n"
+	" legal, and the -k/-a/-m/--best/--strata options which define which and\n"
+	" how many legal alignments should be reported.\n"
 	"\n"
 	" By default, Bowtie enforces an alignment policy equivalent to Maq's\n"
 	" quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it\n"
@@ -461,7 +466,8 @@ static void printLongUsage(ostream& out) {
 	"     scale of 0 up to about 40).\n"
 	"\n"
 	"  The N, L and E parameters are configured using Bowtie's -n, -l and\n"
-	"  -e options.\n"
+	"  -e options.  The -n (Maq-like) option is mutually exclusive with the\n"
+	"  -v (end-to-end k-difference) option.\n"
 	" \n"
 	"  If there are many possible alignments satisfying these criteria,\n"
 	"  Bowtie will prefer to report alignments with fewer mismatches and\n"
@@ -491,7 +497,8 @@ static void printLongUsage(ostream& out) {
 	"  \n"
 	"  The policy has one criterion: Alignments may have no more than V\n"
 	"  mismatches.  Quality values are ignored.  The number of mismatches\n"
-	"  permitted is configurable with the -v option.\n"
+	"  permitted is configurable with the -v option.  The -v (end-to-end)\n"
+	"  option is mutually exclusive with the -n (Maq-like) option.\n"
 	"\n"
 	"  If there are many possible alignments satisfying this criterion,\n"
 	"  Bowtie will prefer to report alignments with fewer mismatches.\n"
@@ -500,12 +507,163 @@ static void printLongUsage(ostream& out) {
 	"  will be best unless the --best option is specified.  Bowtie is\n"
 	"  typically about 1 to 2.5 times slower when --best is specified.\n"
 	"  \n"
+	"  Reporting Modes\n"
+	"  ---------------\n"
+	"  \n"
+	"  With the -k, -a, -m, --best and --strata options, Bowtie gives the\n"
+	"  user a great deal of flexibility in selecting which alignments get\n"
+	"  reported.  Here we give a few examples that demonstrate a few ways\n"
+	"  they can be combined to achieve a desired result.  All examples are\n"
+	"  using the e_coli index that comes packaged with Bowtie.\n"
+	"  \n"
+	"    Example 1: -a\n"
+	"    -------------\n"
+	"    \n"
+	"    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,148810,2>\n"
+	"    1-:<0,2852852,1>\n"
+	"    1-:<0,4930433,2>\n"
+	"    1-:<0,905664,2>\n"
+	"    1+:<0,1093035,2>\n"
+	"    Reported 5 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -a instructs bowtie to report all valid alignments,\n"
+	"    subject to the alignment policy: -v 2.  In this case, bowtie finds\n"
+	"    5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)\n"
+	"    has 1 mismatch and 4 hits have 2 mismatches.  Note that they are\n"
+	"    not necessarily listed in best-to-worst order.\n"
+	"    \n"
+	"    Example 2: -k 3\n"
+	"    ---------------\n"
+	"    \n"
+	"    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,148810,2>\n"
+	"    1-:<0,2852852,1>\n"
+	"    1-:<0,4930433,2>\n"
+	"    Reported 3 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -k 3 instructs bowtie to report up to 3 valid\n"
+	"    alignments.  In this case, a total of 5 valid alignments exist (see\n"
+	"    Example 1); bowtie reports 3 out of those 5.  -k can be set to any\n"
+	"    integer greater than 0.\n"
+	"\n"
+	"    Example 3: -k 6\n"
+	"    ---------------\n"
+	"    \n"
+	"    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,148810,2>\n"
+	"    1-:<0,2852852,1>\n"
+	"    1-:<0,4930433,2>\n"
+	"    1-:<0,905664,2>\n"
+	"    1+:<0,1093035,2>\n"
+	"    Reported 5 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -k 6 instructs bowtie to report up to 6 valid\n"
+	"    alignments.  In this case, a total of 5 valid alignments exist, so\n"
+	"    bowtie reports all 5.\n"
+	"    \n"
+	"    Example 4: default (-k 1)\n"
+	"    -------------------------\n"
+	"    \n"
+	"    $ ./bowtie -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,148810,2>\n"
+	"    Reported 1 alignments to 1 output stream(s)\n"
+	"    \n"
+	"    Leaving the reporting options at their defaults causes Bowtie to\n"
+	"    report the first valid alignment it encounters.  Because --best was\n"
+	"    not specified, we are not guaranteed that bowtie will report the\n"
+	"    best alignment, and in this case it does not (the 1-mismatch\n"
+	"    alignment from the previous example would have been better).  The\n"
+	"    default reporting mode is equivalent to -k 1.\n"
+	"\n"
+	"    Example 5: -a --best\n"
+	"    --------------------\n"
+	"    \n"
+	"    $ ./bowtie -a --best -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,2852852,1>\n"
+	"    1+:<0,1093035,2>\n"
+	"    1-:<0,905664,2>\n"
+	"    1-:<0,148810,2>\n"
+	"    1-:<0,4930433,2>\n"
+	"    Reported 5 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -a --best results in the same alignments being printed\n"
+	"    as if just -a had been specified, but they are guarnteed to be\n"
+	"    reported in best-to-worst order.\n"
+	"\n"
+	"    Example 6: -a --best --strata\n"
+	"    -----------------------------\n"
+	"    \n"
+	"    $ ./bowtie -a --best --strata -v 2 e_coli --concise \\n"
+	"               -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,2852852,1>\n"
+	"    Reported 1 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying --strata in addition to -a and --best causes Bowtie to\n"
+	"    report only those alignments in the best alignment \"stratum\".  The\n"
+	"    alignments in the best stratum are those having the least number of\n"
+	"    mismatches (or mismatches just in the \"seed\" portion of the\n"
+	"    alignment in the case of -n mode).  Note that if --strata is\n"
+	"    specified, --best must also be specified.\n"
+	"\n"
+	"    Example 7: -a -m 3\n"
+	"    ------------------\n"
+	"    \n"
+	"    $ ./bowtie -a -m 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    No results\n"
+	"  \n"
+	"    Specifying -m 3 instructs bowtie to refrain from reporting any\n"
+	"    alignments for reads having more than 3 reportable alignments.  The\n"
+	"    -m option is useful when the user would like to guarantee that\n"
+	"    reported alignments are \"unique\", for some definition of unique.\n"
+	"    \n"
+	"    Example 1 showed that the read has 5 reportable alignments when -a\n"
+	"    and -v 2 are specified, so the -m 3 limit causes bowtie to output\n"
+	"    no alignments.\n"
+	"\n"
+	"    Example 8: -a -m 5\n"
+	"    ------------------\n"
+	"    \n"
+	"    $ ./bowtie -a -m 5 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,148810,2>\n"
+	"    1-:<0,2852852,1>\n"
+	"    1-:<0,4930433,2>\n"
+	"    1-:<0,905664,2>\n"
+	"    1+:<0,1093035,2>\n"
+	"    Reported 5 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -m 5 instructs bowtie to refrain from reporting any\n"
+	"    alignments for reads having more than 5 reportable alignments.\n"
+	"    Since the read has exactly 5 reportable alignments, the -m 5 limit\n"
+	"    allows bowtie to print them as usual. \n"
+	"\n"
+	"    Example 9: -a -m 3 --best --strata\n"
+	"    ----------------------------------\n"
+	"    \n"
+	"    $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --concise \\n"
+	"               -c ATGCATCATGCGCCAT\n"
+	"    1-:<0,2852852,1>\n"
+	"    Reported 1 alignments to 1 output stream(s)\n"
+	"  \n"
+	"    Specifying -m 3 instructs bowtie to refrain from reporting any\n"
+	"    alignments for reads having more than 3 reportable alignments.\n"
+	"    As we saw in Example 6, the read has only 1 reportable alignment\n"
+	"    when -a, --best and --strata are specified, so the -m 3 limit\n"
+	"    allows bowtie to print that alignment as usual.\n"
+	"    \n"
+	"    Intuitively, the -m option, when combined with the --best and\n"
+	"    --strata options, guarntees a principled, though somewhat weaker\n"
+	"    form of \"uniqueness.\"  A stronger form of uniqueness is enforced\n"
+	"    when -m is specified but --best --strata are not.\n"
+	"  \n"
 	"  Paired-end Alignment\n"
 	"  --------------------\n"
 	"  \n"
 	"  Bowtie can align paired-end reads when paired read files are\n"
-	"  specified using the -1 and -2 options.  A valid paired-end alignment\n"
-	"  satisfies the following criteria:\n"
+	"  specified using the -1 and -2 options (for pairs of raw, FASTA, or\n"
+	"  FASTQ read files), or using the --12 option (for Crossbow read\n"
+	"  files).  A valid paired-end alignment satisfies the following\n"
+	"  criteria:\n"
 	"  \n"
 	"  1. Both mates have a valid alignment according to the alignment\n"
 	"     policy specified by the -v/-n/-e/-l options.\n"
@@ -514,7 +672,7 @@ static void printLongUsage(ostream& out) {
 	"  \n"
 	"  Policies governing which paired-end alignments are reported for a\n"
 	"  given read are specified using the -k, -a and -m options as usual.\n"
-	"  The --nostrata and --best options do not apply in paired-end mode.\n"
+	"  The --strata and --best options do not apply in paired-end mode.\n"
 	"  \n"
 	"  A paired-end alignment is reported as a pair of mate alignments, both\n"
 	"  on a separate line, where the alignment for each mate is formatted\n"
@@ -535,13 +693,6 @@ static void printLongUsage(ostream& out) {
 	"  causes Bowtie to miss some valid paired-end alignments where both\n"
 	"  mates lie in repetitive regions, but the user may use the --pairtries\n"
 	"  or -y options to increase Bowtie's sensitivity as desired.\n"
-	"  \n"
-	"  There is currently no way for Bowtie to report a mix of paired-end\n"
-	"  alignments and singleton alignments (for unpaired mates and/or\n"
-	"  single-ended reads) in one run of the tool; if a mix of alignments is\n"
-	"  desired, the user must first perform a paired-end run using the\n"
-	"  --unfa or --unfq option to write unaligned pairs to files, then run\n"
-	"  Bowtie again in single-ended mode using those files as input.\n"
 	" \n"
 	"  Because Bowtie uses an in-memory representation of the original\n"
 	"  reference string when finding paired-end alignments, its memory\n"
@@ -560,13 +711,9 @@ static void printLongUsage(ostream& out) {
 	"  reference.  If possible, download the 64-bit binaries for Bowtie and\n"
 	"  run them on a 64-bit machine.  If you are building Bowtie from\n"
 	"  sources, you may need to pass the -m64 option to g++ to compile the\n"
-	"  64-bit version; you can do this by supplying argument\n"
-	"  EXTRA_FLAGS=\"-m64\" to the 'make' command; e.g.:\n"
-	"  'make EXTRA_FLAGS=\"-m64\" bowtie'.  To determine whether your version\n"
-	"  of bowtie is 64-bit or 32-bit, run 'bowtie --version' and check the\n"
-	"  'Sizeof' line; if the last expression on that line is {4, 4, 8, 4},\n"
-	"  your binary is 32-bit; if the last expression is {4, 8, 8, 8}, your\n"
-	"  binary is 64-bit.\n"
+	"  64-bit version; you can do this by supplying argument BITS=64 to the\n"
+	"  'make' command; e.g.: 'make BITS=64 bowtie'.  To determine whether\n"
+	"  your version of bowtie is 64-bit or 32-bit, run 'bowtie --version'.\n"
 	"  \n"
 	"  Tip 2: If your computer has multiple processors/cores, try -p\n"
 	"   \n"
@@ -626,7 +773,9 @@ static void printLongUsage(ostream& out) {
 	"  The following is a detailed description of the options used to control\n"
 	"  the 'bowtie' aligner:\n"
 	"\n"
-	" Usage: bowtie [options]* <ebwt> {-1 <mates1> -2 <mates2> | <singles>} [<hits>]\n"
+	" Usage:\n"
+	" \n"
+	"  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]\n"
 	"\n"
 	"  <ebwt>             The basename of the index to be searched.  The\n"
 	"                     basename is the name of any of the index files up\n"
@@ -638,7 +787,7 @@ static void printLongUsage(ostream& out) {
 	"                     located, then looks in the directory specified in\n"
 	"                     the BOWTIE_INDEXES environment variable.\n"
 	"\n"
-	"  <mates1>           Comma-separated list of files containing the #1\n"
+	"  <m1>               Comma-separated list of files containing the #1\n"
 	"                     mates (filename usually includes \"_1\"), or, if -c\n"
 	"                     is specified, the mate sequences themselves.\n"
 	"                     E.g., this might be \"flyA_1.fq,flyB_1.fq\", or, if\n"
@@ -646,9 +795,11 @@ static void printLongUsage(ostream& out) {
 	"                     Sequences specified with this option must\n"
 	"                     correspond file-for-file and read-for-read with\n"
 	"                     those specified in <mates2>.  Reads may be a mix\n"
-	"                     of different lengths.\n"
+	"                     of different lengths.  If \"-\" is specified, Bowtie\n"
+	"                     will read the #1 mates from stdin.  \"-\" is not\n"
+	"                     compatible with \"-z/--phased\".\n"
 	"\n"
-	"  <mates2>           Comma-separated list of files containing the #2\n"
+	"  <m2>               Comma-separated list of files containing the #2\n"
 	"                     mates (filename usually includes \"_2\"), or, if -c\n"
 	"                     is specified, the mate sequences themselves.\n"
 	"                     E.g., this might be \"flyA_2.fq,flyB_2.fq\", or, if\n"
@@ -656,16 +807,35 @@ static void printLongUsage(ostream& out) {
 	"                     Sequences specified with this option must\n"
 	"                     correspond file-for-file and read-for-read with\n"
 	"                     those specified in <mates1>.  Reads may be a mix\n"
-	"                     of different lengths.\n"
+	"                     of different lengths.  If \"-\" is specified, Bowtie\n"
+	"                     will read the #2 mates from stdin.  \"-\" is not\n"
+	"                     compatible with \"-z/--phased\".\n"
 	"\n"
-	"  <singles>          A comma-separated list of files containing the\n"
-	"                     reads to be aligned, or, if -c is specified, the\n"
-	"                     sequences themselves. E.g., this might be\n"
+	"  <r>                Comma-separated list of files containing a mix of\n"
+	"                     unpaired and paired-end reads in Crossbow format.\n"
+	"                     The Crossbow format is a 1-read-per-line format\n"
+	"                     where an unpaired read consists of the read name,\n"
+	"                     sequence and quality string separated by tabs.  A\n"
+	"                     paired-end read consists of the read name, sequnce\n"
+	"                     of the /1 mate, quality values of the /1 mate,\n"
+	"                     sequence of the /2 mate, and quality values of the\n"
+	"                     /2 mate separated by tabs.  Reads may be a mix of\n"
+	"                     different lengths and paired-end and unpaired\n"
+	"                     reads may be intermingled.  If \"-\" is specified,\n"
+	"                     Bowtie will read the Crossbow-formatted reads from\n"
+	"                     stdin.\n"
+	"\n"
+	"  <s>                A comma-separated list of files containing\n"
+	"                     unpaired reads to be aligned, or, if -c is\n"
+	"                     specified, the unpaired read sequences themselves.\n"
+	"                     E.g., this might be\n"
 	"                     \"lane1.fq,lane2.fq,lane3.fq,lane4.fq\", or, if -c\n"
 	"                     is specified, this might be \"GGTCATCCT,ACGGGTCGT\".\n"
-	"                     Reads may be a mix of different lengths.\n"
+	"                     Reads may be a mix of different lengths.  If \"-\"\n"
+	"                     is specified, Bowtie gets the reads from stdin.\n"
+	"                     \"-\" is not compatible with \"-z/--phased\".\n"
 	"\n"
-	"  <hits>             File to write alignments to.  By default,\n"
+	"  <hit>              File to write alignments to.  By default,\n"
 	"                     alignments are written to stdout (the console),\n"
 	"                     but a <hits> file must be specified if the\n"
 	"                     -b/--binout option is also specified.\n"
@@ -728,7 +898,7 @@ static void printLongUsage(ostream& out) {
 	"\n"
 	"  --solexa1.3-quals  Same as --phred64-quals.  This is usually the\n"
 	"                     right option for use with (unconverted) reads\n"
-	"                     emitted by GA Pipeline version 1.3 or later.\n"
+	"                     emitted by GA Pipeline version 1.3 or later. \n"
 	"                     Default: off.\n"
 	"\n"
 	"  --integer-quals    Quality values are represented in the FASTQ file\n"
@@ -802,7 +972,7 @@ static void printLongUsage(ostream& out) {
 	"                     mate2 be forward-oriented.  --ll requires both an\n"
 	"                     upstream mate1 and a downstream mate2 to be\n"
 	"                     forward-oriented.  Default: --fr (appropriate for\n"
-	"                     the Illumina short insert library). \n"
+	"                     the Illumina short insert library).\n"
 	"\n"
 	"  --nofw/--norc      If --nofw is specified, Bowtie will not attempt to\n"
 	"                     align against the forward reference strand.  If\n"
@@ -810,7 +980,7 @@ static void printLongUsage(ostream& out) {
 	"                     align against the reverse-complement reference\n"
 	"                     strand.  For paired-end reads using --fr or --rf\n"
 	"                     modes, --nofw and --norc apply to the forward and\n"
-	"                     reverse-complement mate orientations.  I.e.\n"
+	"                     reverse-complement pair orientations.  I.e.\n"
 	"                     specifying --nofw and --fr will only find reads in\n"
 	"                     the R/F orientation where mate 2 occurs upstream\n"
 	"                     of mate 1 with respect to the forward reference\n"
@@ -872,42 +1042,50 @@ static void printLongUsage(ostream& out) {
 	"  -k <int>           Report up to <int> valid alignments per read or\n"
 	"                     pair (default: 1).  Validity of alignments is\n"
 	"                     determined by the alignment policy (combined\n"
-	"                     effects of -n, -v, -l, and -e).  If many\n"
-	"                     alignments are reported, they may be subject to\n"
-	"                     stratification; see --best, --nostrata.  Bowtie is\n"
-	"                     designed to be very fast for small -k but BOWTIE\n"
-	"                     CAN BECOME VERY SLOW AS -k INCREASES.  If you\n"
-	"                     would like to use Bowtie for larger values of -k,\n"
-	"                     consider building an index with a denser suffix-\n"
-	"                     array sample, i.e. specify a smaller '--offrate'\n"
-	"                     when invoking 'bowtie-build' for the relevant\n"
-	"                     index.  This will increase the memory footprint of\n"
-	"                     the index, but makes alignment much faster for\n"
-	"                     large -k.\n"
+	"                     effects of -n, -v, -l, and -e).  If more than one\n"
+	"                     valid alignment exists and the --best and --strata\n"
+	"                     options are specified, then only those alignments\n"
+	"                     belonging to the best alignment \"stratum\" (i.e.\n"
+	"                     those with the fewest mismatches) will be\n"
+	"                     reported.  Bowtie is designed to be very fast for\n"
+	"                     small -k but bowtie can become significantly\n"
+	"                     slower as -k increases.  If you would like to use\n"
+	"                     Bowtie for larger values of -k, consider building\n"
+	"                     an index with a denser suffix-array sample, i.e.\n"
+	"                     specify a smaller '--offrate' when invoking\n"
+	"                     'bowtie-build' for the relevant index (see\n"
+	"                     Performance Tips section for details).\n"
 	"\n"
 	"  -a/--all           Report all valid alignments per read or pair\n"
 	"                     (default: off).  Validity of alignments is\n"
 	"                     determined by the alignment policy (combined\n"
-	"                     effects of -n, -v, -l, and -e).  Reported\n"
-	"                     alignments may be subject to stratification; see\n"
-	"                     --best, --nostrata.  Bowtie is designed to be very\n"
-	"                     fast for small -k; BOWTIE CAN BECOME VERY SLOW\n"
-	"                     IF -a/--all IS SPECIFIED.  If you would like to\n"
-	"                     use Bowtie with -a, consider building an index\n"
-	"                     with a denser suffix-array sample, i.e. specify a\n"
-	"                     smaller '--offrate' when invoking 'bowtie-build'\n"
-	"                     for the relevant index.  This will increase the\n"
-	"                     memory footprint of the index, but makes alignment\n"
-	"                     much faster in -a mode.\n"
+	"                     effects of -n, -v, -l, and -e).  If more than one\n"
+	"                     valid alignment exists and the --best and --strata\n"
+	"                     options are specified, then only those alignments\n"
+	"                     belonging to the best alignment \"stratum\" (i.e.\n"
+	"                     those with the fewest mismatches) will be\n"
+	"                     reported.  Bowtie is designed to be very\n"
+	"                     fast for small -k but bowtie can become\n"
+	"                     significantly slower if -a/--all is specified.  If\n"
+	"                     you would like to use Bowtie with -a, consider\n"
+	"                     building an index with a denser suffix-array\n"
+	"                     sample, i.e. specify a smaller '--offrate' when\n"
+	"                     invoking 'bowtie-build' for the relevant index\n"
+	"                     (see Performance Tips section for details).\n"
 	"\n"
 	"  -m <int>           Suppress all alignments for a particular read or\n"
 	"                     pair if more than <int> reportable alignments\n"
 	"                     exist for it.  Reportable alignments are those\n"
 	"                     that would be reported given the -n, -v, -l, -e,\n"
-	"                     -k, -a, --best, and --nostrata options.  Default:\n"
+	"                     -k, -a, --best, and --strata options.  Default:\n"
 	"                     no limit.  Bowtie is designed to be very fast for\n"
-	"                     small -m but BOWTIE CAN BECOME VERY SLOW AS -m\n"
-	"                     INCREASES.\n"
+	"                     small -m but bowtie can become significantly\n"
+	"                     slower for larger values of -m.    If you would\n"
+	"                     like to use Bowtie for larger values of -k,\n"
+	"                     consider building an index with a denser suffix-\n"
+	"                     array sample, i.e. specify a smaller '--offrate'\n"
+	"                     when invoking 'bowtie-build' for the relevant\n"
+	"                     index (see Performance Tips section for details).\n"
 	"\n"
 	"  --best             Make Bowtie guarantee that reported singleton\n"
 	"                     alignments are \"best\" in terms of stratum (i.e.\n"
@@ -922,18 +1100,24 @@ static void printLongUsage(ostream& out) {
 	"                     alignments that are sub-optimal in terms of\n"
 	"                     stratum and/or quality (though an effort is made\n"
 	"                     to report the best alignment).  --best mode also\n"
-	"                     removes all strand bias.  Bowtie is about 1-2.5\n"
-	"                     times slower when --best is specified.\n"
+	"                     removes all strand bias.  Note that --best does\n"
+	"                     not affect which alignments are considered \"valid\"\n"
+	"                     by Bowtie, only which valid alignments are\n"
+	"                     reported by Bowtie.  When --best is specified and\n"
+	"                     multiple hits are allowed (via -k or -a), the\n"
+	"                     alignments for a given read are guaranteed to\n"
+	"                     appear in best-to-worst order in Bowtie's output.\n"
+	"                     Bowtie is about 1-2.5 times slower when --best is\n"
+	"                     specified.\n"
 	"\n"
-	"  --nostrata         If many valid singleton alignments exist and are\n"
-	"                     reportable (according to the --best and -k\n"
-	"                     options) and they fall into more than one\n"
-	"                     alignment \"stratum\", report all of them.  By\n"
-	"                     default, Bowtie only reports those alignments that\n"
-	"                     fall into the best stratum for which alignments\n"
-	"                     were found, i.e., the one with fewest mismatches.\n"
-	"                     BOWTIE CAN BECOME VERY SLOW WHEN --nostrata IS\n"
-	"                     COMBINED WITH -k OR -a.\n"
+	"  --strata           If many valid alignments exist and are reportable\n"
+	"                     (e.g. are not disallowed via the -k option) and\n"
+	"                     they fall into more than one alignment \"stratum\",\n"
+	"                     report only those alignments that fall into the\n"
+	"                     best stratum.  By default, Bowtie reports all\n"
+	"                     reportable alignments regardless of whether they\n"
+	"                     fall into multiple strata.  When --strata is\n"
+	"                     specified, --best must also be specified. \n"
 	"\n"
 	"   Output:\n"
 	"   -------\n"
@@ -975,60 +1159,43 @@ static void printLongUsage(ostream& out) {
 	"                     (its offset into the list of references that were\n"
 	"                     indexed) rather than by name.\n"
 	"\n"
-	"  --alfa <filename>  Write all reads for which at least one alignment\n"
-	"                     was reported to a FASTA file with name <filename>.\n"
-	"                     Paired-end reads will be written to two parallel\n"
-	"                     files with \"_1\" and \"_2\" inserted in the filename,\n"
-	"                     e.g., if <filename> is aligned.fa, the #1 and #2\n"
-	"                     mates that fail to align will be written to\n"
-	"                     aligned_1.fa and aligned_2.fa respectively.\n"
+	"  --al <filename>    Write all reads for which at least one alignment\n"
+	"                     was reported to a file with name <filename>.\n"
+	"                     Written reads will appear as they did in the\n"
+	"                     input, without any of the trimming or translation\n"
+	"                     of quality values that may have taken place within\n"
+	"                     Bowtie.  Paired-end reads will be written to two\n"
+	"                     parallel files with \"_1\" and \"_2\" inserted in the\n"
+	"                     filename, e.g., if <filename> is aligned.fq, the\n"
+	"                     #1 and #2 mates that fail to align will be written\n"
+	"                     to aligned_1.fq and aligned_2.fq respectively.\n"
 	"\n"
-	"  --alfq <filename>  Write all reads for which at least one alignment\n"
-	"                     was reported to a FASTQ file with name <filename>.\n"
-	"                     Paired-end reads will be written to two parallel\n"
-	"                     files with \"_1\" and \"_2\" inserted in the filename,\n"
-	"                     e.g., if <filename> is aligned.fq, the #1 and #2\n"
-	"                     mates that fail to align will be written to\n"
-	"                     aligned_1.fq and aligned_2.fq respectively.\n"
+	"  --un <filename>    Write all reads that could not be aligned to a\n"
+	"                     file with name <filename>.  Written reads will\n"
+	"                     appear as they did in the input, without any of\n"
+	"                     the trimming or translation of quality values that\n"
+	"                     may have taken place within Bowtie.  Paired-end\n"
+	"                     reads will be written to two parallel files with\n"
+	"                     \"_1\" and \"_2\" inserted in the filename, e.g., if\n"
+	"                     <filename> is unaligned.fq, the #1 and #2 mates\n"
+	"                     that fail to align will be written to\n"
+	"                     unaligned_1.fq and unaligned_2.fq respectively.\n"
+	"                     Unless --max is also specified, reads with a\n"
+	"                     number of valid alignments exceeding the limit set\n"
+	"                     with the -m option are also written to <filename>.\n"
 	"\n"
-	"  --unfa <filename>  Write all reads that fail to align to a FASTA file\n"
-	"                     with name <filename>.  Paired-end reads will be\n"
-	"                     written to two parallel files with \"_1\" and \"_2\"\n"
-	"                     inserted in the filename, e.g., if <filename> is\n"
-	"                     unaligned.fa, the #1 and #2 mates that fail to\n"
-	"                     align will be written to unaligned_1.fa and\n"
-	"                     unaligned_2.fa respectively.  Unless --maxfa is\n"
-	"                     also specified, reads with a number of valid\n"
-	"                     alignments exceeding the limit set with the -m\n"
-	"                     option are also written to <filename>.\n"
-	"\n"
-	"  --unfq <filename>  Write all reads that fail to align to a FASTQ file\n"
-	"                     with name <filename>.  Paired-end reads will be\n"
-	"                     written to two parallel files with \"_1\" and \"_2\"\n"
-	"                     inserted in the filename, e.g., if <filename> is\n"
-	"                     unaligned.fq, the #1 and #2 mates that fail to\n"
-	"                     align will be written to unaligned_1.fq and\n"
-	"                     unaligned_2.fq respectively.  Unless --maxfq is\n"
-	"                     also specified, reads with a number of valid\n"
-	"                     alignments exceeding the limit set with the -m\n"
-	"                     option are also written to <filename>.\n"
-	"\n"
-	"  --maxfa <filename> Write all reads with a number of valid alignments\n"
+	"  --max <filename>   Write all reads with a number of valid alignments\n"
 	"                     exceeding the limit set with the -m option to a\n"
-	"                     FASTA file with given name.  Paired-end reads that\n"
-	"                     exceed the -m limit are written to parallel files\n"
-	"                     with \"_1\" and \"_2\" inserted into the filename, in\n"
-	"                     the same way as with --unfa.  These reads are not\n"
-	"                     written to the file specified with --unfa.\n"
-	"\n"
-	"  --maxfq <filename> Write all reads with a number of valid alignments\n"
-	"                     exceeding the limit set with the -m option to a\n"
-	"                     FASTQ file with given name.  Paired-end reads that\n"
-	"                     exceed the -m limit are written to parallel files\n"
-	"                     with \"_1\" and \"_2\" inserted into the filename, in\n"
-	"                     the same way as with --unfq.  These reads are not\n"
-	"                     written to the file specified with --unfq.\n"
-	"\n"
+	"                     file with name <filename>.  Written reads will\n"
+	"                     appear as they did in the input, without any of\n"
+	"                     the trimming or translation of quality values that\n"
+	"                     may have taken place within Bowtie.  Paired-end\n"
+	"                     reads will be written to two parallel files with\n"
+	"                     \"_1\" and \"_2\" inserted in the filename, e.g., if\n"
+	"                     <filename> is max.fq, the #1 and #2 mates\n"
+	"                     that fail to align will be written to\n"
+	"                     max_1.fq and max_2.fq respectively.  These reads\n"
+	"                     are not written to the file specified with --un.\n"
 	"   Performance:\n"
 	"   ------------\n"
 	"\n"
@@ -1091,14 +1258,21 @@ static void printLongUsage(ostream& out) {
 	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
 	"      if no name was provided\n"
 	"\n"
-	"   4. 0-based offset into the reference sequence where leftmost\n"
+	"   4. 1-based offset into the forward reference strand where leftmost\n"
 	"      character of the alignment occurs\n"
 	"\n"
 	"   5. Read sequence (reverse-complemented if orientation is '-')\n"
 	"\n"
 	"   6. Read qualities (reversed if orientation is '-')\n"
 	"\n"
-	"   7. Reserved\n"
+	"   7. Number of other instances where the same read aligns against the\n"
+	"      same reference characters as were aligned against in this\n"
+	"      alignment.  This is *not* the number of other places the read\n"
+	"      aligns with the same number of mismatches.  The number in this\n"
+	"      column is generally not a good proxy for that number (e.g., the\n"
+	"      number in this column may be '0' while the number of other\n"
+	"      alignments with the same number of mismatches might be large).\n"
+	"      This column was previously described as \"Reserved\".\n"
 	"\n"
 	"   8. Comma-separated list of mismatch descriptors.  If there are no\n"
 	"      mismatches in the alignment, this field is empty.  A single\n"
@@ -1176,7 +1350,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_SHARED_MEM: {
 #ifdef BOWTIE_SHARED_MEM
 	   			useMm = false;
-	   			useShmem = true;
 	   			break;
 #else
 	   			cerr << "Shared-memory mode is disabled because bowtie was not compiled with the" << endl
@@ -1186,18 +1359,20 @@ static void parseOptions(int argc, char **argv) {
 	   		}
 	   		case ARG_MM: {
 	   			useMm = true;
-	   			useShmem = false;
 	   			break;
 	   		}
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
+	   		case ARG_AL: dumpAlBase = optarg; break;
 	   		case ARG_ALFA: dumpAlFaBase = optarg; break;
 	   		case ARG_ALFQ: dumpAlFqBase = optarg; break;
+	   		case ARG_UN: dumpUnalBase = optarg; break;
 	   		case ARG_UNFA: dumpUnalFaBase = optarg; break;
 	   		case ARG_UNFQ: dumpUnalFqBase = optarg; break;
+	   		case ARG_MAXDUMP: dumpMaxBase = optarg; break;
 	   		case ARG_MAXFA: dumpMaxFaBase = optarg; break;
 	   		case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
-			case ARG_solexaQuals: solexaQuals = true; break;
+			case ARG_SOLEXA_QUALS: solexaQuals = true; break;
 			case ARG_integerQuals: integerQuals = true; break;
 			case ARG_PHRED64: phred64Quals = true; break;
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
@@ -1446,7 +1621,10 @@ static char *argv0 = NULL;
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
 	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) break; \
+	if(p->empty() || p->patid() >= qUpto) { \
+		p->bufa().clearAll(); \
+		break; \
+	} \
 	assert(!empty(p->bufa().patFw)); \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
@@ -1475,7 +1653,10 @@ static char *argv0 = NULL;
 /// variables.
 #define GET_READ_FW(p) \
 	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) break; \
+	if(p->empty() || p->patid() >= qUpto) { \
+		p->bufa().clearAll(); \
+		break; \
+	} \
 	params.setPatId(p->patid()); \
 	assert(!empty(p->bufa().patFw)); \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
@@ -1663,6 +1844,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
 			NULL,
+			!nofw,
+			!norc,
 			useV1,
 			_sink,
 			*sinkFact,
@@ -1680,8 +1863,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 			pool,
 			refs, os,
 			!noMaqRound,
-			!better,
 			strandFix,
+			!better,
 			rangeMode,
 			verbose,
 			seed);
@@ -1745,7 +1928,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	exactSearch_refs   = refs;
@@ -2037,6 +2220,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Paired1mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			!nofw,
+			!norc,
 			useV1,
 			_sink,
 			*sinkFact,
@@ -2160,7 +2345,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	mismatchSearch_refs = refs;
@@ -2616,6 +2801,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			!nofw,
+			!norc,
 			useV1,
 			two,
 			_sink,
@@ -2765,7 +2952,7 @@ static void twoOrThreeMismatchSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3579,7 +3766,7 @@ static void seededQualCutoffSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useShmem, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
 		if(!refs->loaded()) exit(1);
 	}
 	seededQualSearch_refs = refs;
@@ -3687,6 +3874,11 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 		}
 	}
 }
+
+#define PASS_DUMP_FILES \
+	dumpAlFaBase, dumpAlFqBase, dumpAlBase, \
+	dumpUnalFaBase, dumpUnalFqBase, dumpUnalBase, \
+	dumpMaxFaBase, dumpMaxFqBase, dumpMaxBase
 
 template<typename TStr>
 static void driver(const char * type,
@@ -3845,7 +4037,6 @@ static void driver(const char * type,
                     true,     // index is for the forward direction
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
-                    useShmem, // whether to use shared memory
                     useMm,    // whether to use memory-mapped files
                     verbose,  // whether to be talkative
                     false /*passMemExc*/,
@@ -3857,7 +4048,6 @@ static void driver(const char * type,
     	                        false, // index is for the reverse direction
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
-    	                        useShmem, // whether to use shared memory
     	                        useMm,    // whether to use memory-mapped files
     	                        verbose,  // whether to be talkative
     	                        false /*passMemExc*/,
@@ -3894,16 +4084,14 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new VerboseHitSink(
 							ebwt.nPat(), offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames, partitionSz);
 				}
 				break;
@@ -3911,16 +4099,14 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new ConciseHitSink(
 							ebwt.nPat(), offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames, reportOpps);
 				} else {
 					sink = new ConciseHitSink(
 							fout, offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames, reportOpps);
 				}
 				break;
@@ -3928,16 +4114,14 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new BinaryHitSink(
 							ebwt.nPat(), offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames);
 				} else {
 					sink = new BinaryHitSink(
 							fout, offBase,
-							dumpAlFaBase, dumpAlFqBase,
-							dumpUnalFaBase, dumpUnalFqBase,
-							dumpMaxFaBase, dumpMaxFqBase,
+							PASS_DUMP_FILES,
+							format == TAB_MATE,
 							table, refnames);
 				}
 				break;

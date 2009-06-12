@@ -236,17 +236,12 @@ sub build {
 		$bucketArg = "-a ";
 	}
 	
-	my $bsearch_arg = "";
-	if(int(rand(2)) == 0) {
-		$bsearch_arg = "--oldpmap";
-	}
-	
 	my $isaArg = "";
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
 	}
 
-	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bsearch_arg $bucketArg $endian $file2";
+	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";
@@ -487,6 +482,17 @@ sub doSearch {
 		$khits .= " -m $mhits";
 	}
 	
+	my $strand = "";
+	if(int(rand(4)) == 0) {
+		if(int(rand(2)) == 0) {
+			# Reverse-complement reference strand only
+			$strand = "--nofw";
+		} else {
+			# Forward reference strand only
+			$strand = "--norc";
+		}
+	}
+	
 	if($oneHit || 1) {
 		$oneHit = "";
 	} else {
@@ -496,7 +502,7 @@ sub doSearch {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr`);
 	
@@ -552,8 +558,8 @@ sub doSearch {
 		$outhash{$key} = 1;
 		# Result should look like "4+:<4,231,0>"
 		my $wellFormed = 0;
-		$wellFormed = ($l =~ m/^([01-9]+)[+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/) unless $pe;
-		$wellFormed = ($l =~ m/^([01-9]+)\/[12][+-]?[:]<[01-9]+,[01-9]+,([01-9]+)>$/) if $pe;
+		$wellFormed = ($l =~ m/^([01-9]+)([+-])[:]<[01-9]+,[01-9]+,([01-9]+)>$/) unless $pe;
+		$wellFormed = ($l =~ m/^([01-9]+)\/([12])([+-])[:]<[01-9]+,[01-9]+,([01-9]+)>$/) if $pe;
 		unless($wellFormed) {
 			print "Results malformed\n";
 			print "$out\n";
@@ -565,7 +571,27 @@ sub doSearch {
 		}
 		# Parse out the read id
 		my $read = $1;
-		my $stratum = $2;
+		my $mate = 0;
+		my $fw = $2;
+		my $stratum = $3;
+		if($pe) {
+			$mate = $2;
+			$fw = $3;
+			$stratum = $4;
+		}
+		if($strand =~ /nofw/) {
+			if($pe) {
+				"$mate$fw" eq "2+" || die "Saw a forward alignment when --nofw was specified";
+			} else {
+				$fw eq "-" || die "Saw a forward alignment when --nofw was specified";
+			}
+		} elsif($strand =~ /norc/) {
+			if($pe) {
+				"$mate$fw" eq "1+" || die "Saw a forward alignment when --norc was specified";
+			} else {
+				$fw eq "+" || die "Saw a rev-comp alignment when --norc was specified";
+			}
+		}
 		if(($read ne $lastread) && ($phased eq "")) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
@@ -644,16 +670,16 @@ sub doSearch {
 	}
 
 	{
-		$cmd = "./bowtie $policy $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
 
-		$cmd = "./bowtie --mm $policy $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";

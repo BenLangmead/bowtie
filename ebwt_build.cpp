@@ -41,9 +41,7 @@ static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
 static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
 static int32_t isaRate       = -1; // sample rate for ISA; default: don't sample
 static int32_t ftabChars     = 10; // 10 chars in initial lookup table
-//static int32_t chunkRate     = 12; // Now set automatically
 static int     bigEndian     = 0;  // little endian
-static bool    useBsearch    = true;
 static bool    nsToAs        = false;
 static bool    autoMem       = true;
 static bool    packed        = false;
@@ -84,13 +82,11 @@ static void printUsage(ostream& out) {
 	    //<< "    -i/--linesperside <int> # lines in a side" << endl
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
 	    << "    -t/--ftabchars <int>    # of chars consumed in initial lookup (default: 10)" << endl
-	    //<< "    --chunkrate <int>       # of characters in a text chunk" << endl
 	    << "    --ntoa                  convert Ns in reference to As" << endl
 	    << "    --big --little          endianness (default: little, this host: "
 	    << (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
-	    << "    --oldpmap               use old reference mapping; yields larger index" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
@@ -303,19 +299,6 @@ static void printLongUsage(ostream& out) {
 	"                            reference sequences (cumulative across\n"
 	"                            sequences) and ignore the rest.\n"
 	"\n"
-	"    --oldpmap               bowtie-build switched schemes for mapping\n"
-	"                            \"joined\" reference locations to original\n"
-	"                            reference locations in version 0.9.8.  The\n"
-	"                            new scheme has the advantage that it does\n"
-	"                            not use padding.  This option activates the\n"
-	"                            old padding-based scheme used in versions\n"
-	"                            prior to 0.9.8.  Versions of 'bowtie' prior\n"
-	"                            to 0.9.8 can query only indexes that use\n"
-	"                            the old scheme.  Version of 'bowtie'\n"
-	"                            starting with 0.9.8 can query indexes using\n"
-	"                            either scheme.  This option will be\n"
-	"                            deprecated in version 1.0. \n"
-	"\n"
 	"    -q/--quiet              bowtie-build is verbose by default.  With\n"
 	"                            this option ebwt-build will print only\n"
 	"                            error messages.\n"
@@ -354,7 +337,6 @@ static struct option long_options[] = {
 	{(char*)"help",         no_argument,       0,            'h'},
 	{(char*)"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
-	{(char*)"oldpmap",      no_argument,       0,            ARG_PMAP},
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)0, 0, 0, 0} // terminator
@@ -413,9 +395,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case 't':
 	   			ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
 	   			break;
-//	   		case 'h':
-//	   			chunkRate = parseNumber<int>(1, "-h/--chunkRate arg must be at least 1");
-//	   			break;
 	   		case 'n':
 	   			// all f-s is used to mean "not set", so put 'e' on end
 	   			bmax = 0xfffffffe;
@@ -453,7 +432,6 @@ static void parseOptions(int argc, char **argv) {
 	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
 	   			break;
 	   		case ARG_NTOA: nsToAs = true; break;
-	   		case ARG_PMAP: useBsearch = false; break;
 	   		case 'a': autoMem = false; break;
 	   		case 'q': verbose = false; break;
 	   		case 's': sanityCheck = true; break;
@@ -525,7 +503,6 @@ static void driver(const string& infile,
 	// characters in one of the input sequences.
 	vector<RefRecord> szs;
 	uint32_t sztot;
-	int32_t chunkRate = 0;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
@@ -565,12 +542,6 @@ static void driver(const string& infile,
 		}
 	}
 	if(justRef) return;
-	// If we have to insert padding between reference sequences...
-	if(!useBsearch) {
-		// Then calculate the space-optimal size for the padding
-		chunkRate = EbwtParams::calcBestChunkRate(szs, offRate, lineRate, linesPerSide);
-		if(verbose) cout << "  Choose best chunkRate: " << chunkRate << endl;
-	}
 	assert_gt(sztot, 0);
 	assert_gt(szs.size(), 0);
 	// Construct Ebwt from input strings and parameters
@@ -579,7 +550,6 @@ static void driver(const string& infile,
 	                offRate,      // suffix-array sampling rate
 	                isaRate,      // ISA sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
-	                useBsearch? -1 : chunkRate, // alignment
 	                outfile,      // basename for .?.ebwt files
 	                !reverse,     // fw
 	                !entireSA,    // useBlockwise
@@ -611,7 +581,7 @@ static void driver(const string& infile,
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, ebwt.eh().chunkRate(), seed);
+			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, seed);
 			assert_eq(length(joinedss), length(s2));
 			assert_eq(joinedss, s2);
 		}

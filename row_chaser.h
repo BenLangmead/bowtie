@@ -157,7 +157,7 @@ public:
 		uint32_t off = flatOff();
 		assert_neq(0xffffffff, off);
 		uint32_t tidx;
-		uint32_t textoff;
+		uint32_t textoff = 0xffffffff;
 		ebwt_->joinedToTextOff(qlen_, off, tidx, textoff, tlen_);
 		// Note: tidx may be 0xffffffff, if alignment overlaps a
 		// reference boundary

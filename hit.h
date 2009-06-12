@@ -278,10 +278,14 @@ public:
 	HitSink(OutFileBuf* out,
 			const std::string& dumpAlignFaBasename,
 			const std::string& dumpAlignFqBasename,
-			const std::string& dumpUnalignFaBasename,
-			const std::string& dumpUnalignFqBasename,
+			const std::string& dumpAlignBasename,
+			const std::string& dumpUnalFaBasename,
+			const std::string& dumpUnalFqBasename,
+			const std::string& dumpUnalBasename,
 			const std::string& dumpMaxedFaBasename,
 			const std::string& dumpMaxedFqBasename,
+			const std::string& dumpMaxedBasename,
+			bool onePairFile,
 			RecalTable *table,
 	        vector<string>* refnames = NULL) :
 		_outs(),
@@ -292,10 +296,14 @@ public:
 		_locks(),
 		dumpAlFaBase_(dumpAlignFaBasename),
 		dumpAlFqBase_(dumpAlignFqBasename),
-		dumpUnalFaBase_(dumpUnalignFaBasename),
-		dumpUnalFqBase_(dumpUnalignFqBasename),
+		dumpAlBase_(dumpAlignBasename),
+		dumpUnalFaBase_(dumpUnalFaBasename),
+		dumpUnalFqBase_(dumpUnalFqBasename),
+		dumpUnalBase_(dumpUnalBasename),
 		dumpMaxFaBase_(dumpMaxedFaBasename),
 		dumpMaxFqBase_(dumpMaxedFqBasename),
+		dumpMaxBase_(dumpMaxedBasename),
+		onePairFile_(onePairFile),
 		first_(true),
 		numReported_(0llu),
 		numReportedPaired_(0llu),
@@ -318,10 +326,14 @@ public:
 	HitSink(size_t numOuts,
 			const std::string& dumpAlignFaBasename,
 			const std::string& dumpAlignFqBasename,
-			const std::string& dumpUnalignFaBasename,
-			const std::string& dumpUnalignFqBasename,
+			const std::string& dumpAlignBasename,
+			const std::string& dumpUnalFaBasename,
+			const std::string& dumpUnalFqBasename,
+			const std::string& dumpUnalBasename,
 			const std::string& dumpMaxedFaBasename,
 			const std::string& dumpMaxedFqBasename,
+			const std::string& dumpMaxedBasename,
+			bool onePairFile,
 			RecalTable *table,
 	        vector<string>* refnames = NULL) :
 		_outs(),
@@ -331,10 +343,14 @@ public:
 		_locks(),
 		dumpAlFaBase_(dumpAlignFaBasename),
 		dumpAlFqBase_(dumpAlignFqBasename),
-		dumpUnalFaBase_(dumpUnalignFaBasename),
-		dumpUnalFqBase_(dumpUnalignFqBasename),
-		dumpMaxFaBase_(dumpUnalignFaBasename),
-		dumpMaxFqBase_(dumpUnalignFqBasename),
+		dumpAlBase_(dumpAlignBasename),
+		dumpUnalFaBase_(dumpUnalFaBasename),
+		dumpUnalFqBase_(dumpUnalFqBasename),
+		dumpUnalBase_(dumpUnalBasename),
+		dumpMaxFaBase_(dumpMaxedFaBasename),
+		dumpMaxFqBase_(dumpMaxedFqBasename),
+		dumpMaxBase_(dumpMaxedBasename),
+		onePairFile_(onePairFile),
 		quiet_(false),
 		ssmode_(ios_base::out)
 	{
@@ -521,7 +537,7 @@ public:
 	 * stream (i.e., iff --alfa or --alfq are specified).
 	 */
 	bool dumpsAlignedReads() {
-		return dumpAlign_;
+		return dumpAlignFlag_;
 	}
 
 	/**
@@ -529,7 +545,7 @@ public:
 	 * stream (i.e., iff --unfa or --unfq are specified).
 	 */
 	bool dumpsUnalignedReads() {
-		return dumpUnalign_;
+		return dumpUnalignFlag_;
 	}
 
 	/**
@@ -537,7 +553,7 @@ public:
 	 * stream (i.e., iff --maxfa or --maxfq are specified).
 	 */
 	bool dumpsMaxedReads() {
-		return dumpMaxed_ || dumpUnalign_;
+		return dumpMaxedFlag_ || dumpUnalignFlag_;
 	}
 
 	/**
@@ -546,7 +562,7 @@ public:
 	 * --unfq, or --maxfq are specified).
 	 */
 	bool dumpsReads() {
-		return dumpAlign_ || dumpUnalign_ || dumpMaxed_;
+		return dumpAlignFlag_ || dumpUnalignFlag_ || dumpMaxedFlag_;
 	}
 
 	/**
@@ -555,50 +571,78 @@ public:
 	 * simultaneous writers.
 	 */
 	void dumpAlign(PatternSourcePerThread& p) {
-		if(!dumpAlign_) return;
-		if(!p.paired()) {
+		if(!dumpAlignFlag_) return;
+		if(!p.paired() || onePairFile_) {
+			// Dump unpaired read to the aligned-read FASTA file
 			if(!dumpAlFaBase_.empty()) {
 				MUTEX_LOCK(dumpAlignFaLock_);
 				if(dumpAlFa_ == NULL) {
-					dumpAlFa_ = openOf(dumpAlFaBase_, 0, true);
+					dumpAlFa_ = openOf(dumpAlFaBase_, 0, ".fa");
 					assert(dumpAlFa_ != NULL);
 				}
 				printFastaRecord(*dumpAlFa_, p.bufa().name, p.bufa().patFw);
 				MUTEX_UNLOCK(dumpAlignFaLock_);
 			}
+			// Dump unpaired read to the aligned-read FASTQ file
 			if(!dumpAlFqBase_.empty()) {
 				MUTEX_LOCK(dumpAlignFqLock_);
 				if(dumpAlFq_ == NULL) {
-					dumpAlFq_ = openOf(dumpAlFqBase_, 0, false);
+					dumpAlFq_ = openOf(dumpAlFqBase_, 0, ".fq");
 					assert(dumpAlFq_ != NULL);
 				}
 				printFastqRecord(*dumpAlFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				MUTEX_UNLOCK(dumpAlignFqLock_);
 			}
+			// Dump unpaired read to an aligned-read file of the same format
+			if(!dumpAlBase_.empty()) {
+				MUTEX_LOCK(dumpAlignLock_);
+				if(dumpAl_ == NULL) {
+					dumpAl_ = openOf(dumpAlBase_, 0, "");
+					assert(dumpAl_ != NULL);
+				}
+				dumpAl_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				MUTEX_UNLOCK(dumpAlignLock_);
+			}
 		} else {
+			// Dump paired-end read to the aligned-read FASTA file
 			if(!dumpAlFaBase_.empty()) {
 				MUTEX_LOCK(dumpAlignFaLockPE_);
 				if(dumpAlFa_1_ == NULL) {
 					assert(dumpAlFa_2_ == NULL);
-					dumpAlFa_1_ = openOf(dumpAlFaBase_, 1, true);
-					dumpAlFa_2_ = openOf(dumpAlFaBase_, 2, true);
+					dumpAlFa_1_ = openOf(dumpAlFaBase_, 1, ".fa");
+					dumpAlFa_2_ = openOf(dumpAlFaBase_, 2, ".fa");
 					assert(dumpAlFa_1_ != NULL && dumpAlFa_2_ != NULL);
 				}
 				printFastaRecord(*dumpAlFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpAlFa_2_, p.bufb().name, p.bufb().patFw);
 				MUTEX_UNLOCK(dumpAlignFaLockPE_);
 			}
+			// Dump paired-end read to the aligned-read FASTQ file
 			if(!dumpAlFqBase_.empty()) {
 				MUTEX_LOCK(dumpAlignFqLockPE_);
 				if(dumpAlFq_1_ == NULL) {
 					assert(dumpAlFq_2_ == NULL);
-					dumpAlFq_1_ = openOf(dumpAlFqBase_, 1, false);
-					dumpAlFq_2_ = openOf(dumpAlFqBase_, 2, false);
+					dumpAlFq_1_ = openOf(dumpAlFqBase_, 1, ".fq");
+					dumpAlFq_2_ = openOf(dumpAlFqBase_, 2, ".fq");
 					assert(dumpAlFq_1_ != NULL && dumpAlFq_2_ != NULL);
 				}
 				printFastqRecord(*dumpAlFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				printFastqRecord(*dumpAlFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
 				MUTEX_UNLOCK(dumpAlignFqLockPE_);
+			}
+			// Dump paired-end read to an aligned-read file (or pair of
+			// files) of the same format
+			if(!dumpAlBase_.empty()) {
+				MUTEX_LOCK(dumpAlignLockPE_);
+				if(dumpAl_1_ == NULL) {
+					dumpAl_1_ = openOf(dumpAlBase_, 1, "");
+		    		dumpAl_2_ = openOf(dumpAlBase_, 2, "");
+					assert(dumpAl_1_ != NULL);
+					assert(dumpAl_2_ != NULL);
+				}
+				dumpAl_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpAl_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				MUTEX_UNLOCK(dumpAlignLockPE_);
 			}
 		}
 	}
@@ -608,51 +652,75 @@ public:
 	 * Be careful to synchronize correctly - there may be multiple
 	 * simultaneous writers.
 	 */
-	void dumpUnalign(PatternSourcePerThread& p) {
-		if(!dumpUnalign_) return;
-		if(!p.paired()) {
+	void dumpUnal(PatternSourcePerThread& p) {
+		if(!dumpUnalignFlag_) return;
+		if(!p.paired() || onePairFile_) {
 			if(!dumpUnalFaBase_.empty()) {
-				MUTEX_LOCK(dumpUnalignFaLock_);
+				MUTEX_LOCK(dumpUnalFaLock_);
 				if(dumpUnalFa_ == NULL) {
-					dumpUnalFa_ = openOf(dumpUnalFaBase_, 0, true);
+					dumpUnalFa_ = openOf(dumpUnalFaBase_, 0, ".fa");
 					assert(dumpUnalFa_ != NULL);
 				}
 				printFastaRecord(*dumpUnalFa_, p.bufa().name, p.bufa().patFw);
-				MUTEX_UNLOCK(dumpUnalignFaLock_);
+				MUTEX_UNLOCK(dumpUnalFaLock_);
 			}
 			if(!dumpUnalFqBase_.empty()) {
-				MUTEX_LOCK(dumpUnalignFqLock_);
+				MUTEX_LOCK(dumpUnalFqLock_);
 				if(dumpUnalFq_ == NULL) {
-					dumpUnalFq_ = openOf(dumpUnalFqBase_, 0, false);
+					dumpUnalFq_ = openOf(dumpUnalFqBase_, 0, ".fq");
 					assert(dumpUnalFq_ != NULL);
 				}
 				printFastqRecord(*dumpUnalFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
-				MUTEX_UNLOCK(dumpUnalignFqLock_);
+				MUTEX_UNLOCK(dumpUnalFqLock_);
+			}
+			// Dump unpaired read to an unaligned-read file of the same format
+			if(!dumpUnalBase_.empty()) {
+				MUTEX_LOCK(dumpUnalLock_);
+				if(dumpUnal_ == NULL) {
+					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
+					assert(dumpUnal_ != NULL);
+				}
+				dumpUnal_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				MUTEX_UNLOCK(dumpUnalLock_);
 			}
 		} else {
 			if(!dumpUnalFaBase_.empty()) {
-				MUTEX_LOCK(dumpUnalignFaLockPE_);
+				MUTEX_LOCK(dumpUnalFaLockPE_);
 				if(dumpUnalFa_1_ == NULL) {
 					assert(dumpUnalFa_2_ == NULL);
-					dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, true);
-					dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, true);
+					dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, ".fa");
+					dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, ".fa");
 					assert(dumpUnalFa_1_ != NULL && dumpUnalFa_2_ != NULL);
 				}
 				printFastaRecord(*dumpUnalFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpUnalFa_2_, p.bufb().name, p.bufb().patFw);
-				MUTEX_UNLOCK(dumpUnalignFaLockPE_);
+				MUTEX_UNLOCK(dumpUnalFaLockPE_);
 			}
 			if(!dumpUnalFqBase_.empty()) {
-				MUTEX_LOCK(dumpUnalignFqLockPE_);
+				MUTEX_LOCK(dumpUnalFqLockPE_);
 				if(dumpUnalFq_1_ == NULL) {
 					assert(dumpUnalFq_2_ == NULL);
-					dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, false);
-					dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, false);
+					dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, ".fq");
+					dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, ".fq");
 					assert(dumpUnalFq_1_ != NULL && dumpUnalFq_2_ != NULL);
 				}
 				printFastqRecord(*dumpUnalFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				printFastqRecord(*dumpUnalFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
-				MUTEX_UNLOCK(dumpUnalignFqLockPE_);
+				MUTEX_UNLOCK(dumpUnalFqLockPE_);
+			}
+			// Dump paired-end read to an unaligned-read file (or pair
+			// of files) of the same format
+			if(!dumpUnalBase_.empty()) {
+				MUTEX_LOCK(dumpUnalLockPE_);
+				if(dumpUnal_1_ == NULL) {
+					dumpUnal_1_ = openOf(dumpUnalBase_, 1, "");
+		    		dumpUnal_2_ = openOf(dumpUnalBase_, 2, "");
+					assert(dumpUnal_1_ != NULL);
+					assert(dumpUnal_2_ != NULL);
+				}
+				dumpUnal_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpUnal_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				MUTEX_UNLOCK(dumpUnalLockPE_);
 			}
 		}
 	}
@@ -663,53 +731,77 @@ public:
 	 * simultaneous writers.
 	 */
 	void dumpMaxed(PatternSourcePerThread& p) {
-		if(!dumpMaxed_) {
-			if(dumpUnalign_) dumpUnalign(p);
+		if(!dumpMaxedFlag_) {
+			if(dumpUnal_) dumpUnal(p);
 			return;
 		}
-		if(!p.paired()) {
+		if(!p.paired() || onePairFile_) {
 			if(!dumpMaxFaBase_.empty()) {
-				MUTEX_LOCK(dumpMaxedFaLock_);
+				MUTEX_LOCK(dumpMaxFaLock_);
 				if(dumpMaxFa_ == NULL) {
-					dumpMaxFa_ = openOf(dumpMaxFaBase_, 0, true);
+					dumpMaxFa_ = openOf(dumpMaxFaBase_, 0, ".fa");
 		    		assert(dumpMaxFa_ != NULL);
 				}
 				printFastaRecord(*dumpMaxFa_, p.bufa().name, p.bufa().patFw);
-				MUTEX_UNLOCK(dumpMaxedFaLock_);
+				MUTEX_UNLOCK(dumpMaxFaLock_);
 			}
 			if(!dumpMaxFqBase_.empty()) {
-				MUTEX_LOCK(dumpMaxedFqLock_);
+				MUTEX_LOCK(dumpMaxFqLock_);
 				if(dumpMaxFq_ == NULL) {
-		    		dumpMaxFq_ = openOf(dumpMaxFqBase_, 0, false);
+		    		dumpMaxFq_ = openOf(dumpMaxFqBase_, 0, ".fq");
 		    		assert(dumpMaxFq_ != NULL);
 				}
 				printFastqRecord(*dumpMaxFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
-				MUTEX_UNLOCK(dumpMaxedFqLock_);
+				MUTEX_UNLOCK(dumpMaxFqLock_);
+			}
+			// Dump unpaired read to an maxed-out-read file of the same format
+			if(!dumpMaxBase_.empty()) {
+				MUTEX_LOCK(dumpMaxLock_);
+				if(dumpMax_ == NULL) {
+					dumpMax_ = openOf(dumpMaxBase_, 0, "");
+					assert(dumpMax_ != NULL);
+				}
+				dumpMax_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				MUTEX_UNLOCK(dumpMaxLock_);
 			}
 		} else {
 			if(!dumpMaxFaBase_.empty()) {
-				MUTEX_LOCK(dumpMaxedFaLockPE_);
+				MUTEX_LOCK(dumpMaxFaLockPE_);
 				if(dumpMaxFa_1_ == NULL) {
 					assert(dumpMaxFa_2_ == NULL);
-		    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, true);
-		    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, true);
+		    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, ".fa");
+		    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, ".fa");
 		    		assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
 				}
 				printFastaRecord(*dumpMaxFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpMaxFa_2_, p.bufb().name, p.bufb().patFw);
-				MUTEX_UNLOCK(dumpMaxedFaLockPE_);
+				MUTEX_UNLOCK(dumpMaxFaLockPE_);
 			}
 			if(!dumpMaxFqBase_.empty()) {
-				MUTEX_LOCK(dumpMaxedFqLockPE_);
+				MUTEX_LOCK(dumpMaxFqLockPE_);
 				if(dumpMaxFq_1_ == NULL) {
 					assert(dumpMaxFq_2_ == NULL);
-		    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, false);
-		    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, false);
+		    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, ".fq");
+		    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, ".fq");
 		    		assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
 				}
 				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
 				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
-				MUTEX_UNLOCK(dumpMaxedFqLockPE_);
+				MUTEX_UNLOCK(dumpMaxFqLockPE_);
+			}
+			// Dump paired-end read to a maxed-out-read file (or pair
+			// of files) of the same format
+			if(!dumpMaxBase_.empty()) {
+				MUTEX_LOCK(dumpMaxLockPE_);
+				if(dumpMax_1_ == NULL) {
+					dumpMax_1_ = openOf(dumpMaxBase_, 1, "");
+		    		dumpMax_2_ = openOf(dumpMaxBase_, 2, "");
+					assert(dumpMax_1_ != NULL);
+					assert(dumpMax_2_ != NULL);
+				}
+				dumpMax_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				dumpMax_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				MUTEX_UNLOCK(dumpMaxLockPE_);
 			}
 		}
 	}
@@ -761,10 +853,15 @@ protected:
 	// Output filenames for dumping
 	std::string dumpAlFaBase_;
 	std::string dumpAlFqBase_;
+	std::string dumpAlBase_;
 	std::string dumpUnalFaBase_;
 	std::string dumpUnalFqBase_;
+	std::string dumpUnalBase_;
 	std::string dumpMaxFaBase_;
 	std::string dumpMaxFqBase_;
+	std::string dumpMaxBase_;
+
+	bool onePairFile_;
 
 	// Output streams for dumping
     std::ofstream *dumpAlFa_;   // for single-ended reads
@@ -773,35 +870,47 @@ protected:
     std::ofstream *dumpAlFq_;   // for single-ended reads
     std::ofstream *dumpAlFq_1_; // for first mates
     std::ofstream *dumpAlFq_2_; // for second mates
+    std::ofstream *dumpAl_;   // for single-ended reads
+    std::ofstream *dumpAl_1_; // for first mates
+    std::ofstream *dumpAl_2_; // for second mates
     std::ofstream *dumpUnalFa_;   // for single-ended reads
     std::ofstream *dumpUnalFa_1_; // for first mates
     std::ofstream *dumpUnalFa_2_; // for second mates
     std::ofstream *dumpUnalFq_;   // for single-ended reads
     std::ofstream *dumpUnalFq_1_; // for first mates
     std::ofstream *dumpUnalFq_2_; // for second mates
+    std::ofstream *dumpUnal_;   // for single-ended reads
+    std::ofstream *dumpUnal_1_; // for first mates
+    std::ofstream *dumpUnal_2_; // for second mates
     std::ofstream *dumpMaxFa_;     // for single-ended reads
     std::ofstream *dumpMaxFa_1_;   // for first mates
     std::ofstream *dumpMaxFa_2_;   // for second mates
     std::ofstream *dumpMaxFq_;     // for single-ended reads
     std::ofstream *dumpMaxFq_1_;   // for first mates
     std::ofstream *dumpMaxFq_2_;   // for second mates
+    std::ofstream *dumpMax_;     // for single-ended reads
+    std::ofstream *dumpMax_1_;   // for first mates
+    std::ofstream *dumpMax_2_;   // for second mates
 
     /**
      * Open an ofstream with given name; output error message and quit
      * if it fails.
      */
-    std::ofstream* openOf(const std::string& name, int mateType, bool fa) {
+    std::ofstream* openOf(const std::string& name,
+                          int mateType,
+                          const std::string& suffix)
+	{
     	std::string s = name;
 		size_t dotoff = name.find_last_of(".");
     	if(mateType == 1) {
     		if(dotoff == string::npos) {
-    			s += (fa ? "_1.fa" : "_1.fq");
+    			s += "_1"; s += suffix;
     		} else {
     			s = name.substr(0, dotoff) + "_1" + s.substr(dotoff);
     		}
     	} else if(mateType == 2) {
     		if(dotoff == string::npos) {
-    			s += (fa ? "_2.fa" : "_2.fq");
+    			s += "_2"; s += suffix;
     		} else {
     			s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
     		}
@@ -824,30 +933,42 @@ protected:
      * Initialize all the locks for dumping.
      */
     void initDumps() {
-        dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_ = NULL;
-        dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_ = NULL;
+        dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_   = NULL;
+        dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_   = NULL;
+        dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
         dumpUnalFa_   = dumpUnalFa_1_ = dumpUnalFa_2_ = NULL;
         dumpUnalFq_   = dumpUnalFq_1_ = dumpUnalFq_2_ = NULL;
+        dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
         dumpMaxFa_    = dumpMaxFa_1_  = dumpMaxFa_2_  = NULL;
         dumpMaxFq_    = dumpMaxFq_1_  = dumpMaxFq_2_  = NULL;
-    	dumpAlign_    = !dumpAlFaBase_.empty() ||
-    	                !dumpAlFqBase_.empty();
-    	dumpUnalign_  = !dumpUnalFaBase_.empty() ||
-    	                !dumpUnalFqBase_.empty();
-    	dumpMaxed_    = !dumpMaxFaBase_.empty() ||
-    	                !dumpMaxFqBase_.empty();
+        dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
+    	dumpAlignFlag_   = !dumpAlFaBase_.empty() ||
+    	                   !dumpAlFqBase_.empty() ||
+    	                   !dumpAlBase_.empty();
+    	dumpUnalignFlag_ = !dumpUnalFaBase_.empty() ||
+    	                   !dumpUnalFqBase_.empty() ||
+    	                   !dumpUnalBase_.empty();
+    	dumpMaxedFlag_   = !dumpMaxFaBase_.empty() ||
+    	                   !dumpMaxFqBase_.empty() ||
+    	                   !dumpMaxBase_.empty();
    		MUTEX_INIT(dumpAlignFaLock_);
    		MUTEX_INIT(dumpAlignFaLockPE_);
    		MUTEX_INIT(dumpAlignFqLock_);
    		MUTEX_INIT(dumpAlignFqLockPE_);
-   		MUTEX_INIT(dumpUnalignFaLock_);
-   		MUTEX_INIT(dumpUnalignFaLockPE_);
-   		MUTEX_INIT(dumpUnalignFqLock_);
-   		MUTEX_INIT(dumpUnalignFqLockPE_);
-   		MUTEX_INIT(dumpMaxedFaLock_);
-   		MUTEX_INIT(dumpMaxedFaLockPE_);
-   		MUTEX_INIT(dumpMaxedFqLock_);
-   		MUTEX_INIT(dumpMaxedFqLockPE_);
+   		MUTEX_INIT(dumpAlignLock_);
+   		MUTEX_INIT(dumpAlignLockPE_);
+   		MUTEX_INIT(dumpUnalFaLock_);
+   		MUTEX_INIT(dumpUnalFaLockPE_);
+   		MUTEX_INIT(dumpUnalFqLock_);
+   		MUTEX_INIT(dumpUnalFqLockPE_);
+   		MUTEX_INIT(dumpUnalLock_);
+   		MUTEX_INIT(dumpUnalLockPE_);
+   		MUTEX_INIT(dumpMaxFaLock_);
+   		MUTEX_INIT(dumpMaxFaLockPE_);
+   		MUTEX_INIT(dumpMaxFqLock_);
+   		MUTEX_INIT(dumpMaxFqLockPE_);
+   		MUTEX_INIT(dumpMaxLock_);
+   		MUTEX_INIT(dumpMaxLockPE_);
     }
 
     void destroyDumps() {
@@ -857,18 +978,29 @@ protected:
     	if(dumpAlFq_     != NULL) { dumpAlFq_->close();     delete dumpAlFq_; }
     	if(dumpAlFq_1_   != NULL) { dumpAlFq_1_->close();   delete dumpAlFq_1_; }
     	if(dumpAlFq_2_   != NULL) { dumpAlFq_2_->close();   delete dumpAlFq_2_; }
+    	if(dumpAl_       != NULL) { dumpAl_->close();       delete dumpAl_; }
+    	if(dumpAl_1_     != NULL) { dumpAl_1_->close();     delete dumpAl_1_; }
+    	if(dumpAl_2_     != NULL) { dumpAl_2_->close();     delete dumpAl_2_; }
+
     	if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
     	if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
     	if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
     	if(dumpUnalFq_   != NULL) { dumpUnalFq_->close();   delete dumpUnalFq_; }
     	if(dumpUnalFq_1_ != NULL) { dumpUnalFq_1_->close(); delete dumpUnalFq_1_; }
     	if(dumpUnalFq_2_ != NULL) { dumpUnalFq_2_->close(); delete dumpUnalFq_2_; }
+    	if(dumpUnal_     != NULL) { dumpUnal_->close();     delete dumpUnal_; }
+    	if(dumpUnal_1_   != NULL) { dumpUnal_1_->close();   delete dumpUnal_1_; }
+    	if(dumpUnal_2_   != NULL) { dumpUnal_2_->close();   delete dumpUnal_2_; }
+
     	if(dumpMaxFa_    != NULL) { dumpMaxFa_->close();    delete dumpMaxFa_; }
     	if(dumpMaxFa_1_  != NULL) { dumpMaxFa_1_->close();  delete dumpMaxFa_1_; }
     	if(dumpMaxFa_2_  != NULL) { dumpMaxFa_2_->close();  delete dumpMaxFa_2_; }
     	if(dumpMaxFq_    != NULL) { dumpMaxFq_->close();    delete dumpMaxFq_; }
     	if(dumpMaxFq_1_  != NULL) { dumpMaxFq_1_->close();  delete dumpMaxFq_1_; }
     	if(dumpMaxFq_2_  != NULL) { dumpMaxFq_2_->close();  delete dumpMaxFq_2_; }
+    	if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
+    	if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
+    	if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
     }
 
     // Locks for dumping
@@ -876,19 +1008,25 @@ protected:
     MUTEX_T dumpAlignFaLockPE_; // _1 and _2
     MUTEX_T dumpAlignFqLock_;
     MUTEX_T dumpAlignFqLockPE_; // _1 and _2
-    MUTEX_T dumpUnalignFaLock_;
-    MUTEX_T dumpUnalignFaLockPE_; // _1 and _2
-    MUTEX_T dumpUnalignFqLock_;
-    MUTEX_T dumpUnalignFqLockPE_; // _1 and _2
-    MUTEX_T dumpMaxedFaLock_;
-    MUTEX_T dumpMaxedFaLockPE_;   // _1 and _2
-    MUTEX_T dumpMaxedFqLock_;
-    MUTEX_T dumpMaxedFqLockPE_;   // _1 and _2
+    MUTEX_T dumpAlignLock_;
+    MUTEX_T dumpAlignLockPE_; // _1 and _2
+    MUTEX_T dumpUnalFaLock_;
+    MUTEX_T dumpUnalFaLockPE_; // _1 and _2
+    MUTEX_T dumpUnalFqLock_;
+    MUTEX_T dumpUnalFqLockPE_; // _1 and _2
+    MUTEX_T dumpUnalLock_;
+    MUTEX_T dumpUnalLockPE_; // _1 and _2
+    MUTEX_T dumpMaxFaLock_;
+    MUTEX_T dumpMaxFaLockPE_;   // _1 and _2
+    MUTEX_T dumpMaxFqLock_;
+    MUTEX_T dumpMaxFqLockPE_;   // _1 and _2
+    MUTEX_T dumpMaxLock_;
+    MUTEX_T dumpMaxLockPE_;   // _1 and _2
 
     // false -> no dumping
-    bool dumpAlign_;
-    bool dumpUnalign_;
-    bool dumpMaxed_;
+    bool dumpAlignFlag_;
+    bool dumpUnalignFlag_;
+    bool dumpMaxedFlag_;
 
 	volatile bool     first_;       /// true -> first hit hasn't yet been reported
 	volatile uint64_t numReported_; /// # single-ended alignments reported
@@ -939,7 +1077,7 @@ public:
 			// user
 			assert(ret == 0 || ret > _max);
 			if(ret > 0) _sink.dumpMaxed(p);
-			else        _sink.dumpUnalign(p);
+			else        _sink.dumpUnal(p);
 		}
 		if(_bufferedHits.size() > 0) {
 			// Flush buffered hits
@@ -1987,20 +2125,28 @@ private:
 #define DECL_HIT_DUMPS \
 	const std::string& dumpAlFa, \
 	const std::string& dumpAlFq, \
+	const std::string& dumpAl, \
 	const std::string& dumpUnalFa, \
 	const std::string& dumpUnalFq, \
+	const std::string& dumpUnal, \
 	const std::string& dumpMaxFa, \
 	const std::string& dumpMaxFq, \
+	const std::string& dumpMax, \
+	bool onePairFile, \
 	RecalTable *recalTable, \
 	std::vector<std::string>* refnames
 
 #define PASS_HIT_DUMPS \
 	dumpAlFa, \
 	dumpAlFq, \
+	dumpAl, \
 	dumpUnalFa, \
 	dumpUnalFq, \
+	dumpUnal, \
 	dumpMaxFa, \
 	dumpMaxFq, \
+	dumpMax, \
+	onePairFile, \
 	recalTable, \
 	refnames
 
@@ -2789,7 +2935,7 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", NULL) { quiet_ = true; }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { quiet_ = true; }
 	virtual void reportHit(const Hit& h) { }
 	virtual void append(ostream& o, const Hit& h) { }
 };

@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.9.9.3.
+available to the public for download.  The current version is 0.10.0.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,33 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.10.0 - June 12, 2009
+   * Major change: All alignment modes are now unstratified by default.
+     The --nostrata option has been removed, since it is now the
+     default.  A --strata option has been added to override the default
+     and force stratified reporting.  Reporting is stratified if and
+     only if --strata is specified.  --strata now cannot be specified
+     without also specifying --best.
+   * Replaced the --unfa/--unfq options with a single --un option,
+     which writes unaligned reads to an output file (or pair of output
+     files) but keeps reads in their original form.  This is in
+     contrast to the old --unfa/--unfq options, which only supported
+     FASTA or FASTQ formats, and which would print a post-trimming and
+     post-quality-value translation version of the read.  Likewise, the
+     --alfa/--alfq and --maxfa/--maxfq options have been replaced with
+     --al and --max options.  The old options are still present, but
+     are deprecated and will be removed in a future version.
+   * Added --nofw and --norc options, allowing alignment to just one
+     reference strand or the other.
+   * Added --mm option that causes bowtie to use memory-mapped files
+     instead of traditional file I/O to access the reference index.
+     This allows multiple bowtie processes running on the same computer
+     to share a single in-memory image of a given index.  This is a
+     useful feature for parallelizing bowtie in situations where memory
+     is limited and where -p is inappropriate or insufficient. 
+   * The --oldpmap option, deprecated in version 0.9.8, has been
+     removed.
 
 Version 0.9.9.3 - May 12, 2009
    * Fixed an issue where bowtie --best would sometimes use excessive

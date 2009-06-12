@@ -93,6 +93,7 @@ struct ReadBuf {
 	/// and set all lengths to 0
 	void reset() {
 		patid = 0;
+		readOrigBufLen = 0;
 		_setBegin(patFw,     (Dna5*)patBufFw);     _setLength(patFw, 0);     _setCapacity(patFw, BUF_SIZE);
 		_setBegin(patRc,     (Dna5*)patBufRc);     _setLength(patRc, 0);     _setCapacity(patRc, BUF_SIZE);
 		_setBegin(qualFw,    (char*)qualBufFw);    _setLength(qualFw, 0);    _setCapacity(qualFw, BUF_SIZE);
@@ -114,6 +115,7 @@ struct ReadBuf {
 		seqan::clear(qualFwRev);
 		seqan::clear(qualRcRev);
 		seqan::clear(name);
+		readOrigBufLen = 0;
 	}
 
 	/// Return true iff the read (pair) is empty
@@ -139,14 +141,17 @@ struct ReadBuf {
 		_setCapacity(patRc,  BUF_SIZE);
 		_setCapacity(qualRc, BUF_SIZE);
 		for(uint32_t i = 0; i < len; i++) {
+			// Reverse-complement the sequence
 			patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
+			// Reverse the quality
 			qualBufRc[i] = qualBufFw[len-i-1];
 		}
 	}
 
 	/**
 	 * Given patFw, patRc, qualFw and qualRc, construct the *Rev
-	 * versions in place.
+	 * versions in place.  Assumes constructRevComps() was called
+	 * previously.
 	 */
 	void constructReverses() {
 		uint32_t len = length();
@@ -179,13 +184,17 @@ struct ReadBuf {
 		assert(i == 1 || i == 2);
 		size_t namelen = seqan::length(name);
 		bool append = false;
-		if(namelen < 2) append = true;
-		else {
+		if(namelen < 2) {
+			// Name is too short to possibly have /1 or /2 on the end
+			append = true;
+		} else {
 			if(i == 1) {
+				// append = true iff mate name does not already end in /1
 				append =
 					nameBuf[namelen-2] != '/' ||
 					nameBuf[namelen-1] != '1';
 			} else {
+				// append = true iff mate name does not already end in /2
 				append =
 					nameBuf[namelen-2] != '/' ||
 					nameBuf[namelen-1] != '2';
@@ -219,8 +228,8 @@ struct ReadBuf {
 	String<char>  qualRcRev;              // reverse quality values reversed
 	char          qualBufRcRev[BUF_SIZE]; // reverse quality value buffer reversed
 
-	String<char>  qualOrig;              // original quality string
-	char          qualBufOrig[BUF_SIZE]; // original quality string buffer
+	char          readOrigBuf[FileBuf::LASTN_BUF_SZ];
+	size_t        readOrigBufLen;
 
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
@@ -760,7 +769,7 @@ public:
 
 	uint32_t      patid()  { return patid_;        }
 	virtual void  reset()  { patid_ = 0xffffffff;  }
-	bool          empty()  { return buf1_.empty();     }
+	bool          empty()  { return buf1_.empty(); }
 
 	/**
 	 * Return true iff the buffers jointly contain a paired-end read.
@@ -1094,11 +1103,11 @@ static inline int getOverNewline(FileBuf& in) {
 /// Skip to the end of the current string of newline chars such that
 /// the next call to get() returns the first character after the
 /// whitespace
-static inline void peekOverNewline(FileBuf& in) {
+static inline int peekOverNewline(FileBuf& in) {
 	while(true) {
 		int c = in.peek();
 		if(c != '\r' && c != '\n') {
-			return;
+			return c;
 		}
 		in.get();
 	}
@@ -1121,17 +1130,17 @@ static inline int getToEndOfLine(FileBuf& in) {
 
 /// Skip to the end of the current line such that the next call to
 /// get() returns the first character on the next line
-static inline void peekToEndOfLine(FileBuf& in) {
+static inline int peekToEndOfLine(FileBuf& in) {
 	while(true) {
-		int c = in.get(); if(c < 0) return;
+		int c = in.get(); if(c < 0) return c;
 		if(c == '\n' || c == '\r') {
 			c = in.peek();
 			while(c == '\n' || c == '\r') {
-				in.get(); if(c < 0) return; // consume \r or \n
+				in.get(); if(c < 0) return c; // consume \r or \n
 				c = in.peek();
 			}
 			// next get() gets first character of next line
-			return;
+			return c;
 		}
 	}
 }
@@ -1493,17 +1502,27 @@ protected:
 		int dstLen = 0;
 		int nameLen = 0;
 		// Pick off the first carat
+		c = filebuf_.get();
+		if(c == -1) {
+			r.clearAll();
+			filebuf_.resetLastN();
+			return;
+		}
+		assert_eq('>', c);
 		if(first_) {
-			c = filebuf_.get();
 			if(c != '>') {
 				if(forgiveInput_) {
 					c = FastaPatternSource::skipToNextFastaRecord(filebuf_);
 					if(c < 0) {
-						r.clearAll(); return;
+						r.clearAll();
+						filebuf_.resetLastN();
+						return;
 					}
 				} else {
 					c = getOverNewline(filebuf_); if(c < 0) {
-						r.clearAll(); return;
+						r.clearAll();
+						filebuf_.resetLastN();
+						return;
 					}
 				}
 			}
@@ -1519,13 +1538,17 @@ protected:
 		// into *name
 		while(true) {
 			c = filebuf_.get(); if(c < 0) {
-				r.clearAll(); return;
+				r.clearAll();
+				filebuf_.resetLastN();
+				return;
 			}
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
 					c = filebuf_.get(); if(c < 0) {
-						r.clearAll(); return;
+						r.clearAll();
+						filebuf_.resetLastN();
+						return;
 					}
 				}
 				break;
@@ -1538,9 +1561,7 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
-		while(c != '>' && c != '#') {
-			// Note: can't have a comment in the middle of a sequence,
-			// though a comment can end a sequence
+		while(c != '>') {
 			if(isalpha(c) && begin++ >= this->trim5_) {
 				if(dstLen + 1 > 1024) {
 					cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
@@ -1551,7 +1572,15 @@ protected:
 				r.qualBufFw[dstLen] = 'I';
 				dstLen++;
 			}
-			if((c = filebuf_.get()) < 0) break;
+			c = filebuf_.get();
+			if(c == '\r' || c == '\n' || c == -1) {
+				// Either we hit EOL or EOF; time to copy the buffered
+				// read data into the 'orig' buffer.
+				c = peekOverNewline(filebuf_);
+				r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+				filebuf_.resetLastN();
+			}
+			if(c < 0) break;
 		}
 		dstLen -= this->trim3_;
 		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
@@ -1657,6 +1686,8 @@ protected:
 		}
 		assert_eq(ct, '\n');
 		assert_neq('\n', filebuf_.peek());
+		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+		filebuf_.resetLastN();
 		// The last character read in parseQuals should have been a
 		// '\n'
 
@@ -1672,6 +1703,7 @@ protected:
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
+			filebuf_.resetLastN();
 			return;
 		}
 		assert_neq('\t', filebuf_.peek());
@@ -1684,6 +1716,7 @@ protected:
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
+			filebuf_.resetLastN();
 			return;
 		}
 		assert_neq('\t', filebuf_.peek());
@@ -1695,11 +1728,15 @@ protected:
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
+			filebuf_.resetLastN();
 			return;
 		}
 		assert(ct == '\t' || ct == '\n');
 		if(ct == '\n') {
 			rb.clearAll();
+			peekOverNewline(filebuf_);
+			ra.readOrigBufLen = filebuf_.copyLastN(ra.readOrigBuf);
+			filebuf_.resetLastN();
 			readCnt_++;
 			patid = readCnt_-1;
 			return;
@@ -1714,6 +1751,7 @@ protected:
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
+			filebuf_.resetLastN();
 			return;
 		}
 		assert_neq('\t', filebuf_.peek());
@@ -1724,6 +1762,7 @@ protected:
 			peekOverNewline(filebuf_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
+			filebuf_.resetLastN();
 			return;
 		}
 		assert_eq('\n', ct);
@@ -1732,6 +1771,9 @@ protected:
 				assert(false);
 			}
 		}
+		peekOverNewline(filebuf_);
+		ra.readOrigBufLen = filebuf_.copyLastN(ra.readOrigBuf);
+		filebuf_.resetLastN();
 
 		// The last character read in parseQuals should have been a
 		// '\n'
@@ -2061,6 +2103,7 @@ public:
 	{ }
 	virtual void reset() {
 		first_ = true;
+		filebuf_.resetLastN();
 		BufferedFilePatternSource::reset();
 	}
 protected:
@@ -2119,12 +2162,16 @@ protected:
 			c = filebuf_.get();
 			if(c != '@') {
 				if(forgiveInput_) {
-					c = FastqPatternSource::skipToNextFastqRecord(filebuf_, c == '+'); if(c < 0) {
+					c = FastqPatternSource::skipToNextFastqRecord(filebuf_, c == '+');
+					if(c < 0) {
+						filebuf_.resetLastN();
 						seqan::clear(r.patFw);
 						return;
 					}
 				} else {
-					c = getOverNewline(filebuf_); if(c < 0) {
+					c = getOverNewline(filebuf_);
+					if(c < 0) {
+						filebuf_.resetLastN();
 						seqan::clear(r.patFw);
 						return;
 					}
@@ -2141,8 +2188,10 @@ protected:
 		// Read to the end of the id line, sticking everything after the '@'
 		// into *name
 		while(true) {
-			c = filebuf_.get(); if(c < 0) {
+			c = filebuf_.get();
+			if(c < 0) {
 				seqan::clear(r.patFw);
+				filebuf_.resetLastN();
 				return;
 			}
 			if(c == '\n' || c == '\r') {
@@ -2151,6 +2200,7 @@ protected:
 					c = filebuf_.get();
 					if(c < 0) {
 						seqan::clear(r.patFw);
+						filebuf_.resetLastN();
 						return;
 					}
 				}
@@ -2193,6 +2243,7 @@ protected:
 			if(c < 0) {
 				// EOF occurred in the middle of a read - abort
 				seqan::clear(r.patFw);
+				filebuf_.resetLastN();
 				return;
 			}
 		}
@@ -2213,15 +2264,6 @@ protected:
 			while (qualsRead < charsRead) {
 				size_t rd = filebuf_.gets(buf, sizeof(buf));
 				if(rd == 0) break;
-				{
-					// Keep the original string in the 'qualOrig' buffer
-					size_t pos = 0;
-					for(size_t i = 0; i < rd; i++) {
-						if(!isspace(buf[i])) {
-							r.qualBufOrig[pos++] = buf[i];
-						}
-					}
-				}
 				assert(NULL == strrchr(buf, '\n'));
 				vector<string> s_quals;
 				tokenize(string(buf), " ", s_quals);
@@ -2244,18 +2286,14 @@ protected:
 					++qualsRead;
 				}
 			} // done reading integer quality lines
-			//assert_eq(charsRead, qualsRead);
-			if (charsRead > qualsRead)
-			{
+			if (charsRead > qualsRead) {
 				tooFewQualities(r.name);
 				exit(1);
 			}
 			_setBegin(r.qualFw, (char*)r.qualBufFw);
 			_setLength(r.qualFw, dstLen);
-			c = filebuf_.get();
-		}
-		else
-		{
+			peekOverNewline(filebuf_);
+		} else {
 			// Non-integer qualities
 			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
 				c = filebuf_.get();
@@ -2266,6 +2304,7 @@ protected:
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
 					seqan::clear(r.patFw);
+					filebuf_.resetLastN();
 					return;
 				}
 				if (c != '\r' && c != '\n') {
@@ -2289,11 +2328,15 @@ protected:
 			_setBegin (r.qualFw, (char*)r.qualBufFw);
 			_setLength(r.qualFw, dstLen);
 			if(c == '\r' || c == '\n') {
-				c = getOverNewline(filebuf_);
+				c = peekOverNewline(filebuf_);
 			} else {
-				c = getToEndOfLine(filebuf_);
+				c = peekToEndOfLine(filebuf_);
 			}
 		}
+		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+		filebuf_.resetLastN();
+
+		c = filebuf_.get();
 		assert(c == -1 || c == '@');
 
 		// Set up a default name if one hasn't been set
@@ -2362,7 +2405,11 @@ protected:
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
-		c = getOverNewline(this->filebuf_);
+		c = peekOverNewline(this->filebuf_);
+		if(c < 0) {
+			seqan::clear(r.patFw);
+			return;
+		}
 		assert(!isspace(c));
 		if(first_) {
 			if(dna4Cat[c] == 0) {
@@ -2381,6 +2428,7 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		while(!isspace(c) && c >= 0) {
+			c = filebuf_.get();
 			if(isalpha(c) && dstLen >= this->trim5_) {
 				size_t len = dstLen - this->trim5_;
 				if(len + 1 > 1024) {
@@ -2389,10 +2437,10 @@ protected:
 					exit(1);
 				}
 				r.patBufFw [len] = charToDna5[c];
-				r.qualBufFw[len] = r.qualBufOrig[len] = 'I';
+				r.qualBufFw[len] = 'I';
 				dstLen++;
 			} else if(isalpha(c)) dstLen++;
-			c = filebuf_.get();
+			c = filebuf_.peek();
 		}
 		if(dstLen >= (this->trim3_ + this->trim5_)) {
 			dstLen -= (this->trim3_ + this->trim5_);
@@ -2403,8 +2451,10 @@ protected:
 		_setLength(r.patFw,  dstLen);
 		_setBegin (r.qualFw, r.qualBufFw);
 		_setLength(r.qualFw, dstLen);
-		_setBegin (r.qualOrig, r.qualBufOrig);
-		_setLength(r.qualOrig, dstLen);
+
+		c = peekToEndOfLine(filebuf_);
+		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+		filebuf_.resetLastN();
 
 		// Set up name
 		itoa10(readCnt_, r.nameBuf);
@@ -2413,11 +2463,6 @@ protected:
 		_setLength(r.name, nameLen);
 		readCnt_++;
 
-		if(c == -1) {
-			return;
-		} else {
-			assert(isspace(c));
-		}
 		patid = readCnt_-1;
 	}
 	/// Read another read pair from a FASTQ input file
