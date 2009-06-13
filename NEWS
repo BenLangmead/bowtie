@@ -45,7 +45,10 @@ Version 0.10.0 - June 12, 2009
      This allows multiple bowtie processes running on the same computer
      to share a single in-memory image of a given index.  This is a
      useful feature for parallelizing bowtie in situations where memory
-     is limited and where -p is inappropriate or insufficient. 
+     is limited and where -p is inappropriate or insufficient.  This
+     feature is not available in the Windows version of Bowtie.
+   * Added a section to the manual ("Reporting Modes") clarifying and
+     giving examples of how to use Bowtie's reporting options.
    * The --oldpmap option, deprecated in version 0.9.8, has been
      removed.
 
