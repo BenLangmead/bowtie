@@ -362,7 +362,7 @@ Bowtie Manual
   
   Bowtie can align paired-end reads when paired read files are
   specified using the -1 and -2 options (for pairs of raw, FASTA, or
-  FASTQ read files), or using the --12 option (for Crossbow read
+  FASTQ read files), or using the --12 option (for Tab-delimited read
   files).  A valid paired-end alignment satisfies the following
   criteria:
   
@@ -495,8 +495,8 @@ Bowtie Manual
                      -c is given, this might be "GGTCATCCT,ACGGGTCGT".
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
-                     those specified in <mates2>.  Reads may be a mix
-                     of different lengths.  If "-" is specified, Bowtie
+                     those specified in <m2>.  Reads may be a mix of
+                     different lengths.  If "-" is specified, Bowtie
                      will read the #1 mates from stdin.  "-" is not
                      compatible with "-z/--phased".
 
@@ -507,24 +507,26 @@ Bowtie Manual
                      -c is given, this might be "GTATGCTG,AATTCAGGCTG".
                      Sequences specified with this option must
                      correspond file-for-file and read-for-read with
-                     those specified in <mates1>.  Reads may be a mix
-                     of different lengths.  If "-" is specified, Bowtie
+                     those specified in <m1>.  Reads may be a mix of
+                     different lengths.  If "-" is specified, Bowtie
                      will read the #2 mates from stdin.  "-" is not
                      compatible with "-z/--phased".
 
   <r>                Comma-separated list of files containing a mix of
-                     unpaired and paired-end reads in Crossbow format.
-                     The Crossbow format is a 1-read-per-line format
-                     where an unpaired read consists of the read name,
-                     sequence and quality string separated by tabs.  A
-                     paired-end read consists of the read name, sequnce
-                     of the /1 mate, quality values of the /1 mate,
-                     sequence of the /2 mate, and quality values of the
-                     /2 mate separated by tabs.  Reads may be a mix of
+                     unpaired and paired-end reads in Tab-delimited
+                     format.  Tab-delimited format is a 1-read-per-line
+                     format where unpaired reads consist of a read
+                     name, sequence and quality string each separated
+                     by tabs.  A paired-end read consists of a read
+                     name, sequnce of the /1 mate, quality values of
+                     the /1 mate, sequence of the /2 mate, and quality
+                     values of the /2 mate separated by tabs.  Quality
+                     values can be expressed using any of the scales
+                     supported in FASTQ files.  Reads may be a mix of
                      different lengths and paired-end and unpaired
-                     reads may be intermingled.  If "-" is specified,
-                     Bowtie will read the Crossbow-formatted reads from
-                     stdin.
+                     reads may be intermingled in the same file.  If
+                     "-" is specified, Bowtie will read the Tab-
+                     delimited reads from stdin.
 
   <s>                A comma-separated list of files containing
                      unpaired reads to be aligned, or, if -c is
@@ -547,28 +549,27 @@ Bowtie Manual
    Input:
    ------
 
-  -q                 The query input files (specified as <mates1>,
-                     <mates2> and <singles>) are FASTQ files (usually
+  -q                 The query input files (specified either as <m1>
+                     and <m2>, or as <s>) are FASTQ files (usually
                      having extension .fq or .fastq).  This is the
                      default.  See also: --solexa-quals and
                      --integer-quals.
 
-  -f                 The query input files (specified as <mates1>,
-                     <mates2> and <singles>) are FASTA files (usually
+  -f                 The query input files (specified either as <m1>
+                     and <m2>, or as <s>) are FASTA files (usually
                      having extension .fa, .mfa, .fna or similar).  All
                      quality values are assumed to be 40 on the Phred
                      scale.
 
-  -r                 The query input files (specified as <mates1>,
-                     <mates2> and <singles>) are Raw files: one
-                     sequence per line, without quality values or
-                     names.  All quality values are assumed to be 40 on
-                     the Phred scale.
+  -r                 The query input files (specified either as <m1>
+                     and <m2>, or as <s>) are Raw files: one sequence
+                     per line, without quality values or names.  All
+                     quality values are assumed to be 40 on the Phred
+                     scale.
 
   -c                 The query sequences are given on command line.
-                     I.e. <mates1>, <mates2> and <singles> are comma-
-                     separated lists of reads rather than lists of
-                     read files.
+                     I.e. <m1>, <m2> and <singles> are comma-separated
+                     lists of reads rather than lists of read files.
 
   -s/--skip <int>    Skip (i.e. do not align) the first <int> reads or
                      pairs in the input.
@@ -583,13 +584,13 @@ Bowtie Manual
   -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
                      each read before alignment (default: 0).
 
-  --phred33-quals    FASTQ qualities are ASCII chars equal to the Phred
+  --phred33-quals    Input qualities are ASCII chars equal to the Phred
                      quality plus 33.  Default: on.
 
-  --phred64-quals    FASTQ qualities are ASCII chars equal to the Phred
+  --phred64-quals    Input qualities are ASCII chars equal to the Phred
                      quality plus 64.  Default: off.
 
-  --solexa-quals     Convert FASTQ qualities from solexa-scaled (which
+  --solexa-quals     Convert input qualities from solexa-scaled (which
                      can be negative) to phred-scaled (which can't).
                      The formula for conversion is phred-qual =
                      10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).
@@ -602,8 +603,8 @@ Bowtie Manual
                      emitted by GA Pipeline version 1.3 or later. 
                      Default: off.
 
-  --integer-quals    Quality values are represented in the FASTQ file
-                     as space-separated ASCII integers, e.g.,
+  --integer-quals    Quality values are represented in the read input
+                     file as space-separated ASCII integers, e.g.,
                      "40 40 30 40...", rather than ASCII characters,
                      e.g., "II?I...".  Integers are treated as being on
                      the Phred scale unless --solexa-quals is also
