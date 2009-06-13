@@ -64,8 +64,9 @@ static inline uint32_t readU32(std::istream& in, bool swap) {
  */
 static inline uint32_t readU32(int in, bool swap) {
 	uint32_t x;
-	ASSERT_ONLY(int r = ) read(in, (void *)&x, 4);
-	assert_eq(4, r);
+	if(read(in, (void *)&x, 4) != 4) {
+		assert(false);
+	}
 	if(swap) {
 		return endianSwapU32(x);
 	} else {
@@ -94,8 +95,9 @@ static inline int32_t readI32(std::istream& in, bool swap) {
  */
 static inline uint32_t readI32(int in, bool swap) {
 	int32_t x;
-	ASSERT_ONLY(int r = ) read(in, (void *)&x, 4);
-	assert_eq(4, r);
+	if(read(in, (void *)&x, 4) != 4) {
+		assert(false);
+	}
 	if(swap) {
 		return endianSwapI32(x);
 	} else {
