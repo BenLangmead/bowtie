@@ -732,7 +732,7 @@ public:
 	 */
 	void dumpMaxed(PatternSourcePerThread& p) {
 		if(!dumpMaxedFlag_) {
-			if(dumpUnal_) dumpUnal(p);
+			if(dumpUnalignFlag_) dumpUnal(p);
 			return;
 		}
 		if(!p.paired() || onePairFile_) {
