@@ -59,6 +59,7 @@ public:
 		}
 
 		char *mmFile = NULL;
+#ifdef BOWTIE_MM
 		if(useMm_) {
 			if(verbose_) {
 				cout << "  Memory-mapping reference index file " << s4 << endl;
@@ -77,6 +78,7 @@ public:
 				exit(1);
 			}
 		}
+#endif
 
 		// Read endianness sentinel, set 'swap'
 		uint32_t one;
@@ -275,13 +277,6 @@ public:
 		assert_gt(recf, reci);
 		uint32_t bufOff = refOffs_[tidx];
 		uint32_t off = 0;
-//
-//		if(useMm_ && sanity_) {
-//			for(size_t i = 0; i < bufAllocSz_; i++) {
-//				assert_eq(buf_[i], sanityBuf_[i]);
-//			}
-//		}
-//
 		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
@@ -325,13 +320,6 @@ public:
 		uint32_t cur = 0;
 		uint32_t bufOff = refOffs_[tidx];
 		uint32_t off = 0;
-//
-//		if(useMm_ && sanity_) {
-//			for(size_t i = 0; i < bufAllocSz_; i++) {
-//				assert_eq(buf_[i], sanityBuf_[i]);
-//			}
-//		}
-//
 		// For all records pertaining to the target reference sequence...
 		for(uint32_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
@@ -383,13 +371,6 @@ public:
 	{
 		ASSERT_ONLY(uint32_t origCount = count);
 		ASSERT_ONLY(uint32_t origToff = toff);
-//
-//		if(useMm_ && sanity_) {
-//			for(size_t i = 0; i < bufAllocSz_; i++) {
-//				assert_eq(buf_[i], sanityBuf_[i]);
-//			}
-//		}
-//
 		if(count == 0) return 0;
 		uint8_t *dest = (uint8_t*)destU32;
 #ifndef NDEBUG

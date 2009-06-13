@@ -14,8 +14,8 @@
 #include <seqan/sequence.h>
 #include <seqan/index.h>
 #include <sys/stat.h>
+#ifdef BOWTIE_MM
 #include <sys/mman.h>
-#ifdef BOWTIE_SHARED_MEM
 #include <sys/shm.h>
 #endif
 #include "alphabet.h"
@@ -666,20 +666,12 @@ public:
 			if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
 			if(_offs != NULL) {
 				delete[] _offs; _offs = NULL;
-			} else if(_offs != NULL) {
-#ifdef BOWTIE_SHARED_MEM
-				shmdt(_offs);
-#endif
 			}
 			if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 			if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
 			if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
 			if(_ebwt != NULL) {
 				delete[] _ebwt; _ebwt = NULL;
-			} else if(_ebwt != NULL) {
-#ifdef BOWTIE_SHARED_MEM
-				shmdt(_ebwt);
-#endif
 			}
 		}
 		close(_in1);
@@ -2652,6 +2644,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	}
 
 	char *mmFile[] = { NULL, NULL };
+#ifdef BOWTIE_MM
 	if(_useMm) {
 		const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
 		int fds[] = { _in1, _in2 };
@@ -2672,7 +2665,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			}
 		}
 	}
-
+#endif
 	if(_verbose) cout << "  Reading header" << endl;
 
 	// Read endianness hints from both streams

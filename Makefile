@@ -11,14 +11,20 @@ CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
 CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
 CXX = $(CPP)
 HEADERS = $(wildcard *.h)
+BOWTIE_PTHREADS = 1
+BOWTIE_MM = 1
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
 ifneq (,$(findstring CYGWIN,$(shell uname)))
 WINDOWS = 1
+# POSIX memory-mapped files not currently supported on Windows
+BOWTIE_MM = 0
 else
 ifneq (,$(findstring MINGW,$(shell uname)))
 WINDOWS = 1
+# POSIX memory-mapped files not currently supported on Windows
+BOWTIE_MM = 0
 endif
 endif
 
@@ -27,7 +33,10 @@ ifneq (,$(findstring Darwin,$(shell uname)))
 MACOS = 1
 endif
 
-BOWTIE_PTHREADS = 1
+MM_DEF = 
+ifeq (1,$(BOWTIE_MM))
+MM_DEF = -DBOWTIE_MM
+endif
 PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
@@ -41,12 +50,6 @@ else
 # There's also -pthread, but that only seems to work on Linux
 PTHREAD_LIB = -lpthread
 endif
-endif
-
-SHMEM_DEF = -DBOWTIE_SHARED_MEM
-ifeq (1,$(WINDOWS))
-# No shared-mem facility in Windows
-SHMEM_DEF =
 endif
 
 PREFETCH_LOCALITY = 2
@@ -141,8 +144,8 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \
      $(FILE_FLAGS) \
      $(PTHREAD_DEF) \
-     $(SHMEM_DEF) \
      $(PREF_DEF) \
+     $(MM_DEF) \
      $(CHUD_DEF)
 
 define checksum
