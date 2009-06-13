@@ -1360,19 +1360,17 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
-	   		case ARG_SHARED_MEM: {
-#ifdef BOWTIE_SHARED_MEM
-	   			useMm = false;
-	   			break;
-#else
-	   			cerr << "Shared-memory mode is disabled because bowtie was not compiled with the" << endl
-	   			     << "BOWTIE_SHARED_MEM option." << endl;
-	   			exit(1);
-#endif
-	   		}
 	   		case ARG_MM: {
+#ifdef BOWTIE_MM
 	   			useMm = true;
 	   			break;
+#else
+	   			cerr << "Memory-mapped I/O mode is disabled because bowtie was not compiled with" << endl
+	   			     << "BOWTIE_MM defined.  Memory-mapped I/O is not supported under Windows.  If you" << endl
+	   			     << "would like to use memory-mapped I/O on a platform that supports it, please" << endl
+	   			     << "refrain from specifying BOWTIE_MM=0 when compiling Bowtie." << endl;
+	   			exit(1);
+#endif
 	   		}
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
