@@ -1565,6 +1565,13 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "When -z/--phased is used, paired-end mode is unavailable" << endl;
 			error = true;
 		}
+		if(!dumpAlBase.empty() ||
+		   !dumpAlFaBase.empty() ||
+		   !dumpAlFqBase.empty())
+		{
+			cerr << "When -z/--phased is used, the --al option is unavailable" << endl;
+			error = true;
+		}
 		if(error) exit(1);
 	}
 	if(tryHard) {
