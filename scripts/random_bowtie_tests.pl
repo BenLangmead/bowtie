@@ -451,6 +451,16 @@ sub doSearch {
 		}
 	}
 	
+	# Perhaps use phased search w/ -z option
+	my $phased = "";
+	if(!$pe && int(rand(3)) == 0) {
+		$phased = "-z";
+		# These aren't available in -z mode
+		$policy =~ s/--best//;
+		$policy =~ s/--oldbest//;
+		$policy =~ s/--better//;
+	}
+	
 	# Perhaps dump unaligned reads using --un argument
 	my $unalignArg = "";
 	my $unalignReconArg = "";
@@ -473,7 +483,7 @@ sub doSearch {
 			}
 		}
 	}
-	if($unalign == 2 || $unalign == 3) {
+	if(($unalign == 2 || $unalign == 3) && $phased eq "") {
 		$unalignArg .= "--al .tmp.al$seed$ext ";
 		if($unalign == 2) {
 			if($pe) {
@@ -487,15 +497,6 @@ sub doSearch {
 	my $isaArg = "";
 	if($isaRate >= 0) {
 		$isaArg = "--isarate $isaRate";
-	}
-	
-	my $phased = "";
-	if(!$pe && int(rand(2)) == 0) {
-		$phased = "-z";
-		# These aren't available in -z mode
-		$policy =~ s/--best//;
-		$policy =~ s/--oldbest//;
-		$policy =~ s/--better//;
 	}
 	
 	my $khits = "-k 1";
@@ -924,7 +925,9 @@ for(; $outer > 0; $outer--) {
 			my $p1 = randDna($plen);
 			$plen = int(rand($prand)) + $pbase;
 			my $p2 = randDna($plen);
+			$p1 =~ tr/MRWSYKVHDBX/N/;
 			$p1 = addQual($p1);
+			$p2 =~ tr/MRWSYKVHDBX/N/ if $pe;
 			$p2 = addQual($p2) if $pe;
 			$pfinal1 .= $p1;
 			$pfinal2 .= $p2 if $pe;
