@@ -49,6 +49,9 @@ Version 0.10.0 - June 12, 2009
      feature is not available in the Windows version of Bowtie.
    * Added a section to the manual ("Reporting Modes") clarifying and
      giving examples of how to use Bowtie's reporting options.
+   * The --al and -z/--phased options previously interacted in such a
+     way that the --al file could contain multiple entries for the same
+     aligned read.  --al and -z/--phased are now incompatible.
    * The --oldpmap option, deprecated in version 0.9.8, has been
      removed.
 
