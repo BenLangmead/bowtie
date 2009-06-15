@@ -97,7 +97,7 @@
 	}
 
 	if(nofw) { // no more 1-mm-in-seed hits are possible
-		DONEMASK_SET(patid);
+		//DONEMASK_SET(patid);
 		continue;
 	}
 

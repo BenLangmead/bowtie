@@ -1598,32 +1598,38 @@ static char *argv0 = NULL;
 	} \
 	skipped = false;
 
-#define FINISH_READ_WITH_HITMASK(p, r) \
-	/* Don't do finishRead if the read isn't legit */ \
-	if(!p->empty()) { \
-		/* r = whether to consider reporting the read as unaligned */ \
-		bool reportUnAl = r; \
-		if(reportUnAl) { \
-			/* If the done-mask already shows the read as done, */ \
-			/* then we already reported the unaligned read and */ \
-			/* should refrain from re-reporting*/ \
-			reportUnAl = !skipped; \
-			if(reportUnAl) { \
-				/* If there hasn't been a hit reported, then report */ \
-				/* read as unaligned */ \
-				reportUnAl = !hitMask.test(p->patid()); \
-			} \
-		} \
-		if(sink->finishRead(*p, reportUnAl) > 0) { \
-			/* We reported a hit for the read, so we set the */ \
-			/* appropriate bit in the hitMask to prevent it from */ \
-			/* being reported as unaligned. */ \
-			if(!reportUnAl && sink->dumpsReads()) { \
-				hitMask.setOver(p->patid()); \
-			} \
-		} \
-	} \
+static inline void finishReadWithHitmask(PatternSourcePerThread* p,
+                                         HitSinkPerThread* sink,
+                                         SyncBitset& hitMask,
+                                         bool r,
+                                         bool& skipped)
+{
+	/* Don't do finishRead if the read isn't legit */
+	if(!p->empty()) {
+		/* r = whether to consider reporting the read as unaligned */
+		bool reportUnAl = r;
+		if(reportUnAl) {
+			/* If the done-mask already shows the read as done, */
+			/* then we already reported the unaligned read and */
+			/* should refrain from re-reporting*/
+			reportUnAl = !skipped;
+			if(reportUnAl) {
+				/* If there hasn't been a hit reported, then report */
+				/* read as unaligned */
+				reportUnAl = !hitMask.test(p->patid());
+			}
+		}
+		if(sink->finishRead(*p, reportUnAl) > 0) {
+			/* We reported a hit for the read, so we set the */
+			/* appropriate bit in the hitMask to prevent it from */
+			/* being reported as unaligned. */
+			if(!reportUnAl && sink->dumpsReads()) {
+				hitMask.setOver(p->patid());
+			}
+		}
+	}
 	skipped = false;
+}
 
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
@@ -2027,7 +2033,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	        false);         // considerQuals
 	bool skipped = false;
 	while(true) {
-		FINISH_READ_WITH_HITMASK(patsrc, false);
+		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
@@ -2036,7 +2042,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 		#include "search_1mm_phase1.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
     WORKER_EXIT();
 }
 
@@ -2072,7 +2078,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	        false);         // considerQuals
 	bool skipped = false;
 	while(true) {
-		FINISH_READ_WITH_HITMASK(patsrc, true);
+		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) { skipped = true; continue; }
 		uint32_t plen = length(patFw);
@@ -2080,7 +2086,7 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		#include "search_1mm_phase2.c"
 	} // End read loop
-	FINISH_READ_WITH_HITMASK(patsrc, true);
+	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
     WORKER_EXIT();
 }
 
@@ -2560,7 +2566,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	        false);         // considerQuals
 	bool skipped = false;
     while(true) { // Read read-in loop
-    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		// If requested, check that this read has the same length
 		// as all the previous ones
@@ -2571,7 +2577,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 		#include "search_23mm_phase1.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
     // Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -2596,7 +2602,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		    false);         // considerQuals
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
 		size_t plen = length(patFw);
@@ -2607,7 +2613,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		#include "search_23mm_phase2.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
 
@@ -2646,7 +2652,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		    true);          // halfAndHalf
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, true);
+    	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 		GET_READ(patsrc);
 		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		uint32_t plen = length(patFw);
@@ -2657,7 +2663,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, true);
+	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 	WORKER_EXIT();
 }
 
@@ -3073,7 +3079,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        false, !noMaqRound);
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
     	GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
@@ -3082,7 +3088,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 		#include "search_seeded_phase1.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
 
@@ -3125,7 +3131,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	        false, !noMaqRound);
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, seedMms == 0);
+    	finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
@@ -3136,7 +3142,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, seedMms == 0);
+	finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
 	WORKER_EXIT();
 }
 
@@ -3198,7 +3204,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	String<QueryMutation> muts;
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, false);
+    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
@@ -3209,7 +3215,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		#include "search_seeded_phase3.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, false);
+	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
 
@@ -3255,7 +3261,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	String<QueryMutation> muts;
 	bool skipped = false;
     while(true) {
-    	FINISH_READ_WITH_HITMASK(patsrc, true);
+    	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 		GET_READ_FW(patsrc);
 		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
@@ -3265,7 +3271,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
     }
-	FINISH_READ_WITH_HITMASK(patsrc, true);
+	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 	WORKER_EXIT();
 }
 

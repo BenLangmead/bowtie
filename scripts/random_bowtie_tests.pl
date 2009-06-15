@@ -295,11 +295,16 @@ sub build {
 	return $ret;
 }
 
+sub deleteReadParts {
+	system("rm -f .tmp.un$seed". ".* .tmp.un$seed". "_1.* .tmp.un$seed". "_2.*");
+	system("rm -f .tmp.max$seed".".* .tmp.max$seed"."_1.* .tmp.max$seed"."_2.*");
+	system("rm -f .tmp.al$seed". ".* .tmp.al$seed". "_1.* .tmp.al$seed". "_2.*");
+}
+
 sub search {
 	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
 	my $ret = doSearch($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate);
-	system("rm -f .tmp.un$seed".".fa .tmp.un$seed"."_1.fa .tmp.un$seed"."_2.fa");
-	system("rm -f .tmp.un$seed".".fq .tmp.un$seed"."_1.fq .tmp.un$seed"."_2.fq");
+	deleteReadParts();
 	return $ret;
 }
 
@@ -322,14 +327,18 @@ sub doSearch {
 	} else {
 		$outformat = "--concise"; # concise
 	}
+	my $ext = ".fq";
 	my $format = int(rand(5));
 	if($format == 0) {
 		# FASTA
 		open FA, ">.randread$seed.fa" || die "Could not open temporary fasta file";
+		$ext = ".fa";
 		my @cs = split /[,]/, $p1;
+		my $idx = 0;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
-			print FA ">\n$cms[0]\n";
+			print FA ">$idx\n$cms[0]\n";
+			$idx++;
 		}
 		close FA;
 		$patarg = "-f";
@@ -339,9 +348,11 @@ sub doSearch {
 			$patstr = "-1 .randread$seed"."_1.fa";
 			open FA, ">.randread$seed"."_2.fa" || die "Could not open temporary fasta file";
 			@cs = split /[,]/, $p2;
+			my $idx = 0;
 			foreach my $c (@cs) {
 				my @cms = split /[:]/, $c;
-				print FA ">\n$cms[0]\n";
+				print FA ">$idx\n$cms[0]\n";
+				$idx++;
 			}
 			close FA;
 			$patstr .= " -2 .randread$seed"."_2.fa";
@@ -349,10 +360,13 @@ sub doSearch {
 	} elsif($format == 1) {
 		# FASTQ with ASCII qualities
 		open FQ, ">.randread$seed.fq" || die "Could not open temporary fastq file";
+		$ext = ".fq";
 		my @cs = split /[,]/, $p1;
+		my $idx = 0;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
-			print FQ "@\n$cms[0]\n+\n$cms[1]\n";
+			print FQ "\@$idx\n$cms[0]\n+\n$cms[1]\n";
+			$idx++;
 		}
 		close FQ;
 		$patarg = "-q";
@@ -362,26 +376,31 @@ sub doSearch {
 			$patstr = "-1 .randread$seed"."_1.fq";
 			open FQ, ">.randread$seed"."_2.fq" || die "Could not open temporary fastq file";
 			@cs = split /[,]/, $p2;
+			my $idx = 0;
 			foreach my $c (@cs) {
 				my @cms = split /[:]/, $c;
-				print FQ "@\n$cms[0]\n+\n$cms[1]\n";
+				print FQ "\@$idx\n$cms[0]\n+\n$cms[1]\n";
+				$idx++;
 			}
 			close FQ;
 			$patstr .= " -2 .randread$seed"."_2.fq";
 		}
 	} elsif($format == 2) {
 		# FASTQ with integer qualities
-		open FQ, ">.randread$seed.integer.fq" || die "Could not open temporary solexa fastq file";
+		open FQ, ">.randread$seed.integer.fq" || die "Could not open temporary solexa fastq file";		my $ext = ".fa";
+		$ext = ".fq";
 		my @cs = split /[,]/, $p1;
+		my $idx = 0;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
-			print FQ "@\n$cms[0]\n+\n";
+			print FQ "\@$idx\n$cms[0]\n+\n";
 			for(my $i = 0; $i < length($cms[1]); $i++) {
 				my $q = substr($cms[1], $i, 1);
 				$q = ord($q) - 33;
 				print FQ "$q ";
 			}
 			print FQ "\n";
+			$idx++;
 		}
 		close FQ;
 		$patarg = "-q --integer-quals";
@@ -391,14 +410,16 @@ sub doSearch {
 			$patstr = "-1 .randread$seed.integer_1.fq";
 			open FQ, ">.randread$seed.integer_2.fq" || die "Could not open temporary fastq file";
 			@cs = split /[,]/, $p2;
+			my $idx = 0;
 			foreach my $c (@cs) {
 				my @cms = split /[:]/, $c;
-				print FQ "@\n$cms[0]\n+\n";
+				print FQ "\@$idx\n$cms[0]\n+\n";
 				for(my $i = 0; $i < length($cms[1]); $i++) {
 					my $q = substr($cms[1], $i, 1);
 					$q = ord($q) - 33;
 					print FQ "$q ";
 				}
+				$idx++;
 				print FQ "\n";
 			}
 			close FQ;
@@ -407,6 +428,7 @@ sub doSearch {
 	} elsif($format == 3) {
 		# Raw
 		open RAW, ">.randread$seed.raw" || die "Could not open temporary raw file";
+		$ext = ".raw";
 		my @cs = split /[,]/, $p1;
 		foreach my $c (@cs) {
 			my @cms = split /[:]/, $c;
@@ -429,14 +451,37 @@ sub doSearch {
 		}
 	}
 	
-	# Perhaps dump unaligned reads using --unfa and/opr --unfq arguments
+	# Perhaps dump unaligned reads using --un argument
 	my $unalignArg = "";
-	my $unalign = int(rand(4));
+	my $unalignReconArg = "";
+	my $unalign = int(rand(5));
 	if($unalign == 0 || $unalign == 2) {
-		$unalignArg .= "--unfa .tmp.un$seed.fa ";
+		$unalignArg .= "--un .tmp.un$seed$ext ";
+		if($pe) {
+			$unalignReconArg .= " .tmp.un$seed"."_1$ext .tmp.un$seed"."_2$ext";
+		} else {
+			$unalignReconArg .= " .tmp.un$seed$ext";
+		}
 	}
 	if($unalign == 1 || $unalign == 2) {
-		$unalignArg .= "--unfq .tmp.un$seed.fq ";
+		$unalignArg .= "--max .tmp.max$seed$ext ";
+		if($unalign == 2) {
+			if($pe) {
+				$unalignReconArg .= " .tmp.max$seed"."_1$ext .tmp.max$seed"."_2$ext";
+			} else {
+				$unalignReconArg .= " .tmp.max$seed$ext";
+			}
+		}
+	}
+	if($unalign == 2 || $unalign == 3) {
+		$unalignArg .= "--al .tmp.al$seed$ext ";
+		if($unalign == 2) {
+			if($pe) {
+				$unalignReconArg .= " .tmp.al$seed"."_1$ext .tmp.al$seed"."_2$ext";
+			} else {
+				$unalignReconArg .= " .tmp.al$seed$ext";
+			}
+		}
 	}
 	
 	my $isaArg = "";
@@ -504,7 +549,7 @@ sub doSearch {
 	}
 	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 	print "$cmd\n";
-	my $out = trim(`$cmd 2>.tmp$seed.stderr`);
+	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
 	# Bad exitlevel?
 	if($? != 0) {
@@ -536,6 +581,7 @@ sub doSearch {
 	my %readStratum1 = (); # for mate 1
 	my %readStratum2 = (); # for mate 2
 	my $lastread = "";
+	
 	for(my $i = 0; $i <= $#outlines; $i++) {
 		# Get the alignment for the first mate (or the unpaired read)
 		my $l = $outlines[$i];
@@ -636,38 +682,6 @@ sub doSearch {
 			$readcount{$read} <= $mhits || die "Read $read matched more than $mhits times";
 		}
 	}
-	
-	# If we dumped the unplaced reads, then sanity-check them.
-	if($unalign == 0 || $unalign == 2) {
-		my @fs = (".tmp.un$seed.fa");
-		if($pe) { @fs = (".tmp.un$seed"."_1.fa", ".tmp.un$seed"."_2.fa"); }
-		for my $f (@fs) {
-			open(UNFA, "$f") or next;
-			while(<UNFA>) {
-				if(/^>(.*)/) {
-					my $read = $1;
-					!defined($readcount{$read}) || die "$read appeared in unplaced file ($f) and in alignment";
-				}
-			}
-			close(UNFA);
-		}
-	}
-	if($unalign == 1 || $unalign == 2) {
-		my @fs = (".tmp.un$seed.fq");
-		if($pe) { @fs = (".tmp.un$seed"."_1.fq", ".tmp.un$seed"."_2.fq"); }
-		for my $f (@fs) {
-			open(UNFQ, "$f") or next;
-			my $c = 0;
-			while(<UNFQ>) {
-				if(/^@(.*)/ && (($c % 4) == 0)) {
-					my $read = $1;
-					!defined($readcount{$read}) || die "$read appeared in unplaced file ($f) and in alignment";
-				}
-				$c++;
-			}
-			close(UNFQ);
-		}
-	}
 
 	{
 		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
@@ -690,9 +704,10 @@ sub doSearch {
 		# outcome using pe_verify.pl
 		my $pol = $policy;
 		$pol =~ s/--.*//;
-		$patstr =~ s/-1//;
-		$patstr =~ s/-2//;
-		$cmd = "perl scripts/pe_verify.pl -d $pol .tmp$seed $patstr";
+		my $patstr2 = $patstr;
+		$patstr2 =~ s/-1//;
+		$patstr2 =~ s/-2//;
+		$cmd = "perl scripts/pe_verify.pl -d $pol .tmp$seed $patstr2";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>.tmp$seed.pe_verify.stderr`);
 		
@@ -722,6 +737,30 @@ sub doSearch {
 				exit 1;
 			}
 			return 0;
+		}
+	}
+		
+	# Run the reconciler to ensure that --un, --max, and --al had
+	# sane output
+	# .tmp$seed.verbose.out
+	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
+		deleteReadParts();
+		my $cmd = "./bowtie $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		print "$cmd\n";
+		system($cmd) == 0 || die;
+		$khits =~ s/--strata --best//;
+		$patarg =~ s/--integer-quals//;
+		$unalignReconArg =~ /\.tmp\.un/ || die;
+		if($pe) {
+			$patstr =~ s/-1//;
+			$patstr =~ s/-2//;
+			$cmd = "perl scripts/reconcile_alignments_pe.pl $patarg $khits $patstr .tmp$seed.verbose.out $unalignReconArg";
+			print "$cmd\n";
+			system($cmd) == 0 || die;
+		} else {
+			$cmd = "perl scripts/reconcile_alignments.pl $patarg $khits $patstr .tmp$seed.verbose.out $unalignReconArg";
+			print "$cmd\n";
+			system($cmd) == 0 || die;
 		}
 	}
 	
@@ -840,11 +879,13 @@ for(; $outer > 0; $outer--) {
 					$p2 = $ptmp;
 				}
 			}
+			$p1 =~ tr/MRWSYKVHDBX/N/;
 			# Add valid random quality values
 			$p1 = addQual($p1);
 			$pfinal1 .= $p1;
 			$pfinal1 .= "," if($i < $np-1);
 			if($pe) {
+				$p2 =~ tr/MRWSYKVHDBX/N/;
 				$p2 = addQual($p2);
 				$pfinal2 .= $p2;
 				$pfinal2 .= "," if($i < $np-1);
