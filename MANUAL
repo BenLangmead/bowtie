@@ -86,7 +86,7 @@ Bowtie Manual
 
  The 'bowtie' aligner takes an index and a set of reads as input and
  outputs a list of alignments.  Alignments are selected according to a
- combination of the -v/-n/-e/-l options (plus the -I/-X/--lr/--rl/--ll
+ combination of the -v/-n/-e/-l options (plus the -I/-X/--fr/--rf/--ff
  options for paired-end alignment), which define which alignments are
  legal, and the -k/-a/-m/--best/--strata options which define which and
  how many legal alignments should be reported.
@@ -369,7 +369,7 @@ Bowtie Manual
   1. Both mates have a valid alignment according to the alignment
      policy specified by the -v/-n/-e/-l options.
   2. The relative orientation and position of the mates satisfy the
-     constraints given by the -I/-X/--lr/--rl/--ll options. 
+     constraints given by the -I/-X/--fr/--rf/--ff options. 
   
   Policies governing which paired-end alignments are reported for a
   given read are specified using the -k, -a and -m options as usual.
@@ -671,7 +671,7 @@ Bowtie Manual
                      mate1 and all other constraints are met, that too
                      is valid.  --rf likewise requires that an upstream
                      mate1 be reverse-complemented and a downstream
-                     mate2 be forward-oriented.  --ll requires both an
+                     mate2 be forward-oriented.  --ff requires both an
                      upstream mate1 and a downstream mate2 to be
                      forward-oriented.  Default: --fr (appropriate for
                      the Illumina short insert library).
