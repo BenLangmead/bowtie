@@ -2643,6 +2643,7 @@ template<typename TStr>
 void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	bool switchEndian; // dummy; caller doesn't care
 	if(_in1Str.length() > 0) {
+		if(_verbose) cout << "  About to open input files" << endl;
 #ifdef BOWTIE_MM
 		// Initialize our primary and secondary input-stream fields
 		close(_in1);
@@ -2657,17 +2658,18 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		}
 #else
 		// Initialize our primary and secondary input-stream fields
-		fclose(_in1);
+		if(_in1 != NULL) fclose(_in1);
 		if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
 		if((_in1 = fopen(_in1Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in1Str << endl;
 		}
-		fclose(_in2);
+		if(_in2 != NULL) fclose(_in2);
 		if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
 		if((_in2 = fopen(_in2Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
 #endif
+		if(_verbose) cout << "  Finished opening input files" << endl;
 	}
 
 #ifdef BOWTIE_MM

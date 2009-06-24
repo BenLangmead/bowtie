@@ -4030,6 +4030,7 @@ static void driver(const char * type,
 		}
 	}
 
+	if(verbose) cout << "About to create PatternSource" << endl;
 	PairedPatternSource *patsrc = NULL;
 	if(mates12.size() > 0) {
 		patsrc = new PairedSoloPatternSource(patsrcs_ab);
@@ -4038,7 +4039,9 @@ static void driver(const char * type,
 	}
 
 	if(skipSearch) return;
+
 	// Open hit output file
+	if(verbose) cout << "About to open hit output file" << endl;
 	OutFileBuf *fout;
 	if(!outfile.empty()) {
 		if(refOut) {
@@ -4055,6 +4058,7 @@ static void driver(const char * type,
 		fout = new OutFileBuf();
 	}
 	// Initialize Ebwt object and read in header
+	if(verbose) cout << "About to initialize forward Ebwt object" << endl;
     Ebwt<TStr> ebwt(adjustedEbwtFileBase,
                     true,     // index is for the forward direction
                     /* overriding: */ offRate,
@@ -4066,6 +4070,7 @@ static void driver(const char * type,
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
+    	if(verbose) cout << "About to initialize reverse Ebwt object" << endl;
     	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
     	                        false, // index is for the reverse direction
     	                        /* overriding: */ offRate,
