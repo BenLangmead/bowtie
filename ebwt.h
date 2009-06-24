@@ -4023,7 +4023,6 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	VMSG_NL("Exiting Ebwt::buildToDisk()");
 }
 
-//string adjustEbwtBase(const string& ebwtFileBase);
 /**
  * Try to find the Bowtie index specified by the user.  First try the
  * exact path given by the user.  Then try the user-provided string
@@ -4033,7 +4032,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
  */
 string adjustEbwtBase(const string& cmdline,
 					  const string& ebwtFileBase,
-					  bool verbose = false) {
+					  bool verbose = false)
+{
 	string str = ebwtFileBase;
 	ifstream in;
 	if(verbose) cout << "Trying " << str << endl;
@@ -4061,8 +4061,10 @@ string adjustEbwtBase(const string& cmdline,
 				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
 				if(!in.is_open()) {
 					if(verbose) cout << "  didn't work" << endl;
-					in.close();
+				} else {
+					if(verbose) cout << "  worked" << endl;
 				}
+				in.close();
 			}
 		}
 	}
