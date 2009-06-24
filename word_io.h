@@ -75,6 +75,23 @@ static inline uint32_t readU32(int in, bool swap) {
 }
 
 /**
+ * Read a 32-bit unsigned from a FILE*, optionally inverting
+ * endianness.
+ */
+static inline uint32_t readU32(FILE* in, bool swap) {
+	uint32_t x;
+	if(fread((void *)&x, 1, 4, in) != 4) {
+		assert(false);
+	}
+	if(swap) {
+		return endianSwapU32(x);
+	} else {
+		return x;
+	}
+}
+
+
+/**
  * Read a 32-bit signed from an input stream, inverting endianness
  * if necessary.
  */
@@ -104,5 +121,22 @@ static inline uint32_t readI32(int in, bool swap) {
 		return x;
 	}
 }
+
+/**
+ * Read a 32-bit unsigned from a FILE*, optionally inverting
+ * endianness.
+ */
+static inline uint32_t readI32(FILE* in, bool swap) {
+	int32_t x;
+	if(fread((void *)&x, 1, 4, in) != 4) {
+		assert(false);
+	}
+	if(swap) {
+		return endianSwapI32(x);
+	} else {
+		return x;
+	}
+}
+
 
 #endif /*WORD_IO_H_*/
