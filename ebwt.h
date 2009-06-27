@@ -263,16 +263,16 @@ public:
 };
 
 /**
- *
+ * Calculate size of file with given name.
  */
 static inline int fileSize(const char* name) {
-  std::ifstream f;
-  f.open(name, std::ios_base::binary | std::ios_base::in);
-  if (!f.good() || f.eof() || !f.is_open()) { return 0; }
-  f.seekg(0, std::ios_base::beg);
-  std::ifstream::pos_type begin_pos = f.tellg();
-  f.seekg(0, std::ios_base::end);
-  return static_cast<int>(f.tellg() - begin_pos);
+	std::ifstream f;
+	f.open(name, std::ios_base::binary | std::ios_base::in);
+	if (!f.good() || f.eof() || !f.is_open()) { return 0; }
+	f.seekg(0, std::ios_base::beg);
+	std::ifstream::pos_type begin_pos = f.tellg();
+	f.seekg(0, std::ios_base::end);
+	return static_cast<int>(f.tellg() - begin_pos);
 }
 
 // Forward declarations for Ebwt class
@@ -632,7 +632,6 @@ public:
 		assert_eq(this->_refnames.size(), this->_nPat);
 		for(size_t i = 0; i < this->_refnames.size(); i++) {
 			out1 << this->_refnames[i] << endl;
-
 		}
 		out1 << '\0';
 		out1.flush(); out2.flush();

@@ -153,7 +153,6 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	bool seqFirst = true;
 
 	size_t ilen = length(dst);
-	bool found_space_in_name = false;
 
 	// Chew up the id line; if the next line is either
 	// another id line or a comment line, keep chewing
@@ -173,18 +172,6 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 					lastc = -1;
 					goto bail;
 				}
-				if (name)
-				{
-					if (isspace(c))
-					{
-						if (name->length())
-							found_space_in_name = true;
-					}
-					else if (!found_space_in_name)
-					{
-						name->push_back(c);
-					}
-				}
 
 				if(c == '\n' || c == '\r') {
 					while(c == '\n' || c == '\r') {
@@ -197,6 +184,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 					// c now holds first character of next line
 					break;
 				}
+				if (name) name->push_back(c);
 			}
 		} while (c == '>' || c == '#');
 	} else {

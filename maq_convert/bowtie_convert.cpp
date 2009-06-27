@@ -268,6 +268,11 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		// Parse orientation, text offset and oms
 		orientation = *scan_orientation;
 		assert(orientation == '+' || orientation == '-');
+		// Truncate the name at the first instance of whitespace to be
+		// compatible with what fasta2bfa does.
+		char *nc = text_name;
+		while(*nc != '\0' && !isspace(*nc)) nc++;
+		*nc = '\0';
 		text_offset = (unsigned int)strtol(scan_refoff, (char**)NULL, 10);
 		other_occs  = (unsigned int)strtol(scan_oms,    (char**)NULL, 10);
 
@@ -314,6 +319,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 		if (i_text_id == names_to_ids.end())
 		{
 			fprintf(stderr, "Warning: read maps to text %s, which is not in BFA, skipping\n", text_name);
+			if(verbose) {
+				// Print all the reference names
+				cerr << "  Reference names in bfa:" << endl;
+			    map<string, unsigned int>::const_iterator iter;
+			    for(iter = names_to_ids.begin(); iter != names_to_ids.end(); ++iter ) {
+			      cerr << "  " << iter->first << endl;
+			    }
+			}
 			continue;
 		}
 
