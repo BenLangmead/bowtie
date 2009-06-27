@@ -165,6 +165,7 @@ public:
 		bufAllocSz_ = cumsz >> 2;
 		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
 		if(useMm_) {
+#ifdef BOWTIE_MM
 			buf_ = (uint8_t*)mmFile;
 			if(sanity_) {
 				FILE *ftmp = fopen(s4.c_str(), "rb");
@@ -179,6 +180,10 @@ public:
 					assert_eq(sanityBuf_[i], buf_[i]);
 				}
 			}
+#else
+			cerr << "Shouldn't be at " << __FILE__ << ":" << __LINE__ << " without BOWTIE_MM defined" << endl;
+			exit(1);
+#endif
 		} else {
 			// Allocate a buffer to hold the reference string
 			try {
