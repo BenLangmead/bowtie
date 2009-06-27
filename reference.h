@@ -2,6 +2,7 @@
 #define REFERENCE_H_
 
 #include "endian_swap.h"
+#include "mm.h"
 
 /**
  * Concrete reference representation that bulk-loads the reference from
@@ -43,6 +44,8 @@ public:
 	{
 		string s3 = in + ".3.ebwt";
 		string s4 = in + ".4.ebwt";
+
+#ifdef BOWTIE_MM
 		int f3, f4;
 		if((f3 = open(s3.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
@@ -57,9 +60,7 @@ public:
 			loaded_ = false;
 			return;
 		}
-
 		char *mmFile = NULL;
-#ifdef BOWTIE_MM
 		if(useMm_) {
 			if(verbose_) {
 				cout << "  Memory-mapping reference index file " << s4 << endl;
@@ -77,6 +78,21 @@ public:
 				cerr << "Error: Could not memory-map the index file " << s4.c_str() << endl;
 				exit(1);
 			}
+		}
+#else
+		FILE *f3, *f4;
+		if((f3 = fopen(s3.c_str(), "rb")) == NULL) {
+			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
+			cerr << "This is most likely because your index was built with an older version" << endl
+			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+			     << "index (or download one from the Bowtie website) and try again." << endl;
+			loaded_ = false;
+			return;
+		}
+		if((f4 = fopen(s4.c_str(), "rb"))  == NULL) {
+			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
+			loaded_ = false;
+			return;
 		}
 #endif
 
@@ -141,7 +157,7 @@ public:
 		bufSz_ = cumsz;
 		assert_eq(nrefs_, refLens_.size());
 		assert_eq(sz, recs_.size());
-		close(f3); // done with .3.ebwt file
+		MM_FILE_CLOSE(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
 		if((cumsz & 3) != 0) {
 			cumsz += (4 - (cumsz & 3));
