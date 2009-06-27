@@ -2458,6 +2458,10 @@ public:
 		h.refcs.resize(readSeqLen, 0);
 		assert_eq(readSeqLen, h.refcs.size());
 
+		// Must consider wacky line breaks not handled by getline
+		while(*cur == '\n' || *cur == '\r') {
+			cur++;
+		}
 		// (h.mm is fixed-width so we don't need to resize it)
 		if(*cur == '\0') {
 			return true;
@@ -2490,6 +2494,10 @@ public:
 				assert_eq("ACGTN"[(int)h.patSeq[readSeqLen - i - 1]], *cur);
 			}
 			cur++;
+			// Must consider wacky line breaks not handled by getline
+			while(*cur == '\n' || *cur == '\r') {
+				cur++;
+			}
 			if(*cur == '\0') {
 				break;
 			}
