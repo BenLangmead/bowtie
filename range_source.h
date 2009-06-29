@@ -215,6 +215,8 @@ struct RangeState {
 		Edit ret;
 		ret.type = EDIT_TYPE_MM;
 		ret.pos = pos;
+		ret.chr = 0;
+		ret.reserved = 0;
 		assert(!eliminated_);
 		assert(!eq.flags.mmA || !eq.flags.mmC || !eq.flags.mmG || !eq.flags.mmT);
 		int num = !eq.flags.mmA + !eq.flags.mmC + !eq.flags.mmG + !eq.flags.mmT;
