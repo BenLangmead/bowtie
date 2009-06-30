@@ -308,9 +308,50 @@ sub search {
 	return $ret;
 }
 
+##
+# Make sure that a verbose alignment is consistent with the content of
+# the reference
+#
+sub checkRefVerbose {
+	my ($l, $ttsr) = @_;
+	my @tts = @{$ttsr};
+	my @ls = split(/\t/, $l);
+	my ($fw, $ref, $off, $seq, $mms) = ($ls[1], $ls[2], $ls[3], $ls[4], $ls[7]);
+	# Parse mismatches
+	my %mmhash = ();
+	my @mmss;
+	@mmss = split(/,/, $mms) if defined($mms);
+	for my $m (@mmss) {
+		my @ms = split(/:/, $m);
+		my $moff = $ms[0];
+		$moff == int($moff) || die "Mismatch offset must be integer";
+		$moff = length($seq)-$moff-1 if $fw eq "-";
+		$mmhash{$ms[0]}{ref} = substr($ms[1], 0, 1);
+		$mmhash{$ms[0]}{sub} = substr($ms[1], 2, 1);
+		substr($seq, $moff, 1) eq $mmhash{$ms[0]}{sub} || die;
+		substr($seq, $moff, 1) = $mmhash{$ms[0]}{ref};
+	}
+	$ref == int($ref) || die;
+	$ref <= $#tts || die "Ref idx $ref exceeds number of texts ".($#tts+1)."\n";
+	my $refstr = substr($tts[$ref], $off, length($seq));
+	print $tts[$ref].'\n';
+	for(my $i = 0; $i < length($seq); $i++) {
+		substr($refstr, $i, 1) ne "N" || die;
+		substr($refstr, $i, 1) eq substr($seq, $i, 1) || die "\n$seq\n$refstr";
+	}
+	return 1;
+}
+
+sub checkRefConcise {
+	my ($l, @tts) = @_;
+	return 1;
+}
+
 # Search for a pattern in an existing Ebwt
 sub doSearch {
 	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
+	
+	my @tts = split(/,/, $t);
 	
 	my $patarg = "-c";
 	my $patstr = "\"$p1\"";
@@ -318,6 +359,7 @@ sub doSearch {
 	my $outformat = int(rand(3));
 	my $maptool_cmd = "";
 	my $outfile = ".tmp$seed.out";
+	
 	if($outformat == 0) {
 		$outformat = ""; # default (verbose)
 		$maptool_cmd = " && ./bowtie-maptool-debug -d -C .tmp$seed.out"; # default
@@ -327,6 +369,7 @@ sub doSearch {
 	} else {
 		$outformat = "--concise"; # concise
 	}
+	
 	my $ext = ".fq";
 	my $format = int(rand(5));
 	if($format == 0) {
@@ -588,6 +631,7 @@ sub doSearch {
 		my $l = $outlines[$i];
 		next if $l =~ /^Reported/; # skip the summary line
 		chomp($l);
+		checkRefConcise($l, @tts);
 		my $key = "$l";
 		my $l2 = "";
 		if($pe) {
@@ -595,6 +639,7 @@ sub doSearch {
 			$l2 = $outlines[++$i];
 			defined($l2) || die "Odd number of output lines";
 			chomp($l2);
+			checkRefConcise($l2, @tts);
 			$key .= ", $l2";
 		}
 		print "$key\n";
@@ -700,6 +745,17 @@ sub doSearch {
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
 	}
 	
+	# Now do another run with verbose output so that we can check the
+	# mismatch strings
+	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr";
+	print "$cmd\n";
+	$out = trim(`$cmd 2>.tmp$seed.stderr`);
+	# Parse output to see if any of it is bad
+	@outlines = split('\n', $out);
+	for my $l (@outlines) {
+		checkRefVerbose($l, \@tts);
+	}
+	
 	if($pe) {
 		# If search was for paired-end alignments, then verify the
 		# outcome using pe_verify.pl
@@ -793,6 +849,7 @@ for(; $outer > 0; $outer--) {
 	my $nt = int(rand(10)) + 1;
 	my $t = '';
 	my @tts;
+	# For each reference sequence...
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
 		my $tt = randDna($tlen);             # add text meat
