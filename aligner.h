@@ -371,7 +371,10 @@ public:
 		driver_->setQuery(patsrc, NULL);
 		this->done = driver_->done;
 		doneFirst_ = false;
+		// Reset #-backtrack countdown
 		if(btCnt_ != NULL) *btCnt_ = maxBts_;
+		// Grab a bit from the pseudo-random seed to determine whether
+		// to start with forward or reverse complement
 		firstIsFw_ = ((patsrc->bufa().seed & 0x10) == 0);
 		chase_ = false;
 	}
@@ -406,7 +409,7 @@ public:
 	}
 
 	/**
-	 * Advance the aligner by one memory op.  Return true iff we're
+	 * Advance the aligner.  Return true iff we're
 	 * done with this read.
 	 */
 	virtual bool advance() {
