@@ -2632,12 +2632,12 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		if(_verbose) cout << "  About to open input files" << endl;
 #ifdef BOWTIE_MM
 		// Initialize our primary and secondary input-stream fields
-		close(_in1);
+		if(_in1 != -1) close(_in1);
 		if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
 		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open index file " << _in1Str << endl;
 		}
-		close(_in2);
+		if(_in2 != -1) close(_in2);
 		if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
 		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open index file " << _in2Str << endl;
@@ -4049,10 +4049,10 @@ string adjustEbwtBase(const string& cmdline,
 				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
 				if(!in.is_open()) {
 					if(verbose) cout << "  didn't work" << endl;
+					in.close();
 				} else {
 					if(verbose) cout << "  worked" << endl;
 				}
-				in.close();
 			}
 		}
 	}
