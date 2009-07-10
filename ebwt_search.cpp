@@ -1695,16 +1695,20 @@ static inline void finishReadWithHitmask(PatternSourcePerThread* p,
 
 #ifdef BOWTIE_PTHREADS
 #define WORKER_EXIT() \
-	if((long)vp != 0L) { \
+	patsrcFact->destroy(patsrc); \
+	delete patsrcFact; \
+	sinkFact->destroy(sink); \
+	delete sinkFact; \
+	if(tid > 0) { \
     	pthread_exit(NULL); \
     } \
-	delete patsrc; \
-	delete sink; \
     return NULL;
 #else
 #define WORKER_EXIT() \
-	delete patsrc; \
-	delete sink; \
+	patsrcFact->destroy(patsrc); \
+	delete patsrcFact; \
+	sinkFact->destroy(sink); \
+	delete sinkFact; \
 	return NULL;
 #endif
 
@@ -1790,6 +1794,7 @@ static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
 static void *exactSearchWorker(void *vp) {
+	int tid = *((int*)vp);
 	PairedPatternSource& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1798,8 +1803,10 @@ static void *exactSearchWorker(void *vp) {
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
 	// Per-thread initialization
-	PatternSourcePerThread *patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
-	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
+	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread *patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSink
 	        os,         // reference sequences
@@ -1833,6 +1840,7 @@ static void *exactSearchWorker(void *vp) {
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 static void *exactSearchWorkerStateful(void *vp) {
+	int tid = *((int*)vp);
 	PairedPatternSource& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1841,7 +1849,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -1906,7 +1914,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	delete sinkFact;
 	delete pool;
 #ifdef BOWTIE_PTHREADS
-	if((long)vp != 0L) pthread_exit(NULL);
+	if(tid > 0) pthread_exit(NULL);
 #endif
 	return NULL;
 }
@@ -1961,20 +1969,23 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
+	int *tids = new int[numAdditionalThreads];
 #endif
 	CHUD_START();
 	{
 		Timer _t(cout, "Time for 0-mismatch search: ", timing);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
+		for(int i = 0; i < numAdditionalThreads; i++) {
+			tids[i] = i+1;
 			if(stateful)
-				pthread_create(&threads[i], &pt_attr, exactSearchWorkerStateful, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, exactSearchWorkerStateful, (void *)&tids[i]);
 			else
-				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)&tids[i]);
 		}
 #endif
-		if(stateful) exactSearchWorkerStateful((void*)0L);
-		else         exactSearchWorker((void*)0L);
+		int tmp = 0;
+		if(stateful) exactSearchWorkerStateful((void*)&tmp);
+		else         exactSearchWorker((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) {
 			int ret;
@@ -1987,6 +1998,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	}
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 	if(refs != NULL) delete refs;
 }
@@ -2010,6 +2022,7 @@ static SyncBitset*                    mismatchSearch_hitMask;
 static BitPairReference*              mismatchSearch_refs;
 
 static void* mismatchSearchWorkerPhase1(void *vp){
+	int tid = *((int*)vp);
 	PairedPatternSource&   _patsrc       = *mismatchSearch_patsrc;
 	HitSink&               _sink         = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
@@ -2017,8 +2030,10 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
-	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread* patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -2054,6 +2069,7 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 }
 
 static void* mismatchSearchWorkerPhase2(void *vp){
+	int tid = *((int*)vp);
 	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
@@ -2062,8 +2078,10 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
-	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread* patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -2144,6 +2162,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
 	// Phase 1
@@ -2151,10 +2170,12 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch Phase 1 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase1, (void *)(long)(i+1));
+			tids[i] = i+1;
+			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
-		mismatchSearchWorkerPhase1((void*)0L);
+		int tmp = 0;
+		mismatchSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2185,10 +2206,11 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cout, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
-		mismatchSearchWorkerPhase2((void*)0L);
+		int tmp = 0;
+		mismatchSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2201,6 +2223,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	}
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 }
 
@@ -2208,6 +2231,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
 static void *mismatchSearchWorkerFullStateful(void *vp) {
+	int tid = *((int*)vp);
 	PairedPatternSource&   _patsrc = *mismatchSearch_patsrc;
 	HitSink&               _sink   = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
@@ -2217,7 +2241,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -2282,12 +2306,13 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	delete sinkFact;
 	delete pool;
 #ifdef BOWTIE_PTHREADS
-	if((long)vp != 0L) pthread_exit(NULL);
+	if(tid > 0) pthread_exit(NULL);
 #endif
 	return NULL;
 }
 
 static void* mismatchSearchWorkerFull(void *vp){
+	int tid = *((int*)vp);
 	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
 	HitSink&               _sink        = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
@@ -2295,8 +2320,10 @@ static void* mismatchSearchWorkerFull(void *vp){
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
     // Per-thread initialization
     bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create();
-	HitSinkPerThread* sink = createSinkFactory(_sink, sanity)->create();
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread* patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 			*sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -2378,21 +2405,24 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
     {
 		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
+			tids[i] = i+1;
 			if(stateful)
-				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)&tids[i]);
 			else
-				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
 		// Go to town
-		if(stateful) mismatchSearchWorkerFullStateful((void*)0L);
-		else         mismatchSearchWorkerFull((void*)0L);
+		int tmp = 0;
+		if(stateful) mismatchSearchWorkerFullStateful((void*)&tmp);
+		else         mismatchSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2405,6 +2435,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
     }
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 	if(refs != NULL) delete refs;
 }
@@ -2538,12 +2569,15 @@ static bool                           twoOrThreeMismatchSearch_two;
 static BitPairReference*              twoOrThreeMismatchSearch_refs;
 
 #define TWOTHREE_WORKER_SETUP() \
+	int tid = *((int*)vp); \
 	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
 	bool                           two      = twoOrThreeMismatchSearch_two; \
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
-	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
+	PatternSourcePerThread* patsrc = patsrcFact->create(); \
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, false); \
+	HitSinkPerThread* sink = sinkFact->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
@@ -2716,6 +2750,7 @@ static void twoOrThreeMismatchSearch(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
 
 	// Load forward index
@@ -2724,10 +2759,12 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)(long)(i+1));
+			tids[i] = i+1;
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
-		twoOrThreeMismatchSearchWorkerPhase1((void*)0L);
+		int tmp = 0;
+		twoOrThreeMismatchSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2744,10 +2781,11 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
-		twoOrThreeMismatchSearchWorkerPhase2((void*)0L);
+		int tmp = 0;
+		twoOrThreeMismatchSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2763,10 +2801,11 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cout, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
-		twoOrThreeMismatchSearchWorkerPhase3((void*)0L);
+		int tmp = 0;
+		twoOrThreeMismatchSearchWorkerPhase3((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -2779,6 +2818,7 @@ static void twoOrThreeMismatchSearch(
 	}
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 	return;
 }
@@ -2787,6 +2827,7 @@ static void twoOrThreeMismatchSearch(
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
+	int tid = *((int*)vp);
 	PairedPatternSource&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
@@ -2797,7 +2838,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -2864,7 +2905,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	delete sinkFact;
 	delete pool;
 #ifdef BOWTIE_PTHREADS
-	if((long)vp != 0L) pthread_exit(NULL);
+	if(tid > 0) pthread_exit(NULL);
 #endif
 	return NULL;
 }
@@ -2992,20 +3033,23 @@ static void twoOrThreeMismatchSearchFull(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
     {
 		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
+			tids[i] = i+1;
 			if(stateful)
-				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)&tids[i]);
 			else
-				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)(long)(i+1));
+				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
-		if(stateful) twoOrThreeMismatchSearchWorkerStateful((void*)0L);
-		else         twoOrThreeMismatchSearchWorkerFull((void*)0L);
+		int tmp = 0;
+		if(stateful) twoOrThreeMismatchSearchWorkerStateful((void*)&tmp);
+		else         twoOrThreeMismatchSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3018,6 +3062,7 @@ static void twoOrThreeMismatchSearchFull(
     }
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 	return;
 }
@@ -3035,12 +3080,15 @@ static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
 #define SEEDEDQUAL_WORKER_SETUP() \
+	int tid = *((int*)vp); \
 	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;    \
 	HitSink&                 _sink      = *seededQualSearch_sink;      \
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;        \
 	int                      qualCutoff = seededQualSearch_qualCutoff; \
-	PatternSourcePerThread* patsrc = createPatsrcFactory(_patsrc, (int)(long)vp)->create(); \
-	HitSinkPerThread* sink = createSinkFactory(_sink, false)->create(); \
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
+	PatternSourcePerThread* patsrc = patsrcFact->create(); \
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, false); \
+	HitSinkPerThread* sink = sinkFact->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
@@ -3450,6 +3498,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 }
 
 static void* seededQualSearchWorkerFullStateful(void *vp) {
+	int tid = *((int*)vp);
 	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
@@ -3460,7 +3509,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, (int)(long)vp);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -3538,14 +3587,15 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 		metrics->printSummary();
 		delete metrics;
 	}
-
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
 #ifdef BOWTIE_PTHREADS
-	if((long)vp != 0L) pthread_exit(NULL);
+	if(tid > 0) {
+    	pthread_exit(NULL);
+    }
 #endif
-	return NULL;
+    return NULL;
 }
 
 /**
@@ -3607,6 +3657,7 @@ static void seededQualCutoffSearch(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -3619,10 +3670,12 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)(long)(i+1));
+			tids[i] = i+1;
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
-		seededQualSearchWorkerPhase1((void*)0L);
+		int tmp = 0;
+		seededQualSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3654,10 +3707,11 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
-		seededQualSearchWorkerPhase2((void*)0L);
+		int tmp = 0;
+		seededQualSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3691,10 +3745,11 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
-		seededQualSearchWorkerPhase3((void*)0L);
+		int tmp = 0;
+		seededQualSearchWorkerPhase3((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3718,10 +3773,11 @@ static void seededQualCutoffSearch(
 		Timer _t(cout, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)(long)(i+1));
+			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)&tids[i]);
 		}
 #endif
-		seededQualSearchWorkerPhase4((void*)0L);
+		int tmp = 0;
+		seededQualSearchWorkerPhase4((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3739,6 +3795,7 @@ static void seededQualCutoffSearch(
 	}
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 }
 
@@ -3798,6 +3855,7 @@ static void seededQualCutoffSearchFull(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	int *tids = new int[nthreads-1];
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -3813,16 +3871,18 @@ static void seededQualCutoffSearchFull(
 		Timer _t(cout, "Seeded quality full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
+			tids[i] = i+1;
 			if(stateful) pthread_create(&threads[i], &pt_attr,
 			                            seededQualSearchWorkerFullStateful,
-			                            (void *)(long)(i+1));
+			                            (void*)&tids[i]);
 			else         pthread_create(&threads[i], &pt_attr,
 			                            seededQualSearchWorkerFull,
-			                            (void *)(long)(i+1));
+			                            (void*)&tids[i]);
 		}
 #endif
-		if(stateful) seededQualSearchWorkerFullStateful((void*)0L);
-		else         seededQualSearchWorkerFull((void*)0L);
+		int tmp = 0;
+		if(stateful) seededQualSearchWorkerFullStateful((void*)&tmp);
+		else         seededQualSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			int ret;
@@ -3839,6 +3899,7 @@ static void seededQualCutoffSearchFull(
 	ebwtBw.evictFromMemory();
 #ifdef BOWTIE_PTHREADS
 	delete[] threads;
+	delete[] tids;
 #endif
 }
 
@@ -4220,12 +4281,14 @@ static void driver(const char * type,
 			assert(patsrcs_a[i] != NULL);
 			delete patsrcs_a[i];
 		}
-		for(size_t i = 0; i < patsrcs_a.size(); i++) {
+		for(size_t i = 0; i < patsrcs_b.size(); i++) {
 			if(patsrcs_b[i] != NULL) {
 				delete patsrcs_b[i];
 			}
 		}
+		delete patsrc;
 		delete sink;
+		if(fout != NULL) delete fout;
 	}
 }
 
@@ -4340,9 +4403,5 @@ int main(int argc, char **argv) {
 #ifdef CHUD_PROFILING
 	chudReleaseRemoteAccess();
 #endif
-#ifdef BOWTIE_PTHREADS
-	pthread_exit(NULL);
-#else
 	return 0;
-#endif
 }

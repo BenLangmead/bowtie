@@ -268,6 +268,48 @@ protected:
 	int len_;
 };
 
+#define DECL_HIT_DUMPS \
+	const std::string& dumpAlFa, \
+	const std::string& dumpAlFq, \
+	const std::string& dumpAl, \
+	const std::string& dumpUnalFa, \
+	const std::string& dumpUnalFq, \
+	const std::string& dumpUnal, \
+	const std::string& dumpMaxFa, \
+	const std::string& dumpMaxFq, \
+	const std::string& dumpMax
+
+#define INIT_HIT_DUMPS \
+	dumpAlFaBase_(dumpAlFa), \
+	dumpAlFqBase_(dumpAlFq), \
+	dumpAlBase_(dumpAl), \
+	dumpUnalFaBase_(dumpUnalFa), \
+	dumpUnalFqBase_(dumpUnalFq), \
+	dumpUnalBase_(dumpUnal), \
+	dumpMaxFaBase_(dumpMaxFa), \
+	dumpMaxFqBase_(dumpMaxFq), \
+	dumpMaxBase_(dumpMax)
+
+#define DECL_HIT_DUMPS2 \
+	DECL_HIT_DUMPS, \
+	bool onePairFile, \
+	RecalTable *recalTable, \
+	std::vector<std::string>* refnames
+
+#define PASS_HIT_DUMPS \
+	dumpAlFa, \
+	dumpAlFq, \
+	dumpAl, \
+	dumpUnalFa, \
+	dumpUnalFq, \
+	dumpUnal, \
+	dumpMaxFa, \
+	dumpMaxFq, \
+	dumpMax, \
+	onePairFile, \
+	recalTable, \
+	refnames
+
 /**
  * Encapsulates an object that accepts hits, optionally retains them in
  * a vector, and does something else with them according to
@@ -275,16 +317,8 @@ protected:
  */
 class HitSink {
 public:
-	HitSink(OutFileBuf* out,
-			const std::string& dumpAlignFaBasename,
-			const std::string& dumpAlignFqBasename,
-			const std::string& dumpAlignBasename,
-			const std::string& dumpUnalFaBasename,
-			const std::string& dumpUnalFqBasename,
-			const std::string& dumpUnalBasename,
-			const std::string& dumpMaxedFaBasename,
-			const std::string& dumpMaxedFqBasename,
-			const std::string& dumpMaxedBasename,
+	explicit HitSink(OutFileBuf* out,
+			DECL_HIT_DUMPS,
 			bool onePairFile,
 			RecalTable *table,
 	        vector<string>* refnames = NULL) :
@@ -294,15 +328,7 @@ public:
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
-		dumpAlFaBase_(dumpAlignFaBasename),
-		dumpAlFqBase_(dumpAlignFqBasename),
-		dumpAlBase_(dumpAlignBasename),
-		dumpUnalFaBase_(dumpUnalFaBasename),
-		dumpUnalFqBase_(dumpUnalFqBasename),
-		dumpUnalBase_(dumpUnalBasename),
-		dumpMaxFaBase_(dumpMaxedFaBasename),
-		dumpMaxFqBase_(dumpMaxedFqBasename),
-		dumpMaxBase_(dumpMaxedBasename),
+		INIT_HIT_DUMPS,
 		onePairFile_(onePairFile),
 		first_(true),
 		numReported_(0llu),
@@ -323,16 +349,8 @@ public:
 	 * is the 0-padded reference index.  Someday we may want to include
 	 * the name of the reference sequence in the filename somehow.
 	 */
-	HitSink(size_t numOuts,
-			const std::string& dumpAlignFaBasename,
-			const std::string& dumpAlignFqBasename,
-			const std::string& dumpAlignBasename,
-			const std::string& dumpUnalFaBasename,
-			const std::string& dumpUnalFqBasename,
-			const std::string& dumpUnalBasename,
-			const std::string& dumpMaxedFaBasename,
-			const std::string& dumpMaxedFqBasename,
-			const std::string& dumpMaxedBasename,
+	explicit HitSink(size_t numOuts,
+			DECL_HIT_DUMPS,
 			bool onePairFile,
 			RecalTable *table,
 	        vector<string>* refnames = NULL) :
@@ -341,15 +359,7 @@ public:
 		recalTable_(table),
 		_refnames(refnames),
 		_locks(),
-		dumpAlFaBase_(dumpAlignFaBasename),
-		dumpAlFqBase_(dumpAlignFqBasename),
-		dumpAlBase_(dumpAlignBasename),
-		dumpUnalFaBase_(dumpUnalFaBasename),
-		dumpUnalFqBase_(dumpUnalFqBasename),
-		dumpUnalBase_(dumpUnalBasename),
-		dumpMaxFaBase_(dumpMaxedFaBasename),
-		dumpMaxFqBase_(dumpMaxedFqBasename),
-		dumpMaxBase_(dumpMaxedBasename),
+		INIT_HIT_DUMPS,
 		onePairFile_(onePairFile),
 		quiet_(false),
 		ssmode_(ios_base::out)
@@ -374,6 +384,7 @@ public:
 			for(size_t i = 0; i < _outs.size(); i++) {
 				if(_outs[i] != NULL) {
 					delete _outs[i];
+					_outs[i] = NULL;
 				}
 			}
 		}
@@ -2122,34 +2133,6 @@ private:
     bool keep_;
 };
 
-#define DECL_HIT_DUMPS \
-	const std::string& dumpAlFa, \
-	const std::string& dumpAlFq, \
-	const std::string& dumpAl, \
-	const std::string& dumpUnalFa, \
-	const std::string& dumpUnalFq, \
-	const std::string& dumpUnal, \
-	const std::string& dumpMaxFa, \
-	const std::string& dumpMaxFq, \
-	const std::string& dumpMax, \
-	bool onePairFile, \
-	RecalTable *recalTable, \
-	std::vector<std::string>* refnames
-
-#define PASS_HIT_DUMPS \
-	dumpAlFa, \
-	dumpAlFq, \
-	dumpAl, \
-	dumpUnalFa, \
-	dumpUnalFq, \
-	dumpUnal, \
-	dumpMaxFa, \
-	dumpMaxFq, \
-	dumpMax, \
-	onePairFile, \
-	recalTable, \
-	refnames
-
 /**
  * Sink that prints lines like this:
  * (pat-id)[-|+]:<hit1-text-id,hit2-text-offset>,<hit2-text-id...
@@ -2163,7 +2146,7 @@ public:
 	 */
 	ConciseHitSink(OutFileBuf* out,
 			       int offBase,
-	               DECL_HIT_DUMPS,
+	               DECL_HIT_DUMPS2,
 	               bool reportOpps = false) :
 		HitSink(out, PASS_HIT_DUMPS),
 		_reportOpps(reportOpps),
@@ -2175,7 +2158,7 @@ public:
 	 */
 	ConciseHitSink(size_t numOuts,
 	               int offBase,
-	               DECL_HIT_DUMPS,
+	               DECL_HIT_DUMPS2,
 	               bool reportOpps = false) :
 		HitSink(numOuts, PASS_HIT_DUMPS),
 		_reportOpps(reportOpps),
@@ -2239,7 +2222,7 @@ public:
 	 */
 	VerboseHitSink(OutFileBuf* out,
 	               int offBase,
-	               DECL_HIT_DUMPS,
+	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(out, PASS_HIT_DUMPS),
 	_partition(partition),
@@ -2252,7 +2235,7 @@ public:
 	 */
 	VerboseHitSink(size_t numOuts,
 	               int offBase,
-	               DECL_HIT_DUMPS,
+	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(numOuts, PASS_HIT_DUMPS),
 	_partition(partition),
@@ -2660,7 +2643,7 @@ public:
 	 */
 	BinaryHitSink(OutFileBuf* out,
 	              int offBase,
-	              DECL_HIT_DUMPS) :
+	              DECL_HIT_DUMPS2) :
 	HitSink(out, PASS_HIT_DUMPS),
 	offBase_(offBase)
 	{
@@ -2673,7 +2656,7 @@ public:
 	 */
 	BinaryHitSink(size_t numOuts,
 	              int offBase,
-	              DECL_HIT_DUMPS) :
+	              DECL_HIT_DUMPS2) :
 	HitSink(numOuts, PASS_HIT_DUMPS),
 	offBase_(offBase)
 	{
