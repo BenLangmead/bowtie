@@ -3191,6 +3191,10 @@ public:
 			btCnt_(btCnt)
 	{ }
 
+	~EbwtRangeSourceDriverFactory() {
+		delete rs_; rs_ = NULL;
+	}
+
 	/**
 	 * Return a newly-allocated EbwtRangeSourceDriver with the given
 	 * parameters.
@@ -3249,7 +3253,10 @@ public:
 		assert(rsSeed_->seed());
 	}
 
-	virtual ~EbwtSeededRangeSourceDriver() { }
+	virtual ~EbwtSeededRangeSourceDriver() {
+		delete rsFact_; rsFact_ = NULL;
+		delete rsSeed_; rsSeed_ = NULL;
+	}
 
 	/**
 	 * Prepare this aligner for the next read.

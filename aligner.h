@@ -208,6 +208,9 @@ public:
 		// the slots is currently using the single-end or paired-end
 		// aligner
 		seOrPe_ = new bool[n_];
+		for(uint32_t i = 0; i < n_; i++) {
+			seOrPe_[i] = true;
+		}
 		// Instantiate all read sources
 		patsrcs_ = patsrcFact_.create(n_);
 		assert(patsrcs_ != NULL);
@@ -227,12 +230,13 @@ public:
 	 */
 	void run(bool verbose = false) {
 		bool done = false;
+		bool first = true;
 		if(n_ == 1) {
 			Aligner *al = seOrPe_[0] ? (*alignersSE_)[0] : (*alignersPE_)[0];
 			PatternSourcePerThread *ps = (*patsrcs_)[0];
 			while(!done) {
 				done = true;
-				if(!al->done) {
+				if(!first && !al->done) {
 					// Advance an aligner already in progress; this is
 					// the common case
 					done = false;
@@ -258,6 +262,7 @@ public:
 						// true
 					}
 				}
+				first = false;
 			}
 		} else {
 			while(!done) {
@@ -265,7 +270,7 @@ public:
 				for(uint32_t i = 0; i < n_; i++) {
 					Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
 											   (*alignersPE_)[i];
-					if(!al->done) {
+					if(!first && !al->done) {
 						// Advance an aligner already in progress; this is
 						// the common case
 						done = false;
@@ -292,6 +297,7 @@ public:
 						}
 					}
 				}
+				first = false;
 			}
 		}
 	}
@@ -355,7 +361,7 @@ public:
 		delete driver_;  driver_  = NULL;
 		delete params_;  params_  = NULL;
 		delete rchase_;  rchase_  = NULL;
-		delete btCnt_;   btCnt_   = NULL;
+		delete[] btCnt_; btCnt_   = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -625,7 +631,8 @@ public:
 		delete driver2Rc_; driver2Rc_ = NULL;
 		delete params_;    params_    = NULL;
 		delete rchase_;    rchase_    = NULL;
-		delete btCnt_;     btCnt_     = NULL;
+		delete[] btCnt_;   btCnt_     = NULL;
+		delete refAligner_; refAligner_ = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
@@ -1439,7 +1446,8 @@ public:
 		delete driver_; driver_ = NULL;
 		delete params_; params_ = NULL;
 		delete rchase_; rchase_ = NULL;
-		delete btCnt_;  btCnt_     = NULL;
+		delete[] btCnt_; btCnt_ = NULL;
+		delete refAligner_; refAligner_ = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
 	}
 
