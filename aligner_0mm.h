@@ -98,6 +98,7 @@ public:
 		if(doFw_) drVec->push_back(driverFw);
 		if(doRc_) drVec->push_back(driverRc);
 		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_);
+		delete drVec;
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -290,7 +291,7 @@ public:
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
 		if(v1_) {
-			return new PairedBWAlignerV1<EbwtRangeSource>(
+			PairedBWAlignerV1<EbwtRangeSource>* al = new PairedBWAlignerV1<EbwtRangeSource>(
 				params,
 				driver1Fw == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver1Fw,
 				driver1Rc == NULL ? (new StubRangeSourceDriver<EbwtRangeSource>()) : driver1Rc,
@@ -301,13 +302,14 @@ public:
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
+			return al;
 		} else {
 			TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 			if(driver1Fw != NULL) drVec->push_back(driver1Fw);
 			if(driver1Rc != NULL) drVec->push_back(driver1Rc);
 			if(driver2Fw != NULL) drVec->push_back(driver2Fw);
 			if(driver2Rc != NULL) drVec->push_back(driver2Rc);
-			return new PairedBWAlignerV2<EbwtRangeSource>(
+			PairedBWAlignerV2<EbwtRangeSource>* al = new PairedBWAlignerV2<EbwtRangeSource>(
 				params,
 				new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_, true),
 				refAligner,
@@ -315,6 +317,8 @@ public:
 				peInner_, peOuter_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
+			delete drVec;
+			return al;
 		}
 	}
 

@@ -204,6 +204,7 @@ public:
 			}
 		}
 		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_);
+		delete drVec;
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -599,7 +600,7 @@ public:
 			new RangeChaser<String<Dna> >(cacheLimit_, cacheFw_, cacheBw_);
 
 		if(v1_) {
-			return new PairedBWAlignerV1<EbwtRangeSource>(
+			PairedBWAlignerV1<EbwtRangeSource> *al = new PairedBWAlignerV1<EbwtRangeSource>(
 				params,
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_),
 				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_),
@@ -610,8 +611,13 @@ public:
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
+			delete dr1FwVec;
+			delete dr1RcVec;
+			delete dr2FwVec;
+			delete dr2RcVec;
+			return al;
 		} else {
-			return new PairedBWAlignerV2<EbwtRangeSource>(
+			PairedBWAlignerV2<EbwtRangeSource>* al = new PairedBWAlignerV2<EbwtRangeSource>(
 				params,
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
 				refAligner, rchase,
@@ -619,6 +625,8 @@ public:
 				peInner_, peOuter_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
+			delete dr1FwVec;
+			return al;
 		}
 	}
 
