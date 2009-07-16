@@ -24,12 +24,13 @@ use strict;
 use Getopt::Std;
 
 my %options=();
-getopts("dv:n:e:t",\%options);
+getopts("dv:n:e:tl:",\%options);
 
 my $debug = $options{d} if defined($options{d});
 my $match_mode = "-n 2";
 $match_mode = "-v " . $options{v} if defined($options{v});
 $match_mode = "-n " . $options{n} if defined($options{n});
+$match_mode = "-l " . $options{l} if defined($options{l});
 
 my $extra_args = "";
 $extra_args = $options{e} if defined($options{e});

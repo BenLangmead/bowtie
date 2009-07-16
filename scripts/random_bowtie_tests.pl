@@ -72,6 +72,9 @@ sub pickPolicy {
 	if($pol =~ /-n/ && int(rand(2)) == 0) {
 		$pol .= " --nomaqround";
 	}
+	if($pol =~ /-n/ && int(rand(2)) == 0) {
+		$pol .= " -l ".int(rand(30)+8);
+	}
 	return $pol;
 }
 

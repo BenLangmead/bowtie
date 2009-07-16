@@ -3246,7 +3246,11 @@ public:
 			bool verbose,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFact_(rsFact), rsFull_(false, NULL, verbose, true),
+			rsFact_(rsFact),
+			rsFull_(false, // no strand-bias fix needed here
+			        NULL,
+			        verbose,
+			        true),
 			rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen), fw_(fw),
 			mate1_(mate1), seedRange_(0)
 	{

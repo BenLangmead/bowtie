@@ -1452,7 +1452,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
 	   		case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
 	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
-	   		case 'l': seedLen = parseInt(20, "-l/--seedlen arg must be at least 20"); break;
+	   		case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
 	   		case 'h': printLongUsage(cout); exit(0); break;
 	   		case '?': printUsage(cerr); exit(1); break;
 	   		case 'a': allHits = true; break;
@@ -3587,6 +3587,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 		metrics->printSummary();
 		delete metrics;
 	}
+
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
@@ -3595,7 +3596,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
     	pthread_exit(NULL);
     }
 #endif
-    return NULL;
+	return NULL;
 }
 
 /**
