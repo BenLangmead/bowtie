@@ -2597,9 +2597,9 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 			if((int)os[i][joff] == 4) {
 				// Skip over Ns
 				if(!mirror) {
-					while((int)os[i][j] == 4 && j < length(os[i])) j++;
+					while(j < length(os[i]) && (int)os[i][j] == 4) j++;
 				} else {
-					while((int)os[i][olen-j-1] == 4 && j < length(os[i])) j++;
+					while(j < length(os[i]) && (int)os[i][olen-j-1] == 4) j++;
 				}
 				break;
 			}
