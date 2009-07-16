@@ -4486,8 +4486,11 @@ protected:
 			if(!seedOnLeft) {
 				// Fill in the anchor using characters from the right-
 				// hand side of the query (but take the characters in
-				// left-to-right order)
-				i = qlen - anchorBitPairs + ii;
+				// left-to-right order).  Be sure to subtract slen from
+				// qlen; not anchorBitPairs from qlen.  We want the
+				// characters in the seedAnchorOverhang region to be to
+				// the right of the characters in the anchor.
+				i = qlen - slen + ii;
 			}
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfwayRi + ii]; // next reference character
