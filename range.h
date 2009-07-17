@@ -13,11 +13,19 @@
  */
 struct Range {
 	Range() :
-		top(0), bot(0), cost(0), stratum(0), numMms(0),
+		top(0xffffffff), bot(0), cost(0), stratum(0), numMms(0),
 		fw(true), mate1(true), ebwt(NULL)
 	{
 		mms.clear();
 		refcs.clear();
+	}
+
+	bool valid() const {
+		return top < 0xffffffff;
+	}
+
+	void invalidate() {
+		top = 0xffffffff;
 	}
 
 	uint32_t top;     // top of range

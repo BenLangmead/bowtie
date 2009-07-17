@@ -2156,26 +2156,24 @@ public:
 			qual_ = fw_ ? &r.qualFwRev : &r.qualRcRev;
 		}
 		name_ = &r.name;
-		seedRange_ = seedRange;
-		assert(qry_ != NULL);
-		assert(qual_ != NULL);
-		assert(name_ != NULL);
+		if(seedRange != NULL) seedRange_ = *seedRange;
+		else                  seedRange_.invalidate();
 		qlen_ = length(*qry_);
 		skippingThisRead_ = false;
 		// Apply edits from the partial alignment to the query pattern
-		if(seedRange_ != NULL) {
+		if(seedRange_.valid()) {
 			qryBuf_ = *qry_;
-			const size_t srSz = seedRange_->mms.size();
+			const size_t srSz = seedRange_.mms.size();
 			assert_gt(srSz, 0);
-			assert_eq(srSz, seedRange_->refcs.size());
+			assert_eq(srSz, seedRange_.refcs.size());
 			for(size_t i = 0; i < srSz; i++) {
-				assert_lt(seedRange_->mms[i], qlen_);
-				char rc = (char)seedRange_->refcs[i];
+				assert_lt(seedRange_.mms[i], qlen_);
+				char rc = (char)seedRange_.refcs[i];
 				assert(rc == 'A' || rc == 'C' || rc == 'G' || rc == 'T');
-				ASSERT_ONLY(char oc = (char)qryBuf_[qlen_ - seedRange_->mms[i] - 1]);
+				ASSERT_ONLY(char oc = (char)qryBuf_[qlen_ - seedRange_.mms[i] - 1]);
 				assert_neq(rc, oc);
-				qryBuf_[qlen_ - seedRange_->mms[i] - 1] = (Dna5)rc;
-				assert_neq((Dna5)rc, (*qry_)[qlen_ - seedRange_->mms[i] - 1]);
+				qryBuf_[qlen_ - seedRange_.mms[i] - 1] = (Dna5)rc;
+				assert_neq((Dna5)rc, (*qry_)[qlen_ - seedRange_.mms[i] - 1]);
 			}
 			qry_ = &qryBuf_;
 		}
@@ -2270,7 +2268,7 @@ public:
 			// constraints.
 			return;
 		}
-		uint16_t icost = (seedRange_ != NULL) ? seedRange_->cost : 0;
+		uint16_t icost = (seedRange_.valid()) ? seedRange_.cost : 0;
 		uint16_t iham = partialEditsHam();
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
@@ -2672,11 +2670,11 @@ protected:
 	 */
 	void addPartialEdits() {
 		// Lump in the edits from the partial alignment
-		if(seedRange_ != NULL) {
-			const size_t srSz = seedRange_->mms.size();
+		if(seedRange_.valid()) {
+			const size_t srSz = seedRange_.mms.size();
 			for(size_t i = 0; i < srSz; i++) {
-				curRange_.mms.push_back(qlen_ - seedRange_->mms[i] - 1);
-				curRange_.refcs.push_back(seedRange_->refcs[i]);
+				curRange_.mms.push_back(qlen_ - seedRange_.mms[i] - 1);
+				curRange_.refcs.push_back(seedRange_.refcs[i]);
 			}
 			curRange_.numMms += srSz;
 		}
@@ -2688,10 +2686,10 @@ protected:
 	 */
 	uint16_t partialEditsHam() {
 		uint16_t ret = 0;
-		if(seedRange_ != NULL) {
-			const size_t srSz = seedRange_->mms.size();
+		if(seedRange_.valid()) {
+			const size_t srSz = seedRange_.mms.size();
 			for(size_t i = 0; i < srSz; i++) {
-				int q = (*qual_)[qlen_ - seedRange_->mms[i] - 1];
+				int q = (*qual_)[qlen_ - seedRange_.mms[i] - 1];
 				q = phredCharToPhredQual(q);
 				ret += mmPenalty(maqPenalty_, q);
 			}
@@ -2898,7 +2896,7 @@ protected:
 	Range               curRange_;
 	// Range for the partial alignment we're extending (NULL if we
 	// aren't extending a partial)
-	Range*              seedRange_;
+	Range               seedRange_;
 	// Starts as false; set to true as soon as we know we want to skip
 	// all further processing of this read
 	bool                skippingThisRead_;
