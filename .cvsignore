@@ -46,3 +46,5 @@ e_coli.map
 bowtie-inspect
 bowtie-inspect-debug
 *.dSYM
+*.dSYM/*
+.unmatched.se

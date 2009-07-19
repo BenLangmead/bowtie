@@ -3602,15 +3602,18 @@ protected:
 		uint32_t skipLeftToRights = 0;
 		uint32_t skipRightToLefts = 0;
 		const uint32_t halfwayRi = halfway - begin;
+		assert_leq(anchorBitPairs, slen);
 		// Construct the 'anchor' 64-bit buffer so that it holds all of
 		// the first 'anchorBitPairs' bit pairs of the query.
 		for(uint32_t ii = 0; ii < anchorBitPairs; ii++) {
 			uint32_t i = ii;
 			if(!seedOnLeft) {
-				// Fill in the anchor using characters from the right-
-				// hand side of the query (but take the characters in
-				// left-to-right order)
-				i = qlen - anchorBitPairs + ii;
+				// Fill in the anchor using characters from the seed
+				// portion of the read, starting at the left.  Note
+				// that we're subtracting by slen rather than
+				// anchorBitPairs because we want the seed anchor
+				// overhang to be on the right-hand side
+				i = qlen - slen + ii;
 			}
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfwayRi + ii]; // next reference character
