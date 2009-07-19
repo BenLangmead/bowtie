@@ -127,10 +127,6 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
  */
 inline static char intToPhred33(int iQ, bool solQuals) {
 	int pQ;
-	if (iQ < 0) {
-		cerr << "Saw integer quality " << ((int)iQ) << "." << endl;
-		exit(1);
-	}
 	if (solQuals) {
 		// Convert from solexa quality to phred
 		// quality and translate to ASCII
@@ -140,6 +136,10 @@ inline static char intToPhred33(int iQ, bool solQuals) {
 		// Keep the phred quality and translate
 		// to ASCII
 		pQ = (iQ <= 93 ? iQ : 93) + 33;
+	}
+	if (pQ < 33) {
+		cerr << "Saw negative Phred quality " << ((int)pQ-33) << "." << endl;
+		exit(1);
 	}
 	assert_geq(pQ, 0);
 	return (int)pQ;

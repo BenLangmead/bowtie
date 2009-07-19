@@ -1898,7 +1898,6 @@ private:
 		if (intQuals_) {
 			char buf[4096];
 			while (qualsRead < charsRead) {
-				// TODO: fixme
 				size_t rd = filebuf_.gets(buf, sizeof(buf));
 				if(rd == 0) break;
 				assert(NULL == strrchr(buf, '\n'));

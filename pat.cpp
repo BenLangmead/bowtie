@@ -8,9 +8,9 @@ using namespace std;
 using namespace seqan;
 
 void wrongQualityFormat() {
-	cerr << "Encounterd space-separated qualities"<<endl
+	cerr << "Encounterd space-separated qualities" << endl
 	     <<  "This appears to be an FASTQ-int file" << endl
-	     << "Please re-run Bowtie with the --integer-quals option.";
+	     << "Please re-run Bowtie with the --integer-quals option." << endl;
 }
 
 void tooFewQualities(const String<char>& read_name) {
