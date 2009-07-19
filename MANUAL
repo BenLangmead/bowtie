@@ -633,6 +633,9 @@ Bowtie Manual
                      the high-quality end of the read to which the -n
                      ceiling applies.  The lowest permitted value for
                      this parameter is 5.  The default is 28.
+                     Depending on the length of the reference genome,
+                     Bowtie can become extremely slow as this parameter
+                     is adjusted downward.
 
   --nomaqround       Maq accepts quality values in the Phred scale, but
                      internally rounds quality values to the nearest 10
