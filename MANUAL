@@ -356,7 +356,7 @@ Bowtie Manual
     --strata options, guarntees a principled, though somewhat weaker
     form of "uniqueness."  A stronger form of uniqueness is enforced
     when -m is specified but --best --strata are not.
-  
+
   Paired-end Alignment
   --------------------
   
@@ -394,6 +394,9 @@ Bowtie Manual
   causes Bowtie to miss some valid paired-end alignments where both
   mates lie in repetitive regions, but the user may use the --pairtries
   or -y options to increase Bowtie's sensitivity as desired.
+  
+  Paired-end alignments where one mate's alignment is entirely
+  contained within the other's are considered invalid.
  
   Because Bowtie uses an in-memory representation of the original
   reference string when finding paired-end alignments, its memory
@@ -628,7 +631,8 @@ Bowtie Manual
   
   -l/--seedlen <int> The "seed length"; i.e., the number of bases on
                      the high-quality end of the read to which the -n
-                     ceiling applies.  The default is 28.
+                     ceiling applies.  The lowest permitted value for
+                     this parameter is 5.  The default is 28.
 
   --nomaqround       Maq accepts quality values in the Phred scale, but
                      internally rounds quality values to the nearest 10
@@ -649,7 +653,10 @@ Bowtie Manual
                      20-bp gap between them, that alignment is
                      considered valid (as long as -X is also
                      satisfied).  A 19-bp gap would not be valid in
-                     that case.  Default: 0.
+                     that case.  If trimming options -3 or -5 are also
+                     used, the -I constraint is applied with respect to
+                     the untrimmed mates, not the trimmed mates.
+                     Default: 0.
 
   -X/--maxins <int>  The maximum insert size for valid paired-end
                      alignments.  E.g. if -X 100 is specified and a
@@ -657,8 +664,10 @@ Bowtie Manual
                      alignments in the proper orientation with a 60-bp
                      gap between them, that alignment is considered
                      valid (as long as -I is also satisfied).  A 61-bp
-                     gap would not be valid in that case.  Default:
-                     250.
+                     gap would not be valid in that case.  If trimming
+                     options -3 or -5 are also used, the -X constraint
+                     is applied with respect to the untrimmed mates,
+                     not the trimmed mates.  Default: 250.
 
   --fr/--rf/--ff     The upstream/downstream mate orientations for a
                      valid paired-end alignment against the forward
@@ -974,7 +983,9 @@ Bowtie Manual
 
    5. Read sequence (reverse-complemented if orientation is '-')
 
-   6. Read qualities (reversed if orientation is '-')
+   6. ASCII-encoded read qualities (reversed if orientation is '-').
+      The encoded quality values are on the Phred scale and the
+      encoding is ASCII-offset by 33 (ASCII char '!'). 
 
    7. Number of other instances where the same read aligns against the
       same reference characters as were aligned against in this

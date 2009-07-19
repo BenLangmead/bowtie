@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.10.0.
+available to the public for download.  The current version is 0.10.1.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,31 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.10.1 - July 19, 2009
+   * Now when -3/-5 are used in combination with -I/-X, the -I/-X
+     constraints are interpreted as applying to the original insert,
+     not the trimmed insert.
+   * Fixed issue whereby -I option was ignored; -I option works now.
+   * Fixed a bug whereby some large indexes were incorrectly reported
+     as corrupt by bowtie-build.
+   * Fixed issue whereby negative quality values were wrongly rejected
+     when both --integer-quals and --solexa-quals were specified.
+   * The -l/--seedlen parameter can now be adjusted down to 5
+     (previously had to be >= 20).
+   * Fixed several minor memory leaks and out-of-bounds issues.  The
+     Linux version of the bowtie aligner now receives a clean bill of
+     health from valgrind's memcheck.
+   * Other minor bugfixes.
+
+Version 0.10.0.2 - 6/28/09
+    * Second bugfix for Windows version. src and bin-win32 packages
+      updated. Linux and Mac users are not affected. Thanks for your
+      bug reports and patience.
+
+Version 0.10.0.1 - 6/23/09
+    * Fix for crashing bug in Windows version. src and bin-win32
+      packages updated. Linux and Mac users are not affected.
 
 Version 0.10.0 - June 12, 2009
    * Major change: All alignment modes are now unstratified by default.
