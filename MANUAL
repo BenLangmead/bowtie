@@ -289,7 +289,7 @@ Bowtie Manual
     Reported 5 alignments to 1 output stream(s)
   
     Specifying -a --best results in the same alignments being printed
-    as if just -a had been specified, but they are guarnteed to be
+    as if just -a had been specified, but they are guaranteed to be
     reported in best-to-worst order.
 
     Example 6: -a --best --strata

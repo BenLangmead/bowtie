@@ -61,6 +61,11 @@ sub pickPolicy {
 	my $r = int(rand($#policies + 1));
 	my $pol = $policies[$r];
 	$pol = $setPolicy if defined($setPolicy);
+	if($pe && int(rand(2)) == 0) {
+		my $min = int(rand(200))+10;
+		$pol .= " -I $min";
+		$pol .= " -X ".int(rand(30)+$min);
+	}
 	if(!$pe && int(rand(2)) == 0) {
 		# Possibly ask for best alignments
 		$pol .= " --best";

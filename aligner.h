@@ -949,17 +949,27 @@ protected:
 		// the alignment of the outstanding mate.  It's up to the
 		// callee to worry about how to scan these positions.
 		uint32_t begin, end;
+		assert_geq(maxInsert_, minInsert_);
+		uint32_t insDiff = maxInsert_ - minInsert_;
 		if(matchRight) {
-			begin = toff + 1;
 			end = toff + maxInsert_;
+			begin = toff + 1;
+			if(qlen < alen) begin += alen-qlen;
+			if(end > insDiff + qlen) {
+				begin = max<uint32_t>(begin, end - insDiff - qlen);
+			}
 			end = min<uint32_t>(refs_->approxLen(tidx), end);
+			begin = min<uint32_t>(refs_->approxLen(tidx), begin);
 		} else {
 			if(toff + alen < maxInsert_) {
 				begin = 0;
 			} else {
 				begin = toff + alen - maxInsert_;
 			}
-			end = toff + min<uint32_t>(alen, qlen) - 1;
+			uint32_t mi = min<uint32_t>(alen, qlen);
+			end = toff + mi - 1;
+			end = min<uint32_t>(end, toff + alen - minInsert_ + qlen - 1);
+			if(toff + alen + qlen < minInsert_ + 1) end = 0;
 		}
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
@@ -1634,29 +1644,31 @@ protected:
 	{
 		assert(refs_->loaded());
 		assert_lt(off.first, refs_->numRefs());
-		// If matchRight is true, then we're trying to align the other
-		// mate to the right of the already-aligned mate.  Otherwise,
-		// to the left.
+		// pairFw = true if the anchor indicates that the pair will
+		// align in its forward orientation (i.e. with mate1 to the
+		// left of mate2)
 		bool pairFw = (range.mate1)? (range.fw == fw1_) : (range.fw == fw2_);
+		// matchRight = true, if the opposite mate will be to the right
+		// of the anchor mate
 		bool matchRight = (pairFw ? range.mate1 : !range.mate1);
-		// Sequence and quals for mate to be matched
+		// fw = orientation of the opposite mate
 		bool fw = range.mate1 ? fw2_ : fw1_; // whether outstanding mate is fw/rc
 		if(!pairFw) fw = !fw;
-		// 'seq' gets sequence of outstanding mate w/r/t the forward
-		// reference strand
+		// 'seq' = sequence for opposite mate
 		const String<Dna5>& seq  =
 			fw ? (range.mate1 ? patsrc_->bufb().patFw   :
 		                        patsrc_->bufa().patFw)  :
 		         (range.mate1 ? patsrc_->bufb().patRc   :
 		                        patsrc_->bufa().patRc);
-		// 'seq' gets qualities of outstanding mate w/r/t the forward
-		// reference strand
+		// 'qual' = qualities for opposite mate
 		const String<char>& qual =
 			fw ? (range.mate1 ? patsrc_->bufb().qualFw  :
 		                        patsrc_->bufa().qualFw) :
 		         (range.mate1 ? patsrc_->bufb().qualRc  :
 		                        patsrc_->bufa().qualRc);
-		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		// qlen = length of opposite mate
+		uint32_t qlen = seqan::length(seq);
+		// alen = length of anchor mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
 		// Don't even try if either of the mates is longer than the
@@ -1665,24 +1677,33 @@ protected:
 		if(maxInsert_ <= max(qlen, alen)) {
 			return false;
 		}
-		const uint32_t tidx = off.first;
-		const uint32_t toff = off.second;
-		// Set begin/end to be a range of all reference
-		// positions that are legally permitted to be involved in
-		// the alignment of the outstanding mate.  It's up to the
-		// callee to worry about how to scan these positions.
+		const uint32_t tidx = off.first;  // text id where anchor mate hit
+		const uint32_t toff = off.second; // offset where anchor mate hit
+		// Set begin/end to the range of reference positions where
+		// outstanding mate may align while fulfilling insert-length
+		// constraints.
 		uint32_t begin, end;
+		assert_geq(maxInsert_, minInsert_);
+		uint32_t insDiff = maxInsert_ - minInsert_;
 		if(matchRight) {
-			begin = toff + 1;
 			end = toff + maxInsert_;
+			begin = toff + 1;
+			if(qlen < alen) begin += alen-qlen;
+			if(end > insDiff + qlen) {
+				begin = max<uint32_t>(begin, end - insDiff - qlen);
+			}
 			end = min<uint32_t>(refs_->approxLen(tidx), end);
+			begin = min<uint32_t>(refs_->approxLen(tidx), begin);
 		} else {
 			if(toff + alen < maxInsert_) {
 				begin = 0;
 			} else {
 				begin = toff + alen - maxInsert_;
 			}
-			end = toff + min<uint32_t>(alen, qlen) - 1;
+			uint32_t mi = min<uint32_t>(alen, qlen);
+			end = toff + mi - 1;
+			end = min<uint32_t>(end, toff + alen - minInsert_ + qlen - 1);
+			if(toff + alen + qlen < minInsert_ + 1) end = 0;
 		}
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.

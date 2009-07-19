@@ -1594,6 +1594,38 @@ static void parseOptions(int argc, char **argv) {
 	if(qUpto + skipReads > qUpto) {
 		qUpto += skipReads;
 	}
+	if(mate1fw && trim5 > 0) {
+		if(verbose) {
+			cout << "Adjusting -I/-X down by " << trim5
+				 << " because mate1 is FW & trim5 is " << trim5 << endl;
+		}
+		maxInsert = max<int>(0, (int)maxInsert - trim5);
+		minInsert = max<int>(0, (int)minInsert - trim5);
+	}
+	if(mate2fw && trim3 > 0) {
+		if(verbose) {
+			cout << "Adjusting -I/-X down by " << trim3
+				 << " because mate2 is FW & trim3 is " << trim3 << endl;
+		}
+		maxInsert = max<int>(0, (int)maxInsert - trim3);
+		minInsert = max<int>(0, (int)minInsert - trim3);
+	}
+	if(!mate1fw && trim3 > 0) {
+		if(verbose) {
+			cout << "Adjusting -I/-X down by " << trim3
+				 << " because mate1 is RC & trim3 is " << trim3 << endl;
+		}
+		maxInsert = max<int>(0, (int)maxInsert - trim3);
+		minInsert = max<int>(0, (int)minInsert - trim3);
+	}
+	if(!mate2fw && trim5 > 0) {
+		if(verbose) {
+			cout << "Adjusting -I/-X down by " << trim5
+				 << " because mate2 is RC & trim5 is " << trim5 << endl;
+		}
+		maxInsert = max<int>(0, (int)maxInsert - trim5);
+		minInsert = max<int>(0, (int)minInsert - trim5);
+	}
 }
 
 static char *argv0 = NULL;

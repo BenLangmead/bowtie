@@ -71,6 +71,7 @@ public:
 	                  bool seedOnLeft = false)
 	{
 		assert_gt(numToFind, 0);
+		assert_gt(end, begin);
 		uint32_t spread = end - begin;
 		uint32_t spreadPlus = spread + 12;
 		// Make sure the buffer is large enough to accommodate the spread

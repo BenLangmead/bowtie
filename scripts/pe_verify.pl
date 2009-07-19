@@ -24,13 +24,20 @@ use strict;
 use Getopt::Std;
 
 my %options=();
-getopts("dv:n:e:tl:",\%options);
+getopts("dv:n:e:tl:I:X:",\%options);
 
 my $debug = $options{d} if defined($options{d});
 my $match_mode = "-n 2";
 $match_mode = "-v " . $options{v} if defined($options{v});
 $match_mode = "-n " . $options{n} if defined($options{n});
 $match_mode = "-l " . $options{l} if defined($options{l});
+$match_mode = "-I " . $options{I} if defined($options{I});
+$match_mode = "-X " . $options{X} if defined($options{X});
+
+my $inner = 0;
+my $outer = 250;
+$inner = $options{I} if defined($options{I});
+$outer = $options{X} if defined($options{X});
 
 my $extra_args = "";
 $extra_args = $options{e} if defined($options{e});
@@ -60,11 +67,6 @@ if($reads1 =~ /\.fa/) {
 	$extra_args .= " -c ";
 }
 
-# Inner and outer differences to use when determining whether two
-# single-end alignments satisfy the mating constraint
-my $inner = 1;
-my $outer = 250;
-
 my $sesMustHavePes = 0; # force se pairs to have corresponding pe pairs 
 
 # Defaults are for Illumina short-insert library
@@ -80,7 +82,7 @@ my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --re
 my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx --nostrata $index $reads2";
 
 # Run Bowtie in paired-end mode
-my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args --refidx $index -1 $reads1 -2 $reads2";
+my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode -I $inner -X $outer -y $extra_args -a --refidx $index -1 $reads1 -2 $reads2";
 print "$bowtie_pe_cmd\n";
 open BOWTIE_PE, "$bowtie_pe_cmd |";
 
@@ -90,12 +92,15 @@ my $pesRc = 0;
 my %peHash = ();
 while(<BOWTIE_PE>) {
 	next if /^Reported/;
-	my $line1 = $_;
-	my $line2 = <BOWTIE_PE>;
-	my @l1s = split(/[\t]/, $line1);
-	my @l2s = split(/[\t]/, $line2);
-	$#l1s >= 5 || die "Paired-end alignment not formatted correctly: $line1";
-	$#l2s >= 5 || die "Paired-end alignment not formatted correctly: $line2";
+	my $l1 = $_;
+	my $l2 = <BOWTIE_PE>;
+	print "$l1";
+	print "$l2";
+	my @l1s = split(/[\t]/, $l1);
+	my @l2s = split(/[\t]/, $l2);
+	$#l1s >= 5 || die "Paired-end alignment not formatted correctly: $l1";
+	$#l2s >= 5 || die "Paired-end alignment not formatted correctly: $l2";
+	# Split the read name
 	my @l1rs = split(/\//, $l1s[0]);
 	my @l2rs = split(/\//, $l2s[0]);
 	$#l1rs >= 1 || die "Read not formatted correctly: $l1s[0]";
@@ -106,9 +111,11 @@ while(<BOWTIE_PE>) {
 	my $basename = $l1rs[0];
 	my $loff = int($l1s[3]);
 	my $roff = int($l2s[3]);
-	$loff < $roff || die "Left/right mate seem to be switched for $basename";
-	$roff - $loff >= $inner || die "Paired-end alignment seems to violate lower bound:\n$line1\n$line2";
-	$roff - $loff <= $outer || die "Paired-end alignment seems to violate upper bound:\n$line1\n$line2";
+	my $insLen = $roff - $loff + length($l2s[4]);
+	$insLen > length($l1s[4]) || die "Insert length did not exceed first mate length";
+	$insLen > length($l1s[5]) || die "Insert length did not exceed first mate length";
+	$insLen >= $inner || die "";
+	$insLen <= $outer || die "";
 	my $read1Short = $l1s[4];
 	my $qual1Short = $l1s[5];
 	my $read2Short = $l2s[4];
@@ -118,7 +125,7 @@ while(<BOWTIE_PE>) {
 	my $read2Mms = "";
 	$read2Mms = $l2s[7] if defined($l2s[7]);
 	my $val = "$basename $mate1str $l1s[2] $l1s[3] $l2s[3] $read1Short:$qual1Short $read2Short:$qual2Short $read1Mms $read2Mms";
-	die if defined ($peHash{$basename});
+	#defined ($peHash{$basename}) && die "Already saw paired-end alignment for basename $basename";
 	$peHash{$basename} = $val;
 	if($mate1) { $pesFw++; } else { $pesRc++; }
 	$pes++;
@@ -190,6 +197,7 @@ while(<BOWTIE_SE2>) {
 			if($ooff > $off) {
 				# The #1 mate is on the right
 				$diff = $ooff - $off + $olen;
+				next if ($diff <= $olen || $diff <= $len);
 				# upstream mate contains downstream one?
 				#next if $off + $len >= $ooff + $olen;
 				# mates are at the same position?
@@ -201,6 +209,7 @@ while(<BOWTIE_SE2>) {
 			} else {
 				# The #1 mate is on the left
 				$diff = $off - $ooff + $len;
+				next if ($diff <= $olen || $diff <= $len);
 				# upstream mate contains downstream one?
 				#next if $ooff + $olen >= $off + $len;
 				# mates are at the same position?
