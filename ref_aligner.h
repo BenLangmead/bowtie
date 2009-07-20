@@ -2221,7 +2221,7 @@ protected:
 				// Fill in the anchor using characters from the right-
 				// hand side of the query (but take the characters in
 				// left-to-right order)
-				i = qlen - anchorBitPairs + ii;
+				i = qlen - slen + ii;
 			}
 			int c = (int)qry[i]; // next query character
 			int r = (int)ref[halfwayRi + ii]; // next reference character
