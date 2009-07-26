@@ -31,6 +31,7 @@
 #include "bitset.h"
 #include "str_util.h"
 #include "mm.h"
+#include "timer.h"
 
 using namespace std;
 using namespace seqan;
@@ -337,6 +338,7 @@ public:
 	     int32_t __overrideIsaRate = -1,
 	     bool __useMm = false,
 	     bool __verbose = false,
+	     bool startVerbose = false,
 	     bool __passMemExc = false,
 	     bool __sanityCheck = false) :
 	     Ebwt_INITS
@@ -345,7 +347,7 @@ public:
 		_useMm = __useMm;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
-		readIntoMemory(true, &_eh);
+		readIntoMemory(true, &_eh, startVerbose);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -449,7 +451,7 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false, NULL);
+			readIntoMemory(false, NULL, false);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -742,7 +744,7 @@ public:
 	 * _in2 streams.
 	 */
 	void loadIntoMemory() {
-		readIntoMemory(false, NULL);
+		readIntoMemory(false, NULL, false);
 	}
 
 	/**
@@ -944,7 +946,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(bool justHeader, EbwtParams *params);
+	void readIntoMemory(bool justHeader, EbwtParams *params, bool startVerbose);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -2626,36 +2628,49 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
  * Read an Ebwt from file with given filename.
  */
 template<typename TStr>
-void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
+void Ebwt<TStr>::readIntoMemory(bool justHeader,
+                                EbwtParams *params,
+                                bool startVerbose)
+{
 	bool switchEndian; // dummy; caller doesn't care
 	if(_in1Str.length() > 0) {
-		if(_verbose) cout << "  About to open input files" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "  About to open input files: ";
+			logTime(cerr);
+		}
 #ifdef BOWTIE_MM
 		// Initialize our primary and secondary input-stream fields
 		if(_in1 != -1) close(_in1);
-		if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "Opening \"" << _in1Str << "\"" << endl;
+		}
 		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open index file " << _in1Str << endl;
 		}
 		if(_in2 != -1) close(_in2);
-		if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "Opening \"" << _in2Str << "\"" << endl;
+		}
 		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
 #else
 		// Initialize our primary and secondary input-stream fields
 		if(_in1 != NULL) fclose(_in1);
-		if(this->verbose()) cout << "Opening \"" << _in1Str << "\"" << endl;
+		if(_verbose || startVerbose) cerr << "Opening \"" << _in1Str << "\"" << endl;
 		if((_in1 = fopen(_in1Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in1Str << endl;
 		}
 		if(_in2 != NULL) fclose(_in2);
-		if(this->verbose()) cout << "Opening \"" << _in2Str << "\"" << endl;
+		if(_verbose || startVerbose) cerr << "Opening \"" << _in2Str << "\"" << endl;
 		if((_in2 = fopen(_in2Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
 #endif
-		if(_verbose) cout << "  Finished opening input files" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "  Finished opening input files: ";
+			logTime(cerr);
+		}
 	}
 
 #ifdef BOWTIE_MM
@@ -2664,7 +2679,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
 		int fds[] = { _in1, _in2 };
 		for(int i = 0; i < 2; i++) {
-			if(_verbose) cout << "  Memory-mapping input file " << (i+1) << endl;
+			if(_verbose || startVerbose) {
+				cerr << "  Memory-mapping input file " << (i+1) << ": ";
+				logTime(cerr);
+			}
 			struct stat sbuf;
 			if (stat(names[i], &sbuf) == -1) {
 				perror("stat");
@@ -2681,7 +2699,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		}
 	}
 #endif
-	if(_verbose) cout << "  Reading header" << endl;
+	if(_verbose || startVerbose) {
+		cerr << "  Reading header: ";
+		logTime(cerr);
+	}
 
 	// Read endianness hints from both streams
 	size_t bytesRead = 0;
@@ -2732,7 +2753,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	bool deleteEh = false;
 	if(params != NULL) {
 		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
-		if(_verbose) params->print(cout);
+		if(_verbose || startVerbose) params->print(cerr);
 		eh = params;
 	} else {
 		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
@@ -2793,7 +2814,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 #endif
 	} else {
 		try {
-			if(_verbose) cout << "Reading plen (" << this->_nPat << ")" << endl;
+			if(_verbose || startVerbose) {
+				cerr << "Reading plen (" << this->_nPat << "): ";
+				logTime(cerr);
+			}
 			this->_plen = new uint32_t[this->_nPat];
 			if(switchEndian) {
 				for(uint32_t i = 0; i < this->_nPat; i++) {
@@ -2821,7 +2845,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 
 	this->_nFrag = readU32(_in1, switchEndian);
 	bytesRead += 4;
-	if(_verbose) cout << "Reading rstarts (" << this->_nFrag*3 << ")" << endl;
+	if(_verbose || startVerbose) {
+		cerr << "Reading rstarts (" << this->_nFrag*3 << "): ";
+		logTime(cerr);
+	}
 	assert_geq(this->_nFrag, this->_nPat);
 	if(_useMm) {
 #ifdef BOWTIE_MM
@@ -2856,7 +2883,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 #endif
 	} else {
 		// Allocate ebwt (big allocation)
-		if(_verbose) cout << "Reading ebwt (" << eh->_ebwtTotLen << ") into process memory" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "Reading ebwt (" << eh->_ebwtTotLen << "): ";
+			logTime(cerr);
+		}
 		try {
 			this->_ebwt = new uint8_t[eh->_ebwtTotLen];
 		} catch(bad_alloc& e) {
@@ -2890,7 +2920,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 
 	try {
 		// Read fchr from primary stream
-		if(_verbose) cout << "Reading fchr (5)" << endl;
+		if(_verbose || startVerbose) cerr << "Reading fchr (5)" << endl;
 		if(_useMm) {
 #ifdef BOWTIE_MM
 			this->_fchr = (uint32_t*)(mmFile[0] + bytesRead);
@@ -2907,7 +2937,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 		}
 		assert_gt(this->_fchr[4], this->_fchr[0]);
 		// Read ftab from primary stream
-		if(_verbose) cout << "Reading ftab (" << eh->_ftabLen << ")" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "Reading ftab (" << eh->_ftabLen << "): ";
+			logTime(cerr);
+		}
 		if(_useMm) {
 #ifdef BOWTIE_MM
 			this->_ftab = (uint32_t*)(mmFile[0] + bytesRead);
@@ -2928,7 +2961,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 			}
 		}
 		// Read etab from primary stream
-		if(_verbose) cout << "Reading eftab (" << eh->_eftabLen << ")" << endl;
+		if(_verbose || startVerbose) {
+			cerr << "Reading eftab (" << eh->_eftabLen << "): ";
+			logTime(cerr);
+		}
 		if(_useMm) {
 #ifdef BOWTIE_MM
 			this->_eftab = (uint32_t*)(mmFile[0] + bytesRead);
@@ -2984,7 +3020,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	if(!_useMm) {
 		// Allocate offs_
 		try {
-			if(_verbose) cout << "Reading offs (" << offsLenSampled << " 32-bit words)" << endl;
+			if(_verbose || startVerbose) {
+				cerr << "Reading offs (" << offsLenSampled << " 32-bit words): ";
+				logTime(cerr);
+			}
 			this->_offs = new uint32_t[offsLenSampled];
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
@@ -3068,7 +3107,10 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	// Allocate _isa[] (big allocation)
 	if(!_useMm) {
 		try {
-			if(_verbose) cout << "Reading isa (" << isaLenSampled << ")" << endl;
+			if(_verbose || startVerbose) {
+				cerr << "Reading isa (" << isaLenSampled << "): ";
+				logTime(cerr);
+			}
 			this->_isa = new uint32_t[isaLenSampled];
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory allocating the isa[] array  for the Bowtie index." << endl
@@ -3121,7 +3163,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader, EbwtParams *params) {
 	}
 
 	this->postReadInit(*eh); // Initialize fields of Ebwt not read from file
-	if(_verbose) print(cout, *eh);
+	if(_verbose || startVerbose) print(cerr, *eh);
 
 	// The fact that _ebwt and friends actually point to something
 	// (other than NULL) now signals to other member functions that the

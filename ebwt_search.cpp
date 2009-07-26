@@ -38,6 +38,7 @@ static vector<string> mates2; // mated reads (second mate)
 static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase = "";
 static bool verbose				= 0; // be talkative
+static bool startVerbose		= 0; // be talkative at startup
 static bool quiet				= false; // print nothing but the alignments
 static int sanityCheck			= 0;  // enable expensive sanity checks
 static int format				= FASTQ; // default read format is FASTQ
@@ -139,6 +140,7 @@ enum {
 	ARG_SOLEXA_QUALS,
 	ARG_MAXBTS,
 	ARG_VERBOSE,
+	ARG_STARTVERBOSE,
 	ARG_QUIET,
 	ARG_RANDOM_READS,
 	ARG_RANDOM_READS_NOSYNC,
@@ -199,6 +201,7 @@ enum {
 
 static struct option long_options[] = {
 	{(char*)"verbose",      no_argument,       0,            ARG_VERBOSE},
+	{(char*)"startverbose", no_argument,       0,            ARG_STARTVERBOSE},
 	{(char*)"quiet",        no_argument,       0,            ARG_QUIET},
 	{(char*)"sanity",       no_argument,       0,            ARG_SANITY},
 	{(char*)"exact",        no_argument,       0,            '0'},
@@ -1338,6 +1341,7 @@ static int parseInt(int lower, const char *errmsg) {
 static void parseOptions(int argc, char **argv) {
     int option_index = 0;
 	int next_option;
+	if(startVerbose) { cerr << "Parsing options: "; logTime(cerr, true); }
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
@@ -1482,6 +1486,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_SPANSTRATA: spanStrata = true; break;
 	   		case ARG_STRATA: spanStrata = false; break;
 	   		case ARG_VERBOSE: verbose = true; break;
+	   		case ARG_STARTVERBOSE: startVerbose = true; break;
 	   		case ARG_QUIET: quiet = true; break;
 	   		case ARG_SANITY: sanityCheck = true; break;
 	   		case 't': timing = true; break;
@@ -4018,6 +4023,9 @@ static void driver(const char * type,
                    const vector<string>& queries,
                    const string& outfile)
 {
+	if(verbose || startVerbose)  {
+		cerr << "Entered driver(): "; logTime(cerr, true);
+	}
 	// Vector of the reference sequences; used for sanity-checking
 	vector<String<Dna5> > os;
 	// Read reference sequences from the command-line or from a FASTA file
@@ -4054,6 +4062,9 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads appearing
 	// interleaved in a single file
+	if(verbose || startVerbose) {
+		cerr << "Creating paired-end patsrcs: "; logTime(cerr, true);
+	}
 	for(size_t i = 0; i < mates12.size(); i++) {
 		if(mates12[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
@@ -4116,6 +4127,9 @@ static void driver(const char * type,
 	assert_eq(patsrcs_a.size(), patsrcs_b.size());
 
 	// Create list of pattern sources for the unpaired reads
+	if(verbose || startVerbose) {
+		cerr << "Creating single-end patsrcs: "; logTime(cerr, true);
+	}
 	for(size_t i = 0; i < queries.size(); i++) {
 		if(queries[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
@@ -4139,7 +4153,9 @@ static void driver(const char * type,
 		}
 	}
 
-	if(verbose) cout << "About to create PatternSource" << endl;
+	if(verbose || startVerbose) {
+		cerr << "Creating PatternSource: "; logTime(cerr, true);
+	}
 	PairedPatternSource *patsrc = NULL;
 	if(mates12.size() > 0) {
 		patsrc = new PairedSoloPatternSource(patsrcs_ab);
@@ -4150,7 +4166,9 @@ static void driver(const char * type,
 	if(skipSearch) return;
 
 	// Open hit output file
-	if(verbose) cout << "About to open hit output file" << endl;
+	if(verbose || startVerbose) {
+		cerr << "Opening hit output file: "; logTime(cerr, true);
+	}
 	OutFileBuf *fout;
 	if(!outfile.empty()) {
 		if(refOut) {
@@ -4167,25 +4185,31 @@ static void driver(const char * type,
 		fout = new OutFileBuf();
 	}
 	// Initialize Ebwt object and read in header
-	if(verbose) cout << "About to initialize forward Ebwt object" << endl;
+	if(verbose || startVerbose) {
+		cerr << "About to initialize fw Ebwt: "; logTime(cerr, true);
+	}
     Ebwt<TStr> ebwt(adjustedEbwtFileBase,
                     true,     // index is for the forward direction
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
                     useMm,    // whether to use memory-mapped files
-                    verbose,  // whether to be talkative
+                    verbose, // whether to be talkative
+                    startVerbose, // talkative during initialization
                     false /*passMemExc*/,
                     sanityCheck);
     Ebwt<TStr>* ebwtBw = NULL;
     // We need the mirror index if mismatches are allowed
     if(mismatches > 0 || maqLike) {
-    	if(verbose) cout << "About to initialize reverse Ebwt object" << endl;
+    	if(verbose || startVerbose) {
+    		cerr << "About to initialize rev Ebwt: "; logTime(cerr, true);
+    	}
     	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
     	                        false, // index is for the reverse direction
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
     	                        useMm,    // whether to use memory-mapped files
     	                        verbose,  // whether to be talkative
+    	                        startVerbose, // talkative during initialization
     	                        false /*passMemExc*/,
     	                        sanityCheck);
     }
@@ -4205,6 +4229,9 @@ static void driver(const char * type,
 	}
 	{
 		Timer _t(cout, "Time searching: ", timing);
+    	if(verbose || startVerbose) {
+    		cerr << "Creating HitSink: "; logTime(cerr, true);
+    	}
 		// Set up hit sink; if sanityCheck && !os.empty() is true,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
@@ -4268,6 +4295,9 @@ static void driver(const char * type,
 				cerr << "Invalid output type: " << outType << endl;
 				exit(1);
 		}
+    	if(verbose || startVerbose) {
+    		cerr << "Dispatching to search driver: "; logTime(cerr, true);
+    	}
 		if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
@@ -4348,6 +4378,7 @@ int main(int argc, char **argv) {
 	string query;   // read query string(s) from this file
 	vector<string> queries;
 	string outfile; // write query results to this file
+	if(startVerbose) { cerr << "Entered main(): "; logTime(cerr, true); }
 	parseOptions(argc, argv);
 	argv0 = argv[0];
 	if(showVersion) {
@@ -4376,6 +4407,9 @@ int main(int argc, char **argv) {
 #endif
 	{
 		Timer _t(cout, "Overall time: ", timing);
+		if(startVerbose) {
+			cerr << "Parsing index and read arguments: "; logTime(cerr, true);
+		}
 
 		// Get index basename
 		if(optind >= argc) {

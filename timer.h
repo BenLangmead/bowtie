@@ -46,4 +46,18 @@ private:
 	bool        _verbose;
 };
 
+static inline void logTime(std::ostream& os, bool nl = true) {
+	struct tm *current;
+	time_t now;
+	time(&now);
+	current = localtime(&now);
+	os << setfill('0') << setw(2)
+	    << current->tm_hour << ":"
+	    << setfill('0') << setw(2)
+	    << current->tm_min << ":"
+	    << setfill('0') << setw(2)
+	    << current->tm_sec;
+	if(nl) os << std::endl;
+}
+
 #endif /*TIMER_H_*/
