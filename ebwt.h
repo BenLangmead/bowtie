@@ -337,6 +337,7 @@ public:
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
 	     bool __useMm = false,
+	     bool mmSweep = false,
 	     bool __verbose = false,
 	     bool startVerbose = false,
 	     bool __passMemExc = false,
@@ -347,7 +348,7 @@ public:
 		_useMm = __useMm;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
-		readIntoMemory(true, &_eh, startVerbose);
+		readIntoMemory(true, &_eh, mmSweep, startVerbose);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -451,7 +452,7 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false, NULL, false);
+			readIntoMemory(false, NULL, false, false);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -744,7 +745,7 @@ public:
 	 * _in2 streams.
 	 */
 	void loadIntoMemory() {
-		readIntoMemory(false, NULL, false);
+		readIntoMemory(false, NULL, false, false);
 	}
 
 	/**
@@ -946,7 +947,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(bool justHeader, EbwtParams *params, bool startVerbose);
+	void readIntoMemory(bool justHeader, EbwtParams *params, bool mmSweep, bool startVerbose);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -2630,6 +2631,7 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 template<typename TStr>
 void Ebwt<TStr>::readIntoMemory(bool justHeader,
                                 EbwtParams *params,
+                                bool mmSweep,
                                 bool startVerbose)
 {
 	bool switchEndian; // dummy; caller doesn't care
@@ -2695,6 +2697,16 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				perror("mmap");
 				cerr << "Error: Could not memory-map the index file " << names[i] << endl;
 				exit(1);
+			}
+			if(mmSweep) {
+				int sum = 0;
+				for(size_t j = 0; j < sbuf.st_size; j += 1024) {
+					sum += (int) mmFile[i][j];
+				}
+				if(startVerbose) {
+					cerr << "  Swept the memory-mapped ebwt index file 1; checksum: " << sum << ": ";
+					logTime(cerr);
+				}
 			}
 		}
 	}

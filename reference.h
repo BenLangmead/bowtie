@@ -3,6 +3,7 @@
 
 #include "endian_swap.h"
 #include "mm.h"
+#include "timer.h"
 
 /**
  * Concrete reference representation that bulk-loads the reference from
@@ -34,7 +35,9 @@ public:
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
 	                 bool useMm = false,
-	                 bool verbose = false) :
+	                 bool mmSweep = false,
+	                 bool verbose = false,
+	                 bool startVerbose = false) :
 	buf_(NULL),
 	sanityBuf_(NULL),
 	loaded_(true),
@@ -62,8 +65,9 @@ public:
 		}
 		char *mmFile = NULL;
 		if(useMm_) {
-			if(verbose_) {
-				cout << "  Memory-mapping reference index file " << s4 << endl;
+			if(verbose_ || startVerbose) {
+				cerr << "  Memory-mapping reference index file " << s4 << ": ";
+				logTime(cerr);
 			}
 			struct stat sbuf;
 			if (stat(s4.c_str(), &sbuf) == -1) {
@@ -77,6 +81,16 @@ public:
 				perror("mmap");
 				cerr << "Error: Could not memory-map the index file " << s4.c_str() << endl;
 				exit(1);
+			}
+			if(mmSweep) {
+				int sum = 0;
+				for(size_t i = 0; i < sbuf.st_size; i += 1024) {
+					sum += (int) mmFile[i];
+				}
+				if(startVerbose) {
+					cerr << "  Swept the memory-mapped ref index file; checksum: " << sum << ": ";
+					logTime(cerr);
+				}
 			}
 		}
 #else
@@ -147,8 +161,9 @@ public:
 			cumlen += recs_.back().off;
 			cumlen += recs_.back().len;
 		}
-		if(verbose_) {
-			cout << "Read " << nrefs_ << " reference strings from " << sz << " records" << endl;
+		if(verbose_ || startVerbose) {
+			cerr << "Read " << nrefs_ << " reference strings from " << sz << " records: ";
+			logTime(cerr);
 		}
 		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back(recs_.size());

@@ -250,7 +250,9 @@ static void driver(const string& ebwtFileBase, const string& query) {
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
 	} else {
 		// Initialize Ebwt object
-		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1, false, verbose);
+		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1,
+		                 false, false, // no memory-mapped io
+		                 verbose);
 	    // Load whole index into memory
 		ebwt.loadIntoMemory();
 		print_index_sequences(cout, ebwt);

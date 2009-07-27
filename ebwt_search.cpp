@@ -100,6 +100,7 @@ static bool forgiveInput        = false; // let read input be a little wrong w/o
 static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
 static bool useMm               = false; // use memory-mapped files to hold the index
+static bool mmSweep             = false; // sweep through memory-mapped files immediately after mapping
 static bool stateful            = false; // use stateful aligners
 static uint32_t prefetchWidth   = 1;     // number of reads to process in parallel w/ --stateful
 static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
@@ -173,6 +174,7 @@ enum {
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
 	ARG_MM,
+	ARG_MMSWEEP,
 	ARG_STATEFUL,
 	ARG_PREFETCH_WIDTH,
 	ARG_FF,
@@ -292,6 +294,7 @@ static struct option long_options[] = {
 	{(char*)"chunksz",      required_argument, 0,            ARG_CHUNKSZ},
 	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
 	{(char*)"mm",           no_argument,       0,            ARG_MM},
+	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
 	{(char*)0, 0, 0, 0} // terminator
@@ -1389,6 +1392,7 @@ static void parseOptions(int argc, char **argv) {
 	   			exit(1);
 #endif
 	   		}
+	   		case ARG_MMSWEEP: mmSweep = true; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_AL: dumpAlBase = optarg; break;
@@ -2010,7 +2014,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	exactSearch_refs   = refs;
@@ -2446,7 +2450,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	mismatchSearch_refs = refs;
@@ -3067,7 +3071,7 @@ static void twoOrThreeMismatchSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3898,7 +3902,7 @@ static void seededQualCutoffSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cout, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, verbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	seededQualSearch_refs = refs;
@@ -4193,6 +4197,7 @@ static void driver(const char * type,
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
                     useMm,    // whether to use memory-mapped files
+                    mmSweep,  // sweep memory-mapped files
                     verbose, // whether to be talkative
                     startVerbose, // talkative during initialization
                     false /*passMemExc*/,
@@ -4208,6 +4213,7 @@ static void driver(const char * type,
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
     	                        useMm,    // whether to use memory-mapped files
+    	                        mmSweep,  // sweep memory-mapped files
     	                        verbose,  // whether to be talkative
     	                        startVerbose, // talkative during initialization
     	                        false /*passMemExc*/,
