@@ -84,7 +84,7 @@ public:
 			}
 			if(mmSweep) {
 				int sum = 0;
-				for(size_t i = 0; i < sbuf.st_size; i += 1024) {
+				for(off_t i = 0; i < sbuf.st_size; i += 1024) {
 					sum += (int) mmFile[i];
 				}
 				if(startVerbose) {

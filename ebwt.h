@@ -2700,7 +2700,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			}
 			if(mmSweep) {
 				int sum = 0;
-				for(size_t j = 0; j < sbuf.st_size; j += 1024) {
+				for(off_t j = 0; j < sbuf.st_size; j += 1024) {
 					sum += (int) mmFile[i][j];
 				}
 				if(startVerbose) {
