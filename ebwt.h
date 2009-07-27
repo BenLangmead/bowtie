@@ -318,7 +318,9 @@ public:
 	    _isa(NULL), \
 	    _ebwt(NULL), \
 	    _useMm(false), \
-	    _refnames()
+	    _refnames(), \
+	    mmFile1_(NULL), \
+	    mmFile2_(NULL)
 
 #ifdef EBWT_STATS
 #define Ebwt_STAT_INITS \
@@ -1046,6 +1048,8 @@ public:
 	uint8_t*   _ebwt;
 	bool       _useMm;        /// use memory-mapped files to hold the index
 	vector<string> _refnames; /// names of the reference sequences
+	char *mmFile1_;
+	char *mmFile2_;
 	EbwtParams _eh;
 
 #ifdef EBWT_STATS
@@ -2635,6 +2639,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
                                 bool startVerbose)
 {
 	bool switchEndian; // dummy; caller doesn't care
+	char *mmFile[] = { NULL, NULL };
 	if(_in1Str.length() > 0) {
 		if(_verbose || startVerbose) {
 			cerr << "  About to open input files: ";
@@ -2673,44 +2678,56 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			cerr << "  Finished opening input files: ";
 			logTime(cerr);
 		}
-	}
 
 #ifdef BOWTIE_MM
-	char *mmFile[] = { NULL, NULL };
-	if(_useMm) {
-		const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
-		int fds[] = { _in1, _in2 };
-		for(int i = 0; i < 2; i++) {
-			if(_verbose || startVerbose) {
-				cerr << "  Memory-mapping input file " << (i+1) << ": ";
-				logTime(cerr);
-			}
-			struct stat sbuf;
-			if (stat(names[i], &sbuf) == -1) {
-				perror("stat");
-				cerr << "Error: Could not stat index file " << names[i] << " prior to memory-mapping" << endl;
-				exit(1);
-			}
-			mmFile[i] = (char*)mmap((void *)0, sbuf.st_size,
-			                        PROT_READ, MAP_SHARED, fds[i], 0);
-			if(mmFile == (void *)(-1)) {
-				perror("mmap");
-				cerr << "Error: Could not memory-map the index file " << names[i] << endl;
-				exit(1);
-			}
-			if(mmSweep) {
-				int sum = 0;
-				for(off_t j = 0; j < sbuf.st_size; j += 1024) {
-					sum += (int) mmFile[i][j];
-				}
-				if(startVerbose) {
-					cerr << "  Swept the memory-mapped ebwt index file 1; checksum: " << sum << ": ";
+		if(_useMm && !justHeader) {
+			const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
+			int fds[] = { _in1, _in2 };
+			for(int i = 0; i < 2; i++) {
+				if(_verbose || startVerbose) {
+					cerr << "  Memory-mapping input file " << (i+1) << ": ";
 					logTime(cerr);
 				}
+				struct stat sbuf;
+				if (stat(names[i], &sbuf) == -1) {
+					perror("stat");
+					cerr << "Error: Could not stat index file " << names[i] << " prior to memory-mapping" << endl;
+					exit(1);
+				}
+				mmFile[i] = (char*)mmap((void *)0, sbuf.st_size,
+										PROT_READ, MAP_SHARED, fds[i], 0);
+				if(mmFile == (void *)(-1)) {
+					perror("mmap");
+					cerr << "Error: Could not memory-map the index file " << names[i] << endl;
+					exit(1);
+				}
+				if(mmSweep) {
+					int sum = 0;
+					for(off_t j = 0; j < sbuf.st_size; j += 1024) {
+						sum += (int) mmFile[i][j];
+					}
+					if(startVerbose) {
+						cerr << "  Swept the memory-mapped ebwt index file 1; checksum: " << sum << ": ";
+						logTime(cerr);
+					}
+				}
 			}
+			mmFile1_ = mmFile[0];
+			mmFile2_ = mmFile[1];
 		}
+#endif
+	}
+#ifdef BOWTIE_MM
+	else if(_useMm && !justHeader) {
+		mmFile[0] = mmFile1_;
+		mmFile[1] = mmFile2_;
+	}
+	if(_useMm && !justHeader) {
+		assert(mmFile[0] == mmFile1_);
+		assert(mmFile[1] == mmFile2_);
 	}
 #endif
+
 	if(_verbose || startVerbose) {
 		cerr << "  Reading header: ";
 		logTime(cerr);
