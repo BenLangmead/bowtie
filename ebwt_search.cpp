@@ -2007,13 +2007,13 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	{
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
-		Timer _t(cout, "Time loading forward index: ", timing);
+		Timer _t(cerr, "Time loading forward index: ", timing);
 		ebwt.loadIntoMemory();
 	}
 
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
-		Timer _t(cout, "Time loading reference: ", timing);
+		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
@@ -2029,7 +2029,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 #endif
 	CHUD_START();
 	{
-		Timer _t(cout, "Time for 0-mismatch search: ", timing);
+		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) {
 			tids[i] = i+1;
@@ -2209,7 +2209,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	{
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
-		Timer _t(cout, "Time loading forward index: ", timing);
+		Timer _t(cerr, "Time loading forward index: ", timing);
 		ebwtFw.loadIntoMemory();
 	}
 
@@ -2223,7 +2223,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
     CHUD_START();
 	// Phase 1
     {
-		Timer _t(cout, "Time for 1-mismatch Phase 1 of 2: ", timing);
+		Timer _t(cerr, "Time for 1-mismatch Phase 1 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -2248,7 +2248,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	{
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
-		Timer _t(cout, "Time loading mirror index: ", timing);
+		Timer _t(cerr, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
     _patsrc.reset();          // reset pattern source to 1st pattern
@@ -2259,7 +2259,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 
 	// Phase 2
 	{
-		Timer _t(cout, "Time for 1-mismatch Phase 2 of 2: ", timing);
+		Timer _t(cerr, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase2, (void *)&tids[i]);
@@ -2438,18 +2438,18 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	assert(!ebwtBw.isInMemory());
 	{
 		// Load the other half of the index into memory
-		Timer _t(cout, "Time loading forward index: ", timing);
+		Timer _t(cerr, "Time loading forward index: ", timing);
 		ebwtFw.loadIntoMemory();
 	}
 	{
 		// Load the other half of the index into memory
-		Timer _t(cout, "Time loading mirror index: ", timing);
+		Timer _t(cerr, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
-		Timer _t(cout, "Time loading reference: ", timing);
+		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
@@ -2465,7 +2465,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #endif
     CHUD_START();
     {
-		Timer _t(cout, "Time for 1-mismatch full-index search: ", timing);
+		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -2502,7 +2502,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	assert(!ebwtBw.isInMemory()); \
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
-		Timer _t(cout, "Time loading forward index: ", timing); \
+		Timer _t(cerr, "Time loading forward index: ", timing); \
 		ebwtFw.loadIntoMemory(); \
 	} \
 	assert(ebwtFw.isInMemory()); \
@@ -2515,7 +2515,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	assert(!ebwtFw.isInMemory()); \
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
-		Timer _t(cout, "Time loading mirror index: ", timing); \
+		Timer _t(cerr, "Time loading mirror index: ", timing); \
 		ebwtBw.loadIntoMemory(); \
 	} \
 	assert(ebwtBw.isInMemory()); \
@@ -2812,7 +2812,7 @@ static void twoOrThreeMismatchSearch(
 	// Load forward index
 	SWITCH_TO_FW_INDEX();
     { // Phase 1
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
+		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -2834,7 +2834,7 @@ static void twoOrThreeMismatchSearch(
 	// Unload forward index and load mirror index
 	SWITCH_TO_BW_INDEX();
 	{ // Phase 2
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
+		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
@@ -2854,7 +2854,7 @@ static void twoOrThreeMismatchSearch(
 	}
 	SWITCH_TO_FW_INDEX();
 	{ // Phase 3
-		Timer _t(cout, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
+		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
@@ -3059,18 +3059,18 @@ static void twoOrThreeMismatchSearchFull(
 	assert(!ebwtBw.isInMemory());
 	{
 		// Load the other half of the index into memory
-		Timer _t(cout, "Time loading forward index: ", timing);
+		Timer _t(cerr, "Time loading forward index: ", timing);
 		ebwtFw.loadIntoMemory();
 	}
 	{
 		// Load the other half of the index into memory
-		Timer _t(cout, "Time loading mirror index: ", timing);
+		Timer _t(cerr, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
-		Timer _t(cout, "Time loading reference: ", timing);
+		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
@@ -3093,7 +3093,7 @@ static void twoOrThreeMismatchSearchFull(
 #endif
     CHUD_START();
     {
-		Timer _t(cout, "End-to-end 2/3-mismatch full-index search: ", timing);
+		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -3724,7 +3724,7 @@ static void seededQualCutoffSearch(
 		if(seedMms == 0) {
 			msg = "Seeded quality search Phase 1 of 2: ";
 		}
-		Timer _t(cout, msg, timing);
+		Timer _t(cerr, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -3761,7 +3761,7 @@ static void seededQualCutoffSearch(
 		if(seedMms == 0) {
 			msg = "Seeded quality search Phase 2 of 2: ";
 		}
-		Timer _t(cout, msg, timing);
+		Timer _t(cerr, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)&tids[i]);
@@ -3799,7 +3799,7 @@ static void seededQualCutoffSearch(
 	{
 		// Phase 3: Consider cases 3R and 4R and generate seedlings for
 		// case 4F
-		Timer _t(cout, "Seeded quality search Phase 3 of 4: ", timing);
+		Timer _t(cerr, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)&tids[i]);
@@ -3827,7 +3827,7 @@ static void seededQualCutoffSearch(
 	SWITCH_TO_BW_INDEX();
 	{
 		// Phase 4: Consider case 4F
-		Timer _t(cout, "Seeded quality search Phase 4 of 4: ", timing);
+		Timer _t(cerr, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)&tids[i]);
@@ -3901,7 +3901,7 @@ static void seededQualCutoffSearchFull(
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
-		Timer _t(cout, "Time loading reference: ", timing);
+		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
@@ -3919,13 +3919,13 @@ static void seededQualCutoffSearchFull(
 	assert(!ebwtBw.isInMemory());
 	{
 		// Load the other half of the index into memory
-		Timer _t(cout, "Time loading mirror index: ", timing);
+		Timer _t(cerr, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory();
 	}
     CHUD_START();
 	{
 		// Phase 1: Consider cases 1R and 2R
-		Timer _t(cout, "Seeded quality full-index search: ", timing);
+		Timer _t(cerr, "Seeded quality full-index search: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
@@ -4234,7 +4234,7 @@ static void driver(const char * type,
 		ebwt.evictFromMemory();
 	}
 	{
-		Timer _t(cout, "Time searching: ", timing);
+		Timer _t(cerr, "Time searching: ", timing);
     	if(verbose || startVerbose) {
     		cerr << "Creating HitSink: "; logTime(cerr, true);
     	}
@@ -4412,7 +4412,7 @@ int main(int argc, char **argv) {
 	chudAcquireRemoteAccess();
 #endif
 	{
-		Timer _t(cout, "Overall time: ", timing);
+		Timer _t(cerr, "Overall time: ", timing);
 		if(startVerbose) {
 			cerr << "Parsing index and read arguments: "; logTime(cerr, true);
 		}
