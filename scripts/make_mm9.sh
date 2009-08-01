@@ -58,7 +58,7 @@ done
 echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} mm9
 ${BOWTIE_BUILD_EXE} ${INPUTS} mm9
 if [ "$?" = "0" ] ; then
-	echo "mm9.1 index built:"
+	echo "mm9 index built:"
 	echo "   mm9.ebwt mm9.2.ebwt"
 	echo "   mm9.3.ebwt mm9.4.ebwt"
 	echo "   mm9.rev.1.ebwt mm9.rev.2.ebwt"
