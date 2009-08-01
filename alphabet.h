@@ -52,10 +52,15 @@ static inline TStr reverseComplement(const TStr& s) {
  * Reverse-complement s in-place.  Ns go to Ns.
  */
 template<typename TStr>
-static inline void reverseComplementInPlace(TStr& s) {
+static inline void reverseComplementInPlace(TStr& s, bool color = false) {
 	typedef typename Value<TStr>::Type TVal;
+	if(color) {
+		reverseInPlace(s);
+		return;
+	}
 	size_t len = length(s);
-	for(size_t i = 0; i < (len>>1); i++) {
+	size_t i;
+	for(i = 0; i < (len>>1); i++) {
 		int sv = (int)s[len-i-1];
 		int sf = (int)s[i];
 		if(sv == 4) {
@@ -68,6 +73,9 @@ static inline void reverseComplementInPlace(TStr& s) {
 		} else {
 			s[len-i-1] = (TVal)(sf ^ 3);
 		}
+	}
+	if((len & 1) != 0 && (int)s[len >> 1] != 4) {
+		s[len >> 1] = (TVal)((int)s[len >> 1] ^ 3);
 	}
 }
 
