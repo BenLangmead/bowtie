@@ -20,8 +20,8 @@ void AnnotationMap::parse() {
 	}
 	while(!in.eof()) {
 		U32Pair pos;
-		char an;
-		in >> pos.first >> pos.second >> an;
+		CharPair an;
+		in >> pos.first >> pos.second >> an.first >> an.second;
 		map_[pos] = an;
 	}
 	in.close();

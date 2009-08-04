@@ -18,10 +18,12 @@
  * somehow (e.g. as a SNP).
  */
 class AnnotationMap {
-	typedef std::pair<uint32_t, uint32_t> U32Pair;
-	typedef std::map<U32Pair, char> AnnotMap;
-
 public:
+	typedef std::pair<uint32_t, uint32_t> U32Pair;
+	typedef std::pair<char, char> CharPair;
+	typedef std::map<U32Pair, CharPair> AnnotMap;
+	typedef std::map<U32Pair, CharPair>::const_iterator Iter;
+
 	AnnotationMap(const char *fname) {
 		fname_ = fname;
 		parse();
@@ -32,8 +34,16 @@ public:
 	 * new reference coordinate via the reference map supplied by the
 	 * user.
 	 */
-	AnnotMap::const_iterator lower_bound(U32Pair& h) const {
+	Iter lower_bound(const U32Pair& h) const {
 		return map_.lower_bound(h);
+	}
+
+	Iter begin() const {
+		return map_.begin();
+	}
+
+	Iter end() const {
+		return map_.end();
 	}
 
 protected:
@@ -46,7 +56,7 @@ protected:
 	/// filename of file containing the annotation map
 	const char *fname_;
 	/// maps reference positions to character annotations
-	std::map<U32Pair, char> map_;
+	AnnotMap map_;
 };
 
 #endif /* ANNOT_H_ */
