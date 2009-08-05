@@ -17,6 +17,9 @@
 #include "pat.h"
 #include "formats.h"
 #include "filebuf.h"
+#include "edit.h"
+#include "refmap.h"
+#include "annot.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -27,9 +30,10 @@ using namespace seqan;
 
 /// Constants for the various output modes
 enum output_types {
-	FULL = 1,
-	CONCISE,
-	BINARY,
+	OUTPUT_FULL = 1,
+	OUTPUT_CONCISE,
+	OUTPUT_BINARY,
+	OUTPUT_CHAIN,
 	NONE
 };
 
@@ -54,46 +58,29 @@ static const int max_read_bp = 1024;
  */
 class Hit {
 public:
-	Hit() :
-		h(make_pair(0, 0)),
-		patId(0),
-		patName(String<char>("")),
-		patSeq(String<char>("")),
-		quals(String<char>("")),
-		mms(),
-		refcs(),
-		oms(0),
-		fw(true),
-		mate(0) { }
+	Hit() : stratum(-1) { }
 
-	Hit(const Hit& other) {
-		this->operator=(other);
-		assert(seqan::begin(patName) != seqan::begin(other.patName));
-		assert(seqan::begin(patSeq)  != seqan::begin(other.patSeq));
-		assert(seqan::begin(quals)   != seqan::begin(other.quals));
-	}
+	Hit(const Hit& other) { this->operator=(other); }
 
 	Hit(U32Pair _h,
-		uint32_t _patId,
-		const String<char>& _patName,
-		const String<Dna5>& _patSeq,
-		const String<char>& _quals,
-		bool _fw,
-		const FixedBitset<max_read_bp>& _mms,
-		const vector<char>& _refcs,
-		uint32_t _oms = 0,
-		uint8_t _mate = 0) :
-		h(_h),
-		patId(_patId),
-		oms(_oms),
-		fw(_fw),
-		mate(_mate)
+		uint32_t id,
+		const String<char>& name,
+		const String<Dna5>& seq,
+		const String<char>& q,
+		bool f,
+		const FixedBitset<max_read_bp>& mm,
+		const vector<char>& rc,
+		uint32_t os,
+		int8_t st,
+		uint16_t co,
+		uint8_t m) :
+		h(_h), patId(id), oms(os), fw(f), stratum(st), cost(co), mate(m)
 	{
-		patName = _patName;
-		patSeq  = _patSeq;
-		quals   = _quals;
-		mms     = _mms;
-		refcs   = _refcs;
+		patName = name;
+		patSeq  = seq;
+		quals   = q;
+		mms     = mm;
+		refcs   = rc;
 		// Enforce the constraints imposed by the binary output format
 		if(seqan::length(patName) > 0xffff) {
 			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
@@ -116,6 +103,82 @@ public:
 			     << "truncate reads and re-run bowtie." << endl;
 			exit(1);
 		}
+		if(stratum < 0 || stratum >= 4) {
+			cerr << "Error: Stratum is out of bounds: " << stratum << endl;
+			exit(1);
+		}
+	}
+
+	/**
+	 * Initialize this Ent to represent the given hit.
+	 */
+	void toHitSetEnt(HitSetEnt& hse, AnnotationMap *amap) const {
+		hse.h = h;
+		hse.fw = fw ? 1 : 0;
+		hse.oms = oms;
+		hse.stratum = stratum;
+		hse.cost = cost;
+		if(mms.count() == 0) return;
+		map<int, char> snpAnnots;
+		if(amap != NULL) {
+			AnnotationMap::Iter ai = amap->lower_bound(hse.h);
+			for(; ai != amap->end(); ai++) {
+				assert_geq(ai->first.first, h.first);
+				if(ai->first.first != h.first) {
+					// Different chromosome
+					break;
+				}
+				if(ai->first.second >= h.second + length()) {
+					// Doesn't fall into alignment
+					break;
+				}
+				if(ai->second.first != 'S') {
+					// Not a SNP annotation
+					continue;
+				}
+				// Found a SNP annotation falling within the alignment
+				size_t off = ai->first.second - h.second;
+				if(!fw) off = length() - off - 1;
+				snpAnnots[off] = ai->second.second;
+			}
+		}
+		for(int i = 0; i < (int)length(); i++) {
+			if(mms.test(i)) {
+				hse.expand();
+				hse.back().type = EDIT_TYPE_MM;
+				hse.back().pos = i;
+				hse.back().chr = charToDna5[(int)refcs[i]];
+			} else if(snpAnnots.find(i) != snpAnnots.end()) {
+				hse.expand();
+				hse.back().type = EDIT_TYPE_SNP;
+				hse.back().pos = i;
+				hse.back().chr = charToDna5[(int)snpAnnots[i]];
+			}
+		}
+	}
+
+	/**
+	 * Convert a list of Hit objects to a single HitSet object suitable
+	 * for chaining.
+	 */
+	static void toHitSet(const std::vector<Hit>& hits, HitSet& hs,
+	                     AnnotationMap *amap)
+	{
+		if(hits.empty()) return;
+		// Initialize HitSet
+		hs.name = hits.front().patName;
+		hs.seq  = hits.front().patSeq;
+		hs.qual = hits.front().quals;
+		if(!hits.front().fw) {
+			// Re-reverse
+			reverseComplementInPlace(hs.seq, false);
+			reverseInPlace(hs.qual);
+		}
+		// Convert hits to entries
+		hs.ents.resize(hits.size());
+		for(size_t i = 0; i < hs.ents.size(); i++) {
+			hits[i].toHitSetEnt(hs.ents[i], amap);
+		}
 	}
 
 	U32Pair             h;       /// reference index & offset
@@ -127,6 +190,8 @@ public:
 	vector<char>        refcs;   /// reference characters for mms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
+	int8_t              stratum; /// stratum of hit (= mismatches in seed)
+	uint16_t            cost;    /// total cost, factoring in stratum and quality penalty
 	uint8_t             mate;    /// matedness; 0 = not a mate
 	                             ///            1 = upstream mate
 	                             ///            2 = downstream mate
@@ -143,6 +208,8 @@ public:
 	    this->refcs   = other.refcs;
 	    this->oms     = other.oms;
 		this->fw      = other.fw;
+		this->stratum = other.stratum;
+		this->cost    = other.cost;
 		this->mate    = other.mate;
 	    return *this;
 	}
@@ -409,13 +476,22 @@ public:
 		return refIdx;
 	}
 
-	/// Implementation of hit-report
-	virtual void reportHit(const Hit& h) = 0;
-
 	/**
 	 * Append a single hit to the given output stream.
 	 */
 	virtual void append(ostream& o, const Hit& h) = 0;
+
+	/**
+	 * Report a maxed-out read.  Typically we do nothing, but we might
+	 * want to print a placeholder when output is chained.
+	 */
+	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) { }
+
+	/**
+	 * Report an unaligned read.  Typically we do nothing, but we might
+	 * want to print a placeholder when output is chained.
+	 */
+	virtual void reportUnaligned(PatternSourcePerThread& p) { }
 
 	/**
 	 * Report a batch of hits.
@@ -521,7 +597,7 @@ public:
 			else if(strIdx < 1000)  oss << "00";
 			else if(strIdx < 10000) oss << "0";
 			oss << strIdx << ".map";
-			_outs[strIdx] = new OutFileBuf(oss.str().c_str());
+			_outs[strIdx] = new OutFileBuf(oss.str().c_str(), ssmode_ == ios_base::binary);
 		}
 		assert(_outs[strIdx] != NULL);
 		return *(_outs[strIdx]);
@@ -819,6 +895,12 @@ public:
 
 protected:
 
+	/// Implementation of hit-report
+	virtual void reportHit(const Hit& h) {
+		cerr << "Error: reportHit unimplemented" << endl;
+		exit(1);
+	}
+
 	/**
 	 * Close (and flush) all OutFileBufs.
 	 */
@@ -1082,22 +1164,29 @@ public:
 	virtual uint32_t finishRead(PatternSourcePerThread& p, bool dump = true) {
 		uint32_t ret = finishReadImpl();
 		_bestRemainingStratum = 0;
-		if(dump && (ret == 0 || (ret > 0 && _bufferedHits.size() == 0))) {
+		bool maxed = (ret > 0 && _bufferedHits.size() == 0);
+		bool unal = (ret == 0);
+		if(dump && (unal || maxed)) {
 			// Either no reportable hits were found or the number of
 			// reportable hits exceeded the -m limit specified by the
 			// user
 			assert(ret == 0 || ret > _max);
-			if(ret > 0) _sink.dumpMaxed(p);
-			else        _sink.dumpUnal(p);
+			if(maxed) _sink.dumpMaxed(p);
+			else      _sink.dumpUnal(p);
 		}
-		if(_bufferedHits.size() > 0) {
+		ret = 0;
+		if(maxed) {
+			// Report how the read maxed-out; useful for chaining output
+			_sink.reportMaxed(_bufferedHits, p);
+		} else if(unal) {
+			// Report how the read maxed-out; useful for chaining output
+			_sink.reportUnaligned(p);
+		} else if(_bufferedHits.size() > 0) {
 			// Flush buffered hits
 			_sink.reportHits(_bufferedHits);
 			_sink.dumpAlign(p);
 			ret = _bufferedHits.size();
 			_bufferedHits.clear();
-		} else {
-			ret = 0;
 		}
 		assert_eq(0, _bufferedHits.size());
 		return ret;
@@ -2187,6 +2276,8 @@ public:
 		ConciseHitSink::append(ss, h, this->offBase_, this->_reportOpps);
 	}
 
+protected:
+
 	/**
 	 * Report a concise alignment to the appropriate output stream.
 	 */
@@ -2222,11 +2313,14 @@ public:
 	 */
 	VerboseHitSink(OutFileBuf* out,
 	               int offBase,
+	               ReferenceMap *rmap,
+	               AnnotationMap *amap,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(out, PASS_HIT_DUMPS),
 	_partition(partition),
-	offBase_(offBase)
+	offBase_(offBase),
+	rmap_(rmap), amap_(amap)
 	{ }
 
 	/**
@@ -2235,11 +2329,14 @@ public:
 	 */
 	VerboseHitSink(size_t numOuts,
 	               int offBase,
+	               ReferenceMap *rmap,
+	               AnnotationMap *amap,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(numOuts, PASS_HIT_DUMPS),
 	_partition(partition),
-	offBase_(offBase)
+	offBase_(offBase),
+	rmap_(rmap), amap_(amap)
 	{ }
 
 	/**
@@ -2496,6 +2593,8 @@ public:
 	static void append(ostream& ss,
 	                   const Hit& h,
 	                   const vector<string>* refnames,
+	                   ReferenceMap *rmap,
+	                   AnnotationMap *amap,
 	                   int partition,
 	                   int offBase)
 	{
@@ -2562,7 +2661,9 @@ public:
 				assert(!dospill);
 				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
 				// .first is text id, .second is offset
-				if(refnames != NULL && h.h.first < refnames->size()) {
+				if(refnames != NULL && rmap != NULL) {
+					ss << rmap->getName(h.h.first);
+				} else if(refnames != NULL && h.h.first < refnames->size()) {
 					ss << (*refnames)[h.h.first];
 				} else {
 					ss << h.h.first;
@@ -2572,24 +2673,49 @@ public:
 				ss << "\t" << h.quals;
 				ss << "\t" << h.oms;
 				ss << "\t";
-				// Output mismatch column
-				bool firstmiss = true;
-				size_t c = 0;
-				for (unsigned int i = 0; i < h.mms.size(); ++ i) {
-					if (h.mms.test(i)) {
-						if (!firstmiss) ss << ",";
-						ss << i;
-						if(h.refcs.size() > 0) {
-							assert_gt(h.refcs.size(), i);
-							ASSERT_ONLY(char cc = toupper(h.refcs[i]));
-							assert(cc == 'A' || cc == 'C' || cc == 'G' || cc == 'T');
-							char refChar = toupper(h.refcs[i]);
-							char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-							assert_neq(refChar, qryChar);
-							ss << ":" << refChar << ">" << qryChar;
+				// Look for SNP annotations falling within the alignment
+				map<int, char> snpAnnots;
+				const size_t len = length(h.patSeq);
+				if(amap != NULL) {
+					AnnotationMap::Iter ai = amap->lower_bound(h.h);
+					for(; ai != amap->end(); ai++) {
+						assert_geq(ai->first.first, h.h.first);
+						if(ai->first.first != h.h.first) {
+							// Different chromosome
+							break;
 						}
-						firstmiss = false;
-						c++;
+						if(ai->first.second >= h.h.second + len) {
+							// Doesn't fall into alignment
+							break;
+						}
+						if(ai->second.first != 'S') {
+							// Not a SNP annotation
+							continue;
+						}
+						size_t off = ai->first.second - h.h.second;
+						if(!h.fw) off = len - off - 1;
+						snpAnnots[off] = ai->second.second;
+					}
+				}
+				// Output mismatch column
+				bool first = true;
+				for (unsigned int i = 0; i < len; ++ i) {
+					if(h.mms.test(i)) {
+						// There's a mismatch at this position
+						if (!first) ss << ",";
+						ss << i; // position
+						assert_gt(h.refcs.size(), i);
+						char refChar = toupper(h.refcs[i]);
+						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+						assert_neq(refChar, qryChar);
+						ss << ":" << refChar << ">" << qryChar;
+						first = false;
+					} else if(snpAnnots.find(i) != snpAnnots.end()) {
+						if (!first) ss << ",";
+						ss << i; // position
+						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+						ss << "S:" << snpAnnots[i] << ">" << qryChar;
+						first = false;
 					}
 				}
 			}
@@ -2602,9 +2728,10 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, this->_refnames, this->_partition, this->offBase_);
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, _partition, offBase_);
 	}
 
+protected:
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
@@ -2630,6 +2757,8 @@ private:
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
+    ReferenceMap *rmap_;   /// mapping to reference coordinate system.
+	AnnotationMap *amap_;  ///
 };
 
 /**
@@ -2898,6 +3027,8 @@ public:
 		return true;
 	}
 
+protected:
+
 	/**
 	 * Report a single hit to the appropriate output stream.
 	 */
@@ -2922,13 +3053,58 @@ private:
 };
 
 /**
+ * Sink for outputting alignments in a binary format.
+ */
+class ChainingHitSink : public HitSink {
+public:
+
+	/**
+	 * Construct a single-stream BinaryHitSink (default)
+	 */
+	ChainingHitSink(OutFileBuf* out, bool strata, AnnotationMap *amap, DECL_HIT_DUMPS2) :
+	HitSink(out, PASS_HIT_DUMPS), amap_(amap), strata_(strata)
+	{
+		ssmode_ |= ios_base::binary;
+	}
+
+	/**
+	 * Report a batch of hits.
+	 */
+	virtual void reportHits(vector<Hit>& hs);
+
+	/**
+	 * Append a binary alignment to the output stream corresponding to
+	 * the reference sequence involved.
+	 */
+	virtual void append(ostream& o, const Hit& h) {
+		cerr << "Error: ChainingHitSink::append() not implemented" << endl;
+		exit(1);
+	}
+
+	/**
+	 * See hit.cpp
+	 */
+	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p);
+
+	/**
+	 * See hit.cpp
+	 */
+	virtual void reportUnaligned(PatternSourcePerThread& p);
+
+protected:
+	AnnotationMap *amap_;
+	bool strata_;
+};
+
+/**
  * Sink that does nothing.
  */
 class StubHitSink : public HitSink {
 public:
 	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { quiet_ = true; }
-	virtual void reportHit(const Hit& h) { }
 	virtual void append(ostream& o, const Hit& h) { }
+protected:
+	virtual void reportHit(const Hit& h) { }
 };
 
 #endif /*HIT_H_*/

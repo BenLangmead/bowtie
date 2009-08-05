@@ -20,6 +20,8 @@
 #include "bitset.h"
 #include "threading.h"
 #include "range_cache.h"
+#include "refmap.h"
+#include "annot.h"
 #include "aligner.h"
 #include "aligner_0mm.h"
 #include "aligner_1mm.h"
@@ -70,7 +72,7 @@ static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -
 static int maxBtsBetter         = 125; // max # backtracks allowed in half-and-half mode
 static int maxBts               = 800; // max # backtracks allowed in half-and-half mode
 static int nthreads             = 1;     // number of pthreads operating concurrently
-static output_types outType		= FULL;  // style of output
+static output_types outType		= OUTPUT_FULL;  // style of output
 static bool randReadsNoSync     = false; // true -> generate reads from per-thread random source
 static int numRandomReads       = 50000000; // # random reads (see Random*PatternSource in pat.h)
 static int lenRandomReads       = 35;    // len of random reads (see Random*PatternSource in pat.h)
@@ -91,7 +93,7 @@ static uint32_t khits           = 1;     // number of hits per read; >1 is much 
 static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
 static bool better				= false; // true -> guarantee alignments from best possible stratum
 static bool oldBest             = false; // true -> guarantee alignments from best possible stratum (the old way)
-static bool spanStrata			= true;  // true -> don't stop at stratum boundaries
+static bool strata			    = false; // true -> don't stop at stratum boundaries
 static bool refOut				= false; // if true, alignments go to per-ref files
 static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
 static int partitionSz          = 0;     // output a partitioning key in first field
@@ -128,6 +130,8 @@ static int recalMaxCycle        = 64;
 static int recalMaxQual         = 40;
 static int recalQualShift       = 2;
 static bool useV1               = true;
+static const char * refMapFile  = NULL;  // file containing a map from index coordinates to another coordinate system
+static const char * annotMapFile= NULL;  // file containing a map from reference coordinates to annotations
 // mating constraints
 
 static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
@@ -163,7 +167,6 @@ enum {
 	ARG_OLDBEST,
 	ARG_BETTER,
 	ARG_BEST,
-	ARG_SPANSTRATA,
 	ARG_REFOUT,
 	ARG_ISARATE,
 	ARG_SEED_EXTEND,
@@ -198,7 +201,11 @@ enum {
 	ARG_CHUNKVERBOSE,
 	ARG_RECAL,
 	ARG_STRATA,
-	ARG_PEV2
+	ARG_PEV2,
+	ARG_CHAINOUT,
+	ARG_CHAININ,
+	ARG_REFMAP,
+	ARG_ANNOTMAP
 };
 
 static struct option long_options[] = {
@@ -252,7 +259,6 @@ static struct option long_options[] = {
 	{(char*)"best",         no_argument,       0,            ARG_BEST},
 	{(char*)"better",       no_argument,       0,            ARG_BETTER},
 	{(char*)"oldbest",      no_argument,       0,            ARG_OLDBEST},
-	{(char*)"nostrata",     no_argument,       0,            ARG_SPANSTRATA},
 	{(char*)"strata",       no_argument,       0,            ARG_STRATA},
 	{(char*)"nomaqround",   no_argument,       0,            ARG_NOMAQROUND},
 	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
@@ -297,6 +303,10 @@ static struct option long_options[] = {
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
+	{(char*)"chainout",     no_argument,       0,            ARG_CHAINOUT},
+	{(char*)"chainin",      no_argument,       0,            ARG_CHAININ},
+	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
+	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1356,6 +1366,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
+	   		case ARG_CHAININ: format = INPUT_CHAIN; break;
 	   		case 'I':
 	   			minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
 	   			break;
@@ -1374,11 +1385,14 @@ static void parseOptions(int argc, char **argv) {
 	   			randReadsNoSync = true;
 	   			break;
 	   		case ARG_RANGE: rangeMode = true; break;
-	   		case ARG_CONCISE: outType = CONCISE; break;
-	   		case 'b': outType = BINARY; break;
+	   		case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
+	   		case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
+	   		case 'b': outType = OUTPUT_BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = NONE; break;
+	   		case ARG_REFMAP: refMapFile = optarg; break;
+	   		case ARG_ANNOTMAP: annotMapFile = optarg; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
 	   		case ARG_MM: {
 #ifdef BOWTIE_MM
@@ -1487,8 +1501,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_BETTER: stateful = true; better = true; oldBest = false; break;
 	   		case ARG_OLDBEST: oldBest = true; stateful = false; break;
 	   		case ARG_BEST: stateful = true; useV1 = false; oldBest = false; break;
-	   		case ARG_SPANSTRATA: spanStrata = true; break;
-	   		case ARG_STRATA: spanStrata = false; break;
+	   		case ARG_STRATA: strata = true; break;
 	   		case ARG_VERBOSE: verbose = true; break;
 	   		case ARG_STARTVERBOSE: startVerbose = true; break;
 	   		case ARG_QUIET: quiet = true; break;
@@ -1580,8 +1593,8 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "When -z/--phased is used, --best is unavailable" << endl;
 			error = true;
 		}
-		if(allHits && !spanStrata) {
-			cerr << "When -a/--all and -z/--phased are used, --nostrata cannot also be used." << endl
+		if(allHits && strata) {
+			cerr << "When -a/--all and -z/--phased are used, --strata cannot also be used." << endl
 			     << "Stratified all-hits search cannot be combined with phased search." << endl;
 			error = true;
 		}
@@ -1604,11 +1617,11 @@ static void parseOptions(int argc, char **argv) {
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
 	}
-	if(fullIndex && !spanStrata && !stateful && !oldBest) {
+	if(fullIndex && strata && !stateful && !oldBest) {
 		cerr << "--strata must be combined with --best" << endl;
 		exit(1);
 	}
-	if(!spanStrata && !allHits && khits == 1 && mhits == 0xffffffff) {
+	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
 		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
 		exit(1);
 	}
@@ -1618,6 +1631,24 @@ static void parseOptions(int argc, char **argv) {
 	if(qUpto + skipReads > qUpto) {
 		qUpto += skipReads;
 	}
+
+	if(outType == OUTPUT_CHAIN) {
+		bool error = false;
+		if(refOut) {
+			cerr << "Error: --chainout is not compatible with --refout; aborting..." << endl;
+			error = true;
+		}
+		if(!stateful) {
+			cerr << "Error: --chainout must be combined with --best; aborting..." << endl;
+			error = true;
+		}
+		if(paired) {
+			cerr << "Error: --chainout cannot be combined with paired-end alignment; aborting..." << endl;
+			error = true;
+		}
+		if(error) exit(1);
+	}
+
 	if(mate1fw && trim5 > 0) {
 		if(verbose) {
 			cout << "Adjusting -I/-X down by " << trim5
@@ -1797,7 +1828,7 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 static HitSinkPerThreadFactory*
 createSinkFactory(HitSink& _sink, bool sanity) {
     HitSinkPerThreadFactory *sink = NULL;
-    if(spanStrata) {
+    if(!strata) {
     	// Unstratified
 		if(!allHits) {
 			if(oldBest) {
@@ -4004,6 +4035,8 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               useSpinlock,
 			                               patDumpfile, trim3,
 			                               trim5, skipReads);
+		case INPUT_CHAIN:
+			return new ChainPatternSource (qs, useSpinlock, patDumpfile);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
@@ -4179,14 +4212,34 @@ static void driver(const char * type,
 			fout = NULL;
 			cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
 		} else {
-			fout = new OutFileBuf(outfile.c_str(), outType == BINARY);
+			fout = new OutFileBuf(outfile.c_str(), outType == OUTPUT_BINARY);
 		}
 	} else {
-		if(outType == BINARY && !refOut) {
+		if(outType == OUTPUT_BINARY && !refOut) {
 			cerr << "Error: Must specify an output file when output mode is binary" << endl;
 			exit(1);
 		}
+		else if(outType == OUTPUT_CHAIN) {
+			cerr << "Error: Must specify an output file when output mode is --chain" << endl;
+			exit(1);
+		}
 		fout = new OutFileBuf();
+	}
+	ReferenceMap* rmap = NULL;
+	if(refMapFile != NULL) {
+		if(verbose || startVerbose) {
+			cerr << "About to load in a reference map file with name "
+			     << refMapFile << ": "; logTime(cerr, true);
+		}
+		rmap = new ReferenceMap(refMapFile);
+	}
+	AnnotationMap* amap = NULL;
+	if(annotMapFile != NULL) {
+		if(verbose || startVerbose) {
+			cerr << "About to load in an annotation map file with name "
+			     << annotMapFile << ": "; logTime(cerr, true);
+		}
+		amap = new AnnotationMap(annotMapFile);
 	}
 	// Initialize Ebwt object and read in header
 	if(verbose || startVerbose) {
@@ -4198,6 +4251,7 @@ static void driver(const char * type,
                     /* overriding: */ isaRate,
                     useMm,    // whether to use memory-mapped files
                     mmSweep,  // sweep memory-mapped files
+                    rmap,     // reference map, or NULL if none is needed
                     verbose, // whether to be talkative
                     startVerbose, // talkative during initialization
                     false /*passMemExc*/,
@@ -4214,6 +4268,7 @@ static void driver(const char * type,
     	                        /* overriding: */ isaRate,
     	                        useMm,    // whether to use memory-mapped files
     	                        mmSweep,  // sweep memory-mapped files
+    	                        rmap,     // reference map, or NULL if none is needed
     	                        verbose,  // whether to be talkative
     	                        startVerbose, // talkative during initialization
     	                        false /*passMemExc*/,
@@ -4249,22 +4304,22 @@ static void driver(const char * type,
 		vector<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
 		switch(outType) {
-			case FULL:
+			case OUTPUT_FULL:
 				if(refOut) {
 					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase,
+							ebwt.nPat(), offBase, rmap, amap,
 							PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
-							fout, offBase,
+							fout, offBase, rmap, amap,
 							PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				}
 				break;
-			case CONCISE:
+			case OUTPUT_CONCISE:
 				if(refOut) {
 					sink = new ConciseHitSink(
 							ebwt.nPat(), offBase,
@@ -4279,7 +4334,7 @@ static void driver(const char * type,
 							table, refnames, reportOpps);
 				}
 				break;
-			case BINARY:
+			case OUTPUT_BINARY:
 				if(refOut) {
 					sink = new BinaryHitSink(
 							ebwt.nPat(), offBase,
@@ -4293,6 +4348,14 @@ static void driver(const char * type,
 							format == TAB_MATE,
 							table, refnames);
 				}
+				break;
+			case OUTPUT_CHAIN:
+				assert(stateful);
+				sink = new ChainingHitSink(
+						fout, strata, amap,
+						PASS_DUMP_FILES,
+						true,
+						table, refnames);
 				break;
 			case NONE:
 				sink = new StubHitSink();
@@ -4372,6 +4435,8 @@ static void driver(const char * type,
 		}
 		delete patsrc;
 		delete sink;
+		delete amap;
+		delete rmap;
 		if(fout != NULL) delete fout;
 	}
 }

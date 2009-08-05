@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <stdio.h>
 #include <stdint.h>
 
@@ -24,13 +25,13 @@ public:
 		assert(_in != NULL);
 	}
 
-	FileBuf(ifstream *inf) {
+	FileBuf(std::ifstream *inf) {
 		init();
 		_inf = inf;
 		assert(_inf != NULL);
 	}
 
-	FileBuf(istream *ins) {
+	FileBuf(std::istream *ins) {
 		init();
 		_ins = ins;
 		assert(_ins != NULL);
@@ -76,8 +77,8 @@ public:
 	/**
 	 * Initialize the buffer with a new C-style file.
 	 */
-	void newFile(FILE *__in) {
-		_in = __in;
+	void newFile(FILE *in) {
+		_in = in;
 		_inf = NULL;
 		_ins = NULL;
 		_cur = BUF_SZ;
@@ -88,7 +89,7 @@ public:
 	/**
 	 * Initialize the buffer with a new ifstream.
 	 */
-	void newFile(ifstream *__inf) {
+	void newFile(std::ifstream *__inf) {
 		_in = NULL;
 		_inf = __inf;
 		_ins = NULL;
@@ -100,7 +101,7 @@ public:
 	/**
 	 * Initialize the buffer with a new istream.
 	 */
-	void newFile(istream *__ins) {
+	void newFile(std::istream *__ins) {
 		_in = NULL;
 		_inf = NULL;
 		_ins = __ins;
@@ -116,10 +117,10 @@ public:
 	void reset() {
 		if(_inf != NULL) {
 			_inf->clear();
-			_inf->seekg(0, ios::beg);
+			_inf->seekg(0, std::ios::beg);
 		} else if(_ins != NULL) {
 			_ins->clear();
-			_ins->seekg(0, ios::beg);
+			_ins->seekg(0, std::ios::beg);
 		} else {
 			rewind(_in);
 		}
@@ -145,10 +146,10 @@ public:
 			else {
 				// Get the next chunk
 				if(_inf != NULL) {
-					_inf->read(_buf, BUF_SZ);
+					_inf->read((char*)_buf, BUF_SZ);
 					_buf_sz = _inf->gcount();
 				} else if(_ins != NULL) {
-					_ins->read(_buf, BUF_SZ);
+					_ins->read((char*)_buf, BUF_SZ);
 					_buf_sz = _ins->gcount();
 				} else {
 					assert(_in != NULL);
@@ -199,6 +200,21 @@ public:
 		}
 	}
 
+	/**
+	 * Store a string of characters from the input file into 'buf',
+	 * until we see a newline, EOF, or until 'len' characters have been
+	 * read.
+	 */
+	size_t get(char *buf, size_t len) {
+		size_t stored = 0;
+		for(size_t i = 0; i < len; i++) {
+			int c = get();
+			if(c == -1) return i;
+			buf[stored++] = (char)c;
+		}
+		return len;
+	}
+
 	static const size_t LASTN_BUF_SZ = 8 * 1024;
 
 	/**
@@ -231,12 +247,12 @@ private:
 
 	static const size_t BUF_SZ = 256 * 1024;
 	FILE     *_in;
-	ifstream *_inf;
-	istream  *_ins;
+	std::ifstream *_inf;
+	std::istream  *_ins;
 	size_t    _cur;
 	size_t    _buf_sz;
 	bool      _done;
-	char      _buf[BUF_SZ]; // (large) input buffer
+	uint8_t   _buf[BUF_SZ]; // (large) input buffer
 	size_t    _lastn_cur;
 	char      _lastn_buf[LASTN_BUF_SZ]; // buffer of the last N chars dispensed
 };
@@ -253,7 +269,7 @@ public:
 		assert(in != NULL);
 		out_ = fopen(in, "wb");
 		if(out_ == NULL) {
-			cerr << "Error: Could not open bitpair-output file " << in << endl;
+			std::cerr << "Error: Could not open bitpair-output file " << in << std::endl;
 			exit(1);
 		}
 	}
@@ -272,7 +288,7 @@ public:
 			if(cur_ == BUF_SZ) {
 				// Flush the buffer
 				if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
-					cerr << "Error writing to the reference index file (.4.ebwt)" << endl;
+					std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
 					exit(1);
 				}
 				// Reset to beginning of the buffer
@@ -292,7 +308,7 @@ public:
 		if(cur_ > 0 || bpPtr_ > 0) {
 			if(bpPtr_ == 0) cur_--;
 			if(!fwrite((const void *)buf_, cur_ + 1, 1, out_)) {
-				cerr << "Error writing to the reference index file (.4.ebwt)" << endl;
+				std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
 				exit(1);
 			}
 		}
@@ -324,7 +340,7 @@ public:
 		assert(out != NULL);
 		out_ = fopen(out, binary ? "wb" : "w");
 		if(out_ == NULL) {
-			cerr << "Error: Could not open alignment output file " << out << endl;
+			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
 			exit(1);
 		}
 	}
@@ -340,35 +356,19 @@ public:
 	 * Write a single character into the write buffer and, if
 	 * necessary, flush.
 	 */
-	void write(int c) {
+	void write(char c) {
 		assert(!closed_);
-		if(cur_ == BUF_SZ) {
-			// Flush the buffer
-			if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
-				cerr << "Error writing to alignment output file " << name_ << endl;
-				exit(1);
-			}
-			// Reset to beginning of the buffer
-			cur_ = 0;
-		}
+		if(cur_ == BUF_SZ) flush();
 		buf_[cur_++] = c;
 	}
 
 	/**
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
-	void writeString(const string& s) {
+	void writeString(const std::string& s) {
 		assert(!closed_);
 		size_t slen = s.length();
-		if(cur_ + slen > BUF_SZ) {
-			// Flush the buffer
-			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
-				cerr << "Error writing to alignment output file " << name_ << endl;
-				exit(1);
-			}
-			// Reset to beginning of the buffer
-			cur_ = 0;
-		}
+		if(cur_ + slen > BUF_SZ) flush();
 		memcpy(&buf_[cur_], s.data(), slen);
 		cur_ += slen;
 		assert_leq(cur_, BUF_SZ);
@@ -379,15 +379,7 @@ public:
 	 */
 	void writeChars(const char * s, size_t len) {
 		assert(!closed_);
-		if(cur_ + len > BUF_SZ) {
-			// Flush the buffer
-			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
-				cerr << "Error writing to alignment output file " << name_ << endl;
-				exit(1);
-			}
-			// Reset to beginning of the buffer
-			cur_ = 0;
-		}
+		if(cur_ + len > BUF_SZ) flush();
 		memcpy(&buf_[cur_], s, len);
 		cur_ += len;
 		assert_leq(cur_, BUF_SZ);
@@ -398,16 +390,19 @@ public:
 	 */
 	void close() {
 		if(closed_) return;
-		if(cur_ > 0) {
-			if(!fwrite((const void *)buf_, cur_, 1, out_)) {
-				cerr << "Error while flushing and closing output" << endl;
-				exit(1);
-			}
-		}
+		if(cur_ > 0) flush();
 		closed_ = true;
 		if(out_ != stdout) {
 			fclose(out_);
 		}
+	}
+
+	void flush() {
+		if(!fwrite((const void *)buf_, cur_, 1, out_)) {
+			std::cerr << "Error while flushing and closing output" << std::endl;
+			exit(1);
+		}
+		cur_ = 0;
 	}
 
 	/**

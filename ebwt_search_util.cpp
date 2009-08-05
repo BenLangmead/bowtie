@@ -244,7 +244,8 @@ void naiveOracle(const vector<String<Dna5> >& os,
 					  qual,   // read qualities
 					  fw,     // forward/reverse-comp
 					  diffs,  // mismatch bitvector
-					  refcs);
+					  refcs,
+					  0, stratum, ham | (stratum << 14), 0);
 				hits.push_back(h);
 				strata.push_back(stratum);
 			} // For each pattern character

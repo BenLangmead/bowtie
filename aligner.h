@@ -401,6 +401,7 @@ public:
 				ra.fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
 				        (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
 				&bufa_->name,
+				ra.ebwt->rmap(),
 				ebwtFw,
 				ra.mms,                   // mismatch positions
 				ra.refcs,                 // reference characters for mms
@@ -410,8 +411,10 @@ public:
 				tlen,                     // textlen
 				alen_,                    // qlen
 				ra.stratum,               // alignment stratum
+				ra.cost,                  // cost, including qual penalty
 				ra.bot - ra.top - 1,      // # other hits
-				patsrc_->patid());
+				patsrc_->patid(),         // pattern id
+				0);                       // mate (0 = unpaired)
 	}
 
 	/**
@@ -779,6 +782,7 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
 					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
 				&bufL->name,
+				rL.ebwt->rmap(),
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -788,6 +792,7 @@ protected:
 				tlen,                         // textlen
 				lenL,                         // qlen
 				rL.stratum,                   // alignment stratum
+				rL.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufL->patid,
 				pairFw ? 1 : 2);
@@ -801,6 +806,7 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
 					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
 				&bufR->name,
+				rR.ebwt->rmap(),
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -810,6 +816,7 @@ protected:
 				tlen,                         // textlen
 				lenR,                         // qlen
 				rR.stratum,                   // alignment stratum
+				rR.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufR->patid,
 				pairFw ? 2 : 1);
@@ -1592,6 +1599,7 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
 					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
 				&bufL->name,
+				rL.ebwt->rmap(),
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -1601,6 +1609,7 @@ protected:
 				tlen,                         // textlen
 				lenL,                         // qlen
 				rL.stratum,                   // alignment stratum
+				rL.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufL->patid,
 				pairFw ? 1 : 2);
@@ -1614,6 +1623,7 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
 					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
 				&bufR->name,
+				rR.ebwt->rmap(),
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -1623,6 +1633,7 @@ protected:
 				tlen,                         // textlen
 				lenR,                         // qlen
 				rR.stratum,                   // alignment stratum
+				rR.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufR->patid,
 				pairFw ? 2 : 1);

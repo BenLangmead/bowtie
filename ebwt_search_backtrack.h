@@ -253,7 +253,7 @@ public:
 					                nsInFtab > 0);
 				} else {
 					// We have a match!
-					ret = reportAlignment(0, top, bot);
+					ret = reportAlignment(0, top, bot, ham);
 				}
 			} else if (bot > top) {
 				// We have an arrow pair from which we can backtrack
@@ -740,7 +740,7 @@ public:
 			   !reportedPartial)      // for when it's a partial alignment we've already reported
 			{
 				uint64_t rhits = sink.numReportedHits();
-				bool ret = reportAlignment(stackDepth, top, bot);
+				bool ret = reportAlignment(stackDepth, top, bot, ham);
 				if(_sanity && sink.numReportedHits() > rhits) {
 					confirmHit(iham);
 				}
@@ -920,7 +920,7 @@ public:
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
-					ret = reportAlignment(stackDepth+1, bttop, btbot);
+					ret = reportAlignment(stackDepth+1, bttop, btbot, ham);
 				} else if(_halfAndHalf &&
 				          !disableFtab &&
 				          _2revOff == _3revOff &&
@@ -1127,7 +1127,7 @@ public:
 		}
 		bool ret = false;
 		if(stackDepth >= _reportPartials) {
-			ret = reportAlignment(stackDepth, top, bot);
+			ret = reportAlignment(stackDepth, top, bot, ham);
 		}
 		if(!ret && stackDepth == 0 && sink.numValidHits() == prehits) {
 			confirmNoHit(iham);
@@ -1523,7 +1523,9 @@ protected:
 	 * full alignments were successfully reported and the caller can
 	 * stop searching.
 	 */
-	bool reportAlignment(uint32_t stackDepth, uint32_t top, uint32_t bot) {
+	bool reportAlignment(uint32_t stackDepth, uint32_t top,
+	                     uint32_t bot, uint16_t cost)
+	{
 #ifndef NDEBUG
 		// No two elements of _mms[] should be the same
 		assert_geq(_mms.size(), stackDepth);
@@ -1549,6 +1551,9 @@ protected:
 		if(stackDepth > 0) {
 			stratum = calcStratum(_mms, stackDepth);
 		}
+		assert_lt(stratum, 4);
+		assert_geq(stratum, 0);
+		cost |= (stratum << 14);
 		bool hit;
 		// If _muts != NULL then this alignment extends a partial
 		// alignment, so we have to account for the differences present
@@ -1564,13 +1569,13 @@ protected:
 			size_t numMuts = length(*_muts);
 			stratum += numMuts;
 			// Report the range of full alignments
-			hit = reportFullAlignment(stackDepth + numMuts, top, bot, stratum);
+			hit = reportFullAlignment(stackDepth + numMuts, top, bot, stratum, cost);
 			// Re-apply partial-alignment mutations
 			applyPartialMutations();
 			assert_eq(tmp, (*_qry));
 		} else {
 			// Report the range of full alignments
-			hit = reportFullAlignment(stackDepth, top, bot, stratum);
+			hit = reportFullAlignment(stackDepth, top, bot, stratum, cost);
 		}
 		return hit;
 	}
@@ -1585,7 +1590,8 @@ protected:
 	bool reportFullAlignment(uint32_t stackDepth,
 	                         uint32_t top,
 	                         uint32_t bot,
-	                         int stratum)
+	                         int stratum,
+	                         uint16_t cost)
 	{
 		assert_gt(bot, top);
 		if(stackDepth == 0 && !_reportExacts) {
@@ -1598,7 +1604,7 @@ protected:
 			assert(_params.arrowMode());
 			return _ebwt->report((*_qry), _qual, _name,
                     _mms, _refcs, stackDepth, 0,
-                    top, bot, _qlen, stratum, _params);
+                    top, bot, _qlen, stratum, cost, _params);
 		}
 		uint32_t spread = bot - top;
 		// Pick a random spot in the range to begin report
@@ -1611,7 +1617,8 @@ protected:
 			// of their offset from the 3' or 5' end.
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
 			                         _mms, _refcs, stackDepth, ri,
-			                         top, bot, _qlen, stratum, _params))
+			                         top, bot, _qlen, stratum, cost,
+			                         _params))
 			{
 				// Return value of true means that we can stop
 				return true;

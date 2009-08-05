@@ -11,22 +11,12 @@
 #include "ebwt.h"
 #include "range.h"
 #include "pool.h"
+#include "edit.h"
 
 enum AdvanceUntil {
 	ADV_FOUND_RANGE = 1,
 	ADV_COST_CHANGES,
 	ADV_STEP
-};
-
-/**
- * Encapsulates an edit between the read sequence and the reference
- * sequence.
- */
-struct Edit {
-	uint16_t type      :  2; // 1 -> subst, 2 -> ins, 3 -> del, 0 -> empty
-	uint16_t pos       : 10; // position w/r/t search root
-	uint16_t chr       :  2; // character involved (for subst and ins)
-	uint16_t reserved  :  2; // reserved
 };
 
 /**
@@ -147,16 +137,6 @@ struct EditList {
 	Edit edits_[numEdits]; // first 4 edits; typically, no more are needed
 	Edit *moreEdits_;    // if used, size is dictated by numMoreEdits
 	Edit *yetMoreEdits_; // if used, size is dictated by length of read
-};
-
-/**
- * 3 types of edits; mismatch (substitution), insertion in the
- * reference, deletion in the reference.
- */
-enum {
-	EDIT_TYPE_MM = 1,
-	EDIT_TYPE_INS,
-	EDIT_TYPE_DEL
 };
 
 /**

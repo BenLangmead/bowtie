@@ -18,6 +18,7 @@
 #include "threading.h"
 #include "filebuf.h"
 #include "qual.h"
+#include "hit_set.h"
 
 /**
  * Classes and routines for reading reads from various input sources.
@@ -208,6 +209,16 @@ struct ReadBuf {
 		}
 	}
 
+	/**
+	 * Write read details to a HitSet object.
+	 */
+	void toHitSet(HitSet& hs) {
+		assert(!empty());
+		hs.name = name;
+		hs.seq = patFw;
+		hs.qual = qualFw;
+	}
+
 	static const int BUF_SIZE = 1024;
 
 	String<Dna5>  patFw;               // forward-strand sequence
@@ -236,6 +247,7 @@ struct ReadBuf {
 	uint32_t      patid;               // unique 0-based id based on order in read file(s)
 	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
 	uint32_t      seed;                // random seed
+	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
 /**
@@ -1440,7 +1452,7 @@ protected:
 			FILE *in;
 			if(infiles_[filecur_] == "-") {
 				in = stdin;
-			} else if((in = fopen(infiles_[filecur_].c_str(), "r")) == NULL) {
+			} else if((in = fopen(infiles_[filecur_].c_str(), "rb")) == NULL) {
 				if(!errs_[filecur_]) {
 					cerr << "Warning: Could not open file \"" << infiles_[filecur_] << "\" for reading" << endl;
 					errs_[filecur_] = true;
@@ -2486,6 +2498,66 @@ protected:
 private:
 	bool first_;
 	int policy_;
+};
+
+/**
+ * Read a Raw-format file (one sequence per line).  No quality strings
+ * allowed.  All qualities are assumed to be 'I' (40 on the Phred-33
+ * scale).
+ */
+class ChainPatternSource : public BufferedFilePatternSource {
+public:
+	ChainPatternSource(const vector<string>& infiles,
+	                   bool useSpinlock = true,
+	                   const char *dumpfile = NULL) :
+	BufferedFilePatternSource(
+		infiles, false, false, useSpinlock, dumpfile, 0, 0, 0) { }
+
+protected:
+
+	/// Read another pattern from a Raw input file
+	virtual void read(ReadBuf& r, uint32_t& patid) {
+		filebuf_.peek();
+		if(filebuf_.eof()) {
+			filebuf_.resetLastN();
+			seqan::clear(r.patFw);
+			return;
+		}
+		do {
+			r.hitset.deserialize(filebuf_);
+		} while(!r.hitset.initialized() && !filebuf_.eof());
+		if(!r.hitset.initialized()) {
+			filebuf_.resetLastN();
+			seqan::clear(r.patFw);
+			return;
+		}
+		// Now copy the name/sequence/quals into r.name/r.patFw/r.qualFw
+		_setBegin(r.name, (char*)r.nameBuf);
+		_setLength(r.name, seqan::length(r.hitset.name));
+		memcpy(r.nameBuf, seqan::begin(r.hitset.name), seqan::length(r.hitset.name));
+		_setBegin (r.patFw, (Dna5*)r.patBufFw);
+		_setLength(r.patFw, seqan::length(r.hitset.seq));
+		memcpy(r.patBufFw, seqan::begin(r.hitset.seq), seqan::length(r.hitset.seq));
+		_setBegin (r.qualFw, r.qualBufFw);
+		_setLength(r.qualFw, seqan::length(r.hitset.qual));
+		memcpy(r.qualBufFw, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
+
+		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+		filebuf_.resetLastN();
+
+		readCnt_++;
+		patid = readCnt_-1;
+	}
+
+	/// Read another read pair
+	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+		// (For now, we shouldn't ever be here)
+		cerr << "In ChainPatternSource.readPair()" << endl;
+		exit(1);
+		read(ra, patid);
+		readCnt_--;
+		read(rb, patid);
+	}
 };
 
 #endif /*PAT_H_*/

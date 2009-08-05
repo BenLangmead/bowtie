@@ -35,9 +35,21 @@ void ReferenceMap::parse() {
 		exit(1);
 	}
 	while(!in.eof()) {
-		map_.resize(map_.size()+1);
+		if(in.peek() == '>') {
+			// This appears to be a name line
+			in.get(); // chop off the initial '>'
+			uint32_t off;
+			in >> off;
+			in.get(); // chop off tab
+			char buf[1024];
+			in.getline(buf, 1023);
+			if(names_.size() <= off) names_.resize(off+1);
+			names_[off] = string(buf);
+			continue;
+		}
 		uint32_t id, off;
 		in >> id >> off;
+		map_.resize(map_.size()+1);
 		map_.back().first = id;
 		map_.back().second = off;
 	}

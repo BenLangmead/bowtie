@@ -27,8 +27,10 @@ void HitSet::reportUpTo(ostream& os, int khits) {
 			// Lazily initialize seqrc and qualr
 			seqrc = seq;
 			reverseComplementInPlace(seqrc, false);
+			assert_eq(seqan::length(seqrc), seqan::length(seq));
 			qualr = qual;
 			reverseInPlace(qualr);
+			assert_eq(seqan::length(qualr), seqan::length(qual));
 		}
 		os << name << '\t'
 		   << (h.fw ? '+' : '-') << '\t'
@@ -37,24 +39,12 @@ void HitSet::reportUpTo(ostream& os, int khits) {
 		   << (h.fw ? seq : seqrc) << '\t'
 		   << (h.fw ? qual : qualr) << '\t'
 		   << h.oms << '\t';
-		if(h.fw) {
-			for(size_t i = 0; i < h.edits.size(); i++) {
-				const Edit& e = h.edits[i];
-				os << e.pos;
-				if(e.type == EDIT_TYPE_SNP) os << "S";
-				os << ":" << "ACGT"[e.chr] << ">" << seq[e.pos];
-				if(i < h.edits.size()-1) os << ",";
-			}
-		} else {
-			for(size_t i = h.edits.size(); i > 0; i--) {
-				Edit e(h.edits[i-1]);
-				const char c = seqrc[e.pos];
-				e.pos = seqan::length(seq) - e.pos - 1;
-				os << e.pos;
-				if(e.type == EDIT_TYPE_SNP) os << "S";
-				os << ":" << "ACGT"[e.chr] << ">" << c;
-				if(i > 1) os << ",";
-			}
+		for(size_t i = 0; i < h.edits.size(); i++) {
+			const Edit& e = h.edits[i];
+			os << e.pos;
+			if(e.type == EDIT_TYPE_SNP) os << "S";
+			os << ":" << "ACGT"[e.chr] << ">" << seq[e.pos];
+			if(i < h.edits.size()-1) os << ",";
 		}
 		os << endl;
 	}

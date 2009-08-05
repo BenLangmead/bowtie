@@ -32,6 +32,7 @@
 #include "str_util.h"
 #include "mm.h"
 #include "timer.h"
+#include "refmap.h"
 
 using namespace std;
 using namespace seqan;
@@ -319,6 +320,7 @@ public:
 	    _ebwt(NULL), \
 	    _useMm(false), \
 	    _refnames(), \
+	    rmap_(NULL), \
 	    mmFile1_(NULL), \
 	    mmFile2_(NULL)
 
@@ -340,6 +342,7 @@ public:
 	     int32_t __overrideIsaRate = -1,
 	     bool __useMm = false,
 	     bool mmSweep = false,
+	     const ReferenceMap* rmap = NULL,
 	     bool __verbose = false,
 	     bool startVerbose = false,
 	     bool __passMemExc = false,
@@ -347,6 +350,7 @@ public:
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS
 	{
+		rmap_ = rmap;
 		_useMm = __useMm;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
@@ -706,6 +710,7 @@ public:
 	uint32_t*   plen() const         { return _plen; }
 	uint32_t*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
+	const ReferenceMap* rmap() const { return rmap_; }
 	bool        toBe() const         { return _toBigEndian; }
 	bool        verbose() const      { return _verbose; }
 	bool        sanityCheck() const  { return _sanity; }
@@ -963,8 +968,8 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1048,6 +1053,7 @@ public:
 	uint8_t*   _ebwt;
 	bool       _useMm;        /// use memory-mapped files to hold the index
 	vector<string> _refnames; /// names of the reference sequences
+	const ReferenceMap* rmap_; /// mapping into another reference coordinate space
 	char *mmFile1_;
 	char *mmFile2_;
 	EbwtParams _eh;
@@ -1116,6 +1122,7 @@ public:
 	bool reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
+	               const ReferenceMap* rmap, // map to another reference coordinate system
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
 	               const std::vector<uint32_t>& mmui32, // mismatch list
 	               const std::vector<uint8_t>& refcs,  // reference characters
@@ -1125,9 +1132,10 @@ public:
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
 	               int stratum,        // alignment stratum
+	               uint16_t cost,      // cost of alignment
 	               uint32_t oms,       // approx. # other valid alignments
-	               uint32_t patid = 0xffffffff,
-	               uint8_t mate = 0) const
+	               uint32_t patid,
+	               uint8_t mate) const
 	{
 		// The search functions should not have allowed us to get here
 		assert_eq(mmui32.size(), refcs.size());
@@ -1138,6 +1146,8 @@ public:
 		reserve(pat, qlen);
 		// Report it using the HitSinkPerThread
 		Hit hit;
+		hit.stratum = stratum;
+		hit.cost = cost;
 		if(patid == 0xffffffff) patid = _patid;
 		// Make a copy of the read name
 		if(name != NULL) assign(hit.patName, *name);
@@ -1240,6 +1250,9 @@ public:
 			if(diffs != hit.mms) assert(false);
 		}
 		hit.h = _arrowMode? a : h;
+		if(!_arrowMode && rmap != NULL) {
+			rmap->map(hit.h);
+		}
 		hit.patId = patid;
 		if(name != NULL) hit.patName = *name;
 		hit.fw = _fw;
@@ -2267,6 +2280,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                uint32_t bot,
                                uint32_t qlen,
                                int stratum,
+                               uint16_t cost,
                                const EbwtSearchParams<TStr>& params) const
 {
 	VMSG_NL("In report");
@@ -2278,6 +2292,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				query,               // read sequence
 				quals,               // read quality values
 				name,                // read name
+				rmap_,               // map to another reference coordinate system
 				_fw,                 // true = index is forward; false = mirror
 				mmui32,              // mismatch positions
 				refcs,               // reference characters for mms
@@ -2287,7 +2302,10 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				0,                   // (bogus) textlen
 				qlen,                // qlen
 				stratum,             // alignment stratum
-				bot-top-1);          // # other hits
+				cost,                // cost, including stratum & quality penalty
+				bot-top-1,           // # other hits
+				0xffffffff,          // pattern id
+				0);                  // mate (0 = unpaired)
 	}
 
 	uint32_t tidx;
@@ -2301,6 +2319,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			query,                    // read sequence
 			quals,                    // read quality values
 			name,                     // read name
+			rmap_,                    // map to another reference coordinate system
 			_fw,                      // true = index is forward; false = mirror
 			mmui32,                   // mismatch positions
 			refcs,                    // reference characters for mms
@@ -2310,7 +2329,10 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			tlen,                     // textlen
 			qlen,                     // qlen
 			stratum,                  // alignment stratum
-			bot-top-1);               // # other hits
+			cost,                     // cost, including stratum & quality penalty
+			bot-top-1,                // # other hits
+	        0xffffffff,               // pattern id
+	        0);                       // mate (0 = unpaired)
 }
 
 #include "row_chaser.h"
@@ -2334,6 +2356,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        uint32_t bot,
                                        uint32_t qlen,
                                        int stratum,
+                                       uint16_t cost,
                                        const EbwtSearchParams<TStr>& params,
                                        SideLocus *l) const
 {
@@ -2381,7 +2404,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_eq(rcoff, off);
 	}
 #endif
-	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, stratum, params);
+	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, stratum, cost, params);
 }
 
 /**

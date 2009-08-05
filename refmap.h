@@ -29,6 +29,21 @@ public:
 	 */
 	void map(U32Pair& h) const;
 
+	/**
+	 * Return true iff we have a name for reference with id 'i'.
+	 */
+	bool hasName(size_t i) const {
+		return !names_[i].empty();
+	}
+
+	/**
+	 * Get the name for reference with id 'i'.
+	 */
+	const std::string& getName(size_t i) const {
+		assert(hasName(i));
+		return names_[i];
+	}
+
 protected:
 
 	/**
@@ -38,6 +53,7 @@ protected:
 
 	const char *fname_;
 	std::vector<U32Pair> map_;
+	std::vector<std::string> names_;
 };
 
 #endif /* REFMAP_H_ */

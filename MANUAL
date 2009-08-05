@@ -981,7 +981,7 @@ Bowtie Manual
    3. Name of reference sequence where alignment occurs, or ordinal ID
       if no name was provided
 
-   4. 1-based offset into the forward reference strand where leftmost
+   4. 0-based offset into the forward reference strand where leftmost
       character of the alignment occurs
 
    5. Read sequence (reverse-complemented if orientation is '-')

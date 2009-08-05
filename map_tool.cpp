@@ -314,7 +314,7 @@ int main(int argc, char **argv) {
 				if(outformat == FORMAT_BIN) {
 					BinaryHitSink::append(*out, h, outrefnames, 0);
 				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */, 0);
+					VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
 				} else if(outformat == FORMAT_FASTQ) {
 					fastqAppend(*out, h);
 				} else if(outformat == FORMAT_FASTA) {
@@ -336,7 +336,7 @@ int main(int argc, char **argv) {
 				if(outformat == FORMAT_BIN) {
 					BinaryHitSink::append(*out, h, outrefnames, 0);
 				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, 0 /* partition */, 0);
+					VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
 				} else if(outformat == FORMAT_FASTQ) {
 					fastqAppend(*out, h);
 				} else if(outformat == FORMAT_FASTA) {

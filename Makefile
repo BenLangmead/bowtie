@@ -59,7 +59,7 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
-SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp log.cpp
+SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp log.cpp hit_set.cpp refmap.cpp annot.cpp
 OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
@@ -229,6 +229,9 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -DEBWT_INSPECT_HASH=`cat .$@.cksum` $(DEFS) -Wall $(INC) -I . -o $@ $< $(OTHER_CPPS) $(LIBS)
+
+chaincat: chaincat.cpp hit_set.h filebuf.h hit_set.cpp alphabet.h alphabet.c
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -Wall $(INC) -I . -o $@ $< hit_set.cpp alphabet.c
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
