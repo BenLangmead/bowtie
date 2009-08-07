@@ -479,7 +479,7 @@ public:
 			}
 		}
 		if(this->done) {
-			sinkPt_->finishRead(*patsrc_, true);
+			sinkPt_->finishRead(*patsrc_, true, true);
 		}
 		return this->done;
 	}
@@ -742,7 +742,7 @@ public:
 		advanceOrientation(!doneFw_);
 		if(this->done) {
 			if(verbose2_) cout << "----" << endl;
-			sinkPt_->finishRead(*patsrc_, true);
+			sinkPt_->finishRead(*patsrc_, true, true);
 		}
 		return this->done;
 	}
@@ -1405,6 +1405,14 @@ protected:
 };
 
 /**
+ * Helper struct that holds a Range together with the coordinates where it al
+ */
+struct RangeWithCoords {
+	Range r;
+	U32Pair h;
+};
+
+/**
  * An aligner for finding paired alignments while operating entirely
  * within the Burrows-Wheeler domain.
  */
@@ -1421,12 +1429,16 @@ class PairedBWAlignerV2 : public Aligner {
 public:
 	PairedBWAlignerV2(
 		EbwtSearchParams<String<Dna> >* params,
+		EbwtSearchParams<String<Dna> >* paramsSe1,
+		EbwtSearchParams<String<Dna> >* paramsSe2,
 		TDriver* driver,
 		RefAligner<String<Dna5> >* refAligner,
 		RangeChaser<String<Dna> >* rchase,
 		HitSink& sink,
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
+		HitSinkPerThread* sinkPtSe1,
+		HitSinkPerThread* sinkPtSe2,
 		bool fw1, bool fw2,
 		uint32_t minInsert,
 		uint32_t maxInsert,
@@ -1441,10 +1453,17 @@ public:
 		refs_(refs), patsrc_(NULL),
 		qlen1_(0), qlen2_(0),
 		chase_(false),
+		donePe_(false),
+		doneSe1_(false),
+		doneSe2_(false),
 		refAligner_(refAligner),
 		sinkPtFactory_(sinkPtFactory),
 		sinkPt_(sinkPt),
+		sinkPtSe1_(sinkPtSe1),
+		sinkPtSe2_(sinkPtSe2),
 		params_(params),
+		paramsSe1_(paramsSe1),
+		paramsSe2_(paramsSe2),
 		minInsert_(minInsert),
 		maxInsert_(maxInsert),
 		mixedAttemptLim_(mixedAttemptLim),
@@ -1464,10 +1483,18 @@ public:
 	virtual ~PairedBWAlignerV2() {
 		delete driver_; driver_ = NULL;
 		delete params_; params_ = NULL;
+		if(paramsSe1_ != NULL) {
+			delete paramsSe1_; paramsSe1_ = NULL;
+			delete paramsSe2_; paramsSe2_ = NULL;
+		}
 		delete rchase_; rchase_ = NULL;
 		delete[] btCnt_; btCnt_ = NULL;
 		delete refAligner_; refAligner_ = NULL;
 		sinkPtFactory_.destroy(sinkPt_); sinkPt_ = NULL;
+		if(sinkPtSe1_ != NULL) {
+			sinkPtFactory_.destroy(sinkPtSe1_); sinkPtSe1_ = NULL;
+			sinkPtFactory_.destroy(sinkPtSe2_); sinkPtSe2_ = NULL;
+		}
 	}
 
 	/**
@@ -1489,8 +1516,14 @@ public:
 		this->done = false;
 		// No ranges are being chased yet
 		chase_ = false;
+		donePe_ = doneSe1_ = doneSe2_ = false;
 		pairs_fw_.clear();
 		pairs_rc_.clear();
+		assert(!sinkPt_->exceededOverThresh());
+		if(sinkPtSe1_ != NULL) {
+			assert(!sinkPtSe1_->exceededOverThresh());
+			assert(!sinkPtSe2_->exceededOverThresh());
+		}
 	}
 
 	/**
@@ -1514,15 +1547,10 @@ public:
 			if(rchase_->foundOff()) {
 				const Range& r = driver_->range();
 				assert(r.repOk());
-				this->done = resolveOutstandingInRef(
+				resolveOutstanding(
 						rchase_->off(),
-						r.ebwt->_plen[rchase_->off().first], r);
-				if(++mixedAttempts_ > mixedAttemptLim_) {
-					// Give up on this pair
-					this->done = true;
-				} else {
-					rchase_->reset();
-				}
+					 	r.ebwt->_plen[rchase_->off().first], r);
+				rchase_->reset();
 			} else {
 				assert(rchase_->done);
 				// Forget this range; keep looking for ranges
@@ -1535,12 +1563,17 @@ public:
 			// Search for more ranges for whichever mate currently has
 			// fewer candidate alignments
 			if(!driver_->done) {
-				// If there are no more ranges for the other mate and
-				// there are no candidate alignments either, then we're
-				// not going to find a paired alignment in this
-				// orientation.
 				if(!this->done) {
-					this->done = sinkPt_->irrelevantCost(driver_->minCost);
+					// See NBestFirstStratHitSinkPerThread.  Basically,
+					// we stop looking if we've already reported a paired-end alignment where
+					if(!donePe_) {
+						donePe_ = sinkPt_->irrelevantCost(driver_->minCost);
+					}
+					if(sinkPtSe1_ != NULL) {
+						this->done = donePe_ && doneSe1_ && doneSe2_;
+					} else {
+						this->done = donePe_;
+					}
 					if(!this->done) {
 						driver_->advance(ADV_COST_CHANGES);
 					}
@@ -1561,7 +1594,14 @@ public:
 		}
 
 		if(this->done) {
-			sinkPt_->finishRead(*patsrc_, true);
+			bool reportedPe = (sinkPt_->finishRead(*patsrc_, true, true) > 0);
+			if(sinkPtSe1_ != NULL) {
+				sinkPtSe1_->finishRead(*patsrc_, !reportedPe, false);
+				sinkPtSe2_->finishRead(*patsrc_, !reportedPe, false);
+				assert(!sinkPtSe1_->exceededOverThresh());
+				assert(!sinkPtSe2_->exceededOverThresh());
+			}
+			assert(!sinkPt_->exceededOverThresh());
 		}
 		return this->done;
 	}
@@ -1641,6 +1681,73 @@ protected:
 				bufR->patid,
 				pairFw ? 2 : 1);
 		return ret;
+	}
+
+	/**
+	 * Helper for reporting a pair of alignments.  As of now, we report
+	 * a paired alignment by reporting two consecutive alignments, one
+	 * for each mate.
+	 */
+	void reportSe(const Range& r, U32Pair h, uint32_t tlen) {
+		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
+		if(params->sink().exceededOverThresh()) {
+			if(r.mate1) assert(doneSe1_); else assert(doneSe2_);
+			return;
+		}
+		params->setFw(r.fw);
+		ReadBuf* buf = r.mate1 ? bufa_ : bufb_;
+		bool ebwtFw = r.ebwt->fw();
+		uint32_t len = r.mate1 ? alen_ : blen_;
+		// Print upstream mate first
+		if(params->reportHit(
+			r.fw ? (ebwtFw?  buf->patFw  :  buf->patFwRev) :
+			       (ebwtFw?  buf->patRc  :  buf->patRcRev),
+			r.fw ? (ebwtFw? &buf->qualFw : &buf->qualFwRev) :
+			       (ebwtFw? &buf->qualRc : &buf->qualRcRev),
+			&buf->name,
+			r.ebwt->rmap(),
+			ebwtFw,
+			r.mms,                   // mismatch positions
+			r.refcs,                 // reference characters for mms
+			r.numMms,                // # mismatches
+			h,                       // position
+			make_pair(r.top, r.bot), // arrows
+			tlen,                    // textlen
+			len,                     // qlen
+			r.stratum,               // alignment stratum
+			r.cost,                  // cost, including quality penalty
+			r.bot - r.top - 1,       // # other hits
+			buf->patid,
+			0))
+		{
+			if(r.mate1) doneSe1_ = true;
+			else        doneSe2_ = true;
+		}
+	}
+
+	void resolveOutstanding(const U32Pair& off,
+	                        const uint32_t tlen,
+	                        const Range& range)
+	{
+		if(!donePe_) {
+			assert(donePe_ || !params_->sink().exceededOverThresh());
+			bool ret = resolveOutstandingInRef(off, tlen, range);
+			if(++mixedAttempts_ > mixedAttemptLim_ || ret) {
+				// Give up on this pair
+				donePe_ = true;
+				if(sinkPtSe1_ == NULL) this->done = true;
+			}
+			assert(donePe_ || !params_->sink().exceededOverThresh());
+		}
+		if(sinkPtSe1_ != NULL) {
+			if(!(range.mate1 ? doneSe1_ : doneSe2_)) {
+				// Hold onto this single-end alignment in case we don't
+				// find any paired alignments
+				reportSe(range, off, tlen);
+			}
+			this->done = doneSe1_ && doneSe2_ && donePe_;
+		}
+		assert(donePe_ || !params_->sink().exceededOverThresh());
 	}
 
 	/**
@@ -1739,25 +1846,28 @@ protected:
 			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
 			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
 			if(report(
-					matchRight ? range : r, // range for upstream mate
-			        matchRight ? r : range, // range for downstream mate
-				    tidx,                   // ref idx
-				    matchRight ? toff : result, // upstream offset
-			        matchRight ? result : toff, // downstream offset
-				    tlen,       // length of ref
-				    pairFw,    // whether the pair is being mapped to fw strand
-				    ebwtLFw,
-				    ebwtRFw,
-				    range.ebwt->rmap())) return true;
+				matchRight ? range : r, // range for upstream mate
+				matchRight ? r : range, // range for downstream mate
+				tidx,                   // ref idx
+				matchRight ? toff : result, // upstream offset
+				matchRight ? result : toff, // downstream offset
+				tlen,       // length of ref
+				pairFw,     // whether the pair is being mapped to fw strand
+				ebwtLFw,
+				ebwtRFw,
+				range.ebwt->rmap())) return true;
 		}
 		return false;
 	}
 
 	const BitPairReference* refs_;
 	PatternSourcePerThread *patsrc_;
-	uint32_t qlen1_;
-	uint32_t qlen2_;
+	uint32_t qlen1_, qlen2_;
 	bool chase_;
+
+	// true -> we're no longer shooting for paired-end alignments;
+	// just collecting single-end ones
+	bool donePe_, doneSe1_, doneSe2_;
 
 	// For searching for outstanding mates
 	RefAligner<String<Dna5> >* refAligner_;
@@ -1765,9 +1875,12 @@ protected:
 	// Temporary HitSink; to be deleted
 	const HitSinkPerThreadFactory& sinkPtFactory_;
 	HitSinkPerThread* sinkPt_;
+	HitSinkPerThread* sinkPtSe1_, * sinkPtSe2_;
 
 	// State for alignment
 	EbwtSearchParams<String<Dna> >* params_;
+	// for single-end:
+	EbwtSearchParams<String<Dna> >* paramsSe1_, * paramsSe2_;
 
 	// Paired-end boundaries
 	const uint32_t minInsert_;
@@ -1778,8 +1891,7 @@ protected:
 
 	// Orientation of upstream/downstream mates when aligning to
 	// forward strand
-	const bool fw1_;
-	const bool fw2_;
+	const bool fw1_, fw2_;
 
 	// State for getting alignments from ranges statefully
 	RangeChaser<String<Dna> >* rchase_;
@@ -1795,8 +1907,7 @@ protected:
 
 	/// For keeping track of paired alignments that have already been
 	/// found for the forward and reverse-comp pair orientations
-	TSetPairs   pairs_fw_;
-	TSetPairs   pairs_rc_;
+	TSetPairs pairs_fw_, pairs_rc_;
 };
 
 #endif /* ALIGNER_H_ */

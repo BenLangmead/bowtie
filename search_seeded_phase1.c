@@ -44,7 +44,7 @@
 		ASSERT_NO_HITS_RC(true);
 		DONEMASK_SET(patid);
 		skipped = true;
-		sink->finishRead(*patsrc, true);
+		sink->finishRead(*patsrc, true, true);
 		continue;
 	}
 

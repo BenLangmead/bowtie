@@ -197,6 +197,7 @@ public:
 			ChunkPool *pool,
 			BitPairReference* refs,
 			vector<String<Dna5> >& os,
+			bool reportSe,
 			bool maqPenalty,
 			bool qualOrder,
 			bool strandFix,
@@ -223,6 +224,7 @@ public:
 			cacheLimit_(cacheLimit),
 			pool_(pool),
 			refs_(refs), os_(os),
+			reportSe_(reportSe),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
 			strandFix_(strandFix),
@@ -240,8 +242,18 @@ public:
 	 */
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
+		HitSinkPerThread* sinkPtSe1 = NULL, * sinkPtSe2 = NULL;
 		EbwtSearchParams<String<Dna> >* params =
 			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+		EbwtSearchParams<String<Dna> >* paramsSe1 = NULL, * paramsSe2 = NULL;
+		if(reportSe_) {
+			sinkPtSe1 = sinkPtFactory_.create();
+			sinkPtSe2 = sinkPtFactory_.create();
+			paramsSe1 =
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_, true, true, true, rangeMode_);
+			paramsSe2 =
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_, true, true, true, rangeMode_);
+		}
 
 		const int halfAndHalf = 0;
 		const bool seeded = false;
@@ -421,10 +433,12 @@ public:
 			return al;
 		} else {
 			PairedBWAlignerV2<EbwtRangeSource>* al = new PairedBWAlignerV2<EbwtRangeSource>(
-				params,
+				params, paramsSe1, paramsSe2,
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
 				refAligner, rchase,
-				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
+				sink_, sinkPtFactory_,
+				sinkPt, sinkPtSe1, sinkPtSe2,
+				mate1fw_, mate2fw_,
 				peInner_, peOuter_,
 				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				INT_MAX, pool_, NULL);
@@ -455,6 +469,7 @@ private:
 	ChunkPool *pool_;
 	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
+	const bool reportSe_;
 	const bool maqPenalty_;
 	const bool qualOrder_;
 	const bool strandFix_;

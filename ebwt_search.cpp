@@ -130,6 +130,7 @@ static int recalMaxCycle        = 64;
 static int recalMaxQual         = 40;
 static int recalQualShift       = 2;
 static bool useV1               = true;
+static bool reportSe            = false;
 static const char * refMapFile  = NULL;  // file containing a map from index coordinates to another coordinate system
 static const char * annotMapFile= NULL;  // file containing a map from reference coordinates to annotations
 // mating constraints
@@ -205,7 +206,8 @@ enum {
 	ARG_CHAINOUT,
 	ARG_CHAININ,
 	ARG_REFMAP,
-	ARG_ANNOTMAP
+	ARG_ANNOTMAP,
+	ARG_REPORTSE
 };
 
 static struct option long_options[] = {
@@ -307,6 +309,7 @@ static struct option long_options[] = {
 	{(char*)"chainin",      no_argument,       0,            ARG_CHAININ},
 	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
+	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1427,6 +1430,7 @@ static void parseOptions(int argc, char **argv) {
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
+			case ARG_REPORTSE: reportSe = true; break;
 			case ARG_PREFETCH_WIDTH:
 				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
 				break;
@@ -1688,7 +1692,7 @@ static char *argv0 = NULL;
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(!p->empty()) { \
-		sink->finishRead(*p, !skipped); \
+		sink->finishRead(*p, true, !skipped); \
 	} \
 	skipped = false;
 
@@ -1713,7 +1717,7 @@ static inline void finishReadWithHitmask(PatternSourcePerThread* p,
 				reportUnAl = !hitMask.test(p->patid());
 			}
 		}
-		if(sink->finishRead(*p, reportUnAl) > 0) {
+		if(sink->finishRead(*p, true, reportUnAl) > 0) {
 			/* We reported a hit for the read, so we set the */
 			/* appropriate bit in the hitMask to prevent it from */
 			/* being reported as unaligned. */
@@ -1979,6 +1983,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			cacheLimit,
 			pool,
 			refs, os,
+			reportSe,
 			!noMaqRound,
 			strandFix,
 			!better,
@@ -2371,6 +2376,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			cacheLimit,
 			pool,
 			refs, os,
+			reportSe,
 			!noMaqRound,
 			!better,
 			strandFix,
@@ -2970,6 +2976,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			cacheLimit,
 			pool,
 			refs, os,
+			reportSe,
 			!noMaqRound,
 			!better,
 			strandFix,
@@ -3653,6 +3660,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			pool,
 			refs,
 			os,
+			reportSe,
 			!noMaqRound,
 			!better,
 			strandFix,

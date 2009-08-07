@@ -1161,9 +1161,13 @@ public:
 	vector<int>& retainedStrata() { return _strata; }
 
 	/// Finalize current read
-	virtual uint32_t finishRead(PatternSourcePerThread& p, bool dump = true) {
+	virtual uint32_t finishRead(PatternSourcePerThread& p, bool report, bool dump) {
 		uint32_t ret = finishReadImpl();
 		_bestRemainingStratum = 0;
+		if(!report) {
+			_bufferedHits.clear();
+			return 0;
+		}
 		bool maxed = (ret > 0 && _bufferedHits.size() == 0);
 		bool unal = (ret == 0);
 		if(dump && (unal || maxed)) {
@@ -1297,6 +1301,20 @@ public:
 	 */
 	bool dumpsReads() {
 		return _sink.dumpsReads();
+	}
+
+	/**
+	 * Return true iff there are currently no buffered hits.
+	 */
+	bool empty() const {
+		return _bufferedHits.empty();
+	}
+
+	/**
+	 * Return the number of currently buffered hits.
+	 */
+	bool size() const {
+		return _bufferedHits.size();
 	}
 
 protected:
