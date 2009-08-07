@@ -1449,6 +1449,8 @@ public:
 	 */
 	virtual bool fw() const = 0;
 
+	virtual void removeMate(int m) { }
+
 	/// Set to true iff we just found a range.
 	bool foundRange;
 
@@ -2011,6 +2013,18 @@ public:
 		return rss_[0]->fw();
 	}
 
+	virtual void removeMate(int m) {
+		bool qmate1 = (m == 1);
+		assert(paired_);
+		for(size_t i = 0; i < active_.size(); i++) {
+			if(active_[i]->mate1() == qmate1) {
+				active_[i]->done = true;
+			}
+		}
+		sortActives();
+		assert(mateEliminated());
+	}
+
 protected:
 
 	/**
@@ -2039,7 +2053,7 @@ protected:
 		// If this RangeSourceDriver is done, shift everyone else
 		// up and delete it
 		const size_t rssSz = active_.size();
-		for(size_t i = 0; i < rssSz-1; i++) {
+		for(size_t i = 0; i < rssSz; i++) {
 			if(!active_[i]->done) {
 				if(active_[i]->mate1()) mate1sLeft = true;
 				else mate2sLeft = true;

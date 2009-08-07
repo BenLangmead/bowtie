@@ -1519,11 +1519,6 @@ public:
 		donePe_ = doneSe1_ = doneSe2_ = false;
 		pairs_fw_.clear();
 		pairs_rc_.clear();
-		assert(!sinkPt_->exceededOverThresh());
-		if(sinkPtSe1_ != NULL) {
-			assert(!sinkPtSe1_->exceededOverThresh());
-			assert(!sinkPtSe2_->exceededOverThresh());
-		}
 	}
 
 	/**
@@ -1564,15 +1559,30 @@ public:
 			// fewer candidate alignments
 			if(!driver_->done) {
 				if(!this->done) {
-					// See NBestFirstStratHitSinkPerThread.  Basically,
-					// we stop looking if we've already reported a paired-end alignment where
 					if(!donePe_) {
+						assert(!this->done);
 						donePe_ = sinkPt_->irrelevantCost(driver_->minCost);
+						if(donePe_ && (!sinkPt_->empty() || sinkPtSe1_ == NULL)) {
+							// Paired-end alignment(s) were found, no
+							// more will be found, and no unpaired
+							// alignments are requested, so stop
+							this->done = true;
+						}
+						if(donePe_ && sinkPtSe1_ != NULL) {
+							if(doneSe1_) driver_->removeMate(1);
+							if(doneSe2_) driver_->removeMate(2);
+						}
 					}
-					if(sinkPtSe1_ != NULL) {
+					if(!this->done && sinkPtSe1_ != NULL) {
+						if(!doneSe1_) {
+							doneSe1_ = sinkPtSe1_->irrelevantCost(driver_->minCost);
+							if(doneSe1_ && donePe_) driver_->removeMate(1);
+						}
+						if(!doneSe2_) {
+							doneSe2_ = sinkPtSe2_->irrelevantCost(driver_->minCost);
+							if(doneSe2_ && donePe_) driver_->removeMate(2);
+						}
 						this->done = donePe_ && doneSe1_ && doneSe2_;
-					} else {
-						this->done = donePe_;
 					}
 					if(!this->done) {
 						driver_->advance(ADV_COST_CHANGES);
@@ -1598,10 +1608,7 @@ public:
 			if(sinkPtSe1_ != NULL) {
 				sinkPtSe1_->finishRead(*patsrc_, !reportedPe, false);
 				sinkPtSe2_->finishRead(*patsrc_, !reportedPe, false);
-				assert(!sinkPtSe1_->exceededOverThresh());
-				assert(!sinkPtSe2_->exceededOverThresh());
 			}
-			assert(!sinkPt_->exceededOverThresh());
 		}
 		return this->done;
 	}
@@ -1690,10 +1697,7 @@ protected:
 	 */
 	void reportSe(const Range& r, U32Pair h, uint32_t tlen) {
 		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
-		if(params->sink().exceededOverThresh()) {
-			if(r.mate1) assert(doneSe1_); else assert(doneSe2_);
-			return;
-		}
+		assert(!(r.mate1 ? doneSe1_ : doneSe2_));
 		params->setFw(r.fw);
 		ReadBuf* buf = r.mate1 ? bufa_ : bufb_;
 		bool ebwtFw = r.ebwt->fw();
@@ -1722,6 +1726,7 @@ protected:
 		{
 			if(r.mate1) doneSe1_ = true;
 			else        doneSe2_ = true;
+			if(donePe_) driver_->removeMate(r.mate1 ? 1 : 2);
 		}
 	}
 
@@ -1729,25 +1734,28 @@ protected:
 	                        const uint32_t tlen,
 	                        const Range& range)
 	{
+		assert(!this->done);
 		if(!donePe_) {
-			assert(donePe_ || !params_->sink().exceededOverThresh());
 			bool ret = resolveOutstandingInRef(off, tlen, range);
 			if(++mixedAttempts_ > mixedAttemptLim_ || ret) {
 				// Give up on this pair
 				donePe_ = true;
-				if(sinkPtSe1_ == NULL) this->done = true;
+				if(sinkPtSe1_ != NULL) {
+					if(doneSe1_) driver_->removeMate(1);
+					if(doneSe2_) driver_->removeMate(2);
+				}
 			}
-			assert(donePe_ || !params_->sink().exceededOverThresh());
+			this->done = (donePe_ && (!sinkPt_->empty() || sinkPtSe1_ == NULL || (doneSe1_ && doneSe2_)));
 		}
-		if(sinkPtSe1_ != NULL) {
-			if(!(range.mate1 ? doneSe1_ : doneSe2_)) {
+		if(!this->done && sinkPtSe1_ != NULL) {
+			bool doneSe = (range.mate1 ? doneSe1_ : doneSe2_);
+			if(!doneSe) {
 				// Hold onto this single-end alignment in case we don't
 				// find any paired alignments
 				reportSe(range, off, tlen);
 			}
 			this->done = doneSe1_ && doneSe2_ && donePe_;
 		}
-		assert(donePe_ || !params_->sink().exceededOverThresh());
 	}
 
 	/**
@@ -1763,6 +1771,7 @@ protected:
 	                             const uint32_t tlen,
 	                             const Range& range)
 	{
+		assert(!donePe_);
 		assert(refs_->loaded());
 		assert_lt(off.first, refs_->numRefs());
 		// pairFw = true if the anchor indicates that the pair will
