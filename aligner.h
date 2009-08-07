@@ -762,7 +762,8 @@ protected:
 	            uint32_t tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
-	            bool ebwtFwR)
+	            bool ebwtFwR,
+	            const ReferenceMap* rmap)
 	{
 		assert_lt(upstreamOff, dnstreamOff);
 		uint32_t spreadL = rL.bot - rL.top;
@@ -782,7 +783,7 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
 					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
 				&bufL->name,
-				rL.ebwt->rmap(),
+				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -806,7 +807,7 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
 					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
 				&bufR->name,
-				rR.ebwt->rmap(),
+				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -829,10 +830,11 @@ protected:
 	            uint32_t upstreamOff, // offset for upstream mate
 	            uint32_t dnstreamOff, // offset for downstream mate
 	            uint32_t tlen, // length of ref
-	            bool pairFw)   // whether the pair is being mapped to fw strand
+	            bool pairFw,   // whether the pair is being mapped to fw strand
+	            const ReferenceMap* rmap)
 	{
 		return report(rL, rR, first, upstreamOff, dnstreamOff, tlen,
-		              pairFw, rL.ebwt->fw(), rR.ebwt->fw());
+		              pairFw, rL.ebwt->fw(), rR.ebwt->fw(), rmap);
 	}
 
 	/**
@@ -840,8 +842,6 @@ protected:
 	 * to the list of positions for that mate and reconcile it against
 	 * all of the positions for the other mate, reporting paired
 	 * alignments wherever the mating constraints are met.
-	 *
-	 * The parameters ending in 1 pertain to the upstream mate.
 	 */
 	bool reconcileAndAdd(const U32Pair& h,
 	                     bool newFromL,
@@ -892,7 +892,8 @@ protected:
 								   left, right, // up/downstream offsets
 								   // _plen array is same both Fw and Bw
 								   rL.ebwt->_plen[h.first],
-								   pairFw)) return true;
+								   pairFw,
+								   rL.ebwt->rmap())) return true;
 						}
 					}
 				}
@@ -1006,7 +1007,8 @@ protected:
 				    tlen,       // length of ref
 				    !doneFw_,   // whether the pair is being mapped to fw strand
 				    ebwtLFw,
-				    ebwtRFw)) return true;
+				    ebwtRFw,
+				    range.ebwt->rmap())) return true;
 		}
 		return false;
 	}
@@ -1579,7 +1581,8 @@ protected:
 	            uint32_t tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
-	            bool ebwtFwR)
+	            bool ebwtFwR,
+	            const ReferenceMap *rmap)
 	{
 		assert_lt(upstreamOff, dnstreamOff);
 		uint32_t spreadL = rL.bot - rL.top;
@@ -1599,7 +1602,7 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
 					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
 				&bufL->name,
-				rL.ebwt->rmap(),
+				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
 				rL.refcs,                     // reference characters for mms
@@ -1623,7 +1626,7 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
 					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
 				&bufR->name,
-				rR.ebwt->rmap(),
+				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
 				rR.refcs,                     // reference characters for mms
@@ -1744,7 +1747,8 @@ protected:
 				    tlen,       // length of ref
 				    pairFw,    // whether the pair is being mapped to fw strand
 				    ebwtLFw,
-				    ebwtRFw)) return true;
+				    ebwtRFw,
+				    range.ebwt->rmap())) return true;
 		}
 		return false;
 	}
