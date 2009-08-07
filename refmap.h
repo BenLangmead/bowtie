@@ -9,6 +9,7 @@
 #define REFMAP_H_
 
 #include <stdint.h>
+#include <cassert>
 #include <vector>
 #include <iostream>
 #include <fstream>
