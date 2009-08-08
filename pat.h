@@ -2055,7 +2055,6 @@ protected:
 					}
 					_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 					_setLength(r.patFw,  length_);
-					cout << "Pat: " << r.patFw << endl;
 					_setBegin (r.qualFw, r.qualBufFw);
 					_setLength(r.qualFw, length_);
 					// Set up a default name if one hasn't been set
