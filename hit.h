@@ -575,12 +575,15 @@ public:
 				maxPct  = 100.0 * (double)numMaxed_ / (double)tot;
 			}
 			cerr << "# reads with at least one reported alignment: "
-			     << numAligned_ << " (" << setprecision(2) << alPct << "%)" << endl;
+			     << numAligned_ << " (" << fixed << setprecision(2)
+			     << alPct << "%)" << endl;
 			cerr << "# reads that failed to align: "
-			     << numUnaligned_ << " (" << setprecision(2) << unalPct << "%)" << endl;
+			     << numUnaligned_ << " (" << fixed << setprecision(2)
+			     << unalPct << "%)" << endl;
 			if(numMaxed_ > 0) {
 				cerr << "# reads with alignments suppressed due to -m: "
-				     << numMaxed_ << " (" << setprecision(2) << maxPct << "%)" << endl;
+				     << numMaxed_ << " (" << fixed << setprecision(2)
+				     << maxPct << "%)" << endl;
 			}
 			if(first_) {
 				assert_eq(0llu, numReported_);
