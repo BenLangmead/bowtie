@@ -549,12 +549,18 @@ public:
 	 * Called when all alignments are complete.  It is assumed that no
 	 * synchronization is necessary.
 	 */
-	void finish() {
+	void finish(pair<uint64_t,uint64_t> readcnt) {
 		// Close output streams
 		closeOuts();
 		if(!quiet_) {
 			// Print information about how many unpaired and/or paired
 			// reads were aligned.
+			if(readcnt.first > 0) {
+				cerr << "# unpaired input reads: " << readcnt.first << endl;
+			}
+			if(readcnt.second > 0) {
+				cerr << "# paired input reads: " << readcnt.second << endl;
+			}
 			if(first_) {
 				assert_eq(0llu, numReported_);
 				cerr << "No results" << endl;

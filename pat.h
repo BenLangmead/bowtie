@@ -777,10 +777,10 @@ public:
 		uint64_t rets = 0llu, retp = 0llu;
 		for(size_t i = 0; i < srca_.size(); i++) {
 			if(srcb_[i] == NULL) {
-				retp += srca_[i]->readCnt();
+				rets += srca_[i]->readCnt();
 			} else {
 				assert_eq(srca_[i]->readCnt(), srcb_[i]->readCnt());
-				rets += srca_[i]->readCnt();
+				retp += srca_[i]->readCnt();
 			}
 		}
 		return make_pair(rets, retp);

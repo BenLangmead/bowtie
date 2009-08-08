@@ -4463,7 +4463,7 @@ static void driver(const char * type,
 			delete ebwtBw;
 		}
 		if(!quiet) {
-			sink->finish(); // end the hits section of the hit file
+			sink->finish(patsrc->readCnt()); // end the hits section of the hit file
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();
