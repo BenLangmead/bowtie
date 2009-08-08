@@ -3150,7 +3150,7 @@ protected:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { quiet_ = true; }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { }
 	virtual void append(ostream& o, const Hit& h) { }
 };
 
