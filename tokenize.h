@@ -27,4 +27,16 @@ static inline void tokenize(const string& s,
     }
 }
 
+static inline void tokenize(
+	const std::string& s,
+    char delim,
+    std::vector<std::string>& ss)
+{
+	std::string token;
+	std::istringstream iss(s);
+	while(getline(iss, token, delim)) {
+		ss.push_back(token);
+	}
+}
+
 #endif /*TOKENIZE_H_*/

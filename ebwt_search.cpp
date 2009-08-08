@@ -133,9 +133,12 @@ static bool useV1               = true;
 static bool reportSe            = false;
 static const char * refMapFile  = NULL;  // file containing a map from index coordinates to another coordinate system
 static const char * annotMapFile= NULL;  // file containing a map from reference coordinates to annotations
+static size_t fastaContLen      = 0;
+static size_t fastaContFreq     = 0;
+
 // mating constraints
 
-static const char *short_options = "fFqbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
+static const char *short_options = "fF:qbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
 
 enum {
 	ARG_ORIG = 256,
@@ -1352,6 +1355,31 @@ static int parseInt(int lower, const char *errmsg) {
 }
 
 /**
+ * Parse a T string 'str'.
+ */
+template<typename T>
+T parse(const char *s) {
+	T tmp;
+	stringstream ss(s);
+	ss >> tmp;
+	return tmp;
+}
+
+/**
+ * Parse a pair of Ts from a string, 'str', delimited with 'delim'.
+ */
+template<typename T>
+pair<T, T> parsePair(const char *str, char delim) {
+	string s(str);
+	vector<string> ss;
+	tokenize(s, delim, ss);
+	pair<T, T> ret;
+	ret.first = parse<T>(ss[0].c_str());
+	ret.second = parse<T>(ss[1].c_str());
+	return ret;
+}
+
+/**
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
@@ -1365,7 +1393,13 @@ static void parseOptions(int argc, char **argv) {
 			case '2': tokenize(optarg, ",", mates2); break;
 			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
 	   		case 'f': format = FASTA; break;
-	   		case 'F': format = FASTA_CONT; break;
+	   		case 'F': {
+	   			format = FASTA_CONT;
+	   			pair<size_t, size_t> p = parsePair<size_t>(optarg, ',');
+	   			fastaContLen = p.first;
+	   			fastaContFreq = p.second;
+	   			break;
+	   		}
 	   		case 'q': format = FASTQ; break;
 	   		case 'r': format = RAW; break;
 	   		case 'c': format = CMDLINE; break;
@@ -4015,7 +4049,8 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               qs, 28, 1,
+			                               qs, fastaContLen,
+			                               fastaContFreq,
 			                               useSpinlock,
 			                               patDumpfile,
 			                               skipReads);

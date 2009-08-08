@@ -2008,6 +2008,7 @@ public:
 		length_(length), freq_(freq),
 		eat_(length_), bufCur_(0)
 	{
+		resetForNextFile();
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
 	}
 
@@ -2024,38 +2025,47 @@ protected:
 				return;
 			} if(c == '>') {
 				resetForNextFile();
+				peekOverNewline(filebuf_);
 			} else {
 				int cat = dna4Cat[c];
 				if(cat == 2) {
-					eat_ = length_;
+					// Encountered an ambiguous char; skip the next
+					// length_ chars
+					eat_ = length_-1;
 				} else if(cat == 0) {
+					// Encountered non-DNA, non-IUPAC char; skip it
 					continue;
 				} else {
+					// DNA char
 					buf_[bufCur_++] = c;
 					if(bufCur_ == 1024) bufCur_ = 0;
-					if(eat_ > 0) eat_--;
-					if(eat_ == 0) {
-						for(size_t i = 0; i < length_; i++) {
-							if(length_ + i <= bufCur_) {
-								c = buf_[bufCur_ - length_ + i];
-							} else {
-								c = buf_[bufCur_ - length_ + i + 1024];
-							}
-							r.patBufFw [i] = charToDna5[c];
-							r.qualBufFw[i] = 'I';
-						}
-						_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-						_setLength(r.patFw,  length_);
-						_setBegin (r.qualFw, r.qualBufFw);
-						_setLength(r.qualFw, length_);
-						// Set up a default name if one hasn't been set
-						itoa10(readCnt_, r.nameBuf);
-						_setBegin(r.name, r.nameBuf);
-						_setLength(r.name, strlen(r.nameBuf));
-						readCnt_++;
-						patid = readCnt_-1;
-						break;
+					if(eat_ > 0) {
+						eat_--;
+						continue;
 					}
+					for(size_t i = 0; i < length_; i++) {
+						if(length_ - i <= bufCur_) {
+							c = buf_[bufCur_ - (length_ - i)];
+						} else {
+							// Rotate
+							c = buf_[bufCur_ - (length_ - i) + 1024];
+						}
+						r.patBufFw [i] = charToDna5[c];
+						r.qualBufFw[i] = 'I';
+					}
+					_setBegin (r.patFw,  (Dna5*)r.patBufFw);
+					_setLength(r.patFw,  length_);
+					cout << "Pat: " << r.patFw << endl;
+					_setBegin (r.qualFw, r.qualBufFw);
+					_setLength(r.qualFw, length_);
+					// Set up a default name if one hasn't been set
+					itoa10(readCnt_, r.nameBuf);
+					_setBegin(r.name, r.nameBuf);
+					_setLength(r.name, strlen(r.nameBuf));
+					eat_ = freq_-1;
+					readCnt_++;
+					patid = readCnt_-1;
+					break;
 				}
 			}
 		}
@@ -2070,7 +2080,7 @@ protected:
 	 * Reset state to be read for the next file.
 	 */
 	virtual void resetForNextFile() {
-		eat_ = length_;
+		eat_ = max(length_-1, freq_-1);
 		bufCur_ = 0;
 	}
 private:

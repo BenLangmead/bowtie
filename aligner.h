@@ -1593,6 +1593,7 @@ public:
 							doneSe1_ = sinkPtSe1_->irrelevantCost(driver_->minCost);
 							if(doneSe1_ && donePe_) driver_->removeMate(1);
 						}
+						if(doneSe1_ && doneSe2_) assert(donePe_);
 						this->done = donePe_ && doneSe1_ && doneSe2_;
 					}
 
