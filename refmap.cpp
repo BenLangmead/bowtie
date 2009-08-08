@@ -30,7 +30,7 @@ void ReferenceMap::map(U32Pair& h) const {
  */
 void ReferenceMap::parse() {
 	ifstream in(fname_);
-	if(!in.good() && in.is_open()) {
+	if(!in.good() || !in.is_open()) {
 		cerr << "Could not open reference map file " << fname_ << endl;
 		exit(1);
 	}
