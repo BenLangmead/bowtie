@@ -424,6 +424,13 @@ public:
 #endif
 	}
 
+	/**
+	 * Return the number of reads attempted.
+	 */
+	uint64_t readCnt() const {
+		return readCnt_;
+	}
+
 protected:
 
 	/**
@@ -477,7 +484,7 @@ protected:
 	}
 
 	/// The number of reads read by this PatternSource
-	uint32_t readCnt_;
+	uint64_t readCnt_;
 
 	const char *dumpfile_; /// dump patterns to this file before returning them
 	ofstream out_;         /// output stream for dumpfile
@@ -508,6 +515,7 @@ public:
 	virtual void addWrapper() = 0;
 	virtual void reset() = 0;
 	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+	virtual pair<uint64_t,uint64_t> readCnt() const = 0;
 
 	/**
 	 * Lock this PairedPatternSource, usually because one of its shared
@@ -609,6 +617,18 @@ public:
 			return true; // paired
 		}
 		return false;
+	}
+
+	/**
+	 * Return the number of reads attempted.
+	 */
+	virtual pair<uint64_t,uint64_t> readCnt() const {
+		uint64_t ret = 0llu;
+		vector<PatternSource*>::const_iterator it;
+		for(it = src_.begin(); it != src_.end(); it++) {
+			ret += (*it)->readCnt();
+		}
+		return make_pair(ret, 0llu);
 	}
 
 protected:
@@ -748,6 +768,22 @@ public:
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Return the number of reads attempted.
+	 */
+	virtual pair<uint64_t,uint64_t> readCnt() const {
+		uint64_t rets = 0llu, retp = 0llu;
+		for(size_t i = 0; i < srca_.size(); i++) {
+			if(srcb_[i] == NULL) {
+				retp += srca_[i]->readCnt();
+			} else {
+				assert_eq(srca_[i]->readCnt(), srcb_[i]->readCnt());
+				rets += srca_[i]->readCnt();
+			}
+		}
+		return make_pair(rets, retp);
 	}
 
 protected:
