@@ -34,7 +34,7 @@ enum output_types {
 	OUTPUT_CONCISE,
 	OUTPUT_BINARY,
 	OUTPUT_CHAIN,
-	NONE
+	OUTPUT_NONE
 };
 
 /// Names of the various output modes
@@ -485,26 +485,6 @@ public:
 	virtual void append(ostream& o, const Hit& h) = 0;
 
 	/**
-	 * Report a maxed-out read.  Typically we do nothing, but we might
-	 * want to print a placeholder when output is chained.
-	 */
-	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
-		mainlock();
-		numMaxed_++;
-		mainunlock();
-	}
-
-	/**
-	 * Report an unaligned read.  Typically we do nothing, but we might
-	 * want to print a placeholder when output is chained.
-	 */
-	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		mainlock();
-		numUnaligned_++;
-		mainunlock();
-	}
-
-	/**
 	 * Report a batch of hits.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
@@ -923,12 +903,37 @@ public:
 		}
 	}
 
+	/**
+	 * Report a maxed-out read.  Typically we do nothing, but we might
+	 * want to print a placeholder when output is chained.
+	 */
+	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+		mainlock();
+		numMaxed_++;
+		mainunlock();
+	}
+
+	/**
+	 * Report an unaligned read.  Typically we do nothing, but we might
+	 * want to print a placeholder when output is chained.
+	 */
+	virtual void reportUnaligned(PatternSourcePerThread& p) {
+		mainlock();
+		numUnaligned_++;
+		mainunlock();
+	}
+
 protected:
 
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
-		cerr << "Error: reportHit unimplemented" << endl;
-		exit(1);
+		mainlock();
+		commitHit(h);
+		first_ = false;
+		if(h.mate > 0) numReportedPaired_++;
+		else           numReported_++;
+		numAligned_++;
+		mainunlock();
 	}
 
 	/**
@@ -2341,18 +2346,12 @@ protected:
 	 * Report a concise alignment to the appropriate output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
+		HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
 		lock(h.h.first);
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
-		mainlock();
-		commitHit(h);
-		first_ = false;
-		if(h.mate > 0) numReportedPaired_++;
-		else           numReported_++;
-		numAligned_++;
-		mainunlock();
 	}
 
 private:
@@ -2798,19 +2797,13 @@ protected:
 	 * output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
+		HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
 		// Make sure to grab lock before writing to output stream
 		lock(h.h.first);
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
-		mainlock();
-		commitHit(h);
-		first_ = false;
-		if(h.mate > 0) numReportedPaired_++;
-		else           numReported_++;
-		numAligned_++;
-		mainunlock();
 	}
 
 private:
@@ -3094,18 +3087,12 @@ protected:
 	 * Report a single hit to the appropriate output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
+		HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
 		lock(h.h.first);
 		out(h.h.first).writeString(ss.str());
 		unlock(h.h.first);
-		mainlock();
-		commitHit(h);
-		first_ = false;
-		if(h.mate > 0) numReportedPaired_++;
-		else           numReported_++;
-		numAligned_++;
-		mainunlock();
 	}
 
 private:
@@ -3165,8 +3152,6 @@ class StubHitSink : public HitSink {
 public:
 	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { quiet_ = true; }
 	virtual void append(ostream& o, const Hit& h) { }
-protected:
-	virtual void reportHit(const Hit& h) { }
 };
 
 #endif /*HIT_H_*/

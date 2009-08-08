@@ -1427,7 +1427,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'b': outType = OUTPUT_BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
 	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
-	   		case ARG_NOOUT: outType = NONE; break;
+	   		case ARG_NOOUT: outType = OUTPUT_NONE; break;
 	   		case ARG_REFMAP: refMapFile = optarg; break;
 	   		case ARG_ANNOTMAP: annotMapFile = optarg; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
@@ -4400,7 +4400,7 @@ static void driver(const char * type,
 						true,
 						table, refnames);
 				break;
-			case NONE:
+			case OUTPUT_NONE:
 				sink = new StubHitSink();
 				break;
 			default:

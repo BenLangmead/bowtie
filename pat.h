@@ -2064,11 +2064,8 @@ protected:
 				peekOverNewline(filebuf_);
 			} else {
 				int cat = dna4Cat[c];
-				if(cat == 2) {
-					// Encountered an ambiguous char; skip the next
-					// length_ chars
-					eat_ = length_-1;
-				} else if(cat == 0) {
+				if(cat == 2) c = 'N';
+				if(cat == 0) {
 					// Encountered non-DNA, non-IUPAC char; skip it
 					continue;
 				} else {
