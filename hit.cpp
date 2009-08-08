@@ -31,6 +31,7 @@ void ChainingHitSink::reportHits(vector<Hit>& hs) {
 		commitHits(hs); // Commit to recalibration table
 		first_ = false;
 		numReported_ += hssz;
+		numAligned_++;
 		mainunlock();
 	}
 }
@@ -40,6 +41,7 @@ void ChainingHitSink::reportHits(vector<Hit>& hs) {
  * want to print a placeholder when output is chained.
  */
 void ChainingHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+	HitSink::reportMaxed(hs, p);
 	assert(!hs.empty());
 	if(strata_) {
 		// Get the stratum
@@ -73,6 +75,7 @@ void ChainingHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread&
  * want to print a placeholder when output is chained.
  */
 void ChainingHitSink::reportUnaligned(PatternSourcePerThread& p) {
+	HitSink::reportUnaligned(p);
 	// Read is unaligned; just report a huge starting stratum
 	HitSet s;
 	p.bufa().toHitSet(s);

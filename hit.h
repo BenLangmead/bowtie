@@ -398,6 +398,9 @@ public:
 		INIT_HIT_DUMPS,
 		onePairFile_(onePairFile),
 		first_(true),
+		numAligned_(0llu),
+		numUnaligned_(0llu),
+		numMaxed_(0llu),
 		numReported_(0llu),
 		numReportedPaired_(0llu),
 		quiet_(false),
@@ -485,13 +488,21 @@ public:
 	 * Report a maxed-out read.  Typically we do nothing, but we might
 	 * want to print a placeholder when output is chained.
 	 */
-	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) { }
+	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+		mainlock();
+		numMaxed_++;
+		mainunlock();
+	}
 
 	/**
 	 * Report an unaligned read.  Typically we do nothing, but we might
 	 * want to print a placeholder when output is chained.
 	 */
-	virtual void reportUnaligned(PatternSourcePerThread& p) { }
+	virtual void reportUnaligned(PatternSourcePerThread& p) {
+		mainlock();
+		numUnaligned_++;
+		mainunlock();
+	}
 
 	/**
 	 * Report a batch of hits.
@@ -525,6 +536,7 @@ public:
 		mainlock();
 		commitHits(hs);
 		first_ = false;
+		numAligned_++;
 		if(paired) numReportedPaired_ += hssz;
 		else       numReported_ += hssz;
 		mainunlock();
@@ -549,21 +561,20 @@ public:
 	 * Called when all alignments are complete.  It is assumed that no
 	 * synchronization is necessary.
 	 */
-	void finish(pair<uint64_t,uint64_t> readcnt) {
+	void finish() {
 		// Close output streams
 		closeOuts();
 		if(!quiet_) {
 			// Print information about how many unpaired and/or paired
 			// reads were aligned.
-			if(readcnt.first > 0) {
-				cerr << "# unpaired input reads: " << readcnt.first << endl;
-			}
-			if(readcnt.second > 0) {
-				cerr << "# paired input reads: " << readcnt.second << endl;
+			cerr << "# reads with at least one reported alignment: " << numAligned_ << endl;
+			cerr << "# reads that failed to align: " << numUnaligned_ << endl;
+			if(numMaxed_ > 0) {
+				cerr << "# reads with alignments suppressed due to -m: " << numMaxed_ << endl;
 			}
 			if(first_) {
 				assert_eq(0llu, numReported_);
-				cerr << "No results" << endl;
+				cerr << "No alignments" << endl;
 			}
 			else if(numReportedPaired_ > 0 && numReported_ == 0) {
 				cerr << "Reported " << (numReportedPaired_ >> 1)
@@ -1128,6 +1139,9 @@ protected:
     bool dumpMaxedFlag_;
 
 	volatile bool     first_;       /// true -> first hit hasn't yet been reported
+	volatile uint64_t numAligned_;  /// # reads with >= 1 alignment
+	volatile uint64_t numUnaligned_;/// # reads with no alignments
+	volatile uint64_t numMaxed_;    /// # reads with # alignments exceeding -m ceiling
 	volatile uint64_t numReported_; /// # single-ended alignments reported
 	volatile uint64_t numReportedPaired_; /// # paired-end alignments reported
 	bool quiet_;  /// true -> don't print alignment stats at the end
@@ -2324,6 +2338,7 @@ protected:
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
+		numAligned_++;
 		mainunlock();
 	}
 
@@ -2781,6 +2796,7 @@ protected:
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
+		numAligned_++;
 		mainunlock();
 	}
 
@@ -3075,6 +3091,7 @@ protected:
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
+		numAligned_++;
 		mainunlock();
 	}
 
