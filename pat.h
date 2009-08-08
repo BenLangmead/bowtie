@@ -428,7 +428,7 @@ public:
 	 * Return the number of reads attempted.
 	 */
 	uint64_t readCnt() const {
-		return readCnt_;
+		return readCnt_ - 1;
 	}
 
 protected:
