@@ -1874,12 +1874,18 @@ public:
 
 	virtual uint32_t maxHits() { return n_; }
 
+	/**
+	 * false -> we do not allow strata to be spanned
+	 */
 	virtual bool spanStrata() {
 		return false; // we do not span strata
 	}
 
+	/**
+	 * true -> we report best hits
+	 */
 	virtual bool best() {
-		return true; // we report "best" hits
+		return true;
 	}
 
 	/**
@@ -1932,14 +1938,16 @@ public:
 	 * stratum, then we're done.
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) {
-		if(hitsForThisRead_ > 0) {
-			return true;
-		}
-		return false;
+		return hitsForThisRead_ > 0;
 	}
 
+	/**
+	 * If there have been any hits reported so far, classify any
+	 * subsequent alignments with higher strata as irrelevant.
+	 */
 	virtual bool irrelevantCost(uint16_t cost) {
 		if(hitsForThisRead_) {
+			// irrelevant iff at worse stratum
 			return ((int)cost >> 14) > bestStratum_;
 		}
 		return false;
@@ -1948,8 +1956,8 @@ public:
 private:
 
 	uint32_t n_; /// max # hits to report
-	int bestStratum_;
-	uint32_t mult_;
+	int bestStratum_; /// best stratum observed so far
+	uint32_t mult_; /// number of batched-up alignments
 };
 
 /**

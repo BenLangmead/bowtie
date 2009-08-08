@@ -1559,6 +1559,10 @@ public:
 			// fewer candidate alignments
 			if(!driver_->done) {
 				if(!this->done) {
+					//
+					// Check whether any of the PE/SE possibilities
+					// have become impossible due to the minCost
+					//
 					if(!donePe_) {
 						assert(!this->done);
 						donePe_ = sinkPt_->irrelevantCost(driver_->minCost);
@@ -1569,6 +1573,7 @@ public:
 							this->done = true;
 						}
 						if(donePe_ && sinkPtSe1_ != NULL) {
+							// Note: removeMate affects minCost
 							if(doneSe1_) driver_->removeMate(1);
 							if(doneSe2_) driver_->removeMate(2);
 						}
@@ -1582,9 +1587,21 @@ public:
 							doneSe2_ = sinkPtSe2_->irrelevantCost(driver_->minCost);
 							if(doneSe2_ && donePe_) driver_->removeMate(2);
 						}
+						// Do Se1 again, because removing Se2 may have
+						// nudged minCost over the threshold
+						if(!doneSe1_) {
+							doneSe1_ = sinkPtSe1_->irrelevantCost(driver_->minCost);
+							if(doneSe1_ && donePe_) driver_->removeMate(1);
+						}
 						this->done = donePe_ && doneSe1_ && doneSe2_;
 					}
+
 					if(!this->done) {
+						if(sinkPtSe1_ != NULL) {
+							assert(doneSe1_ || !sinkPtSe1_->irrelevantCost(driver_->minCost));
+							assert(doneSe2_ || !sinkPtSe2_->irrelevantCost(driver_->minCost));
+						}
+						assert(donePe_ || !sinkPt_->irrelevantCost(driver_->minCost));
 						driver_->advance(ADV_COST_CHANGES);
 					}
 				}
