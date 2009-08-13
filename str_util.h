@@ -1,11 +1,13 @@
 #ifndef STR_UTIL_H_
 #define STR_UTIL_H_
 
+#include <string>
+
 /**
  * Given a string, return an int hash for it.
  */
 static inline int
-hash_string(const string& s) {
+hash_string(const std::string& s) {
 	int ret = 0;
 	int a = 63689;
 	int b = 378551;

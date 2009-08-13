@@ -3,6 +3,7 @@
 
 #include "endian_swap.h"
 #include "mm.h"
+#include "shmem.h"
 #include "timer.h"
 
 /**
@@ -35,6 +36,7 @@ public:
 	                 std::vector<String<Dna5> >* origs = NULL,
 	                 bool infilesSeq = false,
 	                 bool useMm = false,
+	                 bool useShmem = false,
 	                 bool mmSweep = false,
 	                 bool verbose = false,
 	                 bool startVerbose = false) :
@@ -43,6 +45,7 @@ public:
 	loaded_(true),
 	sanity_(sanity),
 	useMm_(useMm),
+	useShmem_(useShmem),
 	verbose_(verbose)
 	{
 		string s3 = in + ".3.ebwt";
@@ -200,37 +203,49 @@ public:
 			exit(1);
 #endif
 		} else {
-			// Allocate a buffer to hold the reference string
-			try {
-				buf_ = new uint8_t[cumsz >> 2];
-				if(buf_ == NULL) throw std::bad_alloc();
-			} catch(std::bad_alloc& e) {
-				cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
-				     << "re-run on a computer with more memory." << endl;
-				exit(1);
+			bool shmemLeader = true;
+			if(!useShmem_) {
+				// Allocate a buffer to hold the reference string
+				try {
+					buf_ = new uint8_t[cumsz >> 2];
+					if(buf_ == NULL) throw std::bad_alloc();
+				} catch(std::bad_alloc& e) {
+					cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
+						 << "re-run on a computer with more memory." << endl;
+					exit(1);
+				}
+			} else {
+				shmemLeader = ALLOC_SHARED(
+					s4 + "[ref]", (cumsz >> 2), (void**)&buf_, "ref",
+					verbose_ || startVerbose);
 			}
-			// Open the bitpair-encoded reference file
-			FILE *f4 = fopen(s4.c_str(), "rb");
-			if(f4 == NULL) {
-				cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
-				cerr << "This is most likely because your index was built with an older version" << endl
-					 << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
-					 << "index (or download one from the Bowtie website) and try again." << endl;
-				loaded_ = false;
-				return;
+			if(shmemLeader) {
+				// Open the bitpair-encoded reference file
+				FILE *f4 = fopen(s4.c_str(), "rb");
+				if(f4 == NULL) {
+					cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
+					cerr << "This is most likely because your index was built with an older version" << endl
+						 << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
+						 << "index (or download one from the Bowtie website) and try again." << endl;
+					loaded_ = false;
+					return;
+				}
+				// Read the whole thing in
+				size_t ret = fread(buf_, 1, cumsz >> 2, f4);
+				// Didn't read all of it?
+				if(ret != (cumsz >> 2)) {
+					cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
+					exit(1);
+				}
+				// Make sure there's no more
+				char c;
+				ret = fread(&c, 1, 1, f4);
+				assert_eq(0, ret); // should have failed
+				fclose(f4);
+				NOTIFY_SHARED(buf_, (cumsz >> 2));
+			} else {
+				WAIT_SHARED(buf_, (cumsz >> 2));
 			}
-			// Read the whole thing in
-			size_t ret = fread(buf_, 1, cumsz >> 2, f4);
-			// Didn't read all of it?
-			if(ret != (cumsz >> 2)) {
-				cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
-				exit(1);
-			}
-			// Make sure there's no more
-			char c;
-			ret = fread(&c, 1, 1, f4);
-			assert_eq(0, ret); // should have failed
-			fclose(f4);
 		}
 
 		// Populate byteToU32_
@@ -561,6 +576,7 @@ protected:
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
 	bool     useMm_;    /// load the reference as a memory-mapped file
+	bool     useShmem_; /// load the reference into shared memory
 	bool     verbose_;
 };
 

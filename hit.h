@@ -1264,11 +1264,11 @@ public:
 		ret = 0;
 		if(maxed) {
 			// Report how the read maxed-out; useful for chaining output
-			_sink.reportMaxed(_bufferedHits, p);
+			if(dump) _sink.reportMaxed(_bufferedHits, p);
 			_bufferedHits.clear();
 		} else if(unal) {
 			// Report how the read maxed-out; useful for chaining output
-			_sink.reportUnaligned(p);
+			if(dump) _sink.reportUnaligned(p);
 		} else if(_bufferedHits.size() > 0) {
 			// Flush buffered hits
 			_sink.reportHits(_bufferedHits);

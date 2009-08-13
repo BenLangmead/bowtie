@@ -251,7 +251,7 @@ static void driver(const string& ebwtFileBase, const string& query) {
 	} else {
 		// Initialize Ebwt object
 		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1,
-		                 false, false, // no memory-mapped io
+		                 false, false, false, // no memory-mapped io
 		                 NULL, // no reference map
 		                 verbose);
 	    // Load whole index into memory

@@ -101,6 +101,7 @@ static bool noMaqRound          = false; // true -> don't round quals to nearest
 static bool forgiveInput        = false; // let read input be a little wrong w/o complaining or dying
 static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel        = false; // separate threads read separate input files in parallel
+static bool useShmem            = false; // use shared memory to hold the index
 static bool useMm               = false; // use memory-mapped files to hold the index
 static bool mmSweep             = false; // sweep through memory-mapped files immediately after mapping
 static bool stateful            = false; // use stateful aligners
@@ -180,6 +181,7 @@ enum {
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
+	ARG_SHMEM,
 	ARG_MM,
 	ARG_MMSWEEP,
 	ARG_STATEFUL,
@@ -305,6 +307,7 @@ static struct option long_options[] = {
 	{(char*)"chunksz",      required_argument, 0,            ARG_CHUNKSZ},
 	{(char*)"chunkverbose", no_argument,       0,            ARG_CHUNKVERBOSE},
 	{(char*)"mm",           no_argument,       0,            ARG_MM},
+	{(char*)"shmem",        no_argument,       0,            ARG_SHMEM},
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
@@ -1431,6 +1434,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_REFMAP: refMapFile = optarg; break;
 	   		case ARG_ANNOTMAP: annotMapFile = optarg; break;
 	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
+	   		case ARG_SHMEM: useShmem = true; break;
 	   		case ARG_MM: {
 #ifdef BOWTIE_MM
 	   			useMm = true;
@@ -1669,7 +1673,10 @@ static void parseOptions(int argc, char **argv) {
 	if(qUpto + skipReads > qUpto) {
 		qUpto += skipReads;
 	}
-
+	if(useShmem && useMm) {
+		cerr << "Warning: --shmem overrides --mm..." << endl;
+		useMm = false;
+	}
 	if(format == INPUT_CHAIN) {
 		bool error = false;
 		if(!stateful) {
@@ -2100,7 +2107,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	exactSearch_refs   = refs;
@@ -2537,7 +2544,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	mismatchSearch_refs = refs;
@@ -3155,7 +3162,7 @@ static void twoOrThreeMismatchSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3987,7 +3994,7 @@ static void seededQualCutoffSearchFull(
 	BitPairReference *refs = NULL;
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) exit(1);
 	}
 	seededQualSearch_refs = refs;
@@ -4305,6 +4312,7 @@ static void driver(const char * type,
                     /* overriding: */ offRate,
                     /* overriding: */ isaRate,
                     useMm,    // whether to use memory-mapped files
+                    useShmem, // whether to use shared memory
                     mmSweep,  // sweep memory-mapped files
                     rmap,     // reference map, or NULL if none is needed
                     verbose, // whether to be talkative
@@ -4322,6 +4330,7 @@ static void driver(const char * type,
     	                        /* overriding: */ offRate,
     	                        /* overriding: */ isaRate,
     	                        useMm,    // whether to use memory-mapped files
+    	                        useShmem, // whether to use shared memory
     	                        mmSweep,  // sweep memory-mapped files
     	                        rmap,     // reference map, or NULL if none is needed
     	                        verbose,  // whether to be talkative

@@ -13,6 +13,7 @@ CXX = $(CPP)
 HEADERS = $(wildcard *.h)
 BOWTIE_PTHREADS = 1
 BOWTIE_MM = 1
+BOWTIE_SHARED_MEM = 1
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
@@ -20,11 +21,13 @@ ifneq (,$(findstring CYGWIN,$(shell uname)))
 WINDOWS = 1
 # POSIX memory-mapped files not currently supported on Windows
 BOWTIE_MM = 0
+BOWTIE_SHARED_MEM = 0
 else
 ifneq (,$(findstring MINGW,$(shell uname)))
 WINDOWS = 1
 # POSIX memory-mapped files not currently supported on Windows
 BOWTIE_MM = 0
+BOWTIE_SHARED_MEM = 0
 endif
 endif
 
@@ -36,6 +39,10 @@ endif
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
 MM_DEF = -DBOWTIE_MM
+endif
+SHMEM_DEF = 
+ifeq (1,$(BOWTIE_SHARED_MEM))
+SHMEM_DEF = -DBOWTIE_SHARED_MEM
 endif
 PTHREAD_PKG =
 PTHREAD_LIB =
@@ -60,7 +67,7 @@ SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp log.cpp hit_set.cpp refmap.cpp annot.cpp
-OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c
+OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c shmem.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/const.c \
@@ -146,6 +153,7 @@ DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
      $(PTHREAD_DEF) \
      $(PREF_DEF) \
      $(MM_DEF) \
+     $(SHMEM_DEF) \
      $(CHUD_DEF)
 
 define checksum

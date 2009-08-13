@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #include <sys/shm.h>
 #endif
+#include "shmem.h"
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "bitpack.h"
@@ -299,9 +300,9 @@ public:
 	    _toBigEndian(currentlyBigEndian()), \
 	    _overrideOffRate(__overrideOffRate), \
 	    _overrideIsaRate(__overrideIsaRate), \
-	    _verbose(__verbose), \
-	    _passMemExc(__passMemExc), \
-	    _sanity(__sanityCheck), \
+	    _verbose(verbose), \
+	    _passMemExc(passMemExc), \
+	    _sanity(sanityCheck), \
 	    _fw(__fw), \
 	    _in1(MM_FILE_INIT), \
 	    _in2(MM_FILE_INIT), \
@@ -319,6 +320,7 @@ public:
 	    _isa(NULL), \
 	    _ebwt(NULL), \
 	    _useMm(false), \
+	    useShmem_(false), \
 	    _refnames(), \
 	    rmap_(NULL), \
 	    mmFile1_(NULL), \
@@ -340,18 +342,21 @@ public:
 	     bool __fw,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
-	     bool __useMm = false,
+	     bool useMm = false,
+	     bool useShmem = false,
 	     bool mmSweep = false,
 	     const ReferenceMap* rmap = NULL,
-	     bool __verbose = false,
+	     bool verbose = false,
 	     bool startVerbose = false,
-	     bool __passMemExc = false,
-	     bool __sanityCheck = false) :
+	     bool passMemExc = false,
+	     bool sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS
 	{
+		assert(!useMm || !useShmem);
 		rmap_ = rmap;
-		_useMm = __useMm;
+		_useMm = useMm;
+		useShmem_ = useShmem;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
 		readIntoMemory(true, &_eh, mmSweep, startVerbose);
@@ -392,9 +397,9 @@ public:
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
-	     bool __verbose = false,
-	     bool __passMemExc = false,
-	     bool __sanityCheck = false) :
+	     bool verbose = false,
+	     bool passMemExc = false,
+	     bool sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS,
 	     _eh(joinedLen(szs), lineRate, linesPerSide, offRate, isaRate, ftabChars)
@@ -673,14 +678,18 @@ public:
 			if(_fchr    != NULL) delete[] _fchr;    _fchr    = NULL;
 			if(_ftab    != NULL) delete[] _ftab;    _ftab    = NULL;
 			if(_eftab   != NULL) delete[] _eftab;   _eftab   = NULL;
-			if(_offs != NULL) {
+			if(_offs != NULL && !useShmem_) {
 				delete[] _offs; _offs = NULL;
+			} else if(_offs != NULL && useShmem_) {
+				FREE_SHARED(_offs);
 			}
 			if(_isa     != NULL) delete[] _isa;     _isa     = NULL;
 			if(_plen    != NULL) delete[] _plen;    _plen    = NULL;
 			if(_rstarts != NULL) delete[] _rstarts; _rstarts = NULL;
-			if(_ebwt != NULL) {
+			if(_ebwt != NULL && !useShmem_) {
 				delete[] _ebwt; _ebwt = NULL;
+			} else if(_ebwt != NULL && useShmem_) {
+				FREE_SHARED(_ebwt);
 			}
 		}
 		MM_FILE_CLOSE(_in1);
@@ -764,13 +773,13 @@ public:
 			delete[] _fchr;
 			delete[] _ftab;
 			delete[] _eftab;
-			delete[] _offs;
+			if(!useShmem_) delete[] _offs;
 			delete[] _isa;
 			// Keep plen; it's small and the client may want to query it
 			// even when the others are evicted.
 			//delete[] _plen;
 			delete[] _rstarts;
-			delete[] _ebwt;
+			if(!useShmem_) delete[] _ebwt;
 		}
 		_fchr  = NULL;
 		_ftab  = NULL;
@@ -1052,6 +1061,7 @@ public:
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
 	bool       _useMm;        /// use memory-mapped files to hold the index
+	bool       useShmem_;     /// use shared memory to hold large parts of the index
 	vector<string> _refnames; /// names of the reference sequences
 	const ReferenceMap* rmap_; /// mapping into another reference coordinate space
 	char *mmFile1_;
@@ -2858,7 +2868,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	}
 
 	// Read plen from primary stream
-	if(_useMm) {
+	if(_useMm && !justHeader) {
 #ifdef BOWTIE_MM
 		this->_plen = (uint32_t*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nPat*4;
@@ -2888,6 +2898,8 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			throw e;
 		}
 	}
+
+	bool shmemLeader;
 
 	// TODO: I'm not consistent on what "header" means.  Here I'm using
 	// "header" to mean everything that would exist in memory if we
@@ -2939,29 +2951,43 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			cerr << "Reading ebwt (" << eh->_ebwtTotLen << "): ";
 			logTime(cerr);
 		}
-		try {
-			this->_ebwt = new uint8_t[eh->_ebwtTotLen];
-		} catch(bad_alloc& e) {
-			cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
-				 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
-				 << "-z option does not solve the problem, please try again on a computer with more" << endl
-				 << "memory." << endl;
-			exit(1);
-		}
-		// Read ebwt from primary stream
-		MM_READ_RET r = MM_READ(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
-		if(r != (MM_READ_RET)eh->_ebwtTotLen) {
-			cerr << "Error reading _ebwt[] array: " << r << ", " << (eh->_ebwtTotLen) << endl;
-			exit(1);
-		}
-		if(switchEndian) {
-			uint8_t *side = this->_ebwt;
-			for(size_t i = 0; i < eh->_numSides; i++) {
-				uint32_t *cums = reinterpret_cast<uint32_t*>(side + eh->_sideSz - 8);
-				cums[0] = endianSwapU32(cums[0]);
-				cums[1] = endianSwapU32(cums[1]);
-				side += this->_eh._sideSz;
+		bool shmemLeader = true;
+		if(useShmem_) {
+			shmemLeader = ALLOC_SHARED(
+				_in1Str + "[ebwt]", eh->_ebwtTotLen, (void**)&this->_ebwt,
+				"ebwt[]", _verbose || startVerbose);
+		} else {
+			try {
+				this->_ebwt = new uint8_t[eh->_ebwtTotLen];
+			} catch(bad_alloc& e) {
+				cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
+					 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
+					 << "-z option does not solve the problem, please try again on a computer with more" << endl
+					 << "memory." << endl;
+				exit(1);
 			}
+		}
+		if(shmemLeader) {
+			// Read ebwt from primary stream
+			MM_READ_RET r = MM_READ(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
+			if(r != (MM_READ_RET)eh->_ebwtTotLen) {
+				cerr << "Error reading _ebwt[] array: " << r << ", " << (eh->_ebwtTotLen) << endl;
+				exit(1);
+			}
+			if(switchEndian) {
+				uint8_t *side = this->_ebwt;
+				for(size_t i = 0; i < eh->_numSides; i++) {
+					uint32_t *cums = reinterpret_cast<uint32_t*>(side + eh->_sideSz - 8);
+					cums[0] = endianSwapU32(cums[0]);
+					cums[1] = endianSwapU32(cums[1]);
+					side += this->_eh._sideSz;
+				}
+			}
+			NOTIFY_SHARED(this->_ebwt, eh->_ebwtTotLen);
+		} else {
+			// Seek past the data and wait until master is finished
+			MM_SEEK(_in1, eh->_ebwtTotLen, SEEK_CUR);
+			WAIT_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		}
 	}
 
@@ -3069,90 +3095,105 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 
 	bytesRead = 4; // reset for secondary index file (already read 1-sentinel)
 
+	shmemLeader = true;
 	if(!_useMm) {
-		// Allocate offs_
-		try {
-			if(_verbose || startVerbose) {
-				cerr << "Reading offs (" << offsLenSampled << " 32-bit words): ";
-				logTime(cerr);
+		if(_verbose || startVerbose) {
+			cerr << "Reading offs (" << offsLenSampled << " 32-bit words): ";
+			logTime(cerr);
+		}
+		if(!useShmem_) {
+			// Allocate offs_
+			try {
+				this->_offs = new uint32_t[offsLenSampled];
+			} catch(bad_alloc& e) {
+				cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
+					 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
+					 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
+					 << "computer with more memory." << endl;
+				exit(1);
 			}
-			this->_offs = new uint32_t[offsLenSampled];
-		} catch(bad_alloc& e) {
-			cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
-				 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
-				 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
-				 << "computer with more memory." << endl;
-			exit(1);
+		} else {
+			shmemLeader = ALLOC_SHARED(
+				_in2Str + "[offs]", offsLenSampled*4,
+				(void**)&this->_offs, "offs", _verbose || startVerbose);
 		}
 	}
 
 	if(_overrideOffRate < 32) {
-		// Allocate offs (big allocation)
-		if(switchEndian || offRateDiff > 0) {
-			assert(!_useMm);
-			const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
-			const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
-			char *buf = new char[blockMaxSz];
-			for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
-				uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
-				MM_READ_RET r = MM_READ(_in2, (void *)buf, block << 2);
-				if(r != (MM_READ_RET)(block << 2)) {
-					cerr << "Error reading block of _offs[] array: " << r << ", " << (block << 2) << endl;
-					exit(1);
-				}
-				uint32_t idx = i >> offRateDiff;
-				for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
-					assert_lt(idx, offsLenSampled);
-					this->_offs[idx] = ((uint32_t*)buf)[j];
-					if(switchEndian) {
-						this->_offs[idx] = endianSwapU32(this->_offs[idx]);
-					}
-					idx++;
-				}
-			}
-			delete[] buf;
-		} else {
-			if(_useMm) {
-#ifdef BOWTIE_MM
-				this->_offs = (uint32_t*)(mmFile[1] + bytesRead);
-				bytesRead += (offsLen << 2);
-				lseek(_in2, (offsLen << 2), SEEK_CUR);
-#endif
-			} else {
-				// If any of the high two bits are set
-				if((offsLen & 0xc0000000) != 0) {
-					if(sizeof(char *) <= 4) {
-						cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
+		if(shmemLeader) {
+			// Allocate offs (big allocation)
+			if(switchEndian || offRateDiff > 0) {
+				assert(!_useMm);
+				const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
+				const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
+				char *buf = new char[blockMaxSz];
+				for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
+					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
+					MM_READ_RET r = MM_READ(_in2, (void *)buf, block << 2);
+					if(r != (MM_READ_RET)(block << 2)) {
+						cerr << "Error reading block of _offs[] array: " << r << ", " << (block << 2) << endl;
 						exit(1);
 					}
-					// offsLen << 2 overflows, so do it in four reads
-					char *offs = (char *)this->_offs;
-					for(int i = 0; i < 4; i++) {
-						MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen);
-						if(r != (MM_READ_RET)(offsLen)) {
-							cerr << "Error reading block of _offs[] array: " << r << ", " << offsLen << endl;
+					uint32_t idx = i >> offRateDiff;
+					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
+						assert_lt(idx, offsLenSampled);
+						this->_offs[idx] = ((uint32_t*)buf)[j];
+						if(switchEndian) {
+							this->_offs[idx] = endianSwapU32(this->_offs[idx]);
+						}
+						idx++;
+					}
+				}
+				delete[] buf;
+			} else {
+				if(_useMm) {
+#ifdef BOWTIE_MM
+					this->_offs = (uint32_t*)(mmFile[1] + bytesRead);
+					bytesRead += (offsLen << 2);
+					lseek(_in2, (offsLen << 2), SEEK_CUR);
+#endif
+				} else {
+					// If any of the high two bits are set
+					if((offsLen & 0xc0000000) != 0) {
+						if(sizeof(char *) <= 4) {
+							cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
 							exit(1);
 						}
-						offs += offsLen;
-					}
-				} else {
-					// Do it all in one read
-					MM_READ_RET r = MM_READ(_in2, (void*)this->_offs, offsLen << 2);
-					if(r != (MM_READ_RET)(offsLen << 2)) {
-						cerr << "Error reading _offs[] array: " << r << ", " << (offsLen << 2) << endl;
-						exit(1);
+						// offsLen << 2 overflows, so do it in four reads
+						char *offs = (char *)this->_offs;
+						for(int i = 0; i < 4; i++) {
+							MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen);
+							if(r != (MM_READ_RET)(offsLen)) {
+								cerr << "Error reading block of _offs[] array: " << r << ", " << offsLen << endl;
+								exit(1);
+							}
+							offs += offsLen;
+						}
+					} else {
+						// Do it all in one read
+						MM_READ_RET r = MM_READ(_in2, (void*)this->_offs, offsLen << 2);
+						if(r != (MM_READ_RET)(offsLen << 2)) {
+							cerr << "Error reading _offs[] array: " << r << ", " << (offsLen << 2) << endl;
+							exit(1);
+						}
 					}
 				}
 			}
-		}
 
-		{
-			ASSERT_ONLY(Bitset offsSeen(len+1));
-			for(uint32_t i = 0; i < offsLenSampled; i++) {
-				assert(!offsSeen.test(this->_offs[i]));
-				ASSERT_ONLY(offsSeen.set(this->_offs[i]));
-				assert_leq(this->_offs[i], len);
+			{
+				ASSERT_ONLY(Bitset offsSeen(len+1));
+				for(uint32_t i = 0; i < offsLenSampled; i++) {
+					assert(!offsSeen.test(this->_offs[i]));
+					ASSERT_ONLY(offsSeen.set(this->_offs[i]));
+					assert_leq(this->_offs[i], len);
+				}
 			}
+
+			if(!_useMm) NOTIFY_SHARED(this->_offs, offsLenSampled*4);
+		} else {
+			// Not the shmem leader
+			MM_SEEK(_in2, offsLenSampled*4, SEEK_CUR);
+			WAIT_SHARED(this->_offs, offsLenSampled*4);
 		}
 	}
 
