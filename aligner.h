@@ -379,6 +379,9 @@ public:
 		doneFirst_ = false;
 		// Reset #-backtrack countdown
 		if(btCnt_ != NULL) *btCnt_ = maxBts_;
+		if(!patsrc->bufa().hitset.empty()) {
+			sinkPt_->setHits(patsrc->bufa().hitset);
+		}
 		// Grab a bit from the pseudo-random seed to determine whether
 		// to start with forward or reverse complement
 		firstIsFw_ = ((patsrc->bufa().seed & 0x10) == 0);
@@ -471,7 +474,8 @@ public:
 				if(!this->done) {
 					driver_->advance(ADV_COST_CHANGES);
 				} else {
-					assert(!sinkPt_->spanStrata());
+					// No longer necessarily true with chain input
+					//assert(!sinkPt_->spanStrata());
 				}
 			}
 			if(driver_->done && !driver_->foundRange && !chase_) {

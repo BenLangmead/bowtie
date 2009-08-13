@@ -15,6 +15,8 @@
 #include "filebuf.h"
 #include "edit.h"
 #include "alphabet.h"
+#include "annot.h"
+#include "refmap.h"
 
 /**
  * Encapsulates a hit contained within a HitSet that can be
@@ -118,6 +120,13 @@ struct HitSetEnt {
 	}
 
 	/**
+	 * Indexing returns edits.
+	 */
+	const Edit& operator[](unsigned x) const {
+		return edits[x];
+	}
+
+	/**
 	 * Return the front entry.
 	 */
 	Edit& front() {
@@ -139,6 +148,20 @@ struct HitSetEnt {
 	}
 
 	/**
+	 * Sort edits by position
+	 */
+	void sort() {
+		if(edits.size() > 1) std::sort(edits.begin(), edits.end());
+	}
+
+	/**
+	 * Return number of edits.
+	 */
+	size_t size() const {
+		return edits.size();
+	}
+
+	/**
 	 * Write HitSetEnt to an output stream.
 	 */
 	friend std::ostream& operator << (std::ostream& os, const HitSetEnt& hse);
@@ -156,6 +179,10 @@ struct HitSetEnt {
  * FileBufs.  Used for chaining.
  */
 struct HitSet {
+
+	typedef std::vector<HitSetEnt> EntVec;
+	typedef EntVec::const_iterator Iter;
+	typedef std::pair<uint32_t,uint32_t> U32Pair;
 
 	HitSet() { }
 
@@ -247,6 +274,14 @@ struct HitSet {
 		ents.clear();
 	}
 
+	Iter begin() const {
+		return ents.begin();
+	}
+
+	Iter end() const {
+		return ents.end();
+	}
+
 	/**
 	 * Return the front entry.
 	 */
@@ -272,7 +307,26 @@ struct HitSet {
 	 * Sort hits by stratum/penalty.
 	 */
 	void sort() {
-		std::sort(ents.begin(), ents.end());
+		if(ents.size() > 1) std::sort(ents.begin(), ents.end());
+	}
+
+	/**
+	 * Return true iff Ents are sorted
+	 */
+	bool sorted() const {
+		if(ents.empty()) return true;
+		for(size_t i = 0; i < ents.size()-1; i++) {
+			if(!(ents[i] < ents[i+1])) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Remove the ith hit from the HitSet, shifting all subsequent hits
+	 * up by one.
+	 */
+	void remove(size_t i) {
+		ents.erase(ents.begin() + i);
 	}
 
 	/**
@@ -294,6 +348,21 @@ struct HitSet {
 	}
 
 	/**
+	 * Indexing returns entries.
+	 */
+	const HitSetEnt& operator[](unsigned x) const {
+		return ents[x];
+	}
+
+	/**
+	 * Apply a reference mappings to all the contained hits.
+	 */
+	void applyReferenceMap(const ReferenceMap& map) {
+		std::vector<HitSetEnt>::iterator it;
+		for(it = ents.begin(); it != ents.end(); it++) map.map(it->h);
+	}
+
+	/**
 	 * Clear out all the strings and all the entries.
 	 */
 	void clearAll() {
@@ -301,6 +370,29 @@ struct HitSet {
 		seqan::clear(seq);
 		seqan::clear(qual);
 		ents.clear();
+	}
+
+	/**
+	 *
+	 */
+	bool tryReplacing(U32Pair h,  bool fw, uint16_t cost, size_t& pos) {
+		for(size_t i = 0; i < ents.size(); i++) {
+			if(ents[i].h == h && ents[i].fw == fw) {
+				if(cost < ents[i].cost) {
+					// New hit at same position is better!  Replace it.
+					ents[i].h = h;
+					ents[i].fw = fw;
+					ents[i].stratum = cost >> 14;
+					ents[i].cost = cost;
+					pos = i;
+					return true;
+				} else {
+					pos = 0xffffffff;
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**

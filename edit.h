@@ -2,7 +2,7 @@
  * edit.h
  *
  *  Created on: Jul 31, 2009
- *      Author: langmead
+ *      Author: Ben Langmead
  */
 
 #ifndef EDIT_H_
@@ -49,10 +49,28 @@ struct Edit {
 	}
 
 	/**
+	 * Edit less-than overload.
+	 */
+	int operator< (const Edit &rhs) const {
+		if(pos < rhs.pos) return 1;
+		if(pos > rhs.pos) return 0;
+		return (chr < rhs.chr)? 1 : 0;
+	}
+
+	/**
+	 * Edit equals overload.
+	 */
+	int operator== (const Edit &rhs) const {
+		return(pos  == rhs.pos &&
+			   chr  == rhs.chr &&
+			   type == rhs.type);
+	}
+
+	/**
 	 * Return true iff this Edit is initialized.
 	 */
 	bool initialized() const {
-		return type != 0;
+		return pos != 1023;
 	}
 
 	uint16_t type      :  2; // 1 -> subst, 2 -> ins, 3 -> del, 0 -> empty

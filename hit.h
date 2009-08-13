@@ -181,6 +181,36 @@ public:
 		}
 	}
 
+	/**
+	 *
+	 */
+	static void fromHitSet(std::vector<Hit>& hits, const HitSet& hs) {
+		assert(hs.sorted());
+		hits.resize(hs.size());
+		for(size_t i = 0; i < hs.size(); i++) {
+			hits[i].h = hs[i].h;
+			hits[i].oms = hs[i].oms;
+			hits[i].fw = hs[i].fw;
+			hits[i].stratum = hs[i].stratum;
+			hits[i].cost = hs[i].cost;
+			hits[i].mate = 0; //hs[i].mate;
+			hits[i].patName = hs.name;
+			hits[i].patSeq = hs.seq;
+			hits[i].quals = hs.qual;
+			size_t len = seqan::length(hs.seq);
+			if(!hs[i].fw) {
+				reverseComplementInPlace(hits[i].patSeq, false);
+				reverseInPlace(hits[i].quals);
+			}
+			hits[i].refcs.resize(len);
+			for(size_t j = 0; j < hs[i].size(); j++) {
+				if(hs[i][j].type != EDIT_TYPE_MM) continue;
+				hits[i].mms.set(hs[i][j].pos);
+				hits[i].refcs[hs[i][j].pos] = "ACGT"[hs[i][j].chr];
+			}
+		}
+	}
+
 	U32Pair             h;       /// reference index & offset
 	uint32_t            patId;   /// read index
 	String<char>        patName; /// read name
@@ -212,6 +242,23 @@ public:
 		this->cost    = other.cost;
 		this->mate    = other.mate;
 	    return *this;
+	}
+};
+
+/**
+ * Compare hits a and b; a < b if its cost is less than B's.  If
+ * there's a tie, break on position and orientation.
+ */
+class HitCostCompare {
+public:
+	bool operator() (const Hit& a, const Hit& b) {
+		if(a.cost < b.cost) return true;
+		if(a.cost > b.cost) return false;
+		if(a.h < b.h) return true;
+		if(a.h > b.h) return false;
+		if(a.fw < b.fw) return true;
+		if(a.fw > b.fw) return false;
+		return false;
 	}
 };
 
@@ -1180,7 +1227,6 @@ public:
 		_keep(__keep),
 		_hits(),
 		_bufferedHits(),
-		_strata(),
 		hitsForThisRead_(),
 		_max(__max)
 	{
@@ -1196,7 +1242,6 @@ public:
 
 	/// Return the vector of retained hits
 	vector<Hit>& retainedHits()   { return _hits; }
-	vector<int>& retainedStrata() { return _strata; }
 
 	/// Finalize current read
 	virtual uint32_t finishRead(PatternSourcePerThread& p, bool report, bool dump) {
@@ -1206,7 +1251,7 @@ public:
 			_bufferedHits.clear();
 			return 0;
 		}
-		bool maxed = (ret > 0 && _bufferedHits.size() == 0);
+		bool maxed = (ret > _max);
 		bool unal = (ret == 0);
 		if(dump && (unal || maxed)) {
 			// Either no reportable hits were found or the number of
@@ -1220,6 +1265,7 @@ public:
 		if(maxed) {
 			// Report how the read maxed-out; useful for chaining output
 			_sink.reportMaxed(_bufferedHits, p);
+			_bufferedHits.clear();
 		} else if(unal) {
 			// Report how the read maxed-out; useful for chaining output
 			_sink.reportUnaligned(p);
@@ -1266,7 +1312,6 @@ public:
 			}
 #endif
 			_hits.push_back(h);
-			_strata.push_back(stratum);
 		}
 #ifndef NDEBUG
 		// Ensure all buffered hits have the same patid
@@ -1300,6 +1345,16 @@ public:
 		bool ret = finishedWithStratumImpl(stratum);
 		_bestRemainingStratum = stratum+1;
 		return ret;
+	}
+
+	/**
+	 * Use the given set of hits as a starting point.  By default, we don't
+	 */
+	virtual void setHits(HitSet& hs) {
+		if(!hs.empty()) {
+			cerr << "Error: default setHits() called with non-empty HitSet" << endl;
+			exit(1);
+		}
 	}
 
 	/**
@@ -1368,7 +1423,6 @@ protected:
 	vector<Hit> _hits; /// Repository for retained hits
 	/// Buffered hits, to be reported and flushed at end of read-phase
 	vector<Hit> _bufferedHits;
-	vector<int> _strata; /// Repository for retained strata
 
 	// Following variables are declared in the parent but maintained in
 	// the concrete subcalsses
@@ -1438,7 +1492,6 @@ public:
 		HitSinkPerThread::reportHit(h, stratum);
 		hitsForThisRead_++;
 		if(hitsForThisRead_ > _max) {
-			if(!_bufferedHits.empty()) _bufferedHits.clear();
 			return true; // done - report nothing
 		}
 		if(hitsForThisRead_ <= _n) {
@@ -1538,7 +1591,6 @@ public:
 			// so it should definitely count
 			hitsForThisRead_++;
 			if(hitsForThisRead_ > _max) {
-				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			if(hitsForThisRead_ <= _n) {
@@ -1576,7 +1628,6 @@ public:
 				// so it should definitely count
 				hitsForThisRead_++;
 				if(hitsForThisRead_ > _max) {
-					_bufferedHits.clear();
 					done = true;
 					break; // done - report nothing
 				}
@@ -1617,7 +1668,6 @@ public:
 				// so it should definitely count
 				hitsForThisRead_++;
 				if(hitsForThisRead_ > _max) {
-					_bufferedHits.clear();
 					return true; // done - report nothing
 				}
 				if(hitsForThisRead_ <= _n) {
@@ -1730,7 +1780,6 @@ public:
 			// so it should definitely count
 			hitsForThisRead_++;
 			if(hitsForThisRead_ > _max) {
-				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			if(hitsForThisRead_ <= _n) {
@@ -1774,7 +1823,6 @@ public:
 				// so it should definitely count
 				hitsForThisRead_++;
 				if(hitsForThisRead_ > _max) {
-					_bufferedHits.clear();
 					break; // done - report nothing
 				}
 				if(hitsForThisRead_ <= _n) {
@@ -1816,7 +1864,6 @@ public:
 			// so it should definitely count
 			hitsForThisRead_++;
 			if(hitsForThisRead_ > _max) {
-				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			if(hitsForThisRead_ <= _n) {
@@ -1939,7 +1986,6 @@ public:
 			bestStratum_ = stratum;
 		}
 		if(hitsForThisRead_ > _max) {
-			_bufferedHits.clear();
 			return true; // done - report nothing
 		}
 		if(hitsForThisRead_ <= n_) {
@@ -2033,6 +2079,216 @@ private:
 };
 
 /**
+ *
+ */
+class ChainingHitSinkPerThread : public HitSinkPerThread {
+public:
+
+	ChainingHitSinkPerThread(HitSink& sink,
+                          uint32_t n,
+                          uint32_t max,
+                          bool keep,
+                          bool strata,
+                          uint32_t mult) :
+    HitSinkPerThread(sink, max * mult, keep),
+    n_(n * mult), mult_(mult), max_(max), strata_(strata), cutoff_(0xffff)
+    {
+		hs_ = NULL;
+		hsISz_ = 0;
+		assert_gt(n_, 0);
+    }
+
+	virtual uint32_t maxHits() { return n_; }
+
+	/**
+	 * Return true iff we're allowed to span strata.
+	 */
+	virtual bool spanStrata() { return !strata_; }
+
+	/**
+	 * true -> we report best hits
+	 */
+	virtual bool best() { return true; }
+
+	/**
+	 * Report and then return false if we've already reported N.
+	 */
+	virtual bool reportHit(const Hit& h, int stratum) {
+		HitSinkPerThread::reportHit(h, stratum);
+		assert(hs_->sorted());
+		assert_eq(h.stratum, stratum);
+		assert_eq(1, mult_);
+
+		if(!hs_->empty() && strata_ && stratum < hs_->front().stratum) {
+			hs_->clear();
+			_bufferedHits.clear();
+			hitsForThisRead_ = 0;
+		}
+
+		size_t replPos = 0;
+		if(!hs_->empty() && hs_->tryReplacing(h.h, h.fw, h.cost, replPos)) {
+			if(replPos != 0xffffffff) {
+				// Replaced an existing hit
+				assert_lt(replPos, _bufferedHits.size());
+				_bufferedHits[replPos] = h;
+				hs_->sort();
+			}
+			// Size didn't change, so no need to check against _max and n_
+			assert(hs_->sorted());
+		} else {
+			// Added a new hit
+			hs_->expand();
+			hs_->back().h = h.h;
+			hs_->back().fw = h.fw;
+			hs_->back().stratum = h.stratum;
+			hs_->back().cost = h.cost;
+			cout << "reportHit: " << h.h.first << ":" << h.h.second << (h.fw? "+":"-") << "," << stratum << "," << hex << h.cost << endl;
+			hitsForThisRead_++;
+			if(hs_->size() > _max) {
+				return true; // done - report nothing
+			}
+			if(hsISz_ == 0 &&
+			   hs_->size() == n_ &&
+			   (_max == 0xffffffff || _max < n_))
+			{
+				return true; // already reported N good hits; stop!
+			}
+			_bufferedHits.push_back(h);
+			hs_->sort();
+		}
+		updateCutoff();
+		return false; // not at N yet; keep going
+	}
+
+	/**
+	 * Finalize current read by reporting any buffered hits from best
+	 * to worst until they're all reported or until we've reported all
+	 * N
+	 */
+	virtual uint32_t finishReadImpl() {
+		assert_eq(1, mult_);
+		uint32_t ret = hitsForThisRead_;
+		hitsForThisRead_ = 0;
+		if(hs_->size() < n_) {
+			const size_t sz = _bufferedHits.size();
+			for(size_t i = 0; i < sz; i++) {
+				// Set 'oms' according to the number of other alignments
+				// at this stratum
+				_bufferedHits[i].oms = (sz / mult_) - 1;
+			}
+		}
+		std::sort(_bufferedHits.begin(), _bufferedHits.end(), HitCostCompare());
+		if(hs_->size() > n_) {
+			_bufferedHits.resize(n_);
+		}
+		return ret;
+	}
+
+	/**
+	 * Set the initial set of Hits.
+	 */
+	virtual void setHits(HitSet& hs) {
+		hs_ = &hs;
+		hsISz_ = hs.size();
+		hitsForThisRead_ = hs.size();
+		assert(_bufferedHits.empty());
+		if(!hs.empty()) {
+			hs.sort();
+			Hit::fromHitSet(_bufferedHits, hs);
+			assert(!_bufferedHits.empty());
+			assert_leq(_bufferedHits.size(), max_);
+		}
+	}
+
+	/**
+	 * If we had any alignments at all and we're now moving on to a new
+	 * stratum, then we're done.
+	 */
+	virtual bool finishedWithStratumImpl(int stratum) {
+		assert(false);
+		return false;
+	}
+
+	/**
+	 * If there have been any hits reported so far, classify any
+	 * subsequent alignments with higher strata as irrelevant.
+	 */
+	virtual bool irrelevantCost(uint16_t cost) {
+		return cost >= cutoff_;
+	}
+
+protected:
+
+	/**
+	 * Update the lowest relevant cost.
+	 */
+	void updateCutoff() {
+		if(hs_->empty()) {
+			assert_eq(0xffff, cutoff_);
+			return;
+		}
+		ASSERT_ONLY(uint16_t origCutoff = cutoff_);
+		assert(hs_->sorted());
+		assert_geq(hs_->back().cost, hs_->front().cost);
+		bool atCapacity = (hs_->size() >= n_);
+		if(atCapacity) {
+			cutoff_ = hs_->back().cost;
+		}
+		if(strata_) {
+			uint16_t sc = hs_->back().cost;
+			sc = ((sc >> 14) + 1) << 14;
+			cutoff_ = min(cutoff_, sc);
+		}
+		assert_leq(cutoff_, origCutoff);
+	}
+
+	HitSet *hs_;
+	size_t hsISz_;
+    uint32_t n_;
+	uint32_t mult_;
+    uint32_t max_;
+    bool strata_; /// true -> reporting is stratified
+    uint16_t cutoff_; /// the smallest irrelevant cost
+};
+
+/**
+ * Concrete factory for ChainingHitSinkPerThread.
+ */
+class ChainingHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
+public:
+	ChainingHitSinkPerThreadFactory(
+			HitSink& sink,
+			uint32_t n,
+			uint32_t max,
+			bool keep,
+			bool strata) :
+			sink_(sink),
+			n_(n),
+			max_(max),
+			keep_(keep),
+			strata_(strata)
+	{ }
+
+	/**
+	 * Allocate a new NGoodHitSinkPerThread object on the heap,
+	 * using the parameters given in the constructor.
+	 */
+	virtual HitSinkPerThread* create() const {
+		return new ChainingHitSinkPerThread(sink_, n_, max_, keep_, strata_, 1);
+	}
+	virtual HitSinkPerThread* createMult(uint32_t m) const {
+		return new ChainingHitSinkPerThread(sink_, n_, max_, keep_, strata_, m);
+	}
+
+private:
+	HitSink& sink_;
+    uint32_t n_;
+    uint32_t max_;
+    bool keep_;
+    bool strata_;
+};
+
+/**
  * Report all valid alignments.
  */
 class AllHitSinkPerThread : public HitSinkPerThread {
@@ -2062,7 +2318,6 @@ public:
 		HitSinkPerThread::reportHit(h, stratum);
 		hitsForThisRead_++;
 		if(hitsForThisRead_ > _max) {
-			if(!_bufferedHits.empty()) _bufferedHits.clear();
 			return true; // done - report nothing
 		}
 		bufferHit(h, stratum);
@@ -2153,7 +2408,6 @@ public:
 			// so it should definitely be reported
 			hitsForThisRead_++;
 			if(hitsForThisRead_ > _max) {
-				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			bufferHit(h, stratum);
@@ -2187,7 +2441,6 @@ public:
 				// so it should definitely count
 				hitsForThisRead_++;
 				if(hitsForThisRead_ > _max) {
-					_bufferedHits.clear();
 					break; // done - report nothing
 				}
 				bufferHit(hitStrata_[bestStratumReported_][i], bestStratumReported_);
@@ -2221,7 +2474,6 @@ public:
 			// so it should definitely count
 			hitsForThisRead_++;
 			if(hitsForThisRead_ > _max) {
-				_bufferedHits.clear();
 				return true; // done - report nothing
 			}
 			bufferHit(hitStrata_[stratum][i], stratum);

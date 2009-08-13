@@ -342,7 +342,7 @@ public:
 			// Check that the alignments produced for the read and
 			// backtracking constraints are consistent with results
 			// obtained by a naive oracle
-			sanityCheckHits(sink.retainedHits(), sink.retainedStrata(), _ihits, iham);
+			sanityCheckHits(sink.retainedHits(), _ihits, iham);
 		}
 		_totNumBts += _numBts;
 		_numBts = 0;
@@ -1773,10 +1773,9 @@ protected:
 		// Not smart enough to deal with seedling hits yet
 		if(!_sanity || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
-		vector<int> oracleStrata;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, oracleStrata, iham);
+		naiveOracle(oracleHits, iham);
 		if(oracleHits.size() > 0) {
 			// Oops, the oracle found at least one hit; print
 			// detailed info about the first oracle hit (for
@@ -1826,10 +1825,9 @@ protected:
 		// Not smart enough to deal with seedling hits yet
 		if(!_sanity || _reportPartials > 0) return;
 		vector<Hit> oracleHits;
-		vector<int> oracleStrata;
 		// Invoke the naive oracle, which will place all qualifying
 		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, oracleStrata, iham);
+		naiveOracle(oracleHits, iham);
 		vector<Hit>& retainedHits = _params.sink().retainedHits();
 		assert_gt(retainedHits.size(), 0);
 		if(oracleHits.size() == 0) {
@@ -1863,21 +1861,17 @@ protected:
 	 * with respect to the current backtracking constraints.
 	 */
 	void sanityCheckHits(const vector<Hit>& hits,
-	                     const vector<int>& strata,
 	                     size_t first, uint32_t iham)
 	{
 		if(!_sanity || _reportPartials > 0 || _bailedOnBacktracks || first == hits.size()) {
 			return;
 		}
-		assert_eq(hits.size(), strata.size());
 		HitSinkPerThread& sink = _params.sink();
 		uint32_t maxHitsAllowed = sink.maxHits();
-		vector<Hit> oracleHits; vector<int> oracleStrata;
+		vector<Hit> oracleHits;
 		// Invoke the naive oracle, which will place all qualifying
-		// hits and their strata in the 'oracleHits' and
-		// 'oracleStrata' vectors
-		naiveOracle(oracleHits, oracleStrata, iham);
-		assert_eq(oracleHits.size(), oracleStrata.size());
+		// hits and their strata in the 'oracleHits' vector
+		naiveOracle(oracleHits, iham);
 		assert_gt(oracleHits.size(), 0);
 		int lastStratum = -1;
 		int bestStratum = -1;
@@ -1885,7 +1879,7 @@ protected:
 		// For each hit generated for this read
 		for(size_t i = first; i < hits.size(); i++) {
 			const Hit& rhit = hits[i];
-			int stratum = strata[i];
+			int stratum = rhit.stratum;
 			// Keep a running measure of the "worst" stratum
 			// observed in the reported hits
 			if(worstStratum == -1) {
@@ -1920,10 +1914,9 @@ protected:
 					// Oracle hit i and reported hit j refer to the
 					// same alignment
 					assert(h.mms == rhit.mms);
-					assert_eq(stratum, oracleStrata[i]);
+					assert_eq(stratum, h.stratum);
 					// Erase the elements in the oracle vectors
 					oracleHits.erase(oracleHits.begin() + i);
-					oracleStrata.erase(oracleStrata.begin() + i);
 					found = true;
 					break;
 				}
@@ -1937,7 +1930,6 @@ protected:
 		assert_neq(-1, lastStratum);
 		assert_neq(-1, bestStratum);
 		assert_neq(-1, worstStratum);
-		assert_eq(oracleHits.size(), oracleStrata.size());
 		if(maxHitsAllowed == 0xffffffff && !sink.exceededOverThresh()) {
 			if(sink.spanStrata()) {
 				// All hits remaining must occur more times than the max
@@ -1953,15 +1945,15 @@ protected:
 				// Must have matched all oracle hits at the best
 				// stratum
 				size_t numLeftovers = 0;
-				for(size_t i = 0; i < oracleStrata.size(); i++) {
-					if(oracleStrata[i] == bestStratum) {
+				for(size_t i = 0; i < oracleHits.size(); i++) {
+					if(oracleHits[i].stratum == bestStratum) {
 						numLeftovers++;
 					}
 				}
 				// Must have matched every oracle hit
 				if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
 					for(size_t i = 0; i < oracleHits.size(); i++) {
-						if(oracleStrata[i] == bestStratum) {
+						if(oracleHits[i].stratum == bestStratum) {
 							printHit(oracleHits[i]);
 						}
 					}
@@ -1973,8 +1965,8 @@ protected:
 			// Ensure that all oracle hits have a stratum at least
 			// as bad as the worst stratum observed in the reported
 			// hits
-			for(size_t i = 0; i < oracleStrata.size(); i++) {
-				assert_leq(bestStratum, oracleStrata[i]);
+			for(size_t i = 0; i < oracleHits.size(); i++) {
+				assert_leq(bestStratum, oracleHits[i].stratum);
 			}
 		}
 	}
@@ -1984,7 +1976,6 @@ protected:
 	 * current backtracking strategy and store hits in hits vector.
 	 */
 	void naiveOracle(vector<Hit>& hits,
-	                 vector<int>& strata,
 	                 uint32_t iham = 0, /// initial weighted hamming distance
 	                 uint32_t unrevOff = 0xffffffff,
 	                 uint32_t oneRevOff = 0xffffffff,
@@ -2007,7 +1998,6 @@ protected:
 		            (*_name),
 		            patid,
 		            hits,
-		            strata,
 		            _qualThresh,
 		            unrevOff,
 		            oneRevOff,

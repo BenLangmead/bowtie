@@ -55,7 +55,6 @@ void naiveOracle(const vector<String<Dna5> >& os,
 				 const String<char>& name,
 				 uint32_t patid,
 				 vector<Hit>& hits,
-				 vector<int>& strata,
 				 uint32_t qualThresh,
 				 uint32_t unrevOff,
 				 uint32_t oneRevOff,
@@ -247,7 +246,6 @@ void naiveOracle(const vector<String<Dna5> >& os,
 					  refcs,
 					  0, stratum, ham | (stratum << 14), 0);
 				hits.push_back(h);
-				strata.push_back(stratum);
 			} // For each pattern character
 		} // For each alignment over current text
 	} // For each text

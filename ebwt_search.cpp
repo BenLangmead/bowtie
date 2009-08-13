@@ -1670,6 +1670,19 @@ static void parseOptions(int argc, char **argv) {
 		qUpto += skipReads;
 	}
 
+	if(format == INPUT_CHAIN) {
+		bool error = false;
+		if(!stateful) {
+			cerr << "Error: --chainin must be combined with --best; aborting..." << endl;
+			error = true;
+		}
+		if(paired) {
+			cerr << "Error: --chainin cannot be combined with paired-end alignment; aborting..." << endl;
+			error = true;
+		}
+		if(error) exit(1);
+	}
+
 	if(outType == OUTPUT_CHAIN) {
 		bool error = false;
 		if(refOut) {
@@ -1866,7 +1879,10 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 static HitSinkPerThreadFactory*
 createSinkFactory(HitSink& _sink, bool sanity) {
     HitSinkPerThreadFactory *sink = NULL;
-    if(!strata) {
+    if(format == INPUT_CHAIN) {
+    	assert(stateful);
+    	sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, sanity, strata);
+    } else if(!strata) {
     	// Unstratified
 		if(!allHits) {
 			if(oldBest) {
@@ -2596,7 +2612,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #define ASSERT_NO_HITS_FW(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
 		vector<Hit> hits; \
-		vector<int> strata; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -2609,7 +2624,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        name, \
 		        patid, \
 		        hits, \
-		        strata, \
 		        qualCutoff, \
 		        unrevOff, \
 		        oneRevOff, \
@@ -2642,7 +2656,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #define ASSERT_NO_HITS_RC(ebwtfw) \
 	if(sanityCheck && os.size() > 0) { \
 		vector<Hit> hits; \
-		vector<int> strata; \
 		uint32_t threeRevOff = (seedMms <= 3) ? s : 0; \
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
@@ -2655,7 +2668,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        name, \
 		        patid, \
 		        hits, \
-		        strata, \
 		        qualCutoff, \
 		        unrevOff, \
 		        oneRevOff, \
