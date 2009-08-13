@@ -242,9 +242,9 @@ public:
 				ret = fread(&c, 1, 1, f4);
 				assert_eq(0, ret); // should have failed
 				fclose(f4);
-				NOTIFY_SHARED(buf_, (cumsz >> 2));
+				if(useShmem_) NOTIFY_SHARED(buf_, (cumsz >> 2));
 			} else {
-				WAIT_SHARED(buf_, (cumsz >> 2));
+				if(useShmem_) WAIT_SHARED(buf_, (cumsz >> 2));
 			}
 		}
 

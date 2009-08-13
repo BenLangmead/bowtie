@@ -2983,11 +2983,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 					side += this->_eh._sideSz;
 				}
 			}
-			NOTIFY_SHARED(this->_ebwt, eh->_ebwtTotLen);
+			if(useShmem_) NOTIFY_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		} else {
 			// Seek past the data and wait until master is finished
 			MM_SEEK(_in1, eh->_ebwtTotLen, SEEK_CUR);
-			WAIT_SHARED(this->_ebwt, eh->_ebwtTotLen);
+			if(useShmem_) WAIT_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		}
 	}
 
@@ -3189,11 +3189,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				}
 			}
 
-			if(!_useMm) NOTIFY_SHARED(this->_offs, offsLenSampled*4);
+			if(useShmem_) NOTIFY_SHARED(this->_offs, offsLenSampled*4);
 		} else {
 			// Not the shmem leader
 			MM_SEEK(_in2, offsLenSampled*4, SEEK_CUR);
-			WAIT_SHARED(this->_offs, offsLenSampled*4);
+			if(useShmem_) WAIT_SHARED(this->_offs, offsLenSampled*4);
 		}
 	}
 
