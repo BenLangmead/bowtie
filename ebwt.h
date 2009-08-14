@@ -2956,6 +2956,9 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			shmemLeader = ALLOC_SHARED(
 				_in1Str + "[ebwt]", eh->_ebwtTotLen, (void**)&this->_ebwt,
 				"ebwt[]", _verbose || startVerbose);
+			if(_verbose || startVerbose) {
+				cerr << "  shared-mem " << (shmemLeader ? "leader" : "follower") << endl;
+			}
 		} else {
 			try {
 				this->_ebwt = new uint8_t[eh->_ebwtTotLen];
@@ -3096,11 +3099,11 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	bytesRead = 4; // reset for secondary index file (already read 1-sentinel)
 
 	shmemLeader = true;
+	if(_verbose || startVerbose) {
+		cerr << "Reading offs (" << offsLenSampled << " 32-bit words): ";
+		logTime(cerr);
+	}
 	if(!_useMm) {
-		if(_verbose || startVerbose) {
-			cerr << "Reading offs (" << offsLenSampled << " 32-bit words): ";
-			logTime(cerr);
-		}
 		if(!useShmem_) {
 			// Allocate offs_
 			try {
@@ -3198,12 +3201,12 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	}
 
 	// Allocate _isa[] (big allocation)
+	if(_verbose || startVerbose) {
+		cerr << "Reading isa (" << isaLenSampled << "): ";
+		logTime(cerr);
+	}
 	if(!_useMm) {
 		try {
-			if(_verbose || startVerbose) {
-				cerr << "Reading isa (" << isaLenSampled << "): ";
-				logTime(cerr);
-			}
 			this->_isa = new uint32_t[isaLenSampled];
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory allocating the isa[] array  for the Bowtie index." << endl

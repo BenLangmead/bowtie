@@ -33,7 +33,7 @@ bool allocSharedMem(string fname,
 	// Reserve 4 bytes at the end for silly synchronization
 	size_t shmemLen = len + 4;
 	if(verbose) {
-		cout << "Reading " << len << "+4 bytes into shared memory for " << memName << endl;
+		cerr << "Reading " << len << "+4 bytes into shared memory for " << memName << endl;
 	}
 	void *ptr = NULL;
 	while(true) {
@@ -97,7 +97,7 @@ bool allocSharedMem(string fname,
 	*dst = ptr;
 	if(ds.shm_cpid == getpid()) {
 		if(verbose) {
-			cout << "  I (pid = " << getpid() << ") created the "
+			cerr << "  I (pid = " << getpid() << ") created the "
 			     << "shared memory for " << memName << endl;
 		}
 		// Set this value just off the end of the chunk to
@@ -106,7 +106,7 @@ bool allocSharedMem(string fname,
 		return true;
 	} else {
 		if(verbose) {
-			cout << "  I (pid = " << getpid()
+			cerr << "  I (pid = " << getpid()
 			     << ") did not create the shared memory for "
 			     << memName << ".  Pid " << ds.shm_cpid << " did." << endl;
 		}
