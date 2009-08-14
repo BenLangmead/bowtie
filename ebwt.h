@@ -760,8 +760,8 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory() {
-		readIntoMemory(false, NULL, false, false);
+	void loadIntoMemory(bool verbose = false) {
+		readIntoMemory(false, NULL, false, verbose);
 	}
 
 	/**
@@ -2868,7 +2868,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	}
 
 	// Read plen from primary stream
-	if(_useMm && !justHeader) {
+	if(_useMm) {
 #ifdef BOWTIE_MM
 		this->_plen = (uint32_t*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nPat*4;
