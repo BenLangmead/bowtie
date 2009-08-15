@@ -136,6 +136,7 @@ static const char * refMapFile  = NULL;  // file containing a map from index coo
 static const char * annotMapFile= NULL;  // file containing a map from reference coordinates to annotations
 static size_t fastaContLen      = 0;
 static size_t fastaContFreq     = 0;
+static bool hadoopOut           = false; // print Hadoop status and summary messages
 
 // mating constraints
 
@@ -212,7 +213,8 @@ enum {
 	ARG_CHAININ,
 	ARG_REFMAP,
 	ARG_ANNOTMAP,
-	ARG_REPORTSE
+	ARG_REPORTSE,
+	ARG_HADOOPOUT
 };
 
 static struct option long_options[] = {
@@ -316,6 +318,7 @@ static struct option long_options[] = {
 	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
+	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1448,6 +1451,7 @@ static void parseOptions(int argc, char **argv) {
 #endif
 	   		}
 	   		case ARG_MMSWEEP: mmSweep = true; break;
+	   		case ARG_HADOOPOUT: hadoopOut = true; break;
 	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
 	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_AL: dumpAlBase = optarg; break;
@@ -4484,7 +4488,7 @@ static void driver(const char * type,
 			delete ebwtBw;
 		}
 		if(!quiet) {
-			sink->finish(); // end the hits section of the hit file
+			sink->finish(hadoopOut); // end the hits section of the hit file
 		}
 		if(dumpHHHits != NULL) dumpHHHits->close();
 		if(dumpNoHits != NULL) dumpNoHits->close();

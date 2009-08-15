@@ -16,6 +16,9 @@
 
 using namespace std;
 
+#define SHMEM_UNINIT  0xafba4242
+#define SHMEM_INIT    0xffaa6161
+
 /**
  * Tries to allocate a shared-memory chunk for a given file of a given size.
  */
@@ -95,14 +98,15 @@ bool allocSharedMem(string fname,
 		}
 	} // while(true)
 	*dst = ptr;
-	if(ds.shm_cpid == getpid()) {
+	bool initid = (((volatile uint32_t*)((char*)ptr + len))[0] == SHMEM_INIT);
+	if(ds.shm_cpid == getpid() && !initid) {
 		if(verbose) {
 			cerr << "  I (pid = " << getpid() << ") created the "
 			     << "shared memory for " << memName << endl;
 		}
 		// Set this value just off the end of the chunk to
 		// indicate that the data hasn't been read yet.
-		((volatile uint32_t*)((char*)ptr + len))[0] = 0xffffffff;
+		((volatile uint32_t*)((char*)ptr + len))[0] = SHMEM_UNINIT;
 		return true;
 	} else {
 		if(verbose) {
@@ -119,7 +123,7 @@ bool allocSharedMem(string fname,
  * finished initializing it.
  */
 void notifySharedMem(void *mem, size_t len) {
-	((volatile uint32_t*)((char*)mem + len))[0] = 0x0f0f0f0f;
+	((volatile uint32_t*)((char*)mem + len))[0] = SHMEM_INIT;
 }
 
 /**
@@ -127,8 +131,8 @@ void notifySharedMem(void *mem, size_t len) {
  * initializing it.
  */
 void waitSharedMem(void *mem, size_t len) {
-	while(((volatile uint32_t*)((char*)mem + len))[0] != 0x0f0f0f0f) {
-		// spin
+	while(((volatile uint32_t*)((char*)mem + len))[0] != SHMEM_INIT) {
+		sleep(1);
 	}
 }
 

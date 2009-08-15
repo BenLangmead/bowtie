@@ -13,7 +13,14 @@ hash_string(const std::string& s) {
 	int b = 378551;
 	for(size_t i = 0; i < s.length(); i++) {
 		ret = (ret * a) + (int)s[i];
-		a *= b;
+		if(a == 0) {
+			a += b;
+		} else {
+			a *= b;
+		}
+		if(a == 0) {
+			a += b;
+		}
 	}
 	return ret;
 }

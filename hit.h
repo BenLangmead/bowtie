@@ -588,7 +588,7 @@ public:
 	 * Called when all alignments are complete.  It is assumed that no
 	 * synchronization is necessary.
 	 */
-	void finish() {
+	void finish(bool hadoopOut) {
 		// Close output streams
 		closeOuts();
 		if(!quiet_) {
@@ -633,6 +633,13 @@ public:
 					 << " paired-end alignments and " << numReported_
 					 << " singleton alignments to " << _outs.size()
 					 << " output stream(s)" << endl;
+			}
+			if(hadoopOut) {
+				cerr << "reporter:counter:Bowtie,reads_with_at_least_1_alignment," << numAligned_ << endl;
+				cerr << "reporter:counter:Bowtie,reads_with_no_alignments," << numUnaligned_ << endl;
+				cerr << "reporter:counter:Bowtie,reads_over_dash_m_limit," << numMaxed_ << endl;
+				cerr << "reporter:counter:Bowtie,unpaired_alignments_reported," << numReported_ << endl;
+				cerr << "reporter:counter:Bowtie,paired_alignments_reported," << numReportedPaired_ << endl;
 			}
 		}
 		// Print the recalibration table.
