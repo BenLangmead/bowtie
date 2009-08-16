@@ -635,11 +635,11 @@ public:
 					 << " output stream(s)" << endl;
 			}
 			if(hadoopOut) {
-				cerr << "reporter:counter:Bowtie,reads_with_at_least_1_alignment," << numAligned_ << endl;
-				cerr << "reporter:counter:Bowtie,reads_with_no_alignments," << numUnaligned_ << endl;
-				cerr << "reporter:counter:Bowtie,reads_over_dash_m_limit," << numMaxed_ << endl;
-				cerr << "reporter:counter:Bowtie,unpaired_alignments_reported," << numReported_ << endl;
-				cerr << "reporter:counter:Bowtie,paired_alignments_reported," << numReportedPaired_ << endl;
+				cerr << "reporter:counter:Bowtie,Reads with reported alignments," << numAligned_ << endl;
+				cerr << "reporter:counter:Bowtie,Reads with no alignments," << numUnaligned_ << endl;
+				cerr << "reporter:counter:Bowtie,Reads exceeding -m limit," << numMaxed_ << endl;
+				cerr << "reporter:counter:Bowtie,Unpaired alignments reported," << numReported_ << endl;
+				cerr << "reporter:counter:Bowtie,Paired alignments reported," << numReportedPaired_ << endl;
 			}
 		}
 		// Print the recalibration table.
