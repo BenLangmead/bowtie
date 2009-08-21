@@ -1831,11 +1831,11 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	if(c < 2) {
 		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side - 8);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
-		assert_lt(ac[1], this->_eh._len);
+		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
 		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8); // next
-		assert_lt(gt[0], this->_eh._len); assert_lt(gt[1], this->_eh._len);
+		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
@@ -1843,7 +1843,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	if(c == 0) {
 		assert_leq(cCnt, this->_eh._sideBwtLen);
 	} else {
-		assert_lt(ret, this->_eh._bwtLen);
+		assert_leq(ret, this->_eh._bwtLen);
 	}
 #endif
 	return ret;
@@ -1891,8 +1891,8 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 	assert_leq(gt[0], this->_fchr[3]-this->_fchr[2]);
 	assert_leq(gt[1], this->_fchr[4]-this->_fchr[3]);
 #endif
-	assert_lt(ac[0], this->_eh._len + this->_eh.sideBwtLen()); assert_lt(ac[1], this->_eh._len);
-	assert_lt(gt[0], this->_eh._len); assert_lt(gt[1], this->_eh._len);
+	assert_leq(ac[0], this->_eh._len + this->_eh.sideBwtLen()); assert_leq(ac[1], this->_eh._len);
+	assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 	arrs[0] += (ac[0] + this->_fchr[0]);
 	arrs[1] += (ac[1] + this->_fchr[1]);
 	arrs[2] += (gt[0] + this->_fchr[2]);
@@ -1936,11 +1936,11 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	if(c < 2) {
 		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
-		assert_lt(ac[1], this->_eh._len);
+		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
 		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + (2*this->_eh._sideSz) - 8); // next
-		assert_lt(gt[0], this->_eh._len); assert_lt(gt[1], this->_eh._len);
+		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
 #ifndef NDEBUG
@@ -1990,8 +1990,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 	assert_leq(gt[0], this->_fchr[3]-this->_fchr[2]);
 	assert_leq(gt[1], this->_fchr[4]-this->_fchr[3]);
 #endif
-	assert_lt(ac[0], this->_eh._len + this->_eh.sideBwtLen()); assert_lt(ac[1], this->_eh._len);
-	assert_lt(gt[0], this->_eh._len); assert_lt(gt[1], this->_eh._len);
+	assert_leq(ac[0], this->_eh._len + this->_eh.sideBwtLen()); assert_leq(ac[1], this->_eh._len);
+	assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 	arrs[0] = (ac[0] - arrs[0] + this->_fchr[0]);
 	arrs[1] = (ac[1] - arrs[1] + this->_fchr[1]);
 	arrs[2] = (gt[0] - arrs[2] + this->_fchr[2]);

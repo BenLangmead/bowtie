@@ -119,41 +119,42 @@ public:
 		hse.stratum = stratum;
 		hse.cost = cost;
 		if(mms.count() == 0) return;
-		map<int, char> snpAnnots;
-		if(amap != NULL) {
-			AnnotationMap::Iter ai = amap->lower_bound(hse.h);
-			for(; ai != amap->end(); ai++) {
-				assert_geq(ai->first.first, h.first);
-				if(ai->first.first != h.first) {
-					// Different chromosome
-					break;
-				}
-				if(ai->first.second >= h.second + length()) {
-					// Doesn't fall into alignment
-					break;
-				}
-				if(ai->second.first != 'S') {
-					// Not a SNP annotation
-					continue;
-				}
-				// Found a SNP annotation falling within the alignment
-				size_t off = ai->first.second - h.second;
-				if(!fw) off = length() - off - 1;
-				snpAnnots[off] = ai->second.second;
-			}
-		}
+//		map<int, char> snpAnnots;
+//		if(amap != NULL) {
+//			AnnotationMap::Iter ai = amap->lower_bound(hse.h);
+//			for(; ai != amap->end(); ai++) {
+//				assert_geq(ai->first.first, h.first);
+//				if(ai->first.first != h.first) {
+//					// Different chromosome
+//					break;
+//				}
+//				if(ai->first.second >= h.second + length()) {
+//					// Doesn't fall into alignment
+//					break;
+//				}
+//				if(ai->second.first != 'S') {
+//					// Not a SNP annotation
+//					continue;
+//				}
+//				// Found a SNP annotation falling within the alignment
+//				size_t off = ai->first.second - h.second;
+//				if(!fw) off = length() - off - 1;
+//				snpAnnots[off] = ai->second.second;
+//			}
+//		}
 		for(int i = 0; i < (int)length(); i++) {
 			if(mms.test(i)) {
 				hse.expand();
 				hse.back().type = EDIT_TYPE_MM;
 				hse.back().pos = i;
 				hse.back().chr = charToDna5[(int)refcs[i]];
-			} else if(snpAnnots.find(i) != snpAnnots.end()) {
-				hse.expand();
-				hse.back().type = EDIT_TYPE_SNP;
-				hse.back().pos = i;
-				hse.back().chr = charToDna5[(int)snpAnnots[i]];
 			}
+//			else if(snpAnnots.find(i) != snpAnnots.end()) {
+//				hse.expand();
+//				hse.back().type = EDIT_TYPE_SNP;
+//				hse.back().pos = i;
+//				hse.back().chr = charToDna5[(int)snpAnnots[i]];
+//			}
 		}
 	}
 
@@ -3035,6 +3036,153 @@ public:
 						ss << "S:" << snpAnnots[i] << ">" << qryChar;
 						first = false;
 					}
+				}
+			}
+			ss << endl;
+		} while(spill);
+	}
+
+	/**
+	 * Append a verbose, readable hit to the output stream
+	 * corresponding to the hit.
+	 */
+	virtual void append(ostream& ss, const Hit& h) {
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, _partition, offBase_);
+	}
+
+protected:
+
+	/**
+	 * Report a verbose, human-readable alignment to the appropriate
+	 * output stream.
+	 */
+	virtual void reportHit(const Hit& h) {
+		HitSink::reportHit(h);
+		ostringstream ss;
+		append(ss, h);
+		// Make sure to grab lock before writing to output stream
+		lock(h.h.first);
+		out(h.h.first).writeString(ss.str());
+		unlock(h.h.first);
+	}
+
+private:
+	int      _partition;   /// partition size, or 0 if partitioning is disabled
+	int      offBase_;     /// Add this to reference offsets before outputting.
+	                       /// (An easy way to make things 1-based instead of
+	                       /// 0-based)
+    ReferenceMap *rmap_;   /// mapping to reference coordinate system.
+	AnnotationMap *amap_;  ///
+};
+
+/**
+ * Sink that prints lines in SAM format:
+ */
+class SAMHitSink : public HitSink {
+public:
+	/**
+	 * Construct a single-stream VerboseHitSink (default)
+	 */
+	SAMHitSink(OutFileBuf* out,
+	           int offBase,
+	           ReferenceMap *rmap,
+	           AnnotationMap *amap,
+	           DECL_HIT_DUMPS2) :
+	HitSink(out, PASS_HIT_DUMPS),
+	offBase_(offBase), rmap_(rmap), amap_(amap) { }
+
+	/**
+	 * Construct a multi-stream VerboseHitSink with one stream per
+	 * reference string (see --refout)
+	 */
+	SAMHitSink(size_t numOuts,
+	           int offBase,
+	           ReferenceMap *rmap,
+	           AnnotationMap *amap,
+	           DECL_HIT_DUMPS2) :
+	HitSink(numOuts, PASS_HIT_DUMPS),
+	offBase_(offBase), rmap_(rmap), amap_(amap) { }
+
+	/**
+	 * Append a SAM alignment to the given output stream.
+	 */
+	static void append(ostream& ss,
+	                   const Hit& h,
+	                   const vector<string>* refnames,
+	                   ReferenceMap *rmap,
+	                   AnnotationMap *amap,
+	                   int offBase)
+	{
+		bool spill = false;
+		int spillAmt = 0;
+		do {
+			bool dospill = false;
+			if(spill) {
+				// The read spilled over a partition boundary and so
+				// needs to be printed more than once
+				spill = false;
+				dospill = true;
+				spillAmt++;
+			}
+			assert(!spill);
+			assert(!dospill);
+			ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
+			// .first is text id, .second is offset
+			if(refnames != NULL && rmap != NULL) {
+				ss << rmap->getName(h.h.first);
+			} else if(refnames != NULL && h.h.first < refnames->size()) {
+				ss << (*refnames)[h.h.first];
+			} else {
+				ss << h.h.first;
+			}
+			ss << "\t" << (h.h.second + offBase);
+			ss << "\t" << h.patSeq;
+			ss << "\t" << h.quals;
+			ss << "\t" << h.oms;
+			ss << "\t";
+			// Look for SNP annotations falling within the alignment
+			map<int, char> snpAnnots;
+			const size_t len = length(h.patSeq);
+			if(amap != NULL) {
+				AnnotationMap::Iter ai = amap->lower_bound(h.h);
+				for(; ai != amap->end(); ai++) {
+					assert_geq(ai->first.first, h.h.first);
+					if(ai->first.first != h.h.first) {
+						// Different chromosome
+						break;
+					}
+					if(ai->first.second >= h.h.second + len) {
+						// Doesn't fall into alignment
+						break;
+					}
+					if(ai->second.first != 'S') {
+						// Not a SNP annotation
+						continue;
+					}
+					size_t off = ai->first.second - h.h.second;
+					if(!h.fw) off = len - off - 1;
+					snpAnnots[off] = ai->second.second;
+				}
+			}
+			// Output mismatch column
+			bool first = true;
+			for (unsigned int i = 0; i < len; ++ i) {
+				if(h.mms.test(i)) {
+					// There's a mismatch at this position
+					if (!first) ss << ",";
+					ss << i; // position
+					assert_gt(h.refcs.size(), i);
+					char refChar = toupper(h.refcs[i]);
+					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					assert_neq(refChar, qryChar);
+					ss << ":" << refChar << ">" << qryChar;
+					first = false;
+				} else if(snpAnnots.find(i) != snpAnnots.end()) {
+					if (!first) ss << ",";
+					ss << i; // position
+					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					ss << "S:" << snpAnnots[i] << ">" << qryChar;
+					first = false;
 				}
 			}
 			ss << endl;
