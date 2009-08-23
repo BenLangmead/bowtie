@@ -2150,7 +2150,6 @@ public:
 			hs_->back().fw = h.fw;
 			hs_->back().stratum = h.stratum;
 			hs_->back().cost = h.cost;
-			cout << "reportHit: " << h.h.first << ":" << h.h.second << (h.fw? "+":"-") << "," << stratum << "," << hex << h.cost << endl;
 			hitsForThisRead_++;
 			if(hs_->size() > _max) {
 				return true; // done - report nothing
@@ -2239,15 +2238,15 @@ protected:
 		assert(hs_->sorted());
 		assert_geq(hs_->back().cost, hs_->front().cost);
 		bool atCapacity = (hs_->size() >= n_);
-		if(atCapacity) {
-			cutoff_ = hs_->back().cost;
+		if(atCapacity && (_max == 0xffffffff || _max < n_)) {
+			cutoff_ = min(hs_->back().cost, cutoff_);
 		}
 		if(strata_) {
 			uint16_t sc = hs_->back().cost;
 			sc = ((sc >> 14) + 1) << 14;
 			cutoff_ = min(cutoff_, sc);
+			assert_leq(cutoff_, origCutoff);
 		}
-		assert_leq(cutoff_, origCutoff);
 	}
 
 	HitSet *hs_;
