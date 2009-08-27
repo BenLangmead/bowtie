@@ -619,7 +619,8 @@ Bowtie Manual
   -n/--seedmms <int> The maximum number of mismatches permitted in the
                      "seed", which is the first 28 base pairs of the
                      read by default (see -l/--seedlen).  This may be
-                     0, 1, 2 or 3 and the default is 2.
+                     0, 1, 2 or 3 and the default is 2.  This option is
+                     mutually exclusive with the -v option.
  
   -e/--maqerr <int>  The maximum permitted total of quality values at
                      mismatched read positions.  This total is also
@@ -646,8 +647,9 @@ Bowtie Manual
   -v <int>           Forego the Maq-like alignment policy and use a
                      SOAP-like alignment policy.  I.e., report end-to-
                      end alignments with at most <int> mismatches.  If
-                     -v is specified, base quality values and the -e,
-                     -l and -n options are ignored.
+                     -v is specified, base quality values and the -e
+                     and -l options are ignored.  -v is mutually
+                     exclusive with -n.
 
   -I/--minins <int>  The minimum insert size for valid paired-end
                      alignments.  E.g. if -I 60 is specified and a

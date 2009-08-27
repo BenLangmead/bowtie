@@ -379,8 +379,9 @@ public:
 		doneFirst_ = false;
 		// Reset #-backtrack countdown
 		if(btCnt_ != NULL) *btCnt_ = maxBts_;
-		if(!patsrc->bufa().hitset.empty()) {
-			sinkPt_->setHits(patsrc->bufa().hitset);
+		if(sinkPt_->setHits(patsrc->bufa().hitset)) {
+			this->done = true;
+			sinkPt_->finishRead(*patsrc_, true, true);
 		}
 		// Grab a bit from the pseudo-random seed to determine whether
 		// to start with forward or reverse complement

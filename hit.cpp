@@ -43,31 +43,13 @@ void ChainingHitSink::reportHits(vector<Hit>& hs) {
 void ChainingHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
 	HitSink::reportMaxed(hs, p);
 	assert(!hs.empty());
-	if(strata_) {
-		// Get the stratum
-		int8_t loStrat = hs.front().stratum;
-#ifndef NDEBUG
-		// Strata should be uniform across hits
-		vector<Hit>::const_iterator it;
-		for(it = hs.begin(); it != hs.end(); it++) {
-			assert_eq(loStrat, it->stratum)
-		}
-#endif
-		if(loStrat > 0) {
-			// Critical section for output stream 0
-			HitSet s;
-			p.bufa().toHitSet(s); // grab read details from ReadBuf
-			lock(0);
-			s.serialize(out(0));
-			unlock(0);
-		} else {
-			// We eliminated all possible strata, so this read is done.
-			// Don't serialize anything.
-			assert_eq(0, loStrat);
-		}
-	} else {
-		// Maxed out in unstratified mode - this read is done
-	}
+	int8_t loStrat = (strata_ ? hs.front().stratum : 0);
+	HitSet s;
+	p.bufa().toHitSet(s);
+	s.maxedStratum = loStrat;
+	lock(0);
+	s.serialize(out(0));
+	unlock(0);
 }
 
 /**

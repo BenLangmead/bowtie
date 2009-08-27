@@ -161,6 +161,10 @@ struct HitSetEnt {
 		return edits.size();
 	}
 
+	bool empty() const {
+		return edits.empty();
+	}
+
 	/**
 	 * Write HitSetEnt to an output stream.
 	 */
@@ -184,7 +188,9 @@ struct HitSet {
 	typedef EntVec::const_iterator Iter;
 	typedef std::pair<uint32_t,uint32_t> U32Pair;
 
-	HitSet() { }
+	HitSet() {
+		maxedStratum = -1;
+	}
 
 	HitSet(FileBuf& fb) {
 		deserialize(fb);
@@ -194,7 +200,6 @@ struct HitSet {
 	 * Write binary representation of HitSet to an OutFileBuf.
 	 */
 	void serialize(OutFileBuf& fb) const {
-		if(empty()) return;
 		uint32_t i = seqan::length(name);
 		assert_gt(i, 0);
 		fb.writeChars((const char*)&i, 4);
@@ -212,6 +217,7 @@ struct HitSet {
 		for(it = ents.begin(); it != ents.end(); it++) {
 			it->serialize(fb);
 		}
+		fb.write(maxedStratum);
 	}
 
 	/**
@@ -238,11 +244,15 @@ struct HitSet {
 		seqan::resize(qual, sz);
 		fb.get(seqan::begin(qual), sz);
 		fb.get((char*)&sz, 4);
-		assert_gt(sz, 0);
-		ents.resize(sz);
-		for(size_t i = 0; i < sz; i++) {
-			ents[i].deserialize(fb);
+		if(sz > 0) {
+			ents.resize(sz);
+			for(size_t i = 0; i < sz; i++) {
+				ents[i].deserialize(fb);
+			}
+		} else {
+			ents.clear();
 		}
+		maxedStratum = fb.get();
 	}
 
 	/**
@@ -271,6 +281,7 @@ struct HitSet {
 	 * Remove all entries from this HitSet.
 	 */
 	void clear() {
+		maxedStratum = -1;
 		ents.clear();
 	}
 
@@ -301,6 +312,14 @@ struct HitSet {
 	 */
 	void expand() {
 		ents.resize(ents.size() + 1);
+		assert(ents.back().empty());
+	}
+
+	/**
+	 * Resize entry list
+	 */
+	void resize(size_t sz) {
+		ents.resize(sz);
 	}
 
 	/**
@@ -375,7 +394,11 @@ struct HitSet {
 	/**
 	 *
 	 */
-	bool tryReplacing(U32Pair h,  bool fw, uint16_t cost, size_t& pos) {
+	bool tryReplacing(U32Pair h,
+	                  bool fw,
+	                  uint16_t cost,
+	                  size_t& pos)
+	{
 		for(size_t i = 0; i < ents.size(); i++) {
 			if(ents[i].h == h && ents[i].fw == fw) {
 				if(cost < ents[i].cost) {
@@ -408,6 +431,7 @@ struct HitSet {
 	seqan::String<char> name;
 	seqan::String<seqan::Dna5> seq;
 	seqan::String<char> qual;
+	int8_t maxedStratum;
 	std::vector<HitSetEnt> ents;
 };
 

@@ -602,6 +602,7 @@ public:
 				unalPct = 100.0 * (double)numUnaligned_ / (double)tot;
 				maxPct  = 100.0 * (double)numMaxed_ / (double)tot;
 			}
+			cerr << "# reads processed: " << tot << endl;
 			cerr << "# reads with at least one reported alignment: "
 			     << numAligned_ << " (" << fixed << setprecision(2)
 			     << alPct << "%)" << endl;
@@ -1358,11 +1359,12 @@ public:
 	/**
 	 * Use the given set of hits as a starting point.  By default, we don't
 	 */
-	virtual void setHits(HitSet& hs) {
+	virtual bool setHits(HitSet& hs) {
 		if(!hs.empty()) {
 			cerr << "Error: default setHits() called with non-empty HitSet" << endl;
 			exit(1);
 		}
+		return false;
 	}
 
 	/**
@@ -2124,14 +2126,18 @@ public:
 	virtual bool reportHit(const Hit& h, int stratum) {
 		HitSinkPerThread::reportHit(h, stratum);
 		assert(hs_->sorted());
+		assert(hs_ != NULL);
 		assert_eq(h.stratum, stratum);
 		assert_eq(1, mult_);
+		assert(consistentStrata());
+		assert(!irrelevantCost(h.cost));
 
 		if(!hs_->empty() && strata_ && stratum < hs_->front().stratum) {
 			hs_->clear();
 			_bufferedHits.clear();
 			hitsForThisRead_ = 0;
 		}
+		assert(consistentStrata());
 
 		size_t replPos = 0;
 		if(!hs_->empty() && hs_->tryReplacing(h.h, h.fw, h.cost, replPos)) {
@@ -2143,6 +2149,7 @@ public:
 			}
 			// Size didn't change, so no need to check against _max and n_
 			assert(hs_->sorted());
+			assert(consistentStrata());
 		} else {
 			// Added a new hit
 			hs_->expand();
@@ -2162,6 +2169,7 @@ public:
 			}
 			_bufferedHits.push_back(h);
 			hs_->sort();
+			assert(consistentStrata());
 		}
 		updateCutoff();
 		return false; // not at N yet; keep going
@@ -2174,9 +2182,11 @@ public:
 	 */
 	virtual uint32_t finishReadImpl() {
 		assert_eq(1, mult_);
+		assert(hs_ != NULL);
+		assert(consistentStrata());
 		uint32_t ret = hitsForThisRead_;
 		hitsForThisRead_ = 0;
-		if(hs_->size() < n_) {
+		if(!hs_->empty() && hs_->size() < n_) {
 			const size_t sz = _bufferedHits.size();
 			for(size_t i = 0; i < sz; i++) {
 				// Set 'oms' according to the number of other alignments
@@ -2188,23 +2198,52 @@ public:
 		if(hs_->size() > n_) {
 			_bufferedHits.resize(n_);
 		}
+		assert(consistentStrata());
+		// Make sure that a chained, maxed-out read gets treated as
+		// maxed-out and not as unaligned
+		if(hs_->empty() && hs_->maxedStratum != -1) {
+			assert(_bufferedHits.empty());
+			// Boy, this is stupid.  Need to switch to just using HitSet
+			// internally all the time.
+			_bufferedHits.resize(max_+1);
+			for(size_t i = 0; i < max_+1; i++) {
+				_bufferedHits[i].stratum = hs_->maxedStratum;
+			}
+			ret = max_+1;
+		} else if(!hs_->empty() && hs_->maxedStratum != -1) {
+			assert_lt(hs_->front().stratum, hs_->maxedStratum);
+		}
 		return ret;
 	}
 
 	/**
 	 * Set the initial set of Hits.
 	 */
-	virtual void setHits(HitSet& hs) {
+	virtual bool setHits(HitSet& hs) {
 		hs_ = &hs;
+		assert(hs_ != NULL);
 		hsISz_ = hs.size();
 		hitsForThisRead_ = hs.size();
 		assert(_bufferedHits.empty());
+		assert_geq(hs.maxedStratum, -1);
+		assert_lt(hs.maxedStratum, 4);
 		if(!hs.empty()) {
+			assert_eq(-1, hs.maxedStratum);
 			hs.sort();
 			Hit::fromHitSet(_bufferedHits, hs);
 			assert(!_bufferedHits.empty());
 			assert_leq(_bufferedHits.size(), max_);
+			assert(consistentStrata());
+		} else if(hs.maxedStratum != -1) {
+			if(hs.maxedStratum == 0) {
+				cutoff_ = 0;
+				// Already done
+				return true;
+			}
+			cutoff_ = (hs.maxedStratum << 14);
 		}
+		updateCutoff();
+		return false;
 	}
 
 	/**
@@ -2226,22 +2265,33 @@ public:
 
 protected:
 
+#ifndef NDEBUG
+	/**
+	 * Sanity check that, if we're in strata_ mode, all 'stratum's
+	 * should be the same among hits.
+	 */
+	bool consistentStrata() {
+		if(hs_->empty() || !strata_) return true;
+		int stratum = hs_->front().stratum;
+		for(size_t i = 1; i < hs_->size(); i++) {
+			assert_eq(stratum, (*hs_)[i].stratum);
+		}
+		return true;
+	}
+#endif
+
 	/**
 	 * Update the lowest relevant cost.
 	 */
 	void updateCutoff() {
-		if(hs_->empty()) {
-			assert_eq(0xffff, cutoff_);
-			return;
-		}
 		ASSERT_ONLY(uint16_t origCutoff = cutoff_);
 		assert(hs_->sorted());
-		assert_geq(hs_->back().cost, hs_->front().cost);
+		assert(hs_->empty() || hs_->back().cost >= hs_->front().cost);
 		bool atCapacity = (hs_->size() >= n_);
 		if(atCapacity && (_max == 0xffffffff || _max < n_)) {
 			cutoff_ = min(hs_->back().cost, cutoff_);
 		}
-		if(strata_) {
+		if(strata_ && !hs_->empty()) {
 			uint16_t sc = hs_->back().cost;
 			sc = ((sc >> 14) + 1) << 14;
 			cutoff_ = min(cutoff_, sc);
