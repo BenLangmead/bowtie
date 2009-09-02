@@ -216,8 +216,9 @@ public:
 				}
 			} else {
 				shmemLeader = ALLOC_SHARED(
-					s4 + "[ref]", (cumsz >> 2), (void**)&buf_, "ref",
-					verbose_ || startVerbose);
+					s4 + "[ref]", (cumsz >> 2),
+					reinterpret_cast<void*>(&buf_),
+					"ref", verbose_ || startVerbose);
 			}
 			if(shmemLeader) {
 				// Open the bitpair-encoded reference file
