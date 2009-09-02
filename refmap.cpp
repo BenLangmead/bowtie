@@ -34,7 +34,7 @@ void ReferenceMap::parse() {
 		cerr << "Could not open reference map file " << fname_ << endl;
 		exit(1);
 	}
-	while(!in.eof()) {
+	while(in.peek() != EOF) {
 		if(in.peek() == '>') {
 			// This appears to be a name line
 			in.get(); // chop off the initial '>'
