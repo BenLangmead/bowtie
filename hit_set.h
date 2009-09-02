@@ -224,7 +224,7 @@ struct HitSet {
 	 * Repopulate a HitSet from its binary representation in FileBuf.
 	 */
 	void deserialize(FileBuf& fb) {
-		size_t sz;
+		uint32_t sz = 0;
 		if(fb.get((char*)&sz, 4) != 4) {
 			seqan::clear(name);
 			seqan::clear(seq);
