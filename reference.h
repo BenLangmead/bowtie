@@ -215,9 +215,8 @@ public:
 					exit(1);
 				}
 			} else {
-				shmemLeader = ALLOC_SHARED(
-					s4 + "[ref]", (cumsz >> 2),
-					reinterpret_cast<void**>(&buf_),
+				shmemLeader = ALLOC_SHARED_U8(
+					s4 + "[ref]", (cumsz >> 2), &buf_,
 					"ref", verbose_ || startVerbose);
 			}
 			if(shmemLeader) {
