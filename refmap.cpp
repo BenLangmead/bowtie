@@ -43,8 +43,10 @@ void ReferenceMap::parse() {
 			in.get(); // chop off tab
 			char buf[1024];
 			in.getline(buf, 1023);
-			if(names_.size() <= off) names_.resize(off+1);
-			names_[off] = string(buf);
+			if(parseNames_) {
+				if(names_.size() <= off) names_.resize(off+1);
+				names_[off] = string(buf);
+			}
 			continue;
 		}
 		uint32_t id, off;

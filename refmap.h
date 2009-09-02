@@ -18,8 +18,9 @@ class ReferenceMap {
 	typedef std::pair<uint32_t, uint32_t> U32Pair;
 
 public:
-	ReferenceMap(const char *fname) {
+	ReferenceMap(const char *fname, bool parseNames) {
 		fname_ = fname;
+		parseNames_ = parseNames;
 		parse();
 	}
 
@@ -34,6 +35,7 @@ public:
 	 * Return true iff we have a name for reference with id 'i'.
 	 */
 	bool hasName(size_t i) const {
+		if(parseNames_) return false;
 		return !names_[i].empty();
 	}
 
@@ -41,6 +43,7 @@ public:
 	 * Get the name for reference with id 'i'.
 	 */
 	const std::string& getName(size_t i) const {
+		assert(!parseNames_);
 		assert(hasName(i));
 		return names_[i];
 	}
@@ -54,6 +57,7 @@ protected:
 
 	const char *fname_;
 	std::vector<U32Pair> map_;
+	bool parseNames_;
 	std::vector<std::string> names_;
 };
 

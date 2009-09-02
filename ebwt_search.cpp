@@ -4297,7 +4297,7 @@ static void driver(const char * type,
 			cerr << "About to load in a reference map file with name "
 			     << refMapFile << ": "; logTime(cerr, true);
 		}
-		rmap = new ReferenceMap(refMapFile);
+		rmap = new ReferenceMap(refMapFile, !noRefNames);
 	}
 	AnnotationMap* amap = NULL;
 	if(annotMapFile != NULL) {
