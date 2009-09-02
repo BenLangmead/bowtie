@@ -3123,7 +3123,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 		} else {
 			shmemLeader = ALLOC_SHARED(
 				_in2Str + "[offs]", offsLenSampled*4,
-				reinterpret_cast<void*>(&this->_offs),
+				reinterpret_cast<void**>(&this->_offs),
 				"offs", _verbose || startVerbose);
 		}
 	}

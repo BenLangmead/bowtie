@@ -217,7 +217,7 @@ public:
 			} else {
 				shmemLeader = ALLOC_SHARED(
 					s4 + "[ref]", (cumsz >> 2),
-					reinterpret_cast<void*>(&buf_),
+					reinterpret_cast<void**>(&buf_),
 					"ref", verbose_ || startVerbose);
 			}
 			if(shmemLeader) {
