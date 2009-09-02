@@ -577,7 +577,7 @@ static void driver(const string& infile,
 		// Try restoring the original string (if there were
 		// multiple texts, what we'll get back is the joined,
 		// padded string, not a list)
-		ebwt.loadIntoMemory();
+		ebwt.loadIntoMemory(false, false);
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{

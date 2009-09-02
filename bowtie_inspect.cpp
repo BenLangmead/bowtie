@@ -255,7 +255,7 @@ static void driver(const string& ebwtFileBase, const string& query) {
 		                 NULL, // no reference map
 		                 verbose);
 	    // Load whole index into memory
-		ebwt.loadIntoMemory();
+		ebwt.loadIntoMemory(true, false);
 		print_index_sequences(cout, ebwt);
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {

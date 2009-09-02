@@ -345,6 +345,7 @@ public:
 	     bool useMm = false,
 	     bool useShmem = false,
 	     bool mmSweep = false,
+	     bool loadNames = false,
 	     const ReferenceMap* rmap = NULL,
 	     bool verbose = false,
 	     bool startVerbose = false,
@@ -359,7 +360,7 @@ public:
 		useShmem_ = useShmem;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
-		readIntoMemory(true, &_eh, mmSweep, startVerbose);
+		readIntoMemory(true, &_eh, mmSweep, loadNames, startVerbose);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -463,7 +464,7 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false, NULL, false, false);
+			readIntoMemory(false, NULL, false, true, false);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -760,8 +761,8 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory(bool verbose = false) {
-		readIntoMemory(false, NULL, false, verbose);
+	void loadIntoMemory(bool loadNames, bool verbose) {
+		readIntoMemory(false, NULL, false, loadNames, verbose);
 	}
 
 	/**
@@ -963,7 +964,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(bool justHeader, EbwtParams *params, bool mmSweep, bool startVerbose);
+	void readIntoMemory(bool justHeader, EbwtParams *params, bool mmSweep, bool loadNames, bool startVerbose);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -2669,6 +2670,7 @@ template<typename TStr>
 void Ebwt<TStr>::readIntoMemory(bool justHeader,
                                 EbwtParams *params,
                                 bool mmSweep,
+                                bool loadNames,
                                 bool startVerbose)
 {
 	bool switchEndian; // dummy; caller doesn't care
@@ -3080,19 +3082,22 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 		exit(1);
 	}
 
-	// Read reference sequence names from primary index file
-	while(true) {
-		char c = '\0';
-		if(MM_READ(_in1, (void *)(&c), (size_t)1) != (MM_READ_RET)1) break;
-		bytesRead++;
-		if(c == '\0') break;
-		else if(c == '\n') {
-			this->_refnames.push_back("");
-		} else {
-			if(this->_refnames.size() == 0) {
+	// Read reference sequence names from primary index file (or not,
+	// if --refidx is specified)
+	if(loadNames) {
+		while(true) {
+			char c = '\0';
+			if(MM_READ(_in1, (void *)(&c), (size_t)1) != (MM_READ_RET)1) break;
+			bytesRead++;
+			if(c == '\0') break;
+			else if(c == '\n') {
 				this->_refnames.push_back("");
+			} else {
+				if(this->_refnames.size() == 0) {
+					this->_refnames.push_back("");
+				}
+				this->_refnames.back().push_back(c);
 			}
-			this->_refnames.back().push_back(c);
 		}
 	}
 
@@ -3474,7 +3479,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 			cout << "Re-reading \"" << out1 << "\"/\"" << out2 << "\" for sanity check" << endl;
 		Ebwt copy(out1, out2, _verbose, _sanity);
 		assert(!isInMemory());
-		copy.loadIntoMemory();
+		copy.loadIntoMemory(false, false);
 		assert(isInMemory());
 	    assert_eq(eh._lineRate,     copy.eh()._lineRate);
 	    assert_eq(eh._linesPerSide, copy.eh()._linesPerSide);

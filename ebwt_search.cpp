@@ -2105,7 +2105,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwt.loadIntoMemory(startVerbose);
+		ebwt.loadIntoMemory(!noRefNames, startVerbose);
 	}
 
 	BitPairReference *refs = NULL;
@@ -2307,7 +2307,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(startVerbose);
+		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
 	}
 
 #ifdef BOWTIE_PTHREADS
@@ -2346,7 +2346,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(startVerbose);
+		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
 	}
     _patsrc.reset();          // reset pattern source to 1st pattern
 	// Sanity-check the restored version of the Ebwt
@@ -2537,12 +2537,12 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(startVerbose);
+		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(startVerbose);
+		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
@@ -2601,7 +2601,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
 		Timer _t(cerr, "Time loading forward index: ", timing); \
-		ebwtFw.loadIntoMemory(startVerbose); \
+		ebwtFw.loadIntoMemory(!noRefNames, startVerbose); \
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -2614,7 +2614,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
 		Timer _t(cerr, "Time loading mirror index: ", timing); \
-		ebwtBw.loadIntoMemory(startVerbose); \
+		ebwtBw.loadIntoMemory(!noRefNames, startVerbose); \
 	} \
 	assert(ebwtBw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -3155,12 +3155,12 @@ static void twoOrThreeMismatchSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(startVerbose);
+		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(startVerbose);
+		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
@@ -4016,7 +4016,7 @@ static void seededQualCutoffSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(startVerbose);
+		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
 	}
     CHUD_START();
 	{
@@ -4318,6 +4318,7 @@ static void driver(const char * type,
                     useMm,    // whether to use memory-mapped files
                     useShmem, // whether to use shared memory
                     mmSweep,  // sweep memory-mapped files
+                    !noRefNames, // load names?
                     rmap,     // reference map, or NULL if none is needed
                     verbose, // whether to be talkative
                     startVerbose, // talkative during initialization
@@ -4336,6 +4337,7 @@ static void driver(const char * type,
     	                        useMm,    // whether to use memory-mapped files
     	                        useShmem, // whether to use shared memory
     	                        mmSweep,  // sweep memory-mapped files
+    	                        !noRefNames, // load names?
     	                        rmap,     // reference map, or NULL if none is needed
     	                        verbose,  // whether to be talkative
     	                        startVerbose, // talkative during initialization
@@ -4352,7 +4354,7 @@ static void driver(const char * type,
 	}
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwt.loadIntoMemory(startVerbose);
+		ebwt.loadIntoMemory(!noRefNames, startVerbose);
 		ebwt.checkOrigs(os, false);
 		ebwt.evictFromMemory();
 	}
