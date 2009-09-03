@@ -6,6 +6,7 @@
  */
 
 #include "refmap.h"
+#include "assert_helpers.h"
 
 using namespace std;
 
