@@ -35,7 +35,7 @@ public:
 	 * Return true iff we have a name for reference with id 'i'.
 	 */
 	bool hasName(size_t i) const {
-		if(parseNames_) return false;
+		if(!parseNames_) return false;
 		return !names_[i].empty();
 	}
 
@@ -43,7 +43,7 @@ public:
 	 * Get the name for reference with id 'i'.
 	 */
 	const std::string& getName(size_t i) const {
-		assert(!parseNames_);
+		assert(parseNames_);
 		assert(hasName(i));
 		return names_[i];
 	}
