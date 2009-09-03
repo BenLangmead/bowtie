@@ -56,6 +56,7 @@ void ReferenceMap::parse() {
 		map_.resize(map_.size()+1);
 		map_.back().first = id;
 		map_.back().second = off;
+		while(isspace(in.peek())) in.get();
 	}
 	assert_eq(EOF, c);
 	if(map_.empty()) {
