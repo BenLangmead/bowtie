@@ -35,8 +35,9 @@ void ReferenceMap::parse() {
 		cerr << "Could not open reference map file " << fname_ << endl;
 		exit(1);
 	}
-	while(in.peek() != EOF) {
-		if(in.peek() == '>') {
+	int c;
+	while((c = in.peek()) != EOF) {
+		if(c == '>') {
 			// This appears to be a name line
 			in.get(); // chop off the initial '>'
 			uint32_t off;
@@ -56,7 +57,7 @@ void ReferenceMap::parse() {
 		map_.back().first = id;
 		map_.back().second = off;
 	}
-	assert_eq(EOF, in.peek());
+	assert_eq(EOF, c);
 	if(map_.empty()) {
 		cerr << "Error: no entries in refmap file " << fname_ << endl;
 	}
