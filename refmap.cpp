@@ -50,13 +50,12 @@ void ReferenceMap::parse() {
 			continue;
 		}
 		uint32_t id, off;
-		in >> id;
-		if(in.eof()) break;
-		in >> off;
+		in >> id >> off;
 		map_.resize(map_.size()+1);
 		map_.back().first = id;
 		map_.back().second = off;
 	}
+	assert_eq(EOF, in.peek());
 	if(map_.empty()) {
 		cerr << "Error: no entries in refmap file " << fname_ << endl;
 	}
