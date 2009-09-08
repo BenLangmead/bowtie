@@ -11,7 +11,7 @@
 
 	if(plen < 2) {
 		cerr << "Error: Reads must be at least 2 characters long in 1-mismatch mode" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	if(!nofw) {

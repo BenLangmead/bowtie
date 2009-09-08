@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <stdexcept>
 #include <getopt.h>
 #include <seqan/sequence.h>
 #include <seqan/file.h>
@@ -185,7 +186,7 @@ static void parseOptions(int argc, char **argv) {
 			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				exit(1);
+				throw runtime_error("");
 		}
 	} while(next_option != -1);
 }
@@ -219,146 +220,150 @@ static char *argv0 = NULL;
  * output appropriate converted alignment.
  */
 int main(int argc, char **argv) {
-	string infile;
-	vector<string> infiles;
-	string outfile;
-	argv0 = argv[0];
-	parseOptions(argc, argv);
-	ostream *out = &cout;
-	if(showVersion) {
-		cout << argv0 << " version " << BOWTIE_VERSION << endl;
-		if(sizeof(void*) == 4) {
-			cout << "32-bit" << endl;
-		} else if(sizeof(void*) == 8) {
-			cout << "64-bit" << endl;
-		} else {
-			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
-		}
-		cout << "Built on " << BUILD_HOST << endl;
-		cout << BUILD_TIME << endl;
-		cout << "Compiler: " << COMPILER_VERSION << endl;
-		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
-		     << sizeof(int)
-		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
-		     << ", " << sizeof(off_t) << "}" << endl;
-		return 0;
-	}
-
-	// Get input filename
-	if(optind >= argc) {
-		cerr << "No input alignments file specified!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
-	infile = argv[optind++];
-	tokenize(infile, ",", infiles);
-
-	// Get output filename
-	if(optind < argc) {
-		out = new ofstream(argv[optind]);
-	} else if(outformat == FORMAT_BIN) {
-		cerr << "If -B/--outbin is specified, <align_out> must also be specified" << endl;
-		exit(1);
-	}
-
-	// Read in reference names, if requested
-	vector<string> refnames;
-	if(!ebwt_name.empty()) {
-		string adjust = adjustEbwtBase(argv[0], ebwt_name, verbose);
-		readEbwtRefnames(adjust, refnames);
-		if(verbose) {
-			cout << "Successfully read " << refnames.size() << " reference sequence names from index" << endl;
-		}
-	}
-
-	for(size_t i = 0; i < infiles.size(); i++) {
-		istream *inp;
-		if(infiles[i] == "-") {
-			inp = &cin;
-		} else {
-			inp = new ifstream(infiles[i].c_str(), ios_base::out | ios_base::binary);
-		}
-		istream& in = *inp;
-		vector<Hit> hits;
-		while(in.good() && !in.eof()) {
-			if(sorthits) {
-				hits.resize(hits.size()+1); // add elt on back using default constructor
-				bool good;
-				vector<string>* inrefnames = &refnames;
-				if(informat == FORMAT_BIN) {
-					good = BinaryHitSink::readHit(hits.back(), in, inrefnames, verbose);
-				} else {
-					good = VerboseHitSink::readHit(hits.back(), in, inrefnames, verbose);
-				}
-				if(!good) {
-					hits.pop_back();
-					continue; // bad alignment; skip it
-				}
+	try {
+		string infile;
+		vector<string> infiles;
+		string outfile;
+		argv0 = argv[0];
+		parseOptions(argc, argv);
+		ostream *out = &cout;
+		if(showVersion) {
+			cout << argv0 << " version " << BOWTIE_VERSION << endl;
+			if(sizeof(void*) == 4) {
+				cout << "32-bit" << endl;
+			} else if(sizeof(void*) == 8) {
+				cout << "64-bit" << endl;
 			} else {
-				Hit h;
-				bool good;
-				vector<string>* inrefnames = &refnames;
+				cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+			}
+			cout << "Built on " << BUILD_HOST << endl;
+			cout << BUILD_TIME << endl;
+			cout << "Compiler: " << COMPILER_VERSION << endl;
+			cout << "Options: " << COMPILER_OPTIONS << endl;
+			cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+				 << sizeof(int)
+				 << ", " << sizeof(long) << ", " << sizeof(long long)
+				 << ", " << sizeof(void *) << ", " << sizeof(size_t)
+				 << ", " << sizeof(off_t) << "}" << endl;
+			return 0;
+		}
+
+		// Get input filename
+		if(optind >= argc) {
+			cerr << "No input alignments file specified!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+		infile = argv[optind++];
+		tokenize(infile, ",", infiles);
+
+		// Get output filename
+		if(optind < argc) {
+			out = new ofstream(argv[optind]);
+		} else if(outformat == FORMAT_BIN) {
+			cerr << "If -B/--outbin is specified, <align_out> must also be specified" << endl;
+			throw runtime_error("");
+		}
+
+		// Read in reference names, if requested
+		vector<string> refnames;
+		if(!ebwt_name.empty()) {
+			string adjust = adjustEbwtBase(argv[0], ebwt_name, verbose);
+			readEbwtRefnames(adjust, refnames);
+			if(verbose) {
+				cout << "Successfully read " << refnames.size() << " reference sequence names from index" << endl;
+			}
+		}
+
+		for(size_t i = 0; i < infiles.size(); i++) {
+			istream *inp;
+			if(infiles[i] == "-") {
+				inp = &cin;
+			} else {
+				inp = new ifstream(infiles[i].c_str(), ios_base::out | ios_base::binary);
+			}
+			istream& in = *inp;
+			vector<Hit> hits;
+			while(in.good() && !in.eof()) {
+				if(sorthits) {
+					hits.resize(hits.size()+1); // add elt on back using default constructor
+					bool good;
+					vector<string>* inrefnames = &refnames;
+					if(informat == FORMAT_BIN) {
+						good = BinaryHitSink::readHit(hits.back(), in, inrefnames, verbose);
+					} else {
+						good = VerboseHitSink::readHit(hits.back(), in, inrefnames, verbose);
+					}
+					if(!good) {
+						hits.pop_back();
+						continue; // bad alignment; skip it
+					}
+				} else {
+					Hit h;
+					bool good;
+					vector<string>* inrefnames = &refnames;
+					vector<string>* outrefnames = NULL;
+					if(!refIdx) {
+						outrefnames = &refnames;
+					}
+					if(informat == FORMAT_BIN) {
+						good = BinaryHitSink::readHit(h, in, inrefnames, verbose);
+					} else {
+						good = VerboseHitSink::readHit(h, in, inrefnames, verbose);
+					}
+					if(!good) continue; // bad alignment; skip it
+
+					if(outformat == FORMAT_BIN) {
+						BinaryHitSink::append(*out, h, outrefnames, 0);
+					} else if(outformat == FORMAT_DEFAULT) {
+						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
+					} else if(outformat == FORMAT_FASTQ) {
+						fastqAppend(*out, h);
+					} else if(outformat == FORMAT_FASTA) {
+						fastaAppend(*out, h);
+					} else {
+						ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
+					}
+				}
+			}
+			// If the user requested that hits be sorted, sort them in memory and output them now
+			if(sorthits) {
+				std::sort(hits.begin(), hits.end());
 				vector<string>* outrefnames = NULL;
 				if(!refIdx) {
 					outrefnames = &refnames;
 				}
-				if(informat == FORMAT_BIN) {
-					good = BinaryHitSink::readHit(h, in, inrefnames, verbose);
-				} else {
-					good = VerboseHitSink::readHit(h, in, inrefnames, verbose);
+				for(size_t i = 0; i < hits.size(); i++) {
+					Hit& h = hits[i];
+					if(outformat == FORMAT_BIN) {
+						BinaryHitSink::append(*out, h, outrefnames, 0);
+					} else if(outformat == FORMAT_DEFAULT) {
+						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
+					} else if(outformat == FORMAT_FASTQ) {
+						fastqAppend(*out, h);
+					} else if(outformat == FORMAT_FASTA) {
+						fastaAppend(*out, h);
+					} else {
+						ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
+					}
 				}
-				if(!good) continue; // bad alignment; skip it
+			} else {
+				assert_eq(0, hits.size());
+			}
+			if(infiles[i] != "-") {
+				((ifstream*)inp)->close();
+				delete inp;
+			}
+		}
 
-				if(outformat == FORMAT_BIN) {
-					BinaryHitSink::append(*out, h, outrefnames, 0);
-				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
-				} else if(outformat == FORMAT_FASTQ) {
-					fastqAppend(*out, h);
-				} else if(outformat == FORMAT_FASTA) {
-					fastaAppend(*out, h);
-				} else {
-					ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
-				}
-			}
+		// Close and delete output
+		if(optind < argc) {
+			((ofstream*)out)->close();
+			delete out;
 		}
-		// If the user requested that hits be sorted, sort them in memory and output them now
-		if(sorthits) {
-			std::sort(hits.begin(), hits.end());
-			vector<string>* outrefnames = NULL;
-			if(!refIdx) {
-				outrefnames = &refnames;
-			}
-			for(size_t i = 0; i < hits.size(); i++) {
-				Hit& h = hits[i];
-				if(outformat == FORMAT_BIN) {
-					BinaryHitSink::append(*out, h, outrefnames, 0);
-				} else if(outformat == FORMAT_DEFAULT) {
-					VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
-				} else if(outformat == FORMAT_FASTQ) {
-					fastqAppend(*out, h);
-				} else if(outformat == FORMAT_FASTA) {
-					fastaAppend(*out, h);
-				} else {
-					ConciseHitSink::append(*out, h, 0, false /* reportOpps */);
-				}
-			}
-		} else {
-			assert_eq(0, hits.size());
-		}
-		if(infiles[i] != "-") {
-			((ifstream*)inp)->close();
-			delete inp;
-		}
+
+		return 0;
+	} catch(std::exception& e) {
+		return 1;
 	}
-
-	// Close and delete output
-	if(optind < argc) {
-		((ofstream*)out)->close();
-		delete out;
-	}
-
-	return 0;
 }

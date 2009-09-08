@@ -39,6 +39,7 @@ public:
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
+			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
@@ -56,6 +57,7 @@ public:
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
+			quiet_(quiet),
 			seed_(seed)
 	{
 		assert(ebwtFw.isInMemory());
@@ -144,7 +146,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			INT_MAX, pool_, NULL, NULL);
+			quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
 private:
@@ -164,6 +166,7 @@ private:
 	bool strandFix_;
 	bool rangeMode_;
 	bool verbose_;
+	bool quiet_;
 	uint32_t seed_;
 };
 
@@ -203,6 +206,7 @@ public:
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
+			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
@@ -230,6 +234,7 @@ public:
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
+			quiet_(quiet),
 			seed_(seed)
 	{
 		assert(ebwtBw != NULL);
@@ -424,7 +429,7 @@ public:
 				refAligner, rchase,
 				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_,
 				INT_MAX, pool_, NULL);
 			delete dr1FwVec;
 			delete dr1RcVec;
@@ -440,7 +445,7 @@ public:
 				sinkPt, sinkPtSe1, sinkPtSe2,
 				mate1fw_, mate2fw_,
 				peInner_, peOuter_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_,
 				INT_MAX, pool_, NULL);
 			delete dr1FwVec;
 			return al;
@@ -475,6 +480,7 @@ private:
 	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
+	const bool quiet_;
 	const uint32_t seed_;
 };
 

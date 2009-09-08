@@ -5,6 +5,7 @@
 #include <sstream>
 #include <stdint.h>
 #include <string.h>
+#include <stdexcept>
 #include "assert_helpers.h"
 #include "threading.h"
 
@@ -33,7 +34,7 @@ bitsetRealloc(uint32_t& sz, uint32_t* words, const char *errmsg = NULL) {
 			// Output given error message
 			std::cerr << errmsg;
 		}
-		exit(1);
+		throw std::runtime_error("");
 	}
 	if(oldsz > 0) {
 		// Move old values into new array
@@ -64,7 +65,7 @@ public:
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
 			}
-			exit(1);
+			throw std::runtime_error("");
 		}
 		assert(_words != NULL);
 		memset(_words, 0, nwords * 4 /* words to bytes */);
@@ -173,7 +174,7 @@ public:
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
 			}
-			exit(1);
+			throw std::runtime_error("");
 		}
 		assert(_words != NULL);
 		memset(_words, 0, nwords * 4);

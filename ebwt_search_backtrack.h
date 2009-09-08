@@ -1,6 +1,7 @@
 #ifndef EBWT_SEARCH_BACKTRACK_H_
 #define EBWT_SEARCH_BACKTRACK_H_
 
+#include <stdexcept>
 #include <seqan/sequence.h>
 #include "pat.h"
 #include "qual.h"
@@ -3123,7 +3124,7 @@ protected:
 		if(cext == PIN_TO_BEGINNING)    return 0;
 		if(cext == PIN_TO_LEN)          return len;
 		cerr << "Bad SearchConstraintExtent: " << cext;
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	bool seed_;

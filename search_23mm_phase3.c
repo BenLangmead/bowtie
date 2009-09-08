@@ -39,9 +39,6 @@
 		}
 		bthh3.resetNumBacktracks();
 		if(done) {
-			if(dumpHHHits != NULL) {
-				(*dumpHHHits) << patFw << endl << qualFw << endl << "---" << endl;
-			}
 			continue;
 		}
 	}

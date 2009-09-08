@@ -4,6 +4,7 @@
 #include <string>
 #include <algorithm>
 #include <cassert>
+#include <stdexcept>
 #include <seqan/find.h>
 #include <getopt.h>
 #include <vector>
@@ -35,108 +36,203 @@
 using namespace std;
 using namespace seqan;
 
-static vector<string> mates1; // mated reads (first mate)
-static vector<string> mates2; // mated reads (second mate)
+static vector<string> mates1;  // mated reads (first mate)
+static vector<string> mates2;  // mated reads (second mate)
 static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
-static string adjustedEbwtFileBase = "";
-static bool verbose				= 0; // be talkative
-static bool startVerbose		= 0; // be talkative at startup
-static bool quiet				= false; // print nothing but the alignments
-static int sanityCheck			= 0;  // enable expensive sanity checks
-static int format				= FASTQ; // default read format is FASTQ
-static string origString		= ""; // reference text, or filename(s)
-static int revcomp				= 1; // search for reverse complements?
-static int seed					= 0; // srandom() seed
-static int timing				= 0; // whether to report basic timing data
-static bool allHits				= false; // for multihits, report just one
-static bool rangeMode			= false; // report BWT ranges instead of ref locs
-static int showVersion			= 0; // just print version and quit?
-static int ipause				= 0; // pause before maching?
-static uint32_t qUpto			= 0xffffffff; // max # of queries to read
-static int skipSearch			= 0; // abort before searching
-static int qSameLen				= 0; // abort before searching
-static int trim5				= 0; // amount to trim from 5' end
-static int trim3				= 0; // amount to trim from 3' end
-static int reportOpps			= 0; // whether to report # of other mappings
-static int offRate				= -1; // keep default offRate
-static int isaRate				= -1; // keep default isaRate
-static int mismatches			= 0; // allow 0 mismatches by default
-static char *patDumpfile		= NULL; // filename to dump patterns to
-static bool solexaQuals			= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
-static bool phred64Quals        = false; // quality chars are phred, but must subtract 64 (not 33)
-static bool integerQuals		= false; // quality strings are space-separated strings of integers, not ASCII
-static int maqLike				= 1; // do maq-like searching
-static int seedLen              = 28; // seed length (changed in Maq 0.6.4 from 24)
-static int seedMms              = 2;  // # mismatches allowed in seed (maq's -n)
-static int qualThresh           = 70; // max qual-weighted hamming dist (maq's -e)
-static int maxBtsBetter         = 125; // max # backtracks allowed in half-and-half mode
-static int maxBts               = 800; // max # backtracks allowed in half-and-half mode
-static int nthreads             = 1;     // number of pthreads operating concurrently
-static output_types outType		= OUTPUT_FULL;  // style of output
-static bool randReadsNoSync     = false; // true -> generate reads from per-thread random source
-static int numRandomReads       = 50000000; // # random reads (see Random*PatternSource in pat.h)
-static int lenRandomReads       = 35;    // len of random reads (see Random*PatternSource in pat.h)
-static bool fullIndex           = true;  // load halves one at a time and proceed in phases
-static bool noRefNames          = false; // true -> print reference indexes; not names
-static ofstream *dumpNoHits     = NULL;  // file to dump non-hitting reads to (for performance study)
-static ofstream *dumpHHHits     = NULL;  // file to dump half-and-half hits to (for performance study)
-static string dumpAlFaBase      = "";    // basename of FASTA files to dump aligned reads to
-static string dumpAlFqBase      = "";    // basename of FASTQ files to dump aligned reads to
-static string dumpAlBase        = "";    // basename of same-format files to dump aligned reads to
-static string dumpUnalFaBase    = "";    // basename of FASTA files to dump unaligned reads to
-static string dumpUnalFqBase    = "";    // basename of FASTQ files to dump unaligned reads to
-static string dumpUnalBase      = "";    // basename of same-format files to dump unaligned reads to
-static string dumpMaxFaBase     = "";    // basename of FASTA files to dump reads with more than -m valid alignments to
-static string dumpMaxFqBase     = "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
-static string dumpMaxBase       = "";    // basename of same-format files to dump reads with more than -m valid alignments to
-static uint32_t khits           = 1;     // number of hits per read; >1 is much slower
-static uint32_t mhits           = 0xffffffff; // don't report any hits if there are > mhits
-static bool better				= false; // true -> guarantee alignments from best possible stratum
-static bool oldBest             = false; // true -> guarantee alignments from best possible stratum (the old way)
-static bool strata			    = false; // true -> don't stop at stratum boundaries
-static bool refOut				= false; // if true, alignments go to per-ref files
-static bool seedAndExtend		= false; // use seed-and-extend aligner; for metagenomics recruitment
-static int partitionSz          = 0;     // output a partitioning key in first field
-static bool noMaqRound          = false; // true -> don't round quals to nearest 10 like maq
-static bool forgiveInput        = false; // let read input be a little wrong w/o complaining or dying
-static bool useSpinlock         = true;  // false -> don't use of spinlocks even if they're #defines
-static bool fileParallel        = false; // separate threads read separate input files in parallel
-static bool useShmem            = false; // use shared memory to hold the index
-static bool useMm               = false; // use memory-mapped files to hold the index
-static bool mmSweep             = false; // sweep through memory-mapped files immediately after mapping
-static bool stateful            = false; // use stateful aligners
-static uint32_t prefetchWidth   = 1;     // number of reads to process in parallel w/ --stateful
-static uint32_t minInsert       = 0;     // minimum insert size (Maq = 0, SOAP = 400)
-static uint32_t maxInsert       = 250;   // maximum insert size (Maq = 250, SOAP = 600)
-static bool mate1fw             = true;  // -1 mate aligns in fw orientation on fw strand
-static bool mate2fw             = false; // -2 mate aligns in rc orientation on fw strand
-static uint32_t mixedThresh     = 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
-static uint32_t mixedAttemptLim = 100;   // number of attempts to make in "mixed mode" before giving up on orientation
-static bool dontReconcileMates  = true;  // suppress pairwise all-versus-all way of resolving mates
-static uint32_t cacheLimit      = 5;     // ranges w/ size > limit will be cached
-static uint32_t cacheSize       = 0;     // # words per range cache
-static int offBase              = 0;     // offsets are 0-based by default, but configurable
-static bool tryHard             = false; // set very high maxBts, mixedAttemptLim
-static uint32_t skipReads       = 0;     // # reads/read pairs to skip
-static bool nofw                = false; // don't align fw orientation of read
-static bool norc                = false; // don't align rc orientation of read
-static bool strandFix           = true;  // attempt to fix strand bias
-static bool randomizeQuals      = false; // randomize quality values
-static bool stats               = false; // print performance stats
-static int chunkPoolMegabytes   = 32;    // max MB to dedicate to best-first search frames per thread
-static int chunkSz              = 16;    // size of single chunk disbursed by ChunkPool
-static bool chunkVerbose        = false; // have chunk allocator output status messages?
-static bool recal               = false;
-static int recalMaxCycle        = 64;
-static int recalMaxQual         = 40;
-static int recalQualShift       = 2;
-static bool useV1               = true;
-static bool reportSe            = false;
-static const char * refMapFile  = NULL;  // file containing a map from index coordinates to another coordinate system
-static const char * annotMapFile= NULL;  // file containing a map from reference coordinates to annotations
-static size_t fastaContLen      = 0;
-static size_t fastaContFreq     = 0;
-static bool hadoopOut           = false; // print Hadoop status and summary messages
+static string adjustedEbwtFileBase;
+static bool verbose;      // be talkative
+static bool startVerbose; // be talkative at startup
+static bool quiet;        // print nothing but the alignments
+static int sanityCheck;   // enable expensive sanity checks
+static int format;        // default read format is FASTQ
+static string origString; // reference text, or filename(s)
+static int revcomp;       // search for reverse complements?
+static int seed;          // srandom() seed
+static int timing;        // whether to report basic timing data
+static bool allHits;      // for multihits, report just one
+static bool rangeMode;    // report BWT ranges instead of ref locs
+static int showVersion;   // just print version and quit?
+static int ipause;        // pause before maching?
+static uint32_t qUpto;    // max # of queries to read
+static int trim5;         // amount to trim from 5' end
+static int trim3;         // amount to trim from 3' end
+static int reportOpps;    // whether to report # of other mappings
+static int offRate;       // keep default offRate
+static int isaRate;       // keep default isaRate
+static int mismatches;    // allow 0 mismatches by default
+static char *patDumpfile; // filename to dump patterns to
+static bool solexaQuals;  // quality strings are solexa quals, not phred, and subtract 64 (not 33)
+static bool phred64Quals; // quality chars are phred, but must subtract 64 (not 33)
+static bool integerQuals; // quality strings are space-separated strings of integers, not ASCII
+static int maqLike;       // do maq-like searching
+static int seedLen;       // seed length (changed in Maq 0.6.4 from 24)
+static int seedMms;       // # mismatches allowed in seed (maq's -n)
+static int qualThresh;    // max qual-weighted hamming dist (maq's -e)
+static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
+static int maxBts;        // max # backtracks allowed in half-and-half mode
+static int nthreads;      // number of pthreads operating concurrently
+static output_types outType;  // style of output
+static bool randReadsNoSync;  // true -> generate reads from per-thread random source
+static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
+static int lenRandomReads;    // len of random reads (see Random*PatternSource in pat.h)
+static bool fullIndex;        // load halves one at a time and proceed in phases
+static bool noRefNames;       // true -> print reference indexes; not names
+static string dumpAlFaBase;   // basename of FASTA files to dump aligned reads to
+static string dumpAlFqBase;   // basename of FASTQ files to dump aligned reads to
+static string dumpAlBase;     // basename of same-format files to dump aligned reads to
+static string dumpUnalFaBase; // basename of FASTA files to dump unaligned reads to
+static string dumpUnalFqBase; // basename of FASTQ files to dump unaligned reads to
+static string dumpUnalBase;   // basename of same-format files to dump unaligned reads to
+static string dumpMaxFaBase;  // basename of FASTA files to dump reads with more than -m valid alignments to
+static string dumpMaxFqBase;  // basename of FASTQ files to dump reads with more than -m valid alignments to
+static string dumpMaxBase;    // basename of same-format files to dump reads with more than -m valid alignments to
+static uint32_t khits;  // number of hits per read; >1 is much slower
+static uint32_t mhits;  // don't report any hits if there are > mhits
+static bool better;     // true -> guarantee alignments from best possible stratum
+static bool oldBest;    // true -> guarantee alignments from best possible stratum (the old way)
+static bool strata;     // true -> don't stop at stratum boundaries
+static bool refOut;     // if true, alignments go to per-ref files
+static int partitionSz; // output a partitioning key in first field
+static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
+static bool forgiveInput; // let read input be a little wrong w/o complaining or dying
+static bool useSpinlock;  // false -> don't use of spinlocks even if they're #defines
+static bool fileParallel; // separate threads read separate input files in parallel
+static bool useShmem;     // use shared memory to hold the index
+static bool useMm;        // use memory-mapped files to hold the index
+static bool mmSweep;      // sweep through memory-mapped files immediately after mapping
+static bool stateful;     // use stateful aligners
+static uint32_t prefetchWidth; // number of reads to process in parallel w/ --stateful
+static uint32_t minInsert;     // minimum insert size (Maq = 0, SOAP = 400)
+static uint32_t maxInsert;     // maximum insert size (Maq = 250, SOAP = 600)
+static bool mate1fw;           // -1 mate aligns in fw orientation on fw strand
+static bool mate2fw;           // -2 mate aligns in rc orientation on fw strand
+static uint32_t mixedThresh;   // threshold for when to switch to paired-end mixed mode (see aligner.h)
+static uint32_t mixedAttemptLim; // number of attempts to make in "mixed mode" before giving up on orientation
+static bool dontReconcileMates;  // suppress pairwise all-versus-all way of resolving mates
+static uint32_t cacheLimit;      // ranges w/ size > limit will be cached
+static uint32_t cacheSize;       // # words per range cache
+static int offBase;              // offsets are 0-based by default, but configurable
+static bool tryHard;             // set very high maxBts, mixedAttemptLim
+static uint32_t skipReads;       // # reads/read pairs to skip
+static bool nofw; // don't align fw orientation of read
+static bool norc; // don't align rc orientation of read
+static bool strandFix;  // attempt to fix strand bias
+static bool randomizeQuals; // randomize quality values
+static bool stats; // print performance stats
+static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
+static int chunkSz;    // size of single chunk disbursed by ChunkPool
+static bool chunkVerbose; // have chunk allocator output status messages?
+static bool recal;
+static int recalMaxCycle;
+static int recalMaxQual;
+static int recalQualShift;
+static bool useV1;
+static bool reportSe;
+static const char * refMapFile;  // file containing a map from index coordinates to another coordinate system
+static const char * annotMapFile;  // file containing a map from reference coordinates to annotations
+static size_t fastaContLen;
+static size_t fastaContFreq;
+static bool hadoopOut; // print Hadoop status and summary messages
+
+static void resetOptions() {
+	mates1.clear();
+	mates2.clear();
+	mates12.clear();
+	adjustedEbwtFileBase	= "";
+	verbose					= 0;
+	startVerbose			= 0;
+	quiet					= false;
+	sanityCheck				= 0;  // enable expensive sanity checks
+	format					= FASTQ; // default read format is FASTQ
+	origString				= ""; // reference text, or filename(s)
+	revcomp					= 1; // search for reverse complements?
+	seed					= 0; // srandom() seed
+	timing					= 0; // whether to report basic timing data
+	allHits					= false; // for multihits, report just one
+	rangeMode				= false; // report BWT ranges instead of ref locs
+	showVersion				= 0; // just print version and quit?
+	ipause					= 0; // pause before maching?
+	qUpto					= 0xffffffff; // max # of queries to read
+	trim5					= 0; // amount to trim from 5' end
+	trim3					= 0; // amount to trim from 3' end
+	reportOpps				= 0; // whether to report # of other mappings
+	offRate					= -1; // keep default offRate
+	isaRate					= -1; // keep default isaRate
+	mismatches				= 0; // allow 0 mismatches by default
+	patDumpfile				= NULL; // filename to dump patterns to
+	solexaQuals				= false; // quality strings are solexa quals, not phred, and subtract 64 (not 33)
+	phred64Quals			= false; // quality chars are phred, but must subtract 64 (not 33)
+	integerQuals			= false; // quality strings are space-separated strings of integers, not ASCII
+	maqLike					= 1;   // do maq-like searching
+	seedLen					= 28;  // seed length (changed in Maq 0.6.4 from 24)
+	seedMms					= 2;   // # mismatches allowed in seed (maq's -n)
+	qualThresh				= 70;  // max qual-weighted hamming dist (maq's -e)
+	maxBtsBetter			= 125; // max # backtracks allowed in half-and-half mode
+	maxBts					= 800; // max # backtracks allowed in half-and-half mode
+	nthreads				= 1;     // number of pthreads operating concurrently
+	outType					= OUTPUT_FULL;  // style of output
+	randReadsNoSync			= false; // true -> generate reads from per-thread random source
+	numRandomReads			= 50000000; // # random reads (see Random*PatternSource in pat.h)
+	lenRandomReads			= 35;    // len of random reads (see Random*PatternSource in pat.h)
+	fullIndex				= true;  // load halves one at a time and proceed in phases
+	noRefNames				= false; // true -> print reference indexes; not names
+	dumpAlFaBase			= "";    // basename of FASTA files to dump aligned reads to
+	dumpAlFqBase			= "";    // basename of FASTQ files to dump aligned reads to
+	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
+	dumpUnalFaBase			= "";    // basename of FASTA files to dump unaligned reads to
+	dumpUnalFqBase			= "";    // basename of FASTQ files to dump unaligned reads to
+	dumpUnalBase			= "";    // basename of same-format files to dump unaligned reads to
+	dumpMaxFaBase			= "";    // basename of FASTA files to dump reads with more than -m valid alignments to
+	dumpMaxFqBase			= "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
+	dumpMaxBase				= "";    // basename of same-format files to dump reads with more than -m valid alignments to
+	khits					= 1;     // number of hits per read; >1 is much slower
+	mhits					= 0xffffffff; // don't report any hits if there are > mhits
+	better					= false; // true -> guarantee alignments from best possible stratum
+	oldBest					= false; // true -> guarantee alignments from best possible stratum (the old way)
+	strata					= false; // true -> don't stop at stratum boundaries
+	refOut					= false; // if true, alignments go to per-ref files
+	partitionSz				= 0;     // output a partitioning key in first field
+	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
+	forgiveInput			= false; // let read input be a little wrong w/o complaining or dying
+	useSpinlock				= true;  // false -> don't use of spinlocks even if they're #defines
+	fileParallel			= false; // separate threads read separate input files in parallel
+	useShmem				= false; // use shared memory to hold the index
+	useMm					= false; // use memory-mapped files to hold the index
+	mmSweep					= false; // sweep through memory-mapped files immediately after mapping
+	stateful				= false; // use stateful aligners
+	prefetchWidth			= 1;     // number of reads to process in parallel w/ --stateful
+	minInsert				= 0;     // minimum insert size (Maq = 0, SOAP = 400)
+	maxInsert				= 250;   // maximum insert size (Maq = 250, SOAP = 600)
+	mate1fw					= true;  // -1 mate aligns in fw orientation on fw strand
+	mate2fw					= false; // -2 mate aligns in rc orientation on fw strand
+	mixedThresh				= 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
+	mixedAttemptLim			= 100;   // number of attempts to make in "mixed mode" before giving up on orientation
+	dontReconcileMates		= true;  // suppress pairwise all-versus-all way of resolving mates
+	cacheLimit				= 5;     // ranges w/ size > limit will be cached
+	cacheSize				= 0;     // # words per range cache
+	offBase					= 0;     // offsets are 0-based by default, but configurable
+	tryHard					= false; // set very high maxBts, mixedAttemptLim
+	skipReads				= 0;     // # reads/read pairs to skip
+	nofw					= false; // don't align fw orientation of read
+	norc					= false; // don't align rc orientation of read
+	strandFix				= true;  // attempt to fix strand bias
+	randomizeQuals			= false; // randomize quality values
+	stats					= false; // print performance stats
+	chunkPoolMegabytes		= 32;    // max MB to dedicate to best-first search frames per thread
+	chunkSz					= 16;    // size of single chunk disbursed by ChunkPool
+	chunkVerbose			= false; // have chunk allocator output status messages?
+	recal					= false;
+	recalMaxCycle			= 64;
+	recalMaxQual			= 40;
+	recalQualShift			= 2;
+	useV1					= true;
+	reportSe				= false;
+	refMapFile				= NULL;  // file containing a map from index coordinates to another coordinate system
+	annotMapFile			= NULL;  // file containing a map from reference coordinates to annotations
+	fastaContLen			= 0;
+	fastaContFreq			= 0;
+	hadoopOut				= false; // print Hadoop status and summary messages
+}
 
 // mating constraints
 
@@ -249,8 +345,6 @@ static struct option long_options[] = {
 	{(char*)"maxfq",        required_argument, 0,            ARG_MAXFQ},
 	{(char*)"offrate",      required_argument, 0,            'o'},
 	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
-	{(char*)"skipsearch",   no_argument,       &skipSearch,  1},
-	{(char*)"qsamelen",     no_argument,       &qSameLen,    1},
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
 	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
@@ -1350,13 +1444,13 @@ static int parseInt(int lower, const char *errmsg) {
 		if (l < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			exit(1);
+			throw std::runtime_error("");
 		}
 		return (int32_t)l;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	exit(1);
+	throw std::runtime_error("");
 	return -1;
 }
 
@@ -1432,7 +1526,6 @@ static void parseOptions(int argc, char **argv) {
 	   		case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
 	   		case 'b': outType = OUTPUT_BINARY; break;
 	   		case ARG_REFOUT: refOut = true; break;
-	   		case ARG_SEED_EXTEND: seedAndExtend = true; break;
 	   		case ARG_NOOUT: outType = OUTPUT_NONE; break;
 	   		case ARG_REFMAP: refMapFile = optarg; break;
 	   		case ARG_ANNOTMAP: annotMapFile = optarg; break;
@@ -1447,13 +1540,11 @@ static void parseOptions(int argc, char **argv) {
 	   			     << "BOWTIE_MM defined.  Memory-mapped I/O is not supported under Windows.  If you" << endl
 	   			     << "would like to use memory-mapped I/O on a platform that supports it, please" << endl
 	   			     << "refrain from specifying BOWTIE_MM=0 when compiling Bowtie." << endl;
-	   			exit(1);
+	   			throw std::runtime_error("");
 #endif
 	   		}
 	   		case ARG_MMSWEEP: mmSweep = true; break;
 	   		case ARG_HADOOPOUT: hadoopOut = true; break;
-	   		case ARG_DUMP_NOHIT: dumpNoHits = new ofstream(".nohits.dump"); break;
-	   		case ARG_DUMP_HHHIT: dumpHHHits = new ofstream(".hhhits.dump"); break;
 	   		case ARG_AL: dumpAlBase = optarg; break;
 	   		case ARG_ALFA: dumpAlFaBase = optarg; break;
 	   		case ARG_ALFQ: dumpAlFqBase = optarg; break;
@@ -1510,14 +1601,14 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
 	   			cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
-	   			exit(1);
+	   			throw std::runtime_error("");
 #endif
 	   			nthreads = parseInt(1, "-p/--threads arg must be at least 1");
 	   			break;
 	   		case ARG_FILEPAR:
 #ifndef BOWTIE_PTHREADS
 	   			cerr << "--filepar is disabled because bowtie was not compiled with pthreads support" << endl;
-	   			exit(1);
+	   			throw std::runtime_error("");
 #endif
 	   			fileParallel = true;
 	   			break;
@@ -1526,7 +1617,7 @@ static void parseOptions(int argc, char **argv) {
 	   			mismatches = parseInt(0, "-v arg must be at least 0");
 	   			if(mismatches > 3) {
 	   				cerr << "-v arg must be at most 3" << endl;
-	   				exit(1);
+	   				throw std::runtime_error("");
 	   			}
 	   			break;
 	   		case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
@@ -1537,7 +1628,7 @@ static void parseOptions(int argc, char **argv) {
 	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
 	   		case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
 	   		case 'h': printLongUsage(cout); exit(0); break;
-	   		case '?': printUsage(cerr); exit(1); break;
+	   		case '?': printUsage(cerr); throw std::runtime_error(""); break;
 	   		case 'a': allHits = true; break;
 	   		case 'y': tryHard = true; break;
 	   		case ARG_RECAL: recal = true; break;
@@ -1570,7 +1661,7 @@ static void parseOptions(int argc, char **argv) {
    				if(optarg == NULL || strlen(optarg) == 0) {
    					cerr << "--orig arg must be followed by a string" << endl;
    					printUsage(cerr);
-   					exit(1);
+   					throw std::runtime_error("");
    				}
    				origString = optarg;
 	   			break;
@@ -1582,7 +1673,7 @@ static void parseOptions(int argc, char **argv) {
 			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				exit(1);
+				throw std::runtime_error("");
 		}
 	} while(next_option != -1);
 	bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
@@ -1603,13 +1694,13 @@ static void parseOptions(int argc, char **argv) {
 		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << mates2.size() << endl
 		     << "mate files/sequences were specified with -2.  The same number of mate files/" << endl
 		     << "sequences must be specified with -1 and -2." << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	// Check for duplicate mate input files
 	if(format != CMDLINE) {
 		for(size_t i = 0; i < mates1.size(); i++) {
 			for(size_t j = 0; j < mates2.size(); j++) {
-				if(mates1[i] == mates2[j]) {
+				if(mates1[i] == mates2[j] && !quiet) {
 					cerr << "Warning: Same mate file \"" << mates1[i] << "\" appears as argument to both -1 and -2" << endl;
 				}
 			}
@@ -1655,7 +1746,7 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "When -z/--phased is used, the --al option is unavailable" << endl;
 			error = true;
 		}
-		if(error) exit(1);
+		if(error) throw std::runtime_error("");
 	}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
@@ -1665,11 +1756,11 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(fullIndex && strata && !stateful && !oldBest) {
 		cerr << "--strata must be combined with --best" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
 		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
 	// since it uses patid to know if we've reached the -u limit (and
@@ -1677,7 +1768,7 @@ static void parseOptions(int argc, char **argv) {
 	if(qUpto + skipReads > qUpto) {
 		qUpto += skipReads;
 	}
-	if(useShmem && useMm) {
+	if(useShmem && useMm && !quiet) {
 		cerr << "Warning: --shmem overrides --mm..." << endl;
 		useMm = false;
 	}
@@ -1691,7 +1782,7 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "Error: --chainin cannot be combined with paired-end alignment; aborting..." << endl;
 			error = true;
 		}
-		if(error) exit(1);
+		if(error) throw std::runtime_error("");
 	}
 
 	if(outType == OUTPUT_CHAIN) {
@@ -1708,12 +1799,12 @@ static void parseOptions(int argc, char **argv) {
 			cerr << "Error: --chainout cannot be combined with paired-end alignment; aborting..." << endl;
 			error = true;
 		}
-		if(error) exit(1);
+		if(error) throw std::runtime_error("");
 	}
 
 	if(mate1fw && trim5 > 0) {
 		if(verbose) {
-			cout << "Adjusting -I/-X down by " << trim5
+			cerr << "Adjusting -I/-X down by " << trim5
 				 << " because mate1 is FW & trim5 is " << trim5 << endl;
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim5);
@@ -1721,7 +1812,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(mate2fw && trim3 > 0) {
 		if(verbose) {
-			cout << "Adjusting -I/-X down by " << trim3
+			cerr << "Adjusting -I/-X down by " << trim3
 				 << " because mate2 is FW & trim3 is " << trim3 << endl;
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim3);
@@ -1729,7 +1820,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(!mate1fw && trim3 > 0) {
 		if(verbose) {
-			cout << "Adjusting -I/-X down by " << trim3
+			cerr << "Adjusting -I/-X down by " << trim3
 				 << " because mate1 is RC & trim3 is " << trim3 << endl;
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim3);
@@ -1737,7 +1828,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(!mate2fw && trim5 > 0) {
 		if(verbose) {
-			cout << "Adjusting -I/-X down by " << trim5
+			cerr << "Adjusting -I/-X down by " << trim5
 				 << " because mate2 is RC & trim5 is " << trim5 << endl;
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim5);
@@ -2022,6 +2113,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
@@ -2050,6 +2142,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			!better,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	{
 		MixedMultiAligner multi(
@@ -2112,7 +2205,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) exit(1);
+		if(!refs->loaded()) throw std::runtime_error("");
 	}
 	exactSearch_refs   = refs;
 
@@ -2144,7 +2237,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2334,7 +2427,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2369,7 +2462,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2415,6 +2508,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	Paired1mmAlignerV1Factory alPEfact(
 			ebwtFw,
@@ -2443,6 +2537,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	{
 		MixedMultiAligner multi(
@@ -2549,7 +2644,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) exit(1);
+		if(!refs->loaded()) throw std::runtime_error("");
 	}
 	mismatchSearch_refs = refs;
 
@@ -2582,7 +2677,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2920,7 +3015,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2941,7 +3036,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -2961,7 +3056,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3010,6 +3105,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
@@ -3039,6 +3135,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	{
 		MixedMultiAligner multi(
@@ -3167,7 +3264,7 @@ static void twoOrThreeMismatchSearchFull(
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) exit(1);
+		if(!refs->loaded()) throw std::runtime_error("");
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
@@ -3206,7 +3303,7 @@ static void twoOrThreeMismatchSearchFull(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3689,6 +3786,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed,
 			metrics);
 	PairedSeedAlignerFactory alPEfact(
@@ -3723,6 +3821,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			strandFix,
 			rangeMode,
 			verbose,
+			quiet,
 			seed);
 	{
 		MixedMultiAligner multi(
@@ -3834,7 +3933,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3847,7 +3946,7 @@ static void seededQualCutoffSearch(
 	} catch(bad_alloc& ba) {
 		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
 		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	seededQualSearch_pamRc = pamRc;
 	{
@@ -3870,7 +3969,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3889,7 +3988,7 @@ static void seededQualCutoffSearch(
 	} catch(bad_alloc& ba) {
 		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
 		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	seededQualSearch_pamFw = pamFw;
 	{
@@ -3908,7 +4007,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3936,7 +4035,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -3999,7 +4098,7 @@ static void seededQualCutoffSearchFull(
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) exit(1);
+		if(!refs->loaded()) throw std::runtime_error("");
 	}
 	seededQualSearch_refs = refs;
 
@@ -4041,7 +4140,7 @@ static void seededQualCutoffSearchFull(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 #endif
@@ -4109,7 +4208,7 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               seed);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 	}
 }
@@ -4171,7 +4270,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates12.size(); i++) {
 		if(mates12[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		const vector<string>* qs = &mates12;
 		vector<string> tmp;
@@ -4191,7 +4290,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates1.size(); i++) {
 		if(mates1[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		const vector<string>* qs = &mates1;
 		vector<string> tmp;
@@ -4211,7 +4310,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates2.size(); i++) {
 		if(mates2[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		const vector<string>* qs = &mates2;
 		vector<string> tmp;
@@ -4236,7 +4335,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < queries.size(); i++) {
 		if(queries[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		const vector<string>* qs = &queries;
 		PatternSource* patsrc = NULL;
@@ -4266,8 +4365,6 @@ static void driver(const char * type,
 		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b);
 	}
 
-	if(skipSearch) return;
-
 	// Open hit output file
 	if(verbose || startVerbose) {
 		cerr << "Opening hit output file: "; logTime(cerr, true);
@@ -4276,18 +4373,20 @@ static void driver(const char * type,
 	if(!outfile.empty()) {
 		if(refOut) {
 			fout = NULL;
-			cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
+			if(!quiet) {
+				cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
+			}
 		} else {
 			fout = new OutFileBuf(outfile.c_str(), outType == OUTPUT_BINARY);
 		}
 	} else {
 		if(outType == OUTPUT_BINARY && !refOut) {
 			cerr << "Error: Must specify an output file when output mode is binary" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		else if(outType == OUTPUT_CHAIN) {
 			cerr << "Error: Must specify an output file when output mode is --chain" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		fout = new OutFileBuf();
 	}
@@ -4432,7 +4531,7 @@ static void driver(const char * type,
 				break;
 			default:
 				cerr << "Invalid output type: " << outType << endl;
-				exit(1);
+				throw std::runtime_error("");
 		}
     	if(verbose || startVerbose) {
     		cerr << "Dispatching to search driver: "; logTime(cerr, true);
@@ -4474,7 +4573,7 @@ static void driver(const char * type,
 				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		} else {
 			// Search without mismatches
@@ -4492,8 +4591,6 @@ static void driver(const char * type,
 		if(!quiet) {
 			sink->finish(hadoopOut); // end the hits section of the hit file
 		}
-		if(dumpHHHits != NULL) dumpHHHits->close();
-		if(dumpNoHits != NULL) dumpNoHits->close();
 		for(size_t i = 0; i < patsrcs_a.size(); i++) {
 			assert(patsrcs_a[i] != NULL);
 			delete patsrcs_a[i];
@@ -4515,116 +4612,121 @@ static void driver(const char * type,
  * main function.  Parses command-line arguments.
  */
 int main(int argc, char **argv) {
-	string ebwtFile;  // read serialized Ebwt from this file
-	string query;   // read query string(s) from this file
-	vector<string> queries;
-	string outfile; // write query results to this file
-	if(startVerbose) { cerr << "Entered main(): "; logTime(cerr, true); }
-	parseOptions(argc, argv);
-	argv0 = argv[0];
-	if(showVersion) {
-		cout << argv0 << " version " << BOWTIE_VERSION << endl;
-		if(sizeof(void*) == 4) {
-			cout << "32-bit" << endl;
-		} else if(sizeof(void*) == 8) {
-			cout << "64-bit" << endl;
-		} else {
-			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
-		}
-		cout << "Built on " << BUILD_HOST << endl;
-		cout << BUILD_TIME << endl;
-		cout << "Compiler: " << COMPILER_VERSION << endl;
-		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
-		     << sizeof(int)
-		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
-		     << ", " << sizeof(off_t) << "}" << endl;
-		return 0;
-	}
-#ifdef CHUD_PROFILING
-	chudInitialize();
-	chudAcquireRemoteAccess();
-#endif
-	{
-		Timer _t(cerr, "Overall time: ", timing);
-		if(startVerbose) {
-			cerr << "Parsing index and read arguments: "; logTime(cerr, true);
-		}
-
-		// Get index basename
-		if(optind >= argc) {
-			cerr << "No index, query, or output file specified!" << endl;
-			printUsage(cerr);
-			return 1;
-		}
-		ebwtFile = argv[optind++];
-
-		// Get query filename
-		if(optind >= argc) {
-			if(mates1.size() > 0 || mates12.size() > 0) {
-				query = "";
+	try {
+		resetOptions();
+		string ebwtFile;  // read serialized Ebwt from this file
+		string query;   // read query string(s) from this file
+		vector<string> queries;
+		string outfile; // write query results to this file
+		if(startVerbose) { cerr << "Entered main(): "; logTime(cerr, true); }
+		parseOptions(argc, argv);
+		argv0 = argv[0];
+		if(showVersion) {
+			cout << argv0 << " version " << BOWTIE_VERSION << endl;
+			if(sizeof(void*) == 4) {
+				cout << "32-bit" << endl;
+			} else if(sizeof(void*) == 8) {
+				cout << "64-bit" << endl;
 			} else {
-				cerr << "No query or output file specified!" << endl;
+				cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+			}
+			cout << "Built on " << BUILD_HOST << endl;
+			cout << BUILD_TIME << endl;
+			cout << "Compiler: " << COMPILER_VERSION << endl;
+			cout << "Options: " << COMPILER_OPTIONS << endl;
+			cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+				 << sizeof(int)
+				 << ", " << sizeof(long) << ", " << sizeof(long long)
+				 << ", " << sizeof(void *) << ", " << sizeof(size_t)
+				 << ", " << sizeof(off_t) << "}" << endl;
+			return 0;
+		}
+	#ifdef CHUD_PROFILING
+		chudInitialize();
+		chudAcquireRemoteAccess();
+	#endif
+		{
+			Timer _t(cerr, "Overall time: ", timing);
+			if(startVerbose) {
+				cerr << "Parsing index and read arguments: "; logTime(cerr, true);
+			}
+
+			// Get index basename
+			if(optind >= argc) {
+				cerr << "No index, query, or output file specified!" << endl;
 				printUsage(cerr);
 				return 1;
 			}
-		} else if (mates1.size() == 0 && mates12.size() == 0) {
-			query = argv[optind++];
-			// Tokenize the list of query files
-			tokenize(query, ",", queries);
-			if(queries.size() < 1) {
-				cerr << "Tokenized query file list was empty!" << endl;
-				printUsage(cerr);
-				return 1;
-			}
-		}
+			ebwtFile = argv[optind++];
 
-		// Get output filename
-		if(optind < argc) {
-			outfile = argv[optind++];
-		}
+			// Get query filename
+			if(optind >= argc) {
+				if(mates1.size() > 0 || mates12.size() > 0) {
+					query = "";
+				} else {
+					cerr << "No query or output file specified!" << endl;
+					printUsage(cerr);
+					return 1;
+				}
+			} else if (mates1.size() == 0 && mates12.size() == 0) {
+				query = argv[optind++];
+				// Tokenize the list of query files
+				tokenize(query, ",", queries);
+				if(queries.size() < 1) {
+					cerr << "Tokenized query file list was empty!" << endl;
+					printUsage(cerr);
+					return 1;
+				}
+			}
 
-		// Extra parametesr?
-		if(optind < argc) {
-			cerr << "Extra parameter(s) specified: ";
-			for(int i = optind; i < argc; i++) {
-				cerr << "\"" << argv[i] << "\"";
-				if(i < argc-1) cerr << ", ";
+			// Get output filename
+			if(optind < argc) {
+				outfile = argv[optind++];
 			}
-			cerr << endl;
-			if(mates1.size() > 0) {
-				cerr << "Note that if <mates> files are specified using -1/-2, a <singles> file cannot" << endl
-				     << "also be specified.  Please run bowtie separately for mates and singles." << endl;
-			}
-			exit(1);
-		}
 
-		// Optionally summarize
-		if(verbose) {
-			cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
-			cout << "Query inputs (DNA, " << file_format_names[format] << "):" << endl;
-			for(size_t i = 0; i < queries.size(); i++) {
-				cout << "  " << queries[i] << endl;
+			// Extra parametesr?
+			if(optind < argc) {
+				cerr << "Extra parameter(s) specified: ";
+				for(int i = optind; i < argc; i++) {
+					cerr << "\"" << argv[i] << "\"";
+					if(i < argc-1) cerr << ", ";
+				}
+				cerr << endl;
+				if(mates1.size() > 0) {
+					cerr << "Note that if <mates> files are specified using -1/-2, a <singles> file cannot" << endl
+						 << "also be specified.  Please run bowtie separately for mates and singles." << endl;
+				}
+				throw std::runtime_error("");
 			}
-			cout << "Output file: \"" << outfile << "\"" << endl;
-			cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
-			cout << "Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
-		#ifdef NDEBUG
-			cout << "Assertions: disabled" << endl;
-		#else
-			cout << "Assertions: enabled" << endl;
-		#endif
+
+			// Optionally summarize
+			if(verbose) {
+				cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
+				cout << "Query inputs (DNA, " << file_format_names[format] << "):" << endl;
+				for(size_t i = 0; i < queries.size(); i++) {
+					cout << "  " << queries[i] << endl;
+				}
+				cout << "Output file: \"" << outfile << "\"" << endl;
+				cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
+				cout << "Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
+			#ifdef NDEBUG
+				cout << "Assertions: disabled" << endl;
+			#else
+				cout << "Assertions: enabled" << endl;
+			#endif
+			}
+			if(ipause) {
+				cout << "Press key to continue..." << endl;
+				getchar();
+			}
+			driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
+			CHUD_STOP();
 		}
-		if(ipause) {
-			cout << "Press key to continue..." << endl;
-			getchar();
-		}
-		driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
-		CHUD_STOP();
-	}
 #ifdef CHUD_PROFILING
-	chudReleaseRemoteAccess();
+		chudReleaseRemoteAccess();
 #endif
-	return 0;
+		return 0;
+	} catch(exception& e) {
+		return 1;
+	}
 }

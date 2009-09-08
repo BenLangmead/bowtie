@@ -87,15 +87,8 @@
 				gaveUp = true;
 			}
 			if(done) {
-				if(dumpHHHits != NULL) {
-					(*dumpHHHits) << patFw << endl << qualFw << endl << btf24.numBacktracks() << endl;
-				}
 				btf24.resetNumBacktracks();
 				continue;
-			} else {
-				if(dumpNoHits != NULL) {
-					(*dumpNoHits) << patFw << endl << qualFw << endl << btf24.numBacktracks() << endl;
-				}
 			}
 			btf24.resetNumBacktracks();
 		}

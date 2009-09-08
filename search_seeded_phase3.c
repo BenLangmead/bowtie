@@ -85,9 +85,6 @@
 				gaveUp = true;
 			}
 			if(done) {
-				if(dumpHHHits != NULL) {
-					(*dumpHHHits) << patFw << endl << qualFw << endl << btr23.numBacktracks() << endl;
-				}
 				DONEMASK_SET(patid);
 				btr23.resetNumBacktracks();
 				continue;

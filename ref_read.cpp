@@ -179,7 +179,7 @@ size_t fastaRefReadSizes(vector<FileBuf*>& in,
 				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please divide the" << endl
 				     << "reference into batches or chunks of about 3.6 billion characters or less each" << endl
 				     << "and index each independently." << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 			tot += rec.len;
 			first = false;

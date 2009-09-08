@@ -44,6 +44,7 @@ public:
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
+			bool quiet,
 			uint32_t seed,
 			AlignerMetrics *metrics) :
 			ebwtFw_(ebwtFw),
@@ -65,6 +66,7 @@ public:
 			qualOrder_(qualOrder),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
+			quiet_(quiet),
 			metrics_(metrics)
 	{
 		assert(ebwtFw.isInMemory());
@@ -532,7 +534,7 @@ public:
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
 			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			maxBts_, pool_, btCnt, metrics_);
+			quiet_, maxBts_, pool_, btCnt, metrics_);
 	}
 
 private:
@@ -556,6 +558,7 @@ private:
 	bool qualOrder_;
 	bool rangeMode_;
 	bool verbose_;
+	bool quiet_;
 	AlignerMetrics *metrics_;
 };
 
@@ -599,6 +602,7 @@ public:
 			bool strandFix,
 			bool rangeMode,
 			bool verbose,
+			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
@@ -629,7 +633,8 @@ public:
 			qualOrder_(qualOrder),
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
-			verbose_(verbose)
+			verbose_(verbose),
+			quiet_(quiet)
 	{
 		assert(ebwtFw.isInMemory());
 		assert(ebwtBw->isInMemory());
@@ -1318,7 +1323,7 @@ public:
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				mate1fw_, mate2fw_, peInner_, peOuter_, dontReconcile_,
 				symCeil_, mixedThresh_, mixedAttemptLim_, refs_,
-				rangeMode_, verbose_, maxBts_, pool_, btCnt);
+				rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt);
 			delete dr1FwVec;
 			delete dr1RcVec;
 			delete dr2FwVec;
@@ -1331,7 +1336,7 @@ public:
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				sinkPtSe1, sinkPtSe2, mate1fw_, mate2fw_, peInner_, peOuter_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_, maxBts_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_, maxBts_,
 				pool_, btCnt);
 			delete dr1FwVec;
 			return al;
@@ -1370,6 +1375,7 @@ private:
 	const bool strandFix_;
 	const bool rangeMode_;
 	const bool verbose_;
+	const bool quiet_;
 };
 
 #endif /* ALIGNER_SEED_MM_H_ */

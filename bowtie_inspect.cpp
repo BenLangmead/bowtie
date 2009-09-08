@@ -107,13 +107,13 @@ static int parseInt(int lower, const char *errmsg) {
 		if (l < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			exit(1);
+			throw std::runtime_error("");
 		}
 		return (int32_t)l;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	exit(1);
+	throw std::runtime_error("");
 	return -1;
 }
 
@@ -140,7 +140,7 @@ static void parseOptions(int argc, char **argv) {
 			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				exit(1);
+				throw std::runtime_error("");
 		}
 	} while(next_option != -1);
 }
@@ -251,7 +251,7 @@ static void driver(const string& ebwtFileBase, const string& query) {
 	} else {
 		// Initialize Ebwt object
 		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1,
-		                 false, false, false, // no memory-mapped io
+		                 false, false, false, true, // no memory-mapped io
 		                 NULL, // no reference map
 		                 verbose);
 	    // Load whole index into memory
@@ -268,52 +268,56 @@ static void driver(const string& ebwtFileBase, const string& query) {
  * main function.  Parses command-line arguments.
  */
 int main(int argc, char **argv) {
-	string ebwtFile;  // read serialized Ebwt from this file
-	string query;   // read query string(s) from this file
-	vector<string> queries;
-	string outfile; // write query results to this file
-	argv0 = argv[0];
-	parseOptions(argc, argv);
-	if(showVersion) {
-		cout << argv0 << " version " << BOWTIE_VERSION << endl;
-		if(sizeof(void*) == 4) {
-			cout << "32-bit" << endl;
-		} else if(sizeof(void*) == 8) {
-			cout << "64-bit" << endl;
-		} else {
-			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+	try {
+		string ebwtFile;  // read serialized Ebwt from this file
+		string query;   // read query string(s) from this file
+		vector<string> queries;
+		string outfile; // write query results to this file
+		argv0 = argv[0];
+		parseOptions(argc, argv);
+		if(showVersion) {
+			cout << argv0 << " version " << BOWTIE_VERSION << endl;
+			if(sizeof(void*) == 4) {
+				cout << "32-bit" << endl;
+			} else if(sizeof(void*) == 8) {
+				cout << "64-bit" << endl;
+			} else {
+				cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+			}
+			cout << "Built on " << BUILD_HOST << endl;
+			cout << BUILD_TIME << endl;
+			cout << "Compiler: " << COMPILER_VERSION << endl;
+			cout << "Options: " << COMPILER_OPTIONS << endl;
+			cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+				 << sizeof(int)
+				 << ", " << sizeof(long) << ", " << sizeof(long long)
+				 << ", " << sizeof(void *) << ", " << sizeof(size_t)
+				 << ", " << sizeof(off_t) << "}" << endl;
+			return 0;
 		}
-		cout << "Built on " << BUILD_HOST << endl;
-		cout << BUILD_TIME << endl;
-		cout << "Compiler: " << COMPILER_VERSION << endl;
-		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
-		     << sizeof(int)
-		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
-		     << ", " << sizeof(off_t) << "}" << endl;
-		return 0;
-	}
 
-	// Get input filename
-	if(optind >= argc) {
-		cerr << "No index name given!" << endl;
-		printUsage(cerr);
+		// Get input filename
+		if(optind >= argc) {
+			cerr << "No index name given!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+		ebwtFile = argv[optind++];
+
+		// Optionally summarize
+		if(verbose) {
+			cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
+			cout << "Output file: \"" << outfile << "\"" << endl;
+			cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
+#ifdef NDEBUG
+			cout << "Assertions: disabled" << endl;
+#else
+			cout << "Assertions: enabled" << endl;
+#endif
+		}
+		driver(ebwtFile, query);
+		return 0;
+	} catch(std::exception& e) {
 		return 1;
 	}
-	ebwtFile = argv[optind++];
-
-	// Optionally summarize
-	if(verbose) {
-		cout << "Input ebwt file: \"" << ebwtFile << "\"" << endl;
-		cout << "Output file: \"" << outfile << "\"" << endl;
-		cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
-#ifdef NDEBUG
-		cout << "Assertions: disabled" << endl;
-#else
-		cout << "Assertions: enabled" << endl;
-#endif
-	}
-	driver(ebwtFile, query);
-	return 0;
 }

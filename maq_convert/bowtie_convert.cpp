@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <seqan/sequence.h>
+#include <stdexcept>
 #include <algorithm>
 #include "maqmap.h"
 #include "algo.hh"
@@ -195,14 +196,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	if (!bwtf)
 	{
 		fprintf(stderr, "Error: could not open Bowtie mapfile %s for reading\n", bwtmap_fname.c_str());
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	void* maqf = gzopen(maqmap_fname.c_str(), "w");
 	if (!maqf)
 	{
 		fprintf(stderr, "Error: could not open Maq mapfile %s for writing\n", maqmap_fname.c_str());
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	std::map<string, int> seqid_to_name;
@@ -286,7 +287,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (next_max));
 			if(tmp == NULL) {
 				cerr << "Memory exhausted allocating space for alignments." << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 			memcpy(tmp, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * (max));
 			free(mm->mapped_reads);
@@ -419,7 +420,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
 	if(mm->ref_name == NULL) {
 		cerr << "Exhausted memory allocating reference name" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	for (map<string, unsigned int>::const_iterator i = names_to_ids.begin();
@@ -462,7 +463,7 @@ void get_names_from_bfa(const string& bfa_filename,
 	if (!bfaf)
 	{
 		fprintf(stderr, "Error: could not open Binary FASTA file %s for reading\n", bfa_filename.c_str());
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	unsigned int next_id = 0;
@@ -480,75 +481,79 @@ void get_names_from_bfa(const string& bfa_filename,
 
 int main(int argc, char **argv)
 {
-	string bwtmap_filename;
-	string maqmap_filename;
-	string bfa_filename;
-	const char *short_options = "voh?";
-	int next_option;
-	do {
-		next_option = getopt(argc, argv, short_options);
-		switch (next_option) {
-	   		case 'v': /* verbose */
-				verbose = true;
-				break;
-			case 'o':
-				short_map_format = true;
-				break;
-			case 'h':
-			case '?':
-				printLongUsage(cout);
-				exit(0);
-			case -1: /* Done with options. */
-				break;
-			default:
-				printUsage(cerr);
-				exit(1);
+	try {
+		string bwtmap_filename;
+		string maqmap_filename;
+		string bfa_filename;
+		const char *short_options = "voh?";
+		int next_option;
+		do {
+			next_option = getopt(argc, argv, short_options);
+			switch (next_option) {
+				case 'v': /* verbose */
+					verbose = true;
+					break;
+				case 'o':
+					short_map_format = true;
+					break;
+				case 'h':
+				case '?':
+					printLongUsage(cout);
+					exit(0);
+				case -1: /* Done with options. */
+					break;
+				default:
+					printUsage(cerr);
+					throw std::runtime_error("");
+			}
+		} while(next_option != -1);
+
+		if(optind >= argc) {
+			printUsage(cerr);
+			return 1;
 		}
-	} while(next_option != -1);
 
-	if(optind >= argc) {
-		printUsage(cerr);
+		// The Bowtie output text file to be converted
+		bwtmap_filename = argv[optind++];
+
+		if(optind >= argc) {
+			printUsage(cerr);
+			return 1;
+		}
+
+		// The name of the binary Maq map to be written
+		maqmap_filename = argv[optind++];
+
+		// An optional argument:
+		// a two-column text file of [Bowtie ref id, reference name string] pairs
+		if(optind >= argc)
+		{
+			printUsage(cerr);
+			return 1;
+		}
+		bfa_filename = string(argv[optind++]);
+
+		init_log_n();
+
+		map<string, unsigned int> names_to_ids;
+		get_names_from_bfa(bfa_filename, names_to_ids);
+
+		int ret;
+		if (short_map_format)
+		{
+			ret = convert_bwt_to_maq<64>(bwtmap_filename,
+										 maqmap_filename,
+										 names_to_ids);
+		}
+		else
+		{
+			ret = convert_bwt_to_maq<128>(bwtmap_filename,
+										 maqmap_filename,
+										 names_to_ids);
+		}
+
+		return ret;
+	} catch(std::exception& e) {
 		return 1;
 	}
-
-	// The Bowtie output text file to be converted
-	bwtmap_filename = argv[optind++];
-
-	if(optind >= argc) {
-		printUsage(cerr);
-		return 1;
-	}
-
-	// The name of the binary Maq map to be written
-	maqmap_filename = argv[optind++];
-
-	// An optional argument:
-	// a two-column text file of [Bowtie ref id, reference name string] pairs
-	if(optind >= argc)
-	{
-		printUsage(cerr);
-		return 1;
-	}
-	bfa_filename = string(argv[optind++]);
-
-	init_log_n();
-
-	map<string, unsigned int> names_to_ids;
-	get_names_from_bfa(bfa_filename, names_to_ids);
-
-	int ret;
-	if (short_map_format)
-	{
-		ret = convert_bwt_to_maq<64>(bwtmap_filename,
-									 maqmap_filename,
-									 names_to_ids);
-	}
-	else
-	{
-		ret = convert_bwt_to_maq<128>(bwtmap_filename,
-									 maqmap_filename,
-									 names_to_ids);
-	}
-
-	return ret;
 }

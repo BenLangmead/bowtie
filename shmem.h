@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <stdexcept>
 #include "str_util.h"
 
 extern void notifySharedMem(void *mem, size_t len);
@@ -69,7 +70,7 @@ bool allocSharedMem(std::string fname,
 					cerr << "shmctl returned " << ret
 						 << " for IPC_RMID, errno is " << errno
 						 << ", shmid is " << shmid << endl;
-					exit(1);
+					throw std::runtime_error("");
 				} else {
 					cerr << "Deleted shared mem chunk with shmid " << shmid << endl;
 				}
@@ -81,22 +82,22 @@ bool allocSharedMem(std::string fname,
 			} else {
 				cerr << "shmget returned " << shmid << " for and errno is " << errno << endl;
 			}
-			exit(1);
+			throw std::runtime_error("");
 		}
 		ptr = (T*)shmat(shmid, 0, 0);
 		if(ptr == (void*)-1) {
 			cerr << "Failed to attach " << memName << " to shared memory with shmat()." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(ptr == NULL) {
 			cerr << memName << " pointer returned by shmat() was NULL." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		// Did I create it, or did I just attach to one created by
 		// another process?
 		if((ret = shmctl(shmid, IPC_STAT, &ds)) < 0) {
 			cerr << "shmctl returned " << ret << " for IPC_STAT and errno is " << errno << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(ds.shm_segsz != shmemLen) {
 			cerr << "Warning: shared-memory chunk's segment size (" << ds.shm_segsz
@@ -104,7 +105,7 @@ bool allocSharedMem(std::string fname,
 				 << "Deleteing old shared memory block and trying again." << endl;
 			if((ret = shmctl(shmid, IPC_RMID, &ds)) < 0) {
 				cerr << "shmctl returned " << ret << " for IPC_RMID and errno is " << errno << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		} else {
 			break;

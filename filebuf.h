@@ -1,3 +1,8 @@
+/*
+ * filebuf.h
+ *
+ *      Author: Ben Langmead
+ */
 #ifndef FILEBUF_H_
 #define FILEBUF_H_
 
@@ -6,6 +11,7 @@
 #include <string>
 #include <stdio.h>
 #include <stdint.h>
+#include <stdexcept>
 
 /**
  * Simple wrapper for a FILE*, istream or ifstream that reads it in
@@ -270,7 +276,7 @@ public:
 		out_ = fopen(in, "wb");
 		if(out_ == NULL) {
 			std::cerr << "Error: Could not open bitpair-output file " << in << std::endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 	}
 
@@ -289,7 +295,7 @@ public:
 				// Flush the buffer
 				if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
 					std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
-					exit(1);
+					throw std::runtime_error("");
 				}
 				// Reset to beginning of the buffer
 				cur_ = 0;
@@ -309,7 +315,7 @@ public:
 			if(bpPtr_ == 0) cur_--;
 			if(!fwrite((const void *)buf_, cur_ + 1, 1, out_)) {
 				std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 		fclose(out_);
@@ -341,7 +347,7 @@ public:
 		out_ = fopen(out, binary ? "wb" : "w");
 		if(out_ == NULL) {
 			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 	}
 
@@ -400,7 +406,7 @@ public:
 	void flush() {
 		if(!fwrite((const void *)buf_, cur_, 1, out_)) {
 			std::cerr << "Error while flushing and closing output" << std::endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		cur_ = 0;
 	}

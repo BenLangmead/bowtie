@@ -13,29 +13,24 @@
 		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
 	}
 
-	if(plen < 2 && seedMms >= 1) {
-		cerr << "Error: Read (" << name << ") is less than 2 characters long" << endl;
-		exit(1);
-	}
-	else if(plen < 3 && seedMms >= 2) {
-		cerr << "Error: Read (" << name << ") is less than 3 characters long" << endl;
-		exit(1);
-	}
-	else if(plen < 4 && seedMms >= 3) {
-		cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
-		exit(1);
-	}
-	// Check and see if the distribution of Ns disqualifies
-	// this read right off the bat
-	size_t slen = min<size_t>(plen, seedLen);
-	int ns = 0;
 	bool done = false;
-	for(size_t i = 0; i < slen; i++) {
-		if((int)(Dna5)patFw[i] == 4) {
-			if(++ns > seedMms) {
-				// Set 'done' so that
-				done = true;
-				break;
+	if(plen < 4) {
+		if(!quiet) {
+			cerr << "Warning: Skipping read (" << name << ") because it is less than 4 characters long" << endl;
+		}
+		done = true;
+	} else {
+		// Check and see if the distribution of Ns disqualifies
+		// this read right off the bat
+		size_t slen = min<size_t>(plen, seedLen);
+		int ns = 0;
+		for(size_t i = 0; i < slen; i++) {
+			if((int)(Dna5)patFw[i] == 4) {
+				if(++ns > seedMms) {
+					// Set 'done' so that
+					done = true;
+					break;
+				}
 			}
 		}
 	}

@@ -8,25 +8,30 @@
  */
 
 #include <iostream>
+#include <stdexcept>
 #include "hit_set.h"
 #include "filebuf.h"
 
 using namespace std;
 
 int main(int argc, char **argv) {
-	if(argc <= 1) {
-		cerr << "Error: must specify chain file as first argument" << endl;
-		exit(1);
+	try {
+		if(argc <= 1) {
+			cerr << "Error: must specify chain file as first argument" << endl;
+			return 1;
+		}
+		FILE *in = fopen(argv[1], "rb");
+		if(in == NULL) {
+			cerr << "Could not open " << argv[1] << endl;
+			return 1;
+		}
+		FileBuf fb(in);
+		while(!fb.eof()) {
+			HitSet s(fb);
+			s.reportUpTo(cout);
+		}
+		fb.close();
+	} catch(std::exception& e) {
+		return 1;
 	}
-	FILE *in = fopen(argv[1], "rb");
-	if(in == NULL) {
-		cerr << "Could not open " << argv[1] << endl;
-		exit(1);
-	}
-	FileBuf fb(in);
-	while(!fb.eof()) {
-		HitSet s(fb);
-		s.reportUpTo(cout);
-	}
-	fb.close();
 }

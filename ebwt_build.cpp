@@ -355,13 +355,13 @@ static int parseNumber(T lower, const char *errmsg) {
 		if (t < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			exit(1);
+			std::runtime_error("");
 		}
 		return t;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	exit(1);
+	std::runtime_error("");
 	return -1;
 }
 
@@ -445,7 +445,7 @@ static void parseOptions(int argc, char **argv) {
 			default:
 				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				exit(1);
+				std::runtime_error("");
 		}
 	} while(next_option != -1);
 	if(bmax < 40) {
@@ -487,7 +487,7 @@ static void driver(const string& infile,
 			FILE *f = fopen(infiles[i].c_str(), "r");
 			if (f == NULL) {
 				cerr << "Error: could not open "<< infiles[i] << endl;
-				exit(1);
+				std::runtime_error("");
 			}
 			FileBuf *fb = new FileBuf(f);
 			assert(fb != NULL);
@@ -519,7 +519,7 @@ static void driver(const string& infile,
 				cerr << "Could not open index file for writing: \"" << file3 << "\"" << endl
 					 << "Please make sure the directory exists and that permissions allow writing by" << endl
 					 << "Bowtie." << endl;
-				exit(1);
+				std::runtime_error("");
 			}
 			bool be = currentlyBigEndian();
 			writeU32(fout3, 1, be); // endianness sentinel
@@ -601,141 +601,144 @@ static char *argv0 = NULL;
  * main function.  Parses command-line arguments.
  */
 int main(int argc, char **argv) {
+	try {
+		string infile;
+		vector<string> infiles;
+		string outfile;
 
-	string infile;
-	vector<string> infiles;
-	string outfile;
-
-	parseOptions(argc, argv);
-	argv0 = argv[0];
-	if(showVersion) {
-		cout << argv0 << " version " << BOWTIE_VERSION << endl;
-		if(sizeof(void*) == 4) {
-			cout << "32-bit" << endl;
-		} else if(sizeof(void*) == 8) {
-			cout << "64-bit" << endl;
-		} else {
-			cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+		parseOptions(argc, argv);
+		argv0 = argv[0];
+		if(showVersion) {
+			cout << argv0 << " version " << BOWTIE_VERSION << endl;
+			if(sizeof(void*) == 4) {
+				cout << "32-bit" << endl;
+			} else if(sizeof(void*) == 8) {
+				cout << "64-bit" << endl;
+			} else {
+				cout << "Neither 32- nor 64-bit: sizeof(void*) = " << sizeof(void*) << endl;
+			}
+			cout << "Built on " << BUILD_HOST << endl;
+			cout << BUILD_TIME << endl;
+			cout << "Compiler: " << COMPILER_VERSION << endl;
+			cout << "Options: " << COMPILER_OPTIONS << endl;
+			cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
+				 << sizeof(int)
+				 << ", " << sizeof(long) << ", " << sizeof(long long)
+				 << ", " << sizeof(void *) << ", " << sizeof(size_t)
+				 << ", " << sizeof(off_t) << "}" << endl;
+			return 0;
 		}
-		cout << "Built on " << BUILD_HOST << endl;
-		cout << BUILD_TIME << endl;
-		cout << "Compiler: " << COMPILER_VERSION << endl;
-		cout << "Options: " << COMPILER_OPTIONS << endl;
-		cout << "Sizeof {int, long, long long, void*, size_t, off_t}: {"
-		     << sizeof(int)
-		     << ", " << sizeof(long) << ", " << sizeof(long long)
-		     << ", " << sizeof(void *) << ", " << sizeof(size_t)
-		     << ", " << sizeof(off_t) << "}" << endl;
-		return 0;
-	}
 
-	// Get input filename
-	if(optind >= argc) {
-		cerr << "No input sequence or sequence file specified!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
-	infile = argv[optind++];
+		// Get input filename
+		if(optind >= argc) {
+			cerr << "No input sequence or sequence file specified!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+		infile = argv[optind++];
 
-	// Get output filename
-	if(optind >= argc) {
-		cerr << "No output file specified!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
-	outfile = argv[optind++];
+		// Get output filename
+		if(optind >= argc) {
+			cerr << "No output file specified!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
+		outfile = argv[optind++];
 
-	tokenize(infile, ",", infiles);
-	if(infiles.size() < 1) {
-		cerr << "Tokenized input file list was empty!" << endl;
-		printUsage(cerr);
-		return 1;
-	}
+		tokenize(infile, ",", infiles);
+		if(infiles.size() < 1) {
+			cerr << "Tokenized input file list was empty!" << endl;
+			printUsage(cerr);
+			return 1;
+		}
 
-	// Optionally summarize
-	if(verbose) {
-		cout << "Settings:" << endl
-		     << "  Output files: \"" << outfile << ".*.ebwt\"" << endl
-		     << "  Line rate: " << lineRate << " (line is " << (1<<lineRate) << " bytes)" << endl
-		     << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
-		     << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
-		     << "  FTable chars: " << ftabChars << endl
-		     << "  Strings: " << (packed? "packed" : "unpacked") << endl
-		     ;
-		if(bmax == 0xffffffff) {
-			cout << "  Max bucket size: default" << endl;
-		} else {
-			cout << "  Max bucket size: " << bmax << endl;
-		}
-		if(bmaxMultSqrt == 0xffffffff) {
-			cout << "  Max bucket size, sqrt multiplier: default" << endl;
-		} else {
-			cout << "  Max bucket size, sqrt multiplier: " << bmaxMultSqrt << endl;
-		}
-		if(bmaxDivN == 0xffffffff) {
-			cout << "  Max bucket size, len divisor: default" << endl;
-		} else {
-			cout << "  Max bucket size, len divisor: " << bmaxDivN << endl;
-		}
-		cout << "  Difference-cover sample period: " << dcv << endl;
-		cout << "  Reference base cutoff: ";
-		if(cutoff == -1) cout << "none"; else cout << cutoff << " bases";
-		cout << endl;
-		cout << "  Endianness: " << (bigEndian? "big":"little") << endl
-	         << "  Actual local endianness: " << (currentlyBigEndian()? "big":"little") << endl
-		     << "  Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
-#ifdef NDEBUG
-		cout << "  Assertions: disabled" << endl;
-#else
-		cout << "  Assertions: enabled" << endl;
-#endif
-		cout << "  Random seed: " << seed << endl;
-		cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << ", size_t:" << sizeof(size_t) << endl;
-		cout << "Input files DNA, " << file_format_names[format] << ":" << endl;
-		for(size_t i = 0; i < infiles.size(); i++) {
-			cout << "  " << infiles[i] << endl;
-		}
-	}
-	// Seed random number generator
-	srand(seed);
-	int64_t origCutoff = cutoff; // save cutoff since it gets modified
-	{
-		Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
-		if(!packed) {
-			try {
-				driver<String<Dna, Alloc<> > >(infile, infiles, outfile);
-			} catch(bad_alloc& e) {
-				if(autoMem) {
-					cerr << "Switching to a packed string representation." << endl;
-					packed = true;
-				} else {
-					throw e;
-				}
+		// Optionally summarize
+		if(verbose) {
+			cout << "Settings:" << endl
+				 << "  Output files: \"" << outfile << ".*.ebwt\"" << endl
+				 << "  Line rate: " << lineRate << " (line is " << (1<<lineRate) << " bytes)" << endl
+				 << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
+				 << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
+				 << "  FTable chars: " << ftabChars << endl
+				 << "  Strings: " << (packed? "packed" : "unpacked") << endl
+				 ;
+			if(bmax == 0xffffffff) {
+				cout << "  Max bucket size: default" << endl;
+			} else {
+				cout << "  Max bucket size: " << bmax << endl;
+			}
+			if(bmaxMultSqrt == 0xffffffff) {
+				cout << "  Max bucket size, sqrt multiplier: default" << endl;
+			} else {
+				cout << "  Max bucket size, sqrt multiplier: " << bmaxMultSqrt << endl;
+			}
+			if(bmaxDivN == 0xffffffff) {
+				cout << "  Max bucket size, len divisor: default" << endl;
+			} else {
+				cout << "  Max bucket size, len divisor: " << bmaxDivN << endl;
+			}
+			cout << "  Difference-cover sample period: " << dcv << endl;
+			cout << "  Reference base cutoff: ";
+			if(cutoff == -1) cout << "none"; else cout << cutoff << " bases";
+			cout << endl;
+			cout << "  Endianness: " << (bigEndian? "big":"little") << endl
+				 << "  Actual local endianness: " << (currentlyBigEndian()? "big":"little") << endl
+				 << "  Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
+	#ifdef NDEBUG
+			cout << "  Assertions: disabled" << endl;
+	#else
+			cout << "  Assertions: enabled" << endl;
+	#endif
+			cout << "  Random seed: " << seed << endl;
+			cout << "  Sizeofs: void*:" << sizeof(void*) << ", int:" << sizeof(int) << ", long:" << sizeof(long) << ", size_t:" << sizeof(size_t) << endl;
+			cout << "Input files DNA, " << file_format_names[format] << ":" << endl;
+			for(size_t i = 0; i < infiles.size(); i++) {
+				cout << "  " << infiles[i] << endl;
 			}
 		}
-		if(packed) {
-			driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile);
-		}
-	}
-	cutoff = origCutoff; // reset cutoff for backward Ebwt
-	if(doubleEbwt) {
+		// Seed random number generator
 		srand(seed);
-		Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
-		if(!packed) {
-			try {
-				driver<String<Dna, Alloc<> > >(infile, infiles, outfile + ".rev", true);
-			} catch(bad_alloc& e) {
-				if(autoMem) {
-					cerr << "Switching to a packed string representation." << endl;
-					packed = true;
-				} else {
-					throw e;
+		int64_t origCutoff = cutoff; // save cutoff since it gets modified
+		{
+			Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
+			if(!packed) {
+				try {
+					driver<String<Dna, Alloc<> > >(infile, infiles, outfile);
+				} catch(bad_alloc& e) {
+					if(autoMem) {
+						cerr << "Switching to a packed string representation." << endl;
+						packed = true;
+					} else {
+						throw e;
+					}
 				}
 			}
+			if(packed) {
+				driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile);
+			}
 		}
-		if(packed) {
-			driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile + ".rev", true);
+		cutoff = origCutoff; // reset cutoff for backward Ebwt
+		if(doubleEbwt) {
+			srand(seed);
+			Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);
+			if(!packed) {
+				try {
+					driver<String<Dna, Alloc<> > >(infile, infiles, outfile + ".rev", true);
+				} catch(bad_alloc& e) {
+					if(autoMem) {
+						cerr << "Switching to a packed string representation." << endl;
+						packed = true;
+					} else {
+						throw e;
+					}
+				}
+			}
+			if(packed) {
+				driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile + ".rev", true);
+			}
 		}
+		return 0;
+	} catch(std::exception& e) {
+		return 1;
 	}
-	return 0;
 }

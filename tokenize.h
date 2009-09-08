@@ -2,6 +2,7 @@
 #define TOKENIZE_H_
 
 #include <string>
+#include <sstream>
 #include <vector>
 
 using namespace std;

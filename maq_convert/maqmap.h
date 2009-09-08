@@ -7,6 +7,7 @@
 #define MAQMAP_FORMAT_NEW -1
 
 #include <iostream>
+#include <stdexcept>
 #include <string.h>
 #include <zlib.h>
 #include <stdint.h>
@@ -49,7 +50,7 @@ header_t<MAXLEN>* maq_init_header()
 	header_t<MAXLEN>* mm = (header_t<MAXLEN>*)calloc(1, sizeof(header_t<MAXLEN>));
 	if(mm == NULL) {
 		std::cerr << "Exhausted memory allocating maqmap header" << std::endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	mm->format = MAQMAP_FORMAT_NEW;
 	return mm;
@@ -95,14 +96,14 @@ header_t<MAXLEN>* maq_read_header(gzFile fp)
 	mm->ref_name = (char**)calloc(mm->n_ref, sizeof(char*));
 	if(mm->ref_name == NULL) {
 		std::cerr << "Exhausted memory allocating reference name list" << std::endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	for (k = 0; k != mm->n_ref; ++k) {
 		gzread(fp, &len, 4);
 		mm->ref_name[k] = (char*)malloc(len);
 		if(mm->ref_name[k] == NULL) {
 			std::cerr << "Exhausted memory allocating reference name" << std::endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		gzread(fp, mm->ref_name[k], len);
 	}

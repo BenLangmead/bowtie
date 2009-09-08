@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <iostream>
 #include <vector>
+#include <stdexcept>
 #include "seqan/sequence.h"
 #include "range.h"
 #include "reference.h"
@@ -136,7 +137,7 @@ public:
 			if(refbuf_ == NULL) throw std::bad_alloc();
 		} catch(std::bad_alloc& e) {
 			cerr << "Error: Could not allocate reference-space alignment buffer of " << newsz << "B" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		refbufSz_ = newsz;
 		freeRefbuf_ = true;

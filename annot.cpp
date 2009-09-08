@@ -5,6 +5,7 @@
  *      Author: Ben Langmead
  */
 
+#include <stdexcept>
 #include "annot.h"
 
 using namespace std;
@@ -16,7 +17,7 @@ void AnnotationMap::parse() {
 	ifstream in(fname_);
 	if(!in.good() && in.is_open()) {
 		cerr << "Could not open annotation file " << fname_ << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	while(!in.eof()) {
 		U32Pair pos;

@@ -333,6 +333,7 @@ public:
 		vector<String<Dna5> >& os,
 		bool rangeMode,
 		bool verbose,
+		bool quiet,
 		int maxBts,
 		ChunkPool *pool,
 		int *btCnt = NULL,
@@ -346,6 +347,8 @@ public:
 		params_(params),
 		rchase_(rchase),
 		driver_(driver),
+		verbose_(verbose),
+		quiet_(quiet),
 		maxBts_(maxBts),
 		pool_(pool),
 		btCnt_(btCnt),
@@ -374,6 +377,15 @@ public:
 			metrics_->nextRead(patsrc->bufa().patFw);
 		}
 		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		if(patsrc->bufa().length() < 4) {
+			if(!quiet_) {
+				cerr << "Warning: Skipping read " << patsrc->bufa().name
+					 << " because it is less than 4 characters long" << endl;
+			}
+			this->done = true;
+			sinkPt_->finishRead(*patsrc_, true, true);
+			return;
+		}
 		driver_->setQuery(patsrc, NULL);
 		this->done = driver_->done;
 		doneFirst_ = false;
@@ -508,6 +520,9 @@ protected:
 	// Range-finding state
 	TDriver* driver_;
 
+	bool verbose_; // be talkative
+	bool quiet_; // don't print informational/warning info
+
 	const int maxBts_;
 	ChunkPool *pool_;
 	int *btCnt_;
@@ -548,6 +563,7 @@ public:
 		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
+		bool quiet,
 		int maxBts,
 		ChunkPool *pool,
 		int *btCnt) :
@@ -572,6 +588,7 @@ public:
 		fw1_(fw1), fw2_(fw2),
 		rchase_(rchase),
 		verbose_(verbose),
+		quiet_(quiet),
 		maxBts_(maxBts),
 		pool_(pool),
 		btCnt_(btCnt),
@@ -654,6 +671,15 @@ public:
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
 		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		if(patsrc->bufa().length() < 4 || patsrc->bufb().length() < 4) {
+			if(!quiet_) {
+				cerr << "Warning: Skipping pair " << patsrc->bufa().name
+					 << " because a mate is less than 4 characters long" << endl;
+			}
+			this->done = true;
+			sinkPt_->finishRead(*patsrc_, true, true);
+			return;
+		}
 		driver1Fw_->setQuery(patsrc, NULL);
 		driver1Rc_->setQuery(patsrc, NULL);
 		driver2Fw_->setQuery(patsrc, NULL);
@@ -1327,6 +1353,8 @@ protected:
 
 	// true -> be talkative
 	bool verbose_;
+	// true -> suppress warnings
+	bool quiet_;
 
 	int maxBts_;
 	ChunkPool *pool_;
@@ -1451,6 +1479,7 @@ public:
 		const BitPairReference* refs,
 		bool rangeMode,
 		bool verbose,
+		bool quiet,
 		int maxBts,
 		ChunkPool *pool,
 		int *btCnt) :
@@ -1477,6 +1506,8 @@ public:
 		rchase_(rchase),
 		driver_(driver),
 		pool_(pool),
+		verbose_(verbose),
+		quiet_(quiet),
 		maxBts_(maxBts),
 		btCnt_(btCnt)
 	{
@@ -1512,6 +1543,15 @@ public:
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
 		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		if(patsrc->bufa().length() < 4 || patsrc->bufb().length() < 4) {
+			if(!quiet_) {
+				cerr << "Warning: Skipping pair " << patsrc->bufa().name
+					 << " because a mate is less than 4 characters long" << endl;
+			}
+			this->done = true;
+			sinkPt_->finishRead(*patsrc_, true, true);
+			return;
+		}
 		driver_->setQuery(patsrc, NULL);
 		qlen1_ = patsrc_->bufa().length();
 		qlen2_ = patsrc_->bufb().length();
@@ -1933,6 +1973,9 @@ protected:
 
 	// Pool for distributing chunks of best-first path descriptor memory
 	ChunkPool *pool_;
+
+	bool verbose_;
+	bool quiet_;
 
 	int maxBts_; // maximum allowed # backtracks
 	int *btCnt_; // current backtrack count

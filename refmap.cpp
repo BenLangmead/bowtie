@@ -5,6 +5,7 @@
  *      Author: Ben Langmead
  */
 
+#include <stdexcept>
 #include "refmap.h"
 #include "assert_helpers.h"
 
@@ -20,7 +21,7 @@ void ReferenceMap::map(U32Pair& h) const {
 		cerr << "Could not find a reference-map entry for reference "
 				  << h.first << " in map file \"" << fname_ << "\""
 				  << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	h.second += map_[h.first].second;
 	h.first = map_[h.first].first;
@@ -33,7 +34,7 @@ void ReferenceMap::parse() {
 	ifstream in(fname_);
 	if(!in.good() || !in.is_open()) {
 		cerr << "Could not open reference map file " << fname_ << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	int c;
 	while((c = in.peek()) != EOF) {
@@ -60,7 +61,7 @@ void ReferenceMap::parse() {
 	}
 	assert_eq(EOF, c);
 	if(map_.empty()) {
-		cerr << "Error: no entries in refmap file " << fname_ << endl;
+		throw std::runtime_error("");
 	}
 	in.close();
 }

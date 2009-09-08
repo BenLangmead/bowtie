@@ -276,7 +276,7 @@ public:
 			out_.open(dumpfile_, ios_base::out);
 			if(!out_.good()) {
 				cerr << "Could not open pattern dump file \"" << dumpfile_ << "\" for writing" << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 		MUTEX_INIT(lock_);
@@ -968,7 +968,7 @@ public:
 	{
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << length_ << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		rand_.init(seed_);
 	}
@@ -1063,7 +1063,7 @@ public:
 		patid_ = thread_;
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSourcePerThread may not exceed 1024; got " << length_ << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		rand_.init(thread_);
 	}
@@ -1499,7 +1499,7 @@ protected:
 			filebuf_.newFile(in);
 			return;
 		}
-		exit(1);
+		throw std::runtime_error("");
 	}
 	vector<string> infiles_; /// filenames for read files
 	vector<bool> errs_; /// whether we've already printed an error for each file
@@ -1576,7 +1576,7 @@ protected:
 			}
 			if(c != '>') {
 				cerr << "Error: reads file does not look like a FASTA file" << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 			assert(c == '>' || c == '#');
 			first_ = false;
@@ -1613,8 +1613,8 @@ protected:
 			if(isalpha(c) && begin++ >= this->trim5_) {
 				if(dstLen + 1 > 1024) {
 					cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-						 << "reads and re-run Bowtie";
-					exit(1);
+						 << "reads and re-run Bowtie" << endl;
+					throw std::runtime_error("");
 				}
 				r.patBufFw [dstLen] = charToDna5[c];
 				r.qualBufFw[dstLen] = 'I';
@@ -1651,7 +1651,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastaPatternSource.readPair()" << endl;
-		exit(1);
+		throw std::runtime_error("");
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -1914,8 +1914,8 @@ private:
 					}
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							 << "reads and re-run Bowtie";
-						exit(1);
+							 << "reads and re-run Bowtie" << endl;
+						throw std::runtime_error("");
 					}
 					r.patBufFw[dstLen] = charToDna5[c];
 					dstLen++;
@@ -1958,8 +1958,8 @@ private:
 						size_t off = qualsRead - trim5_;
 						if(off + 1 > 1024) {
 							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie";
-							exit(1);
+								 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
+							throw std::runtime_error("");
 						}
 						assert_geq(c, 33);
 						assert_leq(c, 73);
@@ -1970,7 +1970,7 @@ private:
 			} // done reading integer quality lines
 			if (charsRead > qualsRead) {
 				tooFewQualities(r.name);
-				exit(1);
+				throw std::runtime_error("");
 			}
 		} else {
 			// Non-integer qualities
@@ -1979,7 +1979,7 @@ private:
 				c2 = c;
 				if (c == ' ') {
 					wrongQualityFormat();
-					exit(1);
+					throw std::runtime_error("");
 				}
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
@@ -1990,8 +1990,8 @@ private:
 						size_t off = qualsRead - trim5_;
 						if(off + 1 > 1024) {
 							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie";
-							exit(1);
+								 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
+							throw std::runtime_error("");
 						}
 						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
@@ -2106,7 +2106,7 @@ protected:
 	// from a continuous input.
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		cerr << "In FastaContinuousPatternSource.readPair()" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	/**
 	 * Reset state to be read for the next file.
@@ -2232,7 +2232,7 @@ protected:
 			}
 			if(c != '@') {
 				cerr << "Error: reads file does not look like a FASTQ file" << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 			assert_eq('@', c);
 			first_ = false;
@@ -2266,7 +2266,7 @@ protected:
 				_setLength(r.name, nameLen);
 				cerr << "FASTQ read name is too long; read names must be " << (bufSz-2) << " characters or fewer." << endl;
 				cerr << "Beginning of bad read name: " << r.name << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 		_setBegin(r.name, r.nameBuf);
@@ -2285,7 +2285,7 @@ protected:
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 							 << "reads and re-run Bowtie";
-						exit(1);
+						throw std::runtime_error("");
 					}
 					r.patBufFw[dstLen] = charToDna5[c];
 					dstLen++;
@@ -2330,7 +2330,7 @@ protected:
 						if(off + 1 > 1024) {
 							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
 								 << "Please truncate reads and quality values and and re-run Bowtie";
-							exit(1);
+							throw std::runtime_error("");
 						}
 						assert_geq(c, 33);
 						assert_leq(c, 73);
@@ -2341,7 +2341,7 @@ protected:
 			} // done reading integer quality lines
 			if (charsRead > qualsRead) {
 				tooFewQualities(r.name);
-				exit(1);
+				throw std::runtime_error("");
 			}
 			_setBegin(r.qualFw, (char*)r.qualBufFw);
 			_setLength(r.qualFw, dstLen);
@@ -2352,7 +2352,7 @@ protected:
 				c = filebuf_.get();
 				if (c == ' ') {
 					wrongQualityFormat();
-					exit(1);
+					throw std::runtime_error("");
 				}
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
@@ -2366,7 +2366,7 @@ protected:
 						if(off + 1 > 1024) {
 							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
 								 << "Please truncate reads and quality values and and re-run Bowtie";
-							exit(1);
+							throw std::runtime_error("");
 						}
 						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
@@ -2407,7 +2407,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastqPatternSource.readPair()" << endl;
-		exit(1);
+		throw std::runtime_error("");
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -2473,7 +2473,7 @@ protected:
 				if(c == '@') {
 					cerr << "Reads file looks like a FASTQ file; please use -q" << endl;
 				}
-				exit(1);
+				throw std::runtime_error("");
 			}
 			first_ = false;
 		}
@@ -2487,7 +2487,7 @@ protected:
 				if(len + 1 > 1024) {
 					cerr << "Reads file contained a pattern with more than 1024 characters." << endl
 						 << "Please truncate reads and and re-run Bowtie";
-					exit(1);
+					throw std::runtime_error("");
 				}
 				r.patBufFw [len] = charToDna5[c];
 				r.qualBufFw[len] = 'I';
@@ -2522,7 +2522,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In RawPatternSource.readPair()" << endl;
-		exit(1);
+		throw std::runtime_error("");
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -2595,7 +2595,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In ChainPatternSource.readPair()" << endl;
-		exit(1);
+		throw std::runtime_error("");
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);

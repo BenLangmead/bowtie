@@ -1,6 +1,8 @@
 #ifndef QUAL_H_
 #define QUAL_H_
 
+#include <stdexcept>
+
 extern unsigned char qualRounds[];
 extern unsigned char solToPhred[];
 
@@ -83,7 +85,7 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
 	if(c == ' ') {
 		cerr << "Saw a space but expected an ASCII-encoded quality value." << endl
 		     << "Are quality values formatted as integers?  If so, try --integer-quals." << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	if (solQuals) {
 		// Convert solexa-scaled chars to phred
@@ -94,7 +96,7 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
 			     << ((int)c)
 			     << " but expected 64-based Solexa qual (converts to " << (int)cc << ")." << endl
 			     << "Try not specifying --solexa-quals." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		c = cc;
 	}
@@ -104,7 +106,7 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
 			     << ((int)c)
 			     << " but expected 64-based Phred qual." << endl
 			     << "Try not specifying --solexa1.3-quals/--phred64-quals." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		// Convert to 33-based phred
 		c -= (64-33);
@@ -115,7 +117,7 @@ inline static char charToPhred33(char c, bool solQuals, bool phred64Quals) {
 			cerr << "Saw ASCII character "
 			     << ((int)c)
 			     << " but expected 33-based Phred qual." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 	}
 	return c;
@@ -139,7 +141,7 @@ inline static char intToPhred33(int iQ, bool solQuals) {
 	}
 	if (pQ < 33) {
 		cerr << "Saw negative Phred quality " << ((int)pQ-33) << "." << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 	assert_geq(pQ, 0);
 	return (int)pQ;

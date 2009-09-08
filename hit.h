@@ -7,6 +7,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
+#include <stdexcept>
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -85,27 +86,27 @@ public:
 		if(seqan::length(patName) > 0xffff) {
 			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
 			     << "read names and re-run bowtie." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(mms.count() > 0xff) {
 			cerr << "Error: The alignment contains 256 or more mismatches.  bowtie cannot handle" << endl
 			     << "alignments with this many alignments.  Please provide smaller reads or consider" << endl
 			     << "using a different tool." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(seqan::length(quals) > 0xffff) {
 			cerr << "Error: One or more quality strings are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(seqan::length(patSeq) > 0xffff) {
 			cerr << "Error: One or more read sequences are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(stratum < 0 || stratum >= 4) {
 			cerr << "Error: Stratum is out of bounds: " << stratum << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 	}
 
@@ -304,7 +305,7 @@ public:
 				memset(ents_, 0, len_ << 2);
 			} catch(std::bad_alloc& e) {
 				cerr << "Error allocating recalibration table with " << len_ << " entries" << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		}
 	}
@@ -1099,7 +1100,7 @@ protected:
     			s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
     		}
     	} else if(mateType != 0) {
-    		cerr << "Bad mate type " << mateType << endl; exit(1);
+    		cerr << "Bad mate type " << mateType << endl; throw std::runtime_error("");
     	}
     	std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
     	if(tmp->fail()) {
@@ -1108,7 +1109,7 @@ protected:
     		} else {
     			cerr << "Could not open paired-end aligned/unaligned-read file for writing: " << name << endl;
     		}
-    		exit(1);
+    		throw std::runtime_error("");
     	}
     	return tmp;
     }
@@ -1362,7 +1363,7 @@ public:
 	virtual bool setHits(HitSet& hs) {
 		if(!hs.empty()) {
 			cerr << "Error: default setHits() called with non-empty HitSet" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		return false;
 	}
@@ -2725,11 +2726,11 @@ public:
 		}
 		if(in.bad()) {
 			cerr << "Alignment file set \"bad\" bit" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		if(in.fail()) {
 			cerr << "A line from the alignment file was longer than 4K" << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 		in.getline(buf, 4096);
 		size_t len = in.gcount();
@@ -2823,7 +2824,7 @@ public:
 				}
 			}
 			cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl;
-			exit(1);
+			throw std::runtime_error("");
 		}
 
 		// Parse reference sequence offset
@@ -3583,7 +3584,7 @@ public:
 	 */
 	virtual void append(ostream& o, const Hit& h) {
 		cerr << "Error: ChainingHitSink::append() not implemented" << endl;
-		exit(1);
+		throw std::runtime_error("");
 	}
 
 	/**
