@@ -1486,12 +1486,14 @@ pair<T, T> parsePair(const char *str, char delim) {
 /**
  * Read command-line arguments
  */
-static void parseOptions(int argc, char **argv) {
+static void parseOptions(int argc, const char **argv) {
     int option_index = 0;
 	int next_option;
 	if(startVerbose) { cerr << "Parsing options: "; logTime(cerr, true); }
 	do {
-		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
+		next_option = getopt_long(
+			argc, const_cast<char**>(argv),
+			short_options, long_options, &option_index);
 		switch (next_option) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
@@ -1572,38 +1574,38 @@ static void parseOptions(int argc, char **argv) {
 			case ARG_PREFETCH_WIDTH:
 				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
 				break;
-	   		case 'B':
-	   			offBase = parseInt(-999999, "-B/--offbase cannot be a large negative number");
-	   			break;
-	   		case ARG_SEED:
-	   			seed = parseInt(0, "--seed arg must be at least 0");
-	   			break;
-	   		case 'u':
-	   			qUpto = (uint32_t)parseInt(1, "-u/--qupto arg must be at least 1");
-	   			break;
-	   		case 'k':
-	   			khits = (uint32_t)parseInt(1, "-k arg must be at least 1");
-	   			break;
-	   		case 'm':
-	   			mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
-	   			break;
-	   		case 'x':
-	   			mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
-	   			break;
-	   		case ARG_MIXED_ATTEMPTS:
-	   			mixedAttemptLim = (uint32_t)parseInt(1, "--mixatt arg must be at least 1");
-	   			break;
-	   		case ARG_CACHE_LIM:
-	   			cacheLimit = (uint32_t)parseInt(1, "--cachelim arg must be at least 1");
-	   			break;
-	   		case ARG_CACHE_SZ:
-	   			cacheSize = (uint32_t)parseInt(1, "--cachesz arg must be at least 1");
-	   			cacheSize *= (1024 * 1024); // convert from MB to B
-	   			break;
-	   		case ARG_NO_RECONCILE:
-	   			dontReconcileMates = true;
-	   			break;
-	   		case 'p':
+			case 'B':
+				offBase = parseInt(-999999, "-B/--offbase cannot be a large negative number");
+				break;
+			case ARG_SEED:
+				seed = parseInt(0, "--seed arg must be at least 0");
+				break;
+			case 'u':
+				qUpto = (uint32_t)parseInt(1, "-u/--qupto arg must be at least 1");
+				break;
+			case 'k':
+				khits = (uint32_t)parseInt(1, "-k arg must be at least 1");
+				break;
+			case 'm':
+				mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
+				break;
+			case 'x':
+				mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
+				break;
+			case ARG_MIXED_ATTEMPTS:
+				mixedAttemptLim = (uint32_t)parseInt(1, "--mixatt arg must be at least 1");
+				break;
+			case ARG_CACHE_LIM:
+				cacheLimit = (uint32_t)parseInt(1, "--cachelim arg must be at least 1");
+				break;
+			case ARG_CACHE_SZ:
+				cacheSize = (uint32_t)parseInt(1, "--cachesz arg must be at least 1");
+				cacheSize *= (1024 * 1024); // convert from MB to B
+				break;
+			case ARG_NO_RECONCILE:
+				dontReconcileMates = true;
+				break;
+			case 'p':
 #ifndef BOWTIE_PTHREADS
 				cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
 				throw std::runtime_error("");
@@ -1845,7 +1847,7 @@ static void parseOptions(int argc, char **argv) {
 	}
 }
 
-static char *argv0 = NULL;
+static const char *argv0 = NULL;
 
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
@@ -4620,8 +4622,9 @@ static void driver(const char * type,
 /**
  * main function.  Parses command-line arguments.
  */
-int main(int argc, char **argv) {
+int bowtie(int argc, const char **argv) {
 	try {
+		opterr = optind = 1;
 		resetOptions();
 		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
@@ -4737,5 +4740,37 @@ int main(int argc, char **argv) {
 		return 0;
 	} catch(exception& e) {
 		return 1;
+	}
+}
+
+/**
+ * main function.  Parses command-line arguments.
+ */
+int main(int argc, const char **argv) {
+	if(argc > 2 && strcmp(argv[1], "-A") == 0) {
+		const char *file = argv[2];
+		ifstream in;
+		in.open(file);
+		char buf[4096];
+		int lastret = -1;
+		while(in.getline(buf, 4095)) {
+			vector<string> args;
+			args.push_back(string(argv[0]));
+			tokenize(buf, " \t", args);
+			const char **myargs = (const char**)malloc(sizeof(char*)*args.size());
+			for(size_t i = 0; i < args.size(); i++) {
+				myargs[i] = args[i].c_str();
+			}
+			if(args.size() == 1) continue;
+			lastret = bowtie(args.size(), myargs);
+			free(myargs);
+		}
+		if(lastret == -1) {
+			cerr << "Warning: No arg strings parsed from " << file << endl;
+			return 0;
+		}
+		return lastret;
+	} else {
+		return bowtie(argc, argv);
 	}
 }
