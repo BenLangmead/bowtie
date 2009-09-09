@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdexcept>
+#include "assert_helpers.h"
 
 /**
  * Simple wrapper for a FILE*, istream or ifstream that reads it in

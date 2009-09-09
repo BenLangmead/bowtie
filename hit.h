@@ -120,29 +120,6 @@ public:
 		hse.stratum = stratum;
 		hse.cost = cost;
 		if(mms.count() == 0) return;
-//		map<int, char> snpAnnots;
-//		if(amap != NULL) {
-//			AnnotationMap::Iter ai = amap->lower_bound(hse.h);
-//			for(; ai != amap->end(); ai++) {
-//				assert_geq(ai->first.first, h.first);
-//				if(ai->first.first != h.first) {
-//					// Different chromosome
-//					break;
-//				}
-//				if(ai->first.second >= h.second + length()) {
-//					// Doesn't fall into alignment
-//					break;
-//				}
-//				if(ai->second.first != 'S') {
-//					// Not a SNP annotation
-//					continue;
-//				}
-//				// Found a SNP annotation falling within the alignment
-//				size_t off = ai->first.second - h.second;
-//				if(!fw) off = length() - off - 1;
-//				snpAnnots[off] = ai->second.second;
-//			}
-//		}
 		for(int i = 0; i < (int)length(); i++) {
 			if(mms.test(i)) {
 				hse.expand();
@@ -150,12 +127,6 @@ public:
 				hse.back().pos = i;
 				hse.back().chr = charToDna5[(int)refcs[i]];
 			}
-//			else if(snpAnnots.find(i) != snpAnnots.end()) {
-//				hse.expand();
-//				hse.back().type = EDIT_TYPE_SNP;
-//				hse.back().pos = i;
-//				hse.back().chr = charToDna5[(int)snpAnnots[i]];
-//			}
 		}
 	}
 
@@ -744,7 +715,7 @@ public:
 					dumpAlFq_ = openOf(dumpAlFqBase_, 0, ".fq");
 					assert(dumpAlFq_ != NULL);
 				}
-				printFastqRecord(*dumpAlFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+				printFastqRecord(*dumpAlFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
 				MUTEX_UNLOCK(dumpAlignFqLock_);
 			}
 			// Dump unpaired read to an aligned-read file of the same format
@@ -780,8 +751,8 @@ public:
 					dumpAlFq_2_ = openOf(dumpAlFqBase_, 2, ".fq");
 					assert(dumpAlFq_1_ != NULL && dumpAlFq_2_ != NULL);
 				}
-				printFastqRecord(*dumpAlFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
-				printFastqRecord(*dumpAlFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
+				printFastqRecord(*dumpAlFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
+				printFastqRecord(*dumpAlFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
 				MUTEX_UNLOCK(dumpAlignFqLockPE_);
 			}
 			// Dump paired-end read to an aligned-read file (or pair of
@@ -824,7 +795,7 @@ public:
 					dumpUnalFq_ = openOf(dumpUnalFqBase_, 0, ".fq");
 					assert(dumpUnalFq_ != NULL);
 				}
-				printFastqRecord(*dumpUnalFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+				printFastqRecord(*dumpUnalFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
 				MUTEX_UNLOCK(dumpUnalFqLock_);
 			}
 			// Dump unpaired read to an unaligned-read file of the same format
@@ -858,8 +829,8 @@ public:
 					dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, ".fq");
 					assert(dumpUnalFq_1_ != NULL && dumpUnalFq_2_ != NULL);
 				}
-				printFastqRecord(*dumpUnalFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
-				printFastqRecord(*dumpUnalFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
+				printFastqRecord(*dumpUnalFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
+				printFastqRecord(*dumpUnalFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
 				MUTEX_UNLOCK(dumpUnalFqLockPE_);
 			}
 			// Dump paired-end read to an unaligned-read file (or pair
@@ -905,7 +876,7 @@ public:
 		    		dumpMaxFq_ = openOf(dumpMaxFqBase_, 0, ".fq");
 		    		assert(dumpMaxFq_ != NULL);
 				}
-				printFastqRecord(*dumpMaxFq_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
+				printFastqRecord(*dumpMaxFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
 				MUTEX_UNLOCK(dumpMaxFqLock_);
 			}
 			// Dump unpaired read to an maxed-out-read file of the same format
@@ -939,8 +910,8 @@ public:
 		    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, ".fq");
 		    		assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
 				}
-				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qualFw);
-				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qualFw);
+				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
+				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
 				MUTEX_UNLOCK(dumpMaxFqLockPE_);
 			}
 			// Dump paired-end read to a maxed-out-read file (or pair

@@ -36,6 +36,7 @@ class RefAligner {
 
 public:
 	RefAligner(bool verbose = false,
+	           bool quiet = false,
 	           uint32_t seedLen = 0,
 	           uint32_t qualMax = 0xffffffff,
 	           bool maqPenalty = false) :
@@ -170,8 +171,8 @@ class ExactRefAligner : public RefAligner<TStr> {
 
 public:
 
-	ExactRefAligner(bool verbose) :
-		RefAligner<TStr>(verbose) { }
+	ExactRefAligner(bool verbose, bool quiet) :
+		RefAligner<TStr>(verbose, quiet) { }
 
 	virtual ~ExactRefAligner() { }
 
@@ -504,8 +505,8 @@ class OneMMRefAligner : public RefAligner<TStr> {
 
 public:
 
-	OneMMRefAligner(bool verbose) :
-		RefAligner<TStr>(verbose) { }
+	OneMMRefAligner(bool verbose, bool quiet) :
+		RefAligner<TStr>(verbose, quiet) { }
 
 	virtual ~OneMMRefAligner() { }
 
@@ -908,8 +909,8 @@ class TwoMMRefAligner : public RefAligner<TStr> {
 
 public:
 
-	TwoMMRefAligner(bool verbose) :
-		RefAligner<TStr>(verbose) { }
+	TwoMMRefAligner(bool verbose, bool quiet) :
+		RefAligner<TStr>(verbose, quiet) { }
 
 	virtual ~TwoMMRefAligner() { }
 
@@ -1386,8 +1387,8 @@ class ThreeMMRefAligner : public RefAligner<TStr> {
 
 public:
 
-	ThreeMMRefAligner(bool verbose) :
-		RefAligner<TStr>(verbose) { }
+	ThreeMMRefAligner(bool verbose, bool quiet) :
+		RefAligner<TStr>(verbose, quiet) { }
 
 	virtual ~ThreeMMRefAligner() { }
 
@@ -1939,8 +1940,8 @@ class Seed0RefAligner : public RefAligner<TStr> {
 
 public:
 
-	Seed0RefAligner(bool verbose, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
-		RefAligner<TStr>(verbose, seedLen, qualMax, maqPenalty) { }
+	Seed0RefAligner(bool verbose, bool quiet, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
+		RefAligner<TStr>(verbose, quiet, seedLen, qualMax, maqPenalty) { }
 
 	virtual ~Seed0RefAligner() { }
 
@@ -2542,8 +2543,8 @@ class Seed1RefAligner : public RefAligner<TStr> {
 
 public:
 
-	Seed1RefAligner(bool verbose, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
-		RefAligner<TStr>(verbose, seedLen, qualMax, maqPenalty) { }
+	Seed1RefAligner(bool verbose, bool quiet, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
+		RefAligner<TStr>(verbose, quiet, seedLen, qualMax, maqPenalty) { }
 
 	virtual ~Seed1RefAligner() { }
 
@@ -3281,8 +3282,8 @@ class Seed2RefAligner : public RefAligner<TStr> {
 
 public:
 
-	Seed2RefAligner(bool verbose, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
-		RefAligner<TStr>(verbose, seedLen, qualMax, maqPenalty) { }
+	Seed2RefAligner(bool verbose, bool quiet, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
+		RefAligner<TStr>(verbose, quiet, seedLen, qualMax, maqPenalty) { }
 
 	virtual ~Seed2RefAligner() { }
 
@@ -4141,8 +4142,8 @@ class Seed3RefAligner : public RefAligner<TStr> {
 
 public:
 
-	Seed3RefAligner(bool verbose, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
-		RefAligner<TStr>(verbose, seedLen, qualMax, maqPenalty) { }
+	Seed3RefAligner(bool verbose, bool quiet, uint32_t seedLen, uint32_t qualMax, bool maqPenalty) :
+		RefAligner<TStr>(verbose, quiet, seedLen, qualMax, maqPenalty) { }
 
 	virtual ~Seed3RefAligner() { }
 

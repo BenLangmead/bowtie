@@ -8,7 +8,9 @@
 #ifndef EDIT_H_
 #define EDIT_H_
 
+#include <iostream>
 #include <stdint.h>
+#include "assert_helpers.h"
 #include "filebuf.h"
 
 /**
@@ -77,6 +79,8 @@ struct Edit {
 	uint16_t pos       : 10; // position w/r/t search root
 	uint16_t chr       :  2; // character involved (for subst and ins)
 	uint16_t reserved  :  2; // reserved
+
+	friend std::ostream& operator<< (std::ostream& os, const Edit& e);
 };
 
 #endif /* EDIT_H_ */

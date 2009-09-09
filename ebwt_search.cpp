@@ -133,6 +133,7 @@ static const char * annotMapFile;  // file containing a map from reference coord
 static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
+static bool fuzzy;
 
 static void resetOptions() {
 	mates1.clear();
@@ -232,6 +233,7 @@ static void resetOptions() {
 	fastaContLen			= 0;
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
+	fuzzy					= false; // reads will have alternate basecalls w/ qualities
 }
 
 // mating constraints
@@ -310,7 +312,8 @@ enum {
 	ARG_REFMAP,
 	ARG_ANNOTMAP,
 	ARG_REPORTSE,
-	ARG_HADOOPOUT
+	ARG_HADOOPOUT,
+	ARG_FUZZY
 };
 
 static struct option long_options[] = {
@@ -413,6 +416,7 @@ static struct option long_options[] = {
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
+	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1563,6 +1567,7 @@ static void parseOptions(int argc, char **argv) {
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
+			case ARG_FUZZY: fuzzy = true; break;
 			case ARG_REPORTSE: reportSe = true; break;
 			case ARG_PREFETCH_WIDTH:
 				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
@@ -1600,71 +1605,71 @@ static void parseOptions(int argc, char **argv) {
 	   			break;
 	   		case 'p':
 #ifndef BOWTIE_PTHREADS
-	   			cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
-	   			throw std::runtime_error("");
+				cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
+				throw std::runtime_error("");
 #endif
-	   			nthreads = parseInt(1, "-p/--threads arg must be at least 1");
-	   			break;
-	   		case ARG_FILEPAR:
+				nthreads = parseInt(1, "-p/--threads arg must be at least 1");
+				break;
+			case ARG_FILEPAR:
 #ifndef BOWTIE_PTHREADS
-	   			cerr << "--filepar is disabled because bowtie was not compiled with pthreads support" << endl;
-	   			throw std::runtime_error("");
+				cerr << "--filepar is disabled because bowtie was not compiled with pthreads support" << endl;
+				throw std::runtime_error("");
 #endif
-	   			fileParallel = true;
-	   			break;
-	   		case 'v':
-	   			maqLike = 0;
-	   			mismatches = parseInt(0, "-v arg must be at least 0");
-	   			if(mismatches > 3) {
-	   				cerr << "-v arg must be at most 3" << endl;
-	   				throw std::runtime_error("");
-	   			}
-	   			break;
-	   		case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
-	   		case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
-	   		case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
-	   		case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
-	   		case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
-	   		case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
-	   		case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
-	   		case 'h': printLongUsage(cout); exit(0); break;
-	   		case '?': printUsage(cerr); throw std::runtime_error(""); break;
-	   		case 'a': allHits = true; break;
-	   		case 'y': tryHard = true; break;
-	   		case ARG_RECAL: recal = true; break;
-	   		case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
-	   		case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
-	   		case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
-	   		case ARG_BETTER: stateful = true; better = true; oldBest = false; break;
-	   		case ARG_OLDBEST: oldBest = true; stateful = false; break;
-	   		case ARG_BEST: stateful = true; useV1 = false; oldBest = false; break;
-	   		case ARG_STRATA: strata = true; break;
-	   		case ARG_VERBOSE: verbose = true; break;
-	   		case ARG_STARTVERBOSE: startVerbose = true; break;
-	   		case ARG_QUIET: quiet = true; break;
-	   		case ARG_SANITY: sanityCheck = true; break;
-	   		case 't': timing = true; break;
-	   		case ARG_NO_FW: nofw = true; break;
-	   		case ARG_NO_RC: norc = true; break;
-	   		case ARG_STATS: stats = true; break;
-	   		case ARG_PEV2: useV1 = false; break;
+				fileParallel = true;
+				break;
+			case 'v':
+				maqLike = 0;
+				mismatches = parseInt(0, "-v arg must be at least 0");
+				if(mismatches > 3) {
+					cerr << "-v arg must be at most 3" << endl;
+					throw std::runtime_error("");
+				}
+				break;
+			case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
+			case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
+			case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
+			case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
+			case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
+			case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
+			case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
+			case 'h': printLongUsage(cout); exit(0); break;
+			case '?': printUsage(cerr); throw std::runtime_error(""); break;
+			case 'a': allHits = true; break;
+			case 'y': tryHard = true; break;
+			case ARG_RECAL: recal = true; break;
+			case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
+			case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
+			case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
+			case ARG_BETTER: stateful = true; better = true; oldBest = false; break;
+			case ARG_OLDBEST: oldBest = true; stateful = false; break;
+			case ARG_BEST: stateful = true; useV1 = false; oldBest = false; break;
+			case ARG_STRATA: strata = true; break;
+			case ARG_VERBOSE: verbose = true; break;
+			case ARG_STARTVERBOSE: startVerbose = true; break;
+			case ARG_QUIET: quiet = true; break;
+			case ARG_SANITY: sanityCheck = true; break;
+			case 't': timing = true; break;
+			case ARG_NO_FW: nofw = true; break;
+			case ARG_NO_RC: norc = true; break;
+			case ARG_STATS: stats = true; break;
+			case ARG_PEV2: useV1 = false; break;
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
 				break;
 			}
-	   		case ARG_DUMP_PATS: patDumpfile = optarg; break;
-	   		case ARG_STRAND_FIX: strandFix = true; break;
-	   		case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
-	   		case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
-	   		case ARG_ORIG:
-   				if(optarg == NULL || strlen(optarg) == 0) {
-   					cerr << "--orig arg must be followed by a string" << endl;
-   					printUsage(cerr);
-   					throw std::runtime_error("");
-   				}
-   				origString = optarg;
-	   			break;
+			case ARG_DUMP_PATS: patDumpfile = optarg; break;
+			case ARG_STRAND_FIX: strandFix = true; break;
+			case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
+			case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
+			case ARG_ORIG:
+				if(optarg == NULL || strlen(optarg) == 0) {
+					cerr << "--orig arg must be followed by a string" << endl;
+					printUsage(cerr);
+					throw std::runtime_error("");
+				}
+				origString = optarg;
+				break;
 
 			case -1: break; /* Done with options. */
 			case 0:
@@ -1760,6 +1765,10 @@ static void parseOptions(int argc, char **argv) {
 	}
 	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
 		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
+		throw std::runtime_error("");
+	}
+	if(fuzzy && (!stateful && !paired)) {
+		cerr << "--fuzzy must be combined with --best or paired-end alignment" << endl;
 		throw std::runtime_error("");
 	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
@@ -1892,18 +1901,14 @@ static inline void finishReadWithHitmask(PatternSourcePerThread* p,
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patRc  = p->bufa().patRc;  \
 	patRc.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualFw = p->bufa().qualFw; \
-	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualRc = p->bufa().qualRc; \
-	qualRc.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qual = p->bufa().qual; \
+	qual.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qualRev = p->bufa().qualRev; \
+	qualRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
 	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patRcRev  = p->bufa().patRcRev;  \
 	patRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualFwRev = p->bufa().qualFwRev; \
-	qualFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualRcRev = p->bufa().qualRcRev; \
-	qualRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();       \
@@ -1923,12 +1928,12 @@ static inline void finishReadWithHitmask(PatternSourcePerThread* p,
 	assert(!empty(p->bufa().patFw)); \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualFw = p->bufa().qualFw; \
-	qualFw.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qual = p->bufa().qual; \
+	qual.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
 	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualFwRev = p->bufa().qualFwRev; \
-	qualFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
+	String<char>& qualRev = p->bufa().qualRev; \
+	qualRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();
@@ -2166,16 +2171,16 @@ static void *exactSearchWorkerStateful(void *vp) {
 }
 
 #define SET_A_FW(bt, p, params) \
-	bt.setQuery(&p->bufa().patFw, &p->bufa().qualFw, &p->bufa().name); \
+	bt.setQuery(&p->bufa().patFw, &p->bufa().qual, &p->bufa().name); \
 	params.setFw(true);
 #define SET_A_RC(bt, p, params) \
-	bt.setQuery(&p->bufa().patRc, &p->bufa().qualRc, &p->bufa().name); \
+	bt.setQuery(&p->bufa().patRc, &p->bufa().qualRev, &p->bufa().name); \
 	params.setFw(false);
 #define SET_B_FW(bt, p, params) \
-	bt.setQuery(&p->bufb().patFw, &p->bufb().qualFw, &p->bufb().name); \
+	bt.setQuery(&p->bufb().patFw, &p->bufb().qual, &p->bufb().name); \
 	params.setFw(true);
 #define SET_B_RC(bt, p, params) \
-	bt.setQuery(&p->bufb().patRc, &p->bufb().qualRc, &p->bufb().name); \
+	bt.setQuery(&p->bufb().patRc, &p->bufb().qualRev, &p->bufb().name); \
 	params.setFw(false);
 
 /**
@@ -2726,7 +2731,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        os, \
 				patFw, \
 				plen, \
-		        qualFw, \
+		        qual, \
 		        name, \
 		        patid, \
 		        hits, \
@@ -2770,7 +2775,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		        os, \
 				patRc, \
 				plen, \
-		        qualRc, \
+		        qualRev, \
 		        name, \
 		        patid, \
 		        hits, \
@@ -2874,7 +2879,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	GreedyDFSRangeSource bt2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2882,13 +2887,13 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false);         // considerQuals
+	        &os,
+	        false);         // considerQuals
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) continue;
 		size_t plen = length(patFw);
@@ -2898,7 +2903,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_23mm_phase2.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
@@ -2910,7 +2915,7 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource bt3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2918,12 +2923,12 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false);         // considerQuals
+	        &os,
+	        false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2931,14 +2936,14 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false,          // considerQuals
-		    true);          // halfAndHalf
+	        &os,
+	        false,          // considerQuals
+	        true);          // halfAndHalf
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 		GET_READ(patsrc);
 		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		uint32_t plen = length(patFw);
@@ -2948,14 +2953,14 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 	WORKER_EXIT();
 }
 
 template<typename TStr>
 static void twoOrThreeMismatchSearch(
-		PairedPatternSource& _patsrc,   /// pattern source
+        PairedPatternSource& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -3000,7 +3005,7 @@ static void twoOrThreeMismatchSearch(
 
 	// Load forward index
 	SWITCH_TO_FW_INDEX();
-    { // Phase 1
+	{ // Phase 1
 		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
@@ -3163,7 +3168,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	GreedyDFSRangeSource btr1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3176,7 +3181,7 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        &os,
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3184,12 +3189,12 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false);         // considerQuals
+	        &os,
+	        false);         // considerQuals
 	GreedyDFSRangeSource bt3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3197,12 +3202,12 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false);         // considerQuals
+	        &os,
+	        false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3210,14 +3215,14 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
 	        NULL,           // seedlings
-		    NULL,           // mutations
+	        NULL,           // mutations
 	        verbose,        // verbose
-		    &os,
-		    false,          // considerQuals
-		    true);          // halfAndHalf
+	        &os,
+	        false,          // considerQuals
+	        true);          // halfAndHalf
 	bool skipped = false;
-    while(true) { // Read read-in loop
-    	FINISH_READ(patsrc);
+	while(true) { // Read read-in loop
+		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
 		uint32_t plen = length(patFw);
@@ -3229,9 +3234,9 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase2.c"
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
-    }
+	}
 	FINISH_READ(patsrc);
-    // Threads join at end of Phase 1
+	// Threads join at end of Phase 1
 	WORKER_EXIT();
 }
 
@@ -3339,7 +3344,7 @@ static BitPairReference*        seededQualSearch_refs;
 	HitSinkPerThread* sink = sinkFact->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
-			*sink,       /* HitSink */ \
+	        *sink,       /* HitSink */ \
 	        os,          /* reference sequences */ \
 	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
@@ -3356,7 +3361,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3368,7 +3373,7 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        &os,
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3381,16 +3386,16 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-    	GET_READ(patsrc);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
+		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
 		uint32_t qs5 = (qs >> 1) + (qs & 1);
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase1.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
@@ -3406,35 +3411,35 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
 	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
 	GreedyDFSRangeSource btf2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        NULL,                  // partial alignment manager
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	// GreedyDFSRangeSource to search for partial alignments for case 4R
 	GreedyDFSRangeSource btr2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        pamRc,                 // partial alignment manager
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
 		GET_READ(patsrc);
 		if(doneMask.test(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
@@ -3444,7 +3449,7 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase2.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
 	WORKER_EXIT();
 }
@@ -3461,14 +3466,14 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource btf3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        pamFw,                 // seedlings
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
@@ -3476,38 +3481,38 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	// GreedyDFSRangeSource to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	GreedyDFSRangeSource btr3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	// The half-and-half GreedyDFSRangeSource
 	GreedyDFSRangeSource btr23(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
-		    &os,
-		    true,    // considerQuals
-		    true,    // halfAndHalf
-		    !noMaqRound);
+	        &os,
+	        true,    // considerQuals
+	        true,    // halfAndHalf
+	        !noMaqRound);
 	vector<PartialAlignment> pals;
 	String<QueryMutation> muts;
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t qs = min<uint32_t>(plen, s);
@@ -3517,7 +3522,7 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase3.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
 	WORKER_EXIT();
 }
@@ -3533,28 +3538,28 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	// GreedyDFSRangeSource to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	GreedyDFSRangeSource btf4(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
 	// Half-and-half GreedyDFSRangeSource for forward read
 	GreedyDFSRangeSource btf24(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,
 	        true,    // considerQuals
@@ -3563,8 +3568,8 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	vector<PartialAlignment> pals;
 	String<QueryMutation> muts;
 	bool skipped = false;
-    while(true) {
-    	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
+	while(true) {
+		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 		GET_READ_FW(patsrc);
 		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
 		size_t plen = length(patFw);
@@ -3573,7 +3578,7 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 		#define DONEMASK_SET(p) doneMask.set(p)
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
-    }
+	}
 	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
 	WORKER_EXIT();
 }
@@ -3592,7 +3597,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3604,7 +3609,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        &os,
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3618,42 +3623,42 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        false, !noMaqRound);
 	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
 	GreedyDFSRangeSource btf2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        NULL,                  // partial alignment manager
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	// GreedyDFSRangeSource to search for partial alignments for case 4R
 	GreedyDFSRangeSource btr2(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        pamRc,                 // partial alignment manager
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
 	        false, !noMaqRound);
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource btf3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
 	        true,                  // reportExacts
 	        rangeMode,             // reportRanges
 	        pamFw,                 // seedlings
-		    NULL,                  // mutations
+	        NULL,                  // mutations
 	        verbose,               // verbose
 	        &os,                   // reference sequences
 	        true,                  // considerQuals
@@ -3661,58 +3666,58 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for hits for case 4R by extending
 	// the partial alignments found in Phase 2
 	GreedyDFSRangeSource btr3(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
 	// The half-and-half GreedyDFSRangeSource
 	GreedyDFSRangeSource btr23(
-			&ebwtFw, params,
+	        &ebwtFw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
-		    &os,
-		    true,    // considerQuals
-		    true,    // halfAndHalf
-		    !noMaqRound);
+	        &os,
+	        true,    // considerQuals
+	        true,    // halfAndHalf
+	        !noMaqRound);
 	// GreedyDFSRangeSource to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	GreedyDFSRangeSource btf4(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,     // reference sequences
 	        true,    // considerQuals
 	        false, !noMaqRound);
 	// Half-and-half GreedyDFSRangeSource for forward read
 	GreedyDFSRangeSource btf24(
-			&ebwtBw, params,
+	        &ebwtBw, params,
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
 	        true,    // reportExacts
 	        rangeMode,// reportRanges
 	        NULL,    // seedlings
-		    NULL,    // mutations
+	        NULL,    // mutations
 	        verbose, // verbose
 	        &os,
 	        true,    // considerQuals
@@ -3720,9 +3725,9 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        !noMaqRound);
 	String<QueryMutation> muts;
 	bool skipped = false;
-    while(true) {
-    	FINISH_READ(patsrc);
-    	GET_READ(patsrc);
+	while(true) {
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		size_t plen = length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -3736,7 +3741,7 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase3.c"
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
-    }
+	}
 	FINISH_READ(patsrc);
 	if(seedMms > 0) {
 		delete pamRc;
@@ -3844,8 +3849,8 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	delete pool;
 #ifdef BOWTIE_PTHREADS
 	if(tid > 0) {
-    	pthread_exit(NULL);
-    }
+		pthread_exit(NULL);
+	}
 #endif
 	return NULL;
 }
@@ -3863,7 +3868,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
  */
 template<typename TStr>
 static void seededQualCutoffSearch(
-		int seedLen,                  /// length of seed (not a maq option)
+        int seedLen,                  /// length of seed (not a maq option)
         int qualCutoff,               /// maximum sum of mismatch qualities
                                       /// like maq map's -e option
                                       /// default: 70
@@ -4064,7 +4069,7 @@ static void seededQualCutoffSearch(
  */
 template<typename TStr>
 static void seededQualCutoffSearchFull(
-		int seedLen,                    /// length of seed (not a maq option)
+        int seedLen,                    /// length of seed (not a maq option)
         int qualCutoff,                 /// maximum sum of mismatch qualities
                                         /// like maq map's -e option
                                         /// default: 70
@@ -4117,7 +4122,7 @@ static void seededQualCutoffSearchFull(
 		Timer _t(cerr, "Time loading mirror index: ", timing);
 		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
 	}
-    CHUD_START();
+	CHUD_START();
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
@@ -4166,7 +4171,8 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 		case FASTA:
 			return new FastaPatternSource (qs, randomizeQuals,
 			                               useSpinlock,
-			                               patDumpfile, trim3, trim5,
+			                               patDumpfile, verbose,
+			                               trim3, trim5,
 			                               forgiveInput,
 			                               skipReads);
 		case FASTA_CONT:
@@ -4174,38 +4180,41 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               qs, fastaContLen,
 			                               fastaContFreq,
 			                               useSpinlock,
-			                               patDumpfile,
+			                               patDumpfile, verbose,
 			                               skipReads);
 		case RAW:
 			return new RawPatternSource   (qs, randomizeQuals,
 			                               useSpinlock,
-			                               patDumpfile, trim3, trim5,
+			                               patDumpfile, verbose,
+			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
 			return new FastqPatternSource (qs, randomizeQuals,
 			                               useSpinlock,
-			                               patDumpfile, trim3, trim5,
+			                               patDumpfile, verbose,
+			                               trim3, trim5,
 			                               forgiveInput,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals, skipReads);
+			                               integerQuals, fuzzy,
+			                               skipReads);
 		case TAB_MATE:
 			return new TabbedPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
-			                               patDumpfile, trim3, trim5,
+			                               patDumpfile, verbose,
+			                               trim3, trim5,
 			                               forgiveInput,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(qs, randomizeQuals,
 			                               useSpinlock,
-			                               patDumpfile, trim3,
-			                               trim5, skipReads);
-		case INPUT_CHAIN:
-			return new ChainPatternSource (qs, useSpinlock, patDumpfile);
+			                               patDumpfile, verbose,
+			                               trim3, trim5,
+			                               skipReads);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
-			                               seed);
+			                               verbose, seed);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw std::runtime_error("");
@@ -4410,39 +4419,39 @@ static void driver(const char * type,
 	if(verbose || startVerbose) {
 		cerr << "About to initialize fw Ebwt: "; logTime(cerr, true);
 	}
-    Ebwt<TStr> ebwt(adjustedEbwtFileBase,
-                    true,     // index is for the forward direction
-                    /* overriding: */ offRate,
-                    /* overriding: */ isaRate,
-                    useMm,    // whether to use memory-mapped files
-                    useShmem, // whether to use shared memory
-                    mmSweep,  // sweep memory-mapped files
-                    !noRefNames, // load names?
-                    rmap,     // reference map, or NULL if none is needed
-                    verbose, // whether to be talkative
-                    startVerbose, // talkative during initialization
-                    false /*passMemExc*/,
-                    sanityCheck);
-    Ebwt<TStr>* ebwtBw = NULL;
-    // We need the mirror index if mismatches are allowed
-    if(mismatches > 0 || maqLike) {
-    	if(verbose || startVerbose) {
-    		cerr << "About to initialize rev Ebwt: "; logTime(cerr, true);
-    	}
-    	ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
-    	                        false, // index is for the reverse direction
-    	                        /* overriding: */ offRate,
-    	                        /* overriding: */ isaRate,
-    	                        useMm,    // whether to use memory-mapped files
-    	                        useShmem, // whether to use shared memory
-    	                        mmSweep,  // sweep memory-mapped files
-    	                        !noRefNames, // load names?
-    	                        rmap,     // reference map, or NULL if none is needed
-    	                        verbose,  // whether to be talkative
-    	                        startVerbose, // talkative during initialization
-    	                        false /*passMemExc*/,
-    	                        sanityCheck);
-    }
+	Ebwt<TStr> ebwt(adjustedEbwtFileBase,
+	                true,     // index is for the forward direction
+	                /* overriding: */ offRate,
+	                /* overriding: */ isaRate,
+	                useMm,    // whether to use memory-mapped files
+	                useShmem, // whether to use shared memory
+	                mmSweep,  // sweep memory-mapped files
+	                !noRefNames, // load names?
+	                rmap,     // reference map, or NULL if none is needed
+	                verbose, // whether to be talkative
+	                startVerbose, // talkative during initialization
+	                false /*passMemExc*/,
+	                sanityCheck);
+	Ebwt<TStr>* ebwtBw = NULL;
+	// We need the mirror index if mismatches are allowed
+	if(mismatches > 0 || maqLike) {
+		if(verbose || startVerbose) {
+			cerr << "About to initialize rev Ebwt: "; logTime(cerr, true);
+		}
+		ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
+		                        false, // index is for the reverse direction
+		                        /* overriding: */ offRate,
+		                        /* overriding: */ isaRate,
+		                        useMm,    // whether to use memory-mapped files
+		                        useShmem, // whether to use shared memory
+		                        mmSweep,  // sweep memory-mapped files
+		                        !noRefNames, // load names?
+		                        rmap,     // reference map, or NULL if none is needed
+		                        verbose,  // whether to be talkative
+		                        startVerbose, // talkative during initialization
+		                        false /*passMemExc*/,
+		                        sanityCheck);
+	}
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt
 		// against original strings
@@ -4459,9 +4468,9 @@ static void driver(const char * type,
 	}
 	{
 		Timer _t(cerr, "Time searching: ", timing);
-    	if(verbose || startVerbose) {
-    		cerr << "Creating HitSink: "; logTime(cerr, true);
-    	}
+		if(verbose || startVerbose) {
+			cerr << "Creating HitSink: "; logTime(cerr, true);
+		}
 		// Set up hit sink; if sanityCheck && !os.empty() is true,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
@@ -4539,13 +4548,13 @@ static void driver(const char * type,
 		if(maqLike) {
 			if(!fullIndex) {
 				seededQualCutoffSearch(seedLen,
-									   qualThresh,
-									   seedMms,
-									   *patsrc,
-									   *sink,
-									   ebwt,    // forward index
-									   *ebwtBw, // mirror index (not optional)
-									   os);     // references, if available
+				                       qualThresh,
+				                       seedMms,
+				                       *patsrc,
+				                       *sink,
+				                       ebwt,    // forward index
+				                       *ebwtBw, // mirror index (not optional)
+				                       os);     // references, if available
 			} else {
 				seededQualCutoffSearchFull(seedLen,
 				                           qualThresh,

@@ -369,73 +369,73 @@ static int parseNumber(T lower, const char *errmsg) {
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
-    int option_index = 0;
+	int option_index = 0;
 	int next_option;
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
-	   		case 'f': format = FASTA; break;
-	   		case 'c': format = CMDLINE; break;
-	   		case 'p': packed = true; break;
-	   		case 'l':
-   				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
-	   			break;
-	   		case 'i':
-	   			linesPerSide = parseNumber<int>(1, "-i/--linesPerSide arg must be at least 1");
-	   			break;
-	   		case 'o':
-	   			offRate = parseNumber<int>(0, "-o/--offRate arg must be at least 0");
-	   			break;
-	   		case ARG_ISARATE:
-	   			isaRate = parseNumber<int>(0, "--isaRate arg must be at least 0");
-	   			break;
-	   		case '3':
-	   			justRef = true;
-	   			break;
-	   		case 't':
-	   			ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
-	   			break;
-	   		case 'n':
-	   			// all f-s is used to mean "not set", so put 'e' on end
-	   			bmax = 0xfffffffe;
-	   			break;
-	   		case 'h':
+			case 'f': format = FASTA; break;
+			case 'c': format = CMDLINE; break;
+			case 'p': packed = true; break;
+			case 'l':
+				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
+				break;
+			case 'i':
+				linesPerSide = parseNumber<int>(1, "-i/--linesPerSide arg must be at least 1");
+				break;
+			case 'o':
+				offRate = parseNumber<int>(0, "-o/--offRate arg must be at least 0");
+				break;
+			case ARG_ISARATE:
+				isaRate = parseNumber<int>(0, "--isaRate arg must be at least 0");
+				break;
+			case '3':
+				justRef = true;
+				break;
+			case 't':
+				ftabChars = parseNumber<int>(1, "-t/--ftabChars arg must be at least 1");
+				break;
+			case 'n':
+				// all f-s is used to mean "not set", so put 'e' on end
+				bmax = 0xfffffffe;
+				break;
+			case 'h':
 				printLongUsage(cout);
 				exit(0);
 				break;
-	   		case '?':
+			case '?':
 				printUsage(cerr);
 				exit(0);
 				break;
-	   		case ARG_BMAX:
-	   			bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
-	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt
-	   			bmaxDivN = 0xffffffff;     // don't use multSqrt
-	   			break;
-	   		case ARG_BMAX_MULT:
-	   			bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxmultsqrt arg must be at least 1");
-	   			bmax = 0xffffffff;     // don't use bmax
-	   			bmaxDivN = 0xffffffff; // don't use multSqrt
-	   			break;
-	   		case ARG_BMAX_DIV:
-	   			bmaxDivN = parseNumber<uint32_t>(1, "--bmaxdivn arg must be at least 1");
-	   			bmax = 0xffffffff;         // don't use bmax
-	   			bmaxMultSqrt = 0xffffffff; // don't use multSqrt
-	   			break;
-	   		case ARG_DCV:
-	   			dcv = parseNumber<int>(3, "--dcv arg must be at least 3");
-	   			break;
-	   		case ARG_SEED:
-	   			seed = parseNumber<int>(0, "--seed arg must be at least 0");
-	   			break;
-	   		case ARG_CUTOFF:
-	   			cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
-	   			break;
-	   		case ARG_NTOA: nsToAs = true; break;
-	   		case 'a': autoMem = false; break;
-	   		case 'q': verbose = false; break;
-	   		case 's': sanityCheck = true; break;
-	   		case 'r': writeRef = false; break;
+			case ARG_BMAX:
+				bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
+				bmaxMultSqrt = 0xffffffff; // don't use multSqrt
+				bmaxDivN = 0xffffffff;     // don't use multSqrt
+				break;
+			case ARG_BMAX_MULT:
+				bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxmultsqrt arg must be at least 1");
+				bmax = 0xffffffff;     // don't use bmax
+				bmaxDivN = 0xffffffff; // don't use multSqrt
+				break;
+			case ARG_BMAX_DIV:
+				bmaxDivN = parseNumber<uint32_t>(1, "--bmaxdivn arg must be at least 1");
+				bmax = 0xffffffff;         // don't use bmax
+				bmaxMultSqrt = 0xffffffff; // don't use multSqrt
+				break;
+			case ARG_DCV:
+				dcv = parseNumber<int>(3, "--dcv arg must be at least 3");
+				break;
+			case ARG_SEED:
+				seed = parseNumber<int>(0, "--seed arg must be at least 0");
+				break;
+			case ARG_CUTOFF:
+				cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
+				break;
+			case ARG_NTOA: nsToAs = true; break;
+			case 'a': autoMem = false; break;
+			case 'q': verbose = false; break;
+			case 's': sanityCheck = true; break;
+			case 'r': writeRef = false; break;
 
 			case -1: /* Done with options. */
 				break;
@@ -450,8 +450,8 @@ static void parseOptions(int argc, char **argv) {
 	} while(next_option != -1);
 	if(bmax < 40) {
 		cerr << "Warning: specified bmax is very small (" << bmax << ").  This can lead to" << endl
-		      << "extremely slow performance and memory exhaustion.  Perhaps you meant to specify" << endl
-		      << "a small --bmaxdivn?" << endl;
+		     << "extremely slow performance and memory exhaustion.  Perhaps you meant to specify" << endl
+		     << "a small --bmaxdivn?" << endl;
 	}
 }
 
@@ -554,8 +554,8 @@ static void driver(const string& infile,
 	                !reverse,     // fw
 	                !entireSA,    // useBlockwise
 	                bmax,         // block size for blockwise SA builder
-                    bmaxMultSqrt, // block size as multiplier of sqrt(len)
-                    bmaxDivN,     // block size as divisor of len
+	                bmaxMultSqrt, // block size as multiplier of sqrt(len)
+	                bmaxDivN,     // block size as divisor of len
 	                noDc? 0 : dcv,// difference-cover period
 	                is,           // list of input streams
 	                szs,          // list of reference sizes

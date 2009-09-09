@@ -380,7 +380,7 @@ public:
 		if(patsrc->bufa().length() < 4) {
 			if(!quiet_) {
 				cerr << "Warning: Skipping read " << patsrc->bufa().name
-					 << " because it is less than 4 characters long" << endl;
+				     << " because it is less than 4 characters long" << endl;
 			}
 			this->done = true;
 			sinkPt_->finishRead(*patsrc_, true, true);
@@ -414,8 +414,8 @@ public:
 		return params_->reportHit(
 				ra.fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
 				        (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
-				ra.fw ? (ebwtFw? &bufa_->qualFw : &bufa_->qualFwRev) :
-				        (ebwtFw? &bufa_->qualRc : &bufa_->qualRcRev),
+				ra.fw ? (ebwtFw? &bufa_->qual    : &bufa_->qualRev) :
+				        (ebwtFw? &bufa_->qualRev : &bufa_->qual),
 				&bufa_->name,
 				ra.ebwt->rmap(),
 				ebwtFw,
@@ -811,8 +811,8 @@ protected:
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
 					    (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
-				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
-					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
+				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
+				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
 				rmap,
 				ebwtFwL,
@@ -835,8 +835,8 @@ protected:
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
 					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
-				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
-					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
+				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
+				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
 				rmap,
 				ebwtFwR,
@@ -968,10 +968,10 @@ protected:
 		                                        patsrc_->bufa().patRc);
 		// 'seq' gets qualities of outstanding mate w/r/t the forward
 		// reference strand
-		const String<char>& qual = fw ? (off1 ? patsrc_->bufb().qualFw  :
-		                                        patsrc_->bufa().qualFw) :
-		                                (off1 ? patsrc_->bufb().qualRc  :
-		                                        patsrc_->bufa().qualRc);
+		const String<char>& qual = fw ? (off1 ? patsrc_->bufb().qual  :
+		                                        patsrc_->bufa().qual) :
+		                                (off1 ? patsrc_->bufb().qualRev  :
+		                                        patsrc_->bufa().qualRev);
 		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (off1 ? patsrc_->bufa().length() :
 		                        patsrc_->bufb().length());
@@ -1030,16 +1030,16 @@ protected:
 			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
 			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
 			if(report(
-					matchRight ? range : r, // range for upstream mate
+			        matchRight ? range : r, // range for upstream mate
 			        matchRight ? r : range, // range for downstream mate
-				    tidx,                   // ref idx
-				    matchRight ? toff : result, // upstream offset
+			        tidx,                   // ref idx
+			        matchRight ? toff : result, // upstream offset
 			        matchRight ? result : toff, // downstream offset
-				    tlen,       // length of ref
-				    !doneFw_,   // whether the pair is being mapped to fw strand
-				    ebwtLFw,
-				    ebwtRFw,
-				    range.ebwt->rmap())) return true;
+			        tlen,       // length of ref
+			        !doneFw_,   // whether the pair is being mapped to fw strand
+			        ebwtLFw,
+			        ebwtRFw,
+			        range.ebwt->rmap())) return true;
 		}
 		return false;
 	}
@@ -1546,7 +1546,7 @@ public:
 		if(patsrc->bufa().length() < 4 || patsrc->bufb().length() < 4) {
 			if(!quiet_) {
 				cerr << "Warning: Skipping pair " << patsrc->bufa().name
-					 << " because a mate is less than 4 characters long" << endl;
+				     << " because a mate is less than 4 characters long" << endl;
 			}
 			this->done = true;
 			sinkPt_->finishRead(*patsrc_, true, true);
@@ -1588,8 +1588,8 @@ public:
 				const Range& r = driver_->range();
 				assert(r.repOk());
 				resolveOutstanding(
-						rchase_->off(),
-					 	r.ebwt->_plen[rchase_->off().first], r);
+					rchase_->off(),
+					r.ebwt->_plen[rchase_->off().first], r);
 				rchase_->reset();
 			} else {
 				assert(rchase_->done);
@@ -1708,9 +1708,9 @@ protected:
 		// Print upstream mate first
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
-					    (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
-				rL.fw ? (ebwtFwL? &bufL->qualFw : &bufL->qualFwRev) :
-					    (ebwtFwL? &bufL->qualRc : &bufL->qualRcRev),
+				        (ebwtFwL?  bufL->patRc  :  bufL->patRcRev),
+				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
+				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
 				rmap,
 				ebwtFwL,
@@ -1732,9 +1732,9 @@ protected:
 		params_->setFw(rR.fw);
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
-					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
-				rR.fw ? (ebwtFwR? &bufR->qualFw : &bufR->qualFwRev) :
-					    (ebwtFwR? &bufR->qualRc : &bufR->qualRcRev),
+				        (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
+				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
+				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
 				rmap,
 				ebwtFwR,
@@ -1767,10 +1767,10 @@ protected:
 		uint32_t len = r.mate1 ? alen_ : blen_;
 		// Print upstream mate first
 		if(params->reportHit(
-			r.fw ? (ebwtFw?  buf->patFw  :  buf->patFwRev) :
-			       (ebwtFw?  buf->patRc  :  buf->patRcRev),
-			r.fw ? (ebwtFw? &buf->qualFw : &buf->qualFwRev) :
-			       (ebwtFw? &buf->qualRc : &buf->qualRcRev),
+			r.fw ? (ebwtFw?  buf->patFw   :  buf->patFwRev) :
+			       (ebwtFw?  buf->patRc   :  buf->patRcRev),
+			r.fw ? (ebwtFw? &buf->qual    : &buf->qualRev) :
+			       (ebwtFw? &buf->qualRev : &buf->qual),
 			&buf->name,
 			r.ebwt->rmap(),
 			ebwtFw,
@@ -1855,13 +1855,11 @@ protected:
 		                        patsrc_->bufa().patRc);
 		// 'qual' = qualities for opposite mate
 		const String<char>& qual =
-			fw ? (range.mate1 ? patsrc_->bufb().qualFw  :
-		                        patsrc_->bufa().qualFw) :
-		         (range.mate1 ? patsrc_->bufb().qualRc  :
-		                        patsrc_->bufa().qualRc);
-		// qlen = length of opposite mate
-		uint32_t qlen = seqan::length(seq);
-		// alen = length of anchor mate
+			fw ? (range.mate1 ? patsrc_->bufb().qual  :
+			                    patsrc_->bufa().qual) :
+			     (range.mate1 ? patsrc_->bufb().qualRev :
+			                    patsrc_->bufa().qualRev);
+		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
 		// Don't even try if either of the mates is longer than the

@@ -78,9 +78,9 @@ public:
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rFw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 			*params, rFw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -90,7 +90,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
+			os_, verbose_, quiet_, true, pool_, NULL);
 		//
 		EbwtRangeSourceDriver * drFw_Fw = new EbwtRangeSourceDriver(
 			*params, rFw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -100,7 +100,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
+			os_, verbose_, quiet_, true, pool_, NULL);
 		TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
 		if(doFw_) {
 			drVec->push_back(drFw_Bw);
@@ -108,9 +108,9 @@ public:
 		}
 
 		EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 			*params, rRc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -120,7 +120,7 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
+			os_, verbose_, quiet_, true, pool_, NULL);
 		//
 		EbwtRangeSourceDriver * drRc_Bw = new EbwtRangeSourceDriver(
 			*params, rRc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -130,12 +130,12 @@ public:
 			PIN_TO_LEN, // allow 1 mismatch in rest of read
 			PIN_TO_LEN, // "
 			PIN_TO_LEN, // "
-			os_, verbose_, true, pool_, NULL);
+			os_, verbose_, quiet_, true, pool_, NULL);
 		if(doRc_) {
 			drVec->push_back(drRc_Fw);
 			drVec->push_back(drRc_Bw);
 		}
-		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_);
+		TCostAwareRangeSrcDr* dr = new TCostAwareRangeSrcDr(strandFix_, drVec, verbose_, quiet_, false);
 		delete drVec;
 
 		// Set up a RangeChaser
@@ -145,8 +145,8 @@ public:
 		// Set up the aligner
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			quiet_, INT_MAX, pool_, NULL, NULL);
+			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, quiet_,
+			INT_MAX, pool_, NULL, NULL);
 	}
 
 private:
@@ -284,9 +284,9 @@ public:
 		dr1FwVec = new TRangeSrcDrPtrVec();
 		if(do1Fw) {
 			EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
 				*params, r1Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -296,7 +296,7 @@ public:
 				PIN_TO_LEN, // allow 1 mismatch in rest of read
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, true, pool_, NULL);
+				os_, verbose_, quiet_, true, pool_, NULL);
 			EbwtRangeSourceDriver * dr1Fw_Fw = new EbwtRangeSourceDriver(
 				*params, r1Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen
@@ -305,7 +305,7 @@ public:
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, true, pool_, NULL);
+				os_, verbose_, quiet_, true, pool_, NULL);
 
 			dr1FwVec->push_back(dr1Fw_Bw);
 			dr1FwVec->push_back(dr1Fw_Fw);
@@ -319,9 +319,9 @@ public:
 		}
 		if(do1Rc) {
 			EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
 				*params, r1Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -331,7 +331,7 @@ public:
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, true, pool_, NULL);
+				os_, verbose_, quiet_, true, pool_, NULL);
 			EbwtRangeSourceDriver * dr1Rc_Bw = new EbwtRangeSourceDriver(
 				*params, r1Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen (0 = whole read is seed)
@@ -340,7 +340,7 @@ public:
 				PIN_TO_LEN, // allow 1 mismatch in rest of read
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, true, pool_, NULL);
+				os_, verbose_, quiet_, true, pool_, NULL);
 			dr1RcVec->push_back(dr1Rc_Fw);
 			dr1RcVec->push_back(dr1Rc_Bw);
 		}
@@ -353,9 +353,9 @@ public:
 		}
 		if(do2Fw) {
 			EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
 				*params, r2Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -365,7 +365,7 @@ public:
 				PIN_TO_LEN, // allow 1 mismatch in rest of read
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, false, pool_, NULL);
+				os_, verbose_, quiet_, false, pool_, NULL);
 			EbwtRangeSourceDriver * dr2Fw_Fw = new EbwtRangeSourceDriver(
 				*params, r2Fw_Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen
@@ -374,7 +374,7 @@ public:
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, false, pool_, NULL);
+				os_, verbose_, quiet_, false, pool_, NULL);
 			dr2FwVec->push_back(dr2Fw_Bw);
 			dr2FwVec->push_back(dr2Fw_Fw);
 		}
@@ -387,9 +387,9 @@ public:
 		}
 		if(do2Rc) {
 			EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, false, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
 				*params, r2Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -399,7 +399,7 @@ public:
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, false, pool_, NULL);
+				os_, verbose_, quiet_, false, pool_, NULL);
 			EbwtRangeSourceDriver * dr2Rc_Bw = new EbwtRangeSourceDriver(
 				*params, r2Rc_Bw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen (0 = whole read is seed)
@@ -408,12 +408,12 @@ public:
 				PIN_TO_LEN, // allow 1 mismatch in rest of read
 				PIN_TO_LEN, // "
 				PIN_TO_LEN, // "
-				os_, verbose_, false, pool_, NULL);
+				os_, verbose_, quiet_, false, pool_, NULL);
 			dr2RcVec->push_back(dr2Rc_Fw);
 			dr2RcVec->push_back(dr2Rc_Bw);
 		}
 
-		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(0);
+		RefAligner<String<Dna5> >* refAligner = new OneMMRefAligner<String<Dna5> >(verbose_, quiet_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -422,10 +422,10 @@ public:
 		if(v1_) {
 			PairedBWAlignerV1<EbwtRangeSource>* al = new PairedBWAlignerV1<EbwtRangeSource>(
 				params,
-				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_),
-				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_),
-				new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_),
-				new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_),
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, quiet_, false),
+				new TCostAwareRangeSrcDr(strandFix_, dr1RcVec, verbose_, quiet_, false),
+				new TCostAwareRangeSrcDr(strandFix_, dr2FwVec, verbose_, quiet_, false),
+				new TCostAwareRangeSrcDr(strandFix_, dr2RcVec, verbose_, quiet_, false),
 				refAligner, rchase,
 				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
@@ -439,7 +439,7 @@ public:
 		} else {
 			PairedBWAlignerV2<EbwtRangeSource>* al = new PairedBWAlignerV2<EbwtRangeSource>(
 				params, paramsSe1, paramsSe2,
-				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, true),
+				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, quiet_, true),
 				refAligner, rchase,
 				sink_, sinkPtFactory_,
 				sinkPt, sinkPtSe1, sinkPtSe2,

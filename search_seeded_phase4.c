@@ -35,7 +35,7 @@
 				seqan::clear(muts);
 				uint8_t oldQuals =
 					PartialAlignmentManager::toMutsString(
-							pals[i], patFwRev, qualFwRev, muts, !noMaqRound);
+						pals[i], patFwRev, qualRev, muts, !noMaqRound);
 				assert_leq(oldQuals, qualThresh);
 				// Set the backtracking thresholds appropriately
 				// Now begin the backtracking, treating the first

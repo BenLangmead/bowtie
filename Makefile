@@ -67,7 +67,7 @@ SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp log.cpp hit_set.cpp refmap.cpp annot.cpp
-OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c shmem.cpp
+OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c shmem.cpp edit.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 MAQ_H   = $(wildcard maq_convert/*.h)
 MAQ_CPP	= maq_convert/const.c \

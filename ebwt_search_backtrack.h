@@ -90,41 +90,37 @@ public:
 		const bool ebwtFw = _ebwt->fw();
 		if(ebwtFw) {
 			_qry  = fw ? &r.patFw : &r.patRc;
-			_qual = fw ? &r.qualFw : &r.qualRc;
+			_qual = fw ? &r.qual  : &r.qualRev;
 		} else {
 			_qry  = fw ? &r.patFwRev : &r.patRcRev;
-			_qual = fw ? &r.qualFwRev : &r.qualRcRev;
+			_qual = fw ? &r.qualRev  : &r.qual;
 		}
 		_name = &r.name;
-		assert(_qry != NULL);
-		assert(_qual != NULL);
-		assert(_name != NULL);
-		// Make sure every qual is a valid qual ASCII character (>= 33)
-		for(size_t i = 0; i < length(*_qual); i++) {
-			assert_geq((*_qual)[i], 33);
-		}
 		// Reset _qlen
 		if(length(*_qry) > _qlen) {
-			_qlen = length(*_qry);
-			// Resize _pairs
-	 		if(_pairs != NULL) { delete[] _pairs; }
-	 		_pairs = new uint32_t[_qlen*_qlen*8];
-	 		// Resize _elims
-	 		if(_elims != NULL) { delete[] _elims; }
-	 		_elims = new uint8_t[_qlen*_qlen];
-	 		memset(_elims, 0, _qlen*_qlen);
-			// Resize _chars
-	 		if(_chars != NULL) { delete[] _chars; }
-			_chars = new char[_qlen];
-			assert(_pairs != NULL);
-			assert(_elims != NULL);
-			assert(_chars != NULL);
+			try {
+				_qlen = length(*_qry);
+				// Resize _pairs
+				if(_pairs != NULL) { delete[] _pairs; }
+				_pairs = new uint32_t[_qlen*_qlen*8];
+				// Resize _elims
+				if(_elims != NULL) { delete[] _elims; }
+				_elims = new uint8_t[_qlen*_qlen];
+				memset(_elims, 0, _qlen*_qlen);
+				// Resize _chars
+				if(_chars != NULL) { delete[] _chars; }
+				_chars = new char[_qlen];
+				assert(_pairs != NULL && _elims != NULL && _chars != NULL);
+			} catch(std::bad_alloc& e) {
+				cerr << "Unable to allocate memory for depth-first "
+				     << "backtracking search; new length = " << length(*_qry)
+				     << endl;
+				exit(1);
+			}
 		} else {
 			// New length is less than old length, so there's no need
 			// to resize any data structures.
-			assert(_pairs != NULL);
-			assert(_elims != NULL);
-			assert(_chars != NULL);
+			assert(_pairs != NULL && _elims != NULL && _chars != NULL);
 			_qlen = length(*_qry);
 		}
 		_mms.clear();
@@ -142,13 +138,13 @@ public:
 	 * Apply a batch of mutations to this read, possibly displacing a
 	 * previous batch of mutations.
 	 */
-	void setMuts(String<QueryMutation>* __muts) {
+	void setMuts(String<QueryMutation>* muts) {
 		if(_muts != NULL) {
 			// Undo previous mutations
 			assert_gt(length(*_muts), 0);
 			undoPartialMutations();
 		}
-		_muts = __muts;
+		_muts = muts;
 		if(_muts != NULL) {
 			assert_gt(length(*_muts), 0);
 			applyPartialMutations();
@@ -158,48 +154,60 @@ public:
 	/**
 	 * Set backtracking constraints.
 	 */
-	void setOffs(uint32_t __5depth,   // depth of far edge of hi-half
-	             uint32_t __3depth,   // depth of far edge of lo-half
-	             uint32_t __unrevOff, // depth above which we cannot backtrack
-	             uint32_t __1revOff,  // depth above which we may backtrack just once
-	             uint32_t __2revOff,  // depth above which we may backtrack just twice
-	             uint32_t __3revOff)  // depth above which we may backtrack just three times
+	void setOffs(uint32_t depth5,   // depth of far edge of hi-half
+	             uint32_t depth3,   // depth of far edge of lo-half
+	             uint32_t unrevOff, // depth above which we cannot backtrack
+	             uint32_t revOff1,  // depth above which we may backtrack just once
+	             uint32_t revOff2,  // depth above which we may backtrack just twice
+	             uint32_t revOff3)  // depth above which we may backtrack just three times
 	{
-		_5depth   = __5depth;
-		_3depth   = __3depth;
-		assert_geq(_3depth, _5depth);
-		_unrevOff = __unrevOff;
-		_1revOff  = __1revOff;
-		_2revOff  = __2revOff;
-		_3revOff  = __3revOff;
+		_5depth   = depth5;
+		_3depth   = depth3;
+		assert_geq(depth3, depth5);
+		_unrevOff = unrevOff;
+		_1revOff  = revOff1;
+		_2revOff  = revOff2;
+		_3revOff  = revOff3;
 	}
 
-	/// Reset number of backtracks to 0
+	/**
+	 * Reset number of backtracks to 0.
+	 */
 	void resetNumBacktracks() {
 		_totNumBts = 0;
 	}
 
-	/// Return number of backtracks since last reset
+	/**
+	 * Return number of backtracks since the last time the count was
+	 * reset.
+	 */
 	uint32_t numBacktracks() {
 		return _totNumBts;
 	}
 
+	/**
+	 * Set whether to report exact hits.
+	 */
 	void setReportExacts(int stratum) {
 		_reportExacts = stratum;
 	}
 
+	/**
+	 * Set the Bowtie index to search against.
+	 */
 	void setEbwt(const Ebwt<String<Dna> >* ebwt) {
 		_ebwt = ebwt;
 	}
 
-	/// Return the current range
+	/**
+	 * Return the current range
+	 */
 	Range& range() {
 		return _curRange;
 	}
 
 	/**
-	 * Set _qlen according to parameter, except don't let it fall below
-	 * the length of the query.
+	 * Set _qlen.  Don't let it exceed length of query.
 	 */
 	void setQlen(uint32_t qlen) {
 		assert(_qry != NULL);
@@ -401,13 +409,13 @@ public:
 		}
 		if(_verbose) {
 			cout << "  backtrack(stackDepth=" << stackDepth << ", "
-                 << "depth=" << depth << ", "
-                 << "top=" << top << ", "
-                 << "bot=" << bot << ", "
-                 << "ham=" << ham << ", "
-                 << "iham=" << iham << ", "
-                 << "pairs=" << pairs << ", "
-                 << "elims=" << (void*)elims << "): \"";
+			     << "depth=" << depth << ", "
+			     << "top=" << top << ", "
+			     << "bot=" << bot << ", "
+			     << "ham=" << ham << ", "
+			     << "iham=" << iham << ", "
+			     << "pairs=" << pairs << ", "
+			     << "elims=" << (void*)elims << "): \"";
 			for(int i = (int)depth - 1; i >= 0; i--) {
 				cout << _chars[i];
 			}
@@ -432,15 +440,11 @@ public:
 			}
 			_numBts++;
 		}
-		// The total number of ranges that are acceptable
-		// backtracking targets ("alternative" ranges)
+		// # positions with at least one legal outgoing path
 		uint32_t altNum = 0;
-		// The total number of ranges that are candidates to be
-		// the *next* backtracking target because they are low quality
-		// ("eligible" ranges)
+		// # positions tied for "best" outgoing qual
 		uint32_t eligibleNum = 0;
-		// Total distance between all lowest-quality "alternative"
-		// ranges that haven't yet been eliminated
+		// total range-size for all eligibles
 		uint32_t eligibleSz = 0;
 		// If there is just one eligible slot at the moment (a common
 		// case), these are its parameters
@@ -788,7 +792,7 @@ public:
 						assert_geq(i, unrevOff);
 						icur = _qlen - i - 1; // current offset into _qry
 						uint8_t qi = qualAt(icur);
-						assert_lt(elims[i], 16); // 1.26% in profile (next or prev?)
+						assert_lt(elims[i], 16);
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 							// This is the leftmost eligible position with at
 							// least one remaining backtrack target
@@ -956,16 +960,16 @@ public:
 						assert_leq(iham, _qualThresh);
 						ret = backtrack(stackDepth+1,
 						                ebwt._eh._ftabChars,
-					                    btUnrevOff,  // new unrevisitable boundary
-					                    btOneRevOff, // new 1-revisitable boundary
-					                    btTwoRevOff, // new 2-revisitable boundary
-					                    btThreeRevOff, // new 3-revisitable boundary
-					                    ftabTop,  // top arrow in range prior to 'depth'
-					                    ftabBot,  // bottom arrow in range prior to 'depth'
-					                    btham,  // weighted hamming distance so far
-					                    iham,   // initial weighted hamming distance
-					                    newPairs,
-					                    newElims);
+						                btUnrevOff,  // new unrevisitable boundary
+						                btOneRevOff, // new 1-revisitable boundary
+						                btTwoRevOff, // new 2-revisitable boundary
+						                btThreeRevOff, // new 3-revisitable boundary
+						                ftabTop,  // top arrow in range prior to 'depth'
+						                ftabBot,  // bottom arrow in range prior to 'depth'
+						                btham,  // weighted hamming distance so far
+						                iham,   // initial weighted hamming distance
+						                newPairs,
+						                newElims);
 					}
 				} else {
 					// We already called initFromTopBot for the range
@@ -974,17 +978,17 @@ public:
 					assert_leq(iham, _qualThresh);
 					// Continue from selected alternative range
 					ret = backtrack(stackDepth+1,// added 1 mismatch to alignment
-				                    i+1,         // start from next position after
-				                    btUnrevOff,  // new unrevisitable boundary
-				                    btOneRevOff, // new 1-revisitable boundary
-				                    btTwoRevOff, // new 2-revisitable boundary
-				                    btThreeRevOff, // new 3-revisitable boundary
-				                    bttop,  // top arrow in range prior to 'depth'
-				                    btbot,  // bottom arrow in range prior to 'depth'
-				                    btham,  // weighted hamming distance so far
-				                    iham,   // initial weighted hamming distance
-				                    newPairs,
-				                    newElims);
+					                i+1,         // start from next position after
+					                btUnrevOff,  // new unrevisitable boundary
+					                btOneRevOff, // new 1-revisitable boundary
+					                btTwoRevOff, // new 2-revisitable boundary
+					                btThreeRevOff, // new 3-revisitable boundary
+					                bttop,  // top arrow in range prior to 'depth'
+					                btbot,  // bottom arrow in range prior to 'depth'
+					                btham,  // weighted hamming distance so far
+					                iham,   // initial weighted hamming distance
+					                newPairs,
+					                newElims);
 				}
 				if(ret) {
 					assert_gt(sink.numValidHits(), prehits);
@@ -1350,6 +1354,10 @@ protected:
 		return true;
 	}
 
+	/**
+	 * Return the Phred quality value for the most likely base at
+	 * offset 'off' in the read.
+	 */
 	inline uint8_t qualAt(size_t off) {
 		return phredCharToPhredQual((*_qual)[off]);
 	}
@@ -1604,8 +1612,8 @@ protected:
 		if(_reportRanges) {
 			assert(_params.arrowMode());
 			return _ebwt->report((*_qry), _qual, _name,
-                    _mms, _refcs, stackDepth, 0,
-                    top, bot, _qlen, stratum, cost, _params);
+			         _mms, _refcs, stackDepth, 0,
+			         top, bot, _qlen, stratum, cost, _params);
 		}
 		uint32_t spread = bot - top;
 		// Pick a random spot in the range to begin report
@@ -1833,8 +1841,8 @@ protected:
 		assert_gt(retainedHits.size(), 0);
 		if(oracleHits.size() == 0) {
 			::printHit(
-					(*_os), retainedHits.back(), (*_qry), _qlen, _unrevOff,
-					_1revOff, _2revOff, _3revOff, _ebwt->fw());
+				(*_os), retainedHits.back(), (*_qry), _qlen, _unrevOff,
+				_1revOff, _2revOff, _3revOff, _ebwt->fw());
 		}
 		// If we found a hit, it had better be one of the ones
 		// that the oracle found
@@ -1845,14 +1853,14 @@ protected:
 		size_t i;
 		for(i = 0; i < oracleHits.size(); i++) {
 			const Hit& h = oracleHits[i];
-    		if(h.h.first == rhit.h.first &&
-    		   h.h.second == rhit.h.second &&
-    		   h.fw == rhit.fw)
-    		{
-    			assert(h.mms == rhit.mms);
-    			// It's a match - hit confirmed
-    			break;
-    		}
+			if(h.h.first == rhit.h.first &&
+			   h.h.second == rhit.h.second &&
+			   h.fw == rhit.fw)
+			{
+				assert(h.mms == rhit.mms);
+				// It's a match - hit confirmed
+				break;
+			}
 		}
 		assert_lt(i, oracleHits.size()); // assert we found a matchup
 	}
@@ -2112,6 +2120,7 @@ public:
 			uint32_t     qualLim,
 			bool         reportExacts,
 			bool         verbose,
+			bool         quiet,
 			int          halfAndHalf,
 			bool         partial,
 			bool         maqPenalty,
@@ -2122,6 +2131,10 @@ public:
 		qlen_(0),
 		qual_(NULL),
 		name_(NULL),
+		altQry_(NULL),
+		altQual_(NULL),
+		alts_(0),
+		fuzzy_(false),
 		ebwt_(ebwt),
 		fw_(fw),
 		offRev0_(0),
@@ -2137,6 +2150,7 @@ public:
 		depth5_(0),
 		depth3_(0),
 		verbose_(verbose),
+		quiet_(quiet),
 		skippingThisRead_(false),
 		metrics_(metrics)
 	{ curEbwt_ = ebwt_; }
@@ -2148,12 +2162,18 @@ public:
 		const bool ebwtFw = ebwt_->fw();
 		if(ebwtFw) {
 			qry_  = fw_ ? &r.patFw : &r.patRc;
-			qual_ = fw_ ? &r.qualFw : &r.qualRc;
+			qual_ = fw_ ? &r.qual  : &r.qualRev;
+			altQry_  = (String<Dna5>*)(fw_ ? r.altPatFw : r.altPatRc);
+			altQual_ = (String<char>*)(fw_ ? r.altQual  : r.altQualRev);
 		} else {
 			qry_  = fw_ ? &r.patFwRev : &r.patRcRev;
-			qual_ = fw_ ? &r.qualFwRev : &r.qualRcRev;
+			qual_ = fw_ ? &r.qualRev  : &r.qual;
+			altQry_  = (String<Dna5>*)(fw_ ? r.altPatFwRev : r.altPatRcRev);
+			altQual_ = (String<char>*)(fw_ ? r.altQualRev  : r.altQual);
 		}
+		alts_ = r.alts;
 		name_ = &r.name;
+		fuzzy_ = r.fuzzy;
 		if(seedRange != NULL) seedRange_ = *seedRange;
 		else                  seedRange_.invalidate();
 		qlen_ = length(*qry_);
@@ -2178,6 +2198,9 @@ public:
 		// Make sure every qual is a valid qual ASCII character (>= 33)
 		for(size_t i = 0; i < length(*qual_); i++) {
 			assert_geq((*qual_)[i], 33);
+			for(int j = 0; j < alts_; j++) {
+				assert_geq(altQual_[j][i], 33);
+			}
 		}
 		assert_geq(length(*qual_), qlen_);
 		this->done = false;
@@ -2254,7 +2277,9 @@ public:
 			if(offRev1_ != offRev2_) maxmms = 2;
 			if(offRev2_ != offRev3_) maxmms = 3;
 			if(qlen_ <= maxmms) {
-				cerr << "Warning: Read (" << (*name_) << ") is less than " << (maxmms+1) << " characters long; skipping..." << endl;
+				if(!quiet_) {
+					cerr << "Warning: Read (" << (*name_) << ") is less than " << (maxmms+1) << " characters long; skipping..." << endl;
+				}
 				this->done = true;
 				skippingThisRead_ = true;
 				return;
@@ -2266,8 +2291,12 @@ public:
 			// constraints.
 			return;
 		}
+		// icost = total cost penalty (major bits = stratum, minor bits =
+		// quality penalty) incurred so far by partial alignment
 		uint16_t icost = (seedRange_.valid()) ? seedRange_.cost : 0;
-		uint16_t iham = partialEditsHam();
+		// iham = total quality penalty incurred so far by partial alignment
+		uint16_t iham = (seedRange_.valid() && qualOrder_) ? (seedRange_.cost & ~0xc000): 0;
+		assert_leq(iham, qualLim_);
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
 		uint32_t m = min<uint32_t>(offRev0_, qlen_);
@@ -2313,11 +2342,14 @@ public:
 					assert(pm.empty());
 					return;
 				}
-				if(!b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+				if(!b->init(
+						pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt))
 				{
+					// Negative result from b->init() indicates we ran
+					// out of best-first chunk memory
 					assert(pm.empty());
 					return;
 				}
@@ -2342,6 +2374,8 @@ public:
 			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt))
 			{
+				// Negative result from b->init() indicates we ran
+				// out of best-first chunk memory
 				assert(pm.empty());
 				return;
 			}
@@ -2356,17 +2390,12 @@ public:
 
 	/**
 	 * Advance along the lowest-cost branch managed by the given
-	 * PathManager.  Keep advancing until some stopping condition
-	 * 'until' is satisfied.
+	 * PathManager.  Keep advancing until condition 'until' is
+	 * satisfied.  Typically, the stopping condition 'until' is
+	 * set to stop whenever pm's minCost changes.
 	 */
 	virtual void
 	advanceBranch(int until, uint16_t minCost, PathManager& pm) {
-		// Restore alignment state from the frontmost continuation.
-		// The frontmost continuation should in principle be the most
-		// promising partial alignment found so far.  In the case of
-		// the greedy DFS backtracker, which partial alignment is most
-		// promising is determined in a greedy, depth-first, non-
-		// optimal fashion.
 		assert(curEbwt_ != NULL);
 
 		// Let this->foundRange = false; we'll set it to true iff this call
@@ -2390,6 +2419,17 @@ public:
 			assert_leq(br->ham_, qualLim_);
 			if(verbose_) {
 				br->print((*qry_), (*qual_), minCost, cout, (halfAndHalf_>0), partial_, fw_, ebwt_->fw());
+				if(!br->edits_.empty()) {
+					cout << "Edit: ";
+					for(size_t i = 0; i < br->edits_.size(); i++) {
+						Edit e = br->edits_.get(i);
+						cout << (curEbwt_->fw() ? (qlen_ - e.pos - 1) : e.pos)
+							 << "ACGT"[e.chr];
+						if(i < br->edits_.size()-1) cout << " ";
+					}
+					cout << endl;
+				}
+
 			}
 			assert(br->repOk(qlen_));
 
@@ -2402,8 +2442,6 @@ public:
 
 			if(halfAndHalf_ > 0) assert_gt(depth3_, depth5_);
 
-			// Compiler complains if our goto's jump over these
-			// initializations, so stick them here
 			bool reportedPartial = false;
 			bool invalidExact = false;
 			bool empty = false;
@@ -2428,14 +2466,24 @@ public:
 				int nextc = -1;
 				if(cur < qlen_-1) nextc = (int)(*qry_)[cur+1];
 				assert_leq(c, 4);
-				uint8_t q = qualAt(cur); // get (unrounded) phred qual at this position
-				uint8_t qq = mmPenalty(maqPenalty_, q);
+				// If any uncalled base's penalty is still under
+				// the ceiling, then this position is an alternative
+				uint8_t q[4] = {'!', '!', '!', '!'};
+				uint8_t bestq;
+				// get unrounded penalties at this position
+				if(fuzzy_) {
+					bestq = penaltiesAt(cur, q, alts_, *qual_, altQry_, altQual_);
+				} else {
+					bestq = q[0] = q[1] = q[2] = q[3] =
+						mmPenalty(maqPenalty_, qualAt(cur));
+				}
 
 				// The current query position is a legit alternative if it a) is
 				// not in the unrevisitable region, and b) its selection would
-				// not cause the quality ceiling (if one exists) to be exceeded
+				// not necessarily cause the quality ceiling (if one exists) to
+				// be exceeded
 				bool curIsAlternative = (depth >= br->depth0_) &&
-				                        (br->ham_ + qq <= qualLim_);
+				                        (br->ham_ + bestq <= qualLim_);
 				ASSERT_ONLY(uint32_t obot = br->bot_);
 				uint32_t otop = br->top_;
 
@@ -2469,7 +2517,8 @@ public:
 					rs->bots[1] = rs->tops[2] = ebwt._fchr[2];
 					rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
 					rs->bots[3]               = ebwt._fchr[4];
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, qq);
+					ASSERT_ONLY(int r =)
+					br->installRanges(c, nextc, fuzzy_, qualLim_ - br->ham_, q);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2513,7 +2562,8 @@ public:
 						}
 #endif
 					}
-					ASSERT_ONLY(int r =) br->installRanges(c, nextc, qq);
+					ASSERT_ONLY(int r =)
+					br->installRanges(c, nextc, fuzzy_, qualLim_ - br->ham_, q);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2562,6 +2612,7 @@ public:
 			// we've been instructed not to report exact alignments
 			nedits = br->edits_.size();
 			invalidExact = (hit && nedits == 0 && !reportExacts_);
+			assert_leq(br->ham_, qualLim_);
 
 			// Set this to true if the only way to make legal progress
 			// is via one or more additional backtracks.
@@ -2589,6 +2640,8 @@ public:
 					cout << endl;
 				}
 				assert_gt(br->bot_, br->top_);
+				assert_leq(br->ham_, qualLim_);
+				assert_leq((uint32_t)(br->cost_ & ~0xc000), qualLim_);
 				if(metrics_ != NULL) metrics_->setReadHasRange();
 				curRange_.top     = br->top_;
 				curRange_.bot     = br->bot_;
@@ -2630,13 +2683,15 @@ public:
 		bail:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
-			if(!pm.splitAndPrep(rand_, qlen_, depth3_, qualOrder_,
-			                    ebwt_->_eh, ebwt_->_ebwt))
+			if(!pm.splitAndPrep(rand_, qlen_, qualLim_, depth3_,
+			                    qualOrder_, fuzzy_,
+			                    ebwt_->_eh, ebwt_->_ebwt, ebwt_->_fw))
 			{
 				pm.reset(0);
 				assert(pm.empty());
 			}
 			if(pm.empty()) {
+				// No more branches
 				break;
 			}
 			assert(!pm.front()->curtailed_);
@@ -2676,23 +2731,6 @@ protected:
 			}
 			curRange_.numMms += srSz;
 		}
-	}
-
-	/**
-	 * Calculate the quality-weighted hamming distance resulting from
-	 * all of the edits in the partial alignment.
-	 */
-	uint16_t partialEditsHam() {
-		uint16_t ret = 0;
-		if(seedRange_.valid()) {
-			const size_t srSz = seedRange_.mms.size();
-			for(size_t i = 0; i < srSz; i++) {
-				int q = (*qual_)[qlen_ - seedRange_.mms[i] - 1];
-				q = phredCharToPhredQual(q);
-				ret += mmPenalty(maqPenalty_, q);
-			}
-		}
-		return ret;
 	}
 
 	/**
@@ -2784,7 +2822,7 @@ protected:
 	}
 
 	/**
-	 *
+	 * Return the Phred-scale quality value at position 'off'
 	 */
 	inline uint8_t qualAt(size_t off) {
 		return phredCharToPhredQual((*qual_)[off]);
@@ -2857,6 +2895,10 @@ protected:
 	size_t              qlen_;   // length of _qry
 	String<char>*       qual_;   // quality values for _qry
 	String<char>*       name_;   // name of _qry
+	String<Dna5>*       altQry_; // alternate basecalls
+	String<char>*       altQual_; // quality values for alternate basecalls
+	int                 alts_;   // max # alternatives
+	bool                fuzzy_;  // alternate scoring scheme?
 	const Ebwt<String<Dna> >*   ebwt_;   // Ebwt to search in
 	bool                fw_;
 	uint32_t            offRev0_; // unrevisitable chunk
@@ -2890,6 +2932,8 @@ protected:
 	RandomSource        rand_;
 	/// Be talkative
 	bool                verbose_;
+	/// Suppress unnecessary output
+	bool                quiet_;
 	// Current range to expose to consumers
 	Range               curRange_;
 	// Range for the partial alignment we're extending (NULL if we
@@ -2917,6 +2961,7 @@ public:
 			uint32_t     qualThresh,
 			bool         reportExacts,
 			bool         verbose,
+			bool         quiet,
 			bool         halfAndHalf,
 			bool         seeded,
 			bool         maqPenalty,
@@ -2927,6 +2972,7 @@ public:
 			qualThresh_(qualThresh),
 			reportExacts_(reportExacts),
 			verbose_(verbose),
+			quiet_(quiet),
 			halfAndHalf_(halfAndHalf),
 			seeded_(seeded),
 			maqPenalty_(maqPenalty),
@@ -2938,7 +2984,7 @@ public:
 	 */
 	EbwtRangeSource *create() {
 		return new EbwtRangeSource(ebwt_, fw_, qualThresh_,
-		                           reportExacts_, verbose_,
+		                           reportExacts_, verbose_, quiet_,
 		                           halfAndHalf_, seeded_, maqPenalty_,
 		                           qualOrder_, metrics_);
 	}
@@ -2949,6 +2995,7 @@ protected:
 	uint32_t     qualThresh_;
 	bool         reportExacts_;
 	bool         verbose_;
+	bool         quiet_;
 	bool         halfAndHalf_;
 	bool         seeded_;
 	bool         maqPenalty_;
@@ -2993,19 +3040,21 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
+			bool quiet,
 			bool mate1,
 			ChunkPool* pool,
 			int *btCnt) :
 			SingleRangeSourceDriver<EbwtRangeSource>(
 					params, rs, fw, sink, sinkPt, os, verbose,
-					mate1, 0, pool, btCnt),
+					quiet, mate1, 0, pool, btCnt),
 			seed_(seed),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
 			rs_(rs), seedLen_(seedLen),
 			nudgeLeft_(nudgeLeft),
 			rev0Off_(rev0Off), rev1Off_(rev1Off),
-			rev2Off_(rev2Off), rev3Off_(rev3Off)
+			rev2Off_(rev2Off), rev3Off_(rev3Off),
+			verbose_(verbose), quiet_(quiet)
 	{
 		if(seed_) assert_gt(seedLen, 0);
 	}
@@ -3021,7 +3070,9 @@ public:
 	 * after setQuery() has been called on the RangeSource but before
 	 * initConts() has been called.
 	 */
-	virtual void initRangeSource(const String<char>& qual) {
+	virtual void initRangeSource(const String<char>& qual, bool fuzzy,
+	                             int alts, const String<char>* altQuals)
+	{
 		// If seedLen_ is huge, then it will always cover the whole
 		// alignment
 		assert_eq(len_, seqan::length(qual));
@@ -3055,13 +3106,20 @@ public:
 			if(qualOrder_) {
 				uint8_t lowQual = 0xff;
 				for(uint32_t d = rev0Off; d < s; d++) {
-					if(qual[qlen - d - 1] < lowQual) {
-						lowQual = qual[qlen - d - 1];
+					uint8_t lowAtPos;
+					if(fuzzy) {
+						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
+					} else {
+						lowAtPos = qual[qlen - d - 1];
 					}
+					if(lowAtPos < lowQual) lowQual = lowAtPos;
 				}
 				assert_lt(lowQual, 0xff);
-				assert_geq(lowQual, 33);
-				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual));
+				if(fuzzy) {
+					minCost += lowQual;
+				} else {
+					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual));
+				}
 			}
 		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < (s-1)) {
 			// Half-and-half constraints are active, so there must be
@@ -3072,33 +3130,53 @@ public:
 				assert(rs_->halfAndHalf() == 2 || rs_->halfAndHalf() == 3);
 				uint8_t lowQual1 = 0xff;
 				for(uint32_t d = 0; d < sRight; d++) {
-					if(qual[qlen - d - 1] < lowQual1) {
-						lowQual1 = qual[qlen - d - 1];
+					uint8_t lowAtPos;
+					if(fuzzy) {
+						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
+					} else {
+						lowAtPos = qual[qlen - d - 1];
 					}
+					if(lowAtPos < lowQual1) lowQual1 = lowAtPos;
 				}
 				assert_lt(lowQual1, 0xff);
-				assert_geq(lowQual1, 33);
-				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
+				if(fuzzy) {
+					minCost += lowQual1;
+				} else {
+					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
+				}
 				uint8_t lowQual2_1 = 0xff;
 				uint8_t lowQual2_2 = 0xff;
 				for(uint32_t d = sRight; d < s; d++) {
-					if(qual[qlen - d - 1] < lowQual2_1) {
+					uint8_t lowAtPos;
+					if(fuzzy) {
+						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
+					} else {
+						lowAtPos = qual[qlen - d - 1];
+					}
+					if(lowAtPos < lowQual2_1) {
 						if(lowQual2_1 != 0xff) {
 							lowQual2_2 = lowQual2_1;
 						}
-						lowQual2_1 = qual[qlen - d - 1];
-					} else if(qual[qlen - d - 1] < lowQual2_2) {
-						lowQual2_2 = qual[qlen - d - 1];
+						lowQual2_1 = lowAtPos;
+					} else if(lowAtPos < lowQual2_2) {
+						lowQual2_2 = lowAtPos;
 					}
 				}
 				assert_lt(lowQual2_1, 0xff);
-				assert_geq(lowQual2_1, 33);
-				assert_lt(lowQual2_2, 0xff);
-				assert_geq(lowQual2_2, 33);
-				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_1));
-				if(rs_->halfAndHalf() > 2) minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_2));
+				if(fuzzy) {
+					minCost += lowQual2_1;
+					if(rs_->halfAndHalf() > 2 && lowQual2_2 != 0xff) {
+						minCost += lowQual2_2;
+					}
+				} else {
+					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_1));
+					if(rs_->halfAndHalf() > 2 && lowQual2_2 != 0xff) {
+						minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_2));
+					}
+				}
 			}
 		}
+		if(verbose_) cout << "initRangeSource minCost: " << minCost << endl;
 		this->minCostAdjustment_ = minCost;
 		rs_->setOffs(sRight,   // depth of far edge of hi-half (only matters where half-and-half is possible)
 		             s,        // depth of far edge of lo-half (only matters where half-and-half is possible)
@@ -3137,6 +3215,8 @@ protected:
 	SearchConstraintExtent rev1Off_;
 	SearchConstraintExtent rev2Off_;
 	SearchConstraintExtent rev3Off_;
+	bool verbose_;
+	bool quiet_;
 };
 
 /**
@@ -3163,6 +3243,7 @@ public:
 			SearchConstraintExtent rev3Off,
 			vector<String<Dna5> >& os,
 			bool verbose,
+			bool quiet,
 			bool mate1,
 			ChunkPool* pool,
 			int *btCnt = NULL) :
@@ -3182,6 +3263,7 @@ public:
 			rev3Off_(rev3Off),
 			os_(os),
 			verbose_(verbose),
+			quiet_(quiet),
 			mate1_(mate1),
 			pool_(pool),
 			btCnt_(btCnt)
@@ -3200,7 +3282,7 @@ public:
 				params_, rs_->create(), fw_, seed_, maqPenalty_,
 				qualOrder_, sink_, sinkPt_, seedLen_, nudgeLeft_,
 				rev0Off_, rev1Off_, rev2Off_, rev3Off_, os_, verbose_,
-				mate1_, pool_, btCnt_);
+				quiet_, mate1_, pool_, btCnt_);
 	}
 
 protected:
@@ -3220,6 +3302,7 @@ protected:
 	SearchConstraintExtent rev3Off_;
 	vector<String<Dna5> >& os_;
 	bool verbose_;
+	bool quiet_;
 	bool mate1_;
 	ChunkPool* pool_;
 	int *btCnt_;
@@ -3240,13 +3323,10 @@ public:
 			bool fw,
 			uint32_t seedLen,
 			bool verbose,
+			bool quiet,
 			bool mate1) :
 			RangeSourceDriver<EbwtRangeSource>(true, 0),
-			rsFact_(rsFact),
-			rsFull_(false, // no strand-bias fix needed here
-			        NULL,
-			        verbose,
-			        true),
+			rsFact_(rsFact), rsFull_(false, NULL, verbose, quiet, true),
 			rsSeed_(rsSeed), patsrc_(NULL), seedLen_(seedLen), fw_(fw),
 			mate1_(mate1), seedRange_(0)
 	{

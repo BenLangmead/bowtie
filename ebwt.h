@@ -1387,12 +1387,12 @@ struct SideLocus {
 		return ebwt + _sideByteOff + (_fw? (-128) : (128));
 	}
 
-    uint32_t _sideByteOff; // offset of top side within ebwt[]
-    uint32_t _sideNum;     // index of side
-    uint16_t _charOff;     // character offset within side
-    bool _fw;              // side is forward or backward?
-    int16_t _by;           // byte within side (not adjusted for bw sides)
-    int8_t _bp;            // bitpair within byte (not adjusted for bw sides)
+	uint32_t _sideByteOff; // offset of top side within ebwt[]
+	uint32_t _sideNum;     // index of side
+	uint16_t _charOff;     // character offset within side
+	bool _fw;              // side is forward or backward?
+	int16_t _by;           // byte within side (not adjusted for bw sides)
+	int8_t _bp;            // bitpair within byte (not adjusted for bw sides)
 };
 
 #include "ebwt_search_backtrack.h"
@@ -1483,7 +1483,7 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 			ASSERT_ONLY(uint32_t gs = u32ebwt[0]);
 			ASSERT_ONLY(uint32_t ts = u32ebwt[1]);
 			assert_eq(gs, occ_save[0]);
- 			assert_eq(ts, occ_save[1]);
+			assert_eq(ts, occ_save[1]);
 			fw = false;
 		} else {
 			// Finished backward bucket; check current [A] and [C]
@@ -1493,8 +1493,8 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 			ASSERT_ONLY(uint32_t cs = u32ebwt[1]);
 			assert(as == occ[0] || as == occ[0]-1); // one 'a' is a skipped '$' and doesn't count toward occ[]
 			assert_eq(cs, occ[1]);
- 			occ_save[0] = occ[2]; // save gs
- 			occ_save[1] = occ[3]; // save ts
+			occ_save[0] = occ[2]; // save gs
+			occ_save[1] = occ[3]; // save ts
 			fw = true;
 		}
 		cur += eh._sideSz;

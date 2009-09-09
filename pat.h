@@ -81,99 +81,120 @@ struct ReadBuf {
 		// Prevent seqan from trying to free buffers
 		_setBegin(patFw, NULL);
 		_setBegin(patRc, NULL);
-		_setBegin(qualFw, NULL);
-		_setBegin(qualRc, NULL);
+		_setBegin(qual, NULL);
 		_setBegin(patFwRev, NULL);
 		_setBegin(patRcRev, NULL);
-		_setBegin(qualFwRev, NULL);
-		_setBegin(qualRcRev, NULL);
+		_setBegin(qualRev, NULL);
 		_setBegin(name, NULL);
+		for(int j = 0; j < 3; j++) {
+			_setBegin(altPatFw[j], NULL);
+			_setBegin(altPatFwRev[j], NULL);
+			_setBegin(altPatRc[j], NULL);
+			_setBegin(altPatRcRev[j], NULL);
+			_setBegin(altQual[j], NULL);
+			_setBegin(altQualRev[j], NULL);
+		}
 	}
+
+#define RESET_BUF(str, buf, typ) _setBegin(str, (typ*)buf); _setLength(str, 0); _setCapacity(str, BUF_SIZE);
+#define RESET_BUF_LEN(str, buf, len, typ) _setBegin(str, (typ*)buf); _setLength(str, len); _setCapacity(str, BUF_SIZE);
 
 	/// Point all Strings to the beginning of their respective buffers
 	/// and set all lengths to 0
 	void reset() {
 		patid = 0;
 		readOrigBufLen = 0;
-		_setBegin(patFw,     (Dna5*)patBufFw);     _setLength(patFw, 0);     _setCapacity(patFw, BUF_SIZE);
-		_setBegin(patRc,     (Dna5*)patBufRc);     _setLength(patRc, 0);     _setCapacity(patRc, BUF_SIZE);
-		_setBegin(qualFw,    (char*)qualBufFw);    _setLength(qualFw, 0);    _setCapacity(qualFw, BUF_SIZE);
-		_setBegin(qualRc,    (char*)qualBufRc);    _setLength(qualRc, 0);    _setCapacity(qualRc, BUF_SIZE);
-		_setBegin(patFwRev,  (Dna5*)patBufFwRev);  _setLength(patFwRev, 0);  _setCapacity(patFwRev, BUF_SIZE);
-		_setBegin(patRcRev,  (Dna5*)patBufRcRev);  _setLength(patRcRev, 0);  _setCapacity(patRcRev, BUF_SIZE);
-		_setBegin(qualFwRev, (char*)qualBufFwRev); _setLength(qualFwRev, 0); _setCapacity(qualFwRev, BUF_SIZE);
-		_setBegin(qualRcRev, (char*)qualBufRcRev); _setLength(qualRcRev, 0); _setCapacity(qualRcRev, BUF_SIZE);
-		_setBegin(name,      (char*)nameBuf);      _setLength(name, 0);      _setCapacity(name, BUF_SIZE);
+		alts = 0;
+		fuzzy = false;
+		RESET_BUF(patFw, patBufFw, Dna5);
+		RESET_BUF(patRc, patBufRc, Dna5);
+		RESET_BUF(qual, qualBuf, char);
+		RESET_BUF(patFwRev, patBufFwRev, Dna5);
+		RESET_BUF(patRcRev, patBufRcRev, Dna5);
+		RESET_BUF(qualRev, qualBufRev, char);
+		RESET_BUF(name, nameBuf, char);
+		for(int j = 0; j < 3; j++) {
+			RESET_BUF(altPatFw[j], altPatBufFw[j], Dna5);
+			RESET_BUF(altPatFwRev[j], altPatBufFwRev[j], Dna5);
+			RESET_BUF(altPatRc[j], altPatBufRc[j], Dna5);
+			RESET_BUF(altPatRcRev[j], altPatBufRcRev[j], Dna5);
+			RESET_BUF(altQual[j], altQualBuf[j], char);
+			RESET_BUF(altQualRev[j], altQualBufRev[j], char);
+		}
 	}
 
 	void clearAll() {
 		seqan::clear(patFw);
 		seqan::clear(patRc);
-		seqan::clear(qualFw);
-		seqan::clear(qualRc);
+		seqan::clear(qual);
 		seqan::clear(patFwRev);
 		seqan::clear(patRcRev);
-		seqan::clear(qualFwRev);
-		seqan::clear(qualRcRev);
+		seqan::clear(qualRev);
 		seqan::clear(name);
+		for(int j = 0; j < 3; j++) {
+			seqan::clear(altPatFw[j]);
+			seqan::clear(altPatFwRev[j]);
+			seqan::clear(altPatRc[j]);
+			seqan::clear(altPatRcRev[j]);
+			seqan::clear(altQual[j]);
+			seqan::clear(altQualRev[j]);
+		}
 		readOrigBufLen = 0;
 	}
 
 	/// Return true iff the read (pair) is empty
-	bool empty() {
+	bool empty() const {
 		return seqan::empty(patFw);
 	}
 
 	/// Return length of the read in the buffer
-	uint32_t length() {
+	uint32_t length() const {
 		return seqan::length(patFw);
 	}
 
 	/**
-	 * Given patFw and qualFw, construct patRc and qualRc in place.
+	 * Construct patRc in place.
 	 */
 	void constructRevComps() {
 		uint32_t len = length();
 		assert_gt(len, 0);
-		_setBegin(patRc,  (Dna5*)patBufRc);
-		_setBegin(qualRc, (char*)qualBufRc);
-		_setLength(patRc,  len);
-		_setLength(qualRc, len);
-		_setCapacity(patRc,  BUF_SIZE);
-		_setCapacity(qualRc, BUF_SIZE);
+		RESET_BUF_LEN(patRc, patBufRc, len, Dna5);
+		for(int j = 0; j < alts; j++) {
+			RESET_BUF_LEN(altPatRc[j], altPatBufRc[j], len, Dna5);
+		}
 		for(uint32_t i = 0; i < len; i++) {
 			// Reverse-complement the sequence
 			patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
-			// Reverse the quality
-			qualBufRc[i] = qualBufFw[len-i-1];
+			for(int j = 0; j < alts; j++) {
+				altPatBufRc[j][i] = (altPatBufFw[j][len-i-1] == 4) ? 4 : (altPatBufFw[j][len-i-1] ^ 3);
+			}
 		}
 	}
 
 	/**
-	 * Given patFw, patRc, qualFw and qualRc, construct the *Rev
-	 * versions in place.  Assumes constructRevComps() was called
-	 * previously.
+	 * Given patFw, patRc, and qual, construct the *Rev versions in
+	 * place.  Assumes constructRevComps() was called previously.
 	 */
 	void constructReverses() {
 		uint32_t len = length();
 		assert_gt(len, 0);
-		_setBegin(patFwRev,  (Dna5*)patBufFwRev);
-		_setBegin(patRcRev,  (Dna5*)patBufRcRev);
-		_setBegin(qualFwRev, (char*)qualBufFwRev);
-		_setBegin(qualRcRev, (char*)qualBufRcRev);
-		_setLength(patFwRev,  len);
-		_setLength(patRcRev,  len);
-		_setLength(qualFwRev, len);
-		_setLength(qualRcRev, len);
-		_setCapacity(patFwRev,  BUF_SIZE);
-		_setCapacity(patRcRev,  BUF_SIZE);
-		_setCapacity(qualFwRev, BUF_SIZE);
-		_setCapacity(qualRcRev, BUF_SIZE);
+		RESET_BUF_LEN(patFwRev, patBufFwRev, len, Dna5);
+		RESET_BUF_LEN(patRcRev, patBufRcRev, len, Dna5);
+		RESET_BUF_LEN(qualRev, qualBufRev, len, char);
+		for(int j = 0; j < alts; j++) {
+			RESET_BUF_LEN(altPatFwRev[j], altPatBufFwRev[j], len, Dna5);
+			RESET_BUF_LEN(altPatRcRev[j], altPatBufRcRev[j], len, Dna5);
+			RESET_BUF_LEN(altQualRev[j], altQualBufRev[j], len, char);
+		}
 		for(uint32_t i = 0; i < len; i++) {
 			patFwRev[i]  = patFw[len-i-1];
 			patRcRev[i]  = patRc[len-i-1];
-			qualFwRev[i] = qualFw[len-i-1];
-			qualRcRev[i] = qualRc[len-i-1];
+			qualRev[i]   = qual[len-i-1];
+			for(int j = 0; j < alts; j++) {
+				altPatFwRev[j][i] = altPatFw[j][len-i-1];
+				altPatRcRev[j][i] = altPatRc[j][len-i-1];
+				altQualRev[j][i]  = altQual[j][len-i-1];
+			}
 		}
 	}
 
@@ -209,6 +230,49 @@ struct ReadBuf {
 		}
 	}
 
+	void dump(std::ostream& os) const {
+		os << name << " " << patFw << " ";
+		// Print out the sequences
+		for(int j = 0; j < 3; j++) {
+			bool started = false;
+			if(seqan::length(altQual[j]) > 0) {
+				for(size_t i = 0; i < length(); i++) {
+					if(altQual[j][i] != '!') {
+						started = true;
+					}
+					if(started) {
+						if(altQual[j][i] == '!') {
+							os << '-';
+						} else {
+							os << altPatFw[j][i];
+						}
+					}
+				}
+			}
+			cout << " ";
+		}
+		os << qual << " ";
+		// Print out the quality strings
+		for(int j = 0; j < 3; j++) {
+			bool started = false;
+			if(seqan::length(altQual[j]) > 0) {
+				for(size_t i = 0; i < length(); i++) {
+					if(altQual[j][i] != '!') {
+						started = true;
+					}
+					if(started) {
+						os << altQual[j][i];
+					}
+				}
+			}
+			if(j == 2) {
+				os << endl;
+			} else {
+				os << " ";
+			}
+		}
+	}
+
 	/**
 	 * Write read details to a HitSet object.
 	 */
@@ -216,7 +280,7 @@ struct ReadBuf {
 		assert(!empty());
 		hs.name = name;
 		hs.seq = patFw;
-		hs.qual = qualFw;
+		hs.qual = qual;
 	}
 
 	static const int BUF_SIZE = 1024;
@@ -225,19 +289,29 @@ struct ReadBuf {
 	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
 	String<Dna5>  patRc;               // reverse-complement sequence
 	uint8_t       patBufRc[BUF_SIZE];  // reverse-complement sequence buffer
-	String<char>  qualFw;              // quality values
-	char          qualBufFw[BUF_SIZE]; // quality value buffer
-	String<char>  qualRc;              // reverse quality values
-	char          qualBufRc[BUF_SIZE]; // reverse quality value buffer
+	String<char>  qual;                // quality values
+	char          qualBuf[BUF_SIZE];   // quality value buffer
+
+	String<Dna5>  altPatFw[3];              // forward-strand sequence
+	uint8_t       altPatBufFw[3][BUF_SIZE]; // forward-strand sequence buffer
+	String<Dna5>  altPatRc[3];              // reverse-complement sequence
+	uint8_t       altPatBufRc[3][BUF_SIZE]; // reverse-complement sequence buffer
+	String<char>  altQual[3];               // quality values for alternate basecalls
+	char          altQualBuf[3][BUF_SIZE];  // quality value buffer for alternate basecalls
 
 	String<Dna5>  patFwRev;               // forward-strand sequence reversed
 	uint8_t       patBufFwRev[BUF_SIZE];  // forward-strand sequence buffer reversed
 	String<Dna5>  patRcRev;               // reverse-complement sequence reversed
 	uint8_t       patBufRcRev[BUF_SIZE];  // reverse-complement sequence buffer reversed
-	String<char>  qualFwRev;              // quality values reversed
-	char          qualBufFwRev[BUF_SIZE]; // quality value buffer reversed
-	String<char>  qualRcRev;              // reverse quality values reversed
-	char          qualBufRcRev[BUF_SIZE]; // reverse quality value buffer reversed
+	String<char>  qualRev;                // quality values reversed
+	char          qualBufRev[BUF_SIZE];   // quality value buffer reversed
+
+	String<Dna5>  altPatFwRev[3];              // forward-strand sequence reversed
+	uint8_t       altPatBufFwRev[3][BUF_SIZE]; // forward-strand sequence buffer reversed
+	String<Dna5>  altPatRcRev[3];              // reverse-complement sequence reversed
+	uint8_t       altPatBufRcRev[3][BUF_SIZE]; // reverse-complement sequence buffer reversed
+	String<char>  altQualRev[3];              // quality values for alternate basecalls reversed
+	char          altQualBufRev[3][BUF_SIZE]; // quality value buffer for alternate basecalls reversed
 
 	char          readOrigBuf[FileBuf::LASTN_BUF_SZ];
 	size_t        readOrigBufLen;
@@ -247,6 +321,8 @@ struct ReadBuf {
 	uint32_t      patid;               // unique 0-based id based on order in read file(s)
 	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
 	uint32_t      seed;                // random seed
+	int           alts;                // number of alternatives
+	bool          fuzzy;               // whether to employ fuzziness
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
@@ -262,14 +338,16 @@ class PatternSource {
 public:
 	PatternSource(bool randomizeQuals = false,
 	              bool useSpinlock = true,
-	              const char *dumpfile = NULL) :
+	              const char *dumpfile = NULL,
+	              bool verbose = false) :
 	    readCnt_(0),
 		dumpfile_(dumpfile),
 		numWrappers_(0),
 		doLocking_(true),
 		useSpinlock_(useSpinlock),
 		randomizeQuals_(randomizeQuals),
-		lock_()
+		lock_(),
+		verbose_(verbose)
 	{
 		// Open dumpfile, if specified
 		if(dumpfile_ != NULL) {
@@ -323,9 +401,9 @@ public:
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
-			ra.seed = genRandSeed(ra.patFw, ra.qualFw, ra.name);
+			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name);
 			if(!rb.empty()) {
-				rb.seed = genRandSeed(rb.patFw, rb.qualFw, rb.name);
+				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name);
 			}
 			// Output it, if desired
 			if(dumpfile_ != NULL) {
@@ -333,6 +411,10 @@ public:
 				if(!rb.empty()) {
 					dumpBuf(rb);
 				}
+			}
+			if(verbose_) {
+				cout << "Parsed mate 1: "; ra.dump(cout);
+				cout << "Parsed mate 2: "; rb.dump(cout);
 			}
 		}
 	}
@@ -357,10 +439,13 @@ public:
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
-			r.seed = genRandSeed(r.patFw, r.qualFw, r.name);
+			r.seed = genRandSeed(r.patFw, r.qual, r.name);
 			// Output it, if desired
 			if(dumpfile_ != NULL) {
 				dumpBuf(r);
+			}
+			if(verbose_) {
+				cout << "Parsed read: "; r.dump(cout);
 			}
 		}
 	}
@@ -442,19 +527,19 @@ protected:
 		const size_t rlen = r.length();
 		for(size_t i = 0; i < rlen; i++) {
 			if(i < rlen-1) {
-				r.qualFw[i] *= (r.qualFw[i+1] + 7);
+				r.qual[i] *= (r.qual[i+1] + 7);
 			}
 			if(i > 0) {
-				r.qualFw[i] *= (r.qualFw[i-1] + 11);
+				r.qual[i] *= (r.qual[i-1] + 11);
 			}
 			// A user says that g++ complained here about "comparison
 			// is always false due to limited range of data type", but
 			// I can't see why.  I added the (int) cast to try to avoid
 			// the warning.
-			if((int)r.qualFw[i] < 0) r.qualFw[i] = -(r.qualFw[i]+1);
-			r.qualFw[i] %= 41;
-			assert_leq(r.qualFw[i], 40);
-			r.qualFw[i] += 33;
+			if((int)r.qual[i] < 0) r.qual[i] = -(r.qual[i]+1);
+			r.qual[i] %= 41;
+			assert_leq(r.qual[i], 40);
+			r.qual[i] += 33;
 		}
 	}
 
@@ -464,10 +549,10 @@ protected:
 	void dumpBuf(const ReadBuf& r) {
 		assert(dumpfile_ != NULL);
 		dump(out_, r.patFw,
-		     empty(r.qualFw) ? String<char>("(empty)") : r.qualFw,
+		     empty(r.qual) ? String<char>("(empty)") : r.qual,
 		     empty(r.name)   ? String<char>("(empty)") : r.name);
 		dump(out_, r.patRc,
-		     empty(r.qualRc) ? String<char>("(empty)") : r.qualRc,
+		     empty(r.qualRev) ? String<char>("(empty)") : r.qualRev,
 		     empty(r.name)   ? String<char>("(empty)") : r.name);
 	}
 
@@ -499,6 +584,7 @@ protected:
 	SpinLock spinlock_;
 #endif
 	MUTEX_T lock_; /// mutex for locking critical regions
+	bool verbose_;
 };
 
 /**
@@ -649,17 +735,17 @@ public:
 	                        const vector<PatternSource*>& srcb) :
 		cur_(0), srca_(srca), srcb_(srcb)
 	{
-	    // srca_ and srcb_ must be parallel
-	    assert_eq(srca_.size(), srcb_.size());
-	    for(size_t i = 0; i < srca_.size(); i++) {
-	    	// Can't have NULL first-mate sources.  Second-mate sources
-	    	// can be NULL, in the case when the corresponding first-
-	    	// mate source is unpaired.
-	    	assert(srca_[i] != NULL);
-		    for(size_t j = 0; j < srcb_.size(); j++) {
-		    	assert_neq(srca_[i], srcb_[j]);
-		    }
-	    }
+		// srca_ and srcb_ must be parallel
+		assert_eq(srca_.size(), srcb_.size());
+		for(size_t i = 0; i < srca_.size(); i++) {
+			// Can't have NULL first-mate sources.  Second-mate sources
+			// can be NULL, in the case when the corresponding first-
+			// mate source is unpaired.
+			assert(srca_[i] != NULL);
+			for(size_t j = 0; j < srcb_.size(); j++) {
+				assert_neq(srca_[i], srcb_[j]);
+			}
+		}
 	}
 
 	virtual ~PairedDualPatternSource() { }
@@ -815,17 +901,20 @@ public:
 	ReadBuf& bufa()        { return buf1_;         }
 	ReadBuf& bufb()        { return buf2_;         }
 
-	uint32_t      patid()  { return patid_;        }
-	virtual void  reset()  { patid_ = 0xffffffff;  }
-	bool          empty()  { return buf1_.empty(); }
+	uint32_t      patid() const { return patid_;        }
+	virtual void  reset()       { patid_ = 0xffffffff;  }
+	bool          empty() const { return buf1_.empty(); }
+	uint32_t length(int mate) const {
+		return (mate == 1)? buf1_.length() : buf2_.length();
+	}
 
 	/**
 	 * Return true iff the buffers jointly contain a paired-end read.
 	 */
 	bool paired() {
 		bool ret = !buf2_.empty();
-	    assert(!ret || !empty());
-	    return ret;
+		assert(!ret || !empty());
+		return ret;
 	}
 
 protected:
@@ -939,11 +1028,11 @@ public:
 	TrimmingPatternSource(bool randomizeQuals = false,
 	                      bool useSpinlock = true,
 	                      const char *dumpfile = NULL,
+	                      bool verbose = false,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(randomizeQuals, useSpinlock, dumpfile),
-		trim3_(trim3),
-		trim5_(trim5) { }
+		PatternSource(randomizeQuals, useSpinlock, dumpfile, verbose),
+		trim3_(trim3), trim5_(trim5) { }
 protected:
 	int trim3_;
 	int trim5_;
@@ -960,8 +1049,9 @@ public:
 	                    int length = 35,
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
+	                    bool verbose = false,
 	                    uint32_t seed = 0) :
-		PatternSource(false, useSpinlock, dumpfile),
+		PatternSource(false, useSpinlock, dumpfile, verbose),
 		numReads_(numReads),
 		length_(length),
 		seed_(seed)
@@ -1019,12 +1109,12 @@ public:
 			ra = RandomSource::nextU32(ra) >> 8;
 			r.patBufFw[i]           = (ra & 3);
 			char c                  = 'I' - ((ra >> 2) & 31);
-			r.qualBufFw[i]          = c;
+			r.qualBuf[i]            = c;
 		}
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, length);
-		_setBegin (r.qualFw, r.qualBufFw);
-		_setLength(r.qualFw, length);
+		_setBegin (r.qual, r.qualBuf);
+		_setLength(r.qual, length);
 		itoa10(patid, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, strlen(r.nameBuf));
@@ -1102,14 +1192,14 @@ private:
 class RandomPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
 public:
 	RandomPatternSourcePerThreadFactory(
-			uint32_t numreads,
-            int length,
-            int numthreads,
-            int thread) :
-            numreads_(numreads),
-            length_(length),
-            numthreads_(numthreads),
-            thread_(thread) { }
+	        uint32_t numreads,
+	        int length,
+	        int numthreads,
+	        int thread) :
+	        numreads_(numreads),
+	        length_(length),
+	        numthreads_(numthreads),
+	        thread_(thread) { }
 
 	/**
 	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
@@ -1135,9 +1225,9 @@ public:
 
 private:
 	uint32_t numreads_;
-    int length_;
-    int numthreads_;
-    int thread_;
+	int length_;
+	int numthreads_;
+	int thread_;
 };
 
 /// Skip to the end of the current string of newline chars and return
@@ -1202,10 +1292,12 @@ public:
 	                    bool randomizeQuals = false,
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
+	                    bool verbose = false,
 	                    int trim3 = 0,
 	                    int trim5 = 0,
 		                uint32_t skip = 0) :
-		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
+		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile,
+		                      verbose, trim3, trim5),
 		cur_(skip), skip_(skip), paired_(false), v_(), quals_()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
@@ -1277,7 +1369,7 @@ public:
 		}
 		// Copy v_*, quals_* strings into the respective Strings
 		r.patFw  = v_[cur_];
-		r.qualFw = quals_[cur_];
+		r.qual = quals_[cur_];
 		ostringstream os;
 		os << cur_;
 		r.name = os.str();
@@ -1310,10 +1402,10 @@ public:
 		}
 		// Copy v_*, quals_* strings into the respective Strings
 		ra.patFw  = v_[cur_];
-		ra.qualFw = quals_[cur_];
+		ra.qual = quals_[cur_];
 		cur_++;
 		rb.patFw  = v_[cur_];
-		rb.qualFw = quals_[cur_];
+		rb.qual = quals_[cur_];
 		ostringstream os;
 		os << readCnt_;
 		ra.name = os.str();
@@ -1332,9 +1424,9 @@ private:
 	size_t cur_;
 	uint32_t skip_;
 	bool paired_;
-	vector<String<Dna5> > v_;        /// forward sequences
-	vector<String<char> > quals_;    /// quality values parallel to v_
-	vector<String<char> > names_;    /// names
+	vector<String<Dna5> > v_;     /// forward sequences
+	vector<String<char> > quals_; /// quality values parallel to v_
+	vector<String<char> > names_; /// names
 };
 
 /**
@@ -1347,10 +1439,12 @@ public:
 	                          bool useSpinlock = true,
 	                          bool __forgiveInput = false,
 	                          const char *dumpfile = NULL,
+	                          bool verbose = false,
 	                          int trim3 = 0,
 	                          int trim5 = 0,
 	                          uint32_t skip = 0) :
-		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile, trim3, trim5),
+		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile,
+		                      verbose, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
 		filebuf_(),
@@ -1519,12 +1613,13 @@ public:
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
+	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          __forgiveInput, dumpfile,
+		                          __forgiveInput, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true)
 	{ }
@@ -1617,7 +1712,7 @@ protected:
 					throw std::runtime_error("");
 				}
 				r.patBufFw [dstLen] = charToDna5[c];
-				r.qualBufFw[dstLen] = 'I';
+				r.qualBuf[dstLen]   = 'I';
 				dstLen++;
 			}
 			c = filebuf_.get();
@@ -1631,10 +1726,10 @@ protected:
 			if(c < 0) break;
 		}
 		dstLen -= this->trim3_;
-		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
-		_setLength(r.patFw,  dstLen);
-		_setBegin (r.qualFw, r.qualBufFw);
-		_setLength(r.qualFw, dstLen);
+		_setBegin (r.patFw, (Dna5*)r.patBufFw);
+		_setLength(r.patFw, dstLen);
+		_setBegin (r.qual,  r.qualBuf);
+		_setLength(r.qual,  dstLen);
 
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
@@ -1671,8 +1766,22 @@ private:
 	int policy_;
 };
 
-extern void wrongQualityFormat();
+
+/**
+ * Tokenize a line of space-separated integer quality values.
+ */
+static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, vector<string>& toks) {
+	size_t rd = filebuf.gets(buf, buflen);
+	if(rd == 0) return false;
+	assert(NULL == strrchr(buf, '\n'));
+	tokenize(string(buf), " ", toks);
+	return true;
+}
+
+extern void wrongQualityFormat(const String<char>& read_name);
 extern void tooFewQualities(const String<char>& read_name);
+extern void tooManyQualities(const String<char>& read_name);
+extern void tooManySeqChars(const String<char>& read_name);
 
 /**
  * Synchronized concrete pattern source for a list of files with tab-
@@ -1685,15 +1794,16 @@ public:
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
+	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
 	                   bool forgiveInput = false,
-					   bool solQuals = false,
-					   bool phred64Quals = false,
-					   bool intQuals = false,
+	                   bool solQuals = false,
+	                   bool phred64Quals = false,
+	                   bool intQuals = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          forgiveInput, dumpfile,
+		                          forgiveInput, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
@@ -1946,41 +2056,26 @@ private:
 		if (intQuals_) {
 			char buf[4096];
 			while (qualsRead < charsRead) {
-				size_t rd = filebuf_.gets(buf, sizeof(buf));
-				if(rd == 0) break;
-				assert(NULL == strrchr(buf, '\n'));
 				vector<string> s_quals;
-				tokenize(string(buf), " ", s_quals);
+				if(!tokenizeQualLine(filebuf_, buf, 4096, s_quals)) break;
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
-					int iQ = atoi(s_quals[j].c_str());
-					char c = intToPhred33(iQ, solQuals_);
+					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
+					assert_geq(c, 33);
 					if (qualsRead >= trim5_) {
 						size_t off = qualsRead - trim5_;
-						if(off + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
-							throw std::runtime_error("");
+						if(off >= 1024) tooManyQualities(r.name);
+						r.qualBuf[off] = c;
 						}
-						assert_geq(c, 33);
-						assert_leq(c, 73);
-						r.qualBufFw[off] = c;
-					}
 					++qualsRead;
 				}
 			} // done reading integer quality lines
-			if (charsRead > qualsRead) {
-				tooFewQualities(r.name);
-				throw std::runtime_error("");
-			}
+			if (charsRead > qualsRead) tooFewQualities(r.name);
 		} else {
 			// Non-integer qualities
 			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
 				c = filebuf_.get();
 				c2 = c;
-				if (c == ' ') {
-					wrongQualityFormat();
-					throw std::runtime_error("");
-				}
+				if (c == ' ') wrongQualityFormat(r.name);
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
 					return -1;
@@ -1988,14 +2083,10 @@ private:
 				if(!isspace(c) && c != upto && (upto2 == -1 || c != upto2)) {
 					if (qualsRead >= trim5_) {
 						size_t off = qualsRead - trim5_;
-						if(off + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
-							throw std::runtime_error("");
-						}
+						if(off >= 1024) tooManyQualities(r.name);
 						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
-						r.qualBufFw[off] = c;
+						r.qualBuf[off] = c;
 					}
 					qualsRead++;
 				} else {
@@ -2010,8 +2101,8 @@ private:
 				}
 			}
 		}
-		_setBegin (r.qualFw, (char*)r.qualBufFw);
-		_setLength(r.qualFw, dstLen);
+		_setBegin (r.qual, (char*)r.qualBuf);
+		_setLength(r.qual, dstLen);
 		while(c != upto && (upto2 == -1 || c != upto2)) {
 			c = filebuf_.get();
 			c2 = c;
@@ -2035,12 +2126,13 @@ public:
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
-	        bool useSpinlock = true,
-	        const char *dumpfile = NULL,
-	        uint32_t skip = 0,
-	        uint32_t seed = 0) :
+			bool useSpinlock = true,
+			const char *dumpfile = NULL,
+			bool verbose = false,
+			uint32_t skip = 0,
+			uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, useSpinlock,
-		                          false, dumpfile, 0, 0, skip),
+		                          false, dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_), bufCur_(0)
 	{
@@ -2084,12 +2176,12 @@ protected:
 							c = buf_[bufCur_ - (length_ - i) + 1024];
 						}
 						r.patBufFw [i] = charToDna5[c];
-						r.qualBufFw[i] = 'I';
+						r.qualBuf[i] = 'I';
 					}
 					_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 					_setLength(r.patFw,  length_);
-					_setBegin (r.qualFw, r.qualBufFw);
-					_setLength(r.qualFw, length_);
+					_setBegin (r.qual, r.qualBuf);
+					_setLength(r.qual, length_);
 					// Set up a default name if one hasn't been set
 					itoa10(readCnt_, r.nameBuf);
 					_setBegin(r.name, r.nameBuf);
@@ -2139,20 +2231,23 @@ public:
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
+	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
 	                   bool __forgiveInput = false,
-					   bool solexa_quals = false,
-					   bool phred64Quals = false,
-					   bool integer_quals = false,
-					   uint32_t skip = 0) :
+	                   bool solexa_quals = false,
+	                   bool phred64Quals = false,
+	                   bool integer_quals = false,
+	                   bool fuzzy = false,
+	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          __forgiveInput, dumpfile,
+		                          __forgiveInput, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
-		intQuals_(integer_quals)
+		intQuals_(integer_quals),
+		fuzzy_(fuzzy)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -2210,6 +2305,8 @@ protected:
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
+		r.fuzzy = fuzzy_;
+		r.alts = 0;
 		// Pick off the first at
 		if(first_) {
 			c = filebuf_.get();
@@ -2278,19 +2375,34 @@ protected:
 		// filebuf_ now points just past the first character of a
 		// sequence line, and c holds the first character
 		int charsRead = 0;
+		uint8_t *sbuf = r.patBufFw;
+		int dstLens[] = {0, 0, 0, 0};
+		int *dstLenCur = &dstLens[0];
+		int trim5 = this->trim5_;
+		int altBufIdx = 0;
 		while(c != '+') {
+			if(fuzzy_ && c == '-') c = 'A';
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
-				if(charsRead >= this->trim5_) {
-					if(dstLen + 1 > 1024) {
-						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-							 << "reads and re-run Bowtie";
-						throw std::runtime_error("");
-					}
-					r.patBufFw[dstLen] = charToDna5[c];
-					dstLen++;
+				if(charsRead >= trim5) {
+					if((*dstLenCur) >= 1024) tooManySeqChars(r.name);
+					sbuf[(*dstLenCur)++] = charToDna5[c];
 				}
 				charsRead++;
+			} else if(fuzzy_ && c == ' ') {
+				trim5 = 0; // disable 5' trimming for now
+				if(charsRead == 0) {
+					c = filebuf_.get();
+					continue;
+					}
+				charsRead = 0;
+				if(altBufIdx >= 3) {
+					cerr << "At most 3 alternate sequence strings permitted; offending read: " << r.name << endl;
+					exit(1);
+				}
+				// Move on to the next alternate-sequence buffer
+				sbuf = r.altPatBufFw[altBufIdx++];
+				dstLenCur = &dstLens[altBufIdx];
 			}
 			c = filebuf_.get();
 			if(c < 0) {
@@ -2301,6 +2413,8 @@ protected:
 			}
 		}
 		// Trim from 3' end
+		dstLen = dstLens[0];
+		charsRead = dstLen + this->trim5_;
 		dstLen -= this->trim3_;
 		// Set trimmed bounds of buffers
 		_setBegin(r.patFw, (Dna5*)r.patBufFw);
@@ -2311,48 +2425,49 @@ protected:
 		peekToEndOfLine(filebuf_);
 
 		// Now read the qualities
-		int qualsRead = 0;
 		if (intQuals_) {
+			assert(!fuzzy_);
+			int qualsRead = 0;
 			char buf[4096];
 			while (qualsRead < charsRead) {
-				size_t rd = filebuf_.gets(buf, sizeof(buf));
-				if(rd == 0) break;
-				assert(NULL == strrchr(buf, '\n'));
 				vector<string> s_quals;
-				tokenize(string(buf), " ", s_quals);
-				for (unsigned int j = 0; j < s_quals.size(); ++j)
-				{
-					int iQ = atoi(s_quals[j].c_str());
-					char c = intToPhred33(iQ, solQuals_);
-					if (qualsRead >= trim5_)
-					{
+				if(!tokenizeQualLine(filebuf_, buf, 4096, s_quals)) break;
+				for (unsigned int j = 0; j < s_quals.size(); ++j) {
+					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
+					assert_geq(c, 33);
+					if (qualsRead >= trim5_) {
 						size_t off = qualsRead - trim5_;
-						if(off + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie";
-							throw std::runtime_error("");
-						}
-						assert_geq(c, 33);
-						assert_leq(c, 73);
-						r.qualBufFw[off] = c;
+						if(off >= 1024) tooManyQualities(r.name);
+						r.qualBuf[off] = c;
 					}
 					++qualsRead;
 				}
 			} // done reading integer quality lines
-			if (charsRead > qualsRead) {
-				tooFewQualities(r.name);
-				throw std::runtime_error("");
-			}
-			_setBegin(r.qualFw, (char*)r.qualBufFw);
-			_setLength(r.qualFw, dstLen);
+			if (charsRead > qualsRead) tooFewQualities(r.name);
+			_setBegin(r.qual, (char*)r.qualBuf);
+			_setLength(r.qual, dstLen);
 			peekOverNewline(filebuf_);
 		} else {
 			// Non-integer qualities
-			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
+			char *qbuf = r.qualBuf;
+			altBufIdx = 0;
+			trim5 = this->trim5_;
+			int qualsRead[4] = {0, 0, 0, 0};
+			int *qualsReadCur = &qualsRead[0];
+			while((*qualsReadCur) < dstLen + this->trim5_ || fuzzy_) {
 				c = filebuf_.get();
-				if (c == ' ') {
-					wrongQualityFormat();
-					throw std::runtime_error("");
+				if (!fuzzy_ && c == ' ') {
+					wrongQualityFormat(r.name);
+				} else if(c == ' ') {
+					trim5 = 0; // disable 5' trimming for now
+					if((*qualsReadCur) == 0) continue;
+					if(altBufIdx >= 3) {
+						cerr << "At most 3 alternate quality strings permitted; offending read: " << r.name << endl;
+						exit(1);
+					}
+					qbuf = r.altQualBuf[altBufIdx++];
+					qualsReadCur = &qualsRead[altBufIdx];
+					continue;
 				}
 				if(c < 0) {
 					// EOF occurred in the middle of a read - abort
@@ -2361,25 +2476,63 @@ protected:
 					return;
 				}
 				if (c != '\r' && c != '\n') {
-					if (qualsRead >= trim5_) {
-						size_t off = qualsRead - trim5_;
-						if(off + 1 > 1024) {
-							cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
-								 << "Please truncate reads and quality values and and re-run Bowtie";
-							throw std::runtime_error("");
-						}
+					if (*qualsReadCur >= trim5) {
+						size_t off = (*qualsReadCur) - trim5;
+						if(off >= 1024) tooManyQualities(r.name);
 						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
-						r.qualBufFw[off] = c;
+						qbuf[off] = c;
 					}
-					qualsRead++;
+					(*qualsReadCur)++;
 				} else {
 					break;
 				}
 			}
-			assert_eq(qualsRead, dstLen + this->trim5_);
-			_setBegin (r.qualFw, (char*)r.qualBufFw);
-			_setLength(r.qualFw, dstLen);
+			_setBegin (r.qual, (char*)r.qualBuf);
+			_setLength(r.qual, dstLen);
+
+			if(fuzzy_) {
+				// Trim from 3' end of alternate basecall and quality strings
+				if(this->trim3_ > 0) {
+					for(int i = 1; i < 4; i++) {
+						assert_eq(qualsRead[i], dstLens[i]);
+						qualsRead[i] = dstLens[i] =
+							max<int>(0, dstLens[i] - this->trim3_);
+					}
+				}
+				// Shift to RHS, and install in Strings
+				assert_eq(0, r.alts);
+				for(int i = 1; i < 4; i++) {
+					if(qualsRead[i] == 0) continue;
+					if(qualsRead[i] > dstLen) {
+						// Shift everybody up
+						int shiftAmt = qualsRead[i] - dstLen;
+						for(int j = 0; j < dstLen; j++) {
+							r.altQualBuf[i-1][j]  = r.altQualBuf[i-1][j+shiftAmt];
+							r.altPatBufFw[i-1][j] = r.altPatBufFw[i-1][j+shiftAmt];
+						}
+					} else if (qualsRead[i] < dstLen) {
+						// Shift everybody down
+						int shiftAmt = dstLen - qualsRead[i];
+						for(int j = dstLen-1; j >= shiftAmt; j--) {
+							r.altQualBuf[i-1][j]  = r.altQualBuf[i-1][j-shiftAmt];
+							r.altPatBufFw[i-1][j] = r.altPatBufFw[i-1][j-shiftAmt];
+						}
+						// Fill in unset positions
+						for(int j = 0; j < shiftAmt; j++) {
+							// '!' - indicates no alternate basecall at
+							// this position
+							r.altQualBuf[i-1][j] = (char)33;
+						}
+					}
+					_setBegin (r.altPatFw[i-1], (Dna5*)r.altPatBufFw[i-1]);
+					_setLength(r.altPatFw[i-1], dstLen);
+					_setBegin (r.altQual[i-1], (char*)r.altQualBuf[i-1]);
+					_setLength(r.altQual[i-1], dstLen);
+					r.alts++;
+				}
+			}
+
 			if(c == '\r' || c == '\n') {
 				c = peekOverNewline(filebuf_);
 			} else {
@@ -2428,6 +2581,7 @@ private:
 	bool phred64Quals_;
 	bool intQuals_;
 	int policy_;
+	bool fuzzy_;
 };
 
 /**
@@ -2441,11 +2595,12 @@ public:
 	                 bool randomizeQuals = false,
 	                 bool useSpinlock = true,
 	                 const char *dumpfile = NULL,
+	                 bool verbose = false,
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, false, useSpinlock,
-		                          dumpfile, trim3, trim5, skip),
+		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true)
 	{ }
 	virtual void reset() {
@@ -2484,13 +2639,9 @@ protected:
 			c = filebuf_.get();
 			if(isalpha(c) && dstLen >= this->trim5_) {
 				size_t len = dstLen - this->trim5_;
-				if(len + 1 > 1024) {
-					cerr << "Reads file contained a pattern with more than 1024 characters." << endl
-						 << "Please truncate reads and and re-run Bowtie";
-					throw std::runtime_error("");
-				}
+				if(len >= 1024) tooManyQualities(String<char>("(no name)"));
 				r.patBufFw [len] = charToDna5[c];
-				r.qualBufFw[len] = 'I';
+				r.qualBuf[len] = 'I';
 				dstLen++;
 			} else if(isalpha(c)) dstLen++;
 			c = filebuf_.peek();
@@ -2502,8 +2653,8 @@ protected:
 		}
 		_setBegin (r.patFw,  (Dna5*)r.patBufFw);
 		_setLength(r.patFw,  dstLen);
-		_setBegin (r.qualFw, r.qualBufFw);
-		_setLength(r.qualFw, dstLen);
+		_setBegin (r.qual, r.qualBuf);
+		_setLength(r.qual, dstLen);
 
 		c = peekToEndOfLine(filebuf_);
 		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
@@ -2580,9 +2731,9 @@ protected:
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, seqan::length(r.hitset.seq));
 		memcpy(r.patBufFw, seqan::begin(r.hitset.seq), seqan::length(r.hitset.seq));
-		_setBegin (r.qualFw, r.qualBufFw);
-		_setLength(r.qualFw, seqan::length(r.hitset.qual));
-		memcpy(r.qualBufFw, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
+		_setBegin (r.qual, r.qualBuf);
+		_setLength(r.qual, seqan::length(r.hitset.qual));
+		memcpy(r.qualBuf, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
 
 		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
 		filebuf_.resetLastN();

@@ -10,7 +10,7 @@
 	bt1.setReportExacts(true);
 
 	if(verbose) {
-		cout << patFw << ":" << qualFw << ", " << patRc << ":" << qualRc << endl;
+		cout << patFw << ":" << qual << ", " << patRc << ":" << qualRev << endl;
 	}
 
 	bool done = false;

@@ -89,6 +89,21 @@ struct EditList {
 	}
 
 	/**
+	 * Get most recently added Edit.
+	 */
+	const Edit& top() const {
+		assert_gt(size(), 0);
+		return get(size()-1);
+	}
+
+	/**
+	 * Return true iff no Edits have been added.
+	 */
+	bool empty() const {
+		return size() == 0;
+	}
+
+	/**
 	 * Set a particular element of the EditList.
 	 */
 	void set(size_t i, const Edit& e) {
@@ -146,34 +161,137 @@ struct EditList {
 union ElimsAndQual {
 
 	/**
+	 * Assuming qualA/C/G/T are already set, set quallo and quallo2
+	 * accordingly.
+	 */
+	void updateLo() {
+		flags.quallo = 127;
+		flags.quallo2 = 127;
+		if(!flags.mmA) {
+			if(flags.qualA < flags.quallo) {
+				flags.quallo2 = flags.quallo;
+				flags.quallo = flags.qualA;
+			} else if(flags.qualA == flags.quallo) {
+				flags.quallo2 = flags.quallo;
+			} else if(flags.qualA < flags.quallo2) {
+				flags.quallo2 = flags.qualA;
+			}
+		}
+		if(!flags.mmC) {
+			if(flags.qualC < flags.quallo) {
+				flags.quallo2 = flags.quallo;
+				flags.quallo = flags.qualC;
+			} else if(flags.qualC == flags.quallo) {
+				flags.quallo2 = flags.quallo;
+			} else if(flags.qualC < flags.quallo2) {
+				flags.quallo2 = flags.qualC;
+			}
+		}
+		if(!flags.mmG) {
+			if(flags.qualG < flags.quallo) {
+				flags.quallo2 = flags.quallo;
+				flags.quallo = flags.qualG;
+			} else if(flags.qualG == flags.quallo) {
+				flags.quallo2 = flags.quallo;
+			} else if(flags.qualG < flags.quallo2) {
+				flags.quallo2 = flags.qualG;
+			}
+		}
+		if(!flags.mmT) {
+			if(flags.qualT < flags.quallo) {
+				flags.quallo2 = flags.quallo;
+				flags.quallo = flags.qualT;
+			} else if(flags.qualT == flags.quallo) {
+				flags.quallo2 = flags.quallo;
+			} else if(flags.qualT < flags.quallo2) {
+				flags.quallo2 = flags.qualT;
+			}
+		}
+		assert(repOk());
+	}
+
+	/**
 	 * Set all the non-qual bits of the flags field to 1, indicating
 	 * that all outgoing paths are eliminated.
 	 */
 	inline void eliminate() {
-		join.elims = 511;
+		join.elims = ((1 << 13) - 1);
+	}
+
+	bool repOk() const {
+		uint8_t lo = 127;
+		uint8_t lo2 = 127;
+		if(!flags.mmA) {
+			if(flags.qualA < lo) {
+				lo2 = lo;
+				lo = flags.qualA;
+			} else if(flags.qualA == lo || flags.qualA < lo2) {
+				lo2 = flags.qualA;
+			}
+		}
+		if(!flags.mmC) {
+			if(flags.qualC < lo) {
+				lo2 = lo;
+				lo = flags.qualC;
+			} else if(flags.qualC == lo || flags.qualC < lo2) {
+				lo2 = flags.qualC;
+			}
+		}
+		if(!flags.mmG) {
+			if(flags.qualG < lo) {
+				lo2 = lo;
+				lo = flags.qualG;
+			} else if(flags.qualG == lo || flags.qualG < lo2) {
+				lo2 = flags.qualG;
+			}
+		}
+		if(!flags.mmT) {
+			if(flags.qualT < lo) {
+				lo2 = lo;
+				lo = flags.qualT;
+			} else if(flags.qualT == lo || flags.qualT < lo2) {
+				lo2 = flags.qualT;
+			}
+		}
+		assert_eq((int)lo, (int)flags.quallo);
+		assert_eq((int)lo2, (int)flags.quallo2);
+		return true;
 	}
 
 	struct {
-		uint16_t mmA   : 1; // A in ref aligns to non-A char in read
-		uint16_t mmC   : 1; // C in ref aligns to non-C char in read
-		uint16_t mmG   : 1; // G in ref aligns to non-G char in read
-		uint16_t mmT   : 1; // T in ref aligns to non-T char in read
-		uint16_t insA  : 1; // A insertion in reference w/r/t read
-		uint16_t insC  : 1; // C insertion in reference w/r/t read
-		uint16_t insG  : 1; // G insertion in reference w/r/t read
-		uint16_t insT  : 1; // T insertion in reference w/r/t read
-		uint16_t del   : 1; // deletion of read character
-		uint16_t qual  : 7; // quality of position
+		uint64_t mmA   : 1; // A in ref aligns to non-A char in read
+		uint64_t mmC   : 1; // C in ref aligns to non-C char in read
+		uint64_t mmG   : 1; // G in ref aligns to non-G char in read
+		uint64_t mmT   : 1; // T in ref aligns to non-T char in read
+		uint64_t snpA  : 1; // Same as mmA, but we think it's a SNP and not a miscall
+		uint64_t snpC  : 1; // Same as mmC, but we think it's a SNP and not a miscall
+		uint64_t snpG  : 1; // Same as mmG, but we think it's a SNP and not a miscall
+		uint64_t snpT  : 1; // Same as mmT, but we think it's a SNP and not a miscall
+		uint64_t insA  : 1; // A insertion in reference w/r/t read
+		uint64_t insC  : 1; // C insertion in reference w/r/t read
+		uint64_t insG  : 1; // G insertion in reference w/r/t read
+		uint64_t insT  : 1; // T insertion in reference w/r/t read
+		uint64_t del   : 1; // deletion of read character
+		uint64_t qualA : 7; // quality penalty for picking A at this position
+		uint64_t qualC : 7; // quality penalty for picking C at this position
+		uint64_t qualG : 7; // quality penalty for picking G at this position
+		uint64_t qualT : 7; // quality penalty for picking T at this position
+		uint64_t quallo : 7; // lowest quality penalty at this position
+		uint64_t quallo2 : 7; // 2nd-lowest quality penalty at this position
+		uint64_t reserved : 9;
 	} flags;
 	struct {
-		uint16_t elims : 9; // all of the edit-elim flags bundled together
-		uint16_t qual  : 7; // quality of position
+		uint64_t elims : 13; // all of the edit-elim flags bundled together
+		uint64_t quals : 42; // quality of positions
+		uint64_t reserved : 9;
 	} join;
 	struct {
-		uint16_t mmElims  : 4; // substitution flags bundled together
-		uint16_t insElims : 4; // inserts-in-reference flags bundled together
-		uint16_t delElims : 1; // deletion of read character
-		uint16_t qual     : 7; // quality of position
+		uint64_t mmElims  : 4; // substitution flags bundled together
+		uint64_t snpElims : 4; // substitution flags bundled together
+		uint64_t insElims : 4; // inserts-in-reference flags bundled together
+		uint64_t delElims : 1; // deletion of read character
+		uint64_t quals    : 42; // quality of positions
+		uint64_t reserved : 9;
 	} join2;
 };
 
@@ -187,10 +305,11 @@ struct RangeState {
 
 	/**
 	 * Using randomness when picking from among multiple choices, pick
-	 * an edit to make.  Only knows how to pick mismatches for now.
+	 * an edit to make.  TODO: Only knows how to pick mismatches for
+	 * now.
 	 */
-	Edit pickEdit(int pos, RandomSource& rand, uint32_t& top,
-	              uint32_t& bot, bool& last)
+	Edit pickEdit(int pos, RandomSource& rand, bool fuzzy,
+	              uint32_t& top, uint32_t& bot, bool& last)
 	{
 		Edit ret;
 		ret.type = EDIT_TYPE_MM;
@@ -198,43 +317,59 @@ struct RangeState {
 		ret.chr = 0;
 		ret.reserved = 0;
 		assert(!eliminated_);
+		assert(!fuzzy || eq.repOk());
 		assert(!eq.flags.mmA || !eq.flags.mmC || !eq.flags.mmG || !eq.flags.mmT);
 		int num = !eq.flags.mmA + !eq.flags.mmC + !eq.flags.mmG + !eq.flags.mmT;
 		assert_leq(num, 4);
 		assert_gt(num, 0);
-		if(num > 1) {
+		uint8_t lo2 = eq.flags.quallo2;
+		if(num == 2) eq.flags.quallo2 = 127;
+		// Only need to pick randomly if there's a quality tie
+		if(num > 1 && (!fuzzy || eq.flags.quallo == lo2)) {
 			last = false; // not the last at this pos
 			// Sum up range sizes and do a random weighted pick
 			uint32_t tot = 0;
-			if(!eq.flags.mmA) {
+			bool candA = !eq.flags.mmA;
+			bool candC = !eq.flags.mmC;
+			bool candG = !eq.flags.mmG;
+			bool candT = !eq.flags.mmT;
+			if(fuzzy) {
+				candA = (candA && eq.flags.qualA == eq.flags.quallo);
+				candC = (candC && eq.flags.qualC == eq.flags.quallo);
+				candG = (candG && eq.flags.qualG == eq.flags.quallo);
+				candT = (candT && eq.flags.qualT == eq.flags.quallo);
+			}
+			ASSERT_ONLY(int origNum = num);
+			if(candA) {
 				assert_gt(bots[0], tops[0]);
 				tot += (bots[0] - tops[0]);
 				assert_gt(num, 0);
 				ASSERT_ONLY(num--);
 			}
-			if(!eq.flags.mmC) {
+			if(candC) {
 				assert_gt(bots[1], tops[1]);
 				tot += (bots[1] - tops[1]);
 				assert_gt(num, 0);
 				ASSERT_ONLY(num--);
 			}
-			if(!eq.flags.mmG) {
+			if(candG) {
 				assert_gt(bots[2], tops[2]);
 				tot += (bots[2] - tops[2]);
 				assert_gt(num, 0);
 				ASSERT_ONLY(num--);
 			}
-			if(!eq.flags.mmT) {
+			if(candT) {
 				assert_gt(bots[3], tops[3]);
 				tot += (bots[3] - tops[3]);
 				assert_gt(num, 0);
 				ASSERT_ONLY(num--);
 			}
-			assert_eq(0, num);
+			assert_geq(num, 0);
+			assert_lt(num, origNum);
 			// Throw a dart randomly that hits one of the possible
 			// substitutions, with likelihoods weighted by range size
 			uint32_t dart = rand.nextU32() % tot;
-			if(!eq.flags.mmA) {
+			if(candA) {
 				if(dart < (bots[0] - tops[0])) {
 					// Eliminate A mismatch
 					top = tops[0];
@@ -242,11 +377,12 @@ struct RangeState {
 					eq.flags.mmA = 1;
 					assert_lt(eq.join2.mmElims, 15);
 					ret.chr = 0;
+					if(fuzzy) eq.updateLo();
 					return ret;
 				}
 				dart -= (bots[0] - tops[0]);
 			}
-			if(!eq.flags.mmC) {
+			if(candC) {
 				if(dart < (bots[1] - tops[1])) {
 					// Eliminate C mismatch
 					top = tops[1];
@@ -254,11 +390,12 @@ struct RangeState {
 					eq.flags.mmC = 1;
 					assert_lt(eq.join2.mmElims, 15);
 					ret.chr = 1;
+					if(fuzzy) eq.updateLo();
 					return ret;
 				}
 				dart -= (bots[1] - tops[1]);
 			}
-			if(!eq.flags.mmG) {
+			if(candG) {
 				if(dart < (bots[2] - tops[2])) {
 					// Eliminate G mismatch
 					top = tops[2];
@@ -266,11 +403,12 @@ struct RangeState {
 					eq.flags.mmG = 1;
 					assert_lt(eq.join2.mmElims, 15);
 					ret.chr = 2;
+					if(fuzzy) eq.updateLo();
 					return ret;
 				}
 				dart -= (bots[2] - tops[2]);
 			}
-			if(!eq.flags.mmT) {
+			if(candT) {
 				assert_lt(dart, (bots[3] - tops[3]));
 				// Eliminate T mismatch
 				top = tops[3];
@@ -278,23 +416,41 @@ struct RangeState {
 				eq.flags.mmT = 1;
 				assert_lt(eq.join2.mmElims, 15);
 				ret.chr = 3;
+				if(fuzzy) eq.updateLo();
 			}
-			return ret;
+		} else {
+			if(fuzzy) {
+				last = (num == 1);
+				if(eq.flags.qualA == eq.flags.quallo && eq.flags.mmA == 0) {
+					eq.flags.mmA = 1;
+					ret.chr = 0;
+				} else if(eq.flags.qualC == eq.flags.quallo && eq.flags.mmC == 0) {
+					eq.flags.mmC = 1;
+					ret.chr = 1;
+				} else if(eq.flags.qualG == eq.flags.quallo && eq.flags.mmG == 0) {
+					eq.flags.mmG = 1;
+					ret.chr = 2;
+				} else {
+					assert_eq(eq.flags.qualT, eq.flags.quallo);
+					assert_eq(0, eq.flags.mmT);
+					eq.flags.mmT = 1;
+					ret.chr = 3;
+			}
+				top = tops[ret.chr];
+				bot = bots[ret.chr];
+				eliminated_ = last;
+				if(!last) eq.updateLo();
 		} else {
 			last = true; // last at this pos
 			// There's only one; pick it!
 			if(!eq.flags.mmA) {
-				//eq.flags.mmA = 1;
 				ret.chr = 0;
 			} else if(!eq.flags.mmC) {
-				//eq.flags.mmC = 1;
 				ret.chr = 1;
 			} else if(!eq.flags.mmG) {
-				//eq.flags.mmG = 1;
 				ret.chr = 2;
 			} else {
 				assert(!eq.flags.mmT);
-				//eq.flags.mmT = 1;
 				ret.chr = 3;
 			}
 			top = tops[ret.chr];
@@ -302,8 +458,9 @@ struct RangeState {
 			//assert_eq(15, eq.join2.mmElims);
 			// Mark entire position as eliminated
 			eliminated_ = true;
-			return ret;
+			}
 		}
+			return ret;
 	}
 
 	/**
@@ -339,9 +496,9 @@ struct RangeState {
 class Branch {
 	typedef std::pair<uint32_t, uint32_t> U32Pair;
 public:
-	Branch() : delayedCost_(0),
-	           curtailed_(false), exhausted_(false), prepped_(false),
-	           delayedIncrease_(false) { }
+	Branch() :
+		delayedCost_(0), curtailed_(false), exhausted_(false),
+		prepped_(false), delayedIncrease_(false) { }
 
 	/**
 	 * Initialize a new branch object with an empty path.
@@ -432,6 +589,16 @@ public:
 		assert(!exhausted_);
 		if(i <= len_ && i < rangesSz_) {
 			assert(ranges_ != NULL);
+#ifndef NDEBUG
+			if(!ranges_[i].eliminated_) {
+				// Someone must be as-yet-uneliminated
+				assert(!ranges_[i].eq.flags.mmA ||
+				       !ranges_[i].eq.flags.mmC ||
+				       !ranges_[i].eq.flags.mmG ||
+				       !ranges_[i].eq.flags.mmT);
+				assert_lt(ranges_[i].eq.flags.quallo, 127);
+			}
+#endif
 			return ranges_[i].eliminated_;
 		}
 		return true;
@@ -442,16 +609,20 @@ public:
 	 * creating a new Branch object for it and inserting that branch
 	 * into the priority queue.  Mark that outgoing path from the
 	 * parent branch as eliminated.  If the second-best outgoing path
-	 * cost more, add the different to the cost of this branch (since
+	 * cost more, add the difference to the cost of this branch (since
 	 * that's the best we can do starting from here from now on).
 	 */
 	Branch* splitBranch(AllocOnlyPool<RangeState>& rpool,
 	                    AllocOnlyPool<Edit>& epool,
 	                    AllocOnlyPool<Branch>& bpool,
 	                    uint32_t pmSz,
-	                    RandomSource& rand, uint32_t qlen, int seedLen,
+	                    RandomSource& rand, uint32_t qlen,
+	                    uint32_t qualLim, int seedLen,
 	                    bool qualOrder, const EbwtParams& ep,
-	                    const uint8_t* ebwt)
+	                    const uint8_t* ebwt, bool ebwtFw,
+	                    bool fuzzy,
+	                    bool verbose,
+	                    bool quiet)
 	{
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
@@ -479,17 +650,31 @@ public:
 			// position
 			if(!eliminated(i)) {
 				numNotEliminated++;
+				if(fuzzy) {
+					assert_lt(ranges_[i].eq.flags.quallo, 127);
+					if(ranges_[i].eq.flags.quallo2 < 127) {
+						numNotEliminated++;
+					}
+				}
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
-				uint16_t cost = (qualOrder ? ranges_[i].eq.join.qual : 0) | stratum;
+				uint16_t cost = stratum;
+				cost |= (qualOrder ? ranges_[i].eq.flags.quallo : 0);
 				if(cost < bestCost) {
 					// Demote the old best to the next-best
 					nextCost = bestCost;
+					if(fuzzy) {
+						if(ranges_[i].eq.flags.quallo2 < 127) {
+							nextCost = min<uint16_t>(
+								nextCost, ranges_[i].eq.flags.quallo2 | stratum);
+						}
+					}
 					// Update the new best
 					bestCost = cost;
 					numTiedPositions = 1;
 					tiedPositions[0] = i;
 				} else if(cost == bestCost) {
 					// As good as the best so far
+					if(fuzzy) nextCost = cost;
 					assert_gt(numTiedPositions, 0);
 					if(numTiedPositions < 3) {
 						tiedPositions[numTiedPositions++] = i;
@@ -507,24 +692,21 @@ public:
 		}
 		assert_gt(numNotEliminated, 0);
 		assert_gt(numTiedPositions, 0);
-		if(nextCost != 0xffff) assert_gt(nextCost, bestCost);
+		//if(nextCost != 0xffff) assert_gt(nextCost, bestCost);
 		int r = 0;
-		// Introduce a little randomness in which path we pick
-		if(false && numTiedPositions > 1) {
-			// Disabled for now
-			r = rand.nextU32() % numTiedPositions;
-			assert_geq(r, 0);
-			assert_lt(r, 3);
-		}
 		int pos = tiedPositions[r];
 		bool last = false;
-		// Pick a not-yet-tried edit (using randomness)
+		// Pick an edit from among the edits tied for lowest cost
+		// (using randomness to break ties).  If the selected edit is
+		// the last remaining one at this position, 'last' is set to
+		// true.
 		uint32_t top = 0, bot = 0;
-		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, top, bot, last);
+		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, fuzzy, top, bot, last);
 		assert_gt(bot, top);
 		// Create and initialize a new Branch
 		uint16_t newRdepth = rdepth_ + pos + 1;
 		assert_lt((bestCost >> 14), 4);
+		uint32_t hamadd = (bestCost & ~0xc000);
 		uint16_t depth = pos + rdepth_;
 		assert_geq(depth, depth0_);
 		uint16_t newDepth0 = depth0_;
@@ -534,10 +716,11 @@ public:
 		if(depth < depth1_) newDepth0 = depth1_;
 		if(depth < depth2_) newDepth1 = depth2_;
 		if(depth < depth3_) newDepth2 = depth3_;
+		assert_eq((uint32_t)(cost_ & ~0xc000), (uint32_t)(ham_ + hamadd));
 		if(!newBranch->init(
 				rpool, epool, id, qlen,
 				newDepth0, newDepth1, newDepth2, newDepth3,
-				newRdepth, 0, cost_, ham_ + ranges_[pos].eq.join.qual,
+				newRdepth, 0, cost_, ham_ + hamadd,
 				top, bot, ep, ebwt, &edits_))
 		{
 			return NULL;
@@ -557,7 +740,16 @@ public:
 					rangesSz_ = 0;
 				}
 			}
-		} else if(numTiedPositions == 1 && last) {
+		}
+		else if(fuzzy && bestCost != nextCost) {
+			// We exhausted the last outgoing edge at the current best
+			// cost; update the best cost to be the next-best
+			assert_gt(nextCost, bestCost);
+			delayedCost_ = (cost_ - bestCost + nextCost);
+			assert_gt(delayedCost_, cost_);
+			delayedIncrease_ = true;
+		}
+		else if(!fuzzy && numTiedPositions == 1 && last) {
 			// We exhausted the last outgoing edge at the current best
 			// cost; update the best cost to be the next-best
 			assert_neq(0xffff, nextCost);
@@ -690,7 +882,7 @@ public:
 			if(!eliminated(i)) {
 				eliminatedStretch = 0;
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
-				uint16_t cost = (qualOrder ? ranges_[i].eq.join.qual : 0) | stratum;
+				uint16_t cost = (qualOrder ? ranges_[i].eq.flags.quallo : 0) | stratum;
 				if(cost < lowestCost) lowestCost = cost;
 			} else if(i < rangesSz_) {
 				eliminatedStretch++;
@@ -763,20 +955,32 @@ public:
 	 * Set the elims to match the ranges in ranges_[len_], already
 	 * calculated by the caller.  Only does mismatches for now.
 	 */
-	int installRanges(int c, int nextc, uint8_t q) {
+	int installRanges(int c, int nextc, bool fuzzy, uint32_t qAllow,
+	                  const uint8_t* qs)
+	{
 		assert(!exhausted_);
 		assert(ranges_ != NULL);
 		RangeState& r = ranges_[len_];
 		int ret = 0;
 		r.eliminated_ = true; // start with everything eliminated
-		r.eq.eliminate();
-		r.eq.flags.qual = q;
+		r.eq.eliminate(); // set all elim flags to 1
+		assert_lt(qs[0], 127);
+		assert_lt(qs[1], 127);
+		assert_lt(qs[2], 127);
+		assert_lt(qs[3], 127);
+		if(!fuzzy) {
+			assert_eq(qs[0], qs[1]);
+			assert_eq(qs[0], qs[2]);
+			assert_eq(qs[0], qs[3]);
+			r.eq.flags.quallo = qs[0];
+			if(qs[0] > qAllow) return 0;
+		}
 		// Set one/both of these to true to do the accounting for
 		// insertions and deletions as well as mismatches
 		bool doInserts = false;
 		bool doDeletes = false;
 		// We can proceed on an A
-		if(c != 0 && r.bots[0] > r.tops[0]) {
+		if(c != 0 && r.bots[0] > r.tops[0] && qs[0] <= qAllow) {
 			r.eliminated_ = false;
 			r.eq.flags.mmA = 0; // A substitution is an option
 			if(doInserts) r.eq.flags.insA = 0;
@@ -784,7 +988,7 @@ public:
 			ret++;
 		}
 		// We can proceed on a C
-		if(c != 1 && r.bots[1] > r.tops[1]) {
+		if(c != 1 && r.bots[1] > r.tops[1] && qs[1] <= qAllow) {
 			r.eliminated_ = false;
 			r.eq.flags.mmC = 0; // C substitution is an option
 			if(doInserts) r.eq.flags.insC = 0;
@@ -792,7 +996,7 @@ public:
 			ret++;
 		}
 		// We can proceed on a G
-		if(c != 2 && r.bots[2] > r.tops[2]) {
+		if(c != 2 && r.bots[2] > r.tops[2] && qs[2] <= qAllow) {
 			r.eliminated_ = false;
 			r.eq.flags.mmG = 0; // G substitution is an option
 			if(doInserts) r.eq.flags.insG = 0;
@@ -800,12 +1004,26 @@ public:
 			ret++;
 		}
 		// We can proceed on a T
-		if(c != 3 && r.bots[3] > r.tops[3]) {
+		if(c != 3 && r.bots[3] > r.tops[3] && qs[3] <= qAllow) {
 			r.eliminated_ = false;
 			r.eq.flags.mmT = 0; // T substitution is an option
 			if(doInserts) r.eq.flags.insT = 0;
 			if(doDeletes && nextc == 3) r.eq.flags.del = 0;
 			ret++;
+		}
+		if(!r.eliminated_ && fuzzy) {
+			// Copy quals
+			r.eq.flags.qualA = qs[0];
+			r.eq.flags.qualC = qs[1];
+			r.eq.flags.qualG = qs[2];
+			r.eq.flags.qualT = qs[3];
+
+			// Now that the quals are set and the elim flags are set
+			// according to which Burrows-Wheeler ranges are empty,
+			// determine best and second-best quals
+			r.eq.updateLo();
+
+			assert_lt(r.eq.flags.quallo, 127);
 		}
 		return ret;
 	}
@@ -940,8 +1158,8 @@ class BranchQueue {
 
 public:
 
-	BranchQueue(bool verbose) :
-		sz_(0), branchQ_(), patid_(0), verbose_(verbose)
+	BranchQueue(bool verbose, bool quiet) :
+		sz_(0), branchQ_(), patid_(0), verbose_(verbose), quiet_(quiet)
 	{ }
 
 	/**
@@ -1062,6 +1280,7 @@ protected:
 	TBranchQueue branchQ_; // priority queue of branches
 	uint32_t patid_;
 	bool verbose_;
+	bool quiet_;
 };
 
 /**
@@ -1090,13 +1309,15 @@ class PathManager {
 
 public:
 
-	PathManager(ChunkPool* cpool_, int *btCnt = NULL) :
-		branchQ_(false),
+	PathManager(ChunkPool* cpool_, int *btCnt, bool verbose, bool quiet) :
+		branchQ_(verbose, quiet),
 		cpool(cpool_),
 		bpool(cpool, "branch"),
 		rpool(cpool, "range state"),
 		epool(cpool, "edit"),
-		minCost(0), btCnt_(btCnt)
+		minCost(0), btCnt_(btCnt),
+		verbose_(verbose),
+		quiet_(quiet)
 	{ }
 
 	~PathManager() { }
@@ -1235,9 +1456,11 @@ public:
 	 * If the frontmost branch is a curtailed branch, split off an
 	 * extendable branch and add it to the queue.
 	 */
-	bool splitAndPrep(RandomSource& rand, uint32_t qlen, int seedLen,
-	                  bool qualOrder,
-	                  const EbwtParams& ep, const uint8_t* ebwt)
+	bool splitAndPrep(RandomSource& rand, uint32_t qlen,
+	                  uint32_t qualLim, int seedLen,
+	                  bool qualOrder, bool fuzzy,
+	                  const EbwtParams& ep, const uint8_t* ebwt,
+	                  bool ebwtFw)
 	{
 		if(empty()) return true;
 		// This counts as a backtrack
@@ -1272,7 +1495,8 @@ public:
 				}
 			}
 			Branch* newbr = splitBranch(
-					f, rand, qlen, seedLen, qualOrder, ep, ebwt);
+					f, rand, qlen, qualLim, seedLen, qualOrder, fuzzy, ep, ebwt,
+					ebwtFw);
 			if(newbr == NULL) {
 				return false;
 			}
@@ -1305,12 +1529,14 @@ protected:
 	 * Split off an extendable branch from a curtailed branch.
 	 */
 	Branch* splitBranch(Branch* src, RandomSource& rand, uint32_t qlen,
-	                    int seedLen, bool qualOrder,
-	                    const EbwtParams& ep, const uint8_t* ebwt)
+	                    uint32_t qualLim, int seedLen, bool qualOrder, bool fuzzy,
+	                    const EbwtParams& ep, const uint8_t* ebwt,
+	                    bool ebwtFw)
 	{
 		Branch* dst = src->splitBranch(
 				rpool, epool, bpool, size(), rand,
-		        qlen, seedLen, qualOrder, ep, ebwt);
+		        qlen, qualLim, seedLen, qualOrder, ep, ebwt, ebwtFw, fuzzy,
+		        verbose_, quiet_);
 		assert(dst->repOk());
 		return dst;
 	}
@@ -1342,6 +1568,8 @@ protected:
 	/// Pointer to the aligner's per-read backtrack counter.  We
 	/// increment it in splitBranch.
 	int *btCnt_;
+	bool verbose_;
+	bool quiet_;
 };
 
 /**
@@ -1499,6 +1727,7 @@ public:
 		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
 		bool verbose,
+		bool quiet,
 		bool mate1,
 		uint32_t minCostAdjustment,
 		ChunkPool* pool,
@@ -1509,7 +1738,7 @@ public:
 		params_(params),
 		fw_(fw), rs_(rs),
 		ebwtFw_(rs_->curEbwt()->fw()),
-		pm_(pool, btCnt)
+		pm_(pool, btCnt, verbose, quiet)
 	{
 		assert(rs_ != NULL);
 	}
@@ -1524,17 +1753,12 @@ public:
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
 		pm_.reset(patsrc->patid());
-		if(mate1_) {
-			ReadBuf& buf = patsrc->bufa();
-			len_ = buf.length();
-			rs_->setQuery(buf, r);
-			initRangeSource((fw_ == ebwtFw_) ? buf.qualFw : buf.qualRc);
-		} else {
-			ReadBuf& buf = patsrc->bufb();
-			len_ = buf.length();
-			rs_->setQuery(buf, r);
-			initRangeSource((fw_ == ebwtFw_) ? buf.qualFw : buf.qualRc);
-		}
+		ReadBuf* buf = mate1_ ? &patsrc->bufa() : &patsrc->bufb();
+		len_ = buf->length();
+		rs_->setQuery(*buf, r);
+		initRangeSource((fw_ == ebwtFw_) ? buf->qual : buf->qualRev,
+		                buf->fuzzy, buf->alts,
+		                (fw_ == ebwtFw_) ? buf->altQual : buf->altQualRev);
 		assert_gt(len_, 0);
 		if(this->done) return;
 		ASSERT_ONLY(allTops_.clear());
@@ -1642,7 +1866,8 @@ public:
 		return fw_;
 	}
 
-	virtual void initRangeSource(const String<char>& qual) = 0;
+	virtual void initRangeSource(const String<char>& qual, bool fuzzy,
+	                             int alts, const String<char>* altQuals) = 0;
 
 protected:
 
@@ -1825,11 +2050,12 @@ public:
 			bool strandFix,
 			const TRangeSrcDrPtrVec* rss,
 			bool verbose,
-			bool mixesReads = false) :
+			bool quiet,
+			bool mixesReads) :
 		RangeSourceDriver<TRangeSource>(false),
 		rss_(), active_(), strandFix_(strandFix),
 		lastRange_(NULL), delayedRange_(NULL), patsrc_(NULL),
-		verbose_(verbose), mixesReads_(mixesReads)
+		verbose_(verbose), quiet_(quiet), mixesReads_(mixesReads)
 	{
 		if(rss != NULL) {
 			rss_ = (*rss);
@@ -2240,6 +2466,7 @@ protected:
 	Range *delayedRange_;
 	PatternSourcePerThread* patsrc_;
 	bool verbose_;
+	bool quiet_;
 	bool mixesReads_;
 	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
 };

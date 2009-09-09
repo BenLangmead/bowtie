@@ -7,15 +7,29 @@
 using namespace std;
 using namespace seqan;
 
-void wrongQualityFormat() {
-	cerr << "Encounterd space-separated qualities" << endl
-	     <<  "This appears to be an FASTQ-int file" << endl
-	     << "Please re-run Bowtie with the --integer-quals option." << endl;
+void wrongQualityFormat(const String<char>& read_name) {
+	cerr << "Encounterd a space parsing the quality string for read " << read_name << endl
+	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
+	     << "re-run Bowtie with the --integer-quals option.  If this is a FASTQ file with" << endl
+	     << "alternate basecall information, please re-run Bowtie with the --fuzzy option." << endl;
+	exit(1);
 }
 
 void tooFewQualities(const String<char>& read_name) {
 	cerr << "Too few quality values for read: " << read_name << endl
 		 << "\tare you sure this is a FASTQ-int file?" << endl;
+}
+
+void tooManyQualities(const String<char>& read_name) {
+	cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
+		 << "Please truncate reads and quality values and and re-run Bowtie";
+	exit(1);
+}
+
+void tooManySeqChars(const String<char>& read_name) {
+	cerr << "Reads file contained a pattern with more than 1024 sequence characters." << endl
+		 << "Please truncate reads and quality values and and re-run Bowtie";
+	exit(1);
 }
 
 /**

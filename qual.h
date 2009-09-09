@@ -147,4 +147,55 @@ inline static char intToPhred33(int iQ, bool solQuals) {
 	return (int)pQ;
 }
 
+/**
+ * Fill the q[] array with the penalties that are determined by
+ * subtracting the quality values of the alternate basecalls from
+ * the quality of the primary basecall.
+ */
+inline static uint8_t penaltiesAt(size_t off, uint8_t *q,
+                                  int alts,
+                                  const String<char>& qual,
+                                  const String<Dna5>* altQry,
+                                  const String<char>* altQual)
+{
+	uint8_t primQ = qual[off]; // qual of primary call
+	uint8_t bestPenalty = primQ - 33;
+	q[0] = q[1] = q[2] = q[3] = bestPenalty;
+	for(int i = 0; i < alts; i++) {
+		uint8_t altQ = altQual[i][off]; // qual of alt call
+		if(altQ == 33) break; // no alt call
+		assert_leq(altQ, primQ);
+		if(primQ - altQ < bestPenalty) {
+			bestPenalty = primQ - altQ;
+		}
+		// Get the base
+		int altC = (int)altQry[i][off];
+		assert_lt(altC, 4);
+		q[altC] = primQ - altQ;
+	}
+	return bestPenalty;
+}
+
+/**
+ * Fill the q[] array with the penalties that are determined by
+ * subtracting the quality values of the alternate basecalls from
+ * the quality of the primary basecall.
+ */
+inline static uint8_t loPenaltyAt(size_t off, int alts,
+                                  const String<char>& qual,
+                                  const String<char>* altQual)
+{
+	uint8_t primQ = qual[off]; // qual of primary call
+	uint8_t bestPenalty = primQ - 33;
+	for(int i = 0; i < alts; i++) {
+		uint8_t altQ = altQual[i][off]; // qual of alt call
+		if(altQ == 33) break; // no more alt calls at this position
+		assert_leq(altQ, primQ);
+		if(primQ - altQ < bestPenalty) {
+			bestPenalty = primQ - altQ;
+		}
+	}
+	return bestPenalty;
+}
+
 #endif /*QUAL_H_*/
