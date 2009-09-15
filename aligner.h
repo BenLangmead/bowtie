@@ -442,6 +442,7 @@ public:
 		if(chase_) {
 			assert(!rangeMode_);
 			assert(driver_->foundRange);
+			assert(!sinkPt_->irrelevantCost(driver_->range().cost));
 			if(!rchase_->foundOff() && !rchase_->done) {
 				rchase_->advance();
 				return false;
@@ -463,6 +464,7 @@ public:
 			assert(!driver_->done || driver_->foundRange);
 			if(driver_->foundRange) {
 				const Range& ra = driver_->range();
+				assert(!sinkPt_->irrelevantCost(ra.cost));
 				assert(ra.repOk());
 				if(rangeMode_) {
 					this->done = report(ra, ra.top, ra.bot, 0);
@@ -475,7 +477,7 @@ public:
 								rchase_->off().second, rchase_->tlen());
 						rchase_->reset();
 					}
-					if(!rchase_->done) {
+					if(!rchase_->done && !sinkPt_->irrelevantCost(ra.cost)) {
 						// Keep chasing this range
 						chase_ = true;
 					} else {

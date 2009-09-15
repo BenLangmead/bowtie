@@ -63,11 +63,11 @@ struct HitSetEnt {
 		fb.get((char*)&cost, 2);
 		assert_eq(stratum, (cost >> 14));
 		fb.get((char*)&oms, 4);
-		size_t sz = 0;
+		uint32_t sz = 0;
 		fb.get((char*)&sz, 4);
 		assert_lt(sz, 1024);
 		edits.resize(sz);
-		for(size_t i = 0; i < sz; i++) {
+		for(uint32_t i = 0; i < sz; i++) {
 			edits[i].deserialize(fb);
 		}
 	}

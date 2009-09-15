@@ -19,11 +19,12 @@ void AnnotationMap::parse() {
 		cerr << "Could not open annotation file " << fname_ << endl;
 		throw std::runtime_error("");
 	}
-	while(!in.eof()) {
+	while(in.peek() != EOF) {
 		U32Pair pos;
 		CharPair an;
 		in >> pos.first >> pos.second >> an.first >> an.second;
 		map_[pos] = an;
+		while(isspace(in.peek())) in.get();
 	}
 	in.close();
 }

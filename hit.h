@@ -1244,14 +1244,15 @@ public:
 		}
 		ret = 0;
 		if(maxed) {
-			// Report how the read maxed-out; useful for chaining output
+			// Report that the read maxed-out; useful for chaining output
 			if(dump) _sink.reportMaxed(_bufferedHits, p);
 			_bufferedHits.clear();
 		} else if(unal) {
-			// Report how the read maxed-out; useful for chaining output
+			// Report that the read failed to align; useful for chaining output
 			if(dump) _sink.reportUnaligned(p);
-		} else if(_bufferedHits.size() > 0) {
+		} else {
 			// Flush buffered hits
+			assert_gt(_bufferedHits.size(), 0);
 			_sink.reportHits(_bufferedHits);
 			_sink.dumpAlign(p);
 			ret = _bufferedHits.size();
@@ -2131,18 +2132,21 @@ public:
 			hs_->back().cost = h.cost;
 			hitsForThisRead_++;
 			if(hs_->size() > _max) {
+				assert_eq(hs_->size(), _bufferedHits.size());
 				return true; // done - report nothing
 			}
+			_bufferedHits.push_back(h);
 			if(hsISz_ == 0 &&
 			   hs_->size() == n_ &&
 			   (_max == 0xffffffff || _max < n_))
 			{
+				assert_eq(hs_->size(), _bufferedHits.size());
 				return true; // already reported N good hits; stop!
 			}
-			_bufferedHits.push_back(h);
 			hs_->sort();
 			assert(consistentStrata());
 		}
+		assert_eq(hs_->size(), _bufferedHits.size());
 		updateCutoff();
 		return false; // not at N yet; keep going
 	}
@@ -2195,6 +2199,7 @@ public:
 		hs_ = &hs;
 		assert(hs_ != NULL);
 		hsISz_ = hs.size();
+		cutoff_ = 0xffff;
 		hitsForThisRead_ = hs.size();
 		assert(_bufferedHits.empty());
 		assert_geq(hs.maxedStratum, -1);
@@ -2214,6 +2219,7 @@ public:
 			}
 			cutoff_ = (hs.maxedStratum << 14);
 		}
+		assert_eq(hs_->size(), _bufferedHits.size());
 		updateCutoff();
 		return false;
 	}
@@ -2232,7 +2238,8 @@ public:
 	 * subsequent alignments with higher strata as irrelevant.
 	 */
 	virtual bool irrelevantCost(uint16_t cost) {
-		return cost >= cutoff_;
+		if(cutoff_ == 0) return false;
+		return cost > cutoff_;
 	}
 
 protected:

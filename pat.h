@@ -2701,10 +2701,12 @@ private:
 class ChainPatternSource : public BufferedFilePatternSource {
 public:
 	ChainPatternSource(const vector<string>& infiles,
-	                   bool useSpinlock = true,
-	                   const char *dumpfile = NULL) :
+	                   bool useSpinlock,
+	                   const char *dumpfile,
+	                   bool verbose,
+	                   uint32_t skip) :
 	BufferedFilePatternSource(
-		infiles, false, false, useSpinlock, dumpfile, 0, 0, 0) { }
+		infiles, false, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
 
 protected:
 

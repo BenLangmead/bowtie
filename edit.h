@@ -18,7 +18,7 @@
  * reference, deletion in the reference.
  */
 enum {
-	EDIT_TYPE_MM = 1,
+	EDIT_TYPE_MM = 0,
 	EDIT_TYPE_SNP,
 	EDIT_TYPE_INS,
 	EDIT_TYPE_DEL

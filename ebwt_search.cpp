@@ -4213,6 +4213,9 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
+		case INPUT_CHAIN:
+			return new ChainPatternSource (qs, useSpinlock, patDumpfile,
+			                               verbose, skipReads);
 		case RANDOM:
 			return new RandomPatternSource(2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
