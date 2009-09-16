@@ -2166,6 +2166,11 @@ protected:
 					if(bufCur_ == 1024) bufCur_ = 0;
 					if(eat_ > 0) {
 						eat_--;
+						// Try to keep readCnt_ aligned with the offset
+						// into the reference; that let's us see where
+						// the sampling gaps are by looking at the read
+						// name
+						readCnt_++;
 						continue;
 					}
 					for(size_t i = 0; i < length_; i++) {
