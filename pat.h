@@ -2134,7 +2134,7 @@ public:
 		BufferedFilePatternSource(infiles, false, useSpinlock,
 		                          false, dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
-		eat_(length_), bufCur_(0)
+		eat_(length_-1), beginning_(true), bufCur_(0)
 	{
 		resetForNextFile();
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
@@ -2171,7 +2171,7 @@ protected:
 						// into the reference; that let's us see where
 						// the sampling gaps are by looking at the read
 						// name
-						readCnt_++;
+						if(beginning_) readCnt_++;
 						continue;
 					}
 					for(size_t i = 0; i < length_; i++) {
@@ -2194,6 +2194,7 @@ protected:
 					_setLength(r.name, strlen(r.nameBuf));
 					eat_ = freq_-1;
 					readCnt_++;
+					beginning_ = false;
 					patid = readCnt_-1;
 					break;
 				}
@@ -2210,7 +2211,8 @@ protected:
 	 * Reset state to be read for the next file.
 	 */
 	virtual void resetForNextFile() {
-		eat_ = max(length_-1, freq_-1);
+		eat_ = length_-1;
+		beginning_ = true;
 		bufCur_ = 0;
 	}
 private:
@@ -2222,6 +2224,7 @@ private:
 	                    /// we have flushed all of the ambiguous or
 	                    /// non-existent characters out of our read
 	                    /// window
+	bool beginning_;    /// skipping over the first read length?
 	char buf_[1024];    /// read buffer
 	size_t bufCur_;     /// buffer cursor; points to where we should
 	                    /// insert the next character
