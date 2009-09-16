@@ -2171,7 +2171,7 @@ protected:
 						// into the reference; that let's us see where
 						// the sampling gaps are by looking at the read
 						// name
-						if(beginning_) readCnt_++;
+						if(!beginning_) readCnt_++;
 						continue;
 					}
 					for(size_t i = 0; i < length_; i++) {

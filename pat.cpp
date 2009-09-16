@@ -52,5 +52,5 @@ char* itoa10(int value, char* result) {
 	std::reverse( result, out );
 
 	*out = 0; // terminator
-	return result;
+	return out;
 }
