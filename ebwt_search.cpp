@@ -134,6 +134,7 @@ static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
 static bool fuzzy;
+static bool fullRef;
 
 static void resetOptions() {
 	mates1.clear();
@@ -234,6 +235,7 @@ static void resetOptions() {
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
 	fuzzy					= false; // reads will have alternate basecalls w/ qualities
+	fullRef					= false; // print entire reference name instead of just up to 1st space
 }
 
 // mating constraints
@@ -313,7 +315,8 @@ enum {
 	ARG_ANNOTMAP,
 	ARG_REPORTSE,
 	ARG_HADOOPOUT,
-	ARG_FUZZY
+	ARG_FUZZY,
+	ARG_FULLREF
 };
 
 static struct option long_options[] = {
@@ -417,6 +420,7 @@ static struct option long_options[] = {
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
+	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -483,6 +487,7 @@ static void printUsage(ostream& out) {
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
+	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
 	    << "Performance:" << endl
 #ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of alignment threads to launch (default: 1)" << endl
@@ -1487,7 +1492,7 @@ pair<T, T> parsePair(const char *str, char delim) {
  * Read command-line arguments
  */
 static void parseOptions(int argc, const char **argv) {
-    int option_index = 0;
+	int option_index = 0;
 	int next_option;
 	if(startVerbose) { cerr << "Parsing options: "; logTime(cerr, true); }
 	do {
@@ -1498,68 +1503,68 @@ static void parseOptions(int argc, const char **argv) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
 			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
-	   		case 'f': format = FASTA; break;
-	   		case 'F': {
-	   			format = FASTA_CONT;
-	   			pair<size_t, size_t> p = parsePair<size_t>(optarg, ',');
-	   			fastaContLen = p.first;
-	   			fastaContFreq = p.second;
-	   			break;
-	   		}
-	   		case 'q': format = FASTQ; break;
-	   		case 'r': format = RAW; break;
-	   		case 'c': format = CMDLINE; break;
-	   		case ARG_CHAININ: format = INPUT_CHAIN; break;
-	   		case 'I':
-	   			minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
-	   			break;
-	   		case 'X':
-	   			maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
-	   			break;
-	   		case 's':
-	   			skipReads = (uint32_t)parseInt(0, "-s arg must be positive");
-	   			break;
-	   		case ARG_FF: mate1fw = true;  mate2fw = true;  break;
-	   		case ARG_RF: mate1fw = false; mate2fw = true;  break;
-	   		case ARG_FR: mate1fw = true;  mate2fw = false; break;
-	   		case ARG_RANDOM_READS: format = RANDOM; break;
-	   		case ARG_RANDOM_READS_NOSYNC:
-	   			format = RANDOM;
-	   			randReadsNoSync = true;
-	   			break;
-	   		case ARG_RANGE: rangeMode = true; break;
-	   		case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
-	   		case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
-	   		case 'b': outType = OUTPUT_BINARY; break;
-	   		case ARG_REFOUT: refOut = true; break;
-	   		case ARG_NOOUT: outType = OUTPUT_NONE; break;
-	   		case ARG_REFMAP: refMapFile = optarg; break;
-	   		case ARG_ANNOTMAP: annotMapFile = optarg; break;
-	   		case ARG_USE_SPINLOCK: useSpinlock = false; break;
-	   		case ARG_SHMEM: useShmem = true; break;
-	   		case ARG_MM: {
+			case 'f': format = FASTA; break;
+			case 'F': {
+				format = FASTA_CONT;
+				pair<size_t, size_t> p = parsePair<size_t>(optarg, ',');
+				fastaContLen = p.first;
+				fastaContFreq = p.second;
+				break;
+			}
+			case 'q': format = FASTQ; break;
+			case 'r': format = RAW; break;
+			case 'c': format = CMDLINE; break;
+			case ARG_CHAININ: format = INPUT_CHAIN; break;
+			case 'I':
+				minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
+				break;
+			case 'X':
+				maxInsert = (uint32_t)parseInt(1, "-X arg must be at least 1");
+				break;
+			case 's':
+				skipReads = (uint32_t)parseInt(0, "-s arg must be positive");
+				break;
+			case ARG_FF: mate1fw = true;  mate2fw = true;  break;
+			case ARG_RF: mate1fw = false; mate2fw = true;  break;
+			case ARG_FR: mate1fw = true;  mate2fw = false; break;
+			case ARG_RANDOM_READS: format = RANDOM; break;
+			case ARG_RANDOM_READS_NOSYNC:
+				format = RANDOM;
+				randReadsNoSync = true;
+				break;
+			case ARG_RANGE: rangeMode = true; break;
+			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
+			case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
+			case 'b': outType = OUTPUT_BINARY; break;
+			case ARG_REFOUT: refOut = true; break;
+			case ARG_NOOUT: outType = OUTPUT_NONE; break;
+			case ARG_REFMAP: refMapFile = optarg; break;
+			case ARG_ANNOTMAP: annotMapFile = optarg; break;
+			case ARG_USE_SPINLOCK: useSpinlock = false; break;
+			case ARG_SHMEM: useShmem = true; break;
+			case ARG_MM: {
 #ifdef BOWTIE_MM
-	   			useMm = true;
-	   			break;
+				useMm = true;
+				break;
 #else
-	   			cerr << "Memory-mapped I/O mode is disabled because bowtie was not compiled with" << endl
-	   			     << "BOWTIE_MM defined.  Memory-mapped I/O is not supported under Windows.  If you" << endl
-	   			     << "would like to use memory-mapped I/O on a platform that supports it, please" << endl
-	   			     << "refrain from specifying BOWTIE_MM=0 when compiling Bowtie." << endl;
-	   			throw std::runtime_error("");
+				cerr << "Memory-mapped I/O mode is disabled because bowtie was not compiled with" << endl
+				     << "BOWTIE_MM defined.  Memory-mapped I/O is not supported under Windows.  If you" << endl
+				     << "would like to use memory-mapped I/O on a platform that supports it, please" << endl
+				     << "refrain from specifying BOWTIE_MM=0 when compiling Bowtie." << endl;
+				throw std::runtime_error("");
 #endif
-	   		}
-	   		case ARG_MMSWEEP: mmSweep = true; break;
-	   		case ARG_HADOOPOUT: hadoopOut = true; break;
-	   		case ARG_AL: dumpAlBase = optarg; break;
-	   		case ARG_ALFA: dumpAlFaBase = optarg; break;
-	   		case ARG_ALFQ: dumpAlFqBase = optarg; break;
-	   		case ARG_UN: dumpUnalBase = optarg; break;
-	   		case ARG_UNFA: dumpUnalFaBase = optarg; break;
-	   		case ARG_UNFQ: dumpUnalFqBase = optarg; break;
-	   		case ARG_MAXDUMP: dumpMaxBase = optarg; break;
-	   		case ARG_MAXFA: dumpMaxFaBase = optarg; break;
-	   		case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
+			}
+			case ARG_MMSWEEP: mmSweep = true; break;
+			case ARG_HADOOPOUT: hadoopOut = true; break;
+			case ARG_AL: dumpAlBase = optarg; break;
+			case ARG_ALFA: dumpAlFaBase = optarg; break;
+			case ARG_ALFQ: dumpAlFqBase = optarg; break;
+			case ARG_UN: dumpUnalBase = optarg; break;
+			case ARG_UNFA: dumpUnalFaBase = optarg; break;
+			case ARG_UNFQ: dumpUnalFqBase = optarg; break;
+			case ARG_MAXDUMP: dumpMaxBase = optarg; break;
+			case ARG_MAXFA: dumpMaxFaBase = optarg; break;
+			case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
 			case ARG_SOLEXA_QUALS: solexaQuals = true; break;
 			case ARG_integerQuals: integerQuals = true; break;
 			case ARG_PHRED64: phred64Quals = true; break;
@@ -1571,6 +1576,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_STATEFUL: stateful = true; break;
 			case ARG_FUZZY: fuzzy = true; break;
 			case ARG_REPORTSE: reportSe = true; break;
+			case ARG_FULLREF: fullRef = true; break;
 			case ARG_PREFETCH_WIDTH:
 				prefetchWidth = parseInt(1, "--prewidth must be at least 1");
 				break;
@@ -1672,7 +1678,6 @@ static void parseOptions(int argc, const char **argv) {
 				}
 				origString = optarg;
 				break;
-
 			case -1: break; /* Done with options. */
 			case 0:
 				if (long_options[option_index].flag != 0)
@@ -1947,9 +1952,9 @@ static inline void finishReadWithHitmask(PatternSourcePerThread* p,
 	sinkFact->destroy(sink); \
 	delete sinkFact; \
 	if(tid > 0) { \
-    	pthread_exit(NULL); \
-    } \
-    return NULL;
+		pthread_exit(NULL); \
+	} \
+	return NULL;
 #else
 #define WORKER_EXIT() \
 	patsrcFact->destroy(patsrc); \
@@ -1977,8 +1982,8 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 	} else {
 		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
 	}
-    assert(patsrcFact != NULL);
-    return patsrcFact;
+	assert(patsrcFact != NULL);
+	return patsrcFact;
 }
 
 /**
@@ -1987,12 +1992,12 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
  */
 static HitSinkPerThreadFactory*
 createSinkFactory(HitSink& _sink, bool sanity) {
-    HitSinkPerThreadFactory *sink = NULL;
-    if(format == INPUT_CHAIN) {
-    	assert(stateful);
-    	sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, sanity, strata);
-    } else if(!strata) {
-    	// Unstratified
+	HitSinkPerThreadFactory *sink = NULL;
+	if(format == INPUT_CHAIN) {
+		assert(stateful);
+		sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, sanity, strata);
+	} else if(!strata) {
+		// Unstratified
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, spanning strata
@@ -2005,9 +2010,9 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 			// All hits, spanning strata
 			sink = new AllHitSinkPerThreadFactory(_sink, mhits, sanity);
 		}
-    } else {
-    	// Stratified
-    	assert(oldBest || stateful);
+	} else {
+		// Stratified
+		assert(oldBest || stateful);
 		if(!allHits) {
 			if(oldBest) {
 				// First N best, not spanning strata
@@ -2029,9 +2034,9 @@ createSinkFactory(HitSink& _sink, bool sanity) {
 				sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits, sanity);
 			}
 		}
-    }
-    assert(sink != NULL);
-    return sink;
+	}
+	assert(sink != NULL);
+	return sink;
 }
 
 /**
@@ -2058,14 +2063,14 @@ static void *exactSearchWorker(void *vp) {
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
-			*sink,      // HitSink
+	        *sink,      // HitSink
 	        os,         // reference sequences
 	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
 	        true,       // index is forward
 	        rangeMode); // range mode
 	GreedyDFSRangeSource bt(
-			&ebwt, params,
+	        &ebwt, params,
 	        0xffffffff,     // qualThresh
 	        0xffffffff,    // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -2081,9 +2086,9 @@ static void *exactSearchWorker(void *vp) {
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		#include "search_exact.c"
-    }
+	}
 	FINISH_READ(patsrc);
-    WORKER_EXIT();
+	WORKER_EXIT();
 }
 
 /**
@@ -4491,13 +4496,13 @@ static void driver(const char * type,
 				if(refOut) {
 					sink = new VerboseHitSink(
 							ebwt.nPat(), offBase, rmap, amap,
-							PASS_DUMP_FILES,
+							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase, rmap, amap,
-							PASS_DUMP_FILES,
+							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				}

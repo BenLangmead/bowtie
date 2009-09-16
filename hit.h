@@ -2662,11 +2662,13 @@ public:
 	               int offBase,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
+	               bool fullRef,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(out, PASS_HIT_DUMPS),
 	_partition(partition),
 	offBase_(offBase),
+	fullRef_(fullRef),
 	rmap_(rmap), amap_(amap)
 	{ }
 
@@ -2678,11 +2680,13 @@ public:
 	               int offBase,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
+	               bool fullRef,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(numOuts, PASS_HIT_DUMPS),
 	_partition(partition),
 	offBase_(offBase),
+	fullRef_(fullRef),
 	rmap_(rmap), amap_(amap)
 	{ }
 
@@ -2942,6 +2946,7 @@ public:
 	                   const vector<string>* refnames,
 	                   ReferenceMap *rmap,
 	                   AnnotationMap *amap,
+	                   bool fullRef,
 	                   int partition,
 	                   int offBase)
 	{
@@ -3009,9 +3014,27 @@ public:
 				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
 				// .first is text id, .second is offset
 				if(refnames != NULL && rmap != NULL) {
-					ss << rmap->getName(h.h.first);
+					if(fullRef) {
+						ss << rmap->getName(h.h.first);
+					} else {
+						size_t pos = rmap->getName(h.h.first).find_first_of(" \t");
+						if(pos != string::npos) {
+							ss << rmap->getName(h.h.first).substr(0, pos);
+						} else {
+							ss << rmap->getName(h.h.first);
+						}
+					}
 				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					ss << (*refnames)[h.h.first];
+					if(fullRef) {
+						ss << (*refnames)[h.h.first];
+					} else {
+						size_t pos = (*refnames)[h.h.first].find_first_of(" \t");
+						if(pos != string::npos) {
+							ss << (*refnames)[h.h.first].substr(0, pos);
+						} else {
+							ss << (*refnames)[h.h.first];
+						}
+					}
 				} else {
 					ss << h.h.first;
 				}
@@ -3075,7 +3098,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, _partition, offBase_);
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, _partition, offBase_);
 	}
 
 protected:
@@ -3099,7 +3122,8 @@ private:
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
-    ReferenceMap *rmap_;   /// mapping to reference coordinate system.
+	bool fullRef_;         /// print full reference name
+	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
 	AnnotationMap *amap_;  ///
 };
 
@@ -3222,7 +3246,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, _partition, offBase_);
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, false, _partition, offBase_);
 	}
 
 protected:
