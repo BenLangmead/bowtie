@@ -2134,7 +2134,8 @@ public:
 		BufferedFilePatternSource(infiles, false, useSpinlock,
 		                          false, dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
-		eat_(length_-1), beginning_(true), bufCur_(0)
+		eat_(length_-1), beginning_(true),
+		nameChars_(0), bufCur_(0)
 	{
 		resetForNextFile();
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
@@ -2143,6 +2144,7 @@ public:
 	virtual void reset() {
 		BufferedFilePatternSource::reset();
 	}
+
 protected:
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
@@ -2154,7 +2156,23 @@ protected:
 			}
 			if(c == '>') {
 				resetForNextFile();
-				peekToEndOfLine(filebuf_);
+				c = filebuf_.peek();
+				bool sawSpace = false;
+				while(c != '\n' && c != '\r') {
+					if(!sawSpace) {
+						sawSpace = isspace(c);
+					}
+					if(!sawSpace) {
+						nameBuf_[nameChars_++] = c;
+					}
+					filebuf_.get();
+					c = filebuf_.peek();
+				}
+				while(c == '\n' || c == '\r') {
+					filebuf_.get();
+					c = filebuf_.peek();
+				}
+				nameBuf_[nameChars_++] = '_';
 			} else {
 				int cat = dna4Cat[c];
 				if(cat == 2) c = 'N';
@@ -2189,7 +2207,7 @@ protected:
 					_setBegin (r.qual, r.qualBuf);
 					_setLength(r.qual, length_);
 					// Set up a default name if one hasn't been set
-					itoa10(readCnt_, r.nameBuf);
+					itoa10(readCnt_, &r.nameBuf[nameChars_]);
 					_setBegin(r.name, r.nameBuf);
 					_setLength(r.name, strlen(r.nameBuf));
 					eat_ = freq_-1;
@@ -2213,7 +2231,7 @@ protected:
 	virtual void resetForNextFile() {
 		eat_ = length_-1;
 		beginning_ = true;
-		bufCur_ = 0;
+		bufCur_ = nameChars_ = 0;
 	}
 private:
 	size_t length_;     /// length of reads to generate
@@ -2226,6 +2244,9 @@ private:
 	                    /// window
 	bool beginning_;    /// skipping over the first read length?
 	char buf_[1024];    /// read buffer
+	char nameBuf_[1024];/// read buffer for name of fasta record being
+	                    /// split into mers
+	size_t nameChars_;  /// number of name characters copied into buf
 	size_t bufCur_;     /// buffer cursor; points to where we should
 	                    /// insert the next character
 };
