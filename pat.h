@@ -2207,6 +2207,9 @@ protected:
 					_setBegin (r.qual, r.qualBuf);
 					_setLength(r.qual, length_);
 					// Set up a default name if one hasn't been set
+					for(size_t i = 0; i < nameChars_; i++) {
+						r.nameBuf[i] = nameBuf_[i];
+					}
 					itoa10(readCnt_, &r.nameBuf[nameChars_]);
 					_setBegin(r.name, r.nameBuf);
 					_setLength(r.name, strlen(r.nameBuf));
