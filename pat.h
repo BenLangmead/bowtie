@@ -2135,7 +2135,7 @@ public:
 		                          false, dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_-1), beginning_(true),
-		nameChars_(0), bufCur_(0)
+		nameChars_(0), bufCur_(0), subReadCnt_(0llu)
 	{
 		resetForNextFile();
 		assert_lt(length_, (size_t)ReadBuf::BUF_SIZE);
@@ -2210,7 +2210,7 @@ protected:
 					for(size_t i = 0; i < nameChars_; i++) {
 						r.nameBuf[i] = nameBuf_[i];
 					}
-					itoa10(readCnt_, &r.nameBuf[nameChars_]);
+					itoa10(readCnt_-subReadCnt_, &r.nameBuf[nameChars_]);
 					_setBegin(r.name, r.nameBuf);
 					_setLength(r.name, strlen(r.nameBuf));
 					eat_ = freq_-1;
@@ -2235,6 +2235,7 @@ protected:
 		eat_ = length_-1;
 		beginning_ = true;
 		bufCur_ = nameChars_ = 0;
+		subReadCnt_ = readCnt_;
 	}
 private:
 	size_t length_;     /// length of reads to generate
@@ -2252,6 +2253,9 @@ private:
 	size_t nameChars_;  /// number of name characters copied into buf
 	size_t bufCur_;     /// buffer cursor; points to where we should
 	                    /// insert the next character
+	uint64_t subReadCnt_;/// number to subtract from readCnt_ to get
+	                    /// the pat id to output (so it resets to 0 for
+	                    /// each new sequence)
 };
 
 /**

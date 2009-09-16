@@ -226,7 +226,7 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
-		$(OTHER_CPPS) $(SEARCH_CPPS) \
+		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
 		$(LIBS) $(SEARCH_LIBS)
 
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
@@ -236,7 +236,8 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 		-DEBWT_SEARCH_HASH=`cat .$@.cksum` \
 		$(DEFS) -Wall \
 		$(INC) \
-		-o $@ $< $(OTHER_CPPS) $(SEARCH_CPPS) \
+		-o $@ $< \
+		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
 		$(LIBS) $(SEARCH_LIBS)
 
 #
@@ -250,7 +251,8 @@ bowtie-maptool: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
 		-DEBWT_MAPTOOL_HASH=`cat .$@.cksum` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
-		-o $@ $< $(OTHER_CPPS) \
+		-o $@ $< \
+		$(OTHER_CPPS) \
 		$(LIBS)
 
 bowtie-maptool-debug: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
@@ -260,7 +262,8 @@ bowtie-maptool-debug: map_tool.cpp $(OTHER_CPPS) $(HEADERS)
 		-DEBWT_MAPTOOL_HASH=`cat .$@.cksum` \
 		$(DEFS) -Wall \
 		$(INC) \
-		-o $@ $< $(OTHER_CPPS) \
+		-o $@ $< \
+		$(OTHER_CPPS) \
 		$(LIBS)
 
 #
@@ -294,7 +297,8 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		-DEBWT_INSPECT_HASH=`cat .$@.cksum` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
-		-o $@ $< $(OTHER_CPPS) \
+		-o $@ $< \
+		$(OTHER_CPPS) \
 		$(LIBS)
 
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
@@ -304,7 +308,8 @@ bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		-DEBWT_INSPECT_HASH=`cat .$@.cksum` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
-		-o $@ $< $(OTHER_CPPS) \
+		-o $@ $< \
+		$(OTHER_CPPS) \
 		$(LIBS)
 
 chaincat: chaincat.cpp hit_set.h filebuf.h hit_set.cpp alphabet.h alphabet.c
