@@ -2151,9 +2151,10 @@ protected:
 			if(c < 0) {
 				seqan::clear(r.patFw);
 				return;
-			} if(c == '>') {
+			}
+			if(c == '>') {
 				resetForNextFile();
-				peekOverNewline(filebuf_);
+				peekToEndOfLine(filebuf_);
 			} else {
 				int cat = dna4Cat[c];
 				if(cat == 2) c = 'N';
