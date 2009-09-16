@@ -368,11 +368,13 @@ static int parseNumber(T lower, const char *errmsg) {
 /**
  * Read command-line arguments
  */
-static void parseOptions(int argc, char **argv) {
+static void parseOptions(int argc, const char **argv) {
 	int option_index = 0;
 	int next_option;
 	do {
-		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
+		next_option = getopt_long(
+			argc, const_cast<char**>(argv),
+			short_options, long_options, &option_index);
 		switch (next_option) {
 			case 'f': format = FASTA; break;
 			case 'c': format = CMDLINE; break;
@@ -595,12 +597,13 @@ static void driver(const string& infile,
 	}
 }
 
-static char *argv0 = NULL;
+static const char *argv0 = NULL;
 
+extern "C" {
 /**
  * main function.  Parses command-line arguments.
  */
-int main(int argc, char **argv) {
+int bowtie_build(int argc, const char **argv) {
 	try {
 		string infile;
 		vector<string> infiles;
@@ -741,4 +744,5 @@ int main(int argc, char **argv) {
 	} catch(std::exception& e) {
 		return 1;
 	}
+}
 }

@@ -1,5 +1,5 @@
 /*
- * main.cpp
+ * bowtie_main.cpp
  *
  *  Created on: Sep 10, 2009
  *      Author: Ben Langmead
