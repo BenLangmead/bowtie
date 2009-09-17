@@ -2143,6 +2143,7 @@ public:
 
 	virtual void reset() {
 		BufferedFilePatternSource::reset();
+		resetForNextFile();
 	}
 
 protected:
