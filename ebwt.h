@@ -2675,7 +2675,9 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
                                 bool startVerbose)
 {
 	bool switchEndian; // dummy; caller doesn't care
+#ifdef BOWTIE_MM
 	char *mmFile[] = { NULL, NULL };
+#endif
 	if(_in1Str.length() > 0) {
 		if(_verbose || startVerbose) {
 			cerr << "  About to open input files: ";
