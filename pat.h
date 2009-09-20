@@ -76,6 +76,8 @@ static inline uint32_t genRandSeed(const String<Dna5>& qry,
  * Each search thread has one.
  */
 struct ReadBuf {
+	ReadBuf() { reset(); }
+
 	~ReadBuf() {
 		clearAll(); reset();
 		// Prevent seqan from trying to free buffers
@@ -2211,7 +2213,7 @@ protected:
 					for(size_t i = 0; i < nameChars_; i++) {
 						r.nameBuf[i] = nameBuf_[i];
 					}
-					itoa10(readCnt_-subReadCnt_, &r.nameBuf[nameChars_]);
+					itoa10(readCnt_ - subReadCnt_, &r.nameBuf[nameChars_]);
 					_setBegin(r.name, r.nameBuf);
 					_setLength(r.name, strlen(r.nameBuf));
 					eat_ = freq_-1;
@@ -2229,6 +2231,7 @@ protected:
 		cerr << "In FastaContinuousPatternSource.readPair()" << endl;
 		throw std::runtime_error("");
 	}
+
 	/**
 	 * Reset state to be read for the next file.
 	 */
@@ -2238,6 +2241,7 @@ protected:
 		bufCur_ = nameChars_ = 0;
 		subReadCnt_ = readCnt_;
 	}
+
 private:
 	size_t length_;     /// length of reads to generate
 	size_t freq_;       /// frequency to sample reads
@@ -2766,12 +2770,15 @@ protected:
 		}
 		// Now copy the name/sequence/quals into r.name/r.patFw/r.qualFw
 		_setBegin(r.name, (char*)r.nameBuf);
+		_setCapacity(r.name, seqan::length(r.hitset.name));
 		_setLength(r.name, seqan::length(r.hitset.name));
 		memcpy(r.nameBuf, seqan::begin(r.hitset.name), seqan::length(r.hitset.name));
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
+		_setCapacity(r.patFw, seqan::length(r.hitset.seq));
 		_setLength(r.patFw, seqan::length(r.hitset.seq));
 		memcpy(r.patBufFw, seqan::begin(r.hitset.seq), seqan::length(r.hitset.seq));
 		_setBegin (r.qual, r.qualBuf);
+		_setCapacity(r.qual, seqan::length(r.hitset.qual));
 		_setLength(r.qual, seqan::length(r.hitset.qual));
 		memcpy(r.qualBuf, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
 
