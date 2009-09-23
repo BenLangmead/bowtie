@@ -22,31 +22,59 @@
  */
 
 // Build parameters
-static bool verbose          = true;  // be talkative (default)
-static int sanityCheck       = 0;     // do slow sanity checks
-static int format            = FASTA; // input sequence format
-static uint32_t bmax         = 0xffffffff; // max blockwise SA bucket size
-static uint32_t bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
-static uint32_t bmaxDivN     = 4;          // same, as divisor of n
-static int dcv               = 1024;  // bwise SA difference-cover sample sz
-static int noDc              = 0;     // disable difference-cover sample
-static int entireSA          = 0;     // 1 = disable blockwise SA
-static int seed              = 0;     // srandom seed
-static int showVersion       = 0;     // just print version and quit?
-static bool doubleEbwt       = true;  // build forward and reverse Ebwts
-static int64_t cutoff        = -1;    // max # of reference bases
+static bool verbose;
+static int sanityCheck;
+static int format;
+static uint32_t bmax;
+static uint32_t bmaxMultSqrt;
+static uint32_t bmaxDivN;
+static int dcv;
+static int noDc;
+static int entireSA;
+static int seed;
+static int showVersion;
+static bool doubleEbwt;
+static int64_t cutoff;
 //   Ebwt parameters
-static int32_t lineRate      = 6;  // a "line" is 64 bytes
-static int32_t linesPerSide  = 1;  // 1 64-byte line on a side
-static int32_t offRate       = 5;  // sample 1 out of 32 SA elts
-static int32_t isaRate       = -1; // sample rate for ISA; default: don't sample
-static int32_t ftabChars     = 10; // 10 chars in initial lookup table
-static int     bigEndian     = 0;  // little endian
-static bool    nsToAs        = false;
-static bool    autoMem       = true;
-static bool    packed        = false;
-static bool    writeRef      = true;  // write compact reference to .3.ebwt/.4.ebwt
-static bool    justRef       = false; // *just* write compact reference, don't index
+static int32_t lineRate;
+static int32_t linesPerSide;
+static int32_t offRate;
+static int32_t isaRate;
+static int32_t ftabChars;
+static int  bigEndian;
+static bool nsToAs;
+static bool autoMem;
+static bool packed;
+static bool writeRef;
+static bool justRef;
+
+static void resetOptions() {
+	verbose      = true;  // be talkative (default)
+	sanityCheck  = 0;     // do slow sanity checks
+	format       = FASTA; // input sequence format
+	bmax         = 0xffffffff; // max blockwise SA bucket size
+	bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
+	bmaxDivN     = 4;          // same, as divisor of n
+	dcv          = 1024;  // bwise SA difference-cover sample sz
+	noDc         = 0;     // disable difference-cover sample
+	entireSA     = 0;     // 1 = disable blockwise SA
+	seed         = 0;     // srandom seed
+	showVersion  = 0;     // just print version and quit?
+	doubleEbwt   = true;  // build forward and reverse Ebwts
+	cutoff       = -1;    // max # of reference bases
+	//   Ebwt parameters
+	lineRate     = 6;  // a "line" is 64 bytes
+	linesPerSide = 1;  // 1 64-byte line on a side
+	offRate      = 5;  // sample 1 out of 32 SA elts
+	isaRate      = -1; // sample rate for ISA; default: don't sample
+	ftabChars    = 10; // 10 chars in initial lookup table
+	bigEndian    = 0;  // little endian
+	nsToAs       = false; // convert reference Ns to As prior to indexing
+	autoMem      = true;  // automatically adjust memory usage parameters
+	packed       = false; //
+	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
+	justRef      = false; // *just* write compact reference, don't index
+}
 
 // Argument constants for getopts
 static const int ARG_BMAX      = 256;
@@ -605,6 +633,10 @@ extern "C" {
  */
 int bowtie_build(int argc, const char **argv) {
 	try {
+		// Reset all global state, including getopt state
+		opterr = optind = 1;
+		resetOptions();
+
 		string infile;
 		vector<string> infiles;
 		string outfile;

@@ -4638,8 +4638,10 @@ extern "C" {
  */
 int bowtie(int argc, const char **argv) {
 	try {
+		// Reset all global state, including getopt state
 		opterr = optind = 1;
 		resetOptions();
+
 		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
 		vector<string> queries;

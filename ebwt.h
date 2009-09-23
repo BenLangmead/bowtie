@@ -4166,47 +4166,6 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
  */
 string adjustEbwtBase(const string& cmdline,
 					  const string& ebwtFileBase,
-					  bool verbose = false)
-{
-	string str = ebwtFileBase;
-	ifstream in;
-	if(verbose) cout << "Trying " << str << endl;
-	in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-	if(!in.is_open()) {
-		if(verbose) cout << "  didn't work" << endl;
-		in.close();
-		str = cmdline;
-		size_t st = str.find_last_of("/\\");
-		if(st != string::npos) {
-			str.erase(st);
-			str += "/indexes/";
-		} else {
-			str = "indexes/";
-		}
-		str += ebwtFileBase;
-		if(verbose) cout << "Trying " << str << endl;
-		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-		if(!in.is_open()) {
-			if(verbose) cout << "  didn't work" << endl;
-			in.close();
-			if(getenv("BOWTIE_INDEXES") != NULL) {
-				str = string(getenv("BOWTIE_INDEXES")) + "/" + ebwtFileBase;
-				if(verbose) cout << "Trying " << str << endl;
-				in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-				if(!in.is_open()) {
-					if(verbose) cout << "  didn't work" << endl;
-					in.close();
-				} else {
-					if(verbose) cout << "  worked" << endl;
-				}
-			}
-		}
-	}
-	if(!in.is_open()) {
-		cerr << "Could not locate a Bowtie index corresponding to basename \"" << ebwtFileBase << "\"" << endl;
-		throw std::runtime_error("");
-	}
-	return str;
-}
+					  bool verbose = false);
 
 #endif /*EBWT_H_*/

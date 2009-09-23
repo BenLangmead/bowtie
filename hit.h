@@ -155,7 +155,7 @@ public:
 	}
 
 	/**
-	 *
+	 * Populate a HitSet
 	 */
 	static void fromHitSet(std::vector<Hit>& hits, const HitSet& hs) {
 		assert(hs.sorted());
