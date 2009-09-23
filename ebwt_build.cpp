@@ -431,11 +431,11 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case 'h':
 				printLongUsage(cout);
-				exit(0);
+				throw std::runtime_error("");
 				break;
 			case '?':
 				printUsage(cerr);
-				exit(0);
+				throw std::runtime_error("");
 				break;
 			case ARG_BMAX:
 				bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");

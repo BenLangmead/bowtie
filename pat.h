@@ -2440,7 +2440,7 @@ protected:
 				charsRead = 0;
 				if(altBufIdx >= 3) {
 					cerr << "At most 3 alternate sequence strings permitted; offending read: " << r.name << endl;
-					exit(1);
+					throw std::runtime_error("");
 				}
 				// Move on to the next alternate-sequence buffer
 				sbuf = r.altPatBufFw[altBufIdx++];
@@ -2505,7 +2505,7 @@ protected:
 					if((*qualsReadCur) == 0) continue;
 					if(altBufIdx >= 3) {
 						cerr << "At most 3 alternate quality strings permitted; offending read: " << r.name << endl;
-						exit(1);
+						throw std::runtime_error("");
 					}
 					qbuf = r.altQualBuf[altBufIdx++];
 					qualsReadCur = &qualsRead[altBufIdx];

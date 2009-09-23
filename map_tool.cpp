@@ -159,28 +159,28 @@ static struct option long_options[] = {
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
-    int option_index = 0;
+	int option_index = 0;
 	int next_option;
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
-	   		case 'h':
-	   		case '?':
+			case 'h':
+			case '?':
 				printLongUsage(cout);
-				exit(0);
+				throw std::runtime_error("");
 				break;
-	   		case 'v': verbose = true; break;
-	   		case 's': sorthits = true; break;
-	   		case ARG_VERSION: showVersion = true; break;
-	   		case ARG_REFIDX: refIdx = true; break;
-	   		case 'd': informat = FORMAT_DEFAULT; break;
-	   		case 'b': informat = FORMAT_BIN; break;
-	   		case 'D': outformat = FORMAT_DEFAULT; break;
-	   		case 'B': outformat = FORMAT_BIN; break;
-	   		case 'C': outformat = FORMAT_CONCISE; break;
-	   		case 'Q': outformat = FORMAT_FASTQ; break;
-	   		case 'F': outformat = FORMAT_FASTA; break;
-	   		case 'n': ebwt_name = optarg; break;
+			case 'v': verbose = true; break;
+			case 's': sorthits = true; break;
+			case ARG_VERSION: showVersion = true; break;
+			case ARG_REFIDX: refIdx = true; break;
+			case 'd': informat = FORMAT_DEFAULT; break;
+			case 'b': informat = FORMAT_BIN; break;
+			case 'D': outformat = FORMAT_DEFAULT; break;
+			case 'B': outformat = FORMAT_BIN; break;
+			case 'C': outformat = FORMAT_CONCISE; break;
+			case 'Q': outformat = FORMAT_FASTQ; break;
+			case 'F': outformat = FORMAT_FASTA; break;
+			case 'n': ebwt_name = optarg; break;
 			case -1: /* Done with options. */ break;
 			case 0: if (long_options[option_index].flag != 0) break;
 			default:
@@ -316,7 +316,7 @@ int main(int argc, char **argv) {
 					if(outformat == FORMAT_BIN) {
 						BinaryHitSink::append(*out, h, outrefnames, 0);
 					} else if(outformat == FORMAT_DEFAULT) {
-						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
+						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, false, 0 /* partition */, 0);
 					} else if(outformat == FORMAT_FASTQ) {
 						fastqAppend(*out, h);
 					} else if(outformat == FORMAT_FASTA) {
@@ -338,7 +338,7 @@ int main(int argc, char **argv) {
 					if(outformat == FORMAT_BIN) {
 						BinaryHitSink::append(*out, h, outrefnames, 0);
 					} else if(outformat == FORMAT_DEFAULT) {
-						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL, 0 /* partition */, 0);
+						VerboseHitSink::append(*out, h, outrefnames, NULL, NULL,false,  0 /* partition */, 0);
 					} else if(outformat == FORMAT_FASTQ) {
 						fastqAppend(*out, h);
 					} else if(outformat == FORMAT_FASTA) {

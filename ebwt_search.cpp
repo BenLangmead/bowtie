@@ -1640,7 +1640,7 @@ static void parseOptions(int argc, const char **argv) {
 			case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
 			case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
 			case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
-			case 'h': printLongUsage(cout); exit(0); break;
+			case 'h': printLongUsage(cout); throw std::runtime_error(""); break;
 			case '?': printUsage(cerr); throw std::runtime_error(""); break;
 			case 'a': allHits = true; break;
 			case 'y': tryHard = true; break;

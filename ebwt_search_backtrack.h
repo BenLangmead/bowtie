@@ -115,7 +115,7 @@ public:
 				cerr << "Unable to allocate memory for depth-first "
 				     << "backtracking search; new length = " << length(*_qry)
 				     << endl;
-				exit(1);
+				throw std::runtime_error("");
 			}
 		} else {
 			// New length is less than old length, so there's no need

@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <getopt.h>
+#include <stdexcept>
 #include <seqan/find.h>
 
 #include "endian_swap.h"
@@ -127,8 +128,11 @@ static void parseOptions(int argc, char **argv) {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
 	   		case 'h':
-	   		case '?':
-	   			printLongUsage(cout); exit(0); break;
+	   		case '?': {
+	   			printLongUsage(cout);
+	   			throw std::runtime_error("");
+	   			break;
+	   		}
 	   		case 'v': verbose = true; break;
 	   		case ARG_VERSION: showVersion = true; break;
 			case 'n': names_only = true; break;

@@ -499,7 +499,7 @@ int main(int argc, char **argv)
 				case 'h':
 				case '?':
 					printLongUsage(cout);
-					exit(0);
+					throw std::runtime_error("");
 				case -1: /* Done with options. */
 					break;
 				default:
