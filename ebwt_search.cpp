@@ -29,6 +29,7 @@
 #include "aligner_23mm.h"
 #include "aligner_seed_mm.h"
 #include "aligner_metrics.h"
+#include "sam.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -240,7 +241,7 @@ static void resetOptions() {
 
 // mating constraints
 
-static const char *short_options = "fF:qbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:y";
+static const char *short_options = "fF:qbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:yS";
 
 enum {
 	ARG_ORIG = 256,
@@ -421,6 +422,7 @@ static struct option long_options[] = {
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
+	{(char*)"sam",          no_argument,       0,            'S'},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -477,6 +479,7 @@ static void printUsage(ostream& out) {
 	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
 	    << "  --strandfix        attempt to fix strand biases" << endl
 	    << "Output:" << endl
+	    << "  -S/--sam           write hits in SAM format" << endl
 	    << "  --concise          write hits in concise format" << endl
 	    << "  -b/--binout        write hits in binary format (<hits> argument not optional)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
@@ -1536,6 +1539,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
 			case 'b': outType = OUTPUT_BINARY; break;
+			case 'S': outType = OUTPUT_SAM; break;
 			case ARG_REFOUT: refOut = true; break;
 			case ARG_NOOUT: outType = OUTPUT_NONE; break;
 			case ARG_REFMAP: refMapFile = optarg; break;
@@ -4505,6 +4509,21 @@ static void driver(const char * type,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
+				}
+				break;
+			case OUTPUT_SAM:
+				if(refOut) {
+					sink = new SAMHitSink(
+							ebwt.nPat(), 1, rmap, amap,
+							fullRef, PASS_DUMP_FILES,
+							format == TAB_MATE,
+							table, refnames);
+				} else {
+					sink = new SAMHitSink(
+							fout, 1, rmap, amap,
+							fullRef, PASS_DUMP_FILES,
+							format == TAB_MATE,
+							table, refnames);
 				}
 				break;
 			case OUTPUT_CONCISE:

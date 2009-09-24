@@ -35,6 +35,7 @@ enum output_types {
 	OUTPUT_CONCISE,
 	OUTPUT_BINARY,
 	OUTPUT_CHAIN,
+	OUTPUT_SAM,
 	OUTPUT_NONE
 };
 
@@ -392,7 +393,10 @@ protected:
 	dumpUnal, \
 	dumpMaxFa, \
 	dumpMaxFq, \
-	dumpMax, \
+	dumpMax
+
+#define PASS_HIT_DUMPS2 \
+	PASS_HIT_DUMPS, \
 	onePairFile, \
 	recalTable, \
 	refnames
@@ -408,7 +412,7 @@ public:
 			DECL_HIT_DUMPS,
 			bool onePairFile,
 			RecalTable *table,
-	        vector<string>* refnames = NULL) :
+			vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(false),
 		recalTable_(table),
@@ -2589,7 +2593,7 @@ public:
 			       int offBase,
 	               DECL_HIT_DUMPS2,
 	               bool reportOpps = false) :
-		HitSink(out, PASS_HIT_DUMPS),
+		HitSink(out, PASS_HIT_DUMPS2),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -2601,7 +2605,7 @@ public:
 	               int offBase,
 	               DECL_HIT_DUMPS2,
 	               bool reportOpps = false) :
-		HitSink(numOuts, PASS_HIT_DUMPS),
+		HitSink(numOuts, PASS_HIT_DUMPS2),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -2650,6 +2654,24 @@ private:
 };
 
 /**
+ * Print the given string.  If ws = true, print only up to and not
+ * including the first space or tab.  Useful for printing reference
+ * names.
+ */
+inline void printUptoWs(std::ostream& os, const std::string& str, bool ws) {
+	if(!ws) {
+		os << str;
+	} else {
+		size_t pos = str.find_first_of(" \t");
+		if(pos != string::npos) {
+			os << str.substr(0, pos);
+		} else {
+			os << str;
+		}
+	}
+}
+
+/**
  * Sink that prints lines like this:
  * pat-name \t [-|+] \t ref-name \t ref-off \t pat \t qual \t #-alt-hits \t mm-list
  */
@@ -2665,7 +2687,7 @@ public:
 	               bool fullRef,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
-	HitSink(out, PASS_HIT_DUMPS),
+	HitSink(out, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
 	fullRef_(fullRef),
@@ -2683,7 +2705,7 @@ public:
 	               bool fullRef,
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
-	HitSink(numOuts, PASS_HIT_DUMPS),
+	HitSink(numOuts, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
 	fullRef_(fullRef),
@@ -2805,8 +2827,11 @@ public:
 					break;
 				}
 			}
-			cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl;
-			throw std::runtime_error("");
+			if(!found) {
+				cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl
+				     << "Try using -n to specify the index used to generate the alignments." << endl;
+				throw std::runtime_error("");
+			}
 		}
 
 		// Parse reference sequence offset
@@ -3014,27 +3039,9 @@ public:
 				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
 				// .first is text id, .second is offset
 				if(refnames != NULL && rmap != NULL) {
-					if(fullRef) {
-						ss << rmap->getName(h.h.first);
-					} else {
-						size_t pos = rmap->getName(h.h.first).find_first_of(" \t");
-						if(pos != string::npos) {
-							ss << rmap->getName(h.h.first).substr(0, pos);
-						} else {
-							ss << rmap->getName(h.h.first);
-						}
-					}
+					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
 				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					if(fullRef) {
-						ss << (*refnames)[h.h.first];
-					} else {
-						size_t pos = (*refnames)[h.h.first].find_first_of(" \t");
-						if(pos != string::npos) {
-							ss << (*refnames)[h.h.first].substr(0, pos);
-						} else {
-							ss << (*refnames)[h.h.first];
-						}
-					}
+					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
 				} else {
 					ss << h.h.first;
 				}
@@ -3128,153 +3135,6 @@ private:
 };
 
 /**
- * Sink that prints lines in SAM format:
- */
-class SAMHitSink : public HitSink {
-public:
-	/**
-	 * Construct a single-stream VerboseHitSink (default)
-	 */
-	SAMHitSink(OutFileBuf* out,
-	           int offBase,
-	           ReferenceMap *rmap,
-	           AnnotationMap *amap,
-	           DECL_HIT_DUMPS2) :
-	HitSink(out, PASS_HIT_DUMPS),
-	offBase_(offBase), rmap_(rmap), amap_(amap) { }
-
-	/**
-	 * Construct a multi-stream VerboseHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	SAMHitSink(size_t numOuts,
-	           int offBase,
-	           ReferenceMap *rmap,
-	           AnnotationMap *amap,
-	           DECL_HIT_DUMPS2) :
-	HitSink(numOuts, PASS_HIT_DUMPS),
-	offBase_(offBase), rmap_(rmap), amap_(amap) { }
-
-	/**
-	 * Append a SAM alignment to the given output stream.
-	 */
-	static void append(ostream& ss,
-	                   const Hit& h,
-	                   const vector<string>* refnames,
-	                   ReferenceMap *rmap,
-	                   AnnotationMap *amap,
-	                   int offBase)
-	{
-		bool spill = false;
-		int spillAmt = 0;
-		do {
-			bool dospill = false;
-			if(spill) {
-				// The read spilled over a partition boundary and so
-				// needs to be printed more than once
-				spill = false;
-				dospill = true;
-				spillAmt++;
-			}
-			assert(!spill);
-			assert(!dospill);
-			ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
-			// .first is text id, .second is offset
-			if(refnames != NULL && rmap != NULL) {
-				ss << rmap->getName(h.h.first);
-			} else if(refnames != NULL && h.h.first < refnames->size()) {
-				ss << (*refnames)[h.h.first];
-			} else {
-				ss << h.h.first;
-			}
-			ss << "\t" << (h.h.second + offBase);
-			ss << "\t" << h.patSeq;
-			ss << "\t" << h.quals;
-			ss << "\t" << h.oms;
-			ss << "\t";
-			// Look for SNP annotations falling within the alignment
-			map<int, char> snpAnnots;
-			const size_t len = length(h.patSeq);
-			if(amap != NULL) {
-				AnnotationMap::Iter ai = amap->lower_bound(h.h);
-				for(; ai != amap->end(); ai++) {
-					assert_geq(ai->first.first, h.h.first);
-					if(ai->first.first != h.h.first) {
-						// Different chromosome
-						break;
-					}
-					if(ai->first.second >= h.h.second + len) {
-						// Doesn't fall into alignment
-						break;
-					}
-					if(ai->second.first != 'S') {
-						// Not a SNP annotation
-						continue;
-					}
-					size_t off = ai->first.second - h.h.second;
-					if(!h.fw) off = len - off - 1;
-					snpAnnots[off] = ai->second.second;
-				}
-			}
-			// Output mismatch column
-			bool first = true;
-			for (unsigned int i = 0; i < len; ++ i) {
-				if(h.mms.test(i)) {
-					// There's a mismatch at this position
-					if (!first) ss << ",";
-					ss << i; // position
-					assert_gt(h.refcs.size(), i);
-					char refChar = toupper(h.refcs[i]);
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					assert_neq(refChar, qryChar);
-					ss << ":" << refChar << ">" << qryChar;
-					first = false;
-				} else if(snpAnnots.find(i) != snpAnnots.end()) {
-					if (!first) ss << ",";
-					ss << i; // position
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					ss << "S:" << snpAnnots[i] << ">" << qryChar;
-					first = false;
-				}
-			}
-			ss << endl;
-		} while(spill);
-	}
-
-	/**
-	 * Append a verbose, readable hit to the output stream
-	 * corresponding to the hit.
-	 */
-	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, false, _partition, offBase_);
-	}
-
-protected:
-
-	/**
-	 * Report a verbose, human-readable alignment to the appropriate
-	 * output stream.
-	 */
-	virtual void reportHit(const Hit& h) {
-		HitSink::reportHit(h);
-		ostringstream ss;
-		append(ss, h);
-		// Make sure to grab lock before writing to output stream
-		lock(h.h.first);
-		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
-	}
-
-private:
-	int      _partition;   /// partition size, or 0 if partitioning is disabled
-	int      offBase_;     /// Add this to reference offsets before outputting.
-	                       /// (An easy way to make things 1-based instead of
-	                       /// 0-based)
-    ReferenceMap *rmap_;   /// mapping to reference coordinate system.
-	AnnotationMap *amap_;  ///
-};
-
-/**
  * Sink for outputting alignments in a binary format.
  */
 class BinaryHitSink : public HitSink {
@@ -3286,7 +3146,7 @@ public:
 	BinaryHitSink(OutFileBuf* out,
 	              int offBase,
 	              DECL_HIT_DUMPS2) :
-	HitSink(out, PASS_HIT_DUMPS),
+	HitSink(out, PASS_HIT_DUMPS2),
 	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
@@ -3299,7 +3159,7 @@ public:
 	BinaryHitSink(size_t numOuts,
 	              int offBase,
 	              DECL_HIT_DUMPS2) :
-	HitSink(numOuts, PASS_HIT_DUMPS),
+	HitSink(numOuts, PASS_HIT_DUMPS2),
 	offBase_(offBase)
 	{
 		ssmode_ |= ios_base::binary;
@@ -3570,7 +3430,7 @@ public:
 	 * Construct a single-stream BinaryHitSink (default)
 	 */
 	ChainingHitSink(OutFileBuf* out, bool strata, AnnotationMap *amap, DECL_HIT_DUMPS2) :
-	HitSink(out, PASS_HIT_DUMPS), amap_(amap), strata_(strata)
+	HitSink(out, PASS_HIT_DUMPS2), amap_(amap), strata_(strata)
 	{
 		ssmode_ |= ios_base::binary;
 	}
