@@ -43,12 +43,12 @@ struct RefRecord {
 		assert(in != NULL);
 		if(!fread(&off, 4, 1, in)) {
 			cerr << "Error reading RefRecord offset from FILE" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(swap) off = endianSwapU32(off);
 		if(!fread(&len, 4, 1, in)) {
 			cerr << "Error reading RefRecord offset from FILE" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(swap) len = endianSwapU32(len);
 		first = fgetc(in) ? true : false;
@@ -60,7 +60,7 @@ struct RefRecord {
 		char c;
 		if(!read(in, &c, 1)) {
 			cerr << "Error reading RefRecord 'first' flag" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		first = (c ? true : false);
 	}
@@ -139,7 +139,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 		c = skipWhitespace(in);
 		if(c != '>') {
 			cerr << "Reference file does not seem to be a FASTA file" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		lastc = c;
 	}

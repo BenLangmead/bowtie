@@ -29,6 +29,11 @@ void SAMHitSink::appendAligned(ostream& ss,
 	ss << h.patName << "\t";
 	// FLAG
 	int flags = 0;
+	if(h.mate == 1) {
+		flags |= SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR;
+	} else if(h.mate == 2) {
+		flags |= SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR;
+	}
 	if(!h.fw) flags |= SAM_FLAG_QUERY_STRAND;
 	ss << flags << "\t";
 	// RNAME

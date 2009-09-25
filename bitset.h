@@ -34,7 +34,7 @@ bitsetRealloc(uint32_t& sz, uint32_t* words, const char *errmsg = NULL) {
 			// Output given error message
 			std::cerr << errmsg;
 		}
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(oldsz > 0) {
 		// Move old values into new array
@@ -65,7 +65,7 @@ public:
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
 			}
-			throw std::runtime_error("");
+			throw 1;
 		}
 		assert(_words != NULL);
 		memset(_words, 0, nwords * 4 /* words to bytes */);
@@ -174,7 +174,7 @@ public:
 			if(_errmsg != NULL) {
 				std::cerr << _errmsg;
 			}
-			throw std::runtime_error("");
+			throw 1;
 		}
 		assert(_words != NULL);
 		memset(_words, 0, nwords * 4);

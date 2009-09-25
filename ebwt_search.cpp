@@ -241,7 +241,7 @@ static void resetOptions() {
 
 // mating constraints
 
-static const char *short_options = "fF:qbzh?cu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:yS";
+static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:yS";
 
 enum {
 	ARG_ORIG = 256,
@@ -317,7 +317,8 @@ enum {
 	ARG_REPORTSE,
 	ARG_HADOOPOUT,
 	ARG_FUZZY,
-	ARG_FULLREF
+	ARG_FULLREF,
+	ARG_USAGE
 };
 
 static struct option long_options[] = {
@@ -422,6 +423,7 @@ static struct option long_options[] = {
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
 	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
+	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"sam",          no_argument,       0,            'S'},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -503,6 +505,7 @@ static void printUsage(ostream& out) {
 	    << "  --verbose          verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
 	    << "  -h/--help          print detailed description of tool and its options" << endl
+	    << "  --usage            print this usage message" << endl
 	    ;
 }
 
@@ -1456,13 +1459,13 @@ static int parseInt(int lower, const char *errmsg) {
 		if (l < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			throw std::runtime_error("");
+			throw 1;
 		}
 		return (int32_t)l;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	throw std::runtime_error("");
+	throw 1;
 	return -1;
 }
 
@@ -1555,7 +1558,7 @@ static void parseOptions(int argc, const char **argv) {
 				     << "BOWTIE_MM defined.  Memory-mapped I/O is not supported under Windows.  If you" << endl
 				     << "would like to use memory-mapped I/O on a platform that supports it, please" << endl
 				     << "refrain from specifying BOWTIE_MM=0 when compiling Bowtie." << endl;
-				throw std::runtime_error("");
+				throw 1;
 #endif
 			}
 			case ARG_MMSWEEP: mmSweep = true; break;
@@ -1618,14 +1621,14 @@ static void parseOptions(int argc, const char **argv) {
 			case 'p':
 #ifndef BOWTIE_PTHREADS
 				cerr << "-p/--threads is disabled because bowtie was not compiled with pthreads support" << endl;
-				throw std::runtime_error("");
+				throw 1;
 #endif
 				nthreads = parseInt(1, "-p/--threads arg must be at least 1");
 				break;
 			case ARG_FILEPAR:
 #ifndef BOWTIE_PTHREADS
 				cerr << "--filepar is disabled because bowtie was not compiled with pthreads support" << endl;
-				throw std::runtime_error("");
+				throw 1;
 #endif
 				fileParallel = true;
 				break;
@@ -1634,7 +1637,7 @@ static void parseOptions(int argc, const char **argv) {
 				mismatches = parseInt(0, "-v arg must be at least 0");
 				if(mismatches > 3) {
 					cerr << "-v arg must be at most 3" << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				break;
 			case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
@@ -1644,8 +1647,8 @@ static void parseOptions(int argc, const char **argv) {
 			case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
 			case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
 			case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
-			case 'h': printLongUsage(cout); throw std::runtime_error(""); break;
-			case '?': printUsage(cerr); throw std::runtime_error(""); break;
+			case 'h': printLongUsage(cout); throw 0; break;
+			case ARG_USAGE: printUsage(cout); throw 0; break;
 			case 'a': allHits = true; break;
 			case 'y': tryHard = true; break;
 			case ARG_RECAL: recal = true; break;
@@ -1678,7 +1681,7 @@ static void parseOptions(int argc, const char **argv) {
 				if(optarg == NULL || strlen(optarg) == 0) {
 					cerr << "--orig arg must be followed by a string" << endl;
 					printUsage(cerr);
-					throw std::runtime_error("");
+					throw 1;
 				}
 				origString = optarg;
 				break;
@@ -1687,9 +1690,8 @@ static void parseOptions(int argc, const char **argv) {
 				if (long_options[option_index].flag != 0)
 					break;
 			default:
-				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				throw std::runtime_error("");
+				throw 1;
 		}
 	} while(next_option != -1);
 	bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
@@ -1710,7 +1712,7 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << mates2.size() << endl
 		     << "mate files/sequences were specified with -2.  The same number of mate files/" << endl
 		     << "sequences must be specified with -1 and -2." << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	// Check for duplicate mate input files
 	if(format != CMDLINE) {
@@ -1762,7 +1764,7 @@ static void parseOptions(int argc, const char **argv) {
 			cerr << "When -z/--phased is used, the --al option is unavailable" << endl;
 			error = true;
 		}
-		if(error) throw std::runtime_error("");
+		if(error) throw 1;
 	}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
@@ -1772,15 +1774,15 @@ static void parseOptions(int argc, const char **argv) {
 	}
 	if(fullIndex && strata && !stateful && !oldBest) {
 		cerr << "--strata must be combined with --best" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
 		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(fuzzy && (!stateful && !paired)) {
 		cerr << "--fuzzy must be combined with --best or paired-end alignment" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
 	// since it uses patid to know if we've reached the -u limit (and
@@ -1802,7 +1804,7 @@ static void parseOptions(int argc, const char **argv) {
 			cerr << "Error: --chainin cannot be combined with paired-end alignment; aborting..." << endl;
 			error = true;
 		}
-		if(error) throw std::runtime_error("");
+		if(error) throw 1;
 	}
 
 	if(outType == OUTPUT_CHAIN) {
@@ -1819,7 +1821,7 @@ static void parseOptions(int argc, const char **argv) {
 			cerr << "Error: --chainout cannot be combined with paired-end alignment; aborting..." << endl;
 			error = true;
 		}
-		if(error) throw std::runtime_error("");
+		if(error) throw 1;
 	}
 
 	if(mate1fw && trim5 > 0) {
@@ -2221,7 +2223,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) throw std::runtime_error("");
+		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
 
@@ -2253,7 +2255,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -2443,7 +2445,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -2478,7 +2480,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -2660,7 +2662,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) throw std::runtime_error("");
+		if(!refs->loaded()) throw 1;
 	}
 	mismatchSearch_refs = refs;
 
@@ -2693,7 +2695,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3031,7 +3033,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3052,7 +3054,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3072,7 +3074,7 @@ static void twoOrThreeMismatchSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3280,7 +3282,7 @@ static void twoOrThreeMismatchSearchFull(
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) throw std::runtime_error("");
+		if(!refs->loaded()) throw 1;
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
 	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
@@ -3319,7 +3321,7 @@ static void twoOrThreeMismatchSearchFull(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3949,7 +3951,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -3962,7 +3964,7 @@ static void seededQualCutoffSearch(
 	} catch(bad_alloc& ba) {
 		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
 		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	seededQualSearch_pamRc = pamRc;
 	{
@@ -3985,7 +3987,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -4004,7 +4006,7 @@ static void seededQualCutoffSearch(
 	} catch(bad_alloc& ba) {
 		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
 		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	seededQualSearch_pamFw = pamFw;
 	{
@@ -4023,7 +4025,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -4051,7 +4053,7 @@ static void seededQualCutoffSearch(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -4114,7 +4116,7 @@ static void seededQualCutoffSearchFull(
 	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
 		Timer _t(cerr, "Time loading reference: ", timing);
 		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
-		if(!refs->loaded()) throw std::runtime_error("");
+		if(!refs->loaded()) throw 1;
 	}
 	seededQualSearch_refs = refs;
 
@@ -4156,7 +4158,7 @@ static void seededQualCutoffSearchFull(
 			int ret;
 			if((ret = pthread_join(threads[i], NULL)) != 0) {
 				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 #endif
@@ -4231,7 +4233,7 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               verbose, seed);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 	}
 }
@@ -4293,7 +4295,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates12.size(); i++) {
 		if(mates12[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		const vector<string>* qs = &mates12;
 		vector<string> tmp;
@@ -4313,7 +4315,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates1.size(); i++) {
 		if(mates1[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		const vector<string>* qs = &mates1;
 		vector<string> tmp;
@@ -4333,7 +4335,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < mates2.size(); i++) {
 		if(mates2[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		const vector<string>* qs = &mates2;
 		vector<string> tmp;
@@ -4358,7 +4360,7 @@ static void driver(const char * type,
 	for(size_t i = 0; i < queries.size(); i++) {
 		if(queries[i] == "-" && !fullIndex) {
 			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		const vector<string>* qs = &queries;
 		PatternSource* patsrc = NULL;
@@ -4405,11 +4407,11 @@ static void driver(const char * type,
 	} else {
 		if(outType == OUTPUT_BINARY && !refOut) {
 			cerr << "Error: Must specify an output file when output mode is binary" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		else if(outType == OUTPUT_CHAIN) {
 			cerr << "Error: Must specify an output file when output mode is --chain" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		fout = new OutFileBuf();
 	}
@@ -4569,7 +4571,7 @@ static void driver(const char * type,
 				break;
 			default:
 				cerr << "Invalid output type: " << outType << endl;
-				throw std::runtime_error("");
+				throw 1;
 		}
     	if(verbose || startVerbose) {
     		cerr << "Dispatching to search driver: "; logTime(cerr, true);
@@ -4611,7 +4613,7 @@ static void driver(const char * type,
 				}
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		} else {
 			// Search without mismatches
@@ -4743,7 +4745,7 @@ int bowtie(int argc, const char **argv) {
 					cerr << "Note that if <mates> files are specified using -1/-2, a <singles> file cannot" << endl
 						 << "also be specified.  Please run bowtie separately for mates and singles." << endl;
 				}
-				throw std::runtime_error("");
+				throw 1;
 			}
 
 			// Optionally summarize
@@ -4778,6 +4780,13 @@ int bowtie(int argc, const char **argv) {
 		for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
 		cerr << endl;
 		return 1;
+	} catch(int e) {
+		if(e != 0) {
+			cerr << "Command: ";
+			for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+			cerr << endl;
+		}
+		return e;
 	}
 } // bowtie()
 } // extern "C"

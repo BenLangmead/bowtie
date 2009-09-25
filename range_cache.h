@@ -43,7 +43,7 @@ public:
 			} catch(std::bad_alloc& e) {
 				cerr << "Allocation error allocating " << lim
 					 << " words of range-cache memory" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			assert(buf_ != NULL);
 			// Fill with 1s to signal that these elements are

@@ -30,11 +30,13 @@ static void readSequenceFile(const std::string& infile,
 	if(baseCutoff <= 0) return;
 	FILE *in = fopen(infile.c_str(), "r");
 	if(in == NULL) {
-		throw runtime_error("Could not open sequence file");
+		cerr << "Could not open sequence file" << endl;
+		throw 1;
 	}
 	// Associate large input buffer with FILE *in
 	if(setvbuf(in, buf, _IOFBF, 256 * 1024) != 0) {
-		throw runtime_error("Could not create input buffer for sequence file");
+		cerr << "Could not create input buffer for sequence file" << endl;
+		throw 1;
 	}
 	// Read entries using SeqAn
 	int cnt = 0;

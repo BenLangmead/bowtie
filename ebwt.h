@@ -414,14 +414,14 @@ public:
 			cerr << "Could not open index file for writing: \"" << _in1Str << "\"" << endl
 			     << "Please make sure the directory exists and that permissions allow writing by" << endl
 			     << "Bowtie." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		ofstream fout2(_in2Str.c_str(), ios::binary);
 		if(!fout2.good()) {
 			cerr << "Could not open index file for writing: \"" << _in2Str << "\"" << endl
 			     << "Please make sure the directory exists and that permissions allow writing by" << endl
 			     << "Bowtie." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		// Build
 		initFromVector(is,
@@ -458,7 +458,7 @@ public:
 		}
 		if(err) {
 			cerr << "Please check if there is a problem with the disk or if disk is full." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		// Reopen as input streams
 		VMSG_NL("Re-opening _in1 and _in2 as input streams");
@@ -542,7 +542,7 @@ public:
 				cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
 				     << "this executable is 32-bit." << endl;
 			}
-			throw std::runtime_error("");
+			throw 1;
 		}
 		// Succesfully obtained joined reference string
 		assert_geq(length(s), jlen);
@@ -579,7 +579,7 @@ public:
 					cerr << "If this computer has more than 4 GB of memory, try using a 64-bit executable;" << endl
 						 << "this executable is 32-bit." << endl;
 				}
-				throw std::runtime_error("");
+				throw 1;
 			}
 			if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
 				dcv <<= 1; // double difference-cover period
@@ -629,7 +629,7 @@ public:
 				out1.flush(); out2.flush();
 				if(out1.fail() || out2.fail()) {
 					cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				break;
 			} catch(bad_alloc& e) {
@@ -638,7 +638,7 @@ public:
 				} else {
 					cerr << "Out of memory while constructing suffix array.  Please try using a smaller" << endl
 						 << "number of blocks by specifying a smaller --bmax or a larger --bmaxdivn" << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			}
 			first = false;
@@ -653,7 +653,7 @@ public:
 		out1.flush(); out2.flush();
 		if(out1.fail() || out2.fail()) {
 			cerr << "An error occurred writing the index to disk.  Please check if the disk is full." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		VMSG_NL("Returning from initFromVector");
 	}
@@ -2730,14 +2730,14 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				if (stat(names[i], &sbuf) == -1) {
 					perror("stat");
 					cerr << "Error: Could not stat index file " << names[i] << " prior to memory-mapping" << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				mmFile[i] = (char*)mmap((void *)0, sbuf.st_size,
 										PROT_READ, MAP_SHARED, fds[i], 0);
 				if(mmFile == (void *)(-1)) {
 					perror("mmap");
 					cerr << "Error: Could not memory-map the index file " << names[i] << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				if(mmSweep) {
 					int sum = 0;
@@ -2793,7 +2793,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	// or we might be setting up a race condition with other processes.
 	if(switchEndian && _useMm) {
 		cerr << "Error: Can't use memory-mapped files when the index is the opposite endianness" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	// Reads header entries one by one from primary stream
@@ -2860,7 +2860,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	// into their own memory spaces.
 	if(_useMm && (offRateDiff || isaRateDiff)) {
 		cerr << "Error: Can't use memory-mapped files when the offrate or isarate is overridden" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	// Read nPat from primary stream
@@ -2894,7 +2894,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				MM_READ_RET r = MM_READ(_in1, (void*)this->_plen, this->_nPat*4);
 				if(r != (MM_READ_RET)(this->_nPat*4)) {
 					cerr << "Error reading _plen[] array: " << r << ", " << (this->_nPat*4) << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			}
 		} catch(bad_alloc& e) {
@@ -2939,7 +2939,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			MM_READ_RET r = MM_READ(_in1, (void *)this->_rstarts, this->_nFrag*4*3);
 			if(r != (MM_READ_RET)(this->_nFrag*4*3)) {
 				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*4*3) << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 	}
@@ -2972,7 +2972,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 					 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
 					 << "-z option does not solve the problem, please try again on a computer with more" << endl
 					 << "memory." << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 		if(shmemLeader) {
@@ -2980,7 +2980,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			MM_READ_RET r = MM_READ(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
 			if(r != (MM_READ_RET)eh->_ebwtTotLen) {
 				cerr << "Error reading _ebwt[] array: " << r << ", " << (eh->_ebwtTotLen) << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			if(switchEndian) {
 				uint8_t *side = this->_ebwt;
@@ -3042,7 +3042,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				MM_READ_RET r = MM_READ(_in1, (void *)this->_ftab, eh->_ftabLen*4);
 				if(r != (MM_READ_RET)(eh->_ftabLen*4)) {
 					cerr << "Error reading _ftab[] array: " << r << ", " << (eh->_ftabLen*4) << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			}
 		}
@@ -3066,7 +3066,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				MM_READ_RET r = MM_READ(_in1, (void *)this->_eftab, eh->_eftabLen*4);
 				if(r != (MM_READ_RET)(eh->_eftabLen*4)) {
 					cerr << "Error reading _eftab[] array: " << r << ", " << (eh->_eftabLen*4) << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			}
 		}
@@ -3082,7 +3082,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
 		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
 		     << "computer with more memory." << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	// Read reference sequence names from primary index file (or not,
@@ -3121,7 +3121,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 					 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
 					 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
 					 << "computer with more memory." << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		} else {
 			shmemLeader = ALLOC_SHARED_U32(
@@ -3143,7 +3143,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 					MM_READ_RET r = MM_READ(_in2, (void *)buf, block << 2);
 					if(r != (MM_READ_RET)(block << 2)) {
 						cerr << "Error reading block of _offs[] array: " << r << ", " << (block << 2) << endl;
-						throw std::runtime_error("");
+						throw 1;
 					}
 					uint32_t idx = i >> offRateDiff;
 					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
@@ -3168,7 +3168,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 					if((offsLen & 0xc0000000) != 0) {
 						if(sizeof(char *) <= 4) {
 							cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
-							throw std::runtime_error("");
+							throw 1;
 						}
 						// offsLen << 2 overflows, so do it in four reads
 						char *offs = (char *)this->_offs;
@@ -3176,7 +3176,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 							MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen);
 							if(r != (MM_READ_RET)(offsLen)) {
 								cerr << "Error reading block of _offs[] array: " << r << ", " << offsLen << endl;
-								throw std::runtime_error("");
+								throw 1;
 							}
 							offs += offsLen;
 						}
@@ -3185,7 +3185,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 						MM_READ_RET r = MM_READ(_in2, (void*)this->_offs, offsLen << 2);
 						if(r != (MM_READ_RET)(offsLen << 2)) {
 							cerr << "Error reading _offs[] array: " << r << ", " << (offsLen << 2) << endl;
-							throw std::runtime_error("");
+							throw 1;
 						}
 					}
 				}
@@ -3221,7 +3221,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
 				 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
 				 << "computer with more memory." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 	}
 	// Read _isa[]
@@ -3233,7 +3233,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 				MM_READ_RET r = MM_READ(_in2, (void *)tmp, 4);
 				if(r != (MM_READ_RET)4) {
 					cerr << "Error reading a word of the _isa[] array: " << r << ", 4" << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			} else {
 				uint32_t idx = i >> isaRateDiff;
@@ -3252,7 +3252,7 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			MM_READ_RET r = MM_READ(_in2, (void *)this->_isa, isaLen*4);
 			if(r != (MM_READ_RET)(isaLen*4)) {
 				cerr << "Error reading _isa[] array: " << r << ", " << (isaLen*4) << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 	}

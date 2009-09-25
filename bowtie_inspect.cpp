@@ -16,13 +16,17 @@ static int verbose     = 0;  // be talkative
 static int names_only  = 0;  // just print the sequence names in the index
 static int across      = 60; // number of characters across in FASTA output
 
-static const char *short_options = "vh?na:";
+static const char *short_options = "vhna:";
 
-static const int ARG_VERSION = 256;
+enum {
+	ARG_VERSION = 256,
+	ARG_USAGE
+};
 
 static struct option long_options[] = {
 	{(char*)"verbose", no_argument,       0, 'v'},
 	{(char*)"version", no_argument,       0, ARG_VERSION},
+	{(char*)"usage",   no_argument,       0, ARG_USAGE},
 	{(char*)"names",   no_argument,       0, 'n'},
 	{(char*)"help",    no_argument,       0, 'h'},
 	{(char*)"across",  required_argument, 0, 'a'},
@@ -41,6 +45,7 @@ static void printUsage(ostream& out) {
 	<< "  -n/--names         Print reference sequence names only" << endl
 	<< "  -v/--verbose       Verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
+	<< "  --help             print this usage message" << endl
 	;
 }
 
@@ -108,13 +113,13 @@ static int parseInt(int lower, const char *errmsg) {
 		if (l < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			throw std::runtime_error("");
+			throw 1;
 		}
 		return (int32_t)l;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	throw std::runtime_error("");
+	throw 1;
 	return -1;
 }
 
@@ -122,19 +127,23 @@ static int parseInt(int lower, const char *errmsg) {
  * Read command-line arguments
  */
 static void parseOptions(int argc, char **argv) {
-    int option_index = 0;
+	int option_index = 0;
 	int next_option;
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
-	   		case 'h':
-	   		case '?': {
-	   			printLongUsage(cout);
-	   			throw std::runtime_error("");
-	   			break;
-	   		}
-	   		case 'v': verbose = true; break;
-	   		case ARG_VERSION: showVersion = true; break;
+			case ARG_USAGE: {
+				printUsage(cout);
+				throw 0;
+				break;
+			}
+			case 'h': {
+				printLongUsage(cout);
+				throw 0;
+				break;
+			}
+			case 'v': verbose = true; break;
+			case ARG_VERSION: showVersion = true; break;
 			case 'n': names_only = true; break;
 			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
 			case -1: break; /* Done with options. */
@@ -142,9 +151,8 @@ static void parseOptions(int argc, char **argv) {
 				if (long_options[option_index].flag != 0)
 					break;
 			default:
-				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				throw std::runtime_error("");
+				throw 1;
 		}
 	} while(next_option != -1);
 }
@@ -322,6 +330,16 @@ int main(int argc, char **argv) {
 		driver(ebwtFile, query);
 		return 0;
 	} catch(std::exception& e) {
+		cerr << "Command: ";
+		for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+		cerr << endl;
 		return 1;
+	} catch(int e) {
+		if(e != 0) {
+			cerr << "Command: ";
+			for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+			cerr << endl;
+		}
+		return e;
 	}
 }

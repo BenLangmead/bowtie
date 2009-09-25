@@ -13,25 +13,25 @@ void wrongQualityFormat(const String<char>& read_name) {
 	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
 	     << "re-run Bowtie with the --integer-quals option.  If this is a FASTQ file with" << endl
 	     << "alternate basecall information, please re-run Bowtie with the --fuzzy option." << endl;
-	throw std::runtime_error("");
+	throw 1;
 }
 
 void tooFewQualities(const String<char>& read_name) {
 	cerr << "Too few quality values for read: " << read_name << endl
 		 << "\tare you sure this is a FASTQ-int file?" << endl;
-	throw std::runtime_error("");
+	throw 1;
 }
 
 void tooManyQualities(const String<char>& read_name) {
 	cerr << "Reads file contained a pattern with more than 1024 quality values." << endl
 		 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
-	throw std::runtime_error("");
+	throw 1;
 }
 
 void tooManySeqChars(const String<char>& read_name) {
 	cerr << "Reads file contained a pattern with more than 1024 sequence characters." << endl
 		 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
-	throw std::runtime_error("");
+	throw 1;
 }
 
 /**

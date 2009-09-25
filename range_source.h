@@ -1917,7 +1917,7 @@ public:
 	virtual void advanceImpl(int until) { }
 
 	/// Return the last valid range found
-	virtual Range& range() { throw std::runtime_error(""); }
+	virtual Range& range() { throw 1; }
 
 	/**
 	 * Return whether we're generating ranges for the first or the

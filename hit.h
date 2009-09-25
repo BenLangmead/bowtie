@@ -87,27 +87,27 @@ public:
 		if(seqan::length(patName) > 0xffff) {
 			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
 			     << "read names and re-run bowtie." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(mms.count() > 0xff) {
 			cerr << "Error: The alignment contains 256 or more mismatches.  bowtie cannot handle" << endl
 			     << "alignments with this many alignments.  Please provide smaller reads or consider" << endl
 			     << "using a different tool." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(seqan::length(quals) > 0xffff) {
 			cerr << "Error: One or more quality strings are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(seqan::length(patSeq) > 0xffff) {
 			cerr << "Error: One or more read sequences are 2^16 characters or longer.  Please" << endl
 			     << "truncate reads and re-run bowtie." << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(stratum < 0 || stratum >= 4) {
 			cerr << "Error: Stratum is out of bounds: " << stratum << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 	}
 
@@ -277,7 +277,7 @@ public:
 				memset(ents_, 0, len_ << 2);
 			} catch(std::bad_alloc& e) {
 				cerr << "Error allocating recalibration table with " << len_ << " entries" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 	}
@@ -1075,7 +1075,7 @@ protected:
     			s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
     		}
     	} else if(mateType != 0) {
-    		cerr << "Bad mate type " << mateType << endl; throw std::runtime_error("");
+    		cerr << "Bad mate type " << mateType << endl; throw 1;
     	}
     	std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
     	if(tmp->fail()) {
@@ -1084,7 +1084,7 @@ protected:
     		} else {
     			cerr << "Could not open paired-end aligned/unaligned-read file for writing: " << name << endl;
     		}
-    		throw std::runtime_error("");
+    		throw 1;
     	}
     	return tmp;
     }
@@ -1339,7 +1339,7 @@ public:
 	virtual bool setHits(HitSet& hs) {
 		if(!hs.empty()) {
 			cerr << "Error: default setHits() called with non-empty HitSet" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		return false;
 	}
@@ -2730,11 +2730,11 @@ public:
 		}
 		if(in.bad()) {
 			cerr << "Alignment file set \"bad\" bit" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		if(in.fail()) {
 			cerr << "A line from the alignment file was longer than 4K" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		in.getline(buf, 4096);
 		size_t len = in.gcount();
@@ -2830,7 +2830,7 @@ public:
 			if(!found) {
 				cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl
 				     << "Try using -n to specify the index used to generate the alignments." << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 
@@ -3446,7 +3446,7 @@ public:
 	 */
 	virtual void append(ostream& o, const Hit& h) {
 		cerr << "Error: ChainingHitSink::append() not implemented" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	/**

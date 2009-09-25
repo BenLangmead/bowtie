@@ -86,7 +86,7 @@ static void printLongUsage(ostream& out) {
 	"\n"
 	"    -v            Print verbose output (for debugging).\n"
 	"\n"
-	"    -h/-?         Print detailed description of tool and its options\n"
+	"    -h            Print detailed description of tool and its options\n"
 	"                  (from MANUAL).\n"
 	"\n"
 	;
@@ -102,7 +102,7 @@ static void printUsage(ostream& out) {
 	"Options:\n"
 	"    -o            output Maq map in old (pre Maq 0.7.0) format\n"
 	"    -v            verbose output\n"
-	"    -h/-?         print detailed description of tool and its options\n"
+	"    -h            print detailed description of tool and its options\n"
 	"\n"
 	;
 }
@@ -196,14 +196,14 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	if (!bwtf)
 	{
 		fprintf(stderr, "Error: could not open Bowtie mapfile %s for reading\n", bwtmap_fname.c_str());
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	void* maqf = gzopen(maqmap_fname.c_str(), "w");
 	if (!maqf)
 	{
 		fprintf(stderr, "Error: could not open Maq mapfile %s for writing\n", maqmap_fname.c_str());
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	std::map<string, int> seqid_to_name;
@@ -287,7 +287,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 				(aln_t<MAXLEN>*)malloc(sizeof(aln_t<MAXLEN>) * (next_max));
 			if(tmp == NULL) {
 				cerr << "Memory exhausted allocating space for alignments." << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			memcpy(tmp, mm->mapped_reads, sizeof(aln_t<MAXLEN>) * (max));
 			free(mm->mapped_reads);
@@ -420,7 +420,7 @@ int convert_bwt_to_maq(const string& bwtmap_fname,
 	mm->ref_name = (char**)malloc(sizeof(char*) * mm->n_ref);
 	if(mm->ref_name == NULL) {
 		cerr << "Exhausted memory allocating reference name" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	for (map<string, unsigned int>::const_iterator i = names_to_ids.begin();
@@ -463,7 +463,7 @@ void get_names_from_bfa(const string& bfa_filename,
 	if (!bfaf)
 	{
 		fprintf(stderr, "Error: could not open Binary FASTA file %s for reading\n", bfa_filename.c_str());
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	unsigned int next_id = 0;
@@ -485,7 +485,7 @@ int main(int argc, char **argv)
 		string bwtmap_filename;
 		string maqmap_filename;
 		string bfa_filename;
-		const char *short_options = "voh?";
+		const char *short_options = "voh";
 		int next_option;
 		do {
 			next_option = getopt(argc, argv, short_options);
@@ -497,14 +497,13 @@ int main(int argc, char **argv)
 					short_map_format = true;
 					break;
 				case 'h':
-				case '?':
 					printLongUsage(cout);
-					throw std::runtime_error("");
+					throw 0;
 				case -1: /* Done with options. */
 					break;
 				default:
 					printUsage(cerr);
-					throw std::runtime_error("");
+					throw 1;
 			}
 		} while(next_option != -1);
 
@@ -554,6 +553,16 @@ int main(int argc, char **argv)
 
 		return ret;
 	} catch(std::exception& e) {
+		cerr << "Command: ";
+		for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+		cerr << endl;
 		return 1;
+	} catch(int e) {
+		if(e != 0) {
+			cerr << "Command: ";
+			for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+			cerr << endl;
+		}
+		return e;
 	}
 }

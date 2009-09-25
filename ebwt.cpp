@@ -59,7 +59,7 @@ string adjustEbwtBase(const string& cmdline,
 	}
 	if(!in.is_open()) {
 		cerr << "Could not locate a Bowtie index corresponding to basename \"" << ebwtFileBase << "\"" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	return str;
 }

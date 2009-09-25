@@ -77,14 +77,14 @@ public:
 			if (stat(s4.c_str(), &sbuf) == -1) {
 				perror("stat");
 				cerr << "Error: Could not stat index file " << s4.c_str() << " prior to memory-mapping" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			mmFile = (char*)mmap((void *)0, sbuf.st_size,
 			                     PROT_READ, MAP_SHARED, f4, 0);
 			if(mmFile == (void *)(-1) || mmFile == NULL) {
 				perror("mmap");
 				cerr << "Error: Could not memory-map the index file " << s4.c_str() << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			if(mmSweep) {
 				int sum = 0;
@@ -121,7 +121,7 @@ public:
 		if(one != 1) {
 			if(useMm_) {
 				cerr << "Error: Can't use memory-mapped files when the index is the opposite endianness" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			assert_eq(0x1000000, one);
 			swap = true; // have to endian swap U32s
@@ -132,7 +132,7 @@ public:
 		sz = readU32(f3, swap);
 		if(sz == 0) {
 			cerr << "Error: number of reference records is 0 in " << s3 << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 
 		// Read records
@@ -159,7 +159,7 @@ public:
 				nrefs_++;
 			} else if(i == 0) {
 				cerr << "First record in reference index file was not marked as 'first'" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			cumsz += recs_.back().len;
 			cumlen += recs_.back().off;
@@ -192,7 +192,7 @@ public:
 				size_t ret = fread(sanityBuf_, 1, cumsz >> 2, ftmp);
 				if(ret != (cumsz >> 2)) {
 					cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				fclose(ftmp);
 				for(size_t i = 0; i < (cumsz >> 2); i++) {
@@ -201,7 +201,7 @@ public:
 			}
 #else
 			cerr << "Shouldn't be at " << __FILE__ << ":" << __LINE__ << " without BOWTIE_MM defined" << endl;
-			throw std::runtime_error("");
+			throw 1;
 #endif
 		} else {
 			bool shmemLeader = true;
@@ -213,7 +213,7 @@ public:
 				} catch(std::bad_alloc& e) {
 					cerr << "Error: Ran out of memory allocating space for the bitpacked reference.  Please" << endl
 						 << "re-run on a computer with more memory." << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 			} else {
 				shmemLeader = ALLOC_SHARED_U8(
@@ -236,7 +236,7 @@ public:
 				// Didn't read all of it?
 				if(ret != (cumsz >> 2)) {
 					cerr << "Only read " << ret << " bytes (out of " << (cumsz >> 2) << ") from reference index file " << s4 << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				// Make sure there's no more
 				char c;

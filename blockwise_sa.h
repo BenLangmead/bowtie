@@ -233,7 +233,7 @@ protected:
 					cerr << "Out of memory creating suffix array in "
 					     << "SillyBlockwiseDnaSA::SillyBlockwiseDnaSA()"
 					     << " at " << __FILE__ << ":" << __LINE__ << endl;
-					std::runtime_error("");
+					throw 1;
 				}
 			}
 			assert_eq(length(this->text())+1, length(_sa));
@@ -482,7 +482,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 				cerr << "Could not allocate sample suffix container of " << (numSamples * 4) << " bytes." << endl
 				     << "Please try using a smaller number of blocks by specifying a larger --bmax or" << endl
 				     << "a smaller --bmaxdivn" << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 		}
 	}
@@ -531,7 +531,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 				cerr << "Could not allocate sizes, representatives (" << ((numBuckets*8)>>10) << " KB) for blocks." << endl
 				     << "Please try using a smaller number of blocks by specifying a larger --bmax or a" << endl
 				     << "smaller --bmaxdivn." << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 		}
 		// Iterate through every suffix in the text, determine which
@@ -844,7 +844,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				cerr << "Could not allocate a master suffix-array block of " << ((len+1) * 4) << " bytes" << endl
 				     << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
 				     << "a larger --bmaxdivn" << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 		}
 	} else {
@@ -860,7 +860,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				cerr << "Could not allocate a suffix-array block of " << ((this->bucketSz()+1) * 4) << " bytes" << endl;
 				cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
 				     << "a larger --bmaxdivn" << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 		}
 		// Select upper and lower bounds from _sampleSuffs[] and
@@ -899,7 +899,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 				cerr << "Could not allocate a z-array of " << (_dcV * 4) << " bytes" << endl;
 				cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
 				     << "a larger --bmaxdivn" << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 		}
 
@@ -942,7 +942,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 						cerr << "Could not append element to block of " << ((length(bucket)) * 4) << " bytes" << endl;
 						cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
 						     << "a larger --bmaxdivn" << endl;
-						std::runtime_error("");
+						throw 1;
 					}
 				}
 				// Not necessarily true; we allow overflowing buckets

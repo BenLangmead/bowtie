@@ -356,7 +356,7 @@ public:
 			out_.open(dumpfile_, ios_base::out);
 			if(!out_.good()) {
 				cerr << "Could not open pattern dump file \"" << dumpfile_ << "\" for writing" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 		MUTEX_INIT(lock_);
@@ -1060,7 +1060,7 @@ public:
 	{
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << length_ << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		rand_.init(seed_);
 	}
@@ -1155,7 +1155,7 @@ public:
 		patid_ = thread_;
 		if(length_ > 1024) {
 			cerr << "Read length for RandomPatternSourcePerThread may not exceed 1024; got " << length_ << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		rand_.init(thread_);
 	}
@@ -1595,7 +1595,7 @@ protected:
 			filebuf_.newFile(in);
 			return;
 		}
-		throw std::runtime_error("");
+		throw 1;
 	}
 	vector<string> infiles_; /// filenames for read files
 	vector<bool> errs_; /// whether we've already printed an error for each file
@@ -1673,7 +1673,7 @@ protected:
 			}
 			if(c != '>') {
 				cerr << "Error: reads file does not look like a FASTA file" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			assert(c == '>' || c == '#');
 			first_ = false;
@@ -1711,7 +1711,7 @@ protected:
 				if(dstLen + 1 > 1024) {
 					cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 						 << "reads and re-run Bowtie" << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				r.patBufFw [dstLen] = charToDna5[c];
 				r.qualBuf[dstLen]   = 'I';
@@ -1748,7 +1748,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastaPatternSource.readPair()" << endl;
-		throw std::runtime_error("");
+		throw 1;
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -2027,7 +2027,7 @@ private:
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 							 << "reads and re-run Bowtie" << endl;
-						throw std::runtime_error("");
+						throw 1;
 					}
 					r.patBufFw[dstLen] = charToDna5[c];
 					dstLen++;
@@ -2229,7 +2229,7 @@ protected:
 	// from a continuous input.
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		cerr << "In FastaContinuousPatternSource.readPair()" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	/**
@@ -2371,7 +2371,7 @@ protected:
 			}
 			if(c != '@') {
 				cerr << "Error: reads file does not look like a FASTQ file" << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 			assert_eq('@', c);
 			first_ = false;
@@ -2405,7 +2405,7 @@ protected:
 				_setLength(r.name, nameLen);
 				cerr << "FASTQ read name is too long; read names must be " << (bufSz-2) << " characters or fewer." << endl;
 				cerr << "Beginning of bad read name: " << r.name << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 		_setBegin(r.name, r.nameBuf);
@@ -2440,7 +2440,7 @@ protected:
 				charsRead = 0;
 				if(altBufIdx >= 3) {
 					cerr << "At most 3 alternate sequence strings permitted; offending read: " << r.name << endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				// Move on to the next alternate-sequence buffer
 				sbuf = r.altPatBufFw[altBufIdx++];
@@ -2505,7 +2505,7 @@ protected:
 					if((*qualsReadCur) == 0) continue;
 					if(altBufIdx >= 3) {
 						cerr << "At most 3 alternate quality strings permitted; offending read: " << r.name << endl;
-						throw std::runtime_error("");
+						throw 1;
 					}
 					qbuf = r.altQualBuf[altBufIdx++];
 					qualsReadCur = &qualsRead[altBufIdx];
@@ -2602,7 +2602,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastqPatternSource.readPair()" << endl;
-		throw std::runtime_error("");
+		throw 1;
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -2670,7 +2670,7 @@ protected:
 				if(c == '@') {
 					cerr << "Reads file looks like a FASTQ file; please use -q" << endl;
 				}
-				throw std::runtime_error("");
+				throw 1;
 			}
 			first_ = false;
 		}
@@ -2715,7 +2715,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In RawPatternSource.readPair()" << endl;
-		throw std::runtime_error("");
+		throw 1;
 		read(ra, patid);
 		readCnt_--;
 		read(rb, patid);
@@ -2793,10 +2793,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In ChainPatternSource.readPair()" << endl;
-		throw std::runtime_error("");
-		read(ra, patid);
-		readCnt_--;
-		read(rb, patid);
+		throw 1;
 	}
 };
 

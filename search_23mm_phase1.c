@@ -12,11 +12,11 @@
 
 	if(plen < 3 && two) {
 		cerr << "Error: Read (" << name << ") is less than 3 characters long" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	else if(plen < 4) {
 		cerr << "Error: Read (" << name << ") is less than 4 characters long" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(!nofw) {
 		// Do an exact-match search on the forward pattern, just in

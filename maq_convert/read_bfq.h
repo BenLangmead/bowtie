@@ -30,8 +30,8 @@ static bool ma_load_1read(gzFile fp, TStr& ret) {
 	// Read name length
 	if (gzread(fp, &len, sizeof(int)) != sizeof(int)) return false;
 	if(len > 2047) {
-		throw std::runtime_error(
-			"One or more .bfq read names are longer than 2047 characters");
+		cerr << "One or more .bfq read names are longer than 2047 characters" << endl;
+		throw 1;
 	}
 	// Read name
 	gzread(fp, name, sizeof(char) * len);
@@ -39,8 +39,8 @@ static bool ma_load_1read(gzFile fp, TStr& ret) {
 	// Read sequence length
 	if(gzread(fp, &len, sizeof(int)) != sizeof(int)) return false;
 	if(len > 2048) {
-		throw std::runtime_error(
-			"One or more .bfq read sequences are longer than 2048 bases");
+		cerr << "One or more .bfq read sequences are longer than 2048 bases" << endl;
+		throw 1;
 	}
 	seqan::reserve(ret, len, seqan::Exact());
 	gzread(fp, seq, sizeof(char) * len);

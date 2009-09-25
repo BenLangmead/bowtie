@@ -17,7 +17,7 @@ void AnnotationMap::parse() {
 	ifstream in(fname_);
 	if(!in.good() && in.is_open()) {
 		cerr << "Could not open annotation file " << fname_ << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	while(in.peek() != EOF) {
 		U32Pair pos;

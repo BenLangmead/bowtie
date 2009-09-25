@@ -277,7 +277,7 @@ public:
 		out_ = fopen(in, "wb");
 		if(out_ == NULL) {
 			std::cerr << "Error: Could not open bitpair-output file " << in << std::endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 	}
 
@@ -296,7 +296,7 @@ public:
 				// Flush the buffer
 				if(!fwrite((const void *)buf_, BUF_SZ, 1, out_)) {
 					std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
-					throw std::runtime_error("");
+					throw 1;
 				}
 				// Reset to beginning of the buffer
 				cur_ = 0;
@@ -316,7 +316,7 @@ public:
 			if(bpPtr_ == 0) cur_--;
 			if(!fwrite((const void *)buf_, cur_ + 1, 1, out_)) {
 				std::cerr << "Error writing to the reference index file (.4.ebwt)" << std::endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		}
 		fclose(out_);
@@ -348,7 +348,7 @@ public:
 		out_ = fopen(out, binary ? "wb" : "w");
 		if(out_ == NULL) {
 			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 	}
 
@@ -407,7 +407,7 @@ public:
 	void flush() {
 		if(!fwrite((const void *)buf_, cur_, 1, out_)) {
 			std::cerr << "Error while flushing and closing output" << std::endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		cur_ = 0;
 	}

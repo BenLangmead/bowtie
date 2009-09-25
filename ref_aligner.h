@@ -138,7 +138,7 @@ public:
 			if(refbuf_ == NULL) throw std::bad_alloc();
 		} catch(std::bad_alloc& e) {
 			cerr << "Error: Could not allocate reference-space alignment buffer of " << newsz << "B" << endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		refbufSz_ = newsz;
 		freeRefbuf_ = true;

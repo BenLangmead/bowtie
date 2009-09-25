@@ -77,15 +77,18 @@ static void resetOptions() {
 }
 
 // Argument constants for getopts
-static const int ARG_BMAX      = 256;
-static const int ARG_BMAX_MULT = 257;
-static const int ARG_BMAX_DIV  = 258;
-static const int ARG_DCV       = 259;
-static const int ARG_SEED      = 260;
-static const int ARG_CUTOFF    = 261;
-static const int ARG_PMAP      = 262;
-static const int ARG_ISARATE   = 263;
-static const int ARG_NTOA      = 264;
+enum {
+	ARG_BMAX = 256,
+	ARG_BMAX_MULT,
+	ARG_BMAX_DIV,
+	ARG_DCV,
+	ARG_SEED,
+	ARG_CUTOFF,
+	ARG_PMAP,
+	ARG_ISARATE,
+	ARG_NTOA,
+	ARG_USAGE
+};
 
 /**
  * Print a detailed usage message to the provided output stream.
@@ -118,6 +121,7 @@ static void printUsage(ostream& out) {
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    //<< "    -s/--sanity             enable sanity checks (much slower/increased memory usage)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
+	    << "    --usage                 print this usage message" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
 }
@@ -367,6 +371,7 @@ static struct option long_options[] = {
 	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
+	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -383,13 +388,13 @@ static int parseNumber(T lower, const char *errmsg) {
 		if (t < lower) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
-			std::runtime_error("");
+			throw 1;
 		}
 		return t;
 	}
 	cerr << errmsg << endl;
 	printUsage(cerr);
-	std::runtime_error("");
+	throw 1;
 	return -1;
 }
 
@@ -431,11 +436,11 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case 'h':
 				printLongUsage(cout);
-				throw std::runtime_error("");
+				throw 0;
 				break;
-			case '?':
-				printUsage(cerr);
-				throw std::runtime_error("");
+			case ARG_USAGE:
+				printUsage(cout);
+				throw 0;
 				break;
 			case ARG_BMAX:
 				bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
@@ -473,9 +478,8 @@ static void parseOptions(int argc, const char **argv) {
 				if (long_options[option_index].flag != 0)
 					break;
 			default:
-				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				std::runtime_error("");
+				throw 1;
 		}
 	} while(next_option != -1);
 	if(bmax < 40) {
@@ -517,7 +521,7 @@ static void driver(const string& infile,
 			FILE *f = fopen(infiles[i].c_str(), "r");
 			if (f == NULL) {
 				cerr << "Error: could not open "<< infiles[i] << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 			FileBuf *fb = new FileBuf(f);
 			assert(fb != NULL);
@@ -549,7 +553,7 @@ static void driver(const string& infile,
 				cerr << "Could not open index file for writing: \"" << file3 << "\"" << endl
 					 << "Please make sure the directory exists and that permissions allow writing by" << endl
 					 << "Bowtie." << endl;
-				std::runtime_error("");
+				throw 1;
 			}
 			bool be = currentlyBigEndian();
 			writeU32(fout3, 1, be); // endianness sentinel
@@ -774,7 +778,17 @@ int bowtie_build(int argc, const char **argv) {
 		}
 		return 0;
 	} catch(std::exception& e) {
+		cerr << "Command: ";
+		for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+		cerr << endl;
 		return 1;
+	} catch(int e) {
+		if(e != 0) {
+			cerr << "Command: ";
+			for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+			cerr << endl;
+		}
+		return e;
 	}
 }
 }

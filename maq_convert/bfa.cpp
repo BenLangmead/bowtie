@@ -14,7 +14,7 @@ nst_bfa1_t *nst_new_bfa1()
 	bfa1 = (nst_bfa1_t*)malloc(sizeof(nst_bfa1_t));
 	if(bfa1 == NULL) {
 		cerr << "Exhausted memory allocating space for the .bfa file" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	bfa1->name = 0;
 	bfa1->seq = bfa1->mask = 0;
@@ -31,7 +31,7 @@ void nst_delete_bfa1(nst_bfa1_t *bfa1)
 }
 static void bfa_read_error() {
 	fprintf(stderr, "Error reading from .bfa file\n");
-	throw std::runtime_error("");
+	throw 1;
 }
 nst_bfa1_t *nst_load_bfa1(FILE *fp)
 {
@@ -42,7 +42,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	bfa1->name = (char*)malloc(sizeof(char) * len);
 	if(bfa1->name == NULL) {
 		cerr << "Exhausted memory allocating space for the .bfa file name" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	/*
 	 * BTL: I had to add in these return-value checks to keep gcc 4.3.2
@@ -60,7 +60,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	bfa1->seq = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
 	if(bfa1->seq == NULL) {
 		cerr << "Exhausted memory allocating space for the .bfa file sequence" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(fread(bfa1->seq, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {
 		bfa_read_error();
@@ -68,7 +68,7 @@ nst_bfa1_t *nst_load_bfa1(FILE *fp)
 	bfa1->mask = (bit64_t*)malloc(sizeof(bit64_t) * bfa1->len);
 	if(bfa1->mask == NULL) {
 		cerr << "Exhausted memory allocating space for the .bfa file mask" << endl;
-		throw std::runtime_error("");
+		throw 1;
 	}
 	if(fread(bfa1->mask, sizeof(bit64_t), bfa1->len, fp) != (size_t)bfa1->len) {
 		bfa_read_error();

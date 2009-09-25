@@ -115,7 +115,7 @@ public:
 				cerr << "Unable to allocate memory for depth-first "
 				     << "backtracking search; new length = " << length(*_qry)
 				     << endl;
-				throw std::runtime_error("");
+				throw 1;
 			}
 		} else {
 			// New length is less than old length, so there's no need
@@ -3202,7 +3202,7 @@ protected:
 		if(cext == PIN_TO_BEGINNING)    return 0;
 		if(cext == PIN_TO_LEN)          return len;
 		cerr << "Bad SearchConstraintExtent: " << cext;
-		throw std::runtime_error("");
+		throw 1;
 	}
 
 	bool seed_;

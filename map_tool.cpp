@@ -127,6 +127,7 @@ static void printUsage(ostream& out) {
 	    << "  -n/--names <ebwt>  if needed, get ref names from index w/ basename <ebwt> " << endl
 	    << "  -v/--verbose       verbose output (for debugging)" << endl
 	    << "  -h/--help          print detailed description of tool and its options" << endl
+	    << "  --usage            print detailed description of tool and its options" << endl
 	    << "  --version          print version information and quit" << endl
 	    ;
 }
@@ -135,7 +136,8 @@ static const char *short_options = "hvsdbsDBCQFn:";
 
 enum {
 	ARG_VERSION = 256,
-	ARG_REFIDX
+	ARG_REFIDX,
+	ARG_USAGE
 };
 
 static struct option long_options[] = {
@@ -152,6 +154,7 @@ static struct option long_options[] = {
 	{(char*)"help",       no_argument, 0, 'h'},
 	{(char*)"refidx",     no_argument, 0, ARG_REFIDX},
 	{(char*)"version",    no_argument, 0, ARG_VERSION},
+	{(char*)"usage",      no_argument, 0, ARG_USAGE},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -165,9 +168,12 @@ static void parseOptions(int argc, char **argv) {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
 			case 'h':
-			case '?':
 				printLongUsage(cout);
-				throw std::runtime_error("");
+				throw 0;
+				break;
+			case ARG_USAGE:
+				printUsage(cout);
+				throw 0;
 				break;
 			case 'v': verbose = true; break;
 			case 's': sorthits = true; break;
@@ -184,9 +190,8 @@ static void parseOptions(int argc, char **argv) {
 			case -1: /* Done with options. */ break;
 			case 0: if (long_options[option_index].flag != 0) break;
 			default:
-				cerr << "Unknown option: " << (char)next_option << endl;
 				printUsage(cerr);
-				throw runtime_error("");
+				throw 1;
 		}
 	} while(next_option != -1);
 }
@@ -262,7 +267,7 @@ int main(int argc, char **argv) {
 			out = new ofstream(argv[optind]);
 		} else if(outformat == FORMAT_BIN) {
 			cerr << "If -B/--outbin is specified, <align_out> must also be specified" << endl;
-			throw runtime_error("");
+			throw 1;
 		}
 
 		// Read in reference names, if requested
@@ -364,6 +369,16 @@ int main(int argc, char **argv) {
 
 		return 0;
 	} catch(std::exception& e) {
+		cerr << "Command: ";
+		for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+		cerr << endl;
 		return 1;
+	} catch(int e) {
+		if(e != 0) {
+			cerr << "Command: ";
+			for(int i = 0; i < argc; i++) cerr << argv[i] << " ";
+			cerr << endl;
+		}
+		return e;
 	}
 }

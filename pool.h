@@ -39,7 +39,7 @@ public:
 			std::cerr << "Error: Could not allocate ChunkPool of "
 			          << totSz << " bytes" << std::endl;
 			exhausted();
-			throw std::runtime_error(""); // Exit if we haven't already
+			throw 1; // Exit if we haven't already
 		}
 	}
 
@@ -148,7 +148,7 @@ public:
 		}
 		if(exhaustCrash_) {
 			std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
-			throw std::runtime_error("");
+			throw 1;
 		}
 		lastSkippedRead_ = patid;
 	}
