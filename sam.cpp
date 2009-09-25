@@ -78,7 +78,6 @@ void SAMHitSink::appendAligned(ostream& ss,
 				// There's a mismatch at this position
 				assert_gt((int)h.refcs.size(), i);
 				char refChar = toupper(h.refcs[i]);
-				char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
 				assert_neq(refChar, qryChar);
 				ss << run << refChar;
 				run = 0;
@@ -93,7 +92,6 @@ void SAMHitSink::appendAligned(ostream& ss,
 				// There's a mismatch at this position
 				assert_gt((int)h.refcs.size(), i);
 				char refChar = toupper(h.refcs[i]);
-				char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
 				assert_neq(refChar, qryChar);
 				ss << run << refChar;
 				run = 0;
