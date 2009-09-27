@@ -4640,6 +4640,11 @@ static void driver(const char * type,
 				delete patsrcs_b[i];
 			}
 		}
+		for(size_t i = 0; i < patsrcs_ab.size(); i++) {
+			if(patsrcs_ab[i] != NULL) {
+				delete patsrcs_ab[i];
+			}
+		}
 		delete patsrc;
 		delete sink;
 		delete amap;

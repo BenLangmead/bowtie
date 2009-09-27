@@ -950,12 +950,6 @@ public:
 		} else {
 			out << "non-NULL, [0] = " << _offs[0] << endl;
 		}
-		out << "    isa: ";
-		if(_isa == NULL) {
-			out << "NULL" << endl;
-		} else {
-			out << "non-NULL, [0] = " << _isa[0] << endl;
-		}
 	}
 
 	// Building
