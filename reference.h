@@ -310,8 +310,8 @@ public:
 	}
 
 	~BitPairReference() {
-		if(buf_ != NULL && !useMm_) delete[] buf_;
-		if(buf_ != NULL) delete[] sanityBuf_;
+		if(buf_ != NULL && !useMm_ && !useShmem_) delete[] buf_;
+		if(sanityBuf_ != NULL) delete[] sanityBuf_;
 	}
 
 	/**
