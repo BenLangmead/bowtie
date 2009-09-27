@@ -3330,6 +3330,7 @@ static void twoOrThreeMismatchSearchFull(
 	delete[] threads;
 	delete[] tids;
 #endif
+	if(refs != NULL) delete refs;
 	return;
 }
 
