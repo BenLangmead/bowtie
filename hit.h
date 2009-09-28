@@ -65,18 +65,21 @@ public:
 	Hit(const Hit& other) { this->operator=(other); }
 
 	Hit(U32Pair _h,
+		U32Pair _mh,
 		uint32_t id,
 		const String<char>& name,
 		const String<Dna5>& seq,
 		const String<char>& q,
-		bool f,
+		bool f, bool mf,
+		uint16_t ml,
 		const FixedBitset<max_read_bp>& mm,
 		const vector<char>& rc,
 		uint32_t os,
 		int8_t st,
 		uint16_t co,
 		uint8_t m) :
-		h(_h), patId(id), oms(os), fw(f), stratum(st), cost(co), mate(m)
+		h(_h), mh(_mh), patId(id), oms(os), fw(f), mfw(mf), mlen(ml),
+		stratum(st), cost(co), mate(m)
 	{
 		patName = name;
 		patSeq  = seq;
@@ -186,6 +189,7 @@ public:
 	}
 
 	U32Pair             h;       /// reference index & offset
+	U32Pair             mh;      /// reference index & offset for mate
 	uint32_t            patId;   /// read index
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence
@@ -194,6 +198,8 @@ public:
 	vector<char>        refcs;   /// reference characters for mms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
+	bool                mfw;     /// orientation of mate in alignment
+	uint16_t            mlen;    /// length of mate
 	int8_t              stratum; /// stratum of hit (= mismatches in seed)
 	uint16_t            cost;    /// total cost, factoring in stratum and quality penalty
 	uint8_t             mate;    /// matedness; 0 = not a mate
@@ -203,19 +209,22 @@ public:
 	size_t length() const { return seqan::length(patSeq); }
 
 	Hit& operator = (const Hit &other) {
-	    this->h       = other.h;
-	    this->patId   = other.patId;
+		this->h       = other.h;
+		this->mh      = other.mh;
+		this->patId   = other.patId;
 		this->patName = other.patName;
 		this->patSeq  = other.patSeq;
 		this->quals   = other.quals;
-	    this->mms     = other.mms;
-	    this->refcs   = other.refcs;
-	    this->oms     = other.oms;
+		this->mms     = other.mms;
+		this->refcs   = other.refcs;
+		this->oms     = other.oms;
 		this->fw      = other.fw;
+		this->mfw     = other.mfw;
+		this->mlen    = other.mlen;
 		this->stratum = other.stratum;
 		this->cost    = other.cost;
 		this->mate    = other.mate;
-	    return *this;
+		return *this;
 	}
 };
 

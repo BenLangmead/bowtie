@@ -30,11 +30,12 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// FLAG
 	int flags = 0;
 	if(h.mate == 1) {
-		flags |= SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR;
+		flags |= SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MAPPED_PAIRED;
 	} else if(h.mate == 2) {
-		flags |= SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR;
+		flags |= SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MAPPED_PAIRED;
 	}
 	if(!h.fw) flags |= SAM_FLAG_QUERY_STRAND;
+	if(h.mate > 0 && !h.mfw) flags |= SAM_FLAG_MATE_STRAND;
 	ss << flags << "\t";
 	// RNAME
 	if(refnames != NULL && rmap != NULL) {
@@ -55,7 +56,20 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// MPOS
 	ss << '\t' << (h.h.second + 1);
 	// ISIZE
-	ss << "\t0";
+	ss << '\t';
+	if(h.mate > 0) {
+		assert_eq(h.h.first, h.mh.first);
+		int64_t inslen = 0;
+		if(h.h.second > h.mh.second) {
+			inslen = (int64_t)h.h.second - (int64_t)h.mh.second + (int64_t)h.length();
+		} else {
+			inslen = (int64_t)h.mh.second - (int64_t)h.h.second + (int64_t)h.mlen;
+			inslen = -inslen;
+		}
+		ss << inslen;
+	} else {
+		ss << '0';
+	}
 	// SEQ
 	ss << '\t' << h.patSeq;
 	// QUAL

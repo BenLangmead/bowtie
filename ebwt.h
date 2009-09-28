@@ -1133,7 +1133,10 @@ public:
 	               const std::vector<uint32_t>& mmui32, // mismatch list
 	               const std::vector<uint8_t>& refcs,  // reference characters
 	               size_t numMms,      // # mismatches
-	               U32Pair h,          // hit position in reference
+	               U32Pair h,          // ref coords
+	               U32Pair mh,         // mate's ref coords
+	               bool mfw,           // mate's orientation
+	               uint16_t mlen,      // mate length
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
 	               uint32_t len,       // length of query
@@ -1261,7 +1264,10 @@ public:
 		}
 		hit.patId = patid;
 		if(name != NULL) hit.patName = *name;
+		hit.mh = mh;
 		hit.fw = _fw;
+		hit.mfw = mfw;
+		hit.mlen = mlen;
 		hit.oms = oms;
 		hit.mate = mate;
 		return sink().reportHit(hit, stratum);
@@ -2304,6 +2310,9 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 				refcs,               // reference characters for mms
 				numMms,              // # mismatches
 				make_pair(0, 0),     // (bogus) position
+				make_pair(0, 0),     // (bogus) mate position
+				true,                // (bogus) mate orientation
+				0,                   // (bogus) mate length
 				make_pair(top, bot), // arrows
 				0,                   // (bogus) textlen
 				qlen,                // qlen
@@ -2331,14 +2340,17 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			refcs,                    // reference characters for mms
 			numMms,                   // # mismatches
 			make_pair(tidx, textoff), // position
+			make_pair(0, 0),          // (bogus) mate position
+			true,                     // (bogus) mate orientation
+			0,                        // (bogus) mate length
 			make_pair(top, bot),      // arrows
 			tlen,                     // textlen
 			qlen,                     // qlen
 			stratum,                  // alignment stratum
 			cost,                     // cost, including stratum & quality penalty
 			bot-top-1,                // # other hits
-	        0xffffffff,               // pattern id
-	        0);                       // mate (0 = unpaired)
+			0xffffffff,               // pattern id
+			0);                       // mate (0 = unpaired)
 }
 
 #include "row_chaser.h"

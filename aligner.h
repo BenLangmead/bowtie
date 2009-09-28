@@ -423,6 +423,9 @@ public:
 				ra.refcs,                 // reference characters for mms
 				ra.numMms,                // # mismatches
 				make_pair(first, second), // position
+				make_pair(0, 0),          // (bogus) mate position
+				true,                     // (bogus) mate orientation
+				0,                        // (bogus) mate length
 				make_pair(ra.top, ra.bot),// arrows
 				tlen,                     // textlen
 				alen_,                    // qlen
@@ -822,6 +825,9 @@ protected:
 				rL.refcs,                     // reference characters for mms
 				rL.numMms,                    // # mismatches
 				make_pair(first, upstreamOff),// position
+				make_pair(first, dnstreamOff),// mate position
+				rR.fw,                        // mate orientation
+				lenR,                         // mate length
 				make_pair(rL.top, rL.bot),    // arrows
 				tlen,                         // textlen
 				lenL,                         // qlen
@@ -846,6 +852,9 @@ protected:
 				rR.refcs,                     // reference characters for mms
 				rR.numMms,                    // # mismatches
 				make_pair(first, dnstreamOff),// position
+				make_pair(first, upstreamOff),// mate position
+				rL.fw,                        // mate orientation
+				lenL,                         // mate length
 				make_pair(rR.top, rR.bot),    // arrows
 				tlen,                         // textlen
 				lenR,                         // qlen
@@ -866,77 +875,9 @@ protected:
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            const ReferenceMap* rmap)
 	{
-		return report(rL, rR, first, upstreamOff, dnstreamOff, tlen,
+		return report(rL, rR, first, upstreamOff,
+		              dnstreamOff, tlen,
 		              pairFw, rL.ebwt->fw(), rR.ebwt->fw(), rmap);
-	}
-
-	/**
-	 * Given a new reference position where one mate aligns, add it
-	 * to the list of positions for that mate and reconcile it against
-	 * all of the positions for the other mate, reporting paired
-	 * alignments wherever the mating constraints are met.
-	 */
-	bool reconcileAndAdd(const U32Pair& h,
-	                     bool newFromL,
-	                     U32PairVec* offsLarr,
-	                     U32PairVec* offsRarr,
-	                     TRangeVec* rangesLarr,
-	                     TRangeVec* rangesRarr,
-		                 TDriver& drL,
-		                 TDriver& drR,
-		                 bool pairFw,
-		                 bool verbose = false)
-	{
-		U32PairVec& offsL   = offsLarr  [h.first & 31];
-		U32PairVec& offsR   = offsRarr  [h.first & 31];
-		TRangeVec&  rangesL = rangesLarr[h.first & 31];
-		TRangeVec&  rangesR = rangesRarr[h.first & 31];
-		assert_eq(offsL.size(), rangesL.size());
-		assert_eq(offsR.size(), rangesR.size());
-		// For each known hit for the other mate, check if this new
-		// alignment can be mated with it.  If so, report the mates.
-		size_t offsDstSz = newFromL ? offsR.size() : offsL.size();
-		if(verbose) cout << "reconcileAndAdd called" << endl;
-		if(offsDstSz > 0) {
-			// Start in a random spot in the offsR array and scan
-			// linearly
-			uint32_t rand = rand_.nextU32() % offsDstSz;
-			for(size_t i = 0; i < offsDstSz; i++) {
-				rand++;
-				if(rand == offsDstSz) rand = 0;
-				const U32Pair& h2 = newFromL ? offsR[rand] : offsL[rand];
-				if(h.first == h2.first) {
-					// Incoming hit hits same reference as buffered
-					uint32_t left  = newFromL ? h.second : h2.second;
-					uint32_t right = newFromL ? h2.second : h.second;
-					if(right > left) {
-						uint32_t gap = right - left;
-						if(gap >= minInsert_ && gap <= maxInsert_) {
-							if(verbose) cout << "...and with the right sized gap; reporting" << endl;
-							// Gap between the two alignments satisfies
-							// the paired-end policy, so we can report
-							// them
-							const Range& rL = newFromL ? drL.range() : rangesL[rand];
-							const Range& rR = newFromL ? rangesR[rand] : drR.range();
-							if(report(
-							       rL, // upstream (left) range
-							       rR, // downstream (right) range
-								   h.first,     // reference target
-								   left, right, // up/downstream offsets
-								   // _plen array is same both Fw and Bw
-								   rL.ebwt->_plen[h.first],
-								   pairFw,
-								   rL.ebwt->rmap())) return true;
-						}
-					}
-				}
-			}
-		}
-		// Push new reference locus and range onto the appropriate
-		// parallel mate buffers
-		if(newFromL) { offsL.push_back(h); rangesL.push_back(drL.range()); }
-		else         { offsR.push_back(h); rangesR.push_back(drR.range()); }
-		return false;
 	}
 
 	/**
@@ -1062,12 +1003,6 @@ protected:
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
-				if(!dontReconcile_ && !overThresh) {
-					this->done = reconcileAndAdd(
-							rchase_->off(), true /* new entry is from 1 */,
-							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
-							*drL_, *drR_, pairFw, verbose_);
-				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
@@ -1114,12 +1049,6 @@ protected:
 				// Resolve this against the reference loci
 				// determined for the other mate
 				const bool overThresh = (*offsLsz_ + *offsRsz_) > mixedThresh_;
-				if(!dontReconcile_ && !overThresh) {
-					this->done = reconcileAndAdd(
-							rchase_->off(), false /* new entry is from 2 */,
-							offsLarr_, offsRarr_, rangesLarr_, rangesRarr_,
-							*drL_, *drR_, pairFw, verbose_);
-				}
 				if(!this->done && (overThresh || dontReconcile_)) {
 					// Because the total size of both ranges exceeds
 					// our threshold, we're now operating in "mixed
@@ -1720,6 +1649,9 @@ protected:
 				rL.refcs,                     // reference characters for mms
 				rL.numMms,                    // # mismatches
 				make_pair(first, upstreamOff),// position
+				make_pair(first, dnstreamOff),// mate position
+				rR.fw,                        // mate orientation
+				lenR,                         // mate length
 				make_pair(rL.top, rL.bot),    // arrows
 				tlen,                         // textlen
 				lenL,                         // qlen
@@ -1744,6 +1676,9 @@ protected:
 				rR.refcs,                     // reference characters for mms
 				rR.numMms,                    // # mismatches
 				make_pair(first, dnstreamOff),// position
+				make_pair(first, upstreamOff),// mate position
+				rL.fw,                        // mate orientation
+				lenL,                         // mate length
 				make_pair(rR.top, rR.bot),    // arrows
 				tlen,                         // textlen
 				lenR,                         // qlen
@@ -1780,6 +1715,9 @@ protected:
 			r.refcs,                 // reference characters for mms
 			r.numMms,                // # mismatches
 			h,                       // position
+			make_pair(0, 0),         // (bogus) mate coords
+			true,                    // (bogus) mate orientation
+			0,                       // (bogus) mate length
 			make_pair(r.top, r.bot), // arrows
 			tlen,                    // textlen
 			len,                     // qlen

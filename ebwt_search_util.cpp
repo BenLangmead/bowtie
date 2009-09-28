@@ -236,15 +236,18 @@ void naiveOracle(const vector<String<Dna5> >& os,
 						stratum++;
 					}
 				}
-				Hit h(make_pair(i, off),
-					  patid,  // read id
-					  name,   // read name
-					  qry,    // read sequence
-					  qual,   // read qualities
-					  fw,     // forward/reverse-comp
-					  diffs,  // mismatch bitvector
-					  refcs,
-					  0, stratum, ham | (stratum << 14), 0);
+				Hit h(make_pair(i, off), // ref coords
+				      make_pair(0, 0), // (bogus) mate ref coords
+				      patid,  // read id
+				      name,   // read name
+				      qry,    // read sequence
+				      qual,   // read qualities
+				      fw,     // forward/reverse-comp
+				      true,   // (bogus) mate forward/reverse-comp
+				      0,      // (bogus) mate length
+				      diffs,  // mismatch bitvector
+				      refcs,
+				      0, stratum, ham | (stratum << 14), 0);
 				hits.push_back(h);
 			} // For each pattern character
 		} // For each alignment over current text
