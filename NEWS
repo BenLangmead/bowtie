@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.10.1.
+available to the public for download.  The current version is 0.11.0.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,31 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.11.0 - October 4, 2009
+   * Initial SAM output support with -S/--sam option.  Bowtie sets all
+     fields according to the SAM spec (Version 0.1.2-draft, 20090820),
+     and sets the optional MD and NM fields.  Bowtie also sets a tool-
+     specific XS:i field encoding the stratum of the alignment.
+   * Added --shmem option: --shmem is similar to --mm in that it allows
+     concurrent 'bowtie' processes querying the same index to share a
+     single memory image of the index.  Unlike --mm, shared memory
+     alocated by --shmem is permanent.
+   * When too-short reads are encountered, Bowtie now always prints
+     warnings, not errors.  --quiet now suppresses those warnings.
+   * By default, when bowtie prints a reference sequence name it now
+     stops at the first whitespace.  In 0.10.1, the default was to
+     print the entire name, which could cause confusion when parsing
+     Bowtie output.  To revert to printing the full name, use the new
+     --fullref option.
+   * Bowtie now prints the command-line before exiting with an error.
+   * Various minor bug fixes.
+   * DEPRECATED: -z/--phased, -b/--binout, bowtie-maptool.  These
+     features will be removed in a future version of Bowtie.
+     Note that -b/--binout and bowtie-maptool are largely superseded by
+     SAM/BAM.
+   * REMOVED: --unfq/--unfa/--maxfq/--maxfa/--alfq/--alfa.  Use
+     --un/--max/--al instead.
 
 Version 0.10.1 - July 19, 2009
    * Now when -3/-5 are used in combination with -I/-X, the -I/-X

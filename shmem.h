@@ -134,8 +134,8 @@ bool allocSharedMem(std::string fname,
 
 #else
 
-#define ALLOC_SHARED_U8(...)
-#define ALLOC_SHARED_U32(...)
+#define ALLOC_SHARED_U8(...) 0
+#define ALLOC_SHARED_U32(...) 0
 #define FREE_SHARED(...)
 #define NOTIFY_SHARED(...)
 #define WAIT_SHARED(...)
