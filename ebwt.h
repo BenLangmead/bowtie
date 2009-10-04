@@ -2965,8 +2965,8 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 		bool shmemLeader = true;
 		if(useShmem_) {
 			shmemLeader = ALLOC_SHARED_U8(
-				_in1Str + "[ebwt]", eh->_ebwtTotLen, &this->_ebwt,
-				"ebwt[]", _verbose || startVerbose);
+				(_in1Str + "[ebwt]"), eh->_ebwtTotLen, &this->_ebwt,
+				"ebwt[]", (_verbose || startVerbose));
 			if(_verbose || startVerbose) {
 				cerr << "  shared-mem " << (shmemLeader ? "leader" : "follower") << endl;
 			}
@@ -3131,8 +3131,8 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 			}
 		} else {
 			shmemLeader = ALLOC_SHARED_U32(
-				_in2Str + "[offs]", offsLenSampled*4, &this->_offs,
-				"offs", _verbose || startVerbose);
+				(_in2Str + "[offs]"), offsLenSampled*4, &this->_offs,
+				"offs", (_verbose || startVerbose));
 		}
 	}
 

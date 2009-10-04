@@ -217,8 +217,8 @@ public:
 				}
 			} else {
 				shmemLeader = ALLOC_SHARED_U8(
-					s4 + "[ref]", (cumsz >> 2), &buf_,
-					"ref", verbose_ || startVerbose);
+					(s4 + "[ref]"), (cumsz >> 2), &buf_,
+					"ref", (verbose_ || startVerbose));
 			}
 			if(shmemLeader) {
 				// Open the bitpair-encoded reference file

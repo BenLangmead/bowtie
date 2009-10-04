@@ -10,6 +10,7 @@
 #include <fstream>
 #include <string>
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdexcept>
 #include "assert_helpers.h"

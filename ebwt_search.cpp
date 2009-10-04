@@ -1557,8 +1557,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_MMSWEEP: mmSweep = true; break;
 			case ARG_HADOOPOUT: hadoopOut = true; break;
 			case ARG_AL: dumpAlBase = optarg; break;
-			case ARG_ALFA: dumpAlFaBase = optarg; break;
-			case ARG_ALFQ: dumpAlFqBase = optarg; break;
 			case ARG_UN: dumpUnalBase = optarg; break;
 			case ARG_SOLEXA_QUALS: solexaQuals = true; break;
 			case ARG_integerQuals: integerQuals = true; break;
