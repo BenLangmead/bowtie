@@ -259,14 +259,8 @@ enum {
 	ARG_NOOUT,
 	ARG_FAST,
 	ARG_AL,
-	ARG_ALFA,
-	ARG_ALFQ,
 	ARG_UN,
-	ARG_UNFA,
-	ARG_UNFQ,
 	ARG_MAXDUMP,
-	ARG_MAXFA,
-	ARG_MAXFQ,
 	ARG_REFIDX,
 	ARG_DUMP_NOHIT,
 	ARG_DUMP_HHHIT,
@@ -343,14 +337,8 @@ static struct option long_options[] = {
 	{(char*)"seed",         required_argument, 0,            ARG_SEED},
 	{(char*)"qupto",        required_argument, 0,            'u'},
 	{(char*)"al",           required_argument, 0,            ARG_AL},
-	{(char*)"alfa",         required_argument, 0,            ARG_ALFA},
-	{(char*)"alfq",         required_argument, 0,            ARG_ALFQ},
 	{(char*)"un",           required_argument, 0,            ARG_UN},
-	{(char*)"unfa",         required_argument, 0,            ARG_UNFA},
-	{(char*)"unfq",         required_argument, 0,            ARG_UNFQ},
 	{(char*)"max",          required_argument, 0,            ARG_MAXDUMP},
-	{(char*)"maxfa",        required_argument, 0,            ARG_MAXFA},
-	{(char*)"maxfq",        required_argument, 0,            ARG_MAXFQ},
 	{(char*)"offrate",      required_argument, 0,            'o'},
 	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
@@ -499,7 +487,12 @@ static void printUsage(ostream& out) {
 #endif
 		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
+#ifdef BOWTIE_MM
 	    << "  --mm               use memory-mapped I/O for index; many 'bowtie's can share" << endl
+#endif
+#ifdef BOWTIE_SHARED_MEM
+	    << "  --shmem            use shared mem for index; many 'bowtie's can share" << endl
+#endif
 	    << "Other:" << endl
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
@@ -1567,11 +1560,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_ALFA: dumpAlFaBase = optarg; break;
 			case ARG_ALFQ: dumpAlFqBase = optarg; break;
 			case ARG_UN: dumpUnalBase = optarg; break;
-			case ARG_UNFA: dumpUnalFaBase = optarg; break;
-			case ARG_UNFQ: dumpUnalFqBase = optarg; break;
-			case ARG_MAXDUMP: dumpMaxBase = optarg; break;
-			case ARG_MAXFA: dumpMaxFaBase = optarg; break;
-			case ARG_MAXFQ: dumpMaxFqBase = optarg; break;
 			case ARG_SOLEXA_QUALS: solexaQuals = true; break;
 			case ARG_integerQuals: integerQuals = true; break;
 			case ARG_PHRED64: phred64Quals = true; break;
