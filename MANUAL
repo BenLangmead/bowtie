@@ -219,7 +219,7 @@ Bowtie Manual
     Example 1: -a
     -------------
     
-    $ ./bowtie --quiet -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
@@ -235,7 +235,7 @@ Bowtie Manual
     Example 2: -k 3
     ---------------
     
-    $ ./bowtie --quiet -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
@@ -248,7 +248,7 @@ Bowtie Manual
     Example 3: -k 6
     ---------------
     
-    $ ./bowtie --quiet -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
@@ -853,7 +853,7 @@ Bowtie Manual
                      line.
 
   -t/--time          Print the amount of wall-clock time taken by each
-                     search phase and index turnover.
+                     phase.
 
   -B/--offbase <int> When outputting alignments, number the first base
                      of a reference sequence as <int>.  Default: 0.
@@ -1020,11 +1020,14 @@ Bowtie Manual
   ----------
 
   Following is a brief description of the SAM format as output by
-  Bowtie when the -S/--sam option is specified.  For many more details,
-  see the SAM format specification
-  (http://samtools.sourceforge.net/SAM1.pdf).
-  
-  Each line is a collection of 11 fields separated by tabs; from left to
+  Bowtie when the -S/--sam option is specified.  For more details, see
+  the SAM format specification (http://samtools.sf.net/SAM1.pdf).
+
+  When -S/--sam is specified, Bowtie will always print a SAM header
+  with @HD, @SQ and @PG lines.
+
+  Each subsequnt line corresponds to a read or an alignment.  Each line
+  is a collection of at least 12 fields separated by tabs; from left to
   right, the fields are:
 
    1. Name of read that aligned
@@ -1041,33 +1044,52 @@ Bowtie Manual
        64: The read is the first (#1) mate in a pair
       128: The read is the second (#2) mate in a pair
 
+      Thus, an unpaired read that aligns to the reverse reference
+      strand will have flag 16.  A paired-end read that aligns and is
+      the first mate in the pair will have flag 83 (= 64 + 16 + 2 + 1).
+
    3. Name of reference sequence where alignment occurs, or ordinal ID
       if no name was provided
 
    4. 1-based offset into the forward reference strand where leftmost
       character of the alignment occurs
-   
+
    5. Mapping quality (always 255)
-   
+
    6. CIGAR string representation of alignment
 
    7. Name of reference sequence where mate's alignment occurs.  Set to
-      "=" if there is no mate, or if the mate's reference sequence is
-      the same as this alignment's.
-   
-   8. 
-   
-   8. Inferred insert size (negative if the mate's alignment occurs
-      upstream of this alignment)
-   
-   9. Read sequence (reverse-complemented if aligned to the reverse
+      "=" if the mate's reference sequence is the same as this
+      alignment's, or "*" if there is no mate.
+
+   8. 1-based offset into the forward reference strand where leftmost
+      character of the mate's alignment occurs.  Offset is 0 if there
+      is no mate.
+
+   9. Inferred insert size.  Size is negative if the mate's alignment
+      occurs upstream of this alignment.  Size is 0 if there is no
+      mate.
+
+  10. Read sequence (reverse-complemented if aligned to the reverse
       strand)
 
-  10. ASCII-encoded read qualities (reversed if aligned to the reverse
+  11. ASCII-encoded read qualities (reversed if aligned to the reverse
       strand).  The encoded quality values are on the Phred scale and
       the encoding is ASCII-offset by 33 (ASCII char '!'). 
 
-  11.
+ 12+. Optional fields.  Fields are tab-separated.  For descriptions of
+      all possible optional fields, see the SAM format specification.
+      Bowtie outputs one or more of these optional fields for each
+      alignment, depending on the type of the alignment:
+
+      NM:i:<N> : Aligned read has an edit distance of <N>
+      MD:Z:<S> : For aligned reads, <S> is a string representation of
+                 the mismatched reference bases in the alignment.  See
+                 SAM format specification for details.
+      XS:i:<N> : Aligned read belongs to stratum <N>
+      XM:i:<N> : For a read with no reported alignments, <N> is 0 if
+                 the read had no alignments, or 1 if the read had
+                 alignments that were suppressed by the -m option.
 
  Using the 'bowtie-build' Indexer
  --------------------------------
