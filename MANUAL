@@ -11,16 +11,15 @@ Bowtie Manual
  large genomes. It aligns 35-base-pair reads to the human genome at a
  rate of 25 million reads per hour on a typical workstation. Bowtie
  indexes the genome with a Burrows-Wheeler index to keep its memory
- footprint small: for the human genome, the index is as small as 1.1 GB
- (using -z), and typically about 2.2 GB (not using -z) or 2.9 GB (for
- paired-end alignment).  Bowtie supports alignment policies equivalent
- to Maq and SOAP but is substantially faster: about 35x faster than Maq
- and over 250x faster than SOAP when aligning 35-bp reads to the human
- genome.  Multiple processor cores can be used simultaneously to
- achieve greater alignment speed.  Bowtie's output format can be
- converted to the format used by Maq, allowing users to rapidly align
- reads with Bowtie then identify variations with Maq.  The Bowtie tools
- run on the command line under Windows, Mac OS X, Linux, and Solaris.
+ footprint small: for the human genome, the index is typically about
+ 2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end alignment).
+ Bowtie supports alignment policies equivalent to Maq and SOAP.
+ Multiple processor cores can be used simultaneously to achieve greater
+ alignment speed.  Bowtie can also output alignments in the standard
+ SAM format, allowing Bowtie to interoperate cleanly with the wide
+ range of tools that support SAM input, including the SAMtools
+ consensus, SNP and indel callers.  The Bowtie tools run on the command
+ line under Windows, Mac OS X, Linux, and Solaris.
 
  What isn't Bowtie?
  ------------------
@@ -464,12 +463,6 @@ Bowtie Manual
   causes bowtie to use a sparser sample of the suffix-array than is
   stored in the index; this saves memory but makes alignment reporting
   slower (which is especially slow when using -a or large -k).
-  
-  A note from firsthand experience: I have a MacBook Pro with 2 GB of
-  RAM and I noticed that 'bowtie -z' would thrash and run very slowly
-  when aligning reads against the pre-built human genome available from
-  the Bowtie website.  Using 'bowtie -z --offrate 6' prevented the
-  thrashing and allowed bowtie to run much faster.
 
   Command Line
   ------------
@@ -500,8 +493,7 @@ Bowtie Manual
                      correspond file-for-file and read-for-read with
                      those specified in <m2>.  Reads may be a mix of
                      different lengths.  If "-" is specified, Bowtie
-                     will read the #1 mates from stdin.  "-" is not
-                     compatible with "-z/--phased".
+                     will read the #1 mates from stdin.
 
   <m2>               Comma-separated list of files containing the #2
                      mates (filename usually includes "_2"), or, if -c
@@ -512,8 +504,7 @@ Bowtie Manual
                      correspond file-for-file and read-for-read with
                      those specified in <m1>.  Reads may be a mix of
                      different lengths.  If "-" is specified, Bowtie
-                     will read the #2 mates from stdin.  "-" is not
-                     compatible with "-z/--phased".
+                     will read the #2 mates from stdin.
 
   <r>                Comma-separated list of files containing a mix of
                      unpaired and paired-end reads in Tab-delimited
@@ -539,7 +530,6 @@ Bowtie Manual
                      is specified, this might be "GGTCATCCT,ACGGGTCGT".
                      Reads may be a mix of different lengths.  If "-"
                      is specified, Bowtie gets the reads from stdin.
-                     "-" is not compatible with "-z/--phased".
 
   <hit>              File to write alignments to.  By default,
                      alignments are written to stdout (the console),
@@ -838,6 +828,26 @@ Bowtie Manual
    Output:
    -------
 
+  -S/--sam           Print alignments in SAM format.  See the SAM
+                     format spec (http://samtools.sourceforge.net/) for
+                     details.  All required fields are set by Bowtie,
+                     including the mapping quality field (MAPQ), which
+                     always receives a value of 255.  Additionally, the
+                     optional MD:Z and NM:i fields are printed for
+                     aligned reads.  The Bowtie-specific optional field
+                     XS:i is also printed for aligned reads; the value
+                     is the stratum of the alignment.  The Bowtie-
+                     specific optional field XM:i is is printed for
+                     reads that didn't align.  A value of 0 indicates
+                     that the read had no alignments, while a value of
+                     1 indicates that the read had a number of
+                     alignments that exceeded the ceiling specified
+                     with the -m option.  Bowtie does not itself write
+                     BAM files, but SAM output can be converted to BAM
+                     on the fly by piping Bowtie's output to the
+                     'samtools view -bt <.fai> -' (or similar) command.
+                     See the samtools documentation for details.
+
   --concise          Print alignments in a concise format. Each line
                      has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',
                      where read_idx is the index of the read mapped,
@@ -847,10 +857,6 @@ Bowtie Manual
                      and mms is the number of mismatches in the
                      alignment.  Each alignment appears on a separate
                      line.
-
-  -b/--binout        Output alignments in a concise binary format.  If
-                     this is specified, <hit_outfile> must also be
-                     specified.
 
   -t/--time          Print the amount of wall-clock time taken by each
                      search phase and index turnover.
@@ -912,6 +918,11 @@ Bowtie Manual
                      that fail to align will be written to
                      max_1.fq and max_2.fq respectively.  These reads
                      are not written to the file specified with --un.
+
+  --fullref          Print the full refernce sequence name, including
+                     whitespace, in alignment output.  By default
+                     bowtie prints everything up to but not including
+                     the first whitespace.
    Performance:
    ------------
 
@@ -920,23 +931,9 @@ Bowtie Manual
                      synchronize when grabbing reads and outputting
                      alignments.  Searching for alignments is highly
                      parallel, and speedup is fairly close to linear.
-                     Speedup suffers somewhat in -z mode because
-                     switching between indexes is a time-consuming
-                     serial operation.  This option is only available
-                     if bowtie is linked with the pthreads library
-                     (i.e. if BOWTIE_PTHREADS=0 is not specified at
-                     build time).
-
-  -z/--phased        Alternate between using the forward and mirror
-                     indexes in a series of phases such that only one
-                     "half" of the index is resident in memory at one
-                     time.  This uses about half the amount of memory
-                     as the default (which keeps both forward and
-                     mirror indexes resident in memory at once), but is
-                     somewhat slower, scales worse (see -p), and is
-                     incompatible with use of --best or -k greater than
-                     1.  It is also incompatible with paired-end
-                     alignment.
+                     This option is only available if bowtie is linked
+                     with the pthreads library (i.e. if
+                     BOWTIE_PTHREADS=0 is not specified at build time).
 
   -o/--offrate <int> Override the offrate of the index with <int>.  If
                      <int> is greater than the offrate used to build
@@ -949,11 +946,29 @@ Bowtie Manual
   --mm               Use memory-mapped I/O to load the index, rather
                      than normal POSIX/C file I/O.  Memory-mapping the
                      index allows many concurrent bowtie processes on
-                     the same machine to share the same memory image of
-                     the index (i.e. you pay the memory overhead just
-                     once).  This facilitates memory-efficient
+                     the same computer to share the same memory image
+                     of the index (i.e. you pay the memory overhead
+                     just once).  This facilitates memory-efficient
                      parallelization of Bowtie in situations where
                      using -p is not desirable.
+
+  --shmem            Use shared memory to load the index, rather than
+                     normal POSIX/C file I/O.  Using shared memory
+                     allows many concurrent bowtie processes on
+                     the same computer to share the same memory image
+                     of the index (i.e. you pay the memory overhead
+                     just once).  This facilitates memory-efficient
+                     parallelization of Bowtie in situations where
+                     using -p is not desirable.  Unlike --mm, --shmem
+                     installs the index into shared memory permanently,
+                     or until the user deletes the shared memory chunks
+                     manually.  See your operating system documentation
+                     for details on how to manually list and remove
+                     shared memory chunks (on Linux and Mac OS X, these
+                     commands are ipcs and ipcrm).  You may also need
+                     to increase your OS's maximum shared-memory chunk
+                     size to accomodate larger indexes; see your OS
+                     documentation.
 
    Other:
    ------
@@ -1202,19 +1217,6 @@ Bowtie Manual
                             reference sequences (cumulative across
                             sequences) and ignore the rest.
 
-    --oldpmap               bowtie-build switched schemes for mapping
-                            "joined" reference locations to original
-                            reference locations in version 0.9.8.  The
-                            new scheme has the advantage that it does
-                            not use padding.  This option activates the
-                            old padding-based scheme used in versions
-                            prior to 0.9.8.  Versions of 'bowtie' prior
-                            to 0.9.8 can query only indexes that use
-                            the old scheme.  Version of 'bowtie'
-                            starting with 0.9.8 can query indexes using
-                            either scheme.  This option will be
-                            deprecated in version 1.0. 
-
     -q/--quiet              bowtie-build is verbose by default.  With
                             this option ebwt-build will print only
                             error messages.
@@ -1223,125 +1225,6 @@ Bowtie Manual
                             options (from MANUAL).
 
     --version               Print version information and quit.
-
- Using the 'bowtie-maptool' Alignment Converter
- ----------------------------------------------
-
- 'bowtie-maptool' allows the user to convert between alignment formats
- generated by Bowtie.  It is most useful for converting from Bowtie's
- compact binary output format (-b/--binout), which is most appropriate
- for archiving large sets of alignments, to Bowtie's more verbose tab-
- delimited human-readable format (Bowtie's default output).  It can
- also be used to sort a set of alignments with respect to the
- alignments' position on the reference (-s/--sort).  This is a
- necessary first step to most analyses, including consensus and SNP
- calling.  At this time, to sort triggered by the -s/--sort option
- occurs entirely in memory, so sorting very large sets of reads may
- exhaust memory.
-
- For information about converting Bowtie alignment to Maq's .map
- format, see the next section on using 'bowtie-maqconvert'.
-
-  Command Line
-  ------------
-
- Usage: bowtie-maptool [options]* <align_in> [<align_out>]
- 
-    <align_in>      Alignment file output by bowtie to be converted, or
-                    "-" to convert alignments from stdin.
-
-    [<align_out>]   Converted alignment file to output.  Default: write
-                    alignments to stdout.  <align_out> must be
-                    specified when -B/--outbin is used.
-
- Options:
-
-    -d/--indef      <align_in> is in Bowtie's default tab-delimited,
-                    human-readable output format.
-
-    -b/--inbin      <align_in> is in Bowtie's compact binary
-                    (-b/--binout) format (default).
-
-    -D/--outdef     <align_out> will be in Bowtie's default tab-
-                    delimited, human-readable output format  (default).
-
-    -B/--outbin     <align_out> will be in Bowtie's compact binary
-                    (-b/--binout) format.
-
-    -C/--outconcise <align_out> will be in Bowtie's --concise format.
-
-    -Q/--outfastq   <align_out> will consist of aligned reads in FASTQ
-                    format.
-
-    -F/--outfasta   <align_out> will consist of aligned reads in FASTA
-                    format.
-
-    -s/--sort       Sort hits by reference position before outputting.
-                    Sorts first by referene sequence (sequences that
-                    appeared earlier in the input have priority), then
-                    by offset into the sequence (alignments appearing
-                    closer to the left-hand end of the sequence have
-                    priority).
-
-    -v/--verbose    Print verbose output (for debugging).
-
-    -h/--help       Print detailed description of tool and its options
-                    (from MANUAL).
-
-    --version       Print version information and quit.
-
- Using the 'bowtie-maqconvert' Alignment Converter
- -------------------------------------------------
-
- 'bowtie-maqconvert' allows the user to convert from Bowtie's default
- alignment format to the format used by Maq.  This is a necessary first
- step to using Maq's analyses to study Bowtie's output, including
- consensus ('maq assemble') and SNP calling ('maq cns2snp').  Please
- note that, because Bowtie does not mimic Maq's exact calculation for
- alignment "mapping quality," results obtained by feeding Bowtie
- alignments to the Maq tools will generally be less accurate than those
- obtained using Maq's own aligner with the Maq tools.   
- 
- The conversion process includes an in-memory sort of all alignments
- with respect to their position on the reference.  This can be
- problematic for very large sets of alignments; sorting so many
- alignments may exhaust memory, causing bowtie-maqconvert to crash or
- run very slowly.  One solution is to split alignments into batches and
- use 'maq mapmerge' to combine outputs from bowtie-maqconvert.  Another
- solution, depending on your application and reference sequences, may
- be to use bowtie's --refout option at alignment time to pre-partition
- alignments into separate files according to the reference sequence
- aligned against.
-
- Note that Maq changed its output format as of version 0.7.0 in order
- to accomodate read lengths up to 127 bases.  Be sure to use the -o
- option of bowtie-maqconvert if you plan to use the results with a Maq
- version prior to 0.7.0.
-
-  Command Line
-  ------------
-
- Usage: bowtie-maqconvert [options]* <in.bwtmap> <out.map> <chr.bfa>
-
-    <in.bwtmap>   An alignments file generated by Bowtie.  Need not
-                  have any particular extension.
-
-    <out.map>     Name of Maq alignment file to output.  Need not have
-                  any particular extension.
-
-    <chr.bfa>     The .bfa version of the reference sequences(s).  Use
-                  'maq fasta2bfa' to build this.  It must be built
-                  using the exact same reference sequences as were used
-                  to build the Bowtie index.
-
- Options:
-
-    -o            Output uses Maq's old (pre-0.7.0) format.
-
-    -v            Print verbose output (for debugging).
-
-    -h/-?         Print detailed description of tool and its options
-                  (from MANUAL).
 
  Using the 'bowtie-inspect' Index Inspector
  ------------------------------------------

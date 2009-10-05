@@ -29,6 +29,10 @@ Version 0.11.0 - October 4, 2009
      concurrent 'bowtie' processes querying the same index to share a
      single memory image of the index.  Unlike --mm, shared memory
      alocated by --shmem is permanent.
+   * The alignment summary printed to stderr at the end of an alignment
+     run is now more friendly and includes data about the number and
+     proportion of reads that aligned, failed to align, or were
+     suppressed via the -m option.
    * When too-short reads are encountered, Bowtie now always prints
      warnings, not errors.  --quiet now suppresses those warnings.
    * By default, when bowtie prints a reference sequence name it now
@@ -37,13 +41,19 @@ Version 0.11.0 - October 4, 2009
      Bowtie output.  To revert to printing the full name, use the new
      --fullref option.
    * Bowtie now prints the command-line before exiting with an error.
+   * Fixed mistake in the manual's "Default output" section: the offset
+     in field 4 is 0-based, not 1-based.  To obtain a 1-based offset
+     instead, use the -B 1 option.
    * Various minor bug fixes.
-   * DEPRECATED: -z/--phased, -b/--binout, bowtie-maptool.  These
-     features will be removed in a future version of Bowtie.
-     Note that -b/--binout and bowtie-maptool are largely superseded by
-     SAM/BAM.
-   * REMOVED: --unfq/--unfa/--maxfq/--maxfa/--alfq/--alfa.  Use
-     --un/--max/--al instead.
+   * DEPRECATED: -z/--phased, -b/--binout, bowtie-maptool,
+     bowtie-maqconvert.  These features will be removed in a future
+     version of Bowtie.  Note that -b/--binout, bowtie-maptool, and
+     bowtie-maqconvert are largely superseded by the SAM output format
+     (-S/--sam), BAM, and SAMtools (http://samtools.sf.net).  Contact
+     the authors if this is a problem.
+   * REMOVED: --unfq/--unfa/--maxfq/--maxfa/--alfq/--alfa.  Please use
+     --un/--max/--al instead.  Contact the authors if this is a
+     problem.
 
 Version 0.10.1 - July 19, 2009
    * Now when -3/-5 are used in combination with -I/-X, the -I/-X

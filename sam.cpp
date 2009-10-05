@@ -15,6 +15,35 @@
 using namespace std;
 
 /**
+ * Write the SAM header lines.
+ */
+void SAMHitSink::appendHeaders(OutFileBuf& os,
+                               size_t numRefs,
+                               const vector<string>& refnames,
+                               ReferenceMap *rmap,
+                               const uint32_t* plen,
+                               bool fullRef,
+                               const char *cmdline)
+{
+	ostringstream ss;
+	ss << "@HD\tVN:0.1.2-draft\tSO:unsorted" << endl;
+	for(size_t i = 0; i < numRefs; i++) {
+		// RNAME
+		ss << "@SQ\tSN:";
+		if(!refnames.empty() && rmap != NULL) {
+			printUptoWs(ss, rmap->getName(i), !fullRef);
+		} else if(i < refnames.size()) {
+			printUptoWs(ss, refnames[i], !fullRef);
+		} else {
+			ss << i;
+		}
+		ss << "\tLN:" << plen[i] << endl;
+	}
+	ss << "@PG\tID=Bowtie\tVN=" << BOWTIE_VERSION << "\tCL=\"" << cmdline << "\"" << endl;
+	os.writeString(ss.str());
+}
+
+/**
  * Append a SAM output record for an unaligned read.
  */
 void SAMHitSink::appendAligned(ostream& ss,

@@ -4230,6 +4230,8 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 	dumpUnalFaBase, dumpUnalFqBase, dumpUnalBase, \
 	dumpMaxFaBase, dumpMaxFqBase, dumpMaxBase
 
+static string argstr;
+
 template<typename TStr>
 static void driver(const char * type,
                    const string& ebwtFileBase,
@@ -4502,17 +4504,20 @@ static void driver(const char * type,
 				break;
 			case OUTPUT_SAM:
 				if(refOut) {
-					sink = new SAMHitSink(
-							ebwt.nPat(), 1, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
-							format == TAB_MATE,
-							table, refnames);
+					throw 1;
 				} else {
-					sink = new SAMHitSink(
+					SAMHitSink *sam = new SAMHitSink(
 							fout, 1, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames);
+					vector<string> refnames;
+					readEbwtRefnames(adjustedEbwtFileBase, refnames);
+					sam->appendHeaders(
+							sam->out(0), ebwt.nPat(),
+							refnames, rmap, ebwt.plen(),
+							fullRef, argstr.c_str());
+					sink = sam;
 				}
 				break;
 			case OUTPUT_CONCISE:
@@ -4654,7 +4659,10 @@ int bowtie(int argc, const char **argv) {
 		// Reset all global state, including getopt state
 		opterr = optind = 1;
 		resetOptions();
-
+		for(int i = 0; i < argc; i++) {
+			argstr += argv[i];
+			if(i < argc-1) argstr += " ";
+		}
 		string ebwtFile;  // read serialized Ebwt from this file
 		string query;   // read query string(s) from this file
 		vector<string> queries;

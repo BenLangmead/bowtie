@@ -89,6 +89,14 @@ public:
 		SAMHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, offBase_);
 	}
 
+	void appendHeaders(OutFileBuf& os,
+	                   size_t numRefs,
+	                   const vector<string>& refnames,
+	                   ReferenceMap *rmap,
+	                   const uint32_t* plen,
+	                   bool fullRef,
+	                   const char *cmdline);
+
 protected:
 
 	/**
