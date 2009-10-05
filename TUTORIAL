@@ -30,7 +30,7 @@ Bowtie Getting Started Guide
 
  Next, issue this command:
 
-    bowtie -t -m 1 e_coli reads/e_coli_1000.fq e_coli.map
+    bowtie -t e_coli reads/e_coli_1000.fq e_coli.map
 
  This run calculates the same alignments as the previous run, but the
  alignments are written to e_coli.map (the final argument) rather than
