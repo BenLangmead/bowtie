@@ -13,13 +13,12 @@ Bowtie Manual
  indexes the genome with a Burrows-Wheeler index to keep its memory
  footprint small: for the human genome, the index is typically about
  2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end alignment).
- Bowtie supports alignment policies equivalent to Maq and SOAP.
  Multiple processor cores can be used simultaneously to achieve greater
  alignment speed.  Bowtie can also output alignments in the standard
- SAM format, allowing Bowtie to interoperate cleanly with the wide
- range of tools that support SAM input, including the SAMtools
- consensus, SNP and indel callers.  The Bowtie tools run on the command
- line under Windows, Mac OS X, Linux, and Solaris.
+ SAM format, allowing Bowtie to interoperate with other tools
+ supporting SAM, including the SAMtools consensus, SNP, and indel
+ callers.  Bowtie runs on the command line under Windows, Mac OS X,
+ Linux, and Solaris.
 
  What isn't Bowtie?
  ------------------
@@ -35,7 +34,7 @@ Bowtie Manual
  observed in other contexts.
 
  Bowtie does not yet work in ABI "color space," and does not yet report
- gapped alignments.  These features are future work.
+ gapped alignments.  Both are future work.
 
  Obtaining Bowtie Binaries
  -------------------------
@@ -214,18 +213,18 @@ Bowtie Manual
   user a great deal of flexibility in selecting which alignments get
   reported.  Here we give a few examples that demonstrate a few ways
   they can be combined to achieve a desired result.  All examples are
-  using the e_coli index that comes packaged with Bowtie.
+  using the e_coli index that comes packaged with Bowtie.  Alignment
+  summary output is elided.
   
     Example 1: -a
     -------------
     
-    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie --quiet -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
     1-:<0,905664,2>
     1+:<0,1093035,2>
-    Reported 5 alignments to 1 output stream(s)
   
     Specifying -a instructs bowtie to report all valid alignments,
     subject to the alignment policy: -v 2.  In this case, bowtie finds
@@ -236,11 +235,10 @@ Bowtie Manual
     Example 2: -k 3
     ---------------
     
-    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie --quiet -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
-    Reported 3 alignments to 1 output stream(s)
   
     Specifying -k 3 instructs bowtie to report up to 3 valid
     alignments.  In this case, a total of 5 valid alignments exist (see
@@ -250,13 +248,12 @@ Bowtie Manual
     Example 3: -k 6
     ---------------
     
-    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
+    $ ./bowtie --quiet -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
     1-:<0,2852852,1>
     1-:<0,4930433,2>
     1-:<0,905664,2>
     1+:<0,1093035,2>
-    Reported 5 alignments to 1 output stream(s)
   
     Specifying -k 6 instructs bowtie to report up to 6 valid
     alignments.  In this case, a total of 5 valid alignments exist, so
@@ -267,7 +264,6 @@ Bowtie Manual
     
     $ ./bowtie -v 2 e_coli --concise -c ATGCATCATGCGCCAT
     1-:<0,148810,2>
-    Reported 1 alignments to 1 output stream(s)
     
     Leaving the reporting options at their defaults causes Bowtie to
     report the first valid alignment it encounters.  Because --best was
@@ -285,7 +281,6 @@ Bowtie Manual
     1-:<0,905664,2>
     1-:<0,148810,2>
     1-:<0,4930433,2>
-    Reported 5 alignments to 1 output stream(s)
   
     Specifying -a --best results in the same alignments being printed
     as if just -a had been specified, but they are guaranteed to be
@@ -297,8 +292,7 @@ Bowtie Manual
     $ ./bowtie -a --best --strata -v 2 e_coli --concise \
                -c ATGCATCATGCGCCAT
     1-:<0,2852852,1>
-    Reported 1 alignments to 1 output stream(s)
-  
+
     Specifying --strata in addition to -a and --best causes Bowtie to
     report only those alignments in the best alignment "stratum".  The
     alignments in the best stratum are those having the least number of
@@ -310,7 +304,7 @@ Bowtie Manual
     ------------------
     
     $ ./bowtie -a -m 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    No results
+    No alignments
   
     Specifying -m 3 instructs bowtie to refrain from reporting any
     alignments for reads having more than 3 reportable alignments.  The
@@ -330,7 +324,6 @@ Bowtie Manual
     1-:<0,4930433,2>
     1-:<0,905664,2>
     1+:<0,1093035,2>
-    Reported 5 alignments to 1 output stream(s)
   
     Specifying -m 5 instructs bowtie to refrain from reporting any
     alignments for reads having more than 5 reportable alignments.
@@ -343,7 +336,6 @@ Bowtie Manual
     $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --concise \
                -c ATGCATCATGCGCCAT
     1-:<0,2852852,1>
-    Reported 1 alignments to 1 output stream(s)
   
     Specifying -m 3 instructs bowtie to refrain from reporting any
     alignments for reads having more than 3 reportable alignments.
@@ -1023,6 +1015,59 @@ Bowtie Manual
       descriptor has the format offset:reference-base>read-base.  The
       offset is expressed as a 0-based offset from the high-quality
       (5') end of the read. 
+
+  SAM output
+  ----------
+
+  Following is a brief description of the SAM format as output by
+  Bowtie when the -S/--sam option is specified.  For many more details,
+  see the SAM format specification
+  (http://samtools.sourceforge.net/SAM1.pdf).
+  
+  Each line is a collection of 11 fields separated by tabs; from left to
+  right, the fields are:
+
+   1. Name of read that aligned
+
+   2. Sum of all applicable flags.  Flags relevant to Bowtie are:
+
+        1: The read is one of a pair
+        2: The alignment is one end of a proper paired-end alignment
+        4: The read has no reported alignments
+        8: The read is one of a pair and has no reported alignments
+       16: The alignment is to the reverse reference strand
+       32: The other mate in the paired-end alignment is aligned to the
+           reverse reference strand
+       64: The read is the first (#1) mate in a pair
+      128: The read is the second (#2) mate in a pair
+
+   3. Name of reference sequence where alignment occurs, or ordinal ID
+      if no name was provided
+
+   4. 1-based offset into the forward reference strand where leftmost
+      character of the alignment occurs
+   
+   5. Mapping quality (always 255)
+   
+   6. CIGAR string representation of alignment
+
+   7. Name of reference sequence where mate's alignment occurs.  Set to
+      "=" if there is no mate, or if the mate's reference sequence is
+      the same as this alignment's.
+   
+   8. 
+   
+   8. Inferred insert size (negative if the mate's alignment occurs
+      upstream of this alignment)
+   
+   9. Read sequence (reverse-complemented if aligned to the reverse
+      strand)
+
+  10. ASCII-encoded read qualities (reversed if aligned to the reverse
+      strand).  The encoded quality values are on the Phred scale and
+      the encoding is ASCII-offset by 33 (ASCII char '!'). 
+
+  11.
 
  Using the 'bowtie-build' Indexer
  --------------------------------
