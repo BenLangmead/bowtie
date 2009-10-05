@@ -20,13 +20,10 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.11.0 - October 4, 2009
+Version 0.11.0 - October 5, 2009
    * Initial SAM output support with -S/--sam option.  Bowtie sets all
-     fields according to the SAM spec (Version 0.1.2-draft, 20090820),
-     and sets the optional MD and NM fields.  Bowtie also sets a tool-
-     specific XS:i field encoding the stratum of the alignment.
-   * The Getting Started Guide and TUTORIAL file have been updated to
-     use SAMtools instead of Maq for the SNP calling step.
+     fields according to the SAM spec (Version 0.1.2-draft, 20090820).
+     See the new "SAM Output" section of the manual for details.
    * Added --shmem option: --shmem is similar to --mm in that it allows
      concurrent 'bowtie' processes querying the same index to share a
      single memory image of the index.  Unlike --mm, shared memory
