@@ -829,10 +829,10 @@ Bowtie Manual
    -------
 
   -S/--sam           Print alignments in SAM format.  See the SAM
-                     format spec (http://samtools.sourceforge.net/) for
-                     details.  All required fields are set by Bowtie,
-                     including the mapping quality field (MAPQ), which
-                     always receives a value of 255.  Additionally, the
+                     format spec (http://samtools.sf.net/) for details.
+                     All required fields are set by Bowtie, including
+                     the mapping quality field (MAPQ), which always
+                     receives a value of 255.  Additionally, the
                      optional MD:Z and NM:i fields are printed for
                      aligned reads.  The Bowtie-specific optional field
                      XS:i is also printed for aligned reads; the value
@@ -845,8 +845,10 @@ Bowtie Manual
                      with the -m option.  Bowtie does not itself write
                      BAM files, but SAM output can be converted to BAM
                      on the fly by piping Bowtie's output to the
-                     'samtools view -bt <.fai> -' (or similar) command.
-                     See the samtools documentation for details.
+                     'samtools view -bt <ref.fai> -u <out.bam> -' (or
+                     similar) command.  See the samtools documentation
+                     for details.  -S/--sam is not compatible with
+                     --refout.
 
   --concise          Print alignments in a concise format. Each line
                      has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',

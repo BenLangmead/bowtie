@@ -471,7 +471,6 @@ static void printUsage(ostream& out) {
 	    << "Output:" << endl
 	    << "  -S/--sam           write hits in SAM format" << endl
 	    << "  --concise          write hits in concise format" << endl
-	    << "  -b/--binout        write hits in binary format (<hits> argument not optional)" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
 	    << "  --quiet            print nothing but the alignments" << endl
