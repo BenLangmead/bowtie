@@ -26,7 +26,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
                                const char *cmdline)
 {
 	ostringstream ss;
-	ss << "@HD\tVN:0.1.2-draft\tSO:unsorted" << endl;
+	ss << "@HD\tVN:1.0\tSO:unsorted" << endl;
 	for(size_t i = 0; i < numRefs; i++) {
 		// RNAME
 		ss << "@SQ\tSN:";
@@ -81,9 +81,17 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// CIGAR
 	ss << '\t' << h.length() << 'M';
 	// MRNM
-	ss << "\t=";
+	if(h.mate > 0) {
+		ss << "\t=";
+	} else {
+		ss << "\t*";
+	}
 	// MPOS
-	ss << '\t' << (h.h.second + 1);
+	if(h.mate > 0) {
+		ss << '\t' << (h.mh.second + 1);
+	} else {
+		ss << "\t0";
+	}
 	// ISIZE
 	ss << '\t';
 	if(h.mate > 0) {
@@ -91,9 +99,9 @@ void SAMHitSink::appendAligned(ostream& ss,
 		int64_t inslen = 0;
 		if(h.h.second > h.mh.second) {
 			inslen = (int64_t)h.h.second - (int64_t)h.mh.second + (int64_t)h.length();
+			inslen = -inslen;
 		} else {
 			inslen = (int64_t)h.mh.second - (int64_t)h.h.second + (int64_t)h.mlen;
-			inslen = -inslen;
 		}
 		ss << inslen;
 	} else {

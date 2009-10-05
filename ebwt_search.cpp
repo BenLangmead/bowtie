@@ -484,7 +484,6 @@ static void printUsage(ostream& out) {
 #ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of alignment threads to launch (default: 1)" << endl
 #endif
-		<< "  -z/--phased        alternate between index halves; slower, but uses 1/2 mem" << endl
 	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
 #ifdef BOWTIE_MM
 	    << "  --mm               use memory-mapped I/O for index; many 'bowtie's can share" << endl
@@ -1808,7 +1807,10 @@ static void parseOptions(int argc, const char **argv) {
 		}
 		if(error) throw 1;
 	}
-
+	if(outType == OUTPUT_SAM && refOut) {
+		cerr << "Error: --refout cannot be combined with -S/--sam" << endl;
+		throw 1;
+	}
 	if(mate1fw && trim5 > 0) {
 		if(verbose) {
 			cerr << "Adjusting -I/-X down by " << trim5
