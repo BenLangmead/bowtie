@@ -168,9 +168,12 @@ void SAMHitSink::reportHit(const Hit& h) {
 /**
  *
  */
-void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p, bool un) {
+void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
+                               const vector<Hit>* hs,
+                               bool un)
+{
 	if(un) HitSink::reportUnaligned(p);
-	else   HitSink::reportMaxed(p);
+	else   HitSink::reportMaxed(*hs, p);
 	ostringstream ss;
 	bool paired = !p.bufb().empty();
 	ss << p.bufa().name << "\t"

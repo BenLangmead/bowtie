@@ -102,7 +102,9 @@ protected:
 	/**
 	 *
 	 */
-	void reportUnOrMax(PatternSourcePerThread& p, bool un);
+	void reportUnOrMax(PatternSourcePerThread& p,
+	                   const vector<Hit>* hs,
+	                   bool un);
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
@@ -114,14 +116,14 @@ protected:
 	 * See sam.cpp
 	 */
 	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
-		reportUnOrMax(p, false);
+		reportUnOrMax(p, &hs, false);
 	}
 
 	/**
 	 * See sam.cpp
 	 */
 	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		reportUnOrMax(p, true);
+		reportUnOrMax(p, NULL, true);
 	}
 
 private:
