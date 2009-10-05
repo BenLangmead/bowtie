@@ -115,7 +115,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// Optional fields
 	//
 	// Always output stratum
-	ss << "\tXS:i:" << (int)h.stratum;
+	ss << "\tXA:i:" << (int)h.stratum;
 	// Look for SNP annotations falling within the alignment
 	// Output MD field
 	const size_t len = length(h.patSeq);
