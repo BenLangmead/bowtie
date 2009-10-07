@@ -547,7 +547,7 @@ public:
 			// sPrime, sPrimeOrder, _isaPrime all exist in memory at
 			// once and that's the peak
 			String<uint32_t> sPrime;
-			reserve(sPrime, sPrimeSz * 3);
+			reserve(sPrime, sPrimeSz * 3 + (1024 * 1024 /*out of caution*/));
 		}
 		return sPrimeSz * 4; // sPrime array
 	}
