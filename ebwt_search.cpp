@@ -1644,6 +1644,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_HADOOPOUT: hadoopOut = true; break;
 			case ARG_AL: dumpAlBase = optarg; break;
 			case ARG_UN: dumpUnalBase = optarg; break;
+			case ARG_MAXDUMP: dumpMaxBase = optarg; break;
 			case ARG_SOLEXA_QUALS: solexaQuals = true; break;
 			case ARG_integerQuals: integerQuals = true; break;
 			case ARG_PHRED64: phred64Quals = true; break;
