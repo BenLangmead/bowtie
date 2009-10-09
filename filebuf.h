@@ -376,9 +376,19 @@ public:
 	void writeString(const std::string& s) {
 		assert(!closed_);
 		size_t slen = s.length();
-		if(cur_ + slen > BUF_SZ) flush();
-		memcpy(&buf_[cur_], s.data(), slen);
-		cur_ += slen;
+		if(cur_ + slen > BUF_SZ) {
+			if(cur_ > 0) flush();
+			if(slen >= BUF_SZ) {
+				fwrite(s.c_str(), slen, 1, out_);
+			} else {
+				memcpy(&buf_[cur_], s.data(), slen);
+				assert_eq(0, cur_);
+				cur_ = slen;
+			}
+		} else {
+			memcpy(&buf_[cur_], s.data(), slen);
+			cur_ += slen;
+		}
 		assert_leq(cur_, BUF_SZ);
 	}
 
@@ -387,9 +397,12 @@ public:
 	 */
 	void writeChars(const char * s, size_t len) {
 		assert(!closed_);
-		if(cur_ + len > BUF_SZ) flush();
-		memcpy(&buf_[cur_], s, len);
-		cur_ += len;
+		if(cur_ + len > BUF_SZ) {
+			flush();
+		} else {
+			memcpy(&buf_[cur_], s, len);
+			cur_ += len;
+		}
 		assert_leq(cur_, BUF_SZ);
 	}
 
