@@ -398,7 +398,14 @@ public:
 	void writeChars(const char * s, size_t len) {
 		assert(!closed_);
 		if(cur_ + len > BUF_SZ) {
-			flush();
+			if(cur_ > 0) flush();
+			if(slen >= BUF_SZ) {
+				fwrite(s, len, 1, out_);
+			} else {
+				memcpy(&buf_[cur_], s, len);
+				assert_eq(0, cur_);
+				cur_ = slen;
+			}
 		} else {
 			memcpy(&buf_[cur_], s, len);
 			cur_ += len;

@@ -89,9 +89,13 @@ public:
 		SAMHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, offBase_);
 	}
 
+	/**
+	 * Write the SAM header lines.
+	 */
 	void appendHeaders(OutFileBuf& os,
 	                   size_t numRefs,
 	                   const vector<string>& refnames,
+	                   bool nosq,
 	                   ReferenceMap *rmap,
 	                   const uint32_t* plen,
 	                   bool fullRef,

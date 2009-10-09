@@ -136,6 +136,8 @@ static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
 static bool fuzzy;
 static bool fullRef;
+static bool samNoHead; // don't print any header lines in SAM output
+static bool samNoSQ;   // don't print @SQ header lines
 
 static void resetOptions() {
 	mates1.clear();
@@ -237,6 +239,8 @@ static void resetOptions() {
 	hadoopOut				= false; // print Hadoop status and summary messages
 	fuzzy					= false; // reads will have alternate basecalls w/ qualities
 	fullRef					= false; // print entire reference name instead of just up to 1st space
+	samNoHead				= false; // don't print any header lines in SAM output
+	samNoSQ					= false; // don't print @SQ header lines
 }
 
 // mating constraints
@@ -312,7 +316,9 @@ enum {
 	ARG_HADOOPOUT,
 	ARG_FUZZY,
 	ARG_FULLREF,
-	ARG_USAGE
+	ARG_USAGE,
+	ARG_SAM_NOHEAD,
+	ARG_SAM_NOSQ
 };
 
 static struct option long_options[] = {
@@ -413,6 +419,9 @@ static struct option long_options[] = {
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"sam",          no_argument,       0,            'S'},
+	{(char*)"sam-nohead",   no_argument,       0,            ARG_SAM_NOHEAD},
+	{(char*)"sam-nosq",     no_argument,       0,            ARG_SAM_NOSQ},
+	{(char*)"sam-noSQ",     no_argument,       0,            ARG_SAM_NOSQ},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1741,6 +1750,8 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_NO_RC: norc = true; break;
 			case ARG_STATS: stats = true; break;
 			case ARG_PEV2: useV1 = false; break;
+			case ARG_SAM_NOHEAD: samNoHead = true; break;
+			case ARG_SAM_NOSQ: samNoSQ = true; break;
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
@@ -4601,12 +4612,17 @@ static void driver(const char * type,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames);
-					vector<string> refnames;
-					readEbwtRefnames(adjustedEbwtFileBase, refnames);
-					sam->appendHeaders(
-							sam->out(0), ebwt.nPat(),
-							refnames, rmap, ebwt.plen(),
-							fullRef, argstr.c_str());
+					if(!samNoHead) {
+						vector<string> refnames;
+						if(!samNoSQ) {
+							readEbwtRefnames(adjustedEbwtFileBase, refnames);
+						}
+						sam->appendHeaders(
+								sam->out(0), ebwt.nPat(),
+								refnames, samNoSQ, rmap,
+								ebwt.plen(), fullRef,
+								argstr.c_str());
+					}
 					sink = sam;
 				}
 				break;
