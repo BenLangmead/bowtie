@@ -399,12 +399,12 @@ public:
 		assert(!closed_);
 		if(cur_ + len > BUF_SZ) {
 			if(cur_ > 0) flush();
-			if(slen >= BUF_SZ) {
+			if(len >= BUF_SZ) {
 				fwrite(s, len, 1, out_);
 			} else {
 				memcpy(&buf_[cur_], s, len);
 				assert_eq(0, cur_);
-				cur_ = slen;
+				cur_ = len;
 			}
 		} else {
 			memcpy(&buf_[cur_], s, len);
