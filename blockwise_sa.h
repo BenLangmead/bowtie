@@ -180,80 +180,6 @@ public:
 	{ }
 };
 
-#if 0
-/**
- * Build the entire SA at once, then dole it out one bucket at a time,
- * in order.
- */
-template<typename TStr>
-class SillyBlockwiseDnaSA : public InorderBlockwiseSA<TStr> {
-public:
-	SillyBlockwiseDnaSA(TStr& __text,
-	                    uint32_t __bucketSz,
-	                    bool __sanityCheck = false,
-	   	                bool __passMemExc = false,
-	                    bool __verbose = false,
-	                    ostream& __logger = cout) :
-	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
-	_sa(), _cur(0), _built(false)
-	{ reset(); }
-
-	/// Retrieve the next block of sorted suffix-array elements
-	virtual void nextBlock() {
-		size_t sz = min<uint32_t>(this->bucketSz(), length(_sa)-_cur);
-		_cur += sz;
-		this->_itrBucket = infix(_sa, _cur-sz, _cur-1);
-	}
-
-	/// Return true iff there are more blocks to retrieve
-	virtual bool hasMoreBlocks() const {
-		return _cur < length(_sa);
-	}
-
-protected:
-	/**
-	 * Initialize a SillyBlockwiseDnaSA
-	 */
-	virtual void reset() {
-		if(!_built) {
-			// Just build the entire suffix array and put it in the _sa
-			// field.
-			try {
-				String<Dna5> text5 = this->text();
-				append(text5, 'N');
-				VMSG_NL("SillyBlockwiseDnaSA: Allocating suffix array string");
-				resize(_sa, length(text5));
-				VMSG_NL("SillyBlockwiseDnaSA: Building suffix array");
-				// Use SeqAn's implementation of Karakkainen's Skew7
-				createSuffixArray(_sa, text5, Skew7());
-			} catch(bad_alloc& e) {
-				if(this->_passMemExc) {
-					throw e; // rethrow immediately
-				} else {
-					cerr << "Out of memory creating suffix array in "
-					     << "SillyBlockwiseDnaSA::SillyBlockwiseDnaSA()"
-					     << " at " << __FILE__ << ":" << __LINE__ << endl;
-					throw 1;
-				}
-			}
-			assert_eq(length(this->text())+1, length(_sa));
-			_built = true;
-		}
-		_cur = 0;
-	}
-
-	/// Return true iff we're about to dole out the first bucket
-	virtual bool isReset() {
-		return _cur == 0;
-	}
-
-private:
-	String<uint32_t> _sa; // the suffix array
-	uint32_t _cur;        // the index of the current bucket
-	bool _built;          // true iff the suffix array has been built
-};
-#endif
-
 /**
  * Build the SA a block at a time according to the scheme outlined in
  * Karkkainen's "Fast BWT" paper.
@@ -850,8 +776,10 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	} else {
 		try {
 			VMSG_NL("  Reserving size (" << this->bucketSz() << ") for bucket");
-			if(capacity(bucket) < this->bucketSz()) {
-				reserve(bucket, this->bucketSz(), Exact());
+			// BTL: Add a +100 fudge factor; there seem to be instances
+			// where a bucket ends up having one more elt than bucketSz()
+			if(capacity(bucket) < this->bucketSz()+100) {
+				reserve(bucket, this->bucketSz()+100, Exact());
 			}
 		} catch(bad_alloc &e) {
 			if(this->_passMemExc) {
