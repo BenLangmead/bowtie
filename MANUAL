@@ -821,26 +821,16 @@ Bowtie Manual
    -------
 
   -S/--sam           Print alignments in SAM format.  See the SAM
-                     format spec (http://samtools.sf.net/) for details.
-                     All required fields are set by Bowtie, including
-                     the mapping quality field (MAPQ), which always
-                     receives a value of 255.  Additionally, the
-                     optional MD:Z and NM:i fields are printed for
-                     aligned reads.  The Bowtie-specific optional field
-                     XA:i is also printed for aligned reads; the value
-                     is the stratum of the alignment.  The Bowtie-
-                     specific optional field XM:i is is printed for
-                     reads that didn't align.  A value of 0 indicates
-                     that the read had no alignments, while a value of
-                     1 indicates that the read had a number of
-                     alignments that exceeded the ceiling specified
-                     with the -m option.  Bowtie does not itself write
-                     BAM files, but SAM output can be converted to BAM
-                     on the fly by piping Bowtie's output to the
-                     'samtools view -bt <ref.fai> -u <out.bam> -' (or
-                     similar) command.  See the samtools documentation
-                     for details.  -S/--sam is not compatible with
-                     --refout.
+                     format spec (http://samtools.sf.net/) and the "SAM
+                     output" section of the manual for details.  To
+                     suppress all SAM headers, use --sam-nohead.  To
+                     suppress just the @SQ headers (e.g. if the
+                     alignment is against a very large number of
+                     reference sequences), use --sam-nosq.  Bowtie
+                     does not write BAM files directly, but SAM output
+                     can be converted to BAM on the fly by piping
+                     Bowtie's output to 'samtools view'.  -S/--sam is
+                     not compatible with --refout.
 
   --concise          Print alignments in a concise format. Each line
                      has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',
@@ -912,6 +902,11 @@ Bowtie Manual
                      that fail to align will be written to
                      max_1.fq and max_2.fq respectively.  These reads
                      are not written to the file specified with --un.
+
+  --sam-nohead       Suppress header lines (starting with @) when
+                     output is SAM.
+
+  --sam-nosq         Suppress @SQ header lines when output is SAM.
 
   --fullref          Print the full refernce sequence name, including
                      whitespace, in alignment output.  By default
