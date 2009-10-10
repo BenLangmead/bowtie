@@ -280,6 +280,7 @@ public:
 			std::cerr << "Error: Could not open bitpair-output file " << in << std::endl;
 			throw 1;
 		}
+		memset(buf_, 0, BUF_SZ);
 	}
 
 	/**
