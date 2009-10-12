@@ -601,7 +601,7 @@ public:
 					// we would have thrown one eventually as part of
 					// constructing the DifferenceCoverSample
 					dcv <<= 1;
-					size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
+					size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv >> 1);
 					AutoArray<uint8_t> tmp(sz);
 					dcv >>= 1;
 					// Likewise with the KarkkainenBlockwiseSA
@@ -609,8 +609,8 @@ public:
 					AutoArray<uint8_t> tmp2(sz);
 					// Now throw in the 'ftab' and 'isaSample' structures
 					// that we'll eventually allocate in buildToDisk
-					AutoArray<uint32_t> ftab(_eh._ftabLen);
-					AutoArray<uint32_t> isaSample(_eh._isaLen);
+					AutoArray<uint32_t> ftab(_eh._ftabLen * 2);
+					AutoArray<uint8_t> side(_eh._sideSz);
 					// Grab another 20 MB out of caution
 					AutoArray<uint32_t> extra(20*1024*1024);
 					// If we made it here without throwing bad_alloc, then we
