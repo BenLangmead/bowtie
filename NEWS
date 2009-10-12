@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.11.3 - October 9, 2009
+Version 0.11.3 - October 12, 2009
    * Fixed crashing bug in -S/--sam mode when the number of reference
      sequences in the index is very large.
    * Added --sam-nohead option to suppress output of SAM headers in
@@ -28,6 +28,9 @@ Version 0.11.3 - October 9, 2009
    * Added --sam-nosq option to suppress output of @SQ SAM headers in
      -S/--sam mode.  These can become a nuisance when the reference
      index contains a very large number of sequences.
+   * Fixed a bug in bowtie-build's auto-configure mode that would cause
+     it to underestimate the amount of memory required by a set of
+     parameters.  This in turn would cause the index to be corrupted.
 
 Version 0.11.2 - October 7, 2009
    * Fixed issue whereby --max option was disabled.
