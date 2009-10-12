@@ -15,11 +15,13 @@
   Lesser General Public License for more details.
 
  ============================================================================
-  $Id: string_pointer.h,v 1.2 2009/02/19 01:51:23 langmead Exp $
+  $Id: string_pointer.h,v 1.3 2009/10/12 16:00:57 langmead Exp $
  ==========================================================================*/
 
 #ifndef SEQAN_HEADER_SEQUENCE_POINTER_H
 #define SEQAN_HEADER_SEQUENCE_POINTER_H
+
+#include <cstring>
 
 namespace SEQAN_NAMESPACE_MAIN
 {
