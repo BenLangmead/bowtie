@@ -17,6 +17,7 @@
 #include "zbox.h"
 #include "alphabet.h"
 #include "timer.h"
+#include "auto_array.h"
 
 using namespace std;
 using namespace seqan;
@@ -214,10 +215,9 @@ public:
 	static size_t simulateAllocs(const TStr& text, uint32_t bucketSz) {
 		size_t len = length(text);
 		// _sampleSuffs and _itrBucket are in memory at the peak
-		String<uint32_t> tmp;
 		size_t bsz = bucketSz;
 		size_t sssz = len / max<uint32_t>(bucketSz-1, 1);
-		reserve(tmp, bsz + sssz + (1024 * 1024 /*out of caution*/));
+		AutoArray<uint32_t> tmp(bsz + sssz + (1024 * 1024 /*out of caution*/));
 		return bsz;
 	}
 

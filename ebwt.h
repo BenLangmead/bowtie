@@ -19,6 +19,7 @@
 #include <sys/mman.h>
 #include <sys/shm.h>
 #endif
+#include "auto_array.h"
 #include "shmem.h"
 #include "alphabet.h"
 #include "assert_helpers.h"
@@ -593,35 +594,27 @@ public:
 				VMSG_NL(" --dcv " << dcv);
 			}
 			iter++;
-			uint8_t *tmp = NULL;
-			uint8_t *tmp2 = NULL;
-			uint32_t *ftab = NULL;
-			uint32_t *isaSample = NULL;
-			uint8_t *extra = NULL;
 			try {
 				{
 					VMSG_NL("  Doing ahead-of-time memory usage test");
 					// Make a quick-and-dirty attempt to force a bad_alloc iff
 					// we would have thrown one eventually as part of
 					// constructing the DifferenceCoverSample
+					dcv <<= 1;
 					size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv);
-					tmp = new uint8_t[sz];
+					AutoArray<uint8_t> tmp(sz);
+					dcv >>= 1;
 					// Likewise with the KarkkainenBlockwiseSA
 					sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
-					tmp2 = new uint8_t[sz];
+					AutoArray<uint8_t> tmp2(sz);
 					// Now throw in the 'ftab' and 'isaSample' structures
 					// that we'll eventually allocate in buildToDisk
-					ftab = new uint32_t[_eh._ftabLen];
-					isaSample = new uint32_t[_eh._isaLen];
+					AutoArray<uint32_t> ftab(_eh._ftabLen);
+					AutoArray<uint32_t> isaSample(_eh._isaLen);
 					// Grab another 20 MB out of caution
-					extra = new uint8_t[20*1024*1024];
+					AutoArray<uint32_t> extra(20*1024*1024);
 					// If we made it here without throwing bad_alloc, then we
 					// passed the memory-usage stress test
-					delete[] tmp; tmp = NULL;
-					delete[] tmp2; tmp2 = NULL;
-					delete[] ftab; ftab = NULL;
-					delete[] isaSample; isaSample = NULL;
-					delete[] extra; extra = NULL;
 					VMSG("  Passed!  Constructing with these parameters: --bmax " << bmax << " --dcv " << dcv);
 					if(isPacked()) {
 						VMSG(" --packed");
@@ -641,11 +634,6 @@ public:
 				}
 				break;
 			} catch(bad_alloc& e) {
-				if(tmp != NULL) { delete[] tmp; tmp = NULL; }
-				if(tmp2 != NULL) { delete[] tmp2; tmp2 = NULL; }
-				if(ftab != NULL) { delete[] ftab; ftab = NULL; }
-				if(isaSample != NULL) { delete[] isaSample; isaSample = NULL; }
-				if(extra != NULL) { delete[] extra; extra = NULL; }
 				if(_passMemExc) {
 					VMSG_NL("  Ran out of memory; automatically trying more memory-economical parameters.");
 				} else {

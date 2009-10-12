@@ -474,11 +474,11 @@ public:
 			MUTEX_INIT(_locks[i]);
 		}
 		MUTEX_INIT(_mainlock);
-   		initDumps();
+		initDumps();
 	}
 
 	/**
-	 *
+	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
 		closeOuts();

@@ -488,6 +488,8 @@ static void printUsage(ostream& out) {
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
+	    << "  --sam-nohead       supppress header lines (starting with @) for SAM output" << endl
+	    << "  --sam-nosq         supppress @SQ header lines for SAM output" << endl
 	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
 	    << "Performance:" << endl
 #ifdef BOWTIE_PTHREADS
@@ -517,8 +519,7 @@ static void printUsage(ostream& out) {
  *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
  */
 static void printLongUsage(ostream& out) {
-	out <<
-	"\n"
+	out << "\n"
 	" Using the 'bowtie' Aligner\n"
 	" --------------------------\n"
 	"\n"
@@ -729,7 +730,7 @@ static void printLongUsage(ostream& out) {
 	"    Example 6: -a --best --strata\n"
 	"    -----------------------------\n"
 	"    \n"
-	"    $ ./bowtie -a --best --strata -v 2 e_coli --concise \\n"
+	"    $ ./bowtie -a --best --strata -v 2 e_coli --concise \\\n"
 	"               -c ATGCATCATGCGCCAT\n"
 	"    1-:<0,2852852,1>\n"
 	"\n"
@@ -1261,26 +1262,16 @@ static void printLongUsage(ostream& out) {
 	"   -------\n"
 	"\n"
 	"  -S/--sam           Print alignments in SAM format.  See the SAM\n"
-	"                     format spec (http://samtools.sf.net/) for details.\n"
-	"                     All required fields are set by Bowtie, including\n"
-	"                     the mapping quality field (MAPQ), which always\n"
-	"                     receives a value of 255.  Additionally, the\n"
-	"                     optional MD:Z and NM:i fields are printed for\n"
-	"                     aligned reads.  The Bowtie-specific optional field\n"
-	"                     XA:i is also printed for aligned reads; the value\n"
-	"                     is the stratum of the alignment.  The Bowtie-\n"
-	"                     specific optional field XM:i is is printed for\n"
-	"                     reads that didn't align.  A value of 0 indicates\n"
-	"                     that the read had no alignments, while a value of\n"
-	"                     1 indicates that the read had a number of\n"
-	"                     alignments that exceeded the ceiling specified\n"
-	"                     with the -m option.  Bowtie does not itself write\n"
-	"                     BAM files, but SAM output can be converted to BAM\n"
-	"                     on the fly by piping Bowtie's output to the\n"
-	"                     'samtools view -bt <ref.fai> -u <out.bam> -' (or\n"
-	"                     similar) command.  See the samtools documentation\n"
-	"                     for details.  -S/--sam is not compatible with\n"
-	"                     --refout.\n"
+	"                     format spec (http://samtools.sf.net/) and the \"SAM\n"
+	"                     output\" section of the manual for details.  To\n"
+	"                     suppress all SAM headers, use --sam-nohead.  To\n"
+	"                     suppress just the @SQ headers (e.g. if the\n"
+	"                     alignment is against a very large number of\n"
+	"                     reference sequences), use --sam-nosq.  Bowtie\n"
+	"                     does not write BAM files directly, but SAM output\n"
+	"                     can be converted to BAM on the fly by piping\n"
+	"                     Bowtie's output to 'samtools view'.  -S/--sam is\n"
+	"                     not compatible with --refout.\n"
 	"\n"
 	"  --concise          Print alignments in a concise format. Each line\n"
 	"                     has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',\n"
@@ -1352,6 +1343,11 @@ static void printLongUsage(ostream& out) {
 	"                     that fail to align will be written to\n"
 	"                     max_1.fq and max_2.fq respectively.  These reads\n"
 	"                     are not written to the file specified with --un.\n"
+	"\n"
+	"  --sam-nohead       Suppress header lines (starting with @) when\n"
+	"                     output is SAM.\n"
+	"\n"
+	"  --sam-nosq         Suppress @SQ header lines when output is SAM.\n"
 	"\n"
 	"  --fullref          Print the full refernce sequence name, including\n"
 	"                     whitespace, in alignment output.  By default\n"

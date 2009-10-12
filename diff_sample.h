@@ -7,6 +7,7 @@
 #include "assert_helpers.h"
 #include "multikey_qsort.h"
 #include "timer.h"
+#include "auto_array.h"
 
 using namespace std;
 using namespace seqan;
@@ -543,12 +544,9 @@ public:
 		String<uint32_t> ds = getDiffCover(v, false /*verbose*/, false /*sanity*/);
 		size_t len = length(text);
 		size_t sPrimeSz = (len / v) * length(ds);
-		{
-			// sPrime, sPrimeOrder, _isaPrime all exist in memory at
-			// once and that's the peak
-			String<uint32_t> sPrime;
-			reserve(sPrime, sPrimeSz * 3 + (1024 * 1024 /*out of caution*/));
-		}
+		// sPrime, sPrimeOrder, _isaPrime all exist in memory at
+		// once and that's the peak
+		AutoArray<uint32_t> aa(sPrimeSz * 3 + (1024 * 1024 /*out of caution*/));
 		return sPrimeSz * 4; // sPrime array
 	}
 
