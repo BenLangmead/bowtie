@@ -2,7 +2,7 @@
  * auto_array.h
  *
  *  Created on: Oct 12, 2009
- *      Author: langmead
+ *      Author: Ben Langmead
  */
 
 #include <cstring>
@@ -10,14 +10,19 @@
 #ifndef AUTO_ARRAY_H_
 #define AUTO_ARRAY_H_
 
+/**
+ * A simple fixed-length array of type T, automatically freed in the
+ * destructor.
+ */
 template<typename T>
 class AutoArray {
 public:
 	AutoArray(size_t sz) {
+		t_ = NULL;
 		t_ = new T[sz];
 		sz_ = sz;
 	}
-	~AutoArray() { delete[] t_; }
+	~AutoArray() { if(t_ != NULL) delete[] t_; }
 	T& operator[](size_t sz) {
 		return t_[sz];
 	}
