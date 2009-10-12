@@ -505,7 +505,6 @@ public:
 		uint32_t jlen;
 		jlen = joinedLen(szs);
 		assert_geq(jlen, sztot);
-		VMSG_NL("  = " << jlen << " (" << (jlen-sztot) << " characters of padding)");
 		VMSG_NL("Writing header");
 		writeFromMemory(true, out1, out2);
 		try {
@@ -582,6 +581,7 @@ public:
 				}
 				throw 1;
 			}
+			if(dcv > 4096) dcv = 4096;
 			if((iter % 6) == 5 && dcv < 4096 && dcv != 0) {
 				dcv <<= 1; // double difference-cover period
 			} else {

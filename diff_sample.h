@@ -438,7 +438,8 @@ static String<T> getDiffCover(T v,
 			return ret;
 		}
 	}
-	return ret;
+	cerr << "Error: Could not find a difference cover sample for v=" << v << endl;
+	throw 1;
 }
 
 /**
@@ -520,12 +521,12 @@ public:
 		_ds(getDiffCover(_v, _verbose, _sanity)),
 		_dmap(getDeltaMap(_v, _ds)),
 		_d(length(_ds)),
-	    _doffs(),
-	    _isaPrime(),
-	    _dInv(),
-	    _log2v(myLog2(_v)),
-	    _vmask(0xffffffff << _log2v),
-	    _logger(__logger)
+		_doffs(),
+		_isaPrime(),
+		_dInv(),
+		_log2v(myLog2(_v)),
+		_vmask(0xffffffff << _log2v),
+		_logger(__logger)
 	{
 		assert_gt(_d, 0);
 		assert_eq(1, popCount(_v)); // must be power of 2
