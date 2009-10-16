@@ -6,12 +6,13 @@
 #
 # From README_CURRENT_BUILD:
 #  Organism: Homo sapiens (human)
-#  NCBI Build Number: 36    
+#  NCBI Build Number: 36
 #  Version: 3
 #  Release date: 24 March 2008
 #
 
 GENOMES_MIRROR=ftp://ftp.ncbi.nih.gov/genomes
+FILE_PATH=${GENOMES_MIRROR}/H_sapiens/ARCHIVE/BUILD.36.3/Assembled_chromosomes
 
 BOWTIE_BUILD_EXE=./bowtie-build
 if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
@@ -31,11 +32,11 @@ for c in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y ; do
 				echo curl not found either, aborting...
 			else
 				# Use curl
-				curl ${GENOMES_MIRROR}/H_sapiens/Assembled_chromosomes/hs_ref_chr$c.fa.gz
+				curl ${FILE_PATH}/hs_ref_chr$c.fa.gz
 			fi
 		else
 			# Use wget
-			wget ${GENOMES_MIRROR}/H_sapiens/Assembled_chromosomes/hs_ref_chr$c.fa.gz
+			wget ${FILE_PATH}/hs_ref_chr$c.fa.gz
 		fi
 		gunzip hs_ref_chr$c.fa.gz
 	fi
