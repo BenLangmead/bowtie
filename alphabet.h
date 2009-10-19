@@ -207,6 +207,23 @@ static inline float entropyDna5(const String<Dna5>& read) {
 	return ent;
 }
 
+/**
+ * Return the DNA complement of the given ASCII char.
+ */
+static inline char comp(char c) {
+	switch(c) {
+	case 'a': return 't';
+	case 'A': return 'T';
+	case 'c': return 'g';
+	case 'C': return 'G';
+	case 'g': return 'c';
+	case 'G': return 'C';
+	case 't': return 'a';
+	case 'T': return 'A';
+	default: return c;
+	}
+}
+
 extern uint8_t dna4Cat[];
 extern uint8_t charToDna5[];
 extern uint8_t rcCharToDna5[];

@@ -47,6 +47,11 @@ struct HitSetEnt {
 		for(it = edits.begin(); it != edits.end(); it++) {
 			it->serialize(fb);
 		}
+		sz = cedits.size();
+		fb.writeChars((const char*)&sz, 4);
+		for(it = cedits.begin(); it != cedits.end(); it++) {
+			it->serialize(fb);
+		}
 	}
 
 	/**
@@ -69,6 +74,12 @@ struct HitSetEnt {
 		edits.resize(sz);
 		for(uint32_t i = 0; i < sz; i++) {
 			edits[i].deserialize(fb);
+		}
+		fb.get((char*)&sz, 4);
+		assert_lt(sz, 1024);
+		cedits.resize(sz);
+		for(uint32_t i = 0; i < sz; i++) {
+			cedits[i].deserialize(fb);
 		}
 	}
 
@@ -127,6 +138,34 @@ struct HitSetEnt {
 	}
 
 	/**
+	 * Another way to get at an edit.
+	 */
+	Edit& editAt(unsigned i) {
+		return edits[i];
+	}
+
+	/**
+	 * Another way to get at a const edit.
+	 */
+	const Edit& editAt(unsigned i) const {
+		return edits[i];
+	}
+
+	/**
+	 * Get the ith color edit.
+	 */
+	Edit& colorEditAt(unsigned i) {
+		return cedits[i];
+	}
+
+	/**
+	 * Another way to get at an edit.
+	 */
+	const Edit& colorEditAt(unsigned i) const {
+		return cedits[i];
+	}
+
+	/**
 	 * Return the front entry.
 	 */
 	Edit& front() {
@@ -176,6 +215,7 @@ struct HitSetEnt {
 	uint16_t cost; // cost, including stratum
 	uint32_t oms; // # others
 	std::vector<Edit> edits; // edits to get from reference to subject
+	std::vector<Edit> cedits; // color edits to get from reference to subject
 };
 
 /**
@@ -200,12 +240,14 @@ struct HitSet {
 	 * Write binary representation of HitSet to an OutFileBuf.
 	 */
 	void serialize(OutFileBuf& fb) const {
+		fb.write(color ? 1 : 0);
 		uint32_t i = seqan::length(name);
 		assert_gt(i, 0);
 		fb.writeChars((const char*)&i, 4);
 		fb.writeChars(seqan::begin(name), i);
 		i = seqan::length(seq);
 		assert_gt(i, 0);
+		assert_lt(i, 1024);
 		fb.writeChars((const char*)&i, 4);
 		for(size_t j = 0; j < i; j++) {
 			fb.write("ACGTN"[(int)seq[j]]);
@@ -224,6 +266,7 @@ struct HitSet {
 	 * Repopulate a HitSet from its binary representation in FileBuf.
 	 */
 	void deserialize(FileBuf& fb) {
+		color = (fb.get() != 0 ? true : false);
 		uint32_t sz = 0;
 		if(fb.get((char*)&sz, 4) != 4) {
 			seqan::clear(name);
@@ -389,6 +432,7 @@ struct HitSet {
 		seqan::clear(seq);
 		seqan::clear(qual);
 		ents.clear();
+		color = false;
 	}
 
 	/**
@@ -433,6 +477,7 @@ struct HitSet {
 	seqan::String<char> qual;
 	int8_t maxedStratum;
 	std::vector<HitSetEnt> ents;
+	bool color; // whether read was orginally in colorspace
 };
 
 #endif /* HIT_SET_H_ */

@@ -311,10 +311,12 @@ struct RangeState {
 	Edit pickEdit(int pos, RandomSource& rand, bool fuzzy,
 	              uint32_t& top, uint32_t& bot, bool& last)
 	{
+		bool color = false;
 		Edit ret;
 		ret.type = EDIT_TYPE_MM;
 		ret.pos = pos;
 		ret.chr = 0;
+		ret.qchr = 0;
 		ret.reserved = 0;
 		assert(!eliminated_);
 		assert(!fuzzy || eq.repOk());
@@ -376,7 +378,7 @@ struct RangeState {
 					bot = bots[0];
 					eq.flags.mmA = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = 0;
+					ret.chr = color ? '0' : 'A';
 					if(fuzzy) eq.updateLo();
 					return ret;
 				}
@@ -389,7 +391,7 @@ struct RangeState {
 					bot = bots[1];
 					eq.flags.mmC = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = 1;
+					ret.chr = color ? '1' : 'C';
 					if(fuzzy) eq.updateLo();
 					return ret;
 				}
@@ -402,7 +404,7 @@ struct RangeState {
 					bot = bots[2];
 					eq.flags.mmG = 1;
 					assert_lt(eq.join2.mmElims, 15);
-					ret.chr = 2;
+					ret.chr = color ? '2' : 'G';
 					if(fuzzy) eq.updateLo();
 					return ret;
 				}
@@ -415,46 +417,50 @@ struct RangeState {
 				bot = bots[3];
 				eq.flags.mmT = 1;
 				assert_lt(eq.join2.mmElims, 15);
-				ret.chr = 3;
+				ret.chr = color ? '3' : 'T';
 				if(fuzzy) eq.updateLo();
 			}
 		} else {
 			if(fuzzy) {
 				last = (num == 1);
+				int chr = -1;
 				if(eq.flags.qualA == eq.flags.quallo && eq.flags.mmA == 0) {
 					eq.flags.mmA = 1;
-					ret.chr = 0;
+					chr = 0;
 				} else if(eq.flags.qualC == eq.flags.quallo && eq.flags.mmC == 0) {
 					eq.flags.mmC = 1;
-					ret.chr = 1;
+					chr = 1;
 				} else if(eq.flags.qualG == eq.flags.quallo && eq.flags.mmG == 0) {
 					eq.flags.mmG = 1;
-					ret.chr = 2;
+					chr = 2;
 				} else {
 					assert_eq(eq.flags.qualT, eq.flags.quallo);
 					assert_eq(0, eq.flags.mmT);
 					eq.flags.mmT = 1;
-					ret.chr = 3;
-			}
-				top = tops[ret.chr];
-				bot = bots[ret.chr];
+					chr = 3;
+				}
+				ret.chr = color ? "0123"[chr] : "ACGT"[chr];
+				top = tops[chr];
+				bot = bots[chr];
 				eliminated_ = last;
 				if(!last) eq.updateLo();
 		} else {
 			last = true; // last at this pos
 			// There's only one; pick it!
+			int chr = -1;
 			if(!eq.flags.mmA) {
-				ret.chr = 0;
+				chr = 0;
 			} else if(!eq.flags.mmC) {
-				ret.chr = 1;
+				chr = 1;
 			} else if(!eq.flags.mmG) {
-				ret.chr = 2;
+				chr = 2;
 			} else {
 				assert(!eq.flags.mmT);
-				ret.chr = 3;
+				chr = 3;
 			}
-			top = tops[ret.chr];
-			bot = bots[ret.chr];
+			ret.chr = color ? "0123"[chr] : "ACGT"[chr];
+			top = tops[chr];
+			bot = bots[chr];
 			//assert_eq(15, eq.join2.mmElims);
 			// Mark entire position as eliminated
 			eliminated_ = true;
@@ -828,7 +834,7 @@ public:
 		if(rdepth_ > 0) {
 			for(size_t i = 0; i < rdepth_; i++) {
 				if(editidx < numEdits && edits_.get(editidx).pos == i) {
-					ss3 << " " << "acgt"[edits_.get(editidx).chr];
+					ss3 << " " << tolower(edits_.get(editidx).chr);
 					editidx++;
 				} else {
 					ss3 << " " << qry[qlen - i - 1];
@@ -841,7 +847,7 @@ public:
 		}
 		for(size_t i = 0; i < len_; i++) {
 			if(editidx < numEdits && edits_.get(editidx).pos == printed) {
-				ss3 << "acgt"[edits_.get(editidx).chr] << " ";
+				ss3 << tolower(edits_.get(editidx).chr) << " ";
 				editidx++;
 			} else {
 				ss3 << qry[qlen - printed - 1] << " ";

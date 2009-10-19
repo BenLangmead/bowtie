@@ -129,7 +129,7 @@ public:
 				hse.expand();
 				hse.back().type = EDIT_TYPE_MM;
 				hse.back().pos = i;
-				hse.back().chr = charToDna5[(int)refcs[i]];
+				hse.back().chr = refcs[i];
 			}
 		}
 	}
@@ -183,7 +183,7 @@ public:
 			for(size_t j = 0; j < hs[i].size(); j++) {
 				if(hs[i][j].type != EDIT_TYPE_MM) continue;
 				hits[i].mms.set(hs[i][j].pos);
-				hits[i].refcs[hs[i][j].pos] = "ACGT"[hs[i][j].chr];
+				hits[i].refcs[hs[i][j].pos] = hs[i][j].chr;
 			}
 		}
 	}

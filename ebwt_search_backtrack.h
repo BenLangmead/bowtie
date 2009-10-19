@@ -2424,7 +2424,7 @@ public:
 					for(size_t i = 0; i < br->edits_.size(); i++) {
 						Edit e = br->edits_.get(i);
 						cout << (curEbwt_->fw() ? (qlen_ - e.pos - 1) : e.pos)
-							 << "ACGT"[e.chr];
+							 << (char)e.chr;
 						if(i < br->edits_.size()-1) cout << " ";
 					}
 					cout << endl;
@@ -2653,7 +2653,7 @@ public:
 				curRange_.refcs.clear();
 				for(size_t i = 0; i < nedits; i++) {
 					curRange_.mms.push_back(qlen_ - br->edits_.get(i).pos - 1);
-					curRange_.refcs.push_back("ACGTN"[br->edits_.get(i).chr]);
+					curRange_.refcs.push_back((char)br->edits_.get(i).chr);
 				}
 				addPartialEdits();
 				curRange_.ebwt    = ebwt_;

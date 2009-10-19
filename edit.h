@@ -18,7 +18,7 @@
  * reference, deletion in the reference.
  */
 enum {
-	EDIT_TYPE_MM = 0,
+	EDIT_TYPE_MM = 1,
 	EDIT_TYPE_SNP,
 	EDIT_TYPE_INS,
 	EDIT_TYPE_DEL
@@ -33,21 +33,21 @@ struct Edit {
 	Edit() : pos(1023) { }
 
 	Edit(int po, int ch, int ty = EDIT_TYPE_MM) :
-		type(ty), pos(po), chr(ch) { }
+		chr(ch), qchr(0), type(ty), pos(po) { }
 
 	/**
 	 * Write Edit to an OutFileBuf.
 	 */
 	void serialize(OutFileBuf& fb) const {
-		assert_eq(2, sizeof(Edit));
-		fb.writeChars((const char*)this, 2);
+		assert_eq(4, sizeof(Edit));
+		fb.writeChars((const char*)this, 4);
 	}
 
 	/**
 	 * Read Edit from a FileBuf.
 	 */
 	void deserialize(FileBuf& fb) {
-		fb.get((char*)this, 2);
+		fb.get((char*)this, 4);
 	}
 
 	/**
@@ -56,7 +56,9 @@ struct Edit {
 	int operator< (const Edit &rhs) const {
 		if(pos < rhs.pos) return 1;
 		if(pos > rhs.pos) return 0;
-		return (chr < rhs.chr)? 1 : 0;
+		if(chr < rhs.chr) return 1;
+		if(chr > rhs.chr) return 0;
+		return (qchr < rhs.qchr)? 1 : 0;
 	}
 
 	/**
@@ -65,6 +67,7 @@ struct Edit {
 	int operator== (const Edit &rhs) const {
 		return(pos  == rhs.pos &&
 			   chr  == rhs.chr &&
+			   qchr == rhs.qchr &&
 			   type == rhs.type);
 	}
 
@@ -75,10 +78,11 @@ struct Edit {
 		return pos != 1023;
 	}
 
-	uint16_t type      :  2; // 1 -> subst, 2 -> ins, 3 -> del, 0 -> empty
-	uint16_t pos       : 10; // position w/r/t search root
-	uint16_t chr       :  2; // character involved (for subst and ins)
-	uint16_t reserved  :  2; // reserved
+	uint32_t chr       :  8; // reference character involved (for subst and ins)
+	uint32_t qchr      :  8; // read character involved (for subst and del
+	uint32_t type      :  4; // 1 -> mm, 2 -> SNP, 3 -> ins, 4 -> del
+	uint32_t pos       : 10; // position w/r/t search root
+	uint32_t reserved  :  2; // padding
 
 	friend std::ostream& operator<< (std::ostream& os, const Edit& e);
 };

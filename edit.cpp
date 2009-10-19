@@ -11,6 +11,6 @@
 using namespace std;
 
 ostream& operator<< (ostream& os, const Edit& e) {
-	os << e.pos << "ACGT"[e.chr];
+	os << e.pos << (char)e.chr;
 	return os;
 }
