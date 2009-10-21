@@ -2279,6 +2279,10 @@ static void *exactSearchWorkerStateful(void *vp) {
 	bt.setQuery(&p->bufb().patRc, &p->bufb().qualRev, &p->bufb().name); \
 	params.setFw(false);
 
+#ifdef BOWTIE_PTHREADS
+#define PTHREAD_ATTRS (PTHREAD_CREATE_JOINABLE | PTHREAD_CREATE_DETACHED)
+#endif
+
 /**
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
@@ -2313,7 +2317,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
 	int *tids = new int[numAdditionalThreads];
@@ -2507,7 +2511,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
@@ -2753,7 +2757,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	// Allocate structures for threads
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
@@ -3094,7 +3098,7 @@ static void twoOrThreeMismatchSearch(
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
@@ -3380,7 +3384,7 @@ static void twoOrThreeMismatchSearchFull(
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
@@ -4009,7 +4013,7 @@ static void seededQualCutoffSearch(
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
@@ -4207,7 +4211,7 @@ static void seededQualCutoffSearchFull(
 #ifdef BOWTIE_PTHREADS
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	int *tids = new int[nthreads-1];
 #endif
