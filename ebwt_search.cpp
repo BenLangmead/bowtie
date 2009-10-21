@@ -2320,6 +2320,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
+	memset(threads, 0, numAdditionalThreads*sizeof(pthread_t));
 	int *tids = new int[numAdditionalThreads];
 #endif
 	CHUD_START();
@@ -2328,10 +2329,15 @@ static void exactSearch(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < numAdditionalThreads; i++) {
 			tids[i] = i+1;
-			if(stateful)
-				pthread_create(&threads[i], &pt_attr, exactSearchWorkerStateful, (void *)&tids[i]);
-			else
-				pthread_create(&threads[i], &pt_attr, exactSearchWorker, (void *)&tids[i]);
+			if(stateful) {
+				pthread_create(&threads[i], &pt_attr,
+				               exactSearchWorkerStateful,
+				               (void *)&tids[i]);
+			} else {
+				pthread_create(&threads[i], &pt_attr,
+				               exactSearchWorker,
+				               (void *)&tids[i]);
+			}
 		}
 #endif
 		int tmp = 0;
@@ -2507,6 +2513,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
@@ -2741,6 +2748,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
@@ -3076,6 +3084,7 @@ static void twoOrThreeMismatchSearch(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
 
@@ -3344,6 +3353,7 @@ static void twoOrThreeMismatchSearchFull(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
     CHUD_START();
@@ -3967,6 +3977,7 @@ static void seededQualCutoffSearch(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
 
@@ -4141,6 +4152,7 @@ static void seededQualCutoffSearchFull(
 	pthread_attr_init(&pt_attr);
 	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
+	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
 #endif
 
