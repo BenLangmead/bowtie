@@ -2315,9 +2315,6 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	exactSearch_refs   = refs;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	int numAdditionalThreads = nthreads-1;
 	pthread_t *threads = new pthread_t[numAdditionalThreads];
 	memset(threads, 0, numAdditionalThreads*sizeof(pthread_t));
@@ -2330,11 +2327,11 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		for(int i = 0; i < numAdditionalThreads; i++) {
 			tids[i] = i+1;
 			if(stateful) {
-				createThread(&threads[i], &pt_attr,
+				createThread(&threads[i],
 				             exactSearchWorkerStateful,
 				             (void *)&tids[i]);
 			} else {
-				createThread(&threads[i], &pt_attr,
+				createThread(&threads[i],
 				             exactSearchWorker,
 				             (void *)&tids[i]);
 			}
@@ -2509,9 +2506,6 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	}
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -2523,7 +2517,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			createThread(&threads[i], &pt_attr,
+			createThread(&threads[i],
 			             mismatchSearchWorkerPhase1,
 			             (void *)&tids[i]);
 		}
@@ -2554,7 +2548,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cerr, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr,
+			createThread(&threads[i],
 			             mismatchSearchWorkerPhase2,
 			             (void *)&tids[i]);
 		}
@@ -2748,9 +2742,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 
 #ifdef BOWTIE_PTHREADS
 	// Allocate structures for threads
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -2762,9 +2753,9 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
 			if(stateful)
-				createThread(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)&tids[i]);
+				createThread(&threads[i], mismatchSearchWorkerFullStateful, (void *)&tids[i]);
 			else
-				createThread(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)&tids[i]);
+				createThread(&threads[i], mismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
 		// Go to town
@@ -3084,9 +3075,6 @@ static void twoOrThreeMismatchSearch(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -3099,7 +3087,7 @@ static void twoOrThreeMismatchSearch(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
+			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3114,7 +3102,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
+			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3128,7 +3116,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
+			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3353,9 +3341,6 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -3367,9 +3352,9 @@ static void twoOrThreeMismatchSearchFull(
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
 			if(stateful)
-				createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)&tids[i]);
+				createThread(&threads[i], twoOrThreeMismatchSearchWorkerStateful, (void *)&tids[i]);
 			else
-				createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
+				createThread(&threads[i], twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3977,9 +3962,6 @@ static void seededQualCutoffSearch(
 	seededQualSearch_qualCutoff = qualCutoff;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -3996,7 +3978,7 @@ static void seededQualCutoffSearch(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)&tids[i]);
+			createThread(&threads[i], seededQualSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4026,7 +4008,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)&tids[i]);
+			createThread(&threads[i], seededQualSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4058,7 +4040,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)&tids[i]);
+			createThread(&threads[i], seededQualSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4080,7 +4062,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)&tids[i]);
+			createThread(&threads[i], seededQualSearchWorkerPhase4, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4152,9 +4134,6 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_refs = refs;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_attr_t pt_attr;
-	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_ATTRS);
 	pthread_t *threads = new pthread_t[nthreads-1];
 	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
 	int *tids = new int[nthreads-1];
@@ -4174,10 +4153,10 @@ static void seededQualCutoffSearchFull(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			if(stateful) createThread(&threads[i], &pt_attr,
+			if(stateful) createThread(&threads[i],
 			                          seededQualSearchWorkerFullStateful,
 			                          (void*)&tids[i]);
-			else         createThread(&threads[i], &pt_attr,
+			else         createThread(&threads[i],
 			                          seededQualSearchWorkerFull,
 			                          (void*)&tids[i]);
 		}
