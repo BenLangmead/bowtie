@@ -1,6 +1,7 @@
 #ifndef THREADING_H_
 #define THREADING_H_
 
+#include <iostream>
 #include "spinlock.h"
 
 // Note that USE_SPINLOCK trumps BOWTIE_PTHREADS
@@ -22,12 +23,14 @@
 static inline void join(pthread_t th) {
 	int ret;
 	if((ret = pthread_detach(th)) != 0) {
-		cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
+		std::cerr << "Error: pthread_detach returned non-zero status: "
+		          << ret << std::endl;
 		throw 1;
 	}
 	int *tmp;
 	if((ret = pthread_join(th, (void**)&tmp)) != 0) {
-		cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+		std::cerr << "Error: pthread_join returned non-zero status: "
+		          << ret << std::endl;
 		throw 1;
 	}
 }

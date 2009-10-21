@@ -2338,17 +2338,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		if(stateful) exactSearchWorkerStateful((void*)&tmp);
 		else         exactSearchWorker((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < numAdditionalThreads; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 #ifdef BOWTIE_PTHREADS
@@ -2532,17 +2522,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		int tmp = 0;
 		mismatchSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
     }
 
@@ -2571,17 +2551,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		int tmp = 0;
 		mismatchSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 #ifdef BOWTIE_PTHREADS
@@ -2790,17 +2760,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		if(stateful) mismatchSearchWorkerFullStateful((void*)&tmp);
 		else         mismatchSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
     }
 #ifdef BOWTIE_PTHREADS
@@ -3132,17 +3092,7 @@ static void twoOrThreeMismatchSearch(
 		int tmp = 0;
 		twoOrThreeMismatchSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
     }
 	// Unload forward index and load mirror index
@@ -3157,17 +3107,7 @@ static void twoOrThreeMismatchSearch(
 		int tmp = 0;
 		twoOrThreeMismatchSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	SWITCH_TO_FW_INDEX();
@@ -3181,17 +3121,7 @@ static void twoOrThreeMismatchSearch(
 		int tmp = 0;
 		twoOrThreeMismatchSearchWorkerPhase3((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 #ifdef BOWTIE_PTHREADS
@@ -3432,17 +3362,7 @@ static void twoOrThreeMismatchSearchFull(
 		if(stateful) twoOrThreeMismatchSearchWorkerStateful((void*)&tmp);
 		else         twoOrThreeMismatchSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
     }
 #ifdef BOWTIE_PTHREADS
@@ -4067,17 +3987,7 @@ static void seededQualCutoffSearch(
 		int tmp = 0;
 		seededQualSearchWorkerPhase1((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	// Unload forward index and load mirror index
@@ -4107,17 +4017,7 @@ static void seededQualCutoffSearch(
 		int tmp = 0;
 		seededQualSearchWorkerPhase2((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	if(seedMms == 0) {
@@ -4149,17 +4049,7 @@ static void seededQualCutoffSearch(
 		int tmp = 0;
 		seededQualSearchWorkerPhase3((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	// Some with the reverse-complement partial alignments
@@ -4181,17 +4071,7 @@ static void seededQualCutoffSearch(
 		int tmp = 0;
 		seededQualSearchWorkerPhase4((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	if(pamFw != NULL) {
@@ -4290,17 +4170,7 @@ static void seededQualCutoffSearchFull(
 		if(stateful) seededQualSearchWorkerFullStateful((void*)&tmp);
 		else         seededQualSearchWorkerFull((void*)&tmp);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			int ret;
-			if((ret = pthread_detach(threads[i])) != 0) {
-				cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-			if((ret = pthread_join(threads[i], NULL)) != 0) {
-				cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
-				throw 1;
-			}
-		}
+		for(int i = 0; i < nthreads-1; i++) join(threads[i]);
 #endif
 	}
 	if(refs != NULL) {
