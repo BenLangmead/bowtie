@@ -42,6 +42,18 @@ static inline void joinThread(pthread_t th) {
 		throw 1;
 	}
 }
+
+static inline void createThread(pthread_t* th,
+                                const pthread_attr_t* attr,
+                                void *(*start_routine) (void *),
+                                void *arg)
+{
+	if(pthread_create(th, attr, start_routine, arg) != 0) {
+		std::cerr << "Error: pthread_create returned non-zero status: "
+		          << ret << std::endl;
+		throw 1;
+	}
+}
 #endif
 
 #endif
