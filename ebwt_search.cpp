@@ -2330,13 +2330,13 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		for(int i = 0; i < numAdditionalThreads; i++) {
 			tids[i] = i+1;
 			if(stateful) {
-				pthread_create(&threads[i], &pt_attr,
-				               exactSearchWorkerStateful,
-				               (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr,
+				             exactSearchWorkerStateful,
+				             (void *)&tids[i]);
 			} else {
-				pthread_create(&threads[i], &pt_attr,
-				               exactSearchWorker,
-				               (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr,
+				             exactSearchWorker,
+				             (void *)&tids[i]);
 			}
 		}
 #endif
@@ -2523,7 +2523,9 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase1, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr,
+			             mismatchSearchWorkerPhase1,
+			             (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -2552,7 +2554,9 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		Timer _t(cerr, "Time for 1-mismatch Phase 2 of 2: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerPhase2, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr,
+			             mismatchSearchWorkerPhase2,
+			             (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -2758,9 +2762,9 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
 			if(stateful)
-				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr, mismatchSearchWorkerFullStateful, (void *)&tids[i]);
 			else
-				pthread_create(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr, mismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
 		// Go to town
@@ -3095,7 +3099,7 @@ static void twoOrThreeMismatchSearch(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3110,7 +3114,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3124,7 +3128,7 @@ static void twoOrThreeMismatchSearch(
 		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3363,9 +3367,9 @@ static void twoOrThreeMismatchSearchFull(
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
 			if(stateful)
-				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerStateful, (void *)&tids[i]);
 			else
-				pthread_create(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
+				createThread(&threads[i], &pt_attr, twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -3992,7 +3996,7 @@ static void seededQualCutoffSearch(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase1, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4022,7 +4026,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, msg, timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase2, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4054,7 +4058,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, "Seeded quality search Phase 3 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase3, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4076,7 +4080,7 @@ static void seededQualCutoffSearch(
 		Timer _t(cerr, "Seeded quality search Phase 4 of 4: ", timing);
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
-			pthread_create(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)&tids[i]);
+			createThread(&threads[i], &pt_attr, seededQualSearchWorkerPhase4, (void *)&tids[i]);
 		}
 #endif
 		int tmp = 0;
@@ -4170,12 +4174,12 @@ static void seededQualCutoffSearchFull(
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
-			if(stateful) pthread_create(&threads[i], &pt_attr,
-			                            seededQualSearchWorkerFullStateful,
-			                            (void*)&tids[i]);
-			else         pthread_create(&threads[i], &pt_attr,
-			                            seededQualSearchWorkerFull,
-			                            (void*)&tids[i]);
+			if(stateful) createThread(&threads[i], &pt_attr,
+			                          seededQualSearchWorkerFullStateful,
+			                          (void*)&tids[i]);
+			else         createThread(&threads[i], &pt_attr,
+			                          seededQualSearchWorkerFull,
+			                          (void*)&tids[i]);
 		}
 #endif
 		int tmp = 0;

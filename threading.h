@@ -48,7 +48,8 @@ static inline void createThread(pthread_t* th,
                                 void *(*start_routine) (void *),
                                 void *arg)
 {
-	if(pthread_create(th, attr, start_routine, arg) != 0) {
+	int ret;
+	if((ret = pthread_create(th, attr, start_routine, arg)) != 0) {
 		std::cerr << "Error: pthread_create returned non-zero status: "
 		          << ret << std::endl;
 		throw 1;
