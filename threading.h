@@ -20,7 +20,7 @@
 #    define MUTEX_LOCK(l) pthread_mutex_lock(&l)
 #    define MUTEX_UNLOCK(l) pthread_mutex_unlock(&l)
 
-static inline void join(pthread_t th) {
+static inline void joinThread(pthread_t th) {
 	int ret;
 	if((ret = pthread_detach(th)) != 0) {
 		std::cerr << "Error: pthread_detach returned non-zero status: "
