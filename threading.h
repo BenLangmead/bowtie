@@ -18,6 +18,20 @@
 #    define MUTEX_INIT(l) pthread_mutex_init(&l, NULL)
 #    define MUTEX_LOCK(l) pthread_mutex_lock(&l)
 #    define MUTEX_UNLOCK(l) pthread_mutex_unlock(&l)
+
+static inline void join(pthread_t th) {
+	int ret;
+	if((ret = pthread_detach(th)) != 0) {
+		cerr << "Error: pthread_detach returned non-zero status: " << ret << endl;
+		throw 1;
+	}
+	int *tmp;
+	if((ret = pthread_join(th, (void**)&tmp)) != 0) {
+		cerr << "Error: pthread_join returned non-zero status: " << ret << endl;
+		throw 1;
+	}
+}
+
 #  else
 #    define MUTEX_T int
 #    define MUTEX_INIT(l) l = 0
