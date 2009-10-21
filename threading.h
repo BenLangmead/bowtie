@@ -44,7 +44,7 @@ static inline void createThread(pthread_t* th,
 	int ret;
 	pthread_attr_t pt_attr;
 	pthread_attr_init(&pt_attr);
-	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE | PTHREAD_CREATE_DETACHED);
+	pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_JOINABLE);
 	pthread_attr_setstacksize(&pt_attr, 2 << 20);
 	if((ret = pthread_create(th, &pt_attr, start_routine, arg)) != 0) {
 		std::cerr << "Error: pthread_create returned non-zero status: "
