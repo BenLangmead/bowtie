@@ -20,6 +20,7 @@ public:
 	AutoArray(size_t sz) {
 		t_ = NULL;
 		t_ = new T[sz];
+		memset(t_, 0, sz*sizeof(T));
 		sz_ = sz;
 	}
 	~AutoArray() { if(t_ != NULL) delete[] t_; }

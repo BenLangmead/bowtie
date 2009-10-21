@@ -2315,16 +2315,14 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	exactSearch_refs   = refs;
 
 #ifdef BOWTIE_PTHREADS
-	int numAdditionalThreads = nthreads-1;
-	pthread_t *threads = new pthread_t[numAdditionalThreads];
-	memset(threads, 0, numAdditionalThreads*sizeof(pthread_t));
-	int *tids = new int[numAdditionalThreads];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 #ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < numAdditionalThreads; i++) {
+		for(int i = 0; i < nthreads-1; i++) {
 			tids[i] = i+1;
 			if(stateful) {
 				createThread(&threads[i],
@@ -2344,10 +2342,6 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
 #endif
 	}
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 	if(refs != NULL) delete refs;
 }
 
@@ -2506,9 +2500,8 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 	}
 
 #ifdef BOWTIE_PTHREADS
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
     CHUD_START();
 	// Phase 1
@@ -2559,10 +2552,6 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
 #endif
 	}
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 }
 
 /**
@@ -2742,9 +2731,8 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 
 #ifdef BOWTIE_PTHREADS
 	// Allocate structures for threads
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
     CHUD_START();
     {
@@ -2765,11 +2753,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #ifdef BOWTIE_PTHREADS
 		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
 #endif
-    }
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
+	}
 	if(refs != NULL) delete refs;
 }
 
@@ -3075,9 +3059,8 @@ static void twoOrThreeMismatchSearch(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
 
 	// Load forward index
@@ -3125,10 +3108,6 @@ static void twoOrThreeMismatchSearch(
 		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
 #endif
 	}
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 	return;
 }
 
@@ -3341,9 +3320,8 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
     CHUD_START();
     {
@@ -3364,10 +3342,6 @@ static void twoOrThreeMismatchSearchFull(
 		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
 #endif
     }
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 	if(refs != NULL) delete refs;
 	return;
 }
@@ -3962,9 +3936,8 @@ static void seededQualCutoffSearch(
 	seededQualSearch_qualCutoff = qualCutoff;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -4076,10 +4049,6 @@ static void seededQualCutoffSearch(
 		pamFw = NULL;
 		seededQualSearch_pamFw = NULL;
 	}
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 }
 
 /**
@@ -4134,9 +4103,8 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_refs = refs;
 
 #ifdef BOWTIE_PTHREADS
-	pthread_t *threads = new pthread_t[nthreads-1];
-	memset(threads, 0, (nthreads-1)*sizeof(pthread_t));
-	int *tids = new int[nthreads-1];
+	AutoArray<pthread_t> threads(nthreads-1);
+	AutoArray<int> tids(nthreads-1);
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -4172,10 +4140,6 @@ static void seededQualCutoffSearchFull(
 		delete refs;
 	}
 	ebwtBw.evictFromMemory();
-#ifdef BOWTIE_PTHREADS
-	delete[] threads;
-	delete[] tids;
-#endif
 }
 
 /**
