@@ -155,7 +155,8 @@ all: $(BIN_LIST)
 
 allall: $(BIN_LIST) $(BIN_LIST_AUX)
 
-DEFS=-DBOWTIE_VERSION="\"`cat VERSION`\"" \
+DEFS=-fno-strict-aliasing \
+     -DBOWTIE_VERSION="\"`cat VERSION`\"" \
      -DBUILD_HOST="\"`hostname`\"" \
      -DBUILD_TIME="\"`date`\"" \
      -DCOMPILER_VERSION="\"`$(CXX) -v 2>&1 | tail -1`\"" \

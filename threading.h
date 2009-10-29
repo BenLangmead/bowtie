@@ -30,7 +30,7 @@
 #ifdef BOWTIE_PTHREADS
 static inline void joinThread(pthread_t th) {
 	int ret, *tmp;
-	if((ret = pthread_join(th, (int**)&tmp)) != 0) {
+	if((ret = pthread_join(th, (void**)(int**)&tmp)) != 0) {
 		std::cerr << "Error: pthread_join returned non-zero status: "
 		          << ret << std::endl;
 		throw 1;
