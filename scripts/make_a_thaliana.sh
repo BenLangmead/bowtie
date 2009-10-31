@@ -3,7 +3,7 @@
 #
 # Downloads sequence for A. thaliana from TAIR.  This script was used
 # to build the Bowtie index for A. thaliana.  The downloaded version
-# was TAIR8.
+# was TAIR9.
 #
 
 GENOMES_MIRROR=ftp://ftp.arabidopsis.org/home/tair
