@@ -3043,6 +3043,8 @@ public:
 				ss << "\t" << h.patSeq;
 				ss << "\t" << h.quals;
 				ss << "\t" << h.oms;
+				ss << "\t" << h.mate;
+				ss << "\t" << h.patName;
 			} else {
 				assert(!dospill);
 				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
