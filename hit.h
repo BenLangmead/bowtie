@@ -3043,7 +3043,7 @@ public:
 				ss << "\t" << h.patSeq;
 				ss << "\t" << h.quals;
 				ss << "\t" << h.oms;
-				ss << "\t" << h.mate;
+				ss << "\t" << (int)h.mate;
 				ss << "\t" << h.patName;
 			} else {
 				assert(!dospill);
