@@ -355,10 +355,23 @@ public:
 	}
 
 	/**
-	 * Open a new output stream to a file with given name.
+	 * Open a new output stream to standard out.
 	 */
 	OutFileBuf() : name_("cout"), cur_(0), closed_(false) {
 		out_ = stdout;
+	}
+
+	/**
+	 * Open a new output stream to a file with given name.
+	 */
+	void setFile(const char *out, bool binary = false) {
+		assert(out != NULL);
+		out_ = fopen(out, binary ? "wb" : "w");
+		if(out_ == NULL) {
+			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
+			throw 1;
+		}
+		reset();
 	}
 
 	/**
@@ -424,6 +437,14 @@ public:
 		if(out_ != stdout) {
 			fclose(out_);
 		}
+	}
+
+	/**
+	 * Reset so that the next write is as though it's the first.
+	 */
+	void reset() {
+		cur_ = 0;
+		closed_ = false;
 	}
 
 	void flush() {
