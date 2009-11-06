@@ -1756,7 +1756,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_DUMP_PATS: patDumpfile = optarg; break;
 			case ARG_STRAND_FIX: strandFix = true; break;
 			case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
-			case ARG_PARTITION: partitionSz = parseInt(0, "--partition must be positive"); break;
+			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_ORIG:
 				if(optarg == NULL || strlen(optarg) == 0) {
 					cerr << "--orig arg must be followed by a string" << endl;

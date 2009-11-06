@@ -2993,27 +2993,28 @@ public:
 			if(spill) {
 				// The read spilled over a partition boundary and so
 				// needs to be printed more than once
-				assert(partition > 0);
 				spill = false;
 				dospill = true;
 				spillAmt++;
 			}
 			assert(!spill);
-			if(partition > 0) {
+			if(partition != 0) {
+				int pospart = abs(partition);
 				// Output a partitioning key
 				// First component of the key is the reference index
 				ss << h.h.first << "\t";
 				ostringstream ss2, ss3;
 				// Next component of the key is the partition id
 				if(!dospill) {
-					pdiv = (h.h.second + offBase) / partition;
-					pmod = (h.h.second + offBase) % partition;
+					pdiv = (h.h.second + offBase) / pospart;
+					pmod = (h.h.second + offBase) % pospart;
 				}
 				assert_neq(0xffffffff, pdiv);
 				assert_neq(0xffffffff, pmod);
 				if(dospill) assert_gt(spillAmt, 0);
 				ss2 << (pdiv + (dospill ? spillAmt : 0));
-				if((pmod + h.length()) >= ((uint32_t)partition * (spillAmt + 1))) {
+				if(partition > 0 &&
+				   (pmod + h.length()) >= ((uint32_t)pospart * (spillAmt + 1))) {
 					// Spills into the next partition so we need to
 					// output another alignment for that partition
 					spill = true;
@@ -3023,11 +3024,11 @@ public:
 				// seen to support numeric)
 				string s2 = ss2.str();
 				size_t partDigits = 1;
-				if(partition >= 10) partDigits++;
-				if(partition >= 100) partDigits++;
-				if(partition >= 1000) partDigits++;
-				if(partition >= 10000) partDigits++;
-				if(partition >= 100000) partDigits++;
+				if(pospart >= 10) partDigits++;
+				if(pospart >= 100) partDigits++;
+				if(pospart >= 1000) partDigits++;
+				if(pospart >= 10000) partDigits++;
+				if(pospart >= 100000) partDigits++;
 				for(size_t i = s2.length(); i < (10-partDigits); i++) {
 					ss << "0";
 				}
