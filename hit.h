@@ -3053,6 +3053,7 @@ public:
 				ss << "\t" << h.oms;
 				ss << "\t" << (int)h.mate;
 				ss << "\t" << h.patName;
+				// end if(partition != 0)
 			} else {
 				assert(!dospill);
 				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
@@ -3068,51 +3069,52 @@ public:
 				ss << "\t" << h.patSeq;
 				ss << "\t" << h.quals;
 				ss << "\t" << h.oms;
-				ss << "\t";
-				// Look for SNP annotations falling within the alignment
-				map<int, char> snpAnnots;
-				const size_t len = length(h.patSeq);
-				if(amap != NULL) {
-					AnnotationMap::Iter ai = amap->lower_bound(h.h);
-					for(; ai != amap->end(); ai++) {
-						assert_geq(ai->first.first, h.h.first);
-						if(ai->first.first != h.h.first) {
-							// Different chromosome
-							break;
-						}
-						if(ai->first.second >= h.h.second + len) {
-							// Doesn't fall into alignment
-							break;
-						}
-						if(ai->second.first != 'S') {
-							// Not a SNP annotation
-							continue;
-						}
-						size_t off = ai->first.second - h.h.second;
-						if(!h.fw) off = len - off - 1;
-						snpAnnots[off] = ai->second.second;
+				// end else clause of if(partition != 0)
+			}
+			ss << '\t';
+			// Look for SNP annotations falling within the alignment
+			map<int, char> snpAnnots;
+			const size_t len = length(h.patSeq);
+			if(amap != NULL) {
+				AnnotationMap::Iter ai = amap->lower_bound(h.h);
+				for(; ai != amap->end(); ai++) {
+					assert_geq(ai->first.first, h.h.first);
+					if(ai->first.first != h.h.first) {
+						// Different chromosome
+						break;
 					}
+					if(ai->first.second >= h.h.second + len) {
+						// Doesn't fall into alignment
+						break;
+					}
+					if(ai->second.first != 'S') {
+						// Not a SNP annotation
+						continue;
+					}
+					size_t off = ai->first.second - h.h.second;
+					if(!h.fw) off = len - off - 1;
+					snpAnnots[off] = ai->second.second;
 				}
-				// Output mismatch column
-				bool first = true;
-				for (unsigned int i = 0; i < len; ++ i) {
-					if(h.mms.test(i)) {
-						// There's a mismatch at this position
-						if (!first) ss << ",";
-						ss << i; // position
-						assert_gt(h.refcs.size(), i);
-						char refChar = toupper(h.refcs[i]);
-						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-						assert_neq(refChar, qryChar);
-						ss << ":" << refChar << ">" << qryChar;
-						first = false;
-					} else if(snpAnnots.find(i) != snpAnnots.end()) {
-						if (!first) ss << ",";
-						ss << i; // position
-						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-						ss << "S:" << snpAnnots[i] << ">" << qryChar;
-						first = false;
-					}
+			}
+			// Output mismatch column
+			bool first = true;
+			for (unsigned int i = 0; i < len; ++ i) {
+				if(h.mms.test(i)) {
+					// There's a mismatch at this position
+					if (!first) ss << ",";
+					ss << i; // position
+					assert_gt(h.refcs.size(), i);
+					char refChar = toupper(h.refcs[i]);
+					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					assert_neq(refChar, qryChar);
+					ss << ":" << refChar << ">" << qryChar;
+					first = false;
+				} else if(snpAnnots.find(i) != snpAnnots.end()) {
+					if (!first) ss << ",";
+					ss << i; // position
+					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+					ss << "S:" << snpAnnots[i] << ">" << qryChar;
+					first = false;
 				}
 			}
 			ss << endl;
