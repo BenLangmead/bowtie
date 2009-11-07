@@ -3002,7 +3002,14 @@ public:
 				int pospart = abs(partition);
 				// Output a partitioning key
 				// First component of the key is the reference index
-				ss << h.h.first << "\t";
+				if(refnames != NULL && rmap != NULL) {
+					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
+				} else if(refnames != NULL && h.h.first < refnames->size()) {
+					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
+				} else {
+					ss << h.h.first;
+				}
+				ss << '\t';
 				ostringstream ss2, ss3;
 				// Next component of the key is the partition id
 				if(!dospill) {
