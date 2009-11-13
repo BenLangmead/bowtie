@@ -66,9 +66,11 @@ get() {
 			echo "Please install wget or curl somewhere in your PATH"
 			exit 1
 		fi
-		return curl -o `basename $1` $1
+		curl -o `basename $1` $1
+		return $?
 	else
-		return wget $1
+		wget $1
+		return $?
 	fi
 }
 

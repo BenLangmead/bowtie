@@ -17,7 +17,7 @@
 # below.
 #
 
-BASE_CHRS= \
+BASE_CHRS="\
 chr1 \
 chr2 \
 chr3 \
@@ -42,9 +42,9 @@ chr21 \
 chr22 \
 chrX \
 chrY \
-chrM
+chrM"
 
-RANDOM_CHRS= \
+RANDOM_CHRS="\
 chr1_random \
 chr2_random \
 chr3_random \
@@ -64,13 +64,13 @@ chr18_random \
 chr19_random \
 chr21_random \
 chr22_random \
-chrX_random
+chrX_random"
 
-ALT_HAP_CHRS= \
+ALT_HAP_CHRS="\
 chr22_h2_hap1 \
 chr5_h2_hap1 \
 chr6_cox_hap1 \
-chr6_qbl_hap2
+chr6_qbl_hap2"
 
 CHRS_TO_INDEX=$BASE_CHRS
 
@@ -83,9 +83,11 @@ get() {
 			echo "Please install wget or curl somewhere in your PATH"
 			exit 1
 		fi
-		return curl -o `basename $1` $1
+		curl -o `basename $1` $1
+		return $?
 	else
-		return wget $1
+		wget $1
+		return $?
 	fi
 }
 
