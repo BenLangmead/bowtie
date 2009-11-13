@@ -16,7 +16,7 @@
 # below.
 #
 
-BASE_CHRS= \
+BASE_CHRS="\
 chr1 \
 chr2 \
 chr3 \
@@ -38,9 +38,9 @@ chr18 \
 chr19 \
 chrX \
 chrY \
-chrM
+chrM"
 
-RANDOM_CHRS= \
+RANDOM_CHRS="\
 1_random \
 3_random \
 4_random \
@@ -53,7 +53,7 @@ RANDOM_CHRS= \
 17_random \
 X_random \
 Y_random \
-Un_random
+Un_random"
 
 CHRS_TO_INDEX=$BASE_CHRS
 
