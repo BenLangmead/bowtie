@@ -10,10 +10,10 @@
 # 1. The base files, named chr??.fa.gz
 # 2. The unplaced-sequence files, named chr??_random.fa.gz
 #
-# By default, this script builds just the base files, since alignment
-# results to those sequences are the most usful.  To change which
-# categories are built by this script, edit the CHRS_TO_INDEX variable
-# below.
+# By default, this script builds and index for just the base files,
+# since alignments to those sequences are the most useful.  To change
+# which categories are built by this script, edit the CHRS_TO_INDEX
+# variable below.
 #
 
 BASE_CHRS="\
