@@ -88,8 +88,8 @@ INPUTS=
 for c in $CHRS_TO_INDEX ; do
 	if [ ! -f ${c}.fa ] ; then
 		F=${c}.fa.gz
-		get ${UCSC_MM9_BASE}/$F || echo "Error getting $F" && exit 1
-		gunzip $F || echo "Error unzipping $F" && exit 1
+		get ${UCSC_MM9_BASE}/$F || (echo "Error getting $F" && exit 1)
+		gunzip $F || (echo "Error unzipping $F" && exit 1)
 	fi
 	[ -n "$INPUTS" ] && INPUTS=$INPUTS,${c}.fa
 	[ -z "$INPUTS" ] && INPUTS=${c}.fa
