@@ -1,17 +1,18 @@
 #!/bin/sh
 
 #
-# Downloads sequence for the mm9 version of M. musculus (mouse) from
+# Downloads sequence for the hg18 version of H. spiens (human) from
 # UCSC.
 #
-# Note that UCSC's mm9 build has two categories of compressed fasta
+# Note that UCSC's hg18 build has three categories of compressed fasta
 # files:
 #
 # 1. The base files, named chr??.fa.gz
 # 2. The unplaced-sequence files, named chr??_random.fa.gz
+# 3. The alternative-haplotype files, named chr??_???_hap?.fa.gz
 #
 # By default, this script builds just the base files, since alignment
-# results to those sequences are the most usful.  To change which
+# results to those sequences are the most useful.  To change which
 # categories are built by this script, edit the CHRS_TO_INDEX variable
 # below.
 #
@@ -36,28 +37,44 @@ chr16 \
 chr17 \
 chr18 \
 chr19 \
+chr20 \
+chr21 \
+chr22 \
 chrX \
 chrY \
 chrM
 
 RANDOM_CHRS= \
-1_random \
-3_random \
-4_random \
-5_random \
-7_random \
-8_random \
-9_random \
-13_random \
-16_random \
-17_random \
-X_random \
-Y_random \
-Un_random
+chr1_random \
+chr2_random \
+chr3_random \
+chr4_random \
+chr5_random \
+chr6_random \
+chr7_random \
+chr8_random \
+chr9_random \
+chr10_random \
+chr11_random \
+chr13_random \
+chr15_random \
+chr16_random \
+chr17_random \
+chr18_random \
+chr19_random \
+chr21_random \
+chr22_random \
+chrX_random
+
+ALT_HAP_CHRS= \
+chr22_h2_hap1 \
+chr5_h2_hap1 \
+chr6_cox_hap1 \
+chr6_qbl_hap2
 
 CHRS_TO_INDEX=$BASE_CHRS
 
-UCSC_MM9_BASE=ftp://hgdownload.cse.ucsc.edu/goldenPath/mm9/chromosomes
+UCSC_HG18_BASE=ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/chromosomes
 
 get() {
 	file=$1
@@ -86,17 +103,17 @@ INPUTS=
 for c in $CHRS_TO_INDEX ; do
 	if [ ! -f ${c}.fa ] ; then
 		F=${c}.fa.gz
-		get ${UCSC_MM9_BASE}/$F || echo "Error getting $F" && exit 1
+		get ${UCSC_HG18_BASE}/$F || echo "Error getting $F" && exit 1
 		gunzip $F || echo "Error unzipping $F" && exit 1
 	fi
 	[ -n "$INPUTS" ] && INPUTS=$INPUTS,${c}.fa
 	[ -z "$INPUTS" ] && INPUTS=${c}.fa
 done
 
-CMD="${BOWTIE_BUILD_EXE} ${INPUTS} mm9"
+CMD="${BOWTIE_BUILD_EXE} ${INPUTS} hg18"
 echo Running $CMD
 if $CMD ; then
-	echo "mm9 index built; you may remove fasta files"
+	echo "hg18 index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"
 fi
