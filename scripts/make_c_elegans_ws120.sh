@@ -32,14 +32,14 @@ get() {
 	fi
 }
 
-F=elegans.WS200.dna.fa
+F=c_elegans.WS200.dna.fa
 if [ ! -f $F ] ; then
-	FGZ=elegans.WS200.dna.fa.gz
+	FGZ=c_elegans.WS200.dna.fa.gz
 	wget ${GENOMES_MIRROR}/$FGZ
 	gunzip $FGZ
 fi
 
-CMD="${BOWTIE_BUILD_EXE} elegans.WS200.dna.fa c_elegans_ws200"
+CMD="${BOWTIE_BUILD_EXE} $F c_elegans_ws200"
 echo "Running $CMD"
 if $CMD ; then
 	echo "c_elegans_ws200 index built; you may remove fasta files"
