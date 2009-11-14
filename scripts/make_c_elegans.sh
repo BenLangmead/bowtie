@@ -1,12 +1,11 @@
 #!/bin/sh
 
 #
-# Downloads sequence for C. elegans from wormbase.  This script
-# was used to build the Bowtie index for C. elegans.  WS190 was the
-# latest freeze as of the build date.
+# Downloads sequence and builds Bowtie indexes for for C. elegans
+# versions WS190 and WS200 from wormbase.
 #
 
-GENOMES_MIRROR=ftp://ftp.gramene.org/pub/wormbase/genomes
+GENOMES_MIRROR=ftp://ftp.gramene.org/pub/wormbase/genomes/c_elegans/sequences/dna
 
 BOWTIE_BUILD_EXE=./bowtie-build
 if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
@@ -18,35 +17,47 @@ if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 	fi
 fi
 
-if [ ! -f elegans.WS190.dna.fa ] ; then
-	if ! which wget > /dev/null ; then
-		echo wget not found, looking for curl...
-		if ! which curl > /dev/null ; then
-			echo curl not found either, aborting...
-		else
-			# Use curl
-			curl ${GENOMES_MIRROR}/c_elegans/sequences/dna/elegans.WS190.dna.fa.gz
+get() {
+	file=$1
+	if ! wget --version >/dev/null 2>/dev/null ; then
+		if ! curl --version >/dev/null 2>/dev/null ; then
+			echo "Please install wget or curl somewhere in your PATH"
+			exit 1
 		fi
+		curl -o `basename $1` $1
+		return $?
 	else
-		# Use wget
-		wget ${GENOMES_MIRROR}/c_elegans/sequences/dna/elegans.WS190.dna.fa.gz
+		wget $1
+		return $?
 	fi
-	gunzip elegans.WS190.dna.fa.gz
+}
+
+F=elegans.WS190.dna.fa
+if [ ! -f $F ] ; then
+	FGZ=elegans.WS190.dna.fa.gz
+	wget ${GENOMES_MIRROR}/$FGZ
+	gunzip $FGZ
 fi
 
-if [ ! -f elegans.WS190.dna.fa ] ; then
-	echo "Could not find elegans.WS190.dna.fa file!"
-	exit 2
+F=elegans.WS200.dna.fa
+if [ ! -f $F ] ; then
+	FGZ=elegans.WS200.dna.fa.gz
+	wget ${GENOMES_MIRROR}/$FGZ
+	gunzip $FGZ
 fi
 
-echo Running ${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
-${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans
-if [ "$?" = "0" ] ; then
-	echo "c_elegans index built:"
-	echo "   c_elegans.1.ebwt c_elegans.2.ebwt"
-	echo "   c_elegans.3.ebwt c_elegans.4.ebwt"
-	echo "   c_elegans.rev.1.ebwt c_elegans.rev.2.ebwt"
-	echo "You may remove elegans.WS190.dna.fa"
+CMD="${BOWTIE_BUILD_EXE} elegans.WS190.dna.fa c_elegans_ws190"
+echo "Running $CMD"
+if $CMD ; then
+	echo "c_elegans_ws190 index built"
+else
+	echo "Index building failed; see error message"
+fi
+
+CMD="${BOWTIE_BUILD_EXE} elegans.WS200.dna.fa c_elegans_ws200"
+echo "Running $CMD"
+if $CMD ; then
+	echo "c_elegans_ws200 index built"
 else
 	echo "Index building failed; see error message"
 fi
