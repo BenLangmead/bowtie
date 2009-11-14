@@ -39,8 +39,8 @@ fi
 
 if [ ! -f $F ] ; then
 	FGZ=$F.gz
-	get ${GENOMES_MIRROR}/$REL/fasta/$FGZ || (echo "Error getting $F" && exit 1)
-	gunzip $FNAME.gz || (echo "Error unzipping $F" && exit 1)
+	get ${GENOMES_MIRROR}/$REL/fasta/$FGZ || (echo "Error getting $FGZ" && exit 1)
+	gunzip $FGZ || (echo "Error unzipping $FGZ" && exit 1)
 fi
 
 CMD="${BOWTIE_BUILD_EXE} $F $IDX_NAME"
