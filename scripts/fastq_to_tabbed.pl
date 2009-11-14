@@ -20,8 +20,8 @@
 # piping them through gzip -dc) to Bowtie and use '--12 -'.
 #
 # Note that this script can also handle unpaired input (with -u), which
-# Bowtie handles approrpaitely even when it's intermingled with paired-
-# end input.
+# Bowtie handles approrpaitely in --12 mode even when it's intermingled
+# with paired-end input.
 #
 
 use strict;
@@ -44,11 +44,10 @@ my $mate1 = "";
 my $mate2 = "";
 my $shuffle = 0;
 
-my $result =
-	GetOptions ("u=s"     => \$unpaired,
-	            "1=s"     => \$mate1,
-	            "2=s"     => \$mate2,
-	            "shuffle" => \$shuffle) || die "Bad option";
+GetOptions ("u=s"     => \$unpaired,
+            "1=s"     => \$mate1,
+            "2=s"     => \$mate2,
+            "shuffle" => \$shuffle) || die "Bad option";
 
 my @output;
 my @unpaireds = split(/,/, $unpaired);

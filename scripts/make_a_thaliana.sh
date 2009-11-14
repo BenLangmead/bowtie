@@ -43,11 +43,7 @@ done
 echo Running ${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
 ${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
 if [ "$?" = "0" ] ; then
-	echo "a_thaliana index built:"
-	echo "   a_thaliana.1.ebwt a_thaliana.2.ebwt"
-	echo "   a_thaliana.3.ebwt a_thaliana.4.ebwt"
-	echo "   a_thaliana.rev.1.ebwt a_thaliana.rev.2.ebwt"
-	echo "You may remove chr1.fas chr2.fas chr3.fas chr4.fas chr5.fas chrC.fas chrM.fas"
+	echo "a_thaliana index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"
 fi
