@@ -22,7 +22,7 @@ get() {
 		curl -o `basename $1` $1
 		return $?
 	else
-		wget $1
+		wget -O `basename $1` $1
 		return $?
 	fi
 }
