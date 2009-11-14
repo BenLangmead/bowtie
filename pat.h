@@ -1765,7 +1765,6 @@ protected:
 	}
 private:
 	bool first_;
-	int policy_;
 };
 
 
@@ -2115,7 +2114,6 @@ private:
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
-	int policy_;
 };
 
 /**
@@ -2245,8 +2243,6 @@ protected:
 private:
 	size_t length_;     /// length of reads to generate
 	size_t freq_;       /// frequency to sample reads
-	int policy_;        /// policy for handling Ns
-
 	size_t eat_;        /// number of characters we need to skip before
 	                    /// we have flushed all of the ambiguous or
 	                    /// non-existent characters out of our read
@@ -2622,7 +2618,6 @@ private:
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
-	int policy_;
 	bool fuzzy_;
 };
 
@@ -2732,7 +2727,6 @@ protected:
 	}
 private:
 	bool first_;
-	int policy_;
 };
 
 /**

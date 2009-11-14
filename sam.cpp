@@ -42,7 +42,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
 			ss << "\tLN:" << plen[i] << endl;
 		}
 	}
-	ss << "@PG\tID=Bowtie\tVN=" << BOWTIE_VERSION << "\tCL=\"" << cmdline << "\"" << endl;
+	ss << "@PG\tID:Bowtie\tVN:" << BOWTIE_VERSION << "\tCL:\"" << cmdline << "\"" << endl;
 	os.writeString(ss.str());
 }
 
