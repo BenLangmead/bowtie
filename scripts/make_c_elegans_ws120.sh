@@ -35,8 +35,8 @@ get() {
 F=c_elegans.WS200.dna.fa
 if [ ! -f $F ] ; then
 	FGZ=c_elegans.WS200.dna.fa.gz
-	wget ${GENOMES_MIRROR}/$FGZ
-	gunzip $FGZ
+	wget ${GENOMES_MIRROR}/$FGZ || (echo "Error getting $F" && exit 1)
+	gunzip $FGZ || (echo "Error unzipping $F" && exit 1)
 fi
 
 CMD="${BOWTIE_BUILD_EXE} $F c_elegans_ws200"
