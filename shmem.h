@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdexcept>
 #include "str_util.h"
 

@@ -1694,8 +1694,8 @@ protected:
 		// Pick off the first carat
 		c = filebuf_.get();
 		if(c < 0) { bail(r); return; }
-		assert_eq('>', c);
 		if(first_) {
+			assert_eq('>', c);
 			if(c != '>') {
 				c = getOverNewline(filebuf_);
 				if(c < 0) { bail(r); return; }
@@ -1706,12 +1706,12 @@ protected:
 			}
 			assert(c == '>' || c == '#');
 			first_ = false;
+			c = filebuf_.get();
 		}
 
 		// Read to the end of the id line, sticking everything after the '>'
 		// into *name
 		while(true) {
-			c = filebuf_.get();
 			if(c < 0) { bail(r); return; }
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
@@ -1722,6 +1722,7 @@ protected:
 				break;
 			}
 			r.nameBuf[nameLen++] = c;
+			c = filebuf_.get();
 		}
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, nameLen);
@@ -1741,23 +1742,18 @@ protected:
 			c = filebuf_.get();
 			if(c < 0) { bail(r); return; }
 		}
-		while(c != '>') {
-			bool ischar = (color_ ? isColor(c) : isDna(c));
-			if(ischar && begin++ >= this->trim5_) {
+		while(c != '>' && c >= 0) {
+			if(color_) {
+				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+				if(c == '.') c = 'N';
+			}
+			if(asc2dnacat[c] > 0 && begin++ >= this->trim5_) {
 				if(dstLen + 1 > 1024) tooManySeqChars(r.name);
-				r.patBufFw[dstLen] = (color_ ? asc2col[c] : charToDna5[c]);
+				r.patBufFw[dstLen] = charToDna5[c];
 				r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
 			c = filebuf_.get();
-			if(c == '\r' || c == '\n') {
-				// Either we hit EOL or EOF; time to copy the buffered
-				// read data into the 'orig' buffer.
-				c = peekOverNewline(filebuf_);
-				r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
-				filebuf_.resetLastN();
-			}
-			if(c < 0) break;
 		}
 		dstLen -= this->trim3_;
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
