@@ -32,6 +32,7 @@ public:
 	 * Load from .3.ebwt/.4.ebwt Bowtie index files.
 	 */
 	BitPairReference(const string& in,
+	                 bool color,
 	                 bool sanity = false,
 	                 std::vector<string>* infiles = NULL,
 	                 std::vector<String<Dna5> >* origs = NULL,
@@ -293,6 +294,29 @@ public:
 				assert(origs != NULL);
 				os = origs;
 			}
+
+			// Never mind; reference is always letters, even if index
+			// and alignment run are colorspace
+
+			// If we're building a colorspace index, we need to convert
+			// osv to colors first
+//			if(color) {
+//				for(size_t i = 0; i < os->size(); i++) {
+//					size_t olen = seqan::length((*os)[i]);
+//					for(size_t j = 0; j < olen-1; j++) {
+//						int b1 = (int)(*os)[i][j];
+//						assert_geq(b1, 0); assert_leq(b1, 4);
+//						int b2 = (int)(*os)[i][j+1];
+//						assert_geq(b2, 0); assert_leq(b2, 4);
+//						(*os)[i][j] = (Dna5)dinuc2color[b1][b2];
+//						assert((b1 != 4 && b2 != 4) || (int)(*os)[i][j] == 4);
+//					}
+//					seqan::resize((*os)[i], olen-1);
+//				}
+//			}
+			// Go through the loaded reference files base-by-base and
+			// sanity check against what we get by calling getBase and
+			// getStretch
 			for(size_t i = 0; i < os->size(); i++) {
 				size_t olen = seqan::length((*os)[i]);
 				size_t olenU32 = (olen + 12) / 4;
@@ -300,8 +324,8 @@ public:
 				uint8_t *bufadj = (uint8_t*)buf;
 				bufadj += getStretch(buf, i, 0, olen);
 				for(size_t j = 0; j < olen; j++) {
-					assert_eq((*os)[i][j], bufadj[j]);
-					assert_eq((int)(*os)[i][j], getBase(i, j));
+					assert_eq((int)(*os)[i][j], (int)bufadj[j]);
+					assert_eq((int)(*os)[i][j], (int)getBase(i, j));
 				}
 				delete[] buf;
 			}

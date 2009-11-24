@@ -17,16 +17,6 @@
 using namespace std;
 using namespace seqan;
 
-/// Skip to the end of the current line; return the first character
-/// of the next line
-static inline int skipWhitespace(FileBuf& in) {
-	int c;
-	while(isspace(c = in.get())) {
-		if(in.eof()) return -1;
-	}
-	return c;
-}
-
 /**
  * Encapsulates a stretch of the reference containing only unambiguous
  * characters.  From an ordered list of RefRecords, one can (almost)
@@ -80,46 +70,37 @@ struct RefRecord {
  * Parameters governing treatment of references as they're read in.
  */
 struct RefReadInParams {
-	RefReadInParams(int64_t bc, int64_t sc, bool r, bool nsToA) :
-		baseCutoff(bc), numSeqCutoff(sc), reverse(r), nsToAs(nsToA) { }
+	RefReadInParams(int64_t bc, int64_t sc, bool col, bool r,
+	                bool nsToA, bool bisulf) :
+		baseCutoff(bc), numSeqCutoff(sc), color(col), reverse(r),
+		nsToAs(nsToA), bisulfite(bisulf) { }
 	// stop reading references once we've finished reading this many
 	// total reference bases
 	int64_t baseCutoff;
 	// stop reading references once we've finished reading this many
 	// distinct sequences
 	int64_t numSeqCutoff;
+	// extract colors from reference
+	bool color;
 	// reverse each reference sequence before passing it along
 	bool reverse;
 	// convert ambiguous characters to As
 	bool nsToAs;
+	// bisulfite-convert the reference
+	bool bisulfite;
 };
 
-extern RefRecord fastaRefReadSize(FileBuf& in,
-                                  const RefReadInParams& refparams,
-                                  bool first,
-                                  BitpairOutFileBuf* bpout = NULL);
-extern size_t fastaRefReadSizes(vector<FileBuf*>& in,
-                                vector<RefRecord>& recs,
-                                const RefReadInParams& refparams,
-                                BitpairOutFileBuf* bpout = NULL);
+extern RefRecord
+fastaRefReadSize(FileBuf& in,
+                 const RefReadInParams& rparms,
+                 bool first,
+                 BitpairOutFileBuf* bpout = NULL);
 
-/**
- * For given filehandle, read to the end of the current line and return
- * the first character on the next line, or -1 if eof is encountered at
- * any time.
- */
-static inline int skipLine(FileBuf& in) {
-	while(true) {
-		int c = in.get(); if(in.eof()) return -1;
-		if(c == '\n' || c == '\r') {
-			while(c == '\n' || c == '\r') {
-				c = in.get(); if(in.eof()) return -1;
-			}
-			// c now holds first character of next line
-			return c;
-		}
-	}
-}
+extern std::pair<size_t, size_t>
+fastaRefReadSizes(vector<FileBuf*>& in,
+                  vector<RefRecord>& recs,
+                  const RefReadInParams& rparms,
+                  BitpairOutFileBuf* bpout = NULL);
 
 /**
  * Reads the next sequence from the given FASTA file and appends it to
@@ -129,14 +110,14 @@ template <typename TStr>
 static RefRecord fastaRefReadAppend(FileBuf& in,
                                     bool first,
                                     TStr& dst,
-                                    RefReadInParams& refparams,
+                                    RefReadInParams& rparms,
                                     string* name = NULL)
 {
 	typedef typename Value<TStr>::Type TVal;
 	int c;
 	static int lastc = '>';
 	if(first) {
-		c = skipWhitespace(in);
+		c = in.getPastWhitespace();
 		if(c != '>') {
 			cerr << "Reference file does not seem to be a FASTA file" << endl;
 			throw 1;
@@ -145,23 +126,24 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	}
 	assert_neq(-1, lastc);
 
-	assert_neq(refparams.baseCutoff, 0);
-	assert_neq(refparams.numSeqCutoff, 0);
+	assert_neq(rparms.baseCutoff, 0);
+	assert_neq(rparms.numSeqCutoff, 0);
 
 	// RefRecord params
-	size_t seqCharsRead = 0;
-	size_t seqOff = 0;
-	bool seqFirst = true;
+	size_t len = 0;
+	size_t off = 0;
+	first = true;
 
 	size_t ilen = length(dst);
 
 	// Chew up the id line; if the next line is either
 	// another id line or a comment line, keep chewing
+	int lc = -1; // last-DNA char variable for color conversion
 	c = lastc;
 	if(c == '>' || c == '#') {
 		do {
 			while (c == '#') {
-				if((c = skipLine(in)) == -1) {
+				if((c = in.getPastNewline()) == -1) {
 					lastc = -1;
 					goto bail;
 				}
@@ -173,40 +155,52 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 					lastc = -1;
 					goto bail;
 				}
-
 				if(c == '\n' || c == '\r') {
-					while(c == '\n' || c == '\r') {
-						c = in.get();
-						if(c == -1) {
-							lastc = -1;
-							goto bail;
-						}
+					while(c == '\r' || c == '\n') c = in.get();
+					if(c == -1) {
+						lastc = -1;
+						goto bail;
 					}
-					// c now holds first character of next line
 					break;
 				}
 				if (name) name->push_back(c);
 			}
+			// c holds the first character on the line after the name
+			// line
 		} while (c == '>' || c == '#');
 	} else {
 		ASSERT_ONLY(int cc = toupper(c));
 		assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
-		seqFirst = false;
+		first = false;
 	}
 
 	// Skip over gaps
 	while(true) {
-		if(refparams.nsToAs && dna4Cat[c] == 2) {
+		int cat = dna4Cat[c];
+		if(rparms.nsToAs && cat == 2) {
 			c = 'A';
 		}
-		int cat = dna4Cat[c];
+		int cc = toupper(c);
+		if(rparms.bisulfite && cc == 'C') c = cc = 'T';
 		if(cat == 1) {
 			// This is a DNA character
-			break; // to read-in loop
+			if(rparms.color) {
+				if(lc != -1) {
+					// Got two consecutive unambiguous DNAs
+					break; // to read-in loop
+				}
+				// Keep going; we need two consecutive unambiguous DNAs
+				lc = charToDna5[(int)c];
+				// The 'if(off > 0)' takes care of the case where
+				// the reference is entirely unambiguous and we don't
+				// want to incorrectly increment off.
+				if(off > 0) off++;
+			} else {
+				break; // to read-in loop
+			}
 		} else if(cat == 2) {
-			ASSERT_ONLY(int cc = toupper(c));
-			assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
-			seqOff++; // skip it
+			lc = -1;
+			off++; // skip it
 		} else if(c == '>') {
 			lastc = '>';
 			goto bail;
@@ -217,6 +211,13 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 			goto bail;
 		}
 	}
+	if(first && rparms.color && off > 0) {
+		// Handle the case where the first record has ambiguous
+		// characters but we're in color space; one of those counts is
+		// spurious
+		off--;
+	}
+	assert(!rparms.color || lc != -1);
 	assert_eq(1, dna4Cat[c]);
 
 	// in now points just past the first character of a sequence
@@ -227,34 +228,42 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 		int cat = dna4Cat[c];
 		assert_neq(2, cat);
 		if(cat == 1) {
-			appendValue(dst, (Dna)(char)c);
+			// Consume it
+			if(!rparms.color || lc != -1) len++;
+			// Add it to referenece buffer
+			if(rparms.color) {
+				appendValue(dst, (Dna)dinuc2color[charToDna5[(int)c]][lc]);
+			} else if(!rparms.color) {
+				appendValue(dst, (Dna)(char)c);
+			}
 			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
-			seqCharsRead++;
-			if(refparams.baseCutoff > 0 &&
-			   (int64_t)seqCharsRead >= refparams.baseCutoff)
+			if(rparms.baseCutoff > 0 &&
+			   (int64_t)len >= rparms.baseCutoff)
 			{
 				lastc = -1;
 				goto bail;
 			}
+			lc = charToDna5[(int)c];
 		}
 		c = in.get();
-		if(refparams.nsToAs && dna4Cat[c] == 2) {
+		if(rparms.nsToAs && dna4Cat[c] == 2) {
 			c = 'A';
 		}
 		if (c == -1 || c == '>' || c == '#' || dna4Cat[c] == 2) {
 			lastc = c;
 			break;
 		}
+		if(rparms.bisulfite && toupper(c) == 'C') c = 'T';
 	}
 
   bail:
 	// Optionally reverse the portion that we just appended
-	if(refparams.reverse) {
+	if(rparms.reverse) {
 		// Find limits of the portion we just appended
 		size_t nlen = length(dst);
-		assert_eq(nlen - ilen, seqCharsRead);
-		if(seqCharsRead > 0) {
-			size_t halfway =  ilen + (seqCharsRead>>1);
+		assert_eq(nlen - ilen, len);
+		if(len > 0) {
+			size_t halfway =  ilen + (len>>1);
 			// Reverse it in-place
 			for(size_t i = ilen; i < halfway; i++) {
 				size_t diff = i-ilen;
@@ -265,7 +274,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 			}
 		}
 	}
-	return RefRecord(seqOff, seqCharsRead, seqFirst);
+	return RefRecord(off, len, first);
 }
 
 #endif /*ndef REF_READ_H_*/

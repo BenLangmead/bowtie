@@ -12,37 +12,27 @@ using namespace std;
 using namespace seqan;
 
 /**
- * Helper function to print a uint32_t as a DNA string where each 2-bit
- * stretch is a character and more significiant bits appear to the left
- * of less singificant bits.
- */
-static inline std::string u32ToDna(uint32_t a, int len) {
-	char buf[17]; // TODO: return a new string; by value I guess
-	assert_leq(len, 16);
-	for(int i = 0; i < len; i++) {
-		buf[len-i-1] = "ACGT"[a & 3];
-		a >>= 2;
-	}
-	buf[len] = '\0';
-	return std::string(buf);
-}
-
-/**
  * Return a new TStr containing the reverse-complement of s.  Ns go to
  * Ns.
  */
 template<typename TStr>
-static inline TStr reverseComplement(const TStr& s) {
+static inline TStr reverseComplement(const TStr& s, bool color) {
 	typedef typename Value<TStr>::Type TVal;
 	TStr s_rc;
 	size_t slen = length(s);
 	resize(s_rc, slen);
-	for(size_t i = 0; i < slen; i++) {
-		int sv = (int)s[slen-i-1];
-		if(sv == 4) {
-			s_rc[i] = (TVal)4;
-		} else {
-			s_rc[i] = (TVal)(sv ^ 3);
+	if(color) {
+		for(size_t i = 0; i < slen; i++) {
+			s_rc[i] = s[slen-i-1];
+		}
+	} else {
+		for(size_t i = 0; i < slen; i++) {
+			int sv = (int)s[slen-i-1];
+			if(sv == 4) {
+				s_rc[i] = (TVal)4;
+			} else {
+				s_rc[i] = (TVal)(sv ^ 3);
+			}
 		}
 	}
 	return s_rc;
@@ -52,7 +42,7 @@ static inline TStr reverseComplement(const TStr& s) {
  * Reverse-complement s in-place.  Ns go to Ns.
  */
 template<typename TStr>
-static inline void reverseComplementInPlace(TStr& s, bool color = false) {
+static inline void reverseComplementInPlace(TStr& s, bool color) {
 	typedef typename Value<TStr>::Type TVal;
 	if(color) {
 		reverseInPlace(s);
@@ -104,25 +94,6 @@ static inline TStr reverseCopy(const TStr& s) {
 		s_rc[i] = (TVal)((int)s[slen-i-1]);
 	}
 	return s_rc;
-}
-
-/**
- * Return the reverse-complement of s.
- */
-static inline bool isReverseComplement(const String<Dna5>& s1,
-                                       const String<Dna5>& s2)
-{
-	if(length(s1) != length(s2)) return false;
-	size_t slen = length(s1);
-	for(size_t i = 0; i < slen; i++) {
-		int i1 = (int)s1[i];
-		int i2 = (int)s2[slen - i - 1];
-		if(i1 == 4) {
-			if(i2 != 4) return false;
-		}
-		else if(i1 != (i2 ^ 3)) return false;
-	}
-	return true;
 }
 
 /**
@@ -226,6 +197,56 @@ static inline char comp(char c) {
 
 extern uint8_t dna4Cat[];
 extern uint8_t charToDna5[];
+extern uint8_t asc2col[];
 extern uint8_t rcCharToDna5[];
+
+/// Convert an ascii char to a DNA category.  Categories are:
+/// 0 -> invalid
+/// 1 -> unambiguous a, c, g or t
+/// 2 -> ambiguous
+/// 3 -> unmatchable
+extern uint8_t asc2dnacat[];
+
+/// Convert an ascii char to a color category.  Categories are:
+/// 0 -> invalid
+/// 1 -> unambiguous 0, 1, 2 or 3
+/// 2 -> ambiguous (not applicable for colors)
+/// 3 -> unmatchable
+extern uint8_t asc2colcat[];
+
+/// Convert a 2-bit nucleotide (and 4=N) and a color to the
+/// corresponding 2-bit nucleotide
+extern uint8_t nuccol2nuc[5][5];
+
+/**
+ * Return true iff c is an unambiguous Dna character.
+ */
+static inline bool isUnambigDna(char c) {
+	return asc2dnacat[(int)c] == 1;
+}
+
+/**
+ * Return true iff c is a Dna character.
+ */
+static inline bool isDna(char c) {
+	return asc2dnacat[(int)c] > 0;
+}
+
+/**
+ * Return true iff c is an unambiguous color character (0,1,2,3).
+ */
+static inline bool isUnambigColor(char c) {
+	return asc2colcat[(int)c] == 1;
+}
+
+/**
+ * Return true iff c is a color character.
+ */
+static inline bool isColor(char c) {
+	return asc2colcat[(int)c] > 0;
+}
+
+/// Convert a pair of 2-bit (and 4=N) encoded DNA bases to a color
+extern uint8_t dinuc2color[5][5];
 
 #endif /*ALPHABETS_H_*/

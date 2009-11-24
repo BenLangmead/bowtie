@@ -108,6 +108,8 @@ struct ReadBuf {
 		readOrigBufLen = 0;
 		alts = 0;
 		fuzzy = false;
+		color = false;
+		primer = '?';
 		RESET_BUF(patFw, patBufFw, Dna5);
 		RESET_BUF(patRc, patBufRc, Dna5);
 		RESET_BUF(qual, qualBuf, char);
@@ -142,6 +144,8 @@ struct ReadBuf {
 			seqan::clear(altQualRev[j]);
 		}
 		readOrigBufLen = 0;
+		color = fuzzy = false;
+		primer = '?';
 	}
 
 	/// Return true iff the read (pair) is empty
@@ -155,7 +159,9 @@ struct ReadBuf {
 	}
 
 	/**
-	 * Construct patRc in place.
+	 * Construct reverse complement of the pattern and the fuzzy
+	 * alternative patters.  If read is in colorspace, just reverse
+	 * them.
 	 */
 	void constructRevComps() {
 		uint32_t len = length();
@@ -164,11 +170,23 @@ struct ReadBuf {
 		for(int j = 0; j < alts; j++) {
 			RESET_BUF_LEN(altPatRc[j], altPatBufRc[j], len, Dna5);
 		}
-		for(uint32_t i = 0; i < len; i++) {
-			// Reverse-complement the sequence
-			patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
-			for(int j = 0; j < alts; j++) {
-				altPatBufRc[j][i] = (altPatBufFw[j][len-i-1] == 4) ? 4 : (altPatBufFw[j][len-i-1] ^ 3);
+		if(color) {
+			for(uint32_t i = 0; i < len; i++) {
+				// Reverse the sequence
+				patBufRc[i]  = patBufFw[len-i-1];
+				for(int j = 0; j < alts; j++) {
+					// Reverse the fuzzy alternatives
+					altPatBufRc[j][i] = altPatBufFw[j][len-i-1];
+				}
+			}
+		} else {
+			for(uint32_t i = 0; i < len; i++) {
+				// Reverse-complement the sequence
+				patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
+				for(int j = 0; j < alts; j++) {
+					// Reverse-complement the fuzzy alternatives
+					altPatBufRc[j][i] = (altPatBufFw[j][len-i-1] == 4) ? 4 : (altPatBufFw[j][len-i-1] ^ 3);
+				}
 			}
 		}
 	}
@@ -232,9 +250,20 @@ struct ReadBuf {
 		}
 	}
 
+	/**
+	 * Dump basic information about this read to the given ostream.
+	 */
 	void dump(std::ostream& os) const {
-		os << name << " " << patFw << " ";
-		// Print out the sequences
+		os << name << ' ';
+		if(color) {
+			for(size_t i = 0; i < seqan::length(patFw); i++) {
+				os << "0123."[(int)patFw[i]];
+			}
+		} else {
+			os << patFw;
+		}
+		os << ' ';
+		// Print out the fuzzy alternative sequences
 		for(int j = 0; j < 3; j++) {
 			bool started = false;
 			if(seqan::length(altQual[j]) > 0) {
@@ -246,7 +275,11 @@ struct ReadBuf {
 						if(altQual[j][i] == '!') {
 							os << '-';
 						} else {
-							os << altPatFw[j][i];
+							if(color) {
+								os << "0123."[(int)altPatFw[j][i]];
+							} else {
+								os << altPatFw[j][i];
+							}
 						}
 					}
 				}
@@ -254,7 +287,7 @@ struct ReadBuf {
 			cout << " ";
 		}
 		os << qual << " ";
-		// Print out the quality strings
+		// Print out the fuzzy alternative quality strings
 		for(int j = 0; j < 3; j++) {
 			bool started = false;
 			if(seqan::length(altQual[j]) > 0) {
@@ -283,6 +316,7 @@ struct ReadBuf {
 		hs.name = name;
 		hs.seq = patFw;
 		hs.qual = qual;
+		hs.color = color;
 	}
 
 	static const int BUF_SIZE = 1024;
@@ -325,6 +359,8 @@ struct ReadBuf {
 	uint32_t      seed;                // random seed
 	int           alts;                // number of alternatives
 	bool          fuzzy;               // whether to employ fuzziness
+	bool          color;               // whether read is in color space
+	char          primer;              // primer base, for csfasta files
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
@@ -1285,6 +1321,11 @@ static inline int peekToEndOfLine(FileBuf& in) {
 	}
 }
 
+extern void wrongQualityFormat(const String<char>& read_name);
+extern void tooFewQualities(const String<char>& read_name);
+extern void tooManyQualities(const String<char>& read_name);
+extern void tooManySeqChars(const String<char>& read_name);
+
 /**
  * Encapsualtes a source of patterns which is an in-memory vector.
  */
@@ -1439,7 +1480,6 @@ public:
 	BufferedFilePatternSource(const vector<string>& infiles,
 	                          bool randomizeQuals = false,
 	                          bool useSpinlock = true,
-	                          bool __forgiveInput = false,
 	                          const char *dumpfile = NULL,
 	                          bool verbose = false,
 	                          int trim3 = 0,
@@ -1450,7 +1490,6 @@ public:
 		infiles_(infiles),
 		filecur_(0),
 		filebuf_(),
-		forgiveInput_(__forgiveInput),
 		skip_(skip),
 		first_(true)
 	{
@@ -1487,7 +1526,7 @@ public:
 			assert(seqan::empty(r.patFw));
 			return;
 		}
-		if(first_ && seqan::empty(r.patFw) && !forgiveInput_) {
+		if(first_ && seqan::empty(r.patFw) /* && !quiet_ */) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any reads in \"" << infiles_[0] << "\"" << endl;
 		}
@@ -1500,7 +1539,7 @@ public:
 				read(r, patid);
 			} while((seqan::empty(r.patFw) && !filebuf_.eof()));
 			assert_geq(patid, skip_);
-			if(seqan::empty(r.patFw) && !forgiveInput_) {
+			if(seqan::empty(r.patFw) /*&& !quiet_ */) {
 				// No reads could be extracted from this _infile
 				cerr << "Warning: Could not find any reads in \"" << infiles_[filecur_] << "\"" << endl;
 			}
@@ -1533,7 +1572,7 @@ public:
 			assert(seqan::empty(ra.patFw));
 			return;
 		}
-		if(first_ && seqan::empty(ra.patFw) && !forgiveInput_) {
+		if(first_ && seqan::empty(ra.patFw) /*&& !quiet_*/) {
 			// No reads could be extracted from the first _infile
 			cerr << "Warning: Could not find any read pairs in \"" << infiles_[0] << "\"" << endl;
 		}
@@ -1546,7 +1585,7 @@ public:
 				readPair(ra, rb, patid);
 			} while((seqan::empty(ra.patFw) && !filebuf_.eof()));
 			assert_geq(patid, skip_);
-			if(seqan::empty(ra.patFw) && !forgiveInput_) {
+			if(seqan::empty(ra.patFw) /*&& !quiet_*/) {
 				// No reads could be extracted from this _infile
 				cerr << "Warning: Could not find any reads in \"" << infiles_[filecur_] << "\"" << endl;
 			}
@@ -1601,29 +1640,28 @@ protected:
 	vector<bool> errs_; /// whether we've already printed an error for each file
 	size_t filecur_;   /// index into infiles_ of next file to read
 	FileBuf filebuf_;  /// read file currently being read from
-	bool forgiveInput_; /// try hard to parse input even if it's malformed
 	uint32_t skip_;     /// number of reads to skip
 	bool first_;
 };
 
 /**
- * Synchronized concrete pattern source for a list of FASTA files.
+ * Synchronized concrete pattern source for a list of FASTA or CSFASTA
+ * (if color = true) files.
  */
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
 	FastaPatternSource(const vector<string>& infiles,
-	                   bool randomizeQuals = false,
+	                   bool color,
+	                   bool randomizeQuals,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
 	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   bool __forgiveInput = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          __forgiveInput, dumpfile, verbose,
-		                          trim3, trim5, skip),
-		first_(true)
+		                          dumpfile, verbose, trim3, trim5, skip),
+		first_(true), color_(color)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -1641,6 +1679,13 @@ protected:
 		}
 		return c;
 	}
+
+	/// Called when we have to bail without having parsed a read.
+	void bail(ReadBuf& r) {
+		r.clearAll();
+		filebuf_.resetLastN();
+	}
+
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		int c;
@@ -1648,28 +1693,12 @@ protected:
 		int nameLen = 0;
 		// Pick off the first carat
 		c = filebuf_.get();
-		if(c == -1) {
-			r.clearAll();
-			filebuf_.resetLastN();
-			return;
-		}
+		if(c < 0) { bail(r); return; }
 		assert_eq('>', c);
 		if(first_) {
 			if(c != '>') {
-				if(forgiveInput_) {
-					c = FastaPatternSource::skipToNextFastaRecord(filebuf_);
-					if(c < 0) {
-						r.clearAll();
-						filebuf_.resetLastN();
-						return;
-					}
-				} else {
-					c = getOverNewline(filebuf_); if(c < 0) {
-						r.clearAll();
-						filebuf_.resetLastN();
-						return;
-					}
-				}
+				c = getOverNewline(filebuf_);
+				if(c < 0) { bail(r); return; }
 			}
 			if(c != '>') {
 				cerr << "Error: reads file does not look like a FASTA file" << endl;
@@ -1682,19 +1711,13 @@ protected:
 		// Read to the end of the id line, sticking everything after the '>'
 		// into *name
 		while(true) {
-			c = filebuf_.get(); if(c < 0) {
-				r.clearAll();
-				filebuf_.resetLastN();
-				return;
-			}
+			c = filebuf_.get();
+			if(c < 0) { bail(r); return; }
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
-					c = filebuf_.get(); if(c < 0) {
-						r.clearAll();
-						filebuf_.resetLastN();
-						return;
-					}
+					c = filebuf_.get();
+					if(c < 0) { bail(r); return; }
 				}
 				break;
 			}
@@ -1706,19 +1729,28 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
+		if(color_) {
+			// This is the primer character, keep it in the
+			// 'primer' field of the read buf and keep parsing
+			c = toupper(c);
+			if(c != 'A' && c != 'C' && c != 'G' && c != 'T') {
+				cerr << "Warning: Primer character for read " << r.name << " is not DNA: " << c << endl;
+			}
+			r.primer = c;
+			r.color = true;
+			c = filebuf_.get();
+			if(c < 0) { bail(r); return; }
+		}
 		while(c != '>') {
-			if(isalpha(c) && begin++ >= this->trim5_) {
-				if(dstLen + 1 > 1024) {
-					cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
-						 << "reads and re-run Bowtie" << endl;
-					throw 1;
-				}
-				r.patBufFw [dstLen] = charToDna5[c];
-				r.qualBuf[dstLen]   = 'I';
+			bool ischar = (color_ ? isColor(c) : isDna(c));
+			if(ischar && begin++ >= this->trim5_) {
+				if(dstLen + 1 > 1024) tooManySeqChars(r.name);
+				r.patBufFw[dstLen] = (color_ ? asc2col[c] : charToDna5[c]);
+				r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
 			c = filebuf_.get();
-			if(c == '\r' || c == '\n' || c == -1) {
+			if(c == '\r' || c == '\n') {
 				// Either we hit EOL or EOF; time to copy the buffered
 				// read data into the 'orig' buffer.
 				c = peekOverNewline(filebuf_);
@@ -1732,7 +1764,6 @@ protected:
 		_setLength(r.patFw, dstLen);
 		_setBegin (r.qual,  r.qualBuf);
 		_setLength(r.qual,  dstLen);
-
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
 			itoa10(readCnt_, r.nameBuf);
@@ -1765,6 +1796,7 @@ protected:
 	}
 private:
 	bool first_;
+	bool color_;
 };
 
 
@@ -1778,11 +1810,6 @@ static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, 
 	tokenize(string(buf), " ", toks);
 	return true;
 }
-
-extern void wrongQualityFormat(const String<char>& read_name);
-extern void tooFewQualities(const String<char>& read_name);
-extern void tooManyQualities(const String<char>& read_name);
-extern void tooManySeqChars(const String<char>& read_name);
 
 /**
  * Synchronized concrete pattern source for a list of files with tab-
@@ -1798,13 +1825,12 @@ public:
 	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   bool forgiveInput = false,
 	                   bool solQuals = false,
 	                   bool phred64Quals = false,
 	                   bool intQuals = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          forgiveInput, dumpfile, verbose,
+		                          dumpfile, verbose,
 		                          trim3, trim5, skip),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
@@ -1926,9 +1952,7 @@ protected:
 		}
 		assert_eq('\n', ct);
 		if(filebuf_.peek() == '\n') {
-			if(!forgiveInput_) {
-				assert(false);
-			}
+			assert(false);
 		}
 		peekOverNewline(filebuf_);
 		ra.readOrigBufLen = filebuf_.copyLastN(ra.readOrigBuf);
@@ -2017,11 +2041,7 @@ private:
 			if(isalpha(c)) {
 				if(begin++ >= this->trim5_) {
 					if(dna4Cat[c] == 0) {
-						if(forgiveInput_) {
-							return -1;
-						} else {
-							assert(false);
-						}
+						assert(false);
 					}
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
@@ -2095,11 +2115,7 @@ private:
 				}
 			}
 			if(qualsRead != dstLen + this->trim5_) {
-				if(forgiveInput_) {
-					return -1;
-				} else {
-					assert(false);
-				}
+				assert(false);
 			}
 		}
 		_setBegin (r.qual, (char*)r.qualBuf);
@@ -2132,7 +2148,7 @@ public:
 			uint32_t skip = 0,
 			uint32_t seed = 0) :
 		BufferedFilePatternSource(infiles, false, useSpinlock,
-		                          false, dumpfile, verbose, 0, 0, skip),
+		                          dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_-1), beginning_(true),
 		nameChars_(0), bufCur_(0), subReadCnt_(0llu)
@@ -2266,26 +2282,27 @@ private:
 class FastqPatternSource : public BufferedFilePatternSource {
 public:
 	FastqPatternSource(const vector<string>& infiles,
+	                   bool color,
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
 	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
-	                   bool __forgiveInput = false,
 	                   bool solexa_quals = false,
 	                   bool phred64Quals = false,
 	                   bool integer_quals = false,
 	                   bool fuzzy = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          __forgiveInput, dumpfile, verbose,
+		                          dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals),
-		fuzzy_(fuzzy)
+		fuzzy_(fuzzy),
+		color_(color)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -2344,26 +2361,14 @@ protected:
 		int dstLen = 0;
 		int nameLen = 0;
 		r.fuzzy = fuzzy_;
+		r.color = color_;
 		r.alts = 0;
 		// Pick off the first at
 		if(first_) {
 			c = filebuf_.get();
 			if(c != '@') {
-				if(forgiveInput_) {
-					c = FastqPatternSource::skipToNextFastqRecord(filebuf_, c == '+');
-					if(c < 0) {
-						filebuf_.resetLastN();
-						seqan::clear(r.patFw);
-						return;
-					}
-				} else {
-					c = getOverNewline(filebuf_);
-					if(c < 0) {
-						filebuf_.resetLastN();
-						seqan::clear(r.patFw);
-						return;
-					}
-				}
+				c = getOverNewline(filebuf_);
+				if(c < 0) { bail(r); return; }
 			}
 			if(c != '@') {
 				cerr << "Error: reads file does not look like a FASTQ file" << endl;
@@ -2377,20 +2382,12 @@ protected:
 		// into *name
 		while(true) {
 			c = filebuf_.get();
-			if(c < 0) {
-				seqan::clear(r.patFw);
-				filebuf_.resetLastN();
-				return;
-			}
+			if(c < 0) { bail(r); return; }
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
 					c = filebuf_.get();
-					if(c < 0) {
-						seqan::clear(r.patFw);
-						filebuf_.resetLastN();
-						return;
-					}
+					if(c < 0) { bail(r); return; }
 				}
 				break;
 			}
@@ -2419,6 +2416,11 @@ protected:
 		int trim5 = this->trim5_;
 		int altBufIdx = 0;
 		while(c != '+') {
+			// Convert color numbers to letters if necessary
+			if(color_) {
+				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+				if(c == '.') c = 'N';
+			}
 			if(fuzzy_ && c == '-') c = 'A';
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
@@ -2432,7 +2434,7 @@ protected:
 				if(charsRead == 0) {
 					c = filebuf_.get();
 					continue;
-					}
+				}
 				charsRead = 0;
 				if(altBufIdx >= 3) {
 					cerr << "At most 3 alternate sequence strings permitted; offending read: " << r.name << endl;
@@ -2443,12 +2445,7 @@ protected:
 				dstLenCur = &dstLens[altBufIdx];
 			}
 			c = filebuf_.get();
-			if(c < 0) {
-				// EOF occurred in the middle of a read - abort
-				seqan::clear(r.patFw);
-				filebuf_.resetLastN();
-				return;
-			}
+			if(c < 0) { bail(r); return; }
 		}
 		// Trim from 3' end
 		dstLen = dstLens[0];
@@ -2507,12 +2504,7 @@ protected:
 					qualsReadCur = &qualsRead[altBufIdx];
 					continue;
 				}
-				if(c < 0) {
-					// EOF occurred in the middle of a read - abort
-					seqan::clear(r.patFw);
-					filebuf_.resetLastN();
-					return;
-				}
+				if(c < 0) { bail(r); return; }
 				if (c != '\r' && c != '\n') {
 					if (*qualsReadCur >= trim5) {
 						size_t off = (*qualsReadCur) - trim5;
@@ -2614,11 +2606,23 @@ protected:
 		out << "@" << name << endl << seq << endl << "+" << endl << qual << endl;
 	}
 private:
+
+	/**
+	 * Do things we need to do if we have to bail in the middle of a
+	 * read, usually because we reached the end of the input without
+	 * finishing.
+	 */
+	void bail(ReadBuf& r) {
+		seqan::clear(r.patFw);
+		filebuf_.resetLastN();
+	}
+
 	bool first_;
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
 	bool fuzzy_;
+	bool color_;
 };
 
 /**
@@ -2629,6 +2633,7 @@ private:
 class RawPatternSource : public BufferedFilePatternSource {
 public:
 	RawPatternSource(const vector<string>& infiles,
+	                 bool color,
 	                 bool randomizeQuals = false,
 	                 bool useSpinlock = true,
 	                 const char *dumpfile = NULL,
@@ -2636,9 +2641,9 @@ public:
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, randomizeQuals, false, useSpinlock,
+		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
 		                          dumpfile, verbose, trim3, trim5, skip),
-		first_(true)
+		first_(true), color_(color)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -2657,6 +2662,10 @@ protected:
 		}
 		assert(!isspace(c));
 		if(first_) {
+			if(color_) {
+				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+				if(c == '.') c = 'N';
+			}
 			if(dna4Cat[c] == 0) {
 				cerr << "Error: reads file does not look like a Raw file" << endl;
 				if(c == '>') {
@@ -2674,6 +2683,10 @@ protected:
 		// line, and c holds the first character
 		while(!isspace(c) && c >= 0) {
 			c = filebuf_.get();
+			if(color_) {
+				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+				if(c == '.') c = 'N';
+			}
 			if(isalpha(c) && dstLen >= this->trim5_) {
 				size_t len = dstLen - this->trim5_;
 				if(len >= 1024) tooManyQualities(String<char>("(no name)"));
@@ -2727,6 +2740,7 @@ protected:
 	}
 private:
 	bool first_;
+	bool color_;
 };
 
 /**
@@ -2742,7 +2756,7 @@ public:
 	                   bool verbose,
 	                   uint32_t skip) :
 	BufferedFilePatternSource(
-		infiles, false, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
+		infiles, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
 
 protected:
 

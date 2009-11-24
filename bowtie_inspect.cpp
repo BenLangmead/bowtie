@@ -262,12 +262,13 @@ static void driver(const string& ebwtFileBase, const string& query) {
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
 	} else {
 		// Initialize Ebwt object
-		TPackedEbwt ebwt(adjustedEbwtFileBase, true, -1, -1,
+		bool color = readEbwtColor(adjustedEbwtFileBase);
+		TPackedEbwt ebwt(adjustedEbwtFileBase, color, true, -1, -1,
 		                 false, false, false, true, // no memory-mapped io
 		                 NULL, // no reference map
 		                 verbose);
-	    // Load whole index into memory
-		ebwt.loadIntoMemory(true, false);
+		// Load whole index into memory
+		ebwt.loadIntoMemory(-1, true, false);
 		print_index_sequences(cout, ebwt);
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {

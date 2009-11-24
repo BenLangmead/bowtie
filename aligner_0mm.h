@@ -25,6 +25,7 @@ public:
 	UnpairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			int snpPhred,
 			bool doFw,
 			bool doRc,
 			HitSink& sink,
@@ -33,6 +34,7 @@ public:
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
 			ChunkPool *pool,
+			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
 			bool qualOrder,
@@ -43,6 +45,7 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			snpPhred_(snpPhred),
 			doFw_(doFw), doRc_(doRc),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -50,6 +53,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
+			refs_(refs),
 			os_(os),
 			maqPenalty_(maqPenalty),
 			qualOrder_(qualOrder),
@@ -68,7 +72,7 @@ public:
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true);
 
 		const int halfAndHalf = 0;
 		const bool seeded = false;
@@ -108,13 +112,14 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_, quiet_,
-			INT_MAX, pool_, NULL, NULL);
+			sink_, sinkPtFactory_, sinkPt, os_, refs_, snpPhred_,
+			rangeMode_, verbose_, quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	int snpPhred_;
 	bool doFw_;
 	bool doRc_;
 	HitSink& sink_;
@@ -123,6 +128,7 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
+	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	bool maqPenalty_;
 	bool qualOrder_;
@@ -144,6 +150,8 @@ public:
 	PairedExactAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool color,
+			int snpPhred,
 			bool doFw,
 			bool doRc,
 			bool v1,
@@ -172,6 +180,8 @@ public:
 			bool quiet,
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
+			color_(color),
+			snpPhred_(snpPhred),
 			doFw_(doFw),
 			doRc_(doRc),
 			v1_(v1),
@@ -209,15 +219,15 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		HitSinkPerThread* sinkPtSe1 = NULL, * sinkPtSe2 = NULL;
 		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true);
 		EbwtSearchParams<String<Dna> >* paramsSe1 = NULL, * paramsSe2 = NULL;
 		if(reportSe_) {
 			sinkPtSe1 = sinkPtFactory_.create();
 			sinkPtSe2 = sinkPtFactory_.create();
 			paramsSe1 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_, true, true, true, rangeMode_);
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_, true, true);
 			paramsSe2 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_, true, true, true, rangeMode_);
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_, true, true);
 		}
 
 		const int halfAndHalf = 0;
@@ -301,7 +311,8 @@ public:
 				os_, verbose_, quiet_, false, pool_, NULL);
 		}
 
-		RefAligner<String<Dna5> >* refAligner = new ExactRefAligner<String<Dna5> >(verbose_, quiet_);
+		RefAligner<String<Dna5> >* refAligner
+			= new ExactRefAligner<String<Dna5> >(color_, verbose_, quiet_);
 
 		// Set up a RangeChaser
 		RangeChaser<String<Dna> > *rchase =
@@ -317,8 +328,8 @@ public:
 				refAligner,
 				rchase, sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_,
-				INT_MAX, pool_, NULL);
+				mixedAttemptLim_, refs_, snpPhred_, rangeMode_, verbose_,
+				quiet_, INT_MAX, pool_, NULL);
 			return al;
 		} else {
 			TRangeSrcDrPtrVec *drVec = new TRangeSrcDrPtrVec();
@@ -333,8 +344,8 @@ public:
 				rchase, sink_, sinkPtFactory_, sinkPt,
 				sinkPtSe1, sinkPtSe2, mate1fw_, mate2fw_,
 				peInner_, peOuter_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_,
-				INT_MAX, pool_, NULL);
+				mixedAttemptLim_, refs_, snpPhred_, rangeMode_,
+				verbose_, quiet_, INT_MAX, pool_, NULL);
 			delete drVec;
 			return al;
 		}
@@ -343,6 +354,8 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool color_;
+	int snpPhred_;
 	bool doFw_;
 	bool doRc_;
 	bool v1_;

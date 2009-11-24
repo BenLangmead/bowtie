@@ -24,46 +24,50 @@ class GreedyDFSRangeSource {
 
 public:
 	GreedyDFSRangeSource(
-			const Ebwt<DnaString>* __ebwt,
-			const EbwtSearchParams<DnaString>& __params,
-			uint32_t __qualThresh,  /// max acceptable q-distance
+			const Ebwt<DnaString>* ebwt,
+			const EbwtSearchParams<DnaString>& params,
+			const BitPairReference* refs,
+			int snpPhred,
+			uint32_t qualThresh,  /// max acceptable q-distance
 			const int maxBts, /// maximum # backtracks allowed
-			uint32_t __reportPartials = 0,
-			bool __reportExacts = true,
-			bool __reportRanges = false,
-			PartialAlignmentManager* __partials = NULL,
-			String<QueryMutation>* __muts = NULL,
-			bool __verbose = true,
-			vector<String<Dna5> >* __os = NULL,
-			bool __considerQuals = true,  // whether to consider quality values when making backtracking decisions
-			bool __halfAndHalf = false, // hacky way of supporting separate revisitable regions
-			bool __maqPenalty = true) :
+			uint32_t reportPartials = 0,
+			bool reportExacts = true,
+			bool reportRanges = false,
+			PartialAlignmentManager* partials = NULL,
+			String<QueryMutation>* muts = NULL,
+			bool verbose = true,
+			vector<String<Dna5> >* os = NULL,
+			bool considerQuals = true,  // whether to consider quality values when making backtracking decisions
+			bool halfAndHalf = false, // hacky way of supporting separate revisitable regions
+			bool maqPenalty = true) :
+		_refs(refs),
+		_snpPhred(snpPhred),
 		_qry(NULL),
 		_qlen(0),
 		_qual(NULL),
 		_name(NULL),
-		_ebwt(__ebwt),
-		_params(__params),
+		_ebwt(ebwt),
+		_params(params),
 		_unrevOff(0),
 		_1revOff(0),
 		_2revOff(0),
 		_3revOff(0),
-		_maqPenalty(__maqPenalty),
-		_qualThresh(__qualThresh),
+		_maqPenalty(maqPenalty),
+		_qualThresh(qualThresh),
 		_pairs(NULL),
 		_elims(NULL),
 		_mms(),
 		_refcs(),
 		_chars(NULL),
-		_reportPartials(__reportPartials),
-		_reportExacts(__reportExacts),
-		_reportRanges(__reportRanges),
-		_partials(__partials),
-		_muts(__muts),
-		_os(__os),
+		_reportPartials(reportPartials),
+		_reportExacts(reportExacts),
+		_reportRanges(reportRanges),
+		_partials(partials),
+		_muts(muts),
+		_os(os),
 		_sanity(_os != NULL && _os->size() > 0),
-		_considerQuals(__considerQuals),
-		_halfAndHalf(__halfAndHalf),
+		_considerQuals(considerQuals),
+		_halfAndHalf(halfAndHalf),
 		_5depth(0),
 		_3depth(0),
 		_numBts(0),
@@ -72,14 +76,14 @@ public:
 		_precalcedSideLocus(false),
 		_preLtop(),
 		_preLbot(),
-		_verbose(__verbose),
+		_verbose(verbose),
 		_ihits(0llu)
 	{ }
 
 	~GreedyDFSRangeSource() {
-		if(_pairs != NULL)          delete[] _pairs;
-		if(_elims != NULL)          delete[] _elims;
-		if(_chars != NULL)          delete[] _chars;
+		if(_pairs != NULL) delete[] _pairs;
+		if(_elims != NULL) delete[] _elims;
+		if(_chars != NULL) delete[] _chars;
 	}
 
 	/**
@@ -131,6 +135,7 @@ public:
 		}
 		// Initialize the random source using new read as part of the
 		// seed.
+		_color = r.color;
 		_rand.init(r.seed);
 	}
 
@@ -347,12 +352,6 @@ public:
 
 		// Remainder of this function is sanity checking
 		sink.setRetainHits(oldRetain); // restore old value
-		if(_sanity) {
-			// Check that the alignments produced for the read and
-			// backtracking constraints are consistent with results
-			// obtained by a naive oracle
-			sanityCheckHits(sink.retainedHits(), _ihits, iham);
-		}
 		_totNumBts += _numBts;
 		_numBts = 0;
 		_precalcedSideLocus = false;
@@ -684,9 +683,6 @@ public:
 						backtrackDespiteMatch = true;
 						mustBacktrack = true;
 					} else if(stackDepth == 0) {
-						if(sink.numValidHits() == prehits) {
-							confirmNoHit(iham);
-						}
 						// We're returning from the bottommost frame
 						// without having found any hits; let's
 						// sanity-check that there really aren't any
@@ -716,12 +712,6 @@ public:
 						mustBacktrack = true;
 						backtrackDespiteMatch = true;
 					} else if(stackDepth < 2) {
-						if(stackDepth == 0 && sink.numValidHits() == prehits) {
-							// We're returning from the bottommost frame
-							// without having found any hits; let's
-							// sanity-check that there really aren't any
-							confirmNoHit(iham);
-						}
 						return false;
 					}
 				}
@@ -744,11 +734,7 @@ public:
 			   !invalidExact &&       // alignment isn't disqualified by no-exact-hits setting
 			   !reportedPartial)      // for when it's a partial alignment we've already reported
 			{
-				uint64_t rhits = sink.numReportedHits();
 				bool ret = reportAlignment(stackDepth, top, bot, ham);
-				if(_sanity && sink.numReportedHits() > rhits) {
-					confirmHit(iham);
-				}
 				if(!ret) {
 					// reportAlignment returned false, so enter the
 					// backtrack loop and keep going
@@ -992,11 +978,6 @@ public:
 				}
 				if(ret) {
 					assert_gt(sink.numValidHits(), prehits);
-					// Not necessarily true that there is a hit to
-					// confirm; it could be that true was returned
-					// because we just ran up against the max, where
-					// max > k
-					//if(_sanity) confirmHit(iham);
 					return true; // return, signaling that we're done
 				}
 				if(_bailedOnBacktracks ||
@@ -1025,12 +1006,6 @@ public:
 					assert_eq(0, altNum);
 					assert_eq(0, eligibleSz);
 					assert_eq(0, eligibleNum);
-					if(stackDepth == 0 && sink.numValidHits() == prehits) {
-						// We're returning from the bottommost frame
-						// without having found any hits; let's
-						// sanity-check that there really aren't any
-						confirmNoHit(iham);
-					}
 					return false;
 				}
 				else if(eligibleNum == 0 && _considerQuals) {
@@ -1096,15 +1071,6 @@ public:
 				// Try again
 			} // while(top == bot && altNum > 0)
 			if(mustBacktrack || invalidHalfAndHalf || invalidExact) {
-				// This full alignment was rejected for one of the above
-				// reasons - return false to indicate we should keep
-				// searching
-				if(stackDepth == 0 && sink.numValidHits() == prehits) {
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					confirmNoHit(iham);
-				}
 				return false;
 			}
 			// Mismatch with no alternatives
@@ -1112,12 +1078,6 @@ public:
 				assert_eq(0, altNum);
 				assert_eq(0, eligibleSz);
 				assert_eq(0, eligibleNum);
-				if(stackDepth == 0 && sink.numValidHits() == prehits) {
-					// We're returning from the bottommost frame
-					// without having found any hits; let's
-					// sanity-check that there really aren't any
-					confirmNoHit(iham);
-				}
 				return false;
 			}
 			// Match!
@@ -1133,9 +1093,6 @@ public:
 		bool ret = false;
 		if(stackDepth >= _reportPartials) {
 			ret = reportAlignment(stackDepth, top, bot, ham);
-		}
-		if(!ret && stackDepth == 0 && sink.numValidHits() == prehits) {
-			confirmNoHit(iham);
 		}
 		return ret;
 	}
@@ -1253,7 +1210,6 @@ protected:
 	                const std::vector<uint32_t>& mms,
 	                uint64_t prehits = 0xffffffffffffffffllu)
 	{
-		HitSinkPerThread& sink = _params.sink();
 		assert_eq(0, _reportPartials);
 		// Crossing from the hi-half into the lo-half
 		if(d == _5depth) {
@@ -1264,14 +1220,6 @@ protected:
 				assert_leq(stackDepth, 1);
 				// Reject if we haven't encountered mismatch by this point
 				if(stackDepth == 0) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits)
-					{
-						// We're returning from the bottommost frame
-						// without having reported any hits; let's
-						// sanity-check that there really aren't any
-						confirmNoHit(iham);
-					}
 					return false;
 				}
 			} else { // if(_3revOff != _2revOff)
@@ -1281,14 +1229,6 @@ protected:
 				assert_leq(stackDepth, 2);
 				// Reject if we haven't encountered mismatch by this point
 				if(stackDepth < 1) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits)
-					{
-						// We're returning from the bottommost frame
-						// without having found any hits; let's
-						// sanity-check that there really aren't any
-						confirmNoHit(iham);
-					}
 					return false;
 				}
 			}
@@ -1301,12 +1241,6 @@ protected:
 				assert_leq(stackDepth, 2);
 				// Must have encountered two mismatches by this point
 				if(stackDepth < 2) {
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits &&
-					   stackDepth == 0)
-					{
-						confirmNoHit(iham);
-					}
 					// We're returning from the bottommost frame
 					// without having found any hits; let's
 					// sanity-check that there really aren't any
@@ -1326,13 +1260,6 @@ protected:
 				assert_leq(loHalfMms + hiHalfMms, 3);
 				assert_gt(hiHalfMms, 0);
 				if(loHalfMms == 0) {
-					// Didn't encounter any mismatches in the lo-half
-					if(prehits != 0xffffffffffffffffllu &&
-					   sink.numValidHits() == prehits &&
-					   stackDepth == 0)
-					{
-						confirmNoHit(iham);
-					}
 					// We're returning from the bottommost frame
 					// without having found any hits; let's
 					// sanity-check that there really aren't any
@@ -1609,12 +1536,7 @@ protected:
 			// of the backtracker)
 			return false;
 		}
-		if(_reportRanges) {
-			assert(_params.arrowMode());
-			return _ebwt->report((*_qry), _qual, _name,
-			         _mms, _refcs, stackDepth, 0,
-			         top, bot, _qlen, stratum, cost, _params);
-		}
+		assert(!_reportRanges);
 		uint32_t spread = bot - top;
 		// Pick a random spot in the range to begin report
 		uint32_t r = top + (_rand.nextU32() % spread);
@@ -1625,9 +1547,9 @@ protected:
 			// their indices into the query string; not in terms
 			// of their offset from the 3' or 5' end.
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
-			                         _mms, _refcs, stackDepth, ri,
-			                         top, bot, _qlen, stratum, cost,
-			                         _params))
+			                         _color, _snpPhred, _refs, _mms,
+			                         _refcs, stackDepth, ri, top, bot,
+			                         _qlen, stratum, cost, _params))
 			{
 				// Return value of true means that we can stop
 				return true;
@@ -1775,258 +1697,14 @@ protected:
 		return true;
 	}
 
-	/**
-	 * Confirm that no
-	 */
-	void confirmNoHit(uint32_t iham) {
-		// Not smart enough to deal with seedling hits yet
-		if(!_sanity || _reportPartials > 0) return;
-		vector<Hit> oracleHits;
-		// Invoke the naive oracle, which will place all qualifying
-		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, iham);
-		if(oracleHits.size() > 0) {
-			// Oops, the oracle found at least one hit; print
-			// detailed info about the first oracle hit (for
-			// debugging)
-			cout << "Oracle hit " << oracleHits.size()
-				 << " times, but backtracker did not hit" << endl;
-			for(size_t i = 0; i < oracleHits.size() && i < 3; i++) {
-				const Hit& h = oracleHits[i];
-				cout << "  Oracle hit " << i << ": " << endl;
-				if(_muts != NULL) {
-					undoPartialMutations();
-					cout << "  Unmutated Pat:  " << prefix(*_qry, _qlen) << endl;
-					applyPartialMutations();
-				}
-				cout << "  Pat:            " << prefix(*_qry, _qlen) << endl;
-				cout << "  Tseg:           ";
-				bool ebwtFw = _ebwt->fw();
-				if(ebwtFw) {
-					for(size_t i = 0; i < _qlen; i++) {
-						cout << (*_os)[h.h.first][h.h.second + i];
-					}
-				} else {
-					for(int i = (int)_qlen-1; i >= 0; i--) {
-						cout << (*_os)[h.h.first][h.h.second + i];
-					}
-				}
-				cout << endl;
-				cout << "  Quals:          " << prefix(*_qual, _qlen) << endl;
-				cout << "  Bt:             ";
-				for(int i = (int)_qlen-1; i >= 0; i--) {
-					if     (i < (int)_unrevOff) cout << "0";
-					else if(i < (int)_1revOff)  cout << "1";
-					else if(i < (int)_2revOff)  cout << "2";
-					else if(i < (int)_3revOff)  cout << "3";
-					else cout << "X";
-				}
-				cout << endl;
-			}
-		}
-		assert_eq(0, oracleHits.size());
-	}
-
-	/**
-	 *
-	 */
-	void confirmHit(uint32_t iham) {
-		// Not smart enough to deal with seedling hits yet
-		if(!_sanity || _reportPartials > 0) return;
-		vector<Hit> oracleHits;
-		// Invoke the naive oracle, which will place all qualifying
-		// hits in the 'oracleHits' vector
-		naiveOracle(oracleHits, iham);
-		vector<Hit>& retainedHits = _params.sink().retainedHits();
-		assert_gt(retainedHits.size(), 0);
-		if(oracleHits.size() == 0) {
-			::printHit(
-				(*_os), retainedHits.back(), (*_qry), _qlen, _unrevOff,
-				_1revOff, _2revOff, _3revOff, _ebwt->fw());
-		}
-		// If we found a hit, it had better be one of the ones
-		// that the oracle found
-		assert_gt(oracleHits.size(), 0);
-		// Get the hit reported by the backtracker
-		Hit& rhit = retainedHits.back();
-		// Go through oracleHits and look for a match
-		size_t i;
-		for(i = 0; i < oracleHits.size(); i++) {
-			const Hit& h = oracleHits[i];
-			if(h.h.first == rhit.h.first &&
-			   h.h.second == rhit.h.second &&
-			   h.fw == rhit.fw)
-			{
-				assert(h.mms == rhit.mms);
-				// It's a match - hit confirmed
-				break;
-			}
-		}
-		assert_lt(i, oracleHits.size()); // assert we found a matchup
-	}
-
-	/**
-	 * Sanity-check the final set of alignments generated for this read
-	 * with respect to the current backtracking constraints.
-	 */
-	void sanityCheckHits(const vector<Hit>& hits,
-	                     size_t first, uint32_t iham)
-	{
-		if(!_sanity || _reportPartials > 0 || _bailedOnBacktracks || first == hits.size()) {
-			return;
-		}
-		HitSinkPerThread& sink = _params.sink();
-		uint32_t maxHitsAllowed = sink.maxHits();
-		vector<Hit> oracleHits;
-		// Invoke the naive oracle, which will place all qualifying
-		// hits and their strata in the 'oracleHits' vector
-		naiveOracle(oracleHits, iham);
-		assert_gt(oracleHits.size(), 0);
-		int lastStratum = -1;
-		int bestStratum = -1;
-		int worstStratum = -1;
-		// For each hit generated for this read
-		for(size_t i = first; i < hits.size(); i++) {
-			const Hit& rhit = hits[i];
-			int stratum = rhit.stratum;
-			// Keep a running measure of the "worst" stratum
-			// observed in the reported hits
-			if(worstStratum == -1) {
-				worstStratum = stratum;
-			} else if(stratum > worstStratum) {
-				worstStratum = stratum;
-			}
-			// Keep a running measure of the "best" stratum
-			// observed in the reported hits
-			if(bestStratum == -1) {
-				bestStratum = stratum;
-			} else if(stratum < bestStratum) {
-				bestStratum = stratum;
-			}
-			if(lastStratum == -1) {
-				lastStratum = stratum;
-			} else if(!sink.spanStrata()) {
-				// Retained hits are not allowed to "span" strata,
-				// so this hit's stratum had better be the same as
-				// the last hit's
-				assert_eq(lastStratum, stratum);
-			}
-			// Go through oracleHits and look for a match
-			size_t i;
-			bool found = false;
-			for(i = 0; i < oracleHits.size(); i++) {
-				const Hit& h = oracleHits[i];
-				if(h.h.first  == rhit.h.first  &&
-				   h.h.second == rhit.h.second &&
-				   h.fw       == rhit.fw)
-				{
-					// Oracle hit i and reported hit j refer to the
-					// same alignment
-					assert(h.mms == rhit.mms);
-					assert_eq(stratum, h.stratum);
-					// Erase the elements in the oracle vectors
-					oracleHits.erase(oracleHits.begin() + i);
-					found = true;
-					break;
-				}
-			}
-			// If the backtracker found a hit, it had better be one
-			// of the ones that the oracle found
-			assert(found);
-		}
-		// All of the oracle hits that corresponded to a reported
-		// hit have now been eliminated
-		assert_neq(-1, lastStratum);
-		assert_neq(-1, bestStratum);
-		assert_neq(-1, worstStratum);
-		if(maxHitsAllowed == 0xffffffff && !sink.exceededOverThresh()) {
-			if(sink.spanStrata()) {
-				// All hits remaining must occur more times than the max
-				map<uint32_t,uint32_t> readToCnt;
-				for(size_t i = 0; i < oracleHits.size(); i++) {
-					readToCnt[oracleHits[i].patId]++;
-				}
-				map<uint32_t,uint32_t>::iterator it;
-				for(it = readToCnt.begin(); it != readToCnt.end(); it++) {
-					assert_gt(it->second, sink.overThresh());
-				}
-			} else {
-				// Must have matched all oracle hits at the best
-				// stratum
-				size_t numLeftovers = 0;
-				for(size_t i = 0; i < oracleHits.size(); i++) {
-					if(oracleHits[i].stratum == bestStratum) {
-						numLeftovers++;
-					}
-				}
-				// Must have matched every oracle hit
-				if(numLeftovers > 0 && numLeftovers <= sink.overThresh()) {
-					for(size_t i = 0; i < oracleHits.size(); i++) {
-						if(oracleHits[i].stratum == bestStratum) {
-							printHit(oracleHits[i]);
-						}
-					}
-					assert(0);
-				}
-			}
-		}
-		if(sink.best() && sink.overThresh() == 0xffffffff && !sink.exceededOverThresh()) {
-			// Ensure that all oracle hits have a stratum at least
-			// as bad as the worst stratum observed in the reported
-			// hits
-			for(size_t i = 0; i < oracleHits.size(); i++) {
-				assert_leq(bestStratum, oracleHits[i].stratum);
-			}
-		}
-	}
-
-	/**
-	 * Naively search for hits for the current pattern under the
-	 * current backtracking strategy and store hits in hits vector.
-	 */
-	void naiveOracle(vector<Hit>& hits,
-	                 uint32_t iham = 0, /// initial weighted hamming distance
-	                 uint32_t unrevOff = 0xffffffff,
-	                 uint32_t oneRevOff = 0xffffffff,
-	                 uint32_t twoRevOff = 0xffffffff,
-	                 uint32_t threeRevOff = 0xffffffff)
-	{
-		if(unrevOff  == 0xffffffff) unrevOff  = _unrevOff;
-		if(oneRevOff == 0xffffffff) oneRevOff = _1revOff;
-		if(twoRevOff == 0xffffffff) twoRevOff = _2revOff;
-		if(threeRevOff == 0xffffffff) threeRevOff = _3revOff;
-		bool ebwtFw = _ebwt->fw();
-		bool fw = _params.fw();
-		uint32_t patid = _params.patId();
-
-		::naiveOracle(
-		            (*_os),
-		            (*_qry),
-		            _qlen,
-		            (*_qual),
-		            (*_name),
-		            patid,
-		            hits,
-		            _qualThresh,
-		            unrevOff,
-		            oneRevOff,
-		            twoRevOff,
-		            threeRevOff,
-		            fw,    // transpose
-		            ebwtFw,
-		            iham,
-		            _muts,
-		            _maqPenalty,
-		            _halfAndHalf,
-		            _reportExacts,
-		            false);
-	}
-
+	const BitPairReference* _refs; // reference sequences (or NULL if not colorspace)
+	int                 _snpPhred; // phred probability of SNP
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry
-	String<char>* _name;         // name of _qry
-	const Ebwt<String<Dna> >*   _ebwt;   // Ebwt to search in
+	String<char>*       _name;   // name of _qry
+	bool                _color;  // whether read is colorspace
+	const Ebwt<String<Dna> >* _ebwt;   // Ebwt to search in
 	const EbwtSearchParams<String<Dna> >& _params;   // Ebwt to search in
 	uint32_t            _unrevOff; // unrevisitable chunk
 	uint32_t            _1revOff;  // 1-revisitable chunk
@@ -2126,7 +1804,7 @@ public:
 			bool         maqPenalty,
 			bool         qualOrder,
 			AlignerMetrics *metrics = NULL) :
-	    RangeSource(),
+		RangeSource(),
 		qry_(NULL),
 		qlen_(0),
 		qual_(NULL),
@@ -2205,6 +1883,7 @@ public:
 		assert_geq(length(*qual_), qlen_);
 		this->done = false;
 		this->foundRange = false;
+		color_ = r.color;
 		rand_.init(r.seed);
 	}
 
@@ -2895,6 +2574,7 @@ protected:
 	size_t              qlen_;   // length of _qry
 	String<char>*       qual_;   // quality values for _qry
 	String<char>*       name_;   // name of _qry
+	bool                color_;  // true -> read is colorspace
 	String<Dna5>*       altQry_; // alternate basecalls
 	String<char>*       altQual_; // quality values for alternate basecalls
 	int                 alts_;   // max # alternatives

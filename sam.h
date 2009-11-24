@@ -95,11 +95,13 @@ public:
 	void appendHeaders(OutFileBuf& os,
 	                   size_t numRefs,
 	                   const vector<string>& refnames,
+	                   bool color,
 	                   bool nosq,
 	                   ReferenceMap *rmap,
 	                   const uint32_t* plen,
 	                   bool fullRef,
-	                   const char *cmdline);
+	                   const char *cmdline,
+	                   const char *rgline);
 
 protected:
 

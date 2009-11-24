@@ -160,28 +160,6 @@ void printHit(const vector<String<Dna5> >& os,
 			  uint32_t threeRevOff,
 			  bool ebwtFw);
 
-extern
-void naiveOracle(const vector<String<Dna5> >& os,
-				 const String<Dna5>& qry,
-				 uint32_t qlen,
-				 const String<char>& qual,
-				 const String<char>& name,
-				 uint32_t patid,
-				 vector<Hit>& hits,
-				 uint32_t qualThresh,
-				 uint32_t unrevOff,
-				 uint32_t oneRevOff,
-				 uint32_t twoRevOff,
-				 uint32_t threeRevOff,
-				 bool fw,
-				 bool ebwtFw,
-				 uint32_t iham,
-				 String<QueryMutation>* muts,
-				 bool maqPenalty,
-				 bool halfAndHalf,
-				 bool reportExacts,
-				 bool invert);
-
 /**
  * A synchronized data structure for storing partial alignments
  * associated with patids, with particular attention to compactness.

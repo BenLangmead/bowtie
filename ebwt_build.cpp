@@ -47,6 +47,7 @@ static bool autoMem;
 static bool packed;
 static bool writeRef;
 static bool justRef;
+static bool color;
 
 static void resetOptions() {
 	verbose      = true;  // be talkative (default)
@@ -74,6 +75,7 @@ static void resetOptions() {
 	packed       = false; //
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
+	color        = false;
 }
 
 // Argument constants for getopts
@@ -102,6 +104,7 @@ static void printUsage(ostream& out) {
 	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
 	    << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
 	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
+	    << "    -C                      build colorspace index" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
 	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
@@ -343,7 +346,7 @@ static void printLongUsage(ostream& out) {
 	;
 }
 
-static const char *short_options = "qraph?nscfl:i:o:t:h:3";
+static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
 
 static struct option long_options[] = {
 	{(char*)"quiet",        no_argument,       0,            'q'},
@@ -371,6 +374,7 @@ static struct option long_options[] = {
 	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
+	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -412,6 +416,7 @@ static void parseOptions(int argc, const char **argv) {
 			case 'f': format = FASTA; break;
 			case 'c': format = CMDLINE; break;
 			case 'p': packed = true; break;
+			case 'C': color = true; break;
 			case 'l':
 				lineRate = parseNumber<int>(3, "-l/--lineRate arg must be at least 3");
 				break;
@@ -500,7 +505,8 @@ static void driver(const string& infile,
                    bool reverse = false)
 {
 	vector<FileBuf*> is;
-	RefReadInParams refparams(cutoff, -1, reverse, nsToAs);
+	bool bisulfite = false;
+	RefReadInParams refparams(cutoff, -1, color, reverse, nsToAs, bisulfite);
 	assert_gt(infiles.size(), 0);
 	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
@@ -536,18 +542,17 @@ static void driver(const string& infile,
 	// sequences.  A record represents a stretch of unambiguous
 	// characters in one of the input sequences.
 	vector<RefRecord> szs;
-	uint32_t sztot;
+	std::pair<size_t, size_t> sztot;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
 		Timer _t(cout, "  Time reading reference sizes: ", verbose);
 		if(!reverse && (writeRef || justRef)) {
+			// For forward reference, dump it to .3.ebwt and .4.ebwt
+			// files
 			string file3 = outfile + ".3.ebwt";
 			string file4 = outfile + ".4.ebwt";
-			BitpairOutFileBuf bpout(file4.c_str());
-			// Read in the sizes of all the unambiguous stretches of the
-			// genome into a vector of RefRecords
-			sztot = fastaRefReadSizes(is, szs, refparams, &bpout);
-			// Write the records back out to a '.3.ebwt' file.
+			// Open output stream for the '.3.ebwt' file which will
+			// hold the size records.
 			ofstream fout3(file3.c_str(), ios::binary);
 			if(!fout3.good()) {
 				cerr << "Could not open index file for writing: \"" << file3 << "\"" << endl
@@ -555,31 +560,64 @@ static void driver(const string& infile,
 					 << "Bowtie." << endl;
 				throw 1;
 			}
+			BitpairOutFileBuf bpout(file4.c_str());
+			// Read in the sizes of all the unambiguous stretches of
+			// the genome into a vector of RefRecords.  The input
+			// streams are reset once it's done.
 			bool be = currentlyBigEndian();
 			writeU32(fout3, 1, be); // endianness sentinel
-			writeU32(fout3, szs.size(), be); // write # records
-			// Write the records themselves
-			for(size_t i = 0; i < szs.size(); i++) {
-				szs[i].write(fout3, be);
+			if(color) {
+				refparams.color = false;
+				// Make sure the .3.ebwt and .4.ebwt files contain
+				// nucleotides; not colors
+				std::pair<size_t, size_t> sztot2 =
+					fastaRefReadSizes(is, szs, refparams, &bpout);
+				refparams.color = true;
+				writeU32(fout3, szs.size(), be); // write # records
+				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, be);
+				szs.clear();
+				// Now read in the colorspace size records; these are
+				// the ones that were indexed
+				sztot = fastaRefReadSizes(is, szs, refparams, NULL);
+				assert_eq(sztot2.second, sztot.second + 1);
+			} else {
+				sztot = fastaRefReadSizes(is, szs, refparams, &bpout);
+				writeU32(fout3, szs.size(), be); // write # records
+				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, be);
 			}
+			assert_gt(sztot.first, 0);
+			assert_gt(sztot.second, 0);
 			bpout.close();
 			fout3.close();
 #ifndef NDEBUG
 			if(sanityCheck) {
-				BitPairReference bpr(outfile, true, &infiles, NULL, format == CMDLINE);
+				BitPairReference bpr(outfile, color, true, &infiles, NULL, format == CMDLINE);
 			}
 #endif
 		} else {
 			// Read in the sizes of all the unambiguous stretches of the
 			// genome into a vector of RefRecords
 			sztot = fastaRefReadSizes(is, szs, refparams);
+#ifndef NDEBUG
+			if(refparams.color) {
+				refparams.color = false;
+				vector<RefRecord> szs2;
+				std::pair<size_t, size_t> sztot2 =
+					fastaRefReadSizes(is, szs2, refparams, NULL);
+				// One less color than base
+				assert_eq(sztot2.second, sztot.second + 1);
+				refparams.color = true;
+			}
+#endif
 		}
 	}
 	if(justRef) return;
-	assert_gt(sztot, 0);
+	assert_gt(sztot.first, 0);
+	assert_gt(sztot.second, 0);
 	assert_gt(szs.size(), 0);
 	// Construct Ebwt from input strings and parameters
-	Ebwt<TStr> ebwt(lineRate,
+	Ebwt<TStr> ebwt(refparams.color ? 1 : 0,
+	                lineRate,
 	                linesPerSide,
 	                offRate,      // suffix-array sampling rate
 	                isaRate,      // ISA sampling rate
@@ -593,7 +631,7 @@ static void driver(const string& infile,
 	                noDc? 0 : dcv,// difference-cover period
 	                is,           // list of input streams
 	                szs,          // list of reference sizes
-	                sztot,        // total size of all references
+	                sztot.first,  // total size of all unambiguous ref chars
 	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
@@ -611,11 +649,11 @@ static void driver(const string& infile,
 		// Try restoring the original string (if there were
 		// multiple texts, what we'll get back is the joined,
 		// padded string, not a list)
-		ebwt.loadIntoMemory(false, false);
+		ebwt.loadIntoMemory(refparams.color ? 1 : 0, false, false);
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot, refparams, seed);
+			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot.first, refparams, seed);
 			assert_eq(length(joinedss), length(s2));
 			assert_eq(joinedss, s2);
 		}

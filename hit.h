@@ -50,9 +50,6 @@ static const std::string output_type_names[] = {
 
 typedef pair<uint32_t,uint32_t> U32Pair;
 
-// Support reads of up to 1024 characters for now
-static const int max_read_bp = 1024;
-
 /**
  * Encapsulates a hit, including a text-id/text-offset pair, a pattern
  * id, and a boolean indicating whether it matched as its forward or
@@ -61,58 +58,6 @@ static const int max_read_bp = 1024;
 class Hit {
 public:
 	Hit() : stratum(-1) { }
-
-	Hit(const Hit& other) { this->operator=(other); }
-
-	Hit(U32Pair _h,
-		U32Pair _mh,
-		uint32_t id,
-		const String<char>& name,
-		const String<Dna5>& seq,
-		const String<char>& q,
-		bool f, bool mf,
-		uint16_t ml,
-		const FixedBitset<max_read_bp>& mm,
-		const vector<char>& rc,
-		uint32_t os,
-		int8_t st,
-		uint16_t co,
-		uint8_t m) :
-		h(_h), mh(_mh), patId(id), oms(os), fw(f), mfw(mf), mlen(ml),
-		stratum(st), cost(co), mate(m)
-	{
-		patName = name;
-		patSeq  = seq;
-		quals   = q;
-		mms     = mm;
-		refcs   = rc;
-		// Enforce the constraints imposed by the binary output format
-		if(seqan::length(patName) > 0xffff) {
-			cerr << "Error: One or more read names are 2^16 characters or longer.  Please truncate" << endl
-			     << "read names and re-run bowtie." << endl;
-			throw 1;
-		}
-		if(mms.count() > 0xff) {
-			cerr << "Error: The alignment contains 256 or more mismatches.  bowtie cannot handle" << endl
-			     << "alignments with this many alignments.  Please provide smaller reads or consider" << endl
-			     << "using a different tool." << endl;
-			throw 1;
-		}
-		if(seqan::length(quals) > 0xffff) {
-			cerr << "Error: One or more quality strings are 2^16 characters or longer.  Please" << endl
-			     << "truncate reads and re-run bowtie." << endl;
-			throw 1;
-		}
-		if(seqan::length(patSeq) > 0xffff) {
-			cerr << "Error: One or more read sequences are 2^16 characters or longer.  Please" << endl
-			     << "truncate reads and re-run bowtie." << endl;
-			throw 1;
-		}
-		if(stratum < 0 || stratum >= 4) {
-			cerr << "Error: Stratum is out of bounds: " << stratum << endl;
-			throw 1;
-		}
-	}
 
 	/**
 	 * Initialize this Ent to represent the given hit.
@@ -146,9 +91,10 @@ public:
 		hs.name = hits.front().patName;
 		hs.seq  = hits.front().patSeq;
 		hs.qual = hits.front().quals;
+		hs.color = hits.front().color;
 		if(!hits.front().fw) {
 			// Re-reverse
-			reverseComplementInPlace(hs.seq, false);
+			reverseComplementInPlace(hs.seq, hs.color);
 			reverseInPlace(hs.qual);
 		}
 		// Convert hits to entries
@@ -159,7 +105,7 @@ public:
 	}
 
 	/**
-	 * Populate a HitSet
+	 * Populate a vector of Hits with hits from the given HitSet.
 	 */
 	static void fromHitSet(std::vector<Hit>& hits, const HitSet& hs) {
 		assert(hs.sorted());
@@ -174,9 +120,10 @@ public:
 			hits[i].patName = hs.name;
 			hits[i].patSeq = hs.seq;
 			hits[i].quals = hs.qual;
+			hits[i].color = hs.color;
 			size_t len = seqan::length(hs.seq);
 			if(!hs[i].fw) {
-				reverseComplementInPlace(hits[i].patSeq, false);
+				reverseComplementInPlace(hits[i].patSeq, hs.color);
 				reverseInPlace(hits[i].quals);
 			}
 			hits[i].refcs.resize(len);
@@ -193,9 +140,12 @@ public:
 	uint32_t            patId;   /// read index
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence
+	String<Dna5>        colSeq;  /// read sequence
 	String<char>        quals;   /// read qualities
-	FixedBitset<max_read_bp> mms;/// mismatch mask
+	FixedBitset<1024>   mms;     /// nucleotide mismatch mask
+	FixedBitset<1024>   cmms;    /// color mismatch mask (if relevant)
 	vector<char>        refcs;   /// reference characters for mms
+	vector<char>        crefcs;  /// reference characters for cmms
 	uint32_t            oms;     /// # of other possible mappings; 0 -> this is unique
 	bool                fw;      /// orientation of read in alignment
 	bool                mfw;     /// orientation of mate in alignment
@@ -205,6 +155,7 @@ public:
 	uint8_t             mate;    /// matedness; 0 = not a mate
 	                             ///            1 = upstream mate
 	                             ///            2 = downstream mate
+	bool                color;   /// read is in colorspace?
 
 	size_t length() const { return seqan::length(patSeq); }
 
@@ -214,9 +165,12 @@ public:
 		this->patId   = other.patId;
 		this->patName = other.patName;
 		this->patSeq  = other.patSeq;
+		this->colSeq  = other.colSeq;
 		this->quals   = other.quals;
 		this->mms     = other.mms;
+		this->cmms    = other.cmms;
 		this->refcs   = other.refcs;
+		this->crefcs  = other.crefcs;
 		this->oms     = other.oms;
 		this->fw      = other.fw;
 		this->mfw     = other.mfw;
@@ -224,6 +178,8 @@ public:
 		this->stratum = other.stratum;
 		this->cost    = other.cost;
 		this->mate    = other.mate;
+		this->color   = other.color;
+		this->cmms    = other.cmms;
 		return *this;
 	}
 };
@@ -456,7 +412,7 @@ public:
 			DECL_HIT_DUMPS,
 			bool onePairFile,
 			RecalTable *table,
-	        vector<string>* refnames = NULL) :
+			vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(true),
 		recalTable_(table),
@@ -774,7 +730,7 @@ public:
 				MUTEX_LOCK(dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
 					dumpAl_1_ = openOf(dumpAlBase_, 1, "");
-		    		dumpAl_2_ = openOf(dumpAlBase_, 2, "");
+					dumpAl_2_ = openOf(dumpAlBase_, 2, "");
 					assert(dumpAl_1_ != NULL);
 					assert(dumpAl_2_ != NULL);
 				}
@@ -852,7 +808,7 @@ public:
 				MUTEX_LOCK(dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
 					dumpUnal_1_ = openOf(dumpUnalBase_, 1, "");
-		    		dumpUnal_2_ = openOf(dumpUnalBase_, 2, "");
+					dumpUnal_2_ = openOf(dumpUnalBase_, 2, "");
 					assert(dumpUnal_1_ != NULL);
 					assert(dumpUnal_2_ != NULL);
 				}
@@ -878,7 +834,7 @@ public:
 				MUTEX_LOCK(dumpMaxFaLock_);
 				if(dumpMaxFa_ == NULL) {
 					dumpMaxFa_ = openOf(dumpMaxFaBase_, 0, ".fa");
-		    		assert(dumpMaxFa_ != NULL);
+					assert(dumpMaxFa_ != NULL);
 				}
 				printFastaRecord(*dumpMaxFa_, p.bufa().name, p.bufa().patFw);
 				MUTEX_UNLOCK(dumpMaxFaLock_);
@@ -907,9 +863,9 @@ public:
 				MUTEX_LOCK(dumpMaxFaLockPE_);
 				if(dumpMaxFa_1_ == NULL) {
 					assert(dumpMaxFa_2_ == NULL);
-		    		dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, ".fa");
-		    		dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, ".fa");
-		    		assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
+					dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, ".fa");
+					dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, ".fa");
+					assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
 				}
 				printFastaRecord(*dumpMaxFa_1_, p.bufa().name, p.bufa().patFw);
 				printFastaRecord(*dumpMaxFa_2_, p.bufb().name, p.bufb().patFw);
@@ -919,9 +875,9 @@ public:
 				MUTEX_LOCK(dumpMaxFqLockPE_);
 				if(dumpMaxFq_1_ == NULL) {
 					assert(dumpMaxFq_2_ == NULL);
-		    		dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, ".fq");
-		    		dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, ".fq");
-		    		assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
+					dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, ".fq");
+					dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, ".fq");
+					assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
 				}
 				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
 				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
@@ -1033,169 +989,169 @@ protected:
 	bool onePairFile_;
 
 	// Output streams for dumping
-    std::ofstream *dumpAlFa_;   // for single-ended reads
-    std::ofstream *dumpAlFa_1_; // for first mates
-    std::ofstream *dumpAlFa_2_; // for second mates
-    std::ofstream *dumpAlFq_;   // for single-ended reads
-    std::ofstream *dumpAlFq_1_; // for first mates
-    std::ofstream *dumpAlFq_2_; // for second mates
-    std::ofstream *dumpAl_;   // for single-ended reads
-    std::ofstream *dumpAl_1_; // for first mates
-    std::ofstream *dumpAl_2_; // for second mates
-    std::ofstream *dumpUnalFa_;   // for single-ended reads
-    std::ofstream *dumpUnalFa_1_; // for first mates
-    std::ofstream *dumpUnalFa_2_; // for second mates
-    std::ofstream *dumpUnalFq_;   // for single-ended reads
-    std::ofstream *dumpUnalFq_1_; // for first mates
-    std::ofstream *dumpUnalFq_2_; // for second mates
-    std::ofstream *dumpUnal_;   // for single-ended reads
-    std::ofstream *dumpUnal_1_; // for first mates
-    std::ofstream *dumpUnal_2_; // for second mates
-    std::ofstream *dumpMaxFa_;     // for single-ended reads
-    std::ofstream *dumpMaxFa_1_;   // for first mates
-    std::ofstream *dumpMaxFa_2_;   // for second mates
-    std::ofstream *dumpMaxFq_;     // for single-ended reads
-    std::ofstream *dumpMaxFq_1_;   // for first mates
-    std::ofstream *dumpMaxFq_2_;   // for second mates
-    std::ofstream *dumpMax_;     // for single-ended reads
-    std::ofstream *dumpMax_1_;   // for first mates
-    std::ofstream *dumpMax_2_;   // for second mates
+	std::ofstream *dumpAlFa_;   // for single-ended reads
+	std::ofstream *dumpAlFa_1_; // for first mates
+	std::ofstream *dumpAlFa_2_; // for second mates
+	std::ofstream *dumpAlFq_;   // for single-ended reads
+	std::ofstream *dumpAlFq_1_; // for first mates
+	std::ofstream *dumpAlFq_2_; // for second mates
+	std::ofstream *dumpAl_;   // for single-ended reads
+	std::ofstream *dumpAl_1_; // for first mates
+	std::ofstream *dumpAl_2_; // for second mates
+	std::ofstream *dumpUnalFa_;   // for single-ended reads
+	std::ofstream *dumpUnalFa_1_; // for first mates
+	std::ofstream *dumpUnalFa_2_; // for second mates
+	std::ofstream *dumpUnalFq_;   // for single-ended reads
+	std::ofstream *dumpUnalFq_1_; // for first mates
+	std::ofstream *dumpUnalFq_2_; // for second mates
+	std::ofstream *dumpUnal_;   // for single-ended reads
+	std::ofstream *dumpUnal_1_; // for first mates
+	std::ofstream *dumpUnal_2_; // for second mates
+	std::ofstream *dumpMaxFa_;     // for single-ended reads
+	std::ofstream *dumpMaxFa_1_;   // for first mates
+	std::ofstream *dumpMaxFa_2_;   // for second mates
+	std::ofstream *dumpMaxFq_;     // for single-ended reads
+	std::ofstream *dumpMaxFq_1_;   // for first mates
+	std::ofstream *dumpMaxFq_2_;   // for second mates
+	std::ofstream *dumpMax_;     // for single-ended reads
+	std::ofstream *dumpMax_1_;   // for first mates
+	std::ofstream *dumpMax_2_;   // for second mates
 
-    /**
-     * Open an ofstream with given name; output error message and quit
-     * if it fails.
-     */
-    std::ofstream* openOf(const std::string& name,
-                          int mateType,
-                          const std::string& suffix)
+	/**
+	 * Open an ofstream with given name; output error message and quit
+	 * if it fails.
+	 */
+	std::ofstream* openOf(const std::string& name,
+	                      int mateType,
+	                      const std::string& suffix)
 	{
-    	std::string s = name;
+		std::string s = name;
 		size_t dotoff = name.find_last_of(".");
-    	if(mateType == 1) {
-    		if(dotoff == string::npos) {
-    			s += "_1"; s += suffix;
-    		} else {
-    			s = name.substr(0, dotoff) + "_1" + s.substr(dotoff);
-    		}
-    	} else if(mateType == 2) {
-    		if(dotoff == string::npos) {
-    			s += "_2"; s += suffix;
-    		} else {
-    			s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
-    		}
-    	} else if(mateType != 0) {
-    		cerr << "Bad mate type " << mateType << endl; throw 1;
-    	}
-    	std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
-    	if(tmp->fail()) {
-    		if(mateType == 0) {
-    			cerr << "Could not open single-ended aligned/unaligned-read file for writing: " << name << endl;
-    		} else {
-    			cerr << "Could not open paired-end aligned/unaligned-read file for writing: " << name << endl;
-    		}
-    		throw 1;
-    	}
-    	return tmp;
-    }
+		if(mateType == 1) {
+			if(dotoff == string::npos) {
+				s += "_1"; s += suffix;
+			} else {
+				s = name.substr(0, dotoff) + "_1" + s.substr(dotoff);
+			}
+		} else if(mateType == 2) {
+			if(dotoff == string::npos) {
+				s += "_2"; s += suffix;
+			} else {
+				s = name.substr(0, dotoff) + "_2" + s.substr(dotoff);
+			}
+		} else if(mateType != 0) {
+			cerr << "Bad mate type " << mateType << endl; throw 1;
+		}
+		std::ofstream* tmp = new ofstream(s.c_str(), ios::out);
+		if(tmp->fail()) {
+			if(mateType == 0) {
+				cerr << "Could not open single-ended aligned/unaligned-read file for writing: " << name << endl;
+			} else {
+				cerr << "Could not open paired-end aligned/unaligned-read file for writing: " << name << endl;
+			}
+			throw 1;
+		}
+		return tmp;
+	}
 
-    /**
-     * Initialize all the locks for dumping.
-     */
-    void initDumps() {
-        dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_   = NULL;
-        dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_   = NULL;
-        dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
-        dumpUnalFa_   = dumpUnalFa_1_ = dumpUnalFa_2_ = NULL;
-        dumpUnalFq_   = dumpUnalFq_1_ = dumpUnalFq_2_ = NULL;
-        dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
-        dumpMaxFa_    = dumpMaxFa_1_  = dumpMaxFa_2_  = NULL;
-        dumpMaxFq_    = dumpMaxFq_1_  = dumpMaxFq_2_  = NULL;
-        dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
-    	dumpAlignFlag_   = !dumpAlFaBase_.empty() ||
-    	                   !dumpAlFqBase_.empty() ||
-    	                   !dumpAlBase_.empty();
-    	dumpUnalignFlag_ = !dumpUnalFaBase_.empty() ||
-    	                   !dumpUnalFqBase_.empty() ||
-    	                   !dumpUnalBase_.empty();
-    	dumpMaxedFlag_   = !dumpMaxFaBase_.empty() ||
-    	                   !dumpMaxFqBase_.empty() ||
-    	                   !dumpMaxBase_.empty();
-   		MUTEX_INIT(dumpAlignFaLock_);
-   		MUTEX_INIT(dumpAlignFaLockPE_);
-   		MUTEX_INIT(dumpAlignFqLock_);
-   		MUTEX_INIT(dumpAlignFqLockPE_);
-   		MUTEX_INIT(dumpAlignLock_);
-   		MUTEX_INIT(dumpAlignLockPE_);
-   		MUTEX_INIT(dumpUnalFaLock_);
-   		MUTEX_INIT(dumpUnalFaLockPE_);
-   		MUTEX_INIT(dumpUnalFqLock_);
-   		MUTEX_INIT(dumpUnalFqLockPE_);
-   		MUTEX_INIT(dumpUnalLock_);
-   		MUTEX_INIT(dumpUnalLockPE_);
-   		MUTEX_INIT(dumpMaxFaLock_);
-   		MUTEX_INIT(dumpMaxFaLockPE_);
-   		MUTEX_INIT(dumpMaxFqLock_);
-   		MUTEX_INIT(dumpMaxFqLockPE_);
-   		MUTEX_INIT(dumpMaxLock_);
-   		MUTEX_INIT(dumpMaxLockPE_);
-    }
+	/**
+	 * Initialize all the locks for dumping.
+	 */
+	void initDumps() {
+		dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_   = NULL;
+		dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_   = NULL;
+		dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
+		dumpUnalFa_   = dumpUnalFa_1_ = dumpUnalFa_2_ = NULL;
+		dumpUnalFq_   = dumpUnalFq_1_ = dumpUnalFq_2_ = NULL;
+		dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
+		dumpMaxFa_    = dumpMaxFa_1_  = dumpMaxFa_2_  = NULL;
+		dumpMaxFq_    = dumpMaxFq_1_  = dumpMaxFq_2_  = NULL;
+		dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
+		dumpAlignFlag_   = !dumpAlFaBase_.empty() ||
+		                   !dumpAlFqBase_.empty() ||
+		                   !dumpAlBase_.empty();
+		dumpUnalignFlag_ = !dumpUnalFaBase_.empty() ||
+		                   !dumpUnalFqBase_.empty() ||
+		                   !dumpUnalBase_.empty();
+		dumpMaxedFlag_   = !dumpMaxFaBase_.empty() ||
+		                   !dumpMaxFqBase_.empty() ||
+		                   !dumpMaxBase_.empty();
+		MUTEX_INIT(dumpAlignFaLock_);
+		MUTEX_INIT(dumpAlignFaLockPE_);
+		MUTEX_INIT(dumpAlignFqLock_);
+		MUTEX_INIT(dumpAlignFqLockPE_);
+		MUTEX_INIT(dumpAlignLock_);
+		MUTEX_INIT(dumpAlignLockPE_);
+		MUTEX_INIT(dumpUnalFaLock_);
+		MUTEX_INIT(dumpUnalFaLockPE_);
+		MUTEX_INIT(dumpUnalFqLock_);
+		MUTEX_INIT(dumpUnalFqLockPE_);
+		MUTEX_INIT(dumpUnalLock_);
+		MUTEX_INIT(dumpUnalLockPE_);
+		MUTEX_INIT(dumpMaxFaLock_);
+		MUTEX_INIT(dumpMaxFaLockPE_);
+		MUTEX_INIT(dumpMaxFqLock_);
+		MUTEX_INIT(dumpMaxFqLockPE_);
+		MUTEX_INIT(dumpMaxLock_);
+		MUTEX_INIT(dumpMaxLockPE_);
+	}
 
-    void destroyDumps() {
-    	if(dumpAlFa_     != NULL) { dumpAlFa_->close();     delete dumpAlFa_; }
-    	if(dumpAlFa_1_   != NULL) { dumpAlFa_1_->close();   delete dumpAlFa_1_; }
-    	if(dumpAlFa_2_   != NULL) { dumpAlFa_2_->close();   delete dumpAlFa_2_; }
-    	if(dumpAlFq_     != NULL) { dumpAlFq_->close();     delete dumpAlFq_; }
-    	if(dumpAlFq_1_   != NULL) { dumpAlFq_1_->close();   delete dumpAlFq_1_; }
-    	if(dumpAlFq_2_   != NULL) { dumpAlFq_2_->close();   delete dumpAlFq_2_; }
-    	if(dumpAl_       != NULL) { dumpAl_->close();       delete dumpAl_; }
-    	if(dumpAl_1_     != NULL) { dumpAl_1_->close();     delete dumpAl_1_; }
-    	if(dumpAl_2_     != NULL) { dumpAl_2_->close();     delete dumpAl_2_; }
+	void destroyDumps() {
+		if(dumpAlFa_     != NULL) { dumpAlFa_->close();     delete dumpAlFa_; }
+		if(dumpAlFa_1_   != NULL) { dumpAlFa_1_->close();   delete dumpAlFa_1_; }
+		if(dumpAlFa_2_   != NULL) { dumpAlFa_2_->close();   delete dumpAlFa_2_; }
+		if(dumpAlFq_     != NULL) { dumpAlFq_->close();     delete dumpAlFq_; }
+		if(dumpAlFq_1_   != NULL) { dumpAlFq_1_->close();   delete dumpAlFq_1_; }
+		if(dumpAlFq_2_   != NULL) { dumpAlFq_2_->close();   delete dumpAlFq_2_; }
+		if(dumpAl_       != NULL) { dumpAl_->close();       delete dumpAl_; }
+		if(dumpAl_1_     != NULL) { dumpAl_1_->close();     delete dumpAl_1_; }
+		if(dumpAl_2_     != NULL) { dumpAl_2_->close();     delete dumpAl_2_; }
 
-    	if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
-    	if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
-    	if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
-    	if(dumpUnalFq_   != NULL) { dumpUnalFq_->close();   delete dumpUnalFq_; }
-    	if(dumpUnalFq_1_ != NULL) { dumpUnalFq_1_->close(); delete dumpUnalFq_1_; }
-    	if(dumpUnalFq_2_ != NULL) { dumpUnalFq_2_->close(); delete dumpUnalFq_2_; }
-    	if(dumpUnal_     != NULL) { dumpUnal_->close();     delete dumpUnal_; }
-    	if(dumpUnal_1_   != NULL) { dumpUnal_1_->close();   delete dumpUnal_1_; }
-    	if(dumpUnal_2_   != NULL) { dumpUnal_2_->close();   delete dumpUnal_2_; }
+		if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
+		if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
+		if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
+		if(dumpUnalFq_   != NULL) { dumpUnalFq_->close();   delete dumpUnalFq_; }
+		if(dumpUnalFq_1_ != NULL) { dumpUnalFq_1_->close(); delete dumpUnalFq_1_; }
+		if(dumpUnalFq_2_ != NULL) { dumpUnalFq_2_->close(); delete dumpUnalFq_2_; }
+		if(dumpUnal_     != NULL) { dumpUnal_->close();     delete dumpUnal_; }
+		if(dumpUnal_1_   != NULL) { dumpUnal_1_->close();   delete dumpUnal_1_; }
+		if(dumpUnal_2_   != NULL) { dumpUnal_2_->close();   delete dumpUnal_2_; }
 
-    	if(dumpMaxFa_    != NULL) { dumpMaxFa_->close();    delete dumpMaxFa_; }
-    	if(dumpMaxFa_1_  != NULL) { dumpMaxFa_1_->close();  delete dumpMaxFa_1_; }
-    	if(dumpMaxFa_2_  != NULL) { dumpMaxFa_2_->close();  delete dumpMaxFa_2_; }
-    	if(dumpMaxFq_    != NULL) { dumpMaxFq_->close();    delete dumpMaxFq_; }
-    	if(dumpMaxFq_1_  != NULL) { dumpMaxFq_1_->close();  delete dumpMaxFq_1_; }
-    	if(dumpMaxFq_2_  != NULL) { dumpMaxFq_2_->close();  delete dumpMaxFq_2_; }
-    	if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
-    	if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
-    	if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
-    }
+		if(dumpMaxFa_    != NULL) { dumpMaxFa_->close();    delete dumpMaxFa_; }
+		if(dumpMaxFa_1_  != NULL) { dumpMaxFa_1_->close();  delete dumpMaxFa_1_; }
+		if(dumpMaxFa_2_  != NULL) { dumpMaxFa_2_->close();  delete dumpMaxFa_2_; }
+		if(dumpMaxFq_    != NULL) { dumpMaxFq_->close();    delete dumpMaxFq_; }
+		if(dumpMaxFq_1_  != NULL) { dumpMaxFq_1_->close();  delete dumpMaxFq_1_; }
+		if(dumpMaxFq_2_  != NULL) { dumpMaxFq_2_->close();  delete dumpMaxFq_2_; }
+		if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
+		if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
+		if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
+	}
 
-    // Locks for dumping
-    MUTEX_T dumpAlignFaLock_;
-    MUTEX_T dumpAlignFaLockPE_; // _1 and _2
-    MUTEX_T dumpAlignFqLock_;
-    MUTEX_T dumpAlignFqLockPE_; // _1 and _2
-    MUTEX_T dumpAlignLock_;
-    MUTEX_T dumpAlignLockPE_; // _1 and _2
-    MUTEX_T dumpUnalFaLock_;
-    MUTEX_T dumpUnalFaLockPE_; // _1 and _2
-    MUTEX_T dumpUnalFqLock_;
-    MUTEX_T dumpUnalFqLockPE_; // _1 and _2
-    MUTEX_T dumpUnalLock_;
-    MUTEX_T dumpUnalLockPE_; // _1 and _2
-    MUTEX_T dumpMaxFaLock_;
-    MUTEX_T dumpMaxFaLockPE_;   // _1 and _2
-    MUTEX_T dumpMaxFqLock_;
-    MUTEX_T dumpMaxFqLockPE_;   // _1 and _2
-    MUTEX_T dumpMaxLock_;
-    MUTEX_T dumpMaxLockPE_;   // _1 and _2
+	// Locks for dumping
+	MUTEX_T dumpAlignFaLock_;
+	MUTEX_T dumpAlignFaLockPE_; // _1 and _2
+	MUTEX_T dumpAlignFqLock_;
+	MUTEX_T dumpAlignFqLockPE_; // _1 and _2
+	MUTEX_T dumpAlignLock_;
+	MUTEX_T dumpAlignLockPE_; // _1 and _2
+	MUTEX_T dumpUnalFaLock_;
+	MUTEX_T dumpUnalFaLockPE_; // _1 and _2
+	MUTEX_T dumpUnalFqLock_;
+	MUTEX_T dumpUnalFqLockPE_; // _1 and _2
+	MUTEX_T dumpUnalLock_;
+	MUTEX_T dumpUnalLockPE_; // _1 and _2
+	MUTEX_T dumpMaxFaLock_;
+	MUTEX_T dumpMaxFaLockPE_;   // _1 and _2
+	MUTEX_T dumpMaxFqLock_;
+	MUTEX_T dumpMaxFqLockPE_;   // _1 and _2
+	MUTEX_T dumpMaxLock_;
+	MUTEX_T dumpMaxLockPE_;   // _1 and _2
 
-    // false -> no dumping
-    bool dumpAlignFlag_;
-    bool dumpUnalignFlag_;
-    bool dumpMaxedFlag_;
+	// false -> no dumping
+	bool dumpAlignFlag_;
+	bool dumpUnalignFlag_;
+	bool dumpMaxedFlag_;
 
 	volatile bool     first_;       /// true -> first hit hasn't yet been reported
 	volatile uint64_t numAligned_;  /// # reads with >= 1 alignment
@@ -1541,9 +1497,9 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t n_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t n_;
+	uint32_t max_;
+	bool keep_;
 };
 
 
@@ -1726,9 +1682,9 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t n_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t n_;
+	uint32_t max_;
+	bool keep_;
 };
 
 /**
@@ -1743,12 +1699,12 @@ class NBestStratHitSinkPerThread : public HitSinkPerThread {
 public:
 	NBestStratHitSinkPerThread(
 			HitSink& sink,
-	        uint32_t __n,
-	        uint32_t __max = 0xffffffff,
-	        bool __keep = false) :
-	        HitSinkPerThread(sink, __max, __keep),
-	        _n(__n),
-	        bestStratumReported_(999)
+			uint32_t __n,
+			uint32_t __max = 0xffffffff,
+			bool __keep = false) :
+				HitSinkPerThread(sink, __max, __keep),
+				_n(__n),
+				bestStratumReported_(999)
 	{
 		assert_gt(_n, 0);
 	}
@@ -1928,9 +1884,9 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t n_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t n_;
+	uint32_t max_;
+	bool keep_;
 };
 
 /**
@@ -2069,9 +2025,9 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t n_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t n_;
+	uint32_t max_;
+	bool keep_;
 };
 
 /**
@@ -2081,18 +2037,18 @@ class ChainingHitSinkPerThread : public HitSinkPerThread {
 public:
 
 	ChainingHitSinkPerThread(HitSink& sink,
-                          uint32_t n,
-                          uint32_t max,
-                          bool keep,
-                          bool strata,
-                          uint32_t mult) :
-    HitSinkPerThread(sink, max * mult, keep),
-    n_(n * mult), mult_(mult), max_(max), strata_(strata), cutoff_(0xffff)
-    {
+	                      uint32_t n,
+	                      uint32_t max,
+	                      bool keep,
+	                      bool strata,
+	                      uint32_t mult) :
+	HitSinkPerThread(sink, max * mult, keep),
+	n_(n * mult), mult_(mult), max_(max), strata_(strata), cutoff_(0xffff)
+	{
 		hs_ = NULL;
 		hsISz_ = 0;
 		assert_gt(n_, 0);
-    }
+	}
 
 	virtual uint32_t maxHits() { return n_; }
 
@@ -2293,11 +2249,11 @@ protected:
 
 	HitSet *hs_;
 	size_t hsISz_;
-    uint32_t n_;
+	uint32_t n_;
 	uint32_t mult_;
-    uint32_t max_;
-    bool strata_; /// true -> reporting is stratified
-    uint16_t cutoff_; /// the smallest irrelevant cost
+	uint32_t max_;
+	bool strata_; /// true -> reporting is stratified
+	uint16_t cutoff_; /// the smallest irrelevant cost
 };
 
 /**
@@ -2331,10 +2287,10 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t n_;
-    uint32_t max_;
-    bool keep_;
-    bool strata_;
+	uint32_t n_;
+	uint32_t max_;
+	bool keep_;
+	bool strata_;
 };
 
 /**
@@ -2415,8 +2371,8 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t max_;
+	bool keep_;
 };
 
 /**
@@ -2583,8 +2539,8 @@ public:
 
 private:
 	HitSink& sink_;
-    uint32_t max_;
-    bool keep_;
+	uint32_t max_;
+	bool keep_;
 };
 
 /**
@@ -2628,7 +2584,7 @@ public:
 			ss << '/' << (int)h.mate;
 		}
 		ss << (h.fw? "+" : "-") << ":";
-    	// .first is text id, .second is offset
+		// .first is text id, .second is offset
 		ss << "<" << h.h.first << "," << (h.h.second + offBase) << "," << h.mms.count();
 		if(reportOpps) ss << "," << h.oms;
 		ss << ">" << endl;
@@ -3048,11 +3004,6 @@ public:
 				}
 				ss << s3;
 				ss << "\t" << (h.fw? "+":"-");
-				ss << "\t" << h.patSeq;
-				ss << "\t" << h.quals;
-				ss << "\t" << h.oms;
-				ss << "\t" << (int)h.mate;
-				ss << "\t" << h.patName;
 				// end if(partition != 0)
 			} else {
 				assert(!dospill);
@@ -3066,11 +3017,11 @@ public:
 					ss << h.h.first;
 				}
 				ss << "\t" << (h.h.second + offBase);
-				ss << "\t" << h.patSeq;
-				ss << "\t" << h.quals;
-				ss << "\t" << h.oms;
 				// end else clause of if(partition != 0)
 			}
+			ss << '\t' << h.patSeq;
+			ss << '\t' << h.quals;
+			ss << '\t' << h.oms;
 			ss << '\t';
 			// Look for SNP annotations falling within the alignment
 			map<int, char> snpAnnots;
@@ -3116,6 +3067,11 @@ public:
 					ss << "S:" << snpAnnots[i] << ">" << qryChar;
 					first = false;
 				}
+			}
+			if(partition != 0) {
+				if(first) ss << '-';
+				ss << "\t" << (int)h.mate;
+				ss << "\t" << h.patName;
 			}
 			ss << endl;
 		} while(spill);
@@ -3437,8 +3393,8 @@ protected:
 
 private:
 	int offBase_;          /// Add this to reference offsets before outputting.
-                           /// (An easy way to make things 1-based instead of
-                           /// 0-based)
+	                       /// (An easy way to make things 1-based instead of
+	                       /// 0-based)
 };
 
 /**

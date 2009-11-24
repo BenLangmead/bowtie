@@ -20,11 +20,13 @@ using namespace std;
 void SAMHitSink::appendHeaders(OutFileBuf& os,
                                size_t numRefs,
                                const vector<string>& refnames,
+                               bool color,
                                bool nosq,
                                ReferenceMap *rmap,
                                const uint32_t* plen,
                                bool fullRef,
-                               const char *cmdline)
+                               const char *cmdline,
+                               const char *rgline)
 {
 	ostringstream ss;
 	ss << "@HD\tVN:1.0\tSO:unsorted" << endl;
@@ -39,8 +41,11 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
 			} else {
 				ss << i;
 			}
-			ss << "\tLN:" << plen[i] << endl;
+			ss << "\tLN:" << (plen[i] + (color ? 1 : 0)) << endl;
 		}
+	}
+	if(rgline != NULL) {
+		ss << "@RG\t" << rgline << endl;
 	}
 	ss << "@PG\tID:Bowtie\tVN:" << BOWTIE_VERSION << "\tCL:\"" << cmdline << "\"" << endl;
 	os.writeString(ss.str());
@@ -58,7 +63,15 @@ void SAMHitSink::appendAligned(ostream& ss,
                                int offBase)
 {
 	// QNAME
-	ss << h.patName << "\t";
+	if(h.mate > 0) {
+		// truncate final 2 chars
+		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
+			ss << h.patName[i];
+		}
+	} else {
+		ss << h.patName;
+	}
+	ss << '\t';
 	// FLAG
 	int flags = 0;
 	if(h.mate == 1) {
@@ -119,20 +132,33 @@ void SAMHitSink::appendAligned(ostream& ss,
 	//
 	// Always output stratum
 	ss << "\tXA:i:" << (int)h.stratum;
+	// Always output cost
+	//ss << "\tXC:i:" << (int)h.cost;
 	// Look for SNP annotations falling within the alignment
 	// Output MD field
-	const size_t len = length(h.patSeq);
+	size_t len = length(h.patSeq);
 	int nm = 0;
 	int run = 0;
 	ss << "\tMD:Z:";
+	const FixedBitset<1024> *mms = &h.mms;
+	const String<Dna5>* pat = &h.patSeq;
+	const vector<char>* refcs = &h.refcs;
+	if(h.color && false) {
+		// Disabled: print MD:Z string w/r/t to colors, not letters
+		mms = &h.cmms;
+		pat = &h.colSeq;
+		assert_eq(length(h.colSeq), len+1);
+		len = length(h.colSeq);
+		refcs = &h.crefcs;
+	}
 	if(h.fw) {
 		for (int i = 0; i < (int)len; ++ i) {
-			if(h.mms.test(i)) {
+			if(mms->test(i)) {
 				nm++;
 				// There's a mismatch at this position
-				assert_gt((int)h.refcs.size(), i);
-				char refChar = toupper(h.refcs[i]);
-				ASSERT_ONLY(char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]));
+				assert_gt((int)refcs->size(), i);
+				char refChar = toupper((*refcs)[i]);
+				ASSERT_ONLY(char qryChar = (h.fw ? (*pat)[i] : (*pat)[len-i-1]));
 				assert_neq(refChar, qryChar);
 				ss << run << refChar;
 				run = 0;
@@ -142,12 +168,12 @@ void SAMHitSink::appendAligned(ostream& ss,
 		}
 	} else {
 		for (int i = len-1; i >= 0; -- i) {
-			if(h.mms.test(i)) {
+			if(mms->test(i)) {
 				nm++;
 				// There's a mismatch at this position
-				assert_gt((int)h.refcs.size(), i);
-				char refChar = toupper(h.refcs[i]);
-				ASSERT_ONLY(char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]));
+				assert_gt((int)refcs->size(), i);
+				char refChar = toupper((*refcs)[i]);
+				ASSERT_ONLY(char qryChar = (h.fw ? (*pat)[i] : (*pat)[len-i-1]));
 				assert_neq(refChar, qryChar);
 				ss << run << refChar;
 				run = 0;
@@ -159,6 +185,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	ss << run;
 	// Add optional edit distance field
 	ss << "\tNM:i:" << nm;
+	if(h.color) ss << "\tCM:i:" << h.cmms.count();
 	ss << endl;
 }
 

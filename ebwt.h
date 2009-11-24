@@ -36,6 +36,8 @@
 #include "mm.h"
 #include "timer.h"
 #include "refmap.h"
+#include "color_dec.h"
+#include "reference.h"
 
 using namespace std;
 using namespace seqan;
@@ -67,6 +69,13 @@ if(this->verbose()) { \
 #endif
 
 /**
+ * Flags describing type of Ebwt.
+ */
+enum EBWT_FLAGS {
+	EBWT_COLOR = 2 // true -> Ebwt is colorspace
+};
+
+/**
  * Extended Burrows-Wheeler transform header.  This together with the
  * actual data arrays and other text-specific parameters defined in
  * class Ebwt constitute the entire Ebwt.
@@ -81,19 +90,22 @@ public:
 	           int32_t linesPerSide,
 	           int32_t offRate,
 	           int32_t isaRate,
-	           int32_t ftabChars)
+	           int32_t ftabChars,
+	           bool color)
 	{
-		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
+		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
 	}
 
 	EbwtParams(const EbwtParams& eh) {
 		init(eh._len, eh._lineRate, eh._linesPerSide, eh._offRate,
-		     eh._isaRate, eh._ftabChars);
+		     eh._isaRate, eh._ftabChars, eh._color);
 	}
 
 	void init(uint32_t len, int32_t lineRate, int32_t linesPerSide,
-	          int32_t offRate, int32_t isaRate, int32_t ftabChars)
+	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
+	          bool color)
 	{
+		_color = color;
 		_len = len;
 		_bwtLen = _len + 1;
 		_sz = (len+3)/4;
@@ -155,6 +167,7 @@ public:
 	uint32_t numLines() const      { return _numLines; }
 	uint32_t ebwtTotLen() const    { return _ebwtTotLen; }
 	uint32_t ebwtTotSz() const     { return _ebwtTotSz; }
+	bool color() const             { return _color; }
 
 	/**
 	 * Set a new suffix-array sampling rate, which involves updating
@@ -162,9 +175,9 @@ public:
 	 */
 	void setOffRate(int __offRate) {
 		_offRate = __offRate;
-        _offMask = 0xffffffff << _offRate;
-        _offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
-        _offsSz = _offsLen*4;
+		_offMask = 0xffffffff << _offRate;
+		_offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
+		_offsSz = _offsLen*4;
 	}
 
 	/**
@@ -173,9 +186,9 @@ public:
 	 */
 	void setIsaRate(int __isaRate) {
 		_isaRate = __isaRate;
-        _isaMask = 0xffffffff << _isaRate;
-        _isaLen = (_bwtLen + (1 << _isaRate) - 1) >> _isaRate;
-        _isaSz = _isaLen*4;
+		_isaMask = 0xffffffff << _isaRate;
+		_isaLen = (_bwtLen + (1 << _isaRate) - 1) >> _isaRate;
+		_isaSz = _isaLen*4;
 	}
 
 	/// Check that this EbwtParams is internally consistent
@@ -227,22 +240,22 @@ public:
 		    << "    ebwtTotSz: "    << _ebwtTotSz << endl;
 	}
 
-    uint32_t _len;
-    uint32_t _bwtLen;
-    uint32_t _sz;
-    uint32_t _bwtSz;
-    int32_t  _lineRate;
-    int32_t  _linesPerSide;
-    int32_t  _origOffRate;
-    int32_t  _offRate;
-    uint32_t _offMask;
-    int32_t  _isaRate;
-    uint32_t _isaMask;
-    int32_t  _ftabChars;
-    uint32_t _eftabLen;
-    uint32_t _eftabSz;
-    uint32_t _ftabLen;
-    uint32_t _ftabSz;
+	uint32_t _len;
+	uint32_t _bwtLen;
+	uint32_t _sz;
+	uint32_t _bwtSz;
+	int32_t  _lineRate;
+	int32_t  _linesPerSide;
+	int32_t  _origOffRate;
+	int32_t  _offRate;
+	uint32_t _offMask;
+	int32_t  _isaRate;
+	uint32_t _isaMask;
+	int32_t  _ftabChars;
+	uint32_t _eftabLen;
+	uint32_t _eftabSz;
+	uint32_t _ftabLen;
+	uint32_t _ftabSz;
 	uint32_t _offsLen;
 	uint32_t _offsSz;
 	uint32_t _isaLen;
@@ -256,6 +269,7 @@ public:
 	uint32_t _numLines;
 	uint32_t _ebwtTotLen;
 	uint32_t _ebwtTotSz;
+	bool _color;
 };
 
 /**
@@ -341,6 +355,7 @@ public:
 
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
+	     int color,
 	     bool __fw,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
@@ -362,7 +377,7 @@ public:
 		useShmem_ = useShmem;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
-		readIntoMemory(true, &_eh, mmSweep, loadNames, startVerbose);
+		readIntoMemory(color, true, &_eh, mmSweep, loadNames, startVerbose);
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -381,7 +396,8 @@ public:
 	/// vector, optionally using a blockwise suffix sorter with the
 	/// given 'bmax' and 'dcv' parameters.  The string vector is
 	/// ultimately joined and the joined string is passed to buildToDisk().
-	Ebwt(int32_t lineRate,
+	Ebwt(int color,
+	     int32_t lineRate,
 	     int32_t linesPerSide,
 	     int32_t offRate,
 	     int32_t isaRate,
@@ -405,7 +421,7 @@ public:
 	     bool sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS,
-	     _eh(joinedLen(szs), lineRate, linesPerSide, offRate, isaRate, ftabChars)
+	     _eh(joinedLen(szs), lineRate, linesPerSide, offRate, isaRate, ftabChars, color)
 	{
 		_in1Str = file + ".1.ebwt";
 		_in2Str = file + ".2.ebwt";
@@ -466,7 +482,7 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(false, NULL, false, true, false);
+			readIntoMemory(color, false, NULL, false, true, false);
 			sanityCheckAll();
 			evictFromMemory();
 			assert(!isInMemory());
@@ -763,8 +779,8 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory(bool loadNames, bool verbose) {
-		readIntoMemory(false, NULL, false, loadNames, verbose);
+	void loadIntoMemory(int color, bool loadNames, bool verbose) {
+		readIntoMemory(color, false, NULL, false, loadNames, verbose);
 	}
 
 	/**
@@ -960,7 +976,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(bool justHeader, EbwtParams *params, bool mmSweep, bool loadNames, bool startVerbose);
+	void readIntoMemory(int color, bool justHeader, EbwtParams *params, bool mmSweep, bool loadNames, bool startVerbose);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -970,12 +986,12 @@ public:
 	void sanityCheckUpToSide(int upToSide) const;
 	void sanityCheckAll() const;
 	void restore(TStr& s) const;
-	void checkOrigs(const vector<String<Dna5> >& os, bool mirror) const;
+	void checkOrigs(const vector<String<Dna5> >& os, bool color, bool mirror) const;
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1106,29 +1122,29 @@ bool Ebwt<TStr>::isPacked() {
 template<typename TStr>
 class EbwtSearchParams {
 public:
-	EbwtSearchParams(HitSinkPerThread& __sink,
-	                 const vector<String<Dna5> >& __texts,
-	                 bool __revcomp = true,
-	                 bool __fw = true,
-	                 bool __ebwtFw = true,
-	                 bool __arrowMode = false) :
-		_sink(__sink),
-		_texts(__texts),
+	EbwtSearchParams(HitSinkPerThread& sink,
+	                 const vector<String<Dna5> >& texts,
+	                 bool fw = true,
+	                 bool ebwtFw = true) :
+		_sink(sink),
+		_texts(texts),
 		_patid(0xffffffff),
-		_revcomp(__revcomp),
-		_fw(__fw),
-        _arrowMode(__arrowMode) { }
-	HitSinkPerThread& sink() const   { return _sink; }
-	void setPatId(uint32_t __patid)  { _patid = __patid; }
-	uint32_t patId() const           { return _patid; }
-	void setFw(bool __fw)            { _fw = __fw; }
-	bool fw() const                  { return _fw; }
+		_fw(fw) { }
+
+	HitSinkPerThread& sink() const { return _sink; }
+	void setPatId(uint32_t patid)  { _patid = patid; }
+	uint32_t patId() const         { return _patid; }
+	void setFw(bool fw)            { _fw = fw; }
+	bool fw() const                { return _fw; }
 	/**
 	 * Report a hit.  Returns true iff caller can call off the search.
 	 */
 	bool reportHit(const String<Dna5>& query, // read sequence
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
+	               bool color,          // true -> read is colorspace
+	               int snpPhred,        // penalty for a SNP
+	               const BitPairReference* ref, // reference (= NULL if not necessary)
 	               const ReferenceMap* rmap, // map to another reference coordinate system
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
 	               const std::vector<uint32_t>& mmui32, // mismatch list
@@ -1140,38 +1156,13 @@ public:
 	               uint16_t mlen,      // mate length
 	               U32Pair a,          // arrow pair
 	               uint32_t tlen,      // length of text
-	               uint32_t len,       // length of query
+	               uint32_t qlen,      // length of query
 	               int stratum,        // alignment stratum
 	               uint16_t cost,      // cost of alignment
 	               uint32_t oms,       // approx. # other valid alignments
 	               uint32_t patid,
 	               uint8_t mate) const
 	{
-		// The search functions should not have allowed us to get here
-		assert_eq(mmui32.size(), refcs.size());
-		assert_leq(numMms, mmui32.size());
-		String<Dna5> pat;
-		uint32_t qlen = length(query);
-		assert_gt(qlen, 0);
-		reserve(pat, qlen);
-		// Report it using the HitSinkPerThread
-		Hit hit;
-		hit.stratum = stratum;
-		hit.cost = cost;
-		if(patid == 0xffffffff) patid = _patid;
-		// Make a copy of the read name
-		if(name != NULL) assign(hit.patName, *name);
-		hit.patSeq = query;
-		if(quals != NULL) {
-			hit.quals = *quals;
-		}
-		if(!ebwtFw) {
-			// Note: this is re-reversing the pattern and the quals
-			// string back to their normal orientation; the pattern
-			// source reversed it initially
-			::reverseInPlace(hit.patSeq);
-			::reverseInPlace(hit.quals);
-		}
 #ifndef NDEBUG
 		// Check that no two elements of the mms array are the same
 		for(size_t i = 0; i < numMms; i++) {
@@ -1180,75 +1171,161 @@ public:
 			}
 		}
 #endif
-		// Turn the mmui32 and refcs arrays into the mm FixedBitset and
-		// the refc vector
-		hit.refcs.resize(qlen, 0);
-		for(size_t i = 0; i < numMms; i++) {
-			if (ebwtFw != _fw) {
-				// The 3' end is on the left but the mm vector encodes
-				// mismatches w/r/t the 5' end, so we flip
-				uint32_t off = len - mmui32[i] - 1;
-				hit.mms.set(off);
-				hit.refcs[off] = refcs[i];
+		// If ebwtFw is true, then 'query' and 'quals' are reversed
+		// If _fw is false, then 'query' and 'quals' are reverse complemented
+		assert(!color || ref != NULL);
+		assert(quals != NULL);
+		assert(name != NULL);
+		assert_eq(mmui32.size(), refcs.size());
+		assert_leq(numMms, mmui32.size());
+		assert_gt(qlen, 0);
+		Hit hit;
+		hit.stratum = stratum;
+		hit.cost = cost;
+		hit.patSeq = query;
+		hit.quals = *quals;
+		if(!ebwtFw) {
+			// Re-reverse the pattern and the quals back to how they
+			// appeared in the read file
+			::reverseInPlace(hit.patSeq);
+			::reverseInPlace(hit.quals);
+		}
+		if(color) {
+			hit.colSeq = hit.patSeq;
+			hit.crefcs.resize(qlen, 0);
+			// Turn the mmui32 and refcs arrays into the mm FixedBitset and
+			// the refc vector
+			for(size_t i = 0; i < numMms; i++) {
+				if (ebwtFw != _fw) {
+					// The 3' end is on the left but the mm vector encodes
+					// mismatches w/r/t the 5' end, so we flip
+					uint32_t off = qlen - mmui32[i] - 1;
+					hit.cmms.set(off);
+					hit.crefcs[off] = refcs[i];
+				} else {
+					hit.cmms.set(mmui32[i]);
+					hit.crefcs[i] = refcs[i];
+				}
 			}
-			else {
-				hit.mms.set(mmui32[i]);
-				hit.refcs[mmui32[i]] = refcs[i];
+			assert(ref != NULL);
+			char read[1024];
+			char rf[1024];
+			char qual[1024];
+			char ns[1024];
+			char cmm[1024];
+			char nmm[1024];
+			int cmms = 0;
+			int nmms = 0;
+			// TODO: account for indels when calculating these bounds
+			size_t readi = 0;
+			size_t readf = seqan::length(hit.patSeq);
+			size_t refi = 0;
+			size_t reff = readf + 1;
+			// The "Phred-scaled probability of a mutation" a la Maq/BWA
+			bool maqRound = false;
+			for(size_t i = 0; i < qlen + 1; i++) {
+				if(i < qlen) {
+					read[i] = (int)hit.patSeq[i];
+					qual[i] = mmPenalty(maqRound, phredCharToPhredQual(hit.quals[i]));
+				}
+				int rc = ref->getBase(h.first, h.second + i);
+				assert_geq(rc, 0);
+				assert_lt(rc, 4);
+				rf[i] = (1 << rc);
+			}
+			decodeHit(
+				read,  // ASCII colors, '0', '1', '2', '3', '.'
+				qual,  // ASCII quals, Phred+33 encoded
+				readi, // offset of first character within 'read' to consider
+				readf, // offset of last char (exclusive) in 'read' to consider
+				rf,    // reference sequence, as masks
+				refi, // offset of first character within 'ref' to consider
+				reff, // offset of last char (exclusive) in 'ref' to consider
+				snpPhred, // penalty incurred by a SNP
+				ns,  // decoded nucleotides are appended here
+				cmm, // where the color mismatches are in the string
+				nmm, // where nucleotide mismatches are in the string
+				cmms, // number of color mismatches
+				nmms);// number of nucleotide mismatches
+			seqan::resize(hit.patSeq, qlen+1);
+			seqan::resize(hit.quals, qlen+1);
+			hit.refcs.resize(qlen+1, 0);
+			for(size_t i = 0; i < qlen + 1; i++) {
+				// Set sequence character
+				assert_leq(ns[i], 4);
+				assert_geq(ns[i], 0);
+				hit.patSeq[i] = (Dna5)(int)ns[i];
+				// Set initial quality
+				hit.quals[i] = '!';
+				// Color mismatches penalize quality
+				if(i > 0) {
+					if(cmm[i-1] == 'M') hit.quals[i] += qual[i-1];
+					else hit.quals[i] -= qual[i-1];
+				}
+				if(i < qlen) {
+					if(cmm[i] == 'M') hit.quals[i] += qual[i];
+					else hit.quals[i] -= qual[i];
+				}
+				if(hit.quals[i] < '!') hit.quals[i] = '!';
+				if(nmm[i] != 'M') {
+					uint32_t off = i;
+					if(!_fw) off = (qlen+1) - i - 1;
+					assert_lt(off, qlen+1);
+					hit.mms.set(off);
+					hit.refcs[off] = "ACGT"[ref->getBase(h.first, h.second+i)];
+				}
+			}
+			qlen++;
+			mlen++;
+		} else {
+			// Turn the mmui32 and refcs arrays into the mm FixedBitset and
+			// the refc vector
+			hit.refcs.resize(qlen, 0);
+			for(size_t i = 0; i < numMms; i++) {
+				if (ebwtFw != _fw) {
+					// The 3' end is on the left but the mm vector encodes
+					// mismatches w/r/t the 5' end, so we flip
+					uint32_t off = qlen - mmui32[i] - 1;
+					hit.mms.set(off);
+					hit.refcs[off] = refcs[i];
+				} else {
+					hit.mms.set(mmui32[i]);
+					hit.refcs[mmui32[i]] = refcs[i];
+				}
 			}
 		}
 		// Check the hit against the original text, if it's available
-		if(_texts.size() > 0 && !_arrowMode) {
+		if(_texts.size() > 0) {
 			assert_lt(h.first, _texts.size());
-			FixedBitset<max_read_bp> diffs;
+			FixedBitset<1024> diffs;
 			// This type of check assumes that only mismatches are
 			// possible.  If indels are possible, then we either need
 			// the caller to provide information about indel locations,
 			// or we need to extend this to a more complicated check.
-			assert_leq(h.second + len, length(_texts[h.first]));
-			for(size_t i = 0; i < len; i++) {
+			assert_leq(h.second + qlen, length(_texts[h.first]));
+			for(size_t i = 0; i < qlen; i++) {
 				assert_neq(4, (int)_texts[h.first][h.second + i]);
-				if(ebwtFw) {
-					// Forward pattern appears at h
-					if((int)query[i] != (int)_texts[h.first][h.second + i]) {
-						uint32_t qoff = i;
-						// if ebwtFw != _fw the 3' end is on on the
-						// left end of the pattern, but the diff vector
-						// should encode mismatches w/r/t the 5' end,
-						// so we flip
-						if (ebwtFw != _fw) diffs.set(len - qoff - 1);
-						else               diffs.set(qoff);
-					}
-				} else {
-					// Reverse of pattern appears at h
-					if((int)query[len-i-1] != (int)_texts[h.first][h.second + i]) {
-						uint32_t qoff = len-i-1;
-						// if ebwtFw != _fw the 3' end is on on the
-						// left end of the pattern, but the diff vector
-						// should encode mismatches w/r/t the 5' end,
-						// so we flip
-						if (ebwtFw != _fw) diffs.set(len - qoff - 1);
-						else               diffs.set(qoff);
-					}
+				// Forward pattern appears at h
+				if((int)hit.patSeq[i] != (int)_texts[h.first][h.second + i]) {
+					uint32_t qoff = i;
+					// if ebwtFw != _fw the 3' end is on on the
+					// left end of the pattern, but the diff vector
+					// should encode mismatches w/r/t the 5' end,
+					// so we flip
+					if (_fw) diffs.set(qoff);
+					else     diffs.set(qlen - qoff - 1);
 				}
 			}
 			if(diffs != hit.mms) {
 				// Oops, mismatches were not where we expected them;
 				// print a diagnostic message before asserting
 				cerr << "Expected " << hit.mms.str() << " mismatches, got " << diffs.str() << endl;
-				cerr << "  Pat:  ";
-				for(size_t i = 0; i < len; i++) {
-					if(ebwtFw) cerr << query[i];
-					else cerr << query[len-i-1];
-				}
-				cerr << endl;
+				cerr << "  Pat:  " << hit.patSeq << endl;
 				cerr << "  Tseg: ";
-				for(size_t i = 0; i < len; i++) {
+				for(size_t i = 0; i < qlen; i++) {
 					cerr << _texts[h.first][h.second + i];
 				}
 				cerr << endl;
-				if(length(_texts[h.first]) < 80) {
-					cerr << "  Text: " << _texts[h.first] << endl;
-				}
 				cerr << "  mmui32: ";
 				for(size_t i = 0; i < numMms; i++) {
 					cerr << mmui32[i] << " ";
@@ -1259,35 +1336,25 @@ public:
 			}
 			if(diffs != hit.mms) assert(false);
 		}
-		hit.h = _arrowMode? a : h;
-		if(!_arrowMode && rmap != NULL) {
-			rmap->map(hit.h);
-		}
-		hit.patId = patid;
-		if(name != NULL) hit.patName = *name;
+		hit.h = h;
+		if(rmap != NULL) rmap->map(hit.h);
+		hit.patId = ((patid == 0xffffffff) ? _patid : patid);
+		hit.patName = *name;
 		hit.mh = mh;
 		hit.fw = _fw;
 		hit.mfw = mfw;
 		hit.mlen = mlen;
 		hit.oms = oms;
 		hit.mate = mate;
+		hit.color = color;
 		return sink().reportHit(hit, stratum);
 	}
-	bool arrowMode() const {
-		return _arrowMode;
-	}
-	void setArrowMode(bool a) {
-		_arrowMode = a;
-	}
-	const vector<String<Dna5> >& texts() const { return _texts; }
 private:
 	HitSinkPerThread& _sink;
-    const vector<String<Dna5> >& _texts; // original texts, if available (if not
-                                // available, _texts.size() == 0)
+	const vector<String<Dna5> >& _texts; // original texts, if available (if not
+	                            // available, _texts.size() == 0)
 	uint32_t _patid;      // id of current read
-	bool _revcomp;        // whether reverse complements are enabled
 	bool _fw;             // current read is forward-oriented
-	bool _arrowMode;      // report arrows
 };
 
 /**
@@ -2285,6 +2352,9 @@ template<typename TStr>
 inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
+                               bool color,
+                               int snpPhred,
+                               const BitPairReference* ref,
                                const std::vector<uint32_t>& mmui32,
                                const std::vector<uint8_t>& refcs,
                                size_t numMms,
@@ -2298,32 +2368,6 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 {
 	VMSG_NL("In report");
 	assert_lt(off, this->_eh._len);
-	if(params.arrowMode()) {
-		// Call reportHit with a bogus genome position; in this mode,
-		// all we care about are the top and bottom arrows
-		return params.reportHit(
-				query,               // read sequence
-				quals,               // read quality values
-				name,                // read name
-				rmap_,               // map to another reference coordinate system
-				_fw,                 // true = index is forward; false = mirror
-				mmui32,              // mismatch positions
-				refcs,               // reference characters for mms
-				numMms,              // # mismatches
-				make_pair(0, 0),     // (bogus) position
-				make_pair(0, 0),     // (bogus) mate position
-				true,                // (bogus) mate orientation
-				0,                   // (bogus) mate length
-				make_pair(top, bot), // arrows
-				0,                   // (bogus) textlen
-				qlen,                // qlen
-				stratum,             // alignment stratum
-				cost,                // cost, including stratum & quality penalty
-				bot-top-1,           // # other hits
-				0xffffffff,          // pattern id
-				0);                  // mate (0 = unpaired)
-	}
-
 	uint32_t tidx;
 	uint32_t textoff;
 	uint32_t tlen;
@@ -2335,6 +2379,9 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			query,                    // read sequence
 			quals,                    // read quality values
 			name,                     // read name
+			color,                    // true -> read is colorspace
+			snpPhred,                 // phred probability of SNP
+			ref,                      // reference sequence
 			rmap_,                    // map to another reference coordinate system
 			_fw,                      // true = index is forward; false = mirror
 			mmui32,                   // mismatch positions
@@ -2367,6 +2414,9 @@ template<typename TStr>
 inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
+                                       bool color,
+                                       int snpPhred,
+                                       const BitPairReference* ref,
                                        const std::vector<uint32_t>& mmui32,
                                        const std::vector<uint8_t>& refcs,
                                        size_t numMms,
@@ -2380,7 +2430,6 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        SideLocus *l) const
 {
 	VMSG_NL("In reportChaseOne");
-	assert(!params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
 	ASSERT_ONLY(uint32_t origi = i);
@@ -2423,7 +2472,9 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_eq(rcoff, off);
 	}
 #endif
-	return report(query, quals, name, mmui32, refcs, numMms, off, top, bot, qlen, stratum, cost, params);
+	return report(query, quals, name, color, snpPhred, ref, mmui32,
+	              refcs, numMms, off, top, bot, qlen, stratum, cost,
+	              params);
 }
 
 /**
@@ -2452,7 +2503,6 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 {
 	VMSG_NL("In reportReconstruct");
 	assert_gt(_eh._isaLen, 0); // Must have inverse suffix array to reconstruct
-	assert(params.arrowMode());
 	uint32_t off;
 	uint32_t jumps = 0;
 	SideLocus myl;
@@ -2628,7 +2678,8 @@ void Ebwt<TStr>::restore(TStr& s) const {
  * the given array of reference sequences.  For sanity checking.
  */
 template <typename TStr>
-void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
+void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
+                            bool color, bool mirror) const
 {
 	TStr rest;
 	restore(rest);
@@ -2640,19 +2691,32 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
 	}
 	while(i < os.size()) {
 		size_t olen = length(os[i]);
+		int lastorig = -1;
 		for(; j < olen; j++) {
 			size_t joff = j;
 			if(mirror) joff = olen - j - 1;
 			if((int)os[i][joff] == 4) {
 				// Skip over Ns
+				lastorig = -1;
 				if(!mirror) {
-					while(j < length(os[i]) && (int)os[i][j] == 4) j++;
+					while(j < olen && (int)os[i][j] == 4) j++;
 				} else {
-					while(j < length(os[i]) && (int)os[i][olen-j-1] == 4) j++;
+					while(j < olen && (int)os[i][olen-j-1] == 4) j++;
 				}
-				break;
+				j--;
+				continue;
 			}
-			assert_eq(os[i][joff], rest[restOff]);
+			if(lastorig == -1 && color) {
+				lastorig = os[i][joff];
+				continue;
+			}
+			if(color) {
+				assert_neq(-1, lastorig);
+				assert_eq(dinuc2color[(int)os[i][joff]][lastorig], rest[restOff]);
+			} else {
+				assert_eq(os[i][joff], rest[restOff]);
+			}
+			lastorig = (int)os[i][joff];
 			restOff++;
 		}
 		if(j == length(os[i])) {
@@ -2675,7 +2739,8 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os, bool mirror) const
  * Read an Ebwt from file with given filename.
  */
 template<typename TStr>
-void Ebwt<TStr>::readIntoMemory(bool justHeader,
+void Ebwt<TStr>::readIntoMemory(int color,
+                                bool justHeader,
                                 EbwtParams *params,
                                 bool mmSweep,
                                 bool loadNames,
@@ -2818,19 +2883,39 @@ void Ebwt<TStr>::readIntoMemory(bool justHeader,
 	int32_t  isaRate      = _overrideIsaRate;
 	int32_t  ftabChars    = readI32(_in1, switchEndian);
 	bytesRead += 4;
-	// BTL: chunkRate is now deprecated
-	/*int32_t  chunkRate =*/ readI32(_in1, switchEndian);
+	// chunkRate was deprecated in an earlier version of Bowtie; now
+	// we use it to hold flags.
+	int32_t flags = readI32(_in1, switchEndian);
+	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
+		if(color != -1 && !color) {
+			cerr << "Error: -C was not specified when running bowtie, but index is in colorspace.  If" << endl
+			     << "your reads are in colorspace, please use the -C option.  If your reads are not" << endl
+			     << "in colorspace, please use a normal index (one built without specifying -C to" << endl
+			     << "bowtie-build)." << endl;
+			throw 1;
+		}
+		color = 1;
+	} else if(flags < 0) {
+		if(color != -1 && color) {
+			cerr << "Error: -C was specified when running bowtie, but index is not in colorspace.  If" << endl
+			     << "your reads are in colorspace, please use a colorspace index (one built using" << endl
+			     << "bowtie-build -C).  If your reads are not in colorspace, don't specify -C when" << endl
+			     << "running bowtie." << endl;
+			throw 1;
+		}
+		color = 0;
+	}
 	bytesRead += 4;
 
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams *eh;
 	bool deleteEh = false;
 	if(params != NULL) {
-		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
+		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
 		if(_verbose || startVerbose) params->print(cerr);
 		eh = params;
 	} else {
-		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars);
+		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
 		deleteEh = true;
 	}
 
@@ -3318,10 +3403,14 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	int32_t  offRate      = readI32(in, switchEndian);
 	int32_t  ftabChars    = readI32(in, switchEndian);
 	// BTL: chunkRate is now deprecated
-	/*int32_t  chunkRate    =*/ readI32(in, switchEndian);
+	int32_t flags = readI32(in, switchEndian);
+	bool color = false;
+	if(flags < 0) {
+		color = (((-flags) & EBWT_COLOR) != 0);
+	}
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars);
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color);
 
 	uint32_t nPat = readI32(in, switchEndian); // nPat
 	in.seekg(nPat*4, ios_base::cur); // skip plen
@@ -3388,6 +3477,41 @@ readEbwtRefnames(const string& instr, vector<string>& refnames) {
 }
 
 /**
+ * Read just enough of the Ebwt's header to determine whether it's
+ * colorspace.
+ */
+static inline bool
+readEbwtColor(const string& instr) {
+	ifstream in;
+	// Initialize our primary and secondary input-stream fields
+	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	if(!in.is_open()) {
+		throw EbwtFileOpenException("Cannot open file " + instr);
+	}
+	assert(in.is_open());
+	assert(in.good());
+	bool switchEndian = false;
+	uint32_t one = readU32(in, switchEndian); // 1st word of primary stream
+	if(one != 1) {
+		assert_eq((1u<<24), one);
+		assert_eq(1, endianSwapU32(one));
+		switchEndian = true;
+	}
+	readU32(in, switchEndian);
+	readI32(in, switchEndian);
+	readI32(in, switchEndian);
+	readI32(in, switchEndian);
+	readI32(in, switchEndian);
+	int32_t flags = readI32(in, switchEndian);
+	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
+		return true;
+	} else {
+		return false;
+	}
+
+}
+
+/**
  * Write an extended Burrows-Wheeler transform to a pair of output
  * streams.
  *
@@ -3416,7 +3540,9 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	writeI32(out1, eh._linesPerSide, be); // not used
 	writeI32(out1, eh._offRate,      be); // every 2^offRate chars is "marked"
 	writeI32(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
-	writeI32(out1, 0xffffffff, be); // BTL: chunkRate is now deprecated
+	int32_t flags = 1;
+	if(eh._color) flags |= EBWT_COLOR;
+	writeI32(out1, -flags, be); // BTL: chunkRate is now deprecated
 
 	if(!justHeader) {
 		assert(isInMemory());
@@ -3489,7 +3615,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 			cout << "Re-reading \"" << out1 << "\"/\"" << out2 << "\" for sanity check" << endl;
 		Ebwt copy(out1, out2, _verbose, _sanity);
 		assert(!isInMemory());
-		copy.loadIntoMemory(false, false);
+		copy.loadIntoMemory(eh._color ? 1 : 0, false, false);
 		assert(isInMemory());
 	    assert_eq(eh._lineRate,     copy.eh()._lineRate);
 	    assert_eq(eh._linesPerSide, copy.eh()._linesPerSide);

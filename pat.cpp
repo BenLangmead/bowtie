@@ -30,7 +30,8 @@ void tooManyQualities(const String<char>& read_name) {
 
 void tooManySeqChars(const String<char>& read_name) {
 	cerr << "Reads file contained a pattern with more than 1024 sequence characters." << endl
-		 << "Please truncate reads and quality values and and re-run Bowtie" << endl;
+		 << "Please truncate reads and quality values and and re-run Bowtie." << endl
+		 << "Offending read: " << read_name << endl;
 	throw 1;
 }
 

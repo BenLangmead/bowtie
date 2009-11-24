@@ -226,6 +226,44 @@ public:
 	static const size_t LASTN_BUF_SZ = 8 * 1024;
 
 	/**
+	 * Keep get()ing characters until a non-whitespace character (or
+	 * -1) is reached, and return it.
+	 */
+	int getPastWhitespace() {
+		int c;
+		while(isspace(c = get()) && c != -1);
+		return c;
+	}
+
+	/**
+	 * Keep get()ing characters until a we've passed over the next
+	 * string of newline characters (\r's and \n's) or -1 is reached,
+	 * and return it.
+	 */
+	int getPastNewline() {
+		int c = get();
+		while(c != '\r' && c != '\n' && c != -1) c = get();
+		while(c == '\r' || c == '\n') c = get();
+		assert_neq(c, '\r');
+		assert_neq(c, '\n');
+		return c;
+	}
+
+	/**
+	 * Keep get()ing characters until a we've passed over the next
+	 * string of newline characters (\r's and \n's) or -1 is reached,
+	 * and return it.
+	 */
+	int peekPastNewline() {
+		int c = peek();
+		while(c != '\r' && c != '\n' && c != -1) c = get();
+		while(c == '\r' || c == '\n') c = get();
+		assert_neq(c, '\r');
+		assert_neq(c, '\n');
+		return c;
+	}
+
+	/**
 	 * Reset to the beginning of the last-N-chars buffer.
 	 */
 	void resetLastN() {

@@ -31,6 +31,7 @@ public:
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
+			int snpPhred,
 			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -38,6 +39,7 @@ public:
 			RangeCache* cacheBw,
 			uint32_t cacheLimit,
 			ChunkPool *pool,
+			BitPairReference* refs,
 			vector<String<Dna5> >& os,
 			bool maqPenalty,
 			bool qualOrder,
@@ -53,6 +55,7 @@ public:
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
+			snpPhred_(snpPhred),
 			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -60,6 +63,7 @@ public:
 			cacheBw_(cacheBw),
 			cacheLimit_(cacheLimit),
 			pool_(pool),
+			refs_(refs),
 			os_(os),
 			strandFix_(strandFix),
 			maqPenalty_(maqPenalty),
@@ -78,7 +82,7 @@ public:
 	virtual Aligner* create() const {
 		HitSinkPerThread* sinkPt = sinkPtFactory_.create();
 		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_);
 		int *btCnt = new int[1];
 		*btCnt = maxBts_;
 
@@ -533,8 +537,9 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, rangeMode_, verbose_,
-			quiet_, maxBts_, pool_, btCnt, metrics_);
+			sink_, sinkPtFactory_, sinkPt, os_, refs_, snpPhred_,
+			rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt,
+			metrics_);
 	}
 
 private:
@@ -545,6 +550,7 @@ private:
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
+	const int snpPhred_;
 	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
@@ -552,6 +558,7 @@ private:
 	RangeCache *cacheBw_;
 	const uint32_t cacheLimit_;
 	ChunkPool *pool_;
+	BitPairReference* refs_;
 	vector<String<Dna5> >& os_;
 	bool strandFix_;
 	bool maqPenalty_;
@@ -573,12 +580,14 @@ public:
 	PairedSeedAlignerFactory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
+			bool color,
 			bool v1,
 			bool doFw,
 			bool doRc,
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
+			int snpPhred,
 			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -606,12 +615,14 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
+			color_(color),
 			v1_(v1),
 			doFw_(doFw),
 			doRc_(doRc),
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
+			snpPhred_(snpPhred),
 			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -647,27 +658,27 @@ public:
 		HitSinkPerThread* sinkPt = sinkPtFactory_.createMult(2);
 		HitSinkPerThread* sinkPtSe1 = NULL, * sinkPtSe2 = NULL;
 		EbwtSearchParams<String<Dna> >* params =
-			new EbwtSearchParams<String<Dna> >(*sinkPt, os_, true, true, true, rangeMode_);
+			new EbwtSearchParams<String<Dna> >(*sinkPt, os_);
 		EbwtSearchParams<String<Dna> >* paramsSe1 = NULL, * paramsSe2 = NULL;
 		if(reportSe_) {
 			sinkPtSe1 = sinkPtFactory_.create();
 			sinkPtSe2 = sinkPtFactory_.create();
 			paramsSe1 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_, true, true, true, rangeMode_);
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe1, os_);
 			paramsSe2 =
-				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_, true, true, true, rangeMode_);
+				new EbwtSearchParams<String<Dna> >(*sinkPtSe2, os_);
 		}
 		RefAligner<String<Dna5> >* refAligner = NULL;
 		int *btCnt = new int[1];
 		*btCnt = maxBts_;
 		if(seedMms_ == 0) {
-			refAligner = new Seed0RefAligner<String<Dna5> >(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed0RefAligner<String<Dna5> >(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else if(seedMms_ == 1) {
-			refAligner = new Seed1RefAligner<String<Dna5> >(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed1RefAligner<String<Dna5> >(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else if(seedMms_ == 2) {
-			refAligner = new Seed2RefAligner<String<Dna5> >(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed2RefAligner<String<Dna5> >(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		} else {
-			refAligner = new Seed3RefAligner<String<Dna5> >(verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
+			refAligner = new Seed3RefAligner<String<Dna5> >(color_, verbose_, quiet_, seedLen_, qualCutoff_, maqPenalty_);
 		}
 		bool do1Fw = true;
 		bool do1Rc = true;
@@ -1324,7 +1335,8 @@ public:
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				mate1fw_, mate2fw_, peInner_, peOuter_, dontReconcile_,
 				symCeil_, mixedThresh_, mixedAttemptLim_, refs_,
-				rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt);
+				snpPhred_, rangeMode_, verbose_, quiet_, maxBts_, pool_,
+				btCnt);
 			delete dr1FwVec;
 			delete dr1RcVec;
 			delete dr2FwVec;
@@ -1337,8 +1349,8 @@ public:
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, quiet_, true),
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				sinkPtSe1, sinkPtSe2, mate1fw_, mate2fw_, peInner_, peOuter_,
-				mixedAttemptLim_, refs_, rangeMode_, verbose_, quiet_, maxBts_,
-				pool_, btCnt);
+				mixedAttemptLim_, refs_, snpPhred_, rangeMode_, verbose_,
+				quiet_, maxBts_, pool_, btCnt);
 			delete dr1FwVec;
 			return al;
 		}
@@ -1347,12 +1359,14 @@ public:
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
+	bool color_;
 	const bool v1_; // whether to use V1 PairedAligner
 	const bool doFw_;
 	const bool doRc_;
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
+	const int snpPhred_;
 	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;

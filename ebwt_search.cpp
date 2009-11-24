@@ -47,7 +47,6 @@ static bool quiet;        // print nothing but the alignments
 static int sanityCheck;   // enable expensive sanity checks
 static int format;        // default read format is FASTQ
 static string origString; // reference text, or filename(s)
-static int revcomp;       // search for reverse complements?
 static int seed;          // srandom() seed
 static int timing;        // whether to report basic timing data
 static bool allHits;      // for multihits, report just one
@@ -95,7 +94,6 @@ static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
-static bool forgiveInput; // let read input be a little wrong w/o complaining or dying
 static bool useSpinlock;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -138,6 +136,9 @@ static bool fuzzy;
 static bool fullRef;
 static bool samNoHead; // don't print any header lines in SAM output
 static bool samNoSQ;   // don't print @SQ header lines
+static bool color;
+static string rgs; // SAM outputs for @RG header line
+static int snpPhred; // probability of SNP, for scoring colorspace alignments
 
 static void resetOptions() {
 	mates1.clear();
@@ -150,7 +151,6 @@ static void resetOptions() {
 	sanityCheck				= 0;  // enable expensive sanity checks
 	format					= FASTQ; // default read format is FASTQ
 	origString				= ""; // reference text, or filename(s)
-	revcomp					= 1; // search for reverse complements?
 	seed					= 0; // srandom() seed
 	timing					= 0; // whether to report basic timing data
 	allHits					= false; // for multihits, report just one
@@ -198,7 +198,6 @@ static void resetOptions() {
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
-	forgiveInput			= false; // let read input be a little wrong w/o complaining or dying
 	useSpinlock				= true;  // false -> don't use of spinlocks even if they're #defines
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
@@ -241,11 +240,14 @@ static void resetOptions() {
 	fullRef					= false; // print entire reference name instead of just up to 1st space
 	samNoHead				= false; // don't print any header lines in SAM output
 	samNoSQ					= false; // don't print @SQ header lines
+	color					= false; // don't align in colorspace by default
+	rgs						= "";    // SAM outputs for @RG header line
+	snpPhred				= 30;    // probability of SNP, for scoring colorspace alignments
 }
 
 // mating constraints
 
-static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:yS";
+static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:ySC";
 
 enum {
 	ARG_ORIG = 256,
@@ -277,7 +279,6 @@ enum {
 	ARG_SEED_EXTEND,
 	ARG_PARTITION,
 	ARG_integerQuals,
-	ARG_FORGIVE_INPUT,
 	ARG_NOMAQROUND,
 	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
@@ -317,8 +318,10 @@ enum {
 	ARG_FUZZY,
 	ARG_FULLREF,
 	ARG_USAGE,
+	ARG_SNPPHRED,
 	ARG_SAM_NOHEAD,
-	ARG_SAM_NOSQ
+	ARG_SAM_NOSQ,
+	ARG_SAM_RG
 };
 
 static struct option long_options[] = {
@@ -350,7 +353,6 @@ static struct option long_options[] = {
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
 	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
-	{(char*)"revcomp",      no_argument,       0,            'r'},
 	{(char*)"maqerr",       required_argument, 0,            'e'},
 	{(char*)"seedlen",      required_argument, 0,            'l'},
 	{(char*)"seedmms",      required_argument, 0,            'n'},
@@ -377,7 +379,6 @@ static struct option long_options[] = {
 	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
-	{(char*)"forgive",      no_argument,       0,            ARG_FORGIVE_INPUT},
 	{(char*)"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
@@ -422,6 +423,9 @@ static struct option long_options[] = {
 	{(char*)"sam-nohead",   no_argument,       0,            ARG_SAM_NOHEAD},
 	{(char*)"sam-nosq",     no_argument,       0,            ARG_SAM_NOSQ},
 	{(char*)"sam-noSQ",     no_argument,       0,            ARG_SAM_NOSQ},
+	{(char*)"color",        no_argument,       0,            'C'},
+	{(char*)"sam-RG",       required_argument, 0,            ARG_SAM_RG},
+	{(char*)"snpphred",     required_argument, 0,            ARG_SNPPHRED},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -446,6 +450,7 @@ static void printUsage(ostream& out) {
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
+	    << "  -C                 reads and index are in colorspace (incompatible with -q)" << endl
 	    << "  -s/--skip <int>    skip the first <int> reads/pairs in the input" << endl
 	    << "  -u/--qupto <int>   stop after first <int> reads/pairs (excl. skipped reads)" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
@@ -476,12 +481,13 @@ static void printUsage(ostream& out) {
 	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
 	    << "  --best             hits guaranteed best stratum; ties broken by quality" << endl
 	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
-	    << "  --strandfix        attempt to fix strand biases" << endl
+	    << "  --strandfix        attempt to fix strand biases (def: on w/ --best, off w/o)" << endl
 	    << "Output:" << endl
 	    << "  -S/--sam           write hits in SAM format" << endl
-	    << "  --concise          write hits in concise format" << endl
+	    //<< "  --concise          write hits in concise format" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
+	    << "  --snphred <int>    penalty for a SNP when decoding colorspace (default: 30)" << endl
 	    << "  --quiet            print nothing but the alignments" << endl
 	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
@@ -1604,6 +1610,7 @@ static void parseOptions(int argc, const char **argv) {
 			case 'q': format = FASTQ; break;
 			case 'r': format = RAW; break;
 			case 'c': format = CMDLINE; break;
+			case 'C': color = true; break;
 			case ARG_CHAININ: format = INPUT_CHAIN; break;
 			case 'I':
 				minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
@@ -1654,8 +1661,8 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_integerQuals: integerQuals = true; break;
 			case ARG_PHRED64: phred64Quals = true; break;
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
-			case ARG_FORGIVE_INPUT: forgiveInput = true; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
+			case ARG_SNPPHRED: snpPhred = parseInt(0, "--snpphred must be at least 0"); break;
 			case 'z': fullIndex = false; break;
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
@@ -1748,6 +1755,11 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PEV2: useV1 = false; break;
 			case ARG_SAM_NOHEAD: samNoHead = true; break;
 			case ARG_SAM_NOSQ: samNoSQ = true; break;
+			case ARG_SAM_RG: {
+				if(!rgs.empty()) rgs += '\t';
+				rgs += optarg;
+				break;
+			}
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
@@ -1782,9 +1794,7 @@ static void parseOptions(int argc, const char **argv) {
 		// ranges).
 		offRate = 32;
 	}
-	if(maqLike) {
-		revcomp = true;
-	} else if(mismatches == 3 && fullIndex) {
+	if(!maqLike && mismatches == 3 && fullIndex) {
 		// Much faster than normal 3-mismatch mode
 		stateful = true;
 	}
@@ -2143,6 +2153,7 @@ static void *exactSearchWorker(void *vp) {
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
+	const BitPairReference* refs =  exactSearch_refs;
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
@@ -2154,14 +2165,14 @@ static void *exactSearchWorker(void *vp) {
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSink
 	        os,         // reference sequences
-	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
-	        true,       // index is forward
-	        rangeMode); // range mode
+	        true);       // index is forward
 	GreedyDFSRangeSource bt(
 	        &ebwt, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
-	        0xffffffff,    // max backtracks (no max)
+	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2200,6 +2211,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
+			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -2208,6 +2220,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
+			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -2219,6 +2232,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
 			NULL,
+			snpPhred,
+			color,
 			!nofw,
 			!norc,
 			useV1,
@@ -2290,8 +2305,7 @@ static void *exactSearchWorkerStateful(void *vp) {
 static void exactSearch(PairedPatternSource& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
-                        vector<String<Dna5> >& os,
-                        bool paired = false)
+                        vector<String<Dna5> >& os)
 {
 	exactSearch_patsrc = &_patsrc;
 	exactSearch_sink   = &_sink;
@@ -2303,13 +2317,14 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwt.loadIntoMemory(!noRefNames, startVerbose);
+		ebwt.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 
 	BitPairReference *refs = NULL;
-	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
+	bool pair = mates1.size() > 0 || mates12.size() > 0;
+	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
@@ -2371,20 +2386,22 @@ static void* mismatchSearchWorkerPhase1(void *vp){
 	vector<String<Dna5> >& os            = *mismatchSearch_os;
 	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
-    bool sanity = sanityCheck && !os.empty() && !rangeMode;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	const BitPairReference* refs         = mismatchSearch_refs;
+
+	bool sanity = sanityCheck && !os.empty() && !rangeMode;
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
-			*sink,      // HitSinkPerThread
+	        *sink,      // HitSinkPerThread
 	        os,         // reference sequences
-	        revcomp,    // forward AND reverse complement?
 	        false,      // read is forward
-	        true,       // index is forward
-	        rangeMode); // range mode
+	        true);      // index is forward
 	GreedyDFSRangeSource bt(
-			&ebwtFw, params,
+	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,    // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -2418,23 +2435,25 @@ static void* mismatchSearchWorkerPhase2(void *vp){
 	vector<String<Dna5> >& os           = *mismatchSearch_os;
 	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
 	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
-    // Per-thread initialization
-    bool sanity = sanityCheck && !os.empty() && !rangeMode;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	const BitPairReference* refs         = mismatchSearch_refs;
+
+	// Per-thread initialization
+	bool sanity = sanityCheck && !os.empty() && !rangeMode;
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
-			*sink,      // HitSinkPerThread
+	        *sink,      // HitSinkPerThread
 	        os,         // reference sequences
-	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
-	        false,      // index is mirror index
-	        rangeMode); // range mode
+	        false);     // index is mirror index
 	GreedyDFSRangeSource bt(
-			&ebwtBw, params,
+	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
-	        0xffffffff,    // max backtracks (no max)
+	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
 	        true,           // reportExacts
 	        rangeMode,      // reportRanges
@@ -2496,7 +2515,7 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 
 #ifdef BOWTIE_PTHREADS
@@ -2528,12 +2547,12 @@ static void mismatchSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
-    _patsrc.reset();          // reset pattern source to 1st pattern
+	_patsrc.reset();          // reset pattern source to 1st pattern
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwtBw.checkOrigs(os, true);
+		ebwtBw.checkOrigs(os, color, true);
 	}
 
 	// Phase 2
@@ -2568,13 +2587,14 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 
 	// Global initialization
 	bool sanity = sanityCheck && !os.empty();
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
+			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -2583,6 +2603,7 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
+			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -2594,6 +2615,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Paired1mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			color,
+			snpPhred,
 			!nofw,
 			!norc,
 			useV1,
@@ -2643,26 +2666,28 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 
 static void* mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
-	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
-	HitSink&               _sink        = *mismatchSearch_sink;
-	Ebwt<String<Dna> >&    ebwtFw       = *mismatchSearch_ebwtFw;
-	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
-	vector<String<Dna5> >& os           = *mismatchSearch_os;
-    // Per-thread initialization
-    bool sanity = sanityCheck && !os.empty() && !rangeMode;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PairedPatternSource&   _patsrc   = *mismatchSearch_patsrc;
+	HitSink&               _sink     = *mismatchSearch_sink;
+	Ebwt<String<Dna> >&    ebwtFw    = *mismatchSearch_ebwtFw;
+	Ebwt<String<Dna> >&    ebwtBw    = *mismatchSearch_ebwtBw;
+	vector<String<Dna5> >& os        = *mismatchSearch_os;
+	const BitPairReference* refs     =  mismatchSearch_refs;
+
+	// Per-thread initialization
+	bool sanity = sanityCheck && !os.empty() && !rangeMode;
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
-			*sink,      // HitSinkPerThread
+	        *sink,      // HitSinkPerThread
 	        os,         // reference sequences
-	        revcomp,    // forward AND reverse complement?
 	        true,       // read is forward
-	        false,      // index is mirror index
-	        rangeMode); // range mode
+	        false);     // index is mirror index
 	GreedyDFSRangeSource bt(
-			&ebwtFw, params,
+	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -2713,18 +2738,19 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
+	bool pair = mates1.size() > 0 || mates12.size() > 0;
+	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	mismatchSearch_refs = refs;
@@ -2764,7 +2790,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
 		Timer _t(cerr, "Time loading forward index: ", timing); \
-		ebwtFw.loadIntoMemory(!noRefNames, startVerbose); \
+		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose); \
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -2777,7 +2803,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtBw.isInMemory()) { \
 		Timer _t(cerr, "Time loading mirror index: ", timing); \
-		ebwtBw.loadIntoMemory(!noRefNames, startVerbose); \
+		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose); \
 	} \
 	assert(ebwtBw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -2790,27 +2816,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
 		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
-		::naiveOracle( \
-		        os, \
-				patFw, \
-				plen, \
-		        qual, \
-		        name, \
-		        patid, \
-		        hits, \
-		        qualCutoff, \
-		        unrevOff, \
-		        oneRevOff, \
-		        twoRevOff, \
-		        threeRevOff, \
-		        true,        /* fw */ \
-		        ebwtfw,      /* ebwtFw */ \
-		        0,           /* iham */ \
-		        NULL,        /* muts */ \
-		        !noMaqRound, /* maqRound */ \
-		        false,       /* halfAndHalf */ \
-		        true,        /* reportExacts */ \
-		        ebwtfw);     /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \
 			::printHit( \
@@ -2818,11 +2823,11 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 				hits[0], \
 				patFw, \
 				plen, \
-			    unrevOff, \
-			    oneRevOff, \
-			    twoRevOff, \
-			    threeRevOff, \
-			    ebwtfw);  /* ebwtFw */ \
+				unrevOff, \
+				oneRevOff, \
+				twoRevOff, \
+				threeRevOff, \
+				ebwtfw);  /* ebwtFw */ \
 		} \
 		assert_eq(0, hits.size()); \
 	}
@@ -2834,27 +2839,6 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		uint32_t twoRevOff   = (seedMms <= 2) ? s : 0; \
 		uint32_t oneRevOff   = (seedMms <= 1) ? s : 0; \
 		uint32_t unrevOff    = (seedMms == 0) ? s : 0; \
-		::naiveOracle( \
-		        os, \
-				patRc, \
-				plen, \
-		        qualRev, \
-		        name, \
-		        patid, \
-		        hits, \
-		        qualCutoff, \
-		        unrevOff, \
-		        oneRevOff, \
-		        twoRevOff, \
-		        threeRevOff, \
-		        false,       /* fw */ \
-		        ebwtfw,      /* ebwtFw */ \
-		        0,           /* iham */ \
-		        NULL,        /* muts */ \
-		        !noMaqRound, /* maqRound */ \
-		        false,       /* halfAndHalf */ \
-		        true,        /* reportExacts */ \
-		        !ebwtfw);    /* invert */ \
 		if(hits.size() > 0) { \
 			/* Print offending hit obtained by oracle */ \
 			::printHit( \
@@ -2862,11 +2846,11 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 				hits[0], \
 				patRc, \
 				plen, \
-			    unrevOff, \
-			    oneRevOff, \
-			    twoRevOff, \
-			    threeRevOff, \
-			    ebwtfw);  /* ebwtFw */ \
+				unrevOff, \
+				oneRevOff, \
+				twoRevOff, \
+				threeRevOff, \
+				ebwtfw);  /* ebwtFw */ \
 		} \
 		assert_eq(0, hits.size()); \
 	}
@@ -2895,18 +2879,20 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
 	EbwtSearchParams<String<Dna> > params( \
 			*sink,       /* HitSink */ \
 	        os,          /* reference sequences */ \
-	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
-	        true,        /* index is forward */ \
-	        rangeMode);  /* range mode (irrelevant here) */
+	        true);       /* index is forward */
 
 static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask  = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
+	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
+
 	GreedyDFSRangeSource btr1(
-			&ebwtFw, params,
+	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2941,8 +2927,12 @@ static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
+	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
+
 	GreedyDFSRangeSource bt2(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2976,9 +2966,13 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
 	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
+	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
+
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource bt3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -2992,6 +2986,8 @@ static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3031,7 +3027,6 @@ static void twoOrThreeMismatchSearch(
         bool two = true)                /// true -> 2, false -> 3
 {
 	// Global initialization
-	assert(revcomp);
 	assert(!fullIndex);
 	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
@@ -3134,6 +3129,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			ebwtFw,
 			&ebwtBw,
 			two,
+			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -3142,6 +3138,7 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
+			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -3153,6 +3150,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	Paired23mmAlignerV1Factory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			color,
+			snpPhred,
 			!nofw,
 			!norc,
 			useV1,
@@ -3205,8 +3204,11 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	TWOTHREE_WORKER_SETUP();
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
+	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
 	GreedyDFSRangeSource btr1(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3220,6 +3222,8 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt2(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3233,6 +3237,8 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bt3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3246,6 +3252,8 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false);         // considerQuals
 	GreedyDFSRangeSource bthh3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -3281,32 +3289,32 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
 		PairedPatternSource& _patsrc,   /// pattern source
-        HitSink& _sink,                 /// hit sink
-        Ebwt<TStr>& ebwtFw,             /// index of original text
-        Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
-        bool two = true)                /// true -> 2, false -> 3
+		HitSink& _sink,                 /// hit sink
+		Ebwt<TStr>& ebwtFw,             /// index of original text
+		Ebwt<TStr>& ebwtBw,             /// index of mirror text
+		vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
+		bool two = true)                /// true -> 2, false -> 3
 {
 	// Global initialization
-	assert(revcomp);
 	assert(fullIndex);
 	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
+	bool pair = mates1.size() > 0 || mates12.size() > 0;
+	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -3372,22 +3380,23 @@ static BitPairReference*        seededQualSearch_refs;
 	EbwtSearchParams<String<Dna> > params( \
 	        *sink,       /* HitSink */ \
 	        os,          /* reference sequences */ \
-	        revcomp,     /* forward AND reverse complement? */ \
 	        true,        /* read is forward */ \
-	        true,        /* index is forward */ \
-	        rangeMode);  /* range mode (irrelevant here) */
+	        true);       /* index is forward */
 
 static void* seededQualSearchWorkerPhase1(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
 	SyncBitset& doneMask = *seededQualSearch_doneMask;
 	SyncBitset& hitMask = *seededQualSearch_hitMask;
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
+	const BitPairReference* refs = seededQualSearch_refs;
 	uint32_t s = seedLen;
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
 	        &ebwtFw, params,
+	        refs,                  // reference sequence (for colorspace)
+	        snpPhred,              // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3400,6 +3409,8 @@ static void* seededQualSearchWorkerPhase1(void *vp) {
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
 	        &ebwtFw, params,
+	        refs,                  // reference sequence (for colorspace)
+	        snpPhred,              // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3435,9 +3446,12 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
+	const BitPairReference* refs = seededQualSearch_refs;
 	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
 	GreedyDFSRangeSource btf2(
 	        &ebwtBw, params,
+	        refs,                  // reference sequence (for colorspace)
+	        snpPhred,              // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
@@ -3452,6 +3466,8 @@ static void* seededQualSearchWorkerPhase2(void *vp) {
 	// GreedyDFSRangeSource to search for partial alignments for case 4R
 	GreedyDFSRangeSource btr2(
 	        &ebwtBw, params,
+	        refs,                  // reference sequence (for colorspace)
+	        snpPhred,              // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
@@ -3490,9 +3506,12 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	Ebwt<String<Dna> >& ebwtFw        = *seededQualSearch_ebwtFw;
 	PartialAlignmentManager* pamFw    = seededQualSearch_pamFw;
 	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
+	const BitPairReference* refs = seededQualSearch_refs;
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource btf3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
@@ -3508,6 +3527,8 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	// the partial alignments found in Phase 2
 	GreedyDFSRangeSource btr3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3522,6 +3543,8 @@ static void* seededQualSearchWorkerPhase3(void *vp) {
 	// The half-and-half GreedyDFSRangeSource
 	GreedyDFSRangeSource btr23(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3561,10 +3584,13 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager* pamFw = seededQualSearch_pamFw;
+	const BitPairReference* refs = seededQualSearch_refs;
 	// GreedyDFSRangeSource to search for hits for case 4F by extending
 	// the partial alignments found in Phase 3
 	GreedyDFSRangeSource btf4(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
@@ -3579,6 +3605,8 @@ static void* seededQualSearchWorkerPhase4(void *vp) {
 	// Half-and-half GreedyDFSRangeSource for forward read
 	GreedyDFSRangeSource btf24(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter, // max backtracks
 	        0,       // reportPartials (don't)
@@ -3620,10 +3648,13 @@ static void* seededQualSearchWorkerFull(void *vp) {
 		pamFw = new PartialAlignmentManager(64);
 	}
 	vector<PartialAlignment> pals;
+	const BitPairReference* refs = seededQualSearch_refs;
 	// GreedyDFSRangeSource for finding exact hits for the forward-
 	// oriented read
 	GreedyDFSRangeSource btf1(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3636,6 +3667,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	        false);                // considerQuals
 	GreedyDFSRangeSource bt1(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -3650,6 +3683,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
 	GreedyDFSRangeSource btf2(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
@@ -3664,6 +3699,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for partial alignments for case 4R
 	GreedyDFSRangeSource btr2(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
@@ -3678,6 +3715,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// GreedyDFSRangeSource to search for seedlings for case 4F
 	GreedyDFSRangeSource btf3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
@@ -3693,6 +3732,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// the partial alignments found in Phase 2
 	GreedyDFSRangeSource btr3(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3707,6 +3748,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// The half-and-half GreedyDFSRangeSource
 	GreedyDFSRangeSource btr23(
 	        &ebwtFw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3723,6 +3766,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// the partial alignments found in Phase 3
 	GreedyDFSRangeSource btf4(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3737,6 +3782,8 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	// Half-and-half GreedyDFSRangeSource for forward read
 	GreedyDFSRangeSource btf24(
 	        &ebwtBw, params,
+	        refs,           // reference sequence (for colorspace)
+	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -3804,6 +3851,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			seedMms,
 			seedLen,
 			qualCutoff,
+			snpPhred,
 			maxBts,
 			_sink,
 			*sinkFact,
@@ -3811,6 +3859,7 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			NULL, //&cacheBw,
 			cacheLimit,
 			pool,
+			refs,
 			os,
 			!noMaqRound,
 			!better,
@@ -3823,12 +3872,14 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	PairedSeedAlignerFactory alPEfact(
 			ebwtFw,
 			&ebwtBw,
+			color,
 			useV1,
 			!nofw,
 			!norc,
 			seedMms,
 			seedLen,
 			qualCutoff,
+			snpPhred,
 			maxBts,
 			_sink,
 			*sinkFact,
@@ -3908,7 +3959,6 @@ static void seededQualCutoffSearch(
         vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
 {
 	// Global intialization
-	assert(revcomp);
 	assert(!fullIndex);
 	assert_leq(seedMms, 3);
 	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
@@ -4079,7 +4129,6 @@ static void seededQualCutoffSearchFull(
 {
 	// Global intialization
 	assert(fullIndex);
-	assert(revcomp);
 	assert_leq(seedMms, 3);
 
 	seededQualSearch_patsrc   = &_patsrc;
@@ -4095,9 +4144,10 @@ static void seededQualCutoffSearchFull(
 
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
-	if((mates1.size() > 0 || mates12.size() > 0) && mixedThresh < 0xffffffff) {
+	bool pair = mates1.size() > 0 || mates12.size() > 0;
+	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	seededQualSearch_refs = refs;
@@ -4112,7 +4162,7 @@ static void seededQualCutoffSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(!noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
 	}
 	CHUD_START();
 	{
@@ -4151,11 +4201,11 @@ static PatternSource*
 patsrcFromStrings(int format, const vector<string>& qs) {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (qs, randomizeQuals,
+			return new FastaPatternSource (qs, color,
+			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
-			                               forgiveInput,
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
@@ -4165,17 +4215,18 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               patDumpfile, verbose,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (qs, randomizeQuals,
+			return new RawPatternSource   (qs, color,
+			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
-			return new FastqPatternSource (qs, randomizeQuals,
+			return new FastqPatternSource (qs, color,
+			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
-			                               forgiveInput,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, fuzzy,
 			                               skipReads);
@@ -4184,7 +4235,6 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
-			                               forgiveInput,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, skipReads);
 		case CMDLINE:
@@ -4407,6 +4457,7 @@ static void driver(const char * type,
 		cerr << "About to initialize fw Ebwt: "; logTime(cerr, true);
 	}
 	Ebwt<TStr> ebwt(adjustedEbwtFileBase,
+	                color,  // index is colorspace
 	                true,     // index is for the forward direction
 	                /* overriding: */ offRate,
 	                /* overriding: */ isaRate,
@@ -4426,6 +4477,7 @@ static void driver(const char * type,
 			cerr << "About to initialize rev Ebwt: "; logTime(cerr, true);
 		}
 		ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
+		                        color,  // index is colorspace
 		                        false, // index is for the reverse direction
 		                        /* overriding: */ offRate,
 		                        /* overriding: */ isaRate,
@@ -4444,13 +4496,13 @@ static void driver(const char * type,
 		// against original strings
 		assert_eq(os.size(), ebwt.nPat());
 		for(size_t i = 0; i < os.size(); i++) {
-			assert_eq(length(os[i]), ebwt.plen()[i]);
+			assert_eq(length(os[i]), ebwt.plen()[i] + (color ? 1 : 0));
 		}
 	}
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwt.loadIntoMemory(!noRefNames, startVerbose);
-		ebwt.checkOrigs(os, false);
+		ebwt.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwt.checkOrigs(os, color, false);
 		ebwt.evictFromMemory();
 	}
 	{
@@ -4500,9 +4552,10 @@ static void driver(const char * type,
 						}
 						sam->appendHeaders(
 								sam->out(0), ebwt.nPat(),
-								refnames, samNoSQ, rmap,
+								refnames, color, samNoSQ, rmap,
 								ebwt.plen(), fullRef,
-								argstr.c_str());
+								argstr.c_str(),
+								rgs.empty() ? NULL : rgs.c_str());
 					}
 					sink = sam;
 				}
@@ -4598,7 +4651,7 @@ static void driver(const char * type,
 			// Search without mismatches
 			// Note that --fast doesn't make a difference here because
 			// we're only loading half of the index anyway
-			exactSearch(*patsrc, *sink, ebwt, os, paired);
+			exactSearch(*patsrc, *sink, ebwt, os);
 		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {

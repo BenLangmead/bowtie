@@ -331,6 +331,8 @@ public:
 		const HitSinkPerThreadFactory& sinkPtFactory,
 		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
+		const BitPairReference* refs,
+		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -339,6 +341,8 @@ public:
 		int *btCnt = NULL,
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode),
+		refs_(refs),
+		snpPhred_(snpPhred),
 		doneFirst_(true),
 		firstIsFw_(true),
 		chase_(false),
@@ -412,11 +416,14 @@ public:
 		bool ebwtFw = ra.ebwt->fw();
 		params_->setFw(ra.fw);
 		return params_->reportHit(
-				ra.fw ? (ebwtFw? bufa_->patFw   : bufa_->patFwRev) :
-				        (ebwtFw? bufa_->patRc   : bufa_->patRcRev),
+				ra.fw ? (ebwtFw? bufa_->patFw    : bufa_->patFwRev) :
+				        (ebwtFw? bufa_->patRc    : bufa_->patRcRev),
 				ra.fw ? (ebwtFw? &bufa_->qual    : &bufa_->qualRev) :
 				        (ebwtFw? &bufa_->qualRev : &bufa_->qual),
 				&bufa_->name,
+				bufa_->color,
+				snpPhred_,
+				refs_,
 				ra.ebwt->rmap(),
 				ebwtFw,
 				ra.mms,                   // mismatch positions
@@ -507,6 +514,12 @@ public:
 	}
 
 protected:
+
+	// Reference sequences (needed for colorspace decoding)
+	const BitPairReference* refs_;
+
+	int snpPhred_;
+
 	// Progress state
 	bool doneFirst_;
 	bool firstIsFw_;
@@ -566,6 +579,7 @@ public:
 		uint32_t mixedThresh,
 		uint32_t mixedAttemptLim,
 		const BitPairReference* refs,
+		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -573,7 +587,8 @@ public:
 		ChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
-		refs_(refs), patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
+		refs_(refs), snpPhred_(snpPhred),
+		patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
 		chase1Fw_(false), chase1Rc_(false),
 		chase2Fw_(false), chase2Rc_(false),
@@ -819,6 +834,9 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
+				bufL->color,
+				snpPhred_,
+				refs_,
 				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
@@ -846,6 +864,9 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
+				bufR->color,
+				snpPhred_,
+				refs_,
 				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
@@ -1228,6 +1249,8 @@ protected:
 
 	const BitPairReference* refs_;
 
+	int snpPhred_;
+
 	PatternSourcePerThread *patsrc_;
 	uint32_t qlen1_;
 	uint32_t qlen2_;
@@ -1408,6 +1431,7 @@ public:
 		uint32_t maxInsert,
 		uint32_t mixedAttemptLim,
 		const BitPairReference* refs,
+		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -1415,7 +1439,9 @@ public:
 		ChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
-		refs_(refs), patsrc_(NULL),
+		refs_(refs),
+		snpPhred_(snpPhred),
+		patsrc_(NULL),
 		qlen1_(0), qlen2_(0),
 		chase_(false),
 		donePe_(false),
@@ -1643,6 +1669,9 @@ protected:
 				rL.fw ? (ebwtFwL? &bufL->qual    : &bufL->qualRev) :
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
+				bufL->color,
+				snpPhred_,
+				refs_,
 				rmap,
 				ebwtFwL,
 				rL.mms,                       // mismatch positions
@@ -1670,6 +1699,9 @@ protected:
 				rR.fw ? (ebwtFwR? &bufR->qual    : &bufR->qualRev) :
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
+				bufR->color,
+				snpPhred_,
+				refs_,
 				rmap,
 				ebwtFwR,
 				rR.mms,                       // mismatch positions
@@ -1709,6 +1741,9 @@ protected:
 			r.fw ? (ebwtFw? &buf->qual    : &buf->qualRev) :
 			       (ebwtFw? &buf->qualRev : &buf->qual),
 			&buf->name,
+			buf->color,
+			snpPhred_,
+			refs_,
 			r.ebwt->rmap(),
 			ebwtFw,
 			r.mms,                   // mismatch positions
@@ -1871,6 +1906,9 @@ protected:
 	}
 
 	const BitPairReference* refs_;
+
+	int snpPhred_;
+
 	PatternSourcePerThread *patsrc_;
 	uint32_t qlen1_, qlen2_;
 	bool chase_;

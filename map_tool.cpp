@@ -201,7 +201,7 @@ static void parseOptions(int argc, char **argv) {
  */
 static void fastqAppend(ostream& out, Hit& h) {
 	if(!h.fw) {
-		::reverseComplementInPlace(h.patSeq);
+		::reverseComplementInPlace(h.patSeq, h.color);
 		::reverseInPlace(h.quals);
 	}
 	out << "@" << h.patName << endl
@@ -214,7 +214,7 @@ static void fastqAppend(ostream& out, Hit& h) {
  * Print the read involved in an alignment as a FASTA record.
  */
 static void fastaAppend(ostream& out, Hit& h) {
-	if(!h.fw) ::reverseComplementInPlace(h.patSeq);
+	if(!h.fw) ::reverseComplementInPlace(h.patSeq, h.color);
 	out << ">" << h.patName << endl << h.patSeq << endl;
 }
 

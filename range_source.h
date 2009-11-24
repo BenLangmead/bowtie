@@ -20,9 +20,7 @@ enum AdvanceUntil {
 };
 
 /**
- * Expandable list of Edits.  One can:
- * - Add an Edit, which might trigger an expansion
- * -
+ * List of Edits that automatically expands as edits are added.
  */
 struct EditList {
 
@@ -32,7 +30,7 @@ struct EditList {
 	 * Add an edit to the edit list.
 	 */
 	bool add(const Edit& e, AllocOnlyPool<Edit>& pool, size_t qlen) {
-		assert_lt(sz_, qlen+3);
+		assert_lt(sz_, qlen + 10);
 		if(sz_ < numEdits) {
 			assert(moreEdits_ == NULL);
 			assert(yetMoreEdits_ == NULL);
@@ -55,7 +53,7 @@ struct EditList {
 		} else if(sz_ == (numEdits + numMoreEdits)) {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
-			yetMoreEdits_ = pool.alloc(qlen+3 - numMoreEdits - numEdits);
+			yetMoreEdits_ = pool.alloc(qlen + 10 - numMoreEdits - numEdits);
 			if(yetMoreEdits_ == NULL) {
 				return false;
 			}
@@ -99,9 +97,7 @@ struct EditList {
 	/**
 	 * Return true iff no Edits have been added.
 	 */
-	bool empty() const {
-		return size() == 0;
-	}
+	bool empty() const { return size() == 0; }
 
 	/**
 	 * Set a particular element of the EditList.
@@ -132,22 +128,20 @@ struct EditList {
 	/**
 	 * Return number of Edits in the List.
 	 */
-	size_t size() const {
-		return sz_;
-	}
+	size_t size() const { return sz_; }
 
 	/**
-	 *
+	 * Free all the heap-allocated edit lists
 	 */
 	void free(AllocOnlyPool<Edit>& epool, size_t qlen) {
 		if(yetMoreEdits_ != NULL)
-			epool.free(yetMoreEdits_, qlen+3 - numMoreEdits - numEdits);
+			epool.free(yetMoreEdits_, qlen + 10 - numMoreEdits - numEdits);
 		if(moreEdits_ != NULL)
 			epool.free(moreEdits_, numMoreEdits);
 	}
 
-	const static size_t numEdits = 6;
-	const static size_t numMoreEdits = 16;
+	const static size_t numEdits = 6; // part of object allocation
+	const static size_t numMoreEdits = 16; // first extra allocation
 	size_t sz_;          // number of Edits stored in the EditList
 	Edit edits_[numEdits]; // first 4 edits; typically, no more are needed
 	Edit *moreEdits_;    // if used, size is dictated by numMoreEdits
@@ -156,28 +150,32 @@ struct EditList {
 
 /**
  * Holds per-position information about what outgoing paths have been
- * eliminated and what the quality value is at the position.
+ * eliminated and what the quality value(s) is (are) at the position.
  */
 union ElimsAndQual {
 
 	/**
-	 * Assuming qualA/C/G/T are already set, set quallo and quallo2
-	 * accordingly.
+	 * Assuming qual A/C/G/T are already set, set quallo and quallo2
+	 * to the additional cost incurred by the least and second-least
+	 * costly paths.
 	 */
 	void updateLo() {
 		flags.quallo = 127;
 		flags.quallo2 = 127;
 		if(!flags.mmA) {
+			// A mismatch to an A in the genome has not been ruled out
 			if(flags.qualA < flags.quallo) {
-				flags.quallo2 = flags.quallo;
+				//flags.quallo2 = flags.quallo;
 				flags.quallo = flags.qualA;
-			} else if(flags.qualA == flags.quallo) {
-				flags.quallo2 = flags.quallo;
-			} else if(flags.qualA < flags.quallo2) {
-				flags.quallo2 = flags.qualA;
 			}
+			//else if(flags.qualA == flags.quallo) {
+			//	flags.quallo2 = flags.quallo;
+			//} else if(flags.qualA < flags.quallo2) {
+			//	flags.quallo2 = flags.qualA;
+			//}
 		}
 		if(!flags.mmC) {
+			// A mismatch to a C in the genome has not been ruled out
 			if(flags.qualC < flags.quallo) {
 				flags.quallo2 = flags.quallo;
 				flags.quallo = flags.qualC;
@@ -188,6 +186,7 @@ union ElimsAndQual {
 			}
 		}
 		if(!flags.mmG) {
+			// A mismatch to a G in the genome has not been ruled out
 			if(flags.qualG < flags.quallo) {
 				flags.quallo2 = flags.quallo;
 				flags.quallo = flags.qualG;
@@ -198,6 +197,7 @@ union ElimsAndQual {
 			}
 		}
 		if(!flags.mmT) {
+			// A mismatch to a T in the genome has not been ruled out
 			if(flags.qualT < flags.quallo) {
 				flags.quallo2 = flags.quallo;
 				flags.quallo = flags.qualT;
@@ -211,23 +211,31 @@ union ElimsAndQual {
 	}
 
 	/**
-	 * Set all the non-qual bits of the flags field to 1, indicating
+	 * Set all 13 elimination bits of the flags field to 1, indicating
 	 * that all outgoing paths are eliminated.
 	 */
 	inline void eliminate() {
 		join.elims = ((1 << 13) - 1);
 	}
 
+	/**
+	 * Internal consistency check.  Basically just checks that lo and
+	 * lo2 are set correctly.
+	 */
 	bool repOk() const {
 		uint8_t lo = 127;
 		uint8_t lo2 = 127;
+		assert_lt(flags.qualA, 127);
+		assert_lt(flags.qualC, 127);
+		assert_lt(flags.qualG, 127);
+		assert_lt(flags.qualT, 127);
 		if(!flags.mmA) {
 			if(flags.qualA < lo) {
-				lo2 = lo;
 				lo = flags.qualA;
-			} else if(flags.qualA == lo || flags.qualA < lo2) {
-				lo2 = flags.qualA;
 			}
+			//else if(flags.qualA == lo || flags.qualA < lo2) {
+			//	lo2 = flags.qualA;
+			//}
 		}
 		if(!flags.mmC) {
 			if(flags.qualC < lo) {
@@ -309,7 +317,8 @@ struct RangeState {
 	 * now.
 	 */
 	Edit pickEdit(int pos, RandomSource& rand, bool fuzzy,
-	              uint32_t& top, uint32_t& bot, bool& last)
+	              uint32_t& top, uint32_t& bot, bool indels,
+	              bool& last)
 	{
 		bool color = false;
 		Edit ret;
@@ -331,11 +340,24 @@ struct RangeState {
 			last = false; // not the last at this pos
 			// Sum up range sizes and do a random weighted pick
 			uint32_t tot = 0;
-			bool candA = !eq.flags.mmA;
-			bool candC = !eq.flags.mmC;
-			bool candG = !eq.flags.mmG;
-			bool candT = !eq.flags.mmT;
+			bool candA = !eq.flags.mmA; bool candC = !eq.flags.mmC;
+			bool candG = !eq.flags.mmG; bool candT = !eq.flags.mmT;
+			bool candInsA = false, candInsC = false;
+			bool candInsG = false, candInsT = false;
+			bool candDel = false;
+			if(indels) {
+				// Insertions and deletions can only be candidates
+				// if the user asked for indels
+				candInsA = !eq.flags.insA;
+				candInsC = !eq.flags.insC;
+				candInsG = !eq.flags.insG;
+				candInsT = !eq.flags.insT;
+				candDel = !eq.flags.del;
+			}
 			if(fuzzy) {
+				// To be a candidate in fuzzy mode, you have to both
+				// (a) not have been eliminated, and (b) be tied for
+				// lowest penalty.
 				candA = (candA && eq.flags.qualA == eq.flags.quallo);
 				candC = (candC && eq.flags.qualC == eq.flags.quallo);
 				candG = (candG && eq.flags.qualG == eq.flags.quallo);
@@ -366,6 +388,38 @@ struct RangeState {
 				assert_gt(num, 0);
 				ASSERT_ONLY(num--);
 			}
+			if(indels) {
+				if(candInsA) {
+					assert_gt(bots[0], tops[0]);
+					tot += (bots[0] - tops[0]);
+					assert_gt(num, 0);
+					ASSERT_ONLY(num--);
+				}
+				if(candInsC) {
+					assert_gt(bots[1], tops[1]);
+					tot += (bots[1] - tops[1]);
+					assert_gt(num, 0);
+					ASSERT_ONLY(num--);
+				}
+				if(candInsG) {
+					assert_gt(bots[2], tops[2]);
+					tot += (bots[2] - tops[2]);
+					assert_gt(num, 0);
+					ASSERT_ONLY(num--);
+				}
+				if(candInsT) {
+					assert_gt(bots[3], tops[3]);
+					tot += (bots[3] - tops[3]);
+					assert_gt(num, 0);
+					ASSERT_ONLY(num--);
+				}
+				if(candDel) {
+					// Always a candidate?
+					// Always a candidate just within the window?
+					// We can eliminate some indels based on the content downstream, but not many
+				}
+			}
+
 			assert_geq(num, 0);
 			assert_lt(num, origNum);
 			// Throw a dart randomly that hits one of the possible
@@ -707,7 +761,8 @@ public:
 		// the last remaining one at this position, 'last' is set to
 		// true.
 		uint32_t top = 0, bot = 0;
-		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, fuzzy, top, bot, last);
+		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, fuzzy, top,
+		                               bot, false, last);
 		assert_gt(bot, top);
 		// Create and initialize a new Branch
 		uint16_t newRdepth = rdepth_ + pos + 1;

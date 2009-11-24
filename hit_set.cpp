@@ -26,7 +26,7 @@ void HitSet::reportUpTo(ostream& os, int khits) {
 		if(!h.fw && seqan::empty(seqrc)) {
 			// Lazily initialize seqrc and qualr
 			seqrc = seq;
-			reverseComplementInPlace(seqrc, false);
+			reverseComplementInPlace(seqrc, color);
 			assert_eq(seqan::length(seqrc), seqan::length(seq));
 			qualr = qual;
 			reverseInPlace(qualr);
