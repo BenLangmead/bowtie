@@ -21,7 +21,7 @@ Version Release History
 =======================
 
 Version 0.12.0 - November 25, 2009
-   * Added ABI SOLiD colorspace support
+   * Added SOLiD colorspace support
      * Colorspace indexes are distinct from standard letterspace
        indexes and must be built with a separate invocation of
        bowtie-build (with -C option)
@@ -42,6 +42,8 @@ Version 0.12.0 - November 25, 2009
    * bowtie -f now supports fasta files with reads split across
      multiple lines 
    * New --suppress option suppresses unwanted columns of output
+   * The MANUAL file was converted to markdown format, facilitating
+     conversion to various other formats using tools like pandoc
    * DEPRECATED: --concise
    * REMOVED: -z/--phased, -b/--binout, bowtie-maptool,
      bowtie-maqconvert

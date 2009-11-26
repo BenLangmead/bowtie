@@ -1,4 +1,13 @@
+%
 % Bowtie: an Ultrafast, Lightweight Short Read Aligner
+% by Ben Langmead and Cole Trapnell
+%
+% This manual is written in "markdown" format and thus contains some
+% mildly distracting visual clutter encoding information about how to
+% convert to HTML.  The document is still quite readable as raw text,
+% but if the clutter is too distracting, try the man or HTML versions
+% instead.
+%
 
 What is Bowtie?
 ===============
@@ -47,9 +56,9 @@ c) the number of alignments reported per read is small (close to 1).
 
 Bowtie does not yet report gapped alignments; this is future work.
 
-[MUMmer] http://mummer.sourceforge.net/
-[BLAST]  http://blast.ncbi.nlm.nih.gov/Blast.cgi
-[Vmatch] http://www.vmatch.de/
+[MUMmer]: http://mummer.sourceforge.net/
+[BLAST]:  http://blast.ncbi.nlm.nih.gov/Blast.cgi
+[Vmatch]: http://www.vmatch.de/
 
 Obtaining Bowtie
 ================
@@ -80,13 +89,13 @@ Due to the `-p` option, Bowtie needs the pthreads library in order to
 compile and run with multithreaded support.  To compile Bowtie without
 pthreads (which disables `-p`), use `make BOWTIE_PTHREADS=0`.
 
-[Cygwin]   http://www.cygwin.com/
-[MinGW]    http://www.mingw.org/
-[MSYS]     http://www.mingw.org/wiki/msys
-[zlib]     http://cygwin.com/packages/mingw-zlib/
-[pthreads] http://sourceware.org/pthreads-win32/
-[GnuWin32] http://gnuwin32.sf.net/packages/coreutils.htm
-[Download] https://sourceforge.net/projects/bowtie-bio/files/bowtie/
+[Cygwin]:   http://www.cygwin.com/
+[MinGW]:    http://www.mingw.org/
+[MSYS]:     http://www.mingw.org/wiki/msys
+[zlib]:     http://cygwin.com/packages/mingw-zlib/
+[pthreads]: http://sourceware.org/pthreads-win32/
+[GnuWin32]: http://gnuwin32.sf.net/packages/coreutils.htm
+[Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
 Using the `bowtie` Aligner
 --------------------------
@@ -225,258 +234,252 @@ Reporting Modes
 ---------------
 
 With the `-k`, `-a`, `-m`, `--best` and `--strata` options, the user
-can flexibility select which alignments are reported.  Here we give a
-few examples that demonstrate a ways in which these options can be
-combined to achieve a desired result.  All examples are using the
-`e_coli` index that comes packaged with Bowtie.  Some output is elided
-for clarity.
+can flexibily select which alignments are reported.  Below we
+demonstrate a few ways in which these options can be combined.  All
+examples are using the `e_coli` index packaged with Bowtie.  The
+--suppress option is used to keep the output concise and some
+output is elided for clarity.
 
 ### Example 1: `-a`
 
-    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,148810,2>
-    1-:<0,2852852,1>
-    1-:<0,4930433,2>
-    1-:<0,905664,2>
-    1+:<0,1093035,2>
+> $ ./bowtie -a -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
 Specifying `-a` instructs bowtie to report *all* valid alignments,
 subject to the alignment policy: `-v 2`.  In this case, bowtie finds
 5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)
-has 1 mismatch and 4 hits have 2 mismatches.  Note that they are
-not necessarily listed in best-to-worst order.
+has 1 mismatch, and the other 4 hits have 2 mismatches.  Four are on
+the reverse reference strand and one is on the forward strand.  Note
+that they are not listed in best-to-worst order.
 
 ### Example 2: `-k 3`
 
-    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,148810,2>
-    1-:<0,2852852,1>
-    1-:<0,4930433,2>
+> $ ./bowtie -k 3 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
 Specifying `-k 3` instructs bowtie to report up to 3 valid alignments.
 In this case, a total of 5 valid alignments exist (see Example 1);
-bowtie reports 3 out of those 5.  -k can be set to any integer greater than 0.
+`bowtie` reports 3 out of those 5.  `-k` can be set to any integer
+greater than 0.
 
-    Example 3: -k 6
-    ---------------
-    
-    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,148810,2>
-    1-:<0,2852852,1>
-    1-:<0,4930433,2>
-    1-:<0,905664,2>
-    1+:<0,1093035,2>
-  
-    Specifying -k 6 instructs bowtie to report up to 6 valid
-    alignments.  In this case, a total of 5 valid alignments exist, so
-    bowtie reports all 5.
-    
-    Example 4: default (-k 1)
-    -------------------------
-    
-    $ ./bowtie -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,148810,2>
-    
-    Leaving the reporting options at their defaults causes Bowtie to
-    report the first valid alignment it encounters.  Because --best was
-    not specified, we are not guaranteed that bowtie will report the
-    best alignment, and in this case it does not (the 1-mismatch
-    alignment from the previous example would have been better).  The
-    default reporting mode is equivalent to -k 1.
+### Example 3: `-k 6`
 
-    Example 5: -a --best
-    --------------------
-    
-    $ ./bowtie -a --best -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,2852852,1>
-    1+:<0,1093035,2>
-    1-:<0,905664,2>
-    1-:<0,148810,2>
-    1-:<0,4930433,2>
-  
-    Specifying -a --best results in the same alignments being printed
-    as if just -a had been specified, but they are guaranteed to be
-    reported in best-to-worst order.
+> $ ./bowtie -k 6 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-    Example 6: -a --best --strata
-    -----------------------------
-    
-    $ ./bowtie -a --best --strata -v 2 e_coli --concise \
-               -c ATGCATCATGCGCCAT
-    1-:<0,2852852,1>
+Specifying `-k 6` instructs bowtie to report up to 6 valid alignments.
+In this case, a total of 5 valid alignments exist, so bowtie reports
+all 5.
 
-    Specifying --strata in addition to -a and --best causes Bowtie to
-    report only those alignments in the best alignment "stratum".  The
-    alignments in the best stratum are those having the least number of
-    mismatches (or mismatches just in the "seed" portion of the
-    alignment in the case of -n mode).  Note that if --strata is
-    specified, --best must also be specified.
+### Example 4: default (`-k 1`)
 
-    Example 7: -a -m 3
-    ------------------
-    
-    $ ./bowtie -a -m 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    No alignments
-  
-    Specifying -m 3 instructs bowtie to refrain from reporting any
-    alignments for reads having more than 3 reportable alignments.  The
-    -m option is useful when the user would like to guarantee that
-    reported alignments are "unique", for some definition of unique.
-    
-    Example 1 showed that the read has 5 reportable alignments when -a
-    and -v 2 are specified, so the -m 3 limit causes bowtie to output
-    no alignments.
+> $ ./bowtie -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
 
-    Example 8: -a -m 5
-    ------------------
-    
-    $ ./bowtie -a -m 5 -v 2 e_coli --concise -c ATGCATCATGCGCCAT
-    1-:<0,148810,2>
-    1-:<0,2852852,1>
-    1-:<0,4930433,2>
-    1-:<0,905664,2>
-    1+:<0,1093035,2>
-  
-    Specifying -m 5 instructs bowtie to refrain from reporting any
-    alignments for reads having more than 5 reportable alignments.
-    Since the read has exactly 5 reportable alignments, the -m 5 limit
-    allows bowtie to print them as usual. 
+Leaving the reporting options at their defaults causes `bowtie` to
+report the first valid alignment it encounters.  Because `--best` was
+not specified, we are not guaranteed that bowtie will report the best
+alignment, and in this case it does not (the 1-mismatch alignment from
+the previous example would have been better).  The default reporting
+mode is equivalent to `-k 1`.
 
-    Example 9: -a -m 3 --best --strata
-    ----------------------------------
-    
-    $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --concise \
-               -c ATGCATCATGCGCCAT
-    1-:<0,2852852,1>
-  
-    Specifying -m 3 instructs bowtie to refrain from reporting any
-    alignments for reads having more than 3 reportable alignments.
-    As we saw in Example 6, the read has only 1 reportable alignment
-    when -a, --best and --strata are specified, so the -m 3 limit
-    allows bowtie to print that alignment as usual.
-    
-    Intuitively, the -m option, when combined with the --best and
-    --strata options, guarntees a principled, though somewhat weaker
-    form of "uniqueness."  A stronger form of uniqueness is enforced
-    when -m is specified but --best --strata are not.
+### Example 5: `-a --best`
 
-  Paired-end Alignment
-  --------------------
-  
-  Bowtie can align paired-end reads when paired read files are
-  specified using the -1 and -2 options (for pairs of raw, FASTA, or
-  FASTQ read files), or using the --12 option (for Tab-delimited read
-  files).  A valid paired-end alignment satisfies the following
-  criteria:
-  
-  1. Both mates have a valid alignment according to the alignment
-     policy specified by the -v/-n/-e/-l options.
-  2. The relative orientation and position of the mates satisfy the
-     constraints given by the -I/-X/--fr/--rf/--ff options. 
-  
-  Policies governing which paired-end alignments are reported for a
-  given read are specified using the -k, -a and -m options as usual.
-  The --strata and --best options do not apply in paired-end mode.
-  
-  A paired-end alignment is reported as a pair of mate alignments, both
-  on a separate line, where the alignment for each mate is formatted
-  the same as an unpaired (singleton) alignment.  The alignment for the
-  mate that occurs closest to the beginning of the reference sequence
-  (the "upstream" mate) is always printed before the alignment for the
-  downstream mate.  Reads files containing paired-end reads will
-  sometimes name the reads according to whether they are the #1 or #2
-  mates by appending a "/1" or "/2" suffix to the read name.  If no
-  such suffix is present in Bowtie's input, the suffix will be added
-  when Bowtie prints read names in alignments.
-  
-  Finding a valid paired-end alignment where both mates align to
-  repetitive regions of the reference can be very time-consuming.  By
-  default, Bowtie avoids much of this cost by imposing a limit on the
-  number of "tries" it makes to match an alignment for one mate with a
-  nearby alignment for the other.  The default limit is 100.  This
-  causes Bowtie to miss some valid paired-end alignments where both
-  mates lie in repetitive regions, but the user may use the --pairtries
-  or -y options to increase Bowtie's sensitivity as desired.
-  
-  Paired-end alignments where one mate's alignment is entirely
-  contained within the other's are considered invalid.
- 
-  Because Bowtie uses an in-memory representation of the original
-  reference string when finding paired-end alignments, its memory
-  footprint is larger when aligning paired-end reads.  For example, the
-  human index has a memory footprint of about 2.2 GB in single-end mode
-  and 2.9 GB in paired-end mode.
-  
-  High Performance Tips
-  ---------------------
+> $ ./bowtie -a --best -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-  Tip 1: Use 64-bit bowtie if possible
+Specifying `-a --best` results in the same alignments being printed as
+if just `-a` had been specified, but they are guaranteed to be reported
+in best-to-worst order.
 
-  The 64-bit version of Bowtie is substantially faster (usually more
-  than 50% faster) than the 32-bit version, due to Bowtie's use of
-  64-bit arithmetic when searching both in the index and in the
-  reference.  If possible, download the 64-bit binaries for Bowtie and
-  run them on a 64-bit machine.  If you are building Bowtie from
-  sources, you may need to pass the -m64 option to g++ to compile the
-  64-bit version; you can do this by supplying argument BITS=64 to the
-  'make' command; e.g.: 'make BITS=64 bowtie'.  To determine whether
-  your version of bowtie is 64-bit or 32-bit, run 'bowtie --version'.
+### Example 6: `-a --best --strata`
+
+> $ ./bowtie -a --best --strata -v 2 --suppress 1,5,6,7 e_coli -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+
+Specifying `--strata` in addition to `-a` and `--best` causes `bowtie`
+to report only those alignments in the best alignment "stratum".  The
+alignments in the best stratum are those having the least number of
+mismatches (or mismatches just in the "seed" portion of the alignment
+in the case of `-n` mode).  Note that if `--strata` is specified,
+`--best` must also be specified.
+
+### Example 7: `-a -m 3`
+
+> $ ./bowtie -a -m 3 -v 2 e_coli -c ATGCATCATGCGCCAT
+> No alignments
+
+Specifying `-m 3` instructs bowtie to refrain from reporting any
+alignments for reads having more than 3 reportable alignments.  The
+`-m` option is useful when the user would like to guarantee that
+reported alignments are "unique", for some definition of unique.
+
+Example 1 showed that the read has 5 reportable alignments when `-a`
+and `-v 2` are specified, so the `-m 3` limit causes bowtie to output
+no alignments.
+
+### Example 8: `-a -m 5`
+
+> $ ./bowtie -a -m 5 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+
+Specifying `-m 5` instructs bowtie to refrain from reporting any
+alignments for reads having more than 5 reportable alignments.  Since
+the read has exactly 5 reportable alignments, the `-m 5` limit allows
+`bowtie` to print them as usual. 
+
+### Example 9: `-a -m 3 --best --strata`
+
+> $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+
+Specifying `-m 3` instructs bowtie to refrain from reporting any
+alignments for reads having more than 3 reportable alignments.  As we
+saw in Example 6, the read has only 1 reportable alignment when `-a`,
+`--best` and `--strata` are specified, so the `-m` 3 limit allows
+`bowtie` to print that alignment as usual.
+
+Intuitively, the `-m` option, when combined with the `--best` and
+`--strata` options, guarantees a principled, though weaker form of
+"uniqueness."  A stronger form of uniqueness is enforced when `-m` is
+specified but `--best` and `--strata` are not.
+
+Paired-end Alignment
+====================
+
+`bowtie` can align paired-end reads when properly paired read files are
+specified using the `-1` and `-2` options (for pairs of raw, FASTA, or
+FASTQ read files), or using the `--12` option (for Tab-delimited read
+files).  A valid paired-end alignment satisfies these criteria:
+
+    1. Both mates have a valid alignment according to the alignment
+       policy defined by the `-v`/`-n`/`-e`/`-l` options.
+    2. The relative orientation and position of the mates satisfy the
+       constraints defined by the `-I`/`-X`/`--fr`/`--rf`/`--ff`
+       options. 
+
+Policies governing which paired-end alignments are reported for a
+given read are specified using the `-k`, `-a` and `-m` options as
+usual.  The `--strata` and `--best` options do not apply in paired-end
+mode.
+
+A paired-end alignment is reported as a pair of mate alignments, both
+on a separate line, where the alignment for each mate is formatted the
+same as an unpaired (singleton) alignment.  The alignment for the mate
+that occurs closest to the beginning of the reference sequence (the
+"upstream" mate) is always printed before the alignment for the
+downstream mate.  Reads files containing paired-end reads will
+sometimes name the reads according to whether they are the #1 or #2
+mates by appending a `/1` or `/2` suffix to the read name.  If no such
+suffix is present in Bowtie's input, the suffix will be added when
+Bowtie prints read names in alignments (except in `-S` "SAM" mode,
+where mate information is encoded in the FLAGS field instead).
+
+Finding a valid paired-end alignment where both mates align to
+repetitive regions of the reference can be very time-consuming.  By
+default, Bowtie avoids much of this cost by imposing a limit on the
+number of "tries" it makes to match an alignment for one mate with a
+nearby alignment for the other.  The default limit is 100.  This causes
+`bowtie` to miss some valid paired-end alignments where both mates lie
+in repetitive regions, but the user may use the `--pairtries` or `-y`
+options to increase Bowtie's sensitivity as desired.
+
+Paired-end alignments where one mate's alignment is entirely contained
+within the other's are considered invalid.
+
+Because Bowtie uses an in-memory representation of the original
+reference string when finding paired-end alignments, its memory
+footprint is larger when aligning paired-end reads.  For example, the
+human index has a memory footprint of about 2.2 GB in single-end mode
+and 2.9 GB in paired-end mode.
+
+Performance Tuning
+==================
+
+    1. Use 64-bit bowtie if possible
+
+    The 64-bit version of Bowtie is substantially faster (usually more
+    than 50% faster) than the 32-bit version, due to Bowtie's use of
+    64-bit arithmetic when searching both in the index and in the
+    reference.  If possible, download the 64-bit binaries for Bowtie
+    and on a 64-bit machine.  If you are building Bowtie from sources,
+    you may need to pass the `-m64` option to `g++` to compile the
+    64-bit version; you can do this by including `BITS=64` in the
+    arguments  to the `make` command; e.g.: `make BITS=64 bowtie`.  To
+    determine whether your version of bowtie is 64-bit or 32-bit, run
+    `bowtie --version`.
   
-  Tip 2: If your computer has multiple processors/cores, try -p
+    2. If your computer has multiple processors/cores, use `-p`
    
-  The -p <int> option causes Bowtie to launch <int> parallel search
-  threads.  Each thread runs on a different processor/core and all
-  threads find alignments in parallel, increasing alignment throughput
-  by approximately a multiple of <int>.
+    The `-p <int>` option causes Bowtie to launch <int> parallel search
+    threads.  Each thread runs on a different processor/core and all
+    threads find alignments in parallel, increasing alignment
+    throughput by approximately a multiple of `<int>`.
   
-  Tip 3: If reporting many alignments per read, try tweaking
-         'bowtie-build --offrate'
+    3. If reporting many alignments per read, try tweaking
+       `bowtie-build --offrate`
    
-  If you are using the -k, -a or -m options and Bowtie is reporting
-  many alignments per read (an average of more than about 10 per read)
-  and you have some physical memory to spare, then consider building
-  an index with a denser SA sample.
-  
-  To build an index with a denser SA sample, specify a smaller
-  --offrate value when running 'bowtie-build'.  A denser SA sample
-  leads to a larger index, but is also particularly effective at
-  speeding up alignment when then number of alignments reported per
-  read is large.  For example, if the number of alignments per read is
-  very large, decreasing the index's --offrate by 1 could as much as
-  double alignment performance, and decreasing by 2 could quadruple
-  alignment performance, etc.
-  
-  On the other hand, decreasing --offrate increases the size of the
-  Bowtie index, both on disk and in memory when aligning reads.  At the
-  default --offrate of 5, the SA sample for the human genome occupies
-  about 375 MB of memory when aligning reads.  Decreasing the --offrate
-  by 1 doubles the memory taken by the SA sample, and decreasing by 2
-  quadruples the memory taken, etc.
-  
-  Tip 4: If bowtie "thrashes", try tweaking 'bowtie --offrate'
-  
-  If 'bowtie' is very slow and consistently triggers more than a few
-  page faults per second (as observed via top or vmstat on Mac/Linux,
-  or via a tool like Process Explorer on Windows), then try giving
-  bowtie the --offrate <int> option with a larger <int> value than the
-  value used when building the index.  For example, bowtie-build's
-  default --offrate is 5 and all pre-built indexes available from the
-  Bowtie website are built with --offrate 5; so if bowtie thrashes when
-  querying such an index, try using 'bowtie --offrate 6'.  If bowtie
-  still thrashes, try 'bowtie --offrate 7', etc.  A higher --offrate
-  causes bowtie to use a sparser sample of the suffix-array than is
-  stored in the index; this saves memory but makes alignment reporting
-  slower (which is especially slow when using -a or large -k).
+    If you are using the `-k`, `-a` or `-m` options and Bowtie is
+    reporting many alignments per read (an average of more than about
+    10 per read) and you have some memory to spare, using an index with
+    a denser SA sample can speed things up considerably.
 
-  Command Line
-  ------------
+    To do this, specify a smaller-than-default `--offrate` value when
+    running 'bowtie-build'.  A denser SA sample yields a larger index,
+    but is also particularly effective at speeding up alignment when
+    many alignments are reported per read.  For example, decreasing the
+    index's --offrate by 1 could as much as double alignment
+    performance, and decreasing by 2 could quadruple alignment
+    performance, etc.
+  
+    On the other hand, decreasing `--offrate` increases the size of the
+    Bowtie index, both on disk and in memory when aligning reads.  At
+    the default `--offrate` of 5, the SA sample for the human genome
+    occupies about 375 MB of memory when aligning reads.  Decreasing
+    the `--offrate` by 1 doubles the memory taken by the SA sample, and
+    decreasing by 2 quadruples the memory taken, etc.
+  
+    4. If bowtie "thrashes", try increasing 'bowtie --offrate'
+  
+    If `bowtie` is beign run on a relatively low-memory machine is very
+    slow and consistently triggers more than a few page faults per
+    second (as observed via `top` or `vmstat` on Mac/Linux, or via a
+    tool like `Process Explorer` on Windows), then try setting
+    `--offrate <int>` to a *larger* `<int>` value than the value used
+    when building the index.  For example, bowtie-build's default
+    `--offrate` is 5 and all pre-built indexes available from the
+    Bowtie website are built with `--offrate 5`; so if bowtie thrashes
+    when querying such an index, try using `bowtie --offrate 6`.  If
+    bowtie still thrashes, try `bowtie --offrate 7`, etc.  A higher
+    `--offrate` causes bowtie to use a sparser sample of the suffix-
+    array than is stored in the index; this saves memory but makes
+    alignment reporting slower (which is especially slow when using
+    `-a` or large `-k` or `-m`).
 
-  The following is a detailed description of the options used to control
-  the 'bowtie' aligner:
+Command Line
+============
 
- Usage:
- 
-  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
+The following options control `bowtie`'s behavior:
+
+    Usage: bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
 
   <ebwt>             The basename of the index to be searched.  The
                      basename is the name of any of the index files up
@@ -984,72 +987,73 @@ bowtie reports 3 out of those 5.  -k can be set to any integer greater than 0.
   -h/--help          Print detailed description of tool and its options
                      (from MANUAL).
 
-  Default output
-  --------------
+Default output
+==============
 
-  The 'bowtie' aligner outputs each alignment on a separate line.  Each
-  line is a collection of 8 fields separated by tabs; from left to
-  right, the fields are:
+`bowtie` outputs one alignment per line.  Each line is a collection of
+8 fields separated by tabs; from left to right, the fields are:
 
-   1. Name of read that aligned
+    1. Name of read that aligned
 
-   2. Orientation of read in the alignment, '-' for reverse complement,
-      '+' otherwise
+    2. Reference strand aligned to, `+` for forward strand, `-` for
+       reverse
 
-   3. Name of reference sequence where alignment occurs, or ordinal ID
-      if no name was provided
+    3. Name of reference sequence where alignment occurs, or numeric ID
+       if no name was provided
 
-   4. 0-based offset into the forward reference strand where leftmost
-      character of the alignment occurs
+    4. 0-based offset into the forward reference strand where leftmost
+       character of the alignment occurs
 
-   5. Read sequence (reverse-complemented if orientation is '-')
+    5. Read sequence (reverse-complemented if orientation is `-`)
 
-   6. ASCII-encoded read qualities (reversed if orientation is '-').
-      The encoded quality values are on the Phred scale and the
-      encoding is ASCII-offset by 33 (ASCII char '!'). 
+    6. ASCII-encoded read qualities (reversed if orientation is `-`).
+       The encoded quality values are on the Phred scale and the
+       encoding is ASCII-offset by 33 (ASCII char `!`). 
 
-   7. Number of other instances where the same read aligns against the
-      same reference characters as were aligned against in this
-      alignment.  This is *not* the number of other places the read
-      aligns with the same number of mismatches.  The number in this
-      column is generally not a good proxy for that number (e.g., the
-      number in this column may be '0' while the number of other
-      alignments with the same number of mismatches might be large).
-      This column was previously described as "Reserved".
+    7. Number of other instances where the same read aligns against the
+       same reference characters as were aligned against in this
+       alignment.  This is *not* the number of other places the read
+       aligns with the same number of mismatches.  The number in this
+       column is generally not a good proxy for that number (e.g., the
+       number in this column may be '0' while the number of other
+       alignments with the same number of mismatches might be large).
+       This column was previously described as "Reserved".
 
-   8. Comma-separated list of mismatch descriptors.  If there are no
-      mismatches in the alignment, this field is empty.  A single
-      descriptor has the format offset:reference-base>read-base.  The
-      offset is expressed as a 0-based offset from the high-quality
-      (5') end of the read. 
+    8. Comma-separated list of mismatch descriptors.  If there are no
+       mismatches in the alignment, this field is empty.  A single
+       descriptor has the format offset:reference-base>read-base.  The
+       offset is expressed as a 0-based offset from the high-quality
+       (5') end of the read. 
 
-  SAM output
-  ----------
+SAM output
+==========
 
-  Following is a brief description of the SAM format as output by
-  Bowtie when the -S/--sam option is specified.  For more details, see
-  the SAM format specification (http://samtools.sf.net/SAM1.pdf).
+Following is a brief description of the SAM format as output by
+`bowtie` when the `-S`/`--sam` option is specified.  For more details,
+see the [SAM format specification].
 
-  When -S/--sam is specified, Bowtie will always print a SAM header
-  with @HD, @SQ and @PG lines.
+When `-S`/`--sam` is specified, `bowtie` prints a SAM header with
+`@HD`, `@SQ` and `@PG` lines.  When one or more `--sam-RG` arguments
+are specified, `bowtie` will also print an appropriately-formatted
+`@RG` line.
 
-  Each subsequnt line corresponds to a read or an alignment.  Each line
-  is a collection of at least 12 fields separated by tabs; from left to
-  right, the fields are:
+Each subsequnt line corresponds to a read or an alignment.  Each line
+is a collection of at least 12 fields separated by tabs; from left to
+right, the fields are:
 
-   1. Name of read that aligned
+    1. Name of read that aligned
 
-   2. Sum of all applicable flags.  Flags relevant to Bowtie are:
+    2. Sum of all applicable flags.  Flags relevant to Bowtie are:
 
-        1: The read is one of a pair
-        2: The alignment is one end of a proper paired-end alignment
-        4: The read has no reported alignments
-        8: The read is one of a pair and has no reported alignments
-       16: The alignment is to the reverse reference strand
-       32: The other mate in the paired-end alignment is aligned to the
+        1. The read is one of a pair
+        2. The alignment is one end of a proper paired-end alignment
+        4. The read has no reported alignments
+        8. The read is one of a pair and has no reported alignments
+       16. The alignment is to the reverse reference strand
+       32. The other mate in the paired-end alignment is aligned to the
            reverse reference strand
-       64: The read is the first (#1) mate in a pair
-      128: The read is the second (#2) mate in a pair
+       64. The read is the first (#1) mate in a pair
+      128. The read is the second (#2) mate in a pair
 
       Thus, an unpaired read that aligns to the reverse reference
       strand will have flag 16.  A paired-end read that aligns and is
@@ -1066,8 +1070,8 @@ bowtie reports 3 out of those 5.  -k can be set to any integer greater than 0.
    6. CIGAR string representation of alignment
 
    7. Name of reference sequence where mate's alignment occurs.  Set to
-      "=" if the mate's reference sequence is the same as this
-      alignment's, or "*" if there is no mate.
+      `=` if the mate's reference sequence is the same as this
+      alignment's, or `*` if there is no mate.
 
    8. 1-based offset into the forward reference strand where leftmost
       character of the mate's alignment occurs.  Offset is 0 if there
@@ -1082,7 +1086,7 @@ bowtie reports 3 out of those 5.  -k can be set to any integer greater than 0.
 
   11. ASCII-encoded read qualities (reversed if aligned to the reverse
       strand).  The encoded quality values are on the Phred scale and
-      the encoding is ASCII-offset by 33 (ASCII char '!'). 
+      the encoding is ASCII-offset by 33 (ASCII char `!`). 
 
  12+. Optional fields.  Fields are tab-separated.  For descriptions of
       all possible optional fields, see the SAM format specification.
@@ -1097,6 +1101,8 @@ bowtie reports 3 out of those 5.  -k can be set to any integer greater than 0.
       XM:i:<N> : For a read with no reported alignments, <N> is 0 if
                  the read had no alignments, or 1 if the read had
                  alignments that were suppressed by the -m option.
+
+[SAM format specification]: http://samtools.sf.net/SAM1.pdf
 
  Using the 'bowtie-build' Indexer
  --------------------------------
