@@ -1,13 +1,15 @@
-%
-% Bowtie: an Ultrafast, Lightweight Short Read Aligner
-% by Ben Langmead and Cole Trapnell
-%
-% This manual is written in "markdown" format and thus contains some
-% mildly distracting visual clutter encoding information about how to
-% convert to HTML.  The document is still quite readable as raw text,
-% but if the clutter is too distracting, try the man or HTML versions
-% instead.
-%
+<!--
+
+Bowtie: an Ultrafast, Lightweight Short Read Aligner
+by Ben Langmead and Cole Trapnell
+
+This manual is written in "markdown" format and thus contains some
+mildly distracting visual clutter encoding information about how to
+convert to HTML.  The document is still quite readable as raw text,
+but if the clutter is too distracting, try the man or HTML versions
+instead.
+
+-->
 
 What is Bowtie?
 ===============
@@ -242,12 +244,12 @@ output is elided for clarity.
 
 ### Example 1: `-a`
 
-> $ ./bowtie -a -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
-> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
-> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
-> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+    $ ./bowtie -a -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+    -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+    +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
 Specifying `-a` instructs bowtie to report *all* valid alignments,
 subject to the alignment policy: `-v 2`.  In this case, bowtie finds
@@ -258,10 +260,10 @@ that they are not listed in best-to-worst order.
 
 ### Example 2: `-k 3`
 
-> $ ./bowtie -k 3 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
-> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+    $ ./bowtie -k 3 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
 Specifying `-k 3` instructs bowtie to report up to 3 valid alignments.
 In this case, a total of 5 valid alignments exist (see Example 1);
@@ -270,12 +272,12 @@ greater than 0.
 
 ### Example 3: `-k 6`
 
-> $ ./bowtie -k 6 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
-> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
-> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
-> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+    $ ./bowtie -k 6 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+    -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+    +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
 Specifying `-k 6` instructs bowtie to report up to 6 valid alignments.
 In this case, a total of 5 valid alignments exist, so bowtie reports
@@ -283,8 +285,8 @@ all 5.
 
 ### Example 4: default (`-k 1`)
 
-> $ ./bowtie -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    $ ./bowtie -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
 
 Leaving the reporting options at their defaults causes `bowtie` to
 report the first valid alignment it encounters.  Because `--best` was
@@ -295,12 +297,12 @@ mode is equivalent to `-k 1`.
 
 ### Example 5: `-a --best`
 
-> $ ./bowtie -a --best -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
-> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
-> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
-> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+    $ ./bowtie -a --best -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+    -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
 Specifying `-a --best` results in the same alignments being printed as
 if just `-a` had been specified, but they are guaranteed to be reported
@@ -308,8 +310,8 @@ in best-to-worst order.
 
 ### Example 6: `-a --best --strata`
 
-> $ ./bowtie -a --best --strata -v 2 --suppress 1,5,6,7 e_coli -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    $ ./bowtie -a --best --strata -v 2 --suppress 1,5,6,7 e_coli -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
 
 Specifying `--strata` in addition to `-a` and `--best` causes `bowtie`
 to report only those alignments in the best alignment "stratum".  The
@@ -320,8 +322,8 @@ in the case of `-n` mode).  Note that if `--strata` is specified,
 
 ### Example 7: `-a -m 3`
 
-> $ ./bowtie -a -m 3 -v 2 e_coli -c ATGCATCATGCGCCAT
-> No alignments
+    $ ./bowtie -a -m 3 -v 2 e_coli -c ATGCATCATGCGCCAT
+    No alignments
 
 Specifying `-m 3` instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  The
@@ -334,12 +336,12 @@ no alignments.
 
 ### Example 8: `-a -m 5`
 
-> $ ./bowtie -a -m 5 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
-> -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
-> -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
-> +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
+    $ ./bowtie -a -m 5 -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
+    -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
+    +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
 Specifying `-m 5` instructs bowtie to refrain from reporting any
 alignments for reads having more than 5 reportable alignments.  Since
@@ -348,8 +350,8 @@ the read has exactly 5 reportable alignments, the `-m 5` limit allows
 
 ### Example 9: `-a -m 3 --best --strata`
 
-> $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
-> -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
+    $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
+    -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
 
 Specifying `-m 3` instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  As we
@@ -370,11 +372,10 @@ specified using the `-1` and `-2` options (for pairs of raw, FASTA, or
 FASTQ read files), or using the `--12` option (for Tab-delimited read
 files).  A valid paired-end alignment satisfies these criteria:
 
-    1. Both mates have a valid alignment according to the alignment
-       policy defined by the `-v`/`-n`/`-e`/`-l` options.
-    2. The relative orientation and position of the mates satisfy the
-       constraints defined by the `-I`/`-X`/`--fr`/`--rf`/`--ff`
-       options. 
+1. Both mates have a valid alignment according to the alignment policy
+   defined by the `-v`/`-n`/`-e`/`-l` options.
+2. The relative orientation and position of the mates satisfy the
+   constraints defined by the `-I`/`-X`/`--fr`/`--rf`/`--ff` options. 
 
 Policies governing which paired-end alignments are reported for a
 given read are specified using the `-k`, `-a` and `-m` options as
@@ -414,65 +415,62 @@ and 2.9 GB in paired-end mode.
 Performance Tuning
 ==================
 
-    1. Use 64-bit bowtie if possible
+1. Use 64-bit bowtie if possible
 
-    The 64-bit version of Bowtie is substantially faster (usually more
-    than 50% faster) than the 32-bit version, due to Bowtie's use of
-    64-bit arithmetic when searching both in the index and in the
-    reference.  If possible, download the 64-bit binaries for Bowtie
-    and on a 64-bit machine.  If you are building Bowtie from sources,
-    you may need to pass the `-m64` option to `g++` to compile the
-    64-bit version; you can do this by including `BITS=64` in the
-    arguments  to the `make` command; e.g.: `make BITS=64 bowtie`.  To
-    determine whether your version of bowtie is 64-bit or 32-bit, run
-    `bowtie --version`.
-  
-    2. If your computer has multiple processors/cores, use `-p`
-   
-    The `-p <int>` option causes Bowtie to launch <int> parallel search
-    threads.  Each thread runs on a different processor/core and all
-    threads find alignments in parallel, increasing alignment
-    throughput by approximately a multiple of `<int>`.
-  
-    3. If reporting many alignments per read, try tweaking
-       `bowtie-build --offrate`
-   
-    If you are using the `-k`, `-a` or `-m` options and Bowtie is
-    reporting many alignments per read (an average of more than about
-    10 per read) and you have some memory to spare, using an index with
-    a denser SA sample can speed things up considerably.
+The 64-bit version of Bowtie is substantially faster (usually more than
+50% faster) than the 32-bit version, due to Bowtie's use of 64-bit
+arithmetic when searching both in the index and in the reference.  If
+possible, download the 64-bit binaries for Bowtie and on a 64-bit
+machine.  If you are building Bowtie from sources, you may need to pass
+the `-m64` option to `g++` to compile the 64-bit version; you can do
+this by including `BITS=64` in the arguments  to the `make` command;
+e.g.: `make BITS=64 bowtie`.  To determine whether your version of
+bowtie is 64-bit or 32-bit, run `bowtie --version`.
 
-    To do this, specify a smaller-than-default `--offrate` value when
-    running 'bowtie-build'.  A denser SA sample yields a larger index,
-    but is also particularly effective at speeding up alignment when
-    many alignments are reported per read.  For example, decreasing the
-    index's --offrate by 1 could as much as double alignment
-    performance, and decreasing by 2 could quadruple alignment
-    performance, etc.
-  
-    On the other hand, decreasing `--offrate` increases the size of the
-    Bowtie index, both on disk and in memory when aligning reads.  At
-    the default `--offrate` of 5, the SA sample for the human genome
-    occupies about 375 MB of memory when aligning reads.  Decreasing
-    the `--offrate` by 1 doubles the memory taken by the SA sample, and
-    decreasing by 2 quadruples the memory taken, etc.
-  
-    4. If bowtie "thrashes", try increasing 'bowtie --offrate'
-  
-    If `bowtie` is beign run on a relatively low-memory machine is very
-    slow and consistently triggers more than a few page faults per
-    second (as observed via `top` or `vmstat` on Mac/Linux, or via a
-    tool like `Process Explorer` on Windows), then try setting
-    `--offrate <int>` to a *larger* `<int>` value than the value used
-    when building the index.  For example, bowtie-build's default
-    `--offrate` is 5 and all pre-built indexes available from the
-    Bowtie website are built with `--offrate 5`; so if bowtie thrashes
-    when querying such an index, try using `bowtie --offrate 6`.  If
-    bowtie still thrashes, try `bowtie --offrate 7`, etc.  A higher
-    `--offrate` causes bowtie to use a sparser sample of the suffix-
-    array than is stored in the index; this saves memory but makes
-    alignment reporting slower (which is especially slow when using
-    `-a` or large `-k` or `-m`).
+2. If your computer has multiple processors/cores, use `-p`
+
+The `-p <int>` option causes Bowtie to launch <int> parallel search
+threads.  Each thread runs on a different processor/core and all
+threads find alignments in parallel, increasing alignment throughput by
+approximately a multiple of `<int>`.
+
+3. If reporting many alignments per read, try tweaking
+   `bowtie-build --offrate`
+
+If you are using the `-k`, `-a` or `-m` options and Bowtie is reporting
+many alignments per read (an average of more than about 10 per read)
+and you have some memory to spare, using an index with a denser SA
+sample can speed things up considerably.
+
+To do this, specify a smaller-than-default `--offrate` value when
+running 'bowtie-build'.  A denser SA sample yields a larger index, but
+is also particularly effective at speeding up alignment when many
+alignments are reported per read.  For example, decreasing the index's
+`--offrate` by 1 could as much as double alignment performance, and
+decreasing by 2 could quadruple alignment performance, etc.
+
+On the other hand, decreasing `--offrate` increases the size of the
+Bowtie index, both on disk and in memory when aligning reads.  At the
+default `--offrate` of 5, the SA sample for the human genome occupies
+about 375 MB of memory when aligning reads.  Decreasing the `--offrate`
+by 1 doubles the memory taken by the SA sample, and decreasing by 2
+quadruples the memory taken, etc.
+
+4. If bowtie "thrashes", try increasing `bowtie --offrate`
+
+If `bowtie` is beign run on a relatively low-memory machine is very
+slow and consistently triggers more than a few page faults per second
+(as observed via `top` or `vmstat` on Mac/Linux, or via a tool like
+`Process Explorer` on Windows), then try setting `--offrate <int>` to a
+*larger* `<int>` value than the value used when building the index.
+For example, bowtie-build's default `--offrate` is 5 and all pre-built
+indexes available from the Bowtie website are built with `--offrate 5`;
+so if bowtie thrashes when querying such an index, try using `bowtie
+--offrate 6`.  If bowtie still thrashes, try `bowtie --offrate 7`, etc.
+A higher `--offrate` causes bowtie to use a sparser sample of the
+suffix-array than is stored in the index; this saves memory but makes
+alignment reporting slower (which is especially slow when using `-a` or
+large `-k` or `-m`).
 
 Command Line
 ============
