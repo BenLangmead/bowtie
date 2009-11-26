@@ -1,5 +1,4 @@
 <!--
-
 Bowtie: an Ultrafast, Lightweight Short Read Aligner
 by Ben Langmead and Cole Trapnell
 
@@ -8,8 +7,8 @@ mildly distracting visual clutter encoding information about how to
 convert to HTML.  The document is still quite readable as raw text,
 but if the clutter is too distracting, try the man or HTML versions
 instead.
-
 -->
+<div id="leftside">
 
 What is Bowtie?
 ===============
