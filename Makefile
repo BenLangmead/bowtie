@@ -286,6 +286,15 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	cp .bin.tmp/$@ .
 	rm -rf .bin.tmp
 
+.PHONY: doc
+doc: doc/manual.html doc/manual.1
+
+doc/manual.html: MANUAL.markdown
+	pandoc --css=doc/style.css -o=$@ --from=markdown --to=HTML --table-of-contents $^
+
+doc/manual.1: MANUAL.markdown
+	pandoc -o=$@ --from=markdown --to=man --table-of-contents $^
+
 .PHONY: clean
 clean:
 	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
