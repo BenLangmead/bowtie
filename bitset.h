@@ -179,6 +179,11 @@ public:
 		assert(_words != NULL);
 		memset(_words, 0, nwords * 4);
 		_sz = nwords << 5;
+		_cnt = 0;
+	}
+
+	Bitset(const Bitset& o) {
+		this->operator=(o);
 	}
 
 	~Bitset() {
@@ -188,7 +193,7 @@ public:
 	/**
 	 * Test whether the given bit is set.
 	 */
-	bool test(uint32_t i) {
+	bool test(uint32_t i) const {
 		bool ret = false;
 		if(i < _sz) {
 			ret = ((_words[i >> 5] >> (i & 0x1f)) & 1) != 0;
@@ -210,6 +215,7 @@ public:
 		}
 		// Fast path
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
+		_cnt++;
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
 	}
@@ -226,8 +232,48 @@ public:
 			assert_gt(_sz, oldsz);
 		}
 		// Fast path
+		if(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0) _cnt++;
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
+	}
+
+	/**
+	 * Unset all entries.  Don't adjust size.
+	 */
+	void clear() {
+		for(size_t i = 0; i < ((_sz+31)>>5); i++) {
+			_words[i] = 0;
+		}
+		_cnt = 0;
+	}
+
+	/**
+	 * Return the number of set bits.
+	 */
+	uint32_t count() const {
+		return _cnt;
+	}
+
+	/**
+	 * Return true iff no bits are set.
+	 */
+	bool empty() const {
+		return _cnt == 0;
+	}
+
+	/**
+	 * Deep copy from given Bitset to this one.
+	 */
+	Bitset& operator=(const Bitset& o) {
+		_errmsg = o._errmsg;
+		_sz = o._sz;
+		_cnt = o._cnt;
+		delete[] _words;
+		_words = new uint32_t[(_sz+31)>>5];
+		for(size_t i = 0; i < (_sz+31)>>5; i++) {
+			_words[i] = o._words[i];
+		}
+		return *this;
 	}
 
 private:
@@ -242,8 +288,9 @@ private:
 		_words = newwords; // install new array
 	}
 
+	uint32_t _cnt;       // number of set bits
 	const char *_errmsg; // error message if an allocation fails
-	uint32_t _sz;          // size as # of bits
+	uint32_t _sz;        // size as # of bits
 	uint32_t *_words;    // storage
 };
 

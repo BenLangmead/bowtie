@@ -2647,6 +2647,7 @@ public:
 	 */
 	VerboseHitSink(OutFileBuf* out,
 	               int offBase,
+	               const Bitset& suppressOuts,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
 	               bool fullRef,
@@ -2655,6 +2656,7 @@ public:
 	HitSink(out, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
+	suppress_(suppressOuts),
 	fullRef_(fullRef),
 	rmap_(rmap), amap_(amap)
 	{ }
@@ -2665,6 +2667,7 @@ public:
 	 */
 	VerboseHitSink(size_t numOuts,
 	               int offBase,
+	               const Bitset& suppressOuts,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
 	               bool fullRef,
@@ -2673,8 +2676,10 @@ public:
 	HitSink(numOuts, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
+	suppress_(64),
 	fullRef_(fullRef),
-	rmap_(rmap), amap_(amap)
+	rmap_(rmap),
+	amap_(amap)
 	{ }
 
 	/**
@@ -2938,7 +2943,8 @@ public:
 	                   AnnotationMap *amap,
 	                   bool fullRef,
 	                   int partition,
-	                   int offBase)
+	                   int offBase,
+	                   const Bitset& suppress)
 	{
 		bool spill = false;
 		int spillAmt = 0;
@@ -2954,18 +2960,23 @@ public:
 				spillAmt++;
 			}
 			assert(!spill);
+			size_t field = 0;
+			bool firstfield = true;
 			if(partition != 0) {
 				int pospart = abs(partition);
-				// Output a partitioning key
-				// First component of the key is the reference index
-				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
-				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
-				} else {
-					ss << h.h.first;
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					// Output a partitioning key
+					// First component of the key is the reference index
+					if(refnames != NULL && rmap != NULL) {
+						printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
+					} else if(refnames != NULL && h.h.first < refnames->size()) {
+						printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
+					} else {
+						ss << h.h.first;
+					}
 				}
-				ss << '\t';
 				ostringstream ss2, ss3;
 				// Next component of the key is the partition id
 				if(!dospill) {
@@ -2982,96 +2993,148 @@ public:
 					// output another alignment for that partition
 					spill = true;
 				}
-				// Print partition id with leading 0s so that Hadoop
-				// can do lexicographical sort (modern Hadoop versions
-				// seen to support numeric)
-				string s2 = ss2.str();
-				size_t partDigits = 1;
-				if(pospart >= 10) partDigits++;
-				if(pospart >= 100) partDigits++;
-				if(pospart >= 1000) partDigits++;
-				if(pospart >= 10000) partDigits++;
-				if(pospart >= 100000) partDigits++;
-				for(size_t i = s2.length(); i < (10-partDigits); i++) {
-					ss << "0";
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					// Print partition id with leading 0s so that Hadoop
+					// can do lexicographical sort (modern Hadoop versions
+					// seen to support numeric)
+					string s2 = ss2.str();
+					size_t partDigits = 1;
+					if(pospart >= 10) partDigits++;
+					if(pospart >= 100) partDigits++;
+					if(pospart >= 1000) partDigits++;
+					if(pospart >= 10000) partDigits++;
+					if(pospart >= 100000) partDigits++;
+					for(size_t i = s2.length(); i < (10-partDigits); i++) {
+						ss << "0";
+					}
+					ss << s2.c_str();
 				}
-				ss << s2.c_str() << "\t";
-				// Print offset with leading 0s
-				ss3 << (h.h.second + offBase);
-				string s3 = ss3.str();
-				for(size_t i = s3.length(); i < 9; i++) {
-					ss << "0";
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					// Print offset with leading 0s
+					ss3 << (h.h.second + offBase);
+					string s3 = ss3.str();
+					for(size_t i = s3.length(); i < 9; i++) {
+						ss << "0";
+					}
+					ss << s3;
 				}
-				ss << s3;
-				ss << "\t" << (h.fw? "+":"-");
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << (h.fw? "+":"-");
+				}
 				// end if(partition != 0)
 			} else {
 				assert(!dospill);
-				ss << h.patName << "\t" << (h.fw? "+":"-") << "\t";
-				// .first is text id, .second is offset
-				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
-				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
-				} else {
-					ss << h.h.first;
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << h.patName;
 				}
-				ss << "\t" << (h.h.second + offBase);
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << (h.fw? '+' : '-');
+				}
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					// .first is text id, .second is offset
+					if(refnames != NULL && rmap != NULL) {
+						printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
+					} else if(refnames != NULL && h.h.first < refnames->size()) {
+						printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
+					} else {
+						ss << h.h.first;
+					}
+				}
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << (h.h.second + offBase);
+				}
 				// end else clause of if(partition != 0)
 			}
-			ss << '\t' << h.patSeq;
-			ss << '\t' << h.quals;
-			ss << '\t' << h.oms;
-			ss << '\t';
-			// Look for SNP annotations falling within the alignment
-			map<int, char> snpAnnots;
-			const size_t len = length(h.patSeq);
-			if(amap != NULL) {
-				AnnotationMap::Iter ai = amap->lower_bound(h.h);
-				for(; ai != amap->end(); ai++) {
-					assert_geq(ai->first.first, h.h.first);
-					if(ai->first.first != h.h.first) {
-						// Different chromosome
-						break;
-					}
-					if(ai->first.second >= h.h.second + len) {
-						// Doesn't fall into alignment
-						break;
-					}
-					if(ai->second.first != 'S') {
-						// Not a SNP annotation
-						continue;
-					}
-					size_t off = ai->first.second - h.h.second;
-					if(!h.fw) off = len - off - 1;
-					snpAnnots[off] = ai->second.second;
-				}
+			if(!suppress.test(field++)) {
+				if(firstfield) firstfield = false;
+				else ss << '\t';
+				ss << h.patSeq;
 			}
-			// Output mismatch column
-			bool first = true;
-			for (unsigned int i = 0; i < len; ++ i) {
-				if(h.mms.test(i)) {
-					// There's a mismatch at this position
-					if (!first) ss << ",";
-					ss << i; // position
-					assert_gt(h.refcs.size(), i);
-					char refChar = toupper(h.refcs[i]);
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					assert_neq(refChar, qryChar);
-					ss << ":" << refChar << ">" << qryChar;
-					first = false;
-				} else if(snpAnnots.find(i) != snpAnnots.end()) {
-					if (!first) ss << ",";
-					ss << i; // position
-					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					ss << "S:" << snpAnnots[i] << ">" << qryChar;
-					first = false;
+			if(!suppress.test(field++)) {
+				if(firstfield) firstfield = false;
+				else ss << '\t';
+				ss << h.quals;
+			}
+			if(!suppress.test(field++)) {
+				if(firstfield) firstfield = false;
+				else ss << '\t';
+				ss << h.oms;
+			}
+			if(!suppress.test(field++)) {
+				if(firstfield) firstfield = false;
+				else ss << '\t';
+				// Look for SNP annotations falling within the alignment
+				map<int, char> snpAnnots;
+				const size_t len = length(h.patSeq);
+				if(amap != NULL) {
+					AnnotationMap::Iter ai = amap->lower_bound(h.h);
+					for(; ai != amap->end(); ai++) {
+						assert_geq(ai->first.first, h.h.first);
+						if(ai->first.first != h.h.first) {
+							// Different chromosome
+							break;
+						}
+						if(ai->first.second >= h.h.second + len) {
+							// Doesn't fall into alignment
+							break;
+						}
+						if(ai->second.first != 'S') {
+							// Not a SNP annotation
+							continue;
+						}
+						size_t off = ai->first.second - h.h.second;
+						if(!h.fw) off = len - off - 1;
+						snpAnnots[off] = ai->second.second;
+					}
 				}
+				// Output mismatch column
+				bool firstmm = true;
+				for (unsigned int i = 0; i < len; ++ i) {
+					if(h.mms.test(i)) {
+						// There's a mismatch at this position
+						if (!firstmm) ss << ",";
+						ss << i; // position
+						assert_gt(h.refcs.size(), i);
+						char refChar = toupper(h.refcs[i]);
+						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+						assert_neq(refChar, qryChar);
+						ss << ":" << refChar << ">" << qryChar;
+						firstmm = false;
+					} else if(snpAnnots.find(i) != snpAnnots.end()) {
+						if (!firstmm) ss << ",";
+						ss << i; // position
+						char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
+						ss << "S:" << snpAnnots[i] << ">" << qryChar;
+						firstmm = false;
+					}
+				}
+				if(partition != 0 && firstmm) ss << '-';
 			}
 			if(partition != 0) {
-				if(first) ss << '-';
-				ss << "\t" << (int)h.mate;
-				ss << "\t" << h.patName;
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << (int)h.mate;
+				}
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << h.patName;
+				}
 			}
 			ss << endl;
 		} while(spill);
@@ -3082,7 +3145,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, _partition, offBase_);
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, _partition, offBase_, suppress_);
 	}
 
 protected:
@@ -3106,6 +3169,7 @@ private:
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
+	Bitset   suppress_;    /// output fields to suppress
 	bool fullRef_;         /// print full reference name
 	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
 	AnnotationMap *amap_;  ///

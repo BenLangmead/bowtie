@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.11.3.
+available to the public for download.  The current version is 0.12.0.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -41,6 +41,11 @@ Version 0.12.0 - November 25, 2009
      crash toward the end of execution with -p > 1.
    * bowtie -f now supports fasta files with reads split across
      multiple lines 
+   * New --suppress option allows user to suppress unwanted columns of
+     output
+   * DEPRECATED: --concise
+   * REMOVED: -z/--phased, -b/--binout, bowtie-maptool,
+     bowtie-maqconvert
 
 Version 0.11.3 - October 12, 2009
    * Fixed crashing bug in -S/--sam mode when the number of reference

@@ -75,7 +75,6 @@ static output_types outType;  // style of output
 static bool randReadsNoSync;  // true -> generate reads from per-thread random source
 static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
 static int lenRandomReads;    // len of random reads (see Random*PatternSource in pat.h)
-static bool fullIndex;        // load halves one at a time and proceed in phases
 static bool noRefNames;       // true -> print reference indexes; not names
 static string dumpAlFaBase;   // basename of FASTA files to dump aligned reads to
 static string dumpAlFqBase;   // basename of FASTQ files to dump aligned reads to
@@ -139,6 +138,7 @@ static bool samNoSQ;   // don't print @SQ header lines
 static bool color;
 static string rgs; // SAM outputs for @RG header line
 static int snpPhred; // probability of SNP, for scoring colorspace alignments
+static Bitset suppressOuts(64); // output fields to suppress
 
 static void resetOptions() {
 	mates1.clear();
@@ -179,7 +179,6 @@ static void resetOptions() {
 	randReadsNoSync			= false; // true -> generate reads from per-thread random source
 	numRandomReads			= 50000000; // # random reads (see Random*PatternSource in pat.h)
 	lenRandomReads			= 35;    // len of random reads (see Random*PatternSource in pat.h)
-	fullIndex				= true;  // load halves one at a time and proceed in phases
 	noRefNames				= false; // true -> print reference indexes; not names
 	dumpAlFaBase			= "";    // basename of FASTA files to dump aligned reads to
 	dumpAlFqBase			= "";    // basename of FASTQ files to dump aligned reads to
@@ -243,6 +242,7 @@ static void resetOptions() {
 	color					= false; // don't align in colorspace by default
 	rgs						= "";    // SAM outputs for @RG header line
 	snpPhred				= 30;    // probability of SNP, for scoring colorspace alignments
+	suppressOuts.clear();            // output fields to suppress
 }
 
 // mating constraints
@@ -321,7 +321,8 @@ enum {
 	ARG_SNPPHRED,
 	ARG_SAM_NOHEAD,
 	ARG_SAM_NOSQ,
-	ARG_SAM_RG
+	ARG_SAM_RG,
+	ARG_SUPPRESS_FIELDS
 };
 
 static struct option long_options[] = {
@@ -426,6 +427,7 @@ static struct option long_options[] = {
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"sam-RG",       required_argument, 0,            ARG_SAM_RG},
 	{(char*)"snpphred",     required_argument, 0,            ARG_SNPPHRED},
+	{(char*)"suppress",     required_argument, 0,            ARG_SUPPRESS_FIELDS},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -1541,10 +1543,10 @@ static void printLongUsage(ostream& out) {
  * if it is less than 'lower', than output the given error message and
  * exit with an error and a usage message.
  */
-static int parseInt(int lower, const char *errmsg) {
+static int parseInt(int lower, const char *errmsg, const char *arg) {
 	long l;
 	char *endPtr= NULL;
-	l = strtol(optarg, &endPtr, 10);
+	l = strtol(arg, &endPtr, 10);
 	if (endPtr != NULL) {
 		if (l < lower) {
 			cerr << errmsg << endl;
@@ -1557,6 +1559,13 @@ static int parseInt(int lower, const char *errmsg) {
 	printUsage(cerr);
 	throw 1;
 	return -1;
+}
+
+/**
+ * Parse from optarg by default.
+ */
+static int parseInt(int lower, const char *errmsg) {
+	return parseInt(lower, errmsg, optarg);
 }
 
 /**
@@ -1640,6 +1649,15 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_ANNOTMAP: annotMapFile = optarg; break;
 			case ARG_USE_SPINLOCK: useSpinlock = false; break;
 			case ARG_SHMEM: useShmem = true; break;
+			case ARG_SUPPRESS_FIELDS: {
+				vector<string> supp;
+				tokenize(optarg, ",", supp);
+				for(size_t i = 0; i < supp.size(); i++) {
+					int ii = parseInt(1, "--suppress arg must be at least 1", supp[i].c_str());
+					suppressOuts.set(ii-1);
+				}
+				break;
+			}
 			case ARG_MM: {
 #ifdef BOWTIE_MM
 				useMm = true;
@@ -1663,7 +1681,10 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case ARG_SNPPHRED: snpPhred = parseInt(0, "--snpphred must be at least 0"); break;
-			case 'z': fullIndex = false; break;
+			case 'z': {
+				cerr << "Error: -z/--phased mode is no longer supported" << endl;
+				throw 1;
+			}
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
 			case ARG_FUZZY: fuzzy = true; break;
@@ -1794,7 +1815,7 @@ static void parseOptions(int argc, const char **argv) {
 		// ranges).
 		offRate = 32;
 	}
-	if(!maqLike && mismatches == 3 && fullIndex) {
+	if(!maqLike && mismatches == 3) {
 		// Much faster than normal 3-mismatch mode
 		stateful = true;
 	}
@@ -1814,55 +1835,13 @@ static void parseOptions(int argc, const char **argv) {
 			}
 		}
 	}
-	// Check for all the parameter combinations that aren't compatible
-	// with -z/--phased mode.
-	if(!fullIndex) {
-		bool error = false;
-		if(khits > 1) {
-			cerr << "When -z/--phased is used, -k X for X > 1 is unavailable" << endl;
-			error = true;
-		}
-		if(mhits != 0xffffffff) {
-			cerr << "When -z/--phased is used, -m is unavailable" << endl;
-			error = true;
-		}
-		if(oldBest) {
-			cerr << "When -z/--phased is used, --oldbest is unavailable" << endl;
-			error = true;
-		}
-		if(stateful && better) {
-			cerr << "When -z/--phased is used, --better is unavailable" << endl;
-			error = true;
-		}
-		else if(stateful) {
-			cerr << "When -z/--phased is used, --best is unavailable" << endl;
-			error = true;
-		}
-		if(allHits && strata) {
-			cerr << "When -a/--all and -z/--phased are used, --strata cannot also be used." << endl
-			     << "Stratified all-hits search cannot be combined with phased search." << endl;
-			error = true;
-		}
-		if(paired) {
-			cerr << "When -z/--phased is used, paired-end mode is unavailable" << endl;
-			error = true;
-		}
-		if(!dumpAlBase.empty() ||
-		   !dumpAlFaBase.empty() ||
-		   !dumpAlFqBase.empty())
-		{
-			cerr << "When -z/--phased is used, the --al option is unavailable" << endl;
-			error = true;
-		}
-		if(error) throw 1;
-	}
 	if(tryHard) {
 		// Increase backtracking limit to huge number
 		maxBts = maxBtsBetter = INT_MAX;
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
 	}
-	if(fullIndex && strata && !stateful && !oldBest) {
+	if(strata && !stateful && !oldBest) {
 		cerr << "--strata must be combined with --best" << endl;
 		throw 1;
 	}
@@ -1948,6 +1927,11 @@ static void parseOptions(int argc, const char **argv) {
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim5);
 		minInsert = max<int>(0, (int)minInsert - trim5);
+	}
+	if(outType != OUTPUT_FULL && suppressOuts.count() > 0 && !quiet) {
+		cerr << "Warning: Ignoring --suppress because output type is not default." << endl;
+		cerr << "         --suppress is only available for the default output type." << endl;
+		suppressOuts.clear();
 	}
 }
 
@@ -2378,201 +2362,6 @@ static SyncBitset*                    mismatchSearch_doneMask;
 static SyncBitset*                    mismatchSearch_hitMask;
 static BitPairReference*              mismatchSearch_refs;
 
-static void* mismatchSearchWorkerPhase1(void *vp){
-	int tid = *((int*)vp);
-	PairedPatternSource&   _patsrc       = *mismatchSearch_patsrc;
-	HitSink&               _sink         = *mismatchSearch_sink;
-	Ebwt<String<Dna> >&    ebwtFw        = *mismatchSearch_ebwtFw;
-	vector<String<Dna5> >& os            = *mismatchSearch_os;
-	SyncBitset&            doneMask      = *mismatchSearch_doneMask;
-	SyncBitset&            hitMask       = *mismatchSearch_hitMask;
-	const BitPairReference* refs         = mismatchSearch_refs;
-
-	bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
-	HitSinkPerThread* sink = sinkFact->create();
-	EbwtSearchParams<String<Dna> > params(
-	        *sink,      // HitSinkPerThread
-	        os,         // reference sequences
-	        false,      // read is forward
-	        true);      // index is forward
-	GreedyDFSRangeSource bt(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh
-	        0xffffffff,    // max backtracks (no max)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false);         // considerQuals
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-		GET_READ(patsrc);
-		uint32_t plen = length(patFw);
-		uint32_t s = plen;
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_1mm_phase1.c"
-		#undef DONEMASK_SET
-	} // End read loop
-	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-    WORKER_EXIT();
-}
-
-static void* mismatchSearchWorkerPhase2(void *vp){
-	int tid = *((int*)vp);
-	PairedPatternSource&   _patsrc      = *mismatchSearch_patsrc;
-	HitSink&               _sink        = *mismatchSearch_sink;
-	Ebwt<String<Dna> >&    ebwtBw       = *mismatchSearch_ebwtBw;
-	vector<String<Dna5> >& os           = *mismatchSearch_os;
-	SyncBitset&            doneMask     = *mismatchSearch_doneMask;
-	SyncBitset&            hitMask      = *mismatchSearch_hitMask;
-	const BitPairReference* refs         = mismatchSearch_refs;
-
-	// Per-thread initialization
-	bool sanity = sanityCheck && !os.empty() && !rangeMode;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
-	HitSinkPerThread* sink = sinkFact->create();
-	EbwtSearchParams<String<Dna> > params(
-	        *sink,      // HitSinkPerThread
-	        os,         // reference sequences
-	        true,       // read is forward
-	        false);     // index is mirror index
-	GreedyDFSRangeSource bt(
-	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh
-	        0xffffffff,     // max backtracks (no max)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false);         // considerQuals
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-		GET_READ(patsrc);
-		if(doneMask.test(patid)) { skipped = true; continue; }
-		uint32_t plen = length(patFw);
-		uint32_t s = plen;
-		uint32_t s3 = s >> 1; // length of 3' half of seed
-		#include "search_1mm_phase2.c"
-	} // End read loop
-	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-    WORKER_EXIT();
-}
-
-/**
- * Search through a single (forward) Ebwt index for exact end-to-end
- * hits.  Assumes that index is already loaded into memory.
- */
-static void mismatchSearch(PairedPatternSource& _patsrc,
-                           HitSink& _sink,
-                           Ebwt<String<Dna> >& ebwtFw,
-                           Ebwt<String<Dna> >& ebwtBw,
-                           vector<String<Dna5> >& os)
-{
-	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
-	if(fullIndex) numQs = 0;
-	SyncBitset doneMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-	// No need to keep track of which reads are aligned because the
-	// user hasn't requested an unaligned-read dump
-	if(!_sink.dumpsReads()) numQs = 0;
-	SyncBitset hitMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-
-	mismatchSearch_patsrc       = &_patsrc;
-	mismatchSearch_sink         = &_sink;
-	mismatchSearch_ebwtFw       = &ebwtFw;
-	mismatchSearch_ebwtBw       = &ebwtBw;
-	mismatchSearch_doneMask     = &doneMask;
-	mismatchSearch_hitMask      = &hitMask;
-	mismatchSearch_os           = &os;
-
-	assert(!ebwtFw.isInMemory());
-	assert(!ebwtBw.isInMemory());
-
-	{
-		// Load the rest of (vast majority of) the backward Ebwt into
-		// memory
-		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
-	}
-
-#ifdef BOWTIE_PTHREADS
-	AutoArray<pthread_t> threads(nthreads-1);
-	AutoArray<int> tids(nthreads-1);
-#endif
-    CHUD_START();
-	// Phase 1
-    {
-		Timer _t(cerr, "Time for 1-mismatch Phase 1 of 2: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			tids[i] = i+1;
-			createThread(&threads[i],
-			             mismatchSearchWorkerPhase1,
-			             (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		mismatchSearchWorkerPhase1((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-    }
-
-	// Release most of the memory associated with the forward Ebwt
-    ebwtFw.evictFromMemory();
-	{
-		// Load the rest of (vast majority of) the backward Ebwt into
-		// memory
-		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
-	}
-	_patsrc.reset();          // reset pattern source to 1st pattern
-	// Sanity-check the restored version of the Ebwt
-	if(sanityCheck && !os.empty()) {
-		ebwtBw.checkOrigs(os, color, true);
-	}
-
-	// Phase 2
-	{
-		Timer _t(cerr, "Time for 1-mismatch Phase 2 of 2: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i],
-			             mismatchSearchWorkerPhase2,
-			             (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		mismatchSearchWorkerPhase2((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-}
-
 /**
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
@@ -2882,230 +2671,6 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
 	        true,        /* read is forward */ \
 	        true);       /* index is forward */
 
-static void* twoOrThreeMismatchSearchWorkerPhase1(void *vp) {
-	TWOTHREE_WORKER_SETUP();
-	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
-	SyncBitset& hitMask  = *twoOrThreeMismatchSearch_hitMask;
-	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
-	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
-
-	GreedyDFSRangeSource btr1(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh
-	        // Do not impose maximums in 2/3-mismatch mode
-	        0xffffffff,     // max backtracks (no limit)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false);         // considerQuals
-	bool skipped = false;
-    while(true) { // Read read-in loop
-    	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-		GET_READ(patsrc);
-		// If requested, check that this read has the same length
-		// as all the previous ones
-		size_t plen = length(patFw);
-		uint32_t s = plen;
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_23mm_phase1.c"
-		#undef DONEMASK_SET
-    }
-	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-    // Threads join at end of Phase 1
-	WORKER_EXIT();
-}
-
-static void* twoOrThreeMismatchSearchWorkerPhase2(void *vp) {
-	TWOTHREE_WORKER_SETUP();
-	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
-	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
-	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
-	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
-
-	GreedyDFSRangeSource bt2(
-	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh
-	        // Do not impose maximums in 2/3-mismatch mode
-	        0xffffffff,     // max backtracks (no limit)
-	        0,              // reportPartials (no)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false);         // considerQuals
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-		GET_READ(patsrc);
-		if(doneMask.test(patid)) continue;
-		size_t plen = length(patFw);
-		uint32_t s = plen;
-		uint32_t s3 = s >> 1; // length of 3' half of seed
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_23mm_phase2.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-	WORKER_EXIT();
-}
-
-static void* twoOrThreeMismatchSearchWorkerPhase3(void *vp) {
-	TWOTHREE_WORKER_SETUP();
-	SyncBitset& doneMask = *twoOrThreeMismatchSearch_doneMask;
-	SyncBitset& hitMask = *twoOrThreeMismatchSearch_hitMask;
-	Ebwt<String<Dna> >& ebwtFw   = *twoOrThreeMismatchSearch_ebwtFw;
-	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
-
-	// GreedyDFSRangeSource to search for seedlings for case 4F
-	GreedyDFSRangeSource bt3(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh (none)
-	        // Do not impose maximums in 2/3-mismatch mode
-	        0xffffffff,     // max backtracks (no limit)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false);         // considerQuals
-	GreedyDFSRangeSource bthh3(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        0xffffffff,     // qualThresh
-	        // Do not impose maximums in 2/3-mismatch mode
-	        0xffffffff,     // max backtracks (no limit)
-	        0,              // reportPartials (don't)
-	        true,           // reportExacts
-	        rangeMode,      // reportRanges
-	        NULL,           // seedlings
-	        NULL,           // mutations
-	        verbose,        // verbose
-	        &os,
-	        false,          // considerQuals
-	        true);          // halfAndHalf
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-		GET_READ(patsrc);
-		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
-		uint32_t plen = length(patFw);
-		uint32_t s = plen;
-		uint32_t s3 = s >> 1; // length of 3' half of seed
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_23mm_phase3.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-	WORKER_EXIT();
-}
-
-template<typename TStr>
-static void twoOrThreeMismatchSearch(
-        PairedPatternSource& _patsrc,   /// pattern source
-        HitSink& _sink,                 /// hit sink
-        Ebwt<TStr>& ebwtFw,             /// index of original text
-        Ebwt<TStr>& ebwtBw,             /// index of mirror text
-        vector<String<Dna5> >& os,      /// text strings, if available (empty otherwise)
-        bool two = true)                /// true -> 2, false -> 3
-{
-	// Global initialization
-	assert(!fullIndex);
-	assert(!ebwtFw.isInMemory());
-	assert(!ebwtBw.isInMemory());
-
-	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
-	SyncBitset doneMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-	// No need to keep track of which reads are aligned because the
-	// user hasn't requested an unaligned-read dump
-	if(!_sink.dumpsReads()) numQs = 0;
-	SyncBitset hitMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-
-	twoOrThreeMismatchSearch_patsrc   = &_patsrc;
-	twoOrThreeMismatchSearch_sink     = &_sink;
-	twoOrThreeMismatchSearch_ebwtFw   = &ebwtFw;
-	twoOrThreeMismatchSearch_ebwtBw   = &ebwtBw;
-	twoOrThreeMismatchSearch_os       = &os;
-	twoOrThreeMismatchSearch_doneMask = &doneMask;
-	twoOrThreeMismatchSearch_hitMask  = &hitMask;
-	twoOrThreeMismatchSearch_two      = two;
-
-#ifdef BOWTIE_PTHREADS
-	AutoArray<pthread_t> threads(nthreads-1);
-	AutoArray<int> tids(nthreads-1);
-#endif
-
-	// Load forward index
-	SWITCH_TO_FW_INDEX();
-	{ // Phase 1
-		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 1 of 3: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			tids[i] = i+1;
-			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase1, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		twoOrThreeMismatchSearchWorkerPhase1((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-    }
-	// Unload forward index and load mirror index
-	SWITCH_TO_BW_INDEX();
-	{ // Phase 2
-		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 2 of 3: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase2, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		twoOrThreeMismatchSearchWorkerPhase2((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	SWITCH_TO_FW_INDEX();
-	{ // Phase 3
-		Timer _t(cerr, "End-to-end 2/3-mismatch Phase 3 of 3: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], twoOrThreeMismatchSearchWorkerPhase3, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		twoOrThreeMismatchSearchWorkerPhase3((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	return;
-}
-
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
@@ -3382,260 +2947,6 @@ static BitPairReference*        seededQualSearch_refs;
 	        os,          /* reference sequences */ \
 	        true,        /* read is forward */ \
 	        true);       /* index is forward */
-
-static void* seededQualSearchWorkerPhase1(void *vp) {
-	SEEDEDQUAL_WORKER_SETUP();
-	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask = *seededQualSearch_hitMask;
-	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
-	const BitPairReference* refs = seededQualSearch_refs;
-	uint32_t s = seedLen;
-	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-	// GreedyDFSRangeSource for finding exact hits for the forward-
-	// oriented read
-	GreedyDFSRangeSource btf1(
-	        &ebwtFw, params,
-	        refs,                  // reference sequence (for colorspace)
-	        snpPhred,              // phred probability of SNP (for colorspace)
-	        qualCutoff,            // qualThresh
-	        maxBtsBetter,          // max backtracks
-	        0,                     // reportPartials (don't)
-	        true,                  // reportExacts
-	        rangeMode,             // reportRanges
-	        NULL,                  // partials
-	        NULL,                  // mutations
-	        verbose,               // verbose
-	        &os,
-	        false);                // considerQuals
-	GreedyDFSRangeSource bt1(
-	        &ebwtFw, params,
-	        refs,                  // reference sequence (for colorspace)
-	        snpPhred,              // phred probability of SNP (for colorspace)
-	        qualCutoff,            // qualThresh
-	        maxBtsBetter,          // max backtracks
-	        0,                     // reportPartials (don't)
-	        true,                  // reportExacts
-	        rangeMode,             // reportRanges
-	        NULL,                  // partials
-	        NULL,                  // mutations
-	        verbose,               // verbose
-	        &os,
-	        true,                  // considerQuals
-	        false, !noMaqRound);
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-		GET_READ(patsrc);
-		size_t plen = length(patFw);
-		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_seeded_phase1.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-	WORKER_EXIT();
-}
-
-static void* seededQualSearchWorkerPhase2(void *vp) {
-	SEEDEDQUAL_WORKER_SETUP();
-	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask  = *seededQualSearch_hitMask;
-	uint32_t s = seedLen;
-	uint32_t s3 = s >> 1; /* length of 3' half of seed */
-	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
-	PartialAlignmentManager* pamRc = seededQualSearch_pamRc;
-	const BitPairReference* refs = seededQualSearch_refs;
-	// GreedyDFSRangeSource to search for hits for cases 1F, 2F, 3F
-	GreedyDFSRangeSource btf2(
-	        &ebwtBw, params,
-	        refs,                  // reference sequence (for colorspace)
-	        snpPhred,              // phred probability of SNP (for colorspace)
-	        qualCutoff,            // qualThresh
-	        maxBtsBetter,          // max backtracks
-	        0,                     // reportPartials (no)
-	        true,                  // reportExacts
-	        rangeMode,             // reportRanges
-	        NULL,                  // partial alignment manager
-	        NULL,                  // mutations
-	        verbose,               // verbose
-	        &os,                   // reference sequences
-	        true,                  // considerQuals
-	        false, !noMaqRound);
-	// GreedyDFSRangeSource to search for partial alignments for case 4R
-	GreedyDFSRangeSource btr2(
-	        &ebwtBw, params,
-	        refs,                  // reference sequence (for colorspace)
-	        snpPhred,              // phred probability of SNP (for colorspace)
-	        qualCutoff,            // qualThresh (none)
-	        maxBtsBetter,          // max backtracks
-	        seedMms,               // report partials (up to seedMms mms)
-	        true,                  // reportExacts
-	        rangeMode,             // reportRanges
-	        pamRc,                 // partial alignment manager
-	        NULL,                  // mutations
-	        verbose,               // verbose
-	        &os,                   // reference sequences
-	        true,                  // considerQuals
-	        false, !noMaqRound);
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
-		GET_READ(patsrc);
-		if(doneMask.test(patid)) { skipped = true; continue; }
-		size_t plen = length(patFw);
-		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs3 = (qs >> 1);
-		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_seeded_phase2.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, seedMms == 0, skipped);
-	WORKER_EXIT();
-}
-
-static void* seededQualSearchWorkerPhase3(void *vp) {
-	SEEDEDQUAL_WORKER_SETUP();
-	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask  = *seededQualSearch_hitMask;
-	uint32_t s = seedLen;
-	uint32_t s3 = s >> 1; /* length of 3' half of seed */
-	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-	Ebwt<String<Dna> >& ebwtFw        = *seededQualSearch_ebwtFw;
-	PartialAlignmentManager* pamFw    = seededQualSearch_pamFw;
-	PartialAlignmentManager* pamRc    = seededQualSearch_pamRc;
-	const BitPairReference* refs = seededQualSearch_refs;
-	// GreedyDFSRangeSource to search for seedlings for case 4F
-	GreedyDFSRangeSource btf3(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        qualCutoff,            // qualThresh (none)
-	        maxBtsBetter,          // max backtracks
-	        seedMms,               // reportPartials (do)
-	        true,                  // reportExacts
-	        rangeMode,             // reportRanges
-	        pamFw,                 // seedlings
-	        NULL,                  // mutations
-	        verbose,               // verbose
-	        &os,                   // reference sequences
-	        true,                  // considerQuals
-	        false, !noMaqRound);
-	// GreedyDFSRangeSource to search for hits for case 4R by extending
-	// the partial alignments found in Phase 2
-	GreedyDFSRangeSource btr3(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        qualCutoff, // qualThresh
-	        maxBtsBetter,          // max backtracks
-	        0,       // reportPartials (don't)
-	        true,    // reportExacts
-	        rangeMode,// reportRanges
-	        NULL,    // seedlings
-	        NULL,    // mutations
-	        verbose, // verbose
-	        &os,                   // reference sequences
-	        true,                  // considerQuals
-	        false, !noMaqRound);
-	// The half-and-half GreedyDFSRangeSource
-	GreedyDFSRangeSource btr23(
-	        &ebwtFw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        qualCutoff, // qualThresh
-	        maxBtsBetter,          // max backtracks
-	        0,       // reportPartials (don't)
-	        true,    // reportExacts
-	        rangeMode,// reportRanges
-	        NULL,    // seedlings
-	        NULL,    // mutations
-	        verbose, // verbose
-	        &os,
-	        true,    // considerQuals
-	        true,    // halfAndHalf
-	        !noMaqRound);
-	vector<PartialAlignment> pals;
-	String<QueryMutation> muts;
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-		GET_READ(patsrc);
-		size_t plen = length(patFw);
-		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs3 = (qs >> 1);
-		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		if(doneMask.test(patid)) continue;
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_seeded_phase3.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, false, skipped);
-	WORKER_EXIT();
-}
-
-static void* seededQualSearchWorkerPhase4(void *vp) {
-	SEEDEDQUAL_WORKER_SETUP();
-	SyncBitset& doneMask = *seededQualSearch_doneMask;
-	SyncBitset& hitMask  = *seededQualSearch_hitMask;
-	uint32_t s = seedLen;
-	uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
-	PartialAlignmentManager* pamFw = seededQualSearch_pamFw;
-	const BitPairReference* refs = seededQualSearch_refs;
-	// GreedyDFSRangeSource to search for hits for case 4F by extending
-	// the partial alignments found in Phase 3
-	GreedyDFSRangeSource btf4(
-	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        qualCutoff, // qualThresh
-	        maxBtsBetter, // max backtracks
-	        0,       // reportPartials (don't)
-	        true,    // reportExacts
-	        rangeMode,// reportRanges
-	        NULL,    // seedlings
-	        NULL,    // mutations
-	        verbose, // verbose
-	        &os,     // reference sequences
-	        true,    // considerQuals
-	        false, !noMaqRound);
-	// Half-and-half GreedyDFSRangeSource for forward read
-	GreedyDFSRangeSource btf24(
-	        &ebwtBw, params,
-	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
-	        qualCutoff, // qualThresh
-	        maxBtsBetter, // max backtracks
-	        0,       // reportPartials (don't)
-	        true,    // reportExacts
-	        rangeMode,// reportRanges
-	        NULL,    // seedlings
-	        NULL,    // mutations
-	        verbose, // verbose
-	        &os,
-	        true,    // considerQuals
-	        true,    // halfAndHalf
-	        !noMaqRound);
-	vector<PartialAlignment> pals;
-	String<QueryMutation> muts;
-	bool skipped = false;
-	while(true) {
-		finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-		GET_READ_FW(patsrc);
-		if(doneMask.testUnsync(patid)) { skipped = true; continue; }
-		size_t plen = length(patFw);
-		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		#define DONEMASK_SET(p) doneMask.set(p)
-		#include "search_seeded_phase4.c"
-		#undef DONEMASK_SET
-	}
-	finishReadWithHitmask(patsrc, sink, hitMask, true, skipped);
-	WORKER_EXIT();
-}
 
 static void* seededQualSearchWorkerFull(void *vp) {
 	SEEDEDQUAL_WORKER_SETUP();
@@ -3944,175 +3255,6 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
  * We call the first 24 base pairs the "seed."
  */
 template<typename TStr>
-static void seededQualCutoffSearch(
-        int seedLen,                  /// length of seed (not a maq option)
-        int qualCutoff,               /// maximum sum of mismatch qualities
-                                      /// like maq map's -e option
-                                      /// default: 70
-        int seedMms,                  /// max # mismatches allowed in seed
-                                      /// (like maq map's -n option)
-                                      /// Can only be 1 or 2, default: 1
-        PairedPatternSource& _patsrc, /// pattern source
-        HitSink& _sink,               /// hit sink
-        Ebwt<TStr>& ebwtFw,           /// index of original text
-        Ebwt<TStr>& ebwtBw,           /// index of mirror text
-        vector<String<Dna5> >& os)    /// text strings, if available (empty otherwise)
-{
-	// Global intialization
-	assert(!fullIndex);
-	assert_leq(seedMms, 3);
-	uint32_t numQs = ((qUpto == 0xffffffff) ? 16 * 1024 * 1024 : qUpto);
-	SyncBitset doneMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the read mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-	// No need to keep track of which reads are aligned because the
-	// user hasn't requested an unaligned-read dump
-	if(!_sink.dumpsReads()) numQs = 0;
-	SyncBitset hitMask(numQs,
-		// Error message for if an allocation fails
-		"Could not allocate enough memory for the hit mask; please subdivide reads and\n"
-		"run bowtie separately on each subset.\n");
-
-	seededQualSearch_patsrc   = &_patsrc;
-	seededQualSearch_sink     = &_sink;
-	seededQualSearch_ebwtFw   = &ebwtFw;
-	seededQualSearch_ebwtBw   = &ebwtBw;
-	seededQualSearch_os       = &os;
-	seededQualSearch_doneMask = &doneMask;
-	seededQualSearch_hitMask  = &hitMask;
-	seededQualSearch_pamFw    = NULL;
-	seededQualSearch_pamRc    = NULL;
-	seededQualSearch_qualCutoff = qualCutoff;
-
-#ifdef BOWTIE_PTHREADS
-	AutoArray<pthread_t> threads(nthreads-1);
-	AutoArray<int> tids(nthreads-1);
-#endif
-
-	SWITCH_TO_FW_INDEX();
-	{
-		// Phase 1: Consider cases 1R and 2R
-		const char * msg = "Seeded quality search Phase 1 of 4: ";
-		if(seedMms == 0) {
-			msg = "Seeded quality search Phase 1 of 2: ";
-		}
-		Timer _t(cerr, msg, timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			tids[i] = i+1;
-			createThread(&threads[i], seededQualSearchWorkerPhase1, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		seededQualSearchWorkerPhase1((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	// Unload forward index and load mirror index
-	SWITCH_TO_BW_INDEX();
-	PartialAlignmentManager *pamRc = NULL;
-	try {
-		if(seedMms > 0) pamRc = new PartialAlignmentManager();
-	} catch(bad_alloc& ba) {
-		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
-		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		throw 1;
-	}
-	seededQualSearch_pamRc = pamRc;
-	{
-		// Phase 2: Consider cases 1F, 2F and 3F and generate seedlings
-		// for case 4R
-		const char * msg = "Seeded quality search Phase 2 of 4: ";
-		if(seedMms == 0) {
-			msg = "Seeded quality search Phase 2 of 2: ";
-		}
-		Timer _t(cerr, msg, timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], seededQualSearchWorkerPhase2, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		seededQualSearchWorkerPhase2((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	if(seedMms == 0) {
-		// If we're not allowing any mismatches in the seed, then there
-		// is no need to continue to phases 3 and 4
-		assert(pamRc == NULL);
-		return;
-	}
-	// Unload mirror index and load forward index
-	SWITCH_TO_FW_INDEX();
-	PartialAlignmentManager *pamFw = NULL;
-	try {
-		if(seedMms > 0) pamFw = new PartialAlignmentManager();
-	} catch(bad_alloc& ba) {
-		cerr << "Could not reserve space for PartialAlignmentManager" << endl;
-		cerr << "Please subdivide the read set and invoke bowtie separately for each subdivision" << endl;
-		throw 1;
-	}
-	seededQualSearch_pamFw = pamFw;
-	{
-		// Phase 3: Consider cases 3R and 4R and generate seedlings for
-		// case 4F
-		Timer _t(cerr, "Seeded quality search Phase 3 of 4: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], seededQualSearchWorkerPhase3, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		seededQualSearchWorkerPhase3((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	// Some with the reverse-complement partial alignments
-	if(pamRc != NULL) {
-		delete pamRc;
-		pamRc = NULL;
-		seededQualSearch_pamRc = NULL;
-	}
-	// Unload forward index and load mirror index
-	SWITCH_TO_BW_INDEX();
-	{
-		// Phase 4: Consider case 4F
-		Timer _t(cerr, "Seeded quality search Phase 4 of 4: ", timing);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) {
-			createThread(&threads[i], seededQualSearchWorkerPhase4, (void *)&tids[i]);
-		}
-#endif
-		int tmp = 0;
-		seededQualSearchWorkerPhase4((void*)&tmp);
-#ifdef BOWTIE_PTHREADS
-		for(int i = 0; i < nthreads-1; i++) joinThread(threads[i]);
-#endif
-	}
-	if(pamFw != NULL) {
-		delete pamFw;
-		pamFw = NULL;
-		seededQualSearch_pamFw = NULL;
-	}
-}
-
-/**
- * Search for a good alignments for each read using criteria that
- * correspond somewhat faithfully to Maq's.  Search is aided by a pair
- * of Ebwt indexes, one for the original references, and one for the
- * transpose of the references.  Neither index should be loaded upon
- * entry to this function.
- *
- * Like Maq, we treat the first 24 base pairs of the read (those
- * closest to the 5' end) differently from the remainder of the read.
- * We call the first 24 base pairs the "seed."
- */
-template<typename TStr>
 static void seededQualCutoffSearchFull(
         int seedLen,                    /// length of seed (not a maq option)
         int qualCutoff,                 /// maximum sum of mismatch qualities
@@ -4314,10 +3456,6 @@ static void driver(const char * type,
 		cerr << "Creating paired-end patsrcs: "; logTime(cerr, true);
 	}
 	for(size_t i = 0; i < mates12.size(); i++) {
-		if(mates12[i] == "-" && !fullIndex) {
-			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw 1;
-		}
 		const vector<string>* qs = &mates12;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -4334,10 +3472,6 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
-		if(mates1[i] == "-" && !fullIndex) {
-			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw 1;
-		}
 		const vector<string>* qs = &mates1;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -4354,10 +3488,6 @@ static void driver(const char * type,
 
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates2.size(); i++) {
-		if(mates2[i] == "-" && !fullIndex) {
-			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw 1;
-		}
 		const vector<string>* qs = &mates2;
 		vector<string> tmp;
 		if(fileParallel) {
@@ -4379,10 +3509,6 @@ static void driver(const char * type,
 		cerr << "Creating single-end patsrcs: "; logTime(cerr, true);
 	}
 	for(size_t i = 0; i < queries.size(); i++) {
-		if(queries[i] == "-" && !fullIndex) {
-			cerr << "Input file \"-\" is not compatible with -z/--phased" << endl;
-			throw 1;
-		}
 		const vector<string>* qs = &queries;
 		PatternSource* patsrc = NULL;
 		vector<string> tmp;
@@ -4524,13 +3650,15 @@ static void driver(const char * type,
 			case OUTPUT_FULL:
 				if(refOut) {
 					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase, rmap, amap,
+							ebwt.nPat(), offBase, suppressOuts,
+							rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
-							fout, offBase, rmap, amap,
+							fout, offBase, suppressOuts,
+							rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
@@ -4609,40 +3737,21 @@ static void driver(const char * type,
     		cerr << "Dispatching to search driver: "; logTime(cerr, true);
     	}
 		if(maqLike) {
-			if(!fullIndex) {
-				seededQualCutoffSearch(seedLen,
-				                       qualThresh,
-				                       seedMms,
-				                       *patsrc,
-				                       *sink,
-				                       ebwt,    // forward index
-				                       *ebwtBw, // mirror index (not optional)
-				                       os);     // references, if available
-			} else {
-				seededQualCutoffSearchFull(seedLen,
-				                           qualThresh,
-				                           seedMms,
-				                           *patsrc,
-				                           *sink,
-				                           ebwt,    // forward index
-				                           *ebwtBw, // mirror index (not optional)
-				                           os);     // references, if available
-			}
+			seededQualCutoffSearchFull(seedLen,
+									   qualThresh,
+									   seedMms,
+									   *patsrc,
+									   *sink,
+									   ebwt,    // forward index
+									   *ebwtBw, // mirror index (not optional)
+									   os);     // references, if available
 		}
 		else if(mismatches > 0) {
 			if(mismatches == 1) {
-				if(!fullIndex) {
-					mismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os);
-				} else {
-					assert(ebwtBw != NULL);
-					mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
-				}
+				assert(ebwtBw != NULL);
+				mismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os);
 			} else if(mismatches == 2 || mismatches == 3) {
-				if(!fullIndex) {
-					twoOrThreeMismatchSearch(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
-				} else {
-					twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
-				}
+				twoOrThreeMismatchSearchFull(*patsrc, *sink, ebwt, *ebwtBw, os, mismatches == 2);
 			} else {
 				cerr << "Error: " << mismatches << " is not a supported number of mismatches" << endl;
 				throw 1;
