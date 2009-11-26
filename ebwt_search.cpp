@@ -76,14 +76,8 @@ static bool randReadsNoSync;  // true -> generate reads from per-thread random s
 static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
 static int lenRandomReads;    // len of random reads (see Random*PatternSource in pat.h)
 static bool noRefNames;       // true -> print reference indexes; not names
-static string dumpAlFaBase;   // basename of FASTA files to dump aligned reads to
-static string dumpAlFqBase;   // basename of FASTQ files to dump aligned reads to
 static string dumpAlBase;     // basename of same-format files to dump aligned reads to
-static string dumpUnalFaBase; // basename of FASTA files to dump unaligned reads to
-static string dumpUnalFqBase; // basename of FASTQ files to dump unaligned reads to
 static string dumpUnalBase;   // basename of same-format files to dump unaligned reads to
-static string dumpMaxFaBase;  // basename of FASTA files to dump reads with more than -m valid alignments to
-static string dumpMaxFqBase;  // basename of FASTQ files to dump reads with more than -m valid alignments to
 static string dumpMaxBase;    // basename of same-format files to dump reads with more than -m valid alignments to
 static uint32_t khits;  // number of hits per read; >1 is much slower
 static uint32_t mhits;  // don't report any hits if there are > mhits
@@ -180,14 +174,8 @@ static void resetOptions() {
 	numRandomReads			= 50000000; // # random reads (see Random*PatternSource in pat.h)
 	lenRandomReads			= 35;    // len of random reads (see Random*PatternSource in pat.h)
 	noRefNames				= false; // true -> print reference indexes; not names
-	dumpAlFaBase			= "";    // basename of FASTA files to dump aligned reads to
-	dumpAlFqBase			= "";    // basename of FASTQ files to dump aligned reads to
 	dumpAlBase				= "";    // basename of same-format files to dump aligned reads to
-	dumpUnalFaBase			= "";    // basename of FASTA files to dump unaligned reads to
-	dumpUnalFqBase			= "";    // basename of FASTQ files to dump unaligned reads to
 	dumpUnalBase			= "";    // basename of same-format files to dump unaligned reads to
-	dumpMaxFaBase			= "";    // basename of FASTA files to dump reads with more than -m valid alignments to
-	dumpMaxFqBase			= "";    // basename of FASTQ files to dump reads with more than -m valid alignments to
 	dumpMaxBase				= "";    // basename of same-format files to dump reads with more than -m valid alignments to
 	khits					= 1;     // number of hits per read; >1 is much slower
 	mhits					= 0xffffffff; // don't report any hits if there are > mhits
@@ -337,7 +325,6 @@ static struct option long_options[] = {
 	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
 	{(char*)"all",          no_argument,       0,            'a'},
 	{(char*)"concise",      no_argument,       0,            ARG_CONCISE},
-	{(char*)"binout",       no_argument,       0,            'b'},
 	{(char*)"noout",        no_argument,       0,            ARG_NOOUT},
 	{(char*)"solexa-quals", no_argument,       0,            ARG_SOLEXA_QUALS},
 	{(char*)"integer-quals",no_argument,       0,            ARG_integerQuals},
@@ -973,9 +960,7 @@ static void printLongUsage(ostream& out) {
 	"                     is specified, Bowtie gets the reads from stdin.\n"
 	"\n"
 	"  <hit>              File to write alignments to.  By default,\n"
-	"                     alignments are written to stdout (the console),\n"
-	"                     but a <hits> file must be specified if the\n"
-	"                     -b/--binout option is also specified.\n"
+	"                     alignments are written to stdout (the console)\n"
 	"\n"
 	" Options:\n"
 	" ========\n"
@@ -1641,7 +1626,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_RANGE: rangeMode = true; break;
 			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
-			case 'b': outType = OUTPUT_BINARY; break;
 			case 'S': outType = OUTPUT_SAM; break;
 			case ARG_REFOUT: refOut = true; break;
 			case ARG_NOOUT: outType = OUTPUT_NONE; break;
@@ -2861,7 +2845,6 @@ static void twoOrThreeMismatchSearchFull(
 		bool two = true)                /// true -> 2, false -> 3
 {
 	// Global initialization
-	assert(fullIndex);
 	assert(!ebwtFw.isInMemory());
 	assert(!ebwtBw.isInMemory());
 	{
@@ -3270,7 +3253,6 @@ static void seededQualCutoffSearchFull(
         vector<String<Dna5> >& os)      /// text strings, if available (empty otherwise)
 {
 	// Global intialization
-	assert(fullIndex);
 	assert_leq(seedMms, 3);
 
 	seededQualSearch_patsrc   = &_patsrc;
@@ -3399,10 +3381,7 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 	}
 }
 
-#define PASS_DUMP_FILES \
-	dumpAlFaBase, dumpAlFqBase, dumpAlBase, \
-	dumpUnalFaBase, dumpUnalFqBase, dumpUnalBase, \
-	dumpMaxFaBase, dumpMaxFqBase, dumpMaxBase
+#define PASS_DUMP_FILES dumpAlBase, dumpUnalBase, dumpMaxBase
 
 static string argstr;
 
@@ -3549,14 +3528,10 @@ static void driver(const char * type,
 				cerr << "Warning: ignoring alignment output file " << outfile << " because --refout was specified" << endl;
 			}
 		} else {
-			fout = new OutFileBuf(outfile.c_str(), outType == OUTPUT_BINARY);
+			fout = new OutFileBuf(outfile.c_str(), false);
 		}
 	} else {
-		if(outType == OUTPUT_BINARY && !refOut) {
-			cerr << "Error: Must specify an output file when output mode is binary" << endl;
-			throw 1;
-		}
-		else if(outType == OUTPUT_CHAIN) {
+		if(outType == OUTPUT_CHAIN && !refOut) {
 			cerr << "Error: Must specify an output file when output mode is --chain" << endl;
 			throw 1;
 		}
@@ -3701,21 +3676,6 @@ static void driver(const char * type,
 							PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, reportOpps);
-				}
-				break;
-			case OUTPUT_BINARY:
-				if(refOut) {
-					sink = new BinaryHitSink(
-							ebwt.nPat(), offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,
-							table, refnames);
-				} else {
-					sink = new BinaryHitSink(
-							fout, offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,
-							table, refnames);
 				}
 				break;
 			case OUTPUT_CHAIN:

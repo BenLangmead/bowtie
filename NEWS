@@ -41,8 +41,7 @@ Version 0.12.0 - November 25, 2009
      crash toward the end of execution with -p > 1.
    * bowtie -f now supports fasta files with reads split across
      multiple lines 
-   * New --suppress option allows user to suppress unwanted columns of
-     output
+   * New --suppress option suppresses unwanted columns of output
    * DEPRECATED: --concise
    * REMOVED: -z/--phased, -b/--binout, bowtie-maptool,
      bowtie-maqconvert

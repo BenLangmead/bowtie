@@ -322,25 +322,13 @@ protected:
 };
 
 #define DECL_HIT_DUMPS \
-	const std::string& dumpAlFa, \
-	const std::string& dumpAlFq, \
 	const std::string& dumpAl, \
-	const std::string& dumpUnalFa, \
-	const std::string& dumpUnalFq, \
 	const std::string& dumpUnal, \
-	const std::string& dumpMaxFa, \
-	const std::string& dumpMaxFq, \
 	const std::string& dumpMax
 
 #define INIT_HIT_DUMPS \
-	dumpAlFaBase_(dumpAlFa), \
-	dumpAlFqBase_(dumpAlFq), \
 	dumpAlBase_(dumpAl), \
-	dumpUnalFaBase_(dumpUnalFa), \
-	dumpUnalFqBase_(dumpUnalFq), \
 	dumpUnalBase_(dumpUnal), \
-	dumpMaxFaBase_(dumpMaxFa), \
-	dumpMaxFqBase_(dumpMaxFq), \
 	dumpMaxBase_(dumpMax)
 
 #define DECL_HIT_DUMPS2 \
@@ -350,14 +338,8 @@ protected:
 	std::vector<std::string>* refnames
 
 #define PASS_HIT_DUMPS \
-	dumpAlFa, \
-	dumpAlFq, \
 	dumpAl, \
-	dumpUnalFa, \
-	dumpUnalFq, \
 	dumpUnal, \
-	dumpMaxFa, \
-	dumpMaxFq, \
 	dumpMax
 
 #define PASS_HIT_DUMPS2 \
@@ -667,26 +649,6 @@ public:
 	void dumpAlign(PatternSourcePerThread& p) {
 		if(!dumpAlignFlag_) return;
 		if(!p.paired() || onePairFile_) {
-			// Dump unpaired read to the aligned-read FASTA file
-			if(!dumpAlFaBase_.empty()) {
-				MUTEX_LOCK(dumpAlignFaLock_);
-				if(dumpAlFa_ == NULL) {
-					dumpAlFa_ = openOf(dumpAlFaBase_, 0, ".fa");
-					assert(dumpAlFa_ != NULL);
-				}
-				printFastaRecord(*dumpAlFa_, p.bufa().name, p.bufa().patFw);
-				MUTEX_UNLOCK(dumpAlignFaLock_);
-			}
-			// Dump unpaired read to the aligned-read FASTQ file
-			if(!dumpAlFqBase_.empty()) {
-				MUTEX_LOCK(dumpAlignFqLock_);
-				if(dumpAlFq_ == NULL) {
-					dumpAlFq_ = openOf(dumpAlFqBase_, 0, ".fq");
-					assert(dumpAlFq_ != NULL);
-				}
-				printFastqRecord(*dumpAlFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				MUTEX_UNLOCK(dumpAlignFqLock_);
-			}
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
 				MUTEX_LOCK(dumpAlignLock_);
@@ -698,32 +660,6 @@ public:
 				MUTEX_UNLOCK(dumpAlignLock_);
 			}
 		} else {
-			// Dump paired-end read to the aligned-read FASTA file
-			if(!dumpAlFaBase_.empty()) {
-				MUTEX_LOCK(dumpAlignFaLockPE_);
-				if(dumpAlFa_1_ == NULL) {
-					assert(dumpAlFa_2_ == NULL);
-					dumpAlFa_1_ = openOf(dumpAlFaBase_, 1, ".fa");
-					dumpAlFa_2_ = openOf(dumpAlFaBase_, 2, ".fa");
-					assert(dumpAlFa_1_ != NULL && dumpAlFa_2_ != NULL);
-				}
-				printFastaRecord(*dumpAlFa_1_, p.bufa().name, p.bufa().patFw);
-				printFastaRecord(*dumpAlFa_2_, p.bufb().name, p.bufb().patFw);
-				MUTEX_UNLOCK(dumpAlignFaLockPE_);
-			}
-			// Dump paired-end read to the aligned-read FASTQ file
-			if(!dumpAlFqBase_.empty()) {
-				MUTEX_LOCK(dumpAlignFqLockPE_);
-				if(dumpAlFq_1_ == NULL) {
-					assert(dumpAlFq_2_ == NULL);
-					dumpAlFq_1_ = openOf(dumpAlFqBase_, 1, ".fq");
-					dumpAlFq_2_ = openOf(dumpAlFqBase_, 2, ".fq");
-					assert(dumpAlFq_1_ != NULL && dumpAlFq_2_ != NULL);
-				}
-				printFastqRecord(*dumpAlFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				printFastqRecord(*dumpAlFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
-				MUTEX_UNLOCK(dumpAlignFqLockPE_);
-			}
 			// Dump paired-end read to an aligned-read file (or pair of
 			// files) of the same format
 			if(!dumpAlBase_.empty()) {
@@ -749,24 +685,6 @@ public:
 	void dumpUnal(PatternSourcePerThread& p) {
 		if(!dumpUnalignFlag_) return;
 		if(!p.paired() || onePairFile_) {
-			if(!dumpUnalFaBase_.empty()) {
-				MUTEX_LOCK(dumpUnalFaLock_);
-				if(dumpUnalFa_ == NULL) {
-					dumpUnalFa_ = openOf(dumpUnalFaBase_, 0, ".fa");
-					assert(dumpUnalFa_ != NULL);
-				}
-				printFastaRecord(*dumpUnalFa_, p.bufa().name, p.bufa().patFw);
-				MUTEX_UNLOCK(dumpUnalFaLock_);
-			}
-			if(!dumpUnalFqBase_.empty()) {
-				MUTEX_LOCK(dumpUnalFqLock_);
-				if(dumpUnalFq_ == NULL) {
-					dumpUnalFq_ = openOf(dumpUnalFqBase_, 0, ".fq");
-					assert(dumpUnalFq_ != NULL);
-				}
-				printFastqRecord(*dumpUnalFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				MUTEX_UNLOCK(dumpUnalFqLock_);
-			}
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
 				MUTEX_LOCK(dumpUnalLock_);
@@ -778,30 +696,6 @@ public:
 				MUTEX_UNLOCK(dumpUnalLock_);
 			}
 		} else {
-			if(!dumpUnalFaBase_.empty()) {
-				MUTEX_LOCK(dumpUnalFaLockPE_);
-				if(dumpUnalFa_1_ == NULL) {
-					assert(dumpUnalFa_2_ == NULL);
-					dumpUnalFa_1_ = openOf(dumpUnalFaBase_, 1, ".fa");
-					dumpUnalFa_2_ = openOf(dumpUnalFaBase_, 2, ".fa");
-					assert(dumpUnalFa_1_ != NULL && dumpUnalFa_2_ != NULL);
-				}
-				printFastaRecord(*dumpUnalFa_1_, p.bufa().name, p.bufa().patFw);
-				printFastaRecord(*dumpUnalFa_2_, p.bufb().name, p.bufb().patFw);
-				MUTEX_UNLOCK(dumpUnalFaLockPE_);
-			}
-			if(!dumpUnalFqBase_.empty()) {
-				MUTEX_LOCK(dumpUnalFqLockPE_);
-				if(dumpUnalFq_1_ == NULL) {
-					assert(dumpUnalFq_2_ == NULL);
-					dumpUnalFq_1_ = openOf(dumpUnalFqBase_, 1, ".fq");
-					dumpUnalFq_2_ = openOf(dumpUnalFqBase_, 2, ".fq");
-					assert(dumpUnalFq_1_ != NULL && dumpUnalFq_2_ != NULL);
-				}
-				printFastqRecord(*dumpUnalFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				printFastqRecord(*dumpUnalFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
-				MUTEX_UNLOCK(dumpUnalFqLockPE_);
-			}
 			// Dump paired-end read to an unaligned-read file (or pair
 			// of files) of the same format
 			if(!dumpUnalBase_.empty()) {
@@ -830,24 +724,6 @@ public:
 			return;
 		}
 		if(!p.paired() || onePairFile_) {
-			if(!dumpMaxFaBase_.empty()) {
-				MUTEX_LOCK(dumpMaxFaLock_);
-				if(dumpMaxFa_ == NULL) {
-					dumpMaxFa_ = openOf(dumpMaxFaBase_, 0, ".fa");
-					assert(dumpMaxFa_ != NULL);
-				}
-				printFastaRecord(*dumpMaxFa_, p.bufa().name, p.bufa().patFw);
-				MUTEX_UNLOCK(dumpMaxFaLock_);
-			}
-			if(!dumpMaxFqBase_.empty()) {
-				MUTEX_LOCK(dumpMaxFqLock_);
-				if(dumpMaxFq_ == NULL) {
-		    		dumpMaxFq_ = openOf(dumpMaxFqBase_, 0, ".fq");
-		    		assert(dumpMaxFq_ != NULL);
-				}
-				printFastqRecord(*dumpMaxFq_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				MUTEX_UNLOCK(dumpMaxFqLock_);
-			}
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
 				MUTEX_LOCK(dumpMaxLock_);
@@ -859,37 +735,13 @@ public:
 				MUTEX_UNLOCK(dumpMaxLock_);
 			}
 		} else {
-			if(!dumpMaxFaBase_.empty()) {
-				MUTEX_LOCK(dumpMaxFaLockPE_);
-				if(dumpMaxFa_1_ == NULL) {
-					assert(dumpMaxFa_2_ == NULL);
-					dumpMaxFa_1_ = openOf(dumpMaxFaBase_, 1, ".fa");
-					dumpMaxFa_2_ = openOf(dumpMaxFaBase_, 2, ".fa");
-					assert(dumpMaxFa_1_ != NULL && dumpMaxFa_2_ != NULL);
-				}
-				printFastaRecord(*dumpMaxFa_1_, p.bufa().name, p.bufa().patFw);
-				printFastaRecord(*dumpMaxFa_2_, p.bufb().name, p.bufb().patFw);
-				MUTEX_UNLOCK(dumpMaxFaLockPE_);
-			}
-			if(!dumpMaxFqBase_.empty()) {
-				MUTEX_LOCK(dumpMaxFqLockPE_);
-				if(dumpMaxFq_1_ == NULL) {
-					assert(dumpMaxFq_2_ == NULL);
-					dumpMaxFq_1_ = openOf(dumpMaxFqBase_, 1, ".fq");
-					dumpMaxFq_2_ = openOf(dumpMaxFqBase_, 2, ".fq");
-					assert(dumpMaxFq_1_ != NULL && dumpMaxFq_2_ != NULL);
-				}
-				printFastqRecord(*dumpMaxFq_1_, p.bufa().name, p.bufa().patFw, p.bufa().qual);
-				printFastqRecord(*dumpMaxFq_2_, p.bufb().name, p.bufb().patFw, p.bufb().qual);
-				MUTEX_UNLOCK(dumpMaxFqLockPE_);
-			}
 			// Dump paired-end read to a maxed-out-read file (or pair
 			// of files) of the same format
 			if(!dumpMaxBase_.empty()) {
 				MUTEX_LOCK(dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
 					dumpMax_1_ = openOf(dumpMaxBase_, 1, "");
-		    		dumpMax_2_ = openOf(dumpMaxBase_, 2, "");
+					dumpMax_2_ = openOf(dumpMaxBase_, 2, "");
 					assert(dumpMax_1_ != NULL);
 					assert(dumpMax_2_ != NULL);
 				}
@@ -976,43 +828,19 @@ protected:
 	MUTEX_T             _mainlock;    /// pthreads mutexes for fields of this object
 
 	// Output filenames for dumping
-	std::string dumpAlFaBase_;
-	std::string dumpAlFqBase_;
 	std::string dumpAlBase_;
-	std::string dumpUnalFaBase_;
-	std::string dumpUnalFqBase_;
 	std::string dumpUnalBase_;
-	std::string dumpMaxFaBase_;
-	std::string dumpMaxFqBase_;
 	std::string dumpMaxBase_;
 
 	bool onePairFile_;
 
 	// Output streams for dumping
-	std::ofstream *dumpAlFa_;   // for single-ended reads
-	std::ofstream *dumpAlFa_1_; // for first mates
-	std::ofstream *dumpAlFa_2_; // for second mates
-	std::ofstream *dumpAlFq_;   // for single-ended reads
-	std::ofstream *dumpAlFq_1_; // for first mates
-	std::ofstream *dumpAlFq_2_; // for second mates
 	std::ofstream *dumpAl_;   // for single-ended reads
 	std::ofstream *dumpAl_1_; // for first mates
 	std::ofstream *dumpAl_2_; // for second mates
-	std::ofstream *dumpUnalFa_;   // for single-ended reads
-	std::ofstream *dumpUnalFa_1_; // for first mates
-	std::ofstream *dumpUnalFa_2_; // for second mates
-	std::ofstream *dumpUnalFq_;   // for single-ended reads
-	std::ofstream *dumpUnalFq_1_; // for first mates
-	std::ofstream *dumpUnalFq_2_; // for second mates
 	std::ofstream *dumpUnal_;   // for single-ended reads
 	std::ofstream *dumpUnal_1_; // for first mates
 	std::ofstream *dumpUnal_2_; // for second mates
-	std::ofstream *dumpMaxFa_;     // for single-ended reads
-	std::ofstream *dumpMaxFa_1_;   // for first mates
-	std::ofstream *dumpMaxFa_2_;   // for second mates
-	std::ofstream *dumpMaxFq_;     // for single-ended reads
-	std::ofstream *dumpMaxFq_1_;   // for first mates
-	std::ofstream *dumpMaxFq_2_;   // for second mates
 	std::ofstream *dumpMax_;     // for single-ended reads
 	std::ofstream *dumpMax_1_;   // for first mates
 	std::ofstream *dumpMax_2_;   // for second mates
@@ -1058,93 +886,39 @@ protected:
 	 * Initialize all the locks for dumping.
 	 */
 	void initDumps() {
-		dumpAlFa_     = dumpAlFa_1_   = dumpAlFa_2_   = NULL;
-		dumpAlFq_     = dumpAlFq_1_   = dumpAlFq_2_   = NULL;
 		dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
-		dumpUnalFa_   = dumpUnalFa_1_ = dumpUnalFa_2_ = NULL;
-		dumpUnalFq_   = dumpUnalFq_1_ = dumpUnalFq_2_ = NULL;
 		dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
-		dumpMaxFa_    = dumpMaxFa_1_  = dumpMaxFa_2_  = NULL;
-		dumpMaxFq_    = dumpMaxFq_1_  = dumpMaxFq_2_  = NULL;
 		dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
-		dumpAlignFlag_   = !dumpAlFaBase_.empty() ||
-		                   !dumpAlFqBase_.empty() ||
-		                   !dumpAlBase_.empty();
-		dumpUnalignFlag_ = !dumpUnalFaBase_.empty() ||
-		                   !dumpUnalFqBase_.empty() ||
-		                   !dumpUnalBase_.empty();
-		dumpMaxedFlag_   = !dumpMaxFaBase_.empty() ||
-		                   !dumpMaxFqBase_.empty() ||
-		                   !dumpMaxBase_.empty();
-		MUTEX_INIT(dumpAlignFaLock_);
-		MUTEX_INIT(dumpAlignFaLockPE_);
-		MUTEX_INIT(dumpAlignFqLock_);
-		MUTEX_INIT(dumpAlignFqLockPE_);
+		dumpAlignFlag_   = !dumpAlBase_.empty();
+		dumpUnalignFlag_ = !dumpUnalBase_.empty();
+		dumpMaxedFlag_   = !dumpMaxBase_.empty();
 		MUTEX_INIT(dumpAlignLock_);
 		MUTEX_INIT(dumpAlignLockPE_);
-		MUTEX_INIT(dumpUnalFaLock_);
-		MUTEX_INIT(dumpUnalFaLockPE_);
-		MUTEX_INIT(dumpUnalFqLock_);
-		MUTEX_INIT(dumpUnalFqLockPE_);
 		MUTEX_INIT(dumpUnalLock_);
 		MUTEX_INIT(dumpUnalLockPE_);
-		MUTEX_INIT(dumpMaxFaLock_);
-		MUTEX_INIT(dumpMaxFaLockPE_);
-		MUTEX_INIT(dumpMaxFqLock_);
-		MUTEX_INIT(dumpMaxFqLockPE_);
 		MUTEX_INIT(dumpMaxLock_);
 		MUTEX_INIT(dumpMaxLockPE_);
 	}
 
 	void destroyDumps() {
-		if(dumpAlFa_     != NULL) { dumpAlFa_->close();     delete dumpAlFa_; }
-		if(dumpAlFa_1_   != NULL) { dumpAlFa_1_->close();   delete dumpAlFa_1_; }
-		if(dumpAlFa_2_   != NULL) { dumpAlFa_2_->close();   delete dumpAlFa_2_; }
-		if(dumpAlFq_     != NULL) { dumpAlFq_->close();     delete dumpAlFq_; }
-		if(dumpAlFq_1_   != NULL) { dumpAlFq_1_->close();   delete dumpAlFq_1_; }
-		if(dumpAlFq_2_   != NULL) { dumpAlFq_2_->close();   delete dumpAlFq_2_; }
 		if(dumpAl_       != NULL) { dumpAl_->close();       delete dumpAl_; }
 		if(dumpAl_1_     != NULL) { dumpAl_1_->close();     delete dumpAl_1_; }
 		if(dumpAl_2_     != NULL) { dumpAl_2_->close();     delete dumpAl_2_; }
 
-		if(dumpUnalFa_   != NULL) { dumpUnalFa_->close();   delete dumpUnalFa_; }
-		if(dumpUnalFa_1_ != NULL) { dumpUnalFa_1_->close(); delete dumpUnalFa_1_; }
-		if(dumpUnalFa_2_ != NULL) { dumpUnalFa_2_->close(); delete dumpUnalFa_2_; }
-		if(dumpUnalFq_   != NULL) { dumpUnalFq_->close();   delete dumpUnalFq_; }
-		if(dumpUnalFq_1_ != NULL) { dumpUnalFq_1_->close(); delete dumpUnalFq_1_; }
-		if(dumpUnalFq_2_ != NULL) { dumpUnalFq_2_->close(); delete dumpUnalFq_2_; }
 		if(dumpUnal_     != NULL) { dumpUnal_->close();     delete dumpUnal_; }
 		if(dumpUnal_1_   != NULL) { dumpUnal_1_->close();   delete dumpUnal_1_; }
 		if(dumpUnal_2_   != NULL) { dumpUnal_2_->close();   delete dumpUnal_2_; }
 
-		if(dumpMaxFa_    != NULL) { dumpMaxFa_->close();    delete dumpMaxFa_; }
-		if(dumpMaxFa_1_  != NULL) { dumpMaxFa_1_->close();  delete dumpMaxFa_1_; }
-		if(dumpMaxFa_2_  != NULL) { dumpMaxFa_2_->close();  delete dumpMaxFa_2_; }
-		if(dumpMaxFq_    != NULL) { dumpMaxFq_->close();    delete dumpMaxFq_; }
-		if(dumpMaxFq_1_  != NULL) { dumpMaxFq_1_->close();  delete dumpMaxFq_1_; }
-		if(dumpMaxFq_2_  != NULL) { dumpMaxFq_2_->close();  delete dumpMaxFq_2_; }
 		if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
 		if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
 		if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
 	}
 
 	// Locks for dumping
-	MUTEX_T dumpAlignFaLock_;
-	MUTEX_T dumpAlignFaLockPE_; // _1 and _2
-	MUTEX_T dumpAlignFqLock_;
-	MUTEX_T dumpAlignFqLockPE_; // _1 and _2
 	MUTEX_T dumpAlignLock_;
 	MUTEX_T dumpAlignLockPE_; // _1 and _2
-	MUTEX_T dumpUnalFaLock_;
-	MUTEX_T dumpUnalFaLockPE_; // _1 and _2
-	MUTEX_T dumpUnalFqLock_;
-	MUTEX_T dumpUnalFqLockPE_; // _1 and _2
 	MUTEX_T dumpUnalLock_;
 	MUTEX_T dumpUnalLockPE_; // _1 and _2
-	MUTEX_T dumpMaxFaLock_;
-	MUTEX_T dumpMaxFaLockPE_;   // _1 and _2
-	MUTEX_T dumpMaxFqLock_;
-	MUTEX_T dumpMaxFqLockPE_;   // _1 and _2
 	MUTEX_T dumpMaxLock_;
 	MUTEX_T dumpMaxLockPE_;   // _1 and _2
 
@@ -2683,257 +2457,6 @@ public:
 	{ }
 
 	/**
-	 * Given a line of output from the VerboseHitSink, parse it into a
-	 * Hit object and return the object (by value).  If the reference
-	 * and/or read are identified in the output by name, then the patid
-	 * and/or h.first fields may be invalid.  TODO: load the id/name
-	 * mapping from the .ebwt file so that we can handle either case.
-	 */
-	static bool readHit(Hit& h,
-	                    istream& in,
-	                    vector<string>* refnames,
-	                    bool verbose = false)
-	{
-		char buf[4096];
-		if(in.eof()) {
-			return false;
-		}
-		if(in.bad()) {
-			cerr << "Alignment file set \"bad\" bit" << endl;
-			throw 1;
-		}
-		if(in.fail()) {
-			cerr << "A line from the alignment file was longer than 4K" << endl;
-			throw 1;
-		}
-		in.getline(buf, 4096);
-		size_t len = in.gcount();
-		if(len < 11) {
-			// Can't possibly be a well-formed line if it's this short
-			return false;
-		}
-
-		// Push cur pointer past partition label, if it exists
-		char *cur = buf;
-		bool sawSpace = true;
-		while(*cur != ' ') {
-			if(*cur == '\t') {
-				sawSpace = false;
-				break;
-			}
-			cur++;
-			assert_lt((size_t)(cur - buf), len);
-		}
-		if(sawSpace) {
-			// Keep moving to past the next tab
-			while(*cur != '\t') cur++;
-			assert_eq('\t', *cur);
-			cur++;
-		} else {
-			cur = buf; // rewind
-		}
-
-		// Parse read name and check whether it's totally numeric
-		bool readNameIsIdx = true;
-		h.patId = 0;
-		char *readName = cur;
-		while(*cur != '\t') {
-			if(*cur < '0' || *cur > '9') {
-				readNameIsIdx = false;
-			} else if(readNameIsIdx) {
-				h.patId *= 10;
-				h.patId += (*cur - '0');
-			}
-			assert_lt((size_t)(cur - readName), len);
-			cur++;
-		}
-		*cur = '\0';
-		size_t readNameLen = cur - readName;
-		cur++;
-
-		// Copy read name into h.patName
-		seqan::resize(h.patName, readNameLen);
-		char *patName = (char *)h.patName.data_begin;
-		for(size_t i = 0; i < readNameLen; i++) {
-			patName[i] = readName[i];
-		}
-		h.mate = 0;
-		if(readNameLen >= 2 && patName[readNameLen-2] == '/') {
-			if     (patName[readNameLen-1] == '1') h.mate = 1;
-			else if(patName[readNameLen-1] == '2') h.mate = 2;
-		}
-
-		// Parse orientation
-		assert(*cur == '+' || *cur == '-');
-		h.fw = (*cur == '+');
-		cur++;
-		assert_eq('\t', *cur);
-		cur++;
-
-		// Parse reference sequence id
-		bool refIsIdx = true;
-		uint32_t refIdx = 0;
-		char *refName = cur;
-		while(*cur != '\t') {
-			if(*cur < '0' || *cur > '9') {
-				refIsIdx = false;
-			} else if(readNameIsIdx) {
-				refIdx *= 10;
-				refIdx += (*cur - '0');
-			}
-			assert_lt((size_t)(cur - readName), len);
-			cur++;
-		}
-		*cur = '\0';
-		//size_t refNameLen = (size_t)(cur - refName);
-		cur++;
-
-		if(!refIsIdx && refnames != NULL) {
-			bool found = false;
-			for(size_t i = 0; i < refnames->size(); i++) {
-				if((*refnames)[i] == refName) {
-					found = true;
-					refIdx = i;
-					break;
-				}
-			}
-			if(!found) {
-				cerr << "Could not find an id to map reference name \"" << refName << "\" to." << endl
-				     << "Try using -n to specify the index used to generate the alignments." << endl;
-				throw 1;
-			}
-		}
-
-		// Parse reference sequence offset
-		uint32_t refOff = 0;
-		ASSERT_ONLY(char *refOffStr = cur);
-		while(*cur != '\t') {
-			if(*cur < '0' || *cur > '9') {
-				assert(false);
-			}
-			refOff *= 10;
-			refOff += (*cur - '0');
-			assert_leq((size_t)(cur - refOffStr), len);
-			cur++;
-		}
-		*cur = '\0'; // terminate reference-offset sequence
-		//size_t refOffLen = (size_t)(cur - refOffStr);
-		cur++;
-
-		// Fill in h.h now that we have refIdx and refOff
-		h.h = make_pair<uint32_t>(refIdx, refOff);
-
-		// Parse read sequence
-		char *readSeq = cur;
-		while(*cur != '\t') {
-			cur++;
-			assert_leq((size_t)(cur - refOffStr), len);
-		}
-		*cur = '\0'; // terminate read sequence
-		size_t readSeqLen = cur - readSeq;
-		assert_gt(readSeqLen, 0);
-		cur++;
-
-		// Copy read sequence into h.patSeq
-		seqan::resize(h.patSeq, readSeqLen);
-		uint8_t *readSeqDest = (uint8_t *)h.patSeq.data_begin;
-		for(size_t i = 0; i < readSeqLen; i++) {
-			assert_neq(0, dna4Cat[(int)readSeq[i]]);
-			readSeqDest[i] = charToDna5[(int)readSeq[i]];
-		}
-
-		// Parse read qualities
-		char *readQuals = cur;
-		while(*cur != '\t') {
-			cur++;
-			assert_leq((size_t)(cur - refOffStr), len);
-		}
-		*cur = '\0'; // terminate read sequence
-		size_t readQualsLen = cur - readQuals;
-		assert_gt(readQualsLen, 0);
-		cur++;
-		assert_eq(readSeqLen, readQualsLen);
-
-		// Copy quality values into h.quals
-		seqan::resize(h.quals, readSeqLen);
-		char *readQualsDest = (char *)h.quals.data_begin;
-		for(size_t i = 0; i < readQualsLen; i++) {
-			assert_geq(readQuals[i], 33);
-			readQualsDest[i] = readQuals[i];
-		}
-
-		// Parse # other hits at this stratum (an underestimate)
-		ASSERT_ONLY(char *omsStr = cur);
-		h.oms = 0;
-		// (the oms field is always followed by a tab, even when the
-		// (following) mismatch field is empty
-		while(*cur != '\t') {
-			// Must be a number
-			assert(*cur >= '0' && *cur <= '9');
-			h.oms *= 10;
-			h.oms += (*cur - '0');
-			cur++;
-			assert_leq((size_t)(cur - omsStr), len);
-		}
-		*cur = '\0'; // terminate read sequence
-		ASSERT_ONLY(size_t omsLen = cur - omsStr);
-		assert_gt(omsLen, 0);
-		cur++;
-
-		// Parse the # other hits at this stratum estimate
-		h.refcs.resize(readSeqLen, 0);
-		assert_eq(readSeqLen, h.refcs.size());
-
-		// Must consider wacky line breaks not handled by getline
-		while(*cur == '\n' || *cur == '\r') {
-			cur++;
-		}
-		// (h.mm is fixed-width so we don't need to resize it)
-		if(*cur == '\0') {
-			return true;
-		}
-		assert(*cur >= '0' && *cur <= '9');
-		while(true) {
-			uint32_t i = 0;
-			ASSERT_ONLY(char *offStr = cur);
-			while(*cur != ':') {
-				// Must be a number
-				assert(*cur >= '0' && *cur <= '9');
-				i *= 10;
-				i += (*cur - '0');
-				cur++;
-				assert_leq((size_t)(cur - offStr), len);
-			}
-			assert_lt(i, readSeqLen);
-			cur++; // now points to reference base
-			assert_eq(1, (int)dna4Cat[(int)(*cur)]);
-			ASSERT_ONLY(int rc = *cur);
-			h.refcs[i] = *cur;
-			h.mms.set(i);
-			cur++; assert_eq('>', *cur);
-			cur++;
-			assert_gt((int)dna4Cat[(int)(*cur)], 0);
-			assert_neq((int)dna4Cat[(int)(*cur)], rc);
-			if(h.fw) {
-				assert_eq("ACGTN"[(int)h.patSeq[i]], *cur);
-			} else {
-				assert_eq("ACGTN"[(int)h.patSeq[readSeqLen - i - 1]], *cur);
-			}
-			cur++;
-			// Must consider wacky line breaks not handled by getline
-			while(*cur == '\n' || *cur == '\r') {
-				cur++;
-			}
-			if(*cur == '\0') {
-				break;
-			}
-			assert_eq(',', *cur);
-			cur++;
-		}
-		return true;
-	}
-
-	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
 	static void append(ostream& ss,
@@ -3178,292 +2701,6 @@ private:
 /**
  * Sink for outputting alignments in a binary format.
  */
-class BinaryHitSink : public HitSink {
-public:
-
-	/**
-	 * Construct a single-stream BinaryHitSink (default)
-	 */
-	BinaryHitSink(OutFileBuf* out,
-	              int offBase,
-	              DECL_HIT_DUMPS2) :
-	HitSink(out, PASS_HIT_DUMPS2),
-	offBase_(offBase)
-	{
-		ssmode_ |= ios_base::binary;
-	}
-
-	/**
-	 * Construct a multi-stream BinaryHitSink with one stream per
-	 * reference string (see --refout)
-	 */
-	BinaryHitSink(size_t numOuts,
-	              int offBase,
-	              DECL_HIT_DUMPS2) :
-	HitSink(numOuts, PASS_HIT_DUMPS2),
-	offBase_(offBase)
-	{
-		ssmode_ |= ios_base::binary;
-	}
-
-	/**
-	 * Append a binary alignment to the output stream corresponding to
-	 * the reference sequence involved.
-	 */
-	static void append(ostream& o,
-					   const Hit& h,
-					   const vector<string>* refnames,
-					   int offBase)
-	{
-		// true iff we're going to print the reference sequence name
-		bool refName = refnames != NULL &&
-		                h.h.first < refnames->size();
-		uint16_t pnamelen = (uint16_t)length(h.patName);
-		// Write read name
-		o.write((const char *)&pnamelen, 2);
-		o.write(begin(h.patName), pnamelen);
-		// Write fw/refname flags
-		assert_lt(h.mate, 3);
-		uint8_t flags = (h.fw ? 1 : 0) | (refName? 2 : 0) | (h.mate << 2);
-		o.write((const char *)&flags, 1);
-		if(refName) {
-			// Write reference name as string
-			uint16_t rnamelen = (uint16_t)(*refnames)[h.h.first].length();
-			o.write((const char *)&rnamelen, 2);
-			o.write((*refnames)[h.h.first].c_str(), rnamelen);
-		} else {
-			// Write reference name as index into global reference name
-			// list
-			o.write((const char *)&h.h.first, 4);
-		}
-		// Write reference offset
-		uint32_t offset = h.h.second + offBase;
-		o.write((const char *)&offset, 4);
-		// Write pattern sequence
-		uint16_t plen = (uint16_t)length(h.patSeq);
-		assert_lt(plen, 1024);
-		o.write((const char *)&plen, 2);
-		for(size_t i = 0; i < plen; i += 2) {
-			uint8_t twoChrs = (uint8_t)h.patSeq[i];
-			if(i+1 < plen) {
-				twoChrs |= ((uint8_t)h.patSeq[i+1] << 4);
-			}
-			o.write((const char *)&twoChrs, 1);
-		}
-		// Write quals sequence
-		uint16_t qlen = (uint16_t)length(h.quals);
-		assert_eq(plen, qlen);
-		o.write(begin(h.quals), qlen);
-		// Write oms
-		o.write((const char *)&h.oms, 4);
-		// Write # mismatches
-		uint8_t numMms = h.mms.count();
-		o.write((const char *)&numMms, 1);
-		// Output mismatches
-		size_t c = 0;
-		for (uint8_t i = 0; i < h.mms.size(); ++ i) {
-			if (h.mms.test(i)) {
-				o.write((const char *)&i, 1);
-				assert_gt(h.refcs.size(), i);
-				assert_eq(1, dna4Cat[(int)h.refcs[i]]);
-				uint8_t refChar = charToDna5[(int)h.refcs[i]];
-				assert_leq(refChar, 4);
-				uint8_t qryChar = (h.fw ? (int)h.patSeq[i] :
-				                          (int)h.patSeq[length(h.patSeq)-i-1]);
-				assert_leq(refChar, 4);
-				assert_neq(refChar, qryChar);
-				uint8_t both = refChar | (qryChar << 4);
-				o.write((const char *)&both, 1);
-				c++;
-			}
-		}
-	}
-
-	/**
-	 * Append a binary alignment to the output stream corresponding to
-	 * the reference sequence involved.
-	 */
-	virtual void append(ostream& o, const Hit& h) {
-		BinaryHitSink::append(o, h, this->_refnames, this->offBase_);
-	}
-
-	/**
-	 * Read a binary-encoded hit (written by append() above) from an
-	 * input stream.
-	 */
-	static bool readHit(Hit& h,
-	                    istream& in,
-	                    vector<string>* refnames,
-	                    bool verbose = false)
-	{
-		if(!in.good()) return false;
-		uint16_t pnamelen;
-		in.read((char *)&pnamelen, 2);
-		if(in.eof()) return false;
-		if(verbose) cout << "name(" << pnamelen << ")=\"";
-		seqan::resize(h.patName, pnamelen);
-		in.read((char*)begin(h.patName), pnamelen);
-		if(verbose) cout << h.patName << "\", ";
-		// Parse read name
-		h.patId = 0;
-		for(int i = 0; i < pnamelen; i++) {
-			// Skip over mate designation
-			if(h.patName[i] == '/' && i == pnamelen-2) break;
-			// Check whether we can continue interpreting this as a
-			// number
-			if(h.patName[i] < '0' || h.patName[i] > '9') {
-				h.patId = 0;
-				break;
-			}
-			h.patId *= 10;
-			h.patId += (h.patName[i] - '0');
-		}
-		if(verbose) cout << "patid(" << h.patId << ")=\"";
-		// Write fw/refname flags
-		uint8_t flags;
-		in.read((char *)&flags, 1);
-		h.fw         = ((flags & 1) != 0);
-		bool refName = ((flags & 2) != 0);
-		h.mate       = (flags >> 2) & 3;
-		if(verbose) cout << "fw=" << (h.fw ? "true":"false") << ", ";
-		if(refName) {
-			// Read and ignore reference name
-			uint16_t rnamelen;
-			char buf[2048];
-			in.read((char *)&rnamelen, 2);
-			in.read(buf, rnamelen);
-			buf[rnamelen] = '\0';
-			if(verbose) cout << "refname=\"" << buf << "\", ";
-			string name(buf);
-			// Add to the refnames vector; this isn't efficient - if
-			// this ends up being a problem, we should use a map
-			// instead of a vector
-			if(refnames != NULL) {
-				bool found = true;
-				h.h.first = 0;
-				for(int i = 0; i < rnamelen; i++) {
-					if(buf[i] < '0' || buf[i] > '9') {
-						h.h.first = 0;
-						found = false;
-						break;
-					}
-					h.h.first *= 10;
-					h.h.first += (buf[i] - '0');
-				}
-				if(!found) {
-					for(size_t i = 0; i < refnames->size(); i++) {
-						if((*refnames)[i] == name) {
-							h.h.first = i;
-							found = true;
-							break;
-						}
-					}
-					if(!found) {
-						h.h.first = refnames->size();
-						refnames->push_back(name);
-					}
-				}
-			} else {
-				h.h.first = 0;
-				for(int i = 0; i < rnamelen; i++) {
-					if(buf[i] < '0' || buf[i] > '9') {
-						h.h.first = 0;
-						break;
-					}
-					h.h.first *= 10;
-					h.h.first += (buf[i] - '0');
-				}
-			}
-			if(verbose) cout << "refidx=\"" << h.h.first << "\", ";
-		} else {
-			// Read reference id as index into global reference name list
-			in.read((char*)&h.h.first, 4);
-			if(verbose) cout << "refidx=" << h.h.first << ", ";
-		}
-		// Read reference offset
-		in.read((char*)&h.h.second, 4);
-		if(verbose) cout << "refoff=" << h.h.second << ", ";
-		// Read pattern length
-		uint16_t plen;
-		in.read((char*)&plen, 2);
-		if(verbose) cout << "plen=" << plen << ", ";
-		h.refcs.resize(plen, 0);
-		assert_gt(plen, 1);
-		assert_lt(plen, 1024);
-		// Read pattern sequence
-		seqan::resize(h.patSeq, plen);
-		for(size_t i = 0; i < plen; i += 2) {
-			uint8_t twoChars;
-			in.read((char *)&twoChars, 1);
-			assert_lt((twoChars & 15), 5);
-			assert_lt((twoChars >> 4), 5);
-			h.patSeq[i] = (twoChars & 15);
-			if(i+1 < plen) {
-				h.patSeq[i+1] = (twoChars >> 4);
-			}
-		}
-		if(verbose) cout << "pat=\"" << h.patSeq << "\", ";
-		// Read quals sequence
-		uint16_t qlen = plen;
-		seqan::resize(h.quals, qlen);
-		in.read((char*)begin(h.quals), qlen);
-		if(verbose) cout << "quals=\"" << h.quals << "\", ";
-#ifndef NDEBUG
-		for(size_t i = 0; i < length(h.quals); i++) {
-			assert_geq(h.quals[i], 33);
-			assert_leq(h.quals[i], 126);
-		}
-#endif
-		// Read oms
-		in.read((char *)&h.oms, 4);
-		if(verbose) cout << "oms=" << h.oms << ", ";
-		// Read # mismatches
-		uint8_t numMms;
-		in.read((char *)&numMms, 1);
-		if(verbose) cout << "nummms=" << ((int)numMms) << ", ";
-		// Read mismatches
-		for(uint8_t i = 0; i < numMms; i++) {
-			uint8_t ii;
-			// Read the read offset (from 5' end)
-			in.read((char*)&ii, 1);
-			h.mms.set(ii);
-			uint8_t both;
-			// Read the reference and query characters involved
-			in.read((char*)&both, 1);
-			uint8_t refChar = both & 15;
-			uint8_t qryChar = both >> 4;
-			assert_neq(refChar, qryChar);
-			h.refcs[ii] = "ACGTN"[refChar];
-			if(verbose) cout << ((int)ii) << ":" << "ACGTN"[refChar] << ">" << "ACGTN"[qryChar] << ", ";
-		}
-		if(verbose) cout << endl;
-		// Done
-		return true;
-	}
-
-protected:
-
-	/**
-	 * Report a single hit to the appropriate output stream.
-	 */
-	virtual void reportHit(const Hit& h) {
-		HitSink::reportHit(h);
-		ostringstream ss;
-		append(ss, h);
-		lock(h.h.first);
-		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
-	}
-
-private:
-	int offBase_;          /// Add this to reference offsets before outputting.
-	                       /// (An easy way to make things 1-based instead of
-	                       /// 0-based)
-};
-
-/**
- * Sink for outputting alignments in a binary format.
- */
 class ChainingHitSink : public HitSink {
 public:
 
@@ -3510,7 +2747,7 @@ protected:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", "", "", "", "", "", "", false, NULL) { }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, NULL) { }
 	virtual void append(ostream& o, const Hit& h) { }
 };
 
