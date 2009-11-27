@@ -480,9 +480,12 @@ Usage:
 
     bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
 
-<table CELLSPACING=15 VALIGN=top><tr><td>
+Main arguments
+--------------
 
-&lt;ebwt>
+<table><tr><td>
+
+    <ebwt>
 
 </td><td>
 
@@ -498,7 +501,7 @@ Usage:
 
 </td></tr><tr><td>
 
-&lt;m1>
+    <m1>
 
 </td><td>
 
@@ -516,7 +519,7 @@ Usage:
 
 </td></tr><tr><td>
 
-&lt;m2>
+    <m2>
 
 </td><td>
 
@@ -534,7 +537,7 @@ Usage:
 
 </td></tr><tr><td>
 
-&lt;r>
+    <r>
 
 </td><td>
 
@@ -556,7 +559,7 @@ Usage:
 
 </td></tr><tr><td>
 
-&lt;s>
+    <s>
 
 </td><td>
 
@@ -572,7 +575,7 @@ Usage:
 
 </td></tr><tr><td>
 
-&lt;hit>
+    <hit>
 
 </td><td>
 
@@ -581,46 +584,97 @@ Usage:
 
 </td></tr></table>
 
- Options:
- ========
+Options
+-------
 
-   Input:
-   ------
+### Input
 
-  -q                 The query input files (specified either as <m1>
-                     and <m2>, or as <s>) are FASTQ files (usually
-                     having extension .fq or .fastq).  This is the
-                     default.  See also: --solexa-quals and
-                     --integer-quals.
+<table><tr><td>
 
-  -f                 The query input files (specified either as <m1>
-                     and <m2>, or as <s>) are FASTA files (usually
-                     having extension .fa, .mfa, .fna or similar).  All
-                     quality values are assumed to be 40 on the Phred
-                     scale.
+    -q
 
-  -r                 The query input files (specified either as <m1>
-                     and <m2>, or as <s>) are Raw files: one sequence
-                     per line, without quality values or names.  All
-                     quality values are assumed to be 40 on the Phred
-                     scale.
+</td><td>
 
-  -c                 The query sequences are given on command line.
-                     I.e. <m1>, <m2> and <singles> are comma-separated
-                     lists of reads rather than lists of read files.
+The query input files (specified either as `&lt;m1>`
+and `&lt;m2>`, or as `&lt;s>`) are FASTQ files (usually
+having extension .fq or .fastq).  This is the
+default.  See also: `--solexa-quals` and
+`--integer-quals`.
 
-  -s/--skip <int>    Skip (i.e. do not align) the first <int> reads or
-                     pairs in the input.
+</td></tr><tr><td>
 
-  -u/--qupto <int>   Only align the first <int> reads or read pairs
-                     from the input (after the -s/--skip reads or pairs
-                     have been skipped).  Default: no limit.
+    -f
 
-  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of
-                     each read before alignment (default: 0).
+</td><td>
 
-  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of
-                     each read before alignment (default: 0).
+The query input files (specified either as `&lt;m1>`
+and `&lt;m2>`, or as `&lt;s>`) are FASTA files (usually
+having extension `.fa`, `.mfa`, `.fna` or similar).  All
+quality values are assumed to be 40 on the Phred
+scale.
+
+</td></tr><tr><td>
+
+    -r
+
+</td><td>
+
+The query input files (specified either as `&lt;m1>`
+and `&lt;m2>`, or as `&lt;s>`) are Raw files: one sequence
+per line, without quality values or names.  All
+quality values are assumed to be 40 on the [Phred
+quality] scale.
+
+[Phred quality]: http://en.wikipedia.org/wiki/FASTQ_format#Variations
+
+</td></tr><tr><td>
+
+    -c
+
+</td><td>
+
+The query sequences are given on command line.
+I.e.` &lt;m1>`, `&lt;m2>` and `&lt;singles>` are comma-separated
+lists of reads rather than lists of read files.
+
+</td></tr><tr><td>
+
+    --s/--skip <int>
+
+</td><td>
+
+Skip (i.e. do not align) the first `&lt;int>` reads or
+pairs in the input.
+
+</td></tr><tr><td>
+
+    -u/--qupto <int>
+
+</td><td>
+
+Only align the first` &lt;int>` reads or read pairs
+from the input (after the `-s/--skip` reads or pairs
+have been skipped).  Default: no limit.
+
+</td></tr><tr><td>
+
+    -5/--trim5 <int>
+
+</td><td>
+
+Trim `&lt;int>` bases from high-quality (left) end of
+each read before alignment (default: 0).
+
+</td></tr><tr><td>
+
+    -3/--trim3 <int>
+
+</td><td>
+
+Trim `&lt;int>` bases from low-quality (right) end of
+each read before alignment (default: 0).
+
+</td></tr></table>
 
   --phred33-quals    Input qualities are ASCII chars equal to the Phred
                      quality plus 33.  Default: on.
