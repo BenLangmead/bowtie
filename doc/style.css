@@ -103,22 +103,24 @@ body {
 #footer .rside { float: right; display: inline; padding: 5px; text-align: right}
 
 #toc {
-	margin-right: 15px;
+	margin: 15px 15px 15px 10px;
 }
 #toc ol { list-style: roman }
 #toc ul { padding: 0 0 0 20px }
 
 a   { color: #0066B3; background: inherit; text-decoration: none }
-h1  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
-h2  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
-h3  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
-p   { margin: 0 0 15px 15px; color: #444 }
-ul  { margin: 0 0 15px 15px; padding: 0; margin: 0; list-style-type: none }
-pre { margin: 0 8px 15px 25px }
-li  { margin: 0 0 15px 15px; color: #444 }
+h1  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
+h2  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+h3  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+p   { margin: 0 15px 10px 15px; color: #444 }
+ul  { margin: 0 15px 10px 15px; padding: 0; margin: 0; list-style-type: none }
+pre { margin: 0 15px 15px 25px }
+li  { margin: 0 15px 1px 15px; color: #444 }
 ol  { margin-left: 24px;
       padding-left 24px;
       list-style: decimal }
+td  { vertical-align: top; }
+
 /* blockquote { margin-left: 35px; font-family: "Courier New", Courier, monospace; } */
 blockquote { margin-left: 35px; font-family: "Courier New", Courier; }
 /* tt { font: .8em; font-family: "Courier New", Courier, monospace; } */

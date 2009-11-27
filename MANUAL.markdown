@@ -595,8 +595,8 @@ Options
 
 </td><td>
 
-The query input files (specified either as `&lt;m1>`
-and `&lt;m2>`, or as `&lt;s>`) are FASTQ files (usually
+The query input files (specified either as `<m1>`
+and `<m2>`, or as `<s>`) are FASTQ files (usually
 having extension .fq or .fastq).  This is the
 default.  See also: `--solexa-quals` and
 `--integer-quals`.
@@ -607,8 +607,8 @@ default.  See also: `--solexa-quals` and
 
 </td><td>
 
-The query input files (specified either as `&lt;m1>`
-and `&lt;m2>`, or as `&lt;s>`) are FASTA files (usually
+The query input files (specified either as `<m1>`
+and `<m2>`, or as `<s>`) are FASTA files (usually
 having extension `.fa`, `.mfa`, `.fna` or similar).  All
 quality values are assumed to be 40 on the Phred
 scale.
@@ -619,8 +619,8 @@ scale.
 
 </td><td>
 
-The query input files (specified either as `&lt;m1>`
-and `&lt;m2>`, or as `&lt;s>`) are Raw files: one sequence
+The query input files (specified either as `<m1>`
+and `<m2>`, or as `<s>`) are Raw files: one sequence
 per line, without quality values or names.  All
 quality values are assumed to be 40 on the [Phred
 quality] scale.
@@ -634,7 +634,7 @@ quality] scale.
 </td><td>
 
 The query sequences are given on command line.
-I.e.` &lt;m1>`, `&lt;m2>` and `&lt;singles>` are comma-separated
+I.e.` &lt;m1>`, `<m2>` and `<singles>` are comma-separated
 lists of reads rather than lists of read files.
 
 </td></tr><tr><td>
@@ -643,7 +643,7 @@ lists of reads rather than lists of read files.
 
 </td><td>
 
-Skip (i.e. do not align) the first `&lt;int>` reads or
+Skip (i.e. do not align) the first `<int>` reads or
 pairs in the input.
 
 </td></tr><tr><td>
@@ -662,7 +662,7 @@ have been skipped).  Default: no limit.
 
 </td><td>
 
-Trim `&lt;int>` bases from high-quality (left) end of
+Trim `<int>` bases from high-quality (left) end of
 each read before alignment (default: 0).
 
 </td></tr><tr><td>
@@ -671,7 +671,7 @@ each read before alignment (default: 0).
 
 </td><td>
 
-Trim `&lt;int>` bases from low-quality (right) end of
+Trim `<int>` bases from low-quality (right) end of
 each read before alignment (default: 0).
 
 </td></tr></table>
