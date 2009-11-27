@@ -102,18 +102,23 @@ body {
 #footer p  { padding: 5px }
 #footer .rside { float: right; display: inline; padding: 5px; text-align: right}
 
+#toc {
+	margin-right: 15px;
+}
 #toc ol { list-style: roman }
+#toc ul { padding: 0 0 0 20px }
 
-a  { color: #0066B3; background: inherit; text-decoration: none }
-h1 { padding: 15px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
-h2 { padding: 15px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
-h3 { padding: 15px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
-p  { margin-top: 10px; color: #444 }
-ul { padding: 0; margin: 0; list-style-type: none }
-li {  }
-ol { margin-left: 24px;
-     padding-left 24px;
-     list-style: decimal }
+a   { color: #0066B3; background: inherit; text-decoration: none }
+h1  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
+h2  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+h3  { margin: 0 0 15px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+p   { margin: 0 0 15px 15px; color: #444 }
+ul  { margin: 0 0 15px 15px; padding: 0; margin: 0; list-style-type: none }
+pre { margin: 0 8px 15px 25px }
+li  { margin: 0 0 15px 15px; color: #444 }
+ol  { margin-left: 24px;
+      padding-left 24px;
+      list-style: decimal }
 /* blockquote { margin-left: 35px; font-family: "Courier New", Courier, monospace; } */
 blockquote { margin-left: 35px; font-family: "Courier New", Courier; }
 /* tt { font: .8em; font-family: "Courier New", Courier, monospace; } */

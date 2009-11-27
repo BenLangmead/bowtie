@@ -166,9 +166,9 @@ strand.
 Gapped alignments are not currently supported, but support is planned
 for a future release.
 
-[the -n alignment mode]: [#the--n-alignment-mode]
-[the -v alignment mode]: [#the--v-alignment-mode]
-[High Performance Tips]: [#high-performance-tips]
+[the -n alignment mode]: #the--n-alignment-mode
+[the -v alignment mode]: #the--v-alignment-mode
+[High Performance Tips]: #high-performance-tips
 [Maq]:                   http://maq.sf.net
 
 The `-n` alignment mode
@@ -480,7 +480,7 @@ Usage:
 
     bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
 
-<table CELLSPACING=15><tr><td>
+<table CELLSPACING=15 VALIGN=top><tr><td>
 
 &lt;ebwt>
 
@@ -509,7 +509,7 @@ Usage:
    `-c` is specified, this might be
    `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
    this option must correspond file-for-file and
-   read-for-read with those specified in <m2>.  Reads
+   read-for-read with those specified in &lt;m2>.  Reads
    may be a mix of different lengths.  If `-` is
    specified, `bowtie` will read the #1 mates from
    the "standard in" filehandle.
@@ -527,7 +527,7 @@ Usage:
    `-c` is specified, this might be
    `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
    this option must correspond file-for-file and
-   read-for-read with those specified in <m1>.  Reads
+   read-for-read with those specified in &lt;m1>.  Reads
    may be a mix of different lengths.  If `-` is
    specified, `bowtie` will read the #2 mates from
    the "standard in" filehandle.
