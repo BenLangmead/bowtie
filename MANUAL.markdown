@@ -1002,157 +1002,238 @@ regardless of whether they fall into multiple strata.  When
 
 <table><tr><td>
 
-  -S/--sam           Print alignments in SAM format.  See the SAM
-                     format spec (http://samtools.sf.net/) and the "SAM
-                     output" section of the manual for details.  To
-                     suppress all SAM headers, use --sam-nohead.  To
-                     suppress just the @SQ headers (e.g. if the
-                     alignment is against a very large number of
-                     reference sequences), use --sam-nosq.  Bowtie
-                     does not write BAM files directly, but SAM output
-                     can be converted to BAM on the fly by piping
-                     Bowtie's output to 'samtools view'.  -S/--sam is
-                     not compatible with --refout.
+    -S/--sam
 
-  --concise          Print alignments in a concise format. Each line
-                     has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',
-                     where read_idx is the index of the read mapped,
-                     {-|+} is the orientation of the read, ref_idx is
-                     the index of the reference sequence aligned to,
-                     ref_off is the offset into the reference sequence,
-                     and mms is the number of mismatches in the
-                     alignment.  Each alignment appears on a separate
-                     line.
+</td><td>
 
-  -t/--time          Print the amount of wall-clock time taken by each
-                     phase.
+Print alignments in [SAM] format.  See the [SAM output] section of the
+manual for details.  To suppress all SAM headers, use `--sam-nohead`.
+To suppress just the `@SQ` headers (e.g. if the alignment is against a
+very large number of reference sequences), use `--sam-nosq`.  `bowtie`
+does not write BAM files directly, but SAM output can be converted to
+BAM on the fly by piping `bowtie`'s output to `samtools view`.  `-S`/
+`--sam` is not compatible with `--refout`.
 
-  -B/--offbase <int> When outputting alignments, number the first base
-                     of a reference sequence as <int>.  Default: 0.
-                     (Default is likely to change to 1 in Bowtie 1.0.)
+</td></tr><tr><td>
 
-  --quiet            Print nothing besides alignments.
+    -t/--time
 
-  --refout           Write alignments to a set of files named
-                     refXXXXX.map, where XXXXX is the 0-padded index of
-                     the reference sequence aligned to.  This can be a
-                     useful way to break up work for downstream
-                     analyses when dealing with, for example, large
-                     numbers of reads aligned to the assembled human
-                     genome.  If <hits> is also specified, it will be
-                     ignored.
+</td><td>
 
-  --refidx           When a reference sequence is referred to in a
-                     reported alignment, refer to it by 0-based index
-                     (its offset into the list of references that were
-                     indexed) rather than by name.
+Print the amount of wall-clock time taken by each phase.
 
-  --al <filename>    Write all reads for which at least one alignment
-                     was reported to a file with name <filename>.
-                     Written reads will appear as they did in the
-                     input, without any of the trimming or translation
-                     of quality values that may have taken place within
-                     Bowtie.  Paired-end reads will be written to two
-                     parallel files with "_1" and "_2" inserted in the
-                     filename, e.g., if <filename> is aligned.fq, the
-                     #1 and #2 mates that fail to align will be written
-                     to aligned_1.fq and aligned_2.fq respectively.
+</td></tr><tr><td>
 
-  --un <filename>    Write all reads that could not be aligned to a
-                     file with name <filename>.  Written reads will
-                     appear as they did in the input, without any of
-                     the trimming or translation of quality values that
-                     may have taken place within Bowtie.  Paired-end
-                     reads will be written to two parallel files with
-                     "_1" and "_2" inserted in the filename, e.g., if
-                     <filename> is unaligned.fq, the #1 and #2 mates
-                     that fail to align will be written to
-                     unaligned_1.fq and unaligned_2.fq respectively.
-                     Unless --max is also specified, reads with a
-                     number of valid alignments exceeding the limit set
-                     with the -m option are also written to <filename>.
+    -B/--offbase <int>
 
-  --max <filename>   Write all reads with a number of valid alignments
-                     exceeding the limit set with the -m option to a
-                     file with name <filename>.  Written reads will
-                     appear as they did in the input, without any of
-                     the trimming or translation of quality values that
-                     may have taken place within Bowtie.  Paired-end
-                     reads will be written to two parallel files with
-                     "_1" and "_2" inserted in the filename, e.g., if
-                     <filename> is max.fq, the #1 and #2 mates
-                     that fail to align will be written to
-                     max_1.fq and max_2.fq respectively.  These reads
-                     are not written to the file specified with --un.
+</td><td>
 
-  --sam-nohead       Suppress header lines (starting with @) when
-                     output is SAM.
+When outputting alignments, number the first base of a reference
+sequence as `<int>`.  Default: 0.
 
-  --sam-nosq         Suppress @SQ header lines when output is SAM.
+</td></tr><tr><td>
 
-  --fullref          Print the full refernce sequence name, including
-                     whitespace, in alignment output.  By default
-                     bowtie prints everything up to but not including
-                     the first whitespace.
-   Performance:
-   ------------
+    --quiet
 
-  -p/--threads <int> Launch <int> parallel search threads (default: 1).
-                     Threads will run on separate processors/cores and
-                     synchronize when grabbing reads and outputting
-                     alignments.  Searching for alignments is highly
-                     parallel, and speedup is fairly close to linear.
-                     This option is only available if bowtie is linked
-                     with the pthreads library (i.e. if
-                     BOWTIE_PTHREADS=0 is not specified at build time).
+</td><td>
 
-  -o/--offrate <int> Override the offrate of the index with <int>.  If
-                     <int> is greater than the offrate used to build
-                     the index, then some row markings are discarded
-                     when the index is read into memory.  This reduces
-                     the memory footprint of the aligner but requires
-                     more time to calculate text offsets.  <int> must
-                     be greater than the value used to build the index.
+Print nothing besides alignments.
 
-  --mm               Use memory-mapped I/O to load the index, rather
-                     than normal POSIX/C file I/O.  Memory-mapping the
-                     index allows many concurrent bowtie processes on
-                     the same computer to share the same memory image
-                     of the index (i.e. you pay the memory overhead
-                     just once).  This facilitates memory-efficient
-                     parallelization of Bowtie in situations where
-                     using -p is not desirable.
+</td></tr><tr><td>
 
-  --shmem            Use shared memory to load the index, rather than
-                     normal POSIX/C file I/O.  Using shared memory
-                     allows many concurrent bowtie processes on
-                     the same computer to share the same memory image
-                     of the index (i.e. you pay the memory overhead
-                     just once).  This facilitates memory-efficient
-                     parallelization of Bowtie in situations where
-                     using -p is not desirable.  Unlike --mm, --shmem
-                     installs the index into shared memory permanently,
-                     or until the user deletes the shared memory chunks
-                     manually.  See your operating system documentation
-                     for details on how to manually list and remove
-                     shared memory chunks (on Linux and Mac OS X, these
-                     commands are ipcs and ipcrm).  You may also need
-                     to increase your OS's maximum shared-memory chunk
-                     size to accomodate larger indexes; see your OS
-                     documentation.
+    --refout
 
-   Other:
-   ------
+</td><td>
 
-  --seed <int>       Use <int> as the seed for pseudo-random number
-                     generator.
+Write alignments to a set of files named `refXXXXX.map`, where `XXXXX`
+is the 0-padded index of the reference sequence aligned to.  This can
+be a useful way to break up work for downstream analyses when dealing
+with, for example, large numbers of reads aligned to the assembled
+human genome.  If `<hits>` is also specified, it will be ignored.
 
-  --verbose          Print verbose output (for debugging).
+</td></tr><tr><td>
 
-  --version          Print version information and quit.
+    --refidx
 
-  -h/--help          Print detailed description of tool and its options
-                     (from MANUAL).
+</td><td>
+
+When a reference sequence is referred to in a reported alignment, refer
+to it by 0-based index (its offset into the list of references that
+were indexed) rather than by name.
+
+</td></tr><tr><td>
+
+    --al <filename>
+
+</td><td>
+
+Write all reads for which at least one alignment was reported to a file
+with name `<filename>`.  Written reads will appear as they did in the
+input, without any of the trimming or translation of quality values
+that may have taken place within `bowtie`.  Paired-end reads will be
+written to two parallel files with `_1` and `_2` inserted in the
+filename, e.g., if `<filename>` is `aligned.fq`, the #1 and #2 mates
+that fail to align will be written to `aligned_1.fq` and `aligned_2.fq`
+respectively.
+
+</td></tr><tr><td>
+
+    --un <filename>
+
+</td><td>
+
+Write all reads that could not be aligned to a file with name
+`<filename>`.  Written reads will appear as they did in the input,
+without any of the trimming or translation of quality values that may
+have taken place within Bowtie.  Paired-end reads will be written to
+two parallel files with `_1` and `_2` inserted in the filename, e.g.,
+if `<filename>` is `unaligned.fq`, the #1 and #2 mates that fail to
+align will be written to `unaligned_1.fq` and `unaligned_2.fq`
+respectively.  Unless `--max` is also specified, reads with a number of
+valid alignments exceeding the limit set with the `-m` option are also
+written to `<filename>`.
+
+</td></tr><tr><td>
+
+    --max <filename>
+
+</td><td>
+
+Write all reads with a number of valid alignments exceeding the limit
+set with the `-m` option to a file with name `<filename>`.  Written
+reads will appear as they did in the input, without any of the trimming
+or translation of quality values that may have taken place within
+`bowtie`.  Paired-end reads will be written to two parallel files with
+`_1` and `_2` inserted in the filename, e.g., if `<filename>` is
+`max.fq`, the #1 and #2 mates that exceed the `-m` limit will be
+written to `max_1.fq` and `max_2.fq` respectively.  These reads are not
+written to the file specified with `--un`.
+
+</td></tr><tr><td>
+
+    --sam-nohead
+
+</td><td>
+
+Suppress header lines (starting with @) when output is SAM.
+
+</td></tr><tr><td>
+
+    --sam-nosq
+
+</td><td>
+
+Suppress `@SQ` header lines when output is SAM.
+
+</td></tr><tr><td>
+
+    --fullref
+
+</td><td>
+
+Print the full refernce sequence name, including whitespace, in
+alignment output.  By default `bowtie` prints everything up to but not
+including the first whitespace.
+
+</td></tr></table>
+
+### Performance
+
+<table><tr><td>
+
+    -p/--threads <int>
+
+</td><td>
+
+Launch `<int>` parallel search threads (default: 1).  Threads will run
+on separate processors/cores and synchronize when parsing reads and
+outputting alignments.  Searching for alignments is highly parallel,
+and speedup is fairly close to linear.  This option is only available
+if `bowtie` is linked with the `pthreads` library (i.e. if
+`BOWTIE_PTHREADS=0` is not specified at build time).
+
+</td></tr><tr><td>
+
+    -o/--offrate <int>
+
+</td><td>
+
+Override the offrate of the index with `<int>`.  If `<int>` is greater
+than the offrate used to build the index, then some row markings are
+discarded when the index is read into memory.  This reduces the memory
+footprint of the aligner but requires more time to calculate text
+offsets.  `<int>` must be greater than the value used to build the
+index.
+
+</td></tr><tr><td>
+
+    --mm
+
+</td><td>
+
+Use memory-mapped I/O to load the index, rather than normal POSIX/C
+file I/O.  Memory-mapping the index allows many concurrent `bowtie`
+processes on the same computer to share the same memory image of the
+index (i.e. you pay the memory overhead just once).  This facilitates
+memory-efficient parallelization of `bowtie` in situations where using
+`-p` is not possible.
+
+</td></tr><tr><td>
+
+    --shmem
+
+</td><td>
+
+Use shared memory to load the index, rather than normal POSIX/C file
+I/O.  Using shared memory allows many concurrent bowtie processes on
+the same computer to share the same memory image of the index (i.e. you
+pay the memory overhead just once).  This facilitates memory-efficient
+parallelization of `bowtie` in situations where using `-p` is not
+desirable.  Unlike `--mm`, `--shmem` installs the index into shared
+memory permanently, or until the user deletes the shared memory chunks
+manually.  See your operating system documentation for details on how
+to manually list and remove shared memory chunks (on Linux and Mac OS
+X, these commands are `ipcs` and `ipcrm`).  You may also need to
+increase your OS's maximum shared-memory chunk size to accomodate
+larger indexes; see your OS documentation.
+
+</td></tr></table>
+
+### Other
+
+<table><tr><td>
+
+    --seed <int>
+
+</td><td>
+
+Use `<int>` as the seed for pseudo-random number generator.
+
+</td></tr><tr><td>
+
+    --verbose
+
+</td><td>
+
+Print verbose output (for debugging).
+
+</td></tr><tr><td>
+
+    --version
+
+</td><td>
+
+Print version information and quit.
+
+</td></tr><tr><td>
+
+    -h/--help
+
+</td><td>
+
+Print usage information and quit.
+
+</td></tr></table>
 
 Default output
 ==============
@@ -1160,44 +1241,43 @@ Default output
 `bowtie` outputs one alignment per line.  Each line is a collection of
 8 fields separated by tabs; from left to right, the fields are:
 
-    1. Name of read that aligned
+1. Name of read that aligned
 
-    2. Reference strand aligned to, `+` for forward strand, `-` for
-       reverse
+2. Reference strand aligned to, `+` for forward strand, `-` for reverse
 
-    3. Name of reference sequence where alignment occurs, or numeric ID
-       if no name was provided
+3. Name of reference sequence where alignment occurs, or numeric ID if
+   no name was provided
 
-    4. 0-based offset into the forward reference strand where leftmost
-       character of the alignment occurs
+4. 0-based offset into the forward reference strand where leftmost
+   character of the alignment occurs
 
-    5. Read sequence (reverse-complemented if orientation is `-`)
+5. Read sequence (reverse-complemented if orientation is `-`)
 
-    6. ASCII-encoded read qualities (reversed if orientation is `-`).
-       The encoded quality values are on the Phred scale and the
-       encoding is ASCII-offset by 33 (ASCII char `!`). 
+6. ASCII-encoded read qualities (reversed if orientation is `-`).  The
+   encoded quality values are on the Phred scale and the encoding is
+   ASCII-offset by 33 (ASCII char `!`). 
 
-    7. Number of other instances where the same read aligns against the
-       same reference characters as were aligned against in this
-       alignment.  This is *not* the number of other places the read
-       aligns with the same number of mismatches.  The number in this
-       column is generally not a good proxy for that number (e.g., the
-       number in this column may be '0' while the number of other
-       alignments with the same number of mismatches might be large).
-       This column was previously described as "Reserved".
+7. Number of other instances where the same read aligns against the
+   same reference characters as were aligned against in this alignment.
+   This is *not* the number of other places the read aligns with the
+   same number of mismatches.  The number in this column is generally
+   not a good proxy for that number (e.g., the number in this column
+   may be '0' while the number of other alignments with the same number
+   of mismatches might be large).  This column was previously described
+   as "Reserved".
 
-    8. Comma-separated list of mismatch descriptors.  If there are no
-       mismatches in the alignment, this field is empty.  A single
-       descriptor has the format offset:reference-base>read-base.  The
-       offset is expressed as a 0-based offset from the high-quality
-       (5') end of the read. 
+8. Comma-separated list of mismatch descriptors.  If there are no
+   mismatches in the alignment, this field is empty.  A single
+   descriptor has the format offset:reference-base>read-base.  The
+   offset is expressed as a 0-based offset from the high-quality (5')
+   end of the read. 
 
 SAM output
 ==========
 
-Following is a brief description of the SAM format as output by
+Following is a brief description of the [SAM] format as output by
 `bowtie` when the `-S`/`--sam` option is specified.  For more details,
-see the [SAM format specification].
+see the [SAM format specification][SAM].
 
 When `-S`/`--sam` is specified, `bowtie` prints a SAM header with
 `@HD`, `@SQ` and `@PG` lines.  When one or more `--sam-RG` arguments
@@ -1208,66 +1288,65 @@ Each subsequnt line corresponds to a read or an alignment.  Each line
 is a collection of at least 12 fields separated by tabs; from left to
 right, the fields are:
 
-    1. Name of read that aligned
+1. Name of read that aligned
 
-    2. Sum of all applicable flags.  Flags relevant to Bowtie are:
+2. Sum of all applicable flags.  Flags relevant to Bowtie are:
 
-        1. The read is one of a pair
-        2. The alignment is one end of a proper paired-end alignment
-        4. The read has no reported alignments
-        8. The read is one of a pair and has no reported alignments
-       16. The alignment is to the reverse reference strand
-       32. The other mate in the paired-end alignment is aligned to the
-           reverse reference strand
-       64. The read is the first (#1) mate in a pair
-      128. The read is the second (#2) mate in a pair
+   1.   The read is one of a pair
+   2.   The alignment is one end of a proper paired-end alignment
+   4.   The read has no reported alignments
+   8.   The read is one of a pair and has no reported alignments
+   16.  The alignment is to the reverse reference strand
+   32.  The other mate in the paired-end alignment is aligned to the
+        reverse reference strand
+   64.  The read is the first (#1) mate in a pair
+   128. The read is the second (#2) mate in a pair
 
-      Thus, an unpaired read that aligns to the reverse reference
-      strand will have flag 16.  A paired-end read that aligns and is
-      the first mate in the pair will have flag 83 (= 64 + 16 + 2 + 1).
+Thus, an unpaired read that aligns to the reverse reference strand will
+have flag 16.  A paired-end read that aligns and is the first mate in
+the pair will have flag 83 (= 64 + 16 + 2 + 1).
 
-   3. Name of reference sequence where alignment occurs, or ordinal ID
-      if no name was provided
+3. Name of reference sequence where alignment occurs, or ordinal ID
+   if no name was provided
 
-   4. 1-based offset into the forward reference strand where leftmost
-      character of the alignment occurs
+4. 1-based offset into the forward reference strand where leftmost
+   character of the alignment occurs
 
-   5. Mapping quality (always 255)
+5. Mapping quality (always 255)
 
-   6. CIGAR string representation of alignment
+6. CIGAR string representation of alignment
 
-   7. Name of reference sequence where mate's alignment occurs.  Set to
-      `=` if the mate's reference sequence is the same as this
-      alignment's, or `*` if there is no mate.
+7. Name of reference sequence where mate's alignment occurs.  Set to
+   `=` if the mate's reference sequence is the same as this
+   alignment's, or `*` if there is no mate.
 
-   8. 1-based offset into the forward reference strand where leftmost
-      character of the mate's alignment occurs.  Offset is 0 if there
-      is no mate.
+8. 1-based offset into the forward reference strand where leftmost
+   character of the mate's alignment occurs.  Offset is 0 if there is
+   no mate.
 
-   9. Inferred insert size.  Size is negative if the mate's alignment
-      occurs upstream of this alignment.  Size is 0 if there is no
-      mate.
+9. Inferred insert size.  Size is negative if the mate's alignment
+   occurs upstream of this alignment.  Size is 0 if there is no mate.
 
-  10. Read sequence (reverse-complemented if aligned to the reverse
-      strand)
+10. Read sequence (reverse-complemented if aligned to the reverse
+    strand)
 
-  11. ASCII-encoded read qualities (reversed if aligned to the reverse
-      strand).  The encoded quality values are on the Phred scale and
-      the encoding is ASCII-offset by 33 (ASCII char `!`). 
+11. ASCII-encoded read qualities (reversed if aligned to the reverse
+    strand).  The encoded quality values are on the Phred scale and the
+    encoding is ASCII-offset by 33 (ASCII char `!`). 
 
- 12+. Optional fields.  Fields are tab-separated.  For descriptions of
-      all possible optional fields, see the SAM format specification.
-      Bowtie outputs one or more of these optional fields for each
-      alignment, depending on the type of the alignment:
+12+. Optional fields.  Fields are tab-separated.  For descriptions of
+     all possible optional fields, see the SAM format specification.
+     `bowtie` outputs one or more of these optional fields for each
+     alignment, depending on the type of the alignment:
 
-      NM:i:<N> : Aligned read has an edit distance of <N>
-      MD:Z:<S> : For aligned reads, <S> is a string representation of
-                 the mismatched reference bases in the alignment.  See
-                 SAM format specification for details.
-      XA:i:<N> : Aligned read belongs to stratum <N>
-      XM:i:<N> : For a read with no reported alignments, <N> is 0 if
-                 the read had no alignments, or 1 if the read had
-                 alignments that were suppressed by the -m option.
+   * `NM:i:<N>` : Aligned read has an edit distance of `<N>`
+   * `MD:Z:<S>` : For aligned reads, `<S>` is a string representation
+                  of the mismatched reference bases in the alignment.
+                  See [SAM] format specification for details.
+   * `XA:i:<N>` : Aligned read belongs to stratum `<N>`
+   * `XM:i:<N>` : For a read with no reported alignments, `<N>` is 0 if
+                  the read had no alignments, or 1 if the read had
+                  alignments that were suppressed by the `-m` option.
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
 
