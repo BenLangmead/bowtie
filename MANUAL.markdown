@@ -625,26 +625,23 @@ per line, without quality values or names.  All
 quality values are assumed to be 40 on the [Phred
 quality] scale.
 
-[Phred quality]: http://en.wikipedia.org/wiki/FASTQ_format#Variations
-
 </td></tr><tr><td>
 
     -c
 
 </td><td>
 
-The query sequences are given on command line.
-I.e.` &lt;m1>`, `<m2>` and `<singles>` are comma-separated
-lists of reads rather than lists of read files.
+The query sequences are given on command line.  I.e. `<m1>`, `<m2>` and
+`<singles>` are comma-separated lists of reads rather than lists of
+read files.
 
 </td></tr><tr><td>
 
-    --s/--skip <int>
+    -s/--skip <int>
 
 </td><td>
 
-Skip (i.e. do not align) the first `<int>` reads or
-pairs in the input.
+Skip (i.e. do not align) the first `<int>` reads or pairs in the input.
 
 </td></tr><tr><td>
 
@@ -652,9 +649,8 @@ pairs in the input.
 
 </td><td>
 
-Only align the first` &lt;int>` reads or read pairs
-from the input (after the `-s/--skip` reads or pairs
-have been skipped).  Default: no limit.
+Only align the first `<int>` reads or read pairs from the input (after
+the `-s/--skip` reads or pairs have been skipped).  Default: no limit.
 
 </td></tr><tr><td>
 
@@ -662,8 +658,8 @@ have been skipped).  Default: no limit.
 
 </td><td>
 
-Trim `<int>` bases from high-quality (left) end of
-each read before alignment (default: 0).
+Trim `<int>` bases from high-quality (left) end of each read before
+alignment (default: 0).
 
 </td></tr><tr><td>
 
@@ -671,36 +667,61 @@ each read before alignment (default: 0).
 
 </td><td>
 
-Trim `<int>` bases from low-quality (right) end of
-each read before alignment (default: 0).
+Trim `<int>` bases from low-quality (right) end of each read before
+alignment (default: 0).
+
+</td></tr><tr><td>
+
+    --phred33-quals
+
+</td><td>
+
+Input qualities are ASCII chars equal to the [Phred quality] plus 33.
+Default: on.
+
+</td></tr><tr><td>
+
+    --phred64-quals
+
+</td><td>
+
+Input qualities are ASCII chars equal to the Phred quality plus 64.
+Default: off.
+
+</td></tr><tr><td>
+
+    --solexa-quals
+
+</td><td>
+
+Convert input qualities from [Solexa][Phred quality] (which can be
+negative) to [Phred][Phred quality] (which can't).  This is usually the
+right option for use with (unconverted) reads emitted by GA Pipeline
+versions prior to 1.3.  Default: off.
+
+</td></tr><tr><td>
+
+    --solexa1.3-quals
+
+</td><td>
+
+Same as `--phred64-quals`.  This is usually the right option for use
+with (unconverted) reads emitted by GA Pipeline version 1.3 or later. 
+Default: off.
+
+</td></tr><tr><td>
+
+    --integer-quals
+
+</td><td>
+
+Quality values are represented in the read input file as
+space-separated ASCII integers, e.g., `40 40 30 40`..., rather than
+ASCII characters, e.g., `II?I`....  Integers are treated as being on
+the [Phred quality] scale unless `--solexa-quals` is also specified.
+Default: off.
 
 </td></tr></table>
-
-  --phred33-quals    Input qualities are ASCII chars equal to the Phred
-                     quality plus 33.  Default: on.
-
-  --phred64-quals    Input qualities are ASCII chars equal to the Phred
-                     quality plus 64.  Default: off.
-
-  --solexa-quals     Convert input qualities from solexa-scaled (which
-                     can be negative) to phred-scaled (which can't).
-                     The formula for conversion is phred-qual =
-                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).
-                     This is usually the right option for use with
-                     (unconverted) reads emitted by GA Pipeline
-                     versions prior to 1.3.  Default: off.
-
-  --solexa1.3-quals  Same as --phred64-quals.  This is usually the
-                     right option for use with (unconverted) reads
-                     emitted by GA Pipeline version 1.3 or later. 
-                     Default: off.
-
-  --integer-quals    Quality values are represented in the read input
-                     file as space-separated ASCII integers, e.g.,
-                     "40 40 30 40...", rather than ASCII characters,
-                     e.g., "II?I...".  Integers are treated as being on
-                     the Phred scale unless --solexa-quals is also
-                     specified.  Default: off.
 
    Alignment:
    ----------
