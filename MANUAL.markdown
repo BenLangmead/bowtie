@@ -427,10 +427,12 @@ Performance Tuning
 
 2.  If your computer has multiple processors/cores, use `-p`
 
-    The `-p <int>` option causes Bowtie to launch <int> parallel search
-    threads.  Each thread runs on a different processor/core and all
-    threads find alignments in parallel, increasing alignment
-    throughput by approximately a multiple of `<int>`.
+    The `-p` option causes Bowtie to launch a specified number of
+    parallel search threads.  Each thread runs on a different
+    processor/core and all threads find alignments in parallel,
+    increasing alignment throughput by approximately a multiple of the
+    number of threads (though in practice, speedup is somewhat worse
+    than linear).
 
 3.  If reporting many alignments per read, try tweaking
     `bowtie-build --offrate`
@@ -461,16 +463,15 @@ Performance Tuning
     slow and consistently triggers more than a few page faults per
     second (as observed via `top` or `vmstat` on Mac/Linux, or via a
     tool like `Process Explorer` on Windows), then try setting
-    `--offrate <int>` to a *larger* `<int>` value than the value used
-    when building the index.  For example, bowtie-build's default
-    `--offrate` is 5 and all pre-built indexes available from the
-    Bowtie website are built with `--offrate 5`; so if bowtie thrashes
-    when querying such an index, try using `bowtie --offrate 6`.  If
-    `bowtie` still thrashes, try `bowtie --offrate 7`, etc.  A higher
-    `--offrate` causes bowtie to use a sparser sample of the suffix-
-    array than is stored in the index; this saves memory but makes
-    alignment reporting slower (which is especially slow when using
-    `-a` or large `-k` or `-m`).
+    `--offrate` to a *larger* value than the value used to build the
+    index.  For example, bowtie-build's default `--offrate` is 5 and
+    all pre-built indexes available from the Bowtie website are built
+    with `--offrate 5`; so if `bowtie` thrashes when querying such an
+    index, try using `bowtie --offrate 6`.  If `bowtie` still thrashes,
+    try `bowtie --offrate 7`, etc.  A higher `--offrate` causes bowtie
+    to use a sparser sample of the suffix array than is stored in the
+    index; this saves memory but makes alignment reporting slower
+    (which is especially slow when using `-a` or large `-k` or `-m`).
 
 Command Line
 ============
@@ -481,102 +482,102 @@ Usage:
 
 <table CELLSPACING=15><tr><td>
 
-<ebwt>
+&lt;ebwt>
 
 </td><td>
 
-                     The basename of the index to be searched.  The
-                     basename is the name of any of the index files up
-                     to but not including the final `.1.ebwt` /
-                     `.rev.1.ebwt` / etc.  `bowtie` looks for the
-                     specified index first in the current directory,
-                     then in the `indexes` subdirectory under the
-                     directory where the `bowtie` executable is
-                     located, then looks in the directory specified in
-                     the `BOWTIE_INDEXES` environment variable.
+   The basename of the index to be searched.  The
+   basename is the name of any of the index files up
+   to but not including the final `.1.ebwt` /
+   `.rev.1.ebwt` / etc.  `bowtie` looks for the
+   specified index first in the current directory,
+   then in the `indexes` subdirectory under the
+   directory where the `bowtie` executable is
+   located, then looks in the directory specified in
+   the `BOWTIE_INDEXES` environment variable.
 
 </td></tr><tr><td>
 
-<m1>
+&lt;m1>
 
 </td><td>
 
-                     Comma-separated list of files containing the #1
-                     mates (filename usually includes `_1`), or, if
-                     `-c` is specified, the mate sequences themselves.
-                     E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if
-                     `-c` is specified, this might be
-                     `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
-                     this option must correspond file-for-file and
-                     read-for-read with those specified in <m2>.  Reads
-                     may be a mix of different lengths.  If `-` is
-                     specified, `bowtie` will read the #1 mates from
-                     the "standard in" filehandle.
+   Comma-separated list of files containing the #1
+   mates (filename usually includes `_1`), or, if
+   `-c` is specified, the mate sequences themselves.
+   E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if
+   `-c` is specified, this might be
+   `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
+   this option must correspond file-for-file and
+   read-for-read with those specified in <m2>.  Reads
+   may be a mix of different lengths.  If `-` is
+   specified, `bowtie` will read the #1 mates from
+   the "standard in" filehandle.
 
 </td></tr><tr><td>
 
-<m2>
+&lt;m2>
 
 </td><td>
 
-                     Comma-separated list of files containing the #2
-                     mates (filename usually includes `_2`), or, if
-                     `-c` is specified, the mate sequences themselves.
-                     E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if
-                     `-c` is specified, this might be
-                     `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
-                     this option must correspond file-for-file and
-                     read-for-read with those specified in <m1>.  Reads
-                     may be a mix of different lengths.  If `-` is
-                     specified, `bowtie` will read the #2 mates from
-                     the "standard in" filehandle.
+   Comma-separated list of files containing the #2
+   mates (filename usually includes `_2`), or, if
+   `-c` is specified, the mate sequences themselves.
+   E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if
+   `-c` is specified, this might be
+   `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
+   this option must correspond file-for-file and
+   read-for-read with those specified in <m1>.  Reads
+   may be a mix of different lengths.  If `-` is
+   specified, `bowtie` will read the #2 mates from
+   the "standard in" filehandle.
 
 </td></tr><tr><td>
 
-<r>
+&lt;r>
 
 </td><td>
 
-                     Comma-separated list of files containing a mix of
-                     unpaired and paired-end reads in Tab-delimited
-                     format.  Tab-delimited format is a 1-read-per-line
-                     format where unpaired reads consist of a read
-                     name, sequence and quality string each separated
-                     by tabs.  A paired-end read consists of a read
-                     name, sequnce of the #1 mate, quality values of
-                     the #1 mate, sequence of the #2 mate, and quality
-                     values of the #2 mate separated by tabs.  Quality
-                     values can be expressed using any of the scales
-                     supported in FASTQ files.  Reads may be a mix of
-                     different lengths and paired-end and unpaired
-                     reads may be intermingled in the same file.  If
-                     `-` is specified, `bowtie` will read the Tab-
-                     delimited reads from the "standard in" filehandle.
+   Comma-separated list of files containing a mix of
+   unpaired and paired-end reads in Tab-delimited
+   format.  Tab-delimited format is a 1-read-per-line
+   format where unpaired reads consist of a read
+   name, sequence and quality string each separated
+   by tabs.  A paired-end read consists of a read
+   name, sequnce of the #1 mate, quality values of
+   the #1 mate, sequence of the #2 mate, and quality
+   values of the #2 mate separated by tabs.  Quality
+   values can be expressed using any of the scales
+   supported in FASTQ files.  Reads may be a mix of
+   different lengths and paired-end and unpaired
+   reads may be intermingled in the same file.  If
+   `-` is specified, `bowtie` will read the Tab-
+   delimited reads from the "standard in" filehandle.
 
 </td></tr><tr><td>
 
-<s>
+&lt;s>
 
 </td><td>
 
-                     A comma-separated list of files containing
-                     unpaired reads to be aligned, or, if `-c` is
-                     specified, the unpaired read sequences themselves.
-                     E.g., this might be
-                     `lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if `-c`
-                     is specified, this might be `GGTCATCCT,ACGGGTCGT`.
-                     Reads may be a mix of different lengths.  If `-`
-                     is specified, Bowtie gets the reads from the
-                     "standard in" filehandle.
+   A comma-separated list of files containing
+   unpaired reads to be aligned, or, if `-c` is
+   specified, the unpaired read sequences themselves.
+   E.g., this might be
+   `lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if `-c`
+   is specified, this might be `GGTCATCCT,ACGGGTCGT`.
+   Reads may be a mix of different lengths.  If `-`
+   is specified, Bowtie gets the reads from the
+   "standard in" filehandle.
 
 </td></tr><tr><td>
 
-<hit>
+&lt;hit>
 
 </td><td>
 
-                     File to write alignments to.  By default,
-                     alignments are written to stdout (the console).
+   File to write alignments to.  By default,
+   alignments are written to stdout (the console).
 
 </td></tr></table>
 

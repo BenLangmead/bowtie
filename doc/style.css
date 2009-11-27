@@ -104,9 +104,11 @@ body {
 
 #toc ol { list-style: roman }
 
-a { color: #0066B3; background: inherit; text-decoration: none }
-h1 { font: bold 1.9em Arial, Arial, Sans-Serif }
-h2 { font: bold 1.2em Arial, Arial, Sans-Serif; padding: 0; margin: 0 }
+a  { color: #0066B3; background: inherit; text-decoration: none }
+h1 { padding: 15px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
+h2 { padding: 15px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+h3 { padding: 15px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+p  { margin-top: 10px; color: #444 }
 ul { padding: 0; margin: 0; list-style-type: none }
 li {  }
 ol { margin-left: 24px;
@@ -131,4 +133,3 @@ code { font: .8em; font-family: "Courier New", Courier; }
 #main #leftside fieldset p { width: 100%; }
 #main input { padding: 3px; margin: 0; border: 1px solid #bbb }
 
-p { margin-top: 10px; }
