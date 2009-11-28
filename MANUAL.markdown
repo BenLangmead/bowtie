@@ -1,9 +1,8 @@
 <!--
  ! This manual is written in "markdown" format and thus contains some
  ! mildly distracting visual clutter encoding information about how
- ! to convert to HTML.  The document is still quite readable as raw
- ! text, but if the clutter is too distracting, try the man or HTML
- ! versions instead.
+ ! to convert to HTML.  See 'MANUAL' file for a clearer version of this
+ ! document.
   -->
 
 What is Bowtie?
@@ -47,9 +46,9 @@ Bowtie is not a general-purpose alignment tool like [MUMmer], [BLAST]
 or [Vmatch].  Bowtie works best when aligning short reads to large
 genomes, though it supports arbitrarily small reference sequences and
 reads as long as 1024 bases.  Bowtie is designed to be extremely fast
-for sets of reads where a) many of the reads have at least one good,
-valid alignment, b) many of the reads are relatively high-quality, and
-c) the number of alignments reported per read is small (close to 1).
+for sets of reads where (a) many of the reads have at least one good,
+valid alignment, (b) many of the reads are relatively high-quality, and
+(c) the number of alignments reported per read is small (close to 1).
 
 Bowtie does not yet report gapped alignments; this is future work.
 
@@ -82,9 +81,9 @@ with the command `make`, but sometimes with `gmake`) with no
 arguments.  If building with MinGW, run `make` from the MSYS
 environment.
 
-Due to the `-p` option, Bowtie needs the pthreads library in order to
+Due to the [`-p`] option, Bowtie needs the pthreads library in order to
 compile and run with multithreaded support.  To compile Bowtie without
-pthreads (which disables `-p`), use `make BOWTIE_PTHREADS=0`.
+pthreads (which disables [`-p`]), use `make BOWTIE_PTHREADS=0`.
 
 [Cygwin]:   http://www.cygwin.com/
 [MinGW]:    http://www.mingw.org/
@@ -99,28 +98,28 @@ The `bowtie` aligner
 
 `bowtie` takes an index and a set of reads as input and outputs a list
 of alignments.  Alignments are selected according to a combination of
-the `-v/-n/-e/-l` options (plus the `-I/-X/--fr/--rf/--ff` options for
+the `[-v]/[-n]/[-e]/[-l]` options (plus the `[-I]/[-X]/[--fr]/[--rf]/[--ff]` options for
 paired-end alignment), which define which alignments are legal, and the
-`-k/-a/-m/--best/--strata` options which define which and how many
+`[-k]/[-a]/[-m]/[--best]/[--strata]` options which define which and how many
 legal alignments should be reported.
 
 By default, Bowtie enforces an alignment policy similar to [Maq]'s
-default quality-aware policy (`-n 2 -l 28 -e 70`).  See [the -n
+default quality-aware policy (`[-n] 2 [-l] 28 [-e] 70`).  See [the -n
 alignment mode] section of the manual for details about this mode.  But
 Bowtie can also enforce a simpler end-to-end k-difference policy (e.g.
-with `-v 2`).  See [the -v alignment mode] section of the manual for
+with `[-v] 2`).  See [the -v alignment mode] section of the manual for
 details about that mode.
 
 Bowtie works best when aligning short reads to large genomes (e.g.
 human or mouse), though it supports arbitrarily small reference
 sequences and reads as long as 1024 bases.  Bowtie is designed to be
 very fast for read sets where a) many of the reads have at least one
-good, valid alignment, b) many of the reads are relatively high-
-quality, c) the number of alignments reported per read is small (close
-to 1).  These criteria are generally satisfied in the context of modern
-short-read analyses such as RNA-seq, ChIP-seq, other types of -seq, and
-mammalian resequencing.  You may observe longer running times in other
-research contexts.
+good, valid alignment, b) many of the reads are relatively
+high-quality, c) the number of alignments reported per read is small
+(close to 1).  These criteria are generally satisfied in the context of
+modern short-read analyses such as RNA-seq, ChIP-seq, other types of
+-seq, and mammalian resequencing.  You may observe longer running times
+in other research contexts.
 
 If `bowtie` is too slow for your application, please try some of the
 performance-tuning hints described in the [Performance Tuning] section
@@ -142,7 +141,7 @@ it makes an effort to sample them randomly.  This randomness flows
 from a simple seeded pseudo-random number generator and is
 deterministic in the sense that Bowtie will always produce the same
 results for the same read when run with the same initial "seed" value
-(see documentation for `--seed` option).
+(see [`--seed`] option).
 
 In the default mode, `bowtie` can exhibit strand bias.  Strand bias
 occurs when input reference and reads are such that (a) some reads
@@ -154,11 +153,11 @@ probability, then reports a randomly-selected alignment for that read
 from among the sites on the selected strand.  This tends to overassign
 alignments to the sites on the strand with fewer sites and underassign
 to sites on the strand with more sites.  The effect is mitigated,
-though it may not be eliminated, when reads are longer or when paired-
-end reads are used.  Running Bowtie in `--best` mode eliminates strand
-bias by forcing Bowtie to select one strand or the other with a
-probability that is proportional to the number of best sites on the
-strand. 
+though it may not be eliminated, when reads are longer or when
+paired-end reads are used.  Running Bowtie in [`--best`] mode
+eliminates strand bias by forcing Bowtie to select one strand or the
+other with a probability that is proportional to the number of best
+sites on the strand.
 
 Gapped alignments are not currently supported, but support is planned
 for a future release.
@@ -171,70 +170,70 @@ for a future release.
 The `-n` alignment mode
 -----------------------
 
-When the `-n` option is specified (and it is by default), `bowtie`
+When the [`-n`] option is specified (and it is by default), `bowtie`
 determines which alignments are valid according to the following
 policy, which is similar to [Maq]'s default policy.
 
   1. Alignments may have no more than `N` mismatches (where `N` is a
-     number 0-3, set with `-n`) in the first `L` bases (where `L` is a
-     number 5 or greater, set with `-l`) on the high-quality (left) end
+     number 0-3, set with [`-n]`) in the first `L` bases (where `L` is a
+     number 5 or greater, set with [`-l`]) on the high-quality (left) end
      of the read.  The first `L` bases are called the "seed".
 
   2. The sum of the [Phred quality] values at all mismatched positions
-     may not exceed `E` (set with `-e`).  Where qualities are
+     may not exceed `E` (set with [`-e`]).  Where qualities are
      unavailable (e.g. if the reads are from a FASTA file), the Phred
      quality defaults to 40.
 
-The `-n` option is mutually exclusive with the `-v` option.
+The [`-n`] option is mutually exclusive with the [`-v`] option.
 
 If there are many possible alignments satisfying these criteria, Bowtie
 gives preference to alignments with fewer mismatches and where the sum
-from criterion 2 is smaller.  When the `--best` option is specified,
+from criterion 2 is smaller.  When the [`--best`] option is specified,
 Bowtie guarantees the reported alignment(s) are "best" in terms of
 these criteria (criterion 1 has priority), and that the alignments are
 reported in best-to-worst order.  Bowtie is somewhat slower when
-`--best` is specified.
+[`--best`] is specified.
 
 Note that [Maq] internally rounds base qualities to the nearest 10 and
 rounds qualities greater than 30 to 30.  To maintain compatibility,
 Bowtie does the same.  Rounding can be suppressed with the
-`--nomaqround` option.
+[`--nomaqround`] option.
  
-Bowtie is not fully sensitive in `-n 2` and `-n 3` modes by default.
+Bowtie is not fully sensitive in `[-n] 2` and `[-n] 3` modes by default.
 In these modes Bowtie imposes a "backtracking limit" to limit effort
 spent trying to find valid alignments for low-quality reads unlikely to
 have any.  This may cause bowtie to miss some legal 2- and 3-mismatch
 alignments.  The limit is set to a reasonable default (125 without
-`--best`, 800 with `--best`), but the user may decrease or increase the
-limit using the `--maxbts` and/or `-y` options.  `-y` mode is
+[`--best`], 800 with [`--best`]), but the user may decrease or increase the
+limit using the [`--maxbts`] and/or [`-y`] options.  [`-y`] mode is
 relatively slow but guarantees full sensitivity.
 
-[Maq]:           http://maq.sf.net
+[Maq]: http://maq.sf.net
 [Phred quality]: http://en.wikipedia.org/wiki/FASTQ_format#Variations
 
 The `-v` alignment mode
 -----------------------
 
-In `-v` mode, alignments may have no more than `V` mismatches, where
-`V` may be a number from 0 through 3 set using the `-v` option.
-Quality values are ignored.  The `-v` option is mutually exclusive with
-the `-n` option.
+In [`-v`] mode, alignments may have no more than `V` mismatches, where
+`V` may be a number from 0 through 3 set using the [`-v`] option.
+Quality values are ignored.  The [`-v`] option is mutually exclusive with
+the [`-n`] option.
 
 If there are many legal alignments, Bowtie gives preference to
-alignments with fewer mismatches.  When the `--best` option is
+alignments with fewer mismatches.  When the [`--best`] option is
 specified, Bowtie guarantees the reported alignment(s) are "best" in
 terms of the number of mismatches, and that the alignments are reported
-in best-to-worst order.  Bowtie is somewhat slower when `--best` is
+in best-to-worst order.  Bowtie is somewhat slower when [`--best`] is
 specified.
 
 Reporting Modes
 ---------------
 
-With the `-k`, `-a`, `-m`, `--best` and `--strata` options, the user
+With the [`-k`], [`-a`], [`-m`], [`--best`] and [`--strata`] options, the user
 can flexibily select which alignments are reported.  Below we
 demonstrate a few ways in which these options can be combined.  All
 examples are using the `e_coli` index packaged with Bowtie.  The
---suppress option is used to keep the output concise and some
+[`--suppress`] option is used to keep the output concise and some
 output is elided for clarity.
 
 ### Example 1: `-a`
@@ -246,8 +245,8 @@ output is elided for clarity.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying `-a` instructs bowtie to report *all* valid alignments,
-subject to the alignment policy: `-v 2`.  In this case, bowtie finds
+Specifying [`-a`] instructs bowtie to report *all* valid alignments,
+subject to the alignment policy: `[-v] 2`.  In this case, bowtie finds
 5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)
 has 1 mismatch, and the other 4 hits have 2 mismatches.  Four are on
 the reverse reference strand and one is on the forward strand.  Note
@@ -260,10 +259,12 @@ that they are not listed in best-to-worst order.
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
     -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-Specifying `-k 3` instructs bowtie to report up to 3 valid alignments.
-In this case, a total of 5 valid alignments exist (see Example 1);
-`bowtie` reports 3 out of those 5.  `-k` can be set to any integer
-greater than 0.
+Specifying `[-k] 3` instructs bowtie to report up to 3 valid
+alignments.  In this case, a total of 5 valid alignments exist (see
+[Example 1]); `bowtie` reports 3 out of those 5.  [`-k`] can be set to
+any integer greater than 0.
+
+[Example 1]: #example-1
 
 ### Example 3: `-k 6`
 
@@ -274,9 +275,9 @@ greater than 0.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying `-k 6` instructs bowtie to report up to 6 valid alignments.
-In this case, a total of 5 valid alignments exist, so bowtie reports
-all 5.
+Specifying `[-k] 6` instructs bowtie to report up to 6 valid
+alignments.  In this case, a total of 5 valid alignments exist, so
+`bowtie` reports all 5.
 
 ### Example 4: default (`-k 1`)
 
@@ -284,11 +285,11 @@ all 5.
     -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
 
 Leaving the reporting options at their defaults causes `bowtie` to
-report the first valid alignment it encounters.  Because `--best` was
+report the first valid alignment it encounters.  Because [`--best`] was
 not specified, we are not guaranteed that bowtie will report the best
 alignment, and in this case it does not (the 1-mismatch alignment from
 the previous example would have been better).  The default reporting
-mode is equivalent to `-k 1`.
+mode is equivalent to `[-k] 1`.
 
 ### Example 5: `-a --best`
 
@@ -299,35 +300,35 @@ mode is equivalent to `-k 1`.
     -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
     -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-Specifying `-a --best` results in the same alignments being printed as
-if just `-a` had been specified, but they are guaranteed to be reported
-in best-to-worst order.
+Specifying `[-a] [--best]` results in the same alignments being printed
+as if just [`-a`] had been specified, but they are guaranteed to be
+reported in best-to-worst order.
 
 ### Example 6: `-a --best --strata`
 
     $ ./bowtie -a --best --strata -v 2 --suppress 1,5,6,7 e_coli -c ATGCATCATGCGCCAT
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
 
-Specifying `--strata` in addition to `-a` and `--best` causes `bowtie`
-to report only those alignments in the best alignment "stratum".  The
-alignments in the best stratum are those having the least number of
-mismatches (or mismatches just in the "seed" portion of the alignment
-in the case of `-n` mode).  Note that if `--strata` is specified,
-`--best` must also be specified.
+Specifying [`--strata`] in addition to [`-a`] and [`--best`] causes
+`bowtie` to report only those alignments in the best alignment
+"stratum".  The alignments in the best stratum are those having the
+least number of mismatches (or mismatches just in the "seed" portion of
+the alignment in the case of [`-n`] mode).  Note that if [`--strata`]
+is specified, [`--best`] must also be specified.
 
 ### Example 7: `-a -m 3`
 
     $ ./bowtie -a -m 3 -v 2 e_coli -c ATGCATCATGCGCCAT
     No alignments
 
-Specifying `-m 3` instructs bowtie to refrain from reporting any
+Specifying `[-m] 3` instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  The
-`-m` option is useful when the user would like to guarantee that
+[`-m`] option is useful when the user would like to guarantee that
 reported alignments are "unique", for some definition of unique.
 
-Example 1 showed that the read has 5 reportable alignments when `-a`
-and `-v 2` are specified, so the `-m 3` limit causes bowtie to output
-no alignments.
+Example 1 showed that the read has 5 reportable alignments when [`-a`]
+and `[-v] 2` are specified, so the `[-m] 3` limit causes bowtie to
+output no alignments.
 
 ### Example 8: `-a -m 5`
 
@@ -338,9 +339,9 @@ no alignments.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying `-m 5` instructs bowtie to refrain from reporting any
+Specifying `[-m] 5` instructs bowtie to refrain from reporting any
 alignments for reads having more than 5 reportable alignments.  Since
-the read has exactly 5 reportable alignments, the `-m 5` limit allows
+the read has exactly 5 reportable alignments, the `[-m] 5` limit allows
 `bowtie` to print them as usual. 
 
 ### Example 9: `-a -m 3 --best --strata`
@@ -348,16 +349,16 @@ the read has exactly 5 reportable alignments, the `-m 5` limit allows
     $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
 
-Specifying `-m 3` instructs bowtie to refrain from reporting any
+Specifying `[-m] 3` instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  As we
-saw in Example 6, the read has only 1 reportable alignment when `-a`,
-`--best` and `--strata` are specified, so the `-m` 3 limit allows
+saw in Example 6, the read has only 1 reportable alignment when [`-a`],
+[`--best`] and [`--strata`] are specified, so the [`-m`] 3 limit allows
 `bowtie` to print that alignment as usual.
 
-Intuitively, the `-m` option, when combined with the `--best` and
-`--strata` options, guarantees a principled, though weaker form of
-"uniqueness."  A stronger form of uniqueness is enforced when `-m` is
-specified but `--best` and `--strata` are not.
+Intuitively, the [`-m`] option, when combined with the [`--best`] and
+[`--strata`] options, guarantees a principled, though weaker form of
+"uniqueness."  A stronger form of uniqueness is enforced when [`-m`] is
+specified but [`--best`] and [`--strata`] are not.
 
 Paired-end Alignment
 --------------------
@@ -368,14 +369,15 @@ FASTQ read files), or using the `--12` option (for Tab-delimited read
 files).  A valid paired-end alignment satisfies these criteria:
 
 1. Both mates have a valid alignment according to the alignment policy
-   defined by the `-v`/`-n`/`-e`/`-l` options.
+   defined by the [`-v`]/[`-n`]/[`-e`]/[`-l`] options.
 2. The relative orientation and position of the mates satisfy the
-   constraints defined by the `-I`/`-X`/`--fr`/`--rf`/`--ff` options. 
+   constraints defined by the [`-I`]/[`-X`]/[`--fr`]/[`--rf`]/[`--ff`]
+   options. 
 
 Policies governing which paired-end alignments are reported for a
-given read are specified using the `-k`, `-a` and `-m` options as
-usual.  The `--strata` and `--best` options do not apply in paired-end
-mode.
+given read are specified using the [`-k`], [`-a`] and [`-m`] options as
+usual.  The [`--strata`] and [`--best`] options do not apply in
+paired-end mode.
 
 A paired-end alignment is reported as a pair of mate alignments, both
 on a separate line, where the alignment for each mate is formatted the
@@ -395,8 +397,8 @@ default, Bowtie avoids much of this cost by imposing a limit on the
 number of "tries" it makes to match an alignment for one mate with a
 nearby alignment for the other.  The default limit is 100.  This causes
 `bowtie` to miss some valid paired-end alignments where both mates lie
-in repetitive regions, but the user may use the `--pairtries` or `-y`
-options to increase Bowtie's sensitivity as desired.
+in repetitive regions, but the user may use the [`--pairtries`] or
+[`-y`] options to increase Bowtie's sensitivity as desired.
 
 Paired-end alignments where one mate's alignment is entirely contained
 within the other's are considered invalid.
@@ -424,7 +426,7 @@ Performance Tuning
 
 2.  If your computer has multiple processors/cores, use `-p`
 
-    The `-p` option causes Bowtie to launch a specified number of
+    The [`-p`] option causes Bowtie to launch a specified number of
     parallel search threads.  Each thread runs on a different
     processor/core and all threads find alignments in parallel,
     increasing alignment throughput by approximately a multiple of the
@@ -434,7 +436,7 @@ Performance Tuning
 3.  If reporting many alignments per read, try tweaking
     `bowtie-build --offrate`
 
-    If you are using the `-k`, `-a` or `-m` options and Bowtie is
+    If you are using the [`-k`], [`-a`] or [`-m`] options and Bowtie is
     reporting many alignments per read (an average of more than about
     10 per read) and you have some memory to spare, using an index with
     a denser SA sample can speed things up considerably.
@@ -499,9 +501,9 @@ directory specified in the `BOWTIE_INDEXES` environment variable.
 </td><td>
 
 Comma-separated list of files containing the #1 mates (filename usually
-includes `_1`), or, if `-c` is specified, the mate sequences
-themselves.  E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if `-c` is
-specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
+includes `_1`), or, if [`-c`] is specified, the mate sequences
+themselves.  E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if [`-c`]
+is specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
 with this option must correspond file-for-file and read-for-read with
 those specified in `<m2>`.  Reads may be a mix of different lengths.
 If `-` is specified, `bowtie` will read the #1 mates from the "standard
@@ -514,9 +516,9 @@ in" filehandle.
 </td><td>
 
 Comma-separated list of files containing the #2 mates (filename usually
-includes `_2`), or, if `-c` is specified, the mate sequences
-themselves.  E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if `-c` is
-specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
+includes `_2`), or, if [`-c`] is specified, the mate sequences
+themselves.  E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if [`-c`]
+is specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
 with this option must correspond file-for-file and read-for-read with
 those specified in `<m1>`.  Reads may be a mix of different lengths.
 If `-` is specified, `bowtie` will read the #2 mates from the "standard
@@ -547,9 +549,9 @@ reads from the "standard in" filehandle.
 </td><td>
 
 A comma-separated list of files containing unpaired reads to be
-aligned, or, if `-c` is specified, the unpaired read sequences
+aligned, or, if [`-c`] is specified, the unpaired read sequences
 themselves.  E.g., this might be
-`lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if `-c` is specified, this
+`lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if [`-c`] is specified, this
 might be `GGTCATCCT,ACGGGTCGT`.  Reads may be a mix of different
 lengths.  If `-` is specified, Bowtie gets the reads from the "standard
 in" filehandle.
@@ -642,7 +644,8 @@ Skip (i.e. do not align) the first `<int>` reads or pairs in the input.
 </td><td>
 
 Only align the first `<int>` reads or read pairs from the input (after
-the `-s/--skip` reads or pairs have been skipped).  Default: no limit.
+the [`-s`/`--skip`] reads or pairs have been skipped).  Default: no
+limit.
 
 </td></tr><tr><td id="bowtie-options-5">
 
@@ -711,7 +714,7 @@ versions prior to 1.3.  Default: off.
 
 </td><td>
 
-Same as `--phred64-quals`.  This is usually the right option for use
+Same as [`--phred64-quals`].  This is usually the right option for use
 with (unconverted) reads emitted by GA Pipeline version 1.3 or later. 
 Default: off.
 
@@ -829,14 +832,18 @@ applied with respect to the untrimmed mates.  Default: 0.
 The maximum insert size for valid paired-end alignments.  E.g. if `-X
 100` is specified and a paired-end alignment consists of two 20-bp
 alignments in the proper orientation with a 60-bp gap between them,
-that alignment is considered valid (as long as `-I` is also satisfied).
-A 61-bp gap would not be valid in that case.  If trimming options `-3`
-or `-5` are also used, the `-X` constraint is applied with respect to
-the untrimmed mates, not the trimmed mates.  Default: 250.
+that alignment is considered valid (as long as [`-I`] is also
+satisfied).  A 61-bp gap would not be valid in that case.  If trimming
+options [`-3`] or [`-5`] are also used, the `-X` constraint is applied
+with respect to the untrimmed mates, not the trimmed mates.  Default:
+250.
 
 </td></tr><tr><td id="bowtie-options-fr">
 
 [`--fr`/`--rf`/`--ff`]: #bowtie-options-fr
+[`--fr`]: #bowtie-options-fr
+[`--rf`]: #bowtie-options-fr
+[`--ff`]: #bowtie-options-fr
 
     --fr/--rf/--ff
 
@@ -865,9 +872,9 @@ for the Illumina short insert library).
 If `--nofw` is specified, `bowtie` will not attempt to align against
 the forward reference strand.  If `--norc` is specified, `bowtie` will
 not attempt to align against the reverse-complement reference strand.
-For paired-end reads using `--fr` or `--rf` modes, `--nofw` and
+For paired-end reads using [`--fr`] or [`--rf`] modes, `--nofw` and
 `--norc` apply to the forward and reverse-complement pair orientations.
-I.e. specifying `--nofw` and `--fr` will only find reads in the R/F
+I.e. specifying `--nofw` and [`--fr`] will only find reads in the R/F
 orientation where mate 2 occurs upstream of mate 1 with respect to the
 forward reference strand.
 
@@ -880,15 +887,15 @@ forward reference strand.
 </td><td>
 
 The maximum number of backtracks permitted when aligning a read in
-`-n 2` or `-n 3` mode (default: 125 without `--best`, 800 with
-`--best`).  A "backtrack" is the introduction of a speculative
+`[-n] 2` or `[-n] 3` mode (default: 125 without [`--best`], 800 with
+[`--best`]).  A "backtrack" is the introduction of a speculative
 substitution into the alignment.  Without this limit, the default
 parameters will sometimes require that `bowtie` try 100s or 1,000s of
 backtracks to align a read, especially if the read has many low-quality
 bases and/or has no valid alignments, slowing bowtie down
 significantly.  However, this limit may cause some valid alignments to
 be missed.  Higher limits yield greater sensitivity at the expensive of
-longer running times.  See also: `-y`/`--tryhard`.
+longer running times.  See also: [`-y`/`--tryhard`].
 
 </td></tr><tr><td id="bowtie-options-pairtries">
 
@@ -905,7 +912,7 @@ only a few such attempts, but pairs where both mates occur in highly
 repetitive regions of the reference can require significantly more.
 Setting this to a higher number allows `bowtie` to find more paired-
 end alignments for repetitive pairs at the expense of speed.  The
-default is 100.  See also: `-y`/`--tryhard`.
+default is 100.  See also: [`-y`/`--tryhard`].
 
 </td></tr><tr><td id="bowtie-options-y">
 
@@ -918,11 +925,11 @@ default is 100.  See also: `-y`/`--tryhard`.
 
 Try as hard as possible to find valid alignments when they exist,
 including paired-end alignments.  This is equivalent to specifying very
-high values for the `--maxbts` and `--pairtries` options.  This mode is
-generally much slower than the default settings, but can be useful for
-certain problems.  This mode is slower when (a) the reference is very
-repetitive, (b) the reads are low quality, or (c) not many reads have
-valid alignments.
+high values for the [`--maxbts`] and [`--pairtries`] options.  This
+mode is generally much slower than the default settings, but can be
+useful for certain problems.  This mode is slower when (a) the
+reference is very repetitive, (b) the reads are low quality, or (c) not
+many reads have valid alignments.
 
 </td></tr><tr><td id="bowtie-options-chunkmbs">
 
@@ -955,15 +962,16 @@ dedicate more memory to the descriptors.  Default: 32.
 
 Report up to `<int>` valid alignments per read or pair (default: 1).
 Validity of alignments is determined by the alignment policy (combined
-effects of `-n`, `-v`, `-l`, and `-e`).  If more than one valid
-alignment exists and the `--best` and `--strata` options are specified,
-then only those alignments belonging to the best alignment "stratum"
-will be reported.  Bowtie is designed to be very fast for small `-k`
-but bowtie can become significantly slower as `-k` increases.  If you
-would like to use Bowtie for larger values of `-k`, consider building
-an index with a denser suffix-array sample, i.e. specify a smaller
-`--offrate` when invoking `bowtie-build` for the relevant index (see
-the [Performance tuning] section for details).
+effects of [`-n`], [`-v`], [`-l`], and [`-e`]).  If more than one valid
+alignment exists and the [`--best`] and [`--strata`] options are
+specified, then only those alignments belonging to the best alignment
+"stratum" will be reported.  Bowtie is designed to be very fast for
+small [`-k`] but bowtie can become significantly slower as [`-k`]
+increases.  If you would like to use Bowtie for larger values of
+[`-k`], consider building an index with a denser suffix-array sample,
+i.e. specify a smaller `-o`/`--offrate` when invoking `bowtie-build`
+for the relevant index (see the [Performance tuning] section for
+details).
 
 </td></tr><tr><td id="bowtie-options-a">
 
@@ -980,11 +988,11 @@ of `-n`, `-v`, `-l`, and `-e`).  If more than one valid alignment
 exists and the `--best` and `--strata` options are specified, then only
 those alignments belonging to the best alignment "stratum" will be
 reported.  Bowtie is designed to be very fast for small `-k` but bowtie
-can become significantly slower if `-a`/`--all` is specified.  If you
-would like to use Bowtie with `-a`, consider building an index with a
-denser suffix-array sample, i.e. specify a smaller `--offrate` when
-invoking `bowtie-build` for the relevant index (see the [Performance
-tuning] section for details).
+can become significantly slower if [`-a`/`--all`] is specified.  If you
+would like to use Bowtie with [`-a`], consider building an index with a
+denser suffix-array sample, i.e. specify a smaller `-o`/`--offrate`
+when invoking `bowtie-build` for the relevant index (see the
+[Performance tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-m">
 
@@ -1068,7 +1076,7 @@ very large number of reference sequences), use [`--sam-nosq`].
 converted to BAM on the fly by piping `bowtie`'s output to
 `samtools view`.  [`-S`/`--sam`] is not compatible with [`--refout`].
 
-[SAM output]: #sam-output
+[SAM output]: #sam-bowtie-output
 
 </td></tr><tr><td id="bowtie-options-t">
 
