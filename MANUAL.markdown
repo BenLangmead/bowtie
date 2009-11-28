@@ -104,7 +104,7 @@ are legal, and the [`-k`]/[`-a`]/[`-m`]/[`--best`]/[`--strata`] options which
 define which and how many legal alignments should be reported.
 
 By default, Bowtie enforces an alignment policy similar to [Maq]'s
-default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70`).  See [the -n
+default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70).  See [the -n
 alignment mode] section of the manual for details about this mode.  But
 Bowtie can also enforce a simpler end-to-end k-difference policy (e.g.
 with [`-v`] 2`).  See [the -v alignment mode] section of the manual for
@@ -412,6 +412,8 @@ and 2.9 GB in paired-end mode.
 Performance Tuning
 ------------------
 
+[Performance tuning]: #performance-tuning
+
 1.  Use 64-bit bowtie if possible
 
     The 64-bit version of Bowtie is substantially faster (usually more
@@ -441,19 +443,19 @@ Performance Tuning
     10 per read) and you have some memory to spare, using an index with
     a denser SA sample can speed things up considerably.
 
-    To do this, specify a smaller-than-default [`-o`/`--offrate`][#bowtie-build-options-o] value
+    To do this, specify a smaller-than-default [`-o`/`--offrate`](#bowtie-build-options-o) value
     when running `bowtie-build`.  A denser SA sample yields a larger
     index, but is also particularly effective at speeding up alignment
     when many alignments are reported per read.  For example,
-    decreasing the index's [`-o`/`--offrate`][#bowtie-build-options-o] by 1 could as much as
+    decreasing the index's [`-o`/`--offrate`](#bowtie-build-options-o) by 1 could as much as
     double alignment performance, and decreasing by 2 could quadruple
     alignment performance, etc.
 
-    On the other hand, decreasing [`-o`/`--offrate`][#bowtie-build-options-o] increases the size
+    On the other hand, decreasing [`-o`/`--offrate`](#bowtie-build-options-o) increases the size
     of the Bowtie index, both on disk and in memory when aligning
-    reads.  At the default [`-o`/`--offrate`][#bowtie-build-options-o] of 5, the SA sample for the
+    reads.  At the default [`-o`/`--offrate`](#bowtie-build-options-o) of 5, the SA sample for the
     human genome occupies about 375 MB of memory when aligning reads.
-    Decreasing the [`-o`/`--offrate`][#bowtie-build-options-o] by 1 doubles the memory taken by
+    Decreasing the [`-o`/`--offrate`](#bowtie-build-options-o) by 1 doubles the memory taken by
     the SA sample, and decreasing by 2 quadruples the memory taken,
     etc.
 
@@ -465,8 +467,8 @@ Performance Tuning
     tool like `Process Explorer` on Windows), then try setting the
     `bowtie` [`-o`/`--offrate`] to a *larger* value than the value used
     to build the index.  For example, `bowtie-build`'s default
-    [`-o`/`--offrate`][#bowtie-build-options-o] is 5 and all pre-built indexes available from the
-    Bowtie website are built with [`-o`/`--offrate`][#bowtie-build-options-o] 5; so if `bowtie`
+    [`-o`/`--offrate`](#bowtie-build-options-o) is 5 and all pre-built indexes available from the
+    Bowtie website are built with [`-o`/`--offrate`](#bowtie-build-options-o) 5; so if `bowtie`
     thrashes when querying such an index, try using `bowtie`
     [`--offrate`] 6.  If `bowtie` still thrashes, try `bowtie`
     [`--offrate`] 7, etc.  A higher [`-o`/`--offrate`] causes `bowtie` to
@@ -1011,9 +1013,9 @@ those that would be reported given the [`-n`], [`-v`], [`-l`], [`-e`], [`-k`],
 designed to be very fast for small [`-m`] but bowtie can become
 significantly slower for larger values of [`-m`].  If you would like to
 use Bowtie for larger values of [`-k`], consider building an index with a
-denser suffix-array sample, i.e. specify a smaller [`-o`/`--offrate`][#bowtie-build-options-o] when
+denser suffix-array sample, i.e. specify a smaller [`-o`/`--offrate`](#bowtie-build-options-o) when
 invoking `bowtie-build` for the relevant index (see the [Performance
-tuning][#performance-tuning] section for details).
+tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-best">
 
@@ -1191,6 +1193,20 @@ or translation of quality values that may have taken place within
 written to `max_1.fq` and `max_2.fq` respectively.  These reads are not
 written to the file specified with [`--un`].
 
+</td></tr><tr><td id="bowtie-options-suppress">
+
+[`--suppress`]: #bowtie-options-suppress
+
+    --suppress <cols>
+
+</td><td>
+
+Suppress columns of output in the default output mode.  E.g. if
+`--suppress 1,5,6` is specified, the read name, read sequence, and read
+quality fields will be omitted.  See [Default Bowtie output] for field
+descriptions.  This option is ignored if the output mode is
+[`-S`/`--sam`].
+
 </td></tr><tr><td id="bowtie-options-sam-nohead">
 
 [`--sam-nohead`]: #bowtie-options-sam-nohead
@@ -1342,6 +1358,8 @@ Print usage information and quit.
 
 Default `bowtie` output
 -----------------------
+
+[Default Bowtie output]: #default-bowtie-output
 
 `bowtie` outputs one alignment per line.  Each line is a collection of
 8 fields separated by tabs; from left to right, the fields are:
@@ -1526,9 +1544,9 @@ Usage:
 </td><td>
 
 A comma-separated list of FASTA files containing the reference
-sequences to be aligned to, or, if [`-c`][#bowtie-build-options-c] is specified, the sequences
+sequences to be aligned to, or, if [`-c`](#bowtie-build-options-c) is specified, the sequences
 themselves. E.g., `<reference_in>` might be
-`chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or, if [`-c`][#bowtie-build-options-c] is specified, this might
+`chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or, if [`-c`](#bowtie-build-options-c) is specified, this might
 be `GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
 
 </td></tr><tr><td>
@@ -1567,7 +1585,7 @@ list of FASTA files.
 
 </td></tr><tr><td id="bowtie-build-options-a">
 
-[`-a`/`--noauto`][#bowtie-build-options-a]
+[`-a`/`--noauto`]: #bowtie-build-options-a
 
     -a/--noauto
 
@@ -1581,7 +1599,7 @@ message will be printed; it is up to the user to try new parameters.
 
 </td></tr><tr><td id="bowtie-build-options-p">
 
-[`--packed`][#bowtie-build-options-p]
+[`--packed`]: #bowtie-build-options-p
 
     -p/--packed
 
@@ -1594,7 +1612,7 @@ configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-bmax">
 
-[`--bmax`][#bowtie-build-options-bmax]
+[`--bmax`]: #bowtie-build-options-bmax
 
     --bmax <int>
 
@@ -1609,7 +1627,7 @@ automatically by default; use [`-a`/`--noauto`] to configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-bmaxdivn">
 
-[`--bmaxdivn`][#bowtie-build-options-bmaxdivn]
+[`--bmaxdivn`]: #bowtie-build-options-bmaxdivn
 
     --bmaxdivn <int>
 
@@ -1623,7 +1641,7 @@ use [`-a`/`--noauto`] to configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-dcv">
 
-[`--dcv`][#bowtie-build-options-dcv]
+[`--dcv`]: #bowtie-build-options-dcv
 
     --dcv <int>
 
@@ -1637,7 +1655,7 @@ default; use [`-a`/`--noauto`] to configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-nodc">
 
-[`--nodc`][#bowtie-build-options-nodc]
+[`--nodc`]: #bowtie-build-options-nodc
 
     --nodc
 
@@ -1675,7 +1693,7 @@ which contain a bitpacked version of the reference sequences and are
 
 To map alignments back to positions on the reference sequences, it's
 necessary to annotate ("mark") some or all of the [Burrows-Wheeler]
-rows with their corresponding location on the genome.  [`-o`/`--offrate`][#bowtie-build-options-o]
+rows with their corresponding location on the genome.  [`-o`/`--offrate`](#bowtie-build-options-o)
 governs how many rows get marked: the indexer will mark every 2^`<int>`
 rows.  Marking more rows makes reference-position lookups faster, but
 requires more memory to hold the annotations at runtime.  The default
@@ -1807,7 +1825,7 @@ bases (default: 60).
 
 </td></tr><tr><td id="bowtie-build-options-n">
 
-[`-n`/`--names`][#bowtie-build-options-n]
+[`-n`/`--names`]: #bowtie-build-options-n
 
     -n/--names
 
@@ -1817,7 +1835,7 @@ Print reference sequence names and quit.
 
 </td></tr><tr><td id="bowtie-build-options-s">
 
-[`-s`/`--summary`][#bowtie-build-options-s]
+[`-s`/`--summary`]: #bowtie-build-options-s
 
     -s/--summary
 
