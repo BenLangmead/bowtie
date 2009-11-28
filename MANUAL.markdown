@@ -107,7 +107,7 @@ By default, Bowtie enforces an alignment policy similar to [Maq]'s
 default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70).  See [the -n
 alignment mode] section of the manual for details about this mode.  But
 Bowtie can also enforce a simpler end-to-end k-difference policy (e.g.
-with [`-v`] 2`).  See [the -v alignment mode] section of the manual for
+with [`-v`] 2).  See [the -v alignment mode] section of the manual for
 details about that mode.
 
 Bowtie works best when aligning short reads to large genomes (e.g.
