@@ -610,6 +610,7 @@ names.  All quality values are assumed to be 40 on the [Phred quality]
 scale.
 
 </td></tr><tr><td id="bowtie-options-c">
+
 [`-c`]: #bowtie-options-c
 
     -c
@@ -621,6 +622,7 @@ The query sequences are given on command line.  I.e. `<m1>`, `<m2>` and
 read files.
 
 </td></tr><tr><td id="bowtie-options-s">
+
 [`-s`/`--skip`]: #bowtie-options-s
 [`-s`]: #bowtie-options-s
 
@@ -631,6 +633,7 @@ read files.
 Skip (i.e. do not align) the first `<int>` reads or pairs in the input.
 
 </td></tr><tr><td id="bowtie-options-u">
+
 [`-u`/`--qupto`]: #bowtie-options-u
 [`-u`]: #bowtie-options-u
 
@@ -642,6 +645,7 @@ Only align the first `<int>` reads or read pairs from the input (after
 the `-s/--skip` reads or pairs have been skipped).  Default: no limit.
 
 </td></tr><tr><td id="bowtie-options-5">
+
 [`-5`/`--trim5`]: #bowtie-options-5
 [`-5`]: #bowtie-options-5
 
@@ -653,6 +657,7 @@ Trim `<int>` bases from high-quality (left) end of each read before
 alignment (default: 0).
 
 </td></tr><tr><td id="bowtie-options-3">
+
 [`-3`/`--trim3`]: #bowtie-options-3
 [`-3`]: #bowtie-options-3
 
@@ -664,6 +669,7 @@ Trim `<int>` bases from low-quality (right) end of each read before
 alignment (default: 0).
 
 </td></tr><tr><td id="bowtie-options-phred33-quals">
+
 [`--phred33-quals`]: #bowtie-options-phred33-quals
 
     --phred33-quals
@@ -674,6 +680,7 @@ Input qualities are ASCII chars equal to the [Phred quality] plus 33.
 Default: on.
 
 </td></tr><tr><td id="bowtie-options-phred64-quals">
+
 [`--phred64-quals`]: #bowtie-options-phred64-quals
 
     --phred64-quals
@@ -684,6 +691,7 @@ Input qualities are ASCII chars equal to the [Phred quality] plus 64.
 Default: off.
 
 </td></tr><tr><td id="bowtie-options-solexa-quals">
+
 [`--solexa-quals`]: #bowtie-options-solexa-quals
 
     --solexa-quals
@@ -696,6 +704,7 @@ right option for use with (unconverted) reads emitted by GA Pipeline
 versions prior to 1.3.  Default: off.
 
 </td></tr><tr><td id="bowtie-options-solexa1.3-quals">
+
 [`--solexa1.3-quals`]: #bowtie-options-solexa1.3-quals
 
     --solexa1.3-quals
@@ -707,6 +716,7 @@ with (unconverted) reads emitted by GA Pipeline version 1.3 or later.
 Default: off.
 
 </td></tr><tr><td id="bowtie-options-integer-quals">
+
 [`--integer-quals`]: #bowtie-options-integer-quals
 
     --integer-quals
@@ -724,6 +734,7 @@ Default: off.
 #### Alignment
 
 <table><tr><td id="bowtie-options-n">
+
 [`-n`/`--seedmms`]: #bowtie-options-n
 [`-n`]: #bowtie-options-n
 
@@ -737,6 +748,7 @@ This may be 0, 1, 2 or 3 and the default is 2.  This option is mutually
 exclusive with the [`-v`] option.
 
 </td></tr><tr><td id="bowtie-options-e">
+
 [`-e`/`--maqerr`]: #bowtie-options-e
 [`-e`]: #bowtie-options-e
 
@@ -750,6 +762,7 @@ nearest 10 and saturates at 30; rounding can be disabled with
 [`--nomaqround`].
 
 </td></tr><tr><td id="bowtie-options-l">
+
 [`-l`/`--seedlen`]: #bowtie-options-l
 [`-l`]: #bowtie-options-l
 
@@ -763,6 +776,7 @@ setting is 5 and the default is 28.  `bowtie` is faster for larger
 values of [`-l`].
 
 </td></tr><tr><td id="bowtie-options-nomaqround">
+
 [`--nomaqround`]: #bowtie-options-nomaqround
 
     --nomaqround
@@ -775,6 +789,7 @@ default, `bowtie` also rounds this way.  [`--nomaqround`] prevents this
 rounding in `bowtie`.
 
 </td></tr><tr><td id="bowtie-options-v">
+
 [`-v`]: #bowtie-options-v
 
     -v <int>
@@ -786,6 +801,7 @@ options are ignored and quality values have no effect on what
 alignments are valid.  [`-v`] is mutually exclusive with [`-n`].
 
 </td></tr><tr><td id="bowtie-options-I">
+
 [`-I`/`--minins`]: #bowtie-options-I
 [`-I`]: #bowtie-options-I
 
@@ -802,6 +818,7 @@ options [`-3`] or [`-5`] are also used, the [`-I`] constraint is
 applied with respect to the untrimmed mates.  Default: 0.
 
 </td></tr><tr><td id="bowtie-options-X">
+
 [`-X`/`--maxins`]: #bowtie-options-X
 [`-X`]: #bowtie-options-X
 
@@ -818,6 +835,7 @@ or `-5` are also used, the `-X` constraint is applied with respect to
 the untrimmed mates, not the trimmed mates.  Default: 250.
 
 </td></tr><tr><td id="bowtie-options-fr">
+
 [`--fr`/`--rf`/`--ff`]: #bowtie-options-fr
 
     --fr/--rf/--ff
@@ -837,6 +855,7 @@ downstream mate2 to be forward-oriented.  Default: `--fr` (appropriate
 for the Illumina short insert library).
 
 </td></tr><tr><td id="bowtie-options-nofw">
+
 [`--nofw`]: #bowtie-options-nofw
 
     --nofw/--norc
@@ -853,6 +872,7 @@ orientation where mate 2 occurs upstream of mate 1 with respect to the
 forward reference strand.
 
 </td></tr><tr><td id="bowtie-options-maxbts">
+
 [`--maxbts`]: #bowtie-options-maxbts
 
     --maxbts
@@ -871,6 +891,7 @@ be missed.  Higher limits yield greater sensitivity at the expensive of
 longer running times.  See also: `-y`/`--tryhard`.
 
 </td></tr><tr><td id="bowtie-options-pairtries">
+
 [`--pairtries`]: #bowtie-options-pairtries
 
     --pairtries <int>
@@ -887,6 +908,7 @@ end alignments for repetitive pairs at the expense of speed.  The
 default is 100.  See also: `-y`/`--tryhard`.
 
 </td></tr><tr><td id="bowtie-options-y">
+
 [`-y`/`--tryhard`]: #bowtie-options-y
 [`-y`]: #bowtie-options-y
 
@@ -903,6 +925,7 @@ repetitive, (b) the reads are low quality, or (c) not many reads have
 valid alignments.
 
 </td></tr><tr><td id="bowtie-options-chunkmbs">
+
 [`--chunkmbs`]: #bowtie-options-chunkmbs
 
     --chunkmbs <int>
@@ -923,6 +946,7 @@ dedicate more memory to the descriptors.  Default: 32.
 #### Reporting
 
 <table><tr><td id="bowtie-options-k">
+
 [`-k`]: #bowtie-options-k
 
     -k <int>
@@ -942,6 +966,7 @@ an index with a denser suffix-array sample, i.e. specify a smaller
 the [Performance tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-a">
+
 [`-a`/`--all`]: #bowtie-options-a
 [`-a`]: #bowtie-options-a
 
@@ -962,6 +987,7 @@ invoking `bowtie-build` for the relevant index (see the [Performance
 tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-m">
+
 [`-m`]: #bowtie-options-m
 
     -m <int>
@@ -982,6 +1008,7 @@ tuning] section for details).
 [Performance Tips]: #performance-tuning
 
 </td></tr><tr><td id="bowtie-options-best">
+
 [`--best`]: #bowtie-options-best
 
     --best
@@ -1006,6 +1033,7 @@ best-to-worst order in `bowtie`'s output.  `bowtie` is somewhat slower
 when [`--best`] is specified.
 
 </td></tr><tr><td id="bowtie-options-strata">
+
 [`--strata`]: #bowtie-options-strata
 
     --strata
@@ -1024,6 +1052,7 @@ regardless of whether they fall into multiple strata.  When
 #### Output
 
 <table><tr><td id="bowtie-options-S">
+
 [`-S`/`--sam`]: #bowtie-options-S
 [`-S`]: #bowtie-options-S
 
@@ -1042,6 +1071,7 @@ converted to BAM on the fly by piping `bowtie`'s output to
 [SAM output]: #sam-output
 
 </td></tr><tr><td id="bowtie-options-t">
+
 [`-t`/`--time`]: #bowtie-options-t
 [`-t`]: #bowtie-options-t
 
@@ -1052,6 +1082,7 @@ converted to BAM on the fly by piping `bowtie`'s output to
 Print the amount of wall-clock time taken by each phase.
 
 </td></tr><tr><td  id="bowtie-options-B">
+
 [`-B`/`--offbase`]: #bowtie-options-B
 [`-B`]: #bowtie-options-B
 
@@ -1063,6 +1094,7 @@ When outputting alignments, number the first base of a reference
 sequence as `<int>`.  Default: 0.
 
 </td></tr><tr><td id="bowtie-options-quiet">
+
 [`--quiet`]: #bowtie-options-quiet
 
     --quiet
@@ -1072,6 +1104,7 @@ sequence as `<int>`.  Default: 0.
 Print nothing besides alignments.
 
 </td></tr><tr><td id="bowtie-options-refout">
+
 [`--refout`]: #bowtie-options-refout
 
     --refout
@@ -1085,6 +1118,7 @@ with, for example, large numbers of reads aligned to the assembled
 human genome.  If `<hits>` is also specified, it will be ignored.
 
 </td></tr><tr><td id="bowtie-options-refidx">
+
 [`--refidx`]: #bowtie-options-refidx
 
     --refidx
@@ -1096,6 +1130,7 @@ to it by 0-based index (its offset into the list of references that
 were indexed) rather than by name.
 
 </td></tr><tr><td id="bowtie-options-al">
+
 [`--al`]: #bowtie-options-al
 
     --al <filename>
@@ -1112,6 +1147,7 @@ that fail to align will be written to `aligned_1.fq` and `aligned_2.fq`
 respectively.
 
 </td></tr><tr><td id="bowtie-options-un">
+
 [`--un`]: #bowtie-options-un
 
     --un <filename>
@@ -1130,6 +1166,7 @@ of valid alignments exceeding the limit set with the [`-m`] option are
 also written to `<filename>`.
 
 </td></tr><tr><td id="bowtie-options-max">
+
 [`--max`]: #bowtie-options-max
 
     --max <filename>
@@ -1147,6 +1184,7 @@ written to `max_1.fq` and `max_2.fq` respectively.  These reads are not
 written to the file specified with [`--un`].
 
 </td></tr><tr><td id="bowtie-options-sam-nohead">
+
 [`--sam-nohead`]: #bowtie-options-sam-nohead
 
     --sam-nohead
@@ -1156,6 +1194,7 @@ written to the file specified with [`--un`].
 Suppress header lines (starting with `@`) when output is [SAM].
 
 </td></tr><tr><td id="bowtie-options-sam-nosq">
+
 [`--sam-nosq`]: #bowtie-options-sam-nosq
 
     --sam-nosq
@@ -1165,6 +1204,7 @@ Suppress header lines (starting with `@`) when output is [SAM].
 Suppress `@SQ` header lines when output is [SAM].
 
 </td></tr><tr><td id="bowtie-options-fullref">
+
 [`--fullref`]: #bowtie-options-fullref
 
     --fullref
@@ -1180,6 +1220,7 @@ including the first whitespace.
 #### Performance
 
 <table><tr><td id="bowtie-options-p">
+
 [`-p`/`--threads`]: #bowtie-options-p
 [`-p`]: #bowtie-options-p
 
@@ -1195,6 +1236,7 @@ if `bowtie` is linked with the `pthreads` library (i.e. if
 `BOWTIE_PTHREADS=0` is not specified at build time).
 
 </td></tr><tr><td id="bowtie-options-o">
+
 [`-o`/`--offrate`]: #bowtie-options-o
 [`-o`]: #bowtie-options-o
 
@@ -1210,6 +1252,7 @@ offsets.  `<int>` must be greater than the value used to build the
 index.
 
 </td></tr><tr><td id="bowtie-options-mm">
+
 [`--mm`]: #bowtie-options-mm
 
     --mm
@@ -1224,6 +1267,7 @@ parallelization of `bowtie` in situations where using [`-p`] is not
 possible.
 
 </td></tr><tr><td id="bowtie-options-shmem">
+
 [`--shmem`]: #bowtie-options-shmem
 
     --shmem
@@ -1248,6 +1292,7 @@ larger indexes; see your OS documentation.
 #### Other
 
 <table><tr><td id="bowtie-options-seed">
+
 [`--seed`]: #bowtie-options-seed
 
     --seed <int>
@@ -1257,6 +1302,7 @@ larger indexes; see your OS documentation.
 Use `<int>` as the seed for pseudo-random number generator.
 
 </td></tr><tr><td id="bowtie-options-verbose">
+
 [`--verbose`]: #bowtie-options-verbose
 
     --verbose
@@ -1266,6 +1312,7 @@ Use `<int>` as the seed for pseudo-random number generator.
 Print verbose output (for debugging).
 
 </td></tr><tr><td id="bowtie-options-version">
+
 [`--version`]: #bowtie-options-version
 
     --version
