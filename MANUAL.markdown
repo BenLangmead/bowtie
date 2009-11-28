@@ -1,13 +1,10 @@
 <!--
-Bowtie: an Ultrafast, Lightweight Short Read Aligner
-by Ben Langmead and Cole Trapnell
-
-This manual is written in "markdown" format and thus contains some
-mildly distracting visual clutter encoding information about how to
-convert to HTML.  The document is still quite readable as raw text,
-but if the clutter is too distracting, try the man or HTML versions
-instead.
--->
+ ! This manual is written in "markdown" format and thus contains some
+ ! mildly distracting visual clutter encoding information about how
+ ! to convert to HTML.  The document is still quite readable as raw
+ ! text, but if the clutter is too distracting, try the man or HTML
+ ! versions instead.
+  -->
 
 What is Bowtie?
 ===============
@@ -125,9 +122,9 @@ short-read analyses such as RNA-seq, ChIP-seq, other types of -seq, and
 mammalian resequencing.  You may observe longer running times in other
 research contexts.
 
-If you find Bowtie's performance to be disappointingly slow, please try
-some of the performance-tuning hints described in the [High Performance
-Tips] section below.
+If `bowtie` is too slow for your application, please try some of the
+performance-tuning hints described in the [Performance Tuning] section
+below.
 
 Alignments involving one or more ambiguous reference characters (`N`,
 `-`, `R`, `Y`, etc.) are considered invalid by Bowtie.  This is true
@@ -169,7 +166,7 @@ for a future release.
 [the -n alignment mode]: #the--n-alignment-mode
 [the -v alignment mode]: #the--v-alignment-mode
 [High Performance Tips]: #high-performance-tips
-[Maq]:                   http://maq.sf.net
+[Maq]: http://maq.sf.net
 
 The `-n` alignment mode
 -----------------------
@@ -488,15 +485,12 @@ Usage:
 
 </td><td>
 
-   The basename of the index to be searched.  The
-   basename is the name of any of the index files up
-   to but not including the final `.1.ebwt` /
-   `.rev.1.ebwt` / etc.  `bowtie` looks for the
-   specified index first in the current directory,
-   then in the `indexes` subdirectory under the
-   directory where the `bowtie` executable is
-   located, then looks in the directory specified in
-   the `BOWTIE_INDEXES` environment variable.
+The basename of the index to be searched.  The basename is the name of
+any of the index files up to but not including the final `.1.ebwt` /
+`.rev.1.ebwt` / etc.  `bowtie` looks for the specified index first in
+the current directory, then in the `indexes` subdirectory under the
+directory where the `bowtie` executable is located, then looks in the
+directory specified in the `BOWTIE_INDEXES` environment variable.
 
 </td></tr><tr><td>
 
@@ -504,17 +498,14 @@ Usage:
 
 </td><td>
 
-   Comma-separated list of files containing the #1
-   mates (filename usually includes `_1`), or, if
-   `-c` is specified, the mate sequences themselves.
-   E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if
-   `-c` is specified, this might be
-   `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
-   this option must correspond file-for-file and
-   read-for-read with those specified in &lt;m2>.  Reads
-   may be a mix of different lengths.  If `-` is
-   specified, `bowtie` will read the #1 mates from
-   the "standard in" filehandle.
+Comma-separated list of files containing the #1 mates (filename usually
+includes `_1`), or, if `-c` is specified, the mate sequences
+themselves.  E.g., this might be `flyA_1.fq,flyB_1.fq`, or, if `-c` is
+specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
+with this option must correspond file-for-file and read-for-read with
+those specified in `<m2>`.  Reads may be a mix of different lengths.
+If `-` is specified, `bowtie` will read the #1 mates from the "standard
+in" filehandle.
 
 </td></tr><tr><td>
 
@@ -522,17 +513,14 @@ Usage:
 
 </td><td>
 
-   Comma-separated list of files containing the #2
-   mates (filename usually includes `_2`), or, if
-   `-c` is specified, the mate sequences themselves.
-   E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if
-   `-c` is specified, this might be
-   `GGTCATCCT,ACGGGTCGT`.  Sequences specified with
-   this option must correspond file-for-file and
-   read-for-read with those specified in &lt;m1>.  Reads
-   may be a mix of different lengths.  If `-` is
-   specified, `bowtie` will read the #2 mates from
-   the "standard in" filehandle.
+Comma-separated list of files containing the #2 mates (filename usually
+includes `_2`), or, if `-c` is specified, the mate sequences
+themselves.  E.g., this might be `flyA_2.fq,flyB_2.fq`, or, if `-c` is
+specified, this might be `GGTCATCCT,ACGGGTCGT`.  Sequences specified
+with this option must correspond file-for-file and read-for-read with
+those specified in `<m1>`.  Reads may be a mix of different lengths.
+If `-` is specified, `bowtie` will read the #2 mates from the "standard
+in" filehandle.
 
 </td></tr><tr><td>
 
@@ -540,21 +528,17 @@ Usage:
 
 </td><td>
 
-   Comma-separated list of files containing a mix of
-   unpaired and paired-end reads in Tab-delimited
-   format.  Tab-delimited format is a 1-read-per-line
-   format where unpaired reads consist of a read
-   name, sequence and quality string each separated
-   by tabs.  A paired-end read consists of a read
-   name, sequnce of the #1 mate, quality values of
-   the #1 mate, sequence of the #2 mate, and quality
-   values of the #2 mate separated by tabs.  Quality
-   values can be expressed using any of the scales
-   supported in FASTQ files.  Reads may be a mix of
-   different lengths and paired-end and unpaired
-   reads may be intermingled in the same file.  If
-   `-` is specified, `bowtie` will read the Tab-
-   delimited reads from the "standard in" filehandle.
+Comma-separated list of files containing a mix of unpaired and
+paired-end reads in Tab-delimited format.  Tab-delimited format is a
+1-read-per-line format where unpaired reads consist of a read name,
+sequence and quality string each separated by tabs.  A paired-end read
+consists of a read name, sequnce of the #1 mate, quality values of the
+#1 mate, sequence of the #2 mate, and quality values of the #2 mate
+separated by tabs.  Quality values can be expressed using any of the
+scales supported in FASTQ files.  Reads may be a mix of different
+lengths and paired-end and unpaired reads may be intermingled in the
+same file.  If `-` is specified, `bowtie` will read the Tab-delimited
+reads from the "standard in" filehandle.
 
 </td></tr><tr><td>
 
@@ -562,15 +546,13 @@ Usage:
 
 </td><td>
 
-   A comma-separated list of files containing
-   unpaired reads to be aligned, or, if `-c` is
-   specified, the unpaired read sequences themselves.
-   E.g., this might be
-   `lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if `-c`
-   is specified, this might be `GGTCATCCT,ACGGGTCGT`.
-   Reads may be a mix of different lengths.  If `-`
-   is specified, Bowtie gets the reads from the
-   "standard in" filehandle.
+A comma-separated list of files containing unpaired reads to be
+aligned, or, if `-c` is specified, the unpaired read sequences
+themselves.  E.g., this might be
+`lane1.fq,lane2.fq,lane3.fq,lane4.fq`, or, if `-c` is specified, this
+might be `GGTCATCCT,ACGGGTCGT`.  Reads may be a mix of different
+lengths.  If `-` is specified, Bowtie gets the reads from the "standard
+in" filehandle.
 
 </td></tr><tr><td>
 
@@ -578,8 +560,8 @@ Usage:
 
 </td><td>
 
-   File to write alignments to.  By default,
-   alignments are written to stdout (the console).
+File to write alignments to.  By default, alignments are written to the
+"standard out" filehandle (i.e. the console).
 
 </td></tr></table>
 
@@ -587,43 +569,45 @@ Usage:
 
 #### Input
 
-<table><tr><td>
+<table>
+<tr><td id="bowtie-options-q">
+[`-q`]: #bowtie-options-q
 
     -q
 
 </td><td>
 
-The query input files (specified either as `<m1>`
-and `<m2>`, or as `<s>`) are FASTQ files (usually
-having extension .fq or .fastq).  This is the
-default.  See also: `--solexa-quals` and
-`--integer-quals`.
+The query input files (specified either as `<m1>` and `<m2>`, or as
+`<s>`) are FASTQ files (usually having extension `.fq` or `.fastq`).
+This is the default.  See also: [`--solexa-quals`] and
+[`--integer-quals`].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-f">
+[`-f`]: #bowtie-options-f
 
     -f
 
 </td><td>
 
-The query input files (specified either as `<m1>`
-and `<m2>`, or as `<s>`) are FASTA files (usually
-having extension `.fa`, `.mfa`, `.fna` or similar).  All
-quality values are assumed to be 40 on the Phred
-scale.
+The query input files (specified either as `<m1>` and `<m2>`, or as
+`<s>`) are FASTA files (usually having extension `.fa`, `.mfa`, `.fna`
+or similar).  All quality values are assumed to be 40 on the [Phred
+quality] scale.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-r">
+[`-r`]: #bowtie-options-r
 
     -r
 
 </td><td>
 
-The query input files (specified either as `<m1>`
-and `<m2>`, or as `<s>`) are Raw files: one sequence
-per line, without quality values or names.  All
-quality values are assumed to be 40 on the [Phred
-quality] scale.
+The query input files (specified either as `<m1>` and `<m2>`, or as
+`<s>`) are Raw files: one sequence per line, without quality values or
+names.  All quality values are assumed to be 40 on the [Phred quality]
+scale.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-c">
+[`-c`]: #bowtie-options-c
 
     -c
 
@@ -633,7 +617,9 @@ The query sequences are given on command line.  I.e. `<m1>`, `<m2>` and
 `<singles>` are comma-separated lists of reads rather than lists of
 read files.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-s">
+[`-s`/`--skip`]: #bowtie-options-s
+[`-s`]: #bowtie-options-s
 
     -s/--skip <int>
 
@@ -641,7 +627,9 @@ read files.
 
 Skip (i.e. do not align) the first `<int>` reads or pairs in the input.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-u">
+[`-u`/`--qupto`]: #bowtie-options-u
+[`-u`]: #bowtie-options-u
 
     -u/--qupto <int>
 
@@ -650,7 +638,9 @@ Skip (i.e. do not align) the first `<int>` reads or pairs in the input.
 Only align the first `<int>` reads or read pairs from the input (after
 the `-s/--skip` reads or pairs have been skipped).  Default: no limit.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-5">
+[`-5`/`--trim5`]: #bowtie-options-5
+[`-5`]: #bowtie-options-5
 
     -5/--trim5 <int>
 
@@ -659,7 +649,9 @@ the `-s/--skip` reads or pairs have been skipped).  Default: no limit.
 Trim `<int>` bases from high-quality (left) end of each read before
 alignment (default: 0).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-3">
+[`-3`/`--trim3`]: #bowtie-options-3
+[`-3`]: #bowtie-options-3
 
     -3/--trim3 <int>
 
@@ -668,7 +660,8 @@ alignment (default: 0).
 Trim `<int>` bases from low-quality (right) end of each read before
 alignment (default: 0).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-phred33-quals">
+[`--phred33-quals`]: #bowtie-options-phred33-quals
 
     --phred33-quals
 
@@ -677,7 +670,8 @@ alignment (default: 0).
 Input qualities are ASCII chars equal to the [Phred quality] plus 33.
 Default: on.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-phred64-quals">
+[`--phred64-quals`]: #bowtie-options-phred64-quals
 
     --phred64-quals
 
@@ -686,7 +680,8 @@ Default: on.
 Input qualities are ASCII chars equal to the [Phred quality] plus 64.
 Default: off.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-solexa-quals">
+[`--solexa-quals`]: #bowtie-options-solexa-quals
 
     --solexa-quals
 
@@ -697,7 +692,8 @@ negative) to [Phred][Phred quality] (which can't).  This is usually the
 right option for use with (unconverted) reads emitted by GA Pipeline
 versions prior to 1.3.  Default: off.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-solexa1.3-quals">
+[`--solexa1.3-quals`]: #bowtie-options-solexa1.3-quals
 
     --solexa1.3-quals
 
@@ -707,7 +703,8 @@ Same as `--phred64-quals`.  This is usually the right option for use
 with (unconverted) reads emitted by GA Pipeline version 1.3 or later. 
 Default: off.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-integer-quals">
+[`--integer-quals`]: #bowtie-options-integer-quals
 
     --integer-quals
 
@@ -723,18 +720,22 @@ Default: off.
 
 #### Alignment
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-n">
+[`-n`/`--seedmms`]: #bowtie-options-n
+[`-n`]: #bowtie-options-n
 
     -n/--seedmms <int>
 
 </td><td>
 
 Maximum number of mismatches permitted in the "seed", i.e. the first
-`L` base pairs of the read (where `L` is set with `-l/--seedlen`).
+`L` base pairs of the read (where `L` is set with [`-l`/`--seedlen`]).
 This may be 0, 1, 2 or 3 and the default is 2.  This option is mutually
-exclusive with the `-v` option.
+exclusive with the [`-v`] option.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-e">
+[`-e`/`--maqerr`]: #bowtie-options-e
+[`-e`]: #bowtie-options-e
 
     -e/--maqerr <int>
 
@@ -743,20 +744,23 @@ exclusive with the `-v` option.
 Maximum permitted total of quality values at mismatched read positions.
 The default is 70.  Like [Maq], `bowtie` rounds quality values to the
 nearest 10 and saturates at 30; rounding can be disabled with
-`--nomaqround`.
+[`--nomaqround`].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-l">
+[`-l`/`--seedlen`]: #bowtie-options-l
+[`-l`]: #bowtie-options-l
 
     -l/--seedlen <int>
 
 </td><td>
 
 The "seed length"; i.e., the number of bases on the high-quality end of
-the read to which the `-n` ceiling applies.  The lowest permitted
+the read to which the [`-n`] ceiling applies.  The lowest permitted
 setting is 5 and the default is 28.  `bowtie` is faster for larger
-values of `-l`.
+values of [`-l`].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-nomaqround">
+[`--nomaqround`]: #bowtie-options-nomaqround
 
     --nomaqround
 
@@ -764,20 +768,23 @@ values of `-l`.
 
 [Maq] accepts quality values in the [Phred quality] scale, but
 internally rounds values to the nearest 10, with a maximum of 30.  By
-default, `bowtie` also rounds this way.  `--nomaqround` prevents this
+default, `bowtie` also rounds this way.  [`--nomaqround`] prevents this
 rounding in `bowtie`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-v">
+[`-v`]: #bowtie-options-v
 
     -v <int>
 
 </td><td>
 
-Report alignments with at most `<int>` mismatches.  `-e` and `-l`
+Report alignments with at most `<int>` mismatches.  [`-e`] and [`-l`]
 options are ignored and quality values have no effect on what
-alignments are valid.  `-v` is mutually exclusive with `-n`.
+alignments are valid.  [`-v`] is mutually exclusive with [`-n`].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-I">
+[`-I`/`--minins`]: #bowtie-options-I
+[`-I`]: #bowtie-options-I
 
     -I/--minins <int>
 
@@ -786,12 +793,14 @@ alignments are valid.  `-v` is mutually exclusive with `-n`.
 The minimum insert size for valid paired-end alignments.  E.g. if `-I
 60` is specified and a paired-end alignment consists of two 20-bp
 alignments in the appropriate orientation with a 20-bp gap between
-them, that alignment is considered valid (as long as `-X` is also
+them, that alignment is considered valid (as long as [`-X`] is also
 satisfied).  A 19-bp gap would not be valid in that case.  If trimming
-options `-3` or `-5` are also used, the `-I` constraint is applied with
-respect to the untrimmed mates, not the trimmed mates.  Default: 0.
+options [`-3`] or [`-5`] are also used, the [`-I`] constraint is
+applied with respect to the untrimmed mates.  Default: 0.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-X">
+[`-X`/`--maxins`]: #bowtie-options-X
+[`-X`]: #bowtie-options-X
 
     -X/--maxins <int>
 
@@ -805,7 +814,8 @@ A 61-bp gap would not be valid in that case.  If trimming options `-3`
 or `-5` are also used, the `-X` constraint is applied with respect to
 the untrimmed mates, not the trimmed mates.  Default: 250.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-fr">
+[`--fr`/`--rf`/`--ff`]: #bowtie-options-fr
 
     --fr/--rf/--ff
 
@@ -823,7 +833,8 @@ forward-oriented. ` --ff` requires both an upstream mate1 and a
 downstream mate2 to be forward-oriented.  Default: `--fr` (appropriate
 for the Illumina short insert library).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-nofw">
+[`--nofw`]: #bowtie-options-nofw
 
     --nofw/--norc
 
@@ -838,7 +849,8 @@ I.e. specifying `--nofw` and `--fr` will only find reads in the R/F
 orientation where mate 2 occurs upstream of mate 1 with respect to the
 forward reference strand.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-maxbts">
+[`--maxbts`]: #bowtie-options-maxbts
 
     --maxbts
 
@@ -855,7 +867,8 @@ significantly.  However, this limit may cause some valid alignments to
 be missed.  Higher limits yield greater sensitivity at the expensive of
 longer running times.  See also: `-y`/`--tryhard`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-pairtries">
+[`--pairtries`]: #bowtie-options-pairtries
 
     --pairtries <int>
 
@@ -870,7 +883,9 @@ Setting this to a higher number allows `bowtie` to find more paired-
 end alignments for repetitive pairs at the expense of speed.  The
 default is 100.  See also: `-y`/`--tryhard`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-y">
+[`-y`/`--tryhard`]: #bowtie-options-y
+[`-y`]: #bowtie-options-y
 
     -y/--tryhard
 
@@ -884,26 +899,28 @@ certain problems.  This mode is slower when (a) the reference is very
 repetitive, (b) the reads are low quality, or (c) not many reads have
 valid alignments.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-chunkmbs">
+[`--chunkmbs`]: #bowtie-options-chunkmbs
 
     --chunkmbs <int>
 
 </td><td>
 
 The number of megabytes of memory a given thread is given to store path
-descriptors in `--best` mode.  Best-first search must keep track of
+descriptors in [`--best`] mode.  Best-first search must keep track of
 many paths at once to ensure it is always extending the path with the
 lowest cumulative cost.  Bowtie tries to minimize the memory impact of
 the descriptors, but they can still grow very large in some cases.  If
 you receive an error message saying that chunk memory has been
-exhausted in `--best` mode, try adjusting this parameter up to dedicate
-more memory to the descriptors.  Default: 32.
+exhausted in [`--best`] mode, try adjusting this parameter up to
+dedicate more memory to the descriptors.  Default: 32.
 
 </td></tr></table>
 
 #### Reporting
 
 <table><tr><td id="bowtie-options-k">
+[`-k`]: #bowtie-options-k
 
     -k <int>
 
@@ -922,6 +939,8 @@ an index with a denser suffix-array sample, i.e. specify a smaller
 the [Performance tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-a">
+[`-a`/`--all`]: #bowtie-options-a
+[`-a`]: #bowtie-options-a
 
     -a/--all
 
@@ -940,6 +959,7 @@ invoking `bowtie-build` for the relevant index (see the [Performance
 tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-m">
+[`-m`]: #bowtie-options-m
 
     -m <int>
 
@@ -959,6 +979,7 @@ tuning] section for details).
 [Performance Tips]: #performance-tuning
 
 </td></tr><tr><td id="bowtie-options-best">
+[`--best`]: #bowtie-options-best
 
     --best
 
@@ -966,53 +987,60 @@ tuning] section for details).
 
 Make Bowtie guarantee that reported singleton alignments are "best" in
 terms of stratum (i.e. number of mismatches, or mismatches in the seed
-in the case of -n mode) and in terms of the quality values at the
+in the case of [`-n`] mode) and in terms of the quality values at the
 mismatched position(s).  Stratum always trumps quality; e.g. a
 1-mismatch alignment where the mismatched position has [Phred quality]
 40 is preferred over a 2-mismatch alignment where the mismatched
-positions both have [Phred quality] 10.  When `--best` is not
+positions both have [Phred quality] 10.  When [`--best`] is not
 specified, Bowtie may report alignments that are sub-optimal in terms
 of stratum and/or quality (though an effort is made to report the best
-alignment).  `--best` mode also removes all strand bias.  Note that
---best does not affect which alignments are considered "valid" by
+alignment).  [`--best`] mode also removes all strand bias.  Note that
+[`--best`] does not affect which alignments are considered "valid" by
 `bowtie`, only which valid alignments are reported by `bowtie`.  When
-`--best` is specified and multiple hits are allowed (via `-k` or `-a`),
-the alignments for a given read are guaranteed to appear in
-best-to-worst order in `bowtie`'s output.  Bowtie is somewhat slower
-when `--best` is specified.
+[`--best`] is specified and multiple hits are allowed (via [`-k`] or
+[`-a`]), the alignments for a given read are guaranteed to appear in
+best-to-worst order in `bowtie`'s output.  `bowtie` is somewhat slower
+when [`--best`] is specified.
 
 </td></tr><tr><td id="bowtie-options-strata">
+[`--strata`]: #bowtie-options-strata
 
     --strata
 
 </td><td>
 
 If many valid alignments exist and are reportable (e.g. are not
-disallowed via the `-k` option) and they fall into more than one
+disallowed via the [`-k`] option) and they fall into more than one
 alignment "stratum", report only those alignments that fall into the
 best stratum.  By default, Bowtie reports all reportable alignments
 regardless of whether they fall into multiple strata.  When
-`--strata` is specified, `--best` must also be specified. 
+[`--strata`] is specified, [`--best`] must also be specified. 
 
 </td></tr></table>
 
 #### Output
 
 <table><tr><td id="bowtie-options-S">
+[`-S`/`--sam`]: #bowtie-options-S
+[`-S`]: #bowtie-options-S
 
     -S/--sam
 
 </td><td>
 
 Print alignments in [SAM] format.  See the [SAM output] section of the
-manual for details.  To suppress all SAM headers, use `--sam-nohead`.
+manual for details.  To suppress all SAM headers, use [`--sam-nohead`].
 To suppress just the `@SQ` headers (e.g. if the alignment is against a
-very large number of reference sequences), use `--sam-nosq`.  `bowtie`
-does not write BAM files directly, but SAM output can be converted to
-BAM on the fly by piping `bowtie`'s output to `samtools view`.  `-S`/
-`--sam` is not compatible with `--refout`.
+very large number of reference sequences), use [`--sam-nosq`].
+`bowtie` does not write BAM files directly, but SAM output can be
+converted to BAM on the fly by piping `bowtie`'s output to
+`samtools view`.  [`-S`/`--sam`] is not compatible with [`--refout`].
+
+[SAM output]: #sam-output
 
 </td></tr><tr><td id="bowtie-options-t">
+[`-t`/`--time`]: #bowtie-options-t
+[`-t`]: #bowtie-options-t
 
     -t/--time
 
@@ -1021,6 +1049,8 @@ BAM on the fly by piping `bowtie`'s output to `samtools view`.  `-S`/
 Print the amount of wall-clock time taken by each phase.
 
 </td></tr><tr><td  id="bowtie-options-B">
+[`-B`/`--offbase`]: #bowtie-options-B
+[`-B`]: #bowtie-options-B
 
     -B/--offbase <int>
 
@@ -1030,6 +1060,7 @@ When outputting alignments, number the first base of a reference
 sequence as `<int>`.  Default: 0.
 
 </td></tr><tr><td id="bowtie-options-quiet">
+[`--quiet`]: #bowtie-options-quiet
 
     --quiet
 
@@ -1038,6 +1069,7 @@ sequence as `<int>`.  Default: 0.
 Print nothing besides alignments.
 
 </td></tr><tr><td id="bowtie-options-refout">
+[`--refout`]: #bowtie-options-refout
 
     --refout
 
@@ -1050,6 +1082,7 @@ with, for example, large numbers of reads aligned to the assembled
 human genome.  If `<hits>` is also specified, it will be ignored.
 
 </td></tr><tr><td id="bowtie-options-refidx">
+[`--refidx`]: #bowtie-options-refidx
 
     --refidx
 
@@ -1060,6 +1093,7 @@ to it by 0-based index (its offset into the list of references that
 were indexed) rather than by name.
 
 </td></tr><tr><td id="bowtie-options-al">
+[`--al`]: #bowtie-options-al
 
     --al <filename>
 
@@ -1075,6 +1109,7 @@ that fail to align will be written to `aligned_1.fq` and `aligned_2.fq`
 respectively.
 
 </td></tr><tr><td id="bowtie-options-un">
+[`--un`]: #bowtie-options-un
 
     --un <filename>
 
@@ -1087,27 +1122,29 @@ have taken place within Bowtie.  Paired-end reads will be written to
 two parallel files with `_1` and `_2` inserted in the filename, e.g.,
 if `<filename>` is `unaligned.fq`, the #1 and #2 mates that fail to
 align will be written to `unaligned_1.fq` and `unaligned_2.fq`
-respectively.  Unless `--max` is also specified, reads with a number of
-valid alignments exceeding the limit set with the `-m` option are also
-written to `<filename>`.
+respectively.  Unless [`--max`] is also specified, reads with a number
+of valid alignments exceeding the limit set with the [`-m`] option are
+also written to `<filename>`.
 
 </td></tr><tr><td id="bowtie-options-max">
+[`--max`]: #bowtie-options-max
 
     --max <filename>
 
 </td><td>
 
 Write all reads with a number of valid alignments exceeding the limit
-set with the `-m` option to a file with name `<filename>`.  Written
+set with the [`-m`] option to a file with name `<filename>`.  Written
 reads will appear as they did in the input, without any of the trimming
 or translation of quality values that may have taken place within
 `bowtie`.  Paired-end reads will be written to two parallel files with
 `_1` and `_2` inserted in the filename, e.g., if `<filename>` is
-`max.fq`, the #1 and #2 mates that exceed the `-m` limit will be
+`max.fq`, the #1 and #2 mates that exceed the [`-m`] limit will be
 written to `max_1.fq` and `max_2.fq` respectively.  These reads are not
-written to the file specified with `--un`.
+written to the file specified with [`--un`].
 
 </td></tr><tr><td id="bowtie-options-sam-nohead">
+[`--sam-nohead`]: #bowtie-options-sam-nohead
 
     --sam-nohead
 
@@ -1116,6 +1153,7 @@ written to the file specified with `--un`.
 Suppress header lines (starting with `@`) when output is [SAM].
 
 </td></tr><tr><td id="bowtie-options-sam-nosq">
+[`--sam-nosq`]: #bowtie-options-sam-nosq
 
     --sam-nosq
 
@@ -1124,6 +1162,7 @@ Suppress header lines (starting with `@`) when output is [SAM].
 Suppress `@SQ` header lines when output is [SAM].
 
 </td></tr><tr><td id="bowtie-options-fullref">
+[`--fullref`]: #bowtie-options-fullref
 
     --fullref
 
@@ -1138,6 +1177,8 @@ including the first whitespace.
 #### Performance
 
 <table><tr><td id="bowtie-options-p">
+[`-p`/`--threads`]: #bowtie-options-p
+[`-p`]: #bowtie-options-p
 
     -p/--threads <int>
 
@@ -1151,6 +1192,8 @@ if `bowtie` is linked with the `pthreads` library (i.e. if
 `BOWTIE_PTHREADS=0` is not specified at build time).
 
 </td></tr><tr><td id="bowtie-options-o">
+[`-o`/`--offrate`]: #bowtie-options-o
+[`-o`]: #bowtie-options-o
 
     -o/--offrate <int>
 
@@ -1164,6 +1207,7 @@ offsets.  `<int>` must be greater than the value used to build the
 index.
 
 </td></tr><tr><td id="bowtie-options-mm">
+[`--mm`]: #bowtie-options-mm
 
     --mm
 
@@ -1173,10 +1217,11 @@ Use memory-mapped I/O to load the index, rather than normal C file I/O.
 Memory-mapping the index allows many concurrent `bowtie` processes on
 the same computer to share the same memory image of the index (i.e. you
 pay the memory overhead just once).  This facilitates memory-efficient
-parallelization of `bowtie` in situations where using `-p` is not
+parallelization of `bowtie` in situations where using [`-p`] is not
 possible.
 
 </td></tr><tr><td id="bowtie-options-shmem">
+[`--shmem`]: #bowtie-options-shmem
 
     --shmem
 
@@ -1186,8 +1231,8 @@ Use shared memory to load the index, rather than normal C file I/O.
 Using shared memory allows many concurrent bowtie processes on the same
 computer to share the same memory image of the index (i.e. you pay the
 memory overhead just once).  This facilitates memory-efficient
-parallelization of `bowtie` in situations where using `-p` is not
-desirable.  Unlike `--mm`, `--shmem` installs the index into shared
+parallelization of `bowtie` in situations where using [`-p`] is not
+desirable.  Unlike [`--mm`], `--shmem` installs the index into shared
 memory permanently, or until the user deletes the shared memory chunks
 manually.  See your operating system documentation for details on how
 to manually list and remove shared memory chunks (on Linux and Mac OS
@@ -1200,6 +1245,7 @@ larger indexes; see your OS documentation.
 #### Other
 
 <table><tr><td id="bowtie-options-seed">
+[`--seed`]: #bowtie-options-seed
 
     --seed <int>
 
@@ -1208,6 +1254,7 @@ larger indexes; see your OS documentation.
 Use `<int>` as the seed for pseudo-random number generator.
 
 </td></tr><tr><td id="bowtie-options-verbose">
+[`--verbose`]: #bowtie-options-verbose
 
     --verbose
 
@@ -1216,6 +1263,7 @@ Use `<int>` as the seed for pseudo-random number generator.
 Print verbose output (for debugging).
 
 </td></tr><tr><td id="bowtie-options-version">
+[`--version`]: #bowtie-options-version
 
     --version
 
@@ -1401,7 +1449,7 @@ of Karkkainen.
 
 [Blockwise algorithm]: http://portal.acm.org/citation.cfm?id=1314852
 [FM Index]: http://portal.acm.org/citation.cfm?id=796543
-[Burrows-Wheeler]: http://en.wikipedia.org/wiki/Burrows–Wheeler_transform
+[Burrows-Wheeler]: http://en.wikipedia.org/wiki/Burrows-Wheeler_transform
 
 Command Line
 ------------
