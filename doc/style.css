@@ -112,7 +112,9 @@ a   { color: #0066B3; background: inherit; text-decoration: none }
 h1  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.9em Arial, Arial, Sans-Serif }
 h2  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
 h3  { margin: 0 15px 10px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
+h4  { margin: 0 15px 15px 15px; padding: 10px 0 10px 0; font: bold 1.2em Arial, Arial, Sans-Serif }
 p   { margin: 0 15px 10px 15px; color: #444 }
+table { margin-top: 15px }
 ul  { margin: 0 15px 10px 15px; padding: 0; margin: 0; list-style-type: none }
 pre { margin: 0 15px 15px 25px }
 li  { margin: 0 15px 1px 15px; color: #444 }

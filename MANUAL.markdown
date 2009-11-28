@@ -571,6 +571,7 @@ File to write alignments to.  By default, alignments are written to the
 
 <table>
 <tr><td id="bowtie-options-q">
+
 [`-q`]: #bowtie-options-q
 
     -q
@@ -583,6 +584,7 @@ This is the default.  See also: [`--solexa-quals`] and
 [`--integer-quals`].
 
 </td></tr><tr><td id="bowtie-options-f">
+
 [`-f`]: #bowtie-options-f
 
     -f
@@ -595,6 +597,7 @@ or similar).  All quality values are assumed to be 40 on the [Phred
 quality] scale.
 
 </td></tr><tr><td id="bowtie-options-r">
+
 [`-r`]: #bowtie-options-r
 
     -r
