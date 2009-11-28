@@ -97,8 +97,8 @@ pthreads (which disables `-p`), use `make BOWTIE_PTHREADS=0`.
 [GnuWin32]: http://gnuwin32.sf.net/packages/coreutils.htm
 [Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
-Using the `bowtie` Aligner
---------------------------
+The `bowtie` aligner
+====================
 
 `bowtie` takes an index and a set of reads as input and outputs a list
 of alignments.  Alignments are selected according to a combination of
@@ -172,7 +172,7 @@ for a future release.
 [Maq]:                   http://maq.sf.net
 
 The `-n` alignment mode
-=======================
+-----------------------
 
 When the `-n` option is specified (and it is by default), `bowtie`
 determines which alignments are valid according to the following
@@ -216,7 +216,7 @@ relatively slow but guarantees full sensitivity.
 [Phred quality]: http://en.wikipedia.org/wiki/FASTQ_format#Variations
 
 The `-v` alignment mode
-=======================
+-----------------------
 
 In `-v` mode, alignments may have no more than `V` mismatches, where
 `V` may be a number from 0 through 3 set using the `-v` option.
@@ -363,7 +363,7 @@ Intuitively, the `-m` option, when combined with the `--best` and
 specified but `--best` and `--strata` are not.
 
 Paired-end Alignment
-====================
+--------------------
 
 `bowtie` can align paired-end reads when properly paired read files are
 specified using the `-1` and `-2` options (for pairs of raw, FASTA, or
@@ -411,7 +411,7 @@ human index has a memory footprint of about 2.2 GB in single-end mode
 and 2.9 GB in paired-end mode.
 
 Performance Tuning
-==================
+------------------
 
 1.  Use 64-bit bowtie if possible
 
@@ -474,14 +474,13 @@ Performance Tuning
     (which is especially slow when using `-a` or large `-k` or `-m`).
 
 Command Line
-============
+------------
 
 Usage:
 
     bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
 
-Main arguments
---------------
+### Main arguments
 
 <table><tr><td>
 
@@ -584,10 +583,9 @@ Main arguments
 
 </td></tr></table>
 
-Options
--------
+### Options
 
-### Input
+#### Input
 
 <table><tr><td>
 
@@ -723,7 +721,7 @@ Default: off.
 
 </td></tr></table>
 
-### Alignment
+#### Alignment
 
 <table><tr><td>
 
@@ -903,9 +901,9 @@ more memory to the descriptors.  Default: 32.
 
 </td></tr></table>
 
-### Reporting
+#### Reporting
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-k">
 
     -k <int>
 
@@ -923,7 +921,7 @@ an index with a denser suffix-array sample, i.e. specify a smaller
 `--offrate` when invoking `bowtie-build` for the relevant index (see
 the [Performance tuning] section for details).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-a">
 
     -a/--all
 
@@ -941,7 +939,7 @@ denser suffix-array sample, i.e. specify a smaller `--offrate` when
 invoking `bowtie-build` for the relevant index (see the [Performance
 tuning] section for details).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-m">
 
     -m <int>
 
@@ -960,7 +958,7 @@ tuning] section for details).
 
 [Performance Tips]: #performance-tuning
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-best">
 
     --best
 
@@ -983,7 +981,7 @@ the alignments for a given read are guaranteed to appear in
 best-to-worst order in `bowtie`'s output.  Bowtie is somewhat slower
 when `--best` is specified.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-strata">
 
     --strata
 
@@ -998,9 +996,9 @@ regardless of whether they fall into multiple strata.  When
 
 </td></tr></table>
 
-### Output
+#### Output
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-S">
 
     -S/--sam
 
@@ -1014,7 +1012,7 @@ does not write BAM files directly, but SAM output can be converted to
 BAM on the fly by piping `bowtie`'s output to `samtools view`.  `-S`/
 `--sam` is not compatible with `--refout`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-t">
 
     -t/--time
 
@@ -1022,7 +1020,7 @@ BAM on the fly by piping `bowtie`'s output to `samtools view`.  `-S`/
 
 Print the amount of wall-clock time taken by each phase.
 
-</td></tr><tr><td>
+</td></tr><tr><td  id="bowtie-options-B">
 
     -B/--offbase <int>
 
@@ -1031,7 +1029,7 @@ Print the amount of wall-clock time taken by each phase.
 When outputting alignments, number the first base of a reference
 sequence as `<int>`.  Default: 0.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-quiet">
 
     --quiet
 
@@ -1039,7 +1037,7 @@ sequence as `<int>`.  Default: 0.
 
 Print nothing besides alignments.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-refout">
 
     --refout
 
@@ -1051,7 +1049,7 @@ be a useful way to break up work for downstream analyses when dealing
 with, for example, large numbers of reads aligned to the assembled
 human genome.  If `<hits>` is also specified, it will be ignored.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-refidx">
 
     --refidx
 
@@ -1061,7 +1059,7 @@ When a reference sequence is referred to in a reported alignment, refer
 to it by 0-based index (its offset into the list of references that
 were indexed) rather than by name.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-al">
 
     --al <filename>
 
@@ -1076,7 +1074,7 @@ filename, e.g., if `<filename>` is `aligned.fq`, the #1 and #2 mates
 that fail to align will be written to `aligned_1.fq` and `aligned_2.fq`
 respectively.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-un">
 
     --un <filename>
 
@@ -1093,7 +1091,7 @@ respectively.  Unless `--max` is also specified, reads with a number of
 valid alignments exceeding the limit set with the `-m` option are also
 written to `<filename>`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-max">
 
     --max <filename>
 
@@ -1109,23 +1107,23 @@ or translation of quality values that may have taken place within
 written to `max_1.fq` and `max_2.fq` respectively.  These reads are not
 written to the file specified with `--un`.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-sam-nohead">
 
     --sam-nohead
 
 </td><td>
 
-Suppress header lines (starting with @) when output is SAM.
+Suppress header lines (starting with `@`) when output is [SAM].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-sam-nosq">
 
     --sam-nosq
 
 </td><td>
 
-Suppress `@SQ` header lines when output is SAM.
+Suppress `@SQ` header lines when output is [SAM].
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-fullref">
 
     --fullref
 
@@ -1137,9 +1135,9 @@ including the first whitespace.
 
 </td></tr></table>
 
-### Performance
+#### Performance
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-p">
 
     -p/--threads <int>
 
@@ -1152,7 +1150,7 @@ and speedup is fairly close to linear.  This option is only available
 if `bowtie` is linked with the `pthreads` library (i.e. if
 `BOWTIE_PTHREADS=0` is not specified at build time).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-o">
 
     -o/--offrate <int>
 
@@ -1165,29 +1163,29 @@ footprint of the aligner but requires more time to calculate text
 offsets.  `<int>` must be greater than the value used to build the
 index.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-mm">
 
     --mm
 
 </td><td>
 
-Use memory-mapped I/O to load the index, rather than normal POSIX/C
-file I/O.  Memory-mapping the index allows many concurrent `bowtie`
-processes on the same computer to share the same memory image of the
-index (i.e. you pay the memory overhead just once).  This facilitates
-memory-efficient parallelization of `bowtie` in situations where using
-`-p` is not possible.
+Use memory-mapped I/O to load the index, rather than normal C file I/O.
+Memory-mapping the index allows many concurrent `bowtie` processes on
+the same computer to share the same memory image of the index (i.e. you
+pay the memory overhead just once).  This facilitates memory-efficient
+parallelization of `bowtie` in situations where using `-p` is not
+possible.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-shmem">
 
     --shmem
 
 </td><td>
 
-Use shared memory to load the index, rather than normal POSIX/C file
-I/O.  Using shared memory allows many concurrent bowtie processes on
-the same computer to share the same memory image of the index (i.e. you
-pay the memory overhead just once).  This facilitates memory-efficient
+Use shared memory to load the index, rather than normal C file I/O.
+Using shared memory allows many concurrent bowtie processes on the same
+computer to share the same memory image of the index (i.e. you pay the
+memory overhead just once).  This facilitates memory-efficient
 parallelization of `bowtie` in situations where using `-p` is not
 desirable.  Unlike `--mm`, `--shmem` installs the index into shared
 memory permanently, or until the user deletes the shared memory chunks
@@ -1199,9 +1197,9 @@ larger indexes; see your OS documentation.
 
 </td></tr></table>
 
-### Other
+#### Other
 
-<table><tr><td>
+<table><tr><td id="bowtie-options-seed">
 
     --seed <int>
 
@@ -1209,7 +1207,7 @@ larger indexes; see your OS documentation.
 
 Use `<int>` as the seed for pseudo-random number generator.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-verbose">
 
     --verbose
 
@@ -1217,7 +1215,7 @@ Use `<int>` as the seed for pseudo-random number generator.
 
 Print verbose output (for debugging).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-version">
 
     --version
 
@@ -1225,7 +1223,7 @@ Print verbose output (for debugging).
 
 Print version information and quit.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-options-h">
 
     -h/--help
 
@@ -1235,8 +1233,8 @@ Print usage information and quit.
 
 </td></tr></table>
 
-Default output
-==============
+Default `bowtie` output
+-----------------------
 
 `bowtie` outputs one alignment per line.  Each line is a collection of
 8 fields separated by tabs; from left to right, the fields are:
@@ -1272,12 +1270,12 @@ Default output
    offset is expressed as a 0-based offset from the high-quality (5')
    end of the read. 
 
-SAM output
-==========
+SAM `bowtie` output
+-------------------
 
 Following is a brief description of the [SAM] format as output by
-`bowtie` when the `-S`/`--sam` option is specified.  For more details,
-see the [SAM format specification][SAM].
+`bowtie` when the [`-S`/`--sam`] option is specified.  For more
+details, see the [SAM format specification][SAM].
 
 When `-S`/`--sam` is specified, `bowtie` prints a SAM header with
 `@HD`, `@SQ` and `@PG` lines.  When one or more `--sam-RG` arguments
@@ -1288,308 +1286,458 @@ Each subsequnt line corresponds to a read or an alignment.  Each line
 is a collection of at least 12 fields separated by tabs; from left to
 right, the fields are:
 
-1. Name of read that aligned
+1.  Name of read that aligned
 
-2. Sum of all applicable flags.  Flags relevant to Bowtie are:
+2.  Sum of all applicable flags.  Flags relevant to Bowtie are:
 
-   1.   The read is one of a pair
-   2.   The alignment is one end of a proper paired-end alignment
-   4.   The read has no reported alignments
-   8.   The read is one of a pair and has no reported alignments
-   16.  The alignment is to the reverse reference strand
-   32.  The other mate in the paired-end alignment is aligned to the
-        reverse reference strand
-   64.  The read is the first (#1) mate in a pair
-   128. The read is the second (#2) mate in a pair
+    * 1: The read is one of a pair
+    * 2: The alignment is one end of a proper paired-end alignment
+    * 4: The read has no reported alignments
+    * 8: The read is one of a pair and has no reported alignments
+    * 16: The alignment is to the reverse reference strand
+    * 32: The other mate in the paired-end alignment is aligned to the
+          reverse reference strand
+    * 64: The read is the first (#1) mate in a pair
+    * 128: The read is the second (#2) mate in a pair
 
-Thus, an unpaired read that aligns to the reverse reference strand will
-have flag 16.  A paired-end read that aligns and is the first mate in
-the pair will have flag 83 (= 64 + 16 + 2 + 1).
+    Thus, an unpaired read that aligns to the reverse reference strand
+    will have flag 16.  A paired-end read that aligns and is the first
+    mate in the pair will have flag 83 (= 64 + 16 + 2 + 1).
 
-3. Name of reference sequence where alignment occurs, or ordinal ID
-   if no name was provided
+3.  Name of reference sequence where alignment occurs, or ordinal ID
+    if no name was provided
 
-4. 1-based offset into the forward reference strand where leftmost
-   character of the alignment occurs
+4.  1-based offset into the forward reference strand where leftmost
+    character of the alignment occurs
 
-5. Mapping quality (always 255)
+5.  Mapping quality
 
-6. CIGAR string representation of alignment
+6.  CIGAR string representation of alignment
 
-7. Name of reference sequence where mate's alignment occurs.  Set to
-   `=` if the mate's reference sequence is the same as this
-   alignment's, or `*` if there is no mate.
+7.  Name of reference sequence where mate's alignment occurs.  Set to
+    `=` if the mate's reference sequence is the same as this
+    alignment's, or `*` if there is no mate.
 
-8. 1-based offset into the forward reference strand where leftmost
-   character of the mate's alignment occurs.  Offset is 0 if there is
-   no mate.
+8.  1-based offset into the forward reference strand where leftmost
+    character of the mate's alignment occurs.  Offset is 0 if there is
+    no mate.
 
-9. Inferred insert size.  Size is negative if the mate's alignment
-   occurs upstream of this alignment.  Size is 0 if there is no mate.
+9.  Inferred insert size.  Size is negative if the mate's alignment
+    occurs upstream of this alignment.  Size is 0 if there is no mate.
 
 10. Read sequence (reverse-complemented if aligned to the reverse
     strand)
 
-11. ASCII-encoded read qualities (reversed if aligned to the reverse
-    strand).  The encoded quality values are on the Phred scale and the
-    encoding is ASCII-offset by 33 (ASCII char `!`). 
+11. ASCII-encoded read qualities (reverse-complemented if the read
+    aligned to the reverse strand).  The encoded quality values are on
+    the [Phred quality] scale and the encoding is ASCII-offset by 33
+    (ASCII char `!`), similarly to a [FASTQ] file. 
 
-12+. Optional fields.  Fields are tab-separated.  For descriptions of
-     all possible optional fields, see the SAM format specification.
-     `bowtie` outputs one or more of these optional fields for each
-     alignment, depending on the type of the alignment:
+12. Optional fields.  Fields are tab-separated.  For descriptions of
+    all possible optional fields, see the SAM format specification.
+    `bowtie` outputs one or more of these optional fields for each
+    alignment, depending on the type of the alignment:
 
-   * `NM:i:<N>` : Aligned read has an edit distance of `<N>`
-   * `MD:Z:<S>` : For aligned reads, `<S>` is a string representation
-                  of the mismatched reference bases in the alignment.
-                  See [SAM] format specification for details.
-   * `XA:i:<N>` : Aligned read belongs to stratum `<N>`
-   * `XM:i:<N>` : For a read with no reported alignments, `<N>` is 0 if
-                  the read had no alignments, or 1 if the read had
-                  alignments that were suppressed by the `-m` option.
+    * `NM:i:<N>` : Aligned read has an edit distance of `<N>`
+    * `MD:Z:<S>` : For aligned reads, `<S>` is a string representation
+                   of the mismatched reference bases in the alignment.
+                   See [SAM] format specification for details.
+    * `XA:i:<N>` : Aligned read belongs to stratum `<N>`
+    * `XM:i:<N>` : For a read with no reported alignments, `<N>` is 0
+                   if the read had no alignments, or 1 if the read had
+                   alignments that were suppressed by the [`-m`]
+                   option.
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
+[FASTQ]: http://en.wikipedia.org/wiki/FASTQ_format
+[`-S`/`--sam`]: #bowtie-options-S
+[`-m`]: #bowtie-options-m
 
- Using the 'bowtie-build' Indexer
- --------------------------------
+The `bowtie-build` indexer
+==========================
 
- Use 'bowtie-build' to build a Bowtie index from a set of DNA
- sequences.  bowtie-build outputs a set of 6 files with suffixes
- .1.ebwt, .2.ebwt, .3.ebwt, .4.ebwt, .rev.1.ebwt, and .rev.2.ebwt,
- where the prefix is the <ebwt_outfile_base> parameter supplied by the
- user on the command line.  These files together constitute the index:
- they are all that is needed to align reads to the reference sequences.
- The original sequence files are no longer used by Bowtie once the
- index is built.  
+`bowtie-build` builds a Bowtie index from a set of DNA sequences.
+`bowtie-build` outputs a set of 6 files with suffixes
+`.1.ebwt`, `.2.ebwt`, `.3.ebwt`, `.4.ebwt`, `.rev.1.ebwt`, and
+`.rev.2.ebwt`.  These files together constitute the index: they are all
+that is needed to align reads to that reference.  The original sequence
+files are no longer used by Bowtie once the index is built.  
 
- Use of Karkkainen's blockwise algorithm (see reference #4 below)
- allows bowtie-build to trade off between running time and memory
- usage. bowtie-build has three options governing how it makes this
- trade: -p/--packed, --bmax/--bmaxdivn, and --dcv.  By default, bowtie-
- build will automatically search for the settings that yield the best
+Use of Karkkainen's [blockwise algorithm] allows `bowtie-build` to
+trade off between running time and memory usage. `bowtie-build` has
+three options governing how it makes this trade: `-p`/`--packed`,
+`--bmax`/`--bmaxdivn`, and `--dcv`.  By default, `bowtie-build` will
+automatically search for the settings that yield the best
  running time without exhausting memory.  This behavior can be disabled
- using the -a/--noauto option.
+ using the `-a`/`--noauto` option.
 
- The indexer provides options pertaining to the "shape" of the index,
- e.g. --offrate governs the fraction of Burrows-Wheeler rows that are
- "marked" (i.e., the "density" of the suffix-array sample; see
- reference #2).  All of these options are potentially profitable trade-
- offs depending on the application.  They have been set to defaults
- that are reasonable for most cases according to our experiments.  See
- "High Performance Tips" in the "Using the 'bowtie' Aligner" section
- for additional details.
+The indexer provides options pertaining to the "shape" of the index,
+e.g. `--offrate` governs the fraction of [Burrows-Wheeler] rows that
+are "marked" (i.e., the density of the suffix-array sample; see the
+original [FM Index] paper for details).  All of these options are
+potentially profitable trade-offs depending on the application.  They
+have been set to defaults that are reasonable for most cases according
+to our experiments.  See [Performance Tuning] for details.
 
- Because bowtie-build uses 32-bit pointers internally, it can handle up
- to a maximum of 2^32-1 (somewhat more than 4 billion) characters in an
- index.  If your reference exceeds 2^32-1 characters, bowtie-build will
- print an error message and abort.  To resolve this, divide your
- reference sequences into smaller batches and/or chunks and build a
- separate index for each.
- 
- If your computer has more than 3-4 GB of memory and you would like to
- exploit that fact to make index building faster, you must use a 64-bit
- version of the bowtie-build binary.  The 32-bit version of the binary
- is restricted to using less than 4 GB of memory.  If a 64-bit pre-
- built binary does not yet exist for your platform on the sourceforge
- download site, you will need to build one from source.
+Because `bowtie-build` uses 32-bit pointers internally, it can handle
+up to a theoretical maximum of 2^32-1 (somewhat more than 4 billion)
+characters in an index, though, with other constraints, the actual
+ceiling is somewhat less than that.  If your reference exceeds 2^32-1
+characters, `bowtie-build` will print an error message and abort.  To
+resolve this, divide your reference sequences into smaller batches
+and/or chunks and build a separate index for each.
 
- The Bowtie index is based on the FM Index of Ferragina and Manzini,
- which in turn is based on the Burrows-Wheeler transform.  The
- algorithm used to build the index is based on the blockwise algorithm
- of Karkkainen.  For more information on these techniques, see these
- references:
+If your computer has more than 3-4 GB of memory and you would like to
+exploit that fact to make index building faster, use a 64-bit version
+of the `bowtie-build` binary.  The 32-bit version of the binary is
+restricted to using less than 4 GB of memory.  If a 64-bit pre-built
+binary does not yet exist for your platform on the sourceforge download
+site, you will need to build one from source.
 
- 1. Burrows M, Wheeler DJ: A block sorting lossless data compression
-    algorithm. Digital Equipment Corporation, Palo Alto, CA 1994,
-    Technical Report 124.
- 2. Ferragina, P. and Manzini, G. 2000. Opportunistic data structures
-    with applications. In Proceedings of the 41st Annual Symposium on
-    Foundations of Computer Science (November 12 - 14, 2000). FOCS
- 3. Ferragina, P. and Manzini, G. 2001. An experimental study of an
-    opportunistic index. In Proceedings of the Twelfth Annual ACM-SIAM
-    Symposium on Discrete Algorithms (Washington, D.C., United States,
-    January 07 - 09, 2001). 269-278.
- 4. Karkkainen, J. 2007. Fast BWT in small space by blockwise suffix
-    sorting. Theor. Comput. Sci. 387, 3 (Nov. 2007), 249-257
+The Bowtie index is based on the [FM Index] of Ferragina and Manzini,
+which in turn is based on the [Burrows-Wheeler] transform.  The
+algorithm used to build the index is based on the [blockwise algorithm]
+of Karkkainen.
 
-  Command Line
-  ------------
+[Blockwise algorithm]: http://portal.acm.org/citation.cfm?id=1314852
+[FM Index]: http://portal.acm.org/citation.cfm?id=796543
+[Burrows-Wheeler]: http://en.wikipedia.org/wiki/Burrows–Wheeler_transform
 
- Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>
+Command Line
+------------
 
-    <reference_in>          A comma-separated list of FASTA files
-                            containing the reference sequences to be
-                            aligned to, or, if -c is specified, the
-                            sequences themselves. E.g., this might be
-                            "chr1.fa,chr2.fa,chrX.fa,chrY.fa", or, if
-                            -c is specified, this might be
-                            "GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA".
+Usage:
 
-    <ebwt_outfile_base>     The basename of the index files to write.
-                            By default, bowtie-build writes files named
-                            NAME.1.ebwt, NAME.2.ebwt, NAME.3.ebwt,
-                            NAME.4.ebwt, NAME.rev.1.ebwt, and
-                            NAME.rev.2.ebwt, where NAME is the
-                            basename.
+    bowtie-build [options]* <reference_in> <ebwt_base>
 
- Options:
+### Main arguments
 
-    -f                      The reference input files (specified as
-                            <reference_in>) are FASTA files (usually
-                            having extension .fa, .mfa, .fna or
-                            similar).
+<table><tr><td>
 
-    -c                      The reference sequences are given on the
-                            command line.  I.e. <reference_in> is a
-                            comma-separated list of sequences rather
-                            than a list of FASTA files.
+    <reference_in>
 
-    -a/--noauto             Disable the default behavior whereby
-                            bowtie-build automatically selects values
-                            for --bmax/--dcv/--packed parameters
-                            according to the memory available.  User
-                            may specify values for those parameters.
-                            If memory is exhausted during indexing, an
-                            error message will be printed; it is up to
-                            the user to try new parameters.
+</td><td>
 
-    -p/--packed             Use a packed (2-bits-per-nucleotide)
-                            representation for DNA strings.  This saves
-                            memory but makes indexing 2-3 times slower.
-                            Default: off.  This is configured
-                            automatically by default; use -a/--noauto
-                            to configure manually.
+A comma-separated list of FASTA files containing the reference
+sequences to be aligned to, or, if `-c` is specified, the sequences
+themselves. E.g., `<reference_in>` might be
+`chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or, if `-c` is specified, this might
+be `GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
 
-    --bmax <int>            The maximum number of suffixes allowed in a
-                            block.  Allowing more suffixes per block
-                            makes indexing faster, but increases memory
-                            overhead.  Overrides any previous
-                            specification of --bmax, --bmaxmultsqrt or
-                            --bmaxdivn.  Default: --bmaxdivn 4.  This
-                            is configured automatically by default; use
-                            -a/--noauto to configure manually.
+</td></tr><tr><td>
 
-    --bmaxdivn <int>        The maximum number of suffixes allowed in a
-                            block, expressed as a fraction of the
-                            length of the reference.  Overrides any
-                            previous specification of --bmax,
-                            --bmaxmultsqrt or --bmaxdivn. Default:
-                            --bmaxdivn 4.  This is configured
-                            automatically by default; use -a/--noauto
-                            to configure manually.
+    <reference_in>
 
-    --dcv <int>             Use <int> as the period for the difference-
-                            cover sample.  A larger period yields less
-                            memory overhead, but may make suffix
-                            sorting slower, especially if repeats are
-                            present.  Must be a power of 2 no greater
-                            than 4096.  Default: 1024.  This is
-                            configured automatically by default; use
-                            -a/--noauto to configure manually.
+</td><td>
 
-    --nodc                  Disable use of the difference-cover sample.
-                            Suffix sorting becomes quadratic-time in
-                            the worst case (where the worst case is an
-                            extremely repetitive reference).  Default:
-                            off.
+A comma-separated list of FASTA files containing the reference
+sequences to be aligned to, or, if `-c` is specified, the sequences
+themselves. E.g., this might be `chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or,
+if `-c` is specified, this might be
+`GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
 
-    -r/--noref              Do not build the NAME.3.ebwt and
-                            NAME.4.ebwt portions of the index, which
-                            contain a bitpacked version of the
-                            reference sequences and are (currently)
-                            only used for paired-end alignment.
+</td></tr><tr><td>
 
-    -3/--justref            Build *only* the NAME.3.ebwt and
-                            NAME.4.ebwt portions of the index, which
-                            contain a bitpacked version of the
-                            reference sequences and are (currently)
-                            only used for paired-end alignment.
+    <ebwt_base>
 
-    -o/--offrate <int>      To map alignments back to positions on the
-                            reference sequences, it's necessary to
-                            annotate ("mark") some or all of the
-                            Burrows-Wheeler rows with their
-                            corresponding location on the genome.  The
-                            offrate governs how many rows get marked:
-                            the indexer will mark every 2^<int> rows.
-                            Marking more rows makes reference-position
-                            lookups faster, but requires more memory to
-                            hold the annotations at runtime.  The
-                            default is 5 (every 32nd row is marked; for 
-                            human genome, annotations occupy about 340
-                            megabytes).  
+</td><td>
 
-    -t/--ftabchars <int>    The ftab is the lookup table used to
-                            calculate an initial Burrows-Wheeler range
-                            with respect to the first <int> characters
-                            of the query.  A larger <int> yields a
-                            larger lookup table but faster query times.
-                            The ftab has size 4^(<int>+1) bytes.  The
-                            default is 10 (ftab is 4MB).
+The basename of the index files to write.  By default, `bowtie-build`
+writes files named `NAME.1.ebwt`, `NAME.2.ebwt`, `NAME.3.ebwt`,
+`NAME.4.ebwt`, `NAME.rev.1.ebwt`, and `NAME.rev.2.ebwt`, where `NAME`
+is ``.
 
-    --ntoa                  Convert Ns in the reference sequence to As
-                            before building the index.  By default, Ns
-                            are simply excluded from the index and
-                            'bowtie' will not find alignments that
-                            overlap them.
+</td></tr></table>
 
-    --big --little          Endianness to use when serializing integers
-                            to the index file.  Default: little-endian
-                            (recommended for Intel- and AMD-based
-                            architectures).
+### Options
 
-    --seed <int>            Use <int> as the seed for pseudo-random
-                            number generator.
+<table><tr><td>
 
-    --cutoff <int>          Index only the first <int> bases of the
-                            reference sequences (cumulative across
-                            sequences) and ignore the rest.
+    -f
 
-    -q/--quiet              bowtie-build is verbose by default.  With
-                            this option ebwt-build will print only
-                            error messages.
+</td><td>
 
-    -h/--help               Print detailed description of tool and its
-                            options (from MANUAL).
+The reference input files (specified as `<reference_in>`) are FASTA
+files (usually having extension `.fa`, `.mfa`, `.fna` or similar).
 
-    --version               Print version information and quit.
+</td></tr><tr><td>
 
- Using the 'bowtie-inspect' Index Inspector
- ------------------------------------------
+    -c
 
- 'bowtie-inspect' extracts information from a Bowtie index about the
- original reference sequences used to build it.  By default, the tool
- will output a FASTA file containing the sequences of the original
- references (with all non-A/C/G/T characters converted to Ns).  It can
- also be used to extract just the reference sequence names using the -n
- option.
+</td><td>
 
-  Command Line
-  ------------
+The reference sequences are given on the command line.  I.e.
+`<reference_in>` is a comma-separated list of sequences rather than a
+list of FASTA files.
 
- Usage: bowtie-inspect [options]* <ebwt_base>
+</td></tr><tr><td>
 
-  <ebwt_base>        The basename of the index to be inspected.  The
-                     basename is the name of any of the four index
-                     files up to but not including the first period.
-                     bowtie first looks in the current directory for
-                     the index files, then looks in the 'indexes'
-                     subdirectory under the directory where the
-                     currently-running 'bowtie' executable is located,
-                     then looks in the directory specified in the
-                     BOWTIE_INDEXES environment variable.
+    -a/--noauto
 
- Options:
+</td><td>
 
-  -a/--across <int>  When printing FASTA output, output a newline
-                     character every <int> bases (default: 60).
+Disable the default behavior whereby `bowtie-build` automatically
+selects values for the `--bmax`, `--dcv` and `--packed` parameters
+according to available memory.  Instead, user may specify values for
+those parameters.  If memory is exhausted during indexing, an error
+message will be printed; it is up to the user to try new parameters.
 
-  -n/--names         Print reference sequence names only; ignore
-                     sequence.
+</td></tr><tr><td>
 
-  -v/--verbose       Print verbose output (for debugging).
+    -p/--packed
 
-  --version          Print version information and quit.
+</td><td>
 
-  -h/--help          Print detailed description of tool and its options
-                     (from MANUAL).
+Use a packed (2-bits-per-nucleotide) representation for DNA strings.
+This saves memory but makes indexing 2-3 times slower.  Default: off.
+This is configured automatically by default; use `-a`/`--noauto` to
+configure manually.
+
+</td></tr><tr><td>
+
+    --bmax <int>
+
+</td><td>
+
+The maximum number of suffixes allowed in a block.  Allowing more
+suffixes per block makes indexing faster, but increases peak memory
+usage.  Setting this option overrides any previous setting for
+`--bmax`, `--bmaxmultsqrt` or `--bmaxdivn`.  Default (in terms of the
+`--bmaxdivn` parameter) is `--bmaxdivn 4`.  This is configured
+automatically by default; use `-a`/`--noauto` to configure manually.
+
+</td></tr><tr><td>
+
+    --bmaxdivn <int>
+
+</td><td>
+
+The maximum number of suffixes allowed in a block, expressed as a
+fraction of the length of the reference.  Setting this option overrides
+any previous setting for `--bmax`, `--bmaxmultsqrt` or `--bmaxdivn`.
+Default: `--bmaxdivn 4`.  This is configured automatically by default;
+use `-a`/`--noauto` to configure manually.
+
+</td></tr><tr><td>
+
+    --dcv <int>
+
+</td><td>
+
+Use `<int>` as the period for the difference-cover sample.  A larger
+period yields less memory overhead, but may make suffix sorting slower,
+especially if repeats are present.  Must be a power of 2 no greater
+than 4096.  Default: 1024.  This is configured automatically by
+default; use `-a`/`--noauto` to configure manually.
+
+</td></tr><tr><td>
+
+    --nodc
+
+</td><td>
+
+Disable use of the difference-cover sample.  Suffix sorting becomes
+quadratic-time in the worst case (where the worst case is an extremely
+repetitive reference).  Default: off.
+
+</td></tr><tr><td>
+
+    -r/--noref
+
+</td><td>
+
+Do not build the `NAME.3.ebwt` and `NAME.4.ebwt` portions of the index,
+which contain a bitpacked version of the reference sequences and are
+(currently) only used for paired-end alignment.
+
+</td></tr><tr><td>
+
+    -3/--justref
+
+</td><td>
+
+Build *only* the `NAME.3.ebwt` and `NAME.4.ebwt` portions of the index,
+which contain a bitpacked version of the reference sequences and are
+(currently) only used for paired-end alignment.
+
+</td></tr><tr><td>
+
+    -o/--offrate <int>
+
+</td><td>
+
+To map alignments back to positions on the reference sequences, it's
+necessary to annotate ("mark") some or all of the [Burrows-Wheeler]
+rows with their corresponding location on the genome.  `--offrate`
+governs how many rows get marked: the indexer will mark every 2^`<int>`
+rows.  Marking more rows makes reference-position lookups faster, but
+requires more memory to hold the annotations at runtime.  The default
+is 5 (every 32nd row is marked; for human genome, annotations occupy
+about 340 megabytes).  
+
+</td></tr><tr><td>
+
+    -t/--ftabchars <int>
+
+</td><td>
+
+The ftab is the lookup table used to calculate an initial
+[Burrows-Wheeler] range with respect to the first `<int>` characters
+of the query.  A larger `<int>` yields a larger lookup table but faster
+query times.  The ftab has size 4^(`<int>`+1) bytes.  The default
+setting for `-t`/`--ftabchars` is 10 (ftab is 4MB).
+
+</td></tr><tr><td>
+
+    --ntoa
+
+</td><td>
+
+Convert Ns in the reference sequence to As before building the index.
+By default, Ns are simply excluded from the index and `bowtie` will not
+report alignments that overlap them.
+
+</td></tr><tr><td>
+
+    --big --little
+
+</td><td>
+
+Endianness to use when serializing integers to the index file.
+Default: little-endian (recommended for Intel- and AMD-based
+architectures).
+
+</td></tr><tr><td>
+
+    --seed <int>
+
+</td><td>
+
+Use `<int>` as the seed for pseudo-random number generator.
+
+</td></tr><tr><td>
+
+    --cutoff <int>
+
+</td><td>
+
+Index only the first `<int>` bases of the reference sequences
+(cumulative across sequences) and ignore the rest.
+
+</td></tr><tr><td>
+
+    -q/--quiet
+
+</td><td>
+
+`bowtie-build` is verbose by default.  With this option `bowtie-build`
+will print only error messages.
+
+</td></tr><tr><td>
+
+    -h/--help
+
+</td><td>
+
+Print usage information and quit.
+
+</td></tr><tr><td>
+
+    --version
+
+</td><td>
+
+Print version information and quit.
+
+</td></tr></table>
+
+The `bowtie-inspect` index inspector
+====================================
+
+`bowtie-inspect` extracts information from a Bowtie index about what
+kind of index it is and what reference sequences were used to build it.
+When run without any options, the tool will output a FASTA file
+containing the sequences of the original references (with all
+non-`A`/`C`/`G`/`T` characters converted to `N`s).  It can also be used
+to extract just the reference sequence names using the `-n`/`--names`
+option or a more verbose summary using the `-s`/`--summary` option.
+
+Command Line
+------------
+
+Usage:
+
+    bowtie-inspect [options]* <ebwt_base>
+
+### Main arguments
+
+<table><tr><td>
+
+    <ebwt_base>
+
+</td><td>
+
+The basename of the index to be inspected.  The basename is name of any
+of the index files but with the `.X.ebwt` or `.rev.X.ebwt` suffix
+omitted.  `bowtie-inspect` first looks in the current directory for the
+index files, then looks in the `indexes` subdirectory under the
+directory where the currently-running `bowtie` executable is located,
+then looks in the directory specified in the `BOWTIE_INDEXES`
+environment variable.
+
+</td></tr></table>
+
+### Options
+
+<table><tr><td>
+
+    -a/--across <int>
+
+</td><td>
+
+When printing FASTA output, output a newline character every `<int>`
+bases (default: 60).
+
+</td></tr><tr><td>
+
+    -n/--names
+
+</td><td>
+
+Print reference sequence names and quit.
+
+</td></tr><tr><td>
+
+    -s/--summary
+
+</td><td>
+
+Print a summary that includes information about index settings, as well
+as the names and lengths of the input sequences.
+
+</td></tr><tr><td>
+
+    -v/--verbose
+
+</td><td>
+
+Print verbose output (for debugging).
+
+</td></tr><tr><td>
+
+    --version
+
+</td><td>
+
+Print version information and quit.
+
+</td></tr><tr><td>
+
+    -h/--help
+
+</td><td>
+
+Print usage information and quit.
+
+</td></tr></table>
+
