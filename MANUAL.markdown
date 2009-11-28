@@ -98,16 +98,16 @@ The `bowtie` aligner
 
 `bowtie` takes an index and a set of reads as input and outputs a list
 of alignments.  Alignments are selected according to a combination of
-the `[-v]/[-n]/[-e]/[-l]` options (plus the `[-I]/[-X]/[--fr]/[--rf]/[--ff]` options for
-paired-end alignment), which define which alignments are legal, and the
-`[-k]/[-a]/[-m]/[--best]/[--strata]` options which define which and how many
-legal alignments should be reported.
+the [`-v`]/[`-n`]/[`-e`]/[`-l`] options (plus the [`-I`]/[`-X`]/[`--fr`]/[`--rf`]/
+[`--ff`] options for paired-end alignment), which define which alignments
+are legal, and the [`-k`]/[`-a`]/[`-m`]/[`--best`]/[`--strata`] options which
+define which and how many legal alignments should be reported.
 
 By default, Bowtie enforces an alignment policy similar to [Maq]'s
-default quality-aware policy (`[-n] 2 [-l] 28 [-e] 70`).  See [the -n
+default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70`).  See [the -n
 alignment mode] section of the manual for details about this mode.  But
 Bowtie can also enforce a simpler end-to-end k-difference policy (e.g.
-with `[-v] 2`).  See [the -v alignment mode] section of the manual for
+with [`-v`] 2`).  See [the -v alignment mode] section of the manual for
 details about that mode.
 
 Bowtie works best when aligning short reads to large genomes (e.g.
@@ -175,7 +175,7 @@ determines which alignments are valid according to the following
 policy, which is similar to [Maq]'s default policy.
 
   1. Alignments may have no more than `N` mismatches (where `N` is a
-     number 0-3, set with [`-n]`) in the first `L` bases (where `L` is a
+     number 0-3, set with [`-n`]) in the first `L` bases (where `L` is a
      number 5 or greater, set with [`-l`]) on the high-quality (left) end
      of the read.  The first `L` bases are called the "seed".
 
@@ -199,7 +199,7 @@ rounds qualities greater than 30 to 30.  To maintain compatibility,
 Bowtie does the same.  Rounding can be suppressed with the
 [`--nomaqround`] option.
  
-Bowtie is not fully sensitive in `[-n] 2` and `[-n] 3` modes by default.
+Bowtie is not fully sensitive in [`-n`] 2 and [`-n`] 3 modes by default.
 In these modes Bowtie imposes a "backtracking limit" to limit effort
 spent trying to find valid alignments for low-quality reads unlikely to
 have any.  This may cause bowtie to miss some legal 2- and 3-mismatch
@@ -246,7 +246,7 @@ output is elided for clarity.
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
 Specifying [`-a`] instructs bowtie to report *all* valid alignments,
-subject to the alignment policy: `[-v] 2`.  In this case, bowtie finds
+subject to the alignment policy: [`-v`] 2.  In this case, bowtie finds
 5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)
 has 1 mismatch, and the other 4 hits have 2 mismatches.  Four are on
 the reverse reference strand and one is on the forward strand.  Note
@@ -259,7 +259,7 @@ that they are not listed in best-to-worst order.
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
     -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-Specifying `[-k] 3` instructs bowtie to report up to 3 valid
+Specifying [`-k`] 3 instructs bowtie to report up to 3 valid
 alignments.  In this case, a total of 5 valid alignments exist (see
 [Example 1]); `bowtie` reports 3 out of those 5.  [`-k`] can be set to
 any integer greater than 0.
@@ -275,7 +275,7 @@ any integer greater than 0.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying `[-k] 6` instructs bowtie to report up to 6 valid
+Specifying [`-k`] 6 instructs bowtie to report up to 6 valid
 alignments.  In this case, a total of 5 valid alignments exist, so
 `bowtie` reports all 5.
 
@@ -289,7 +289,7 @@ report the first valid alignment it encounters.  Because [`--best`] was
 not specified, we are not guaranteed that bowtie will report the best
 alignment, and in this case it does not (the 1-mismatch alignment from
 the previous example would have been better).  The default reporting
-mode is equivalent to `[-k] 1`.
+mode is equivalent to [`-k`] 1.
 
 ### Example 5: `-a --best`
 
@@ -300,7 +300,7 @@ mode is equivalent to `[-k] 1`.
     -	gi|110640213|ref|NC_008253.1|	148810	10:A>G,13:C>G
     -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-Specifying `[-a] [--best]` results in the same alignments being printed
+Specifying [`-a`] [`--best`] results in the same alignments being printed
 as if just [`-a`] had been specified, but they are guaranteed to be
 reported in best-to-worst order.
 
@@ -321,13 +321,13 @@ is specified, [`--best`] must also be specified.
     $ ./bowtie -a -m 3 -v 2 e_coli -c ATGCATCATGCGCCAT
     No alignments
 
-Specifying `[-m] 3` instructs bowtie to refrain from reporting any
+Specifying [`-m`] 3 instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  The
 [`-m`] option is useful when the user would like to guarantee that
 reported alignments are "unique", for some definition of unique.
 
 Example 1 showed that the read has 5 reportable alignments when [`-a`]
-and `[-v] 2` are specified, so the `[-m] 3` limit causes bowtie to
+and [`-v`] 2 are specified, so the [`-m`] 3 limit causes bowtie to
 output no alignments.
 
 ### Example 8: `-a -m 5`
@@ -339,9 +339,9 @@ output no alignments.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying `[-m] 5` instructs bowtie to refrain from reporting any
+Specifying [`-m`] 5 instructs bowtie to refrain from reporting any
 alignments for reads having more than 5 reportable alignments.  Since
-the read has exactly 5 reportable alignments, the `[-m] 5` limit allows
+the read has exactly 5 reportable alignments, the [`-m`] 5 limit allows
 `bowtie` to print them as usual. 
 
 ### Example 9: `-a -m 3 --best --strata`
@@ -349,7 +349,7 @@ the read has exactly 5 reportable alignments, the `[-m] 5` limit allows
     $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --suppress 1,5,6,7 -c ATGCATCATGCGCCAT
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
 
-Specifying `[-m] 3` instructs bowtie to refrain from reporting any
+Specifying [`-m`] 3 instructs bowtie to refrain from reporting any
 alignments for reads having more than 3 reportable alignments.  As we
 saw in Example 6, the read has only 1 reportable alignment when [`-a`],
 [`--best`] and [`--strata`] are specified, so the [`-m`] 3 limit allows
@@ -441,36 +441,38 @@ Performance Tuning
     10 per read) and you have some memory to spare, using an index with
     a denser SA sample can speed things up considerably.
 
-    To do this, specify a smaller-than-default `--offrate` value when
-    running 'bowtie-build'.  A denser SA sample yields a larger index,
-    but is also particularly effective at speeding up alignment when
-    many alignments are reported per read.  For example, decreasing the
-    index's `--offrate` by 1 could as much as double alignment
-    performance, and decreasing by 2 could quadruple alignment
-    performance, etc.
+    To do this, specify a smaller-than-default [`-o`/`--offrate`][#bowtie-build-options-o] value
+    when running `bowtie-build`.  A denser SA sample yields a larger
+    index, but is also particularly effective at speeding up alignment
+    when many alignments are reported per read.  For example,
+    decreasing the index's [`-o`/`--offrate`][#bowtie-build-options-o] by 1 could as much as
+    double alignment performance, and decreasing by 2 could quadruple
+    alignment performance, etc.
 
-    On the other hand, decreasing `--offrate` increases the size of the
-    Bowtie index, both on disk and in memory when aligning reads.  At
-    the default `--offrate` of 5, the SA sample for the human genome
-    occupies about 375 MB of memory when aligning reads.  Decreasing
-    the `--offrate` by 1 doubles the memory taken by the SA sample, and
-    decreasing by 2 quadruples the memory taken, etc.
+    On the other hand, decreasing [`-o`/`--offrate`][#bowtie-build-options-o] increases the size
+    of the Bowtie index, both on disk and in memory when aligning
+    reads.  At the default [`-o`/`--offrate`][#bowtie-build-options-o] of 5, the SA sample for the
+    human genome occupies about 375 MB of memory when aligning reads.
+    Decreasing the [`-o`/`--offrate`][#bowtie-build-options-o] by 1 doubles the memory taken by
+    the SA sample, and decreasing by 2 quadruples the memory taken,
+    etc.
 
 4.  If bowtie "thrashes", try increasing `bowtie --offrate`
 
     If `bowtie` is beign run on a relatively low-memory machine is very
     slow and consistently triggers more than a few page faults per
     second (as observed via `top` or `vmstat` on Mac/Linux, or via a
-    tool like `Process Explorer` on Windows), then try setting
-    `--offrate` to a *larger* value than the value used to build the
-    index.  For example, bowtie-build's default `--offrate` is 5 and
-    all pre-built indexes available from the Bowtie website are built
-    with `--offrate 5`; so if `bowtie` thrashes when querying such an
-    index, try using `bowtie --offrate 6`.  If `bowtie` still thrashes,
-    try `bowtie --offrate 7`, etc.  A higher `--offrate` causes bowtie
-    to use a sparser sample of the suffix array than is stored in the
+    tool like `Process Explorer` on Windows), then try setting the
+    `bowtie` [`-o`/`--offrate`] to a *larger* value than the value used
+    to build the index.  For example, `bowtie-build`'s default
+    [`-o`/`--offrate`][#bowtie-build-options-o] is 5 and all pre-built indexes available from the
+    Bowtie website are built with [`-o`/`--offrate`][#bowtie-build-options-o] 5; so if `bowtie`
+    thrashes when querying such an index, try using `bowtie`
+    [`--offrate`] 6.  If `bowtie` still thrashes, try `bowtie`
+    [`--offrate`] 7, etc.  A higher [`-o`/`--offrate`] causes `bowtie` to
+    use a sparser sample of the suffix array than is stored in the
     index; this saves memory but makes alignment reporting slower
-    (which is especially slow when using `-a` or large `-k` or `-m`).
+    (which is especially slow when using [`-a`] or large [`-k`] or [`-m`]).
 
 Command Line
 ------------
@@ -887,7 +889,7 @@ forward reference strand.
 </td><td>
 
 The maximum number of backtracks permitted when aligning a read in
-`[-n] 2` or `[-n] 3` mode (default: 125 without [`--best`], 800 with
+[`-n`] 2 or [`-n`] 3 mode (default: 125 without [`--best`], 800 with
 [`--best`]).  A "backtrack" is the introduction of a speculative
 substitution into the alignment.  Without this limit, the default
 parameters will sometimes require that `bowtie` try 100s or 1,000s of
@@ -1004,16 +1006,14 @@ when invoking `bowtie-build` for the relevant index (see the
 
 Suppress all alignments for a particular read or pair if more than
 `<int>` reportable alignments exist for it.  Reportable alignments are
-those that would be reported given the `-n`, `-v`, `-l`, `-e`, `-k`,
-`-a`, `--best`, and `--strata` options.  Default: no limit.  Bowtie is
-designed to be very fast for small `-m` but bowtie can become
-significantly slower for larger values of `-m`.  If you would like to
-use Bowtie for larger values of `-k`, consider building an index with a
-denser suffix-array sample, i.e. specify a smaller `--offrate` when
+those that would be reported given the [`-n`], [`-v`], [`-l`], [`-e`], [`-k`],
+[`-a`], [`--best`], and [`--strata`] options.  Default: no limit.  Bowtie is
+designed to be very fast for small [`-m`] but bowtie can become
+significantly slower for larger values of [`-m`].  If you would like to
+use Bowtie for larger values of [`-k`], consider building an index with a
+denser suffix-array sample, i.e. specify a smaller [`-o`/`--offrate`][#bowtie-build-options-o] when
 invoking `bowtie-build` for the relevant index (see the [Performance
-tuning] section for details).
-
-[Performance Tips]: #performance-tuning
+tuning][#performance-tuning] section for details).
 
 </td></tr><tr><td id="bowtie-options-best">
 
@@ -1247,6 +1247,7 @@ if `bowtie` is linked with the `pthreads` library (i.e. if
 
 [`-o`/`--offrate`]: #bowtie-options-o
 [`-o`]: #bowtie-options-o
+[`--offrate`]: #bowtie-options-o
 
     -o/--offrate <int>
 
@@ -1525,9 +1526,9 @@ Usage:
 </td><td>
 
 A comma-separated list of FASTA files containing the reference
-sequences to be aligned to, or, if `-c` is specified, the sequences
+sequences to be aligned to, or, if [`-c`][#bowtie-build-options-c] is specified, the sequences
 themselves. E.g., `<reference_in>` might be
-`chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or, if `-c` is specified, this might
+`chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or, if [`-c`][#bowtie-build-options-c] is specified, this might
 be `GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
 
 </td></tr><tr><td>
@@ -1554,7 +1555,7 @@ is `<ebwt_base>`.
 The reference input files (specified as `<reference_in>`) are FASTA
 files (usually having extension `.fa`, `.mfa`, `.fna` or similar).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-c">
 
     -c
 
@@ -1564,19 +1565,23 @@ The reference sequences are given on the command line.  I.e.
 `<reference_in>` is a comma-separated list of sequences rather than a
 list of FASTA files.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-a">
+
+[`-a`/`--noauto`][#bowtie-build-options-a]
 
     -a/--noauto
 
 </td><td>
 
 Disable the default behavior whereby `bowtie-build` automatically
-selects values for the `--bmax`, `--dcv` and `--packed` parameters
+selects values for the [`--bmax`], [`--dcv`] and [`--packed`] parameters
 according to available memory.  Instead, user may specify values for
 those parameters.  If memory is exhausted during indexing, an error
 message will be printed; it is up to the user to try new parameters.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-p">
+
+[`--packed`][#bowtie-build-options-p]
 
     -p/--packed
 
@@ -1584,10 +1589,12 @@ message will be printed; it is up to the user to try new parameters.
 
 Use a packed (2-bits-per-nucleotide) representation for DNA strings.
 This saves memory but makes indexing 2-3 times slower.  Default: off.
-This is configured automatically by default; use `-a`/`--noauto` to
+This is configured automatically by default; use [`-a`/`--noauto`] to
 configure manually.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-bmax">
+
+[`--bmax`][#bowtie-build-options-bmax]
 
     --bmax <int>
 
@@ -1596,11 +1603,13 @@ configure manually.
 The maximum number of suffixes allowed in a block.  Allowing more
 suffixes per block makes indexing faster, but increases peak memory
 usage.  Setting this option overrides any previous setting for
-`--bmax`, `--bmaxmultsqrt` or `--bmaxdivn`.  Default (in terms of the
-`--bmaxdivn` parameter) is `--bmaxdivn 4`.  This is configured
-automatically by default; use `-a`/`--noauto` to configure manually.
+[`--bmax`], [`--bmaxmultsqrt`] or [`--bmaxdivn`].  Default (in terms of the
+[`--bmaxdivn`] parameter) is [`--bmaxdivn`] 4.  This is configured
+automatically by default; use [`-a`/`--noauto`] to configure manually.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-bmaxdivn">
+
+[`--bmaxdivn`][#bowtie-build-options-bmaxdivn]
 
     --bmaxdivn <int>
 
@@ -1608,11 +1617,13 @@ automatically by default; use `-a`/`--noauto` to configure manually.
 
 The maximum number of suffixes allowed in a block, expressed as a
 fraction of the length of the reference.  Setting this option overrides
-any previous setting for `--bmax`, `--bmaxmultsqrt` or `--bmaxdivn`.
-Default: `--bmaxdivn 4`.  This is configured automatically by default;
-use `-a`/`--noauto` to configure manually.
+any previous setting for [`--bmax`], [`--bmaxmultsqrt`] or [`--bmaxdivn`].
+Default: [`--bmaxdivn`] 4.  This is configured automatically by default;
+use [`-a`/`--noauto`] to configure manually.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-dcv">
+
+[`--dcv`][#bowtie-build-options-dcv]
 
     --dcv <int>
 
@@ -1622,9 +1633,11 @@ Use `<int>` as the period for the difference-cover sample.  A larger
 period yields less memory overhead, but may make suffix sorting slower,
 especially if repeats are present.  Must be a power of 2 no greater
 than 4096.  Default: 1024.  This is configured automatically by
-default; use `-a`/`--noauto` to configure manually.
+default; use [`-a`/`--noauto`] to configure manually.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-nodc">
+
+[`--nodc`][#bowtie-build-options-nodc]
 
     --nodc
 
@@ -1654,7 +1667,7 @@ Build *only* the `NAME.3.ebwt` and `NAME.4.ebwt` portions of the index,
 which contain a bitpacked version of the reference sequences and are
 (currently) only used for paired-end alignment.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-o">
 
     -o/--offrate <int>
 
@@ -1662,7 +1675,7 @@ which contain a bitpacked version of the reference sequences and are
 
 To map alignments back to positions on the reference sequences, it's
 necessary to annotate ("mark") some or all of the [Burrows-Wheeler]
-rows with their corresponding location on the genome.  `--offrate`
+rows with their corresponding location on the genome.  [`-o`/`--offrate`][#bowtie-build-options-o]
 governs how many rows get marked: the indexer will mark every 2^`<int>`
 rows.  Marking more rows makes reference-position lookups faster, but
 requires more memory to hold the annotations at runtime.  The default
@@ -1679,7 +1692,7 @@ The ftab is the lookup table used to calculate an initial
 [Burrows-Wheeler] range with respect to the first `<int>` characters
 of the query.  A larger `<int>` yields a larger lookup table but faster
 query times.  The ftab has size 4^(`<int>`+1) bytes.  The default
-setting for `-t`/`--ftabchars` is 10 (ftab is 4MB).
+setting is 10 (ftab is 4MB).
 
 </td></tr><tr><td>
 
@@ -1753,8 +1766,8 @@ kind of index it is and what reference sequences were used to build it.
 When run without any options, the tool will output a FASTA file
 containing the sequences of the original references (with all
 non-`A`/`C`/`G`/`T` characters converted to `N`s).  It can also be used
-to extract just the reference sequence names using the `-n`/`--names`
-option or a more verbose summary using the `-s`/`--summary` option.
+to extract just the reference sequence names using the [`-n`/`--names`]
+option or a more verbose summary using the [`-s`/`--summary`] option.
 
 Command Line
 ------------
@@ -1792,7 +1805,9 @@ environment variable.
 When printing FASTA output, output a newline character every `<int>`
 bases (default: 60).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-n">
+
+[`-n`/`--names`][#bowtie-build-options-n]
 
     -n/--names
 
@@ -1800,7 +1815,9 @@ bases (default: 60).
 
 Print reference sequence names and quit.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-s">
+
+[`-s`/`--summary`][#bowtie-build-options-s]
 
     -s/--summary
 
