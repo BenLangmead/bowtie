@@ -1426,18 +1426,6 @@ be `GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
 
 </td></tr><tr><td>
 
-    <reference_in>
-
-</td><td>
-
-A comma-separated list of FASTA files containing the reference
-sequences to be aligned to, or, if `-c` is specified, the sequences
-themselves. E.g., this might be `chr1.fa,chr2.fa,chrX.fa,chrY.fa`, or,
-if `-c` is specified, this might be
-`GGTCATCCT,ACGGGTCGT,CCGTTCTATGCGGCTTA`.
-
-</td></tr><tr><td>
-
     <ebwt_base>
 
 </td><td>
@@ -1445,7 +1433,7 @@ if `-c` is specified, this might be
 The basename of the index files to write.  By default, `bowtie-build`
 writes files named `NAME.1.ebwt`, `NAME.2.ebwt`, `NAME.3.ebwt`,
 `NAME.4.ebwt`, `NAME.rev.1.ebwt`, and `NAME.rev.2.ebwt`, where `NAME`
-is ``.
+is `<ebwt_base>`.
 
 </td></tr></table>
 
