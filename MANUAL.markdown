@@ -733,7 +733,7 @@ Default: off.
 Quality values are represented in the read input file as
 space-separated ASCII integers, e.g., `40 40 30 40`..., rather than
 ASCII characters, e.g., `II?I`....  Integers are treated as being on
-the [Phred quality] scale unless `--solexa-quals` is also specified.
+the [Phred quality] scale unless [`--solexa-quals`] is also specified.
 Default: off.
 
 </td></tr></table>
@@ -988,13 +988,13 @@ details).
 
 Report all valid alignments per read or pair (default: off).  Validity
 of alignments is determined by the alignment policy (combined effects
-of `-n`, `-v`, `-l`, and `-e`).  If more than one valid alignment
-exists and the `--best` and `--strata` options are specified, then only
+of [`-n`], [`-v`], [`-l`], and [`-e`]).  If more than one valid alignment
+exists and the [`--best`] and [`--strata`] options are specified, then only
 those alignments belonging to the best alignment "stratum" will be
-reported.  Bowtie is designed to be very fast for small `-k` but bowtie
+reported.  Bowtie is designed to be very fast for small [`-k`] but bowtie
 can become significantly slower if [`-a`/`--all`] is specified.  If you
 would like to use Bowtie with [`-a`], consider building an index with a
-denser suffix-array sample, i.e. specify a smaller `-o`/`--offrate`
+denser suffix-array sample, i.e. specify a smaller [`-o`/`--offrate`](#bowtie-build-options-o)
 when invoking `bowtie-build` for the relevant index (see the
 [Performance tuning] section for details).
 
@@ -1364,36 +1364,47 @@ Default `bowtie` output
 `bowtie` outputs one alignment per line.  Each line is a collection of
 8 fields separated by tabs; from left to right, the fields are:
 
-1. Name of read that aligned
+1.  Name of read that aligned
 
-2. Reference strand aligned to, `+` for forward strand, `-` for reverse
+2.  Reference strand aligned to, `+` for forward strand, `-` for
+    reverse
 
-3. Name of reference sequence where alignment occurs, or numeric ID if
-   no name was provided
+3.  Name of reference sequence where alignment occurs, or numeric ID if
+    no name was provided
 
-4. 0-based offset into the forward reference strand where leftmost
-   character of the alignment occurs
+4.  0-based offset into the forward reference strand where leftmost
+    character of the alignment occurs
 
-5. Read sequence (reverse-complemented if orientation is `-`)
+5.  Read sequence (reverse-complemented if orientation is `-`).
+    
+    If the read was in colorspace, then the sequence shown in this
+    column is the sequence of *decoded nucleotides*, not the original
+    colors.  See the [Colorspace alignment] section for details about
+    decoding.  To display colors instead, use the [`--colseq`] option.
 
-6. ASCII-encoded read qualities (reversed if orientation is `-`).  The
-   encoded quality values are on the Phred scale and the encoding is
-   ASCII-offset by 33 (ASCII char `!`). 
+6.  ASCII-encoded read qualities (reversed if orientation is `-`).  The
+    encoded quality values are on the Phred scale and the encoding is
+    ASCII-offset by 33 (ASCII char `!`).
+    
+    If the read was in colorspace, then the qualities shown in this
+    column are the *decoded qualities*, not the original qualities.
+    See the [Colorspace alignment] section for details about decoding.
+    To display colors instead, use the [`--colqual`] option.
 
-7. Number of other instances where the same read aligns against the
-   same reference characters as were aligned against in this alignment.
-   This is *not* the number of other places the read aligns with the
-   same number of mismatches.  The number in this column is generally
-   not a good proxy for that number (e.g., the number in this column
-   may be '0' while the number of other alignments with the same number
-   of mismatches might be large).  This column was previously described
-   as "Reserved".
+7.  Number of other instances where the same read aligns against the
+    same reference characters as were aligned against in this alignment.
+    This is *not* the number of other places the read aligns with the
+    same number of mismatches.  The number in this column is generally
+    not a good proxy for that number (e.g., the number in this column
+    may be '0' while the number of other alignments with the same
+    number of mismatches might be large).  This column was previously
+    described as "Reserved".
 
-8. Comma-separated list of mismatch descriptors.  If there are no
-   mismatches in the alignment, this field is empty.  A single
-   descriptor has the format offset:reference-base>read-base.  The
-   offset is expressed as a 0-based offset from the high-quality (5')
-   end of the read. 
+8.  Comma-separated list of mismatch descriptors.  If there are no
+    mismatches in the alignment, this field is empty.  A single
+    descriptor has the format offset:reference-base>read-base.  The
+    offset is expressed as a 0-based offset from the high-quality (5')
+    end of the read. 
 
 SAM `bowtie` output
 -------------------
@@ -1621,9 +1632,9 @@ configure manually.
 The maximum number of suffixes allowed in a block.  Allowing more
 suffixes per block makes indexing faster, but increases peak memory
 usage.  Setting this option overrides any previous setting for
-[`--bmax`], [`--bmaxmultsqrt`] or [`--bmaxdivn`].  Default (in terms of the
-[`--bmaxdivn`] parameter) is [`--bmaxdivn`] 4.  This is configured
-automatically by default; use [`-a`/`--noauto`] to configure manually.
+[`--bmax`], or [`--bmaxdivn`].  Default (in terms of the [`--bmaxdivn`]
+parameter) is [`--bmaxdivn`] 4.  This is configured automatically by
+default; use [`-a`/`--noauto`] to configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-bmaxdivn">
 
@@ -1635,9 +1646,9 @@ automatically by default; use [`-a`/`--noauto`] to configure manually.
 
 The maximum number of suffixes allowed in a block, expressed as a
 fraction of the length of the reference.  Setting this option overrides
-any previous setting for [`--bmax`], [`--bmaxmultsqrt`] or [`--bmaxdivn`].
-Default: [`--bmaxdivn`] 4.  This is configured automatically by default;
-use [`-a`/`--noauto`] to configure manually.
+any previous setting for [`--bmax`], or [`--bmaxdivn`].  Default:
+[`--bmaxdivn`] 4.  This is configured automatically by default; use
+[`-a`/`--noauto`] to configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-dcv">
 
@@ -1673,7 +1684,7 @@ repetitive reference).  Default: off.
 
 Do not build the `NAME.3.ebwt` and `NAME.4.ebwt` portions of the index,
 which contain a bitpacked version of the reference sequences and are
-(currently) only used for paired-end alignment.
+used for paired-end alignment.
 
 </td></tr><tr><td>
 
@@ -1683,7 +1694,7 @@ which contain a bitpacked version of the reference sequences and are
 
 Build *only* the `NAME.3.ebwt` and `NAME.4.ebwt` portions of the index,
 which contain a bitpacked version of the reference sequences and are
-(currently) only used for paired-end alignment.
+used for paired-end alignment.
 
 </td></tr><tr><td id="bowtie-build-options-o">
 
