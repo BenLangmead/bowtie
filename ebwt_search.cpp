@@ -133,6 +133,11 @@ static bool color;
 static string rgs; // SAM outputs for @RG header line
 static int snpPhred; // probability of SNP, for scoring colorspace alignments
 static Bitset suppressOuts(64); // output fields to suppress
+static bool sampleMax; // whether to report a random alignment when maxed-out via -m/-M
+static int defaultMapq; // default mapping quality to print in SAM mode
+static bool colorSeq; // true -> show colorspace alignments as colors, not decoded bases
+static bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
+static bool printCost; // true -> print stratum and cost
 
 static void resetOptions() {
 	mates1.clear();
@@ -231,11 +236,16 @@ static void resetOptions() {
 	rgs						= "";    // SAM outputs for @RG header line
 	snpPhred				= 30;    // probability of SNP, for scoring colorspace alignments
 	suppressOuts.clear();            // output fields to suppress
+	sampleMax				= false;
+	defaultMapq				= 255;
+	colorSeq				= false; // true -> show colorspace alignments as colors, not decoded bases
+	colorQual				= false; // true -> show colorspace qualities as original quals, not decoded quals
+	printCost				= false; // true -> print cost and stratum
 }
 
 // mating constraints
 
-static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:1:2:I:X:x:B:ySC";
+static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I:X:x:B:ySC";
 
 enum {
 	ARG_ORIG = 256,
@@ -256,15 +266,12 @@ enum {
 	ARG_UN,
 	ARG_MAXDUMP,
 	ARG_REFIDX,
-	ARG_DUMP_NOHIT,
-	ARG_DUMP_HHHIT,
 	ARG_SANITY,
 	ARG_OLDBEST,
 	ARG_BETTER,
 	ARG_BEST,
 	ARG_REFOUT,
 	ARG_ISARATE,
-	ARG_SEED_EXTEND,
 	ARG_PARTITION,
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
@@ -307,10 +314,15 @@ enum {
 	ARG_FULLREF,
 	ARG_USAGE,
 	ARG_SNPPHRED,
+	ARG_SNPFRAC,
 	ARG_SAM_NOHEAD,
 	ARG_SAM_NOSQ,
 	ARG_SAM_RG,
-	ARG_SUPPRESS_FIELDS
+	ARG_SUPPRESS_FIELDS,
+	ARG_DEFAULT_MAPQ,
+	ARG_COLOR_SEQ,
+	ARG_COLOR_QUAL,
+	ARG_COST
 };
 
 static struct option long_options[] = {
@@ -318,9 +330,9 @@ static struct option long_options[] = {
 	{(char*)"startverbose", no_argument,       0,            ARG_STARTVERBOSE},
 	{(char*)"quiet",        no_argument,       0,            ARG_QUIET},
 	{(char*)"sanity",       no_argument,       0,            ARG_SANITY},
-	{(char*)"exact",        no_argument,       0,            '0'},
-	{(char*)"1mm",          no_argument,       0,            '1'},
-	{(char*)"2mm",          no_argument,       0,            '2'},
+	//{(char*)"exact",        no_argument,       0,            '0'},
+	//{(char*)"1mm",          no_argument,       0,            '1'},
+	//{(char*)"2mm",          no_argument,       0,            '2'},
 	{(char*)"pause",        no_argument,       &ipause,      1},
 	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
 	{(char*)"all",          no_argument,       0,            'a'},
@@ -362,10 +374,7 @@ static struct option long_options[] = {
 	{(char*)"randread",     no_argument,       0,            ARG_RANDOM_READS},
 	{(char*)"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{(char*)"phased",       no_argument,       0,            'z'},
-	{(char*)"dumpnohit",    no_argument,       0,            ARG_DUMP_NOHIT},
-	{(char*)"dumphhhit",    no_argument,       0,            ARG_DUMP_HHHIT},
 	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
-	{(char*)"seedextend",   no_argument,       0,            ARG_SEED_EXTEND},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
 	{(char*)"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
@@ -414,7 +423,12 @@ static struct option long_options[] = {
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"sam-RG",       required_argument, 0,            ARG_SAM_RG},
 	{(char*)"snpphred",     required_argument, 0,            ARG_SNPPHRED},
+	{(char*)"snpfrac",      required_argument, 0,            ARG_SNPFRAC},
 	{(char*)"suppress",     required_argument, 0,            ARG_SUPPRESS_FIELDS},
+	{(char*)"mapq",         required_argument, 0,            ARG_DEFAULT_MAPQ},
+	{(char*)"colseq",       no_argument,       0,            ARG_COLOR_SEQ},
+	{(char*)"colqual",      no_argument,       0,            ARG_COLOR_QUAL},
+	{(char*)"cost",         no_argument,       0,            ARG_COST},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -439,7 +453,7 @@ static void printUsage(ostream& out) {
 	    << "  -f                 query input files are (multi-)FASTA .fa/.mfa" << endl
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
-	    << "  -C                 reads and index are in colorspace (incompatible with -q)" << endl
+	    << "  -C                 reads and index are in colorspace" << endl
 	    << "  -s/--skip <int>    skip the first <int> reads/pairs in the input" << endl
 	    << "  -u/--qupto <int>   stop after first <int> reads/pairs (excl. skipped reads)" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
@@ -467,30 +481,37 @@ static void printUsage(ostream& out) {
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def: no limit)" << endl
+	    << "  -M <int>           like -m, but reports 1 random hit (MAPQ=0); requires --best" << endl
 	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
 	    << "  --best             hits guaranteed best stratum; ties broken by quality" << endl
 	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
-	    << "  --strandfix        attempt to fix strand biases (def: on w/ --best, off w/o)" << endl
+	    //<< "  --strandfix        attempt to fix strand biases (def: on w/ --best, off w/o)" << endl
+	    << "  --snpphred <int>   penalty for a SNP when decoding colorspace (default: 30)" << endl
+	    << "  --snpfrac <dec>    approx. fraction of SNP bases (e.g. 0.001); sets --snpphred" << endl
 	    << "Output:" << endl
-	    << "  -S/--sam           write hits in SAM format" << endl
-	    //<< "  --concise          write hits in concise format" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
-	    << "  --snphred <int>    penalty for a SNP when decoding colorspace (default: 30)" << endl
 	    << "  --quiet            print nothing but the alignments" << endl
 	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
+	    << "  --suppress <cols>  suppresses given columns (comma-delim'ed) in default output" << endl
+	    << "  --colseq           print aligned colorspace seqs as colors, not decoded bases" << endl
+	    << "  --colqual          print original colorspace quals, not decoded quals" << endl
+	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
+	    << "SAM:" << endl
+	    << "  -S/--sam           write hits in SAM format" << endl
+	    << "  --mapq <int>       default mapping quality (MAPQ) to print for SAM alignments" << endl
 	    << "  --sam-nohead       supppress header lines (starting with @) for SAM output" << endl
 	    << "  --sam-nosq         supppress @SQ header lines for SAM output" << endl
-	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
+	    << "  --sam-RG <text>    add <text> (usually \"lab=value\") to @RG line of SAM header" << endl
 	    << "Performance:" << endl
+	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
 #ifdef BOWTIE_PTHREADS
 	    << "  -p/--threads <int> number of alignment threads to launch (default: 1)" << endl
 #endif
-	    << "  -o/--offrate <int> override offrate of index; must be >= index's offrate" << endl
 #ifdef BOWTIE_MM
 	    << "  --mm               use memory-mapped I/O for index; many 'bowtie's can share" << endl
 #endif
@@ -504,1023 +525,6 @@ static void printUsage(ostream& out) {
 	    << "  -h/--help          print detailed description of tool and its options" << endl
 	    << "  --usage            print this usage message" << endl
 	    ;
-}
-
-/**
- * Print a detailed usage message to the provided output stream.
- *
- * Manual text converted to C++ string with something like:
- * cat MANUAL  | head -1015 | tail -940 | sed -e 's/\"/\\\"/g' | \
- *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
- */
-static void printLongUsage(ostream& out) {
-	out << "\n"
-	" Using the 'bowtie' Aligner\n"
-	" --------------------------\n"
-	"\n"
-	" The 'bowtie' aligner takes an index and a set of reads as input and\n"
-	" outputs a list of alignments.  Alignments are selected according to a\n"
-	" combination of the -v/-n/-e/-l options (plus the -I/-X/--fr/--rf/--ff\n"
-	" options for paired-end alignment), which define which alignments are\n"
-	" legal, and the -k/-a/-m/--best/--strata options which define which and\n"
-	" how many legal alignments should be reported.\n"
-	"\n"
-	" By default, Bowtie enforces an alignment policy equivalent to Maq's\n"
-	" quality-aware policy (http://maq.sf.net) (-n 2 -l 28 -e 70), but it\n"
-	" can also be made to enforce an end-to-end k-difference policy\n"
-	" equivalent to SOAP's (http://soap.genomics.org.cn/) (-v 2).\n"
-	"\n"
-	" Bowtie is designed to be very fast for read sets where a) many of the\n"
-	" reads have at least one good, valid alignment, b) many of the reads\n"
-	" are relatively high-quality, c) the number of alignments reported per\n"
-	" read is small (close to 1).  These criteria are generally satisfied in\n"
-	" the context of modern short-read analyses such as RNA-seq, ChIP-seq,\n"
-	" other types of -seq, and especially mammalian genotyping (e.g. the\n"
-	" 1000 Genomes Project).  You may observe longer running times in other\n"
-	" research contexts.  If you find Bowtie's performance to be\n"
-	" disappointingly slow, please try the hints described in the \"High\n"
-	" Performance Tips\" section below.  If Bowtie continues to be too slow,\n"
-	" please contact us and tell us the nature of your research application\n"
-	" and the parameters you are using to run Bowtie.  We are eager to hear\n"
-	" your feedback.\n"
-	" \n"
-	" A result of Bowtie's indexing strategy is that alignments involving\n"
-	" one or more ambiguous reference characters ('N', '-', 'R', 'Y', etc.)\n"
-	" are considered invalid by Bowtie, regardless of the alignment policy.\n"
-	" This is true only for ambiguous characters in the reference;\n"
-	" alignments involving ambiguous characters in the read are legal,\n"
-	" subject to the alignment policy.\n"
-	" \n"
-	" Also, alignments that \"fall off\" the reference sequence are not\n"
-	" considered legal by Bowtie, though some such alignments will become\n"
-	" legal once gapped alignment is implemented.\n"
-	"\n"
-	" The process by which bowtie chooses an alignment to report is\n"
-	" randomized in order to avoid \"mapping bias\" - the phenomenon whereby\n"
-	" an aligner systematically fails to report a particular class of good\n"
-	" alignments, causing spurious \"holes\" in the comparative assembly.\n"
-	" Whenever bowtie reports a subset of the valid alignments that exist,\n"
-	" it makes an effort to sample them randomly.  This randomness flows\n"
-	" from a simple seeded pseudo-random number generator and is\n"
-	" \"deterministic\" in the sense that Bowtie will always produce the same\n"
-	" results for the same read when run with the same initial \"seed\" value\n"
-	" (see documentation for --seed option).\n"
-	" \n"
-	" In the default mode, bowtie can exhibit strand bias.  Strand bias\n"
-	" occurs when input reference and reads are such that (a) some reads\n"
-	" align equally well to sites on the forward and reverse strands of the\n"
-	" reference, and (b) the number of such sites on one strand is different\n"
-	" from the number on the other strand.  When this happens for a given\n"
-	" read, bowtie effectively chooses one strand or the other with 50%\n"
-	" probability, then reports a randomly-selected alignment for that read\n"
-	" from among the sites on the selected strand.  This tends to overassign\n"
-	" alignments to the sites on the strand with fewer sites and underassign\n"
-	" to sites on the strand with more sites.  The effect is mitigated,\n"
-	" though it may not be eliminated, when reads are longer or when paired-\n"
-	" end reads are used.  Running Bowtie in --best mode eliminates strand\n"
-	" bias by forcing Bowtie to select one strand or the other with a\n"
-	" probability that is proportional to the number of best sites on the\n"
-	" strand. \n"
-	"\n"
-	" Gapped alignments are not currently supported, but we do plan to\n"
-	" implement this in the future.  Alignment in ABI \"color space\" is also\n"
-	" not currently supported.\n"
-	"\n"
-	"  Maq-like Policy\n"
-	"  ---------------\n"
-	"\n"
-	"  When the -n option is specified (and it is by default), Bowtie\n"
-	"  determines which alignments are valid according to the following\n"
-	"  policy, which is equivalent to Maq's default policy:\n"
-	"\n"
-	"  1. Alignments may have no more than N mismatches in the first L\n"
-	"     bases on the high-quality end of the read.\n"
-	"\n"
-	"  2. The sum of the quality values at all mismatched positions may not\n"
-	"     exceed E (where each position has a quality value on a phred-like\n"
-	"     scale of 0 up to about 40).\n"
-	"\n"
-	"  The N, L and E parameters are configured using Bowtie's -n, -l and\n"
-	"  -e options.  The -n (Maq-like) option is mutually exclusive with the\n"
-	"  -v (end-to-end k-difference) option.\n"
-	" \n"
-	"  If there are many possible alignments satisfying these criteria,\n"
-	"  Bowtie will prefer to report alignments with fewer mismatches and\n"
-	"  where the sum from criterion 2 is smaller.  However, Bowtie does not\n"
-	"  guarantee that the reported alignment(s) are \"best\" in terms of the\n"
-	"  number of mismatches (i.e. the alignment \"stratum\") or in terms of\n"
-	"  the quality values at the mismatched positions unless the --best\n"
-	"  option is specified.  Bowtie is about 1 to 2.5 times slower when\n"
-	"  --best is specified.\n"
-	"\n"
-	"  Note that Maq internally rounds base qualities to the nearest 10 and\n"
-	"  rounds qualities greater than 30 to 30.  To maintain compatibility\n"
-	"  with Maq, Bowtie does the same.  Rounding can be suppressed with the\n"
-	"  --nomaqround option.\n"
-	" \n"
-	"  Bowtie is not fully sensitive in -n 2 and -n 3 modes by default.  In\n"
-	"  these modes Bowtie imposes a \"backtracking limit\" to limit effort\n"
-	"  spent trying to find valid alignments for low-quality reads that are\n"
-	"  unlikely to have any.  This may cause bowtie to miss some legal 2-\n"
-	"  and 3-mismatch alignments.  The limit is set to a reasonable default\n"
-	"  (125 without --best, 800 with --best), but the user may decrease or\n"
-	"  increase the limit using the --maxbts and/or -y options.  -y mode is\n"
-	"  slow but guarantees full sensitivity.\n"
-	" \n"
-	"  End-to-end k-difference Policy\n"
-	"  ------------------------------\n"
-	"  \n"
-	"  The policy has one criterion: Alignments may have no more than V\n"
-	"  mismatches.  Quality values are ignored.  The number of mismatches\n"
-	"  permitted is configurable with the -v option.  The -v (end-to-end)\n"
-	"  option is mutually exclusive with the -n (Maq-like) option.\n"
-	"\n"
-	"  If there are many possible alignments satisfying this criterion,\n"
-	"  Bowtie will prefer to report alignments with fewer mismatches.\n"
-	"  However, for reads where the \"best\" alignment has one or more\n"
-	"  mismatches, Bowtie does not guarantee that the reported alignment(s)\n"
-	"  will be best unless the --best option is specified.  Bowtie is\n"
-	"  typically about 1 to 2.5 times slower when --best is specified.\n"
-	"  \n"
-	"  Reporting Modes\n"
-	"  ---------------\n"
-	"  \n"
-	"  With the -k, -a, -m, --best and --strata options, Bowtie gives the\n"
-	"  user a great deal of flexibility in selecting which alignments get\n"
-	"  reported.  Here we give a few examples that demonstrate a few ways\n"
-	"  they can be combined to achieve a desired result.  All examples are\n"
-	"  using the e_coli index that comes packaged with Bowtie.  Alignment\n"
-	"  summary output is elided.\n"
-	"  \n"
-	"    Example 1: -a\n"
-	"    -------------\n"
-	"    \n"
-	"    $ ./bowtie -a -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,148810,2>\n"
-	"    1-:<0,2852852,1>\n"
-	"    1-:<0,4930433,2>\n"
-	"    1-:<0,905664,2>\n"
-	"    1+:<0,1093035,2>\n"
-	"  \n"
-	"    Specifying -a instructs bowtie to report all valid alignments,\n"
-	"    subject to the alignment policy: -v 2.  In this case, bowtie finds\n"
-	"    5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)\n"
-	"    has 1 mismatch and 4 hits have 2 mismatches.  Note that they are\n"
-	"    not necessarily listed in best-to-worst order.\n"
-	"    \n"
-	"    Example 2: -k 3\n"
-	"    ---------------\n"
-	"    \n"
-	"    $ ./bowtie -k 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,148810,2>\n"
-	"    1-:<0,2852852,1>\n"
-	"    1-:<0,4930433,2>\n"
-	"  \n"
-	"    Specifying -k 3 instructs bowtie to report up to 3 valid\n"
-	"    alignments.  In this case, a total of 5 valid alignments exist (see\n"
-	"    Example 1); bowtie reports 3 out of those 5.  -k can be set to any\n"
-	"    integer greater than 0.\n"
-	"\n"
-	"    Example 3: -k 6\n"
-	"    ---------------\n"
-	"    \n"
-	"    $ ./bowtie -k 6 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,148810,2>\n"
-	"    1-:<0,2852852,1>\n"
-	"    1-:<0,4930433,2>\n"
-	"    1-:<0,905664,2>\n"
-	"    1+:<0,1093035,2>\n"
-	"  \n"
-	"    Specifying -k 6 instructs bowtie to report up to 6 valid\n"
-	"    alignments.  In this case, a total of 5 valid alignments exist, so\n"
-	"    bowtie reports all 5.\n"
-	"    \n"
-	"    Example 4: default (-k 1)\n"
-	"    -------------------------\n"
-	"    \n"
-	"    $ ./bowtie -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,148810,2>\n"
-	"    \n"
-	"    Leaving the reporting options at their defaults causes Bowtie to\n"
-	"    report the first valid alignment it encounters.  Because --best was\n"
-	"    not specified, we are not guaranteed that bowtie will report the\n"
-	"    best alignment, and in this case it does not (the 1-mismatch\n"
-	"    alignment from the previous example would have been better).  The\n"
-	"    default reporting mode is equivalent to -k 1.\n"
-	"\n"
-	"    Example 5: -a --best\n"
-	"    --------------------\n"
-	"    \n"
-	"    $ ./bowtie -a --best -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,2852852,1>\n"
-	"    1+:<0,1093035,2>\n"
-	"    1-:<0,905664,2>\n"
-	"    1-:<0,148810,2>\n"
-	"    1-:<0,4930433,2>\n"
-	"  \n"
-	"    Specifying -a --best results in the same alignments being printed\n"
-	"    as if just -a had been specified, but they are guaranteed to be\n"
-	"    reported in best-to-worst order.\n"
-	"\n"
-	"    Example 6: -a --best --strata\n"
-	"    -----------------------------\n"
-	"    \n"
-	"    $ ./bowtie -a --best --strata -v 2 e_coli --concise \\\n"
-	"               -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,2852852,1>\n"
-	"\n"
-	"    Specifying --strata in addition to -a and --best causes Bowtie to\n"
-	"    report only those alignments in the best alignment \"stratum\".  The\n"
-	"    alignments in the best stratum are those having the least number of\n"
-	"    mismatches (or mismatches just in the \"seed\" portion of the\n"
-	"    alignment in the case of -n mode).  Note that if --strata is\n"
-	"    specified, --best must also be specified.\n"
-	"\n"
-	"    Example 7: -a -m 3\n"
-	"    ------------------\n"
-	"    \n"
-	"    $ ./bowtie -a -m 3 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    No alignments\n"
-	"  \n"
-	"    Specifying -m 3 instructs bowtie to refrain from reporting any\n"
-	"    alignments for reads having more than 3 reportable alignments.  The\n"
-	"    -m option is useful when the user would like to guarantee that\n"
-	"    reported alignments are \"unique\", for some definition of unique.\n"
-	"    \n"
-	"    Example 1 showed that the read has 5 reportable alignments when -a\n"
-	"    and -v 2 are specified, so the -m 3 limit causes bowtie to output\n"
-	"    no alignments.\n"
-	"\n"
-	"    Example 8: -a -m 5\n"
-	"    ------------------\n"
-	"    \n"
-	"    $ ./bowtie -a -m 5 -v 2 e_coli --concise -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,148810,2>\n"
-	"    1-:<0,2852852,1>\n"
-	"    1-:<0,4930433,2>\n"
-	"    1-:<0,905664,2>\n"
-	"    1+:<0,1093035,2>\n"
-	"  \n"
-	"    Specifying -m 5 instructs bowtie to refrain from reporting any\n"
-	"    alignments for reads having more than 5 reportable alignments.\n"
-	"    Since the read has exactly 5 reportable alignments, the -m 5 limit\n"
-	"    allows bowtie to print them as usual. \n"
-	"\n"
-	"    Example 9: -a -m 3 --best --strata\n"
-	"    ----------------------------------\n"
-	"    \n"
-	"    $ ./bowtie -a -m 3 --best --strata -v 2 e_coli --concise \\n"
-	"               -c ATGCATCATGCGCCAT\n"
-	"    1-:<0,2852852,1>\n"
-	"  \n"
-	"    Specifying -m 3 instructs bowtie to refrain from reporting any\n"
-	"    alignments for reads having more than 3 reportable alignments.\n"
-	"    As we saw in Example 6, the read has only 1 reportable alignment\n"
-	"    when -a, --best and --strata are specified, so the -m 3 limit\n"
-	"    allows bowtie to print that alignment as usual.\n"
-	"    \n"
-	"    Intuitively, the -m option, when combined with the --best and\n"
-	"    --strata options, guarntees a principled, though somewhat weaker\n"
-	"    form of \"uniqueness.\"  A stronger form of uniqueness is enforced\n"
-	"    when -m is specified but --best --strata are not.\n"
-	"\n"
-	"  Paired-end Alignment\n"
-	"  --------------------\n"
-	"  \n"
-	"  Bowtie can align paired-end reads when paired read files are\n"
-	"  specified using the -1 and -2 options (for pairs of raw, FASTA, or\n"
-	"  FASTQ read files), or using the --12 option (for Tab-delimited read\n"
-	"  files).  A valid paired-end alignment satisfies the following\n"
-	"  criteria:\n"
-	"  \n"
-	"  1. Both mates have a valid alignment according to the alignment\n"
-	"     policy specified by the -v/-n/-e/-l options.\n"
-	"  2. The relative orientation and position of the mates satisfy the\n"
-	"     constraints given by the -I/-X/--fr/--rf/--ff options. \n"
-	"  \n"
-	"  Policies governing which paired-end alignments are reported for a\n"
-	"  given read are specified using the -k, -a and -m options as usual.\n"
-	"  The --strata and --best options do not apply in paired-end mode.\n"
-	"  \n"
-	"  A paired-end alignment is reported as a pair of mate alignments, both\n"
-	"  on a separate line, where the alignment for each mate is formatted\n"
-	"  the same as an unpaired (singleton) alignment.  The alignment for the\n"
-	"  mate that occurs closest to the beginning of the reference sequence\n"
-	"  (the \"upstream\" mate) is always printed before the alignment for the\n"
-	"  downstream mate.  Reads files containing paired-end reads will\n"
-	"  sometimes name the reads according to whether they are the #1 or #2\n"
-	"  mates by appending a \"/1\" or \"/2\" suffix to the read name.  If no\n"
-	"  such suffix is present in Bowtie's input, the suffix will be added\n"
-	"  when Bowtie prints read names in alignments.\n"
-	"  \n"
-	"  Finding a valid paired-end alignment where both mates align to\n"
-	"  repetitive regions of the reference can be very time-consuming.  By\n"
-	"  default, Bowtie avoids much of this cost by imposing a limit on the\n"
-	"  number of \"tries\" it makes to match an alignment for one mate with a\n"
-	"  nearby alignment for the other.  The default limit is 100.  This\n"
-	"  causes Bowtie to miss some valid paired-end alignments where both\n"
-	"  mates lie in repetitive regions, but the user may use the --pairtries\n"
-	"  or -y options to increase Bowtie's sensitivity as desired.\n"
-	"  \n"
-	"  Paired-end alignments where one mate's alignment is entirely\n"
-	"  contained within the other's are considered invalid.\n"
-	" \n"
-	"  Because Bowtie uses an in-memory representation of the original\n"
-	"  reference string when finding paired-end alignments, its memory\n"
-	"  footprint is larger when aligning paired-end reads.  For example, the\n"
-	"  human index has a memory footprint of about 2.2 GB in single-end mode\n"
-	"  and 2.9 GB in paired-end mode.\n"
-	"  \n"
-	"  High Performance Tips\n"
-	"  ---------------------\n"
-	"\n"
-	"  Tip 1: Use 64-bit bowtie if possible\n"
-	"\n"
-	"  The 64-bit version of Bowtie is substantially faster (usually more\n"
-	"  than 50% faster) than the 32-bit version, due to Bowtie's use of\n"
-	"  64-bit arithmetic when searching both in the index and in the\n"
-	"  reference.  If possible, download the 64-bit binaries for Bowtie and\n"
-	"  run them on a 64-bit machine.  If you are building Bowtie from\n"
-	"  sources, you may need to pass the -m64 option to g++ to compile the\n"
-	"  64-bit version; you can do this by supplying argument BITS=64 to the\n"
-	"  'make' command; e.g.: 'make BITS=64 bowtie'.  To determine whether\n"
-	"  your version of bowtie is 64-bit or 32-bit, run 'bowtie --version'.\n"
-	"  \n"
-	"  Tip 2: If your computer has multiple processors/cores, try -p\n"
-	"   \n"
-	"  The -p <int> option causes Bowtie to launch <int> parallel search\n"
-	"  threads.  Each thread runs on a different processor/core and all\n"
-	"  threads find alignments in parallel, increasing alignment throughput\n"
-	"  by approximately a multiple of <int>.\n"
-	"  \n"
-	"  Tip 3: If reporting many alignments per read, try tweaking\n"
-	"         'bowtie-build --offrate'\n"
-	"   \n"
-	"  If you are using the -k, -a or -m options and Bowtie is reporting\n"
-	"  many alignments per read (an average of more than about 10 per read)\n"
-	"  and you have some physical memory to spare, then consider building\n"
-	"  an index with a denser SA sample.\n"
-	"  \n"
-	"  To build an index with a denser SA sample, specify a smaller\n"
-	"  --offrate value when running 'bowtie-build'.  A denser SA sample\n"
-	"  leads to a larger index, but is also particularly effective at\n"
-	"  speeding up alignment when then number of alignments reported per\n"
-	"  read is large.  For example, if the number of alignments per read is\n"
-	"  very large, decreasing the index's --offrate by 1 could as much as\n"
-	"  double alignment performance, and decreasing by 2 could quadruple\n"
-	"  alignment performance, etc.\n"
-	"  \n"
-	"  On the other hand, decreasing --offrate increases the size of the\n"
-	"  Bowtie index, both on disk and in memory when aligning reads.  At the\n"
-	"  default --offrate of 5, the SA sample for the human genome occupies\n"
-	"  about 375 MB of memory when aligning reads.  Decreasing the --offrate\n"
-	"  by 1 doubles the memory taken by the SA sample, and decreasing by 2\n"
-	"  quadruples the memory taken, etc.\n"
-	"  \n"
-	"  Tip 4: If bowtie \"thrashes\", try tweaking 'bowtie --offrate'\n"
-	"  \n"
-	"  If 'bowtie' is very slow and consistently triggers more than a few\n"
-	"  page faults per second (as observed via top or vmstat on Mac/Linux,\n"
-	"  or via a tool like Process Explorer on Windows), then try giving\n"
-	"  bowtie the --offrate <int> option with a larger <int> value than the\n"
-	"  value used when building the index.  For example, bowtie-build's\n"
-	"  default --offrate is 5 and all pre-built indexes available from the\n"
-	"  Bowtie website are built with --offrate 5; so if bowtie thrashes when\n"
-	"  querying such an index, try using 'bowtie --offrate 6'.  If bowtie\n"
-	"  still thrashes, try 'bowtie --offrate 7', etc.  A higher --offrate\n"
-	"  causes bowtie to use a sparser sample of the suffix-array than is\n"
-	"  stored in the index; this saves memory but makes alignment reporting\n"
-	"  slower (which is especially slow when using -a or large -k).\n"
-	"\n"
-	"  Command Line\n"
-	"  ------------\n"
-	"\n"
-	"  The following is a detailed description of the options used to control\n"
-	"  the 'bowtie' aligner:\n"
-	"\n"
-	" Usage:\n"
-	" \n"
-	"  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]\n"
-	"\n"
-	"  <ebwt>             The basename of the index to be searched.  The\n"
-	"                     basename is the name of any of the index files up\n"
-	"                     to but not including the final .1.ebwt /\n"
-	"                     .rev.1.ebwt / etc.  bowtie looks for the specified\n"
-	"                     index first in the current directory, then in the\n"
-	"                     'indexes' subdirectory under the directory where\n"
-	"                     the currently-running 'bowtie' executable is\n"
-	"                     located, then looks in the directory specified in\n"
-	"                     the BOWTIE_INDEXES environment variable.\n"
-	"\n"
-	"  <m1>               Comma-separated list of files containing the #1\n"
-	"                     mates (filename usually includes \"_1\"), or, if -c\n"
-	"                     is specified, the mate sequences themselves.\n"
-	"                     E.g., this might be \"flyA_1.fq,flyB_1.fq\", or, if\n"
-	"                     -c is given, this might be \"GGTCATCCT,ACGGGTCGT\".\n"
-	"                     Sequences specified with this option must\n"
-	"                     correspond file-for-file and read-for-read with\n"
-	"                     those specified in <m2>.  Reads may be a mix of\n"
-	"                     different lengths.  If \"-\" is specified, Bowtie\n"
-	"                     will read the #1 mates from stdin.\n"
-	"\n"
-	"  <m2>               Comma-separated list of files containing the #2\n"
-	"                     mates (filename usually includes \"_2\"), or, if -c\n"
-	"                     is specified, the mate sequences themselves.\n"
-	"                     E.g., this might be \"flyA_2.fq,flyB_2.fq\", or, if\n"
-	"                     -c is given, this might be \"GTATGCTG,AATTCAGGCTG\".\n"
-	"                     Sequences specified with this option must\n"
-	"                     correspond file-for-file and read-for-read with\n"
-	"                     those specified in <m1>.  Reads may be a mix of\n"
-	"                     different lengths.  If \"-\" is specified, Bowtie\n"
-	"                     will read the #2 mates from stdin.\n"
-	"\n"
-	"  <r>                Comma-separated list of files containing a mix of\n"
-	"                     unpaired and paired-end reads in Tab-delimited\n"
-	"                     format.  Tab-delimited format is a 1-read-per-line\n"
-	"                     format where unpaired reads consist of a read\n"
-	"                     name, sequence and quality string each separated\n"
-	"                     by tabs.  A paired-end read consists of a read\n"
-	"                     name, sequnce of the /1 mate, quality values of\n"
-	"                     the /1 mate, sequence of the /2 mate, and quality\n"
-	"                     values of the /2 mate separated by tabs.  Quality\n"
-	"                     values can be expressed using any of the scales\n"
-	"                     supported in FASTQ files.  Reads may be a mix of\n"
-	"                     different lengths and paired-end and unpaired\n"
-	"                     reads may be intermingled in the same file.  If\n"
-	"                     \"-\" is specified, Bowtie will read the Tab-\n"
-	"                     delimited reads from stdin.\n"
-	"\n"
-	"  <s>                A comma-separated list of files containing\n"
-	"                     unpaired reads to be aligned, or, if -c is\n"
-	"                     specified, the unpaired read sequences themselves.\n"
-	"                     E.g., this might be\n"
-	"                     \"lane1.fq,lane2.fq,lane3.fq,lane4.fq\", or, if -c\n"
-	"                     is specified, this might be \"GGTCATCCT,ACGGGTCGT\".\n"
-	"                     Reads may be a mix of different lengths.  If \"-\"\n"
-	"                     is specified, Bowtie gets the reads from stdin.\n"
-	"\n"
-	"  <hit>              File to write alignments to.  By default,\n"
-	"                     alignments are written to stdout (the console)\n"
-	"\n"
-	" Options:\n"
-	" ========\n"
-	"\n"
-	"   Input:\n"
-	"   ------\n"
-	"\n"
-	"  -q                 The query input files (specified either as <m1>\n"
-	"                     and <m2>, or as <s>) are FASTQ files (usually\n"
-	"                     having extension .fq or .fastq).  This is the\n"
-	"                     default.  See also: --solexa-quals and\n"
-	"                     --integer-quals.\n"
-	"\n"
-	"  -f                 The query input files (specified either as <m1>\n"
-	"                     and <m2>, or as <s>) are FASTA files (usually\n"
-	"                     having extension .fa, .mfa, .fna or similar).  All\n"
-	"                     quality values are assumed to be 40 on the Phred\n"
-	"                     scale.\n"
-	"\n"
-	"  -r                 The query input files (specified either as <m1>\n"
-	"                     and <m2>, or as <s>) are Raw files: one sequence\n"
-	"                     per line, without quality values or names.  All\n"
-	"                     quality values are assumed to be 40 on the Phred\n"
-	"                     scale.\n"
-	"\n"
-	"  -c                 The query sequences are given on command line.\n"
-	"                     I.e. <m1>, <m2> and <singles> are comma-separated\n"
-	"                     lists of reads rather than lists of read files.\n"
-	"\n"
-	"  -s/--skip <int>    Skip (i.e. do not align) the first <int> reads or\n"
-	"                     pairs in the input.\n"
-	"\n"
-	"  -u/--qupto <int>   Only align the first <int> reads or read pairs\n"
-	"                     from the input (after the -s/--skip reads or pairs\n"
-	"                     have been skipped).  Default: no limit.\n"
-	"\n"
-	"  -5/--trim5 <int>   Trim <int> bases from high-quality (left) end of\n"
-	"                     each read before alignment (default: 0).\n"
-	"\n"
-	"  -3/--trim3 <int>   Trim <int> bases from low-quality (right) end of\n"
-	"                     each read before alignment (default: 0).\n"
-	"\n"
-	"  --phred33-quals    Input qualities are ASCII chars equal to the Phred\n"
-	"                     quality plus 33.  Default: on.\n"
-	"\n"
-	"  --phred64-quals    Input qualities are ASCII chars equal to the Phred\n"
-	"                     quality plus 64.  Default: off.\n"
-	"\n"
-	"  --solexa-quals     Convert input qualities from solexa-scaled (which\n"
-	"                     can be negative) to phred-scaled (which can't).\n"
-	"                     The formula for conversion is phred-qual =\n"
-	"                     10 * log(1 + 10 ** (solexa-qual/10.0)) / log(10).\n"
-	"                     This is usually the right option for use with\n"
-	"                     (unconverted) reads emitted by GA Pipeline\n"
-	"                     versions prior to 1.3.  Default: off.\n"
-	"\n"
-	"  --solexa1.3-quals  Same as --phred64-quals.  This is usually the\n"
-	"                     right option for use with (unconverted) reads\n"
-	"                     emitted by GA Pipeline version 1.3 or later. \n"
-	"                     Default: off.\n"
-	"\n"
-	"  --integer-quals    Quality values are represented in the read input\n"
-	"                     file as space-separated ASCII integers, e.g.,\n"
-	"                     \"40 40 30 40...\", rather than ASCII characters,\n"
-	"                     e.g., \"II?I...\".  Integers are treated as being on\n"
-	"                     the Phred scale unless --solexa-quals is also\n"
-	"                     specified.  Default: off.\n"
-	"\n"
-	"   Alignment:\n"
-	"   ----------\n"
-	"\n"
-	"  -n/--seedmms <int> The maximum number of mismatches permitted in the\n"
-	"                     \"seed\", which is the first 28 base pairs of the\n"
-	"                     read by default (see -l/--seedlen).  This may be\n"
-	"                     0, 1, 2 or 3 and the default is 2.  This option is\n"
-	"                     mutually exclusive with the -v option.\n"
-	" \n"
-	"  -e/--maqerr <int>  The maximum permitted total of quality values at\n"
-	"                     mismatched read positions.  This total is also\n"
-	"                     called the \"quality-weighted hamming distance\" or\n"
-	"                     \"Q-distance.\"  This is analogous to the -e option\n"
-	"                     for \"maq map\".  The default is 70.  Note that,\n"
-	"                     like Maq, Bowtie rounds quality values to the\n"
-	"                     nearest 10 and saturates at 30.\n"
-	"  \n"
-	"  -l/--seedlen <int> The \"seed length\"; i.e., the number of bases on\n"
-	"                     the high-quality end of the read to which the -n\n"
-	"                     ceiling applies.  The lowest permitted value for\n"
-	"                     this parameter is 5.  The default is 28.\n"
-	"                     Depending on the length of the reference genome,\n"
-	"                     Bowtie can become extremely slow as this parameter\n"
-	"                     is adjusted downward.\n"
-	"\n"
-	"  --nomaqround       Maq accepts quality values in the Phred scale, but\n"
-	"                     internally rounds quality values to the nearest 10\n"
-	"                     saturating at 30.  By default, Bowtie imitates\n"
-	"                     this behavior.  Use --nomaqround to prevent this\n"
-	"                     type of rounding in Bowtie.\n"
-	"\n"
-	"  -v <int>           Forego the Maq-like alignment policy and use a\n"
-	"                     SOAP-like alignment policy.  I.e., report end-to-\n"
-	"                     end alignments with at most <int> mismatches.  If\n"
-	"                     -v is specified, base quality values and the -e\n"
-	"                     and -l options are ignored.  -v is mutually\n"
-	"                     exclusive with -n.\n"
-	"\n"
-	"  -I/--minins <int>  The minimum insert size for valid paired-end\n"
-	"                     alignments.  E.g. if -I 60 is specified and a\n"
-	"                     paired-end alignment consists of two 20-bp\n"
-	"                     alignments in the appropriate orientation with a\n"
-	"                     20-bp gap between them, that alignment is\n"
-	"                     considered valid (as long as -X is also\n"
-	"                     satisfied).  A 19-bp gap would not be valid in\n"
-	"                     that case.  If trimming options -3 or -5 are also\n"
-	"                     used, the -I constraint is applied with respect to\n"
-	"                     the untrimmed mates, not the trimmed mates.\n"
-	"                     Default: 0.\n"
-	"\n"
-	"  -X/--maxins <int>  The maximum insert size for valid paired-end\n"
-	"                     alignments.  E.g. if -X 100 is specified and a\n"
-	"                     paired-end alignment consists of two 20-bp\n"
-	"                     alignments in the proper orientation with a 60-bp\n"
-	"                     gap between them, that alignment is considered\n"
-	"                     valid (as long as -I is also satisfied).  A 61-bp\n"
-	"                     gap would not be valid in that case.  If trimming\n"
-	"                     options -3 or -5 are also used, the -X constraint\n"
-	"                     is applied with respect to the untrimmed mates,\n"
-	"                     not the trimmed mates.  Default: 250.\n"
-	"\n"
-	"  --fr/--rf/--ff     The upstream/downstream mate orientations for a\n"
-	"                     valid paired-end alignment against the forward\n"
-	"                     reference strand.  E.g., if --fr is specified and\n"
-	"                     there is a candidate paired-end alignment where\n"
-	"                     mate1 appears upstream of the reverse complement\n"
-	"                     of mate2 and the insert length constraints are\n"
-	"                     met, that alignment is valid.  Also, if mate2\n"
-	"                     appears upstream of the reverse complement of\n"
-	"                     mate1 and all other constraints are met, that too\n"
-	"                     is valid.  --rf likewise requires that an upstream\n"
-	"                     mate1 be reverse-complemented and a downstream\n"
-	"                     mate2 be forward-oriented.  --ff requires both an\n"
-	"                     upstream mate1 and a downstream mate2 to be\n"
-	"                     forward-oriented.  Default: --fr (appropriate for\n"
-	"                     the Illumina short insert library).\n"
-	"\n"
-	"  --nofw/--norc      If --nofw is specified, Bowtie will not attempt to\n"
-	"                     align against the forward reference strand.  If\n"
-	"                     --norc is specified, Bowtie will not attempt to\n"
-	"                     align against the reverse-complement reference\n"
-	"                     strand.  For paired-end reads using --fr or --rf\n"
-	"                     modes, --nofw and --norc apply to the forward and\n"
-	"                     reverse-complement pair orientations.  I.e.\n"
-	"                     specifying --nofw and --fr will only find reads in\n"
-	"                     the R/F orientation where mate 2 occurs upstream\n"
-	"                     of mate 1 with respect to the forward reference\n"
-	"                     strand.\n"
-	"\n"
-	"  --maxbts           The maximum number of backtracks permitted when\n"
-	"                     aligning a read in -n 2 or -n 3 mode (default:\n"
-	"                     125 without --best, 800 with --best).  A\n"
-	"                     \"backtrack\" is the introduction of a speculative\n"
-	"                     substitution into the alignment.  Without this\n"
-	"                     limit, the default parameters will sometimes\n"
-	"                     require that 'bowtie' try 100s or 1,000s of\n"
-	"                     backtracks to align a read, especially if the read\n"
-	"                     has many low-quality bases and/or has no valid\n"
-	"                     alignments, slowing bowtie down significantly.\n"
-	"                     However, this limit may cause some valid\n"
-	"                     alignments to be missed.  Higher limits yield\n"
-	"                     greater sensitivity at the expensive of longer\n"
-	"                     running times.  See also: -y/--tryhard.\n"
-	"\n"
-	"  --pairtries <int>  For paired-end alignment, this is the maximum\n"
-	"                     number of attempts Bowtie will make to match an\n"
-	"                     alignment for one mate up with an alignment for\n"
-	"                     the opposite mate.  Most paired-end alignments\n"
-	"                     require only a few such attempts, but pairs where\n"
-	"                     both mates occur in highly repetitive regions of\n"
-	"                     the reference can require significantly more.\n"
-	"                     Setting this to a higher number allows Bowtie to\n"
-	"                     find more paired-end alignments for repetitive\n"
-	"                     pairs at the expense of speed.  The default is\n"
-	"                     100.  See also: -y/--tryhard.\n"
-	"\n"
-	"  -y/--tryhard       Try as hard as possible to find valid alignments\n"
-	"                     when they exist, including paired-end alignments.\n"
-	"                     This is equivalent to specifying very high values\n"
-	"                     for the --maxbts and --pairtries options.  This\n"
-	"                     mode is generally MUCH SLOWER than the default\n"
-	"                     settings, but can be useful for certain research\n"
-	"                     problems.  This mode is slower when (a) the\n"
-	"                     reference is very repetitive, (b) the reads are\n"
-	"                     low quality, or (c) not many reads have valid\n"
-	"                     alignments.\n"
-	"\n"
-	"  --chunkmbs <int>   The number of megabytes of memory a given thread\n"
-	"                     is given to store path descriptors in --best mode.\n"
-	"                     Best-first search must keep track of many paths at\n"
-	"                     once to ensure it is always extending the path\n"
-	"                     with the lowest cumulative cost.  Bowtie tries to\n"
-	"                     minimize the memory impact of the descriptors, but\n"
-	"                     they can still grow very large in some cases.  If\n"
-	"                     you receive an error message saying that chunk\n"
-	"                     memory has been exhausted in --best mode, try\n"
-	"                     adjusting this parameter up to dedicate more\n"
-	"                     memory to the descriptors.  Default: 32.\n"
-	"\n"
-	"   Reporting:\n"
-	"   ----------\n"
-	"\n"
-	"  -k <int>           Report up to <int> valid alignments per read or\n"
-	"                     pair (default: 1).  Validity of alignments is\n"
-	"                     determined by the alignment policy (combined\n"
-	"                     effects of -n, -v, -l, and -e).  If more than one\n"
-	"                     valid alignment exists and the --best and --strata\n"
-	"                     options are specified, then only those alignments\n"
-	"                     belonging to the best alignment \"stratum\" (i.e.\n"
-	"                     those with the fewest mismatches) will be\n"
-	"                     reported.  Bowtie is designed to be very fast for\n"
-	"                     small -k but bowtie can become significantly\n"
-	"                     slower as -k increases.  If you would like to use\n"
-	"                     Bowtie for larger values of -k, consider building\n"
-	"                     an index with a denser suffix-array sample, i.e.\n"
-	"                     specify a smaller '--offrate' when invoking\n"
-	"                     'bowtie-build' for the relevant index (see\n"
-	"                     Performance Tips section for details).\n"
-	"\n"
-	"  -a/--all           Report all valid alignments per read or pair\n"
-	"                     (default: off).  Validity of alignments is\n"
-	"                     determined by the alignment policy (combined\n"
-	"                     effects of -n, -v, -l, and -e).  If more than one\n"
-	"                     valid alignment exists and the --best and --strata\n"
-	"                     options are specified, then only those alignments\n"
-	"                     belonging to the best alignment \"stratum\" (i.e.\n"
-	"                     those with the fewest mismatches) will be\n"
-	"                     reported.  Bowtie is designed to be very\n"
-	"                     fast for small -k but bowtie can become\n"
-	"                     significantly slower if -a/--all is specified.  If\n"
-	"                     you would like to use Bowtie with -a, consider\n"
-	"                     building an index with a denser suffix-array\n"
-	"                     sample, i.e. specify a smaller '--offrate' when\n"
-	"                     invoking 'bowtie-build' for the relevant index\n"
-	"                     (see Performance Tips section for details).\n"
-	"\n"
-	"  -m <int>           Suppress all alignments for a particular read or\n"
-	"                     pair if more than <int> reportable alignments\n"
-	"                     exist for it.  Reportable alignments are those\n"
-	"                     that would be reported given the -n, -v, -l, -e,\n"
-	"                     -k, -a, --best, and --strata options.  Default:\n"
-	"                     no limit.  Bowtie is designed to be very fast for\n"
-	"                     small -m but bowtie can become significantly\n"
-	"                     slower for larger values of -m.    If you would\n"
-	"                     like to use Bowtie for larger values of -k,\n"
-	"                     consider building an index with a denser suffix-\n"
-	"                     array sample, i.e. specify a smaller '--offrate'\n"
-	"                     when invoking 'bowtie-build' for the relevant\n"
-	"                     index (see Performance Tips section for details).\n"
-	"\n"
-	"  --best             Make Bowtie guarantee that reported singleton\n"
-	"                     alignments are \"best\" in terms of stratum (i.e.\n"
-	"                     number of mismatches, or mismatches in the seed in\n"
-	"                     the case of -n mode) and in terms of the quality\n"
-	"                     values at the mismatched position(s).  Stratum\n"
-	"                     always trumps quality; e.g. a 1-mismatch alignment\n"
-	"                     where the mismatched position has Phred quality 40\n"
-	"                     is preferred over a 2-mismatch alignment where the\n"
-	"                     mismatched positions both have Phred quality 10.\n"
-	"                     When --best is not specified, Bowtie may report\n"
-	"                     alignments that are sub-optimal in terms of\n"
-	"                     stratum and/or quality (though an effort is made\n"
-	"                     to report the best alignment).  --best mode also\n"
-	"                     removes all strand bias.  Note that --best does\n"
-	"                     not affect which alignments are considered \"valid\"\n"
-	"                     by Bowtie, only which valid alignments are\n"
-	"                     reported by Bowtie.  When --best is specified and\n"
-	"                     multiple hits are allowed (via -k or -a), the\n"
-	"                     alignments for a given read are guaranteed to\n"
-	"                     appear in best-to-worst order in Bowtie's output.\n"
-	"                     Bowtie is about 1-2.5 times slower when --best is\n"
-	"                     specified.\n"
-	"\n"
-	"  --strata           If many valid alignments exist and are reportable\n"
-	"                     (e.g. are not disallowed via the -k option) and\n"
-	"                     they fall into more than one alignment \"stratum\",\n"
-	"                     report only those alignments that fall into the\n"
-	"                     best stratum.  By default, Bowtie reports all\n"
-	"                     reportable alignments regardless of whether they\n"
-	"                     fall into multiple strata.  When --strata is\n"
-	"                     specified, --best must also be specified. \n"
-	"\n"
-	"   Output:\n"
-	"   -------\n"
-	"\n"
-	"  -S/--sam           Print alignments in SAM format.  See the SAM\n"
-	"                     format spec (http://samtools.sf.net/) and the \"SAM\n"
-	"                     output\" section of the manual for details.  To\n"
-	"                     suppress all SAM headers, use --sam-nohead.  To\n"
-	"                     suppress just the @SQ headers (e.g. if the\n"
-	"                     alignment is against a very large number of\n"
-	"                     reference sequences), use --sam-nosq.  Bowtie\n"
-	"                     does not write BAM files directly, but SAM output\n"
-	"                     can be converted to BAM on the fly by piping\n"
-	"                     Bowtie's output to 'samtools view'.  -S/--sam is\n"
-	"                     not compatible with --refout.\n"
-	"\n"
-	"  --concise          Print alignments in a concise format. Each line\n"
-	"                     has format 'read_idx{-|+}:<ref_idx,ref_off,mms>',\n"
-	"                     where read_idx is the index of the read mapped,\n"
-	"                     {-|+} is the orientation of the read, ref_idx is\n"
-	"                     the index of the reference sequence aligned to,\n"
-	"                     ref_off is the offset into the reference sequence,\n"
-	"                     and mms is the number of mismatches in the\n"
-	"                     alignment.  Each alignment appears on a separate\n"
-	"                     line.\n"
-	"\n"
-	"  -t/--time          Print the amount of wall-clock time taken by each\n"
-	"                     phase.\n"
-	"\n"
-	"  -B/--offbase <int> When outputting alignments, number the first base\n"
-	"                     of a reference sequence as <int>.  Default: 0.\n"
-	"                     (Default is likely to change to 1 in Bowtie 1.0.)\n"
-	"\n"
-	"  --quiet            Print nothing besides alignments.\n"
-	"\n"
-	"  --refout           Write alignments to a set of files named\n"
-	"                     refXXXXX.map, where XXXXX is the 0-padded index of\n"
-	"                     the reference sequence aligned to.  This can be a\n"
-	"                     useful way to break up work for downstream\n"
-	"                     analyses when dealing with, for example, large\n"
-	"                     numbers of reads aligned to the assembled human\n"
-	"                     genome.  If <hits> is also specified, it will be\n"
-	"                     ignored.\n"
-	"\n"
-	"  --refidx           When a reference sequence is referred to in a\n"
-	"                     reported alignment, refer to it by 0-based index\n"
-	"                     (its offset into the list of references that were\n"
-	"                     indexed) rather than by name.\n"
-	"\n"
-	"  --al <filename>    Write all reads for which at least one alignment\n"
-	"                     was reported to a file with name <filename>.\n"
-	"                     Written reads will appear as they did in the\n"
-	"                     input, without any of the trimming or translation\n"
-	"                     of quality values that may have taken place within\n"
-	"                     Bowtie.  Paired-end reads will be written to two\n"
-	"                     parallel files with \"_1\" and \"_2\" inserted in the\n"
-	"                     filename, e.g., if <filename> is aligned.fq, the\n"
-	"                     #1 and #2 mates that fail to align will be written\n"
-	"                     to aligned_1.fq and aligned_2.fq respectively.\n"
-	"\n"
-	"  --un <filename>    Write all reads that could not be aligned to a\n"
-	"                     file with name <filename>.  Written reads will\n"
-	"                     appear as they did in the input, without any of\n"
-	"                     the trimming or translation of quality values that\n"
-	"                     may have taken place within Bowtie.  Paired-end\n"
-	"                     reads will be written to two parallel files with\n"
-	"                     \"_1\" and \"_2\" inserted in the filename, e.g., if\n"
-	"                     <filename> is unaligned.fq, the #1 and #2 mates\n"
-	"                     that fail to align will be written to\n"
-	"                     unaligned_1.fq and unaligned_2.fq respectively.\n"
-	"                     Unless --max is also specified, reads with a\n"
-	"                     number of valid alignments exceeding the limit set\n"
-	"                     with the -m option are also written to <filename>.\n"
-	"\n"
-	"  --max <filename>   Write all reads with a number of valid alignments\n"
-	"                     exceeding the limit set with the -m option to a\n"
-	"                     file with name <filename>.  Written reads will\n"
-	"                     appear as they did in the input, without any of\n"
-	"                     the trimming or translation of quality values that\n"
-	"                     may have taken place within Bowtie.  Paired-end\n"
-	"                     reads will be written to two parallel files with\n"
-	"                     \"_1\" and \"_2\" inserted in the filename, e.g., if\n"
-	"                     <filename> is max.fq, the #1 and #2 mates\n"
-	"                     that fail to align will be written to\n"
-	"                     max_1.fq and max_2.fq respectively.  These reads\n"
-	"                     are not written to the file specified with --un.\n"
-	"\n"
-	"  --sam-nohead       Suppress header lines (starting with @) when\n"
-	"                     output is SAM.\n"
-	"\n"
-	"  --sam-nosq         Suppress @SQ header lines when output is SAM.\n"
-	"\n"
-	"  --fullref          Print the full refernce sequence name, including\n"
-	"                     whitespace, in alignment output.  By default\n"
-	"                     bowtie prints everything up to but not including\n"
-	"                     the first whitespace.\n"
-	"   Performance:\n"
-	"   ------------\n"
-	"\n"
-	"  -p/--threads <int> Launch <int> parallel search threads (default: 1).\n"
-	"                     Threads will run on separate processors/cores and\n"
-	"                     synchronize when grabbing reads and outputting\n"
-	"                     alignments.  Searching for alignments is highly\n"
-	"                     parallel, and speedup is fairly close to linear.\n"
-	"                     This option is only available if bowtie is linked\n"
-	"                     with the pthreads library (i.e. if\n"
-	"                     BOWTIE_PTHREADS=0 is not specified at build time).\n"
-	"\n"
-	"  -o/--offrate <int> Override the offrate of the index with <int>.  If\n"
-	"                     <int> is greater than the offrate used to build\n"
-	"                     the index, then some row markings are discarded\n"
-	"                     when the index is read into memory.  This reduces\n"
-	"                     the memory footprint of the aligner but requires\n"
-	"                     more time to calculate text offsets.  <int> must\n"
-	"                     be greater than the value used to build the index.\n"
-	"\n"
-	"  --mm               Use memory-mapped I/O to load the index, rather\n"
-	"                     than normal POSIX/C file I/O.  Memory-mapping the\n"
-	"                     index allows many concurrent bowtie processes on\n"
-	"                     the same computer to share the same memory image\n"
-	"                     of the index (i.e. you pay the memory overhead\n"
-	"                     just once).  This facilitates memory-efficient\n"
-	"                     parallelization of Bowtie in situations where\n"
-	"                     using -p is not desirable.\n"
-	"\n"
-	"  --shmem            Use shared memory to load the index, rather than\n"
-	"                     normal POSIX/C file I/O.  Using shared memory\n"
-	"                     allows many concurrent bowtie processes on\n"
-	"                     the same computer to share the same memory image\n"
-	"                     of the index (i.e. you pay the memory overhead\n"
-	"                     just once).  This facilitates memory-efficient\n"
-	"                     parallelization of Bowtie in situations where\n"
-	"                     using -p is not desirable.  Unlike --mm, --shmem\n"
-	"                     installs the index into shared memory permanently,\n"
-	"                     or until the user deletes the shared memory chunks\n"
-	"                     manually.  See your operating system documentation\n"
-	"                     for details on how to manually list and remove\n"
-	"                     shared memory chunks (on Linux and Mac OS X, these\n"
-	"                     commands are ipcs and ipcrm).  You may also need\n"
-	"                     to increase your OS's maximum shared-memory chunk\n"
-	"                     size to accomodate larger indexes; see your OS\n"
-	"                     documentation.\n"
-	"\n"
-	"   Other:\n"
-	"   ------\n"
-	"\n"
-	"  --seed <int>       Use <int> as the seed for pseudo-random number\n"
-	"                     generator.\n"
-	"\n"
-	"  --verbose          Print verbose output (for debugging).\n"
-	"\n"
-	"  --version          Print version information and quit.\n"
-	"\n"
-	"  -h/--help          Print detailed description of tool and its options\n"
-	"                     (from MANUAL).\n"
-	"\n"
-	"  Default output\n"
-	"  --------------\n"
-	"\n"
-	"  The 'bowtie' aligner outputs each alignment on a separate line.  Each\n"
-	"  line is a collection of 8 fields separated by tabs; from left to\n"
-	"  right, the fields are:\n"
-	"\n"
-	"   1. Name of read that aligned\n"
-	"\n"
-	"   2. Orientation of read in the alignment, '-' for reverse complement,\n"
-	"      '+' otherwise\n"
-	"\n"
-	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
-	"      if no name was provided\n"
-	"\n"
-	"   4. 0-based offset into the forward reference strand where leftmost\n"
-	"      character of the alignment occurs\n"
-	"\n"
-	"   5. Read sequence (reverse-complemented if orientation is '-')\n"
-	"\n"
-	"   6. ASCII-encoded read qualities (reversed if orientation is '-').\n"
-	"      The encoded quality values are on the Phred scale and the\n"
-	"      encoding is ASCII-offset by 33 (ASCII char '!'). \n"
-	"\n"
-	"   7. Number of other instances where the same read aligns against the\n"
-	"      same reference characters as were aligned against in this\n"
-	"      alignment.  This is *not* the number of other places the read\n"
-	"      aligns with the same number of mismatches.  The number in this\n"
-	"      column is generally not a good proxy for that number (e.g., the\n"
-	"      number in this column may be '0' while the number of other\n"
-	"      alignments with the same number of mismatches might be large).\n"
-	"      This column was previously described as \"Reserved\".\n"
-	"\n"
-	"   8. Comma-separated list of mismatch descriptors.  If there are no\n"
-	"      mismatches in the alignment, this field is empty.  A single\n"
-	"      descriptor has the format offset:reference-base>read-base.  The\n"
-	"      offset is expressed as a 0-based offset from the high-quality\n"
-	"      (5') end of the read. \n"
-	"\n"
-	"  SAM output\n"
-	"  ----------\n"
-	"\n"
-	"  Following is a brief description of the SAM format as output by\n"
-	"  Bowtie when the -S/--sam option is specified.  For more details, see\n"
-	"  the SAM format specification (http://samtools.sf.net/SAM1.pdf).\n"
-	"\n"
-	"  When -S/--sam is specified, Bowtie will always print a SAM header\n"
-	"  with @HD, @SQ and @PG lines.\n"
-	"\n"
-	"  Each subsequnt line corresponds to a read or an alignment.  Each line\n"
-	"  is a collection of at least 12 fields separated by tabs; from left to\n"
-	"  right, the fields are:\n"
-	"\n"
-	"   1. Name of read that aligned\n"
-	"\n"
-	"   2. Sum of all applicable flags.  Flags relevant to Bowtie are:\n"
-	"\n"
-	"        1: The read is one of a pair\n"
-	"        2: The alignment is one end of a proper paired-end alignment\n"
-	"        4: The read has no reported alignments\n"
-	"        8: The read is one of a pair and has no reported alignments\n"
-	"       16: The alignment is to the reverse reference strand\n"
-	"       32: The other mate in the paired-end alignment is aligned to the\n"
-	"           reverse reference strand\n"
-	"       64: The read is the first (#1) mate in a pair\n"
-	"      128: The read is the second (#2) mate in a pair\n"
-	"\n"
-	"      Thus, an unpaired read that aligns to the reverse reference\n"
-	"      strand will have flag 16.  A paired-end read that aligns and is\n"
-	"      the first mate in the pair will have flag 83 (= 64 + 16 + 2 + 1).\n"
-	"\n"
-	"   3. Name of reference sequence where alignment occurs, or ordinal ID\n"
-	"      if no name was provided\n"
-	"\n"
-	"   4. 1-based offset into the forward reference strand where leftmost\n"
-	"      character of the alignment occurs\n"
-	"\n"
-	"   5. Mapping quality (always 255)\n"
-	"\n"
-	"   6. CIGAR string representation of alignment\n"
-	"\n"
-	"   7. Name of reference sequence where mate's alignment occurs.  Set to\n"
-	"      \"=\" if the mate's reference sequence is the same as this\n"
-	"      alignment's, or \"*\" if there is no mate.\n"
-	"\n"
-	"   8. 1-based offset into the forward reference strand where leftmost\n"
-	"      character of the mate's alignment occurs.  Offset is 0 if there\n"
-	"      is no mate.\n"
-	"\n"
-	"   9. Inferred insert size.  Size is negative if the mate's alignment\n"
-	"      occurs upstream of this alignment.  Size is 0 if there is no\n"
-	"      mate.\n"
-	"\n"
-	"  10. Read sequence (reverse-complemented if aligned to the reverse\n"
-	"      strand)\n"
-	"\n"
-	"  11. ASCII-encoded read qualities (reversed if aligned to the reverse\n"
-	"      strand).  The encoded quality values are on the Phred scale and\n"
-	"      the encoding is ASCII-offset by 33 (ASCII char '!'). \n"
-	"\n"
-	" 12+. Optional fields.  Fields are tab-separated.  For descriptions of\n"
-	"      all possible optional fields, see the SAM format specification.\n"
-	"      Bowtie outputs one or more of these optional fields for each\n"
-	"      alignment, depending on the type of the alignment:\n"
-	"\n"
-	"      NM:i:<N> : Aligned read has an edit distance of <N>\n"
-	"      MD:Z:<S> : For aligned reads, <S> is a string representation of\n"
-	"                 the mismatched reference bases in the alignment.  See\n"
-	"                 SAM format specification for details.\n"
-	"      XA:i:<N> : Aligned read belongs to stratum <N>\n"
-	"      XM:i:<N> : For a read with no reported alignments, <N> is 0 if\n"
-	"                 the read had no alignments, or 1 if the read had\n"
-	"                 alignments that were suppressed by the -m option.\n"
-	"\n"
-	;
 }
 
 /**
@@ -1633,6 +637,8 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_ANNOTMAP: annotMapFile = optarg; break;
 			case ARG_USE_SPINLOCK: useSpinlock = false; break;
 			case ARG_SHMEM: useShmem = true; break;
+			case ARG_COLOR_SEQ: colorSeq = true; break;
+			case ARG_COLOR_QUAL: colorQual = true; break;
 			case ARG_SUPPRESS_FIELDS: {
 				vector<string> supp;
 				tokenize(optarg, ",", supp);
@@ -1665,6 +671,18 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
 			case ARG_SNPPHRED: snpPhred = parseInt(0, "--snpphred must be at least 0"); break;
+			case ARG_SNPFRAC: {
+				double p = parse<double>(optarg);
+				if(p <= 0.0) {
+					cerr << "Error: --snpfrac parameter must be > 0.0" << endl;
+					throw 1;
+				}
+				p = (log10(p) * -10);
+				snpPhred = (int)(p + 0.5);
+				if(snpPhred < 10)
+				cout << "snpPhred: " << snpPhred << endl;
+				break;
+			}
 			case 'z': {
 				cerr << "Error: -z/--phased mode is no longer supported" << endl;
 				throw 1;
@@ -1689,6 +707,8 @@ static void parseOptions(int argc, const char **argv) {
 			case 'k':
 				khits = (uint32_t)parseInt(1, "-k arg must be at least 1");
 				break;
+			case 'M':
+				sampleMax = true;
 			case 'm':
 				mhits = (uint32_t)parseInt(1, "-m arg must be at least 1");
 				break;
@@ -1737,7 +757,7 @@ static void parseOptions(int argc, const char **argv) {
 			case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
 			case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
 			case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
-			case 'h': printLongUsage(cout); throw 0; break;
+			case 'h': printUsage(cout); throw 0; break;
 			case ARG_USAGE: printUsage(cout); throw 0; break;
 			case 'a': allHits = true; break;
 			case 'y': tryHard = true; break;
@@ -1765,6 +785,10 @@ static void parseOptions(int argc, const char **argv) {
 				rgs += optarg;
 				break;
 			}
+			case ARG_COST: printCost = true; break;
+			case ARG_DEFAULT_MAPQ:
+				defaultMapq = parseInt(0, "--mapq must be positive");
+				break;
 			case ARG_MAXBTS: {
 				maxBts  = parseInt(0, "--maxbts must be positive");
 				maxBtsBetter = maxBts;
@@ -1825,6 +849,12 @@ static void parseOptions(int argc, const char **argv) {
 		// Increase number of paired-end scan attempts to huge number
 		mixedAttemptLim = UINT_MAX;
 	}
+	if(!stateful && sampleMax) {
+		if(!quiet) {
+			cerr << "Warning: -M was specified w/o --best; automatically enabling --best" << endl;
+		}
+		stateful = true;
+	}
 	if(strata && !stateful && !oldBest) {
 		cerr << "--strata must be combined with --best" << endl;
 		throw 1;
@@ -1846,6 +876,9 @@ static void parseOptions(int argc, const char **argv) {
 	if(useShmem && useMm && !quiet) {
 		cerr << "Warning: --shmem overrides --mm..." << endl;
 		useMm = false;
+	}
+	if(snpPhred <= 10 && color && !quiet) {
+		cerr << "Warning: the colorspace SNP penalty (--snpphred) is very low: " << snpPhred << endl;
 	}
 	if(format == INPUT_CHAIN) {
 		bool error = false;
@@ -3325,7 +2358,7 @@ static PatternSource*
 patsrcFromStrings(int format, const vector<string>& qs) {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (qs, color,
+			return new FastaPatternSource (seed, qs, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
@@ -3333,20 +2366,20 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               qs, fastaContLen,
+			                               seed, qs, fastaContLen,
 			                               fastaContFreq,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (qs, color,
+			return new RawPatternSource   (seed, qs, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
-			return new FastqPatternSource (qs, color,
+			return new FastqPatternSource (seed, qs, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
@@ -3355,25 +2388,27 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               integerQuals, fuzzy,
 			                               skipReads);
 		case TAB_MATE:
-			return new TabbedPatternSource(qs, randomizeQuals,
+			return new TabbedPatternSource(seed, qs, color,
+			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals, skipReads);
 		case CMDLINE:
-			return new VectorPatternSource(qs, randomizeQuals,
+			return new VectorPatternSource(seed, qs, color,
+			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case INPUT_CHAIN:
-			return new ChainPatternSource (qs, useSpinlock, patDumpfile,
+			return new ChainPatternSource (seed, qs, useSpinlock, patDumpfile,
 			                               verbose, skipReads);
 		case RANDOM:
-			return new RandomPatternSource(2000000, lenRandomReads,
+			return new RandomPatternSource(seed, 2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
-			                               verbose, seed);
+			                               verbose);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;
@@ -3625,15 +2660,17 @@ static void driver(const char * type,
 			case OUTPUT_FULL:
 				if(refOut) {
 					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase, suppressOuts,
-							rmap, amap,
+							ebwt.nPat(), offBase, sampleMax,
+							colorSeq, colorQual, printCost,
+							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
-							fout, offBase, suppressOuts,
-							rmap, amap,
+							fout, offBase, sampleMax,
+							colorSeq, colorQual, printCost,
+							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames, partitionSz);
@@ -3645,7 +2682,8 @@ static void driver(const char * type,
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
 							fout, 1, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
+							fullRef, sampleMax, defaultMapq,
+							PASS_DUMP_FILES,
 							format == TAB_MATE,
 							table, refnames);
 					if(!samNoHead) {

@@ -1192,6 +1192,7 @@ public:
 		}
 		if(color) {
 			hit.colSeq = hit.patSeq;
+			hit.colQuals = hit.quals;
 			hit.crefcs.resize(qlen, 0);
 			// Turn the mmui32 and refcs arrays into the mm FixedBitset and
 			// the refc vector

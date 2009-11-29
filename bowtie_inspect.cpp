@@ -14,9 +14,10 @@ using namespace seqan;
 static bool showVersion = false; // just print version and quit?
 static int verbose     = 0;  // be talkative
 static int names_only  = 0;  // just print the sequence names in the index
+static int summarize_only = 0; // just print summary of index and quit
 static int across      = 60; // number of characters across in FASTA output
 
-static const char *short_options = "vhna:";
+static const char *short_options = "vhnsa:";
 
 enum {
 	ARG_VERSION = 256,
@@ -28,6 +29,7 @@ static struct option long_options[] = {
 	{(char*)"version", no_argument,       0, ARG_VERSION},
 	{(char*)"usage",   no_argument,       0, ARG_USAGE},
 	{(char*)"names",   no_argument,       0, 'n'},
+	{(char*)"summary", no_argument,       0, 's'},
 	{(char*)"help",    no_argument,       0, 'h'},
 	{(char*)"across",  required_argument, 0, 'a'},
 	{(char*)0, 0, 0, 0} // terminator
@@ -43,60 +45,10 @@ static void printUsage(ostream& out) {
 	<< "Options:" << endl
 	<< "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
+	<< "  -s/--summary       Print summary incl. ref names, lengths, index properties" << endl
 	<< "  -v/--verbose       Verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
 	<< "  --help             print this usage message" << endl
-	;
-}
-
-/**
- * Print a detailed usage message to the provided output stream.
- *
- * Manual text converted to C++ string with something like:
- * cat MANUAL  | tail -100 | sed -e 's/\"/\\\"/g' | \
- *   sed -e 's/^/"/' | sed -e 's/$/\\n"/'
- */
-static void printLongUsage(ostream& out) {
-	out <<
-	"\n"
-	" Using the 'bowtie-inspect' Index Inspector\n"
-	" ------------------------------------------\n"
-	"\n"
-	" 'bowtie-inspect' extracts information from a Bowtie index about the\n"
-	" original reference sequences that were used to build it.  By default,\n"
-	" the tool will output a FASTA file containing the sequences of the\n"
-	" original references (with all non-A/C/G/T characters converted to Ns).\n"
-	" It can also be used to extract just the reference sequence names using\n"
-	" the -n option.\n"
-	"\n"
-	"  Command Line\n"
-	"  ------------\n"
-	" \n"
-	" Usage: bowtie-inspect [options]* <ebwt_base>\n"
-	"\n"
-	"  <ebwt_base>        The basename of the index to be inspected.  The\n"
-	"                     basename is the name of any of the four index\n"
-	"                     files up to but not including the first period.\n"
-	"                     bowtie first looks in the current directory for\n"
-	"                     the index files, then looks in the 'indexes'\n"
-	"                     subdirectory under the directory where the\n"
-	"                     currently-running 'bowtie' executable is located,\n"
-	"                     then looks in the directory specified in the\n"
-	"                     BOWTIE_INDEXES environment variable.\n"
-	"\n"
-	" Options:\n"
-	"\n"
-	"  -a/--across <int>  When printing FASTA output, output a newline\n"
-	"                     character every <int> bases (default: 60).\n"
-	"\n"
-	"  -n/--names         Print reference sequence names only; ignore\n"
-	"                     sequence.\n"
-	"\n"
-	"  -v/--verbose       Print verbose output (for debugging).\n"
-	"\n"
-	"  -h/--help          Print detailed description of tool and its options\n"
-	"                     (from MANUAL).\n"
-	"\n"
 	;
 }
 
@@ -132,19 +84,15 @@ static void parseOptions(int argc, char **argv) {
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
-			case ARG_USAGE: {
+			case ARG_USAGE:
+			case 'h':
 				printUsage(cout);
 				throw 0;
 				break;
-			}
-			case 'h': {
-				printLongUsage(cout);
-				throw 0;
-				break;
-			}
 			case 'v': verbose = true; break;
 			case ARG_VERSION: showVersion = true; break;
 			case 'n': names_only = true; break;
+			case 's': summarize_only = true; break;
 			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
 			case -1: break; /* Done with options. */
 			case 0:
@@ -245,8 +193,7 @@ static char *argv0 = NULL;
 void print_index_sequence_names(const string& fname, ostream& fout)
 {
 	vector<string> p_refnames;
-	string adjust = adjustEbwtBase(argv0, fname, verbose);
-	readEbwtRefnames(adjust, p_refnames);
+	readEbwtRefnames(fname, p_refnames);
 	for(size_t i = 0; i < p_refnames.size(); i++) {
 		cout << p_refnames[i] << endl;
 	}
@@ -254,12 +201,37 @@ void print_index_sequence_names(const string& fname, ostream& fout)
 
 typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
 
+/**
+ *
+ */
+void print_index_summary(const string& fname, ostream& fout)
+{
+	bool color = readEbwtColor(fname);
+	TPackedEbwt ebwt(
+		fname, color, true, -1, -1, false, false, false, true,
+	    NULL, verbose);
+	vector<string> p_refnames;
+	readEbwtRefnames(fname, p_refnames);
+	cout << "Colorspace" << '\t' << (color ? "1" : "0") << endl;
+	cout << "SA-Sample" << "\t1 in " << (1 << ebwt.eh().offRate()) << endl;
+	cout << "FTab-Chars" << '\t' << ebwt.eh().ftabChars() << endl;
+	assert_eq(ebwt.nPat(), p_refnames.size());
+	for(size_t i = 0; i < p_refnames.size(); i++) {
+		cout << "Sequence-" << (i+1)
+		     << '\t' << p_refnames[i]
+		     << '\t' << (ebwt.plen()[i] + (color ? 1 : 0))
+		     << endl;
+	}
+}
+
 static void driver(const string& ebwtFileBase, const string& query) {
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 
 	if (names_only) {
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
+	} else if(summarize_only) {
+		print_index_summary(adjustedEbwtFileBase, cout);
 	} else {
 		// Initialize Ebwt object
 		bool color = readEbwtColor(adjustedEbwtFileBase);

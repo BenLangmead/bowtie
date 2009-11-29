@@ -65,3 +65,22 @@ void ChainingHitSink::reportUnaligned(PatternSourcePerThread& p) {
 	s.serialize(out(0));
 	unlock(0);
 }
+
+/**
+ * Report a maxed-out read.
+ */
+void VerboseHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+	HitSink::reportMaxed(hs, p);
+	if(sampleMax_) {
+		rand_.init(p.bufa().seed);
+		assert_gt(hs.size(), 0);
+		size_t num = 1;
+		for(size_t i = 1; i < hs.size(); i++) {
+			assert_geq(hs[i].stratum, hs[i-1].stratum);
+			if(hs[i].stratum == hs[i-1].stratum) num++;
+			else break;
+		}
+		assert_leq(num, hs.size());
+		reportHit(hs[rand_.nextU32() % num]);
+	}
+}

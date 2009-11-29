@@ -754,6 +754,9 @@ public:
 		assert_gt(numTiedPositions, 0);
 		//if(nextCost != 0xffff) assert_gt(nextCost, bestCost);
 		int r = 0;
+		if(numTiedPositions > 1) {
+			r = rand.nextU32() % numTiedPositions;
+		}
 		int pos = tiedPositions[r];
 		bool last = false;
 		// Pick an edit from among the edits tied for lowest cost

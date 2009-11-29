@@ -37,12 +37,13 @@ extern char* itoa10(int value, char* result);
  */
 static inline uint32_t genRandSeed(const String<Dna5>& qry,
                                    const String<char>& qual,
-                                   const String<char>& name)
+                                   const String<char>& name,
+                                   uint32_t seed)
 {
 	// Calculate a per-read random seed based on a combination of
 	// the read data (incl. sequence, name, quals) and the global
 	// seed
-	uint32_t rseed = 0;
+	uint32_t rseed = seed * 997;
 	size_t qlen = seqan::length(qry);
 	// Throw all the characters of the read into the random seed
 	for(size_t i = 0; i < qlen; i++) {
@@ -374,11 +375,13 @@ struct ReadBuf {
  */
 class PatternSource {
 public:
-	PatternSource(bool randomizeQuals = false,
+	PatternSource(uint32_t seed,
+	              bool randomizeQuals = false,
 	              bool useSpinlock = true,
 	              const char *dumpfile = NULL,
 	              bool verbose = false) :
-	    readCnt_(0),
+		seed_(seed),
+		readCnt_(0),
 		dumpfile_(dumpfile),
 		numWrappers_(0),
 		doLocking_(true),
@@ -439,9 +442,9 @@ public:
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
-			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name);
+			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
 			if(!rb.empty()) {
-				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name);
+				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
 			}
 			// Output it, if desired
 			if(dumpfile_ != NULL) {
@@ -477,7 +480,7 @@ public:
 			// Fill in the random-seed field using a combination of
 			// information from the user-specified seed and the read
 			// sequence, qualities, and name
-			r.seed = genRandSeed(r.patFw, r.qual, r.name);
+			r.seed = genRandSeed(r.patFw, r.qual, r.name, seed_);
 			// Output it, if desired
 			if(dumpfile_ != NULL) {
 				dumpBuf(r);
@@ -605,6 +608,8 @@ protected:
 	{
 		out << name << ": " << seq << " " << qual << endl;
 	}
+
+	uint32_t seed_;
 
 	/// The number of reads read by this PatternSource
 	uint64_t readCnt_;
@@ -1063,13 +1068,14 @@ private:
  */
 class TrimmingPatternSource : public PatternSource {
 public:
-	TrimmingPatternSource(bool randomizeQuals = false,
+	TrimmingPatternSource(uint32_t seed,
+	                      bool randomizeQuals = false,
 	                      bool useSpinlock = true,
 	                      const char *dumpfile = NULL,
 	                      bool verbose = false,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(randomizeQuals, useSpinlock, dumpfile, verbose),
+		PatternSource(seed, randomizeQuals, useSpinlock, dumpfile, verbose),
 		trim3_(trim3), trim5_(trim5) { }
 protected:
 	int trim3_;
@@ -1083,13 +1089,13 @@ protected:
  */
 class RandomPatternSource : public PatternSource {
 public:
-	RandomPatternSource(uint32_t numReads = 2000000,
+	RandomPatternSource(uint32_t seed,
+	                    uint32_t numReads = 2000000,
 	                    int length = 35,
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
-	                    bool verbose = false,
-	                    uint32_t seed = 0) :
-		PatternSource(false, useSpinlock, dumpfile, verbose),
+	                    bool verbose = false) :
+		PatternSource(seed, false, useSpinlock, dumpfile, verbose),
 		numReads_(numReads),
 		length_(length),
 		seed_(seed)
@@ -1331,7 +1337,9 @@ extern void tooManySeqChars(const String<char>& read_name);
  */
 class VectorPatternSource : public TrimmingPatternSource {
 public:
-	VectorPatternSource(const vector<string>& v,
+	VectorPatternSource(uint32_t seed,
+	                    const vector<string>& v,
+	                    bool color,
 	                    bool randomizeQuals = false,
 	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
@@ -1339,9 +1347,10 @@ public:
 	                    int trim3 = 0,
 	                    int trim5 = 0,
 		                uint32_t skip = 0) :
-		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile,
-		                      verbose, trim3, trim5),
-		cur_(skip), skip_(skip), paired_(false), v_(), quals_()
+		TrimmingPatternSource(seed, randomizeQuals, useSpinlock,
+		                      dumpfile, verbose, trim3, trim5),
+		color_(color), cur_(skip), skip_(skip), paired_(false), v_(),
+		quals_()
 	{
 		for(size_t i = 0; i < v.size(); i++) {
 			vector<string> ss;
@@ -1350,6 +1359,15 @@ public:
 			assert_leq(ss.size(), 2);
 			// Initialize s
 			string s = ss[0];
+			if(color_) {
+				// Convert '0'-'3' to 'A'-'T'
+				for(size_t i = 0; i < s.length(); i++) {
+					if(s[i] >= '0' && s[i] <= '4') {
+						s[i] = "ACGTN"[(int)s[i] - '0'];
+					}
+					if(s[i] == '.') s[i] = 'N';
+				}
+			}
 			if(s.length() <= (size_t)(trim3_ + trim5_)) {
 				// Entire read is trimmed away
 				continue;
@@ -1464,6 +1482,7 @@ public:
 		paired_ = false;
 	}
 private:
+	bool color_;
 	size_t cur_;
 	uint32_t skip_;
 	bool paired_;
@@ -1477,7 +1496,8 @@ private:
  */
 class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
-	BufferedFilePatternSource(const vector<string>& infiles,
+	BufferedFilePatternSource(uint32_t seed,
+	                          const vector<string>& infiles,
 	                          bool randomizeQuals = false,
 	                          bool useSpinlock = true,
 	                          const char *dumpfile = NULL,
@@ -1485,8 +1505,8 @@ public:
 	                          int trim3 = 0,
 	                          int trim5 = 0,
 	                          uint32_t skip = 0) :
-		TrimmingPatternSource(randomizeQuals, useSpinlock, dumpfile,
-		                      verbose, trim3, trim5),
+		TrimmingPatternSource(seed, randomizeQuals, useSpinlock,
+		                      dumpfile, verbose, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
 		filebuf_(),
@@ -1650,7 +1670,8 @@ protected:
  */
 class FastaPatternSource : public BufferedFilePatternSource {
 public:
-	FastaPatternSource(const vector<string>& infiles,
+	FastaPatternSource(uint32_t seed,
+	                   const vector<string>& infiles,
 	                   bool color,
 	                   bool randomizeQuals,
 	                   bool useSpinlock = true,
@@ -1659,7 +1680,7 @@ public:
 	                   int trim3 = 0,
 	                   int trim5 = 0,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, randomizeQuals, useSpinlock,
 		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true), color_(color)
 	{ }
@@ -1734,12 +1755,17 @@ protected:
 			// This is the primer character, keep it in the
 			// 'primer' field of the read buf and keep parsing
 			c = toupper(c);
-			if(c != 'A' && c != 'C' && c != 'G' && c != 'T') {
-				cerr << "Warning: Primer character for read " << r.name << " is not DNA: " << c << endl;
+			if(asc2dnacat[c] > 0) {
+				// First char is a DNA char
+				int c2 = toupper(filebuf_.peek());
+				// Second char is a color char
+				if(asc2colcat[c2] > 0) {
+					r.primer = c;
+					c = filebuf_.get();
+					assert_eq(c, c2);
+				}
 			}
-			r.primer = c;
 			r.color = true;
-			c = filebuf_.get();
 			if(c < 0) { bail(r); return; }
 		}
 		while(c != '>' && c >= 0) {
@@ -1814,20 +1840,23 @@ static inline bool tokenizeQualLine(FileBuf& filebuf, char *buf, size_t buflen, 
  */
 class TabbedPatternSource : public BufferedFilePatternSource {
 public:
-	TabbedPatternSource(const vector<string>& infiles,
-	                   bool randomizeQuals = false,
-	                   bool useSpinlock = true,
-	                   const char *dumpfile = NULL,
-	                   bool verbose = false,
-	                   int trim3 = 0,
-	                   int trim5 = 0,
-	                   bool solQuals = false,
-	                   bool phred64Quals = false,
-	                   bool intQuals = false,
-	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          dumpfile, verbose,
+	TabbedPatternSource(uint32_t seed,
+	                    const vector<string>& infiles,
+	                    bool color,
+	                    bool randomizeQuals = false,
+	                    bool useSpinlock = true,
+	                    const char *dumpfile = NULL,
+	                    bool verbose = false,
+	                    int trim3 = 0,
+	                    int trim5 = 0,
+	                    bool solQuals = false,
+	                    bool phred64Quals = false,
+	                    bool intQuals = false,
+	                    uint32_t skip = 0) :
+		BufferedFilePatternSource(seed, infiles, randomizeQuals,
+		                          useSpinlock, dumpfile, verbose,
 		                          trim3, trim5, skip),
+		color_(color),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
 		intQuals_(intQuals)
@@ -2032,8 +2061,10 @@ private:
 		int c = filebuf_.get();
 		assert(c != upto);
 		while(c != upto) {
-			// Note: can't have a comment in the middle of a sequence,
-			// though a comment can end a sequence
+			if(color_) {
+				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+				if(c == '.') c = 'N';
+			}
 			if(isalpha(c)) {
 				if(begin++ >= this->trim5_) {
 					if(dna4Cat[c] == 0) {
@@ -2123,6 +2154,7 @@ private:
 		return qualsRead;
 	}
 
+	bool color_;
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
@@ -2135,15 +2167,15 @@ private:
 class FastaContinuousPatternSource : public BufferedFilePatternSource {
 public:
 	FastaContinuousPatternSource(
+			uint32_t seed,
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
 			bool useSpinlock = true,
 			const char *dumpfile = NULL,
 			bool verbose = false,
-			uint32_t skip = 0,
-			uint32_t seed = 0) :
-		BufferedFilePatternSource(infiles, false, useSpinlock,
+			uint32_t skip = 0) :
+		BufferedFilePatternSource(seed, infiles, false, useSpinlock,
 		                          dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_-1), beginning_(true),
@@ -2277,7 +2309,8 @@ private:
  */
 class FastqPatternSource : public BufferedFilePatternSource {
 public:
-	FastqPatternSource(const vector<string>& infiles,
+	FastqPatternSource(uint32_t seed,
+	                   const vector<string>& infiles,
 	                   bool color,
 	                   bool randomizeQuals = false,
 	                   bool useSpinlock = true,
@@ -2290,8 +2323,8 @@ public:
 	                   bool integer_quals = false,
 	                   bool fuzzy = false,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
-		                          dumpfile, verbose,
+		BufferedFilePatternSource(seed, infiles, randomizeQuals,
+		                          useSpinlock, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
 		solQuals_(solexa_quals),
@@ -2628,7 +2661,8 @@ private:
  */
 class RawPatternSource : public BufferedFilePatternSource {
 public:
-	RawPatternSource(const vector<string>& infiles,
+	RawPatternSource(uint32_t seed,
+	                 const vector<string>& infiles,
 	                 bool color,
 	                 bool randomizeQuals = false,
 	                 bool useSpinlock = true,
@@ -2637,7 +2671,7 @@ public:
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
-		BufferedFilePatternSource(infiles, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, randomizeQuals, useSpinlock,
 		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true), color_(color)
 	{ }
@@ -2746,13 +2780,14 @@ private:
  */
 class ChainPatternSource : public BufferedFilePatternSource {
 public:
-	ChainPatternSource(const vector<string>& infiles,
+	ChainPatternSource(uint32_t seed,
+	                   const vector<string>& infiles,
 	                   bool useSpinlock,
 	                   const char *dumpfile,
 	                   bool verbose,
 	                   uint32_t skip) :
 	BufferedFilePatternSource(
-		infiles, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
+		seed, infiles, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
 
 protected:
 

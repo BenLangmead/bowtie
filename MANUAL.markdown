@@ -100,8 +100,8 @@ The `bowtie` aligner
 of alignments.  Alignments are selected according to a combination of
 the [`-v`]/[`-n`]/[`-e`]/[`-l`] options (plus the [`-I`]/[`-X`]/[`--fr`]/[`--rf`]/
 [`--ff`] options for paired-end alignment), which define which alignments
-are legal, and the [`-k`]/[`-a`]/[`-m`]/[`--best`]/[`--strata`] options which
-define which and how many legal alignments should be reported.
+are legal, and the [`-k`]/[`-a`]/[`-m`]/[`-M`]/[`--best`]/[`--strata`] options
+which define which and how many legal alignments should be reported.
 
 By default, Bowtie enforces an alignment policy similar to [Maq]'s
 default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70).  See [the -n
@@ -229,8 +229,8 @@ specified.
 Reporting Modes
 ---------------
 
-With the [`-k`], [`-a`], [`-m`], [`--best`] and [`--strata`] options, the user
-can flexibily select which alignments are reported.  Below we
+With the [`-k`], [`-a`], [`-m`], [`-M`], [`--best`] and [`--strata`] options, the
+user can flexibily select which alignments are reported.  Below we
 demonstrate a few ways in which these options can be combined.  All
 examples are using the `e_coli` index packaged with Bowtie.  The
 [`--suppress`] option is used to keep the output concise and some
@@ -1126,9 +1126,11 @@ one valid alignment from among those found is reported at random.  In
 the [default output mode], the 7th column is set to `<int>` to indicate
 that the read has at least `<int>` valid alignments.  In [`-S`/`--sam`]
 mode, the alignment is given a `MAPQ` (mapping quality) of 0,
-indicating its repetitiveness to [SAMtools].  Randomly-selected
+indicating its repetitiveness to [SAMtools].    Randomly-selected
 alignments reported in this way do not count toward the "reads with at
-least one reported alignment" total reported by `bowtie`.
+least one reported alignment" total reported by `bowtie`.  This option
+requires [`--best`] mode; if `-M` is specified without [`--best`],
+[`--best`] will be enabled automatically.
 
 [default output mode]: #default-bowtie-output
 
@@ -2156,7 +2158,7 @@ bases (default: 60).
 
 </td><td>
 
-Print reference sequence names and quit.
+Print reference sequence names, one per line, and quit.
 
 </td></tr><tr><td id="bowtie-build-options-s">
 
@@ -2171,9 +2173,12 @@ as the names and lengths of the input sequences.  The summary has this
 format:
 
     Colorspace	<0 or 1>
-    Sequence	1	<name>	<len>
-    Sequence	2	<name>	<len>
+    SA-Sample	1 in <sample>
+    FTab-Chars	<chars>
+    Sequence-1	<name>	<len>
+    Sequence-2	<name>	<len>
     ...
+    Sequence-N	<name>	<len>
 
 Tabs delimit fields.
 

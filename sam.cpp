@@ -56,6 +56,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
  */
 void SAMHitSink::appendAligned(ostream& ss,
                                const Hit& h,
+                               int mapq,
                                const vector<string>* refnames,
                                ReferenceMap *rmap,
                                AnnotationMap *amap,
@@ -93,7 +94,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// POS
 	ss << '\t' << (h.h.second + 1);
 	// MAPQ
-	ss << "\t255";
+	ss << "\t" << mapq;
 	// CIGAR
 	ss << '\t' << h.length() << 'M';
 	// MRNM
@@ -193,10 +194,10 @@ void SAMHitSink::appendAligned(ostream& ss,
  * Report a verbose, human-readable alignment to the appropriate
  * output stream.
  */
-void SAMHitSink::reportHit(const Hit& h) {
+void SAMHitSink::reportHit(const Hit& h, int mapq) {
 	HitSink::reportHit(h);
 	ostringstream ss;
-	append(ss, h);
+	append(ss, h, mapq);
 	// Make sure to grab lock before writing to output stream
 	lock(h.h.first);
 	out(h.h.first).writeString(ss.str());
@@ -204,7 +205,9 @@ void SAMHitSink::reportHit(const Hit& h) {
 }
 
 /**
- *
+ * Report either an unaligned read or a read that exceeded the -m
+ * ceiling.  We output placeholders for most of the fields in this
+ * case.
  */
 void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
                                const vector<Hit>* hs,
@@ -236,11 +239,12 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
  */
 void SAMHitSink::append(ostream& ss,
                         const Hit& h,
+                        int mapq,
                         const vector<string>* refnames,
                         ReferenceMap *rmap,
                         AnnotationMap *amap,
                         bool fullRef,
                         int offBase)
 {
-	appendAligned(ss, h, refnames, rmap, amap, fullRef, offBase);
+	appendAligned(ss, h, mapq, refnames, rmap, amap, fullRef, offBase);
 }

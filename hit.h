@@ -140,8 +140,9 @@ public:
 	uint32_t            patId;   /// read index
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence
-	String<Dna5>        colSeq;  /// read sequence
+	String<Dna5>        colSeq;  /// original color sequence, not decoded
 	String<char>        quals;   /// read qualities
+	String<char>        colQuals;/// original color qualities, not decoded
 	FixedBitset<1024>   mms;     /// nucleotide mismatch mask
 	FixedBitset<1024>   cmms;    /// color mismatch mask (if relevant)
 	vector<char>        refcs;   /// reference characters for mms
@@ -167,6 +168,7 @@ public:
 		this->patSeq  = other.patSeq;
 		this->colSeq  = other.colSeq;
 		this->quals   = other.quals;
+		this->colQuals= other.colQuals;
 		this->mms     = other.mms;
 		this->cmms    = other.cmms;
 		this->refcs   = other.refcs;
@@ -2421,6 +2423,10 @@ public:
 	 */
 	VerboseHitSink(OutFileBuf* out,
 	               int offBase,
+	               bool sampleMax,
+	               bool colorSeq,
+	               bool colorQual,
+	               bool printCost,
 	               const Bitset& suppressOuts,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
@@ -2430,6 +2436,10 @@ public:
 	HitSink(out, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
+	sampleMax_(sampleMax),
+	colorSeq_(colorSeq),
+	colorQual_(colorQual),
+	cost_(printCost),
 	suppress_(suppressOuts),
 	fullRef_(fullRef),
 	rmap_(rmap), amap_(amap)
@@ -2441,6 +2451,10 @@ public:
 	 */
 	VerboseHitSink(size_t numOuts,
 	               int offBase,
+	               bool sampleMax,
+	               bool colorSeq,
+	               bool colorQual,
+	               bool printCost,
 	               const Bitset& suppressOuts,
 	               ReferenceMap *rmap,
 	               AnnotationMap *amap,
@@ -2450,6 +2464,10 @@ public:
 	HitSink(numOuts, PASS_HIT_DUMPS2),
 	_partition(partition),
 	offBase_(offBase),
+	sampleMax_(sampleMax),
+	colorSeq_(colorSeq),
+	colorQual_(colorQual),
+	cost_(printCost),
 	suppress_(64),
 	fullRef_(fullRef),
 	rmap_(rmap),
@@ -2467,6 +2485,9 @@ public:
 	                   bool fullRef,
 	                   int partition,
 	                   int offBase,
+	                   bool colorSeq,
+	                   bool colorQual,
+	                   bool cost,
 	                   const Bitset& suppress)
 	{
 		bool spill = false;
@@ -2585,12 +2606,16 @@ public:
 			if(!suppress.test(field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
-				ss << h.patSeq;
+				const String<Dna5>* pat = &h.patSeq;
+				if(h.color && colorSeq) pat = &h.colSeq;
+				ss << *pat;
 			}
 			if(!suppress.test(field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
-				ss << h.quals;
+				const String<char>* qual = &h.quals;
+				if(h.color && colorQual) qual = &h.colQuals;
+				ss << *qual;
 			}
 			if(!suppress.test(field++)) {
 				if(firstfield) firstfield = false;
@@ -2659,6 +2684,20 @@ public:
 					ss << h.patName;
 				}
 			}
+			if(cost) {
+				// Stratum
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << h.stratum;
+				}
+				// Cost
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << h.cost;
+				}
+			}
 			ss << endl;
 		} while(spill);
 	}
@@ -2668,8 +2707,16 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, _partition, offBase_, suppress_);
+		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_,
+		                       fullRef_, _partition, offBase_,
+		                       colorSeq_, colorQual_, cost_,
+		                       suppress_);
 	}
+
+	/**
+	 * See hit.cpp
+	 */
+	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p);
 
 protected:
 
@@ -2692,10 +2739,15 @@ private:
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)
+	int      sampleMax_;   /// whether to report random alignment when -M is exceeded
+	bool     colorSeq_;    /// true -> print colorspace alignment sequence in colors
+	bool     colorQual_;   /// true -> print colorspace quals as originals, not decoded
+	bool     cost_;        /// true -> print statum and cost
 	Bitset   suppress_;    /// output fields to suppress
 	bool fullRef_;         /// print full reference name
 	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
 	AnnotationMap *amap_;  ///
+	RandomSource rand_;    /// pseudo-randoms for -M sampling
 };
 
 /**

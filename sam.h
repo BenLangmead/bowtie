@@ -8,7 +8,10 @@
 #ifndef SAM_H_
 #define SAM_H_
 
-#include "hit.h"
+#include "refmap.h"
+#include "annot.h"
+#include "pat.h"
+#include "random_source.h"
 
 class ReferenceMap;
 class AnnotationMap;
@@ -41,9 +44,12 @@ public:
 	           ReferenceMap *rmap,
 	           AnnotationMap *amap,
 	           bool fullRef,
+	           bool sampleMax,
+	           int defaultMapq,
 	           DECL_HIT_DUMPS2) :
 	HitSink(out, PASS_HIT_DUMPS2),
-	offBase_(offBase), rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
+	offBase_(offBase), sampleMax_(sampleMax), defaultMapq_(defaultMapq),
+	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
 
 	/**
 	 * Construct a multi-stream VerboseHitSink with one stream per
@@ -54,15 +60,19 @@ public:
 	           ReferenceMap *rmap,
 	           AnnotationMap *amap,
 	           bool fullRef,
+	           bool sampleMax,
+	           int defaultMapq,
 	           DECL_HIT_DUMPS2) :
 	HitSink(numOuts, PASS_HIT_DUMPS2),
-	offBase_(offBase), rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
+	offBase_(offBase),  sampleMax_(sampleMax), defaultMapq_(defaultMapq),
+	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
 
 	/**
 	 * Append a SAM alignment to the given output stream.
 	 */
 	static void append(ostream& ss,
 	                   const Hit& h,
+	                   int mapq,
 	                   const vector<string>* refnames,
 	                   ReferenceMap *rmap,
 	                   AnnotationMap *amap,
@@ -75,6 +85,7 @@ public:
 	 */
 	static void appendAligned(ostream& ss,
 	                          const Hit& h,
+	                          int mapq,
 	                          const vector<string>* refnames,
 	                          ReferenceMap *rmap,
 	                          AnnotationMap *amap,
@@ -86,7 +97,15 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		SAMHitSink::append(ss, h, _refnames, rmap_, amap_, fullRef_, offBase_);
+		SAMHitSink::append(ss, h, defaultMapq_, _refnames, rmap_, amap_, fullRef_, offBase_);
+	}
+
+	/**
+	 * Append a verbose, readable hit to the output stream
+	 * corresponding to the hit.
+	 */
+	virtual void append(ostream& ss, const Hit& h, int mapq) {
+		SAMHitSink::append(ss, h, mapq, _refnames, rmap_, amap_, fullRef_, offBase_);
 	}
 
 	/**
@@ -116,13 +135,35 @@ protected:
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream.
 	 */
-	virtual void reportHit(const Hit& h);
+	virtual void reportHit(const Hit& h) {
+		reportHit(h, defaultMapq_);
+	}
+
+	/**
+	 * Report a verbose, human-readable alignment to the appropriate
+	 * output stream with the given mapping quality.
+	 */
+	virtual void reportHit(const Hit& h, int mapq);
 
 	/**
 	 * See sam.cpp
 	 */
 	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
-		reportUnOrMax(p, &hs, false);
+		if(sampleMax_) {
+			HitSink::reportMaxed(hs, p);
+			rand_.init(p.bufa().seed);
+			assert_gt(hs.size(), 0);
+			size_t num = 1;
+			for(size_t i = 1; i < hs.size(); i++) {
+				assert_geq(hs[i].stratum, hs[i-1].stratum);
+				if(hs[i].stratum == hs[i-1].stratum) num++;
+				else break;
+			}
+			assert_leq(num, hs.size());
+			reportHit(hs[rand_.nextU32() % num], 0 /* MAPQ=0 */);
+		} else {
+			reportUnOrMax(p, &hs, false);
+		}
 	}
 
 	/**
@@ -133,13 +174,17 @@ protected:
 	}
 
 private:
-	int      _partition;   /// partition size, or 0 if partitioning is disabled
-	int      offBase_;     /// Add this to reference offsets before outputting.
-	                       /// (An easy way to make things 1-based instead of
-	                       /// 0-based)
-    ReferenceMap *rmap_;   /// mapping to reference coordinate system.
-	AnnotationMap *amap_;  ///
-	bool fullRef_;         /// print full reference name, not just up to whitespace
+	int  offBase_;        /// Add this to reference offsets before outputting.
+	                      /// (An easy way to make things 1-based instead of
+	                      /// 0-based)
+	bool sampleMax_;      /// When reporting a maxed-out read, randomly report
+	                      /// 1 of the alignments with mapping quality = 0
+	int  defaultMapq_;    /// Default mapping quality to report when one is
+	                      /// not specified
+	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
+	AnnotationMap *amap_; ///
+	bool fullRef_;        /// print full reference name, not just up to whitespace
+	RandomSource rand_;   /// for pseudo-randoms
 };
 
 #endif /* SAM_H_ */
