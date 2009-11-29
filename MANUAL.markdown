@@ -1748,7 +1748,7 @@ right, the fields are:
 
     Aligned read has an edit distance of `<N>` (in nucleotides)
 
-    <table><tr><td>
+    </td></tr><tr><td>
 
         CM:i:<N>
 
