@@ -364,8 +364,8 @@ Paired-end Alignment
 --------------------
 
 `bowtie` can align paired-end reads when properly paired read files are
-specified using the `-1` and `-2` options (for pairs of raw, FASTA, or
-FASTQ read files), or using the `--12` option (for Tab-delimited read
+specified using the [`-1`](#command-line) and [`-2`](#command-line) options (for pairs of raw, FASTA, or
+FASTQ read files), or using the [`--12`](#command-line) option (for Tab-delimited read
 files).  A valid paired-end alignment satisfies these criteria:
 
 1. Both mates have a valid alignment according to the alignment policy
@@ -412,6 +412,8 @@ and 2.9 GB in paired-end mode.
 Colorspace Alignment
 --------------------
 
+[Colorspace alignment]: #colorspace-alignment
+
 As of version 0.12.0, `bowtie` aligns colorspace reads against
 colorspace references when [`-C`] is specified.  Colorspace is the
 characteristic output format of Applied Biosystems' SOLiD system.  In a
@@ -425,7 +427,7 @@ Sequencing] application note for details.
 ### Colorspace reads
 
 All Bowtie input formats (FASTA [`-f`], FASTQ [`-q`], raw [`-r`], tab-
-delimited [`--12`], command-line [`-c`]) are compatible with colorspace
+delimited [`--12`](#command-line), command-line [`-c`]) are compatible with colorspace
 ([`-C`]).  When [`-C`] is specified, read sequences are treated as
 colors.  Colors may be encoded either as numbers (`0`=blue, `1`=green,
 `2`=orange, `3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green,
@@ -706,6 +708,20 @@ scale.
 The query sequences are given on command line.  I.e. `<m1>`, `<m2>` and
 `<singles>` are comma-separated lists of reads rather than lists of
 read files.
+
+</td></tr><tr><td id="bowtie-options-C">
+
+[`-C`]: #bowtie-options-C
+[`-C`/`--color`]: #bowtie-options-C
+
+    -C/--color
+
+</td><td>
+
+Align in colorspace.  Read characters are interpreted as colors.  The
+index specified must be a colorspace index (i.e. built with
+`bowtie-build` [`-C`](#bowtie-build-options-C), or `bowtie` will print an error message and quit.
+See [Colorspace alignment] for more details.
 
 </td></tr><tr><td id="bowtie-options-s">
 
@@ -1156,6 +1172,35 @@ best stratum.  By default, Bowtie reports all reportable alignments
 regardless of whether they fall into multiple strata.  When
 [`--strata`] is specified, [`--best`] must also be specified. 
 
+</td></tr><tr><td id="bowtie-options-snpphred">
+
+[`--snpphred`]: #bowtie-options-snpphred
+
+    --snpphred <int>
+
+</td><td>
+
+When decoding colorspace alignments, use `<int>` as the SNP penalty.
+This should be set to the user's best guess of the true ratio of SNPs
+per base in the subject genome, converted to the [Phred quality] scale.
+E.g., if the user expects about 1 SNP every 1,000 positions,
+`--snpphred` should be set to 30 (which is also the default).  To
+specify the fraction directly, use [`--snpfrac`].
+
+</td></tr><tr><td id="bowtie-options-snpfrac">
+
+[`--snpfrac`]: #bowtie-options-snpfrac
+
+    --snpfrac <dec>
+
+</td><td>
+
+When decoding colorspace alignments, use `<dec>` as the estimated ratio
+of SNPs per base.  For best decoding results, this should be set to the
+user's best guess of the true ratio.  `bowtie` internally converts the
+ratio to a [Phred quality], and behaves as if that quality had been set
+via the [`--snpphred`] option.  Default: 0.001.
+
 </td></tr></table>
 
 #### Output
@@ -1302,6 +1347,8 @@ If reads are in colorspace and the [default output mode] is active,
 read-sequence column (column 5) instead of the decoded nucleotide
 sequence.  See the [Decoding colorspace alignments] section for details
 about decoding.  This option is ignored in [`-S`/`--sam`] mode.
+
+</td></tr><tr><td id="bowtie-options-colqual">
 
 [`--colqual`]: #bowtie-options-colqual
 
