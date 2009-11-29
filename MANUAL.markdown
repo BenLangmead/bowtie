@@ -1063,26 +1063,9 @@ regardless of whether they fall into multiple strata.  When
 
 #### Output
 
-<table><tr><td id="bowtie-options-S">
+<table>
 
-[`-S`/`--sam`]: #bowtie-options-S
-[`-S`]: #bowtie-options-S
-
-    -S/--sam
-
-</td><td>
-
-Print alignments in [SAM] format.  See the [SAM output] section of the
-manual for details.  To suppress all SAM headers, use [`--sam-nohead`].
-To suppress just the `@SQ` headers (e.g. if the alignment is against a
-very large number of reference sequences), use [`--sam-nosq`].
-`bowtie` does not write BAM files directly, but SAM output can be
-converted to BAM on the fly by piping `bowtie`'s output to
-`samtools view`.  [`-S`/`--sam`] is not compatible with [`--refout`].
-
-[SAM output]: #sam-bowtie-output
-
-</td></tr><tr><td id="bowtie-options-t">
+<tr><td id="bowtie-options-t">
 
 [`-t`/`--time`]: #bowtie-options-t
 [`-t`]: #bowtie-options-t
@@ -1209,26 +1192,6 @@ quality fields will be omitted.  See [Default Bowtie output] for field
 descriptions.  This option is ignored if the output mode is
 [`-S`/`--sam`].
 
-</td></tr><tr><td id="bowtie-options-sam-nohead">
-
-[`--sam-nohead`]: #bowtie-options-sam-nohead
-
-    --sam-nohead
-
-</td><td>
-
-Suppress header lines (starting with `@`) when output is [SAM].
-
-</td></tr><tr><td id="bowtie-options-sam-nosq">
-
-[`--sam-nosq`]: #bowtie-options-sam-nosq
-
-    --sam-nosq
-
-</td><td>
-
-Suppress `@SQ` header lines when output is [SAM].
-
 </td></tr><tr><td id="bowtie-options-fullref">
 
 [`--fullref`]: #bowtie-options-fullref
@@ -1240,6 +1203,77 @@ Suppress `@SQ` header lines when output is [SAM].
 Print the full refernce sequence name, including whitespace, in
 alignment output.  By default `bowtie` prints everything up to but not
 including the first whitespace.
+
+</td></tr></table>
+
+#### SAM
+
+<table>
+
+<tr><td id="bowtie-options-S">
+
+[`-S`/`--sam`]: #bowtie-options-S
+[`-S`]: #bowtie-options-S
+
+    -S/--sam
+
+</td><td>
+
+Print alignments in [SAM] format.  See the [SAM output] section of the
+manual for details.  To suppress all SAM headers, use [`--sam-nohead`].
+To suppress just the `@SQ` headers (e.g. if the alignment is against a
+very large number of reference sequences), use [`--sam-nosq`].
+`bowtie` does not write BAM files directly, but SAM output can be
+converted to BAM on the fly by piping `bowtie`'s output to
+`samtools view`.  [`-S`/`--sam`] is not compatible with [`--refout`].
+
+[SAM output]: #sam-bowtie-output
+
+</td></tr><tr><td id="bowtie-options-mapq">
+
+[`--mapq`]: #bowtie-options-mapq
+
+    --mapq
+
+</td><td>
+
+If an alignment is non-repetitive (according to [`-m`], [`--strata`] and
+other options) set the MAPQ field to this value.  Default: 255.
+
+</td></tr><tr><td id="bowtie-options-sam-nohead">
+
+[`--sam-nohead`]: #bowtie-options-sam-nohead
+
+    --sam-nohead
+
+</td><td>
+
+Suppress header lines (starting with `@`) when output is [`-S`/`--sam`].
+
+</td></tr><tr><td id="bowtie-options-sam-nosq">
+
+[`--sam-nosq`]: #bowtie-options-sam-nosq
+
+    --sam-nosq
+
+</td><td>
+
+Suppress `@SQ` header lines when output is [`-S`/`--sam`].
+
+</td></tr><tr><td id="bowtie-options-sam-RG">
+
+[`--sam-RG`]: #bowtie-options-sam-RG
+
+    --sam-RG <text>
+
+</td><td>
+
+Add `<text>` (usually of the form `TAG:VAL`, e.g. `ID:IL7LANE2`) as a
+field on the `@RG` header line.  Specify `--sam-RG` multiple times to
+set multiple fields.  See the [SAM Spec][SAM] for details about what fields
+are legal.  Note that, if any `@RG` fields are set using this option,
+the `ID` and `SM` fields must both be among them according to the [SAM
+Spec][SAM].
 
 </td></tr></table>
 
