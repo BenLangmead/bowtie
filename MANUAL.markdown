@@ -1746,7 +1746,17 @@ right, the fields are:
 
     </td><td>
 
-    Aligned read has an edit distance of `<N>`
+    Aligned read has an edit distance of `<N>` (in nucleotides)
+
+    <table><tr><td>
+
+        CM:i:<N>
+
+    </td><td>
+
+    Aligned read has an edit distance of `<N>` in colorspace.  This
+    field is present in addition to the `NM` field in [`-C`/`--color`]
+    mode.
 
     </td></tr><tr><td>
 
@@ -1756,7 +1766,8 @@ right, the fields are:
 
     For aligned reads, `<S>` is a string representation of the
     mismatched reference bases in the alignment.  See [SAM] format
-    specification for details.
+    specification for details.  For colorspace alignments, this string
+    describes the decoded nucleotide alignment.
 
     </td></tr><tr><td>
 
@@ -2156,7 +2167,15 @@ Print reference sequence names and quit.
 </td><td>
 
 Print a summary that includes information about index settings, as well
-as the names and lengths of the input sequences.
+as the names and lengths of the input sequences.  The summary has this
+format:
+
+    Colorspace	<0 or 1>
+    Sequence	1	<name>	<len>
+    Sequence	2	<name>	<len>
+    ...
+
+Tabs delimit fields.
 
 </td></tr><tr><td>
 
