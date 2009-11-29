@@ -973,7 +973,7 @@ specified, then only those alignments belonging to the best alignment
 small [`-k`] but bowtie can become significantly slower as [`-k`]
 increases.  If you would like to use Bowtie for larger values of
 [`-k`], consider building an index with a denser suffix-array sample,
-i.e. specify a smaller `-o`/`--offrate` when invoking `bowtie-build`
+i.e. specify a smaller [`-o`/`--offrate`](#bowtie-build-options-o) when invoking `bowtie-build`
 for the relevant index (see the [Performance tuning] section for
 details).
 
@@ -1474,15 +1474,43 @@ right, the fields are:
     `bowtie` outputs one or more of these optional fields for each
     alignment, depending on the type of the alignment:
 
-    * `NM:i:<N>` : Aligned read has an edit distance of `<N>`
-    * `MD:Z:<S>` : For aligned reads, `<S>` is a string representation
-                   of the mismatched reference bases in the alignment.
-                   See [SAM] format specification for details.
-    * `XA:i:<N>` : Aligned read belongs to stratum `<N>`
-    * `XM:i:<N>` : For a read with no reported alignments, `<N>` is 0
-                   if the read had no alignments, or 1 if the read had
-                   alignments that were suppressed by the [`-m`]
-                   option.
+    <table><tr><td>
+
+        NM:i:<N>
+
+    </td><td>
+
+    Aligned read has an edit distance of `<N>`
+
+    </td></tr><tr><td>
+
+        MD:Z:<S>
+
+    </td><td>
+
+    For aligned reads, `<S>` is a string representation of the
+    mismatched reference bases in the alignment.  See [SAM] format
+    specification for details.
+
+    </td></tr><tr><td>
+
+        XA:i:<N>
+
+    </td><td>
+
+    Aligned read belongs to stratum `<N>`
+
+    </td></tr><tr><td>
+
+        `XM:i:<N>`
+
+    </td><td>
+
+    For a read with no reported alignments, `<N>` is 0 if the read had
+    no alignments, or 1 if the read had alignments that were suppressed
+    by the [`-m`] option.
+    
+    </td></tr></table>
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
 [FASTQ]: http://en.wikipedia.org/wiki/FASTQ_format
@@ -1501,14 +1529,14 @@ files are no longer used by Bowtie once the index is built.
 
 Use of Karkkainen's [blockwise algorithm] allows `bowtie-build` to
 trade off between running time and memory usage. `bowtie-build` has
-three options governing how it makes this trade: `-p`/`--packed`,
-`--bmax`/`--bmaxdivn`, and `--dcv`.  By default, `bowtie-build` will
+three options governing how it makes this trade: [`-p`/`--packed`],
+[`--bmax`]/[`--bmaxdivn`], and [`--dcv`].  By default, `bowtie-build` will
 automatically search for the settings that yield the best
  running time without exhausting memory.  This behavior can be disabled
- using the `-a`/`--noauto` option.
+ using the [`-a`/`--noauto`] option.
 
 The indexer provides options pertaining to the "shape" of the index,
-e.g. `--offrate` governs the fraction of [Burrows-Wheeler] rows that
+e.g. [`--offrate`](#bowtie-build-options-o) governs the fraction of [Burrows-Wheeler] rows that
 are "marked" (i.e., the density of the suffix-array sample; see the
 original [FM Index] paper for details).  All of these options are
 potentially profitable trade-offs depending on the application.  They
