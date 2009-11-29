@@ -1426,15 +1426,72 @@ right, the fields are:
 
 2.  Sum of all applicable flags.  Flags relevant to Bowtie are:
 
-    * 1: The read is one of a pair
-    * 2: The alignment is one end of a proper paired-end alignment
-    * 4: The read has no reported alignments
-    * 8: The read is one of a pair and has no reported alignments
-    * 16: The alignment is to the reverse reference strand
-    * 32: The other mate in the paired-end alignment is aligned to the
-          reverse reference strand
-    * 64: The read is the first (#1) mate in a pair
-    * 128: The read is the second (#2) mate in a pair
+    <table><tr><td>
+
+        1
+
+    </td><td>
+
+    The read is one of a pair
+
+    </td></tr><tr><td>
+
+        2
+
+    </td><td>
+
+    The alignment is one end of a proper paired-end alignment
+
+    </td></tr><tr><td>
+
+        4
+
+    </td><td>
+
+    The read has no reported alignments
+
+    </td></tr><tr><td>
+
+        8
+
+    </td><td>
+
+    The read is one of a pair and has no reported alignments
+
+    </td></tr><tr><td>
+
+        16
+
+    </td><td>
+
+    The alignment is to the reverse reference strand
+
+    </td></tr><tr><td>
+
+        32
+
+    </td><td>
+
+    The other mate in the paired-end alignment is aligned to the
+    reverse reference strand
+
+    </td></tr><tr><td>
+
+        64
+
+    </td><td>
+
+    The read is the first (#1) mate in a pair
+
+    </td></tr><tr><td>
+
+        128
+
+    </td><td>
+
+    The read is the second (#2) mate in a pair
+
+    </td></tr></table>
 
     Thus, an unpaired read that aligns to the reverse reference strand
     will have flag 16.  A paired-end read that aligns and is the first
@@ -1502,7 +1559,7 @@ right, the fields are:
 
     </td></tr><tr><td>
 
-        `XM:i:<N>`
+        XM:i:<N>
 
     </td><td>
 
@@ -1639,6 +1696,7 @@ message will be printed; it is up to the user to try new parameters.
 </td></tr><tr><td id="bowtie-build-options-p">
 
 [`--packed`]: #bowtie-build-options-p
+[`-p`/`--packed`]: #bowtie-build-options-p
 
     -p/--packed
 
