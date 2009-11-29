@@ -464,7 +464,7 @@ Performance Tuning
     If `bowtie` is beign run on a relatively low-memory machine is very
     slow and consistently triggers more than a few page faults per
     second (as observed via `top` or `vmstat` on Mac/Linux, or via a
-    tool like `Process Explorer` on Windows), then try setting the
+    tool like [Process Explorer] on Windows), then try setting the
     `bowtie` [`-o`/`--offrate`] to a *larger* value than the value used
     to build the index.  For example, `bowtie-build`'s default
     [`-o`/`--offrate`](#bowtie-build-options-o) is 5 and all pre-built indexes available from the
@@ -475,6 +475,8 @@ Performance Tuning
     use a sparser sample of the suffix array than is stored in the
     index; this saves memory but makes alignment reporting slower
     (which is especially slow when using [`-a`] or large [`-k`] or [`-m`]).
+
+[Process Explorer]: http://technet.microsoft.com/en-us/sysinternals/bb896653.aspx
 
 Command Line
 ------------
@@ -1413,8 +1415,8 @@ Following is a brief description of the [SAM] format as output by
 `bowtie` when the [`-S`/`--sam`] option is specified.  For more
 details, see the [SAM format specification][SAM].
 
-When `-S`/`--sam` is specified, `bowtie` prints a SAM header with
-`@HD`, `@SQ` and `@PG` lines.  When one or more `--sam-RG` arguments
+When [`-S`/`--sam`] is specified, `bowtie` prints a SAM header with
+`@HD`, `@SQ` and `@PG` lines.  When one or more [`--sam-RG`] arguments
 are specified, `bowtie` will also print an appropriately-formatted
 `@RG` line.
 
