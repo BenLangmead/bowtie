@@ -409,6 +409,84 @@ footprint is larger when aligning paired-end reads.  For example, the
 human index has a memory footprint of about 2.2 GB in single-end mode
 and 2.9 GB in paired-end mode.
 
+Colorspace Alignment
+--------------------
+
+As of version 0.12.0, `bowtie` aligns colorspace reads against
+colorspace references when [`-C`] is specified.  Colorspace is the
+characteristic output format of Applied Biosystems' SOLiD system.  In a
+colorspace read, each character is a color (rather than a nucleotide)
+where a color encodes a class of dinucleotides.  E.g. the color blue
+encodes "one of the dinucleotides: AA, CC, GG, TT."  Colorspace has the
+advantage of (often) being able to distinguish sequencing errors from
+SNPs once the read has been aligned.  See ABI's [Principles of Di-Base
+Sequencing] application note for details.
+
+### Colorspace reads
+
+All Bowtie input formats (FASTA [`-f`], FASTQ [`-q`], raw [`-r`], tab-
+delimited [`--12`], command-line [`-c`]) are compatible with colorspace
+([`-C`]).  When [`-C`] is specified, read sequences are treated as
+colors.  Colors may be encoded either as numbers (`0`=blue, `1`=green,
+`2`=orange, `3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green,
+`G`=orange, `T`=red).
+
+Note that CSFASTA files typically include a primer base as the first
+character of a read; e.g.:
+
+    >1_53_33_F3
+    T2213120002010301233221223311331
+    >1_53_70_F3
+    T2302111203131231130300111123220
+    ...
+
+(`T` is the primer base.)  Bowtie does not generally expect the input
+to have a primer base, but when the input is CSFASTA ([`-f`] [`-C`]) and
+colors are encoded as numbers (`0`=blue, `1`=green, `2`=orange,
+`3`=red), Bowtie detects and handles the primer base properly.  If the
+input is not CSFASTA or is not encoded as numbers and a primer base is
+present, it is up to the user to trim off the primer base using the
+[`-5`/`--trim5`] option so that it does not interfere with alignment.
+
+### Building a colorspace index
+
+A colorspace index is built in the same was as a normal index except
+that [`-C`](#bowtie-build-options-C) is specified when running `bowtie-build`.  If the user
+attempts to use `bowtie` without the [`-C`] option to align against an
+index that was built with the [`-C`] option (or vice versa), `bowtie`
+will print an error message and quit.
+
+### Decoding colorspace alignments
+
+Once a colorspace read is aligned in colorspace, Bowtie decodes the
+alignment into nucleotides and reports the decoded nucleotide sequence.
+A principled decoding scheme is necessary because color mismatches
+allow many different possible decodings.  Finding the true decoding
+with 100% certainty requires knowing all all variants (e.g. SNPs) in
+the subject genome beforehand, which is usually not possible.  Instead,
+Bowtie employs the approximate decoding scheme described in the [BWA
+paper].  This scheme attempts to distinguish variants from sequencing
+errors according to their relative likelihood under a model that
+considers the quality values of the colors and the global likelihood of
+seeing a SNP at any position.
+
+For accurate decodings, [`--snpphred`]/[`--snpfrac`] must be set according
+to the user's best guess of the SNP frequency in the subject.  The
+[`--snpphred`] parameter sets the SNP penalty directly (on the [Phred
+quality] scale), whereas [`--snpfrac`] allows the user to specify the
+fraction of sites expected to be SNPs; the fraction is then converted
+to a [Phred quality] internally.
+
+Note that in [`-S`/`--sam`] mode, the decoded nucleotide sequence is
+printed for alignments, but the original color sequence (with `A`=blue,
+`C`=green, `G`=orange, `T`=red) is printed for reads without an
+alignment.  As always, the [`--un`], [`--max`] and [`--al`] parameters
+print reads exactly as they appeared in the input file.
+
+[Principles of Di-Base Sequencing]: http://tinyurl.com/ygnb2gn
+[Decoding colorspace alignments]: #decoding-colorspace-alignments
+[BWA paper]: http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754
+
 Performance Tuning
 ------------------
 
@@ -1019,6 +1097,25 @@ denser suffix-array sample, i.e. specify a smaller [`-o`/`--offrate`](#bowtie-bu
 invoking `bowtie-build` for the relevant index (see the [Performance
 tuning] section for details).
 
+</td></tr><tr><td id="bowtie-options-M">
+
+[`-M`]: #bowtie-options-M
+
+    -M <int>
+
+</td><td>
+
+Behaves exactly like [`-m`] except that, when the ceiling is exceeded,
+one valid alignment from among those found is reported at random.  In
+the [default output mode], the 7th column is set to `<int>` to indicate
+that the read has at least `<int>` valid alignments.  In [`-S`/`--sam`]
+mode, the alignment is given a `MAPQ` (mapping quality) of 0,
+indicating its repetitiveness to [SAMtools].  Randomly-selected
+alignments reported in this way do not count toward the "reads with at
+least one reported alignment" total reported by `bowtie`.
+
+[default output mode]: #default-bowtie-output
+
 </td></tr><tr><td id="bowtie-options-best">
 
 [`--best`]: #bowtie-options-best
@@ -1186,11 +1283,37 @@ written to the file specified with [`--un`].
 
 </td><td>
 
-Suppress columns of output in the default output mode.  E.g. if
+Suppress columns of output in the [default output mode].  E.g. if
 `--suppress 1,5,6` is specified, the read name, read sequence, and read
 quality fields will be omitted.  See [Default Bowtie output] for field
 descriptions.  This option is ignored if the output mode is
 [`-S`/`--sam`].
+
+</td></tr><tr><td id="bowtie-options-colseq">
+
+[`--colseq`]: #bowtie-options-colseq
+
+    --colseq
+
+</td><td>
+
+If reads are in colorspace and the [default output mode] is active,
+`--colseq` causes the reads' color sequence to appear in the
+read-sequence column (column 5) instead of the decoded nucleotide
+sequence.  See the [Decoding colorspace alignments] section for details
+about decoding.  This option is ignored in [`-S`/`--sam`] mode.
+
+[`--colqual`]: #bowtie-options-colqual
+
+    --colqual
+
+</td><td>
+
+If reads are in colorspace and the [default output mode] is active,
+`--colqual` causes the reads' original (color) quality sequence to
+appear in the quality column (column 6) instead of the decoded
+qualities.  See the [Colorspace alignment] section for details about
+decoding.  This option is ignored in [`-S`/`--sam`] mode.
 
 </td></tr><tr><td id="bowtie-options-fullref">
 
@@ -1233,12 +1356,13 @@ converted to BAM on the fly by piping `bowtie`'s output to
 
 [`--mapq`]: #bowtie-options-mapq
 
-    --mapq
+    --mapq <int>
 
 </td><td>
 
 If an alignment is non-repetitive (according to [`-m`], [`--strata`] and
-other options) set the MAPQ field to this value.  Default: 255.
+other options) set the `MAPQ` (mapping quality) field to this value.
+See the [SAM Spec][SAM] for details about the `MAPQ` field  Default: 255.
 
 </td></tr><tr><td id="bowtie-options-sam-nohead">
 
@@ -1272,30 +1396,16 @@ Add `<text>` (usually of the form `TAG:VAL`, e.g. `ID:IL7LANE2`) as a
 field on the `@RG` header line.  Specify `--sam-RG` multiple times to
 set multiple fields.  See the [SAM Spec][SAM] for details about what fields
 are legal.  Note that, if any `@RG` fields are set using this option,
-the `ID` and `SM` fields must both be among them according to the [SAM
-Spec][SAM].
+the `ID` and `SM` fields must both be among them to make the `@RG` line
+legal according to the [SAM Spec][SAM].
 
 </td></tr></table>
 
 #### Performance
 
-<table><tr><td id="bowtie-options-p">
+<table><tr>
 
-[`-p`/`--threads`]: #bowtie-options-p
-[`-p`]: #bowtie-options-p
-
-    -p/--threads <int>
-
-</td><td>
-
-Launch `<int>` parallel search threads (default: 1).  Threads will run
-on separate processors/cores and synchronize when parsing reads and
-outputting alignments.  Searching for alignments is highly parallel,
-and speedup is fairly close to linear.  This option is only available
-if `bowtie` is linked with the `pthreads` library (i.e. if
-`BOWTIE_PTHREADS=0` is not specified at build time).
-
-</td></tr><tr><td id="bowtie-options-o">
+<td id="bowtie-options-o">
 
 [`-o`/`--offrate`]: #bowtie-options-o
 [`-o`]: #bowtie-options-o
@@ -1311,6 +1421,22 @@ discarded when the index is read into memory.  This reduces the memory
 footprint of the aligner but requires more time to calculate text
 offsets.  `<int>` must be greater than the value used to build the
 index.
+
+</td></tr><tr><td id="bowtie-options-p">
+
+[`-p`/`--threads`]: #bowtie-options-p
+[`-p`]: #bowtie-options-p
+
+    -p/--threads <int>
+
+</td><td>
+
+Launch `<int>` parallel search threads (default: 1).  Threads will run
+on separate processors/cores and synchronize when parsing reads and
+outputting alignments.  Searching for alignments is highly parallel,
+and speedup is fairly close to linear.  This option is only available
+if `bowtie` is linked with the `pthreads` library (i.e. if
+`BOWTIE_PTHREADS=0` is not specified at build time).
 
 </td></tr><tr><td id="bowtie-options-mm">
 
@@ -1714,6 +1840,14 @@ files (usually having extension `.fa`, `.mfa`, `.fna` or similar).
 The reference sequences are given on the command line.  I.e.
 `<reference_in>` is a comma-separated list of sequences rather than a
 list of FASTA files.
+
+</td></tr><tr><td id="bowtie-build-options-C">
+
+    -C/--color
+
+</td><td>
+
+Build a colorspace index, to be queried using `bowtie` [`-C`].
 
 </td></tr><tr><td id="bowtie-build-options-a">
 
