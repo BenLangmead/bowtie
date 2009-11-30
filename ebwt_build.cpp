@@ -221,9 +221,6 @@ static void parseOptions(int argc, const char **argv) {
 				bmax = 0xfffffffe;
 				break;
 			case 'h':
-				printLongUsage(cout);
-				throw 0;
-				break;
 			case ARG_USAGE:
 				printUsage(cout);
 				throw 0;

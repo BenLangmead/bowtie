@@ -1121,16 +1121,15 @@ tuning] section for details).
 
 </td><td>
 
-Behaves exactly like [`-m`] except that, when the ceiling is exceeded,
-one valid alignment from among those found is reported at random.  In
-the [default output mode], the 7th column is set to `<int>` to indicate
-that the read has at least `<int>` valid alignments.  In [`-S`/`--sam`]
-mode, the alignment is given a `MAPQ` (mapping quality) of 0,
-indicating its repetitiveness to [SAMtools].    Randomly-selected
-alignments reported in this way do not count toward the "reads with at
-least one reported alignment" total reported by `bowtie`.  This option
-requires [`--best`] mode; if `-M` is specified without [`--best`],
-[`--best`] will be enabled automatically.
+Behaves like [`-m`] except that if a read has more than `<int>`
+reportable alignments, one is reported at random.  In [default
+output mode], the selected alignment's 7th column is set to `<int>` to
+indicate the read has at least `<int>` valid alignments.  In
+[`-S`/`--sam`] mode, the selected alignment is given a `MAPQ` (mapping
+quality) of 0.  Randomly-selected alignments do not count toward the
+"reads with at least one reported alignment" total reported by
+`bowtie`.  This option requires [`--best`] mode; if `-M` is specified
+without [`--best`], [`--best`] is enabled automatically.
 
 [default output mode]: #default-bowtie-output
 

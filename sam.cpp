@@ -57,6 +57,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
 void SAMHitSink::appendAligned(ostream& ss,
                                const Hit& h,
                                int mapq,
+                               //int xms, // value for XM:I field
                                const vector<string>* refnames,
                                ReferenceMap *rmap,
                                AnnotationMap *amap,
@@ -217,11 +218,13 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	else   HitSink::reportMaxed(*hs, p);
 	ostringstream ss;
 	bool paired = !p.bufb().empty();
+	assert(un || hs->size() > 0);
+	assert(!un || hs->size() == 0);
 	ss << p.bufa().name << "\t"
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	   << "\t0\t0\t*\t*\t0\t0\t"
 	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << (un ? '0' : '1') << endl;
+	   << hs->size() << endl;
 	if(paired) {
 		ss << p.bufb().name << "\t"
 		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
