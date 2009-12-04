@@ -337,12 +337,7 @@ public:
 	               bool disableFtab = false)
 	{
 		HitSinkPerThread& sink = _params.sink();
-		bool oldRetain = sink.retainHits();
 		_ihits = sink.retainedHits().size();
-		if(_sanity) {
-			// Save some info about hits retained at this point
-			sink.setRetainHits(true);
-		}
 
 		// Initiate the recursive, randomized quality-aware backtracker
 		// with a stack depth of 0 (no backtracks so far)
@@ -350,8 +345,6 @@ public:
 		bool done = backtrack(0, depth, _unrevOff, _1revOff, _2revOff, _3revOff,
 		                      top, bot, iham, iham, _pairs, _elims, disableFtab);
 
-		// Remainder of this function is sanity checking
-		sink.setRetainHits(oldRetain); // restore old value
 		_totNumBts += _numBts;
 		_numBts = 0;
 		_precalcedSideLocus = false;

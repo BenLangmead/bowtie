@@ -40,7 +40,7 @@ void ChainingHitSink::reportHits(vector<Hit>& hs) {
  * Report a maxed-out read.  Typically we do nothing, but we might
  * want to print a placeholder when output is chained.
  */
-void ChainingHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+void ChainingHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 	HitSink::reportMaxed(hs, p);
 	assert(!hs.empty());
 	int8_t loStrat = (strata_ ? hs.front().stratum : 0);
@@ -69,20 +69,54 @@ void ChainingHitSink::reportUnaligned(PatternSourcePerThread& p) {
 /**
  * Report a maxed-out read.
  */
-void VerboseHitSink::reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
+void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 	HitSink::reportMaxed(hs, p);
 	if(sampleMax_) {
 		rand_.init(p.bufa().seed);
 		assert_gt(hs.size(), 0);
+		bool paired = hs.front().mate > 0;
 		size_t num = 1;
-		for(size_t i = 1; i < hs.size(); i++) {
-			assert_geq(hs[i].stratum, hs[i-1].stratum);
-			if(hs[i].stratum == hs[i-1].stratum) num++;
-			else break;
+		if(paired) {
+			num = 0;
+			int bestStratum = 999;
+			for(size_t i = 0; i < hs.size()-1; i += 2) {
+				int strat = min(hs[i].stratum, hs[i+1].stratum);
+				if(strat < bestStratum) {
+					bestStratum = strat;
+					num = 1;
+				} else if(strat == bestStratum) {
+					num++;
+				}
+			}
+			assert_leq(num, hs.size());
+			uint32_t rand = rand_.nextU32() % num;
+			num = 0;
+			for(size_t i = 0; i < hs.size()-1; i += 2) {
+				int strat = min(hs[i].stratum, hs[i+1].stratum);
+				if(strat == bestStratum) {
+					if(num == rand) {
+						Hit& h1 = hs[i];
+						Hit& h2 = hs[i+1];
+						h1.oms = h2.oms = hs.size()/2;
+						reportHit(h1, false);
+						reportHit(h2, false);
+						break;
+					}
+					num++;
+				}
+			}
+			assert_eq(num, rand);
+		} else {
+			for(size_t i = 1; i < hs.size(); i++) {
+				assert_geq(hs[i].stratum, hs[i-1].stratum);
+				if(hs[i].stratum == hs[i-1].stratum) num++;
+				else break;
+			}
+			assert_leq(num, hs.size());
+			uint32_t rand = rand_.nextU32() % num;
+			Hit& h = hs[rand];
+			h.oms = hs.size()-1;
+			reportHit(h, false);
 		}
-		assert_leq(num, hs.size());
-		uint32_t ch = rand_.nextU32() % num;
-		//hs[ch].oms = hs.size()-1;
-		reportHit(hs[ch]);
 	}
 }

@@ -57,7 +57,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
 void SAMHitSink::appendAligned(ostream& ss,
                                const Hit& h,
                                int mapq,
-                               //int xms, // value for XM:I field
+                               int xms, // value for XM:I field
                                const vector<string>* refnames,
                                ReferenceMap *rmap,
                                AnnotationMap *amap,
@@ -188,6 +188,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// Add optional edit distance field
 	ss << "\tNM:i:" << nm;
 	if(h.color) ss << "\tCM:i:" << h.cmms.count();
+	if(xms > 0)  ss << "\tXM:i:" << xms;
 	ss << endl;
 }
 
@@ -195,10 +196,14 @@ void SAMHitSink::appendAligned(ostream& ss,
  * Report a verbose, human-readable alignment to the appropriate
  * output stream.
  */
-void SAMHitSink::reportHit(const Hit& h, int mapq) {
-	HitSink::reportHit(h);
+void SAMHitSink::reportHit(const Hit& h, int mapq, int xms) {
+	if(xms == 0) {
+		// Otherwise, this is actually a sampled read and belongs in
+		// the same category as maxed reads
+		HitSink::reportHit(h);
+	}
 	ostringstream ss;
-	append(ss, h, mapq);
+	append(ss, h, mapq, xms);
 	// Make sure to grab lock before writing to output stream
 	lock(h.h.first);
 	out(h.h.first).writeString(ss.str());
@@ -211,26 +216,44 @@ void SAMHitSink::reportHit(const Hit& h, int mapq) {
  * case.
  */
 void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
-                               const vector<Hit>* hs,
-                               bool un)
+                               vector<Hit>* hs,
+                               bool un) // lower bound on number of other hits
 {
 	if(un) HitSink::reportUnaligned(p);
 	else   HitSink::reportMaxed(*hs, p);
 	ostringstream ss;
 	bool paired = !p.bufb().empty();
+	assert(paired || p.bufa().mate == 0);
+	assert(!paired || p.bufa().mate > 0);
 	assert(un || hs->size() > 0);
 	assert(!un || hs->size() == 0);
-	ss << p.bufa().name << "\t"
+	if(paired) {
+		// truncate final 2 chars
+		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
+			ss << p.bufa().name[i];
+		}
+	} else {
+		ss << p.bufa().name;
+	}
+	ss << "\t"
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	   << "\t0\t0\t*\t*\t0\t0\t"
 	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << hs->size() << endl;
+	   << (paired ? hs->size()/2+1 : hs->size()) << endl;
 	if(paired) {
-		ss << p.bufb().name << "\t"
+		if(paired) {
+			// truncate final 2 chars
+			for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
+				ss << p.bufb().name[i];
+			}
+		} else {
+			ss << p.bufb().name;
+		}
+		ss << "\t"
 		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 		   << "\t0\t0\t*\t*\t0\t0\t"
 		   << p.bufb().patFw << "\t" << p.bufb().qual << "\tXM:i:"
-		   << (un ? '0' : '1') << endl;
+		   << (hs->size()/2+1) << endl;
 	}
 	lock(0);
 	out(0).writeString(ss.str());
@@ -243,11 +266,70 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 void SAMHitSink::append(ostream& ss,
                         const Hit& h,
                         int mapq,
+                        int xms,
                         const vector<string>* refnames,
                         ReferenceMap *rmap,
                         AnnotationMap *amap,
                         bool fullRef,
                         int offBase)
 {
-	appendAligned(ss, h, mapq, refnames, rmap, amap, fullRef, offBase);
+	appendAligned(ss, h, mapq, xms, refnames, rmap, amap, fullRef, offBase);
+}
+
+/**
+ * Report maxed-out read; if sampleMax_ is set, then report 1 alignment
+ * at random.
+ */
+void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
+	if(sampleMax_) {
+		HitSink::reportMaxed(hs, p);
+		rand_.init(p.bufa().seed);
+		assert_gt(hs.size(), 0);
+		bool paired = hs.front().mate > 0;
+		size_t num = 1;
+		if(paired) {
+			num = 0;
+			int bestStratum = 999;
+			for(size_t i = 0; i < hs.size()-1; i += 2) {
+				int strat = min(hs[i].stratum, hs[i+1].stratum);
+				if(strat < bestStratum) {
+					bestStratum = strat;
+					num = 1;
+				} else if(strat == bestStratum) {
+					num++;
+				}
+			}
+			assert_leq(num, hs.size());
+			uint32_t rand = rand_.nextU32() % num;
+			num = 0;
+			for(size_t i = 0; i < hs.size()-1; i += 2) {
+				int strat = min(hs[i].stratum, hs[i+1].stratum);
+				if(strat == bestStratum) {
+					if(num == rand) {
+						const Hit& h1 = hs[i];
+						const Hit& h2 = hs[i+1];
+						reportHit(h1, 0,          // MAPQ
+						          hs.size()/2+1); // XM:I
+						reportHit(h2, 0,          // MAPQ
+						          hs.size()/2+1); // XM:I
+						break;
+					}
+					num++;
+				}
+			}
+			assert_eq(num, rand);
+		} else {
+			for(size_t i = 1; i < hs.size(); i++) {
+				assert_geq(hs[i].stratum, hs[i-1].stratum);
+				if(hs[i].stratum == hs[i-1].stratum) num++;
+				else break;
+			}
+			assert_leq(num, hs.size());
+			uint32_t rand = rand_.nextU32() % num;
+			const Hit& h = hs[rand];
+			reportHit(h, /*MAPQ*/0, /*XM:I*/hs.size());
+		}
+	} else {
+		reportUnOrMax(p, &hs, false);
+	}
 }

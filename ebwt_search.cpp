@@ -82,7 +82,6 @@ static string dumpMaxBase;    // basename of same-format files to dump reads wit
 static uint32_t khits;  // number of hits per read; >1 is much slower
 static uint32_t mhits;  // don't report any hits if there are > mhits
 static bool better;     // true -> guarantee alignments from best possible stratum
-static bool oldBest;    // true -> guarantee alignments from best possible stratum (the old way)
 static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
@@ -185,7 +184,6 @@ static void resetOptions() {
 	khits					= 1;     // number of hits per read; >1 is much slower
 	mhits					= 0xffffffff; // don't report any hits if there are > mhits
 	better					= false; // true -> guarantee alignments from best possible stratum
-	oldBest					= false; // true -> guarantee alignments from best possible stratum (the old way)
 	strata					= false; // true -> don't stop at stratum boundaries
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
@@ -330,9 +328,6 @@ static struct option long_options[] = {
 	{(char*)"startverbose", no_argument,       0,            ARG_STARTVERBOSE},
 	{(char*)"quiet",        no_argument,       0,            ARG_QUIET},
 	{(char*)"sanity",       no_argument,       0,            ARG_SANITY},
-	//{(char*)"exact",        no_argument,       0,            '0'},
-	//{(char*)"1mm",          no_argument,       0,            '1'},
-	//{(char*)"2mm",          no_argument,       0,            '2'},
 	{(char*)"pause",        no_argument,       &ipause,      1},
 	{(char*)"orig",         required_argument, 0,            ARG_ORIG},
 	{(char*)"all",          no_argument,       0,            'a'},
@@ -765,9 +760,8 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
 			case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
 			case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
-			case ARG_BETTER: stateful = true; better = true; oldBest = false; break;
-			case ARG_OLDBEST: oldBest = true; stateful = false; break;
-			case ARG_BEST: stateful = true; useV1 = false; oldBest = false; break;
+			case ARG_BETTER: stateful = true; better = true; break;
+			case ARG_BEST: stateful = true; useV1 = false; break;
 			case ARG_STRATA: strata = true; break;
 			case ARG_VERBOSE: verbose = true; break;
 			case ARG_STARTVERBOSE: startVerbose = true; break;
@@ -855,7 +849,7 @@ static void parseOptions(int argc, const char **argv) {
 		}
 		stateful = true;
 	}
-	if(strata && !stateful && !oldBest) {
+	if(strata && !stateful) {
 		cerr << "--strata must be combined with --best" << endl;
 		throw 1;
 	}
@@ -1091,48 +1085,33 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
  * global params and return a pointer to it.
  */
 static HitSinkPerThreadFactory*
-createSinkFactory(HitSink& _sink, bool sanity) {
+createSinkFactory(HitSink& _sink) {
 	HitSinkPerThreadFactory *sink = NULL;
 	if(format == INPUT_CHAIN) {
 		assert(stateful);
-		sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, sanity, strata);
+		sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, strata);
 	} else if(!strata) {
 		// Unstratified
 		if(!allHits) {
-			if(oldBest) {
-				// First N best, spanning strata
-				sink = new NBestHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
-			} else {
-				// First N good; "good" inherently ignores strata
-				sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
-			}
+			// First N good; "good" inherently ignores strata
+			sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits);
 		} else {
 			// All hits, spanning strata
-			sink = new AllHitSinkPerThreadFactory(_sink, mhits, sanity);
+			sink = new AllHitSinkPerThreadFactory(_sink, mhits);
 		}
 	} else {
 		// Stratified
-		assert(oldBest || stateful);
+		assert(stateful);
 		if(!allHits) {
-			if(oldBest) {
-				// First N best, not spanning strata
-				sink = new NBestStratHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
-			} else {
-				assert(stateful);
-				// Buffer best hits, assuming they're arriving in best-
-				// to-worst order
-				sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, khits, mhits, sanity);
-			}
+			assert(stateful);
+			// Buffer best hits, assuming they're arriving in best-
+			// to-worst order
+			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, khits, mhits);
 		} else {
-			if(oldBest) {
-				// All hits, not spanning strata
-				sink = new AllStratHitSinkPerThreadFactory(_sink, mhits, sanity);
-			} else {
-				assert(stateful);
-				// Buffer best hits, assuming they're arriving in best-
-				// to-worst order
-				sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits, sanity);
-			}
+			assert(stateful);
+			// Buffer best hits, assuming they're arriving in best-
+			// to-worst order
+			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits);
 		}
 	}
 	assert(sink != NULL);
@@ -1156,12 +1135,10 @@ static void *exactSearchWorker(void *vp) {
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	const BitPairReference* refs =  exactSearch_refs;
 
-	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
 	// Per-thread initialization
 	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid);
 	PatternSourcePerThread *patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSink
@@ -1204,9 +1181,8 @@ static void *exactSearchWorkerStateful(void *vp) {
 	BitPairReference* refs       =  exactSearch_refs;
 
 	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	UnpairedExactAlignerV1Factory alSEfact(
@@ -1392,9 +1368,8 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	BitPairReference*      refs    =  mismatchSearch_refs;
 
 	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
@@ -1480,10 +1455,9 @@ static void* mismatchSearchWorkerFull(void *vp){
 	const BitPairReference* refs     =  mismatchSearch_refs;
 
 	// Per-thread initialization
-	bool sanity = sanityCheck && !os.empty() && !rangeMode;
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSinkPerThread
@@ -1679,7 +1653,7 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
 	bool                           two      = twoOrThreeMismatchSearch_two; \
     PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
 	PatternSourcePerThread* patsrc = patsrcFact->create(); \
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, false); \
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink); \
 	HitSinkPerThread* sink = sinkFact->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
@@ -1702,9 +1676,8 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	static bool            two     =  twoOrThreeMismatchSearch_two;
 
 	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	Unpaired23mmAlignerV1Factory alSEfact(
@@ -1955,7 +1928,7 @@ static BitPairReference*        seededQualSearch_refs;
 	int                      qualCutoff = seededQualSearch_qualCutoff; \
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
 	PatternSourcePerThread* patsrc = patsrcFact->create(); \
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, false); \
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink); \
 	HitSinkPerThread* sink = sinkFact->create(); \
 	/* Per-thread initialization */ \
 	EbwtSearchParams<String<Dna> > params( \
@@ -2161,9 +2134,8 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 	BitPairReference*        refs       = seededQualSearch_refs;
 
 	// Global initialization
-	bool sanity = sanityCheck && !os.empty();
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, sanity);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	AlignerMetrics *metrics = NULL;
@@ -2660,19 +2632,19 @@ static void driver(const char * type,
 			case OUTPUT_FULL:
 				if(refOut) {
 					sink = new VerboseHitSink(
-							ebwt.nPat(), offBase, sampleMax,
+							ebwt.nPat(), offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
-							format == TAB_MATE,
+							format == TAB_MATE, sampleMax,
 							table, refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
-							fout, offBase, sampleMax,
+							fout, offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
-							format == TAB_MATE,
+							format == TAB_MATE, sampleMax,
 							table, refnames, partitionSz);
 				}
 				break;
@@ -2682,9 +2654,9 @@ static void driver(const char * type,
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
 							fout, 1, rmap, amap,
-							fullRef, sampleMax, defaultMapq,
+							fullRef, defaultMapq,
 							PASS_DUMP_FILES,
-							format == TAB_MATE,
+							format == TAB_MATE, sampleMax,
 							table, refnames);
 					if(!samNoHead) {
 						vector<string> refnames;
@@ -2706,13 +2678,13 @@ static void driver(const char * type,
 					sink = new ConciseHitSink(
 							ebwt.nPat(), offBase,
 							PASS_DUMP_FILES,
-							format == TAB_MATE,
+							format == TAB_MATE,  sampleMax,
 							table, refnames, reportOpps);
 				} else {
 					sink = new ConciseHitSink(
 							fout, offBase,
 							PASS_DUMP_FILES,
-							format == TAB_MATE,
+							format == TAB_MATE,  sampleMax,
 							table, refnames, reportOpps);
 				}
 				break;
@@ -2721,7 +2693,7 @@ static void driver(const char * type,
 				sink = new ChainingHitSink(
 						fout, strata, amap,
 						PASS_DUMP_FILES,
-						true,
+						true, sampleMax,
 						table, refnames);
 				break;
 			case OUTPUT_NONE:

@@ -44,11 +44,10 @@ public:
 	           ReferenceMap *rmap,
 	           AnnotationMap *amap,
 	           bool fullRef,
-	           bool sampleMax,
 	           int defaultMapq,
 	           DECL_HIT_DUMPS2) :
 	HitSink(out, PASS_HIT_DUMPS2),
-	offBase_(offBase), sampleMax_(sampleMax), defaultMapq_(defaultMapq),
+	offBase_(offBase), defaultMapq_(defaultMapq),
 	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
 
 	/**
@@ -60,11 +59,10 @@ public:
 	           ReferenceMap *rmap,
 	           AnnotationMap *amap,
 	           bool fullRef,
-	           bool sampleMax,
 	           int defaultMapq,
 	           DECL_HIT_DUMPS2) :
 	HitSink(numOuts, PASS_HIT_DUMPS2),
-	offBase_(offBase),  sampleMax_(sampleMax), defaultMapq_(defaultMapq),
+	offBase_(offBase), defaultMapq_(defaultMapq),
 	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
 
 	/**
@@ -73,6 +71,7 @@ public:
 	static void append(ostream& ss,
 	                   const Hit& h,
 	                   int mapq,
+	                   int xms,
 	                   const vector<string>* refnames,
 	                   ReferenceMap *rmap,
 	                   AnnotationMap *amap,
@@ -86,6 +85,7 @@ public:
 	static void appendAligned(ostream& ss,
 	                          const Hit& h,
 	                          int mapq,
+	                          int xms,
 	                          const vector<string>* refnames,
 	                          ReferenceMap *rmap,
 	                          AnnotationMap *amap,
@@ -97,15 +97,15 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		SAMHitSink::append(ss, h, defaultMapq_, _refnames, rmap_, amap_, fullRef_, offBase_);
+		SAMHitSink::append(ss, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, offBase_);
 	}
 
 	/**
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(ostream& ss, const Hit& h, int mapq) {
-		SAMHitSink::append(ss, h, mapq, _refnames, rmap_, amap_, fullRef_, offBase_);
+	virtual void append(ostream& ss, const Hit& h, int mapq, int xms) {
+		SAMHitSink::append(ss, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, offBase_);
 	}
 
 	/**
@@ -128,7 +128,7 @@ protected:
 	 *
 	 */
 	void reportUnOrMax(PatternSourcePerThread& p,
-	                   const vector<Hit>* hs,
+	                   vector<Hit>* hs,
 	                   bool un);
 
 	/**
@@ -136,35 +136,19 @@ protected:
 	 * output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
-		reportHit(h, defaultMapq_);
+		reportHit(h, defaultMapq_, 0);
 	}
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream with the given mapping quality.
 	 */
-	virtual void reportHit(const Hit& h, int mapq);
+	virtual void reportHit(const Hit& h, int mapq, int xms);
 
 	/**
 	 * See sam.cpp
 	 */
-	virtual void reportMaxed(const vector<Hit>& hs, PatternSourcePerThread& p) {
-		if(sampleMax_) {
-			HitSink::reportMaxed(hs, p);
-			rand_.init(p.bufa().seed);
-			assert_gt(hs.size(), 0);
-			size_t num = 1;
-			for(size_t i = 1; i < hs.size(); i++) {
-				assert_geq(hs[i].stratum, hs[i-1].stratum);
-				if(hs[i].stratum == hs[i-1].stratum) num++;
-				else break;
-			}
-			assert_leq(num, hs.size());
-			reportHit(hs[rand_.nextU32() % num], 0 /* MAPQ=0 */);
-		} else {
-			reportUnOrMax(p, &hs, false);
-		}
-	}
+	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p);
 
 	/**
 	 * See sam.cpp
@@ -177,8 +161,6 @@ private:
 	int  offBase_;        /// Add this to reference offsets before outputting.
 	                      /// (An easy way to make things 1-based instead of
 	                      /// 0-based)
-	bool sampleMax_;      /// When reporting a maxed-out read, randomly report
-	                      /// 1 of the alignments with mapping quality = 0
 	int  defaultMapq_;    /// Default mapping quality to report when one is
 	                      /// not specified
 	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
