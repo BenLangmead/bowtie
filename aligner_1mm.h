@@ -25,7 +25,6 @@ public:
 	Unpaired1mmAlignerV1Factory(
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
-			int snpPhred,
 			bool doFw,
 			bool doRc,
 			HitSink& sink,
@@ -45,7 +44,6 @@ public:
 			uint32_t seed) :
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
-			snpPhred_(snpPhred),
 			doFw_(doFw),
 			doRc_(doRc),
 			sink_(sink),
@@ -149,14 +147,13 @@ public:
 		// Set up the aligner
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, refs_, snpPhred_,
+			sink_, sinkPtFactory_, sinkPt, os_, refs_,
 			rangeMode_, verbose_, quiet_, INT_MAX, pool_, NULL, NULL);
 	}
 
 private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
-	const int snpPhred_;
 	bool doFw_;
 	bool doRc_;
 	HitSink& sink_;
@@ -188,7 +185,6 @@ public:
 			Ebwt<String<Dna> >& ebwtFw,
 			Ebwt<String<Dna> >* ebwtBw,
 			bool color,
-			int snpPhred,
 			bool doFw,
 			bool doRc,
 			bool v1,
@@ -219,7 +215,6 @@ public:
 			ebwtFw_(ebwtFw),
 			ebwtBw_(ebwtBw),
 			color_(color),
-			snpPhred_(snpPhred),
 			doFw_(doFw),
 			doRc_(doRc),
 			v1_(v1),
@@ -440,7 +435,7 @@ public:
 				refAligner, rchase,
 				sink_, sinkPtFactory_, sinkPt, mate1fw_, mate2fw_,
 				peInner_, peOuter_, dontReconcile_, symCeil_, mixedThresh_,
-				mixedAttemptLim_, refs_, snpPhred_, rangeMode_, verbose_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				quiet_, INT_MAX, pool_, NULL);
 			delete dr1FwVec;
 			delete dr1RcVec;
@@ -456,7 +451,7 @@ public:
 				sinkPt, sinkPtSe1, sinkPtSe2,
 				mate1fw_, mate2fw_,
 				peInner_, peOuter_,
-				mixedAttemptLim_, refs_, snpPhred_, rangeMode_,
+				mixedAttemptLim_, refs_, rangeMode_,
 				verbose_, quiet_, INT_MAX, pool_, NULL);
 			delete dr1FwVec;
 			return al;
@@ -467,7 +462,6 @@ private:
 	Ebwt<String<Dna> >& ebwtFw_;
 	Ebwt<String<Dna> >* ebwtBw_;
 	bool color_;
-	const int snpPhred_;
 	bool doFw_;
 	bool doRc_;
 	bool v1_;

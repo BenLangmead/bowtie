@@ -20,6 +20,7 @@
 #include "ref_aligner.h"
 #include "reference.h"
 #include "aligner_metrics.h"
+#include "search_globals.h"
 
 /**
  * State machine for carrying out an alignment, which usually consists
@@ -332,7 +333,6 @@ public:
 		HitSinkPerThread* sinkPt,
 		vector<String<Dna5> >& os,
 		const BitPairReference* refs,
-		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -342,7 +342,6 @@ public:
 		AlignerMetrics *metrics = NULL) :
 		Aligner(true, rangeMode),
 		refs_(refs),
-		snpPhred_(snpPhred),
 		doneFirst_(true),
 		firstIsFw_(true),
 		chase_(false),
@@ -422,7 +421,8 @@ public:
 				        (ebwtFw? &bufa_->qualRev : &bufa_->qual),
 				&bufa_->name,
 				bufa_->color,
-				snpPhred_,
+				colorExEnds,
+				snpPhred,
 				refs_,
 				ra.ebwt->rmap(),
 				ebwtFw,
@@ -518,8 +518,6 @@ protected:
 	// Reference sequences (needed for colorspace decoding)
 	const BitPairReference* refs_;
 
-	int snpPhred_;
-
 	// Progress state
 	bool doneFirst_;
 	bool firstIsFw_;
@@ -579,7 +577,6 @@ public:
 		uint32_t mixedThresh,
 		uint32_t mixedAttemptLim,
 		const BitPairReference* refs,
-		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -587,7 +584,7 @@ public:
 		ChunkPool *pool,
 		int *btCnt) :
 		Aligner(true, rangeMode),
-		refs_(refs), snpPhred_(snpPhred),
+		refs_(refs),
 		patsrc_(NULL), qlen1_(0), qlen2_(0), doneFw_(true),
 		doneFwFirst_(true),
 		chase1Fw_(false), chase1Rc_(false),
@@ -835,7 +832,8 @@ protected:
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
 				bufL->color,
-				snpPhred_,
+				colorExEnds,
+				snpPhred,
 				refs_,
 				rmap,
 				ebwtFwL,
@@ -865,7 +863,8 @@ protected:
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
 				bufR->color,
-				snpPhred_,
+				colorExEnds,
+				snpPhred,
 				refs_,
 				rmap,
 				ebwtFwR,
@@ -1249,8 +1248,6 @@ protected:
 
 	const BitPairReference* refs_;
 
-	int snpPhred_;
-
 	PatternSourcePerThread *patsrc_;
 	uint32_t qlen1_;
 	uint32_t qlen2_;
@@ -1431,7 +1428,6 @@ public:
 		uint32_t maxInsert,
 		uint32_t mixedAttemptLim,
 		const BitPairReference* refs,
-		int snpPhred,
 		bool rangeMode,
 		bool verbose,
 		bool quiet,
@@ -1440,7 +1436,6 @@ public:
 		int *btCnt) :
 		Aligner(true, rangeMode),
 		refs_(refs),
-		snpPhred_(snpPhred),
 		patsrc_(NULL),
 		qlen1_(0), qlen2_(0),
 		chase_(false),
@@ -1670,7 +1665,8 @@ protected:
 				        (ebwtFwL? &bufL->qualRev : &bufL->qual),
 				&bufL->name,
 				bufL->color,
-				snpPhred_,
+				colorExEnds,
+				snpPhred,
 				refs_,
 				rmap,
 				ebwtFwL,
@@ -1700,7 +1696,8 @@ protected:
 				        (ebwtFwR? &bufR->qualRev : &bufR->qual),
 				&bufR->name,
 				bufR->color,
-				snpPhred_,
+				colorExEnds,
+				snpPhred,
 				refs_,
 				rmap,
 				ebwtFwR,
@@ -1742,7 +1739,8 @@ protected:
 			       (ebwtFw? &buf->qualRev : &buf->qual),
 			&buf->name,
 			buf->color,
-			snpPhred_,
+			colorExEnds,
+			snpPhred,
 			refs_,
 			r.ebwt->rmap(),
 			ebwtFw,
@@ -1906,8 +1904,6 @@ protected:
 	}
 
 	const BitPairReference* refs_;
-
-	int snpPhred_;
 
 	PatternSourcePerThread *patsrc_;
 	uint32_t qlen1_, qlen2_;

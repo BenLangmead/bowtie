@@ -128,9 +128,10 @@ static bool fuzzy;
 static bool fullRef;
 static bool samNoHead; // don't print any header lines in SAM output
 static bool samNoSQ;   // don't print @SQ header lines
-static bool color;
+static bool color;     // true -> inputs are colorspace
+bool colorExEnds; // true -> nucleotides on either end of decoded cspace alignment should be excluded
 static string rgs; // SAM outputs for @RG header line
-static int snpPhred; // probability of SNP, for scoring colorspace alignments
+int snpPhred; // probability of SNP, for scoring colorspace alignments
 static Bitset suppressOuts(64); // output fields to suppress
 static bool sampleMax; // whether to report a random alignment when maxed-out via -m/-M
 static int defaultMapq; // default mapping quality to print in SAM mode
@@ -231,6 +232,7 @@ static void resetOptions() {
 	samNoHead				= false; // don't print any header lines in SAM output
 	samNoSQ					= false; // don't print @SQ header lines
 	color					= false; // don't align in colorspace by default
+	colorExEnds				= true;  // true -> nucleotides on either end of decoded cspace alignment should be excluded
 	rgs						= "";    // SAM outputs for @RG header line
 	snpPhred				= 30;    // probability of SNP, for scoring colorspace alignments
 	suppressOuts.clear();            // output fields to suppress
@@ -320,7 +322,8 @@ enum {
 	ARG_DEFAULT_MAPQ,
 	ARG_COLOR_SEQ,
 	ARG_COLOR_QUAL,
-	ARG_COST
+	ARG_COST,
+	ARG_COLOR_KEEP_ENDS
 };
 
 static struct option long_options[] = {
@@ -421,8 +424,9 @@ static struct option long_options[] = {
 	{(char*)"snpfrac",      required_argument, 0,            ARG_SNPFRAC},
 	{(char*)"suppress",     required_argument, 0,            ARG_SUPPRESS_FIELDS},
 	{(char*)"mapq",         required_argument, 0,            ARG_DEFAULT_MAPQ},
-	{(char*)"colseq",       no_argument,       0,            ARG_COLOR_SEQ},
-	{(char*)"colqual",      no_argument,       0,            ARG_COLOR_QUAL},
+	{(char*)"col-cseq",     no_argument,       0,            ARG_COLOR_SEQ},
+	{(char*)"col-cqual",    no_argument,       0,            ARG_COLOR_QUAL},
+	{(char*)"col-keepends", no_argument,       0,            ARG_COLOR_KEEP_ENDS},
 	{(char*)"cost",         no_argument,       0,            ARG_COST},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -459,11 +463,12 @@ static void printUsage(ostream& out) {
 		<< "  --solexa1.3-quals  input quals are from GA Pipeline ver. >= 1.3" << endl
 		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
 	    << "Alignment:" << endl
-	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: -n 2)" << endl
-	    << "  -e/--maqerr <int>  max sum of mismatch quals (rounds like maq; default: 70)" << endl
-	    << "  -l/--seedlen <int> seed length (default: 28)" << endl
-		<< "  --nomaqround       disable Maq-like quality rounding (to nearest 10 <= 30)" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
+	    << "    or" << endl
+	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: -n 2)" << endl
+	    << "  -e/--maqerr <int>  max sum of mismatch quals across alignment for -n (def: 70)" << endl
+	    << "  -l/--seedlen <int> seed length for -n (default: 28)" << endl
+		<< "  --nomaqround       disable Maq-like quality rounding for -n (nearest 10 <= 30)" << endl
 	    << "  -I/--minins <int>  minimum insert size for paired-end alignment (default: 0)" << endl
 	    << "  -X/--maxins <int>  maximum insert size for paired-end alignment (default: 250)" << endl
 	    << "  --fr/--rf/--ff     -1, -2 mates align fw/rev, rev/fw, fw/fw (default: --fr)" << endl
@@ -481,8 +486,6 @@ static void printUsage(ostream& out) {
 	    << "  --best             hits guaranteed best stratum; ties broken by quality" << endl
 	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
 	    //<< "  --strandfix        attempt to fix strand biases (def: on w/ --best, off w/o)" << endl
-	    << "  --snpphred <int>   penalty for a SNP when decoding colorspace (default: 30)" << endl
-	    << "  --snpfrac <dec>    approx. fraction of SNP bases (e.g. 0.001); sets --snpphred" << endl
 	    << "Output:" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
@@ -493,9 +496,14 @@ static void printUsage(ostream& out) {
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
 	    << "  --suppress <cols>  suppresses given columns (comma-delim'ed) in default output" << endl
-	    << "  --colseq           print aligned colorspace seqs as colors, not decoded bases" << endl
-	    << "  --colqual          print original colorspace quals, not decoded quals" << endl
 	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
+	    << "Colorspace:" << endl
+	    << "  --snpphred <int>   Phred penalty for SNP when decoding colorspace (def: 30)" << endl
+	    << "     or" << endl
+	    << "  --snpfrac <dec>    approx. fraction of SNP bases (e.g. 0.001); sets --snpphred" << endl
+	    << "  --col-cseq         print aligned colorspace seqs as colors, not decoded bases" << endl
+	    << "  --col-cqual        print original colorspace quals, not decoded quals" << endl
+	    << "  --col-keepends     keep nucleotides at extreme ends of decoded alignment" << endl
 	    << "SAM:" << endl
 	    << "  -S/--sam           write hits in SAM format" << endl
 	    << "  --mapq <int>       default mapping quality (MAPQ) to print for SAM alignments" << endl
@@ -665,6 +673,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PHRED64: phred64Quals = true; break;
 			case ARG_PHRED33: solexaQuals = false; phred64Quals = false; break;
 			case ARG_NOMAQROUND: noMaqRound = true; break;
+			case ARG_COLOR_KEEP_ENDS: colorExEnds = false; break;
 			case ARG_SNPPHRED: snpPhred = parseInt(0, "--snpphred must be at least 0"); break;
 			case ARG_SNPFRAC: {
 				double p = parse<double>(optarg);
@@ -1148,7 +1157,6 @@ static void *exactSearchWorker(void *vp) {
 	GreedyDFSRangeSource bt(
 	        &ebwt, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -1188,7 +1196,6 @@ static void *exactSearchWorkerStateful(void *vp) {
 	UnpairedExactAlignerV1Factory alSEfact(
 			ebwt,
 			NULL,
-			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -1209,7 +1216,6 @@ static void *exactSearchWorkerStateful(void *vp) {
 	PairedExactAlignerV1Factory alPEfact(
 			ebwt,
 			NULL,
-			snpPhred,
 			color,
 			!nofw,
 			!norc,
@@ -1375,7 +1381,6 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 	Unpaired1mmAlignerV1Factory alSEfact(
 			ebwtFw,
 			&ebwtBw,
-			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -1397,7 +1402,6 @@ static void *mismatchSearchWorkerFullStateful(void *vp) {
 			ebwtFw,
 			&ebwtBw,
 			color,
-			snpPhred,
 			!nofw,
 			!norc,
 			useV1,
@@ -1467,7 +1471,6 @@ static void* mismatchSearchWorkerFull(void *vp){
 	GreedyDFSRangeSource bt(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        0xffffffff,     // max backtracks (no max)
 	        0,              // reportPartials (don't)
@@ -1684,7 +1687,6 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			ebwtFw,
 			&ebwtBw,
 			two,
-			snpPhred,
 			!nofw,
 			!norc,
 			_sink,
@@ -1706,7 +1708,6 @@ static void *twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 			ebwtFw,
 			&ebwtBw,
 			color,
-			snpPhred,
 			!nofw,
 			!norc,
 			useV1,
@@ -1763,7 +1764,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr1(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -1778,7 +1778,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt2(
 	        &ebwtBw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -1793,7 +1792,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt3(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh (none)
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -1808,7 +1806,6 @@ static void* twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bthh3(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        0xffffffff,     // qualThresh
 	        // Do not impose maximums in 2/3-mismatch mode
 	        0xffffffff,     // max backtracks (no limit)
@@ -1954,7 +1951,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf1(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -1968,7 +1964,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource bt1(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (don't)
@@ -1984,7 +1979,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf2(
 	        &ebwtBw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,                     // reportPartials (no)
@@ -2000,7 +1994,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr2(
 	        &ebwtBw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // report partials (up to seedMms mms)
@@ -2016,7 +2009,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf3(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff,            // qualThresh (none)
 	        maxBtsBetter,          // max backtracks
 	        seedMms,               // reportPartials (do)
@@ -2033,7 +2025,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr3(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2049,7 +2040,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btr23(
 	        &ebwtFw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2067,7 +2057,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf4(
 	        &ebwtBw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2083,7 +2072,6 @@ static void* seededQualSearchWorkerFull(void *vp) {
 	GreedyDFSRangeSource btf24(
 	        &ebwtBw, params,
 	        refs,           // reference sequence (for colorspace)
-	        snpPhred,       // phred probability of SNP (for colorspace)
 	        qualCutoff, // qualThresh
 	        maxBtsBetter,          // max backtracks
 	        0,       // reportPartials (don't)
@@ -2150,7 +2138,6 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			seedMms,
 			seedLen,
 			qualCutoff,
-			snpPhred,
 			maxBts,
 			_sink,
 			*sinkFact,
@@ -2178,7 +2165,6 @@ static void* seededQualSearchWorkerFullStateful(void *vp) {
 			seedMms,
 			seedLen,
 			qualCutoff,
-			snpPhred,
 			maxBts,
 			_sink,
 			*sinkFact,

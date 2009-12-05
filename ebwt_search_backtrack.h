@@ -9,6 +9,7 @@
 #include "range.h"
 #include "range_source.h"
 #include "aligner_metrics.h"
+#include "search_globals.h"
 
 /**
  * Class that coordinates quality- and quantity-aware backtracking over
@@ -27,7 +28,6 @@ public:
 			const Ebwt<DnaString>* ebwt,
 			const EbwtSearchParams<DnaString>& params,
 			const BitPairReference* refs,
-			int snpPhred,
 			uint32_t qualThresh,  /// max acceptable q-distance
 			const int maxBts, /// maximum # backtracks allowed
 			uint32_t reportPartials = 0,
@@ -41,7 +41,6 @@ public:
 			bool halfAndHalf = false, // hacky way of supporting separate revisitable regions
 			bool maqPenalty = true) :
 		_refs(refs),
-		_snpPhred(snpPhred),
 		_qry(NULL),
 		_qlen(0),
 		_qual(NULL),
@@ -1540,7 +1539,7 @@ protected:
 			// their indices into the query string; not in terms
 			// of their offset from the 3' or 5' end.
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
-			                         _color, _snpPhred, _refs, _mms,
+			                         _color, colorExEnds, snpPhred, _refs, _mms,
 			                         _refcs, stackDepth, ri, top, bot,
 			                         _qlen, stratum, cost, _params))
 			{
@@ -1691,7 +1690,6 @@ protected:
 	}
 
 	const BitPairReference* _refs; // reference sequences (or NULL if not colorspace)
-	int                 _snpPhred; // phred probability of SNP
 	String<Dna5>*       _qry;    // query (read) sequence
 	size_t              _qlen;   // length of _qry
 	String<char>*       _qual;   // quality values for _qry

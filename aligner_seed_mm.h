@@ -31,7 +31,6 @@ public:
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
-			int snpPhred,
 			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -55,7 +54,6 @@ public:
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
-			snpPhred_(snpPhred),
 			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -537,7 +535,7 @@ public:
 
 		return new UnpairedAlignerV2<EbwtRangeSource>(
 			params, dr, rchase,
-			sink_, sinkPtFactory_, sinkPt, os_, refs_, snpPhred_,
+			sink_, sinkPtFactory_, sinkPt, os_, refs_,
 			rangeMode_, verbose_, quiet_, maxBts_, pool_, btCnt,
 			metrics_);
 	}
@@ -550,7 +548,6 @@ private:
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
-	const int snpPhred_;
 	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;
@@ -587,7 +584,6 @@ public:
 			uint32_t seedMms,
 			uint32_t seedLen,
 			int qualCutoff,
-			int snpPhred,
 			int maxBts,
 			HitSink& sink,
 			const HitSinkPerThreadFactory& sinkPtFactory,
@@ -622,7 +618,6 @@ public:
 			seedMms_(seedMms),
 			seedLen_(seedLen),
 			qualCutoff_(qualCutoff),
-			snpPhred_(snpPhred),
 			maxBts_(maxBts),
 			sink_(sink),
 			sinkPtFactory_(sinkPtFactory),
@@ -1335,7 +1330,7 @@ public:
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				mate1fw_, mate2fw_, peInner_, peOuter_, dontReconcile_,
 				symCeil_, mixedThresh_, mixedAttemptLim_, refs_,
-				snpPhred_, rangeMode_, verbose_, quiet_, maxBts_, pool_,
+				rangeMode_, verbose_, quiet_, maxBts_, pool_,
 				btCnt);
 			delete dr1FwVec;
 			delete dr1RcVec;
@@ -1349,7 +1344,7 @@ public:
 				new TCostAwareRangeSrcDr(strandFix_, dr1FwVec, verbose_, quiet_, true),
 				refAligner, rchase, sink_, sinkPtFactory_, sinkPt,
 				sinkPtSe1, sinkPtSe2, mate1fw_, mate2fw_, peInner_, peOuter_,
-				mixedAttemptLim_, refs_, snpPhred_, rangeMode_, verbose_,
+				mixedAttemptLim_, refs_, rangeMode_, verbose_,
 				quiet_, maxBts_, pool_, btCnt);
 			delete dr1FwVec;
 			return al;
@@ -1366,7 +1361,6 @@ private:
 	const uint32_t seedMms_;
 	const uint32_t seedLen_;
 	const int qualCutoff_;
-	const int snpPhred_;
 	const int maxBts_;
 	HitSink& sink_;
 	const HitSinkPerThreadFactory& sinkPtFactory_;

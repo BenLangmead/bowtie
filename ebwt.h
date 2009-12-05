@@ -990,8 +990,8 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1143,6 +1143,7 @@ public:
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
 	               bool color,          // true -> read is colorspace
+	               bool colExEnds,      // true -> exclude nucleotides at extreme ends after decoding
 	               int snpPhred,        // penalty for a SNP
 	               const BitPairReference* ref, // reference (= NULL if not necessary)
 	               const ReferenceMap* rmap, // map to another reference coordinate system
@@ -1210,7 +1211,8 @@ public:
 			}
 			assert(ref != NULL);
 			char read[1024];
-			char rf[1024];
+			uint32_t rfbuf[(1024+16)/4];
+			ASSERT_ONLY(char rfbuf2[1024]);
 			char qual[1024];
 			char ns[1024];
 			char cmm[1024];
@@ -1222,17 +1224,19 @@ public:
 			size_t readf = seqan::length(hit.patSeq);
 			size_t refi = 0;
 			size_t reff = readf + 1;
-			// The "Phred-scaled probability of a mutation" a la Maq/BWA
 			bool maqRound = false;
 			for(size_t i = 0; i < qlen + 1; i++) {
 				if(i < qlen) {
 					read[i] = (int)hit.patSeq[i];
 					qual[i] = mmPenalty(maqRound, phredCharToPhredQual(hit.quals[i]));
 				}
-				int rc = ref->getBase(h.first, h.second + i);
-				assert_geq(rc, 0);
-				assert_lt(rc, 4);
-				rf[i] = (1 << rc);
+				ASSERT_ONLY(rfbuf2[i] = ref->getBase(h.first, h.second + i));
+			}
+			int offset = ref->getStretch(rfbuf, h.first, h.second, qlen + 1);
+			char *rf = (char*)rfbuf + offset;
+			for(size_t i = 0; i < qlen + 1; i++) {
+				assert_eq(rf[i], rfbuf2[i]);
+				rf[i] = (1 << rf[i]);
 			}
 			decodeHit(
 				read,  // ASCII colors, '0', '1', '2', '3', '.'
@@ -1248,36 +1252,45 @@ public:
 				nmm, // where nucleotide mismatches are in the string
 				cmms, // number of color mismatches
 				nmms);// number of nucleotide mismatches
-			seqan::resize(hit.patSeq, qlen+1);
-			seqan::resize(hit.quals, qlen+1);
-			hit.refcs.resize(qlen+1, 0);
-			for(size_t i = 0; i < qlen + 1; i++) {
+			size_t nqlen = qlen + (colExEnds ? -1 : 1);
+			seqan::resize(hit.patSeq, nqlen);
+			seqan::resize(hit.quals, nqlen);
+			hit.refcs.resize(nqlen);
+			size_t lo = colExEnds ? 1 : 0;
+			size_t hi = colExEnds ? qlen : qlen+1;
+			size_t destpos = 0;
+			for(size_t i = lo; i < hi; i++, destpos++) {
 				// Set sequence character
 				assert_leq(ns[i], 4);
 				assert_geq(ns[i], 0);
-				hit.patSeq[i] = (Dna5)(int)ns[i];
+				hit.patSeq[destpos] = (Dna5)(int)ns[i];
 				// Set initial quality
-				hit.quals[i] = '!';
+				hit.quals[destpos] = '!';
 				// Color mismatches penalize quality
 				if(i > 0) {
-					if(cmm[i-1] == 'M') hit.quals[i] += qual[i-1];
-					else hit.quals[i] -= qual[i-1];
+					if(cmm[i-1] == 'M') hit.quals[destpos] += qual[i-1];
+					else hit.quals[destpos] -= qual[i-1];
 				}
 				if(i < qlen) {
-					if(cmm[i] == 'M') hit.quals[i] += qual[i];
-					else hit.quals[i] -= qual[i];
+					if(cmm[i] == 'M') hit.quals[destpos] += qual[i];
+					else hit.quals[destpos] -= qual[i];
 				}
-				if(hit.quals[i] < '!') hit.quals[i] = '!';
+				if(hit.quals[destpos] < '!') {
+					hit.quals[destpos] = '!';
+				}
 				if(nmm[i] != 'M') {
-					uint32_t off = i;
-					if(!_fw) off = (qlen+1) - i - 1;
-					assert_lt(off, qlen+1);
+					uint32_t off = i - (colExEnds? 1:0);
+					if(!_fw) off = nqlen - off - 1;
+					assert_lt(off, nqlen);
 					hit.mms.set(off);
 					hit.refcs[off] = "ACGT"[ref->getBase(h.first, h.second+i)];
 				}
 			}
-			qlen++;
-			mlen++;
+			if(colExEnds) {
+				qlen--; mlen--;
+			} else {
+				qlen++; mlen++;
+			}
 		} else {
 			// Turn the mmui32 and refcs arrays into the mm FixedBitset and
 			// the refc vector
@@ -2354,6 +2367,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
                                bool color,
+                               bool colExEnds,
                                int snpPhred,
                                const BitPairReference* ref,
                                const std::vector<uint32_t>& mmui32,
@@ -2381,6 +2395,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			quals,                    // read quality values
 			name,                     // read name
 			color,                    // true -> read is colorspace
+			colExEnds,                // true -> exclude nucleotides on ends
 			snpPhred,                 // phred probability of SNP
 			ref,                      // reference sequence
 			rmap_,                    // map to another reference coordinate system
@@ -2416,6 +2431,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
                                        bool color,
+                                       bool colExEnds,
                                        int snpPhred,
                                        const BitPairReference* ref,
                                        const std::vector<uint32_t>& mmui32,
@@ -2473,9 +2489,9 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_eq(rcoff, off);
 	}
 #endif
-	return report(query, quals, name, color, snpPhred, ref, mmui32,
-	              refcs, numMms, off, top, bot, qlen, stratum, cost,
-	              params);
+	return report(query, quals, name, color, colExEnds, snpPhred, ref,
+	              mmui32, refcs, numMms, off, top, bot, qlen, stratum,
+	              cost, params);
 }
 
 /**

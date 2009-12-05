@@ -179,10 +179,10 @@ policy, which is similar to [Maq]'s default policy.
      number 5 or greater, set with [`-l`]) on the high-quality (left) end
      of the read.  The first `L` bases are called the "seed".
 
-  2. The sum of the [Phred quality] values at all mismatched positions
-     may not exceed `E` (set with [`-e`]).  Where qualities are
-     unavailable (e.g. if the reads are from a FASTA file), the Phred
-     quality defaults to 40.
+  2. The sum of the [Phred quality] values at *all* mismatched positions
+     (not just in the seed) may not exceed `E` (set with [`-e`]).  Where
+     qualities are unavailable (e.g. if the reads are from a FASTA
+     file), the [Phred quality] defaults to 40.
 
 The [`-n`] option is mutually exclusive with the [`-v`] option.
 
@@ -414,12 +414,12 @@ Colorspace Alignment
 
 [Colorspace alignment]: #colorspace-alignment
 
-As of version 0.12.0, `bowtie` aligns colorspace reads against
-colorspace references when [`-C`] is specified.  Colorspace is the
+As of version 0.12.0, `bowtie` can align colorspace reads against a
+colorspace index when [`-C`] is specified.  Colorspace is the
 characteristic output format of Applied Biosystems' SOLiD system.  In a
-colorspace read, each character is a color (rather than a nucleotide)
+colorspace read, each character is a color rather than a nucleotide,
 where a color encodes a class of dinucleotides.  E.g. the color blue
-encodes "one of the dinucleotides: AA, CC, GG, TT."  Colorspace has the
+encodes any of the dinucleotides: AA, CC, GG, TT.  Colorspace has the
 advantage of (often) being able to distinguish sequencing errors from
 SNPs once the read has been aligned.  See ABI's [Principles of Di-Base
 Sequencing] application note for details.
@@ -836,7 +836,21 @@ Default: off.
 
 #### Alignment
 
-<table><tr><td id="bowtie-options-n">
+<table>
+
+<tr><td id="bowtie-options-v">
+
+[`-v`]: #bowtie-options-v
+
+    -v <int>
+
+</td><td>
+
+Report alignments with at most `<int>` mismatches.  [`-e`] and [`-l`]
+options are ignored and quality values have no effect on what
+alignments are valid.  [`-v`] is mutually exclusive with [`-n`].
+
+</td></tr><tr><td id="bowtie-options-n">
 
 [`-n`/`--seedmms`]: #bowtie-options-n
 [`-n`]: #bowtie-options-n
@@ -859,8 +873,9 @@ exclusive with the [`-v`] option.
 
 </td><td>
 
-Maximum permitted total of quality values at mismatched read positions.
-The default is 70.  Like [Maq], `bowtie` rounds quality values to the
+Maximum permitted total of quality values at *all* mismatched read
+positions throughout the entire alignment, not just in the "seed".  The
+default is 70.  Like [Maq], `bowtie` rounds quality values to the
 nearest 10 and saturates at 30; rounding can be disabled with
 [`--nomaqround`].
 
@@ -890,18 +905,6 @@ values of [`-l`].
 internally rounds values to the nearest 10, with a maximum of 30.  By
 default, `bowtie` also rounds this way.  [`--nomaqround`] prevents this
 rounding in `bowtie`.
-
-</td></tr><tr><td id="bowtie-options-v">
-
-[`-v`]: #bowtie-options-v
-
-    -v <int>
-
-</td><td>
-
-Report alignments with at most `<int>` mismatches.  [`-e`] and [`-l`]
-options are ignored and quality values have no effect on what
-alignments are valid.  [`-v`] is mutually exclusive with [`-n`].
 
 </td></tr><tr><td id="bowtie-options-I">
 
@@ -1123,13 +1126,12 @@ tuning] section for details).
 
 Behaves like [`-m`] except that if a read has more than `<int>`
 reportable alignments, one is reported at random.  In [default
-output mode], the selected alignment's 7th column is set to `<int>` to
-indicate the read has at least `<int>` valid alignments.  In
+output mode], the selected alignment's 7th column is set to `<int>`+1 to
+indicate the read has at least `<int>`+1 valid alignments.  In
 [`-S`/`--sam`] mode, the selected alignment is given a `MAPQ` (mapping
-quality) of 0.  Randomly-selected alignments do not count toward the
-"reads with at least one reported alignment" total reported by
-`bowtie`.  This option requires [`--best`] mode; if `-M` is specified
-without [`--best`], [`--best`] is enabled automatically.
+quality) of 0 and the `XM:I` field is set to `<int>`+1.  This option
+requires [`--best`]; if specified without [`--best`], [`--best`] is enabled
+automatically.
 
 [default output mode]: #default-bowtie-output
 
@@ -1173,36 +1175,8 @@ best stratum.  By default, Bowtie reports all reportable alignments
 regardless of whether they fall into multiple strata.  When
 [`--strata`] is specified, [`--best`] must also be specified. 
 
-</td></tr><tr><td id="bowtie-options-snpphred">
-
-[`--snpphred`]: #bowtie-options-snpphred
-
-    --snpphred <int>
-
-</td><td>
-
-When decoding colorspace alignments, use `<int>` as the SNP penalty.
-This should be set to the user's best guess of the true ratio of SNPs
-per base in the subject genome, converted to the [Phred quality] scale.
-E.g., if the user expects about 1 SNP every 1,000 positions,
-`--snpphred` should be set to 30 (which is also the default).  To
-specify the fraction directly, use [`--snpfrac`].
-
-</td></tr><tr><td id="bowtie-options-snpfrac">
-
-[`--snpfrac`]: #bowtie-options-snpfrac
-
-    --snpfrac <dec>
-
-</td><td>
-
-When decoding colorspace alignments, use `<dec>` as the estimated ratio
-of SNPs per base.  For best decoding results, this should be set to the
-user's best guess of the true ratio.  `bowtie` internally converts the
-ratio to a [Phred quality], and behaves as if that quality had been set
-via the [`--snpphred`] option.  Default: 0.001.
-
-</td></tr></table>
+</td></tr>
+</table>
 
 #### Output
 
@@ -1335,35 +1309,8 @@ quality fields will be omitted.  See [Default Bowtie output] for field
 descriptions.  This option is ignored if the output mode is
 [`-S`/`--sam`].
 
-</td></tr><tr><td id="bowtie-options-colseq">
-
-[`--colseq`]: #bowtie-options-colseq
-
-    --colseq
-
-</td><td>
-
-If reads are in colorspace and the [default output mode] is active,
-`--colseq` causes the reads' color sequence to appear in the
-read-sequence column (column 5) instead of the decoded nucleotide
-sequence.  See the [Decoding colorspace alignments] section for details
-about decoding.  This option is ignored in [`-S`/`--sam`] mode.
-
-</td></tr><tr><td id="bowtie-options-colqual">
-
-[`--colqual`]: #bowtie-options-colqual
-
-    --colqual
-
-</td><td>
-
-If reads are in colorspace and the [default output mode] is active,
-`--colqual` causes the reads' original (color) quality sequence to
-appear in the quality column (column 6) instead of the decoded
-qualities.  See the [Colorspace alignment] section for details about
-decoding.  This option is ignored in [`-S`/`--sam`] mode.
-
-</td></tr><tr><td id="bowtie-options-fullref">
+</td></tr>
+<tr><td id="bowtie-options-fullref">
 
 [`--fullref`]: #bowtie-options-fullref
 
@@ -1376,6 +1323,87 @@ alignment output.  By default `bowtie` prints everything up to but not
 including the first whitespace.
 
 </td></tr></table>
+
+#### Colorspace
+
+<table>
+<tr><td id="bowtie-options-snpphred">
+
+[`--snpphred`]: #bowtie-options-snpphred
+
+    --snpphred <int>
+
+</td><td>
+
+When decoding colorspace alignments, use `<int>` as the SNP penalty.
+This should be set to the user's best guess of the true ratio of SNPs
+per base in the subject genome, converted to the [Phred quality] scale.
+E.g., if the user expects about 1 SNP every 1,000 positions,
+`--snpphred` should be set to 30 (which is also the default).  To
+specify the fraction directly, use [`--snpfrac`].
+
+</td></tr>
+<tr><td id="bowtie-options-snpfrac">
+
+[`--snpfrac`]: #bowtie-options-snpfrac
+
+    --snpfrac <dec>
+
+</td><td>
+
+When decoding colorspace alignments, use `<dec>` as the estimated ratio
+of SNPs per base.  For best decoding results, this should be set to the
+user's best guess of the true ratio.  `bowtie` internally converts the
+ratio to a [Phred quality], and behaves as if that quality had been set
+via the [`--snpphred`] option.  Default: 0.001.
+
+</td></tr>
+<tr><td id="bowtie-options-col-cseq">
+
+[`--col-cseq`]: #bowtie-options-col-cseq
+
+    --col-cseq
+
+</td><td>
+
+If reads are in colorspace and the [default output mode] is active,
+`--col-cseq` causes the reads' color sequence to appear in the
+read-sequence column (column 5) instead of the decoded nucleotide
+sequence.  See the [Decoding colorspace alignments] section for details
+about decoding.  This option is ignored in [`-S`/`--sam`] mode.
+
+</td></tr>
+<tr><td id="bowtie-options-col-cqual">
+
+[`--col-cqual`]: #bowtie-options-col-cqual
+
+    --col-cqual
+
+</td><td>
+
+If reads are in colorspace and the [default output mode] is active,
+`--col-cqual` causes the reads' original (color) quality sequence to
+appear in the quality column (column 6) instead of the decoded
+qualities.  See the [Colorspace alignment] section for details about
+decoding.  This option is ignored in [`-S`/`--sam`] mode.
+
+</td></tr>
+<tr><td id="bowtie-options-col-keepends">
+
+[`--col-keepends`]: #bowtie-options-col-keepends
+
+    --col-keepends
+
+</td><td>
+
+When decoding colorpsace alignments, `bowtie` trims off a nucleotide
+and quality from the left and right edges of the alignment.  This is
+because those nucleotides are supported by only one color, in contrast
+to the middle nucleotides which are supported by two.  Specify
+`--col-keepends` to keep the extreme-end nucleotides and qualities.
+
+</td></tr>
+</table>
 
 #### SAM
 
@@ -1391,12 +1419,13 @@ including the first whitespace.
 </td><td>
 
 Print alignments in [SAM] format.  See the [SAM output] section of the
-manual for details.  To suppress all SAM headers, use [`--sam-nohead`].
-To suppress just the `@SQ` headers (e.g. if the alignment is against a
-very large number of reference sequences), use [`--sam-nosq`].
-`bowtie` does not write BAM files directly, but SAM output can be
-converted to BAM on the fly by piping `bowtie`'s output to
-`samtools view`.  [`-S`/`--sam`] is not compatible with [`--refout`].
+manual for details.  To suppress all SAM headers, use [`--sam-nohead`]
+in addition to `-S/--sam`.  To suppress just the `@SQ` headers (e.g. if
+the alignment is against a very large number of reference sequences),
+use [`--sam-nosq`] in addition to `-S/--sam`.  `bowtie` does not write
+BAM files directly, but SAM output can be converted to BAM on the fly
+by piping `bowtie`'s output to `samtools view`.  [`-S`/`--sam`] is not
+compatible with [`--refout`].
 
 [SAM output]: #sam-bowtie-output
 
@@ -1421,6 +1450,8 @@ See the [SAM Spec][SAM] for details about the `MAPQ` field  Default: 255.
 </td><td>
 
 Suppress header lines (starting with `@`) when output is [`-S`/`--sam`].
+This must be specified *in addition to* [`-S`/`--sam`].  `--sam-nohead`
+is ignored unless [`-S`/`--sam`] is also specified.
 
 </td></tr><tr><td id="bowtie-options-sam-nosq">
 
@@ -1430,7 +1461,9 @@ Suppress header lines (starting with `@`) when output is [`-S`/`--sam`].
 
 </td><td>
 
-Suppress `@SQ` header lines when output is [`-S`/`--sam`].
+Suppress `@SQ` header lines when output is [`-S`/`--sam`].  This must be
+specified *in addition to* [`-S`/`--sam`].  `--sam-nosq` is ignored
+unless [`-S`/`--sam`] is also specified.
 
 </td></tr><tr><td id="bowtie-options-sam-RG">
 
@@ -1445,7 +1478,8 @@ field on the `@RG` header line.  Specify `--sam-RG` multiple times to
 set multiple fields.  See the [SAM Spec][SAM] for details about what fields
 are legal.  Note that, if any `@RG` fields are set using this option,
 the `ID` and `SM` fields must both be among them to make the `@RG` line
-legal according to the [SAM Spec][SAM].
+legal according to the [SAM Spec][SAM].  `--sam-RG` is ignored unless
+[`-S`/`--sam`] is also specified.
 
 </td></tr></table>
 
@@ -1590,7 +1624,7 @@ Default `bowtie` output
     If the read was in colorspace, then the sequence shown in this
     column is the sequence of *decoded nucleotides*, not the original
     colors.  See the [Colorspace alignment] section for details about
-    decoding.  To display colors instead, use the [`--colseq`] option.
+    decoding.  To display colors instead, use the [`--col-cseq`] option.
 
 6.  ASCII-encoded read qualities (reversed if orientation is `-`).  The
     encoded quality values are on the Phred scale and the encoding is
@@ -1599,9 +1633,12 @@ Default `bowtie` output
     If the read was in colorspace, then the qualities shown in this
     column are the *decoded qualities*, not the original qualities.
     See the [Colorspace alignment] section for details about decoding.
-    To display colors instead, use the [`--colqual`] option.
+    To display colors instead, use the [`--col-cqual`] option.
 
-7.  Number of other instances where the same read aligns against the
+7.  If [`-M`] was specified and the [`-M`] ceiling was exceeded for this
+    read, this column contains the 
+
+Number of other instances where the same read aligns against the
     same reference characters as were aligned against in this alignment.
     This is *not* the number of other places the read aligns with the
     same number of mismatches.  The number in this column is generally
@@ -1785,9 +1822,15 @@ right, the fields are:
     </td><td>
 
     For a read with no reported alignments, `<N>` is 0 if the read had
-    no alignments, or 1 if the read had alignments that were suppressed
-    by the [`-m`] option.
-    
+    no alignments.  If [`-m`] was specified and the read's alignments
+    were supressed because the [`-m`] ceiling was exceeded, `<N>` equals
+    the [`-m`] ceiling + 1, to indicate that there were at least that
+    many valid alignments (but they were suppressed).  In [`-M`] mode, if
+    the alignment was randomly selected because the [`-M`] ceiling was
+    exceeded, `<N>` equals the [`-M`] ceiling + 1, to indicate that there
+    were at least that many valid alignments (but only one was
+    reported).
+
     </td></tr></table>
 
 [SAM format specification]: http://samtools.sf.net/SAM1.pdf
