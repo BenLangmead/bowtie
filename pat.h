@@ -1509,7 +1509,7 @@ public:
 		                      dumpfile, verbose, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
-		filebuf_(),
+		fb_(),
 		skip_(skip),
 		first_(true)
 	{
@@ -1520,7 +1520,7 @@ public:
 	}
 
 	virtual ~BufferedFilePatternSource() {
-		if(filebuf_.isOpen()) filebuf_.close();
+		if(fb_.isOpen()) fb_.close();
 	}
 
 	/**
@@ -1538,8 +1538,8 @@ public:
 			// Try again if r is empty (indicating an error) and input
 			// is not yet exhausted, OR if we have more reads to skip
 			// over
-			notDone = seqan::empty(r.patFw) && !filebuf_.eof();
-		} while(notDone || (!filebuf_.eof() && patid < skip_));
+			notDone = seqan::empty(r.patFw) && !fb_.eof();
+		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
 			unlock();
 			r.clearAll();
@@ -1557,7 +1557,7 @@ public:
 			resetForNextFile(); // reset state to handle a fresh file
 			do {
 				read(r, patid);
-			} while((seqan::empty(r.patFw) && !filebuf_.eof()));
+			} while((seqan::empty(r.patFw) && !fb_.eof()));
 			assert_geq(patid, skip_);
 			if(seqan::empty(r.patFw) /*&& !quiet_ */) {
 				// No reads could be extracted from this _infile
@@ -1583,8 +1583,8 @@ public:
 			// Try again if ra is empty (indicating an error) and input
 			// is not yet exhausted, OR if we have more reads to skip
 			// over
-			notDone = seqan::empty(ra.patFw) && !filebuf_.eof();
-		} while(notDone || (!filebuf_.eof() && patid < skip_));
+			notDone = seqan::empty(ra.patFw) && !fb_.eof();
+		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
 			unlock();
 			ra.clearAll();
@@ -1603,7 +1603,7 @@ public:
 			resetForNextFile(); // reset state to handle a fresh file
 			do {
 				readPair(ra, rb, patid);
-			} while((seqan::empty(ra.patFw) && !filebuf_.eof()));
+			} while((seqan::empty(ra.patFw) && !fb_.eof()));
 			assert_geq(patid, skip_);
 			if(seqan::empty(ra.patFw) /*&& !quiet_*/) {
 				// No reads could be extracted from this _infile
@@ -1637,7 +1637,7 @@ protected:
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() { }
 	void open() {
-		if(filebuf_.isOpen()) filebuf_.close();
+		if(fb_.isOpen()) fb_.close();
 		while(filecur_ < infiles_.size()) {
 			// Open read
 			FILE *in;
@@ -1651,7 +1651,7 @@ protected:
 				filecur_++;
 				continue;
 			}
-			filebuf_.newFile(in);
+			fb_.newFile(in);
 			return;
 		}
 		throw 1;
@@ -1659,7 +1659,7 @@ protected:
 	vector<string> infiles_; /// filenames for read files
 	vector<bool> errs_; /// whether we've already printed an error for each file
 	size_t filecur_;   /// index into infiles_ of next file to read
-	FileBuf filebuf_;  /// read file currently being read from
+	FileBuf fb_;  /// read file currently being read from
 	uint32_t skip_;     /// number of reads to skip
 	bool first_;
 };
@@ -1704,7 +1704,7 @@ protected:
 	/// Called when we have to bail without having parsed a read.
 	void bail(ReadBuf& r) {
 		r.clearAll();
-		filebuf_.resetLastN();
+		fb_.resetLastN();
 	}
 
 	/// Read another pattern from a FASTA input file
@@ -1713,12 +1713,12 @@ protected:
 		int dstLen = 0;
 		int nameLen = 0;
 		// Pick off the first carat
-		c = filebuf_.get();
+		c = fb_.get();
 		if(c < 0) { bail(r); return; }
 		if(first_) {
 			assert_eq('>', c);
 			if(c != '>') {
-				c = getOverNewline(filebuf_);
+				c = getOverNewline(fb_);
 				if(c < 0) { bail(r); return; }
 			}
 			if(c != '>') {
@@ -1727,7 +1727,7 @@ protected:
 			}
 			assert(c == '>' || c == '#');
 			first_ = false;
-			c = filebuf_.get();
+			c = fb_.get();
 		}
 
 		// Read to the end of the id line, sticking everything after the '>'
@@ -1737,13 +1737,13 @@ protected:
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
-					c = filebuf_.get();
+					c = fb_.get();
 					if(c < 0) { bail(r); return; }
 				}
 				break;
 			}
 			r.nameBuf[nameLen++] = c;
-			c = filebuf_.get();
+			c = fb_.get();
 		}
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, nameLen);
@@ -1757,11 +1757,11 @@ protected:
 			c = toupper(c);
 			if(asc2dnacat[c] > 0) {
 				// First char is a DNA char
-				int c2 = toupper(filebuf_.peek());
+				int c2 = toupper(fb_.peek());
 				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
 					r.primer = c;
-					c = filebuf_.get();
+					c = fb_.get();
 					assert_eq(c, c2);
 				}
 			}
@@ -1779,7 +1779,7 @@ protected:
 				r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
-			c = filebuf_.get();
+			c = fb_.get();
 		}
 		dstLen -= this->trim3_;
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
@@ -1796,7 +1796,8 @@ protected:
 		assert_gt(nameLen, 0);
 		readCnt_++;
 		patid = readCnt_-1;
-		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
+		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+		fb_.resetLastN();
 	}
 	/// Read another pair of patterns from a FASTA input file
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
@@ -1867,38 +1868,38 @@ protected:
 
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// name field
 		if(parseName(r, NULL, '\t') == -1) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
 			return;
 		}
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// sequence field
 		int charsRead = 0;
 		int dstLen = parseSeq(r, charsRead, '\t');
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 		if(dstLen <= 0) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
 			return;
 		}
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// quality-string field
 		char ct = 0;
 		if(parseQuals(r, charsRead, dstLen, ct, '\n') <= 0) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
 			return;
 		}
 		assert_eq(ct, '\n');
-		assert_neq('\n', filebuf_.peek());
-		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
-		filebuf_.resetLastN();
+		assert_neq('\n', fb_.peek());
+		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+		fb_.resetLastN();
 		// The last character read in parseQuals should have been a
 		// '\n'
 
@@ -1908,81 +1909,81 @@ protected:
 
 	/// Read another pair of patterns from a FASTA input file
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// name field
 		if(parseName(ra, &rb, '\t') == -1) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			return;
 		}
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// sequence field for the first mate
 		int charsRead1 = 0;
 		int dstLen1 = parseSeq(ra, charsRead1, '\t');
 		if(dstLen1 <= -1) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			return;
 		}
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// quality-string field
 		char ct = 0;
 		if(parseQuals(ra, charsRead1, dstLen1, ct, '\t', '\n') <= 0) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			return;
 		}
 		assert(ct == '\t' || ct == '\n');
 		if(ct == '\n') {
 			rb.clearAll();
-			peekOverNewline(filebuf_);
-			ra.readOrigBufLen = filebuf_.copyLastN(ra.readOrigBuf);
-			filebuf_.resetLastN();
+			peekOverNewline(fb_);
+			ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
+			fb_.resetLastN();
 			readCnt_++;
 			patid = readCnt_-1;
 			return;
 		}
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// sequence field for the second mate
 		int charsRead2 = 0;
 		int dstLen2 = parseSeq(rb, charsRead2, '\t');
 		if(dstLen2 <= 0) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			return;
 		}
-		assert_neq('\t', filebuf_.peek());
+		assert_neq('\t', fb_.peek());
 
-		// filebuf_ is about to dish out the first character of the
+		// fb_ is about to dish out the first character of the
 		// quality-string field
 		if(parseQuals(rb, charsRead2, dstLen2, ct, '\n') <= 0) {
-			peekOverNewline(filebuf_); // skip rest of line
+			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			return;
 		}
 		assert_eq('\n', ct);
-		if(filebuf_.peek() == '\n') {
+		if(fb_.peek() == '\n') {
 			assert(false);
 		}
-		peekOverNewline(filebuf_);
-		ra.readOrigBufLen = filebuf_.copyLastN(ra.readOrigBuf);
-		filebuf_.resetLastN();
+		peekOverNewline(fb_);
+		ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
+		fb_.resetLastN();
 
 		// The last character read in parseQuals should have been a
 		// '\n'
@@ -2005,8 +2006,8 @@ protected:
 private:
 
 	/**
-	 * Parse a name from filebuf_ and store in r.  Assume that the next
-	 * character obtained via filebuf_.get() is the first character of
+	 * Parse a name from fb_ and store in r.  Assume that the next
+	 * character obtained via fb_.get() is the first character of
 	 * the sequence and the string stops at the next char upto (could
 	 * be tab, newline, etc.).
 	 */
@@ -2015,7 +2016,7 @@ private:
 		int c = 0;
 		int nameLen = 0;
 		while(true) {
-			if((c = filebuf_.get()) < 0) {
+			if((c = fb_.get()) < 0) {
 				return -1;
 			}
 			if(c == upto) {
@@ -2051,15 +2052,15 @@ private:
 	}
 
 	/**
-	 * Parse a single sequence from filebuf_ and store in r.  Assume
-	 * that the next character obtained via filebuf_.get() is the first
+	 * Parse a single sequence from fb_ and store in r.  Assume
+	 * that the next character obtained via fb_.get() is the first
 	 * character of the sequence and the sequence stops at the next
 	 * char upto (could be tab, newline, etc.).
 	 */
 	int parseSeq(ReadBuf& r, int& charsRead, char upto = '\t') {
 		int begin = 0;
 		int dstLen = 0;
-		int c = filebuf_.get();
+		int c = fb_.get();
 		assert(c != upto);
 		while(c != upto) {
 			if(color_) {
@@ -2081,7 +2082,7 @@ private:
 				}
 				charsRead++;
 			}
-			if((c = filebuf_.get()) < 0) {
+			if((c = fb_.get()) < 0) {
 				return -1;
 			}
 		}
@@ -2092,8 +2093,8 @@ private:
 	}
 
 	/**
-	 * Parse a single quality string from filebuf_ and store in r.
-	 * Assume that the next character obtained via filebuf_.get() is
+	 * Parse a single quality string from fb_ and store in r.
+	 * Assume that the next character obtained via fb_.get() is
 	 * the first character of the quality string and the string stops
 	 * at the next char upto (could be tab, newline, etc.).
 	 */
@@ -2106,7 +2107,7 @@ private:
 			char buf[4096];
 			while (qualsRead < charsRead) {
 				vector<string> s_quals;
-				if(!tokenizeQualLine(filebuf_, buf, 4096, s_quals)) break;
+				if(!tokenizeQualLine(fb_, buf, 4096, s_quals)) break;
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
 					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
 					assert_geq(c, 33);
@@ -2122,7 +2123,7 @@ private:
 		} else {
 			// Non-integer qualities
 			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
-				c = filebuf_.get();
+				c = fb_.get();
 				c2 = c;
 				if (c == ' ') wrongQualityFormat(r.name);
 				if(c < 0) {
@@ -2149,7 +2150,7 @@ private:
 		_setBegin (r.qual, (char*)r.qualBuf);
 		_setLength(r.qual, dstLen);
 		while(c != upto && (upto2 == -1 || c != upto2)) {
-			c = filebuf_.get();
+			c = fb_.get();
 			c2 = c;
 		}
 		return qualsRead;
@@ -2195,14 +2196,14 @@ protected:
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		while(true) {
-			int c = filebuf_.get();
+			int c = fb_.get();
 			if(c < 0) {
 				seqan::clear(r.patFw);
 				return;
 			}
 			if(c == '>') {
 				resetForNextFile();
-				c = filebuf_.peek();
+				c = fb_.peek();
 				bool sawSpace = false;
 				while(c != '\n' && c != '\r') {
 					if(!sawSpace) {
@@ -2211,12 +2212,12 @@ protected:
 					if(!sawSpace) {
 						nameBuf_[nameChars_++] = c;
 					}
-					filebuf_.get();
-					c = filebuf_.peek();
+					fb_.get();
+					c = fb_.peek();
 				}
 				while(c == '\n' || c == '\r') {
-					filebuf_.get();
-					c = filebuf_.peek();
+					fb_.get();
+					c = fb_.peek();
 				}
 				nameBuf_[nameChars_++] = '_';
 			} else {
@@ -2336,7 +2337,7 @@ public:
 	{ }
 	virtual void reset() {
 		first_ = true;
-		filebuf_.resetLastN();
+		fb_.resetLastN();
 		BufferedFilePatternSource::reset();
 	}
 protected:
@@ -2395,9 +2396,9 @@ protected:
 		r.alts = 0;
 		// Pick off the first at
 		if(first_) {
-			c = filebuf_.get();
+			c = fb_.get();
 			if(c != '@') {
-				c = getOverNewline(filebuf_);
+				c = getOverNewline(fb_);
 				if(c < 0) { bail(r); return; }
 			}
 			if(c != '@') {
@@ -2411,12 +2412,12 @@ protected:
 		// Read to the end of the id line, sticking everything after the '@'
 		// into *name
 		while(true) {
-			c = filebuf_.get();
+			c = fb_.get();
 			if(c < 0) { bail(r); return; }
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
-					c = filebuf_.get();
+					c = fb_.get();
 					if(c < 0) { bail(r); return; }
 				}
 				break;
@@ -2437,7 +2438,7 @@ protected:
 		// c now holds the first character on the line after the
 		// @name line
 
-		// filebuf_ now points just past the first character of a
+		// fb_ now points just past the first character of a
 		// sequence line, and c holds the first character
 		int charsRead = 0;
 		uint8_t *sbuf = r.patBufFw;
@@ -2462,7 +2463,7 @@ protected:
 			} else if(fuzzy_ && c == ' ') {
 				trim5 = 0; // disable 5' trimming for now
 				if(charsRead == 0) {
-					c = filebuf_.get();
+					c = fb_.get();
 					continue;
 				}
 				charsRead = 0;
@@ -2474,7 +2475,7 @@ protected:
 				sbuf = r.altPatBufFw[altBufIdx++];
 				dstLenCur = &dstLens[altBufIdx];
 			}
-			c = filebuf_.get();
+			c = fb_.get();
 			if(c < 0) { bail(r); return; }
 		}
 		// Trim from 3' end
@@ -2487,7 +2488,7 @@ protected:
 		assert_eq('+', c);
 
 		// Chew up the optional name on the '+' line
-		peekToEndOfLine(filebuf_);
+		peekToEndOfLine(fb_);
 
 		// Now read the qualities
 		if (intQuals_) {
@@ -2496,7 +2497,7 @@ protected:
 			char buf[4096];
 			while (qualsRead < charsRead) {
 				vector<string> s_quals;
-				if(!tokenizeQualLine(filebuf_, buf, 4096, s_quals)) break;
+				if(!tokenizeQualLine(fb_, buf, 4096, s_quals)) break;
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
 					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
 					assert_geq(c, 33);
@@ -2511,7 +2512,7 @@ protected:
 			if (charsRead > qualsRead) tooFewQualities(r.name);
 			_setBegin(r.qual, (char*)r.qualBuf);
 			_setLength(r.qual, dstLen);
-			peekOverNewline(filebuf_);
+			peekOverNewline(fb_);
 		} else {
 			// Non-integer qualities
 			char *qbuf = r.qualBuf;
@@ -2520,7 +2521,7 @@ protected:
 			int qualsRead[4] = {0, 0, 0, 0};
 			int *qualsReadCur = &qualsRead[0];
 			while((*qualsReadCur) < dstLen + this->trim5_ || fuzzy_) {
-				c = filebuf_.get();
+				c = fb_.get();
 				if (!fuzzy_ && c == ' ') {
 					wrongQualityFormat(r.name);
 				} else if(c == ' ') {
@@ -2594,15 +2595,15 @@ protected:
 			}
 
 			if(c == '\r' || c == '\n') {
-				c = peekOverNewline(filebuf_);
+				c = peekOverNewline(fb_);
 			} else {
-				c = peekToEndOfLine(filebuf_);
+				c = peekToEndOfLine(fb_);
 			}
 		}
-		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
-		filebuf_.resetLastN();
+		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+		fb_.resetLastN();
 
-		c = filebuf_.get();
+		c = fb_.get();
 		assert(c == -1 || c == '@');
 
 		// Set up a default name if one hasn't been set
@@ -2644,7 +2645,7 @@ private:
 	 */
 	void bail(ReadBuf& r) {
 		seqan::clear(r.patFw);
-		filebuf_.resetLastN();
+		fb_.resetLastN();
 	}
 
 	bool first_;
@@ -2686,7 +2687,7 @@ protected:
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
-		c = peekOverNewline(this->filebuf_);
+		c = peekOverNewline(this->fb_);
 		if(c < 0) {
 			seqan::clear(r.patFw);
 			return;
@@ -2713,7 +2714,7 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		while(!isspace(c) && c >= 0) {
-			c = filebuf_.get();
+			c = fb_.get();
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
@@ -2725,7 +2726,7 @@ protected:
 				r.qualBuf[len] = 'I';
 				dstLen++;
 			} else if(isalpha(c)) dstLen++;
-			c = filebuf_.peek();
+			c = fb_.peek();
 		}
 		if(dstLen >= (this->trim3_ + this->trim5_)) {
 			dstLen -= (this->trim3_ + this->trim5_);
@@ -2737,9 +2738,9 @@ protected:
 		_setBegin (r.qual, r.qualBuf);
 		_setLength(r.qual, dstLen);
 
-		c = peekToEndOfLine(filebuf_);
-		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
-		filebuf_.resetLastN();
+		c = peekToEndOfLine(fb_);
+		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+		fb_.resetLastN();
 
 		// Set up name
 		itoa10(readCnt_, r.nameBuf);
@@ -2794,17 +2795,17 @@ protected:
 
 	/// Read another pattern from a Raw input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		filebuf_.peek();
-		if(filebuf_.eof()) {
-			filebuf_.resetLastN();
+		fb_.peek();
+		if(fb_.eof()) {
+			fb_.resetLastN();
 			seqan::clear(r.patFw);
 			return;
 		}
 		do {
-			r.hitset.deserialize(filebuf_);
-		} while(!r.hitset.initialized() && !filebuf_.eof());
+			r.hitset.deserialize(fb_);
+		} while(!r.hitset.initialized() && !fb_.eof());
 		if(!r.hitset.initialized()) {
-			filebuf_.resetLastN();
+			fb_.resetLastN();
 			seqan::clear(r.patFw);
 			return;
 		}
@@ -2822,8 +2823,8 @@ protected:
 		_setLength(r.qual, seqan::length(r.hitset.qual));
 		memcpy(r.qualBuf, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
 
-		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
-		filebuf_.resetLastN();
+		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+		fb_.resetLastN();
 
 		readCnt_++;
 		patid = readCnt_-1;
