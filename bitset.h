@@ -182,7 +182,7 @@ public:
 		_cnt = 0;
 	}
 
-	Bitset(const Bitset& o) {
+	Bitset(const Bitset& o) : _words(NULL) {
 		this->operator=(o);
 	}
 
@@ -268,7 +268,7 @@ public:
 		_errmsg = o._errmsg;
 		_sz = o._sz;
 		_cnt = o._cnt;
-		delete[] _words;
+		if(_words != NULL) delete[] _words;
 		_words = new uint32_t[(_sz+31)>>5];
 		for(size_t i = 0; i < (_sz+31)>>5; i++) {
 			_words[i] = o._words[i];

@@ -39,7 +39,6 @@ static int64_t cutoff;
 static int32_t lineRate;
 static int32_t linesPerSide;
 static int32_t offRate;
-static int32_t isaRate;
 static int32_t ftabChars;
 static int  bigEndian;
 static bool nsToAs;
@@ -67,7 +66,6 @@ static void resetOptions() {
 	lineRate     = 6;  // a "line" is 64 bytes
 	linesPerSide = 1;  // 1 64-byte line on a side
 	offRate      = 5;  // sample 1 out of 32 SA elts
-	isaRate      = -1; // sample rate for ISA; default: don't sample
 	ftabChars    = 10; // 10 chars in initial lookup table
 	bigEndian    = 0;  // little endian
 	nsToAs       = false; // convert reference Ns to As prior to indexing
@@ -87,7 +85,6 @@ enum {
 	ARG_SEED,
 	ARG_CUTOFF,
 	ARG_PMAP,
-	ARG_ISARATE,
 	ARG_NTOA,
 	ARG_USAGE
 };
@@ -116,8 +113,8 @@ static void printUsage(ostream& out) {
 	    << "    -o/--offrate <int>      SA is sampled every 2^offRate BWT chars (default: 5)" << endl
 	    << "    -t/--ftabchars <int>    # of chars consumed in initial lookup (default: 10)" << endl
 	    << "    --ntoa                  convert Ns in reference to As" << endl
-	    << "    --big --little          endianness (default: little, this host: "
-	    << (currentlyBigEndian()? "big":"little") << ")" << endl
+	    //<< "    --big --little          endianness (default: little, this host: "
+	    //<< (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
 	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
@@ -148,7 +145,6 @@ static struct option long_options[] = {
 	{(char*)"linerate",     required_argument, 0,            'l'},
 	{(char*)"linesperside", required_argument, 0,            'i'},
 	{(char*)"offrate",      required_argument, 0,            'o'},
-	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
 	{(char*)"ftabchars",    required_argument, 0,            't'},
 	{(char*)"help",         no_argument,       0,            'h'},
 	{(char*)"cutoff",       required_argument, 0,            ARG_CUTOFF},
@@ -206,9 +202,6 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case 'o':
 				offRate = parseNumber<int>(0, "-o/--offRate arg must be at least 0");
-				break;
-			case ARG_ISARATE:
-				isaRate = parseNumber<int>(0, "--isaRate arg must be at least 0");
 				break;
 			case '3':
 				justRef = true;
@@ -342,8 +335,7 @@ static void driver(const string& infile,
 			// Read in the sizes of all the unambiguous stretches of
 			// the genome into a vector of RefRecords.  The input
 			// streams are reset once it's done.
-			bool be = currentlyBigEndian();
-			writeU32(fout3, 1, be); // endianness sentinel
+			writeU32(fout3, 1, bigEndian); // endianness sentinel
 			if(color) {
 				refparams.color = false;
 				// Make sure the .3.ebwt and .4.ebwt files contain
@@ -351,8 +343,8 @@ static void driver(const string& infile,
 				std::pair<size_t, size_t> sztot2 =
 					fastaRefReadSizes(is, szs, refparams, &bpout);
 				refparams.color = true;
-				writeU32(fout3, szs.size(), be); // write # records
-				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, be);
+				writeU32(fout3, szs.size(), bigEndian); // write # records
+				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 				szs.clear();
 				// Now read in the colorspace size records; these are
 				// the ones that were indexed
@@ -360,8 +352,8 @@ static void driver(const string& infile,
 				assert_eq(sztot2.second, sztot.second + 1);
 			} else {
 				sztot = fastaRefReadSizes(is, szs, refparams, &bpout);
-				writeU32(fout3, szs.size(), be); // write # records
-				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, be);
+				writeU32(fout3, szs.size(), bigEndian); // write # records
+				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			}
 			assert_gt(sztot.first, 0);
 			assert_gt(sztot.second, 0);
@@ -398,7 +390,7 @@ static void driver(const string& infile,
 	                lineRate,
 	                linesPerSide,
 	                offRate,      // suffix-array sampling rate
-	                isaRate,      // ISA sampling rate
+	                -1,           // ISA sampling rate
 	                ftabChars,    // number of chars in initial arrow-pair calc
 	                outfile,      // basename for .?.ebwt files
 	                !reverse,     // fw
