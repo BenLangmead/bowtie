@@ -1715,20 +1715,15 @@ protected:
 		// Pick off the first carat
 		c = fb_.get();
 		if(c < 0) { bail(r); return; }
+		assert_eq('>', c);
 		if(first_) {
-			assert_eq('>', c);
-			if(c != '>') {
-				c = getOverNewline(fb_);
-				if(c < 0) { bail(r); return; }
-			}
 			if(c != '>') {
 				cerr << "Error: reads file does not look like a FASTA file" << endl;
 				throw 1;
 			}
-			assert(c == '>' || c == '#');
 			first_ = false;
-			c = fb_.get();
 		}
+		c = fb_.get(); // get next char after '>'
 
 		// Read to the end of the id line, sticking everything after the '>'
 		// into *name
@@ -1779,6 +1774,7 @@ protected:
 				r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
+			if(fb_.peek() == '>') break;
 			c = fb_.get();
 		}
 		dstLen -= this->trim3_;
