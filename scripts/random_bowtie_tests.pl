@@ -41,7 +41,7 @@ $setPolicy = $options{p} if defined($options{p});
 # make all the relevant binaries, unless we were asked not to
 unless(defined $options{n}) {
 	system("make bowtie bowtie-debug bowtie-build-debug ".
-	       "bowtie-maptool-debug bowtie-inspect-debug") == 0 || die "Error building";
+	       "bowtie-inspect-debug") == 0 || die "Error building";
 }
 
 # Alignment policies
@@ -502,16 +502,6 @@ sub doSearch {
 		}
 	}
 	
-	# Perhaps use phased search w/ -z option
-	my $phased = "";
-	if(!$pe && int(rand(3)) == 0) {
-		$phased = "-z";
-		# These aren't available in -z mode
-		$policy =~ s/--best//;
-		$policy =~ s/--oldbest//;
-		$policy =~ s/--better//;
-	}
-	
 	# Perhaps dump unaligned reads using --un argument
 	my $unalignArg = "";
 	my $unalignReconArg = "";
@@ -534,7 +524,7 @@ sub doSearch {
 			}
 		}
 	}
-	if(($unalign == 2 || $unalign == 3) && $phased eq "") {
+	if($unalign == 2 || $unalign == 3) {
 		$unalignArg .= "--al .tmp.al$seed$ext ";
 		if($unalign == 2) {
 			if($pe) {
@@ -552,27 +542,19 @@ sub doSearch {
 	
 	my $khits = "-k 1";
 	my $mhits = 0;
-	if($phased eq "-z") {
-		# A phased search may optionally be a non-stratified all-hits
-		# search
-		if(int(rand(2)) == 0) {
-			$khits = "-a";
-		}
+	if(int(rand(2)) == 0) {
+		$khits = "-a";
 	} else {
-		if(int(rand(2)) == 0) {
-			$khits = "-a";
-		} else {
-			$khits = "-k " . (int(rand(20))+2);
-		}
-		if(int(rand(3)) == 0) {
-			$policy =~ s/--oldbest//;
-			$policy =~ s/--better//;
-			$khits .= " --strata --best";
-		}
-		if(int(rand(2)) == 0) {
-			$requireResult = 0;
-			$mhits = (int(rand(20))+2);
-		}
+		$khits = "-k " . (int(rand(20))+2);
+	}
+	if(int(rand(3)) == 0) {
+		$policy =~ s/--oldbest//;
+		$policy =~ s/--better//;
+		$khits .= " --strata --best";
+	}
+	if(int(rand(2)) == 0) {
+		$requireResult = 0;
+		$mhits = (int(rand(20))+2);
 	}
 	
 	if($mhits > 0) {
@@ -599,7 +581,7 @@ sub doSearch {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
@@ -692,7 +674,7 @@ sub doSearch {
 				$fw eq "+" || die "Saw a rev-comp alignment when --norc was specified";
 			}
 		}
-		if(($read ne $lastread) && ($phased eq "")) {
+		if($read ne $lastread)) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
 		if(!$pe && $policy =~ /--strata /) {
@@ -738,16 +720,16 @@ sub doSearch {
 	}
 
 	{
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
 
-		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
 		print "$cmd\n";
 		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -755,7 +737,7 @@ sub doSearch {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(`$cmd 2>.tmp$seed.stderr`);
 	# Parse output to see if any of it is bad
@@ -810,7 +792,7 @@ sub doSearch {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "./bowtie $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $phased $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "./bowtie $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		system($cmd) == 0 || die;
 		$khits =~ s/--strata --best//;
