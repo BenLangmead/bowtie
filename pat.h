@@ -1796,6 +1796,7 @@ protected:
 		assert_gt(nameLen, 0);
 		readCnt_++;
 		patid = readCnt_-1;
+		r.readOrigBufLen = filebuf_.copyLastN(r.readOrigBuf);
 	}
 	/// Read another pair of patterns from a FASTA input file
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {

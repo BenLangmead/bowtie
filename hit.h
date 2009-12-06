@@ -1836,7 +1836,7 @@ public:
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(out, PASS_HIT_DUMPS2),
-	_partition(partition),
+	partition_(partition),
 	offBase_(offBase),
 	colorSeq_(colorSeq),
 	colorQual_(colorQual),
@@ -1862,7 +1862,7 @@ public:
 	               DECL_HIT_DUMPS2,
 				   int partition = 0) :
 	HitSink(numOuts, PASS_HIT_DUMPS2),
-	_partition(partition),
+	partition_(partition),
 	offBase_(offBase),
 	colorSeq_(colorSeq),
 	colorQual_(colorQual),
@@ -2107,7 +2107,7 @@ public:
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
 		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_,
-		                       fullRef_, _partition, offBase_,
+		                       fullRef_, partition_, offBase_,
 		                       colorSeq_, colorQual_, cost_,
 		                       suppress_);
 	}
@@ -2142,7 +2142,7 @@ protected:
 	}
 
 private:
-	int      _partition;   /// partition size, or 0 if partitioning is disabled
+	int      partition_;   /// partition size, or 0 if partitioning is disabled
 	int      offBase_;     /// Add this to reference offsets before outputting.
 	                       /// (An easy way to make things 1-based instead of
 	                       /// 0-based)

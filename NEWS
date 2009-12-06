@@ -44,7 +44,7 @@ Version 0.12.0 - November 25, 2009
    * New --suppress option suppresses unwanted columns of output
    * The MANUAL file was converted to markdown format, facilitating
      conversion to various other formats using tools like pandoc
-   * DEPRECATED: --concise
+   * DEPRECATED: bowtie: --concise, bowtie-build: --big, --little
    * REMOVED: -z/--phased, -b/--binout, bowtie-maptool,
      bowtie-maqconvert
 

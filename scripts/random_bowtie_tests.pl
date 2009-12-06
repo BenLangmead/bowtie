@@ -2,13 +2,12 @@
 
 #
 # Generate and run a series of random (but non-trivial) test cases for
-# the Bowtie suite of tools, including bowtie, bowtie-build,
-# bowtie-maptool, and bowtie-inspect.  Most of the problems turned up
-# this way are in the form of assertions in the tools.  However, we
-# also do some sanity-checking of the results; e.g. we use the
-# pe_verify.pl script to verify that paired-end alignments are
-# consistent with matched-up single-end alignments.  This script does
-# not compare single-ended results against an oracle.
+# the Bowtie suite of tools, including bowtie, bowtie-build and
+# bowtie-inspect.  Most of the problems turned up this way are in the
+# form of assertions in the tools.  However, we also do some sanity-
+# checking of the results; e.g. we use the pe_verify.pl script to
+# verify that paired-end alignments are consistent with matched-up
+# single-end alignments.
 #
 # Usage: perl random_tester.pl [rand seed] \
 #                              [# outer iters] \
@@ -69,10 +68,6 @@ sub pickPolicy {
 	if(!$pe && int(rand(2)) == 0) {
 		# Possibly ask for best alignments
 		$pol .= " --best";
-	} elsif(!$pe && int(rand(2)) == 0) {
-		$pol .= " --better";
-	} elsif(!$pe && int(rand(2)) == 0) {
-		$pol .= " --oldbest";
 	}
 	if($pol =~ /-n/ && int(rand(2)) == 0) {
 		$pol .= " --nomaqround";
@@ -199,7 +194,7 @@ sub trim($) {
 
 # Build an Ebwt based on given arguments
 sub build {
-	my($t, $lineRate, $linesPerSide, $offRate, $isaRate, $ftabChars, $endian) = @_;
+	my($t, $offRate, $ftabChars) = @_;
 	my $ret = 0;
 	
 	my $file1 = "-c";
@@ -219,7 +214,8 @@ sub build {
 	close(FA);
 	
 	# Make a version of the FASTA file where all non-A/C/G/T characters
-	# are Ns.
+	# are Ns.  This is useful if we'd like to compare to the output of
+	# bowtie-inspect.
 	open FAN, ">.randtmp$seed.ns.fa" || die "Could not open temporary fasta file";
 	for(my $i = 0; $i <= $#seqs; $i++) {
 		print FAN ">$i\n";
@@ -243,13 +239,12 @@ sub build {
 	} elsif($bucketRand == 1) {
 		$bucketArg = "-a ";
 	}
-	
-	my $isaArg = "";
-	if($isaRate >= 0) {
-		$isaArg = "--isarate $isaRate";
-	}
 
-	my $args = "-q $isaArg --sanity $file1 --offrate $offRate --ftabchars $ftabChars $bucketArg $endian $file2";
+	$offRate   = "--offrate $offRate"   if $offRate ne "";
+	$ftabChars = "--ftabchars $ftabChars" if $ftabChars ne "";
+	my $noauto = "";
+	$noauto = "-a" if $offRate eq "" && $ftabChars eq "";
+	my $args = "-q --sanity $file1 $noauto $offRate $ftabChars $bucketArg $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";
@@ -277,18 +272,14 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
-		$cmd = "./bowtie-build-debug -p $args .tmp$seed.packed";
+		$cmd = "./bowtie-build-debug -a -p $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>&1`);
 		if($out eq "") {
 			if(system("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
-				if($exitOnFail) {
-					exit 1;
-				}
+				die if $exitOnFail;
 			} elsif(system("diff .tmp$seed.2.ebwt .tmp$seed.packed.2.ebwt") != 0) {
-				if($exitOnFail) {
-					exit 1;
-				}
+				die if $exitOnFail;
 			} else {
 				$ret++;
 			}
@@ -310,8 +301,8 @@ sub deleteReadParts {
 }
 
 sub search {
-	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
-	my $ret = doSearch($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate);
+	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my $ret = doSearch($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
 	deleteReadParts();
 	return $ret;
 }
@@ -350,14 +341,9 @@ sub checkRefVerbose {
 	return 1;
 }
 
-sub checkRefConcise {
-	my ($l, @tts) = @_;
-	return 1;
-}
-
 # Search for a pattern in an existing Ebwt
 sub doSearch {
-	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate, $isaRate) = @_;
+	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
 	
 	my @tts = split(/,/, $t);
 	
@@ -365,18 +351,7 @@ sub doSearch {
 	my $patstr = "\"$p1\"";
 	$patstr = "-1 \"$p1\" -2 \"$p2\"" if $pe;
 	my $outformat = int(rand(3));
-	my $maptool_cmd = "";
 	my $outfile = ".tmp$seed.out";
-	
-	if($outformat == 0) {
-		$outformat = ""; # default (verbose)
-		$maptool_cmd = " && ./bowtie-maptool-debug -d -C .tmp$seed.out"; # default
-	} elsif($outformat == 1) {
-		$outformat = "-b"; # binary
-		$maptool_cmd = " && ./bowtie-maptool-debug -b -C .tmp$seed.out"; # binary
-	} else {
-		$outformat = "--concise"; # concise
-	}
 	
 	my $ext = ".fq";
 	my $format = int(rand(5));
@@ -535,11 +510,6 @@ sub doSearch {
 		}
 	}
 	
-	my $isaArg = "";
-	if($isaRate >= 0) {
-		$isaArg = "--isarate $isaRate";
-	}
-	
 	my $khits = "-k 1";
 	my $mhits = 0;
 	if(int(rand(2)) == 0) {
@@ -581,7 +551,7 @@ sub doSearch {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
@@ -619,9 +589,8 @@ sub doSearch {
 	for(my $i = 0; $i <= $#outlines; $i++) {
 		# Get the alignment for the first mate (or the unpaired read)
 		my $l = $outlines[$i];
-		next if $l =~ /^Reported/; # skip the summary line
 		chomp($l);
-		checkRefConcise($l, @tts);
+		checkRefVerbose($l, @tts);
 		my $key = "$l";
 		my $l2 = "";
 		if($pe) {
@@ -629,7 +598,7 @@ sub doSearch {
 			$l2 = $outlines[++$i];
 			defined($l2) || die "Odd number of output lines";
 			chomp($l2);
-			checkRefConcise($l2, @tts);
+			checkRefVerbose($l2, @tts);
 			$key .= ", $l2";
 		}
 		print "$key\n";
@@ -674,7 +643,7 @@ sub doSearch {
 				$fw eq "+" || die "Saw a rev-comp alignment when --norc was specified";
 			}
 		}
-		if($read ne $lastread)) {
+		if($read ne $lastread) {
 			die "Read $read appears multiple times non-consecutively" if defined($readcount{$read});
 		}
 		if(!$pe && $policy =~ /--strata /) {
@@ -720,16 +689,16 @@ sub doSearch {
 	}
 
 	{
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
 
-		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile $maptool_cmd";
+		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -737,7 +706,7 @@ sub doSearch {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(`$cmd 2>.tmp$seed.stderr`);
 	# Parse output to see if any of it is bad
@@ -792,7 +761,7 @@ sub doSearch {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "./bowtie $policy $strand $unalignArg $khits $isaArg $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "./bowtie $policy $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		system($cmd) == 0 || die;
 		$khits =~ s/--strata --best//;
@@ -822,17 +791,13 @@ my $fail = 0;
 for(; $outer > 0; $outer--) {
 
 	# Generate random parameters
-	my $lineRate = 4 + int(rand(7));     # Must be >= 4
-	my $linesPerSide = 1 + int(rand(3));
-	my $offRate = int(rand(16));         # Can be anything
-	my $isaRate = int(rand(8))-1;        # Can be anything
-	my $ftabChars = 1 + int(rand(8));    # Must be >= 1
-	my $big = int(rand(2));
-	my $endian = '';
-	if($big) {
-		$endian = "--big";
-	} else {
-		$endian = "--little";
+	my $offRate = "";
+	if(int(rand(2)) == 0) {
+		$offRate = int(rand(16));
+	}
+	my $ftabChars = "";
+	if(int(rand(2)) == 0) {
+		$ftabChars = 1 + int(rand(8));
 	}
 
 	# Generate random text(s)
@@ -849,7 +814,7 @@ for(; $outer > 0; $outer--) {
 	}
 	
 	# Run the command to build the Ebwt from the random text
-	$pass += build($t, $lineRate, $linesPerSide, $offRate, $isaRate, $ftabChars, $endian);
+	$pass += build($t, $offRate, $ftabChars);
 	last if(++$tests > $limit);
 
 	my $in = $inner;
@@ -956,7 +921,7 @@ for(; $outer > 0; $outer--) {
 		} else {
 			$expectResult = 0;
 		}
-		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate, $isaRate); # require 1 or more results
+		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -987,7 +952,7 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy($pe);
-		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate, $isaRate); # do not require any results
+		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
 		last if(++$tests > $limit);
 	}
 }
