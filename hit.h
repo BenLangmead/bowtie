@@ -1220,9 +1220,6 @@ public:
 	 * already reported N hits.
 	 */
 	virtual bool finishedWithStratumImpl(int stratum) { return false; }
-
-private:
-	uint32_t _n;               /// max # hits to report per read
 };
 
 /**
