@@ -226,7 +226,7 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	assert(paired || p.bufa().mate == 0);
 	assert(!paired || p.bufa().mate > 0);
 	assert(un || hs->size() > 0);
-	assert(!un || hs->size() == 0);
+	assert(!un || hs == NULL || hs->size() == 0);
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
