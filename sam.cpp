@@ -241,21 +241,17 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	   << "\t0\t0\t*\t*\t0\t0\t"
 	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << (paired ? hssz/2+1 : hssz) << endl;
+	   << (paired ? (hssz+1)/2 : hssz) << endl;
 	if(paired) {
-		if(paired) {
-			// truncate final 2 chars
-			for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
-				ss << p.bufb().name[i];
-			}
-		} else {
-			ss << p.bufb().name;
+		// truncate final 2 chars
+		for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
+			ss << p.bufb().name[i];
 		}
 		ss << "\t"
 		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 		   << "\t0\t0\t*\t*\t0\t0\t"
 		   << p.bufb().patFw << "\t" << p.bufb().qual << "\tXM:i:"
-		   << (hssz/2+1) << endl;
+		   << (hssz+1)/2 << endl;
 	}
 	lock(0);
 	out(0).writeString(ss.str());
