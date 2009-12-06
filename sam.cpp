@@ -227,6 +227,8 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	assert(!paired || p.bufa().mate > 0);
 	assert(un || hs->size() > 0);
 	assert(!un || hs == NULL || hs->size() == 0);
+	size_t hssz = 0;
+	if(hs != NULL) hssz = hs->size();
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
@@ -239,7 +241,7 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	   << "\t0\t0\t*\t*\t0\t0\t"
 	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << (paired ? hs->size()/2+1 : hs->size()) << endl;
+	   << (paired ? hssz/2+1 : hssz) << endl;
 	if(paired) {
 		if(paired) {
 			// truncate final 2 chars
@@ -253,7 +255,7 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 		   << "\t0\t0\t*\t*\t0\t0\t"
 		   << p.bufb().patFw << "\t" << p.bufb().qual << "\tXM:i:"
-		   << (hs->size()/2+1) << endl;
+		   << (hssz/2+1) << endl;
 	}
 	lock(0);
 	out(0).writeString(ss.str());
