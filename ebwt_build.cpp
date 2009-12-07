@@ -360,6 +360,10 @@ static void driver(const string& infile,
 				writeU32(fout3, szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			}
+			if(sztot.first == 0) {
+				cerr << "Error: No unambiguous stretches of characters in the input.  Aborting..." << endl;
+				throw 1;
+			}
 			assert_gt(sztot.first, 0);
 			assert_gt(sztot.second, 0);
 			bpout.close();
