@@ -353,8 +353,7 @@ static void driver(const string& infile,
 				// the ones that were indexed
 				int numSeqs2 = 0;
 				sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs2);
-				assert_eq(numSeqs, numSeqs2);
-				assert_eq(sztot2.second, sztot.second + numSeqs);
+				assert_geq(sztot2.second, sztot.second + 1);
 			} else {
 				int numSeqs = 0;
 				sztot = fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
@@ -384,7 +383,7 @@ static void driver(const string& infile,
 					fastaRefReadSizes(is, szs2, refparams, NULL, numSeqs2);
 				assert_eq(numSeqs, numSeqs2);
 				// One less color than base
-				assert_eq(sztot2.second, sztot.second + numSeqs);
+				assert_geq(sztot2.second, sztot.second + 1);
 				refparams.color = true;
 			}
 #endif

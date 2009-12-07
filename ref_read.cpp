@@ -237,8 +237,8 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 		assert(!in[i]->eof());
 #endif
 	}
-	assert_gt(bothTot, 0);
-	assert_gt(unambigTot, 0);
+	assert_geq(bothTot, 0);
+	assert_geq(unambigTot, 0);
 	return make_pair(
 		unambigTot, // total number of unambiguous DNA characters read
 		bothTot); // total number of DNA characters read, incl. ambiguous ones
