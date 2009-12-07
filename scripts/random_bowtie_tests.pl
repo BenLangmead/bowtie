@@ -518,8 +518,6 @@ sub doSearch {
 		$khits = "-k " . (int(rand(20))+2);
 	}
 	if(int(rand(3)) == 0) {
-		$policy =~ s/--oldbest//;
-		$policy =~ s/--better//;
 		$khits .= " --strata --best";
 	}
 	if(int(rand(2)) == 0) {
@@ -528,7 +526,11 @@ sub doSearch {
 	}
 	
 	if($mhits > 0) {
-		$khits .= " -m $mhits";
+		if(int(rand(2)) == 0) {
+			$khits .= " -m $mhits";
+		} else {
+			$khits .= " -M $mhits";
+		}
 	}
 	
 	my $strand = "";
@@ -551,7 +553,7 @@ sub doSearch {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
@@ -739,12 +741,11 @@ sub doSearch {
 		}
 	}
 	
-	if(!$pe && $policy =~ /--best|--better/) {
+	if(!$pe && $policy =~ /--best/) {
 		$cmd = "perl scripts/best_verify.pl -d $policy .tmp$seed $patstr";
 		print "$cmd\n";
 		$out = trim(`$cmd 2>.tmp$seed.best_verify.stderr`);
 		
-		# Bad exitlevel?
 		if($? != 0) {
 			print "scripts/best_verify.pl exitlevel: $?\n";
 			if($exitOnFail) {
