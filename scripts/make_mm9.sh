@@ -95,7 +95,7 @@ for c in $CHRS_TO_INDEX ; do
 	[ -z "$INPUTS" ] && INPUTS=${c}.fa
 done
 
-CMD="${BOWTIE_BUILD_EXE} ${INPUTS} mm9"
+CMD="${BOWTIE_BUILD_EXE} $* ${INPUTS} mm9"
 echo Running $CMD
 if $CMD ; then
 	echo "mm9 index built; you may remove fasta files"

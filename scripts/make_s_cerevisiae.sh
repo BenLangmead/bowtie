@@ -41,7 +41,7 @@ fi
 CMD="$BOWTIE_BUILD_EXE $* Scerevisiae_chr.fna s_cerevisiae"
 echo $CMD
 if $CMD ; then
-	echo "$OUTPUT index built; you may remove fasta files"
+	echo "s_cerevisiae index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"
 fi

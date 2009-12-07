@@ -8,6 +8,21 @@
 
 GENOMES_MIRROR=ftp://ftp.arabidopsis.org/home/tair
 
+get() {
+	file=$1
+	if ! wget --version >/dev/null 2>/dev/null ; then
+		if ! curl --version >/dev/null 2>/dev/null ; then
+			echo "Please install wget or curl somewhere in your PATH"
+			exit 1
+		fi
+		curl -o `basename $1` $1
+		return $?
+	else
+		wget $1
+		return $?
+	fi
+}
+
 BOWTIE_BUILD_EXE=./bowtie-build
 if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 	if ! which bowtie-build ; then
@@ -20,18 +35,8 @@ fi
 
 for c in 1 2 3 4 5 C M ; do
 	if [ ! -f chr$c.fas ] ; then
-		if ! which wget > /dev/null ; then
-			echo wget not found, looking for curl...
-			if ! which curl > /dev/null ; then
-				echo curl not found either, aborting...
-			else
-				# Use curl
-				curl ${GENOMES_MIRROR}/Sequences/whole_chromosomes/chr$c.fas -o chr$c.fas
-			fi
-		else
-			# Use wget
-			wget ${GENOMES_MIRROR}/Sequences/whole_chromosomes/chr$c.fas
-		fi
+		F=${GENOMES_MIRROR}/Sequences/whole_chromosomes/chr$c.fas
+		get $f || (echo "Error getting $F" && exit 1)
 	fi
 	
 	if [ ! -f chr$c.fas ] ; then
@@ -40,9 +45,9 @@ for c in 1 2 3 4 5 C M ; do
 	fi
 done
 
-echo Running ${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
-${BOWTIE_BUILD_EXE} chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana
-if [ "$?" = "0" ] ; then
+CMD="${BOWTIE_BUILD_EXE} $* chr1.fas,chr2.fas,chr3.fas,chr4.fas,chr5.fas,chrC.fas,chrM.fas  a_thaliana"
+echo $CMD
+if $CMD ; then
 	echo "a_thaliana index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"

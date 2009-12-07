@@ -17,9 +17,6 @@
 # variable below.
 #
 
-ARGS=$1
-shift
-
 BASE_CHRS="\
 chr1 \
 chr2 \
@@ -115,7 +112,7 @@ for c in $CHRS_TO_INDEX ; do
 	[ -z "$INPUTS" ] && INPUTS=${c}.fa
 done
 
-CMD="${BOWTIE_BUILD_EXE} ${ARGS} ${INPUTS} hg18"
+CMD="${BOWTIE_BUILD_EXE} $* ${INPUTS} hg18"
 echo Running $CMD
 if $CMD ; then
 	echo "hg18 index built; you may remove fasta files"

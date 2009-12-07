@@ -43,7 +43,7 @@ if [ ! -f $F ] ; then
 	gunzip $FGZ || (echo "Error unzipping $FGZ" && exit 1)
 fi
 
-CMD="${BOWTIE_BUILD_EXE} $F $IDX_NAME"
+CMD="${BOWTIE_BUILD_EXE} $* $F $IDX_NAME"
 echo "Running $CMD"
 if $CMD ; then
 	echo "$IDX_NAME index built; you may remove fasta files"
