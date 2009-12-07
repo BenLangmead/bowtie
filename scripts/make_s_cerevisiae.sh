@@ -38,14 +38,10 @@ if [ ! -f Scerevisiae_chr.fna ] ; then
 	exit 2
 fi
 
-echo Running ${BOWTIE_BUILD_EXE} Scerevisiae_chr.fna s_cerevisiae
-${BOWTIE_BUILD_EXE} Scerevisiae_chr.fna s_cerevisiae
-if [ "$?" = "0" ] ; then
-	echo "s_cerevisiae index built:"
-	echo "   s_cerevisiae.1.ebwt s_cerevisiae.2.ebwt"
-	echo "   s_cerevisiae.3.ebwt s_cerevisiae.4.ebwt"
-	echo "   s_cerevisiae.rev.1.ebwt s_cerevisiae.rev.2.ebwt"
-	echo "You may remove Scerevisiae_chr.fna"
+CMD="$BOWTIE_BUILD_EXE $* Scerevisiae_chr.fna s_cerevisiae"
+echo $CMD
+if $CMD ; then
+	echo "$OUTPUT index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"
 fi
