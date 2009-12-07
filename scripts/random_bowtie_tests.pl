@@ -194,7 +194,7 @@ sub trim($) {
 
 # Build an Ebwt based on given arguments
 sub build {
-	my($t, $offRate, $ftabChars) = @_;
+	my($t, $color, $offRate, $ftabChars) = @_;
 	my $ret = 0;
 	
 	my $file1 = "-c";
@@ -203,6 +203,8 @@ sub build {
 		# Add backslash to escape first dash
 		$file2 = "\"\\$t\"";
 	}
+	
+	$color = ($color ? "-C" : "");
 	
 	# Write reference sequences to a FASTA file
 	open FA, ">.randtmp$seed.fa" || die "Could not open temporary fasta file";
@@ -244,7 +246,7 @@ sub build {
 	$ftabChars = "--ftabchars $ftabChars" if $ftabChars ne "";
 	my $noauto = "";
 	$noauto = "-a" if $offRate eq "" && $ftabChars eq "";
-	my $args = "-q --sanity $file1 $noauto $offRate $ftabChars $bucketArg $file2";
+	my $args = "-q --sanity $color $file1 $noauto $offRate $ftabChars $bucketArg $file2";
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";
@@ -301,8 +303,8 @@ sub deleteReadParts {
 }
 
 sub search {
-	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
-	my $ret = doSearch($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
+	my($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my $ret = doSearch($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
 	deleteReadParts();
 	return $ret;
 }
@@ -343,7 +345,7 @@ sub checkRefVerbose {
 
 # Search for a pattern in an existing Ebwt
 sub doSearch {
-	my($t, $pe, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
 	
 	my @tts = split(/,/, $t);
 	
@@ -352,6 +354,8 @@ sub doSearch {
 	$patstr = "-1 \"$p1\" -2 \"$p2\"" if $pe;
 	my $outformat = int(rand(3));
 	my $outfile = ".tmp$seed.out";
+
+	$color = ($color ? "-C" : "");
 	
 	my $ext = ".fq";
 	my $format = int(rand(5));
@@ -553,7 +557,7 @@ sub doSearch {
 	if(int(rand(3)) == 0) {
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	my $cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
@@ -777,6 +781,43 @@ my $pass = 0;
 my $tests = 0;
 my $fail = 0;
 
+sub colorize($) {
+	my $s = shift;
+	my %cmap = (
+		"AA" => "0",
+		"CC" => "0",
+		"GG" => "0",
+		"TT" => "0",
+		"AC" => "1",
+		"CA" => "1",
+		"GT" => "1",
+		"TG" => "1",
+		"AG" => "2",
+		"GA" => "2",
+		"CT" => "2",
+		"TC" => "2",
+		"AT" => "3",
+		"TA" => "3",
+		"CG" => "3",
+		"GC" => "3",
+		"NA" => ".",
+		"NC" => ".",
+		"NG" => ".",
+		"NT" => ".",
+		"AN" => ".",
+		"CN" => ".",
+		"GN" => ".",
+		"TN" => ".",
+		"NN" => "."
+	);
+	my $ret = "";
+	for(my $i = 0; $i < length($s)-1; $i++) {
+		my $di = substr($s, $i, 2);
+		$ret .= $cmap{$di};
+	}
+	return $ret;
+}
+
 for(; $outer > 0; $outer--) {
 
 	# Generate random parameters
@@ -802,8 +843,10 @@ for(; $outer > 0; $outer--) {
 		if($i < $nt-1) { $t .= ","; }        # add comma separator
 	}
 	
+	my $color = (int(rand(2)) == 0);
+	
 	# Run the command to build the Ebwt from the random text
-	$pass += build($t, $offRate, $ftabChars);
+	$pass += build($t, $color, $offRate, $ftabChars);
 	last if(++$tests > $limit);
 
 	my $in = $inner;
@@ -858,16 +901,16 @@ for(; $outer > 0; $outer--) {
 			if($pe && (length($p2) < 4 || index($p2, ",") != -1)) {
 				$i--; next;
 			}
-			# Optionally add mutations to pattern (but not the first)
+			# Optionally add nucleotide changes to pattern
 			if($i > 0) {
-				my $nummms = int(rand(4));
+				my $nummms = int(rand($color ? 3 : 5));
 				for(my $j = 0; $j < $nummms; $j++) {
-					substr($p1, int(rand(length($p1))), 1, randDna(1));
+					substr($p1, int(rand(length($p1))), 1) = randDna(1);
 				}
 				if($pe) {
 					$nummms = int(rand(4));
 					for(my $j = 0; $j < $nummms; $j++) {
-						substr($p2, int(rand(length($p2))), 1, randDna(1));
+						substr($p2, int(rand(length($p2))), 1) = randDna(1);
 					}
 				}
 			}
@@ -882,6 +925,23 @@ for(; $outer > 0; $outer--) {
 				}
 			}
 			$p1 =~ tr/MRWSYKVHDBX/N/;
+			if($color) {
+				$p1 = colorize($p1);
+				$p2 = colorize($p2);
+				# Optionally add color changes to pattern
+				if($i > 0) {
+					my $nummms = int(rand(3));
+					for(my $j = 0; $j < $nummms; $j++) {
+						substr($p1, int(rand(length($p1))), 1) = randDna(1);
+					}
+					if($pe) {
+						$nummms = int(rand(4));
+						for(my $j = 0; $j < $nummms; $j++) {
+							substr($p2, int(rand(length($p2))), 1) = randDna(1);
+						}
+					}
+				}
+			}
 			# Add valid random quality values
 			$p1 = addQual($p1);
 			$pfinal1 .= $p1;
@@ -910,7 +970,7 @@ for(; $outer > 0; $outer--) {
 		} else {
 			$expectResult = 0;
 		}
-		$pass += search($t, $pe, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
+		$pass += search($t, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -927,8 +987,10 @@ for(; $outer > 0; $outer--) {
 			$plen = int(rand($prand)) + $pbase;
 			my $p2 = randDna($plen);
 			$p1 =~ tr/MRWSYKVHDBX/N/;
+			$p1 = colorize($p1);
 			$p1 = addQual($p1);
 			$p2 =~ tr/MRWSYKVHDBX/N/ if $pe;
+			$p2 = colorize($p2) if $pe;
 			$p2 = addQual($p2) if $pe;
 			$pfinal1 .= $p1;
 			$pfinal2 .= $p2 if $pe;
