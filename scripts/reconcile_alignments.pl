@@ -29,13 +29,14 @@ use warnings;
 use Getopt::Std;
 
 my %options=();
-getopts("rfqak:m:u:",\%options);
+getopts("rfqak:m:u:M:",\%options);
 
 my $khits = 1;
 $khits = int($options{k}) if defined($options{k});
 $khits = 999999 if $options{a};
 my $maxhits = 999999;
 $maxhits = int($options{m}) if defined($options{m});
+$maxhits = int($options{M}) if defined($options{M});
 my $num_reads = -1;
 $num_reads = $options{u} if defined($options{u});
 
@@ -148,8 +149,10 @@ while(1) {
 	my ($name, $seq, $qual) = get_read($UN);
 	last if $name eq "";
 	$uns++;
-	defined($hits_hash{$name}) &&
-		die "Read $name appears both in hits file $algn_file and in --un file $un_file";
+	unless(defined($options{M})) {
+		defined($hits_hash{$name}) &&
+			die "Read $name appears both in hits file $algn_file and in --un file $un_file";
+	}
 	defined($un_hash{$name}) &&
 		die "Read $name appears more than once in --un file $un_file";
 	$un_hash{$name}{seq} = $seq;
@@ -166,8 +169,13 @@ if($max_file ne "") {
 		my ($name, $seq, $qual) = get_read($MAX);
 		last if $name eq "";
 		$maxs++;
-		defined($hits_hash{$name}) &&
-			die "Read $name appears both in hits file $algn_file and in --max file $max_file";
+		if(defined($options{M})) {
+			defined($hits_hash{$name}) ||
+				die "Read $name appears in --max file $max_file but not in alignment file $algn_file";
+		} else {
+			defined($hits_hash{$name}) &&
+				die "Read $name appears both in hits file $algn_file and in --max file $max_file";
+		}
 		defined($un_hash{$name})   &&
 			die "Read $name appears both in --un file $un_file and in --max file $max_file";
 		defined($max_hash{$name})  &&
