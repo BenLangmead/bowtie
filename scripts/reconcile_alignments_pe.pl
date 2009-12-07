@@ -35,20 +35,26 @@ use Getopt::Long;
 my $khits = 1;
 my $allHits = 0;
 my $maxhits = 999999;
+my $maxhits_M = 999999;
 my $num_reads = -1;
 my $verbose = 0;
 my $fastq = 0;
 my $fasta = 0;
 my $raw = 0;
+my $M = 0;
 
 GetOptions("m=i" => \$maxhits,
+           "M=i" => \$maxhits_M,
            "k=i" => \$khits,
            "u=i" => \$num_reads,
            "a"   => \$allHits,
            "v"   => \$verbose,
            "q"   => \$fastq,
            "f"   => \$fasta,
-           "e"   => \$raw);
+           "e"   => \$raw) || die "Bad arguments";
+
+$maxhits = $maxhits_M if ($maxhits_M != 999999);
+$M = ($maxhits_M != 999999);
 
 $fastq = 1 if ($fastq + $fasta + $raw == 0);
 
@@ -228,8 +234,15 @@ while(1) {
 	$ls1[0] eq $ls2[0] || die "Different names for paired alignments: $ls1[0], $ls2[0]";
 	my $name = $ls1[0];
 	# Where have we seen it before?  Nowhere, hopefully
-	defined($hits_hash{$name}) &&
-		die "Read $name appears both in hits file $hits_file and in --un file $un1_file/$un2_file";
+	if($M) {
+		if(defined($hits_hash{$name})) {
+			delete $hits_hash{$name};
+			$distinctHits--;
+		}
+	} else {
+		defined($hits_hash{$name}) &&
+			die "Read $name appears both in hits file $hits_file and in --un file $un1_file/$un2_file";
+	}
 	defined($un_hash{$name}) &&
 		die "Read $name appears in --un file $un1_file/$un2_file more than once";
 	# Insert summary of the pair that didn't align
@@ -266,8 +279,15 @@ if($max1_file ne "") {
 		$ls1[0] eq $ls2[0] || die "Different names for paired alignments: $ls1[0], $ls2[0]";
 		my $name = $ls1[0];
 		# Where have we seen it before?  Nowhere, hopefully
-		defined($hits_hash{$name}) &&
-			die "Read $name appears in hits file $hits_file and in --max file $max1_file/$max2_file";
+		if($M) {
+			defined($hits_hash{$name}) ||
+				die "Read $name appears in --max file $max1_file/$max2_file but not in hits file $hits_file in -M mode";
+			delete $hits_hash{$name};
+			$distinctHits--;
+		} else {
+			defined($hits_hash{$name}) &&
+				die "Read $name appears in hits file $hits_file and in --max file $max1_file/$max2_file";
+		}
 		defined($un_hash{$name}) &&
 			die "Read $name appears in --un file $un1_file/$un2_file and in --max file $max1_file/$max2_file";
 		defined($max_hash{$name}) &&
