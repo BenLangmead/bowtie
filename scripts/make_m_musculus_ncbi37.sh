@@ -63,7 +63,7 @@ if [ ! -f mm_ref_chrMT.fa ] ; then
 fi
 append $F
 
-CMD="$BOWTIE_BUILD_EXE $INPUTS $OUTPUT"
+CMD="$BOWTIE_BUILD_EXE $* $INPUTS $OUTPUT"
 echo $CMD
 if $CMD ; then
 	echo "$OUTPUT index built; you may remove fasta files"
