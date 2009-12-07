@@ -100,7 +100,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			return RefRecord(off, len, first);
+			return RefRecord(0, 0, false);
 		}
 		c = in.get();
 		if(c == -1) {
@@ -111,7 +111,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			return RefRecord(off, len, first);
+			return RefRecord(0, 0, false);
 		}
 	}
 	assert(!rparms.color || (lc != -1));
