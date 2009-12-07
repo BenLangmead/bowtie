@@ -11,6 +11,9 @@
 #  Release date: 24 March 2008
 #
 
+ARGS=$1
+shift
+
 GENOMES_MIRROR=ftp://ftp.ncbi.nih.gov/genomes
 FILE_PATH=${GENOMES_MIRROR}/H_sapiens/ARCHIVE/BUILD.36.3/Assembled_chromosomes
 
@@ -66,8 +69,8 @@ fi
 
 INPUTS=hs_ref_chr1.fa,hs_ref_chr2.fa,hs_ref_chr3.fa,hs_ref_chr4.fa,hs_ref_chr5.fa,hs_ref_chr6.fa,hs_ref_chr7.fa,hs_ref_chr8.fa,hs_ref_chr9.fa,hs_ref_chr10.fa,hs_ref_chr11.fa,hs_ref_chr12.fa,hs_ref_chr13.fa,hs_ref_chr14.fa,hs_ref_chr15.fa,hs_ref_chr16.fa,hs_ref_chr17.fa,hs_ref_chr18.fa,hs_ref_chr19.fa,hs_ref_chr20.fa,hs_ref_chr21.fa,hs_ref_chr22.fa,hs_ref_chrMT.fa,hs_ref_chrX.fa,hs_ref_chrY.fa
 
-echo Running ${BOWTIE_BUILD_EXE} ${INPUTS} h_sapiens_asm
-${BOWTIE_BUILD_EXE} ${INPUTS} h_sapiens_asm
+echo Running ${BOWTIE_BUILD_EXE} ${ARGS} ${INPUTS} h_sapiens_asm
+${BOWTIE_BUILD_EXE} ${ARGS} ${INPUTS} h_sapiens_asm
 
 if [ "$?" = "0" ] ; then
 	echo "h_sapiens_asm index built:"
