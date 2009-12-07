@@ -2701,10 +2701,7 @@ protected:
 		int dstLen = 0;
 		int nameLen = 0;
 		c = getOverNewline(this->fb_);
-		if(c < 0) {
-			seqan::clear(r.patFw);
-			return;
-		}
+		if(c < 0) { bail(r); return; }
 		assert(!isspace(c));
 		if(first_) {
 			// Check that the first character is sane for a raw file
@@ -2802,6 +2799,15 @@ protected:
 		out << seq << endl;
 	}
 private:
+	/**
+	 * Do things we need to do if we have to bail in the middle of a
+	 * read, usually because we reached the end of the input without
+	 * finishing.
+	 */
+	void bail(ReadBuf& r) {
+		seqan::clear(r.patFw);
+		fb_.resetLastN();
+	}
 	bool first_;
 	bool color_;
 };
