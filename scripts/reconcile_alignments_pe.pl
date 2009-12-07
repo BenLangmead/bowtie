@@ -31,6 +31,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+Getopt::Long::Configure ("no_ignore_case");
 
 my $khits = 1;
 my $allHits = 0;
