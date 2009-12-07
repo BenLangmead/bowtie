@@ -609,23 +609,11 @@ sub doSearch {
 			!defined($outhash{$key}) || die "Result $key appears in output twice";
 		}
 		$outhash{$key} = 1;
-		# Result should look like "4+:<4,231,0>"
-		my $wellFormed = 0;
-		$wellFormed = ($l =~ m/^([01-9]+)([+-])[:]<[01-9]+,[01-9]+,([01-9]+)>$/) unless $pe;
-		$wellFormed = ($l =~ m/^([01-9]+)\/([12])([+-])[:]<[01-9]+,[01-9]+,([01-9]+)>$/) if $pe;
-		unless($wellFormed) {
-			print "Results malformed\n";
-			print "$out\n";
-			if($exitOnFail) {
-				print "Stdout:\n$out\nStderr:\n$err\n";
-				exit 1;
-			}
-			return 0;
-		}
 		# Parse out the read id
-		my $read = $1;
+		my @ls = split(/[\t]/, $l);
+		my $read = $ls[0];
 		my $mate = 0;
-		my $fw = $2;
+		my $fw = $ls[1];
 		my $stratum = $3;
 		if($pe) {
 			$mate = $2;

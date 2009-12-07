@@ -152,6 +152,8 @@ while(1) {
 	unless(defined($options{M})) {
 		defined($hits_hash{$name}) &&
 			die "Read $name appears both in hits file $algn_file and in --un file $un_file";
+	} elsif(defined($hits_hash{$name})) {
+		$distinctHits--;
 	}
 	defined($un_hash{$name}) &&
 		die "Read $name appears more than once in --un file $un_file";
@@ -172,6 +174,7 @@ if($max_file ne "") {
 		if(defined($options{M})) {
 			defined($hits_hash{$name}) ||
 				die "Read $name appears in --max file $max_file but not in alignment file $algn_file";
+			$distinctHits--;
 		} else {
 			defined($hits_hash{$name}) &&
 				die "Read $name appears both in hits file $algn_file and in --max file $max_file";
