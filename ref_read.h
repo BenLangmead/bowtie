@@ -100,7 +100,8 @@ extern std::pair<size_t, size_t>
 fastaRefReadSizes(vector<FileBuf*>& in,
                   vector<RefRecord>& recs,
                   const RefReadInParams& rparms,
-                  BitpairOutFileBuf* bpout = NULL);
+                  BitpairOutFileBuf* bpout,
+                  int& numSeqs);
 
 /**
  * Reads the next sequence from the given FASTA file and appends it to

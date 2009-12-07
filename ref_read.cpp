@@ -188,7 +188,8 @@ std::pair<size_t, size_t>
 fastaRefReadSizes(vector<FileBuf*>& in,
                   vector<RefRecord>& recs,
                   const RefReadInParams& rparms,
-                  BitpairOutFileBuf* bpout)
+                  BitpairOutFileBuf* bpout,
+                  int& numSeqs)
 {
 	uint32_t unambigTot = 0;
 	uint32_t bothTot = 0;
@@ -217,6 +218,7 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 				throw 1;
 			}
 			// Add the length of this record.
+			if(rec.first) numSeqs++;
 			unambigTot += rec.len;
 			bothTot += rec.len;
 			bothTot += rec.off;

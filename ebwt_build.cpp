@@ -340,18 +340,24 @@ static void driver(const string& infile,
 				refparams.color = false;
 				// Make sure the .3.ebwt and .4.ebwt files contain
 				// nucleotides; not colors
+				int numSeqs = 0;
 				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs, refparams, &bpout);
+					fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
 				refparams.color = true;
 				writeU32(fout3, szs.size(), bigEndian); // write # records
-				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
+				for(size_t i = 0; i < szs.size(); i++) {
+					szs[i].write(fout3, bigEndian);
+				}
 				szs.clear();
 				// Now read in the colorspace size records; these are
 				// the ones that were indexed
-				sztot = fastaRefReadSizes(is, szs, refparams, NULL);
-				assert_eq(sztot2.second, sztot.second + 1);
+				int numSeqs2 = 0;
+				sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs2);
+				assert_eq(numSeqs, numSeqs2);
+				assert_eq(sztot2.second, sztot.second + numSeqs);
 			} else {
-				sztot = fastaRefReadSizes(is, szs, refparams, &bpout);
+				int numSeqs = 0;
+				sztot = fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
 				writeU32(fout3, szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			}
@@ -367,15 +373,18 @@ static void driver(const string& infile,
 		} else {
 			// Read in the sizes of all the unambiguous stretches of the
 			// genome into a vector of RefRecords
-			sztot = fastaRefReadSizes(is, szs, refparams);
+			int numSeqs = 0;
+			sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs);
 #ifndef NDEBUG
 			if(refparams.color) {
 				refparams.color = false;
 				vector<RefRecord> szs2;
+				int numSeqs2 = 0;
 				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs2, refparams, NULL);
+					fastaRefReadSizes(is, szs2, refparams, NULL, numSeqs2);
+				assert_eq(numSeqs, numSeqs2);
 				// One less color than base
-				assert_eq(sztot2.second, sztot.second + 1);
+				assert_eq(sztot2.second, sztot.second + numSeqs);
 				refparams.color = true;
 			}
 #endif
