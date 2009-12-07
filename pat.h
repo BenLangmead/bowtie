@@ -2442,6 +2442,23 @@ protected:
 		int *dstLenCur = &dstLens[0];
 		int trim5 = this->trim5_;
 		int altBufIdx = 0;
+		if(color_) {
+			// This may be a primer character.  If so, keep it in the
+			// 'primer' field of the read buf and parse the rest of the
+			// read without it.
+			c = toupper(c);
+			if(asc2dnacat[c] > 0) {
+				// First char is a DNA char
+				int c2 = toupper(fb_.peek());
+				// Second char is a color char
+				if(asc2colcat[c2] > 0) {
+					r.primer = c;
+					c = fb_.get();
+					assert_eq(c, c2);
+				}
+			}
+			if(c < 0) { bail(r); return; }
+		}
 		while(c != '+') {
 			// Convert color numbers to letters if necessary
 			if(color_) {
@@ -2683,18 +2700,20 @@ protected:
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
-		c = peekOverNewline(this->fb_);
+		c = getOverNewline(this->fb_);
 		if(c < 0) {
 			seqan::clear(r.patFw);
 			return;
 		}
 		assert(!isspace(c));
 		if(first_) {
+			// Check that the first character is sane for a raw file
+			int cc = c;
 			if(color_) {
-				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
-				if(c == '.') c = 'N';
+				if(cc >= '0' && cc <= '4') cc = "ACGTN"[(int)cc - '0'];
+				if(cc == '.') cc = 'N';
 			}
-			if(dna4Cat[c] == 0) {
+			if(dna4Cat[cc] == 0) {
 				cerr << "Error: reads file does not look like a Raw file" << endl;
 				if(c == '>') {
 					cerr << "Reads file looks like a FASTA file; please use -f" << endl;
@@ -2706,11 +2725,26 @@ protected:
 			}
 			first_ = false;
 		}
-
+		if(color_) {
+			// This may be a primer character.  If so, keep it in the
+			// 'primer' field of the read buf and parse the rest of the
+			// read without it.
+			c = toupper(c);
+			if(asc2dnacat[c] > 0) {
+				// First char is a DNA char
+				int c2 = toupper(fb_.peek());
+				// Second char is a color char
+				if(asc2colcat[c2] > 0) {
+					r.primer = c;
+					c = fb_.get();
+					assert_eq(c, c2);
+				}
+			}
+			if(c < 0) { bail(r); return; }
+		}
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		while(!isspace(c) && c >= 0) {
-			c = fb_.get();
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
@@ -2722,7 +2756,8 @@ protected:
 				r.qualBuf[len] = 'I';
 				dstLen++;
 			} else if(isalpha(c)) dstLen++;
-			c = fb_.peek();
+			if(isspace(fb_.peek())) break;
+			c = fb_.get();
 		}
 		if(dstLen >= (this->trim3_ + this->trim5_)) {
 			dstLen -= (this->trim3_ + this->trim5_);
