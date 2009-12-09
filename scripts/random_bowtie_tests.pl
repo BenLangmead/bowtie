@@ -168,6 +168,46 @@ sub reverseComp($) {
 	return $r;
 }
 
+##
+# Given a string in nucleotide space, convert to colorspace.
+#
+sub colorize($) {
+	my $s = shift;
+	my %cmap = (
+		"AA" => "0",
+		"CC" => "0",
+		"GG" => "0",
+		"TT" => "0",
+		"AC" => "1",
+		"CA" => "1",
+		"GT" => "1",
+		"TG" => "1",
+		"AG" => "2",
+		"GA" => "2",
+		"CT" => "2",
+		"TC" => "2",
+		"AT" => "3",
+		"TA" => "3",
+		"CG" => "3",
+		"GC" => "3",
+		"NA" => ".",
+		"NC" => ".",
+		"NG" => ".",
+		"NT" => ".",
+		"AN" => ".",
+		"CN" => ".",
+		"GN" => ".",
+		"TN" => ".",
+		"NN" => "."
+	);
+	my $ret = "";
+	for(my $i = 0; $i < length($s)-1; $i++) {
+		my $di = substr($s, $i, 2);
+		$ret .= $cmap{$di};
+	}
+	return $ret;
+}
+
 # Add some random quality values to encourage excercising the
 # backtracking code
 sub addQual($) {
@@ -222,6 +262,7 @@ sub build {
 	for(my $i = 0; $i <= $#seqs; $i++) {
 		print FAN ">$i\n";
 		my $t = nonACGTtoN($seqs[$i]);
+		$t = colorize($t) if $color;
 		print FAN "$t\n";
 	}
 	close(FAN);
@@ -780,43 +821,6 @@ sub doSearch {
 my $pass = 0;
 my $tests = 0;
 my $fail = 0;
-
-sub colorize($) {
-	my $s = shift;
-	my %cmap = (
-		"AA" => "0",
-		"CC" => "0",
-		"GG" => "0",
-		"TT" => "0",
-		"AC" => "1",
-		"CA" => "1",
-		"GT" => "1",
-		"TG" => "1",
-		"AG" => "2",
-		"GA" => "2",
-		"CT" => "2",
-		"TC" => "2",
-		"AT" => "3",
-		"TA" => "3",
-		"CG" => "3",
-		"GC" => "3",
-		"NA" => ".",
-		"NC" => ".",
-		"NG" => ".",
-		"NT" => ".",
-		"AN" => ".",
-		"CN" => ".",
-		"GN" => ".",
-		"TN" => ".",
-		"NN" => "."
-	);
-	my $ret = "";
-	for(my $i = 0; $i < length($s)-1; $i++) {
-		my $di = substr($s, $i, 2);
-		$ret .= $cmap{$di};
-	}
-	return $ret;
-}
 
 for(; $outer > 0; $outer--) {
 
