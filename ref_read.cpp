@@ -13,8 +13,6 @@ RefRecord fastaRefReadSize(FileBuf& in,
 {
 	int c;
 	static int lastc = '>'; // last character seen
-	assert_neq(rparms.baseCutoff, 0); // should have stopped
-	assert_neq(rparms.numSeqCutoff, 0); // should have stopped
 
 	// RefRecord params
 	size_t len = 0; // 'len' counts toward total length
@@ -33,8 +31,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			lastc = -1;
 			return RefRecord(0, 0, true);
 		}
-		// TODO: having # could yield spurious warnings (below)
-		assert(c == '>' || c == '#');
+		assert(c == '>');
 	}
 
 	first = true;
@@ -53,7 +50,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			// continue until a non-name, non-comment line
-		} while (c == '>' || c == '#');
+		} while (c == '>');
 	} else {
 		first = false; // not the first in a sequence
 		off = 1; // The gap has already been consumed, so count it
@@ -70,10 +67,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	int lc = -1; // last-DNA char variable for color conversion
 	while(true) {
 		int cat = dna4Cat[c];
-		if(rparms.nsToAs && cat == 2) {
-			// Turn this 'N' (or other ambiguous char) into an 'A'
-			c = 'A';
-		}
+		if(rparms.nsToAs && cat == 2) c = 'A';
 		if(cat == 1) {
 			// This is a DNA character
 			if(rparms.color) {
@@ -91,6 +85,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				break; // to read-in loop
 			}
 		} else if(cat == 2) {
+			if(lc != -1 && off == 0) off++;
 			lc = -1;
 			off++; // skip over gap character and increment
 		} else if(c == '>') {
@@ -100,7 +95,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			return RefRecord(0, 0, false);
+			return RefRecord(off, 0, false);
 		}
 		c = in.get();
 		if(c == -1) {
@@ -111,7 +106,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			return RefRecord(0, 0, false);
+			return RefRecord(off, 0, false);
 		}
 	}
 	assert(!rparms.color || (lc != -1));
@@ -126,10 +121,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	// in now points just past the first character of a sequence
 	// line, and c holds the first character
 	while(c != -1 && c != '>') {
-		if(rparms.nsToAs && dna4Cat[c] == 2) {
-			// Turn this 'N' (or other ambiguous char) into an 'A'
-			c = 'A';
-		}
+		if(rparms.nsToAs && dna4Cat[c] == 2) c = 'A';
 		uint8_t cat = dna4Cat[c];
 		int cc = toupper(c);
 		if(rparms.bisulfite && cc == 'C') c = cc = 'T';
@@ -147,12 +139,6 @@ RefRecord fastaRefReadSize(FileBuf& in,
 					// output nucleotide
 					bpout->write(charToDna5[c]);
 				}
-			}
-			if(rparms.baseCutoff != -1 &&
-			   (int64_t)len >= rparms.baseCutoff)
-			{
-				lastc = -1;
-				return RefRecord(off, len, first);
 			}
 			lc = charToDna5[(int)c];
 		} else if(cat == 2) {
@@ -199,18 +185,9 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 	for(size_t i = 0; i < in.size(); i++) {
 		bool first = true;
 		assert(!in[i]->eof());
-		assert_geq(rpcp.baseCutoff, -1);
-		assert_neq(rpcp.baseCutoff, 0);
-		assert_geq(rpcp.numSeqCutoff, -1);
-		assert_neq(rpcp.numSeqCutoff, 0);
 		// For each pattern in this istream
-		while(!in[i]->eof() && rpcp.baseCutoff != 0 && rpcp.numSeqCutoff != 0) {
+		while(!in[i]->eof()) {
 			RefRecord rec = fastaRefReadSize(*in[i], rparms, first, bpout);
-			if(rpcp.baseCutoff > 0) assert_leq((int64_t)rec.len, rpcp.baseCutoff);
-			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= rec.len;
-			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
-			assert_geq(rpcp.baseCutoff, -1);
-			assert_geq(rpcp.numSeqCutoff, -1);
 			if((unambigTot + rec.len) < unambigTot) {
 				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please divide the" << endl
 				     << "reference into batches or chunks of about 3.6 billion characters or less each" << endl

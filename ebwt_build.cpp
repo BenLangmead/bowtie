@@ -34,7 +34,6 @@ static int entireSA;
 static int seed;
 static int showVersion;
 static bool doubleEbwt;
-static int64_t cutoff;
 //   Ebwt parameters
 static int32_t lineRate;
 static int32_t linesPerSide;
@@ -61,7 +60,6 @@ static void resetOptions() {
 	seed         = 0;     // srandom seed
 	showVersion  = 0;     // just print version and quit?
 	doubleEbwt   = true;  // build forward and reverse Ebwts
-	cutoff       = -1;    // max # of reference bases
 	//   Ebwt parameters
 	lineRate     = 6;  // a "line" is 64 bytes
 	linesPerSide = 1;  // 1 64-byte line on a side
@@ -116,7 +114,6 @@ static void printUsage(ostream& out) {
 	    //<< "    --big --little          endianness (default: little, this host: "
 	    //<< (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
-	    << "    --cutoff <int>          truncate reference at prefix of <int> bases" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
 	    << "    --usage                 print this usage message" << endl
@@ -147,7 +144,6 @@ static struct option long_options[] = {
 	{(char*)"offrate",      required_argument, 0,            'o'},
 	{(char*)"ftabchars",    required_argument, 0,            't'},
 	{(char*)"help",         no_argument,       0,            'h'},
-	{(char*)"cutoff",       required_argument, 0,            ARG_CUTOFF},
 	{(char*)"ntoa",         no_argument,       0,            ARG_NTOA},
 	{(char*)"justref",      no_argument,       0,            '3'},
 	{(char*)"noref",        no_argument,       0,            'r'},
@@ -239,9 +235,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_SEED:
 				seed = parseNumber<int>(0, "--seed arg must be at least 0");
 				break;
-			case ARG_CUTOFF:
-				cutoff = parseNumber<int64_t>(1, "--cutoff arg must be at least 1");
-				break;
 			case ARG_NTOA: nsToAs = true; break;
 			case 'a': autoMem = false; break;
 			case 'q': verbose = false; break;
@@ -277,7 +270,7 @@ static void driver(const string& infile,
 {
 	vector<FileBuf*> is;
 	bool bisulfite = false;
-	RefReadInParams refparams(cutoff, -1, color, reverse, nsToAs, bisulfite);
+	RefReadInParams refparams(color, reverse, nsToAs, bisulfite);
 	assert_gt(infiles.size(), 0);
 	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
@@ -353,7 +346,8 @@ static void driver(const string& infile,
 				// the ones that were indexed
 				int numSeqs2 = 0;
 				sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs2);
-				assert_geq(sztot2.second, sztot.second + 1);
+				assert_eq(numSeqs, numSeqs2);
+				assert_eq(sztot2.second, sztot.second + numSeqs);
 			} else {
 				int numSeqs = 0;
 				sztot = fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
@@ -387,7 +381,7 @@ static void driver(const string& infile,
 					fastaRefReadSizes(is, szs2, refparams, NULL, numSeqs2);
 				assert_eq(numSeqs, numSeqs2);
 				// One less color than base
-				assert_geq(sztot2.second, sztot.second + 1);
+				assert_geq(sztot2.second, sztot.second + numSeqs);
 				refparams.color = true;
 			}
 #endif
@@ -537,9 +531,6 @@ int bowtie_build(int argc, const char **argv) {
 				cout << "  Max bucket size, len divisor: " << bmaxDivN << endl;
 			}
 			cout << "  Difference-cover sample period: " << dcv << endl;
-			cout << "  Reference base cutoff: ";
-			if(cutoff == -1) cout << "none"; else cout << cutoff << " bases";
-			cout << endl;
 			cout << "  Endianness: " << (bigEndian? "big":"little") << endl
 				 << "  Actual local endianness: " << (currentlyBigEndian()? "big":"little") << endl
 				 << "  Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
@@ -557,7 +548,6 @@ int bowtie_build(int argc, const char **argv) {
 		}
 		// Seed random number generator
 		srand(seed);
-		int64_t origCutoff = cutoff; // save cutoff since it gets modified
 		{
 			Timer timer(cout, "Total time for call to driver() for forward index: ", verbose);
 			if(!packed) {
@@ -576,7 +566,6 @@ int bowtie_build(int argc, const char **argv) {
 				driver<String<Dna, Packed<Alloc<> > > >(infile, infiles, outfile);
 			}
 		}
-		cutoff = origCutoff; // reset cutoff for backward Ebwt
 		if(doubleEbwt) {
 			srand(seed);
 			Timer timer(cout, "Total time for backward call to driver() for mirror index: ", verbose);

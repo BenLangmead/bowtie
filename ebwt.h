@@ -3726,9 +3726,7 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 		// For each sequence we can pull out of istream l[i]...
 		assert(!l[i]->eof());
 		bool first = true;
-		assert_geq(rpcp.numSeqCutoff, -1);
-		assert_geq(rpcp.baseCutoff, -1);
-		while(!l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+		while(!l[i]->eof()) {
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp);
 			first = false;
 			size_t bases = rec.len;
@@ -3737,10 +3735,6 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 			assert_eq(rec.first, szs[szsi].first);
 			ASSERT_ONLY(szsi++);
 			if(bases == 0) continue;
-			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
-			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
-			assert_geq(rpcp.numSeqCutoff, -1);
-			assert_geq(rpcp.baseCutoff, -1);
 		}
 	}
 	return ret;
@@ -3822,12 +3816,10 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	for(unsigned int i = 0; i < l.size(); i++) {
 		assert(!l[i]->eof());
 		bool first = true;
-		assert_geq(rpcp.numSeqCutoff, -1);
-		assert_geq(rpcp.baseCutoff, -1);
 		uint32_t patoff = 0;
 		// For each *fragment* (not necessary an entire sequence) we
 		// can pull out of istream l[i]...
-		while(!l[i]->eof() && rpcp.numSeqCutoff != 0 && rpcp.baseCutoff != 0) {
+		while(!l[i]->eof()) {
 			string name;
 			// Push a new name onto our vector
 			_refnames.push_back("");
@@ -3860,10 +3852,6 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			if(rec.first) patoff = 0;
 			patoff += rec.off; // add fragment's offset from end of last frag.
 			// Adjust rpcps
-			if(rpcp.numSeqCutoff != -1) rpcp.numSeqCutoff--;
-			if(rpcp.baseCutoff != -1)   rpcp.baseCutoff -= bases;
-			assert_geq(rpcp.numSeqCutoff, -1);
-			assert_geq(rpcp.baseCutoff, -1);
 			uint32_t seq = seqsRead-1;
 			ASSERT_ONLY(entsWritten++);
 			writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string

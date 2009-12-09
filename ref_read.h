@@ -70,16 +70,8 @@ struct RefRecord {
  * Parameters governing treatment of references as they're read in.
  */
 struct RefReadInParams {
-	RefReadInParams(int64_t bc, int64_t sc, bool col, bool r,
-	                bool nsToA, bool bisulf) :
-		baseCutoff(bc), numSeqCutoff(sc), color(col), reverse(r),
-		nsToAs(nsToA), bisulfite(bisulf) { }
-	// stop reading references once we've finished reading this many
-	// total reference bases
-	int64_t baseCutoff;
-	// stop reading references once we've finished reading this many
-	// distinct sequences
-	int64_t numSeqCutoff;
+	RefReadInParams(bool col, bool r, bool nsToA, bool bisulf) :
+		color(col), reverse(r), nsToAs(nsToA), bisulfite(bisulf) { }
 	// extract colors from reference
 	bool color;
 	// reverse each reference sequence before passing it along
@@ -126,9 +118,6 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 		lastc = c;
 	}
 	assert_neq(-1, lastc);
-
-	assert_neq(rparms.baseCutoff, 0);
-	assert_neq(rparms.numSeqCutoff, 0);
 
 	// RefRecord params
 	size_t len = 0;
@@ -200,6 +189,7 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 				break; // to read-in loop
 			}
 		} else if(cat == 2) {
+			if(lc != -1 && off == 0) off++;
 			lc = -1;
 			off++; // skip it
 		} else if(c == '>') {
@@ -238,18 +228,10 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 				appendValue(dst, (Dna)(char)c);
 			}
 			assert_lt((uint8_t)(Dna)dst[length(dst)-1], 4);
-			if(rparms.baseCutoff > 0 &&
-			   (int64_t)len >= rparms.baseCutoff)
-			{
-				lastc = -1;
-				goto bail;
-			}
 			lc = charToDna5[(int)c];
 		}
 		c = in.get();
-		if(rparms.nsToAs && dna4Cat[c] == 2) {
-			c = 'A';
-		}
+		if(rparms.nsToAs && dna4Cat[c] == 2) c = 'A';
 		if (c == -1 || c == '>' || c == '#' || dna4Cat[c] == 2) {
 			lastc = c;
 			break;
