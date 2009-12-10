@@ -128,15 +128,15 @@ static bool fuzzy;
 static bool fullRef;
 static bool samNoHead; // don't print any header lines in SAM output
 static bool samNoSQ;   // don't print @SQ header lines
-static bool color;     // true -> inputs are colorspace
+bool color;     // true -> inputs are colorspace
 bool colorExEnds; // true -> nucleotides on either end of decoded cspace alignment should be excluded
 static string rgs; // SAM outputs for @RG header line
 int snpPhred; // probability of SNP, for scoring colorspace alignments
 static Bitset suppressOuts(64); // output fields to suppress
 static bool sampleMax; // whether to report a random alignment when maxed-out via -m/-M
 static int defaultMapq; // default mapping quality to print in SAM mode
-static bool colorSeq; // true -> show colorspace alignments as colors, not decoded bases
-static bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
+bool colorSeq; // true -> show colorspace alignments as colors, not decoded bases
+bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
 static bool printCost; // true -> print stratum and cost
 
 static void resetOptions() {
@@ -939,6 +939,13 @@ static void parseOptions(int argc, const char **argv) {
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim3);
 		minInsert = max<int>(0, (int)minInsert - trim3);
+	}
+	if(color) {
+		if(verbose) {
+			cerr << "Adjusting -I and -X down by 1 because of colorspace" << endl;
+		}
+		maxInsert = max<int>(0, maxInsert-1);
+		minInsert = max<int>(0, minInsert-1);
 	}
 	if(!mate2fw && trim5 > 0) {
 		if(verbose) {

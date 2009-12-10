@@ -21,32 +21,59 @@
 
 use warnings;
 use strict;
-use Getopt::Std;
+use List::Util qw[min max];
+use Getopt::Long;
+Getopt::Long::Configure ("no_ignore_case");
 
-my %options=();
-getopts("dv:n:e:tl:I:X:",\%options);
+my $l = undef;
+my $n = undef;
+my $e = undef;
+my $v = undef;
+my $I = undef;
+my $X = undef;
+my $d = undef;
+my $C = undef;
+my $colCseq = undef;
+my $colCqual = undef;
+my $args = "";
+my $verbose = undef;
 
-my $debug = $options{d} if defined($options{d});
-my $match_mode = "-n 2";
-$match_mode = "-v " . $options{v} if defined($options{v});
-$match_mode = "-n " . $options{n} if defined($options{n});
-$match_mode = "-l " . $options{l} if defined($options{l});
-$match_mode = "-I " . $options{I} if defined($options{I});
-$match_mode = "-X " . $options{X} if defined($options{X});
+GetOptions ("I=i" => \$I,
+            "X=i" => \$X,
+            "v=i" => \$v,
+            "n=i" => \$n,
+            "e=i" => \$e,
+            "l=i" => \$l,
+            "d"   => \$d,
+            "C"   => \$C,
+            "verbose" => \$verbose,
+            "col-cseq" => \$colCseq,
+            "col-cqual" => \$colCqual,
+            "args:s" => \$args,
+            ) || die "One or more errors parsing script arguments";
 
 my $inner = 0;
 my $outer = 250;
-$inner = $options{I} if defined($options{I});
-$outer = $options{X} if defined($options{X});
+$inner = $I if ${I};
+$outer = $X if ${X};
 
 my $extra_args = "";
-$extra_args = $options{e} if defined($options{e});
+$extra_args = $e if $e;
+my $match_mode = "-n 2";
+$match_mode = "-v " . $v if $v;
+$match_mode = "-n " . $n if $n;
+$match_mode = "-l " . $l if $l;
+$match_mode = "-e " . $e if $e;
+$match_mode = "-I " . $I if $I;
+$match_mode = "-X " . $X if $X;
+$match_mode .= " -C" if $C;
+$match_mode .= " --col-cseq" if $colCseq;
 
 print "Using match mode: $match_mode\n";
 
 my $bowtie_dir = ".";
 my $bowtie_exe = "bowtie";
-$bowtie_exe .= "-debug" if $debug;
+$bowtie_exe .= "-debug" if $d;
 
 my $index  = "e_coli";
 $index = $ARGV[0] if defined($ARGV[0]);
@@ -76,26 +103,31 @@ my $m2fw = 0;
 system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
 
 # Run Bowtie not in paired-end mode for first mate file
-my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx $index $reads1";
+my $bowtie_se_cmd1 = "$bowtie_dir/$bowtie_exe $match_mode $args -y $extra_args -a --refidx $index $reads1";
 
 # Run Bowtie not in paired-end mode for second mate file
-my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode -y $extra_args -a --refidx $index $reads2";
+my $bowtie_se_cmd2 = "$bowtie_dir/$bowtie_exe $match_mode $args -y $extra_args -a --refidx $index $reads2";
 
 # Run Bowtie in paired-end mode
-my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode -I $inner -X $outer -y $extra_args -a --refidx $index -1 $reads1 -2 $reads2";
+my $bowtie_pe_cmd = "$bowtie_dir/$bowtie_exe $match_mode $args -I $inner -X $outer -y $extra_args -a --refidx $index -1 $reads1 -2 $reads2";
 print "$bowtie_pe_cmd\n";
 open BOWTIE_PE, "$bowtie_pe_cmd |";
+
+if($C) {
+	$inner = max(0, $inner-2);
+	$outer = max(0, $outer-2);
+}
 
 my $pes = 0;
 my $pesFw = 0;
 my $pesRc = 0;
 my %peHash = ();
 while(<BOWTIE_PE>) {
-	next if /^Reported/;
+	chomp;
 	my $l1 = $_;
 	my $l2 = <BOWTIE_PE>;
-	print "$l1";
-	print "$l2";
+	chomp($l2);
+	print "$l1\n$l2\n";
 	my @l1s = split(/[\t]/, $l1);
 	my @l2s = split(/[\t]/, $l2);
 	$#l1s >= 5 || die "Paired-end alignment not formatted correctly: $l1";
@@ -114,17 +146,23 @@ while(<BOWTIE_PE>) {
 	my $insLen = $roff - $loff + length($l2s[4]);
 	$insLen > length($l1s[4]) || die "Insert length did not exceed first mate length";
 	$insLen > length($l1s[5]) || die "Insert length did not exceed first mate length";
-	$insLen >= $inner || die "";
-	$insLen <= $outer || die "";
+	$insLen >= $inner || die "Insert length was $insLen < $inner\n";
+	$insLen <= $outer || die "Insert length was $insLen > $outer\n";
 	my $read1Short = $l1s[4];
 	my $qual1Short = $l1s[5];
 	my $read2Short = $l2s[4];
 	my $qual2Short = $l2s[5];
 	my $read1Mms = "";
 	$read1Mms = $l1s[7] if defined($l1s[7]);
+	$read1Mms = "-" if $read1Mms eq "";
 	my $read2Mms = "";
 	$read2Mms = $l2s[7] if defined($l2s[7]);
-	my $val = "$basename $mate1str $l1s[2] $l1s[3] $l2s[3] $read1Short:$qual1Short $read2Short:$qual2Short $read1Mms $read2Mms";
+	$read2Mms = "-" if $read2Mms eq "";
+	my $content = "$read1Short:$qual1Short $read2Short:$qual2Short";
+	$content = "" if $C && !$colCseq;
+	my $mcont = "$read1Mms $read2Mms";
+	$mcont = "" if $C;
+	my $val = "$basename $mate1str $l1s[2] $l1s[3] $l2s[3] $content $mcont";
 	#defined ($peHash{$basename}) && die "Already saw paired-end alignment for basename $basename";
 	$peHash{$basename} = $val;
 	if($mate1) { $pesFw++; } else { $pesRc++; }
@@ -142,7 +180,7 @@ my $unmatchedSeReads = 0;
 print "$bowtie_se_cmd1\n";
 open BOWTIE_SE1, "$bowtie_se_cmd1 |";
 while(<BOWTIE_SE1>) {
-	next if /^Reported/;
+	chomp;
 	$ses++;
 	my @ls = split(/[\t]/, $_);
 	my @lrs = split(/\//, $ls[0]);
@@ -154,7 +192,9 @@ while(<BOWTIE_SE1>) {
 	my $qualShort = $ls[5];
 	my $mms = "";
 	$mms = $ls[7] if defined($ls[7]);
-	my $key = "$ref $ls[1] $off $len $readShort $qualShort $mms";
+	$mms = "-" if $mms eq "";
+	my $content = "$readShort $qualShort $mms";
+	my $key = "$ref $ls[1] $off $len $content";
 	push @{ $seHash{$basename}{$ref} }, $key;
 }
 close(BOWTIE_SE1);
@@ -163,7 +203,7 @@ print "$bowtie_se_cmd2\n";
 open BOWTIE_SE2, "$bowtie_se_cmd2 |";
 open UNMATCHED_SE, ">.unmatched.se";
 while(<BOWTIE_SE2>) {
-	next if /^Reported/;
+	chomp;
 	$ses++;
 	my @ls = split(/[\t]/, $_);
 	my @lrs = split(/\//, $ls[0]);
@@ -176,7 +216,10 @@ while(<BOWTIE_SE2>) {
 	my $qualShort = $ls[5];
 	my $mms = "";
 	$mms = $ls[7] if defined($ls[7]);
-	my $key = "$ref $ls[1] $off $len $readShort $qualShort $mms";
+	$mms = "-" if $mms eq "";
+	my $content = "$readShort $qualShort";
+	my $mcont = "$mms";
+	my $key = "$ref $ls[1] $off $len $content $mcont";
 	# Is the other mate already aligned?
 	if(defined($seHash{$basename}{$ref})) {
 		# Get all of the alignments for the mate
@@ -190,6 +233,7 @@ while(<BOWTIE_SE2>) {
 			my $oreadShort = $oms[4];
 			my $oqualShort = $oms[5];
 			my $omms = "";
+			print "Trying $ref:$off and $oref:$ooff\n" if $verbose;
 			$omms = $oms[6] if defined($oms[6]);
 			$oref eq $ref || die "Refs don't match: $oref, $ref";
 			my $diff;
@@ -197,31 +241,72 @@ while(<BOWTIE_SE2>) {
 			if($ooff > $off) {
 				# The #1 mate is on the right
 				$diff = $ooff - $off + $olen;
-				next if ($diff <= $olen || $diff <= $len);
+				if ($diff <= $olen || $diff <= $len) {
+					print "diff $diff is <= $olen and $len\n" if $verbose;
+					next;
+				}
 				# upstream mate contains downstream one?
 				#next if $off + $len >= $ooff + $olen;
 				# mates are at the same position?
-				next if $ooff == $off;
-				next if ($diff < $inner || $diff > $outer);
-				next if $ofw == $m1fw;
-				next if $fw == $m2fw;
-				$peKey .= "0 $ref $off $ooff $readShort:$qualShort $oreadShort:$oqualShort $mms $omms";
+				if($ooff == $off) {
+					print "overlapping offsets: $ooff, $off\n" if $verbose;
+					next;
+				}
+				if ($diff < $inner || $diff > $outer) {
+					print "diff $diff is outside of inner/outer: [$inner, $outer]\n" if $verbose;
+					next;
+				}
+				if($ofw == $m1fw) {
+					print "orientation of other $ofw matches unexpected $m1fw\n" if $verbose;
+					next;
+				}
+				if($fw == $m2fw) {
+					print "orientation of anchor $fw matches unexpected $m2fw\n" if $verbose;
+					next;
+				}
+				$content = "$readShort:$qualShort $oreadShort:$oqualShort";
+				$content = "" if $C && !$colCseq;
+				$mcont = "$mms $omms";
+				$mcont = "" if $C;
+				$peKey .= "0 $ref $off $ooff $content $mcont";
 			} else {
 				# The #1 mate is on the left
 				$diff = $off - $ooff + $len;
-				next if ($diff <= $olen || $diff <= $len);
+				if ($diff <= $olen || $diff <= $len) {
+					print "diff $diff is <= $olen and $len\n" if $verbose;
+					next;
+				}
 				# upstream mate contains downstream one?
 				#next if $ooff + $olen >= $off + $len;
 				# mates are at the same position?
-				next if $ooff == $off;
-				next if ($diff < $inner || $diff > $outer);
-				next if $fw != $m2fw;
-				next if $ofw != $m1fw;
-				$peKey .= "1 $ref $ooff $off $oreadShort:$oqualShort $readShort:$qualShort $omms $mms";
+				if($ooff == $off) {
+					print "overlapping offsets: $ooff, $off\n" if $verbose;
+					next;
+				}
+				if ($diff < $inner || $diff > $outer) {
+					print "diff $diff is outside of inner/outer: [$inner, $outer]\n" if $verbose;
+					next;
+				}
+				if($ofw != $m1fw) {
+					print "orientation of other $ofw doesn't match expected $m1fw\n" if $verbose;
+					next;
+				}
+				if($fw != $m2fw) {
+					print "orientation of anchor $fw doesn't match expected $m2fw\n" if $verbose;
+					next;
+				}
+				$content = "$oreadShort:$oqualShort $readShort:$qualShort";
+				$content = "" if $C && !$colCseq;
+				$mcont = "$omms $mms";
+				$mcont = "" if $C;
+				$peKey .= "1 $ref $ooff $off $content $mcont";
 			}
 			# Found a legitimate paired-end alignment using a pair of
 			# single-end alignments
-			next if $seMatedHash{$basename}; # already found corresponding paired-end
+			if($seMatedHash{$basename}) {
+				print "already found corresponding paired-end\n" if $verbose;
+				next;
+			}
 			if($sesMustHavePes) {
 				defined($peHash{$basename}) ||
 					die "Found single-end alignment for $basename, but no paired-end";
@@ -240,7 +325,7 @@ while(<BOWTIE_SE2>) {
 				delete $peHash{$basename};
 				$seMatedHash{$basename} = 1;
 			} else {
-				#print "No matchup:\n$peHash{$basename}\n$peKey\n";
+				print "No matchup:\n$peHash{$basename}\n$peKey\n" if $verbose;
 			}
 			#print "Found alignment for mate $otherMate of $ls[0]; diff: $diff\n";
 		}

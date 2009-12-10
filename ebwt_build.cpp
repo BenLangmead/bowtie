@@ -45,7 +45,7 @@ static bool autoMem;
 static bool packed;
 static bool writeRef;
 static bool justRef;
-static bool color;
+bool color;
 
 static void resetOptions() {
 	verbose      = true;  // be talkative (default)

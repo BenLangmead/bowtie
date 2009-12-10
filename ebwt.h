@@ -1287,8 +1287,16 @@ public:
 				}
 			}
 			if(colExEnds) {
+				// Extreme bases have been removed; that makes the
+				// nucleotide alignment one character shorter than the
+				// color alignment
 				qlen--; mlen--;
+				// It also shifts the alignment's offset up by 1
+				h.second++;
 			} else {
+				// Extreme bases are included; that makes the
+				// nucleotide alignment one character longer than the
+				// color alignment
 				qlen++; mlen++;
 			}
 		} else {

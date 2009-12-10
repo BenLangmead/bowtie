@@ -859,10 +859,8 @@ public:
 					// Is either input exhausted?  If so, bail.
 					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
 						seqan::clear(ra.patFw);
-						lock();
 						if(cur + 1 > cur_) cur_++;
 						cur = cur_;
-						unlock();
 						cont = true;
 						break;
 					}
@@ -1429,6 +1427,7 @@ public:
 			return;
 		}
 		// Copy v_*, quals_* strings into the respective Strings
+		r.color = color_;
 		r.patFw  = v_[cur_];
 		r.qual = quals_[cur_];
 		ostringstream os;
@@ -1712,6 +1711,7 @@ protected:
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
+		r.color = color_;
 		// Pick off the first carat
 		c = fb_.get();
 		if(c < 0) { bail(r); return; }
@@ -1753,14 +1753,13 @@ protected:
 			if(asc2dnacat[c] > 0) {
 				// First char is a DNA char
 				int c2 = toupper(fb_.peek());
-				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
+					// Second char is a color char
 					r.primer = c;
 					c = fb_.get();
 					assert_eq(c, c2);
 				}
 			}
-			r.color = true;
 			if(c < 0) { bail(r); return; }
 		}
 		while(c != '>' && c >= 0) {
@@ -1864,6 +1863,7 @@ protected:
 
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
+		r.color = color_;
 		// fb_ is about to dish out the first character of the
 		// name field
 		if(parseName(r, NULL, '\t') == -1) {
@@ -2703,6 +2703,7 @@ protected:
 		c = getOverNewline(this->fb_);
 		if(c < 0) { bail(r); return; }
 		assert(!isspace(c));
+		r.color = color_;
 		if(first_) {
 			// Check that the first character is sane for a raw file
 			int cc = c;

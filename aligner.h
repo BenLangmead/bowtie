@@ -414,6 +414,7 @@ public:
 	{
 		bool ebwtFw = ra.ebwt->fw();
 		params_->setFw(ra.fw);
+		assert_eq(bufa_->color, color);
 		return params_->reportHit(
 				ra.fw ? (ebwtFw? bufa_->patFw    : bufa_->patFwRev) :
 				        (ebwtFw? bufa_->patRc    : bufa_->patRcRev),
@@ -824,6 +825,7 @@ protected:
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
+		assert_eq(bufL->color, color);
 		// Print upstream mate first
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
@@ -856,6 +858,7 @@ protected:
 			return true; // can happen when -m is set
 		}
 		params_->setFw(rR.fw);
+		assert_eq(bufR->color, color);
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
 					    (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
@@ -1657,6 +1660,7 @@ protected:
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
+		assert_eq(bufL->color, color);
 		// Print upstream mate first
 		ret = params_->reportHit(
 				rL.fw ? (ebwtFwL?  bufL->patFw  :  bufL->patFwRev) :
@@ -1689,6 +1693,7 @@ protected:
 			return true; // can happen when -m is set
 		}
 		params_->setFw(rR.fw);
+		assert_eq(bufR->color, color);
 		ret = params_->reportHit(
 				rR.fw ? (ebwtFwR?  bufR->patFw  :  bufR->patFwRev) :
 				        (ebwtFwR?  bufR->patRc  :  bufR->patRcRev),
@@ -1731,6 +1736,7 @@ protected:
 		ReadBuf* buf = r.mate1 ? bufa_ : bufb_;
 		bool ebwtFw = r.ebwt->fw();
 		uint32_t len = r.mate1 ? alen_ : blen_;
+		assert_eq(buf->color, color);
 		// Print upstream mate first
 		if(params->reportHit(
 			r.fw ? (ebwtFw?  buf->patFw   :  buf->patFwRev) :

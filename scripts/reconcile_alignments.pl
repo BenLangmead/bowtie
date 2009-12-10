@@ -26,23 +26,45 @@
 
 use strict;
 use warnings;
-use Getopt::Std;
+use Getopt::Long;
+Getopt::Long::Configure ("no_ignore_case");
 
-my %options=();
-getopts("rfqak:m:u:M:",\%options);
+my $k = undef;
+my $m = undef;
+my $M = undef;
+my $u = undef;
+my $f = undef;
+my $r = undef;
+my $a = undef;
+my $q = undef;
+my $C = undef;
+my $colCseq = undef;
+my $colCqual = undef;
+
+GetOptions ("k=i" => \$k,
+            "m=i" => \$m,
+            "M=i" => \$M,
+            "u=i" => \$u,
+            "q"   => \$q,
+            "f"   => \$f,
+            "a"   => \$a,
+            "C"   => \$C,
+            "col-cseq" => \$colCseq,
+            "col-cqual" => \$colCqual,
+            "r"   => \$r) || die "One or more errors parsing script arguments";
 
 my $khits = 1;
-$khits = int($options{k}) if defined($options{k});
-$khits = 999999 if $options{a};
+$khits = int($k) if defined($k);
+$khits = 999999 if $a;
 my $maxhits = 999999;
-$maxhits = int($options{m}) if defined($options{m});
-$maxhits = int($options{M}) if defined($options{M});
+$maxhits = int($m) if defined($m);
+$maxhits = int($M) if defined($M);
 my $num_reads = -1;
-$num_reads = $options{u} if defined($options{u});
+$num_reads = $u if defined($u);
 
 my $format = "fastq";
-$format = "fasta" if defined($options{f});
-$format = "raw" if defined($options{r});
+$format = "fasta" if $f;
+$format = "raw" if $r;
 
 # Utility function that returns the reverse complement of its argument
 sub reverseComp($) {
@@ -50,6 +72,22 @@ sub reverseComp($) {
 	$r = reverse($r);
 	$r =~ tr/aAcCgGtT/tTgGcCaA/;
 	return $r;
+}
+
+##
+# Encode colors as proxy nucleotides
+#
+sub nucencode($) {
+	my $s = shift;
+	my %nmap = ("0" => "A", "1" => "C", "2" => "G", "3" => "T", "." => "N",
+	            "A" => "A", "C" => "C", "G" => "G", "T" => "T", "N" => "N");
+	my $ret = "";
+	for(my $i = 0; $i < length($s); $i++) {
+		my $c = uc substr($s, $i, 1);
+		defined($nmap{$c}) || die;
+		$ret .= $nmap{$c};
+	}
+	return $ret;
 }
 
 defined($ARGV[0]) || die "Must specify input read file as first arg";
@@ -72,8 +110,8 @@ my %max_hash = ();
 # Go through Bowtie-produced alignments
 my $hits = 0;
 my $distinctHits = 0;
-open(ALGN, $algn_file);
-{
+if(-f $algn_file) {
+	open(ALGN, $algn_file) || die "Could not open alignment file $algn_file\n";
 	my %num_hash = (); # for checking -k/-m
 	while(<ALGN>) {
 		my @s = split /\t/;
@@ -104,15 +142,19 @@ open(ALGN, $algn_file);
 			my $qual = $s[5];
 			if(!$fw) {
 				# Reverse / reverse-comp
-				$seq = reverseComp($seq);
+				if($C && $colCseq) {
+					$seq = reverse $seq;
+				} else {
+					$seq = reverseComp($seq);
+				}
 				$qual = reverse $qual;
 			}
 			$hits_hash{$name}{seq} = $seq;
 			$hits_hash{$name}{qual} = (($format eq "fasta")? "" : $qual);
 		}
 	}
+	close(ALGN);
 }
-close(ALGN);
 
 sub get_read($) {
 	my $fh = shift;
@@ -143,36 +185,38 @@ sub get_read($) {
 
 # Go through entries of the FASTQ file for the unaligned reads
 my $uns = 0;
-my $UN;
-open $UN, $un_file;
-while(1) {
-	my ($name, $seq, $qual) = get_read($UN);
-	last if $name eq "";
-	$uns++;
-	unless(defined($options{M})) {
-		defined($hits_hash{$name}) &&
-			die "Read $name appears both in hits file $algn_file and in --un file $un_file";
-	} elsif(defined($hits_hash{$name})) {
-		$distinctHits--;
-		delete $hits_hash{$name};
+if(-f $un_file) {
+	my $UN;
+	open $UN, $un_file || die "Could not open unaligned-read file $un_file\n";
+	while(1) {
+		my ($name, $seq, $qual) = get_read($UN);
+		last if $name eq "";
+		$uns++;
+		unless($M) {
+			defined($hits_hash{$name}) &&
+				die "Read $name appears both in hits file $algn_file and in --un file $un_file";
+		} elsif(defined($hits_hash{$name})) {
+			$distinctHits--;
+			delete $hits_hash{$name};
+		}
+		defined($un_hash{$name}) &&
+			die "Read $name appears more than once in --un file $un_file";
+		$un_hash{$name}{seq} = $seq;
+		$un_hash{$name}{qual} = $qual;
 	}
-	defined($un_hash{$name}) &&
-		die "Read $name appears more than once in --un file $un_file";
-	$un_hash{$name}{seq} = $seq;
-	$un_hash{$name}{qual} = $qual;
+	close($UN);
 }
-close($UN);
 
 my $maxs = 0;
-if($max_file ne "") {
+if($max_file ne "" && -f $max_file) {
 	my $MAX;
-	open $MAX, $max_file;
+	open $MAX, $max_file || die "Could not open maxed-read file $max_file\n";
 	# Go through entries of the MAX file for the unaligned reads
 	while(1) {
 		my ($name, $seq, $qual) = get_read($MAX);
 		last if $name eq "";
 		$maxs++;
-		if(defined($options{M})) {
+		if($M) {
 			defined($hits_hash{$name}) ||
 				die "Read $name appears in --max file $max_file but not in alignment file $algn_file";
 			$distinctHits--;
@@ -228,9 +272,15 @@ for my $read_file (@read_list) {
 		last if $name eq "";
 		$reads++;
 		if(defined($hits_hash{$name})) {
-			$hits_hash{$name}{seq} eq $seq ||
-				die "Read $name in hits file $algn_file has different sequence ".
-				    "from input read.\nHit: $hits_hash{$name}{seq}\nInput: $seq";
+			my $alseq = $seq;
+			if($C && $colCseq) {
+				$alseq = nucencode($seq);
+			}
+			if(!$C || $colCseq) {
+				$hits_hash{$name}{seq} eq $alseq ||
+					die "Read $name in hits file $algn_file has different sequence ".
+					    "from input read.\nHit: \"$hits_hash{$name}{seq}\"\nInput: \"$alseq\"";
+			}
 			# Qualities can be legitimately different
 			#$hits_hash{$name}{qual} eq $qual ||
 			#	die "Read $name in hits file $algn_file has different sequence ".
@@ -239,18 +289,18 @@ for my $read_file (@read_list) {
 		elsif(defined($un_hash{$name})) {
 			$un_hash{$name}{seq} eq $seq ||
 				die "Read $name in --un file $un_file has different sequence ".
-				    "from input read.\nHit: $un_hash{$name}{seq}\nInput: $seq";
+				    "from input read.\nHit: \"$un_hash{$name}{seq}\"\nInput: \"$seq\"";
 			$un_hash{$name}{qual} eq $qual ||
 				die "Read $name in --un file $un_file has different sequence ".
-				    "from input read.\nHit: $un_hash{$name}{qual}\nInput: $qual";
+				    "from input read.\nHit: \"$un_hash{$name}{qual}\"\nInput: \"$qual\"";
 		}
 		elsif(defined($max_hash{$name})) {
 			$max_hash{$name}{seq} eq $seq ||
 				die "Read $name in --max file $max_file has different sequence ".
-				    "from input read.\nHit: $max_hash{$name}{seq}\nInput: $seq";
+				    "from input read.\nHit: \"$max_hash{$name}{seq}\"\nInput: \"$seq\"";
 			$max_hash{$name}{qual} eq $qual ||
 				die "Read $name in --max file $max_file has different sequence ".
-				    "from input read.\nHit: $max_hash{$name}{qual}\nInput: $qual";
+				    "from input read.\nHit: \"$max_hash{$name}{qual}\"\nInput: \"$qual\"";
 		}
 		else {
 			die "Read with name $name appears in input, but not in any of the output files";
@@ -258,10 +308,10 @@ for my $read_file (@read_list) {
 		if(defined($al_hash{$name})) {
 			$al_hash{$name}{seq} eq $seq ||
 				die "Read $name in --al file $al_file has different sequence ".
-				    "from input read.\nHit: $al_hash{$name}{seq}\nInput: $seq";
+				    "from input read.\nHit: \"$al_hash{$name}{seq}\"\nInput: \"$seq\"";
 			$al_hash{$name}{qual} eq $qual ||
 				die "Read $name in --al file $al_file has different sequence ".
-				    "from input read.\nHit: $al_hash{$name}{qual}\nInput: $qual";
+				    "from input read.\nHit: \"$al_hash{$name}{qual}\"\nInput: \"$qual\"";
 		}
 		$patid++;
 		last if $patid == $num_reads;

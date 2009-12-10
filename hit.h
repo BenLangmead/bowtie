@@ -2088,13 +2088,13 @@ public:
 				if(!suppress.test(field++)) {
 					if(firstfield) firstfield = false;
 					else ss << '\t';
-					ss << h.stratum;
+					ss << (int)h.stratum;
 				}
 				// Cost
 				if(!suppress.test(field++)) {
 					if(firstfield) firstfield = false;
 					else ss << '\t';
-					ss << h.cost;
+					ss << (int)h.cost;
 				}
 			}
 			ss << endl;

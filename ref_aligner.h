@@ -88,7 +88,7 @@ public:
 		if(color_) {
 			// Colorize buffer
 			for(size_t i = 0; i < (end-begin); i++) {
-				assert_lt(buf[i], 4);
+				assert_leq((int)buf[i], 4);
 				buf[i] = dinuc2color[(int)buf[i]][(int)buf[i+1]];
 			}
 		}

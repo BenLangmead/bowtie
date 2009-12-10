@@ -35,33 +35,37 @@ Getopt::Long::Configure ("no_ignore_case");
 
 my $khits = 1;
 my $allHits = 0;
-my $maxhits = 999999;
-my $maxhits_M = 999999;
-my $num_reads = -1;
+my $m = 999999;
+my $M = undef;
+my $u = -1;
 my $verbose = 0;
 my $fastq = 0;
 my $fasta = 0;
 my $raw = 0;
-my $M = 0;
+my $C = undef;
+my $colCseq = undef;
+my $colCqual = undef;
 
-GetOptions("m=i" => \$maxhits,
-           "M=i" => \$maxhits_M,
+GetOptions("m=i" => \$m,
+           "M=i" => \$M,
            "k=i" => \$khits,
-           "u=i" => \$num_reads,
+           "u=i" => \$u,
            "a"   => \$allHits,
            "v"   => \$verbose,
            "q"   => \$fastq,
            "f"   => \$fasta,
+           "C"   => \$C,
+           "col-cseq" => \$colCseq,
+           "col-cqual" => \$colCqual,
            "e"   => \$raw) || die "Bad arguments";
 
-$maxhits = $maxhits_M if ($maxhits_M != 999999);
-$M = ($maxhits_M != 999999);
+$m = $M if $M;
 
 $fastq = 1 if ($fastq + $fasta + $raw == 0);
 
 $khits = 999999 if $allHits;
 
-print "khits: $khits\nmaxhits: $maxhits\nnum_reads: $num_reads\n" if $verbose;
+print "khits: $khits\nmaxhits: $m\nnum_reads: $u\n" if $verbose;
 
 # Utility function that returns the reverse complement of its argument
 sub reverseComp($) {
@@ -124,6 +128,22 @@ sub get_read($) {
 	return ($name, $seq, $qual);
 }
 
+##
+# Encode colors as proxy nucleotides
+#
+sub nucencode($) {
+	my $s = shift;
+	my %nmap = ("0" => "A", "1" => "C", "2" => "G", "3" => "T", "." => "N",
+	            "A" => "A", "C" => "C", "G" => "G", "T" => "T", "N" => "N");
+	my $ret = "";
+	for(my $i = 0; $i < length($s); $i++) {
+		my $c = uc substr($s, $i, 1);
+		defined($nmap{$c}) || die;
+		$ret .= $nmap{$c};
+	}
+	return $ret;
+}
+
 my %hits_hash = ();
 my %un_hash = ();
 my %max_hash = ();
@@ -174,8 +194,8 @@ open(HITS, $hits_file);
 				die "Number of alignments for read $read_name exceeds -k limit of $khits";
 			}
 			# Check whether num_hash violates -m
-			if($num_hash{$read_name} > $maxhits) {
-				die "Number of alignments for read $read_name exceeds -m limit of $maxhits";
+			if($num_hash{$read_name} > $m) {
+				die "Number of alignments for read $read_name exceeds -m limit of $m";
 			}
 		} else {
 			defined($hits_hash{$read_name}) &&
@@ -188,7 +208,11 @@ open(HITS, $hits_file);
 			my $qual1 = $s1[5];
 			if(!$fw1) {
 				# Reverse / reverse-comp
-				$seq1 = reverseComp($seq1);
+				if($C && $colCseq) {
+					$seq1 = reverse $seq1;
+				} else {
+					$seq1 = reverseComp($seq1);
+				}
 				$qual1 = reverse $qual1;
 			}
 			my $fw2 = ($s2[1] eq "+");
@@ -196,7 +220,11 @@ open(HITS, $hits_file);
 			my $qual2 = $s2[5];
 			if(!$fw2) {
 				# Reverse / reverse-comp
-				$seq2 = reverseComp($seq2);
+				if($C && $colCseq) {
+					$seq2 = reverse $seq2;
+				} else {
+					$seq2 = reverseComp($seq2);
+				}
 				$qual2 = reverse $qual2;
 			}
 			if(!$swap) {
@@ -366,16 +394,26 @@ while(1) {
 	$ls1[0] eq $ls2[0] || die "Different names for paired alignments: $ls1[0], $ls2[0]";
 	my $name = $ls1[0];
 	if(defined($hits_hash{$name})) {
-		$hits_hash{$name}{seq1} eq $seq1 ||
-			die "Read $name in alignment file has different _1 sequence than in ".
-		 	    "input read file.\nAlgn: $hits_hash{$name}{seq1}\nInput: $seq1";
+		my $alseq1 = $seq1;
+		my $alseq2 = $seq2;
+		if($C && $colCseq) {
+			$alseq1 = nucencode($seq1);
+			$alseq2 = nucencode($seq2);
+		}
+		if(!$C || $colCseq) {
+			$hits_hash{$name}{seq1} eq $alseq1 ||
+				die "Read $name in alignment file has different _1 sequence than in ".
+			 	    "input read file.\nAlgn: \"$hits_hash{$name}{seq1}\"\nInput: \"$alseq1\"";
+		}
 		# Qualities can be legitimately different
 		#$hits_hash{$name}{qual1} eq $qual1 ||
 		#	die "Read $name in alignment file has different _1 quals than in ".
 		#	    "input read file.\nAlgn: $hits_hash{$name}{qual1}\nInput: $qual1";
-		$hits_hash{$name}{seq2} eq $seq2 ||
-			die "Read $name in alignment file has different _2 sequence than in ".
-			    "input read file.\nAlgn: $hits_hash{$name}{seq2}\nInput: $seq2";
+		if(!$C || $colCseq) {
+			$hits_hash{$name}{seq2} eq $alseq2 ||
+				die "Read $name in alignment file has different _2 sequence than in ".
+				    "input read file.\nAlgn: \"$hits_hash{$name}{seq2}\"\nInput: \"$alseq2\"";
+		}
 		#$hits_hash{$name}{qual2} eq $qual2 ||
 		#	die "Read $name in alignment file has different _2 quals than in ".
 		#	    "input read file.\nAlgn: $hits_hash{$name}{qual2}\nInput: $seq2";
@@ -428,7 +466,7 @@ while(1) {
 	}
 	
 	$patid++;
-	last if $patid == $num_reads;
+	last if $patid == $u;
 }
 close($READ1);
 close($READ2);
