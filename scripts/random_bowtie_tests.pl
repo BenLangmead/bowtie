@@ -171,39 +171,23 @@ sub reverseComp($) {
 ##
 # Given a string in nucleotide space, convert to colorspace.
 #
-sub colorize($) {
+sub colorize($$) {
 	my $s = shift;
+	my $nucs = shift; # if true, convert to nuc alphabet first
 	my %cmap = (
-		"AA" => "0",
-		"CC" => "0",
-		"GG" => "0",
-		"TT" => "0",
-		"AC" => "1",
-		"CA" => "1",
-		"GT" => "1",
-		"TG" => "1",
-		"AG" => "2",
-		"GA" => "2",
-		"CT" => "2",
-		"TC" => "2",
-		"AT" => "3",
-		"TA" => "3",
-		"CG" => "3",
-		"GC" => "3",
-		"NA" => ".",
-		"NC" => ".",
-		"NG" => ".",
-		"NT" => ".",
-		"AN" => ".",
-		"CN" => ".",
-		"GN" => ".",
-		"TN" => ".",
+		"AA" => "0", "CC" => "0", "GG" => "0", "TT" => "0",
+		"AC" => "1", "CA" => "1", "GT" => "1", "TG" => "1",
+		"AG" => "2", "GA" => "2", "CT" => "2", "TC" => "2",
+		"AT" => "3", "TA" => "3", "CG" => "3", "GC" => "3",
+		"NA" => ".", "NC" => ".", "NG" => ".", "NT" => ".",
+		"AN" => ".", "CN" => ".", "GN" => ".", "TN" => ".",
 		"NN" => "."
 	);
+	my %nmap = ("0" => "A", "1" => "C", "2" => "G", "3" => "T", "." => "N");
 	my $ret = "";
 	for(my $i = 0; $i < length($s)-1; $i++) {
 		my $di = substr($s, $i, 2);
-		$ret .= $cmap{$di};
+		$ret .= ($nucs ? $nmap{$cmap{$di}} : $cmap{$di});
 	}
 	return $ret;
 }
@@ -262,7 +246,7 @@ sub build {
 	for(my $i = 0; $i <= $#seqs; $i++) {
 		print FAN ">$i\n";
 		my $t = nonACGTtoN($seqs[$i]);
-		$t = colorize($t) if $color;
+		$t = colorize($t, 1) if $color;
 		print FAN "$t\n";
 	}
 	close(FAN);
@@ -724,16 +708,16 @@ sub doSearch {
 	}
 
 	{
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $outformat $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
 
-		$cmd = "./bowtie --mm $policy $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "./bowtie --mm $policy $color $strand $unalignArg $khits $outformat --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -741,7 +725,7 @@ sub doSearch {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "./bowtie-debug $policy $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(`$cmd 2>.tmp$seed.stderr`);
 	# Parse output to see if any of it is bad
@@ -795,7 +779,7 @@ sub doSearch {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "./bowtie $policy $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		system($cmd) == 0 || die;
 		$khits =~ s/--strata --best//;
@@ -930,8 +914,8 @@ for(; $outer > 0; $outer--) {
 			}
 			$p1 =~ tr/MRWSYKVHDBX/N/;
 			if($color) {
-				$p1 = colorize($p1);
-				$p2 = colorize($p2);
+				$p1 = colorize($p1, int(rand(2)) == 0);
+				$p2 = colorize($p2, int(rand(2)) == 0);
 				# Optionally add color changes to pattern
 				if($i > 0) {
 					my $nummms = int(rand(3));
@@ -991,10 +975,10 @@ for(; $outer > 0; $outer--) {
 			$plen = int(rand($prand)) + $pbase;
 			my $p2 = randDna($plen);
 			$p1 =~ tr/MRWSYKVHDBX/N/;
-			$p1 = colorize($p1);
+			$p1 = colorize($p1, int(rand(2)) == 0);
 			$p1 = addQual($p1);
 			$p2 =~ tr/MRWSYKVHDBX/N/ if $pe;
-			$p2 = colorize($p2) if $pe;
+			$p2 = colorize($p2, int(rand(2)) == 0) if $pe;
 			$p2 = addQual($p2) if $pe;
 			$pfinal1 .= $p1;
 			$pfinal2 .= $p2 if $pe;
