@@ -22,9 +22,13 @@ public:
 
 	uint32_t nextU32() {
 		assert(inited_);
+		uint32_t ret;
 		last = a * last + c;
+		ret = last >> 16;
+		last = a * last + c;
+		ret |= last;
 		lastOff = 0;
-		return last;
+		return ret;
 	}
 
 	uint32_t nextU2() {
