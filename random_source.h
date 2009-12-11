@@ -1,6 +1,8 @@
 #ifndef RANDOM_GEN_H_
 #define RANDOM_GEN_H_
 
+#include "assert_helpers.h"
+
 /**
  * Simple pseudo-random linear congruential generator, a la Numerical
  * Recipes.
@@ -26,7 +28,7 @@ public:
 		last = a * last + c;
 		ret = last >> 16;
 		last = a * last + c;
-		ret |= last;
+		ret ^= last;
 		lastOff = 0;
 		return ret;
 	}
