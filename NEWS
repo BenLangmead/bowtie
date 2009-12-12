@@ -27,10 +27,16 @@ Version 0.12.0-beta1 - December 12, 2009
        bowtie-build (with -C option)
      * Running bowtie with -C causes Bowtie to align in colorspace;
        both index and reads must be in colorspace
+     * Colorspace memory requirement is the same as paired-end
+       alignment in nucleotide-space (normal) mode.  Paired-end
+       alignment does not increase the memory requirement further in
+       colorspace.
      * csfasta, csfastq, and "raw" read formats are all supported with
        -C; '0' means "blue" and is intechangeable with 'A', likewise
        '1' ('C') means "green", '2' ('G') means "orange" and '3' ('T')
        means "red"
+     * Colorspace versions of pre-built indexes added (see Bowtie web
+       site)
      * New manual section discussing colorspace features
    * Fixed a few SAM output issues
      * @PG line now properly uses colons instead of equals signs

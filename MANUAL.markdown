@@ -1,8 +1,7 @@
 <!--
  ! This manual is written in "markdown" format and thus contains some
- ! mildly distracting visual clutter encoding information about how
- ! to convert to HTML.  See 'MANUAL' file for a clearer version of this
- ! document.
+ ! distracting clutter encoding information about how to convert to
+ ! HTML.  See 'MANUAL' for a clearer version of this document.
   -->
 
 What is Bowtie?
@@ -12,12 +11,12 @@ What is Bowtie?
 toward quickly aligning large sets of short DNA sequences (reads) to
 large genomes. It aligns 35-base-pair reads to the human genome at a
 rate of 25 million reads per hour on a typical workstation. Bowtie
-indexes the genome with a Burrows-Wheeler index to keep its memory
+indexes the genome with a [Burrows-Wheeler] index to keep its memory
 footprint small: for the human genome, the index is typically about
-2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end alignment).
-Multiple processor cores can be used simultaneously to achieve greater
-alignment speed.  Bowtie can also output alignments in the standard
-[SAM] format, allowing Bowtie to interoperate with other tools
+2.2 GB (for unpaired alignment) or 2.9 GB (for paired-end or colorspace
+alignment).  Multiple processors can be used simultaneously to achieve
+greater alignment speed.  Bowtie can also output alignments in the
+standard [SAM] format, allowing Bowtie to interoperate with other tools
 supporting SAM, including the [SAMtools] consensus, SNP, and indel
 callers.  Bowtie runs on the command line under Windows, Mac OS X,
 Linux, and Solaris.
@@ -25,30 +24,32 @@ Linux, and Solaris.
 [Bowtie] also forms the basis for other tools, including [TopHat]: a
 fast splice junction mapper for RNA-seq reads, [Cufflinks]: a tool for
 transcriptome assembly and isoform quantitiation from RNA-seq reads,
-and [Crossbow]: a cloud-computing software tool for large reseuqncing
-projects.
+and [Crossbow]: a cloud-computing software tool for large-scale
+reseuqncing data.
 
 If you use [Bowtie] for your published research, please cite the
 [Bowtie paper].
 
-[Bowtie]:       http://bowtie-bio.sf.net
-[SAM]:          http://samtools.sourceforge.net/SAM1.pdf
-[SAMtools]:     http://samtools.sourceforge.net/
-[TopHat]:       http://tophat.cbcb.umd.edu/
-[Cufflinks]:    http://cufflinks.cbcb.umd.edu/
-[Crossbow]:     http://bowtie-bio.sf.net/crossbow
-[Bowtie paper]: http://genomebiology.com/2009/10/3/R25
+[Bowtie]:          http://bowtie-bio.sf.net
+[Burrows-Wheeler]: http://en.wikipedia.org/wiki/Burrows-Wheeler_transform
+[SAM]:             http://samtools.sourceforge.net/SAM1.pdf
+[SAMtools]:        http://samtools.sourceforge.net/
+[TopHat]:          http://tophat.cbcb.umd.edu/
+[Cufflinks]:       http://cufflinks.cbcb.umd.edu/
+[Crossbow]:        http://bowtie-bio.sf.net/crossbow
+[Bowtie paper]:    http://genomebiology.com/2009/10/3/R25
 
 What isn't Bowtie?
 ==================
 
 Bowtie is not a general-purpose alignment tool like [MUMmer], [BLAST]
 or [Vmatch].  Bowtie works best when aligning short reads to large
-genomes, though it supports arbitrarily small reference sequences and
-reads as long as 1024 bases.  Bowtie is designed to be extremely fast
-for sets of reads where (a) many of the reads have at least one good,
-valid alignment, (b) many of the reads are relatively high-quality, and
-(c) the number of alignments reported per read is small (close to 1).
+genomes, though it supports arbitrarily small reference sequences (e.g.
+amplicons) and reads as long as 1024 bases.  Bowtie is designed to be
+extremely fast for sets of short reads where (a) many of the reads have
+at least one good, valid alignment, (b) many of the reads are
+relatively high-quality, and (c) the number of alignments reported per
+read is small (close to 1).
 
 Bowtie does not yet report gapped alignments; this is future work.
 
@@ -61,7 +62,7 @@ Obtaining Bowtie
 
 You may download either Bowtie sources or binaries for your platform
 from the [Download] section of the Sourceforge project site.  Binaries
-are currently available for Intel architectures (i386 and x86_64)
+are currently available for Intel architectures (`i386` and `x86_64`)
 running Linux, Windows, and Mac OS X.
 
 Building from source
@@ -81,9 +82,9 @@ with the command `make`, but sometimes with `gmake`) with no
 arguments.  If building with MinGW, run `make` from the MSYS
 environment.
 
-Due to the [`-p`] option, Bowtie needs the pthreads library in order to
-compile and run with multithreaded support.  To compile Bowtie without
-pthreads (which disables [`-p`]), use `make BOWTIE_PTHREADS=0`.
+To support the [`-p`] (multithreading) option, Bowtie needs the
+`pthreads` library.  To compile Bowtie without `pthreads` (which
+disables [`-p`]), use `make BOWTIE_PTHREADS=0`.
 
 [Cygwin]:   http://www.cygwin.com/
 [MinGW]:    http://www.mingw.org/
@@ -108,20 +109,21 @@ default quality-aware policy ([`-n`] 2 [`-l`] 28 [`-e`] 70).  See [the -n
 alignment mode] section of the manual for details about this mode.  But
 Bowtie can also enforce a simpler end-to-end k-difference policy (e.g.
 with [`-v`] 2).  See [the -v alignment mode] section of the manual for
-details about that mode.
+details about that mode.  [The -n alignment mode] and [the -v alignment
+mode] are mutually exclusive.
 
 Bowtie works best when aligning short reads to large genomes (e.g.
 human or mouse), though it supports arbitrarily small reference
 sequences and reads as long as 1024 bases.  Bowtie is designed to be
-very fast for read sets where a) many of the reads have at least one
-good, valid alignment, b) many of the reads are relatively
-high-quality, c) the number of alignments reported per read is small
-(close to 1).  These criteria are generally satisfied in the context of
-modern short-read analyses such as RNA-seq, ChIP-seq, other types of
--seq, and mammalian resequencing.  You may observe longer running times
-in other research contexts.
+very fast for sets of short reads where a) many reads have at least one
+good, valid alignment, b) many reads are relatively high-quality, c)
+the number of alignments reported per read is small (close to 1).
+These criteria are generally satisfied in the context of modern
+short-read analyses such as RNA-seq, ChIP-seq, other types of -seq, and
+mammalian resequencing.  You may observe longer running times in other
+research contexts.
 
-If `bowtie` is too slow for your application, please try some of the
+If `bowtie` is too slow for your application, try some of the
 performance-tuning hints described in the [Performance Tuning] section
 below.
 
@@ -129,8 +131,9 @@ Alignments involving one or more ambiguous reference characters (`N`,
 `-`, `R`, `Y`, etc.) are considered invalid by Bowtie.  This is true
 only for ambiguous characters in the reference; alignments involving
 ambiguous characters in the read are legal, subject to the alignment
-policy.  Also, alignments that "fall off" the reference sequence are
-not considered legal by Bowtie.
+policy.  Ambiguous characters in the read mismatch all other
+characters.  Alignments that "fall off" the reference sequence are not
+considered valid.
 
 The process by which `bowtie` chooses an alignment to report is
 randomized in order to avoid "mapping bias" - the phenomenon whereby
@@ -170,7 +173,7 @@ for a future release.
 The `-n` alignment mode
 -----------------------
 
-When the [`-n`] option is specified (and it is by default), `bowtie`
+When the [`-n`] option is specified (which is the default), `bowtie`
 determines which alignments are valid according to the following
 policy, which is similar to [Maq]'s default policy.
 
@@ -225,6 +228,17 @@ specified, Bowtie guarantees the reported alignment(s) are "best" in
 terms of the number of mismatches, and that the alignments are reported
 in best-to-worst order.  Bowtie is somewhat slower when [`--best`] is
 specified.
+
+Strata
+------
+
+In [the -n alignment mode], an alignment's "stratum" is defined as the
+number of mismatches in the "seed" region, i.e. the leftmost `L` bases,
+where `L` is set with the [`-l`] option.  In [the -v alignment mode], an
+alignment's stratum is defined as the total number of mismatches in the
+entire alignment.  Some of Bowtie's options (e.g. [`--strata`] and [`-m`]
+use the notion of "stratum" to limit or expand the scope of reportable
+alignments.
 
 Reporting Modes
 ---------------
@@ -388,8 +402,8 @@ downstream mate.  Reads files containing paired-end reads will
 sometimes name the reads according to whether they are the #1 or #2
 mates by appending a `/1` or `/2` suffix to the read name.  If no such
 suffix is present in Bowtie's input, the suffix will be added when
-Bowtie prints read names in alignments (except in `-S` "SAM" mode,
-where mate information is encoded in the FLAGS field instead).
+Bowtie prints read names in alignments (except in [`-S`] "SAM" mode,
+where mate information is encoded in the `FLAGS` field instead).
 
 Finding a valid paired-end alignment where both mates align to
 repetitive regions of the reference can be very time-consuming.  By
@@ -407,7 +421,9 @@ Because Bowtie uses an in-memory representation of the original
 reference string when finding paired-end alignments, its memory
 footprint is larger when aligning paired-end reads.  For example, the
 human index has a memory footprint of about 2.2 GB in single-end mode
-and 2.9 GB in paired-end mode.
+and 2.9 GB in paired-end mode.  Note that paired-end and unpaired
+alignment incur the same memory footprint in colorspace (e.g. human
+incurs about 2.9 GB)
 
 Colorspace Alignment
 --------------------
@@ -442,21 +458,17 @@ character of a read; e.g.:
     T2302111203131231130300111123220
     ...
 
-(`T` is the primer base.)  Bowtie does not generally expect the input
-to have a primer base, but when the input is CSFASTA ([`-f`] [`-C`]) and
-colors are encoded as numbers (`0`=blue, `1`=green, `2`=orange,
-`3`=red), Bowtie detects and handles the primer base properly.  If the
-input is not CSFASTA or is not encoded as numbers and a primer base is
-present, it is up to the user to trim off the primer base using the
-[`-5`/`--trim5`] option so that it does not interfere with alignment.
+In this example, `T` is the primer base.  Bowtie attempts to detect and
+handle the primer base properly (i.e., it does not include it in the
+read sequence).
 
 ### Building a colorspace index
 
-A colorspace index is built in the same was as a normal index except
-that [`-C`](#bowtie-build-options-C) is specified when running `bowtie-build`.  If the user
-attempts to use `bowtie` without the [`-C`] option to align against an
-index that was built with the [`-C`] option (or vice versa), `bowtie`
-will print an error message and quit.
+A colorspace index is built in the same way as a normal index except
+that [`-C`](#bowtie-build-options-C) must be specified when running `bowtie-build`.  If the user
+attempts to use `bowtie` without [`-C`] to align against an index that
+was built with [`-C`] (or vice versa), `bowtie` prints an error message
+and quits.
 
 ### Decoding colorspace alignments
 
@@ -472,12 +484,22 @@ errors according to their relative likelihood under a model that
 considers the quality values of the colors and the global likelihood of
 seeing a SNP at any position.
 
+Quality values are also "decoded" so that each reported quality value
+is a function of the two color qualities overlapping the corresponding
+nucleotide.  Bowtie again adopts the scheme described in the [BWA
+paper], i.e., the decoded nucleotide quality is either the sum of the
+overlapping color qualities (when both overlapping colors match), the
+quality of the matching color minus the quality of the mismatching
+color, or 0 (when both overlapping colors mismatch).
+
 For accurate decodings, [`--snpphred`]/[`--snpfrac`] must be set according
 to the user's best guess of the SNP frequency in the subject.  The
 [`--snpphred`] parameter sets the SNP penalty directly (on the [Phred
 quality] scale), whereas [`--snpfrac`] allows the user to specify the
 fraction of sites expected to be SNPs; the fraction is then converted
-to a [Phred quality] internally.
+to a [Phred quality] internally.  For Bowtie, "SNP" frequency is
+defined in terms of SNPs per *haplotype* base.  Thus, if the genome is
+diploid, heterozygous SNPs have half the weight of homozygous SNPs
 
 Note that in [`-S`/`--sam`] mode, the decoded nucleotide sequence is
 printed for alignments, but the original color sequence (with `A`=blue,
@@ -496,15 +518,15 @@ Performance Tuning
 
 1.  Use 64-bit bowtie if possible
 
-    The 64-bit version of Bowtie is substantially faster (usually more
-    than 50% faster) than the 32-bit version, owing to its use of
-    64-bit arithmetic when searching.  If possible, download the 64-bit
-    binaries for Bowtie and on a 64-bit computer.  If you are building
-    Bowtie from sources, you may need to pass the `-m64` option to
-    `g++` to compile the 64-bit version; you can do this by including
-    `BITS=64` in the arguments to the `make` command; e.g.:
-    `make BITS=64 bowtie`.  To determine whether your version of bowtie
-    is 64-bit or 32-bit, run `bowtie --version`.
+    The 64-bit version of Bowtie is substantially (usually more then
+    50%) faster than the 32-bit version, owing to its use of 64-bit
+    arithmetic.  If possible, download the 64-bit binaries for Bowtie
+    and run on a 64-bit computer.  If you are building Bowtie from
+    sources, you may need to pass the `-m64` option to `g++` to compile
+    the 64-bit version; you can do this by including `BITS=64` in the
+    arguments to the `make` command; e.g.: `make BITS=64 bowtie`.  To
+    determine whether your version of bowtie is 64-bit or 32-bit, run
+    `bowtie --version`.
 
 2.  If your computer has multiple processors/cores, use `-p`
 
@@ -541,22 +563,18 @@ Performance Tuning
 
 4.  If bowtie "thrashes", try increasing `bowtie --offrate`
 
-    If `bowtie` is beign run on a relatively low-memory machine is very
-    slow and consistently triggers more than a few page faults per
-    second (as observed via `top` or `vmstat` on Mac/Linux, or via a
-    tool like [Process Explorer] on Windows), then try setting the
-    `bowtie` [`-o`/`--offrate`] to a *larger* value than the value used
-    to build the index.  For example, `bowtie-build`'s default
-    [`-o`/`--offrate`](#bowtie-build-options-o) is 5 and all pre-built indexes available from the
-    Bowtie website are built with [`-o`/`--offrate`](#bowtie-build-options-o) 5; so if `bowtie`
-    thrashes when querying such an index, try using `bowtie`
-    [`--offrate`] 6.  If `bowtie` still thrashes, try `bowtie`
-    [`--offrate`] 7, etc.  A higher [`-o`/`--offrate`] causes `bowtie` to
-    use a sparser sample of the suffix array than is stored in the
-    index; this saves memory but makes alignment reporting slower
-    (which is especially slow when using [`-a`] or large [`-k`] or [`-m`]).
-
-[Process Explorer]: http://technet.microsoft.com/en-us/sysinternals/bb896653.aspx
+    If `bowtie` runs very slow on a relatively low-memory machine
+    (having less than about 4 GB of memory), then try setting `bowtie`
+    [`-o`/`--offrate`] to a *larger* value than the value used to build
+    the index.  For example, `bowtie-build`'s default [`-o`/`--offrate`](#bowtie-build-options-o)
+    is 5 and all pre-built indexes available from the Bowtie website
+    are built with [`-o`/`--offrate`](#bowtie-build-options-o) 5; so if `bowtie` thrashes when
+    querying such an index, try using `bowtie` [`--offrate`] 6.  If
+    `bowtie` still thrashes, try `bowtie` [`--offrate`] 7, etc.  A higher
+    [`-o`/`--offrate`] causes `bowtie` to use a sparser sample of the
+    suffix array than is stored in the index; this saves memory but
+    makes alignment reporting slower (which is especially slow when
+    using [`-a`] or large [`-k`] or [`-m`]).
 
 Command Line
 ------------
