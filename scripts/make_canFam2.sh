@@ -8,7 +8,7 @@
 i=2
 BASE_CHRS=chr1
 while [ $i -lt 39 ] ; do
-	BASE_CHRS="$BASE_CHRS $i"
+	BASE_CHRS="$BASE_CHRS chr$i"
 	i=`expr $i + 1`
 done
 BASE_CHRS="$BASE_CHRS chrX chrM chrUn"
