@@ -713,7 +713,7 @@ sub doSearch {
 					die "Saw a rev-comp alignment on line ".($i+1)." when --norc was specified";
 			}
 		}
-		if($mate1 ne $lastread) {
+		if($mate1 ne $lastread && !$pe) {
 			die "Read $mate1 appears multiple times non-consecutively" if defined($readcount{$mate1});
 		}
 		if(!$pe && $policy =~ /--strata /) {
@@ -783,10 +783,12 @@ sub doSearch {
 		$patstr2 =~ s/-1//;
 		$patstr2 =~ s/-2//;
 		my $col = ($color ? "-C" : "");
+		open TMP, ">.tmp$seed.pe_verify.cmd" || die;
 		$cmd = "perl scripts/pe_verify.pl --args=\"--quiet\" $col -d $pol .tmp$seed $patstr2";
 		print "$cmd\n";
+		print TMP "$cmd\n";
 		$out = trim(`$cmd 2>.tmp$seed.pe_verify.stderr`);
-		
+		close(TMP);
 		# Bad exitlevel?
 		if($? != 0) {
 			print "scripts/pe_verify.pl exitlevel: $?\n";
@@ -918,16 +920,16 @@ for(; $outer > 0; $outer--) {
 				# Pick a length for the read
 				$plen = int(rand($prand)) + $pbase;
 				$pl = int(rand(length($tt))) - 10;
-				$pl = max($pl, 4);
+				$pl = max($pl, $color ? 5 : 4);
 				$pl = min($pl, length($tt));
 				$pr = min($pl + $plen, length($tt));
 				$p1 = substr $tt, $pl, $pr - $pl;
 			}
 			# Check for empty pattern or pattern that spans a comma
-			if(length($p1) < 4 || index($p1, ",") != -1) {
+			if(length($p1) < ($color ? 5 : 4) || index($p1, ",") != -1) {
 				$i--; next;
 			}
-			if($pe && (length($p2) < 4 || index($p2, ",") != -1)) {
+			if($pe && (length($p2) < ($color ? 5 : 4) || index($p2, ",") != -1)) {
 				$i--; next;
 			}
 			# Optionally add nucleotide changes to pattern

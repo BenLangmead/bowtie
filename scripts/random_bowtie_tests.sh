@@ -8,11 +8,11 @@ else
 fi
 
 if [ "$1" == "-c" ] ; then
-	rm -f bowtie bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug
+	rm -f bowtie bowtie-debug bowtie-build-debug bowtie-inspect-debug
 	shift
 fi
 
-make $* bowtie bowtie-debug bowtie-build-debug bowtie-maptool-debug bowtie-inspect-debug
+make $* bowtie bowtie-debug bowtie-build-debug bowtie-inspect-debug
 
 # Args: seed, outer, inner, tbase, trand, pbase, prand
 
