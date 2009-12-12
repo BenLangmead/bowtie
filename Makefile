@@ -287,7 +287,7 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	rm -rf .bin.tmp
 
 .PHONY: doc
-doc: doc/manual.html doc/manual.1
+doc: doc/manual.html doc/manual.pdf
 
 doc/manual.html: MANUAL.markdown
 	echo "<h1>Table of Contents</h1>" > .tmp.head
@@ -296,8 +296,11 @@ doc/manual.html: MANUAL.markdown
 	       --from markdown --to HTML \
 	       --table-of-contents $^
 
-doc/manual.1: MANUAL.markdown
-	pandoc -o $@ --from markdown --to man --table-of-contents $^
+doc/manual.pdf: MANUAL.markdown
+	pandoc -T "Bowtie Manual" \
+	       -o $@ \
+	       --from markdown --to PDF \
+	       --table-of-contents $^
 
 .PHONY: clean
 clean:
