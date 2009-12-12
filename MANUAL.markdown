@@ -1655,17 +1655,19 @@ Default `bowtie` output
     See the [Colorspace alignment] section for details about decoding.
     To display colors instead, use the [`--col-cqual`] option.
 
-7.  If [`-M`] was specified and the [`-M`] ceiling was exceeded for this
-    read, this column contains the 
-
-Number of other instances where the same read aligns against the
-    same reference characters as were aligned against in this alignment.
-    This is *not* the number of other places the read aligns with the
-    same number of mismatches.  The number in this column is generally
-    not a good proxy for that number (e.g., the number in this column
-    may be '0' while the number of other alignments with the same
-    number of mismatches might be large).  This column was previously
-    described as "Reserved".
+7.  If [`-M`] was specified and the prescribed ceiling was exceeded for
+    this read, this column contains the value of the ceiling,
+    indicating that at least that many valid alignments were found in
+    addition to the one reported.
+    
+    Otherwise, this column contains the number of other instances where
+    the same sequence aligned against the same reference characters as
+    were aligned against in the reported alignment.  This is *not* the
+    number of other places the read aligns with the same number of
+    mismatches.  The number in this column is generally not a good
+    proxy for that number (e.g., the number in this column may be '0'
+    while the number of other alignments with the same number of
+    mismatches might be large).
 
 8.  Comma-separated list of mismatch descriptors.  If there are no
     mismatches in the alignment, this field is empty.  A single

@@ -3233,20 +3233,16 @@ T2302111203131231130300111123220
 	  ><code
 	    >-M</code
 	    ></a
-	  > was specified and the <a href="#bowtie-options-m"
-	  ><code
-	    >-M</code
-	    ></a
-	  > ceiling was exceeded for this read, this column contains the</p
+	  > was specified and the prescribed ceiling was exceeded for this read, this column contains the value of the ceiling, indicating that at least that many valid alignments were found in addition to the one reported.</p
+	><p
+	>Otherwise, this column contains the number of other instances where the same sequence aligned against the same reference characters as were aligned against in the reported alignment. This is <em
+	  >not</em
+	  > the number of other places the read aligns with the same number of mismatches. The number in this column is generally not a good proxy for that number (e.g., the number in this column may be '0' while the number of other alignments with the same number of mismatches might be large).</p
 	></li
-      ></ol
-    ><p
-    >Number of other instances where the same read aligns against the same reference characters as were aligned against in this alignment. This is <em
-      >not</em
-      > the number of other places the read aligns with the same number of mismatches. The number in this column is generally not a good proxy for that number (e.g., the number in this column may be '0' while the number of other alignments with the same number of mismatches might be large). This column was previously described as &quot;Reserved&quot;.</p
-    ><ol start="8" class="decimal"
-    ><li
-      >Comma-separated list of mismatch descriptors. If there are no mismatches in the alignment, this field is empty. A single descriptor has the format offset:reference-base&gt;read-base. The offset is expressed as a 0-based offset from the high-quality (5') end of the read.</li
+      ><li
+      ><p
+	>Comma-separated list of mismatch descriptors. If there are no mismatches in the alignment, this field is empty. A single descriptor has the format offset:reference-base&gt;read-base. The offset is expressed as a 0-based offset from the high-quality (5') end of the read.</p
+	></li
       ></ol
     ><h2 id="sam-bowtie-output"
     ><a href="#TOC-sam-bowtie-output"
