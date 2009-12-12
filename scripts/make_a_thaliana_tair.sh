@@ -36,7 +36,7 @@ fi
 for c in 1 2 3 4 5 C M ; do
 	if [ ! -f chr$c.fas ] ; then
 		F=${GENOMES_MIRROR}/Sequences/whole_chromosomes/chr$c.fas
-		get $f || (echo "Error getting $F" && exit 1)
+		get $F || (echo "Error getting $F" && exit 1)
 	fi
 	
 	if [ ! -f chr$c.fas ] ; then
