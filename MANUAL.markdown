@@ -449,8 +449,8 @@ colors.  Colors may be encoded either as numbers (`0`=blue, `1`=green,
 `2`=orange, `3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green,
 `G`=orange, `T`=red).
 
-Note that CSFASTA files typically include a primer base as the first
-character of a read; e.g.:
+Note that sometimes reads will include a primer base as the first
+character of each read; e.g.:
 
     >1_53_33_F3
     T2213120002010301233221223311331
@@ -458,9 +458,9 @@ character of a read; e.g.:
     T2302111203131231130300111123220
     ...
 
-In this example, `T` is the primer base.  Bowtie attempts to detect and
-handle the primer base properly (i.e., it does not include it in the
-read sequence).
+In this example, `T` is the primer base.  `bowtie` detects and handles
+primer bases properly (i.e., it is trimmed prior to alignment) as long
+as the rest of the read is encoded as numbers.
 
 ### Building a colorspace index
 
