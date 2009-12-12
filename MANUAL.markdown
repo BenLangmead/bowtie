@@ -472,40 +472,42 @@ and quits.
 
 ### Decoding colorspace alignments
 
-Once a colorspace read is aligned in colorspace, Bowtie decodes the
-alignment into nucleotides and reports the decoded nucleotide sequence.
-A principled decoding scheme is necessary because color mismatches
-allow many different possible decodings.  Finding the true decoding
-with 100% certainty requires knowing all all variants (e.g. SNPs) in
-the subject genome beforehand, which is usually not possible.  Instead,
-Bowtie employs the approximate decoding scheme described in the [BWA
-paper].  This scheme attempts to distinguish variants from sequencing
-errors according to their relative likelihood under a model that
-considers the quality values of the colors and the global likelihood of
-seeing a SNP at any position.
+Once a colorspace read is aligned, Bowtie decodes the alignment into
+nucleotides and reports the decoded nucleotide sequence.  A principled
+decoding scheme is necessary because many different possible decodings
+are usually possible.  Finding the true decoding with 100% certainty
+requires knowing all variants (e.g. SNPs) in the subject's genome
+beforehand, which is usually not possible.  Instead, `bowtie` employs
+the approximate decoding scheme described in the [BWA paper].  This
+scheme attempts to distinguish variants from sequencing errors
+according to their relative likelihood under a model that considers the
+quality values of the colors and the (configurable) global likelihood
+of a SNP.
 
 Quality values are also "decoded" so that each reported quality value
-is a function of the two color qualities overlapping the corresponding
-nucleotide.  Bowtie again adopts the scheme described in the [BWA
-paper], i.e., the decoded nucleotide quality is either the sum of the
-overlapping color qualities (when both overlapping colors match), the
-quality of the matching color minus the quality of the mismatching
-color, or 0 (when both overlapping colors mismatch).
+is a function of the two color qualities overlapping it.  Bowtie again
+adopts the scheme described in the [BWA paper], i.e., the decoded
+nucleotide quality is either the sum of the overlapping color qualities
+(when both overlapping colors correspond to bases that match in the
+alignment), the quality of the matching color minus the quality of the
+mismatching color, or 0 (when both overlapping colors correspond to
+mismatches).
 
-For accurate decodings, [`--snpphred`]/[`--snpfrac`] must be set according
+For accurate decoding, [`--snpphred`]/[`--snpfrac`] should be set according
 to the user's best guess of the SNP frequency in the subject.  The
 [`--snpphred`] parameter sets the SNP penalty directly (on the [Phred
 quality] scale), whereas [`--snpfrac`] allows the user to specify the
 fraction of sites expected to be SNPs; the fraction is then converted
-to a [Phred quality] internally.  For Bowtie, "SNP" frequency is
-defined in terms of SNPs per *haplotype* base.  Thus, if the genome is
-diploid, heterozygous SNPs have half the weight of homozygous SNPs
+to a [Phred quality] internally.  For the purpose of decoding, the SNP
+fraction is defined in terms of SNPs per *haplotype* base.  Thus, if
+the genome is diploid, heterozygous SNPs have half the weight of
+homozygous SNPs
 
 Note that in [`-S`/`--sam`] mode, the decoded nucleotide sequence is
 printed for alignments, but the original color sequence (with `A`=blue,
-`C`=green, `G`=orange, `T`=red) is printed for reads without an
-alignment.  As always, the [`--un`], [`--max`] and [`--al`] parameters
-print reads exactly as they appeared in the input file.
+`C`=green, `G`=orange, `T`=red) is printed for unaligned reads without
+any reported alignments.  As always, the [`--un`], [`--max`] and [`--al`]
+parameters print reads exactly as they appeared in the input file.
 
 [Principles of Di-Base Sequencing]: http://tinyurl.com/ygnb2gn
 [Decoding colorspace alignments]: #decoding-colorspace-alignments

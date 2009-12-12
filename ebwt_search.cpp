@@ -482,10 +482,8 @@ static void printUsage(ostream& out) {
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
 	    << "  -m <int>           suppress all alignments if > <int> exist (def: no limit)" << endl
 	    << "  -M <int>           like -m, but reports 1 random hit (MAPQ=0); requires --best" << endl
-	    //<< "  --better           alignments guaranteed best possible stratum (old --best)" << endl
 	    << "  --best             hits guaranteed best stratum; ties broken by quality" << endl
 	    << "  --strata           hits in sub-optimal strata aren't reported (requires --best)" << endl
-	    //<< "  --strandfix        attempt to fix strand biases (def: on w/ --best, off w/o)" << endl
 	    << "Output:" << endl
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
@@ -525,8 +523,7 @@ static void printUsage(ostream& out) {
 	    << "  --seed <int>       seed for random number generator" << endl
 	    << "  --verbose          verbose output (for debugging)" << endl
 	    << "  --version          print version information and quit" << endl
-	    << "  -h/--help          print detailed description of tool and its options" << endl
-	    << "  --usage            print this usage message" << endl
+	    << "  -h/--help          print this usage message" << endl
 	    ;
 }
 

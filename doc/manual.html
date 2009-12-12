@@ -1181,7 +1181,7 @@ No alignments
       >T</code
       >=red).</p
     ><p
-    >Note that CSFASTA files typically include a primer base as the first character of a read; e.g.:</p
+    >Note that sometimes reads will include a primer base as the first character of each read; e.g.:</p
     ><pre
     ><code
       >&gt;1_53_33_F3
@@ -1194,7 +1194,9 @@ T2302111203131231130300111123220
     ><p
     >In this example, <code
       >T</code
-      > is the primer base. Bowtie attempts to detect and handle the primer base properly (i.e., it does not include it in the read sequence).</p
+      > is the primer base. <code
+      >bowtie</code
+      > detects and handles primer bases properly (i.e., it is trimmed prior to alignment) as long as the rest of the read is encoded as numbers.</p
     ><h3 id="building-a-colorspace-index"
     ><a href="#TOC-building-a-colorspace-index"
       >Building a colorspace index</a
@@ -1224,15 +1226,17 @@ T2302111203131231130300111123220
       >Decoding colorspace alignments</a
       ></h3
     ><p
-    >Once a colorspace read is aligned in colorspace, Bowtie decodes the alignment into nucleotides and reports the decoded nucleotide sequence. A principled decoding scheme is necessary because color mismatches allow many different possible decodings. Finding the true decoding with 100% certainty requires knowing all all variants (e.g. SNPs) in the subject genome beforehand, which is usually not possible. Instead, Bowtie employs the approximate decoding scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754"
+    >Once a colorspace read is aligned, Bowtie decodes the alignment into nucleotides and reports the decoded nucleotide sequence. A principled decoding scheme is necessary because many different possible decodings are usually possible. Finding the true decoding with 100% certainty requires knowing all variants (e.g. SNPs) in the subject's genome beforehand, which is usually not possible. Instead, <code
+      >bowtie</code
+      > employs the approximate decoding scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754"
       >BWA paper</a
-      >. This scheme attempts to distinguish variants from sequencing errors according to their relative likelihood under a model that considers the quality values of the colors and the global likelihood of seeing a SNP at any position.</p
+      >. This scheme attempts to distinguish variants from sequencing errors according to their relative likelihood under a model that considers the quality values of the colors and the (configurable) global likelihood of a SNP.</p
     ><p
-    >Quality values are also &quot;decoded&quot; so that each reported quality value is a function of the two color qualities overlapping the corresponding nucleotide. Bowtie again adopts the scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754"
+    >Quality values are also &quot;decoded&quot; so that each reported quality value is a function of the two color qualities overlapping it. Bowtie again adopts the scheme described in the <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754"
       >BWA paper</a
-      >, i.e., the decoded nucleotide quality is either the sum of the overlapping color qualities (when both overlapping colors match), the quality of the matching color minus the quality of the mismatching color, or 0 (when both overlapping colors mismatch).</p
+      >, i.e., the decoded nucleotide quality is either the sum of the overlapping color qualities (when both overlapping colors correspond to bases that match in the alignment), the quality of the matching color minus the quality of the mismatching color, or 0 (when both overlapping colors correspond to mismatches).</p
     ><p
-    >For accurate decodings, <a href="#bowtie-options-snpphred"
+    >For accurate decoding, <a href="#bowtie-options-snpphred"
       ><code
 	>--snpphred</code
 	></a
@@ -1240,7 +1244,7 @@ T2302111203131231130300111123220
       ><code
 	>--snpfrac</code
 	></a
-      > must be set according to the user's best guess of the SNP frequency in the subject. The <a href="#bowtie-options-snpphred"
+      > should be set according to the user's best guess of the SNP frequency in the subject. The <a href="#bowtie-options-snpphred"
       ><code
 	>--snpphred</code
 	></a
@@ -1252,7 +1256,7 @@ T2302111203131231130300111123220
 	></a
       > allows the user to specify the fraction of sites expected to be SNPs; the fraction is then converted to a <a href="http://en.wikipedia.org/wiki/FASTQ_format#Variations"
       >Phred quality</a
-      > internally. For Bowtie, &quot;SNP&quot; frequency is defined in terms of SNPs per <em
+      > internally. For the purpose of decoding, the SNP fraction is defined in terms of SNPs per <em
       >haplotype</em
       > base. Thus, if the genome is diploid, heterozygous SNPs have half the weight of homozygous SNPs</p
     ><p
@@ -1270,7 +1274,7 @@ T2302111203131231130300111123220
       >G</code
       >=orange, <code
       >T</code
-      >=red) is printed for reads without an alignment. As always, the <a href="#bowtie-options-un"
+      >=red) is printed for unaligned reads without any reported alignments. As always, the <a href="#bowtie-options-un"
       ><code
 	>--un</code
 	></a
