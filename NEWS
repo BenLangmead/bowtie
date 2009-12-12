@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.12.0 - November 25, 2009
+Version 0.12.0-beta1 - December 12, 2009
    * Added SOLiD colorspace support
      * Colorspace indexes are distinct from standard letterspace
        indexes and must be built with a separate invocation of
@@ -39,6 +39,10 @@ Version 0.12.0 - November 25, 2009
        for flags that appear on the @RG line
    * Fixed lingering pthreads bugs that would cause Bowtie to hang or
      crash toward the end of execution with -p > 1.
+   * Fixed performance-related bug that would cause paired-end
+     alignment to be artificially slow in many situations.
+   * Fixed issue with random number generation that would result in
+     non-random selection of alignments in some situations.
    * bowtie -f now supports fasta files with reads split across
      multiple lines 
    * New --suppress option suppresses unwanted columns of output
