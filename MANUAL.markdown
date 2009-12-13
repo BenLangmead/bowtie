@@ -2106,7 +2106,7 @@ of the query.  A larger `<int>` yields a larger lookup table but faster
 query times.  The ftab has size 4^(`<int>`+1) bytes.  The default
 setting is 10 (ftab is 4MB).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-ntoa">
 
     --ntoa
 
