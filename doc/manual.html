@@ -3285,9 +3285,13 @@ T2302111203131231130300111123220
 	></a
       > arguments are specified, <code
       >bowtie</code
-      > will also print an appropriately-formatted <code
+      > will also print an <code
       >@RG</code
-      > line.</p
+      > line that includes all user-specified <a href="#bowtie-options-sam-RG"
+      ><code
+	>--sam-RG</code
+	></a
+      > tokens separated by tabs.</p
     ><p
     >Each subsequnt line corresponds to a read or an alignment. Each line is a collection of at least 12 fields separated by tabs; from left to right, the fields are:</p
     ><ol class="decimal"
@@ -3424,7 +3428,7 @@ T2302111203131231130300111123220
       ><p
 	>Optional fields. Fields are tab-separated. For descriptions of all possible optional fields, see the SAM format specification. <code
 	  >bowtie</code
-	  > outputs one or more of these optional fields for each alignment, depending on the type of the alignment:</p
+	  > outputs some of these optional fields for each alignment, depending on the type of the alignment:</p
 	><table><tr><td>
 <pre
 	><code
@@ -3435,7 +3439,7 @@ T2302111203131231130300111123220
 <p
 	>Aligned read has an edit distance of <code
 	  >&lt;N&gt;</code
-	  > (in nucleotides)</p
+	  >.</p
 	></td></tr><tr><td>
 <pre
 	><code
@@ -3454,7 +3458,7 @@ T2302111203131231130300111123220
 	    >/<code
 	    >--color</code
 	    ></a
-	  > mode.</p
+	  > mode, but is omitted otherwise.</p
 	></td></tr><tr><td>
 <pre
 	><code
@@ -3467,7 +3471,11 @@ T2302111203131231130300111123220
 	  >&lt;S&gt;</code
 	  > is a string representation of the mismatched reference bases in the alignment. See <a href="http://samtools.sourceforge.net/SAM1.pdf"
 	  >SAM</a
-	  > format specification for details. For colorspace alignments, this string describes the decoded nucleotide alignment.</p
+	  > format specification for details. For colorspace alignments, <code
+	  >&lt;S&gt;</code
+	  > describes the decoded <em
+	  >nucleotide</em
+	  > alignment, not the colorspace alignment.</p
 	></td></tr><tr><td>
 <pre
 	><code
@@ -3478,7 +3486,7 @@ T2302111203131231130300111123220
 <p
 	>Aligned read belongs to stratum <code
 	  >&lt;N&gt;</code
-	  ></p
+	  >. See [Strata] for definition.</p
 	></td></tr><tr><td>
 <pre
 	><code
@@ -3503,7 +3511,7 @@ T2302111203131231130300111123220
 	  ><code
 	    >-m</code
 	    ></a
-	  > ceiling + 1, to indicate that there were at least that many valid alignments (but they were suppressed). In <a href="#bowtie-options-m"
+	  > ceiling + 1, to indicate that there were at least that many valid alignments (but all were suppressed). In <a href="#bowtie-options-m"
 	  ><code
 	    >-M</code
 	    ></a
@@ -3517,7 +3525,7 @@ T2302111203131231130300111123220
 	  ><code
 	    >-M</code
 	    ></a
-	  > ceiling + 1, to indicate that there were at least that many valid alignments (but only one was reported).</p
+	  > ceiling + 1, to indicate that there were at least that many valid alignments (of which one was reported at random).</p
 	></td></tr></table>
 
 
@@ -4118,7 +4126,7 @@ Sequence-N  &lt;name&gt;  &lt;len&gt;
 </code
       ></pre
     ><p
-    >Tabs delimit fields.</p
+    >Fields are separated by tabs.</p
     ></td></tr><tr><td>
 <pre
     ><code

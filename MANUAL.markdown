@@ -1684,8 +1684,8 @@ details, see the [SAM format specification][SAM].
 
 When [`-S`/`--sam`] is specified, `bowtie` prints a SAM header with
 `@HD`, `@SQ` and `@PG` lines.  When one or more [`--sam-RG`] arguments
-are specified, `bowtie` will also print an appropriately-formatted
-`@RG` line.
+are specified, `bowtie` will also print an `@RG` line that includes all
+user-specified [`--sam-RG`] tokens separated by tabs.
 
 Each subsequnt line corresponds to a read or an alignment.  Each line
 is a collection of at least 12 fields separated by tabs; from left to
@@ -1797,8 +1797,8 @@ right, the fields are:
 
 12. Optional fields.  Fields are tab-separated.  For descriptions of
     all possible optional fields, see the SAM format specification.
-    `bowtie` outputs one or more of these optional fields for each
-    alignment, depending on the type of the alignment:
+    `bowtie` outputs some of these optional fields for each alignment,
+    depending on the type of the alignment:
 
     <table><tr><td>
 
@@ -1806,7 +1806,7 @@ right, the fields are:
 
     </td><td>
 
-    Aligned read has an edit distance of `<N>` (in nucleotides)
+    Aligned read has an edit distance of `<N>`.
 
     </td></tr><tr><td>
 
@@ -1816,7 +1816,7 @@ right, the fields are:
 
     Aligned read has an edit distance of `<N>` in colorspace.  This
     field is present in addition to the `NM` field in [`-C`/`--color`]
-    mode.
+    mode, but is omitted otherwise.
 
     </td></tr><tr><td>
 
@@ -1826,8 +1826,9 @@ right, the fields are:
 
     For aligned reads, `<S>` is a string representation of the
     mismatched reference bases in the alignment.  See [SAM] format
-    specification for details.  For colorspace alignments, this string
-    describes the decoded nucleotide alignment.
+    specification for details.  For colorspace alignments, `<S>`
+    describes the decoded *nucleotide* alignment, not the colorspace
+    alignment.
 
     </td></tr><tr><td>
 
@@ -1835,7 +1836,7 @@ right, the fields are:
 
     </td><td>
 
-    Aligned read belongs to stratum `<N>`
+    Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
     </td></tr><tr><td>
 
@@ -1847,11 +1848,11 @@ right, the fields are:
     no alignments.  If [`-m`] was specified and the read's alignments
     were supressed because the [`-m`] ceiling was exceeded, `<N>` equals
     the [`-m`] ceiling + 1, to indicate that there were at least that
-    many valid alignments (but they were suppressed).  In [`-M`] mode, if
+    many valid alignments (but all were suppressed).  In [`-M`] mode, if
     the alignment was randomly selected because the [`-M`] ceiling was
     exceeded, `<N>` equals the [`-M`] ceiling + 1, to indicate that there
-    were at least that many valid alignments (but only one was
-    reported).
+    were at least that many valid alignments (of which one was reported
+    at random).
 
     </td></tr></table>
 
