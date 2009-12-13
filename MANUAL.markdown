@@ -1838,6 +1838,8 @@ right, the fields are:
 
     Aligned read belongs to stratum `<N>`.  See [Strata] for definition.
 
+[Strata]: #strata
+
     </td></tr><tr><td>
 
         XM:i:<N>
