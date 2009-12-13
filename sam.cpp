@@ -211,6 +211,33 @@ void SAMHitSink::reportHit(const Hit& h, int mapq, int xms) {
 }
 
 /**
+ * Report a batch of hits from a vector, perhaps subsetting it.
+ */
+void SAMHitSink::reportHits(vector<Hit>& hs,
+                            size_t start, size_t end,
+                            int mapq, int xms)
+{
+	assert_geq(end, start);
+	if(end-start == 0) return;
+	assert_gt(hs[start].mate, 0);
+	char buf[4096];
+	lock(0);
+	for(size_t i = start; i < end; i++) {
+		ostringstream ss(ssmode_);
+		ss.rdbuf()->pubsetbuf(buf, 4096);
+		append(ss, hs[i], mapq, xms);
+		out(0).writeChars(buf, ss.tellp());
+	}
+	unlock(0);
+	mainlock();
+	commitHits(hs);
+	first_ = false;
+	numAligned_++;
+	numReportedPaired_ += (end-start);
+	mainunlock();
+}
+
+/**
  * Report either an unaligned read or a read that exceeded the -m
  * ceiling.  We output placeholders for most of the fields in this
  * case.
@@ -304,12 +331,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == rand) {
-						const Hit& h1 = hs[i];
-						const Hit& h2 = hs[i+1];
-						reportHit(h1, 0,          // MAPQ
-						          hs.size()/2+1); // XM:I
-						reportHit(h2, 0,          // MAPQ
-						          hs.size()/2+1); // XM:I
+						reportHits(hs, i, i+2, 0, hs.size()/2+1);
 						break;
 					}
 					num++;
@@ -324,8 +346,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			}
 			assert_leq(num, hs.size());
 			uint32_t rand = rand_.nextU32() % num;
-			const Hit& h = hs[rand];
-			reportHit(h, /*MAPQ*/0, /*XM:I*/hs.size());
+			reportHit(hs[rand], /*MAPQ*/0, /*XM:I*/hs.size());
 		}
 	} else {
 		reportUnOrMax(p, &hs, false);

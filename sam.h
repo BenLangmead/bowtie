@@ -140,10 +140,20 @@ protected:
 	}
 
 	/**
-	 * Report a verbose, human-readable alignment to the appropriate
-	 * output stream with the given mapping quality.
+	 * Report a SAM alignment with the given mapping quality and XM
+	 * field.
 	 */
 	virtual void reportHit(const Hit& h, int mapq, int xms);
+
+	/**
+	 * Report a batch of SAM alignments (e.g. two mates that should be
+	 * printed together) with the given mapping quality and XM field.
+	 */
+	virtual void reportHits(vector<Hit>& hs,
+	                        size_t start,
+	                        size_t end,
+	                        int mapq,
+	                        int xms);
 
 	/**
 	 * See sam.cpp
