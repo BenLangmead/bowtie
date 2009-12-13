@@ -464,40 +464,47 @@ public:
 	virtual void append(ostream& o, const Hit& h) = 0;
 
 	/**
-	 * Report a batch of hits.
+	 * Report a batch of hits; all in the given vector.
 	 */
 	virtual void reportHits(vector<Hit>& hs) {
-		size_t hssz = hs.size();
-		if(hssz == 0) return;
-		bool paired = hs[0].mate > 0;
+		reportHits(hs, 0, hs.size());
+	}
+
+	/**
+	 * Report a batch of hits from a vector, perhaps subsetting it.
+	 */
+	virtual void reportHits(vector<Hit>& hs, size_t start, size_t end) {
+		assert_geq(end, start);
+		if(end-start == 0) return;
+		bool paired = hs[start].mate > 0;
 		// Sort reads so that those against the same reference sequence
 		// are consecutive.
-		if(_outs.size() > 1 && hssz > 2) {
-			sort(hs.begin(), hs.end());
+		if(_outs.size() > 1 && end-start > 2) {
+			sort(hs.begin() + start, hs.begin() + end);
 		}
 		char buf[4096];
-		for(size_t i = 0; i < hssz; i++) {
+		for(size_t i = start; i < end; i++) {
 			const Hit& h = hs[i];
 			bool diff = false;
-			if(i > 0) {
+			if(i > start) {
 				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
 				if(diff) unlock(hs[i-1].h.first);
 			}
 			ostringstream ss(ssmode_);
 			ss.rdbuf()->pubsetbuf(buf, 4096);
 			append(ss, h);
-			if(i == 0 || diff) {
+			if(i == start || diff) {
 				lock(h.h.first);
 			}
 			out(h.h.first).writeChars(buf, ss.tellp());
 		}
-		unlock(hs[hssz-1].h.first);
+		unlock(hs[end-1].h.first);
 		mainlock();
 		commitHits(hs);
 		first_ = false;
 		numAligned_++;
-		if(paired) numReportedPaired_ += hssz;
-		else       numReported_ += hssz;
+		if(paired) numReportedPaired_ += (end-start);
+		else       numReported_ += (end-start);
 		mainunlock();
 	}
 

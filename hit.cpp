@@ -95,11 +95,8 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == rand) {
-						Hit& h1 = hs[i];
-						Hit& h2 = hs[i+1];
-						h1.oms = h2.oms = hs.size()/2;
-						reportHit(h1, false);
-						reportHit(h2, false);
+						hs[i].oms = hs[i+1].oms = hs.size()/2;
+						reportHits(hs, i, i+2);
 						break;
 					}
 					num++;
