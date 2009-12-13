@@ -2244,7 +2244,7 @@ format:
     ...
     Sequence-N	<name>	<len>
 
-Tabs delimit fields.
+Fields are separated by tabs.
 
 </td></tr><tr><td>
 
