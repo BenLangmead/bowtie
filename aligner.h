@@ -441,6 +441,7 @@ public:
 				ra.cost,                  // cost, including qual penalty
 				ra.bot - ra.top - 1,      // # other hits
 				patsrc_->patid(),         // pattern id
+				bufa_->seed,              // pseudo-random seed
 				0);                       // mate (0 = unpaired)
 	}
 
@@ -853,6 +854,7 @@ protected:
 				rL.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufL->patid,
+				bufL->seed,
 				pairFw ? 1 : 2);
 		if(ret) {
 			return true; // can happen when -m is set
@@ -885,6 +887,7 @@ protected:
 				rR.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufR->patid,
+				bufR->seed,
 				pairFw ? 2 : 1);
 		return ret;
 	}
@@ -1688,6 +1691,7 @@ protected:
 				rL.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufL->patid,
+				bufL->seed,
 				pairFw ? 1 : 2);
 		if(ret) {
 			return true; // can happen when -m is set
@@ -1720,6 +1724,7 @@ protected:
 				rR.cost,                      // cost, including quality penalty
 				oms,                          // # other hits
 				bufR->patid,
+				bufR->seed,
 				pairFw ? 2 : 1);
 		return ret;
 	}
@@ -1764,6 +1769,7 @@ protected:
 			r.cost,                  // cost, including quality penalty
 			r.bot - r.top - 1,       // # other hits
 			buf->patid,
+			buf->seed,
 			0))
 		{
 			if(r.mate1) doneSe1_ = true;

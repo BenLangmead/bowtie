@@ -43,14 +43,14 @@ static inline uint32_t genRandSeed(const String<Dna5>& qry,
 	// Calculate a per-read random seed based on a combination of
 	// the read data (incl. sequence, name, quals) and the global
 	// seed
-	uint32_t rseed = seed * 997;
+	uint32_t rseed = (seed + 101) * 59 * 61 * 67 * 71 * 73 * 79 * 83;
 	size_t qlen = seqan::length(qry);
 	// Throw all the characters of the read into the random seed
 	for(size_t i = 0; i < qlen; i++) {
 		int p = (int)qry[i];
 		assert_leq(p, 4);
 		size_t off = ((i & 15) << 1);
-		rseed |= (p << off);
+		rseed ^= (p << off);
 	}
 	// Throw all the quality values for the read into the random
 	// seed
@@ -58,7 +58,7 @@ static inline uint32_t genRandSeed(const String<Dna5>& qry,
 		int p = (int)qual[i];
 		assert_leq(p, 255);
 		size_t off = ((i & 3) << 3);
-		rseed |= (p << off);
+		rseed ^= (p << off);
 	}
 	// Throw all the characters in the read name into the random
 	// seed
@@ -67,7 +67,7 @@ static inline uint32_t genRandSeed(const String<Dna5>& qry,
 		int p = (int)name[i];
 		assert_leq(p, 255);
 		size_t off = ((i & 3) << 3);
-		rseed |= (p << off);
+		rseed ^= (p << off);
 	}
 	return rseed;
 }
@@ -111,6 +111,7 @@ struct ReadBuf {
 		fuzzy = false;
 		color = false;
 		primer = '?';
+		seed = 0;
 		RESET_BUF(patFw, patBufFw, Dna5);
 		RESET_BUF(patRc, patBufRc, Dna5);
 		RESET_BUF(qual, qualBuf, char);
@@ -147,6 +148,7 @@ struct ReadBuf {
 		readOrigBufLen = 0;
 		color = fuzzy = false;
 		primer = '?';
+		seed = 0;
 	}
 
 	/// Return true iff the read (pair) is empty
@@ -636,8 +638,9 @@ protected:
  */
 class PairedPatternSource {
 public:
-	PairedPatternSource() {
+	PairedPatternSource(uint32_t seed) {
 		MUTEX_INIT(lock_);
+		seed_ = seed;
 	}
 	virtual ~PairedPatternSource() { }
 
@@ -675,6 +678,7 @@ protected:
 	SpinLock spinlock_;
 #endif
 	MUTEX_T lock_; /// mutex for locking critical regions
+	uint32_t seed_;
 };
 
 /**
@@ -685,8 +689,9 @@ class PairedSoloPatternSource : public PairedPatternSource {
 
 public:
 
-	PairedSoloPatternSource(const vector<PatternSource*>& src) :
-		cur_(0), src_(src)
+	PairedSoloPatternSource(const vector<PatternSource*>& src,
+	                        uint32_t seed) :
+		PairedPatternSource(seed), cur_(0), src_(src)
 	{
 	    for(size_t i = 0; i < src_.size(); i++) {
 	    	assert(src_[i] != NULL);
@@ -736,7 +741,9 @@ public:
 				unlock();
 				continue; // on to next pair of PatternSources
 			}
+			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
 			if(!rb.empty()) {
+				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
 				ra.fixMateName(1);
 				rb.fixMateName(2);
 			}
@@ -775,8 +782,9 @@ class PairedDualPatternSource : public PairedPatternSource {
 public:
 
 	PairedDualPatternSource(const vector<PatternSource*>& srca,
-	                        const vector<PatternSource*>& srcb) :
-		cur_(0), srca_(srca), srcb_(srcb)
+	                        const vector<PatternSource*>& srcb,
+	                        uint32_t seed) :
+		PairedPatternSource(seed), cur_(0), srca_(srca), srcb_(srcb)
 	{
 		// srca_ and srcb_ must be parallel
 		assert_eq(srca_.size(), srcb_.size());

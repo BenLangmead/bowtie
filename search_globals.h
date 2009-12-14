@@ -13,5 +13,6 @@ extern bool colorExEnds;
 extern bool colorSeq;
 extern bool colorQual;
 extern int  snpPhred;
+extern bool showSeed;
 
 #endif /* SEARCH_GLOBALS_H_ */

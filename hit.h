@@ -21,6 +21,7 @@
 #include "edit.h"
 #include "refmap.h"
 #include "annot.h"
+#include "search_globals.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -157,6 +158,7 @@ public:
 	                             ///            1 = upstream mate
 	                             ///            2 = downstream mate
 	bool                color;   /// read is in colorspace?
+	uint32_t            seed;    /// pseudo-random seed for aligned read
 
 	size_t length() const { return seqan::length(patSeq); }
 
@@ -182,6 +184,7 @@ public:
 		this->mate    = other.mate;
 		this->color   = other.color;
 		this->cmms    = other.cmms;
+		this->seed    = other.seed;
 		return *this;
 	}
 };
@@ -2102,6 +2105,14 @@ public:
 					if(firstfield) firstfield = false;
 					else ss << '\t';
 					ss << (int)h.cost;
+				}
+			}
+			if(showSeed) {
+				// Seed
+				if(!suppress.test(field++)) {
+					if(firstfield) firstfield = false;
+					else ss << '\t';
+					ss << h.seed;
 				}
 			}
 			ss << endl;

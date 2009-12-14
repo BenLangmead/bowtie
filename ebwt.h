@@ -990,8 +990,8 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1162,6 +1162,7 @@ public:
 	               uint16_t cost,      // cost of alignment
 	               uint32_t oms,       // approx. # other valid alignments
 	               uint32_t patid,
+	               uint32_t seed,
 	               uint8_t mate) const
 	{
 #ifndef NDEBUG
@@ -1369,6 +1370,7 @@ public:
 		hit.oms = oms;
 		hit.mate = mate;
 		hit.color = color;
+		hit.seed = seed;
 		return sink().reportHit(hit, stratum);
 	}
 private:
@@ -2367,8 +2369,7 @@ void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
 
 /**
  * Report a potential match at offset 'off' with pattern length
- * 'qlen'.  We must be careful to filter out spurious matches that
- * fall partially within the padding that separates texts.
+ * 'qlen'.  Filter out spurious matches that span texts.
  */
 template<typename TStr>
 inline bool Ebwt<TStr>::report(const String<Dna5>& query,
@@ -2387,6 +2388,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                uint32_t qlen,
                                int stratum,
                                uint16_t cost,
+                               uint32_t patid,
+                               uint32_t seed,
                                const EbwtSearchParams<TStr>& params) const
 {
 	VMSG_NL("In report");
@@ -2421,7 +2424,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			stratum,                  // alignment stratum
 			cost,                     // cost, including stratum & quality penalty
 			bot-top-1,                // # other hits
-			0xffffffff,               // pattern id
+			patid,                    // pattern id
+			seed,                     // pseudo-random seed
 			0);                       // mate (0 = unpaired)
 }
 
@@ -2451,6 +2455,8 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        uint32_t qlen,
                                        int stratum,
                                        uint16_t cost,
+                                       uint32_t patid,
+                                       uint32_t seed,
                                        const EbwtSearchParams<TStr>& params,
                                        SideLocus *l) const
 {
@@ -2499,7 +2505,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 #endif
 	return report(query, quals, name, color, colExEnds, snpPhred, ref,
 	              mmui32, refcs, numMms, off, top, bot, qlen, stratum,
-	              cost, params);
+	              cost, patid, seed, params);
 }
 
 /**

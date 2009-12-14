@@ -135,6 +135,8 @@ public:
 		// Initialize the random source using new read as part of the
 		// seed.
 		_color = r.color;
+		_seed = r.seed;
+		_patid = r.patid;
 		_rand.init(r.seed);
 	}
 
@@ -1541,7 +1543,8 @@ protected:
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
 			                         _color, colorExEnds, snpPhred, _refs, _mms,
 			                         _refcs, stackDepth, ri, top, bot,
-			                         _qlen, stratum, cost, _params))
+			                         _qlen, stratum, cost, _patid, _seed,
+			                         _params))
 			{
 				// Return value of true means that we can stop
 				return true;
@@ -1767,6 +1770,8 @@ protected:
 	vector<PartialAlignment> _partialsBuf;
 	// Current range to expose to consumers
 	Range               _curRange;
+	uint32_t            _patid;
+	uint32_t            _seed;
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;
 #endif

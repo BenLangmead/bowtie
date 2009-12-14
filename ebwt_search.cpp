@@ -138,6 +138,7 @@ static int defaultMapq; // default mapping quality to print in SAM mode
 bool colorSeq; // true -> show colorspace alignments as colors, not decoded bases
 bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
 static bool printCost; // true -> print stratum and cost
+bool showSeed;
 
 static void resetOptions() {
 	mates1.clear();
@@ -241,6 +242,7 @@ static void resetOptions() {
 	colorSeq				= false; // true -> show colorspace alignments as colors, not decoded bases
 	colorQual				= false; // true -> show colorspace qualities as original quals, not decoded quals
 	printCost				= false; // true -> print cost and stratum
+	showSeed				= false; // true -> print per-read pseudo-random seed
 }
 
 // mating constraints
@@ -323,7 +325,8 @@ enum {
 	ARG_COLOR_SEQ,
 	ARG_COLOR_QUAL,
 	ARG_COST,
-	ARG_COLOR_KEEP_ENDS
+	ARG_COLOR_KEEP_ENDS,
+	ARG_SHOWSEED
 };
 
 static struct option long_options[] = {
@@ -428,6 +431,7 @@ static struct option long_options[] = {
 	{(char*)"col-cqual",    no_argument,       0,            ARG_COLOR_QUAL},
 	{(char*)"col-keepends", no_argument,       0,            ARG_COLOR_KEEP_ENDS},
 	{(char*)"cost",         no_argument,       0,            ARG_COST},
+	{(char*)"showseed",     no_argument,       0,            ARG_SHOWSEED},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -639,6 +643,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_SHMEM: useShmem = true; break;
 			case ARG_COLOR_SEQ: colorSeq = true; break;
 			case ARG_COLOR_QUAL: colorQual = true; break;
+			case ARG_SHOWSEED: showSeed = true; break;
 			case ARG_SUPPRESS_FIELDS: {
 				vector<string> supp;
 				tokenize(optarg, ",", supp);
@@ -2508,9 +2513,9 @@ static void driver(const char * type,
 	}
 	PairedPatternSource *patsrc = NULL;
 	if(mates12.size() > 0) {
-		patsrc = new PairedSoloPatternSource(patsrcs_ab);
+		patsrc = new PairedSoloPatternSource(patsrcs_ab, seed);
 	} else {
-		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b);
+		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b, seed);
 	}
 
 	// Open hit output file
