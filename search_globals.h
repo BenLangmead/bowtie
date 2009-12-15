@@ -8,6 +8,7 @@
 #ifndef SEARCH_GLOBALS_H_
 #define SEARCH_GLOBALS_H_
 
+// declared in ebwt_search.cpp
 extern bool color;
 extern bool colorExEnds;
 extern bool colorSeq;

@@ -66,11 +66,11 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
-OTHER_CPPS = ccnt_lut.cpp hit.cpp ref_read.cpp alphabet.c shmem.cpp \
+OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.c shmem.cpp \
              edit.cpp ebwt.cpp
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
-              color.cpp color_dec.cpp
+              color.cpp color_dec.cpp hit.cpp
 SEARCH_CPPS_MAIN = $(SEARCH_CPPS) bowtie_main.cpp
 
 BUILD_CPPS =
