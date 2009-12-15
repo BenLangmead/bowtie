@@ -176,7 +176,6 @@ private:
 	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
 	AnnotationMap *amap_; ///
 	bool fullRef_;        /// print full reference name, not just up to whitespace
-	RandomSource rand_;   /// for pseudo-randoms
 };
 
 #endif /* SAM_H_ */

@@ -2171,7 +2171,6 @@ private:
 	bool fullRef_;         /// print full reference name
 	ReferenceMap *rmap_;   /// mapping to reference coordinate system.
 	AnnotationMap *amap_;  ///
-	RandomSource rand_;    /// pseudo-randoms for -M sampling
 };
 
 /**

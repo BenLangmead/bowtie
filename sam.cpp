@@ -308,7 +308,8 @@ void SAMHitSink::append(ostream& ss,
 void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 	if(sampleMax_) {
 		HitSink::reportMaxed(hs, p);
-		rand_.init(p.bufa().seed);
+		RandomSource rand;
+		rand.init(p.bufa().seed);
 		assert_gt(hs.size(), 0);
 		bool paired = hs.front().mate > 0;
 		size_t num = 1;
@@ -325,19 +326,19 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				}
 			}
 			assert_leq(num, hs.size());
-			uint32_t rand = rand_.nextU32() % num;
+			uint32_t r = rand.nextU32() % num;
 			num = 0;
 			for(size_t i = 0; i < hs.size()-1; i += 2) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
-					if(num == rand) {
+					if(num == r) {
 						reportHits(hs, i, i+2, 0, hs.size()/2+1);
 						break;
 					}
 					num++;
 				}
 			}
-			assert_eq(num, rand);
+			assert_eq(num, r);
 		} else {
 			for(size_t i = 1; i < hs.size(); i++) {
 				assert_geq(hs[i].stratum, hs[i-1].stratum);
@@ -345,8 +346,8 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				else break;
 			}
 			assert_leq(num, hs.size());
-			uint32_t rand = rand_.nextU32() % num;
-			reportHit(hs[rand], /*MAPQ*/0, /*XM:I*/hs.size());
+			uint32_t r = rand.nextU32() % num;
+			reportHit(hs[r], /*MAPQ*/0, /*XM:I*/hs.size());
 		}
 	} else {
 		reportUnOrMax(p, &hs, false);
