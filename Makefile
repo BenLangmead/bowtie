@@ -119,6 +119,9 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
+               doc/manual.html \
+               doc/README \
+               doc/style.css \
                reads/e_coli_10000snp.fa \
                reads/e_coli_10000snp.fq \
                $(PTHREAD_PKG) \
@@ -126,6 +129,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                COPYING \
                NEWS \
                MANUAL \
+               MANUAL.markdown \
                TUTORIAL \
                VERSION
 
@@ -135,6 +139,7 @@ SRC_PKG_LIST = $(wildcard *.h) \
                $(wildcard *.cpp) \
                $(shell find SeqAn-1.1 -name '*.h') \
                $(shell find SeqAn-1.1 -name '*.txt') \
+               doc/strip_markdown.pl \
                Makefile \
                $(GENERAL_LIST)
 

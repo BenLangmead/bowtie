@@ -67,7 +67,6 @@ body {
 
 #main #rightside h2 {
 	font: bold 1.0em Arial, Arial, Sans-Serif; 
-	background: #CDCDCD url(../images/greyc.gif) no-repeat top right;
 	height: 18px;
 	padding: 3px;
 	color: #666;
@@ -83,7 +82,7 @@ body {
 	
 }
 #leftside h1 { padding: 15px 0 10px 0 }
-#leftside h2 { padding: 15px 0 10px 0; color: #555; text-indent: 17px; background: #FFF url(../images/head.gif) no-repeat left; }
+#leftside h2 { padding: 15px 0 10px 0; color: #555; text-indent: 17px }
 /* #leftside h3 { font-size: 100%; margin-left: 15px; text-indent: 17px; background: #FFF url(../images/head.gif) no-repeat left; } */
 #leftside h3 { padding: 15px 0 10px 0; font-size: 100%; margin-left: 5px; text-indent: 17px; background: #FFF url(../images/head.gif) no-repeat left; }
 #leftside ul { margin-left: 24px; padding-left 24px; list-style-type: circle }
@@ -122,15 +121,12 @@ ol  { margin-left: 24px;
       padding-left 24px;
       list-style: decimal }
 td  { vertical-align: top; }
-
-/* blockquote { margin-left: 35px; font-family: "Courier New", Courier, monospace; } */
 blockquote { margin-left: 35px; font-family: "Courier New", Courier; }
-/* tt { font: .8em; font-family: "Courier New", Courier, monospace; } */
 tt { font: .8em; font-family: "Courier New", Courier; }
 code { font: .8em; font-family: "Courier New", Courier; }
 .date { border-top: 1px solid #e5e5e5; text-align: right; margin-bottom: 25px; margin-top: 5px;}
 #main #leftside .date a, #main #rightside a { border: 0; text-decoration: none; }
- 
+
 .comment .date { text-align: left; border: 0;}	
 
 #leftside #txt {width: 100%; height: 10em; padding: 3px 3px 3px 6px; margin-left:0em;}
