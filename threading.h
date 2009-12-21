@@ -6,6 +6,10 @@
 
 // Note that USE_SPINLOCK trumps BOWTIE_PTHREADS
 
+#ifdef BOWTIE_PTHREADS
+#include <pthread.h>
+#endif
+
 #ifdef USE_SPINLOCK
 #  include "spinlock.h"
 #  define MUTEX_T SpinLock
@@ -14,7 +18,6 @@
 #  define MUTEX_UNLOCK(l) l.Leave()
 #else
 #  ifdef BOWTIE_PTHREADS
-#    include <pthread.h>
 #    define MUTEX_T pthread_mutex_t
 #    define MUTEX_INIT(l) pthread_mutex_init(&l, NULL)
 #    define MUTEX_LOCK(l) pthread_mutex_lock(&l)
