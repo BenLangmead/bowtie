@@ -319,6 +319,7 @@ void VerboseHitSink::append(ostream& ss,
 			if(partition != 0 && firstmm) ss << '-';
 		}
 		if(partition != 0) {
+			// Fields addded as of Crossbow 0.1.4
 			if(!suppress.test(field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
