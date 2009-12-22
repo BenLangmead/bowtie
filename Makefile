@@ -133,12 +133,16 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                TUTORIAL \
                VERSION
 
+# This is helpful on Windows under MinGW/MSYS, where Make might go for
+# the Windows FIND tool instead.
+FIND=$(shell which find)
+
 SRC_PKG_LIST = $(wildcard *.h) \
                $(wildcard *.hh) \
                $(wildcard *.c) \
                $(wildcard *.cpp) \
-               $(shell find SeqAn-1.1 -name '*.h') \
-               $(shell find SeqAn-1.1 -name '*.txt') \
+               $(shell $(FIND) SeqAn-1.1 -name "*.h") \
+               $(shell $(FIND) SeqAn-1.1 -name "*.txt") \
                doc/strip_markdown.pl \
                Makefile \
                $(GENERAL_LIST)
