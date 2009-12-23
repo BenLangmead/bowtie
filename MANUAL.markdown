@@ -462,6 +462,14 @@ In this example, `T` is the primer base.  `bowtie` detects and handles
 primer bases properly (i.e., it is trimmed prior to alignment) as long
 as the rest of the read is encoded as numbers.
 
+If your input is in the form of parallel `.csfasta` and `_QV.qual`
+files and you would like to use them with Bowtie while maintaining
+quality information, they must first be converted to a `.csfastq` file
+using, for example, [Galaxy]'s conversion tool (click "NGS: QC and
+manipulation", then "SOLiD-to-FASTQ" in the left-hand sidebar).
+
+[Galaxy]: http://main.g2.bx.psu.edu/
+
 ### Building a colorspace index
 
 A colorspace index is built in the same way as a normal index except

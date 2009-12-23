@@ -1197,6 +1197,16 @@ T2302111203131231130300111123220
       > is the primer base. <code
       >bowtie</code
       > detects and handles primer bases properly (i.e., it is trimmed prior to alignment) as long as the rest of the read is encoded as numbers.</p
+    ><p
+    >If your input is in the form of parallel <code
+      >.csfasta</code
+      > and <code
+      >_QV.qual</code
+      > files and you would like to use them with Bowtie while maintaining quality information, they must first be converted to a <code
+      >.csfastq</code
+      > file using, for example, <a href="http://main.g2.bx.psu.edu/"
+      >Galaxy</a
+      >'s conversion tool (click &quot;NGS: QC and manipulation&quot;, then &quot;SOLiD-to-FASTQ&quot; in the left-hand sidebar).</p
     ><h3 id="building-a-colorspace-index"
     ><a href="#TOC-building-a-colorspace-index"
       >Building a colorspace index</a
