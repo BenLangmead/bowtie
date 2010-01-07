@@ -111,6 +111,7 @@ struct ReadBuf {
 		fuzzy = false;
 		color = false;
 		primer = '?';
+		trimc = '?';
 		seed = 0;
 		RESET_BUF(patFw, patBufFw, Dna5);
 		RESET_BUF(patRc, patBufRc, Dna5);
@@ -148,6 +149,7 @@ struct ReadBuf {
 		readOrigBufLen = 0;
 		color = fuzzy = false;
 		primer = '?';
+		trimc = '?';
 		seed = 0;
 	}
 
@@ -364,6 +366,7 @@ struct ReadBuf {
 	bool          fuzzy;               // whether to employ fuzziness
 	bool          color;               // whether read is in color space
 	char          primer;              // primer base, for csfasta files
+	char          trimc;               // trimmed color, for csfasta files
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
@@ -1764,8 +1767,9 @@ protected:
 				if(asc2colcat[c2] > 0) {
 					// Second char is a color char
 					r.primer = c;
+					r.trimc = fb_.get();
+					assert_eq(r.trimc, c2);
 					c = fb_.get();
-					assert_eq(c, c2);
 				}
 			}
 			if(c < 0) { bail(r); return; }
@@ -2461,8 +2465,9 @@ protected:
 				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
 					r.primer = c;
+					r.trimc = fb_.get();
+					assert_eq(r.trimc, c2);
 					c = fb_.get();
-					assert_eq(c, c2);
 				}
 			}
 			if(c < 0) { bail(r); return; }
@@ -2742,8 +2747,9 @@ protected:
 				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
 					r.primer = c;
+					r.trimc = fb_.get();
+					assert_eq(r.trimc, c2);
 					c = fb_.get();
-					assert_eq(c, c2);
 				}
 			}
 			if(c < 0) { bail(r); return; }

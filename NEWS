@@ -21,9 +21,13 @@ Version Release History
 =======================
 
 Version 0.12.1 - January 6, 2010
-   * Fixed bug whereby, when -M limit was exceeded, the number output
-     in the 7th column for the randomly-selected alignment was too low
-     by 1.
+   * IMPORTANT: Fixed bug whereby bowtie would fail to remove both the
+     primer base and the first color when parsing .csfasta files with
+     primer bases in -C -f mode.  A workaround for users of version
+     0.12.0 is to use "-5 1" in that situation.
+   * Fixed bug whereby, when -M limit was exceeded for an unpaired
+     read, the number printed in the 7th column for the random
+     alignment was too low by 1.
    * Added documentation discussing a pitfall regarding SOLiD paired-
      end input, i.e., not all entries necessarily have corresponding
      mates in the other file.
