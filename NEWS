@@ -24,8 +24,9 @@ Version 0.12.1 - January 6, 2010
    * Fixed bug whereby, when -M limit was exceeded, the number output
      in the 7th column for the randomly-selected alignment was too low
      by 1.
-   * Added documentation discussing one pitfall with SOLiD paired-end
-     input.
+   * Added documentation discussing a pitfall regarding SOLiD paired-
+     end input, i.e., not all entries necessarily have corresponding
+     mates in the other file.
 
 Version 0.12.0 - December 23, 2009
    * Added missing README.markdown file
