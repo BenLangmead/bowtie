@@ -114,7 +114,7 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
 			Hit& h = hs[r];
-			h.oms = hs.size()-1;
+			h.oms = hs.size();
 			reportHit(h, false);
 		}
 	}

@@ -347,7 +347,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			}
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
-			reportHit(hs[r], /*MAPQ*/0, /*XM:I*/hs.size());
+			reportHit(hs[r], /*MAPQ*/0, /*XM:I*/hs.size()+1);
 		}
 	} else {
 		reportUnOrMax(p, &hs, false);
