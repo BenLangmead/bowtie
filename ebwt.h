@@ -3091,10 +3091,8 @@ void Ebwt<TStr>::readIntoMemory(int color,
 			try {
 				this->_ebwt = new uint8_t[eh->_ebwtTotLen];
 			} catch(bad_alloc& e) {
-				cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  If you ran" << endl
-					 << "Bowtie without the -z option, try adding the -z option to save memory.  If the" << endl
-					 << "-z option does not solve the problem, please try again on a computer with more" << endl
-					 << "memory." << endl;
+				cerr << "Out of memory allocating the ebwt[] array for the Bowtie index.  Please try" << endl
+				     << "again on a computer with more memory." << endl;
 				throw 1;
 			}
 		}
@@ -3202,9 +3200,7 @@ void Ebwt<TStr>::readIntoMemory(int color,
 		}
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating fchr[], ftab[] or eftab[] arrays for the Bowtie index." << endl
-		     << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
-		     << "memory.  If the -z option does not solve the problem, please try again on a" << endl
-		     << "computer with more memory." << endl;
+		     << "Please try again on a computer with more memory." << endl;
 		throw 1;
 	}
 
@@ -3241,9 +3237,7 @@ void Ebwt<TStr>::readIntoMemory(int color,
 				this->_offs = new uint32_t[offsLenSampled];
 			} catch(bad_alloc& e) {
 				cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
-					 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
-					 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
-					 << "computer with more memory." << endl;
+					 << "Please try again on a computer with more memory." << endl;
 				throw 1;
 			}
 		} else {
@@ -3341,9 +3335,7 @@ void Ebwt<TStr>::readIntoMemory(int color,
 			this->_isa = new uint32_t[isaLenSampled];
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory allocating the isa[] array  for the Bowtie index." << endl
-				 << "If you ran Bowtie without the -z option, try adding the -z option to save" << endl
-				 << "memory.  If the -z option does not solve the problem, please try again on a" << endl
-				 << "computer with more memory." << endl;
+				 << "Please try again on a computer with more memory." << endl;
 			throw 1;
 		}
 	}
