@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.12.1 - January 6, 2010
+Version 0.12.1 - January 8, 2010
    * IMPORTANT: Fixed bug whereby bowtie would fail to remove both the
      primer base and the first color when parsing .csfasta files with
      primer bases in -C -f mode.  A workaround for users of version
