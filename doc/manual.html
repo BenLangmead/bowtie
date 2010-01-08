@@ -1,4 +1,18 @@
-<h1>Table of Contents</h1>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><title
+    >Bowtie Manual</title
+    ><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"
+     /><meta name="generator" content="pandoc"
+     /><style type="text/css"
+    >
+ol.decimal { list-style-type: decimal; }
+</style
+    ><link rel="stylesheet" href="style.css" type="text/css" media="all" />
+</head
+  ><body
+  ><h1>Table of Contents</h1>
 <div id="toc"
     ><ul
       ><li
@@ -120,6 +134,10 @@
 		><li
 		><a href="#decoding-colorspace-alignments" id="TOC-decoding-colorspace-alignments"
 		  >Decoding colorspace alignments</a
+		  ></li
+		><li
+		><a href="#paired-end-colorspace-alignment" id="TOC-paired-end-colorspace-alignment"
+		  >Paired-end colorspace alignment</a
 		  ></li
 		></ul
 	      ></li
@@ -1182,7 +1200,7 @@ T2302111203131231130300111123220
       >T</code
       > is the primer base. <code
       >bowtie</code
-      > detects and handles primer bases properly (i.e., it is trimmed prior to alignment) as long as the rest of the read is encoded as numbers.</p
+      > detects and handles primer bases properly (i.e., the primer base and the adjacent color are both trimmed away prior to alignment) as long as the rest of the read is encoded as numbers.</p
     ><p
     >If your input is in the form of parallel <code
       >.csfasta</code
@@ -1283,6 +1301,16 @@ T2302111203131231130300111123220
 	>--al</code
 	></a
       > parameters print reads exactly as they appeared in the input file.</p
+    ><h3 id="paired-end-colorspace-alignment"
+    ><a href="#TOC-paired-end-colorspace-alignment"
+      >Paired-end colorspace alignment</a
+      ></h3
+    ><p
+    >Like other platforms, SOLiD supports generation of paired-end reads. However, SOLiD paired-end data comes with a caveat: in SOLiD-generated read files, some mates may lack corresponding mates in the other file. To avoid problems, SOLiD paired-end output should first be converted to <code
+      >.csfastq</code
+      > files with unpaired mates omitted. This can be accomplished using, for example, <a href="http://main.g2.bx.psu.edu/"
+      >Galaxy</a
+      >'s conversion tool (click &quot;NGS: QC and manipulation&quot;, then &quot;SOLiD-to-FASTQ&quot; in the left-hand sidebar).</p
     ><h2 id="performance-tuning"
     ><a href="#TOC-performance-tuning"
       >Performance Tuning</a
@@ -4153,4 +4181,9 @@ Sequence-N  &lt;name&gt;  &lt;len&gt;
 <p
     >Print usage information and quit.</p
     ></td></tr></table>
+
+
+</body
+  ></html
+>
 

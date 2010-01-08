@@ -447,8 +447,9 @@ character of each read; e.g.:
     ...
 
 In this example, `T` is the primer base.  `bowtie` detects and handles
-primer bases properly (i.e., it is trimmed prior to alignment) as long
-as the rest of the read is encoded as numbers.
+primer bases properly (i.e., the primer base and the adjacent color are
+both trimmed away prior to alignment) as long as the rest of the read
+is encoded as numbers.
 
 If your input is in the form of parallel `.csfasta` and `_QV.qual`
 files and you would like to use them with Bowtie while maintaining
@@ -504,6 +505,17 @@ printed for alignments, but the original color sequence (with `A`=blue,
 `C`=green, `G`=orange, `T`=red) is printed for unaligned reads without
 any reported alignments.  As always, the `--un`, `--max` and `--al`
 parameters print reads exactly as they appeared in the input file.
+
+  Paired-end colorspace alignment
+
+Like other platforms, SOLiD supports generation of paired-end reads.
+However, SOLiD paired-end data comes with a caveat: in SOLiD-generated
+read files, some mates may lack corresponding mates in the other file.
+To avoid problems, SOLiD paired-end output should first be converted to
+`.csfastq` files with unpaired mates omitted.  This can be accomplished
+using, for example, [Galaxy]'s conversion tool (click
+"NGS: QC and manipulation", then "SOLiD-to-FASTQ" in the left-hand
+sidebar).
 
 [Principles of Di-Base Sequencing]: http://tinyurl.com/ygnb2gn
 [BWA paper]: http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754
