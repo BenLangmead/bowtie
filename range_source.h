@@ -563,17 +563,24 @@ public:
 	/**
 	 * Initialize a new branch object with an empty path.
 	 */
-	bool init(AllocOnlyPool<RangeState>& pool, AllocOnlyPool<Edit>& epool,
-	          uint32_t id, uint32_t qlen,
-	          uint16_t depth0, uint16_t depth1, uint16_t depth2,
-	          uint16_t depth3, uint16_t rdepth, uint16_t len,
-	          uint16_t cost, uint16_t ham,
-	          uint32_t itop, uint32_t ibot,
-	          const EbwtParams& ep, const uint8_t* ebwt,
+	bool init(AllocOnlyPool<RangeState>& rsPool,
+	          AllocOnlyPool<Edit>& epool,
+	          uint32_t id,
+	          uint32_t qlen,
+	          uint16_t depth0,
+	          uint16_t depth1,
+	          uint16_t depth2,
+	          uint16_t depth3,
+	          uint16_t rdepth,
+	          uint16_t len,
+	          uint16_t cost,
+	          uint16_t ham,
+	          uint32_t itop,
+	          uint32_t ibot,
+	          const EbwtParams& ep,
+	          const uint8_t* ebwt,
 	          const EditList* edits = NULL)
 	{
-		// No guarantee that there's room in the edits array for all
-		// edits; eventually need to do dynamic allocation for them.
 		id_ = id;
 		delayedCost_ = 0;
 		depth0_ = depth0;
@@ -596,9 +603,9 @@ public:
 			lbot_.invalidate();
 		}
 		if(qlen - rdepth_ > 0) {
-			ranges_ = pool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
+			ranges_ = rsPool.allocC(qlen - rdepth_); // allocated from the RangeStatePool
 			if(ranges_ == NULL) {
-				return false;
+				return false; // RangeStatePool exhausted
 			}
 			rangesSz_ = qlen - rdepth_;
 		} else {
@@ -884,18 +891,18 @@ public:
 			}
 		}
 		out << s;
-		if(halfAndHalf) out << " h";
-		else if(seeded) out << " s";
-		else            out << "  ";
+		if(halfAndHalf) out << " h ";
+		else if(seeded) out << " s ";
+		else            out << "   ";
 		std::stringstream ss3;
 		const size_t numEdits = edits_.size();
 		if(rdepth_ > 0) {
 			for(size_t i = 0; i < rdepth_; i++) {
 				if(editidx < numEdits && edits_.get(editidx).pos == i) {
-					ss3 << " " << tolower(edits_.get(editidx).chr);
+					ss3 << " " << (char)tolower(edits_.get(editidx).chr);
 					editidx++;
 				} else {
-					ss3 << " " << qry[qlen - i - 1];
+					ss3 << " " << (char)qry[qlen - i - 1];
 				}
 				printed++;
 			}
@@ -905,16 +912,16 @@ public:
 		}
 		for(size_t i = 0; i < len_; i++) {
 			if(editidx < numEdits && edits_.get(editidx).pos == printed) {
-				ss3 << tolower(edits_.get(editidx).chr) << " ";
+				ss3 << (char)tolower(edits_.get(editidx).chr) << " ";
 				editidx++;
 			} else {
-				ss3 << qry[qlen - printed - 1] << " ";
+				ss3 << (char)qry[qlen - printed - 1] << " ";
 			}
 			printed++;
 		}
 		assert_eq(editidx, edits_.size());
 		for(size_t i = printed; i < qlen; i++) {
-			ss3 << "- ";
+			ss3 << "= ";
 		}
 		s = ss3.str();
 		if(ebwtFw) {
@@ -942,11 +949,13 @@ public:
 		uint32_t eliminatedStretch = 0;
 		int i = (int)depth0_;
 		i = max(0, i - rdepth_);
+		// TODO: It matters whether an insertion/deletion at given
+		// position would be a gap open or a gap extension
 		for(; i <= len_; i++) {
 			if(!eliminated(i)) {
 				eliminatedStretch = 0;
 				uint16_t stratum = (rdepth_ + i < seedLen) ? (1 << 14) : 0;
-				uint16_t cost = (qualOrder ? ranges_[i].eq.flags.quallo : 0) | stratum;
+				uint16_t cost = (qualOrder ? /*TODO*/ ranges_[i].eq.flags.quallo : 0) | stratum;
 				if(cost < lowestCost) lowestCost = cost;
 			} else if(i < rangesSz_) {
 				eliminatedStretch++;
@@ -1543,7 +1552,7 @@ public:
 				f->cost_ = f->delayedCost_;
 				f->delayedIncrease_ = false;
 				f->delayedCost_ = 0;
-				push(f);
+				push(f); // re-insert it
 				assert(!empty());
 			}
 			f = front();
