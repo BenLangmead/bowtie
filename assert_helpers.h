@@ -220,4 +220,20 @@ public:
 #define assert_leq_msg(a,b,msg)
 #endif
 
+#ifndef NDEBUG
+#define assert_in(c, s) assert_in2(c, s, __FILE__, __LINE__)
+static inline void assert_in2(char c, const char *str, const char *file, int line) {
+	const char *s = str;
+	while(*s != '\0') {
+		if(c == *s) return;
+		s++;
+	}
+	std::cout << "assert_in: (" << c << ") not in  (" << str << ")" << std::endl;
+	std::cout << file << ":" << line << std::endl;
+	assert(0);
+}
+#else
+#define assert_in(c, s)
+#endif
+
 #endif /*ASSERT_HELPERS_H_*/
