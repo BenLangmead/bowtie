@@ -1373,14 +1373,12 @@ public:
 				// This may be a primer character.  If so, keep it in the
 				// 'primer' field of the read buf and parse the rest of the
 				// read without it.
-				c = toupper(s[0]);
+				int c = toupper(s[0]);
 				if(asc2dnacat[c] > 0) {
 					// First char is a DNA char
 					int c2 = toupper(s[1]);
 					// Second char is a color char
 					if(asc2colcat[c2] > 0) {
-						r.primer = c;
-						r.trimc = c2;
 						mytrim5 += 2; // trim primer and first color
 					}
 				}
