@@ -1269,11 +1269,23 @@ public:
 				hit.quals[destpos] = '!';
 				// Color mismatches penalize quality
 				if(i > 0) {
-					if(cmm[i-1] == 'M') hit.quals[destpos] += qual[i-1];
+					if(cmm[i-1] == 'M') {
+						if((int)hit.quals[destpos] + (int)qual[i-1] > 126) {
+							hit.quals[destpos] = 126;
+						} else {
+							hit.quals[destpos] += qual[i-1];
+						}
+					}
 					else hit.quals[destpos] -= qual[i-1];
 				}
 				if(i < qlen) {
-					if(cmm[i] == 'M') hit.quals[destpos] += qual[i];
+					if(cmm[i] == 'M') {
+						if((int)hit.quals[destpos] + (int)qual[i] > 126) {
+							hit.quals[destpos] = 126;
+						} else {
+							hit.quals[destpos] += qual[i];
+						}
+					}
 					else hit.quals[destpos] -= qual[i];
 				}
 				if(hit.quals[destpos] < '!') {
