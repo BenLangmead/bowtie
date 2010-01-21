@@ -1368,6 +1368,23 @@ public:
 			assert_leq(ss.size(), 2);
 			// Initialize s
 			string s = ss[0];
+			int mytrim5 = this->trim5_;
+			if(color_ && s.length() > 1) {
+				// This may be a primer character.  If so, keep it in the
+				// 'primer' field of the read buf and parse the rest of the
+				// read without it.
+				c = toupper(s[0]);
+				if(asc2dnacat[c] > 0) {
+					// First char is a DNA char
+					int c2 = toupper(s[1]);
+					// Second char is a color char
+					if(asc2colcat[c2] > 0) {
+						r.primer = c;
+						r.trimc = c2;
+						mytrim5 += 2; // trim primer and first color
+					}
+				}
+			}
 			if(color_) {
 				// Convert '0'-'3' to 'A'-'T'
 				for(size_t i = 0; i < s.length(); i++) {
@@ -1377,13 +1394,13 @@ public:
 					if(s[i] == '.') s[i] = 'N';
 				}
 			}
-			if(s.length() <= (size_t)(trim3_ + trim5_)) {
+			if(s.length() <= (size_t)(trim3_ + mytrim5)) {
 				// Entire read is trimmed away
 				continue;
 			} else {
 				// Trim on 5' (high-quality) end
-				if(trim5_ > 0) {
-					s.erase(0, trim5_);
+				if(mytrim5 > 0) {
+					s.erase(0, mytrim5);
 				}
 				// Trim on 3' (low-quality) end
 				if(trim3_ > 0) {
@@ -1396,10 +1413,10 @@ public:
 				vq = ss[1];
 			}
 			// Trim qualities
-			if(vq.length() > (size_t)(trim3_ + trim5_)) {
+			if(vq.length() > (size_t)(trim3_ + mytrim5)) {
 				// Trim on 5' (high-quality) end
-				if(trim5_ > 0) {
-					vq.erase(0, trim5_);
+				if(mytrim5 > 0) {
+					vq.erase(0, mytrim5);
 				}
 				// Trim on 3' (low-quality) end
 				if(trim3_ > 0) {
@@ -1757,6 +1774,7 @@ protected:
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
 		int begin = 0;
+		int mytrim5 = this->trim5_;
 		if(color_) {
 			// This is the primer character, keep it in the
 			// 'primer' field of the read buf and keep parsing
@@ -1767,9 +1785,8 @@ protected:
 				if(asc2colcat[c2] > 0) {
 					// Second char is a color char
 					r.primer = c;
-					r.trimc = fb_.get();
-					assert_eq(r.trimc, c2);
-					c = fb_.get();
+					r.trimc = c2;
+					mytrim5 += 2;
 				}
 			}
 			if(c < 0) { bail(r); return; }
@@ -1779,7 +1796,7 @@ protected:
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
 			}
-			if(asc2dnacat[c] > 0 && begin++ >= this->trim5_) {
+			if(asc2dnacat[c] > 0 && begin++ >= mytrim5) {
 				if(dstLen + 1 > 1024) tooManySeqChars(r.name);
 				r.patBufFw[dstLen] = charToDna5[c];
 				r.qualBuf[dstLen]  = 'I';
@@ -1876,6 +1893,7 @@ protected:
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
 		r.color = color_;
+		int trim5 = this->trim5_;
 		// fb_ is about to dish out the first character of the
 		// name field
 		if(parseName(r, NULL, '\t') == -1) {
@@ -1888,7 +1906,7 @@ protected:
 		// fb_ is about to dish out the first character of the
 		// sequence field
 		int charsRead = 0;
-		int dstLen = parseSeq(r, charsRead, '\t');
+		int dstLen = parseSeq(r, charsRead, trim5, '\t');
 		assert_neq('\t', fb_.peek());
 		if(dstLen <= 0) {
 			peekOverNewline(fb_); // skip rest of line
@@ -1899,7 +1917,7 @@ protected:
 		// fb_ is about to dish out the first character of the
 		// quality-string field
 		char ct = 0;
-		if(parseQuals(r, charsRead, dstLen, ct, '\n') <= 0) {
+		if(parseQuals(r, charsRead, dstLen, trim5, ct, '\n') <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
 			return;
@@ -1919,6 +1937,7 @@ protected:
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// fb_ is about to dish out the first character of the
 		// name field
+		int mytrim5_1 = this->trim5_;
 		if(parseName(ra, &rb, '\t') == -1) {
 			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
@@ -1931,7 +1950,7 @@ protected:
 		// fb_ is about to dish out the first character of the
 		// sequence field for the first mate
 		int charsRead1 = 0;
-		int dstLen1 = parseSeq(ra, charsRead1, '\t');
+		int dstLen1 = parseSeq(ra, charsRead1, mytrim5_1, '\t');
 		if(dstLen1 <= -1) {
 			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
@@ -1944,7 +1963,7 @@ protected:
 		// fb_ is about to dish out the first character of the
 		// quality-string field
 		char ct = 0;
-		if(parseQuals(ra, charsRead1, dstLen1, ct, '\t', '\n') <= 0) {
+		if(parseQuals(ra, charsRead1, dstLen1, mytrim5_1, ct, '\t', '\n') <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
@@ -1953,6 +1972,7 @@ protected:
 		}
 		assert(ct == '\t' || ct == '\n');
 		if(ct == '\n') {
+			// Unpaired record; return.
 			rb.clearAll();
 			peekOverNewline(fb_);
 			ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
@@ -1966,7 +1986,8 @@ protected:
 		// fb_ is about to dish out the first character of the
 		// sequence field for the second mate
 		int charsRead2 = 0;
-		int dstLen2 = parseSeq(rb, charsRead2, '\t');
+		int mytrim5_2 = this->trim5_;
+		int dstLen2 = parseSeq(rb, charsRead2, mytrim5_2, '\t');
 		if(dstLen2 <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
@@ -1978,7 +1999,7 @@ protected:
 
 		// fb_ is about to dish out the first character of the
 		// quality-string field
-		if(parseQuals(rb, charsRead2, dstLen2, ct, '\n') <= 0) {
+		if(parseQuals(rb, charsRead2, dstLen2, mytrim5_2, ct, '\n') <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			ra.clearAll();
 			rb.clearAll();
@@ -2065,18 +2086,36 @@ private:
 	 * character of the sequence and the sequence stops at the next
 	 * char upto (could be tab, newline, etc.).
 	 */
-	int parseSeq(ReadBuf& r, int& charsRead, char upto = '\t') {
+	int parseSeq(ReadBuf& r, int& charsRead, int& trim5, char upto = '\t') {
 		int begin = 0;
 		int dstLen = 0;
 		int c = fb_.get();
 		assert(c != upto);
+		if(color_) {
+			// This may be a primer character.  If so, keep it in the
+			// 'primer' field of the read buf and parse the rest of the
+			// read without it.
+			c = toupper(c);
+			if(asc2dnacat[c] > 0) {
+				// First char is a DNA char
+				int c2 = toupper(fb_.peek());
+				// Second char is a color char
+				if(asc2colcat[c2] > 0) {
+					r.primer = c;
+					r.trimc = c2;
+					trim5 += 2; // trim primer and first color
+				}
+			}
+			if(c < 0) { return -1; }
+		}
 		while(c != upto) {
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
 			}
+			assert_in(toupper(c), "ACGTN");
 			if(isalpha(c)) {
-				if(begin++ >= this->trim5_) {
+				if(begin++ >= trim5) {
 					if(dna4Cat[c] == 0) {
 						assert(false);
 					}
@@ -2106,8 +2145,8 @@ private:
 	 * the first character of the quality string and the string stops
 	 * at the next char upto (could be tab, newline, etc.).
 	 */
-	int parseQuals(ReadBuf& r, int charsRead, int dstLen, char& c2,
-	               char upto = '\t', char upto2 = -1)
+	int parseQuals(ReadBuf& r, int charsRead, int dstLen, int trim5,
+	               char& c2, char upto = '\t', char upto2 = -1)
 	{
 		int qualsRead = 0;
 		int c = 0;
@@ -2119,18 +2158,18 @@ private:
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
 					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
 					assert_geq(c, 33);
-					if (qualsRead >= trim5_) {
-						size_t off = qualsRead - trim5_;
+					if (qualsRead >= trim5) {
+						size_t off = qualsRead - trim5;
 						if(off >= 1024) tooManyQualities(r.name);
 						r.qualBuf[off] = c;
-						}
+					}
 					++qualsRead;
 				}
 			} // done reading integer quality lines
 			if (charsRead > qualsRead) tooFewQualities(r.name);
 		} else {
 			// Non-integer qualities
-			while((qualsRead < dstLen + this->trim5_) && c >= 0) {
+			while((qualsRead < dstLen + trim5) && c >= 0) {
 				c = fb_.get();
 				c2 = c;
 				if (c == ' ') wrongQualityFormat(r.name);
@@ -2139,8 +2178,8 @@ private:
 					return -1;
 				}
 				if(!isspace(c) && c != upto && (upto2 == -1 || c != upto2)) {
-					if (qualsRead >= trim5_) {
-						size_t off = qualsRead - trim5_;
+					if (qualsRead >= trim5) {
+						size_t off = qualsRead - trim5;
 						if(off >= 1024) tooManyQualities(r.name);
 						c = charToPhred33(c, solQuals_, phred64Quals_);
 						assert_geq(c, 33);
@@ -2151,7 +2190,7 @@ private:
 					break;
 				}
 			}
-			if(qualsRead != dstLen + this->trim5_) {
+			if(qualsRead != dstLen + trim5) {
 				assert(false);
 			}
 		}
@@ -2452,7 +2491,7 @@ protected:
 		uint8_t *sbuf = r.patBufFw;
 		int dstLens[] = {0, 0, 0, 0};
 		int *dstLenCur = &dstLens[0];
-		int trim5 = this->trim5_;
+		int mytrim5 = this->trim5_;
 		int altBufIdx = 0;
 		if(color_) {
 			// This may be a primer character.  If so, keep it in the
@@ -2465,13 +2504,13 @@ protected:
 				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
 					r.primer = c;
-					r.trimc = fb_.get();
-					assert_eq(r.trimc, c2);
-					c = fb_.get();
+					r.trimc = c2;
+					mytrim5 += 2; // trim primer and first color
 				}
 			}
 			if(c < 0) { bail(r); return; }
 		}
+		int trim5 = mytrim5;
 		while(c != '+') {
 			// Convert color numbers to letters if necessary
 			if(color_) {
@@ -2479,6 +2518,7 @@ protected:
 				if(c == '.') c = 'N';
 			}
 			if(fuzzy_ && c == '-') c = 'A';
+			assert_in(toupper(c), "ACGTN");
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
 				if(charsRead >= trim5) {
@@ -2506,7 +2546,7 @@ protected:
 		}
 		// Trim from 3' end
 		dstLen = dstLens[0];
-		charsRead = dstLen + this->trim5_;
+		charsRead = dstLen + mytrim5;
 		dstLen -= this->trim3_;
 		// Set trimmed bounds of buffers
 		_setBegin(r.patFw, (Dna5*)r.patBufFw);
@@ -2527,8 +2567,8 @@ protected:
 				for (unsigned int j = 0; j < s_quals.size(); ++j) {
 					char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
 					assert_geq(c, 33);
-					if (qualsRead >= trim5_) {
-						size_t off = qualsRead - trim5_;
+					if (qualsRead >= mytrim5) {
+						size_t off = qualsRead - mytrim5;
 						if(off >= 1024) tooManyQualities(r.name);
 						r.qualBuf[off] = c;
 					}
@@ -2543,10 +2583,10 @@ protected:
 			// Non-integer qualities
 			char *qbuf = r.qualBuf;
 			altBufIdx = 0;
-			trim5 = this->trim5_;
+			trim5 = mytrim5;
 			int qualsRead[4] = {0, 0, 0, 0};
 			int *qualsReadCur = &qualsRead[0];
-			while((*qualsReadCur) < dstLen + this->trim5_ || fuzzy_) {
+			while((*qualsReadCur) < dstLen + mytrim5 || fuzzy_) {
 				c = fb_.get();
 				if (!fuzzy_ && c == ' ') {
 					wrongQualityFormat(r.name);
@@ -2717,6 +2757,7 @@ protected:
 		if(c < 0) { bail(r); return; }
 		assert(!isspace(c));
 		r.color = color_;
+		int mytrim5 = this->trim5_;
 		if(first_) {
 			// Check that the first character is sane for a raw file
 			int cc = c;
@@ -2747,9 +2788,8 @@ protected:
 				// Second char is a color char
 				if(asc2colcat[c2] > 0) {
 					r.primer = c;
-					r.trimc = fb_.get();
-					assert_eq(r.trimc, c2);
-					c = fb_.get();
+					r.trimc = c2;
+					mytrim5 += 2; // trim primer and first color
 				}
 			}
 			if(c < 0) { bail(r); return; }
@@ -2761,8 +2801,8 @@ protected:
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
 			}
-			if(isalpha(c) && dstLen >= this->trim5_) {
-				size_t len = dstLen - this->trim5_;
+			if(isalpha(c) && dstLen >= mytrim5) {
+				size_t len = dstLen - mytrim5;
 				if(len >= 1024) tooManyQualities(String<char>("(no name)"));
 				r.patBufFw [len] = charToDna5[c];
 				r.qualBuf[len] = 'I';
@@ -2771,8 +2811,8 @@ protected:
 			if(isspace(fb_.peek())) break;
 			c = fb_.get();
 		}
-		if(dstLen >= (this->trim3_ + this->trim5_)) {
-			dstLen -= (this->trim3_ + this->trim5_);
+		if(dstLen >= (this->trim3_ + mytrim5)) {
+			dstLen -= (this->trim3_ + mytrim5);
 		} else {
 			dstLen = 0;
 		}

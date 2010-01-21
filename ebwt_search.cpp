@@ -536,12 +536,12 @@ static void printUsage(ostream& out) {
  * if it is less than 'lower', than output the given error message and
  * exit with an error and a usage message.
  */
-static int parseInt(int lower, const char *errmsg, const char *arg) {
+static int parseInt(int lower, int upper, const char *errmsg, const char *arg) {
 	long l;
 	char *endPtr= NULL;
 	l = strtol(arg, &endPtr, 10);
 	if (endPtr != NULL) {
-		if (l < lower) {
+		if (l < lower || l > upper) {
 			cerr << errmsg << endl;
 			printUsage(cerr);
 			throw 1;
@@ -558,7 +558,21 @@ static int parseInt(int lower, const char *errmsg, const char *arg) {
  * Parse from optarg by default.
  */
 static int parseInt(int lower, const char *errmsg) {
-	return parseInt(lower, errmsg, optarg);
+	return parseInt(lower, INT_MAX, errmsg, optarg);
+}
+
+/**
+ * Upper is INT_MAX by default.
+ */
+static int parseInt(int lower, const char *errmsg, const char *arg) {
+	return parseInt(lower, INT_MAX, errmsg, arg);
+}
+
+/**
+ * Upper is INT_MAX, parse from optarg by default.
+ */
+static int parseInt(int lower, int upper, const char *errmsg) {
+	return parseInt(lower, upper, errmsg, optarg);
 }
 
 /**
@@ -750,18 +764,14 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case 'v':
 				maqLike = 0;
-				mismatches = parseInt(0, "-v arg must be at least 0");
-				if(mismatches > 3) {
-					cerr << "-v arg must be at most 3" << endl;
-					throw 1;
-				}
+				mismatches = parseInt(0, 3, "-v arg must be at least 0 and at most 3");
 				break;
 			case '3': trim3 = parseInt(0, "-3/--trim3 arg must be at least 0"); break;
 			case '5': trim5 = parseInt(0, "-5/--trim5 arg must be at least 0"); break;
 			case 'o': offRate = parseInt(1, "-o/--offrate arg must be at least 1"); break;
 			case ARG_ISARATE: isaRate = parseInt(0, "--isarate arg must be at least 0"); break;
 			case 'e': qualThresh = parseInt(1, "-e/--err arg must be at least 1"); break;
-			case 'n': seedMms = parseInt(0, "-n/--seedmms arg must be at least 0"); maqLike = 1; break;
+			case 'n': seedMms = parseInt(0, 3, "-n/--seedmms arg must be at least 0 and at most 3"); maqLike = 1; break;
 			case 'l': seedLen = parseInt(5, "-l/--seedlen arg must be at least 5"); break;
 			case 'h': printUsage(cout); throw 0; break;
 			case ARG_USAGE: printUsage(cout); throw 0; break;
