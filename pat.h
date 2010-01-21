@@ -2089,6 +2089,7 @@ private:
 		int dstLen = 0;
 		int c = fb_.get();
 		assert(c != upto);
+		r.color = color_;
 		if(color_) {
 			// This may be a primer character.  If so, keep it in the
 			// 'primer' field of the read buf and parse the rest of the
@@ -2516,9 +2517,9 @@ protected:
 				if(c == '.') c = 'N';
 			}
 			if(fuzzy_ && c == '-') c = 'A';
-			assert_in(toupper(c), "ACGTN");
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
+				assert_in(toupper(c), "ACGTN");
 				if(charsRead >= trim5) {
 					if((*dstLenCur) >= 1024) tooManySeqChars(r.name);
 					sbuf[(*dstLenCur)++] = charToDna5[c];

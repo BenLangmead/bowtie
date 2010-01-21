@@ -97,6 +97,7 @@ static uint32_t minInsert;     // minimum insert size (Maq = 0, SOAP = 400)
 static uint32_t maxInsert;     // maximum insert size (Maq = 250, SOAP = 600)
 static bool mate1fw;           // -1 mate aligns in fw orientation on fw strand
 static bool mate2fw;           // -2 mate aligns in rc orientation on fw strand
+static bool mateFwSet;         // true -> user set --ff/--fr/--rf
 static uint32_t mixedThresh;   // threshold for when to switch to paired-end mixed mode (see aligner.h)
 static uint32_t mixedAttemptLim; // number of attempts to make in "mixed mode" before giving up on orientation
 static bool dontReconcileMates;  // suppress pairwise all-versus-all way of resolving mates
@@ -201,6 +202,7 @@ static void resetOptions() {
 	maxInsert				= 250;   // maximum insert size (Maq = 250, SOAP = 600)
 	mate1fw					= true;  // -1 mate aligns in fw orientation on fw strand
 	mate2fw					= false; // -2 mate aligns in rc orientation on fw strand
+	mateFwSet				= false; // true -> user set mate1fw/mate2fw with --ff/--fr/--rf
 	mixedThresh				= 4;     // threshold for when to switch to paired-end mixed mode (see aligner.h)
 	mixedAttemptLim			= 100;   // number of attempts to make in "mixed mode" before giving up on orientation
 	dontReconcileMates		= true;  // suppress pairwise all-versus-all way of resolving mates
@@ -637,9 +639,9 @@ static void parseOptions(int argc, const char **argv) {
 			case 's':
 				skipReads = (uint32_t)parseInt(0, "-s arg must be positive");
 				break;
-			case ARG_FF: mate1fw = true;  mate2fw = true;  break;
-			case ARG_RF: mate1fw = false; mate2fw = true;  break;
-			case ARG_FR: mate1fw = true;  mate2fw = false; break;
+			case ARG_FF: mate1fw = true;  mate2fw = true;  mateFwSet = true; break;
+			case ARG_RF: mate1fw = false; mate2fw = true;  mateFwSet = true; break;
+			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
 			case ARG_RANDOM_READS: format = RANDOM; break;
 			case ARG_RANDOM_READS_NOSYNC:
 				format = RANDOM;
@@ -966,6 +968,17 @@ static void parseOptions(int argc, const char **argv) {
 		}
 		maxInsert = max<int>(0, (int)maxInsert - trim5);
 		minInsert = max<int>(0, (int)minInsert - trim5);
+	}
+	if(!mateFwSet) {
+		if(color) {
+			// Set colorspace default (--ff)
+			mate1fw = true;
+			mate2fw = true;
+		} else {
+			// Set nucleotide space default (--fr)
+			mate1fw = true;
+			mate2fw = false;
+		}
 	}
 	if(outType != OUTPUT_FULL && suppressOuts.count() > 0 && !quiet) {
 		cerr << "Warning: Ignoring --suppress because output type is not default." << endl;
