@@ -26,8 +26,9 @@ static const std::string file_format_names[] = {
 	"FASTQ",
 	"Tabbed mated",
 	"Raw",
-	"Random",
-	"Command line"
+	"Command line",
+	"Chained",
+	"Random"
 };
 
 /**
