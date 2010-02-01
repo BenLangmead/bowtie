@@ -587,6 +587,7 @@ public:
 		depth1_ = depth1;
 		depth2_ = depth2;
 		depth3_ = depth3;
+		assert_gt(depth3_, 0);
 		rdepth_ = rdepth;
 		len_ = len;
 		cost_ = cost;
@@ -1120,6 +1121,7 @@ public:
 		assert_leq(depth0_, depth1_);
 		assert_leq(depth1_, depth2_);
 		assert_leq(depth2_, depth3_);
+		assert_gt(depth3_, 0);
 		if(qlen > 0) {
 			assert_leq(edits_.size(), qlen); // might have to relax this with inserts
 			assert_leq(rdepth_, qlen);

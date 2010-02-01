@@ -2018,7 +2018,7 @@ public:
 					return;
 				}
 				if(!b->init(
-						pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+				        pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt))
