@@ -76,7 +76,8 @@ my @reads = (
 my @args1 = (
 	"",
 	"--best",
-	"--best --strata"
+	"--best -m 1",
+	"--best --strata -m 1"
 );
 
 my @args2 = (
@@ -94,10 +95,10 @@ sub btrun {
 	my ($read, $args, $color) = @_;
 	$args .= $color ? " -C" : "";
 	my $cmd = "$bowtie $args -c e_coli \"$read\"";
-	print "$cmd\n";
+	print "\n$cmd\n\n";
 	system($cmd) && die;
 	$cmd = "$bowtie_d $args -c e_coli \"$read\"";
-	print "$cmd\n";
+	print "\n$cmd\n\n";
 	system($cmd) && die;
 	print "PASSED: \"$args\"\n";
 }
