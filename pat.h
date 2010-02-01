@@ -108,6 +108,7 @@ struct ReadBuf {
 		patid = 0;
 		readOrigBufLen = 0;
 		alts = 0;
+		trimmed5 = trimmed3 = 0;
 		fuzzy = false;
 		color = false;
 		primer = '?';
@@ -146,6 +147,7 @@ struct ReadBuf {
 			seqan::clear(altQual[j]);
 			seqan::clear(altQualRev[j]);
 		}
+		trimmed5 = trimmed3 = 0;
 		readOrigBufLen = 0;
 		color = fuzzy = false;
 		primer = '?';
@@ -367,6 +369,8 @@ struct ReadBuf {
 	bool          color;               // whether read is in color space
 	char          primer;              // primer base, for csfasta files
 	char          trimc;               // trimmed color, for csfasta files
+	int           trimmed5;            // amount actually trimmed off 5' end
+	int           trimmed3;            // amount actually trimmed off 3' end
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
@@ -1433,6 +1437,8 @@ public:
 			assert_eq(vq.length(), length(s));
 			v_.push_back(s);
 			quals_.push_back(vq);
+			trimmed3_.push_back(trim3_);
+			trimmed5_.push_back(mytrim5);
 			ostringstream os;
 			os << (names_.size());
 			names_.push_back(os.str());
@@ -1456,6 +1462,8 @@ public:
 		r.color = color_;
 		r.patFw  = v_[cur_];
 		r.qual = quals_[cur_];
+		r.trimmed3 = trimmed3_[cur_];
+		r.trimmed5 = trimmed5_[cur_];
 		ostringstream os;
 		os << cur_;
 		r.name = os.str();
@@ -1489,9 +1497,13 @@ public:
 		// Copy v_*, quals_* strings into the respective Strings
 		ra.patFw  = v_[cur_];
 		ra.qual = quals_[cur_];
+		ra.trimmed3 = trimmed3_[cur_];
+		ra.trimmed5 = trimmed5_[cur_];
 		cur_++;
 		rb.patFw  = v_[cur_];
 		rb.qual = quals_[cur_];
+		rb.trimmed3 = trimmed3_[cur_];
+		rb.trimmed5 = trimmed5_[cur_];
 		ostringstream os;
 		os << readCnt_;
 		ra.name = os.str();
@@ -1515,6 +1527,8 @@ private:
 	vector<String<Dna5> > v_;     /// forward sequences
 	vector<String<char> > quals_; /// quality values parallel to v_
 	vector<String<char> > names_; /// names
+	vector<int> trimmed3_; // names
+	vector<int> trimmed5_; // names
 };
 
 /**
@@ -1809,6 +1823,8 @@ protected:
 		_setLength(r.patFw, dstLen);
 		_setBegin (r.qual,  r.qualBuf);
 		_setLength(r.qual,  dstLen);
+		r.trimmed3 = this->trim3_;
+		r.trimmed5 = mytrim5;
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
 			itoa10(readCnt_, r.nameBuf);
@@ -1921,6 +1937,8 @@ protected:
 			r.clearAll();
 			return;
 		}
+		r.trimmed3 = this->trim3_;
+		r.trimmed5 = mytrim5;
 		assert_eq(ct, '\n');
 		assert_neq('\n', fb_.peek());
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
@@ -1969,6 +1987,8 @@ protected:
 			fb_.resetLastN();
 			return;
 		}
+		ra.trimmed3 = this->trim3_;
+		ra.trimmed5 = mytrim5_1;
 		assert(ct == '\t' || ct == '\n');
 		if(ct == '\n') {
 			// Unpaired record; return.
@@ -2012,6 +2032,9 @@ protected:
 		peekOverNewline(fb_);
 		ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
 		fb_.resetLastN();
+
+		rb.trimmed3 = this->trim3_;
+		rb.trimmed5 = mytrim5_2;
 
 		// The last character read in parseQuals should have been a
 		// '\n'
@@ -2679,6 +2702,8 @@ protected:
 			nameLen = strlen(r.nameBuf);
 			_setLength(r.name, nameLen);
 		}
+		r.trimmed3 = this->trim3_;
+		r.trimmed5 = mytrim5;
 		assert_gt(nameLen, 0);
 		readCnt_++;
 		patid = readCnt_-1;
@@ -2822,6 +2847,8 @@ protected:
 		_setLength(r.qual, dstLen);
 
 		c = peekToEndOfLine(fb_);
+		r.trimmed3 = this->trim3_;
+		r.trimmed5 = mytrim5;
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
 		fb_.resetLastN();
 
