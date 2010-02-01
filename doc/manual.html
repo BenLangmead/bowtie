@@ -1117,6 +1117,20 @@ No alignments
     ><p
     >Paired-end alignments where one mate's alignment is entirely contained within the other's are considered invalid.</p
     ><p
+    >When colospace alignment is enabled via <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      >, the default setting for paired-end orientation is <a href="#bowtie-options-fr"
+      ><code
+	>--ff</code
+	></a
+      >. This is because most SOLiD datasets have that orientation. When colorspace alignment is not enabled (default), the default setting for orientation is <a href="#bowtie-options-fr"
+      ><code
+	>--fr</code
+	></a
+      >, since most Illumina datasets have this orientation. The orientation setting can be overriden in either case.</p
+    ><p
     >Because Bowtie uses an in-memory representation of the original reference string when finding paired-end alignments, its memory footprint is larger when aligning paired-end reads. For example, the human index has a memory footprint of about 2.2 GB in single-end mode and 2.9 GB in paired-end mode. Note that paired-end and unpaired alignment incur the same memory footprint in colorspace (e.g. human incurs about 2.9 GB)</p
     ><h2 id="colorspace-alignment"
     ><a href="#TOC-colorspace-alignment"
@@ -1306,7 +1320,13 @@ T2302111203131231130300111123220
       >Paired-end colorspace alignment</a
       ></h3
     ><p
-    >Like other platforms, SOLiD supports generation of paired-end reads. However, SOLiD paired-end data comes with a caveat: in SOLiD-generated read files, some mates may lack corresponding mates in the other file. To avoid problems, SOLiD paired-end output should first be converted to <code
+    >Like other platforms, SOLiD supports generation of paired-end reads. When colorspace alignment is enabled, the default paired-end orientation setting is <a href="#bowtie-options-fr"
+      ><code
+	>--ff</code
+	></a
+      >. This is because most SOLiD datasets have that orientation.</p
+    ><p
+    >Note that SOLiD-generated read files can have &quot;orphaned&quot; mates; i.e. mates without a correpsondingly-named mate in the other file. To avoid problems due to orphaned mates, SOLiD paired-end output should first be converted to <code
       >.csfastq</code
       > files with unpaired mates omitted. This can be accomplished using, for example, <a href="http://main.g2.bx.psu.edu/"
       >Galaxy</a
@@ -2081,7 +2101,17 @@ T2302111203131231130300111123220
       >--ff</code
       > requires both an upstream mate1 and a downstream mate2 to be forward-oriented. Default: <code
       >--fr</code
-      > (appropriate for the Illumina short insert library).</p
+      > when <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      > (colorspace alignment) is not specified, <code
+      >--ff</code
+      > when <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      > is specified.</p
     ></td></tr><tr><td id="bowtie-options-nofw">
 
 

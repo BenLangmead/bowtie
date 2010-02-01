@@ -407,6 +407,13 @@ in repetitive regions, but the user may use the `--pairtries` or
 Paired-end alignments where one mate's alignment is entirely contained
 within the other's are considered invalid.
 
+When colospace alignment is enabled via `-C`, the default setting for
+paired-end orientation is `--ff`.  This is because most SOLiD datasets
+have that orientation.  When colorspace alignment is not enabled
+(default), the default setting for orientation is `--fr`, since most
+Illumina datasets have this orientation.  The orientation setting can
+be overriden in either case.
+
 Because Bowtie uses an in-memory representation of the original
 reference string when finding paired-end alignments, its memory
 footprint is larger when aligning paired-end reads.  For example, the
@@ -509,11 +516,15 @@ parameters print reads exactly as they appeared in the input file.
   Paired-end colorspace alignment
 
 Like other platforms, SOLiD supports generation of paired-end reads.
-However, SOLiD paired-end data comes with a caveat: in SOLiD-generated
-read files, some mates may lack corresponding mates in the other file.
-To avoid problems, SOLiD paired-end output should first be converted to
-`.csfastq` files with unpaired mates omitted.  This can be accomplished
-using, for example, [Galaxy]'s conversion tool (click
+When colorspace alignment is enabled, the default paired-end
+orientation setting is `--ff`.  This is because most SOLiD datasets
+have that orientation.
+
+Note that SOLiD-generated read files can have "orphaned" mates; i.e.
+mates without a correpsondingly-named mate in the other file.  To avoid
+problems due to orphaned mates, SOLiD paired-end output should first be
+converted to `.csfastq` files with unpaired mates omitted.  This can be
+accomplished using, for example, [Galaxy]'s conversion tool (click
 "NGS: QC and manipulation", then "SOLiD-to-FASTQ" in the left-hand
 sidebar).
 
@@ -810,8 +821,8 @@ appears upstream of the reverse complement of mate1 and all other
 constraints are met, that too is valid.  `--rf` likewise requires that
 an upstream mate1 be reverse-complemented and a downstream mate2 be
 forward-oriented. ` --ff` requires both an upstream mate1 and a
-downstream mate2 to be forward-oriented.  Default: `--fr` (appropriate
-for the Illumina short insert library).
+downstream mate2 to be forward-oriented.  Default: `--fr` when `-C`
+(colorspace alignment) is not specified, `--ff` when `-C` is specified.
 
     --nofw/--norc
 
