@@ -1496,6 +1496,7 @@ public:
 		os << readCnt_;
 		ra.name = os.str();
 		rb.name = os.str();
+		ra.color = rb.color = color_;
 		cur_++;
 		readCnt_++;
 		patid = readCnt_;
@@ -2112,8 +2113,8 @@ private:
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				if(c == '.') c = 'N';
 			}
-			assert_in(toupper(c), "ACGTN");
 			if(isalpha(c)) {
+				assert_in(toupper(c), "ACGTN");
 				if(begin++ >= trim5) {
 					if(dna4Cat[c] == 0) {
 						assert(false);
