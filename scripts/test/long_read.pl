@@ -51,10 +51,10 @@ my @reads = (
 sub btrun {
 	my ($read, $color) = @_;
 	my $args = $color ? "-C" : "";
-	my $cmd = "$bowtie $args -c e_coli $read";
+	my $cmd = "$bowtie $args -c e_coli \"$read\"";
 	print "$cmd\n";
 	system($cmd) && die;
-	$cmd = "$bowtie_d $args -c e_coli $read";
+	$cmd = "$bowtie_d $args -c e_coli \"$read\"";
 	print "$cmd\n";
 	system($cmd) && die;
 }
