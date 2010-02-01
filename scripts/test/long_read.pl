@@ -76,8 +76,7 @@ my @reads = (
 my @args1 = (
 	"",
 	"--best",
-	"--best -m 1",
-	"--best --strata -m 1"
+	"--best --strata"
 );
 
 my @args2 = (
