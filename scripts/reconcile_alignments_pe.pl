@@ -45,6 +45,7 @@ my $raw = 0;
 my $C = undef;
 my $colCseq = undef;
 my $colCqual = undef;
+my $colCedit = undef;
 
 GetOptions("m=i" => \$m,
            "M=i" => \$M,
@@ -56,6 +57,7 @@ GetOptions("m=i" => \$m,
            "f"   => \$fasta,
            "C"   => \$C,
            "col-cseq" => \$colCseq,
+           "col-cedit" => \$colCedit,
            "col-cqual" => \$colCqual,
            "e"   => \$raw) || die "Bad arguments";
 

@@ -40,6 +40,7 @@ my $q = undef;
 my $C = undef;
 my $colCseq = undef;
 my $colCqual = undef;
+my $colCedit = undef;
 
 GetOptions ("k=i" => \$k,
             "m=i" => \$m,
@@ -50,6 +51,7 @@ GetOptions ("k=i" => \$k,
             "a"   => \$a,
             "C"   => \$C,
             "col-cseq" => \$colCseq,
+            "col-cedit" => \$colCedit,
             "col-cqual" => \$colCqual,
             "r"   => \$r) || die "One or more errors parsing script arguments";
 
