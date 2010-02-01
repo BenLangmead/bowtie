@@ -20,6 +20,20 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
+Version 0.12.2 - February 1, 2010
+   * When -C/--color is enabled, the default paired-end orientation is
+     now --ff, not --fr.  The new default fits typical SOLiD output.
+   * Fixed a bug whereby very large reads could cause bowtie to crash
+     in --best mode
+   * After 0.12.1, some issues remained whereby bowtie would fail to
+     trim the primer in colorspace (e.g. in -c mode).  All input modes
+     should now have fully-functioning
+   * Fixed a bug whereby decoded colorspace qualities could overflow
+     and erroneously become low qualities.
+   * Better error checking and reporting for some bowtie options.
+   * Some basic testing scripts are now bundled with Bowtie (in
+     scripts/test), which should make it easier to regression-test.
+
 Version 0.12.1 - January 8, 2010
    * IMPORTANT: Fixed bug whereby bowtie would fail to remove both the
      primer base and the first color when parsing .csfasta files with
