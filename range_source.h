@@ -1323,7 +1323,7 @@ public:
 		assert_eq(pair.second, (b->cost_ & ~0xc000));
 		std::set<Branch*>::iterator it;
 		for(it = bset.begin(); it != bset.end(); it++) {
-			assert_gt(it->depth3_, 0);
+			assert_gt((*it)->depth3_, 0);
 		}
 		return true;
 	}

@@ -2084,6 +2084,7 @@ public:
 		assert(!pm.empty());
 
 		do {
+			assert(pm.repOk());
 			// Get the highest-priority branch according to the priority
 			// queue in 'pm'
 			Branch* br = pm.front();
