@@ -48,9 +48,26 @@ my @reads = (
 	""
 );
 
+my @args1 = (
+	"",
+	"--best",
+	"--best --strata"
+);
+
+my @args2 = (
+	"-v 0",
+	"-v 1",
+	"-v 2",
+	"-v 3",
+	"-n 0",
+	"-n 1",
+	"-n 2",
+	"-n 3"
+);
+
 sub btrun {
-	my ($read, $color) = @_;
-	my $args = $color ? "-C" : "";
+	my ($read, $args, $color) = @_;
+	$args .= $color ? " -C" : "";
 	my $cmd = "$bowtie $args -c e_coli \"$read\"";
 	print "$cmd\n";
 	system($cmd) && die;
@@ -60,5 +77,10 @@ sub btrun {
 }
 
 for my $r (@reads) {
-	btrun($r, 0);
+	next if $r eq "";
+	for my $a1 (@args1) {
+		for my $a2 (@args2) {
+			btrun($r, "$a1 $a2", 0);
+		}
+	}
 }
