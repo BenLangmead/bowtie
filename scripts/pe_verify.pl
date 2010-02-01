@@ -33,10 +33,13 @@ my $I = undef;
 my $X = undef;
 my $d = undef;
 my $C = undef;
+my $g = undef;
 my $colCseq = undef;
 my $colCqual = undef;
 my $args = "";
 my $verbose = undef;
+my $m1fw = 1;
+my $m2fw = 0;
 
 GetOptions ("I=i" => \$I,
             "X=i" => \$X,
@@ -45,6 +48,7 @@ GetOptions ("I=i" => \$I,
             "e=i" => \$e,
             "l=i" => \$l,
             "d"   => \$d,
+            "g"   => \$g,
             "C"   => \$C,
             "verbose" => \$verbose,
             "col-cseq" => \$colCseq,
@@ -58,16 +62,16 @@ $inner = $I if ${I};
 $outer = $X if ${X};
 
 my $extra_args = "";
-$extra_args = $e if $e;
+$extra_args = $e if defined($e);
 my $match_mode = "-n 2";
-$match_mode = "-v " . $v if $v;
-$match_mode = "-n " . $n if $n;
-$match_mode = "-l " . $l if $l;
-$match_mode = "-e " . $e if $e;
-$match_mode = "-I " . $I if $I;
-$match_mode = "-X " . $X if $X;
-$match_mode .= " -C" if $C;
-$match_mode .= " --col-cseq" if $colCseq;
+$match_mode = "-v " . $v if defined($v);
+$match_mode = "-n " . $n if defined($n);
+$match_mode .= " -l " . $l if defined($l);
+$match_mode .= " -e " . $e if defined($e);
+$match_mode .= " -C" if defined($C);
+$match_mode .= " -g" if defined($g);
+$match_mode .= " --col-cseq" if defined($colCseq);
+$m2fw = 1 if $C;
 
 print "Using match mode: $match_mode\n";
 
@@ -96,10 +100,6 @@ if($reads1 =~ /\.fa/) {
 
 my $sesMustHavePes = 0; # force se pairs to have corresponding pe pairs 
 
-# Defaults are for Illumina short-insert library
-my $m1fw = 1;
-my $m2fw = 0;
-
 system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
 
 # Run Bowtie not in paired-end mode for first mate file
@@ -114,8 +114,8 @@ print "$bowtie_pe_cmd\n";
 open BOWTIE_PE, "$bowtie_pe_cmd |";
 
 if($C) {
-	$inner = max(0, $inner-2);
-	$outer = max(0, $outer-2);
+	$inner = max(0, $inner-1);
+	$outer = max(0, $outer-1);
 }
 
 my $pes = 0;
@@ -180,6 +180,7 @@ my $unmatchedSeReads = 0;
 print "$bowtie_se_cmd1\n";
 open BOWTIE_SE1, "$bowtie_se_cmd1 |";
 while(<BOWTIE_SE1>) {
+	print "$_";
 	chomp;
 	$ses++;
 	my @ls = split(/[\t]/, $_);
@@ -203,6 +204,7 @@ print "$bowtie_se_cmd2\n";
 open BOWTIE_SE2, "$bowtie_se_cmd2 |";
 open UNMATCHED_SE, ">.unmatched.se";
 while(<BOWTIE_SE2>) {
+	print "$_";
 	chomp;
 	$ses++;
 	my @ls = split(/[\t]/, $_);
@@ -211,7 +213,7 @@ while(<BOWTIE_SE2>) {
 	my $ref = $ls[2];
 	my $off = int($ls[3]);
 	my $len = length($ls[4]);
-	my $fw = ($ls[1] eq "+");
+	my $fw = $ls[1] eq "+" ? 1 : 0;
 	my $readShort = $ls[4];
 	my $qualShort = $ls[5];
 	my $mms = "";
@@ -227,7 +229,7 @@ while(<BOWTIE_SE2>) {
 			my @oms = split(/ /, $om);
 			$#oms == 6 || die "Wrong number of elements for oms: $#oms";
 			my $oref = $oms[0];
-			my $ofw = ($oms[1] eq "+");
+			my $ofw = $oms[1] eq "+" ? 1 : 0;
 			my $ooff = int($oms[2]);
 			my $olen = int($oms[3]);
 			my $oreadShort = $oms[4];
@@ -240,6 +242,8 @@ while(<BOWTIE_SE2>) {
 			my $peKey = "$basename ";
 			if($ooff > $off) {
 				# The #1 mate is on the right
+				my $my_m1fw = $m1fw ? 0 : 1;
+				my $my_m2fw = $m2fw ? 0 : 1;
 				$diff = $ooff - $off + $olen;
 				if ($diff <= $olen || $diff <= $len) {
 					print "diff $diff is <= $olen and $len\n" if $verbose;
@@ -256,12 +260,12 @@ while(<BOWTIE_SE2>) {
 					print "diff $diff is outside of inner/outer: [$inner, $outer]\n" if $verbose;
 					next;
 				}
-				if($ofw == $m1fw) {
-					print "orientation of other $ofw matches unexpected $m1fw\n" if $verbose;
+				if($ofw != $my_m1fw) {
+					print "orientation of other $ofw doesn't match expected $my_m1fw\n" if $verbose;
 					next;
 				}
-				if($fw == $m2fw) {
-					print "orientation of anchor $fw matches unexpected $m2fw\n" if $verbose;
+				if($fw != $my_m2fw) {
+					print "orientation of anchor $fw doesn't match expected $my_m2fw\n" if $verbose;
 					next;
 				}
 				$content = "$readShort:$qualShort $oreadShort:$oqualShort";
@@ -318,7 +322,7 @@ while(<BOWTIE_SE2>) {
 					}
 					$unmatchedSe{$basename}++;
 					$unmatchedSes++;
-					print UNMATCHED_SE "$om\n$key\n";
+					print UNMATCHED_SE "Read $basename:\n$om\n$key\n";
 				}
 			}
 			if(defined($peHash{$basename}) && $peHash{$basename} eq $peKey) {
@@ -337,6 +341,7 @@ close(UNMATCHED_SE);
 my $die = 0;
 for my $peKey (keys %peHash) {
 	print "Paired-end $peKey has a paired-end alignment without single-end support\n";
+	print "[ $peHash{$peKey} ]\n";
 	$die++;
 }
 $die && die "Found $die paired-end reads with no corresponding single-end mates";
