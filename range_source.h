@@ -1473,6 +1473,8 @@ public:
 		assert(epool.empty());
 		assert(rpool.empty());
 		ASSERT_ONLY(branchSet_.clear());
+		assert_eq(0, branchSet_.size());
+		assert_eq(0, branchQ_.size());
 		minCost = 0;
 	}
 

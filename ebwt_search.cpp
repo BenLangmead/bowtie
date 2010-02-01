@@ -217,7 +217,7 @@ static void resetOptions() {
 	randomizeQuals			= false; // randomize quality values
 	stats					= false; // print performance stats
 	chunkPoolMegabytes		= 32;    // max MB to dedicate to best-first search frames per thread
-	chunkSz					= 16;    // size of single chunk disbursed by ChunkPool
+	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
 	chunkVerbose			= false; // have chunk allocator output status messages?
 	recal					= false;
 	recalMaxCycle			= 64;

@@ -189,6 +189,7 @@ public:
 		assert(pool != NULL);
 		lim_ = pool->chunkSize() / sizeof(T);
 		assert_gt(lim_, 0);
+		assert_gt(lim_, 1024);
 	}
 
 	/**
@@ -231,7 +232,9 @@ public:
 		if(!lazyInit()) return NULL;
 		if(cur_ + num >= lim_) {
 			if(!allocNextPool()) return NULL;
+			assert_eq(0, cur_);
 		}
+		assert_leq(num, lim_);
 		cur_ += num;
 		return &pools_[curPool_][cur_ - num];
 	}
