@@ -2177,12 +2177,6 @@ public:
 				// Get the range state for the current position
 				RangeState *rs = br->rangeState();
 				assert(rs != NULL);
-				// Should be all 0s
-				assert_eq(0, rs->tops[0]); assert_eq(0, rs->bots[0]);
-				assert_eq(0, rs->tops[1]); assert_eq(0, rs->bots[1]);
-				assert_eq(0, rs->tops[2]); assert_eq(0, rs->bots[2]);
-				assert_eq(0, rs->tops[3]); assert_eq(0, rs->bots[3]);
-
 				// Calculate the ranges for this position
 				if(br->top_ == 0 && br->bot_ == 0) {
 					// Calculate first quartet of ranges using the _fchr[]
