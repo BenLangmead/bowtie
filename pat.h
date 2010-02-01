@@ -1938,7 +1938,7 @@ protected:
 			return;
 		}
 		r.trimmed3 = this->trim3_;
-		r.trimmed5 = mytrim5;
+		r.trimmed5 = trim5;
 		assert_eq(ct, '\n');
 		assert_neq('\n', fb_.peek());
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);

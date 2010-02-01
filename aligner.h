@@ -1847,10 +1847,27 @@ protected:
 		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
+		int minins = minInsert_;
+		int maxins = maxInsert_;
+		if(fw1_) {
+			minins = max<int>(0, minins - patsrc_->bufa().trimmed5);
+			maxins = max<int>(0, maxins - patsrc_->bufa().trimmed5);
+		} else {
+			minins = max<int>(0, minins - patsrc_->bufa().trimmed3);
+			maxins = max<int>(0, maxins - patsrc_->bufa().trimmed3);
+		}
+		if(fw2_) {
+			minins = max<int>(0, minins - patsrc_->bufb().trimmed3);
+			maxins = max<int>(0, maxins - patsrc_->bufb().trimmed3);
+		} else {
+			minins = max<int>(0, minins - patsrc_->bufb().trimmed5);
+			maxins = max<int>(0, maxins - patsrc_->bufb().trimmed5);
+		}
+		assert_geq(minins, 0);
+		assert_geq(maxins, 0);
 		// Don't even try if either of the mates is longer than the
-		// maximum insert size; this seems to be compatible with what
-		// Maq does.
-		if(maxInsert_ <= max(qlen, alen)) {
+		// maximum insert size.
+		if((uint32_t)maxins <= max(qlen, alen)) {
 			return false;
 		}
 		const uint32_t tidx = off.first;  // text id where anchor mate hit
@@ -1859,10 +1876,10 @@ protected:
 		// outstanding mate may align while fulfilling insert-length
 		// constraints.
 		uint32_t begin, end;
-		assert_geq(maxInsert_, minInsert_);
-		uint32_t insDiff = maxInsert_ - minInsert_;
+		assert_geq(maxins, minins);
+		uint32_t insDiff = maxins - minins;
 		if(matchRight) {
-			end = toff + maxInsert_;
+			end = toff + maxins;
 			begin = toff + 1;
 			if(qlen < alen) begin += alen-qlen;
 			if(end > insDiff + qlen) {
@@ -1871,15 +1888,15 @@ protected:
 			end = min<uint32_t>(refs_->approxLen(tidx), end);
 			begin = min<uint32_t>(refs_->approxLen(tidx), begin);
 		} else {
-			if(toff + alen < maxInsert_) {
+			if(toff + alen < (uint32_t)maxins) {
 				begin = 0;
 			} else {
-				begin = toff + alen - maxInsert_;
+				begin = toff + alen - maxins;
 			}
 			uint32_t mi = min<uint32_t>(alen, qlen);
 			end = toff + mi - 1;
-			end = min<uint32_t>(end, toff + alen - minInsert_ + qlen - 1);
-			if(toff + alen + qlen < minInsert_ + 1) end = 0;
+			end = min<uint32_t>(end, toff + alen - minins + qlen - 1);
+			if(toff + alen + qlen < (uint32_t)(minins + 1)) end = 0;
 		}
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
