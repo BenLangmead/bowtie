@@ -75,6 +75,9 @@ sub pickPolicy {
 	if($pol =~ /-n/ && int(rand(2)) == 0) {
 		$pol .= " -l ".int(rand(30)+8);
 	}
+	if($pol =~ /-n/ && int(rand(2)) == 0) {
+		$pol .= " -e ".int(rand(120)+40);
+	}
 	return $pol;
 }
 
@@ -171,11 +174,87 @@ sub randColor($) {
 }
 
 # Utility function that returns the reverse complement of its argument
-sub reverseComp($) {
+sub revcomp {
 	my $r = shift;
+	my $c = shift; # may be undef
 	$r = reverse($r);
-	$r =~ tr/aAcCgGtT/tTgGcCaA/;
+	$r =~ tr/aAcCgGtT/tTgGcCaA/ unless (defined($c) && $c);
 	return $r;
+}
+
+# Utility function that returns the complement of its argument
+sub comp {
+	my $r = shift;
+	my $c = shift;
+	$r =~ tr/aAcCgGtT/tTgGcCaA/ unless (defined($c) && $c);
+	return $r;
+}
+
+# Insert $src just before the $off'th character of $dst
+sub ins {
+	my ($dst, $src, $off) = @_;
+	$off < length($dst) || die "ins offset $off is not less than dst length ".length($dst)."\n";
+	my $s = substr($dst, 0, $off) . $src . substr($dst, $off);
+	return $s;
+}
+
+# Delete the $off'th character of $dst
+sub del {
+	my ($dst, $off) = @_;
+	my $s = substr($dst, 0, $off).substr($dst, $off+1);
+	return $s;
+}
+
+# Substitute $src for the $off'th character of $dst
+sub subst {
+	my ($dst, $src, $off) = @_;
+	my $s = substr($dst, 0, $off).$src.substr($dst, $off+1);
+	return $s;
+}
+
+##
+# Sanity check whether a read and a list of edits corresponds correctly
+# to a substring of the reference.
+#
+sub checkAlignmentRef {
+	my ($ref, $read, $fw, $off, $edits, $alnuc) = @_;
+	my $orig = $read;
+	$off-- unless $alnuc;
+	if($edits ne '-') {
+		my $adjust = 0;
+		my @es = split(/[,]/, $edits);
+		for my $e (@es) {
+			my $colonoff = index($e, ":");
+			my $caratoff = index($e, ">");
+			my $pos = substr($e, 0, $colonoff);
+			my $ref = substr($e, $colonoff+1, $caratoff-$colonoff-1);
+			my $qry = substr($e, $caratoff+1);
+			length($qry) == 1 || die "Query char in edit $e, \"$qry\", isn't 1 char\n";
+			$ref = comp($ref, $alnuc) unless $fw;
+			if($qry eq "-") {
+				# insertion
+				#my $inspos = ($fw ? $pos + $adjust : length($read) - $pos - $adjust);
+				my $inspos = $pos + $adjust;
+				$read = ins($read, $ref, $inspos);
+				$adjust += length($ref);
+			} elsif($ref eq "-") {
+				# deletion
+				#my $delpos = ($fw ? $pos + $adjust : length($read) - $pos - $adjust);
+				my $delpos = $pos + $adjust;
+				$read = del($read, $delpos);
+				$adjust--;
+			} else {
+				# mismatch
+				#my $mmpos = ($fw ? $pos + $adjust : length($read) - $pos - $adjust);
+				my $mmpos = $pos + $adjust;
+				$read = subst($read, $ref, $mmpos);
+			}
+		}
+	}
+	$read = revcomp($read, $alnuc) unless $fw;
+	my $rstr = substr($ref, $off, length($read));
+	$fw = $fw ? '+' : '-';
+	$read eq $rstr || die "FW: $fw, Off: $off, Edits: $edits\nOrig: $orig\nQry:  $read\nRef:  $rstr\n";
 }
 
 ##
@@ -197,7 +276,7 @@ sub colorize($$) {
 	my $ret = "";
 	for(my $i = 0; $i < length($s)-1; $i++) {
 		my $di = uc substr($s, $i, 2);
-		$di =~ s/[URYMKWSBDHV]/N/gi;
+		$di =~ tr/-NnMmRrWwSsYyKkVvHhDdBbXx/N/;
 		defined($cmap{$di}) || die "Bad dinuc: $di\n";
 		$ret .= ($nucs ? $nmap{$cmap{$di}} : $cmap{$di});
 	}
@@ -356,9 +435,9 @@ sub deleteReadParts {
 	system("rm -f .tmp.al$seed". ".* .tmp.al$seed". "_1.* .tmp.al$seed". "_2.*");
 }
 
-sub search {
-	my($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
-	my $ret = doSearch($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
+sub search($$$$$$$$$$) {
+	my($tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my $ret = doSearch($tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
 	deleteReadParts();
 	return $ret;
 }
@@ -369,35 +448,41 @@ sub search {
 #
 # $alnuc: Alignments are in nucleotides (not colors, as with -C --col-cseq)
 #
-sub checkRefVerbose($$$) {
-	my ($l, $ttsr, $alnuc) = @_;
-	my @tts = @{$ttsr};
-	scalar(@tts) > 0 || die;
+sub checkRefVerbose($$$$) {
+	my ($l, $textsr, $ctextsr, $alnuc) = @_;
+	my @texts = @{$textsr};
+	my @ctexts = @{$ctextsr};
+	scalar(@texts) > 0 || die;
 	my @ls = split(/\t/, $l);
-	my ($fw, $ref, $off, $seq, $mms) = ($ls[1], $ls[2], $ls[3], $ls[4], $ls[7]);
+	my ($fw, $ref, $off, $seq, $mms) = ($ls[1] eq '+', $ls[2], $ls[3], $ls[4], $ls[7]);
 	defined($ref) || die "Malformed verbose output line: $l\n";
-	# Parse mismatches
-	my %mmhash = ();
-	my @mmss;
-	@mmss = split(/,/, $mms) if defined($mms);
-	for my $m (@mmss) {
-		my @ms = split(/:/, $m);
-		my $moff = $ms[0];
-		$moff == int($moff) || die "Mismatch offset must be integer";
-		$moff = length($seq)-$moff-1 if $fw eq "-";
-		$mmhash{$ms[0]}{ref} = substr($ms[1], 0, 1);
-		$mmhash{$ms[0]}{sub} = substr($ms[1], 2, 1);
-		my $subref = substr($seq, $moff, 1);
-		# Check that read character in MM string is compatible with string
-		!$alnuc || $subref eq $mmhash{$ms[0]}{sub} ||
-			die "Alignment says that read char at $moff is $mmhash{$ms[0]}{sub}, but it's $subref\n";
-		# Overwrite read character with reference character
-		substr($seq, $moff, 1) = $mmhash{$ms[0]}{ref} if $alnuc;
-	}
 	$ref == int($ref) || die;
-	$ref <= $#tts || die "Ref idx $ref exceeds number of texts ".($#tts+1)."\n";
-	my $refstr = substr($tts[$ref], $off, length($seq));
-	#print $tts[$ref]."\n";
+	$ref <= $#texts || die "Ref idx $ref exceeds number of texts ".($#texts+1)."\n";
+	my $orig = $seq;
+	$orig = revcomp($orig, $alnuc) unless $fw;
+	checkAlignmentRef($alnuc ? $texts[$ref] : $ctexts[$ref],
+	                  $orig, $fw, $off, $mms, $alnuc);
+	# Parse mismatches
+	if($mms ne '-') {
+		my %mmhash = ();
+		my @mmss;
+		@mmss = split(/,/, $mms) if defined($mms);
+		for my $m (@mmss) {
+			my @ms = split(/:/, $m);
+			my $moff = $ms[0];
+			$moff == int($moff) || die "Mismatch offset must be integer";
+			$moff = length($seq)-$moff-1 unless $fw;
+			$mmhash{$ms[0]}{ref} = substr($ms[1], 0, 1);
+			$mmhash{$ms[0]}{sub} = substr($ms[1], 2, 1);
+			my $subref = substr($seq, $moff, 1);
+			# Check that read character in MM string is compatible with string
+			!$alnuc || $subref eq $mmhash{$ms[0]}{sub} ||
+				die "Alignment says that read char at $moff is $mmhash{$ms[0]}{sub}, but it's $subref\n";
+			# Overwrite read character with reference character
+			substr($seq, $moff, 1) = $mmhash{$ms[0]}{ref} if $alnuc;
+		}
+	}
+	my $refstr = substr($texts[$ref], $off, length($seq));
 	for(my $i = 0; $i < length($seq); $i++) {
 		substr($refstr, $i, 1) ne "N" || die;
 		!$alnuc || substr($refstr, $i, 1) eq substr($seq, $i, 1) || die "\n$seq\n$refstr";
@@ -406,10 +491,11 @@ sub checkRefVerbose($$$) {
 }
 
 # Search for a pattern in an existing Ebwt
-sub doSearch {
-	my($t, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+sub doSearch($$$$$$$$$$) {
+	my($nstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
 	
-	my @tts = split(/,/, $t);
+	my @nts = split(/,/, $nstr); # nucleotide texts
+	my @cts = split(/,/, $cstr); # color texts
 	
 	my $patarg = "-c";
 	my $patstr = "\"$p1\"";
@@ -420,7 +506,7 @@ sub doSearch {
 	if($color) {
 		$color = "-C";
 		if(int(rand(3))) {
-			$color .= " --col-cseq";
+			$color .= " --col-cseq --col-cedit";
 			$alnuc = 0;
 		}
 		$color .= " --col-cqual" if int(rand(3)) == 0;
@@ -629,7 +715,14 @@ sub doSearch {
 		$offRate == int($offRate) || die "Bad offrate: $offRate\n";
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
-	my $cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	defined($policy) || die;
+	defined($color) || die;
+	defined($strand) || die;
+	defined($unalignArg) || die;
+	defined($khits) || die;
+	defined($offRateStr) || die;
+	defined($nstr) || die;
+	my $cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
 	
@@ -669,7 +762,7 @@ sub doSearch {
 		# Get the alignment for the first mate (or the unpaired read)
 		my $l = $outlines[$i];
 		chomp($l);
-		checkRefVerbose($l, \@tts, $alnuc);
+		checkRefVerbose($l, \@nts, \@cts, $alnuc);
 		my $key = "$l";
 		my $l2 = "";
 		if($pe) {
@@ -677,7 +770,7 @@ sub doSearch {
 			$l2 = $outlines[++$i];
 			defined($l2) || die "Odd number of output lines";
 			chomp($l2);
-			checkRefVerbose($l2, \@tts, $alnuc);
+			checkRefVerbose($l2, \@nts, \@cts, $alnuc);
 			$key .= ", $l2";
 		}
 		print "$key\n";
@@ -694,20 +787,38 @@ sub doSearch {
 			my @l2s = split(/[\t]/, $l2);
 			($mate2, $fw2, $stratum2) = ($l2s[0], $l2s[1], $l2s[8]);
 		}
+		my $peor = ($color ? "ff" : "fr");
+		my $m1fw = ($peor eq 'fr' || $peor eq 'ff') ? '+' : '-';
+		my $m2fw = ($peor eq 'ff') ? '+' : '-';
+		if($pe && $peor eq 'ff') {
+			$fw1 eq $fw2 || die "Saw different orientations for mates\n";
+		} elsif($pe) {
+			$fw1 ne $fw2 || die "Saw same orientation for mates\n";
+		}
 		if($strand =~ /nofw/) {
 			if($pe) {
 				my $m = substr($mate1, index($mate1, "/")+1);
-				"$m$fw1" eq "2+" ||
-					die "Saw a forward alignment on line ".($i+1)." when --nofw was specified";
+				if($peor eq 'ff') {
+					($fw1 eq '-' && $fw2 eq '-') ||
+						die "Saw non-rc alignment with --nofw specified\n";
+				} else {
+					"$m$fw1" eq "2+" ||
+						die "Saw a forward alignment on line ".($i+1)." when --nofw was specified";
+				}
 			} else {
 				$fw1 eq "-" ||
 					die "Saw a forward alignment on line ".($i+1)." when --nofw was specified";
 			}
 		} elsif($strand =~ /norc/) {
 			if($pe) {
-				my $m = substr($mate1, index($mate1, "/")+1);
-				"$m$fw1" eq "1+" ||
-					die "Saw a rev-comp alignment on line ".($i+1)." when --norc was specified";
+				if($peor eq 'ff') {
+					($fw1 eq '+' && $fw2 eq '+') ||
+						die "Saw non-fw alignment with --nofw specified\n";
+				} else {
+					my $m = substr($mate1, index($mate1, "/")+1);
+					"$m$fw1" eq "1+" ||
+						die "Saw a rev-comp alignment on line ".($i+1)." when --norc was specified";
+				}
 			} else {
 				$fw1 eq "+" ||
 					die "Saw a rev-comp alignment on line ".($i+1)." when --norc was specified";
@@ -748,16 +859,16 @@ sub doSearch {
 	}
 
 	{
-		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 		print "$cmd\n";
 		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $color $strand $unalignArg $khits --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "./bowtie $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
 
-		$cmd = "./bowtie --mm $policy $color $strand $unalignArg $khits --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "./bowtie --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -765,13 +876,13 @@ sub doSearch {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(`$cmd 2>.tmp$seed.stderr`);
 	# Parse output to see if any of it is bad
 	@outlines = split('\n', $out);
 	for my $l (@outlines) {
-		checkRefVerbose($l, \@tts, $alnuc);
+		checkRefVerbose($l, \@nts, \@cts, $alnuc);
 	}
 	
 	if($pe) {
@@ -822,7 +933,7 @@ sub doSearch {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --orig \"$t\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		system($cmd) == 0 || die;
 		$khits =~ s/--strata --best//;
@@ -863,21 +974,29 @@ for(; $outer > 0; $outer--) {
 
 	# Generate random text(s)
 	my $nt = int(rand(10)) + 1;
-	my $t = '';
-	my @tts;
+	my $tstr = '', $cstr = '';
+	my @nts;
+	my @cts;
+	
 	# For each reference sequence...
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
 		my $tt = randDna($tlen);             # add text meat
-		push(@tts, $tt);
-		$t .= (randGap() . $tt . randGap()); # add random padding
-		if($i < $nt-1) { $t .= ","; }        # add comma separator
+		push(@nts, $tt);
+		push(@cts, colorize($tt, 1));
+		my $newt = randGap() . $tt . randGap();
+		$tstr .= $newt;
+		$cstr .= colorize($newt, 1);
+		if($i < $nt-1) {
+			$tstr .= ",";
+			$cstr .= ",";
+		}
 	}
 	
 	my $color = (int(rand(2)) == 0);
 	
 	# Run the command to build the Ebwt from the random text
-	$pass += build($t, $color, $offRate, $ftabChars);
+	$pass += build($tstr, $color, $offRate, $ftabChars);
 	last if(++$tests > $limit);
 
 	my $in = $inner;
@@ -892,7 +1011,7 @@ for(; $outer > 0; $outer--) {
 		my $np = int(rand(30)) + 1;
 		for(my $i = 0; $i < $np; $i++) {
 			# Pick a text
-			my $tt = $tts[int(rand($#tts))];
+			my $tt = $nts[int(rand($#nts))];
 			# Pick a length
 			my $pl;
 			my $plen;
@@ -915,7 +1034,7 @@ for(; $outer > 0; $outer--) {
 				$is = reverse $is;
 				$p2 = substr $is, 0, $plen2;
 				$p2 = reverse $p2;
-				$p2 = reverseComp($p2);
+				$p2 = revcomp($p2);
 			} else {
 				# Pick a length for the read
 				$plen = int(rand($prand)) + $pbase;
@@ -947,9 +1066,9 @@ for(; $outer > 0; $outer--) {
 			}
 			# Possibly reverse complement it
 			if((int(rand(2)) == 0)) {
-				$p1 = reverseComp($p1);
+				$p1 = revcomp($p1);
 				if($pe) {
-					$p2 = reverseComp($p2);
+					$p2 = revcomp($p2);
 					my $ptmp = $p1;
 					$p1 = $p2;
 					$p2 = $ptmp;
@@ -1008,7 +1127,7 @@ for(; $outer > 0; $outer--) {
 		} else {
 			$expectResult = 0;
 		}
-		$pass += search($t, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
+		$pass += search($tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
 		last if(++$tests > $limit);
 	}
 
@@ -1041,7 +1160,7 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy($pe);
-		$pass += search($t, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
+		$pass += search($tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
 		last if(++$tests > $limit);
 	}
 }
