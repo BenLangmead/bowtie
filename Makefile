@@ -51,7 +51,7 @@ ifeq (1,$(BOWTIE_PTHREADS))
 PTHREAD_DEF = -DBOWTIE_PTHREADS
 ifeq (1,$(WINDOWS))
 # pthreads for windows forces us to be specific about the library
-PTHREAD_LIB = -lpthreadGC2
+PTHREAD_LIB = -L . -lpthreadGC2
 PTHREAD_PKG = pthreadGC2.dll
 else
 # There's also -pthread, but that only seems to work on Linux
