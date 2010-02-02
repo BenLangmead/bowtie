@@ -1003,7 +1003,7 @@ protected:
 		std::vector<uint32_t> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, doneFw_ ? &pairs_rc_ : &pairs_fw_,
-		                  toff, !matchRight);
+		                  toff, fw);
 		assert_eq(ranges.size(), offs.size());
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
@@ -1922,7 +1922,7 @@ protected:
 		std::vector<uint32_t> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, pairFw ? &pairs_fw_ : &pairs_rc_,
-		                  toff, !matchRight);
+		                  toff, fw);
 		assert_eq(ranges.size(), offs.size());
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
