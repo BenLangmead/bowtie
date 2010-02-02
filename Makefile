@@ -166,7 +166,7 @@ DEFS=-fno-strict-aliasing \
      $(CHUD_DEF)
 
 define checksum
-  cat $^ | cksum | sed 's/[01-9][01-9] .*//' | awk '{print $$1}' > .$@.cksum
+  cat $^ | md5sum | awk '{print $$1}' > .$@.cksum
 endef
 
 #
@@ -176,7 +176,7 @@ endef
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.cksum` \
+		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -186,7 +186,7 @@ bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.cksum` \
+		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -196,7 +196,7 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.cksum` \
+		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -210,7 +210,7 @@ bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.cksum` \
+		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -221,7 +221,7 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.cksum` \
+		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -232,7 +232,7 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.cksum` \
+		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -247,7 +247,7 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_INSPECT_HASH=`cat .$@.cksum` \
+		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
 		-o $@ $< \
@@ -258,7 +258,7 @@ bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(EXTRA_FLAGS) \
-		-DEBWT_INSPECT_HASH=`cat .$@.cksum` \
+		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
 		-o $@ $< \
