@@ -166,7 +166,7 @@ DEFS=-fno-strict-aliasing \
      $(CHUD_DEF)
 
 define checksum
-  cat $^ | md5sum | awk '{print $$1}' > .$@.cksum
+  cat $^ | md5sum | awk '{print $$1}' > .$@.md5
 endef
 
 #
