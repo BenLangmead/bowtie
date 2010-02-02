@@ -507,7 +507,7 @@ sub doSearch($$$$$$$$$$) {
 	if($color) {
 		$color = "-C";
 		if(int(rand(3))) {
-			$color .= " --col-cseq --col-cedit";
+			$color .= " --col-cseq";
 			$alnuc = 0;
 		}
 		$color .= " --col-cqual" if int(rand(3)) == 0;
