@@ -218,6 +218,7 @@ sub subst {
 #
 sub checkAlignmentRef {
 	my ($ref, $read, $fw, $off, $edits, $alnuc) = @_;
+	return unless $alnuc;
 	my $orig = $read;
 	$off-- unless $alnuc;
 	if($edits ne '-') {
