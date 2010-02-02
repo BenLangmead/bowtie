@@ -930,45 +930,6 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "Error: --refout cannot be combined with -S/--sam" << endl;
 		throw 1;
 	}
-	if(mate1fw && trim5 > 0) {
-		if(verbose) {
-			cerr << "Adjusting -I/-X down by " << trim5
-				 << " because mate1 is FW & trim5 is " << trim5 << endl;
-		}
-		maxInsert = max<int>(0, (int)maxInsert - trim5);
-		minInsert = max<int>(0, (int)minInsert - trim5);
-	}
-	if(mate2fw && trim3 > 0) {
-		if(verbose) {
-			cerr << "Adjusting -I/-X down by " << trim3
-				 << " because mate2 is FW & trim3 is " << trim3 << endl;
-		}
-		maxInsert = max<int>(0, (int)maxInsert - trim3);
-		minInsert = max<int>(0, (int)minInsert - trim3);
-	}
-	if(!mate1fw && trim3 > 0) {
-		if(verbose) {
-			cerr << "Adjusting -I/-X down by " << trim3
-				 << " because mate1 is RC & trim3 is " << trim3 << endl;
-		}
-		maxInsert = max<int>(0, (int)maxInsert - trim3);
-		minInsert = max<int>(0, (int)minInsert - trim3);
-	}
-	if(color) {
-		if(verbose) {
-			cerr << "Adjusting -I and -X down by 1 because of colorspace" << endl;
-		}
-		maxInsert = max<int>(0, maxInsert-1);
-		minInsert = max<int>(0, minInsert-1);
-	}
-	if(!mate2fw && trim5 > 0) {
-		if(verbose) {
-			cerr << "Adjusting -I/-X down by " << trim5
-				 << " because mate2 is RC & trim5 is " << trim5 << endl;
-		}
-		maxInsert = max<int>(0, (int)maxInsert - trim5);
-		minInsert = max<int>(0, (int)minInsert - trim5);
-	}
 	if(!mateFwSet) {
 		if(color) {
 			// Set colorspace default (--ff)
