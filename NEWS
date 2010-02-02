@@ -30,6 +30,12 @@ Version 0.12.2 - February 1, 2010
      should now have fully-functioning
    * Fixed a bug whereby decoded colorspace qualities could overflow
      and erroneously become low qualities.
+   * Fixed a bug that could produce incorrect paired-end alignment
+     results in -n mode when using paired-end orientation modes other
+     than --fr.  Even with the bug, reported results are reasonable;
+     but the seed edit constraint (-n) may have been applied to the
+     wrong end of one of the mates.
+   * Changed --chunkmbs default up to 64 from 32.
    * Better error checking and reporting for some bowtie options.
    * Some basic testing scripts are now bundled with Bowtie (in
      scripts/test), which should make it easier to regression-test.

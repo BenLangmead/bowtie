@@ -1100,7 +1100,7 @@ lowest cumulative cost.  Bowtie tries to minimize the memory impact of
 the descriptors, but they can still grow very large in some cases.  If
 you receive an error message saying that chunk memory has been
 exhausted in [`--best`] mode, try adjusting this parameter up to
-dedicate more memory to the descriptors.  Default: 32.
+dedicate more memory to the descriptors.  Default: 64.
 
 </td></tr></table>
 

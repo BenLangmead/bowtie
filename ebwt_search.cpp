@@ -216,7 +216,7 @@ static void resetOptions() {
 	strandFix				= true;  // attempt to fix strand bias
 	randomizeQuals			= false; // randomize quality values
 	stats					= false; // print performance stats
-	chunkPoolMegabytes		= 32;    // max MB to dedicate to best-first search frames per thread
+	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
 	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
 	chunkVerbose			= false; // have chunk allocator output status messages?
 	recal					= false;
@@ -482,7 +482,7 @@ static void printUsage(ostream& out) {
 	    << "  --maxbts <int>     max # backtracks for -n 2/3 (default: 125, 800 for --best)" << endl
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
-	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 32)" << endl
+	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 64)" << endl
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
