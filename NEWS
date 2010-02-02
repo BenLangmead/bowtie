@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.1.
+available to the public for download.  The current version is 0.12.2.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -20,7 +20,7 @@ Please report any issues using the Sourceforge bug tracker:
 Version Release History
 =======================
 
-Version 0.12.2 - February 1, 2010
+Version 0.12.2 - February 2, 2010
    * When -C/--color is enabled, the default paired-end orientation is
      now --ff, not --fr.  The new default fits typical SOLiD output.
    * Fixed a bug whereby very large reads could cause bowtie to crash
