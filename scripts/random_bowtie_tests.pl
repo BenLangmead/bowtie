@@ -397,7 +397,7 @@ sub checkRefVerbose($$$) {
 	$ref == int($ref) || die;
 	$ref <= $#tts || die "Ref idx $ref exceeds number of texts ".($#tts+1)."\n";
 	my $refstr = substr($tts[$ref], $off, length($seq));
-	print $tts[$ref].'\n';
+	#print $tts[$ref]."\n";
 	for(my $i = 0; $i < length($seq); $i++) {
 		substr($refstr, $i, 1) ne "N" || die;
 		!$alnuc || substr($refstr, $i, 1) eq substr($seq, $i, 1) || die "\n$seq\n$refstr";
@@ -625,7 +625,7 @@ sub doSearch {
 		$oneHit = "-a";
 	}
 	my $offRateStr = "";
-	if(int(rand(3)) == 0) {
+	if($offRate ne "" && int(rand(3)) == 0) {
 		$offRate == int($offRate) || die "Bad offrate: $offRate\n";
 		$offRateStr = "--offrate " . ($offRate + 1 + int(rand(4)));
 	}
@@ -657,7 +657,7 @@ sub doSearch {
 	
 	# Parse output to see if any of it is bad
 	print $out;
-	my @outlines = split('\n', $out);
+	my @outlines = split(/[\r\n]+/, $out);
 	my %outhash = ();
 	my %readcount = ();
 	my %readStratum = (); # for unpaired reads
