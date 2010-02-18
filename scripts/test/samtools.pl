@@ -51,7 +51,32 @@ sub run($) {
 	return system($cmd);
 }
 
+system("rm -f .samtools.pl.*");
 run("$bowtie_d -S e_coli reads/e_coli_10000snp.fq .samtools.pl.sam") && die;
 run("$samtools view -bS -o .samtools.pl.bam .samtools.pl.sam") && die;
 run("$samtools sort .samtools.pl.bam .samtools.pl.sorted") && die;
-run("$samtools pileup -cv -f genomes/NC_008253.fna .samtools.pl.sorted.bam") && die;
+open SAM, "$samtools pileup -cv -f genomes/NC_008253.fna .samtools.pl.sorted.bam |" || die;
+my $snps = 0;
+while(<SAM>) {
+	print $_;
+	$snps++;
+}
+close(SAM);
+$? == 0 || die "samtools pileup quit with exitlevel $?\n";
+$snps == 10 || die "Wrong number of SNPs output by samtools; expected 10, got $snps\n";
+print "PASSED\n";
+system("rm -f .samtools.pl.*");
+
+run("$bowtie_d -S -C -f e_coli_c reads/e_coli_10000snp.csfasta .samtools.pl.sam") && die;
+run("$samtools view -bS -o .samtools.pl.bam .samtools.pl.sam") && die;
+run("$samtools sort .samtools.pl.bam .samtools.pl.sorted") && die;
+open SAM, "$samtools pileup -cv -f genomes/NC_008253.fna .samtools.pl.sorted.bam |" || die;
+$snps = 0;
+while(<SAM>) {
+	print $_;
+	$snps++;
+}
+close(SAM);
+$? == 0 || die "samtools pileup quit with exitlevel $?\n";
+$snps == 10 || die "Wrong number of SNPs output by samtools; expected 10, got $snps\n";
+print "PASSED\n";
