@@ -264,6 +264,26 @@ public:
 	}
 
 	/**
+	 * Keep peek()ing then get()ing characters until the next return
+	 * from peek() is just after the last newline of the line.
+	 */
+	int peekUptoNewline() {
+		int c = peek();
+		while(c != '\r' && c != '\n' && c != -1) {
+			get(); c = peek();
+		}
+		while(c == '\r' || c == '\n') {
+			get();
+			c = peek();
+		}
+		assert_neq(c, '\r');
+		assert_neq(c, '\n');
+		return c;
+	}
+
+	size_t lastNCur() const { return _lastn_cur; }
+
+	/**
 	 * Reset to the beginning of the last-N-chars buffer.
 	 */
 	void resetLastN() {

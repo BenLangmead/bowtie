@@ -676,10 +676,18 @@ public:
 			if(!dumpAlBase_.empty()) {
 				MUTEX_LOCK(dumpAlignLock_);
 				if(dumpAl_ == NULL) {
+					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
 					assert(dumpAl_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpAlQv_ = openOf(dumpAlBase_ + ".qual", 0, "");
+						assert(dumpAlQv_ != NULL);
+					}
 				}
 				dumpAl_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				if(dumpAlQv_ != NULL) {
+					dumpAlQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpAlignLock_);
 			}
 		} else {
@@ -688,13 +696,25 @@ public:
 			if(!dumpAlBase_.empty()) {
 				MUTEX_LOCK(dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
+					assert(dumpAlQv_1_ == NULL);
+					assert(dumpAlQv_2_ == NULL);
 					dumpAl_1_ = openOf(dumpAlBase_, 1, "");
 					dumpAl_2_ = openOf(dumpAlBase_, 2, "");
 					assert(dumpAl_1_ != NULL);
 					assert(dumpAl_2_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpAlQv_1_ = openOf(dumpAlBase_ + ".qual", 1, "");
+						dumpAlQv_2_ = openOf(dumpAlBase_ + ".qual", 2, "");
+						assert(dumpAlQv_1_ != NULL);
+						assert(dumpAlQv_2_ != NULL);
+					}
 				}
 				dumpAl_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
 				dumpAl_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				if(dumpAlQv_1_ != NULL) {
+					dumpAlQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpAlQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpAlignLockPE_);
 			}
 		}
@@ -712,10 +732,18 @@ public:
 			if(!dumpUnalBase_.empty()) {
 				MUTEX_LOCK(dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
+					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
 					assert(dumpUnal_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpUnalQv_ = openOf(dumpUnalBase_ + ".qual", 0, "");
+						assert(dumpUnalQv_ != NULL);
+					}
 				}
 				dumpUnal_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				if(dumpUnalQv_ != NULL) {
+					dumpUnalQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpUnalLock_);
 			}
 		} else {
@@ -724,13 +752,23 @@ public:
 			if(!dumpUnalBase_.empty()) {
 				MUTEX_LOCK(dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
+					assert(dumpUnal_1_ == NULL);
+					assert(dumpUnal_2_ == NULL);
 					dumpUnal_1_ = openOf(dumpUnalBase_, 1, "");
 					dumpUnal_2_ = openOf(dumpUnalBase_, 2, "");
 					assert(dumpUnal_1_ != NULL);
 					assert(dumpUnal_2_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpUnalQv_1_ = openOf(dumpUnalBase_ + ".qual", 1, "");
+						dumpUnalQv_2_ = openOf(dumpUnalBase_ + ".qual", 2, "");
+					}
 				}
 				dumpUnal_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
 				dumpUnal_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				if(dumpUnalQv_1_ != NULL) {
+					dumpUnalQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpUnalQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpUnalLockPE_);
 			}
 		}
@@ -753,8 +791,14 @@ public:
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpMaxQv_ = openOf(dumpMaxBase_ + ".qual", 0, "");
+					}
 				}
 				dumpMax_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
+				if(dumpMaxQv_ != NULL) {
+					dumpMaxQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpMaxLock_);
 			}
 		} else {
@@ -763,13 +807,23 @@ public:
 			if(!dumpMaxBase_.empty()) {
 				MUTEX_LOCK(dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
+					assert(dumpMaxQv_1_ == NULL);
+					assert(dumpMaxQv_2_ == NULL);
 					dumpMax_1_ = openOf(dumpMaxBase_, 1, "");
 					dumpMax_2_ = openOf(dumpMaxBase_, 2, "");
 					assert(dumpMax_1_ != NULL);
 					assert(dumpMax_2_ != NULL);
+					if(p.bufa().qualOrigBufLen > 0) {
+						dumpMaxQv_1_ = openOf(dumpMaxBase_ + ".qual", 1, "");
+						dumpMaxQv_2_ = openOf(dumpMaxBase_ + ".qual", 2, "");
+					}
 				}
 				dumpMax_1_->write(p.bufa().readOrigBuf, p.bufa().readOrigBufLen);
 				dumpMax_2_->write(p.bufb().readOrigBuf, p.bufb().readOrigBufLen);
+				if(dumpMaxQv_1_ != NULL) {
+					dumpMaxQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
+					dumpMaxQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
+				}
 				MUTEX_UNLOCK(dumpMaxLockPE_);
 			}
 		}
@@ -858,16 +912,27 @@ protected:
 	bool onePairFile_;
 	bool sampleMax_;
 
-	// Output streams for dumping
-	std::ofstream *dumpAl_;   // for single-ended reads
-	std::ofstream *dumpAl_1_; // for first mates
-	std::ofstream *dumpAl_2_; // for second mates
-	std::ofstream *dumpUnal_;   // for single-ended reads
-	std::ofstream *dumpUnal_1_; // for first mates
-	std::ofstream *dumpUnal_2_; // for second mates
-	std::ofstream *dumpMax_;     // for single-ended reads
-	std::ofstream *dumpMax_1_;   // for first mates
-	std::ofstream *dumpMax_2_;   // for second mates
+	// Output streams for dumping sequences
+	std::ofstream *dumpAl_;       // for single-ended reads
+	std::ofstream *dumpAl_1_;     // for first mates
+	std::ofstream *dumpAl_2_;     // for second mates
+	std::ofstream *dumpUnal_;     // for single-ended reads
+	std::ofstream *dumpUnal_1_;   // for first mates
+	std::ofstream *dumpUnal_2_;   // for second mates
+	std::ofstream *dumpMax_;      // for single-ended reads
+	std::ofstream *dumpMax_1_;    // for first mates
+	std::ofstream *dumpMax_2_;    // for second mates
+
+	// Output streams for dumping qualities
+	std::ofstream *dumpAlQv_;     // for single-ended reads
+	std::ofstream *dumpAlQv_1_;   // for first mates
+	std::ofstream *dumpAlQv_2_;   // for second mates
+	std::ofstream *dumpUnalQv_;   // for single-ended reads
+	std::ofstream *dumpUnalQv_1_; // for first mates
+	std::ofstream *dumpUnalQv_2_; // for second mates
+	std::ofstream *dumpMaxQv_;    // for single-ended reads
+	std::ofstream *dumpMaxQv_1_;  // for first mates
+	std::ofstream *dumpMaxQv_2_;  // for second mates
 
 	/**
 	 * Open an ofstream with given name; output error message and quit
@@ -913,6 +978,9 @@ protected:
 		dumpAl_       = dumpAl_1_     = dumpAl_2_     = NULL;
 		dumpUnal_     = dumpUnal_1_   = dumpUnal_2_   = NULL;
 		dumpMax_      = dumpMax_1_    = dumpMax_2_    = NULL;
+		dumpAlQv_     = dumpAlQv_1_   = dumpAlQv_2_   = NULL;
+		dumpUnalQv_   = dumpUnalQv_1_ = dumpUnalQv_2_ = NULL;
+		dumpMaxQv_    = dumpMaxQv_1_  = dumpMaxQv_2_  = NULL;
 		dumpAlignFlag_   = !dumpAlBase_.empty();
 		dumpUnalignFlag_ = !dumpUnalBase_.empty();
 		dumpMaxedFlag_   = !dumpMaxBase_.empty();
@@ -928,14 +996,21 @@ protected:
 		if(dumpAl_       != NULL) { dumpAl_->close();       delete dumpAl_; }
 		if(dumpAl_1_     != NULL) { dumpAl_1_->close();     delete dumpAl_1_; }
 		if(dumpAl_2_     != NULL) { dumpAl_2_->close();     delete dumpAl_2_; }
-
 		if(dumpUnal_     != NULL) { dumpUnal_->close();     delete dumpUnal_; }
 		if(dumpUnal_1_   != NULL) { dumpUnal_1_->close();   delete dumpUnal_1_; }
 		if(dumpUnal_2_   != NULL) { dumpUnal_2_->close();   delete dumpUnal_2_; }
-
 		if(dumpMax_      != NULL) { dumpMax_->close();      delete dumpMax_; }
 		if(dumpMax_1_    != NULL) { dumpMax_1_->close();    delete dumpMax_1_; }
 		if(dumpMax_2_    != NULL) { dumpMax_2_->close();    delete dumpMax_2_; }
+		if(dumpAlQv_     != NULL) { dumpAlQv_->close();     delete dumpAlQv_; }
+		if(dumpAlQv_1_   != NULL) { dumpAlQv_1_->close();   delete dumpAlQv_1_; }
+		if(dumpAlQv_2_   != NULL) { dumpAlQv_2_->close();   delete dumpAlQv_2_; }
+		if(dumpUnalQv_   != NULL) { dumpUnalQv_->close();   delete dumpUnalQv_; }
+		if(dumpUnalQv_1_ != NULL) { dumpUnalQv_1_->close(); delete dumpUnalQv_1_; }
+		if(dumpUnalQv_2_ != NULL) { dumpUnalQv_2_->close(); delete dumpUnalQv_2_; }
+		if(dumpMaxQv_    != NULL) { dumpMaxQv_->close();    delete dumpMaxQv_; }
+		if(dumpMaxQv_1_  != NULL) { dumpMaxQv_1_->close();  delete dumpMaxQv_1_; }
+		if(dumpMaxQv_2_  != NULL) { dumpMaxQv_2_->close();  delete dumpMaxQv_2_; }
 	}
 
 	// Locks for dumping

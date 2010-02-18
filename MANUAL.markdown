@@ -71,16 +71,14 @@ Building from source
 Building Bowtie from source requires a GNU-like environment that
 includes GCC, GNU Make and other basics.  It should be possible to
 build Bowtie on a vanilla Linux or Mac installation.  Bowtie can also
-be built on Windows using [Cygwin] or [MinGW] (MinGW recommended).  If
-building with MinGW, first install MinGW and [MSYS], the [zlib]
-library, and the [pthreads] library.  You may also need the [GnuWin32]
-core and other utilities to drive the build process.
+be built on Windows using [Cygwin] or [MinGW].  We recommend
+[TDM's MinGW Build].  If using [MinGW], you must also have [MSYS]
+installed.
 
-Extract the sources, change to the directory where they were
-extracted, and build the Bowtie tools by running GNU `make` (usually
-with the command `make`, but sometimes with `gmake`) with no
-arguments.  If building with MinGW, run `make` from the MSYS
-environment.
+To build Bowtie, extract the sources, change to the extracted
+directory, and run GNU `make` (usually with the command `make`, but
+sometimes with `gmake`) with no arguments.  If building with [MinGW],
+run `make` from the [MSYS] command line.
 
 To support the [`-p`] (multithreading) option, Bowtie needs the
 `pthreads` library.  To compile Bowtie without `pthreads` (which
@@ -88,10 +86,8 @@ disables [`-p`]), use `make BOWTIE_PTHREADS=0`.
 
 [Cygwin]:   http://www.cygwin.com/
 [MinGW]:    http://www.mingw.org/
+[TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
-[zlib]:     http://cygwin.com/packages/mingw-zlib/
-[pthreads]: http://sourceware.org/pthreads-win32/
-[GnuWin32]: http://gnuwin32.sf.net/packages/coreutils.htm
 [Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
 The `bowtie` aligner
@@ -421,8 +417,8 @@ When colospace alignment is enabled via [`-C`], the default setting for
 paired-end orientation is [`--ff`].  This is because most SOLiD datasets
 have that orientation.  When colorspace alignment is not enabled
 (default), the default setting for orientation is [`--fr`], since most
-Illumina datasets have this orientation.  The orientation setting can
-be overriden in either case.
+Illumina datasets have this orientation.  The default can be overriden
+in either case.
 
 Because Bowtie uses an in-memory representation of the original
 reference string when finding paired-end alignments, its memory
@@ -445,19 +441,18 @@ where a color encodes a class of dinucleotides.  E.g. the color blue
 encodes any of the dinucleotides: AA, CC, GG, TT.  Colorspace has the
 advantage of (often) being able to distinguish sequencing errors from
 SNPs once the read has been aligned.  See ABI's [Principles of Di-Base
-Sequencing] application note for details.
+Sequencing] document for details.
 
 ### Colorspace reads
 
-All Bowtie input formats (FASTA [`-f`], FASTQ [`-q`], raw [`-r`], tab-
-delimited [`--12`](#command-line), command-line [`-c`]) are compatible with colorspace
-([`-C`]).  When [`-C`] is specified, read sequences are treated as
-colors.  Colors may be encoded either as numbers (`0`=blue, `1`=green,
-`2`=orange, `3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green,
-`G`=orange, `T`=red).
+All input formats (FASTA [`-f`], FASTQ [`-q`], raw [`-r`], tab-delimited
+[`--12`](#command-line), command-line [`-c`]) are compatible with colorspace ([`-C`]).
+When [`-C`] is specified, read sequences are treated as colors.  Colors
+may be encoded either as numbers (`0`=blue, `1`=green, `2`=orange,
+`3`=red) or as characters `A/C/G/T` (`A`=blue, `C`=green, `G`=orange,
+`T`=red).
 
-Note that sometimes reads will include a primer base as the first
-character of each read; e.g.:
+Some reads include a primer base as the first character; e.g.:
 
     >1_53_33_F3
     T2213120002010301233221223311331
@@ -465,18 +460,17 @@ character of each read; e.g.:
     T2302111203131231130300111123220
     ...
 
-In this example, `T` is the primer base.  `bowtie` detects and handles
-primer bases properly (i.e., the primer base and the adjacent color are
-both trimmed away prior to alignment) as long as the rest of the read
-is encoded as numbers.
+Here, `T` is the primer base.  `bowtie` detects and handles primer
+bases properly (i.e., the primer base and the adjacent color are both
+trimmed away prior to alignment) as long as the rest of the read is
+encoded as numbers.
 
-If your input is in the form of parallel `.csfasta` and `_QV.qual`
-files and you would like to use them with Bowtie while maintaining
-quality information, they must first be converted to a `.csfastq` file
-using, for example, [Galaxy]'s conversion tool (click "NGS: QC and
-manipulation", then "SOLiD-to-FASTQ" in the left-hand sidebar).
-
-[Galaxy]: http://main.g2.bx.psu.edu/
+`bowtie` also handles input in the form of parallel `.csfasta` and
+`_QV.qual` files.  Use [`-f`] to specify the `.csfasta` files and [`-Q`]
+(for unpaired reads) or [`--Q1`]/[`--Q2`] (for paired-end reads) to
+specify the corresponding `_QV.qual` files.  It is not necessary to
+first convert to FASTQ, though `bowtie` also handles FASTQ-formatted
+colorspace reads (with [`-q`], the default).
 
 ### Building a colorspace index
 
@@ -773,6 +767,46 @@ Align in colorspace.  Read characters are interpreted as colors.  The
 index specified must be a colorspace index (i.e. built with
 `bowtie-build` [`-C`](#bowtie-build-options-C), or `bowtie` will print an error message and quit.
 See [Colorspace alignment] for more details.
+
+</td></tr><tr><td id="bowtie-options-Q">
+
+[`-Q`]: #bowtie-options-Q
+[`-Q`/`--quals`]: #bowtie-options-Q
+
+    -Q/--quals <files>
+
+</td><td>
+
+Comma-separated list of files containing quality values for
+corresponding unpaired CSFASTA reads.  Use in combination with [`-C`]
+and [`-f`].  [`--integer-quals`] is set automatically when `-Q`/`--quals`
+is specified.
+
+</td></tr><tr><td id="bowtie-options-Q1">
+
+[`--Q1`]: #bowtie-options-Q1
+
+    --Q1 <files>
+
+</td><td>
+
+Comma-separated list of files containing quality values for
+corresponding CSFASTA #1 mates.  Use in combination with [`-C`], [`-f`],
+and [`-1`].  [`--integer-quals`] is set automatically when `--Q1`
+is specified.
+
+</td></tr><tr><td id="bowtie-options-Q2">
+
+[`--Q2`]: #bowtie-options-Q2
+
+    --Q2 <files>
+
+</td><td>
+
+Comma-separated list of files containing quality values for
+corresponding CSFASTA #2 mates.  Use in combination with [`-C`], [`-f`],
+and [`-2`].  [`--integer-quals`] is set automatically when `--Q2`
+is specified.
 
 </td></tr><tr><td id="bowtie-options-s">
 

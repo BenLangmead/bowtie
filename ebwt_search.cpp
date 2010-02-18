@@ -140,6 +140,9 @@ bool colorSeq; // true -> show colorspace alignments as colors, not decoded base
 bool colorQual; // true -> show colorspace qualities as original quals, not decoded quals
 static bool printCost; // true -> print stratum and cost
 bool showSeed;
+static vector<string> qualities;
+static vector<string> qualities1;
+static vector<string> qualities2;
 
 static void resetOptions() {
 	mates1.clear();
@@ -245,11 +248,14 @@ static void resetOptions() {
 	colorQual				= false; // true -> show colorspace qualities as original quals, not decoded quals
 	printCost				= false; // true -> print cost and stratum
 	showSeed				= false; // true -> print per-read pseudo-random seed
+	qualities.clear();
+	qualities1.clear();
+	qualities2.clear();
 }
 
 // mating constraints
 
-static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I:X:x:B:ySC";
+static const char *short_options = "fF:qbzhcu:rv:s:at3:5:o:e:n:l:w:p:k:m:M:1:2:I:X:x:B:ySCQ:";
 
 enum {
 	ARG_ORIG = 256,
@@ -328,7 +334,9 @@ enum {
 	ARG_COLOR_QUAL,
 	ARG_COST,
 	ARG_COLOR_KEEP_ENDS,
-	ARG_SHOWSEED
+	ARG_SHOWSEED,
+	ARG_QUALS1,
+	ARG_QUALS2
 };
 
 static struct option long_options[] = {
@@ -366,6 +374,9 @@ static struct option long_options[] = {
 	{(char*)"mhits",        required_argument, 0,            'm'},
 	{(char*)"minins",       required_argument, 0,            'I'},
 	{(char*)"maxins",       required_argument, 0,            'X'},
+	{(char*)"quals",        required_argument, 0,            'Q'},
+	{(char*)"Q1",           required_argument, 0,            ARG_QUALS1},
+	{(char*)"Q2",           required_argument, 0,            ARG_QUALS2},
 	{(char*)"best",         no_argument,       0,            ARG_BEST},
 	{(char*)"better",       no_argument,       0,            ARG_BETTER},
 	{(char*)"oldbest",      no_argument,       0,            ARG_OLDBEST},
@@ -459,6 +470,8 @@ static void printUsage(ostream& out) {
 	    << "  -r                 query input files are raw one-sequence-per-line" << endl
 	    << "  -c                 query sequences given on cmd line (as <mates>, <singles>)" << endl
 	    << "  -C                 reads and index are in colorspace" << endl
+	    << "  -Q/--quals <file>  QV file(s) corresponding to CSFASTA inputs; use with -f -C" << endl
+	    << "  --Q1/--Q2 <file>   same as -Q, but for mate files 1 and 2 respectively" << endl
 	    << "  -s/--skip <int>    skip the first <int> reads/pairs in the input" << endl
 	    << "  -u/--qupto <int>   stop after first <int> reads/pairs (excl. skipped reads)" << endl
 	    << "  -5/--trim5 <int>   trim <int> bases from 5' (left) end of reads" << endl
@@ -729,6 +742,18 @@ static void parseOptions(int argc, const char **argv) {
 			case 'k':
 				khits = (uint32_t)parseInt(1, "-k arg must be at least 1");
 				break;
+			case 'Q':
+				tokenize(optarg, ",", qualities);
+				integerQuals = true;
+				break;
+			case ARG_QUALS1:
+				tokenize(optarg, ",", qualities1);
+				integerQuals = true;
+				break;
+			case ARG_QUALS2:
+				tokenize(optarg, ",", qualities2);
+				integerQuals = true;
+				break;
 			case 'M':
 				sampleMax = true;
 			case 'm':
@@ -848,6 +873,48 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << mates2.size() << endl
 		     << "mate files/sequences were specified with -2.  The same number of mate files/" << endl
 		     << "sequences must be specified with -1 and -2." << endl;
+		throw 1;
+	}
+	if(qualities.size() && format != FASTA) {
+		cerr << "Error: one or more quality files were specified with -Q but -f was not" << endl
+		     << "enabled.  -Q works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities.size() && !color) {
+		cerr << "Error: one or more quality files were specified with -Q but -C was not" << endl
+		     << "enabled.  -Q works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities1.size() && format != FASTA) {
+		cerr << "Error: one or more quality files were specified with --Q1 but -f was not" << endl
+		     << "enabled.  --Q1 works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities1.size() && !color) {
+		cerr << "Error: one or more quality files were specified with --Q1 but -C was not" << endl
+		     << "enabled.  --Q1 works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities2.size() && format != FASTA) {
+		cerr << "Error: one or more quality files were specified with --Q2 but -f was not" << endl
+		     << "enabled.  --Q2 works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities2.size() && !color) {
+		cerr << "Error: one or more quality files were specified with --Q2 but -C was not" << endl
+		     << "enabled.  --Q2 works only in combination with -f and -C." << endl;
+		throw 1;
+	}
+	if(qualities1.size() > 0 && mates1.size() != qualities1.size()) {
+		cerr << "Error: " << mates1.size() << " mate files/sequences were specified with -1, but " << qualities1.size() << endl
+		     << "quality files were specified with --Q1.  The same number of mate and quality" << endl
+		     << "files must sequences must be specified with -1 and --Q1." << endl;
+		throw 1;
+	}
+	if(qualities2.size() > 0 && mates2.size() != qualities2.size()) {
+		cerr << "Error: " << mates2.size() << " mate files/sequences were specified with -2, but " << qualities2.size() << endl
+		     << "quality files were specified with --Q2.  The same number of mate and quality" << endl
+		     << "files must sequences must be specified with -2 and --Q2." << endl;
 		throw 1;
 	}
 	// Check for duplicate mate input files
@@ -2306,31 +2373,36 @@ static void seededQualCutoffSearchFull(
  * from or as the sequences themselves (i.e. if -c was used).
  */
 static PatternSource*
-patsrcFromStrings(int format, const vector<string>& qs) {
+patsrcFromStrings(int format,
+                  const vector<string>& reads,
+                  const vector<string>* quals)
+{
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (seed, qs, color,
+			return new FastaPatternSource (seed, reads, quals, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
+			                               solexaQuals, phred64Quals,
+			                               integerQuals,
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               seed, qs, fastaContLen,
+			                               seed, reads, fastaContLen,
 			                               fastaContFreq,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (seed, qs, color,
+			return new RawPatternSource   (seed, reads, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
-			return new FastqPatternSource (seed, qs, color,
+			return new FastqPatternSource (seed, reads, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
@@ -2339,22 +2411,21 @@ patsrcFromStrings(int format, const vector<string>& qs) {
 			                               integerQuals, fuzzy,
 			                               skipReads);
 		case TAB_MATE:
-			return new TabbedPatternSource(seed, qs, color,
+			return new TabbedPatternSource(seed, reads, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
-			                               solexaQuals, phred64Quals,
-			                               integerQuals, skipReads);
+			                               skipReads);
 		case CMDLINE:
-			return new VectorPatternSource(seed, qs, color,
+			return new VectorPatternSource(seed, reads, color,
 			                               randomizeQuals,
 			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case INPUT_CHAIN:
-			return new ChainPatternSource (seed, qs, useSpinlock, patDumpfile,
+			return new ChainPatternSource (seed, reads, useSpinlock, patDumpfile,
 			                               verbose, skipReads);
 		case RANDOM:
 			return new RandomPatternSource(seed, 2000000, lenRandomReads,
@@ -2376,6 +2447,7 @@ static void driver(const char * type,
                    const string& ebwtFileBase,
                    const string& query,
                    const vector<string>& queries,
+                   const vector<string>& qualities,
                    const string& outfile)
 {
 	if(verbose || startVerbose)  {
@@ -2429,7 +2501,7 @@ static void driver(const char * type,
 			tmp.push_back(mates12[i]);
 			assert_eq(1, tmp.size());
 		}
-		patsrcs_ab.push_back(patsrcFromStrings(format, *qs));
+		patsrcs_ab.push_back(patsrcFromStrings(format, *qs, NULL));
 		if(!fileParallel) {
 			break;
 		}
@@ -2438,14 +2510,19 @@ static void driver(const char * type,
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates1.size(); i++) {
 		const vector<string>* qs = &mates1;
-		vector<string> tmp;
+		const vector<string>* quals = &qualities1;
+		vector<string> tmpSeq;
+		vector<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
-			qs = &tmp;
-			tmp.push_back(mates1[i]);
-			assert_eq(1, tmp.size());
+			qs = &tmpSeq;
+			tmpSeq.push_back(mates1[i]);
+			quals = &tmpSeq;
+			tmpQual.push_back(qualities1[i]);
+			assert_eq(1, tmpSeq.size());
 		}
-		patsrcs_a.push_back(patsrcFromStrings(format, *qs));
+		if(quals->empty()) quals = NULL;
+		patsrcs_a.push_back(patsrcFromStrings(format, *qs, quals));
 		if(!fileParallel) {
 			break;
 		}
@@ -2454,14 +2531,19 @@ static void driver(const char * type,
 	// Create list of pattern sources for paired reads
 	for(size_t i = 0; i < mates2.size(); i++) {
 		const vector<string>* qs = &mates2;
-		vector<string> tmp;
+		const vector<string>* quals = &qualities2;
+		vector<string> tmpSeq;
+		vector<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
-			qs = &tmp;
-			tmp.push_back(mates2[i]);
-			assert_eq(1, tmp.size());
+			qs = &tmpSeq;
+			tmpSeq.push_back(mates2[i]);
+			quals = &tmpQual;
+			tmpQual.push_back(qualities2[i]);
+			assert_eq(1, tmpSeq.size());
 		}
-		patsrcs_b.push_back(patsrcFromStrings(format, *qs));
+		if(quals->empty()) quals = NULL;
+		patsrcs_b.push_back(patsrcFromStrings(format, *qs, quals));
 		if(!fileParallel) {
 			break;
 		}
@@ -2475,15 +2557,20 @@ static void driver(const char * type,
 	}
 	for(size_t i = 0; i < queries.size(); i++) {
 		const vector<string>* qs = &queries;
+		const vector<string>* quals = &qualities;
 		PatternSource* patsrc = NULL;
-		vector<string> tmp;
+		vector<string> tmpSeq;
+		vector<string> tmpQual;
 		if(fileParallel) {
 			// Feed query files one to each PatternSource
-			qs = &tmp;
-			tmp.push_back(queries[i]);
-			assert_eq(1, tmp.size());
+			qs = &tmpSeq;
+			tmpSeq.push_back(queries[i]);
+			quals = &tmpQual;
+			tmpQual.push_back(qualities[i]);
+			assert_eq(1, tmpSeq.size());
 		}
-		patsrc = patsrcFromStrings(format, *qs);
+		if(quals->empty()) quals = NULL;
+		patsrc = patsrcFromStrings(format, *qs, quals);
 		assert(patsrc != NULL);
 		patsrcs_a.push_back(patsrc);
 		patsrcs_b.push_back(NULL);
@@ -2853,6 +2940,10 @@ int bowtie(int argc, const char **argv) {
 				for(size_t i = 0; i < queries.size(); i++) {
 					cout << "  " << queries[i] << endl;
 				}
+				cout << "Quality inputs:" << endl;
+				for(size_t i = 0; i < qualities.size(); i++) {
+					cout << "  " << qualities[i] << endl;
+				}
 				cout << "Output file: \"" << outfile << "\"" << endl;
 				cout << "Local endianness: " << (currentlyBigEndian()? "big":"little") << endl;
 				cout << "Sanity checking: " << (sanityCheck? "enabled":"disabled") << endl;
@@ -2866,7 +2957,7 @@ int bowtie(int argc, const char **argv) {
 				cout << "Press key to continue..." << endl;
 				getchar();
 			}
-			driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, outfile);
+			driver<String<Dna, Alloc<> > >("DNA", ebwtFile, query, queries, qualities, outfile);
 			CHUD_STOP();
 		}
 #ifdef CHUD_PROFILING

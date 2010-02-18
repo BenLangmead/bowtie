@@ -37,9 +37,13 @@ if(defined $options{h}) {
 my $setPolicy;
 $setPolicy = $options{p} if defined($options{p});
 
+my $seed = 0;
+$seed = int $ARGV[0] if defined($ARGV[0]);
+srand $seed;
+
 # make all the relevant binaries, unless we were asked not to
 unless(defined $options{n}) {
-	system("make bowtie bowtie-debug bowtie-build-debug ".
+	run("make bowtie bowtie-debug bowtie-build-debug ".
 	       "bowtie-inspect-debug") == 0 || die "Error building";
 }
 
@@ -80,10 +84,6 @@ sub pickPolicy {
 	}
 	return $pol;
 }
-
-my $seed = 0;
-$seed = int $ARGV[0] if defined($ARGV[0]);
-srand $seed;
 
 my $outer = 5000;
 $outer = int $ARGV[1] if defined($ARGV[1]);
@@ -221,7 +221,7 @@ sub checkAlignmentRef {
 	return unless $alnuc;
 	my $orig = $read;
 	$off-- unless $alnuc;
-	if($edits ne '-') {
+	if($edits ne '-' && $edits ne "") {
 		my $adjust = 0;
 		my @es = split(/[,]/, $edits);
 		for my $e (@es) {
@@ -255,7 +255,11 @@ sub checkAlignmentRef {
 	$read = revcomp($read, $alnuc) unless $fw;
 	my $rstr = substr($ref, $off, length($read));
 	$fw = $fw ? '+' : '-';
-	$read eq $rstr || die "FW: $fw, Off: $off, Edits: $edits\nOrig: $orig\nQry:  $read\nRef:  $rstr\n";
+	$read eq $rstr || die "\n\nAlignment failed to pass sanity check:\n".
+	                      "FW: $fw, Off: $off, Edits: $edits\n".
+	                      "Orig: $orig\n".
+	                      "Qry:  $read\n".
+	                      "Ref:  $rstr\n";
 }
 
 ##
@@ -324,6 +328,22 @@ sub trim($) {
 	return $string;
 }
 
+sub run {
+	my $cmd = shift;
+	open CMDTMP, ">.randtmp$seed.cmd" || die;
+	print CMDTMP "$cmd\n";
+	close(CMDTMP);
+	return system($cmd);
+}
+
+sub runBacktick {
+	my $cmd = shift;
+	open CMDTMP, ">.randtmp$seed.cmd" || die;
+	print CMDTMP "$cmd\n";
+	close(CMDTMP);
+	return `$cmd`;
+}
+
 # Build an Ebwt based on given arguments
 sub build {
 	my($t, $color, $offRate, $ftabChars) = @_;
@@ -384,9 +404,9 @@ sub build {
 	
 	# Do unpacked version
 	my $cmd = "./bowtie-build-debug $args .tmp$seed";
-	system("echo \"$cmd\" > .tmp$seed.cmd");
+	run("echo \"$cmd\" > .tmp$seed.cmd");
 	print "$cmd\n";
-	my $out = trim(`$cmd 2>&1`);
+	my $out = trim(runBacktick("$cmd 2>&1"));
 	if($out eq "") {
 		$ret++;
 	} else {
@@ -400,21 +420,21 @@ sub build {
 	# original reference sequences
 	$cmd = "./bowtie-inspect-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
 	print "$cmd\n";
-	system($cmd) == 0 || die "$cmd - failed";
+	run($cmd) == 0 || die "$cmd - failed";
 	$cmd = "diff .randtmp$seed.ns.fa .tmp$seed.inspect.ref";
 	print "$cmd\n";
-	system($cmd) == 0 || die "$cmd - failed";
+	run($cmd) == 0 || die "$cmd - failed";
 
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
 		$cmd = "./bowtie-build-debug -a -p $args .tmp$seed.packed";
 		print "$cmd\n";
-		$out = trim(`$cmd 2>&1`);
+		$out = trim(runBacktick("$cmd 2>&1"));
 		if($out eq "") {
-			if(system("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
+			if(run("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
 				die if $exitOnFail;
-			} elsif(system("diff .tmp$seed.2.ebwt .tmp$seed.packed.2.ebwt") != 0) {
+			} elsif(run("diff .tmp$seed.2.ebwt .tmp$seed.packed.2.ebwt") != 0) {
 				die if $exitOnFail;
 			} else {
 				$ret++;
@@ -431,9 +451,9 @@ sub build {
 }
 
 sub deleteReadParts {
-	system("rm -f .tmp.un$seed". ".* .tmp.un$seed". "_1.* .tmp.un$seed". "_2.*");
-	system("rm -f .tmp.max$seed".".* .tmp.max$seed"."_1.* .tmp.max$seed"."_2.*");
-	system("rm -f .tmp.al$seed". ".* .tmp.al$seed". "_1.* .tmp.al$seed". "_2.*");
+	run("rm -f .tmp.un$seed". ".* .tmp.un$seed". "_1.* .tmp.un$seed". "_2.*");
+	run("rm -f .tmp.max$seed".".* .tmp.max$seed"."_1.* .tmp.max$seed"."_2.*");
+	run("rm -f .tmp.al$seed". ".* .tmp.al$seed". "_1.* .tmp.al$seed". "_2.*");
 }
 
 sub search($$$$$$$$$$) {
@@ -456,38 +476,15 @@ sub checkRefVerbose($$$$) {
 	scalar(@texts) > 0 || die;
 	my @ls = split(/\t/, $l);
 	my ($fw, $ref, $off, $seq, $mms) = ($ls[1] eq '+', $ls[2], $ls[3], $ls[4], $ls[7]);
+	$mms = "-" unless(defined($mms));
 	defined($ref) || die "Malformed verbose output line: $l\n";
 	$ref == int($ref) || die;
 	$ref <= $#texts || die "Ref idx $ref exceeds number of texts ".($#texts+1)."\n";
 	my $orig = $seq;
 	$orig = revcomp($orig, $alnuc) unless $fw;
+	print STDERR "Checking alignemnt: $l\n";
 	checkAlignmentRef($alnuc ? $texts[$ref] : $ctexts[$ref],
 	                  $orig, $fw, $off, $mms, $alnuc);
-	# Parse mismatches
-	if($mms ne '-') {
-		my %mmhash = ();
-		my @mmss;
-		@mmss = split(/,/, $mms) if defined($mms);
-		for my $m (@mmss) {
-			my @ms = split(/:/, $m);
-			my $moff = $ms[0];
-			$moff == int($moff) || die "Mismatch offset must be integer";
-			$moff = length($seq)-$moff-1 unless $fw;
-			$mmhash{$ms[0]}{ref} = substr($ms[1], 0, 1);
-			$mmhash{$ms[0]}{sub} = substr($ms[1], 2, 1);
-			my $subref = substr($seq, $moff, 1);
-			# Check that read character in MM string is compatible with string
-			!$alnuc || $subref eq $mmhash{$ms[0]}{sub} ||
-				die "Alignment says that read char at $moff is $mmhash{$ms[0]}{sub}, but it's $subref\n";
-			# Overwrite read character with reference character
-			substr($seq, $moff, 1) = $mmhash{$ms[0]}{ref} if $alnuc;
-		}
-	}
-	my $refstr = substr($texts[$ref], $off, length($seq));
-	for(my $i = 0; $i < length($seq); $i++) {
-		substr($refstr, $i, 1) ne "N" || die;
-		!$alnuc || substr($refstr, $i, 1) eq substr($seq, $i, 1) || die "\n$seq\n$refstr";
-	}
 	return 1;
 }
 
@@ -507,7 +504,7 @@ sub doSearch($$$$$$$$$$) {
 	if($color) {
 		$color = "-C";
 		if(int(rand(3))) {
-			$color .= " --col-cseq";
+			$color .= " --col-cseq ";
 			$alnuc = 0;
 		}
 		$color .= " --col-cqual" if int(rand(3)) == 0;
@@ -530,7 +527,7 @@ sub doSearch($$$$$$$$$$) {
 		$patarg = "-f";
 		$patstr = ".randread$seed.fa";
 		if($pe) {
-			system("mv .randread$seed.fa .randread$seed"."_1.fa");
+			run("mv .randread$seed.fa .randread$seed"."_1.fa");
 			$patstr = "-1 .randread$seed"."_1.fa";
 			open FA, ">.randread$seed"."_2.fa" || die "Could not open temporary fasta file";
 			@cs = split /[,]/, $p2;
@@ -559,7 +556,7 @@ sub doSearch($$$$$$$$$$) {
 		$patarg = "-q";
 		$patstr = ".randread$seed.fq";
 		if($pe) {
-			system("mv .randread$seed.fq .randread$seed"."_1.fq");
+			run("mv .randread$seed.fq .randread$seed"."_1.fq");
 			$patstr = "-1 .randread$seed"."_1.fq";
 			open FQ, ">.randread$seed"."_2.fq" || die "Could not open temporary fastq file";
 			@cs = split /[,]/, $p2;
@@ -594,7 +591,7 @@ sub doSearch($$$$$$$$$$) {
 		$patarg = "-q --integer-quals";
 		$patstr = ".randread$seed.integer.fq";
 		if($pe) {
-			system("mv .randread$seed.integer.fq .randread$seed.integer_1.fq");
+			run("mv .randread$seed.integer.fq .randread$seed.integer_1.fq");
 			$patstr = "-1 .randread$seed.integer_1.fq";
 			open FQ, ">.randread$seed.integer_2.fq" || die "Could not open temporary fastq file";
 			@cs = split /[,]/, $p2;
@@ -626,7 +623,7 @@ sub doSearch($$$$$$$$$$) {
 		$patarg = "-r";
 		$patstr = ".randread$seed.raw";
 		if($pe) {
-			system("mv .randread$seed.raw .randread$seed"."_1.raw");
+			run("mv .randread$seed.raw .randread$seed"."_1.raw");
 			$patstr = "-1 .randread$seed"."_1.raw";
 			open RAW, ">.randread$seed"."_2.raw" || die "Could not open temporary fastq file";
 			@cs = split /[,]/, $p2;
@@ -725,19 +722,19 @@ sub doSearch($$$$$$$$$$) {
 	defined($nstr) || die;
 	my $cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
-	my $out = trim(`$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout`);
+	my $out = trim(runBacktick("$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout"));
 	
 	# Bad exitlevel?
 	if($? != 0) {
 		print "Exitlevel: $?\n";
 		if($exitOnFail) {
-			my $err = trim(`cat .tmp$seed.stderr 2> /dev/null`);
+			my $err = `cat .tmp$seed.stderr 2> /dev/null`;
 			print "Stdout:\n$out\nStderr:\n$err\n";
 			exit 1;
 		}
 		return 0;
 	}
-	my $err = trim(`cat .tmp$seed.stderr 2> /dev/null`);
+	my $err = `cat .tmp$seed.stderr 2> /dev/null`;
 
 	# No output?
 	if($out eq "" && $requireResult) {
@@ -862,16 +859,16 @@ sub doSearch($$$$$$$$$$) {
 	{
 		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 		print "$cmd\n";
-		my $out2 = trim(`$cmd 2>.tmp$seed.stderr`);
+		my $out2 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
 		$cmd = "./bowtie $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
-		my $out3 = trim(`$cmd 2>.tmp$seed.stderr`);
+		my $out3 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 
 		$cmd = "./bowtie --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
-		my $out4 = trim(`$cmd 2>.tmp$seed.stderr`);
+		my $out4 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
 	}
 	
@@ -879,7 +876,7 @@ sub doSearch($$$$$$$$$$) {
 	# mismatch strings
 	$cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
-	$out = trim(`$cmd 2>.tmp$seed.stderr`);
+	$out = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 	# Parse output to see if any of it is bad
 	@outlines = split('\n', $out);
 	for my $l (@outlines) {
@@ -899,13 +896,13 @@ sub doSearch($$$$$$$$$$) {
 		$cmd = "perl scripts/pe_verify.pl --args=\"--quiet\" $col -d $pol .tmp$seed $patstr2";
 		print "$cmd\n";
 		print TMP "$cmd\n";
-		$out = trim(`$cmd 2>.tmp$seed.pe_verify.stderr`);
+		$out = trim(runBacktick("$cmd 2>.tmp$seed.pe_verify.stderr"));
 		close(TMP);
 		# Bad exitlevel?
 		if($? != 0) {
 			print "scripts/pe_verify.pl exitlevel: $?\n";
 			if($exitOnFail) {
-				my $err = trim(`cat .tmp$seed.pe_verify.stderr 2> /dev/null`);
+				my $err = `cat .tmp$seed.pe_verify.stderr 2> /dev/null`;
 				print "Stdout:\n$out\nStderr:\n$err\n";
 				exit 1;
 			}
@@ -914,14 +911,15 @@ sub doSearch($$$$$$$$$$) {
 	}
 	
 	if(!$pe && $policy =~ /--best/) {
-		$cmd = "perl scripts/best_verify.pl -d $policy .tmp$seed $patstr";
+		my $col = ($color ? "-C" : "");
+		$cmd = "perl scripts/best_verify.pl -d $policy $col .tmp$seed $patstr";
 		print "$cmd\n";
-		$out = trim(`$cmd 2>.tmp$seed.best_verify.stderr`);
+		$out = trim(runBacktick("$cmd 2>.tmp$seed.best_verify.stderr"));
 		
 		if($? != 0) {
 			print "scripts/best_verify.pl exitlevel: $?\n";
 			if($exitOnFail) {
-				my $err = trim(`cat .tmp$seed.best_verify.stderr 2> /dev/null`);
+				my $err = `cat .tmp$seed.best_verify.stderr 2> /dev/null`;
 				print "Stdout:\n$out\nStderr:\n$err\n";
 				exit 1;
 			}
@@ -936,7 +934,7 @@ sub doSearch($$$$$$$$$$) {
 		deleteReadParts();
 		my $cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
-		system($cmd) == 0 || die;
+		run($cmd) == 0 || die "Error performing reconciler run\n";
 		$khits =~ s/--strata --best//;
 		$patarg =~ s/--integer-quals//;
 		$unalignReconArg =~ /\.tmp\.un/ || die;
@@ -945,11 +943,11 @@ sub doSearch($$$$$$$$$$) {
 			$patstr =~ s/-2//;
 			$cmd = "perl scripts/reconcile_alignments_pe.pl $color $patarg $khits $patstr .tmp$seed.verbose.out $unalignReconArg";
 			print "$cmd\n";
-			system($cmd) == 0 || die;
+			run($cmd) == 0 || die "Failed to reconcile";
 		} else {
 			$cmd = "perl scripts/reconcile_alignments.pl $color $patarg $khits $patstr .tmp$seed.verbose.out $unalignReconArg";
 			print "$cmd\n";
-			system($cmd) == 0 || die;
+			run($cmd) == 0 || die "Failed to reconcile";
 		}
 	}
 	

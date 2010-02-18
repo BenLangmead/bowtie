@@ -5,11 +5,100 @@
 #include <seqan/sequence.h>
 #include <seqan/file.h>
 
+#include "pat.h"
+#include "filebuf.h"
+
 using namespace std;
 using namespace seqan;
 
+/**
+ * Parse a single quality string from fb and store qualities in r.
+ * Assume the next character obtained via fb.get() is the first
+ * character of the quality string.  When returning, the next
+ * character returned by fb.peek() or fb.get() should be the first
+ * character of the following line.
+ */
+int parseQuals(ReadBuf& r,
+               FileBuf& fb,
+               int readLen,
+               int trim3,
+               int trim5,
+               bool intQuals,
+               bool phred64,
+               bool solexa64)
+{
+	int qualsRead = 0;
+	int c = 0;
+	assert(fb.peek() != '\n' && fb.peek() != '\r');
+	_setBegin (r.qual, (char*)r.qualBuf);
+	_setLength(r.qual, 0);
+	if (intQuals) {
+		while (c != '\r' && c != '\n' && c != -1) {
+			bool neg = false;
+			int num = 0;
+			while(!isspace(c = fb.get()) && !fb.eof()) {
+				if(c == '-') {
+					neg = true;
+					assert_eq(num, 0);
+				} else {
+					if(!isdigit(c)) {
+						char buf[2048];
+						cerr << "Warning: could not parse quality line:" << endl;
+						fb.getPastNewline();
+						cerr << fb.copyLastN(buf);
+						buf[2047] = '\0';
+						cerr << buf;
+						throw 1;
+					}
+					assert(isdigit(c));
+					num *= 10;
+					num += (c - '0');
+				}
+			}
+			if(neg) num = 0;
+			// Phred-33 ASCII encode it and add it to the back of the
+			// quality string
+			r.qualBuf[qualsRead++] = ('!' + num);
+			// Skip over next stretch of whitespace
+			c = fb.peek();
+			while(c != '\r' && c != '\n' && isspace(c) && !fb.eof()) {
+				fb.get();
+				c = fb.peek();
+			}
+		}
+	} else {
+		while (c != '\r' && c != '\n' && c != -1) {
+			c = fb.get();
+			r.qualBuf[qualsRead++] = charToPhred33(c, solexa64, phred64);
+			c = fb.peek();
+			while(c != '\r' && c != '\n' && isspace(c) && !fb.eof()) {
+				fb.get();
+				c = fb.peek();
+			}
+		}
+	}
+	if (qualsRead < readLen-1 ||
+	    qualsRead < readLen && !r.color)
+	{
+		tooFewQualities(r.name);
+	}
+	qualsRead -= trim3;
+	if(qualsRead <= 0) return 0;
+	int trimmedReadLen = readLen-trim3-trim5;
+	assert_gt(trimmedReadLen, 0);
+	if(qualsRead > trimmedReadLen) {
+		// Shift everybody left
+		for(int i = 0; i < readLen; i++) {
+			r.qualBuf[i] = r.qualBuf[i+qualsRead-trimmedReadLen];
+		}
+	}
+	_setLength(r.qual, trimmedReadLen);
+	while(fb.peek() == '\n' || fb.peek() == '\r') fb.get();
+	return qualsRead;
+}
+
 void wrongQualityFormat(const String<char>& read_name) {
-	cerr << "Encounterd a space parsing the quality string for read " << read_name << endl
+	cerr << "Encountered a space parsing the quality string for read " << read_name << endl
 	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
 	     << "re-run Bowtie with the --integer-quals option.  If this is a FASTQ file with" << endl
 	     << "alternate basecall information, please re-run Bowtie with the --fuzzy option." << endl;

@@ -323,25 +323,27 @@ ol.decimal { list-style-type: decimal; }
       >Cygwin</a
       > or <a href="http://www.mingw.org/"
       >MinGW</a
-      > (MinGW recommended). If building with MinGW, first install MinGW and <a href="http://www.mingw.org/wiki/msys"
+      >. We recommend <a href="http://www.tdragon.net/recentgcc/"
+      >TDM's MinGW Build</a
+      >. If using <a href="http://www.mingw.org/"
+      >MinGW</a
+      >, you must also have <a href="http://www.mingw.org/wiki/msys"
       >MSYS</a
-      >, the <a href="http://cygwin.com/packages/mingw-zlib/"
-      >zlib</a
-      > library, and the <a href="http://sourceware.org/pthreads-win32/"
-      >pthreads</a
-      > library. You may also need the <a href="http://gnuwin32.sf.net/packages/coreutils.htm"
-      >GnuWin32</a
-      > core and other utilities to drive the build process.</p
+      > installed.</p
     ><p
-    >Extract the sources, change to the directory where they were extracted, and build the Bowtie tools by running GNU <code
+    >To build Bowtie, extract the sources, change to the extracted directory, and run GNU <code
       >make</code
       > (usually with the command <code
       >make</code
       >, but sometimes with <code
       >gmake</code
-      >) with no arguments. If building with MinGW, run <code
+      >) with no arguments. If building with <a href="http://www.mingw.org/"
+      >MinGW</a
+      >, run <code
       >make</code
-      > from the MSYS environment.</p
+      > from the <a href="http://www.mingw.org/wiki/msys"
+      >MSYS</a
+      > command line.</p
     ><p
     >To support the <a href="#bowtie-options-p"
       ><code
@@ -1129,7 +1131,7 @@ No alignments
       ><code
 	>--fr</code
 	></a
-      >, since most Illumina datasets have this orientation. The orientation setting can be overriden in either case.</p
+      >, since most Illumina datasets have this orientation. The default can be overriden in either case.</p
     ><p
     >Because Bowtie uses an in-memory representation of the original reference string when finding paired-end alignments, its memory footprint is larger when aligning paired-end reads. For example, the human index has a memory footprint of about 2.2 GB in single-end mode and 2.9 GB in paired-end mode. Note that paired-end and unpaired alignment incur the same memory footprint in colorspace (e.g. human incurs about 2.9 GB)</p
     ><h2 id="colorspace-alignment"
@@ -1145,17 +1147,17 @@ No alignments
 	></a
       > is specified. Colorspace is the characteristic output format of Applied Biosystems' SOLiD system. In a colorspace read, each character is a color rather than a nucleotide, where a color encodes a class of dinucleotides. E.g. the color blue encodes any of the dinucleotides: AA, CC, GG, TT. Colorspace has the advantage of (often) being able to distinguish sequencing errors from SNPs once the read has been aligned. See ABI's <a href="http://tinyurl.com/ygnb2gn"
       >Principles of Di-Base Sequencing</a
-      > application note for details.</p
+      > document for details.</p
     ><h3 id="colorspace-reads"
     ><a href="#TOC-colorspace-reads"
       >Colorspace reads</a
       ></h3
     ><p
-    >All Bowtie input formats (FASTA <a href="#bowtie-options-f"
+    >All input formats (FASTA <a href="#bowtie-options-f"
       ><code
 	>-f</code
 	></a
-      >, FASTQ <a href="#bowtie-options-q"
+      >, FASTQ <a href="#bowtie-options-Q"
       ><code
 	>-q</code
 	></a
@@ -1163,7 +1165,7 @@ No alignments
       ><code
 	>-r</code
 	></a
-      >, tab- delimited <a href="#command-line"
+      >, tab-delimited <a href="#command-line"
       ><code
 	>--12</code
 	></a
@@ -1199,7 +1201,7 @@ No alignments
       >T</code
       >=red).</p
     ><p
-    >Note that sometimes reads will include a primer base as the first character of each read; e.g.:</p
+    >Some reads include a primer base as the first character; e.g.:</p
     ><pre
     ><code
       >&gt;1_53_33_F3
@@ -1210,21 +1212,45 @@ T2302111203131231130300111123220
 </code
       ></pre
     ><p
-    >In this example, <code
+    >Here, <code
       >T</code
       > is the primer base. <code
       >bowtie</code
       > detects and handles primer bases properly (i.e., the primer base and the adjacent color are both trimmed away prior to alignment) as long as the rest of the read is encoded as numbers.</p
     ><p
-    >If your input is in the form of parallel <code
+    ><code
+      >bowtie</code
+      > also handles input in the form of parallel <code
       >.csfasta</code
       > and <code
       >_QV.qual</code
-      > files and you would like to use them with Bowtie while maintaining quality information, they must first be converted to a <code
-      >.csfastq</code
-      > file using, for example, <a href="http://main.g2.bx.psu.edu/"
-      >Galaxy</a
-      >'s conversion tool (click &quot;NGS: QC and manipulation&quot;, then &quot;SOLiD-to-FASTQ&quot; in the left-hand sidebar).</p
+      > files. Use <a href="#bowtie-options-f"
+      ><code
+	>-f</code
+	></a
+      > to specify the <code
+      >.csfasta</code
+      > files and <a href="#bowtie-options-Q"
+      ><code
+	>-Q</code
+	></a
+      > (for unpaired reads) or <a href="#bowtie-options-Q1"
+      ><code
+	>--Q1</code
+	></a
+      >/<a href="#bowtie-options-Q2"
+      ><code
+	>--Q2</code
+	></a
+      > (for paired-end reads) to specify the corresponding <code
+      >_QV.qual</code
+      > files. It is not necessary to first convert to FASTQ, though <code
+      >bowtie</code
+      > also handles FASTQ-formatted colorspace reads (with <a href="#bowtie-options-Q"
+      ><code
+	>-q</code
+	></a
+      >, the default).</p
     ><h3 id="building-a-colorspace-index"
     ><a href="#TOC-building-a-colorspace-index"
       >Building a colorspace index</a
@@ -1328,9 +1354,7 @@ T2302111203131231130300111123220
     ><p
     >Note that SOLiD-generated read files can have &quot;orphaned&quot; mates; i.e. mates without a correpsondingly-named mate in the other file. To avoid problems due to orphaned mates, SOLiD paired-end output should first be converted to <code
       >.csfastq</code
-      > files with unpaired mates omitted. This can be accomplished using, for example, <a href="http://main.g2.bx.psu.edu/"
-      >Galaxy</a
-      >'s conversion tool (click &quot;NGS: QC and manipulation&quot;, then &quot;SOLiD-to-FASTQ&quot; in the left-hand sidebar).</p
+      > files with unpaired mates omitted. This can be accomplished using, for example, [Galaxy]'s conversion tool (click &quot;NGS: QC and manipulation&quot;, then &quot;SOLiD-to-FASTQ&quot; in the left-hand sidebar).</p
     ><h2 id="performance-tuning"
     ><a href="#TOC-performance-tuning"
       >Performance Tuning</a
@@ -1754,6 +1778,88 @@ T2302111203131231130300111123220
       > will print an error message and quit. See <a href="#colorspace-alignment"
       >Colorspace alignment</a
       > for more details.</p
+    ></td></tr><tr><td id="bowtie-options-Q">
+
+
+
+<pre
+    ><code
+      >-Q/--quals &lt;files&gt;
+</code
+      ></pre
+    ></td><td>
+<p
+    >Comma-separated list of files containing quality values for corresponding unpaired CSFASTA reads. Use in combination with <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      > and <a href="#bowtie-options-f"
+      ><code
+	>-f</code
+	></a
+      >. <a href="#bowtie-options-integer-quals"
+      ><code
+	>--integer-quals</code
+	></a
+      > is set automatically when <code
+      >-Q</code
+      >/<code
+      >--quals</code
+      > is specified.</p
+    ></td></tr><tr><td id="bowtie-options-Q1">
+
+
+<pre
+    ><code
+      >--Q1 &lt;files&gt;
+</code
+      ></pre
+    ></td><td>
+<p
+    >Comma-separated list of files containing quality values for corresponding CSFASTA #1 mates. Use in combination with <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      >, <a href="#bowtie-options-f"
+      ><code
+	>-f</code
+	></a
+      >, and [<code
+      >-1</code
+      >]. <a href="#bowtie-options-integer-quals"
+      ><code
+	>--integer-quals</code
+	></a
+      > is set automatically when <code
+      >--Q1</code
+      > is specified.</p
+    ></td></tr><tr><td id="bowtie-options-Q2">
+
+
+<pre
+    ><code
+      >--Q2 &lt;files&gt;
+</code
+      ></pre
+    ></td><td>
+<p
+    >Comma-separated list of files containing quality values for corresponding CSFASTA #2 mates. Use in combination with <a href="#bowtie-options-C"
+      ><code
+	>-C</code
+	></a
+      >, <a href="#bowtie-options-f"
+      ><code
+	>-f</code
+	></a
+      >, and [<code
+      >-2</code
+      >]. <a href="#bowtie-options-integer-quals"
+      ><code
+	>--integer-quals</code
+	></a
+      > is set automatically when <code
+      >--Q2</code
+      > is specified.</p
     ></td></tr><tr><td id="bowtie-options-s">
 
 

@@ -70,7 +70,6 @@ static void backtrack(int table[4][6][1025], // filled-in table
                       int& nmms)  // # nucleotide mismatches
 {
 	const size_t len = reff-refi;
-	char buf[1025];
 	cmms = nmms = 0;
 	int min = INT_MAX;
 	int bests = 0;
@@ -100,7 +99,6 @@ static void backtrack(int table[4][6][1025], // filled-in table
 	// Determine what reference nucleotides were matched against
 	for(size_t i = 0; i < len; i++) {
 		if(matches(s[i], ref[refi+i])) {
-			buf[i] = s[i];
 			assert_eq(1, alts[(int)ref[refi+i]]);
 			// Just plain matched
 			nmm[i] = 'M';
@@ -108,8 +106,6 @@ static void backtrack(int table[4][6][1025], // filled-in table
 			// If ref is ambiguous here, does it matter which one we
 			// choose?  I don't think so.
 			assert_eq(1, alts[(int)ref[refi+i]]);
-			//buf[i] = randFromMask(ref[refi+i]);
-			buf[i] = firsts[(int)ref[refi+i]];
 			// SNP here
 			nmm[i] = 'S';
 			nmms++;
@@ -117,7 +113,7 @@ static void backtrack(int table[4][6][1025], // filled-in table
 	}
 	for(size_t i = 0; i < len-1; i++) {
 		int c1 = (int)read[readi+i]; // actual
-		int c2 = dinuc2color[(int)buf[i]][(int)buf[i+1]]; // decoded
+		int c2 = dinuc2color[(int)s[i]][(int)s[i+1]]; // decoded
 		assert_leq(c1, 4); assert_geq(c1, 0);
 		if(c1 != c2 || c1 == 4) {
 			// Actual != decoded

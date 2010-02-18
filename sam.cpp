@@ -68,10 +68,14 @@ void SAMHitSink::appendAligned(ostream& ss,
 	if(h.mate > 0) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
+			if(isspace(h.patName[i])) break;
 			ss << h.patName[i];
 		}
 	} else {
-		ss << h.patName;
+		for(int i = 0; i < (int)seqan::length(h.patName); i++) {
+			if(isspace(h.patName[i])) break;
+			ss << h.patName[i];
+		}
 	}
 	ss << '\t';
 	// FLAG

@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.2.
+available to the public for download.  The current version is 0.12.3.
 The Bowtie project is still in its early stages, and anyone interested
 in improving this project is strongly encouraged to contact us. See the
 project website (http://bowtie-bio.sf.net) for more details.
@@ -19,6 +19,23 @@ Please report any issues using the Sourceforge bug tracker:
 
 Version Release History
 =======================
+
+Version 0.12.3 - February 17, 2010
+   * Fixed a significant bug in -C/--color mode whereby quality values
+     for SNP nucleotide positions were erroneously penalized.
+   * Fixed a bug in -S/--sam mode whereby if whitespace occurred in the
+     original read name, it would be printed in the QNAME field in
+     violation of the SAM spec. Bowtie now truncates read names at the
+     first whitespace character before printing.
+   * When input is FASTQ and -C/--color is enabled, Bowtie is now
+     tolerant of output from FASTQ converters that include the primer
+     base and where the quality string is one character shorter than
+     the sequence string (due to the primer). This fixes issues users
+     have reported using output from BFAST's solid2fastq.
+   * Added support for SOLiD-style _QV files, via the -Q/--quals, --Q1
+     and --Q2 options. These options are used in combination with
+     -C/--color and -f to align parallel colorspace read/quality files
+     without having to convert to FASTQ.
 
 Version 0.12.2 - February 2, 2010
    * When -C/--color is enabled, the default paired-end orientation is

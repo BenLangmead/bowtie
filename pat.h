@@ -107,6 +107,7 @@ struct ReadBuf {
 	void reset() {
 		patid = 0;
 		readOrigBufLen = 0;
+		qualOrigBufLen = 0;
 		alts = 0;
 		trimmed5 = trimmed3 = 0;
 		fuzzy = false;
@@ -149,6 +150,7 @@ struct ReadBuf {
 		}
 		trimmed5 = trimmed3 = 0;
 		readOrigBufLen = 0;
+		qualOrigBufLen = 0;
 		color = fuzzy = false;
 		primer = '?';
 		trimc = '?';
@@ -356,8 +358,13 @@ struct ReadBuf {
 	String<char>  altQualRev[3];              // quality values for alternate basecalls reversed
 	char          altQualBufRev[3][BUF_SIZE]; // quality value buffer for alternate basecalls reversed
 
+	// For remembering the exact input text used to define a read
 	char          readOrigBuf[FileBuf::LASTN_BUF_SZ];
 	size_t        readOrigBufLen;
+
+	// For when qualities are in a separate file
+	char          qualOrigBuf[FileBuf::LASTN_BUF_SZ];
+	size_t        qualOrigBufLen;
 
 	String<char>  name;                // read name
 	char          nameBuf[BUF_SIZE];   // read name buffer
@@ -1538,6 +1545,7 @@ class BufferedFilePatternSource : public TrimmingPatternSource {
 public:
 	BufferedFilePatternSource(uint32_t seed,
 	                          const vector<string>& infiles,
+	                          const vector<string>* qinfiles,
 	                          bool randomizeQuals = false,
 	                          bool useSpinlock = true,
 	                          const char *dumpfile = NULL,
@@ -1550,17 +1558,33 @@ public:
 		infiles_(infiles),
 		filecur_(0),
 		fb_(),
+		qfb_(),
 		skip_(skip),
 		first_(true)
 	{
+		qinfiles_.clear();
+		if(qinfiles != NULL) qinfiles_ = *qinfiles;
 		assert_gt(infiles.size(), 0);
 		errs_.resize(infiles_.size(), false);
+		if(qinfiles_.size() > 0 &&
+		   qinfiles_.size() != infiles_.size())
+		{
+			cerr << "Error: Different numbers of input FASTA/quality files ("
+			     << infiles_.size() << "/" << qinfiles_.size() << ")" << endl;
+			throw 1;
+		}
+		assert(!fb_.isOpen());
+		assert(!qfb_.isOpen());
 		open(); // open first file in the list
 		filecur_++;
 	}
 
 	virtual ~BufferedFilePatternSource() {
 		if(fb_.isOpen()) fb_.close();
+		if(qfb_.isOpen()) {
+			assert_gt(qinfiles_.size(), 0);
+			qfb_.close();
+		}
 	}
 
 	/**
@@ -1678,6 +1702,7 @@ protected:
 	virtual void resetForNextFile() { }
 	void open() {
 		if(fb_.isOpen()) fb_.close();
+		if(qfb_.isOpen()) qfb_.close();
 		while(filecur_ < infiles_.size()) {
 			// Open read
 			FILE *in;
@@ -1685,24 +1710,57 @@ protected:
 				in = stdin;
 			} else if((in = fopen(infiles_[filecur_].c_str(), "rb")) == NULL) {
 				if(!errs_[filecur_]) {
-					cerr << "Warning: Could not open file \"" << infiles_[filecur_] << "\" for reading" << endl;
+					cerr << "Warning: Could not open read file \"" << infiles_[filecur_] << "\" for reading; skipping..." << endl;
 					errs_[filecur_] = true;
 				}
 				filecur_++;
 				continue;
 			}
 			fb_.newFile(in);
+			// Open quality
+			if(!qinfiles_.empty()) {
+				FILE *in;
+				if(qinfiles_[filecur_] == "-") {
+					in = stdin;
+				} else if((in = fopen(qinfiles_[filecur_].c_str(), "rb")) == NULL) {
+					if(!errs_[filecur_]) {
+						cerr << "Warning: Could not open quality file \"" << qinfiles_[filecur_] << "\" for reading; skipping..." << endl;
+						errs_[filecur_] = true;
+					}
+					filecur_++;
+					continue;
+				}
+				qfb_.newFile(in);
+			}
 			return;
 		}
 		throw 1;
 	}
 	vector<string> infiles_; /// filenames for read files
+	vector<string> qinfiles_; /// filenames for quality files
 	vector<bool> errs_; /// whether we've already printed an error for each file
 	size_t filecur_;   /// index into infiles_ of next file to read
 	FileBuf fb_;  /// read file currently being read from
+	FileBuf qfb_; /// quality file currently being read from
 	uint32_t skip_;     /// number of reads to skip
 	bool first_;
 };
+
+/**
+ * Parse a single quality string from fb and store qualities in r.
+ * Assume the next character obtained via fb.get() is the first
+ * character of the quality string.  When returning, the next
+ * character returned by fb.peek() or fb.get() should be the first
+ * character of the following line.
+ */
+int parseQuals(ReadBuf& r,
+               FileBuf& fb,
+               int readLen,
+               int trim3,
+               int trim5,
+               bool intQuals,
+               bool phred64,
+               bool solexa64);
 
 /**
  * Synchronized concrete pattern source for a list of FASTA or CSFASTA
@@ -1712,6 +1770,7 @@ class FastaPatternSource : public BufferedFilePatternSource {
 public:
 	FastaPatternSource(uint32_t seed,
 	                   const vector<string>& infiles,
+	                   const vector<string>* qinfiles,
 	                   bool color,
 	                   bool randomizeQuals,
 	                   bool useSpinlock = true,
@@ -1719,10 +1778,15 @@ public:
 	                   bool verbose = false,
 	                   int trim3 = 0,
 	                   int trim5 = 0,
+	                   bool solexa64 = false,
+	                   bool phred64 = false,
+	                   bool intQuals = false,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, randomizeQuals, useSpinlock,
-		                          dumpfile, verbose, trim3, trim5, skip),
-		first_(true), color_(color)
+		BufferedFilePatternSource(seed, infiles, qinfiles, randomizeQuals,
+		                          useSpinlock, dumpfile, verbose, trim3,
+		                          trim5, skip),
+		first_(true), color_(color), solexa64_(solexa64),
+		phred64_(phred64), intQuals_(intQuals)
 	{ }
 	virtual void reset() {
 		first_ = true;
@@ -1745,44 +1809,83 @@ protected:
 	void bail(ReadBuf& r) {
 		r.clearAll();
 		fb_.resetLastN();
+		qfb_.resetLastN();
 	}
 
 	/// Read another pattern from a FASTA input file
 	virtual void read(ReadBuf& r, uint32_t& patid) {
-		int c;
+		int c, qc = 0;
 		int dstLen = 0;
 		int nameLen = 0;
+		bool doquals = qinfiles_.size() > 0;
+		assert(!doquals || qfb_.isOpen());
+		assert(fb_.isOpen());
 		r.color = color_;
-		// Pick off the first carat
+
+		// Skip over between-read comments.  Note that SOLiD's comments use #s
 		c = fb_.get();
 		if(c < 0) { bail(r); return; }
-		assert_eq('>', c);
+		while(c == '#' || c == ';') {
+			c = fb_.peekUptoNewline();
+			fb_.resetLastN();
+			c = fb_.get();
+		}
+		assert_eq(1, fb_.lastNCur());
+		if(doquals) {
+			qc = qfb_.get();
+			if(qc < 0) { bail(r); return; }
+			while(qc == '#' || qc == ';') {
+				qc = qfb_.peekUptoNewline();
+				qfb_.resetLastN();
+				qc = qfb_.get();
+			}
+			assert_eq(1, qfb_.lastNCur());
+		}
+
+		// Pick off the first carat
 		if(first_) {
 			if(c != '>') {
 				cerr << "Error: reads file does not look like a FASTA file" << endl;
 				throw 1;
 			}
+			if(doquals && qc != '>') {
+				cerr << "Error: quality file does not look like a FASTA quality file" << endl;
+				throw 1;
+			}
 			first_ = false;
 		}
+		assert_eq('>', c);
+		if(doquals) assert_eq('>', qc);
 		c = fb_.get(); // get next char after '>'
+		if(doquals) qc = qfb_.get();
 
 		// Read to the end of the id line, sticking everything after the '>'
 		// into *name
+		bool warning = false;
 		while(true) {
-			if(c < 0) { bail(r); return; }
+			if(c < 0 || qc < 0) { bail(r); return; }
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
 					c = fb_.get();
-					if(c < 0) { bail(r); return; }
+					if(doquals) qc = qfb_.get();
+					if(c < 0 || qc < 0) { bail(r); return; }
 				}
 				break;
 			}
+			if(doquals && c != qc) {
+				cerr << "Warning: one or more mismatched read names between FASTA and quality files" << endl;
+				warning = true;
+			}
 			r.nameBuf[nameLen++] = c;
 			c = fb_.get();
+			if(doquals) qc = qfb_.get();
 		}
 		_setBegin(r.name, r.nameBuf);
 		_setLength(r.name, nameLen);
+		if(warning) {
+			cerr << "         Offending read name: \"" << r.name << "\"" << endl;
+		}
 
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
@@ -1812,7 +1915,7 @@ protected:
 			if(asc2dnacat[c] > 0 && begin++ >= mytrim5) {
 				if(dstLen + 1 > 1024) tooManySeqChars(r.name);
 				r.patBufFw[dstLen] = charToDna5[c];
-				r.qualBuf[dstLen]  = 'I';
+				if(!doquals) r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
 			if(fb_.peek() == '>') break;
@@ -1821,10 +1924,15 @@ protected:
 		dstLen -= this->trim3_;
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, dstLen);
-		_setBegin (r.qual,  r.qualBuf);
-		_setLength(r.qual,  dstLen);
 		r.trimmed3 = this->trim3_;
 		r.trimmed5 = mytrim5;
+		if(doquals) {
+			parseQuals(r, qfb_, dstLen + r.trimmed3 + r.trimmed5,
+			           r.trimmed3, r.trimmed5, intQuals_, phred64_,
+			           solexa64_);
+		}
+		_setBegin (r.qual,  r.qualBuf);
+		_setLength(r.qual,  dstLen);
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
 			itoa10(readCnt_, r.nameBuf);
@@ -1837,6 +1945,20 @@ protected:
 		patid = readCnt_-1;
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
 		fb_.resetLastN();
+		if(doquals) {
+			r.qualOrigBufLen = qfb_.copyLastN(r.qualOrigBuf);
+			qfb_.resetLastN();
+			if(false) {
+				cout << "Name: " << r.name << endl
+					 << " Seq: " << r.patFw << " (" << seqan::length(r.patFw) << ")" << endl
+					 << "Qual: " << r.qual  << " (" << seqan::length(r.qual) << ")" << endl
+					 << "Orig seq:" << endl;
+				for(size_t i = 0; i < r.readOrigBufLen; i++) cout << r.readOrigBuf[i];
+				cout << "Orig qual:" << endl;
+				for(size_t i = 0; i < r.qualOrigBufLen; i++) cout << r.qualOrigBuf[i];
+				cout << endl;
+			}
+		}
 	}
 	/// Read another pair of patterns from a FASTA input file
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
@@ -1860,6 +1982,9 @@ protected:
 private:
 	bool first_;
 	bool color_;
+	bool solexa64_;
+	bool phred64_;
+	bool intQuals_;
 };
 
 
@@ -1894,7 +2019,7 @@ public:
 	                    bool phred64Quals = false,
 	                    bool intQuals = false,
 	                    uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, randomizeQuals,
+		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
 		                          useSpinlock, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		color_(color),
@@ -2247,7 +2372,7 @@ public:
 			const char *dumpfile = NULL,
 			bool verbose = false,
 			uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, false, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, NULL, false, useSpinlock,
 		                          dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_-1), beginning_(true),
@@ -2395,7 +2520,7 @@ public:
 	                   bool integer_quals = false,
 	                   bool fuzzy = false,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, randomizeQuals,
+		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
 		                          useSpinlock, dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
@@ -2463,6 +2588,7 @@ protected:
 		int nameLen = 0;
 		r.fuzzy = fuzzy_;
 		r.color = color_;
+		r.primer = -1;
 		r.alts = 0;
 		// Pick off the first at
 		if(first_) {
@@ -2584,6 +2710,7 @@ protected:
 			assert(!fuzzy_);
 			int qualsRead = 0;
 			char buf[4096];
+			if(color_ && r.primer != -1) mytrim5--;
 			while (qualsRead < charsRead) {
 				vector<string> s_quals;
 				if(!tokenizeQualLine(fb_, buf, 4096, s_quals)) break;
@@ -2598,7 +2725,17 @@ protected:
 					++qualsRead;
 				}
 			} // done reading integer quality lines
-			if (charsRead > qualsRead) tooFewQualities(r.name);
+			if(color_ && r.primer != -1) mytrim5++;
+			if(qualsRead < charsRead-mytrim5) {
+				tooFewQualities(r.name);
+			} else if(qualsRead > charsRead-mytrim5+1) {
+				tooManyQualities(r.name);
+			}
+			if(qualsRead == charsRead-mytrim5+1 && color_ && r.primer != -1) {
+				for(int i = 0; i < qualsRead-1; i++) {
+					r.qualBuf[i] = r.qualBuf[i+1];
+				}
+			}
 			_setBegin(r.qual, (char*)r.qualBuf);
 			_setLength(r.qual, dstLen);
 			peekOverNewline(fb_);
@@ -2607,9 +2744,11 @@ protected:
 			char *qbuf = r.qualBuf;
 			altBufIdx = 0;
 			trim5 = mytrim5;
+			if(color_ && r.primer != -1) trim5--;
+			int itrim5 = trim5;
 			int qualsRead[4] = {0, 0, 0, 0};
 			int *qualsReadCur = &qualsRead[0];
-			while((*qualsReadCur) < dstLen + mytrim5 || fuzzy_) {
+			while(true) {
 				c = fb_.get();
 				if (!fuzzy_ && c == ' ') {
 					wrongQualityFormat(r.name);
@@ -2636,6 +2775,18 @@ protected:
 					(*qualsReadCur)++;
 				} else {
 					break;
+				}
+			}
+			qualsRead[0] -= this->trim3_;
+			int qRead = (int)(qualsRead[0] - itrim5);
+			if(qRead < dstLen) {
+				tooFewQualities(r.name);
+			} else if(qRead > dstLen+1) {
+				tooManyQualities(r.name);
+			}
+			if(qRead == dstLen+1 && color_ && r.primer != -1) {
+				for(int i = 0; i < dstLen; i++) {
+					r.qualBuf[i] = r.qualBuf[i+1];
 				}
 			}
 			_setBegin (r.qual, (char*)r.qualBuf);
@@ -2764,7 +2915,7 @@ public:
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals, useSpinlock,
 		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true), color_(color)
 	{ }
@@ -2908,7 +3059,7 @@ public:
 	                   bool verbose,
 	                   uint32_t skip) :
 	BufferedFilePatternSource(
-		seed, infiles, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
+		seed, infiles, NULL, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
 
 protected:
 
