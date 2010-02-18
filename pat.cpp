@@ -78,7 +78,7 @@ int parseQuals(ReadBuf& r,
 		}
 	}
 	if (qualsRead < readLen-1 ||
-	    qualsRead < readLen && !r.color)
+	    (qualsRead < readLen && !r.color))
 	{
 		tooFewQualities(r.name);
 	}

@@ -3276,7 +3276,12 @@ void Ebwt<TStr>::readIntoMemory(int color,
 					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
 					MM_READ_RET r = MM_READ(_in2, (void *)buf, block << 2);
 					if(r != (MM_READ_RET)(block << 2)) {
-						cerr << "Error reading block of _offs[] array: " << r << ", " << (block << 2) << endl;
+						cerr << "Error reading block of offs array: " << r << ", " << (block << 2) << endl
+						     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
+						     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
+						     << "XYZ.4.ebwt, XYZ.rev.1.ebwt, and XYZ.rev.2.ebwt.  The XYZ.1.ebwt and " << endl
+						     << "XYZ.rev.1.ebwt files should have the same size, as should the XYZ.2.ebwt and" << endl
+						     << "XYZ.rev.2.ebwt files." << endl;
 						throw 1;
 					}
 					uint32_t idx = i >> offRateDiff;
