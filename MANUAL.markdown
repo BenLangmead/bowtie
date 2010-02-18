@@ -792,7 +792,7 @@ is specified.
 
 Comma-separated list of files containing quality values for
 corresponding CSFASTA #1 mates.  Use in combination with [`-C`], [`-f`],
-and [`-1`].  [`--integer-quals`] is set automatically when `--Q1`
+and [`-1`](#command-line).  [`--integer-quals`] is set automatically when `--Q1`
 is specified.
 
 </td></tr><tr><td id="bowtie-options-Q2">
@@ -805,7 +805,7 @@ is specified.
 
 Comma-separated list of files containing quality values for
 corresponding CSFASTA #2 mates.  Use in combination with [`-C`], [`-f`],
-and [`-2`].  [`--integer-quals`] is set automatically when `--Q2`
+and [`-2`][`-1`](#command-line).  [`--integer-quals`] is set automatically when `--Q2`
 is specified.
 
 </td></tr><tr><td id="bowtie-options-s">
