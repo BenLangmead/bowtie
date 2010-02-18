@@ -3112,7 +3112,12 @@ void Ebwt<TStr>::readIntoMemory(int color,
 			// Read ebwt from primary stream
 			MM_READ_RET r = MM_READ(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
 			if(r != (MM_READ_RET)eh->_ebwtTotLen) {
-				cerr << "Error reading _ebwt[] array: " << r << ", " << (eh->_ebwtTotLen) << endl;
+				cerr << "Error reading ebwt array: " << r << ", " << (eh->_ebwtTotLen) << endl;
+				cerr << "Your index files may be corrupt; please try re-building or re-downloading." << endl
+				     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
+				     << "XYZ.4.ebwt, XYZ.rev.1.ebwt, and XYZ.rev.2.ebwt.  The XYZ.1.ebwt and " << endl
+				     << "XYZ.rev.1.ebwt files should have the same size, as should the XYZ.2.ebwt and" << endl
+				     << "XYZ.rev.2.ebwt files." << endl;
 				throw 1;
 			}
 			if(switchEndian) {
