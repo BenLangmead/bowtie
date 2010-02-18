@@ -10,13 +10,21 @@
 use strict;
 use warnings;
 
-my $debug = "-debug";
-my $bowtie = "./bowtie$debug";
+my $bowtie = "./bowtie";
 if(system("$bowtie --version") != 0) {
-	$bowtie = `which bowtie$debug`;
+	$bowtie = `which bowtie`;
 	chomp($bowtie);
 	if(system("$bowtie --version") != 0) {
 		die "Could not find bowtie in current directory or in PATH\n";
+	}
+}
+
+my $bowtie_d = "./bowtie-debug";
+if(system("$bowtie_d --version") != 0) {
+	$bowtie_d = `which bowtie-debug`;
+	chomp($bowtie_d);
+	if(system("$bowtie_d --version") != 0) {
+		die "Could not find bowtie-debug in current directory or in PATH\n";
 	}
 }
 
@@ -34,6 +42,21 @@ sub readToFastq {
 	system("rm -f $fname");
 	open TMPFQ, ">$fname" || die "Could not open $fname for writing\n";
 	print TMPFQ "\@r\n$r[0]\n+\n$r[1]\n";
+	close(TMPFQ);
+}
+
+sub readToBFASTFastq {
+	my ($rstr, $fname) = @_;
+	my @r = split(/[:]/, $rstr);
+	system("rm -f $fname");
+	open TMPFQ, ">$fname" || die "Could not open $fname for writing\n";
+	my $q = $r[1];
+	if(substr($r[0], 0, 1) =~ /[ACGT]/ &&
+	   substr($r[0], 1, 1) =~ /[0123\.]/)
+	{
+		$q = substr($q, 1);
+	}
+	print TMPFQ "\@r\n$r[0]\n+\n$q\n";
 	close(TMPFQ);
 }
 
@@ -74,6 +97,18 @@ sub readToTabbed2 {
 	close(TMPT);
 }
 
+sub readToFastaQV {
+	my ($rstr, $fname) = @_;
+	my @r = split(/[:]/, $rstr);
+	system("rm -f $fname $fname.qv");
+	open TMPT, "# Some\n#\t annoting\n#comments\n>$fname" || die "Could not open $fname for writing\n";
+	print TMPT ">r\n$r[0]\n";
+	close(TMPT);
+	open TMPQ, "#annoying\n;comment\n>$fname.qv" || die "Could not open $fname.qv for writing\n";
+	print TMPQ ">r\n$r[1]\n";
+	close(TMPQ);
+}
+
 ##
 # Given a string in nucleotide space, convert to colorspace.
 #
@@ -109,21 +144,45 @@ sub reverseComp($) {
 }
 
 sub btrun {
-	my ($name, $args, $num) = @_;
-	my $cmd = "$bowtie $args";
-	print "$cmd\n";
-	open BTIE, "$cmd |" || die;
-	while(<BTIE>) {
-		my @s = split;
-		my ($seq, $quals) = ($s[4], $s[5]);
-		my $sl = length($seq);
-		my $el = $num;
-		$sl == $el || die "Expected seq length $el, got $sl\n";
-		my $ql = length($quals);
-		$ql == $el || die "Expected qual length $el, got $ql\n";
+	my ($name, $args, $num, $char1, $qual1, $char2, $qual2) = @_;
+	$char1 =~ tr/0123./ACGTN/ if defined($char1);
+	$char2 =~ tr/0123./ACGTN/ if defined($char2);
+	for my $bt ($bowtie, $bowtie_d) {
+		my $cmd = "$bt $args";
+		print "$cmd\n";
+		open BTIE, "$cmd |" || die;
+		while(<BTIE>) {
+			my @s = split;
+			my ($seq, $quals) = ($s[4], $s[5]);
+			my $sl = length($seq);
+			my $el = $num;
+			$sl == $el || die "Expected seq length $el, got $sl\n";
+			my $ql = length($quals);
+			$ql == $el || die "Expected qual length $el, got $ql\n";
+		}
+		print "$cmd\n";
+		if($args =~ /-C/) {
+			$cmd .= " --col-cseq --col-cqual";
+			open BTIE, "$cmd |" || die;
+			my $line = 0;
+			while(<BTIE>) {
+				my @s = split;
+				my ($seq, $quals) = ($s[4], $s[5]);
+				my $fc = substr($seq, 0, 1);
+				my $fq = substr($quals, 0, 1);
+				if($line == 0) {
+					!defined($char1) || $fc eq $char1 || die "Expected first char $char1, got $fc\n";
+					!defined($qual1) || $fq eq $qual1 || die "Expected first qual $qual1, got $fq\n";
+				} elsif($line == 1) {
+					!defined($char2) || $fc eq $char2 || die "Expected first char $char2, got $fc\n";
+					!defined($qual2) || $fq eq $qual2 || die "Expected first qual $qual2, got $fq\n";
+				}
+				$line++;
+			}
+			close(BTIE);
+		}
+		$? == 0 || die "$bt returned non-zero status $?\n";
 	}
-	close(BTIE);
-	$? == 0 || die "bowtie returned non-zero status $?\n";
 	print "PASSED $name\n";
 }
 
@@ -138,15 +197,40 @@ my $n2 = reverseComp("CATCACCATTACCACAGGTAACGGTGCGGGCTG");
 
 my $q = "ABCDEFGHIJKLMNOPQRSTUVWXYZZZZZZZZZ";
 
-my @reads = (
+sub intize {
+	my $read = shift;
+	my $start = shift;
+	$start = 0 unless defined($start);
+	my @rs = split(/:/, $read);
+	my $q = $rs[1];
+	my $qint = "";
+	for(my $i = $start; $i < length($q); $i++) {
+		my $qc = substr($q, $i, 1);
+		$qint .= " " if $qint ne "";
+		$qint .= (ord($qc)-33);
+	}
+	return "$rs[0]:$qint";
+}
+
+my @trimReads = (
 	# Trim me
 	"T0$m1:$q",
 	# Trim me
 	"A1$m2:$q",
+	# Trim me
+	"G.$m1:$q",
+	# Trim me
+	"C.$m2:$q"
+);
+
+my @nucReads = (
 	# Don't trim me
-	"$n1:".(substr($q, 0, -2)),
+	"$n1:".(substr($q, 2)),
 	# Don't trim me
-	"$n2:".(substr($q, 0, -2)),
+	"$n2:".(substr($q, 2))
+);
+
+my @untrimReads = (
 	# Don't trim me
 	"TT$m1:$q",
 	# Don't trim me
@@ -161,65 +245,223 @@ my @reads = (
 	"CC$m2n:$q"
 );
 
-btrun("trim/-c/paired",   "-C -c e_coli_c -1 $reads[0] -2 $reads[1]", length($m1)-1);
-btrun("trim/-c/unpaired", "-C -c e_coli_c $reads[0],$reads[1]", length($m1)-1);
+sub ca {
+	my ($str, $off) = @_;
+	return substr($str, $off, 1);
+}
 
-readToFastq($reads[0], ".tmp1.fq");
-readToFastq($reads[1], ".tmp2.fq");
-btrun("no-trim/fastq/paired",   "-C e_coli_c -q -1 .tmp1.fq -2 .tmp2.fq", length($m1)-1);
-btrun("no-trim/fastq/unpaired", "-C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)-1);
-btrun("trim5/fastq/unpaired", "-5 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)-1-3);
-btrun("trim35/fastq/unpaired", "-5 5 -3 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)-1-8);
-
-readToFasta($reads[0], ".tmp1.fa");
-readToFasta($reads[1], ".tmp2.fa");
-btrun("no-trim/fasta/paired",   "-C e_coli_c -f -1 .tmp1.fa -2 .tmp2.fa", length($m1)-1);
-btrun("no-trim/fasta/unpaired", "-C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)-1);
-btrun("trim5/fasta/unpaired", "-5 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)-1-3);
-btrun("trim35/fasta/unpaired", "-5 5 -3 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)-1-8);
-
-readToRaw($reads[0], ".tmp1.raw");
-readToRaw($reads[1], ".tmp2.raw");
-btrun("no-trim/raw/paired",   "-C e_coli_c -r -1 .tmp1.raw -2 .tmp2.raw", length($m1)-1);
-btrun("no-trim/raw/unpaired", "-C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)-1);
-btrun("trim5/raw/unpaired", "-5 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)-1-3);
-btrun("trim35/raw/unpaired", "-5 5 -3 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)-1-8);
-
-btrun("trim/-c/paired",   "-c e_coli -1 $reads[2] -2 $reads[3]", length($n1));
-btrun("trim/-c/unpaired", "-c e_coli $reads[2],$reads[3]", length($n1));
-
-for(my $i = 4; $i <= $#reads; $i += 2) {
-	btrun("no-trim/-c/paired",   "-C -c e_coli_c -1 $reads[$i] -2 $reads[$i+1]", length($m1)+1);
-	btrun("no-trim/-c/unpaired", "-C -c e_coli_c $reads[$i],$reads[$i+1]", length($m1)+1);
-	btrun("trim5/-c/unpaired", "-5 3 -C -c e_coli_c $reads[$i],$reads[$i+1]", length($m1)+1-3);
-	btrun("trim35/-c/unpaired", "-5 5 -3 3 -C -c e_coli_c $reads[$i],$reads[$i+1]", length($m1)+1-8);
+for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 	
-	readToFastq($reads[$i], ".tmp1.fq");
-	readToFastq($reads[$i+1], ".tmp2.fq");
-	btrun("no-trim/fastq/paired",   "-C e_coli_c -q -1 .tmp1.fq -2 .tmp2.fq", length($m1)+1);
-	btrun("no-trim/fastq/unpaired", "-C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)+1);
-	btrun("trim5/fastq/unpaired", "-5 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)+1-3);
-	btrun("trim35/fastq/unpaired", "-5 5 -3 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq", length($m1)+1-8);
+	my $r1 = $trimReads[$i];
+	my $r2 = $trimReads[$i+1];
 
-	readToFasta($reads[$i], ".tmp1.fa");
-	readToFasta($reads[$i+1], ".tmp2.fa");
-	btrun("no-trim/fasta/paired",   "-C e_coli_c -f -1 .tmp1.fa -2 .tmp2.fa", length($m1)+1);
-	btrun("no-trim/fasta/unpaired", "-C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)+1);
-	btrun("trim5/fasta/unpaired", "-5 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)+1-3);
-	btrun("trim35/fasta/unpaired", "-5 5 -3 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa", length($m1)+1-8);
+	btrun("trim/-c/paired",   "-C -c e_coli_c -1 $r1 -2 $r2",
+	      length($m1)-1,
+	      ca($m1, 0), ca($q, 2),
+	      ca($m2, 0), ca($q, 2));
+	btrun("trim/-c/unpaired", "-C -c e_coli_c $r1,$r2",
+	      length($m1)-1,
+	      ca($m1, 0), ca($q, 2),
+	      ca($m2, 0), ca($q, 2));
 
-	readToRaw($reads[$i], ".tmp1.raw");
-	readToRaw($reads[$i+1], ".tmp2.raw");
-	btrun("no-trim/raw/paired",   "-C e_coli_c -r -1 .tmp1.raw -2 .tmp2.raw", length($m1)+1);
-	btrun("no-trim/raw/unpaired", "-C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)+1);
-	btrun("trim5/raw/unpaired", "-5 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)+1-3);
-	btrun("trim35/raw/unpaired", "-5 5 -3 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw", length($m1)+1-8);
+	for(my $j = 0; $j < 4; $j++) {
+		my ($fq1, $fq2) = (".tmp1.fq", ".tmp2.fq");
+		my $args = "";
+		my $peargs = "";
+		if($j == 0) {
+			readToFastq($r1, $fq1);
+			readToFastq($r2, $fq2);
+			$peargs = "-q -1 $fq1 -2 $fq2";
+			$args = "-q $fq1,$fq2";
+		} elsif($j == 1) {
+			$fq1 = ".tmp1.bfast.fq";
+			$fq2 = ".tmp2.bfast.fq";
+			readToBFASTFastq($r1, $fq1);
+			readToBFASTFastq($r2, $fq2);
+			$peargs = "-q -1 $fq1 -2 $fq2";
+			$args = "-q $fq1,$fq2";
+		} elsif($j == 2) {
+			$fq1 = ".tmp1.fa";
+			$fq2 = ".tmp2.fa";
+			readToFastaQV(intize($r1), $fq1);
+			readToFastaQV(intize($r2), $fq2);
+			$peargs = "-f -1 $fq1 -2 $fq2 --Q1 $fq1.qv --Q2 $fq2.qv";
+			$args = "-f $fq1,$fq2 -Q $fq1.qv,$fq2.qv";
+		} else {
+			$fq1 = ".tmp1.fa";
+			$fq2 = ".tmp2.fa";
+			readToFastaQV(intize($r1, 1), $fq1);
+			readToFastaQV(intize($r2, 1), $fq2);
+			$peargs = "-f -1 $fq1 -2 $fq2 --Q1 $fq1.qv --Q2 $fq2.qv";
+			$args = "-f $fq1,$fq2 -Q $fq1.qv,$fq2.qv";
+		}
+	
+		btrun("no-trim/fastq/paired", "-C e_coli_c $peargs",
+		      length($m1)-1,
+		      ca($m1, 0), ca($q, 2),
+		      ca($m2, 0), ca($q, 2));
+		btrun("no-trim/fastq/unpaired", "-C e_coli_c $args",
+		      length($m1)-1,
+		      ca($m1, 0), ca($q, 2),
+		      ca($m2, 0), ca($q, 2));
+		btrun("trim5/fastq/unpaired", "-5 3 -C e_coli_c $args",
+		      length($m1)-1-3,
+		      ca($m1, 3), ca($q, 5),
+		      ca($m2, 3), ca($q, 5));
+		btrun("trim35/fastq/unpaired", "-5 5 -3 3 -C e_coli_c $args",
+		      length($m1)-1-8,
+		      ca($m1, 5), ca($q, 7),
+		      ca($m2, 5), ca($q, 7));
+		my $tmp = <STDIN>;
+	}
+	
+	readToFasta($r1, ".tmp1.fa");
+	readToFasta($r2, ".tmp2.fa");
+	btrun("no-trim/fasta/paired",   "-C e_coli_c -f -1 .tmp1.fa -2 .tmp2.fa",
+	      length($m1)-1,
+	      ca($m1, 0), "I",
+	      ca($m2, 0), "I");
+	btrun("no-trim/fasta/unpaired", "-C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)-1,
+	      ca($m1, 0), "I",
+	      ca($m2, 0), "I");
+	btrun("trim5/fasta/unpaired", "-5 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)-1-3,
+	      ca($m1, 3), "I",
+	      ca($m2, 3), "I");
+	btrun("trim35/fasta/unpaired", "-5 5 -3 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)-1-8,
+	      ca($m1, 5), "I",
+	      ca($m2, 5), "I");
+	
+	readToFasta($r1, ".tmp1.fa");
+	readToFasta($r2, ".tmp2.fa");
+	
+	readToRaw($r1, ".tmp1.raw");
+	readToRaw($r2, ".tmp2.raw");
+	btrun("no-trim/raw/paired",   "-C e_coli_c -r -1 .tmp1.raw -2 .tmp2.raw",
+	      length($m1)-1,
+	      ca($m1, 0), "I",
+	      ca($m2, 0), "I");
+	btrun("no-trim/raw/unpaired", "-C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)-1,
+	      ca($m1, 0), "I",
+	      ca($m2, 0), "I");
+	btrun("trim5/raw/unpaired", "-5 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)-1-3,
+	      ca($m1, 3), "I",
+	      ca($m2, 3), "I");
+	btrun("trim35/raw/unpaired", "-5 5 -3 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)-1-8,
+	      ca($m1, 5), "I",
+	      ca($m2, 5), "I");
+}
 
-	readToTabbed($reads[$i], ".tmp1.tabbed");
-	readToTabbed($reads[$i+1], ".tmp2.tabbed");
-	readToTabbed2($reads[$i], $reads[$i+1], ".tmp.tabbed");
-	btrun("no-trim/tabbed/paired",   "-C e_coli_c --12 .tmp.tabbed", length($m1)+1);
-	btrun("no-trim/tabbed/unpaired", "-C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed", length($m1)+1);
-	btrun("trim5/tabbed/unpaired", "-5 3 -C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed", length($m1)+1-3);
-	btrun("trim35/tabbed/unpaired", "-5 5 -3 3 -C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed", length($m1)+1-8);
+for(my $i = 0; $i < scalar(@nucReads); $i += 2) {
+	my $r1 = $nucReads[$i];
+	my $r2 = $nucReads[$i+1];
+	btrun("trim/-c/paired",   "-c e_coli -1 $r1 -2 $r2",
+	      length($n1), undef, undef, undef, undef);
+	btrun("trim/-c/unpaired", "-c e_coli $r1,$r2",
+	      length($n1), undef, undef, undef, undef);
+}
+
+for(my $i = 0; $i < scalar(@untrimReads); $i += 2) {
+	my $r1 = $untrimReads[$i];
+	my $r2 = $untrimReads[$i+1];
+	my $colri = index($r1, ":");
+	my $colrp = index($r2, ":");
+	btrun("no-trim/-c/paired",   "-C -c e_coli_c -1 $r1 -2 $r2",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colrp+1+0));
+	btrun("no-trim/-c/unpaired", "-C -c e_coli_c $r1,$r2",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colri+1+0));
+	btrun("trim5/-c/unpaired", "-5 3 -C -c e_coli_c $r1,$r2",
+	      length($m1)+1-3,
+	      ca($r1, 3), ca($r1, $colri+1+3),
+	      ca($r2, 3), ca($r2, $colri+1+3));
+	btrun("trim35/-c/unpaired", "-5 5 -3 3 -C -c e_coli_c $r1,$r2",
+	      length($m1)+1-8,
+	      ca($r1, 5), ca($r1, $colri+1+5),
+	      ca($r2, 5), ca($r2, $colri+1+5));
+	
+	readToFastq($r1, ".tmp1.fq");
+	readToFastq($r2, ".tmp2.fq");
+	btrun("no-trim/fastq/paired", "-C e_coli_c -q -1 .tmp1.fq -2 .tmp2.fq",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colri+1+0));
+	btrun("no-trim/fastq/unpaired", "-C e_coli_c -q .tmp1.fq,.tmp2.fq",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colri+1+0));
+	btrun("trim5/fastq/unpaired", "-5 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq",
+	      length($m1)+1-3,
+	      ca($r1, 3), ca($r1, $colri+1+3),
+	      ca($r2, 3), ca($r2, $colri+1+3));
+	btrun("trim35/fastq/unpaired", "-5 5 -3 3 -C e_coli_c -q .tmp1.fq,.tmp2.fq",
+	      length($m1)+1-8,
+	      ca($r1, 5), ca($r1, $colri+1+5),
+	      ca($r2, 5), ca($r2, $colri+1+5));
+
+	readToFasta($r1, ".tmp1.fa");
+	readToFasta($r2, ".tmp2.fa");
+	btrun("no-trim/fasta/paired",   "-C e_coli_c -f -1 .tmp1.fa -2 .tmp2.fa",
+	      length($m1)+1,
+	      ca($r1, 0), "I",
+	      ca($r2, 0), "I");
+	btrun("no-trim/fasta/unpaired", "-C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)+1,
+	      ca($r1, 0), "I",
+	      ca($r2, 0), "I");
+	btrun("trim5/fasta/unpaired", "-5 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)+1-3,
+	      ca($r1, 3), "I",
+	      ca($r2, 3), "I");
+	btrun("trim35/fasta/unpaired", "-5 5 -3 3 -C e_coli_c -f .tmp1.fa,.tmp2.fa",
+	      length($m1)+1-8,
+	      ca($r1, 5), "I",
+	      ca($r2, 5), "I");
+
+	readToRaw($r1, ".tmp1.raw");
+	readToRaw($r2, ".tmp2.raw");
+	btrun("no-trim/raw/paired",   "-C e_coli_c -r -1 .tmp1.raw -2 .tmp2.raw",
+	      length($m1)+1,
+	      ca($r1, 0), "I",
+	      ca($r2, 0), "I");
+	btrun("no-trim/raw/unpaired", "-C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)+1,
+	      ca($r1, 0), "I",
+	      ca($r2, 0), "I");
+	btrun("trim5/raw/unpaired", "-5 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)+1-3,
+	      ca($r1, 3), "I",
+	      ca($r2, 3), "I");
+	btrun("trim35/raw/unpaired", "-5 5 -3 3 -C e_coli_c -r .tmp1.raw,.tmp2.raw",
+	      length($m1)+1-8,
+	      ca($r1, 5), "I",
+	      ca($r2, 5), "I");
+
+	readToTabbed($r1, ".tmp1.tabbed");
+	readToTabbed($r2, ".tmp2.tabbed");
+	readToTabbed2($r1, $r2, ".tmp.tabbed");
+	btrun("no-trim/tabbed/paired",   "-C e_coli_c --12 .tmp.tabbed",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colri+1+0));
+	btrun("no-trim/tabbed/unpaired", "-C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed",
+	      length($m1)+1,
+	      ca($r1, 0), ca($r1, $colri+1+0),
+	      ca($r2, 0), ca($r2, $colri+1+0));
+	btrun("trim5/tabbed/unpaired", "-5 3 -C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed",
+	      length($m1)+1-3,
+	      ca($r1, 3), ca($r1, $colri+1+3),
+	      ca($r2, 3), ca($r2, $colri+1+3));
+	btrun("trim35/tabbed/unpaired", "-5 5 -3 3 -C e_coli_c --12 .tmp1.tabbed,.tmp2.tabbed",
+	      length($m1)+1-8,
+	      ca($r1, 5), ca($r1, $colri+1+5),
+	      ca($r2, 5), ca($r2, $colri+1+5));
 }
