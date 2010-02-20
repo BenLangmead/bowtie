@@ -6,9 +6,6 @@ Bowtie NEWS
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
 available to the public for download.  The current version is 0.12.3.
-The Bowtie project is still in its early stages, and anyone interested
-in improving this project is strongly encouraged to contact us. See the
-project website (http://bowtie-bio.sf.net) for more details.
 
 Reporting Issues
 ================
@@ -16,6 +13,15 @@ Reporting Issues
 Please report any issues using the Sourceforge bug tracker:
 
   https://sourceforge.net/tracker/?group_id=236897&atid=1101606
+
+Announcements
+=============
+
+To receive announcements (including release announcements) about Bowtie
+and related tools (including Crossbow, TopHat, Cufflinks) subscribe to
+our mailing list:
+
+  https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce
 
 Version Release History
 =======================

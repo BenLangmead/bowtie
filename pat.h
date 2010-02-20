@@ -569,9 +569,7 @@ public:
 	/**
 	 * Return the number of reads attempted.
 	 */
-	uint64_t readCnt() const {
-		return readCnt_ - 1;
-	}
+	uint64_t readCnt() const { return readCnt_ - 1; }
 
 protected:
 
@@ -1353,7 +1351,7 @@ extern void tooManyQualities(const String<char>& read_name);
 extern void tooManySeqChars(const String<char>& read_name);
 
 /**
- * Encapsualtes a source of patterns which is an in-memory vector.
+ * Encapsulates a source of patterns which is an in-memory vector.
  */
 class VectorPatternSource : public TrimmingPatternSource {
 public:
@@ -2264,9 +2262,7 @@ private:
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
 				if(begin++ >= trim5) {
-					if(dna4Cat[c] == 0) {
-						assert(false);
-					}
+					assert_neq(0, dna4Cat[c]);
 					if(dstLen + 1 > 1024) {
 						cerr << "Input file contained a pattern more than 1024 characters long.  Please truncate" << endl
 							 << "reads and re-run Bowtie" << endl;

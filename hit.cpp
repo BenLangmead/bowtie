@@ -325,10 +325,30 @@ void VerboseHitSink::append(ostream& ss,
 				else ss << '\t';
 				ss << (int)h.mate;
 			}
+			// Print label, or whole read name if label isn't found
 			if(!suppress.test(field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
-				ss << h.patName;
+				int labelOff = -1;
+				// If LB: field is present, print its value
+				for(int i = 0; i < (int)seqan::length(h.patName)-3; i++) {
+					if(h.patName[i]   == 'L' &&
+					   h.patName[i+1] == 'B' &&
+					   h.patName[i+2] == ':' &&
+					   ((i == 0) || h.patName[i-1] == ';'))
+					{
+						labelOff = i+3;
+						for(int j = labelOff; j < (int)seqan::length(h.patName); j++) {
+							if(h.patName[j] != ';') {
+								ss << h.patName[j];
+							} else {
+								break;
+							}
+						}
+					}
+				}
+				// Otherwise, print the whole read name
+				if(labelOff == -1) ss << h.patName;
 			}
 		}
 		if(cost) {
