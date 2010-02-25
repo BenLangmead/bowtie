@@ -382,7 +382,7 @@ struct ReadBuf {
 };
 
 /**
- * Encapsualtes a synchronized source of patterns; usually a file.
+ * Encapsulates a synchronized source of patterns; usually a file.
  * Handles dumping patterns to a logfile (useful for debugging).  Also
  * optionally reverses reads and quality strings before returning them,
  * though that is usually more efficiently done by the concrete
