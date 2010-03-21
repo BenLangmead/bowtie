@@ -129,6 +129,7 @@ open BTRC, "$rccmd |" || die "Couldn't open pipe '$rccmd |'\n";
 print STDERR "Reading...\n";
 my $ln = 0;
 my $cur = 0;
+my $lastc = "a";
 while(1) {
 	my $fwl = <BTFW>;
 	my $rcl = <BTRC>;
@@ -161,12 +162,18 @@ while(1) {
 			for(; $cur < $lens{$name}; $cur++) {
 				$running -= $last[$cur % $win];
 				$last[$cur % $win] = 0;
-				print chr($running + 64);
-				print "\n" if (($cur+1) % 60) == 0;
+				$lastc = chr($running + 64);
+				print $lastc;
+				if((($cur+1) % 60) == 0) {
+					$lastc = "\n";
+					print $lastc;
+				}
 			}
 		}
 		$name = $cname;
+		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
+		$lastc = "\n";
 		$cur = 0;
 		$running = 0;
 		clearLast();
@@ -183,8 +190,12 @@ while(1) {
 	$running += $last[$cur % $win];
 
 	$running <= $win || die "running counter $running got higher than window size $win\n";
-	print chr($running + 64);
-	print "\n" if (($cur+1) % 60) == 0;
+	$lastc = chr($running + 64);
+	print $lastc;
+	if((($cur+1) % 60) == 0) {
+		$lastc = "\n";
+		print $lastc;
+	}
 
 	$cur++;
 }
