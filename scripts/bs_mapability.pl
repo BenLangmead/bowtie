@@ -179,7 +179,7 @@ while(1) {
 	}
 	
 	$running -= $last[$cur % $win];
-	$last[$cur % $win] = $uniqueFw + $uniqueRc;
+	$last[$cur % $win] = $mapable;
 	$running += $last[$cur % $win];
 
 	$running <= $win || die "running counter $running got higher than window size $win\n";
