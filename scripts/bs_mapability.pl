@@ -15,23 +15,36 @@ my $fa = "";
 my $win = 50;
 my $freq = 1;
 my $bowtie = "";
+my $bowtie_arg = "";
 my $pol = "-v 3";
 my $fwidx = "";
 my $rcidx = "";
 my $btargs = "-t --norc -S -M 1 --mm";
 my $debug = 0;
 
+if(defined($ENV{BOWTIE_HOME})) {
+	$bowtie = "$ENV{BOWTIE_HOME}/bowtie";
+	unless(-x $bowtie) { $bowtie = "" };
+}
+if($bowtie eq "") {
+	$bowtie = `which bowtie 2>/dev/null`;
+	chomp($bowtie);
+	unless(-x $bowtie) { $bowtie = "" };
+}
+$bowtie = "./bowtie" if ($bowtie eq "" && -x "./bowtie");
+
 GetOptions(
 	"fasta=s"     => \$fa,
 	"window=i"    => \$win,
 	"frequency=i" => \$freq,
-	"bowtie=s"    => \$bowtie,
+	"bowtie=s"    => \$bowtie_arg,
 	"policy=s"    => \$pol,
 	"fwidx=s"     => \$fwidx,
 	"rcidx=s"     => \$rcidx,
 	"debug"       => \$debug
 ) || die;
 
+print STDERR "Bowtie: found: $bowtie; given: $bowtie_arg\n";
 print STDERR "Input fasta: $fa\n";
 print STDERR "FW index: $fwidx\n";
 print STDERR "RC index: $rcidx\n";
@@ -44,6 +57,16 @@ $fwidx ne "" || die "Must specify -fwidx\n";
 $rcidx ne "" || die "Must specify -rcidx\n";
 -f "$fwidx.1.ebwt" || die "Could not find -fwidx index file $fwidx.1.ebwt\n";
 -f "$rcidx.1.ebwt" || die "Could not find -rcidx index file $rcidx.1.ebwt\n";
+
+$bowtie = $bowtie_arg if $bowtie_arg ne "";
+unless(-x $bowtie) {
+	# No bowtie? die
+	if($bowtie_arg ne "") {
+		die "Specified -bowtie, \"$bowtie\" doesn't exist or isn't executable\n";
+	} else {
+		die "bowtie couldn't be found in BOWTIE_HOME, PATH, or current directory; please specify -bowtie\n";
+	}
+}
 
 my $running = 0;
 my $name = ""; # name of sequence currently being processed
