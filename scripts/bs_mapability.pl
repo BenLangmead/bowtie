@@ -19,7 +19,7 @@ my $bowtie_arg = "";
 my $pol = "-v 3";
 my $fwidx = "";
 my $rcidx = "";
-my $btargs = "-t --norc -S -M 1 --mm";
+my $btargs = "-t --norc -S --sam-nohead -M 1 --mm";
 my $debug = 0;
 
 if(defined($ENV{BOWTIE_HOME})) {
