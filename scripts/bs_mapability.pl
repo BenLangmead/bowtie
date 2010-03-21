@@ -100,11 +100,14 @@ open BTRC, "$bowtie -F $win,$freq $btargs $pol $rcidx $fa |";
 # 10_559  4       *       0       0       *       *       0       0       NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN      IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII      XM:i:0
 
 print STDERR "Reading...\n";
+my $ln = 0;
+my $cur = 0;
 while(1) {
 	my $fwl = <BTFW>;
 	my $rcl = <BTRC>;
 	
 	last unless defined($fwl) && defined($rcl);
+	$ln++;
 
 	# TODO: should probably be a space instead of an underscore
 	my @fws = split(/\t/, $fwl);
