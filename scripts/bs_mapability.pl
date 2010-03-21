@@ -146,8 +146,9 @@ while(1) {
 	$cname eq $rcs1[0] || die "Name mismatch on line $ln:\n$fwl\n$rcl\n";
 	my $off = $fws1[1];
 	$off eq $rcs1[1] || die "Offset mismatch on line $ln:\n$fwl\n$rcl\n";
-	my $uniqueFw = ($fws[-1] =~ /XM:i/ ? 0 : 1);
-	my $uniqueRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
+	my $mappedFw = ($fws[-1] =~ /XM:i/ ? 0 : 1);
+	my $mappedRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
+	my $mapable = $mappedFw != $mappedRc;
 	
 	if($name ne $cname) {
 		if($name ne "") {
@@ -167,6 +168,7 @@ while(1) {
 		$name = $cname;
 		print ">$name\n";
 		$cur = 0;
+		$running = 0;
 		clearLast();
 	}
 	
@@ -180,6 +182,7 @@ while(1) {
 	$last[$cur % $win] = $uniqueFw + $uniqueRc;
 	$running += $last[$cur % $win];
 
+	$running <= $win || die "running counter $running got higher than window size $win\n";
 	print chr($running + 64);
 	print "\n" if (($cur+1) % 60) == 0;
 
