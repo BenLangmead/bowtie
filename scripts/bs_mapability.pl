@@ -129,7 +129,7 @@ open BTRC, "$rccmd |" || die "Couldn't open pipe '$rccmd |'\n";
 print STDERR "Reading...\n";
 my $ln = 0;
 my $cur = 0;
-my $lastc = "a";
+my $lastc = "\n";
 while(1) {
 	my $fwl = <BTFW>;
 	my $rcl = <BTRC>;
