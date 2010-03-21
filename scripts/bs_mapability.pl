@@ -112,8 +112,12 @@ sub clearLast {
 }
 
 print STDERR "Opening bowtie pipes\n";
-open BTFW, "$bowtie -F $win,$freq $btargs $pol $fwidx $fa |";
-open BTRC, "$bowtie -F $win,$freq $btargs $pol $rcidx $fa |";
+my $fwcmd = "$bowtie -F $win,$freq $btargs $pol $fwidx $fa";
+my $rccmd = "$bowtie -F $win,$freq $btargs $pol $rcidx $fa";
+print STDERR "Forward command: $fwcmd\n";
+print STDERR "Reverse comp command: $rccmd\n";
+open BTFW, "$fwcmd |" || die "Couldn't open pipe '$fwcmd |'\n";
+open BTRC, "$rccmd |" || die "Couldn't open pipe '$rccmd |'\n";
 
 # 10_554  4       *       0       0       *       *       0       0       NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN      IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII      XM:i:0
 # 10_555  4       *       0       0       *       *       0       0       NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN      IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII      XM:i:0
