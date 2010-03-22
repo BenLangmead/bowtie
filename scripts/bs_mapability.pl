@@ -159,6 +159,7 @@ while(1) {
 				print STDERR "Flushing...\n";
 				my $tmp = <STDIN>;
 			}
+			defined($lens{$name}) || die;
 			for(; $cur < $lens{$name}; $cur++) {
 				$running -= $last[$cur % $win];
 				$last[$cur % $win] = 0;
@@ -171,6 +172,7 @@ while(1) {
 			}
 		}
 		$name = $cname;
+		defined($lens{$name}) || die;
 		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
 		$lastc = "\n";
@@ -198,6 +200,17 @@ while(1) {
 	}
 
 	$cur++;
+}
+defined($lens{$name}) || die;
+for(; $cur < $lens{$name}; $cur++) {
+	$running -= $last[$cur % $win];
+	$last[$cur % $win] = 0;
+	$lastc = chr($running + 64);
+	print $lastc;
+	if((($cur+1) % 60) == 0) {
+		$lastc = "\n";
+		print $lastc;
+	}
 }
 close(BTFW);
 $? == 0 || die "Bad exitlevel from forward bowtie: $?\n";
