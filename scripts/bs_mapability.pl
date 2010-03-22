@@ -160,6 +160,7 @@ while(1) {
 				my $tmp = <STDIN>;
 			}
 			defined($lens{$name}) || die;
+			$cur == $lens{$name} - $win + 1 || die "cur is $cur, len is $lens{$name}, win is $win\n";
 			for(; $cur < $lens{$name}; $cur++) {
 				$running -= $last[$cur % $win];
 				$last[$cur % $win] = 0;
