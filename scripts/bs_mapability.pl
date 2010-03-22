@@ -173,6 +173,7 @@ while(1) {
 			}
 		}
 		$name = $cname;
+		$name =~ s/\s.*//; # trim at the beginning
 		defined($lens{$name}) || die;
 		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
