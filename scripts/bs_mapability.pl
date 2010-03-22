@@ -174,7 +174,7 @@ while(1) {
 		}
 		$name = $cname;
 		$name =~ s/\s.*//; # trim at the beginning
-		defined($lens{$name}) || die;
+		defined($lens{$name}) || die "No such name as \"$name\"\n";
 		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
 		$lastc = "\n";
