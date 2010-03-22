@@ -143,10 +143,10 @@ while(1) {
 	my @rcs = split(/\t/, $rcl);
 	my @rcs1 = split(/_/, $rcs[0]);
 	
-	my $cname = $fws1[0];
-	$cname eq $rcs1[0] || die "Name mismatch on line $ln:\n$fwl\n$rcl\n";
-	my $off = $fws1[1];
-	$off eq $rcs1[1] || die "Offset mismatch on line $ln:\n$fwl\n$rcl\n";
+	my $cname = join("_", $fws1[$#fws1-1]);
+	$cname eq join("_", $fws1[$#fws1-1]) || die "Name mismatch on line $ln:\n$fwl\n$rcl\n";
+	my $off = $fws1[-1];
+	$off eq $rcs1[-1] || die "Offset mismatch on line $ln:\n$fwl\n$rcl\n";
 	my $mappedFw = ($fws[-1] =~ /XM:i/ ? 0 : 1);
 	my $mappedRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
 	my $mapable = $mappedFw != $mappedRc;
