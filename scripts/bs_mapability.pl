@@ -174,6 +174,8 @@ while(1) {
 		}
 		$name = $cname;
 		$name =~ s/\s.*//; # trim at the beginning
+		$name =~ /^FW:/ || $name =~ /^RC:/ || die;
+		$name = substr($name, 3);
 		defined($lens{$name}) || die "No such name as \"$name\"\n";
 		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
