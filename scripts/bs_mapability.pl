@@ -151,6 +151,9 @@ while(1) {
 	my $mappedRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
 	my $mapable = $mappedFw != $mappedRc;
 	
+	$cname =~ s/\s.*//; # trim at the beginning
+	$cname =~ /^FW:/ || $cname =~ /^RC:/ || die;
+	$cname = substr($cname, 3);
 	if($name ne $cname) {
 		if($name ne "") {
 			# Flush remaining characters from previous name
@@ -173,9 +176,6 @@ while(1) {
 			}
 		}
 		$name = $cname;
-		$name =~ s/\s.*//; # trim at the beginning
-		$name =~ /^FW:/ || $name =~ /^RC:/ || die;
-		$name = substr($name, 3);
 		defined($lens{$name}) || die "No such name as \"$name\"\n";
 		print "\n" unless $lastc eq "\n";
 		print ">$name\n";
