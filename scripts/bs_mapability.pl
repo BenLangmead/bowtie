@@ -151,9 +151,10 @@ while(1) {
 	my $mappedRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
 	my $mapable = $mappedFw != $mappedRc;
 	
-	$cname =~ s/\s.*//; # trim at the beginning
-	$cname =~ /^FW:/ || $cname =~ /^RC:/ || die;
-	$cname = substr($cname, 3);
+	$cname =~ s/\s.*//; # trim everything after first whitespace to get short name
+	if($cname =~ /^FW:/ || $cname =~ /^RC:/) {
+		$cname = substr($cname, 3);
+	}
 	if($name ne $cname) {
 		if($name ne "") {
 			# Flush remaining characters from previous name
