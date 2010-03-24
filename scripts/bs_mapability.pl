@@ -87,6 +87,7 @@ sub readLens($) {
 			chomp;
 			if(substr($_, 0, 1) eq '>') {
 				next if /\?[0-9]*$/; # Skip >?50000 lines
+				$name = $_;
 				$name = substr($name, 1); # Chop off >
 				if($name =~ /^FW:/ || $name =~ /^RC:/) {
 					$name = substr($name, 3); # Chop off FW:/RC:
