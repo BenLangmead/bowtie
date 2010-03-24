@@ -87,7 +87,10 @@ sub readLens($) {
 			chomp;
 			if(substr($_, 0, 1) eq '>') {
 				next if /\?[0-9]*$/; # Skip >?50000 lines
-				$name = substr($_, 4); # Chop off >FW:/>RC:
+				$name = substr($name, 1); # Chop off >
+				if($name =~ /^FW:/ || $name =~ /^RC:/) {
+					$name = substr($name, 3); # Chop off FW:/RC:
+				}
 				my @ns = split(/\s+/, $name);
 				$name = $ns[0]; # Get short name
 				push @names, $name;
