@@ -151,9 +151,16 @@ while(1) {
 	$cname eq join("_", @fws1[0..$#fws1-1]) || die "Name mismatch on line $ln:\n$fwl\n$rcl\n";
 	my $off = $fws1[-1];
 	$off eq $rcs1[-1] || die "Offset mismatch on line $ln:\n$fwl\n$rcl\n";
-	my $mappedFw = ($fws[-1] =~ /XM:i/ ? 0 : 1);
-	my $mappedRc = ($rcs[-1] =~ /XM:i/ ? 0 : 1);
-	my $mapable = $mappedFw != $mappedRc;
+	# If a read aligns, XM:i is not printed
+	# If a read fails to align, XM:i:0 is printed
+	# If a read aligns multiple places, XM:i:N is printed where N>0
+	my $fwxm0 = $fws[-1] =~ /XM:i:0/;
+	my $rcxm0 = $rcs[-1] =~ /XM:i:0/;
+	my $fwxm  = $fws[-1] =~ /XM:i:/;
+	my $rcxm  = $rcs[-1] =~ /XM:i:/;
+	# For mapable to be true, we need the read to have failed to align
+	# in one index and aligned uniquely in the other
+	my $mapable = (($fwxm0 && !$rcxm) || ($rcxm0 && !$fwxm)) ? 1 : 0;
 	
 	$cname =~ s/\s.*//; # trim everything after first whitespace to get short name
 	if($cname =~ /^FW:/ || $cname =~ /^RC:/) {
