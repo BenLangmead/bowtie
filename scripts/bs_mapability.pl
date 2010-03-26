@@ -141,7 +141,6 @@ while(1) {
 	last unless defined($fwl) && defined($rcl);
 	$ln++;
 
-	# TODO: should probably be a space instead of an underscore
 	my @fws = split(/\t/, $fwl);
 	my @fws1 = split(/_/, $fws[0]);
 	my @rcs = split(/\t/, $rcl);
@@ -169,11 +168,6 @@ while(1) {
 	if($name ne $cname) {
 		if($name ne "") {
 			# Flush remaining characters from previous name
-			if($debug) {
-				print STDERR "Read $cur characters of sequence $name, with lenth ".$lens{$name}."\n";
-				print STDERR "Flushing...\n";
-				my $tmp = <STDIN>;
-			}
 			defined($lens{$name}) || die;
 			$cur == $lens{$name} - $win + 1 || die "name is $name, cur is $cur, len is $lens{$name}, win is $win\n";
 			for(; $cur < $lens{$name}; $cur++) {
@@ -195,12 +189,6 @@ while(1) {
 		$cur = 0;
 		$running = 0;
 		clearLast();
-	}
-	
-	if($debug) {
-		#print STDERR "Read $cur characters of sequence $name, with lenth ".$lens{$name}."\n";
-		#print STDERR "Flushing...\n";
-		#my $tmp = <STDIN>;
 	}
 	
 	$running -= $last[$cur % $win];

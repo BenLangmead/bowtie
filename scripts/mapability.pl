@@ -102,7 +102,7 @@ sub readLens($) {
 }
 print STDERR "Reading fasta lengths\n";
 readLens($fa);
-print STDERR "  read ".scalar(keys %lens)." sequences with total length $totlen\n";
+print STDERR "  read ".scalar(keys %lens)." fasta sequences with total length $totlen\n";
 
 my @last;
 for(my $i = 0; $i < $win; $i++) { push @last, 0 };
@@ -110,7 +110,7 @@ sub clearLast {
 	for(my $i = 0; $i < $win; $i++) { $last[$i] = 0 };
 }
 
-print STDERR "Opening bowtie pipes\n";
+print STDERR "Opening bowtie pipe\n";
 my $cmd = "$bowtie -F $win,$freq $btargs $pol $idx $fa";
 print STDERR "Forward command: $cmd\n";
 open BT, "$cmd |" || die "Couldn't open pipe '$cmd |'\n";
@@ -122,13 +122,15 @@ my $lastc = "\n";
 while(<BT>) {
 	$ln++;
 
-	# TODO: should probably be a space instead of an underscore
 	my @s = split(/\t/, $_);
 	my @s1 = split(/_/, $s[0]);
 	
 	my $cname = join("_", @s1[0..$#s1-1]);
 	my $off = $s1[-1];
-	my $mapable = ($s[-1] =~ /XM:i:[^0]/ ? 0 : 1);
+	# If a read aligns, XM:i is not printed
+	# If a read fails to align, XM:i:0 is printed
+	# If a read aligns multiple places, XM:i:N is printed where N>0
+	my $mapable = ($s[-1] =~ /XM:i:/ ? 0 : 1);
 	
 	$cname =~ s/\s.*//; # trim everything after first whitespace to get short name
 	if($cname =~ /^FW:/ || $cname =~ /^RC:/) {
@@ -158,12 +160,6 @@ while(<BT>) {
 		$cur = 0;
 		$running = 0;
 		clearLast();
-	}
-	
-	if($debug) {
-		#print STDERR "Read $cur characters of sequence $name, with lenth ".$lens{$name}."\n";
-		#print STDERR "Flushing...\n";
-		#my $tmp = <STDIN>;
 	}
 	
 	$running -= $last[$cur % $win];
