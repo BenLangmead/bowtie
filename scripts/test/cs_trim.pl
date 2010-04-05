@@ -101,11 +101,11 @@ sub readToFastaQV {
 	my ($rstr, $fname) = @_;
 	my @r = split(/[:]/, $rstr);
 	system("rm -f $fname $fname.qv");
-	open TMPT, "# Some\n#\t annoting\n#comments\n>$fname" || die "Could not open $fname for writing\n";
-	print TMPT ">r\n$r[0]\n";
+	open TMPT, ">$fname" || die "Could not open $fname for writing\n";
+	print TMPT "# Some\n#\t annoting\n#comments\n>r\n$r[0]\n";
 	close(TMPT);
-	open TMPQ, "#annoying\n;comment\n>$fname.qv" || die "Could not open $fname.qv for writing\n";
-	print TMPQ ">r\n$r[1]\n";
+	open TMPQ, ">$fname.qv" || die "Could not open $fname.qv for writing\n";
+	print TMPQ "#annoying\n;comment\n>r\n$r[1]\n";
 	close(TMPQ);
 }
 
@@ -160,9 +160,9 @@ sub btrun {
 			my $ql = length($quals);
 			$ql == $el || die "Expected qual length $el, got $ql\n";
 		}
-		print "$cmd\n";
 		if($args =~ /-C/) {
 			$cmd .= " --col-cseq --col-cqual";
+			print "$cmd\n";
 			open BTIE, "$cmd |" || die;
 			my $line = 0;
 			while(<BTIE>) {
@@ -312,7 +312,6 @@ for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 		      length($m1)-1-8,
 		      ca($m1, 5), ca($q, 7),
 		      ca($m2, 5), ca($q, 7));
-		my $tmp = <STDIN>;
 	}
 	
 	readToFasta($r1, ".tmp1.fa");
