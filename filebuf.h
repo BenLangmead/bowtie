@@ -299,6 +299,20 @@ public:
 		return _lastn_cur;
 	}
 
+	/**
+	 * Get const pointer to the last-N-chars buffer.
+	 */
+	const char *lastN() const {
+		return _lastn_buf;
+	}
+
+	/**
+	 * Get current size of the last-N-chars buffer.
+	 */
+	const size_t lastNLen() const {
+		return _lastn_cur;
+	}
+
 private:
 
 	void init() {
@@ -451,7 +465,10 @@ public:
 		if(cur_ + slen > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(slen >= BUF_SZ) {
-				fwrite(s.c_str(), slen, 1, out_);
+				if(fwrite(s.c_str(), slen, 1, out_) != slen) {
+					std::cerr << "Error while writing string output; not all characters written" << std::endl;
+					throw 1;
+				}
 			} else {
 				memcpy(&buf_[cur_], s.data(), slen);
 				assert_eq(0, cur_);
@@ -472,7 +489,10 @@ public:
 		if(cur_ + len > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(len >= BUF_SZ) {
-				fwrite(s, len, 1, out_);
+				if(fwrite(s, len, 1, out_) != len) {
+					std::cerr << "Error while writing string output; not all characters written" << std::endl;
+					throw 1;
+				}
 			} else {
 				memcpy(&buf_[cur_], s, len);
 				assert_eq(0, cur_);

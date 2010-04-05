@@ -14,8 +14,8 @@
 #  include "spinlock.h"
 #  define MUTEX_T SpinLock
 #  define MUTEX_INIT(l)
-#  define MUTEX_LOCK(l) l.Enter()
-#  define MUTEX_UNLOCK(l) l.Leave()
+#  define MUTEX_LOCK(l) (l).Enter()
+#  define MUTEX_UNLOCK(l) (l).Leave()
 #else
 #  ifdef BOWTIE_PTHREADS
 #    define MUTEX_T pthread_mutex_t
@@ -56,5 +56,19 @@ static inline void createThread(pthread_t* th,
 	}
 }
 #endif
+
+/**
+ * Wrap a lock; obtain lock upon construction, release upon destruction.
+ */
+class ThreadSafe {
+public:
+	ThreadSafe(MUTEX_T* lock) {
+		lock_ = lock;
+		MUTEX_LOCK(*lock_);
+	}
+	~ThreadSafe() { MUTEX_UNLOCK(*lock_); }
+private:
+	MUTEX_T *lock_;
+};
 
 #endif

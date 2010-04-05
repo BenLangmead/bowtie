@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.3.
+available to the public for download.  The current version is 0.12.4.
 
 Reporting Issues
 ================
@@ -25,6 +25,19 @@ our mailing list:
 
 Version Release History
 =======================
+
+Version 0.12.4 - April 5, 2010
+   * Periods in read sequences are now treated as Ns instead of
+     ignored.  This should help with some problems where Bowtie
+     erroneously reports "Reads file contained a pattern with more than
+     1024 quality values..." for data from recent versions of the
+     Illumina GA pipeline.
+   * Fixed a bug whereby some error and warning messages would be
+     printed on top of each other in -p mode.
+   * Chunk-exhaustion warnings messages are now suppressed when --quiet
+     is specified.
+   * Fixed small issue in quality decoding whereby no-confidence colors
+     would incorrectly influence decoded quality of adjacent bases.
 
 Version 0.12.3 - February 17, 2010
    * Fixed a significant bug in -C/--color mode whereby quality values

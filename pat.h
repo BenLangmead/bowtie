@@ -2257,8 +2257,8 @@ private:
 		while(c != upto) {
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
-				if(c == '.') c = 'N';
 			}
+			if(c == '.') c = 'N';
 			if(isalpha(c)) {
 				assert_in(toupper(c), "ACGTN");
 				if(begin++ >= trim5) {
@@ -2660,8 +2660,8 @@ protected:
 			// Convert color numbers to letters if necessary
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
-				if(c == '.') c = 'N';
 			}
+			if(c == '.') c = 'N';
 			if(fuzzy_ && c == '-') c = 'A';
 			if(isalpha(c)) {
 				// If it's past the 5'-end trim point
@@ -2971,8 +2971,8 @@ protected:
 		while(!isspace(c) && c >= 0) {
 			if(color_) {
 				if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
-				if(c == '.') c = 'N';
 			}
+			if(c == '.') c = 'N';
 			if(isalpha(c) && dstLen >= mytrim5) {
 				size_t len = dstLen - mytrim5;
 				if(len >= 1024) tooManyQualities(String<char>("(no name)"));

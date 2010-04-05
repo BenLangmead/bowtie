@@ -1275,8 +1275,9 @@ public:
 						} else {
 							hit.quals[destpos] += qual[i-1];
 						}
+					} else if((int)hit.colSeq[i-1] != 4) {
+						hit.quals[destpos] -= qual[i-1];
 					}
-					else hit.quals[destpos] -= qual[i-1];
 				}
 				if(i < qlen) {
 					if(cmm[i] == 'M') {
@@ -1285,8 +1286,9 @@ public:
 						} else {
 							hit.quals[destpos] += qual[i];
 						}
+					} else if((int)hit.patSeq[i] != 4) {
+						hit.quals[destpos] -= qual[i];
 					}
-					else hit.quals[destpos] -= qual[i];
 				}
 				if(hit.quals[destpos] < '!') {
 					hit.quals[destpos] = '!';

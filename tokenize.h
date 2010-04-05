@@ -1,3 +1,10 @@
+/*
+ * tokenize.h
+ *
+ *  Created on: Jul 21, 2009
+ *      Author: Ben Langmead
+ */
+
 #ifndef TOKENIZE_H_
 #define TOKENIZE_H_
 

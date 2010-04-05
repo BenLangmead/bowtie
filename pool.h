@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include "bitset.h"
 #include "log.h"
+#include "search_globals.h"
 
 /**
  * Very simple allocator for fixed-size chunks of memory.  Chunk size
@@ -36,6 +37,7 @@ public:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
+			ThreadSafe _ts(&gLock);
 			std::cerr << "Error: Could not allocate ChunkPool of "
 			          << totSz << " bytes" << std::endl;
 			exhausted();
@@ -141,14 +143,18 @@ public:
 	 */
 	void exhausted() {
 		if(patid != lastSkippedRead_) {
-			if(!exhaustCrash_) {
-				std::cerr << "Warning: ";
+			if(!exhaustCrash_ && !quiet) std::cerr << "Warning: ";
+			if(!quiet) {
+				std::cerr << "Exhausted best-first chunk memory for read "
+				          << (*readName_) << " (patid " << patid
+				          << "); skipping read" << std::endl;
 			}
-			std::cerr << "Exhausted best-first chunk memory for read " << (*readName_) << " (patid " << patid << "); skipping read" << std::endl;
-		}
-		if(exhaustCrash_) {
-			std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
-			throw 1;
+			if(exhaustCrash_) {
+				if(!quiet) {
+					std::cerr << "Please try specifying a larger --chunkmbs <int> (default is 32)" << std::endl;
+				}
+				throw 1;
+			}
 		}
 		lastSkippedRead_ = patid;
 	}
@@ -334,7 +340,7 @@ protected:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
-			//std::cerr << "Error: Could not allocate " << name_ << " pool #" << (curPool_+1) << " of " << (lim_ * sizeof(T)) << " bytes" << std::endl;
+			ThreadSafe _ts(&gLock);
 			pool_->exhausted();
 			return false;
 		}
@@ -354,7 +360,7 @@ protected:
 					throw std::bad_alloc();
 				}
 			} catch(std::bad_alloc& e) {
-				//std::cerr << "Error: Could not allocate " << name_ << " pool #1" << std::endl;
+				ThreadSafe _ts(&gLock);
 				pool_->exhausted();
 				return false;
 			}

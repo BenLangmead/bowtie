@@ -115,6 +115,7 @@ public:
 				_chars = new char[_qlen];
 				assert(_pairs != NULL && _elims != NULL && _chars != NULL);
 			} catch(std::bad_alloc& e) {
+				ThreadSafe _ts(&gLock);
 				cerr << "Unable to allocate memory for depth-first "
 				     << "backtracking search; new length = " << length(*_qry)
 				     << endl;
@@ -1953,6 +1954,7 @@ public:
 			if(offRev2_ != offRev3_) maxmms = 3;
 			if(qlen_ <= maxmms) {
 				if(!quiet_) {
+					ThreadSafe _ts(&gLock);
 					cerr << "Warning: Read (" << (*name_) << ") is less than " << (maxmms+1) << " characters long; skipping..." << endl;
 				}
 				this->done = true;

@@ -43,7 +43,7 @@ static vector<string> mates12; // mated reads (1st/2nd interleaved in 1 file)
 static string adjustedEbwtFileBase;
 static bool verbose;      // be talkative
 static bool startVerbose; // be talkative at startup
-static bool quiet;        // print nothing but the alignments
+bool quiet;        // print nothing but the alignments
 static int sanityCheck;   // enable expensive sanity checks
 static int format;        // default read format is FASTQ
 static string origString; // reference text, or filename(s)
@@ -143,6 +143,7 @@ bool showSeed;
 static vector<string> qualities;
 static vector<string> qualities1;
 static vector<string> qualities2;
+MUTEX_T gLock;
 
 static void resetOptions() {
 	mates1.clear();
@@ -251,6 +252,7 @@ static void resetOptions() {
 	qualities.clear();
 	qualities1.clear();
 	qualities2.clear();
+	MUTEX_INIT(gLock);
 }
 
 // mating constraints
@@ -2769,9 +2771,9 @@ static void driver(const char * type,
 				cerr << "Invalid output type: " << outType << endl;
 				throw 1;
 		}
-    	if(verbose || startVerbose) {
-    		cerr << "Dispatching to search driver: "; logTime(cerr, true);
-    	}
+		if(verbose || startVerbose) {
+			cerr << "Dispatching to search driver: "; logTime(cerr, true);
+		}
 		if(maqLike) {
 			seededQualCutoffSearchFull(seedLen,
 									   qualThresh,
