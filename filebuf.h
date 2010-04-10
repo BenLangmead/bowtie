@@ -465,8 +465,11 @@ public:
 		if(cur_ + slen > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(slen >= BUF_SZ) {
-				if(fwrite(s.c_str(), slen, 1, out_) != slen) {
-					std::cerr << "Error while writing string output; not all characters written" << std::endl;
+				size_t wlen = fwrite(s.c_str(), 1, slen, out_);
+				if(wlen != slen) {
+					std::cerr << "Error while writing string output; " << slen
+							  << " characters in string, " << wlen
+							  << " written" << std::endl;
 					throw 1;
 				}
 			} else {
@@ -489,8 +492,11 @@ public:
 		if(cur_ + len > BUF_SZ) {
 			if(cur_ > 0) flush();
 			if(len >= BUF_SZ) {
-				if(fwrite(s, len, 1, out_) != len) {
-					std::cerr << "Error while writing string output; not all characters written" << std::endl;
+				size_t wlen = fwrite(s, 1, len, out_);
+				if(wlen != len) {
+					std::cerr << "Error while writing string output; " << len
+							  << " characters in string, " << wlen
+							  << " written" << std::endl;
 					throw 1;
 				}
 			} else {
