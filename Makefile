@@ -40,7 +40,7 @@ endif
 LINUX = 0
 ifneq (,$(findstring Linux,$(shell uname)))
 LINUX = 1
-EXTRA_FLAGS += "-Wl,--hash-style=both"
+EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
 MM_DEF = 
