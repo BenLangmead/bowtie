@@ -36,6 +36,12 @@ ifneq (,$(findstring Darwin,$(shell uname)))
 MACOS = 1
 endif
 
+LINUX = 0
+ifneq (,$(findstring Linux,$(shell uname)))
+LINUX = 1
+EXTRA_FLAGS += -Wl,--hash-style=both
+endif
+
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
 MM_DEF = -DBOWTIE_MM
