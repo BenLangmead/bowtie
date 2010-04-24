@@ -14,6 +14,7 @@ HEADERS = $(wildcard *.h)
 BOWTIE_PTHREADS = 1
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
+EXTRA_FLAGS =
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
@@ -84,7 +85,6 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
-EXTRA_FLAGS =
 
 # Convert BITS=?? to a -m flag
 BITS_FLAG =
