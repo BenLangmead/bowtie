@@ -3306,20 +3306,20 @@ void Ebwt<TStr>::readIntoMemory(int color,
 #endif
 				} else {
 					// If any of the high two bits are set
-					if((offsLen & 0xc0000000) != 0) {
+					if((offsLen & 0xf0000000) != 0) {
 						if(sizeof(char *) <= 4) {
 							cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
 							throw 1;
 						}
-						// offsLen << 2 overflows, so do it in four reads
+						// offsLen << 4 overflows sometimes, so do it in four reads
 						char *offs = (char *)this->_offs;
-						for(int i = 0; i < 4; i++) {
-							MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen);
-							if(r != (MM_READ_RET)(offsLen)) {
-								cerr << "Error reading block of _offs[] array: " << r << ", " << offsLen << endl;
+						for(int i = 0; i < 16; i++) {
+							MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen >> 2);
+							if(r != (MM_READ_RET)(offsLen >> 2)) {
+								cerr << "Error reading block of _offs[] array: " << r << ", " << (offsLen >> 2) << endl;
 								throw 1;
 							}
-							offs += offsLen;
+							offs += (offsLen >> 2);
 						}
 					} else {
 						// Do it all in one read
