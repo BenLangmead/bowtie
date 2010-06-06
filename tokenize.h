@@ -27,12 +27,12 @@ static inline void tokenize(const string& s,
 	string::size_type pos = s.find_first_of(delims, lastPos);
 	while (string::npos != pos || string::npos != lastPos) {
 		ss.push_back(s.substr(lastPos, pos - lastPos));
-        lastPos = s.find_first_not_of(delims, pos);
-        pos = s.find_first_of(delims, lastPos);
-        if(ss.size() == (max - 1)) {
-        	pos = string::npos;
-        }
-    }
+		lastPos = s.find_first_not_of(delims, pos);
+		pos = s.find_first_of(delims, lastPos);
+		if(ss.size() == (max - 1)) {
+			pos = string::npos;
+		}
+	}
 }
 
 static inline void tokenize(

@@ -28,7 +28,7 @@ Version Release History
 
 Version 0.12.5 - April 10, 2010
    * Fixed spurious "Error while writing string output; not all
-     characters written" errors.
+     characters written" errors in -S/--sam mode.
 
 Version 0.12.4 - April 5, 2010
    * Periods in read sequences are now treated as Ns instead of
