@@ -2664,6 +2664,7 @@ protected:
 					cerr << "Warning: Skipping read (" << r.name << ") because it had length 0" << endl;
 				}
 				peekToEndOfLine(fb_);
+				fb_.get();
 				continue;
 			}
 			while(c != '+') {
