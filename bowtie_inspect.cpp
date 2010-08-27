@@ -5,8 +5,10 @@
 #include <stdexcept>
 #include <seqan/find.h>
 
+#include "assert_helpers.h"
 #include "endian_swap.h"
 #include "ebwt.h"
+#include "reference.h"
 
 using namespace std;
 using namespace seqan;
@@ -19,7 +21,7 @@ static int across       = 60; // number of characters across in FASTA output
 static bool extra       = false; // print extra summary info
 static bool refFromEbwt = false; // true -> when printing reference, decode it from Ebwt instead of reading it from BitPairReference
 
-static const char *short_options = "vhnsa:";
+static const char *short_options = "vhnsea:";
 
 enum {
 	ARG_VERSION = 256,
@@ -97,6 +99,7 @@ static void parseOptions(int argc, char **argv) {
 			case 'v': verbose = true; break;
 			case ARG_VERSION: showVersion = true; break;
 			case ARG_EXTRA: extra = true; break;
+			case 'e': refFromEbwt = true; break;
 			case 'n': names_only = true; break;
 			case 's': summarize_only = true; break;
 			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
@@ -129,6 +132,69 @@ void print_fasta_record(ostream& fout,
 			fout << seq.substr(i) << endl;
 	} else {
 		fout << seq << endl;
+	}
+}
+
+/**
+ * Given output stream, BitPairReference, reference index, name and
+ * length, print the whole nucleotide reference with the appropriate
+ * number of columns.
+ */
+void print_ref_sequence(
+	ostream& fout,
+	BitPairReference& ref,
+	const string& name,
+	size_t refi,
+	size_t len)
+{
+	size_t incr = across * 1000;
+	uint32_t *buf = new uint32_t[(incr + 128)/4];
+	fout << ">" << name << "\n";
+	for(size_t i = 0; i < len; i += incr) {
+		size_t amt = min(incr, len-i);
+		assert_leq(amt, incr);
+		int off = ref.getStretch(buf, refi, i, amt);
+		uint8_t *cb = ((uint8_t*)buf) + off;
+		for(size_t j = 0; j < amt; j++) {
+			if(j > 0 && (j % across) == 0) fout << "\n";
+			assert_range(0, 4, (int)cb[j]);
+			fout << "ACGTN"[(int)cb[j]];
+		}
+		fout << "\n";
+	}
+	delete buf;
+}
+
+/**
+ * 
+ */
+void print_ref_sequences(
+	ostream& fout,
+	bool color,
+	const vector<string>& refnames,
+	const uint32_t* plen,
+	const string& adjustedEbwtFileBase)
+{
+	BitPairReference ref(
+		adjustedEbwtFileBase, // input basename
+		color,                // true -> expect colorspace reference
+		false,                // sanity-check reference
+		NULL,                 // infiles
+		NULL,                 // originals
+		false,                // infiles are sequences
+		false,                // memory-map
+		false,                // use shared memory
+		false,                // sweep mm-mapped ref
+		verbose,              // be talkative
+		verbose);             // be talkative at startup
+	assert_eq(ref.numRefs(), refnames.size());
+	for(size_t i = 0; i < ref.numRefs(); i++) {
+		print_ref_sequence(
+			fout,
+			ref,
+			refnames[i],
+			i,
+			plen[i]);
 	}
 }
 
@@ -280,8 +346,19 @@ static void driver(
 			false,                // pass up memory exceptions?
 			false);               // sanity check?
 		// Load whole index into memory
-		ebwt.loadIntoMemory(-1, true, false);
-		print_index_sequences(cout, ebwt);
+		if(refFromEbwt) {
+			ebwt.loadIntoMemory(-1, true, false);
+			print_index_sequences(cout, ebwt);
+		} else {
+			vector<string> refnames;
+			readEbwtRefnames(adjustedEbwtFileBase, refnames);
+			print_ref_sequences(
+				cout,
+				readEbwtColor(ebwtFileBase),
+				refnames,
+				ebwt.plen(),
+				adjustedEbwtFileBase);
+		}
 		// Evict any loaded indexes from memory
 		if(ebwt.isInMemory()) {
 			ebwt.evictFromMemory();

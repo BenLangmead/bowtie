@@ -72,7 +72,8 @@ if(this->verbose()) { \
  * Flags describing type of Ebwt.
  */
 enum EBWT_FLAGS {
-	EBWT_COLOR = 2 // true -> Ebwt is colorspace
+	EBWT_COLOR = 2, // true -> Ebwt is colorspace
+	EBWT_ENTIRE_REV = 4 // true -> Ebwt is concatenated then reversed
 };
 
 /**
@@ -3524,11 +3525,9 @@ readEbwtRefnames(const string& instr, vector<string>& refnames) {
 }
 
 /**
- * Read just enough of the Ebwt's header to determine whether it's
- * colorspace.
+ * Read just enough of the Ebwt's header to get its flags
  */
-static inline bool
-readEbwtColor(const string& instr) {
+static inline int32_t readFlags(const string& instr) {
 	ifstream in;
 	// Initialize our primary and secondary input-stream fields
 	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
@@ -3550,12 +3549,35 @@ readEbwtColor(const string& instr) {
 	readI32(in, switchEndian);
 	readI32(in, switchEndian);
 	int32_t flags = readI32(in, switchEndian);
+	return flags;
+}
+
+/**
+ * Read just enough of the Ebwt's header to determine whether it's
+ * colorspace.
+ */
+static inline bool
+readEbwtColor(const string& instr) {
+	int32_t flags = readFlags(instr);
 	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
 		return true;
 	} else {
 		return false;
 	}
+}
 
+/**
+ * Read just enough of the Ebwt's header to determine whether it's
+ * entirely reversed.
+ */
+static inline bool
+readEntireReverse(const string& instr) {
+	int32_t flags = readFlags(instr);
+	if(flags < 0 && (((-flags) & EBWT_ENTIRE_REV) != 0)) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
 /**

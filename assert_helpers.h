@@ -236,4 +236,24 @@ static inline void assert_in2(char c, const char *str, const char *file, int lin
 #define assert_in(c, s)
 #endif
 
+#ifndef NDEBUG
+#define assert_range(b, e, v) assert_range_helper(b, e, v, __FILE__, __LINE__)
+template<typename T>
+inline static void assert_range_helper(const T& begin,
+                                       const T& end,
+                                       const T& val,
+                                       const char *file,
+                                       int line)
+{
+	if(val < begin || val > end) {
+		std::cout << "assert_range: (" << val << ") not in  ["
+		          << begin << ", " << end << "]" << std::endl;
+		std::cout << file << ":" << line << std::endl;
+		assert(0);
+	}
+}
+#else
+#define assert_range(b, e, v)
+#endif
+
 #endif /*ASSERT_HELPERS_H_*/
