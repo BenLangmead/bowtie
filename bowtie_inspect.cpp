@@ -49,12 +49,18 @@ static void printUsage(ostream& out) {
 	out
 	<< "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
 	<< "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	<< endl
+	<< "  By default, prints FASTA records of the indexed nucleotide sequences to" << endl
+	<< "  standard out.  With -n, just prints names.  With -s, just prints a summary of" << endl
+	<< "  the index parameters and sequences.  With -e, preserves colors if applicable." << endl
+	<< endl
 	<< "Options:" << endl
 	<< "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
 	<< "  -s/--summary       Print summary incl. ref names, lengths, index properties" << endl
 	<< "  -v/--verbose       Verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
+	<< "  -e/--ebwt-ref      Reconstruct reference from ebwt (slow, preserves colors)" << endl
 	<< "  --help             print this usage message" << endl
 	;
 }
@@ -147,7 +153,9 @@ void print_ref_sequence(
 	size_t refi,
 	size_t len)
 {
-	size_t incr = across * 1000;
+	bool newlines = across > 0;
+	int myacross = across > 0 ? across : 60;
+	size_t incr = myacross * 1000;
 	uint32_t *buf = new uint32_t[(incr + 128)/4];
 	fout << ">" << name << "\n";
 	for(size_t i = 0; i < len; i += incr) {
@@ -156,7 +164,7 @@ void print_ref_sequence(
 		int off = ref.getStretch(buf, refi, i, amt);
 		uint8_t *cb = ((uint8_t*)buf) + off;
 		for(size_t j = 0; j < amt; j++) {
-			if(j > 0 && (j % across) == 0) fout << "\n";
+			if(newlines && j > 0 && (j % myacross) == 0) fout << "\n";
 			assert_range(0, 4, (int)cb[j]);
 			fout << "ACGTN"[(int)cb[j]];
 		}
@@ -166,7 +174,9 @@ void print_ref_sequence(
 }
 
 /**
- * 
+ * Create a BitPairReference encapsulating the reference portion of the
+ * index at the given basename.  Iterate through the reference
+ * sequences, sending each one to print_ref_sequence to print.
  */
 void print_ref_sequences(
 	ostream& fout,
@@ -194,10 +204,14 @@ void print_ref_sequences(
 			ref,
 			refnames[i],
 			i,
-			plen[i]);
+			plen[i] + (color ? 1 : 0));
 	}
 }
 
+/**
+ * Given an index, reconstruct the reference by LF mapping through the
+ * entire thing.
+ */
 template<typename TStr>
 void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
 {
@@ -331,7 +345,7 @@ static void driver(
 		TPackedEbwt ebwt(
 			adjustedEbwtFileBase,
 			color,                // index is colorspace
-			//-1,                   // don't care about entire-reverse
+			//-1,                  / don't care about entire-reverse
 			true,                 // index is for the forward direction
 			-1,                   // offrate (-1 = index default)
 			-1,

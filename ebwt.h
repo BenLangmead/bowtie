@@ -378,7 +378,13 @@ public:
 		useShmem_ = useShmem;
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
-		readIntoMemory(color, true, &_eh, mmSweep, loadNames, startVerbose);
+		readIntoMemory(
+			color,        // expect colorspace reference?
+			true,         // just load the header and quit?
+			&_eh,         // params structure to fill in
+			mmSweep,      // sweep the memory-mapped memory?
+			loadNames,    // load names?
+			startVerbose);// be talkative?
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {

@@ -370,15 +370,25 @@ sub build {
 	# Make a version of the FASTA file where all non-A/C/G/T characters
 	# are Ns.  This is useful if we'd like to compare to the output of
 	# bowtie-inspect.
+	#
+	# We make one version (FAN) that's colorized when the index is
+	# colorspace so that we can compare the output of bowtie-inspect -e,
+	# and another version (FANO) that's always in nucleotide space, so
+	# we can test default bowtie-inspect.
+	#
 	open FAN, ">.randtmp$seed.ns.fa" || die "Could not open temporary fasta file";
+	open FANO, ">.randtmp$seed.ns.orig.fa" || die "Could not open temporary fasta file";
 	for(my $i = 0; $i <= $#seqs; $i++) {
 		print FAN ">$i\n";
+		print FANO ">$i\n";
 		my $t = nonACGTtoN($seqs[$i]);
 		defined($t) || die;
+		print FANO "$t\n";
 		$t = colorize($t, 1) if $color;
 		print FAN "$t\n";
 	}
 	close(FAN);
+	close(FANO);
 	
 	my $fasta = int(rand(2)) == 0;
 	if($fasta) {
@@ -421,7 +431,13 @@ sub build {
 	$cmd = "./bowtie-inspect-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
 	print "$cmd\n";
 	run($cmd) == 0 || die "$cmd - failed";
-	$cmd = "diff .randtmp$seed.ns.fa .tmp$seed.inspect.ref";
+	$cmd = "./bowtie-inspect-debug -e -a -1 .tmp$seed > .tmp$seed.inspect.ebwtref";
+	print "$cmd\n";
+	run($cmd) == 0 || die "$cmd - failed";
+	$cmd = "diff .randtmp$seed.ns.orig.fa .tmp$seed.inspect.ref";
+	print "$cmd\n";
+	run($cmd) == 0 || die "$cmd - failed";
+	$cmd = "diff .randtmp$seed.ns.fa .tmp$seed.inspect.ebwtref";
 	print "$cmd\n";
 	run($cmd) == 0 || die "$cmd - failed";
 
