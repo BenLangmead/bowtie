@@ -1921,14 +1921,27 @@ protected:
 			c = fb_.get();
 		}
 		dstLen -= this->trim3_;
+		if(dstLen < 0) dstLen = 0;
 		_setBegin (r.patFw, (Dna5*)r.patBufFw);
 		_setLength(r.patFw, dstLen);
 		r.trimmed3 = this->trim3_;
 		r.trimmed5 = mytrim5;
 		if(doquals) {
-			parseQuals(r, qfb_, dstLen + r.trimmed3 + r.trimmed5,
-			           r.trimmed3, r.trimmed5, intQuals_, phred64_,
-			           solexa64_);
+			if(dstLen > 0) {
+				parseQuals(r, qfb_, dstLen + r.trimmed3 + r.trimmed5,
+						   r.trimmed3, r.trimmed5, intQuals_, phred64_,
+						   solexa64_);
+			} else {
+				// Bail
+				qfb_.peekUptoNewline();
+				qfb_.get();
+				qfb_.resetLastN();
+				fb_.resetLastN();
+				// Count the read
+				readCnt_++;
+				patid = readCnt_-1;
+				return;
+			}
 		}
 		_setBegin (r.qual,  r.qualBuf);
 		_setLength(r.qual,  dstLen);

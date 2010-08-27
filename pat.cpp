@@ -36,7 +36,7 @@ int parseQuals(ReadBuf& r,
 		while (c != '\r' && c != '\n' && c != -1) {
 			bool neg = false;
 			int num = 0;
-			while(!isspace(c = fb.get()) && !fb.eof()) {
+			while(!isspace(c = fb.peek()) && !fb.eof()) {
 				if(c == '-') {
 					neg = true;
 					assert_eq(num, 0);
@@ -54,6 +54,7 @@ int parseQuals(ReadBuf& r,
 					num *= 10;
 					num += (c - '0');
 				}
+				fb.get();
 			}
 			if(neg) num = 0;
 			// Phred-33 ASCII encode it and add it to the back of the
@@ -85,7 +86,7 @@ int parseQuals(ReadBuf& r,
 	qualsRead -= trim3;
 	if(qualsRead <= 0) return 0;
 	int trimmedReadLen = readLen-trim3-trim5;
-	assert_gt(trimmedReadLen, 0);
+	if(trimmedReadLen < 0) trimmedReadLen = 0;
 	if(qualsRead > trimmedReadLen) {
 		// Shift everybody left
 		for(int i = 0; i < readLen; i++) {
