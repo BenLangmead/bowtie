@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.5.
+available to the public for download.  The current version is 0.12.6.
 
 Reporting Issues
 ================
@@ -25,6 +25,22 @@ our mailing list:
 
 Version Release History
 =======================
+
+Version 0.12.6 - Auguust 27, 2010
+   * Modified bowtie-inspect's default mode to use the bit-encoded
+     reference portion of the index to reconstruct the reference
+     sequence, rather than the ebwt portion.  This makes bowtie-inspect
+     much faster and uses less memory, and the output for a colorspace
+     index will now be in nucleotide space.  To get the behavior of the
+     old default, use the new -e/--ebwt-ref option.
+   * Fixed bug whereby SOLiD QV strings in the middle of the file
+     without a trailing space would fail to parse.
+   * Fixed issue that would sometimes cause bowtie-build to crash when
+     building a large index with a low --offrate.
+   * Fixed build issue that would cause bowtie build on one version of
+     Linux to die with a "floating point error" on other versions.
+   * bowtie now simply skips reads with 0 characters.  Previously it
+     would print an error and exit.
 
 Version 0.12.5 - April 10, 2010
    * Fixed spurious "Error while writing string output; not all
