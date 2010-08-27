@@ -52,17 +52,17 @@ sub btrun {
 }
 
 my @cases = (
-	"2112233000030311222131111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqqqqqqqqqq,e_coli_c, ",
-	"2112233011030311222131111011,ACAGATAACAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqqqqqqqqqq,e_coli_c, ",
-	"2112233000030311222..1111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqI!Iqqqqqq,e_coli_c, ",
-	"2112233000030311222...111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqI!!Iqqqqq,e_coli_c,-v 3",
-	"2112233010030311222131111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqq!!qqqqqqqqqqqqqqqqqq,e_coli_c, ",
-	"2112233000030311222311111011,ACAGATAAAAATTACAGAGCACACAAC,qqqqqqqqqqqqqqqqqqqqqqqqqqq,e_coli_c, "
+	"1,2112233000030311222131111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqqqqqqqqqq,e_coli_c, ",
+	"2,2112233011030311222131111011,ACAGATAACAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqqqqqqqqqq,e_coli_c, ",
+	"3,2112233000030311222..1111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqI!Iqqqqqq,e_coli_c, ",
+	"4,2112233000030311222...111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqqqqqqqqqqqqqI!!Iqqqqq,e_coli_c,-v 3",
+	"5,2112233010030311222131111011,ACAGATAAAAATTACAGAGTACACAAC,qqqqqqq!!qqqqqqqqqqqqqqqqqq,e_coli_c, ",
 );
 
 for my $c (@cases) {
 	my @cs = split(/,/, $c);
-	$#cs == 4 || die;
-	my ($read, $exseq, $exqual, $index, $args) = @cs;
+	$#cs == 5 || die;
+	my ($name, $read, $exseq, $exqual, $index, $args) = @cs;
+	print "Doing case $name:\n";
 	btrun("$index $args -c $read", $exseq, $exqual);
 }
