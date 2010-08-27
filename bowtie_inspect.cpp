@@ -12,26 +12,31 @@ using namespace std;
 using namespace seqan;
 
 static bool showVersion = false; // just print version and quit?
-static int verbose     = 0;  // be talkative
-static int names_only  = 0;  // just print the sequence names in the index
+int verbose             = 0;  // be talkative
+static int names_only   = 0;  // just print the sequence names in the index
 static int summarize_only = 0; // just print summary of index and quit
-static int across      = 60; // number of characters across in FASTA output
+static int across       = 60; // number of characters across in FASTA output
+static bool extra       = false; // print extra summary info
+static bool refFromEbwt = false; // true -> when printing reference, decode it from Ebwt instead of reading it from BitPairReference
 
 static const char *short_options = "vhnsa:";
 
 enum {
 	ARG_VERSION = 256,
-	ARG_USAGE
+	ARG_USAGE,
+	ARG_EXTRA
 };
 
 static struct option long_options[] = {
-	{(char*)"verbose", no_argument,       0, 'v'},
-	{(char*)"version", no_argument,       0, ARG_VERSION},
-	{(char*)"usage",   no_argument,       0, ARG_USAGE},
-	{(char*)"names",   no_argument,       0, 'n'},
-	{(char*)"summary", no_argument,       0, 's'},
-	{(char*)"help",    no_argument,       0, 'h'},
-	{(char*)"across",  required_argument, 0, 'a'},
+	{(char*)"verbose",  no_argument,        0, 'v'},
+	{(char*)"version",  no_argument,        0, ARG_VERSION},
+	{(char*)"usage",    no_argument,        0, ARG_USAGE},
+	{(char*)"extra",    no_argument,        0, ARG_EXTRA},
+	{(char*)"names",    no_argument,        0, 'n'},
+	{(char*)"summary",  no_argument,        0, 's'},
+	{(char*)"help",     no_argument,        0, 'h'},
+	{(char*)"across",   required_argument,  0, 'a'},
+	{(char*)"ebwt-ref", no_argument,        0, 'e'},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -91,6 +96,7 @@ static void parseOptions(int argc, char **argv) {
 				break;
 			case 'v': verbose = true; break;
 			case ARG_VERSION: showVersion = true; break;
+			case ARG_EXTRA: extra = true; break;
 			case 'n': names_only = true; break;
 			case 's': summarize_only = true; break;
 			case 'a': across = parseInt(-1, "-a/--across arg must be at least 1"); break;
@@ -202,17 +208,35 @@ void print_index_sequence_names(const string& fname, ostream& fout)
 typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
 
 /**
- *
+ * Print a short summary of what's in the index and its flags.
  */
-void print_index_summary(const string& fname, ostream& fout)
+void print_index_summary(
+	const string& fname,
+	ostream& fout)
 {
 	bool color = readEbwtColor(fname);
+	bool entireReverse = readEntireReverse(fname);
 	TPackedEbwt ebwt(
-		fname, color, true, -1, -1, false, false, false, true,
-	    NULL, verbose);
+		fname,
+		color,                // index is colorspace
+		//-1,                   // don't require entire reverse
+		true,                 // index is for the forward direction
+		-1,                   // offrate (-1 = index default)
+		-1,
+		false,                // use memory-mapped IO
+		false,                // use shared memory
+		false,                // sweep memory-mapped memory
+		true,                 // load names?
+		//false,                // load SA sample?
+		NULL,                 // no reference map
+		verbose,              // be talkative?
+		verbose,              // be talkative at startup?
+		false,                // pass up memory exceptions?
+		false);               // sanity check?
 	vector<string> p_refnames;
 	readEbwtRefnames(fname, p_refnames);
 	cout << "Colorspace" << '\t' << (color ? "1" : "0") << endl;
+	if(extra) cout << "2.0-compatible" << '\t' << (entireReverse ? "1" : "0") << endl;
 	cout << "SA-Sample" << "\t1 in " << (1 << ebwt.eh().offRate()) << endl;
 	cout << "FTab-Chars" << '\t' << ebwt.eh().ftabChars() << endl;
 	assert_eq(ebwt.nPat(), p_refnames.size());
@@ -224,7 +248,10 @@ void print_index_summary(const string& fname, ostream& fout)
 	}
 }
 
-static void driver(const string& ebwtFileBase, const string& query) {
+static void driver(
+	const string& ebwtFileBase,
+	const string& query)
+{
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
 
@@ -235,10 +262,23 @@ static void driver(const string& ebwtFileBase, const string& query) {
 	} else {
 		// Initialize Ebwt object
 		bool color = readEbwtColor(adjustedEbwtFileBase);
-		TPackedEbwt ebwt(adjustedEbwtFileBase, color, true, -1, -1,
-		                 false, false, false, true, // no memory-mapped io
-		                 NULL, // no reference map
-		                 verbose);
+		TPackedEbwt ebwt(
+			adjustedEbwtFileBase,
+			color,                // index is colorspace
+			//-1,                   // don't care about entire-reverse
+			true,                 // index is for the forward direction
+			-1,                   // offrate (-1 = index default)
+			-1,
+			false,                // use memory-mapped IO
+			false,                // use shared memory
+			false,                // sweep memory-mapped memory
+			true,                 // load names?
+			//true,                 // load SA sample?
+			NULL,                 // no reference map
+			verbose,              // be talkative?
+			verbose,              // be talkative at startup?
+			false,                // pass up memory exceptions?
+			false);               // sanity check?
 		// Load whole index into memory
 		ebwt.loadIntoMemory(-1, true, false);
 		print_index_sequences(cout, ebwt);
