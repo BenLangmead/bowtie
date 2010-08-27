@@ -16,7 +16,9 @@ BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
 EXTRA_FLAGS =
 EXTRA_CFLAGS =
+EXTRA_CXXFLAGS =
 CFLAGS += $(EXTRA_CFLAGS)
+CXXFLAGS += $(EXTRA_CXXFLAGS)
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
@@ -108,9 +110,7 @@ endif
 endif
 
 DEBUG_FLAGS = -O0 -g3 $(BITS_FLAG)
-DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(EXTRA_FLAGS)\""
 RELEASE_FLAGS = -O3 $(BITS_FLAG)
-RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(EXTRA_FLAGS)\""
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
@@ -177,13 +177,17 @@ define checksum
   cat $^ | md5sum | awk '{print $$1}' > .$@.md5
 endef
 
+ALL_FLAGS=$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
+DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(ALL_FLAGS)\""
+RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
+
 #
 # bowtie-build targets
 #
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
 		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
@@ -193,7 +197,7 @@ bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
-	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(ALL_FLAGS) \
 		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
@@ -203,7 +207,7 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(checksum)
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) \
 		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
@@ -217,7 +221,7 @@ bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(checksum)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(EXTRA_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
 		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
@@ -228,7 +232,7 @@ bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMEN
 bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
-		$(RELEASE_DEFS) -pg -p -g3 $(EXTRA_FLAGS) \
+		$(RELEASE_DEFS) -pg -p -g3 $(ALL_FLAGS) \
 		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
@@ -239,7 +243,7 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
-		$(DEBUG_DEFS) $(EXTRA_FLAGS) \
+		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
@@ -254,7 +258,7 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
-		$(RELEASE_DEFS) $(EXTRA_FLAGS) \
+		$(RELEASE_DEFS) $(ALL_FLAGS) \
 		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
@@ -265,7 +269,7 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
-		$(DEBUG_DEFS) $(EXTRA_FLAGS) \
+		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
@@ -274,7 +278,7 @@ bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(LIBS)
 
 chaincat: chaincat.cpp hit_set.h filebuf.h hit_set.cpp alphabet.h alphabet.c
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(EXTRA_FLAGS) -Wall $(INC) -I . -o $@ $< hit_set.cpp alphabet.c
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) -Wall $(INC) -I . -o $@ $< hit_set.cpp alphabet.c
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
