@@ -97,15 +97,19 @@ sub readToTabbed2 {
 	close(TMPT);
 }
 
+my $evenodd = 0;
 sub readToFastaQV {
 	my ($rstr, $fname) = @_;
 	my @r = split(/[:]/, $rstr);
+	$evenodd++;
 	system("rm -f $fname $fname.qv");
 	open TMPT, ">$fname" || die "Could not open $fname for writing\n";
 	print TMPT "# Some\n#\t annoting\n#comments\n>r\n$r[0]\n";
+	print TMPT "\n\n>r\nNNNN\n";
 	close(TMPT);
 	open TMPQ, ">$fname.qv" || die "Could not open $fname.qv for writing\n";
-	print TMPQ "#annoying\n;comment\n>r\n$r[1]\n";
+	print TMPQ "#annoying\n;comment\n>r\n$r[1]".((($evenodd % 2) == 0) ? " " : "")."\n";
+	print TMPQ ">r\n10 10 10 10\n".((($evenodd % 2) == 0) ? " " : "")."\n";
 	close(TMPQ);
 }
 
@@ -145,6 +149,7 @@ sub reverseComp($) {
 
 sub btrun {
 	my ($name, $args, $num, $char1, $qual1, $char2, $qual2) = @_;
+	my $case = "$name, $args, $num, $char1, $qual1, $char2, $qual2";
 	$char1 =~ tr/0123./ACGTN/ if defined($char1);
 	$char2 =~ tr/0123./ACGTN/ if defined($char2);
 	for my $bt ($bowtie, $bowtie_d) {
@@ -171,11 +176,11 @@ sub btrun {
 				my $fc = substr($seq, 0, 1);
 				my $fq = substr($quals, 0, 1);
 				if($line == 0) {
-					!defined($char1) || $fc eq $char1 || die "Expected first char $char1, got $fc\n";
-					!defined($qual1) || $fq eq $qual1 || die "Expected first qual $qual1, got $fq\n";
+					!defined($char1) || $fc eq $char1 || die "Expected first char on line 1 $char1, got $fc\nCase: $case\nBowtie: $_";
+					!defined($qual1) || $fq eq $qual1 || die "Expected first qual on line 1 $qual1, got $fq\nCase: $case\nBowtie: $_";
 				} elsif($line == 1) {
-					!defined($char2) || $fc eq $char2 || die "Expected first char $char2, got $fc\n";
-					!defined($qual2) || $fq eq $qual2 || die "Expected first qual $qual2, got $fq\n";
+					!defined($char2) || $fc eq $char2 || die "Expected first char $char2, got $fc\nCase: $case\nBowtie: $_";
+					!defined($qual2) || $fq eq $qual2 || die "Expected first qual $qual2, got $fq\nCase: $case\nBowtie: $_";
 				}
 				$line++;
 			}
@@ -268,11 +273,13 @@ for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 		my ($fq1, $fq2) = (".tmp1.fq", ".tmp2.fq");
 		my $args = "";
 		my $peargs = "";
+		my $name = "";
 		if($j == 0) {
 			readToFastq($r1, $fq1);
 			readToFastq($r2, $fq2);
 			$peargs = "-q -1 $fq1 -2 $fq2";
 			$args = "-q $fq1,$fq2";
+			$name = "fastq";
 		} elsif($j == 1) {
 			$fq1 = ".tmp1.bfast.fq";
 			$fq2 = ".tmp2.bfast.fq";
@@ -280,6 +287,7 @@ for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 			readToBFASTFastq($r2, $fq2);
 			$peargs = "-q -1 $fq1 -2 $fq2";
 			$args = "-q $fq1,$fq2";
+			$name = "fastq-bfast";
 		} elsif($j == 2) {
 			$fq1 = ".tmp1.fa";
 			$fq2 = ".tmp2.fa";
@@ -287,6 +295,7 @@ for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 			readToFastaQV(intize($r2), $fq2);
 			$peargs = "-f -1 $fq1 -2 $fq2 --Q1 $fq1.qv --Q2 $fq2.qv";
 			$args = "-f $fq1,$fq2 -Q $fq1.qv,$fq2.qv";
+			$name = "fastq-qv";
 		} else {
 			$fq1 = ".tmp1.fa";
 			$fq2 = ".tmp2.fa";
@@ -294,21 +303,22 @@ for(my $i = 0; $i < scalar(@trimReads); $i += 2) {
 			readToFastaQV(intize($r2, 1), $fq2);
 			$peargs = "-f -1 $fq1 -2 $fq2 --Q1 $fq1.qv --Q2 $fq2.qv";
 			$args = "-f $fq1,$fq2 -Q $fq1.qv,$fq2.qv";
+			$name = "fastq-qv";
 		}
 	
-		btrun("no-trim/fastq/paired", "-C e_coli_c $peargs",
+		btrun("no-trim/$name/paired", "-C e_coli_c $peargs",
 		      length($m1)-1,
 		      ca($m1, 0), ca($q, 2),
 		      ca($m2, 0), ca($q, 2));
-		btrun("no-trim/fastq/unpaired", "-C e_coli_c $args",
+		btrun("no-trim/$name/unpaired", "-C e_coli_c $args",
 		      length($m1)-1,
 		      ca($m1, 0), ca($q, 2),
 		      ca($m2, 0), ca($q, 2));
-		btrun("trim5/fastq/unpaired", "-5 3 -C e_coli_c $args",
+		btrun("trim5/$name/unpaired", "-5 3 -C e_coli_c $args",
 		      length($m1)-1-3,
 		      ca($m1, 3), ca($q, 5),
 		      ca($m2, 3), ca($q, 5));
-		btrun("trim35/fastq/unpaired", "-5 5 -3 3 -C e_coli_c $args",
+		btrun("trim35/$name/unpaired", "-5 5 -3 3 -C e_coli_c $args",
 		      length($m1)-1-8,
 		      ca($m1, 5), ca($q, 7),
 		      ca($m2, 5), ca($q, 7));
