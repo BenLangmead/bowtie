@@ -2415,6 +2415,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                const EbwtSearchParams<TStr>& params) const
 {
 	VMSG_NL("In report");
+	assert_geq(cost, (uint32_t)(stratum << 14));
 	assert_lt(off, this->_eh._len);
 	uint32_t tidx;
 	uint32_t textoff;

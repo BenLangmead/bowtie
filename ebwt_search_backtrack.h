@@ -1485,6 +1485,7 @@ protected:
 		assert_lt(stratum, 4);
 		assert_geq(stratum, 0);
 		cost |= (stratum << 14);
+		assert_geq(cost, (uint32_t)(stratum << 14));
 		bool hit;
 		// If _muts != NULL then this alignment extends a partial
 		// alignment, so we have to account for the differences present
@@ -1541,6 +1542,7 @@ protected:
 			// reportChaseOne takes the _mms[] list in terms of
 			// their indices into the query string; not in terms
 			// of their offset from the 3' or 5' end.
+			assert_geq(cost, (uint32_t)(stratum << 14));
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
 			                         _color, colorExEnds, snpPhred, _refs, _mms,
 			                         _refcs, stackDepth, ri, top, bot,
