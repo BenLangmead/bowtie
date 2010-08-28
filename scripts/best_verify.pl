@@ -80,10 +80,10 @@ my $vmode = ($match_mode =~ /[-]v/);
 system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
 
 # Run Bowtie to get best alignments
-my $bowtie_best_cmd = "$bowtie_dir/$bowtie_exe -y -l $seedLen $round $match_mode --best --refidx $index $reads";
+my $bowtie_best_cmd = "$bowtie_dir/$bowtie_exe -y $round $match_mode --best --refidx $index $reads";
 
 # Run Bowtie to get all alignments
-my $bowtie_all_cmd = "$bowtie_dir/$bowtie_exe -y -l $seedLen $round $match_mode -a --refidx $index $reads";
+my $bowtie_all_cmd = "$bowtie_dir/$bowtie_exe -y $round $match_mode -a --refidx $index $reads";
 
 print "$bowtie_best_cmd\n";
 open BOWTIE_BEST, "$bowtie_best_cmd |";
