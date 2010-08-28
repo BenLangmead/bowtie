@@ -159,6 +159,15 @@ public:
 	bool                color;   /// read is in colorspace?
 	uint32_t            seed;    /// pseudo-random seed for aligned read
 
+	/**
+	 * Return true if this Hit is internally consistent.  Otherwise,
+	 * throw an assertion.
+	 */
+	bool repOk() const {
+		assert_geq(cost, (uint32_t)(stratum << 14));
+		return true;
+	}
+
 	size_t length() const { return seqan::length(patSeq); }
 
 	Hit& operator = (const Hit &other) {
@@ -262,6 +271,7 @@ public:
 		// Iterate through the pattern from 5' to 3', calculate the
 		// shifted quality value, obtain the reference character, and
 		// increment the appropriate counter
+		assert(h.repOk());
 		for(int i = 0; i < (int)h.length(); i++) {
 			int ii = i;
 			if(!h.fw) {
@@ -487,6 +497,7 @@ public:
 		char buf[4096];
 		for(size_t i = start; i < end; i++) {
 			const Hit& h = hs[i];
+			assert(h.repOk());
 			bool diff = false;
 			if(i > start) {
 				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
@@ -853,6 +864,7 @@ protected:
 
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
+		assert(h.repOk());
 		mainlock();
 		commitHit(h);
 		first_ = false;
@@ -1124,6 +1136,7 @@ public:
 	 * return true iff the caller should continue to report more hits.
 	 */
 	virtual bool reportHit(const Hit& h, int stratum) {
+		assert(h.repOk());
 		_numValidHits++;
 		return true;
 	}

@@ -1392,6 +1392,7 @@ public:
 		hit.mate = mate;
 		hit.color = color;
 		hit.seed = seed;
+		assert(hit.repOk());
 		return sink().reportHit(hit, stratum);
 	}
 private:
