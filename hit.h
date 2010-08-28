@@ -165,6 +165,7 @@ public:
 	 */
 	bool repOk() {
 		assert_geq(cost, stratum << 14);
+		return true;
 	}
 
 	size_t length() const { return seqan::length(patSeq); }
