@@ -163,7 +163,7 @@ public:
 	 * Return true if this Hit is internally consistent.  Otherwise,
 	 * throw an assertion.
 	 */
-	bool repOk() {
+	bool repOk() const {
 		assert_geq(cost, stratum << 14);
 		return true;
 	}
