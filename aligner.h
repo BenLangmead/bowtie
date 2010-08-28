@@ -1008,12 +1008,12 @@ protected:
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
 			r.fw = fw;
+			r.cost |= (r.stratum << 14);
 			r.mate1 = !off1;
 			const uint32_t result = offs[i];
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
 			r.bot = range.bot;
-			r.cost = r.stratum << 14;
 			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
 			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
 			if(report(
@@ -1928,6 +1928,7 @@ protected:
 		for(size_t i = 0; i < ranges.size(); i++) {
 			Range& r = ranges[i];
 			r.fw = fw;
+			r.cost |= (r.stratum << 14);
 			r.mate1 = !range.mate1;
 			const uint32_t result = offs[i];
 			// Just copy the known range's top and bot for now
