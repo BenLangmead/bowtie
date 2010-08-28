@@ -25,6 +25,7 @@ using namespace seqan;
  * of reference sequences).
  */
 struct RefRecord {
+	RefRecord() : off(), len(), first() { }
 	RefRecord(uint32_t _off, uint32_t _len, bool _first) :
 		off(_off), len(_len), first(_first)
 	{ }
@@ -66,16 +67,22 @@ struct RefRecord {
 	bool   first; /// Whether this record is the first for a reference sequence
 };
 
+enum {
+	REF_READ_FORWARD = 0, // don't reverse reference sequence
+	REF_READ_REVERSE,     // reverse entire reference sequence
+	REF_READ_REVERSE_EACH // reverse each unambiguous stretch of reference
+};
+
 /**
  * Parameters governing treatment of references as they're read in.
  */
 struct RefReadInParams {
-	RefReadInParams(bool col, bool r, bool nsToA, bool bisulf) :
+	RefReadInParams(bool col, int r, bool nsToA, bool bisulf) :
 		color(col), reverse(r), nsToAs(nsToA), bisulfite(bisulf) { }
 	// extract colors from reference
 	bool color;
 	// reverse each reference sequence before passing it along
-	bool reverse;
+	int reverse;
 	// convert ambiguous characters to As
 	bool nsToAs;
 	// bisulfite-convert the reference
@@ -94,6 +101,12 @@ fastaRefReadSizes(vector<FileBuf*>& in,
                   const RefReadInParams& rparms,
                   BitpairOutFileBuf* bpout,
                   int& numSeqs);
+
+extern void
+reverseRefRecords(const vector<RefRecord>& src,
+                  vector<RefRecord>& dst,
+                  bool recursive = false,
+                  bool verbose = false);
 
 /**
  * Reads the next sequence from the given FASTA file and appends it to
@@ -164,7 +177,9 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 		first = false;
 	}
 
-	// Skip over gaps
+	// Skip over an initial stretch of gaps or ambiguous characters.
+	// For colorspace we skip until we see two consecutive unambiguous
+	// characters (i.e. the first unambiguous color).
 	while(true) {
 		int cat = dna4Cat[c];
 		if(rparms.nsToAs && cat == 2) {
@@ -189,7 +204,9 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 				break; // to read-in loop
 			}
 		} else if(cat == 2) {
-			if(lc != -1 && off == 0) off++;
+			if(lc != -1 && off == 0) {
+				off++;
+			}
 			lc = -1;
 			off++; // skip it
 		} else if(c == '>') {
@@ -240,8 +257,9 @@ static RefRecord fastaRefReadAppend(FileBuf& in,
 	}
 
   bail:
-	// Optionally reverse the portion that we just appended
-	if(rparms.reverse) {
+	// Optionally reverse the portion that we just appended.
+	// ilen = length of buffer before this last sequence was appended.
+	if(rparms.reverse == REF_READ_REVERSE_EACH) {
 		// Find limits of the portion we just appended
 		size_t nlen = length(dst);
 		assert_eq(nlen - ilen, len);

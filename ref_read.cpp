@@ -95,7 +95,8 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			return RefRecord(off, 0, false);
+			//return RefRecord(off, 0, false);
+			return RefRecord(off, 0, first);
 		}
 		c = in.get();
 		if(c == -1) {
@@ -106,7 +107,8 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			return RefRecord(off, 0, false);
+			//return RefRecord(off, 0, false);
+			return RefRecord(off, 0, first);
 		}
 	}
 	assert(!rparms.color || (lc != -1));
@@ -163,6 +165,66 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	}
 	lastc = c;
 	return RefRecord(off, len, first);
+}
+
+static void
+printRecords(ostream& os, const vector<RefRecord>& l) {
+	for(size_t i = 0; i < l.size(); i++) {
+		os << l[i].first << ", " << l[i].off << ", " << l[i].len << endl;
+	}
+}
+
+/**
+ * Reverse the 'src' list of RefRecords into the 'dst' list.  Don't
+ * modify 'src'.
+ */
+void reverseRefRecords(const vector<RefRecord>& src,
+					   vector<RefRecord>& dst,
+					   bool recursive,
+					   bool verbose)
+{
+	dst.clear();
+	{
+		vector<RefRecord> cur;
+		for(int i = src.size()-1; i >= 0; i--) {
+			bool first = (i == (int)src.size()-1 || src[i+1].first);
+			if(src[i].len) {
+				cur.push_back(RefRecord(0, src[i].len, first));
+				first = false;
+			}
+			if(src[i].off) cur.push_back(RefRecord(src[i].off, 0, first));
+		}
+		bool mergedLast;
+		for(int i = 0; i < (int)cur.size(); i++) {
+			mergedLast = false;
+			assert(cur[i].off == 0 || cur[i].len == 0);
+			if(i < (int)cur.size()-1 && cur[i].off != 0 && !cur[i+1].first) {
+				dst.push_back(RefRecord(cur[i].off, cur[i+1].len, cur[i].first));
+				i++;
+				mergedLast = true;
+			} else {
+				dst.push_back(cur[i]);
+			}
+		}
+	}
+	if(verbose) {
+		cout << "Source: " << endl;
+		printRecords(cout, src);
+		cout << "Dest: " << endl;
+		printRecords(cout, dst);
+	}
+#ifndef NDEBUG
+	if(!recursive) {
+		vector<RefRecord> tmp;
+		reverseRefRecords(dst, tmp, true);
+		assert_eq(tmp.size(), src.size());
+		for(size_t i = 0; i < src.size(); i++) {
+			assert_eq(src[i].len, tmp[i].len);
+			assert_eq(src[i].off, tmp[i].off);
+			assert_eq(src[i].first, tmp[i].first);
+		}
+	}
+#endif
 }
 
 /**

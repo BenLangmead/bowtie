@@ -299,7 +299,7 @@ void print_index_summary(
 	TPackedEbwt ebwt(
 		fname,
 		color,                // index is colorspace
-		//-1,                   // don't require entire reverse
+		-1,                   // don't require entire reverse
 		true,                 // index is for the forward direction
 		-1,                   // offrate (-1 = index default)
 		-1,
@@ -345,7 +345,7 @@ static void driver(
 		TPackedEbwt ebwt(
 			adjustedEbwtFileBase,
 			color,                // index is colorspace
-			//-1,                  / don't care about entire-reverse
+			-1,                   // don't care about entire-reverse
 			true,                 // index is for the forward direction
 			-1,                   // offrate (-1 = index default)
 			-1,
@@ -361,7 +361,7 @@ static void driver(
 			false);               // sanity check?
 		// Load whole index into memory
 		if(refFromEbwt) {
-			ebwt.loadIntoMemory(-1, true, false);
+			ebwt.loadIntoMemory(-1, -1, true, false);
 			print_index_sequences(cout, ebwt);
 		} else {
 			vector<string> refnames;

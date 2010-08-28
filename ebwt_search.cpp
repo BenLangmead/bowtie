@@ -1362,7 +1362,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		// Load the rest of (vast majority of) the backward Ebwt into
 		// memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwt.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwt.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 
 	BitPairReference *refs = NULL;
@@ -1583,12 +1583,12 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
@@ -1635,7 +1635,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	/* Load the forward index into memory if necessary */ \
 	if(!ebwtFw.isInMemory()) { \
 		Timer _t(cerr, "Time loading forward index: ", timing); \
-		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose); \
+		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose); \
 	} \
 	assert(ebwtFw.isInMemory()); \
 	_patsrc.reset(); /* rewind pattern source to first pattern */ \
@@ -1915,12 +1915,12 @@ static void twoOrThreeMismatchSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading forward index: ", timing);
-		ebwtFw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwtFw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 	// Create range caches, which are shared among all aligners
 	BitPairReference *refs = NULL;
@@ -2339,7 +2339,7 @@ static void seededQualCutoffSearchFull(
 	{
 		// Load the other half of the index into memory
 		Timer _t(cerr, "Time loading mirror index: ", timing);
-		ebwtBw.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwtBw.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 	}
 	CHUD_START();
 	{
@@ -2634,6 +2634,7 @@ static void driver(const char * type,
 	}
 	Ebwt<TStr> ebwt(adjustedEbwtFileBase,
 	                color,  // index is colorspace
+	                -1,     // don't care about entireReverse
 	                true,     // index is for the forward direction
 	                /* overriding: */ offRate,
 	                /* overriding: */ isaRate,
@@ -2654,6 +2655,7 @@ static void driver(const char * type,
 		}
 		ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
 		                        color,  // index is colorspace
+		                        -1,     // don't care about entireReverse
 		                        false, // index is for the reverse direction
 		                        /* overriding: */ offRate,
 		                        /* overriding: */ isaRate,
@@ -2677,7 +2679,7 @@ static void driver(const char * type,
 	}
 	// Sanity-check the restored version of the Ebwt
 	if(sanityCheck && !os.empty()) {
-		ebwt.loadIntoMemory(color ? 1 : 0, !noRefNames, startVerbose);
+		ebwt.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 		ebwt.checkOrigs(os, color, false);
 		ebwt.evictFromMemory();
 	}

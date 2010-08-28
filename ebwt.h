@@ -72,8 +72,10 @@ if(this->verbose()) { \
  * Flags describing type of Ebwt.
  */
 enum EBWT_FLAGS {
-	EBWT_COLOR = 2, // true -> Ebwt is colorspace
-	EBWT_ENTIRE_REV = 4 // true -> Ebwt is concatenated then reversed
+	EBWT_COLOR = 2,     // true -> Ebwt is colorspace
+	EBWT_ENTIRE_REV = 4 // true -> reverse Ebwt is the whole
+	                    // concatenated string reversed, rather than
+	                    // each stretch reversed
 };
 
 /**
@@ -92,21 +94,23 @@ public:
 	           int32_t offRate,
 	           int32_t isaRate,
 	           int32_t ftabChars,
-	           bool color)
+	           bool color,
+	           bool entireReverse)
 	{
-		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
+		init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireReverse);
 	}
 
 	EbwtParams(const EbwtParams& eh) {
 		init(eh._len, eh._lineRate, eh._linesPerSide, eh._offRate,
-		     eh._isaRate, eh._ftabChars, eh._color);
+		     eh._isaRate, eh._ftabChars, eh._color, eh._entireReverse);
 	}
 
 	void init(uint32_t len, int32_t lineRate, int32_t linesPerSide,
 	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
-	          bool color)
+	          bool color, bool entireReverse)
 	{
 		_color = color;
+		_entireReverse = entireReverse;
 		_len = len;
 		_bwtLen = _len + 1;
 		_sz = (len+3)/4;
@@ -169,6 +173,7 @@ public:
 	uint32_t ebwtTotLen() const    { return _ebwtTotLen; }
 	uint32_t ebwtTotSz() const     { return _ebwtTotSz; }
 	bool color() const             { return _color; }
+	bool entireReverse() const     { return _entireReverse; }
 
 	/**
 	 * Set a new suffix-array sampling rate, which involves updating
@@ -238,7 +243,8 @@ public:
 		    << "    numSides: "     << _numSides << endl
 		    << "    numLines: "     << _numLines << endl
 		    << "    ebwtTotLen: "   << _ebwtTotLen << endl
-		    << "    ebwtTotSz: "    << _ebwtTotSz << endl;
+		    << "    ebwtTotSz: "    << _ebwtTotSz << endl
+		    << "    reverse: "      << _entireReverse << endl;
 	}
 
 	uint32_t _len;
@@ -270,7 +276,8 @@ public:
 	uint32_t _numLines;
 	uint32_t _ebwtTotLen;
 	uint32_t _ebwtTotSz;
-	bool _color;
+	bool     _color;
+	bool     _entireReverse;
 };
 
 /**
@@ -357,6 +364,7 @@ public:
 	/// Construct an Ebwt from the given input file
 	Ebwt(const string& in,
 	     int color,
+	     int needEntireReverse,
 	     bool __fw,
 	     int32_t __overrideOffRate = -1,
 	     int32_t __overrideIsaRate = -1,
@@ -379,12 +387,13 @@ public:
 		_in1Str = in + ".1.ebwt";
 		_in2Str = in + ".2.ebwt";
 		readIntoMemory(
-			color,        // expect colorspace reference?
-			true,         // just load the header and quit?
-			&_eh,         // params structure to fill in
-			mmSweep,      // sweep the memory-mapped memory?
-			loadNames,    // load names?
-			startVerbose);// be talkative?
+			color,         // expect colorspace reference?
+			__fw ? -1 : needEntireReverse, // need REF_READ_REVERSE
+			true,          // stop after loading the header portion?
+			&_eh,          // params structure to fill in
+			mmSweep,       // mmSweep
+			loadNames,     // loadNames
+			startVerbose); // startVerbose
 		// If the offRate has been overridden, reflect that in the
 		// _eh._offRate field
 		if(_overrideOffRate > _eh._offRate) {
@@ -428,7 +437,14 @@ public:
 	     bool sanityCheck = false) :
 	     Ebwt_INITS
 	     Ebwt_STAT_INITS,
-	     _eh(joinedLen(szs), lineRate, linesPerSide, offRate, isaRate, ftabChars, color)
+	     _eh(joinedLen(szs),
+	         lineRate,
+	         linesPerSide,
+	         offRate,
+	         isaRate,
+	         ftabChars,
+	         color,
+	         refparams.reverse == REF_READ_REVERSE)
 	{
 		_in1Str = file + ".1.ebwt";
 		_in2Str = file + ".2.ebwt";
@@ -448,18 +464,19 @@ public:
 			throw 1;
 		}
 		// Build
-		initFromVector(is,
-		               szs,
-		               sztot,
-		               refparams,
-		               fout1,
-		               fout2,
-		               useBlockwise,
-		               bmax,
-		               bmaxSqrtMult,
-		               bmaxDivN,
-		               dcv,
-		               seed);
+		initFromVector(
+			is,
+			szs,
+			sztot,
+			refparams,
+			fout1,
+			fout2,
+			useBlockwise,
+			bmax,
+			bmaxSqrtMult,
+			bmaxDivN,
+			dcv,
+			seed);
 		// Close output files
 		fout1.flush();
 		int64_t tellpSz1 = (int64_t)fout1.tellp();
@@ -489,8 +506,15 @@ public:
 		if(_sanity) {
 			VMSG_NL("Sanity-checking Ebwt");
 			assert(!isInMemory());
-			readIntoMemory(color, false, NULL, false, true, false);
-			sanityCheckAll();
+			readIntoMemory(
+				color,
+				__fw ? -1 : refparams.reverse == REF_READ_REVERSE,
+				false,
+				NULL,
+				false,
+				true,
+				false);
+			sanityCheckAll(refparams.reverse);
 			evictFromMemory();
 			assert(!isInMemory());
 		}
@@ -498,6 +522,36 @@ public:
 	}
 
 	bool isPacked();
+
+	/**
+	 * Write the rstarts array given the szs array for the reference.
+	 */
+	void szsToDisk(const vector<RefRecord>& szs, ostream& os, int reverse) {
+		size_t seq = 0;
+		uint32_t off = 0;
+		uint32_t totlen = 0;
+		for(unsigned int i = 0; i < szs.size(); i++) {
+			if(szs[i].len == 0) continue;
+			if(szs[i].first) off = 0;
+			off += szs[i].off;
+			if(szs[i].first && szs[i].len > 0) seq++;
+			size_t seqm1 = seq-1;
+			assert_lt(seqm1, _nPat);
+			size_t fwoff = off;
+			if(reverse == REF_READ_REVERSE) {
+				// Invert pattern idxs
+				seqm1 = _nPat - seqm1 - 1;
+				// Invert pattern idxs
+				assert_leq(off + szs[i].len, _plen[seqm1]);
+				fwoff = _plen[seqm1] - (off + szs[i].len);
+			}
+			writeU32(os, totlen, this->toBe()); // offset from beginning of joined string
+			writeU32(os, seqm1,  this->toBe()); // sequence id
+			writeU32(os, fwoff,  this->toBe()); // offset into sequence
+			totlen += szs[i].len;
+			off += szs[i].len;
+		}
+	}
 
 	/**
 	 * Helper for the constructors above.  Takes a vector of text
@@ -534,10 +588,23 @@ public:
 			VMSG_NL("Reserving space for joined string");
 			seqan::reserve(s, jlen, Exact());
 			VMSG_NL("Joining reference sequences");
-			{
+			if(refparams.reverse == REF_READ_REVERSE) {
+				{
+					Timer timer(cout, "  Time to join reference sequences: ", _verbose);
+					joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
+				} {
+					Timer timer(cout, "  Time to reverse reference sequence: ", _verbose);
+					vector<RefRecord> tmp;
+					reverseInPlace(s);
+					reverseRefRecords(szs, tmp, false, false);
+					szsToDisk(tmp, out1, refparams.reverse);
+				}
+			} else {
 				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
 				joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
+				szsToDisk(szs, out1, refparams.reverse);
 			}
+			// Joined reference sequence now in 's'
 		} catch(bad_alloc& e) {
 			// If we throw an allocation exception in the try block,
 			// that means that the joined version of the reference
@@ -786,8 +853,20 @@ public:
 	 * Load this Ebwt into memory by reading it in from the _in1 and
 	 * _in2 streams.
 	 */
-	void loadIntoMemory(int color, bool loadNames, bool verbose) {
-		readIntoMemory(color, false, NULL, false, loadNames, verbose);
+	void loadIntoMemory(
+		int color,
+		int needEntireReverse,
+		bool loadNames,
+		bool verbose)
+	{
+		readIntoMemory(
+			color,      // expect index to be colorspace?
+			needEntireReverse, // require reverse index to be concatenated reference reversed
+			false,      // stop after loading the header portion?
+			NULL,       // params
+			false,      // mmSweep
+			loadNames,  // loadNames
+			verbose);   // startVerbose
 	}
 
 	/**
@@ -983,7 +1062,7 @@ public:
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
-	void readIntoMemory(int color, bool justHeader, EbwtParams *params, bool mmSweep, bool loadNames, bool startVerbose);
+	void readIntoMemory(int color, int needEntireReverse, bool justHeader, EbwtParams *params, bool mmSweep, bool loadNames, bool startVerbose);
 	void writeFromMemory(bool justHeader, ostream& out1, ostream& out2) const;
 	void writeFromMemory(bool justHeader, const string& out1, const string& out2) const;
 
@@ -991,7 +1070,7 @@ public:
 	void printRangeFw(uint32_t begin, uint32_t end) const;
 	void printRangeBw(uint32_t begin, uint32_t end) const;
 	void sanityCheckUpToSide(int upToSide) const;
-	void sanityCheckAll() const;
+	void sanityCheckAll(int reverse) const;
 	void restore(TStr& s) const;
 	void checkOrigs(const vector<String<Dna5> >& os, bool color, bool mirror) const;
 
@@ -1619,7 +1698,7 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
  * Sanity-check various pieces of the Ebwt
  */
 template<typename TStr>
-void Ebwt<TStr>::sanityCheckAll() const {
+void Ebwt<TStr>::sanityCheckAll(int reverse) const {
 	const EbwtParams& eh = this->_eh;
 	assert(isInMemory());
 	// Check ftab
@@ -1661,7 +1740,11 @@ void Ebwt<TStr>::sanityCheckAll() const {
 	// Check rstarts
 	for(uint32_t i = 0; i < this->_nFrag-1; i++) {
 		assert_gt(this->_rstarts[(i+1)*3], this->_rstarts[i*3]);
-		assert(this->_rstarts[(i*3)+1] <= this->_rstarts[((i+1)*3)+1]);
+		if(reverse == REF_READ_REVERSE) {
+			assert(this->_rstarts[(i*3)+1] >= this->_rstarts[((i+1)*3)+1]);
+		} else {
+			assert(this->_rstarts[(i*3)+1] <= this->_rstarts[((i+1)*3)+1]);
+		}
 	}
 
 	// Check ebwt
@@ -2793,12 +2876,14 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
  * Read an Ebwt from file with given filename.
  */
 template<typename TStr>
-void Ebwt<TStr>::readIntoMemory(int color,
-                                bool justHeader,
-                                EbwtParams *params,
-                                bool mmSweep,
-                                bool loadNames,
-                                bool startVerbose)
+void Ebwt<TStr>::readIntoMemory(
+	int color,
+	int needEntireRev,
+	bool justHeader,
+	EbwtParams *params,
+	bool mmSweep,
+	bool loadNames,
+	bool startVerbose)
 {
 	bool switchEndian; // dummy; caller doesn't care
 #ifdef BOWTIE_MM
@@ -2940,6 +3025,7 @@ void Ebwt<TStr>::readIntoMemory(int color,
 	// chunkRate was deprecated in an earlier version of Bowtie; now
 	// we use it to hold flags.
 	int32_t flags = readI32(_in1, switchEndian);
+	bool entireRev = false;
 	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
 		if(color != -1 && !color) {
 			cerr << "Error: -C was not specified when running bowtie, but index is in colorspace.  If" << endl
@@ -2959,17 +3045,24 @@ void Ebwt<TStr>::readIntoMemory(int color,
 		}
 		color = 0;
 	}
+	if(flags < 0 && (((-flags) & EBWT_ENTIRE_REV) == 0)) {
+		if(needEntireRev != -1 && needEntireRev != 0) {
+			cerr << "Error: This index is not compatible with this version of bowtie.  Please use a" << endl
+			     << "current version of bowtie-build." << endl;
+			throw 1;
+		}
+	} else entireRev = true;
 	bytesRead += 4;
 
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams *eh;
 	bool deleteEh = false;
 	if(params != NULL) {
-		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
+		params->init(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev);
 		if(_verbose || startVerbose) params->print(cerr);
 		eh = params;
 	} else {
-		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color);
+		eh = new EbwtParams(len, lineRate, linesPerSide, offRate, isaRate, ftabChars, color, entireRev);
 		deleteEh = true;
 	}
 
@@ -3461,12 +3554,14 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	// BTL: chunkRate is now deprecated
 	int32_t flags = readI32(in, switchEndian);
 	bool color = false;
+	bool entireReverse = false;
 	if(flags < 0) {
 		color = (((-flags) & EBWT_COLOR) != 0);
+		entireReverse = (((-flags) & EBWT_ENTIRE_REV) != 0);
 	}
 
 	// Create a new EbwtParams from the entries read from primary stream
-	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color);
+	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse);
 
 	uint32_t nPat = readI32(in, switchEndian); // nPat
 	in.seekg(nPat*4, ios_base::cur); // skip plen
@@ -3619,6 +3714,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	writeI32(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
 	int32_t flags = 1;
 	if(eh._color) flags |= EBWT_COLOR;
+	if(eh._entireReverse) flags |= EBWT_ENTIRE_REV;
 	writeI32(out1, -flags, be); // BTL: chunkRate is now deprecated
 
 	if(!justHeader) {
@@ -3838,7 +3934,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	this->_nFrag = 0;
 	for(size_t i = 0; i < szs.size(); i++) {
 		if(szs[i].len > 0) this->_nFrag++;
-		if(szs[i].first) this->_nPat++;
+		if(szs[i].first && szs[i].len > 0) this->_nPat++;
 	}
 	assert_gt(this->_nPat, 0);
 	assert_geq(this->_nFrag, this->_nPat);
@@ -3854,9 +3950,8 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	}
 	// For each pattern, set plen
 	int npat = -1;
-	assert(szs[0].first);
 	for(size_t i = 0; i < szs.size(); i++) {
-		if(szs[i].first) {
+		if(szs[i].first && szs[i].len > 0) {
 			if(npat >= 0) {
 				writeU32(out1, this->_plen[npat], this->toBe());
 			}
@@ -3873,6 +3968,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	size_t seqsRead = 0;
 	ASSERT_ONLY(uint32_t szsi = 0);
 	ASSERT_ONLY(uint32_t entsWritten = 0);
+	// For each filebuf
 	for(unsigned int i = 0; i < l.size(); i++) {
 		assert(!l[i]->eof());
 		bool first = true;
@@ -3883,11 +3979,11 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			string name;
 			// Push a new name onto our vector
 			_refnames.push_back("");
-			uint32_t oldRetLen = length(ret);
+			//uint32_t oldRetLen = length(ret);
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp, &_refnames.back());
 			first = false;
 			size_t bases = rec.len;
-			if(rec.first) {
+			if(rec.first && rec.len > 0) {
 				if(_refnames.back().length() == 0) {
 					// If name was empty, replace with an index
 					ostringstream stm;
@@ -3895,7 +3991,9 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 					_refnames.back() = stm.str();
 				}
 			} else {
-				assert_eq(0, _refnames.back().length());
+				// This record didn't actually start a new sequence so
+				// no need to add a name
+				//assert_eq(0, _refnames.back().length());
 				_refnames.pop_back();
 			}
 			assert_lt(szsi, szs.size());
@@ -3905,18 +4003,19 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			assert(rec.first || rec.off > 0);
 			ASSERT_ONLY(szsi++);
 			// Increment seqsRead if this is the first fragment
-			if(rec.first) seqsRead++;
+			if(rec.first && rec.len > 0) seqsRead++;
 			if(bases == 0) continue;
 			assert_leq(bases, this->_plen[seqsRead-1]);
 			// Reset the patoff if this is the first fragment
 			if(rec.first) patoff = 0;
 			patoff += rec.off; // add fragment's offset from end of last frag.
 			// Adjust rpcps
-			uint32_t seq = seqsRead-1;
+			//uint32_t seq = seqsRead-1;
 			ASSERT_ONLY(entsWritten++);
-			writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
-			writeU32(out1, seq,       this->toBe()); // sequence id
-			writeU32(out1, patoff,    this->toBe()); // offset into sequence
+			// This is where rstarts elements are written to the output stream
+			//writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
+			//writeU32(out1, seq,       this->toBe()); // sequence id
+			//writeU32(out1, patoff,    this->toBe()); // offset into sequence
 			patoff += bases;
 		}
 		assert_gt(szsi, 0);

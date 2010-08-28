@@ -45,6 +45,7 @@ static bool autoMem;
 static bool packed;
 static bool writeRef;
 static bool justRef;
+static int reverseType;
 bool color;
 
 static void resetOptions() {
@@ -71,6 +72,7 @@ static void resetOptions() {
 	packed       = false; //
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
+	reverseType  = REF_READ_REVERSE;
 	color        = false;
 }
 
@@ -84,7 +86,8 @@ enum {
 	ARG_CUTOFF,
 	ARG_PMAP,
 	ARG_NTOA,
-	ARG_USAGE
+	ARG_USAGE,
+	ARG_OLD_REVERSE
 };
 
 /**
@@ -114,6 +117,7 @@ static void printUsage(ostream& out) {
 	    //<< "    --big --little          endianness (default: little, this host: "
 	    //<< (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
+	    << "    --old-reverse           reverse then concatenate stretches, not vice versa" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
 	    << "    --usage                 print this usage message" << endl
@@ -149,6 +153,7 @@ static struct option long_options[] = {
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
+	{(char*)"old-reverse",  no_argument,       0,            ARG_OLD_REVERSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -236,6 +241,7 @@ static void parseOptions(int argc, const char **argv) {
 				seed = parseNumber<int>(0, "--seed arg must be at least 0");
 				break;
 			case ARG_NTOA: nsToAs = true; break;
+			case ARG_OLD_REVERSE: reverseType = REF_READ_REVERSE_EACH; break;
 			case 'a': autoMem = false; break;
 			case 'q': verbose = false; break;
 			case 's': sanityCheck = true; break;
@@ -270,7 +276,7 @@ static void driver(const string& infile,
 {
 	vector<FileBuf*> is;
 	bool bisulfite = false;
-	RefReadInParams refparams(color, reverse, nsToAs, bisulfite);
+	RefReadInParams refparams(color, reverse ? reverseType : REF_READ_FORWARD, nsToAs, bisulfite);
 	assert_gt(infiles.size(), 0);
 	if(format == CMDLINE) {
 		// Adapt sequence strings to stringstreams open for input
@@ -425,11 +431,23 @@ static void driver(const string& infile,
 		// Try restoring the original string (if there were
 		// multiple texts, what we'll get back is the joined,
 		// padded string, not a list)
-		ebwt.loadIntoMemory(refparams.color ? 1 : 0, false, false);
+		ebwt.loadIntoMemory(
+			refparams.color ? 1 : 0,
+			-1,
+			false,
+			false);
 		TStr s2; ebwt.restore(s2);
 		ebwt.evictFromMemory();
 		{
-			TStr joinedss = Ebwt<TStr>::join(is, szs, sztot.first, refparams, seed);
+			TStr joinedss = Ebwt<TStr>::join(
+				is,          // list of input streams
+				szs,         // list of reference sizes
+				sztot.first, // total size of all unambiguous ref chars
+				refparams,   // reference read-in parameters
+				seed);       // pseudo-random number generator seed
+			if(refparams.reverse == REF_READ_REVERSE) {
+				reverseInPlace(joinedss);
+			}
 			assert_eq(length(joinedss), length(s2));
 			assert_eq(joinedss, s2);
 		}
