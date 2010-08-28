@@ -1484,8 +1484,6 @@ protected:
 		}
 		assert_lt(stratum, 4);
 		assert_geq(stratum, 0);
-		cost |= (stratum << 14);
-		assert_geq(cost, (uint32_t)(stratum << 14));
 		bool hit;
 		// If _muts != NULL then this alignment extends a partial
 		// alignment, so we have to account for the differences present
@@ -1500,6 +1498,8 @@ protected:
 			// All muts are in the seed, so they count toward the stratum
 			size_t numMuts = length(*_muts);
 			stratum += numMuts;
+			cost |= (stratum << 14);
+			assert_geq(cost, (uint32_t)(stratum << 14));
 			// Report the range of full alignments
 			hit = reportFullAlignment(stackDepth + numMuts, top, bot, stratum, cost);
 			// Re-apply partial-alignment mutations
@@ -1507,6 +1507,8 @@ protected:
 			assert_eq(tmp, (*_qry));
 		} else {
 			// Report the range of full alignments
+			cost |= (stratum << 14);
+			assert_geq(cost, (uint32_t)(stratum << 14));
 			hit = reportFullAlignment(stackDepth, top, bot, stratum, cost);
 		}
 		return hit;
