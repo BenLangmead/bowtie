@@ -58,9 +58,9 @@ static void printUsage(ostream& out) {
 	<< "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
 	<< "  -s/--summary       Print summary incl. ref names, lengths, index properties" << endl
+	<< "  -e/--ebwt-ref      Reconstruct reference from ebwt (slow, preserves colors)" << endl
 	<< "  -v/--verbose       Verbose output (for debugging)" << endl
 	<< "  -h/--help          print detailed description of tool and its options" << endl
-	<< "  -e/--ebwt-ref      Reconstruct reference from ebwt (slow, preserves colors)" << endl
 	<< "  --help             print this usage message" << endl
 	;
 }
@@ -316,7 +316,10 @@ void print_index_summary(
 	vector<string> p_refnames;
 	readEbwtRefnames(fname, p_refnames);
 	cout << "Colorspace" << '\t' << (color ? "1" : "0") << endl;
-	if(extra) cout << "2.0-compatible" << '\t' << (entireReverse ? "1" : "0") << endl;
+	if(extra) {
+		cout << "Concat then reverse" << '\t' << (entireReverse ? "1" : "0") << endl;
+		cout << "Reverse then concat" << '\t' << (entireReverse ? "0" : "1") << endl;
+	}
 	cout << "SA-Sample" << "\t1 in " << (1 << ebwt.eh().offRate()) << endl;
 	cout << "FTab-Chars" << '\t' << ebwt.eh().ftabChars() << endl;
 	assert_eq(ebwt.nPat(), p_refnames.size());
