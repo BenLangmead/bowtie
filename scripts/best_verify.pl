@@ -25,23 +25,24 @@ my $debug = 0;
 my $round = "";
 my $best = undef;
 my $nomaqround = 0;
-my $result = GetOptions("v=i" => \$varg,
-                        "n=i" => \$narg,
-                        "l=i" => \$l,
-                        "e=i" => \$e,
-                        "d"   => \$debug,
-                        "g"   => \$g,
-                        "best"=> \$best,
-                        "C"   => \$C,
-                        "nomaqround" => \$nomaqround) || die "Bad options";
-
+my $result = GetOptions(
+	"v=i" => \$varg,
+	"n=i" => \$narg,
+	"l=i" => \$l,
+	"e=i" => \$e,
+	"d"   => \$debug,
+	"g"   => \$g,
+	"best"=> \$best,
+	"C"   => \$C,
+	"nomaqround" => \$nomaqround) || die "Bad options";
 my $match_mode = "-n 2";
-$match_mode = "-v " . $varg if defined($varg);
-$match_mode = "-n " . $narg if defined($narg);
+$match_mode  = " -v " . $varg if defined($varg);
+$match_mode  = " -n " . $narg if defined($narg);
 $match_mode .= " -l $l " if defined($l);
 $match_mode .= " -e $e " if defined($e);
 $match_mode .= " -g " if defined($g);
 $match_mode .= " -C " if defined($C);
+$match_mode .= " --cost ";
 $round = "--nomaqround" if $nomaqround;
 
 print "Maq-like rounding is: ".($nomaqround ? "off" : "on") . "\n";
@@ -94,6 +95,7 @@ while(<BOWTIE_BEST>) {
 	chomp;
 	my $line = $_;
 	my @ls = split(/[\t]/, $line);
+	my $btcost = $ls[-1];
 	$#ls >= 5 || die "Alignment not formatted correctly: $line";
 	my $name = $ls[0];
 	defined($nameToBestAlignment{$name}) && die "Read with name $name appeared more than once in best-hit output";
@@ -128,6 +130,7 @@ while(<BOWTIE_BEST>) {
 		}
 	}
 	print "$line: $cost\n";
+	$cost == $btcost || die "script-calculated cost $cost doesn't match bowtie-calculated cost $btcost\n";
 	$nameToBestAlignment{$name} = $line;
 	$nameToBestScore{$name} = $cost;
 	$bestAls++;
@@ -145,6 +148,7 @@ while(<BOWTIE_ALL>) {
 	chomp;
 	my $line = $_;
 	my @ls = split(/[\t]/, $line);
+	my $btcost = $ls[-1];
 	$#ls >= 5 || die "Alignment not formatted correctly: $line";
 	my $name = $ls[0];
 	my $len = length($ls[4]);
@@ -177,6 +181,7 @@ while(<BOWTIE_ALL>) {
 		}
 	}
 	print "$line: $cost\n";
+	$cost == $btcost || die "script-calculated cost $cost doesn't match bowtie-calculated cost $btcost\n";
 	defined($nameToBestAlignment{$name}) ||
 		die "Read with alignment:\n$line\nhas no corresponding alignment in best-hit mode\n";
 	int($cost) >= int($nameToBestScore{$name}) ||
