@@ -152,7 +152,7 @@ public:
 	bool                mfw;     /// orientation of mate in alignment
 	uint16_t            mlen;    /// length of mate
 	int8_t              stratum; /// stratum of hit (= mismatches in seed)
-	uint16_t            cost;    /// total cost, factoring in stratum and quality penalty
+	uint32_t            cost;    /// total cost, factoring in stratum and quality penalty
 	uint8_t             mate;    /// matedness; 0 = not a mate
 	                             ///            1 = upstream mate
 	                             ///            2 = downstream mate
