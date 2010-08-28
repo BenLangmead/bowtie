@@ -1013,19 +1013,20 @@ protected:
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
 			r.bot = range.bot;
+			r.cost = r.stratum << 14;
 			bool ebwtLFw = matchRight ? range.ebwt->fw() : true;
 			bool ebwtRFw = matchRight ? true : range.ebwt->fw();
 			if(report(
-			        matchRight ? range : r, // range for upstream mate
-			        matchRight ? r : range, // range for downstream mate
-			        tidx,                   // ref idx
-			        matchRight ? toff : result, // upstream offset
-			        matchRight ? result : toff, // downstream offset
-			        tlen,       // length of ref
-			        !doneFw_,   // whether the pair is being mapped to fw strand
-			        ebwtLFw,
-			        ebwtRFw,
-			        range.ebwt->rmap())) return true;
+				matchRight ? range : r, // range for upstream mate
+				matchRight ? r : range, // range for downstream mate
+				tidx,                   // ref idx
+				matchRight ? toff : result, // upstream offset
+				matchRight ? result : toff, // downstream offset
+				tlen,       // length of ref
+				!doneFw_,   // whether the pair is being mapped to fw strand
+				ebwtLFw,
+				ebwtRFw,
+				range.ebwt->rmap())) return true;
 		}
 		return false;
 	}
