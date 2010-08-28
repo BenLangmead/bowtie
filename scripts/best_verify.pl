@@ -44,6 +44,8 @@ $match_mode .= " -g " if defined($g);
 $match_mode .= " -C " if defined($C);
 $match_mode .= " --cost ";
 $round = "--nomaqround" if $nomaqround;
+my $seedLen = 28;
+$seedLen = $l if defined($l);
 
 print "Maq-like rounding is: ".($nomaqround ? "off" : "on") . "\n";
 print "Using match mode: $match_mode\n";
@@ -74,7 +76,6 @@ if($reads =~ /\.fa$/) {
 	$reads = " -c $reads ";
 }
 
-my $seedLen = 28;
 my $vmode = ($match_mode =~ /[-]v/);
 
 system("make -C $bowtie_dir $bowtie_exe") == 0 || die;
