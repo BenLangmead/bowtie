@@ -294,8 +294,10 @@ void print_index_summary(
 	const string& fname,
 	ostream& fout)
 {
+	int32_t flags = readFlags(fname);
+	int32_t flagsr = readFlags(fname + ".rev");
 	bool color = readEbwtColor(fname);
-	bool entireReverse = readEntireReverse(fname);
+	bool entireReverse = readEntireReverse(fname + ".rev");
 	TPackedEbwt ebwt(
 		fname,
 		color,                // index is colorspace
@@ -315,6 +317,10 @@ void print_index_summary(
 		false);               // sanity check?
 	vector<string> p_refnames;
 	readEbwtRefnames(fname, p_refnames);
+	if(extra) {
+		cout << "Flags" << '\t' << (-flags) << endl;
+		cout << "Reverse flags" << '\t' << (-flagsr) << endl;
+	}
 	cout << "Colorspace" << '\t' << (color ? "1" : "0") << endl;
 	if(extra) {
 		cout << "Concat then reverse" << '\t' << (entireReverse ? "1" : "0") << endl;
