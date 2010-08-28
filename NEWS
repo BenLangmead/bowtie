@@ -18,8 +18,8 @@ Announcements
 =============
 
 To receive announcements (including release announcements) about Bowtie
-and related tools (including Crossbow, TopHat, Cufflinks) subscribe to
-our mailing list:
+and related tools (including Crossbow, TopHat, Cufflinks, Myrna)
+subscribe to our mailing list:
 
   https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce
 
@@ -39,6 +39,8 @@ Version 0.12.6 - August 27, 2010
    * Fixed build issue that would cause bowtie-build built on one
      version of Linux to die with a "floating point error" on other
      versions.
+   * Fixed a bug whereby alignment cost could sometimes be
+     miscalculated.  Stratum was unaffected.
    * bowtie now simply skips reads with 0 characters.  Previously it
      would print an error and exit.
 
