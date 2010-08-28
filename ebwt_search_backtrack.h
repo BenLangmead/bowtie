@@ -906,7 +906,7 @@ public:
 				assert_leq(i+1, _qlen);
 				bool ret;
 				if(i+1 == _qlen) {
-					ret = reportAlignment(stackDepth+1, bttop, btbot, ham);
+					ret = reportAlignment(stackDepth+1, bttop, btbot, btham);
 				} else if(_halfAndHalf &&
 				          !disableFtab &&
 				          _2revOff == _3revOff &&
