@@ -24,8 +24,9 @@ Linux, and Solaris.
 [Bowtie] also forms the basis for other tools, including [TopHat]: a
 fast splice junction mapper for RNA-seq reads, [Cufflinks]: a tool for
 transcriptome assembly and isoform quantitiation from RNA-seq reads,
-and [Crossbow]: a cloud-computing software tool for large-scale
-reseuqncing data.
+[Crossbow]: a cloud-computing software tool for large-scale
+resequencing data,and [Myrna]: a cloud computing tool for calculating
+differential gene expression in large RNA-seq datasets.
 
 If you use [Bowtie] for your published research, please cite the
 [Bowtie paper].
@@ -37,6 +38,7 @@ If you use [Bowtie] for your published research, please cite the
 [TopHat]:          http://tophat.cbcb.umd.edu/
 [Cufflinks]:       http://cufflinks.cbcb.umd.edu/
 [Crossbow]:        http://bowtie-bio.sf.net/crossbow
+[Myrna]:           http://bowtie-bio.sf.net/myrna
 [Bowtie paper]:    http://genomebiology.com/2009/10/3/R25
 
 What isn't Bowtie?
@@ -2181,7 +2183,7 @@ Convert Ns in the reference sequence to As before building the index.
 By default, Ns are simply excluded from the index and `bowtie` will not
 report alignments that overlap them.
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-big-little">
 
     --big --little
 
@@ -2191,13 +2193,28 @@ Endianness to use when serializing integers to the index file.
 Default: little-endian (recommended for Intel- and AMD-based
 architectures).
 
-</td></tr><tr><td>
+</td></tr><tr><td id="bowtie-build-options-seed">
 
     --seed <int>
 
 </td><td>
 
 Use `<int>` as the seed for pseudo-random number generator.
+
+</td></tr><tr><td id="bowtie-build-options-old-reverse">
+
+    --old-reverse
+
+</td><td>
+
+`bowtie-build` versions prior to 0.12.6 would construct the reverse
+index (in the `.rev.1.ebwt` and `.rev.2.ebwt`) by first reversing each
+unambiguous stretch of nucleotides then concatenating the reversed
+strings.  Starting with `bowtie-build` 0.12.6, the reverse index is
+constructed by first concatenating the unambiguous stretches of
+nucleotides, then reversing the concatenated string.  Specify
+`--old-reverse` to revert to the old behavior.  Both types of index are
+fully forward and backward compatible, unless otherwise noted.
 
 </td></tr><tr><td>
 
@@ -2292,9 +2309,9 @@ bases (default: 60).
 
 Print reference sequence names, one per line, and quit.
 
-</td></tr><tr><td id="bowtie-build-options-s">
+</td></tr><tr><td id="bowtie-inspect-options-s">
 
-[`-s`/`--summary`]: #bowtie-build-options-s
+[`-s`/`--summary`]: #bowtie-inspect-options-s
 
     -s/--summary
 
@@ -2313,6 +2330,24 @@ format:
     Sequence-N	<name>	<len>
 
 Fields are separated by tabs.
+
+</td></tr><tr><td id="bowtie-inspect-options-e">
+
+[`-e`/`--ebwt-ref`]: #bowtie-inspect-options-e
+
+    -e/--ebwt-ref
+
+</td><td>
+
+By default, when `bowtie-inspect` is run without [`-s`] or [`-n`], it
+recreates the reference nucleotide sequences using the bit-encoded
+reference nucleotides kept in the `.3.ebwt` and `.4.ebwt` index files.
+When `-e/--ebwt-ref` is specified, `bowtie-inspect` recreates the
+reference sequences from the Burrows-Wheeler-transformed reference
+sequence in the `.1.ebwt` file instead.  The reference recreation
+process is much slower when `-e/--ebwt-ref` is specified.  Also, when
+`-e/--ebwt-ref` is specified and the index is in colorspace, the
+reference is printed in colors (A=blue, C=green, G=orange, T=red).
 
 </td></tr><tr><td>
 
