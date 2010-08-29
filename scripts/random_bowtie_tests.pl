@@ -23,40 +23,43 @@
 #
 
 use List::Util qw[min max];
-use Getopt::Std;
+use Getopt::Long;
 
-my %options=();
-getopts("mhnop:we",\%options);
+my $setPolicy;
+my $help = 0;
+my $noCompile = 0;
+my $bowtie = "./bowtie";                 # path to version of 'bowtie' binary to use
+my $bowtie_build = "./bowtie-build";     # path to version of 'bowtie-build' binary to use
+my $bowtie_inspect = "./bowtie-inspect"; # path to version of 'bowtie-build' binary to use
 
-if(defined $options{h}) {
-	print "Usage: perl random_bowtie_tests.pl seed outer inner tbase trand pbase prand\n";
+GetOptions(
+	"bowtie=s"         => \$bowtie,
+	"bowtie-build=s"   => \$bowtie_build,
+	"bowtie-inspect=s" => \$bowtie_inspect,
+	"h|help"           => \$help,
+	"n|no-compile"     => \$noCompile,
+	"p|policy"         => \$setPolicy, # overrides pickPolicy()
+	"e|pairs-only"     => \$pairedEndOnly) || die "Bad arguments";
+
+if($help) {
+	print "Usage: perl random_bowtie_tests.pl [options]* seed outer inner tbase trand pbase prand\n";
 	exit 0;
 }
-
-# Let user specify a policy that will always override pickPolicy()
-my $setPolicy;
-$setPolicy = $options{p} if defined($options{p});
 
 my $seed = 0;
 $seed = int $ARGV[0] if defined($ARGV[0]);
 srand $seed;
 
 # make all the relevant binaries, unless we were asked not to
-unless(defined $options{n}) {
+unless($noCompile) {
 	run("make bowtie bowtie-debug bowtie-build-debug ".
 	       "bowtie-inspect-debug") == 0 || die "Error building";
 }
 
 # Alignment policies
 my @policies = (
-	"-n 3",
-	"-n 2",
-	"-n 1",
-	"-n 0",
-	"-v 3",
-	"-v 2",
-	"-v 1",
-	"-v 0"
+	"-n 3", "-n 2", "-n 1", "-n 0",
+	"-v 3", "-v 2", "-v 1", "-v 0"
 );
 
 sub pickPolicy {
@@ -413,7 +416,7 @@ sub build {
 	my $args = "-q --sanity $color $file1 $noauto $offRate $ftabChars $bucketArg $file2";
 	
 	# Do unpacked version
-	my $cmd = "./bowtie-build-debug $args .tmp$seed";
+	my $cmd = "${bowtie_build}-debug $args .tmp$seed";
 	run("echo \"$cmd\" > .tmp$seed.cmd");
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>&1"));
@@ -428,10 +431,10 @@ sub build {
 	
 	# Use bowtie-inspect to compare the output of bowtie-build to the
 	# original reference sequences
-	$cmd = "./bowtie-inspect-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
+	$cmd = "${bowtie_inspect}-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
 	print "$cmd\n";
 	run($cmd) == 0 || die "$cmd - failed";
-	$cmd = "./bowtie-inspect-debug -e -a -1 .tmp$seed > .tmp$seed.inspect.ebwtref";
+	$cmd = "${bowtie_inspect}-debug -e -a -1 .tmp$seed > .tmp$seed.inspect.ebwtref";
 	print "$cmd\n";
 	run($cmd) == 0 || die "$cmd - failed";
 	$cmd = "diff .randtmp$seed.ns.orig.fa .tmp$seed.inspect.ref";
@@ -444,7 +447,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
-		$cmd = "./bowtie-build-debug -a -p $args .tmp$seed.packed";
+		$cmd = "${bowtie_build}-debug -a -p $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(runBacktick("$cmd 2>&1"));
 		if($out eq "") {
@@ -736,7 +739,7 @@ sub doSearch($$$$$$$$$$) {
 	defined($khits) || die;
 	defined($offRateStr) || die;
 	defined($nstr) || die;
-	my $cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	my $cmd = "${bowtie}-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout"));
 	
@@ -873,16 +876,16 @@ sub doSearch($$$$$$$$$$) {
 	}
 
 	{
-		$cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+		$cmd = "${bowtie} $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 		print "$cmd\n";
 		my $out2 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "./bowtie $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "${bowtie} $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out3 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 
-		$cmd = "./bowtie --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "${bowtie} --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out4 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -890,7 +893,7 @@ sub doSearch($$$$$$$$$$) {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "./bowtie-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "${bowtie}-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 	# Parse output to see if any of it is bad
@@ -948,7 +951,7 @@ sub doSearch($$$$$$$$$$) {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "./bowtie $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "${bowtie} $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		run($cmd) == 0 || die "Error performing reconciler run\n";
 		$khits =~ s/--strata --best//;
@@ -1018,7 +1021,7 @@ for(; $outer > 0; $outer--) {
 	for(; $in >= 0; $in--) {
 		# Paired-end?
 		my $pe = (int(rand(2)) == 0);
-		$pe = 1 if defined($options{e});
+		$pe = 1 if $pairedEndOnly;
 		# Generate random pattern(s) based on text
 		my $pfinal1 = '';
 		my $pfinal2 = '';
