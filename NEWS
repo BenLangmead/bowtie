@@ -26,7 +26,7 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
-Version 0.12.6 - August 27, 2010
+Version 0.12.6 - August 29, 2010
    * Modified bowtie-inspect's default mode to use the bit-encoded
      reference portion of the index to reconstruct the reference
      sequence, rather than the ebwt portion.  This makes bowtie-inspect
@@ -34,6 +34,10 @@ Version 0.12.6 - August 27, 2010
      index will now be in nucleotide space.  To get the behavior of the
      old default, use the new -e/--ebwt-ref option.
    * Fixed bug whereby SOLiD QV strings would fail to parse.
+   * Moved to a new default way of building the reverse index.  Revert
+     to the old behavior with bowtie-build's new --old-reverse option.
+     The new reverse index format is forward and backward compatible
+     with `bowtie`, unless otherwise noted in a future version.
    * Fixed issue that would sometimes cause bowtie-build to crash when
      building a large index with a low --offrate.
    * Fixed build issue that would cause bowtie-build built on one
