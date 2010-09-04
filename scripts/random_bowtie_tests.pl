@@ -439,21 +439,6 @@ sub build {
 		}
 	}
 	
-	# Use bowtie-inspect to compare the output of bowtie-build to the
-	# original reference sequences
-	$cmd = "${bowtie_inspect}-debug -a -1 .tmp$seed > .tmp$seed.inspect.ref";
-	print "$cmd\n";
-	run($cmd) == 0 || die "$cmd - failed";
-	$cmd = "${bowtie_inspect}-debug -e -a -1 .tmp$seed > .tmp$seed.inspect.ebwtref";
-	print "$cmd\n";
-	run($cmd) == 0 || die "$cmd - failed";
-	$cmd = "diff .randtmp$seed.ns.orig.fa .tmp$seed.inspect.ref";
-	print "$cmd\n";
-	run($cmd) == 0 || die "$cmd - failed";
-	$cmd = "diff .randtmp$seed.ns.fa .tmp$seed.inspect.ebwtref";
-	print "$cmd\n";
-	run($cmd) == 0 || die "$cmd - failed";
-
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
