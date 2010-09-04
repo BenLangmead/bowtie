@@ -19,6 +19,7 @@ my $bowtie_build2 = "./bowtie-build";
 my $bowtie_inspect = "./bowtie-inspect";
 my $bowtie_inspect2 = "./bowtie-inspect";
 my $ref = "";
+my $seed = 0;
 my $debug = 0;
 my $debug_old = 0;
 
@@ -29,6 +30,7 @@ GetOptions (
 	"bowtie-build2:s"      => \$bowtie_build2,
 	"bowtie-inspect:s"     => \$bowtie_inspect,
 	"bowtie-inspect2:s"    => \$bowtie_inspect2,
+	"seed:i"               => \$seed,
 	"debug"                => \$debug,
 	"debug2"               => \$debug_old);
 
@@ -115,13 +117,13 @@ sub trim($) {
 #
 sub match($$$) {
 	if($_[0] ne $_[1]) {
-		open(D1, ">.inspect.pl.d1") || die;
-		open(D2, ">.inspect.pl.d2") || die;
+		open(D1, ">.inspect.pl.$seed.d1") || die;
+		open(D2, ">.inspect.pl.$seed.d2") || die;
 		print D1 "$_[0]\n";
 		print D2 "$_[1]\n";
 		close(D1);
 		close(D2);
-		system("diff -uw .inspect.pl.d1 .inspect.pl.d2");
+		system("diff -uw .inspect.pl.$seed.d1 .inspect.pl.$seed.d2");
 		die "$_[2]";
 	}
 }
@@ -156,7 +158,7 @@ if($ref ne "") {
 	close(REF);
 }
 
-my $fn = ".inspect.pl.tmp.fa";
+my $fn = ".inspect.pl.tmp.$seed.fa";
 for my $ca (@cases) {
 	for my $col (0, 1) {
 		my ($c, $e) = split(/:/, $ca);

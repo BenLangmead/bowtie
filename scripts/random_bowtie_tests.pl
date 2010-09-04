@@ -373,7 +373,7 @@ sub build {
 	}
 	close(FA);
 	
-	$cmd = "perl $Bin/test/inspect.pl --debug --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa";
+	$cmd = "perl $Bin/test/inspect.pl --debug --seed $seed --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa";
 	print "$cmd\n";
 	system($cmd) == 0
 		|| die "inspect.pl died with exitlevel $?";
