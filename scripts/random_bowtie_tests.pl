@@ -428,10 +428,12 @@ sub build {
 	run("echo \"$cmd\" > .tmp$seed.cmd");
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>&1"));
+	$out =~ s/Warning: Encountered reference sequence with only gaps//g;
+	$out = trim($out);
 	if($out eq "") {
 		$ret++;
 	} else {
-		print "$out\n";
+		print "Expected no output, got:\n$out\n";
 		if($exitOnFail) {
 			exit 1;
 		}
