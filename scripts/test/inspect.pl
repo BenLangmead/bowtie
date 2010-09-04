@@ -18,9 +18,11 @@ my $bowtie_build = "./bowtie-build";
 my $bowtie_build2 = "./bowtie-build";
 my $bowtie_inspect = "./bowtie-inspect";
 my $bowtie_inspect2 = "./bowtie-inspect";
+my $ref = "";
 my $debug = 0;
 
 GetOptions (
+	"ref:s"                => \$ref,
 	"bowtie:s"             => \$bowtie,
 	"bowtie-build:s"       => \$bowtie_build,
 	"bowtie-build2:s"      => \$bowtie_build2,
@@ -100,6 +102,28 @@ sub colorize($$) {
 	return $ret;
 }
 
+sub trim($) {
+	my $ret = $_[0];
+	$ret =~ s/^\s+//; $ret =~ s/\s+$//;
+	return $ret;
+}
+
+##
+#
+#
+sub match($$$) {
+	if($_[0] ne $_[1]) {
+		open(D1, ">.inspect.pl.d1") || die;
+		open(D2, ">.inspect.pl.d2") || die;
+		print D1 "$_[0]\n";
+		print D2 "$_[1]\n";
+		close(D1);
+		close(D2);
+		system("diff -uw .inspect.pl.d1 .inspect.pl.d2");
+		die "$_[2]";
+	}
+}
+
 ##
 # Given a fasta file string, strip away all sequences that consist
 # entirely of gaps.
@@ -118,6 +142,18 @@ sub colorizeFasta($) {
 	return $ret;
 }
 
+if($ref ne "") {
+	open(REF, $ref) || die "Could not open -ref $ref";
+	@cases = ();
+	push @cases, "";
+	while(<REF>) {
+		chomp;
+		unless(/^>/) { s/[^ACGT]/N/gi; }
+		$cases[0] .= "$_\n";
+	}
+	close(REF);
+}
+
 my $fn = ".inspect.pl.tmp.fa";
 for my $ca (@cases) {
 	for my $col (0, 1) {
@@ -132,6 +168,7 @@ for my $ca (@cases) {
 		my $bb = $debug ? $bowtie_build_d : $bowtie_build;
 		$bb .= " -C" if $col;
 		my $bi = $debug ? $bowtie_inspect_d : $bowtie_inspect;
+		$bi .= " -a -1";
 		if($bowtie_build2 ne "") {
 			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | awk '/^Sequence/ {p=1} p==1 {print}'";
 			my $bbo = $debug ? $bowtie_build2_d : $bowtie_build2;
@@ -151,46 +188,47 @@ for my $ca (@cases) {
 		system($cmd) == 0 || die "Exitlevel $? from command '$cmd'\n";
 		$cmd = "$bi $fn";
 		print "$cmd\n";
-		my $io = `$cmd`;
+		my $io = trim(`$cmd`);
 		$? == 0 || die "Exitlevel $? from command '$cmd'\n";
 		my $msg = "Output from bowtie-inspect:\n$io\ndidn't match input:\n";
 		if(defined($e)) {
-			my $e2 = stripAllGaps($e, $col);
-			$io eq $e2 || die "$msg$e2";
+			my $e2 = trim(stripAllGaps($e, $col));
+			match($io, $e2, "$msg$e2");
 		} else {
-			my $c2 = stripAllGaps($c, $col);
-			$io eq $c2 || die "$msg$c2";
+			my $c2 = trim(stripAllGaps($c, $col));
+			match($io, $c2, "$msg$c2");
 		}
 		print $io;
 		$cmd = "$bi -e $fn";
 		print "$cmd\n";
-		$io = `$cmd`;
+		$io = trim(`$cmd`);
 		$? == 0 || die "Exitlevel $? from command '$cmd'\n";
 		$msg = "Output from bowtie-inspect -e:\n$io\ndidn't match input:\n";
 		if(defined($e)) {
 			# Colorspace quandry: strip gaps then colorize, or vice versa?
 			my $e2 = ($col ? colorizeFasta($e) : $e);
-			$e2 = stripAllGaps($e2, 0);
-			$io eq $e2 || die "$msg$e2";
+			$e2 = trim(stripAllGaps($e2, 0));
+			match($io, $e2, "$msg$e2");
 		} else {
 			my $c2 = ($col ? colorizeFasta($c) : $c);
-			$c2 = stripAllGaps($c2, 0);
-			$io eq $c2 || die "$msg$c2";
+			$c2 = trim(stripAllGaps($c2, 0));
+			match($io, $c2, "$msg$c2");
 		}
 		print $io;
 		if($bowtie_inspect2 ne "") {
 			my $bio = $debug ? $bowtie_inspect2_d : $bowtie_inspect2;
+			$bio .= " -a -1";
 			$cmd = "$bio $fn";
 			print "$cmd\n";
-			$io = `$cmd`;
+			$io = trim(`$cmd`);
 			$? == 0 || die "Exitlevel $? from command '$cmd'\n";
 			$msg = "Output from bowtie-inspect:\n$io\ndidn't match input:\n";
 			if(defined($e)) {
-				my $e2 = stripAllGaps($e, $col);
-				$io eq $e2 || die "$msg$e2";
+				my $e2 = trim(stripAllGaps($e, $col));
+				match($io, $e2, "$msg$e2");
 			} else {
-				my $c2 = stripAllGaps($c, $col);
-				$io eq $c2 || die "$msg$c2";
+				my $c2 = trim(stripAllGaps($c, $col));
+				match($io, $c2, "$msg$c2");
 			}
 			print $io;
 		}

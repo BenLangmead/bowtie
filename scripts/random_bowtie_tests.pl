@@ -24,22 +24,25 @@
 
 use List::Util qw[min max];
 use Getopt::Long;
+use FindBin qw($Bin); 
 
 my $setPolicy;
 my $help = 0;
 my $noCompile = 0;
 my $bowtie = "./bowtie";                 # path to version of 'bowtie' binary to use
 my $bowtie_build = "./bowtie-build";     # path to version of 'bowtie-build' binary to use
+my $bowtie_build_old = "./bowtie-build"; # path to old version of 'bowtie-build' binary to use (for inspect.pl)
 my $bowtie_inspect = "./bowtie-inspect"; # path to version of 'bowtie-build' binary to use
 
 GetOptions(
-	"bowtie=s"         => \$bowtie,
-	"bowtie-build=s"   => \$bowtie_build,
-	"bowtie-inspect=s" => \$bowtie_inspect,
-	"h|help"           => \$help,
-	"n|no-compile"     => \$noCompile,
-	"p|policy"         => \$setPolicy, # overrides pickPolicy()
-	"e|pairs-only"     => \$pairedEndOnly) || die "Bad arguments";
+	"bowtie=s"           => \$bowtie,
+	"bowtie-build=s"     => \$bowtie_build,
+	"bowtie-build-old=s" => \$bowtie_build_old,
+	"bowtie-inspect=s"   => \$bowtie_inspect,
+	"h|help"             => \$help,
+	"n|no-compile"       => \$noCompile,
+	"p|policy"           => \$setPolicy, # overrides pickPolicy()
+	"e|pairs-only"       => \$pairedEndOnly) || die "Bad arguments";
 
 if($help) {
 	print "Usage: perl random_bowtie_tests.pl [options]* seed outer inner tbase trand pbase prand\n";
@@ -369,6 +372,8 @@ sub build {
 		print FA "$seqs[$i]\n";
 	}
 	close(FA);
+	
+	system("perl $Bin/test/inspect.pl --debug --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa") == 0 || die;
 	
 	# Make a version of the FASTA file where all non-A/C/G/T characters
 	# are Ns.  This is useful if we'd like to compare to the output of
