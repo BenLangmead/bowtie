@@ -377,7 +377,7 @@ public:
 			int curStretch = 0;
 			for(size_t i = 0; i < os->size(); i++) {
 				size_t olen = seqan::length((*os)[i]);
-				for(size_t j = i; j < olen; j++) {
+				for(size_t j = 0; j < olen; j++) {
 					if((int)(*os)[i][j] < 4) {
 						curStretch++;
 						if(curStretch > longestStretch) longestStretch = curStretch;

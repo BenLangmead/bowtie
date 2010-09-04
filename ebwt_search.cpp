@@ -2653,21 +2653,41 @@ static void driver(const char * type,
 		if(verbose || startVerbose) {
 			cerr << "About to initialize rev Ebwt: "; logTime(cerr, true);
 		}
-		ebwtBw = new Ebwt<TStr>(adjustedEbwtFileBase + ".rev",
-		                        color,  // index is colorspace
-		                        -1,     // don't care about entireReverse
-		                        false, // index is for the reverse direction
-		                        /* overriding: */ offRate,
-		                        /* overriding: */ isaRate,
-		                        useMm,    // whether to use memory-mapped files
-		                        useShmem, // whether to use shared memory
-		                        mmSweep,  // sweep memory-mapped files
-		                        !noRefNames, // load names?
-		                        rmap,     // reference map, or NULL if none is needed
-		                        verbose,  // whether to be talkative
-		                        startVerbose, // talkative during initialization
-		                        false /*passMemExc*/,
-		                        sanityCheck);
+		ebwtBw = new Ebwt<TStr>(
+			adjustedEbwtFileBase + ".rev",
+			color,  // index is colorspace
+			-1,     // don't care about entireReverse
+			false, // index is for the reverse direction
+			/* overriding: */ offRate,
+			/* overriding: */ isaRate,
+			useMm,    // whether to use memory-mapped files
+			useShmem, // whether to use shared memory
+			mmSweep,  // sweep memory-mapped files
+			!noRefNames, // load names?
+			rmap,     // reference map, or NULL if none is needed
+			verbose,  // whether to be talkative
+			startVerbose, // talkative during initialization
+			false /*passMemExc*/,
+			sanityCheck);
+	}
+	if(!os.empty()) {
+		for(size_t i = 0; i < os.size(); i++) {
+			size_t olen = seqan::length(os[i]);
+			int longestStretch = 0;
+			int curStretch = 0;
+			for(size_t j = 0; j < olen; j++) {
+				if((int)os[i][j] < 4) {
+					curStretch++;
+					if(curStretch > longestStretch) longestStretch = curStretch;
+				} else {
+					curStretch = 0;
+				}
+			}
+			if(longestStretch < (color ? 2 : 1)) {
+				os.erase(os.begin() + i);
+				i--;
+			}
+		}
 	}
 	if(sanityCheck && !os.empty()) {
 		// Sanity check number of patterns and pattern lengths in Ebwt
@@ -2676,9 +2696,6 @@ static void driver(const char * type,
 		for(size_t i = 0; i < os.size(); i++) {
 			assert_eq(length(os[i]), ebwt.plen()[i] + (color ? 1 : 0));
 		}
-	}
-	// Sanity-check the restored version of the Ebwt
-	if(sanityCheck && !os.empty()) {
 		ebwt.loadIntoMemory(color ? 1 : 0, -1, !noRefNames, startVerbose);
 		ebwt.checkOrigs(os, color, false);
 		ebwt.evictFromMemory();
