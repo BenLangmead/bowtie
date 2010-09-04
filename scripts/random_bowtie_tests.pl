@@ -1000,10 +1000,16 @@ for(; $outer > 0; $outer--) {
 		# and bowtie-inspect
 		my $tt;
 		if(rand() < 0.15) {
-			$tt = 'N' x $tlen; # add text meat
-		} else {
-			$tt = randDna($tlen); # add text meat
+			$tt = 'N' x $tlen;
+			push(@nts, $tt);
+			push(@cts, colorize($tt, 1));
+			my $newt = randGap() . $tt . randGap();
+			$tstr .= $newt;
+			$cstr .= colorize($newt, 1);
+			$tstr .= ",";
+			$cstr .= ",";
 		}
+		$tt = randDna($tlen); # add text meat
 		push(@nts, $tt);
 		push(@cts, colorize($tt, 1));
 		my $newt = randGap() . $tt . randGap();
