@@ -427,6 +427,7 @@ public:
 	     int dcv,
 	     vector<FileBuf*>& is,
 	     vector<RefRecord>& szs,
+	     vector<uint32_t>& plens,
 	     uint32_t sztot,
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
@@ -467,6 +468,7 @@ public:
 		initFromVector(
 			is,
 			szs,
+			plens,
 			sztot,
 			refparams,
 			fout1,
@@ -534,7 +536,11 @@ public:
 			if(szs[i].len == 0) continue;
 			if(szs[i].first) off = 0;
 			off += szs[i].off;
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
 			if(szs[i].first && szs[i].len > 0) seq++;
+#else
+			if(szs[i].first) seq++;
+#endif
 			size_t seqm1 = seq-1;
 			assert_lt(seqm1, _nPat);
 			size_t fwoff = off;
@@ -563,18 +569,20 @@ public:
 	 * suffix-array producer can then be used to obtain chunks of the
 	 * joined string's suffix array.
 	 */
-	void initFromVector(vector<FileBuf*>& is,
-	                    vector<RefRecord>& szs,
-	                    uint32_t sztot,
-	                    const RefReadInParams& refparams,
-	                    ofstream& out1,
-	                    ofstream& out2,
-	                    bool useBlockwise,
-	                    uint32_t bmax,
-	                    uint32_t bmaxSqrtMult,
-	                    uint32_t bmaxDivN,
-	                    int dcv,
-	                    uint32_t seed)
+	void initFromVector(
+		vector<FileBuf*>& is,
+		vector<RefRecord>& szs,
+		vector<uint32_t>& plens,
+		uint32_t sztot,
+		const RefReadInParams& refparams,
+		ofstream& out1,
+		ofstream& out2,
+		bool useBlockwise,
+		uint32_t bmax,
+		uint32_t bmaxSqrtMult,
+		uint32_t bmaxDivN,
+		int dcv,
+		uint32_t seed)
 	{
 		// Compose text strings into single string
 		VMSG_NL("Calculating joined length");
@@ -591,7 +599,7 @@ public:
 			if(refparams.reverse == REF_READ_REVERSE) {
 				{
 					Timer timer(cout, "  Time to join reference sequences: ", _verbose);
-					joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
+					joinToDisk(is, szs, plens, sztot, refparams, s, out1, out2, seed);
 				} {
 					Timer timer(cout, "  Time to reverse reference sequence: ", _verbose);
 					vector<RefRecord> tmp;
@@ -601,7 +609,7 @@ public:
 				}
 			} else {
 				Timer timer(cout, "  Time to join reference sequences: ", _verbose);
-				joinToDisk(is, szs, sztot, refparams, s, out1, out2, seed);
+				joinToDisk(is, szs, plens, sztot, refparams, s, out1, out2, seed);
 				szsToDisk(szs, out1, refparams.reverse);
 			}
 			// Joined reference sequence now in 's'
@@ -736,7 +744,11 @@ public:
 		}
 		assert(repOk());
 		// Now write reference sequence names on the end
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
+		assert_geq(this->_refnames.size(), this->_nPat);
+#else
 		assert_eq(this->_refnames.size(), this->_nPat);
+#endif
 		for(size_t i = 0; i < this->_refnames.size(); i++) {
 			out1 << this->_refnames[i] << endl;
 		}
@@ -1058,7 +1070,7 @@ public:
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t seed);
 	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t seed);
-	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
+	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -3905,20 +3917,22 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
  * been written to 'out1' before this function is called.
  *
  * The static member Ebwt::join just returns a joined version of a
- * list of strings without building any of the auxilliary arrays.
+ * list of strings without building any of the auxiliary arrays.
  * Because the pseudo-random number generator is the same, we expect
  * this function and the static function to give the same result given
  * the same seed.
  */
 template<typename TStr>
-void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
-                            vector<RefRecord>& szs,
-                            uint32_t sztot,
-                            const RefReadInParams& refparams,
-                            TStr& ret,
-                            ostream& out1,
-                            ostream& out2,
-                            uint32_t seed = 0)
+void Ebwt<TStr>::joinToDisk(
+	vector<FileBuf*>& l,
+	vector<RefRecord>& szs,
+	vector<uint32_t>& plens,
+	uint32_t sztot,
+	const RefReadInParams& refparams,
+	TStr& ret,
+	ostream& out1,
+	ostream& out2,
+	uint32_t seed = 0)
 {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);
@@ -3932,14 +3946,25 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 	// fragments.
 	this->_nPat = 0;
 	this->_nFrag = 0;
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
+	int nGapFrag = 0;
+#endif
 	for(size_t i = 0; i < szs.size(); i++) {
 		if(szs[i].len > 0) this->_nFrag++;
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
+		if(szs[i].len == 0 && szs[i].off > 0) nGapFrag++;
 		if(szs[i].first && szs[i].len > 0) this->_nPat++;
+#else
+		// For all records where len=0 and first=1, set first=0
+		assert(szs[i].len > 0 || !szs[i].first);
+		if(szs[i].first) this->_nPat++;
+#endif
 	}
 	assert_gt(this->_nPat, 0);
 	assert_geq(this->_nFrag, this->_nPat);
 	this->_rstarts = NULL;
 	writeU32(out1, this->_nPat, this->toBe());
+	assert_eq(plens.size(), this->_nPat);
 	// Allocate plen[]
 	try {
 		this->_plen = new uint32_t[this->_nPat];
@@ -3949,20 +3974,10 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 		throw e;
 	}
 	// For each pattern, set plen
-	int npat = -1;
-	for(size_t i = 0; i < szs.size(); i++) {
-		if(szs[i].first && szs[i].len > 0) {
-			if(npat >= 0) {
-				writeU32(out1, this->_plen[npat], this->toBe());
-			}
-			npat++;
-			this->_plen[npat] = (szs[i].len + szs[i].off);
-		} else {
-			this->_plen[npat] += (szs[i].len + szs[i].off);
-		}
+	for(size_t i = 0; i < plens.size(); i++) {
+		this->_plen[i] = plens[i];
+		writeU32(out1, this->_plen[i], this->toBe());
 	}
-	assert_eq((uint32_t)npat, this->_nPat-1);
-	writeU32(out1, this->_plen[npat], this->toBe());
 	// Write the number of fragments
 	writeU32(out1, this->_nFrag, this->toBe());
 	size_t seqsRead = 0;
@@ -3981,13 +3996,15 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			_refnames.push_back("");
 			//uint32_t oldRetLen = length(ret);
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp, &_refnames.back());
+#ifndef ACCOUNT_FOR_ALL_GAP_REFS
+			if(rec.first && rec.len == 0) rec.first = false;
+#endif
 			first = false;
-			size_t bases = rec.len;
-			if(rec.first && rec.len > 0) {
+			if(rec.first) {
 				if(_refnames.back().length() == 0) {
 					// If name was empty, replace with an index
 					ostringstream stm;
-					stm << seqsRead;
+					stm << (_refnames.size()-1);
 					_refnames.back() = stm.str();
 				}
 			} else {
@@ -3997,15 +4014,23 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 				_refnames.pop_back();
 			}
 			assert_lt(szsi, szs.size());
+			assert(szs[szsi].first == 0 || szs[szsi].first == 1);
 			assert_eq(rec.off, szs[szsi].off);
 			assert_eq(rec.len, szs[szsi].len);
-			assert_eq(rec.first, szs[szsi].first);
+			// szs[szsi].first == 2 sometimes?!?!  g++ is unable to do
+			// the following correctly, regardless of how I write it
+			//assert((rec.first == 0) == (szs[szsi].first == 0));
 			assert(rec.first || rec.off > 0);
 			ASSERT_ONLY(szsi++);
-			// Increment seqsRead if this is the first fragment
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
+			if(rec.len == 0) continue;
 			if(rec.first && rec.len > 0) seqsRead++;
-			if(bases == 0) continue;
-			assert_leq(bases, this->_plen[seqsRead-1]);
+			assert_leq(rec.len, this->_plen[seqsRead-1]);
+#else
+			if(rec.first) seqsRead++;
+			if(rec.len == 0) continue;
+			assert_leq(rec.len, this->_plen[seqsRead-1]);
+#endif
 			// Reset the patoff if this is the first fragment
 			if(rec.first) patoff = 0;
 			patoff += rec.off; // add fragment's offset from end of last frag.
@@ -4016,7 +4041,7 @@ void Ebwt<TStr>::joinToDisk(vector<FileBuf*>& l,
 			//writeU32(out1, oldRetLen, this->toBe()); // offset from beginning of joined string
 			//writeU32(out1, seq,       this->toBe()); // sequence id
 			//writeU32(out1, patoff,    this->toBe()); // offset into sequence
-			patoff += bases;
+			patoff += rec.len;
 		}
 		assert_gt(szsi, 0);
 		l[i]->reset();

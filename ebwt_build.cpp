@@ -72,7 +72,7 @@ static void resetOptions() {
 	packed       = false; //
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
-	reverseType  = REF_READ_REVERSE;
+	reverseType  = REF_READ_REVERSE_EACH;
 	color        = false;
 }
 
@@ -87,7 +87,7 @@ enum {
 	ARG_PMAP,
 	ARG_NTOA,
 	ARG_USAGE,
-	ARG_OLD_REVERSE
+	ARG_NEW_REVERSE
 };
 
 /**
@@ -117,7 +117,7 @@ static void printUsage(ostream& out) {
 	    //<< "    --big --little          endianness (default: little, this host: "
 	    //<< (currentlyBigEndian()? "big":"little") << ")" << endl
 	    << "    --seed <int>            seed for random number generator" << endl
-	    << "    --old-reverse           reverse then concatenate stretches, not vice versa" << endl
+	    //<< "    --new-reverse           concatenate then reverse stretches, not vice versa" << endl
 	    << "    -q/--quiet              verbose output (for debugging)" << endl
 	    << "    -h/--help               print detailed description of tool and its options" << endl
 	    << "    --usage                 print this usage message" << endl
@@ -153,7 +153,7 @@ static struct option long_options[] = {
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
-	{(char*)"old-reverse",  no_argument,       0,            ARG_OLD_REVERSE},
+	{(char*)"new-reverse",  no_argument,       0,            ARG_NEW_REVERSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -241,7 +241,7 @@ static void parseOptions(int argc, const char **argv) {
 				seed = parseNumber<int>(0, "--seed arg must be at least 0");
 				break;
 			case ARG_NTOA: nsToAs = true; break;
-			case ARG_OLD_REVERSE: reverseType = REF_READ_REVERSE_EACH; break;
+			case ARG_NEW_REVERSE: reverseType = REF_READ_REVERSE; break;
 			case 'a': autoMem = false; break;
 			case 'q': verbose = false; break;
 			case 's': sanityCheck = true; break;
@@ -312,6 +312,7 @@ static void driver(const string& infile,
 	// sequences.  A record represents a stretch of unambiguous
 	// characters in one of the input sequences.
 	vector<RefRecord> szs;
+	vector<uint32_t> plens;
 	std::pair<size_t, size_t> sztot;
 	{
 		if(verbose) cout << "Reading reference sizes" << endl;
@@ -341,22 +342,23 @@ static void driver(const string& infile,
 				// nucleotides; not colors
 				int numSeqs = 0;
 				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
+					fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
 				refparams.color = true;
 				writeU32(fout3, szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) {
 					szs[i].write(fout3, bigEndian);
 				}
 				szs.clear();
+				plens.clear();
 				// Now read in the colorspace size records; these are
 				// the ones that were indexed
 				int numSeqs2 = 0;
-				sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs2);
-				assert_eq(numSeqs, numSeqs2);
-				assert_eq(sztot2.second, sztot.second + numSeqs);
+				sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs2);
+				assert_geq(numSeqs, numSeqs2);
+				//assert_eq(sztot2.second, sztot.second + numSeqs);
 			} else {
 				int numSeqs = 0;
-				sztot = fastaRefReadSizes(is, szs, refparams, &bpout, numSeqs);
+				sztot = fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
 				writeU32(fout3, szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			}
@@ -370,24 +372,37 @@ static void driver(const string& infile,
 			fout3.close();
 #ifndef NDEBUG
 			if(sanityCheck) {
-				BitPairReference bpr(outfile, color, true, &infiles, NULL, format == CMDLINE);
+				BitPairReference bpr(
+					outfile, // ebwt basename
+					color,   // expect color?
+					true,    // sanity check?
+					&infiles,// files to check against
+					NULL,    // sequences to check against
+					format == CMDLINE, // whether infiles contains strings
+					true,    // load sequence?
+					false,   // use memory-mapped files
+					false,   // use shared memory
+					false,   // sweep through memory-mapped memory
+					false,   // be talkative
+					false);  // be talkative
 			}
 #endif
 		} else {
 			// Read in the sizes of all the unambiguous stretches of the
 			// genome into a vector of RefRecords
 			int numSeqs = 0;
-			sztot = fastaRefReadSizes(is, szs, refparams, NULL, numSeqs);
+			sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs);
 #ifndef NDEBUG
 			if(refparams.color) {
 				refparams.color = false;
 				vector<RefRecord> szs2;
+				vector<uint32_t> plens2;
 				int numSeqs2 = 0;
 				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs2, refparams, NULL, numSeqs2);
-				assert_eq(numSeqs, numSeqs2);
+					fastaRefReadSizes(is, szs2, plens2, refparams, NULL, numSeqs2);
+				assert_leq(numSeqs, numSeqs2);
 				// One less color than base
-				assert_geq(sztot2.second, sztot.second + numSeqs);
+				//assert_geq(sztot2.second, sztot.second + numSeqs);
 				refparams.color = true;
 			}
 #endif
@@ -413,6 +428,7 @@ static void driver(const string& infile,
 	                noDc? 0 : dcv,// difference-cover period
 	                is,           // list of input streams
 	                szs,          // list of reference sizes
+	                plens,        // list of not-all-gap reference sequence lengths
 	                sztot.first,  // total size of all unambiguous ref chars
 	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed

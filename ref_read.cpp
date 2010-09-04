@@ -95,7 +95,6 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			//return RefRecord(off, 0, false);
 			return RefRecord(off, 0, first);
 		}
 		c = in.get();
@@ -107,7 +106,6 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			//return RefRecord(off, 0, false);
 			return RefRecord(off, 0, first);
 		}
 	}
@@ -235,6 +233,7 @@ void reverseRefRecords(const vector<RefRecord>& src,
 std::pair<size_t, size_t>
 fastaRefReadSizes(vector<FileBuf*>& in,
                   vector<RefRecord>& recs,
+                  vector<uint32_t>& plens,
                   const RefReadInParams& rparms,
                   BitpairOutFileBuf* bpout,
                   int& numSeqs)
@@ -243,6 +242,7 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 	uint32_t bothTot = 0;
 	RefReadInParams rpcp = rparms;
 	assert_gt(in.size(), 0);
+	uint32_t both = 0, unambig = 0;
 	// For each input istream
 	for(size_t i = 0; i < in.size(); i++) {
 		bool first = true;
@@ -250,6 +250,17 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 		// For each pattern in this istream
 		while(!in[i]->eof()) {
 			RefRecord rec = fastaRefReadSize(*in[i], rparms, first, bpout);
+			// Update plens
+			if(rec.first) {
+				if(unambig > 0) {
+					plens.push_back(both);
+				}
+				both = 0;
+				unambig = 0;
+			}
+#ifndef ACCOUNT_FOR_ALL_GAP_REFS
+			if(rec.len == 0) rec.first = false;
+#endif
 			if((unambigTot + rec.len) < unambigTot) {
 				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please divide the" << endl
 				     << "reference into batches or chunks of about 3.6 billion characters or less each" << endl
@@ -258,9 +269,9 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 			}
 			// Add the length of this record.
 			if(rec.first) numSeqs++;
-			unambigTot += rec.len;
-			bothTot += rec.len;
-			bothTot += rec.off;
+			unambigTot += rec.len; unambig += rec.len;
+			bothTot += rec.len;    both += rec.len;
+			bothTot += rec.off;    both += rec.off;
 			first = false;
 			if(rec.len == 0 && rec.off == 0 && !rec.first) continue;
 			recs.push_back(rec);
@@ -278,6 +289,9 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 	}
 	assert_geq(bothTot, 0);
 	assert_geq(unambigTot, 0);
+	if(unambig > 0) {
+		plens.push_back(both);
+	}
 	return make_pair(
 		unambigTot, // total number of unambiguous DNA characters read
 		bothTot); // total number of DNA characters read, incl. ambiguous ones

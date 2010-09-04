@@ -33,15 +33,16 @@ public:
 	 */
 	BitPairReference(const string& in,
 	                 bool color,
-	                 bool sanity = false,
-	                 std::vector<string>* infiles = NULL,
-	                 std::vector<String<Dna5> >* origs = NULL,
-	                 bool infilesSeq = false,
-	                 bool useMm = false,
-	                 bool useShmem = false,
-	                 bool mmSweep = false,
-	                 bool verbose = false,
-	                 bool startVerbose = false) :
+	                 bool sanity,
+	                 std::vector<string>* infiles,
+	                 std::vector<String<Dna5> >* origs,
+	                 bool infilesSeq,
+	                 bool loadSequence, // as opposed to just records
+	                 bool useMm,
+	                 bool useShmem,
+	                 bool mmSweep,
+	                 bool verbose,
+	                 bool startVerbose) :
 	buf_(NULL),
 	sanityBuf_(NULL),
 	loaded_(true),
@@ -138,44 +139,97 @@ public:
 
 		// Read records
 		nrefs_ = 0;
+		nNoGapRefs_ = 0;
 
 		// Cumulative count of all unambiguous characters on a per-
 		// stretch 8-bit alignment (i.e. count of bytes we need to
 		// allocate in buf_)
 		uint32_t cumsz = 0;
 		uint32_t cumlen = 0;
+		uint32_t unambiglen = 0;
+		uint32_t maxlen = 0;
 		// For each unambiguous stretch...
 		for(uint32_t i = 0; i < sz; i++) {
 			recs_.push_back(RefRecord(f3, swap));
-			if(recs_.back().first) {
-				// Remember that this is the first record for this
-				// reference sequence (and the last record for the one
-				// before)
-				refRecOffs_.push_back(recs_.size()-1);
-				refOffs_.push_back(cumsz);
+		}
+		for(uint32_t i = 0; i < sz; i++) {
+			if(recs_[i].first) {
 				if(nrefs_ > 0) {
 					refLens_.push_back(cumlen);
 				}
+				// Stupid hack to get around the fact that, for
+				// colorspace Ebwts, not only do we omit reference
+				// sequences that are *all* gaps from
+				// nPat/plen/refnames, but we also omit reference
+				// sequences that never have a stretch of more than 1
+				// unambiguous character.
+				if(unambiglen > 0 && (!color || maxlen > 1)) {
+					refApproxLens_.push_back(cumlen);
+				}
+				// More hackery to detect references that won't be
+				// in the Ebwt even though they have non-zero length
+				bool willBeInEbwt = true;
+				if(recs_[i].len > 0 && color) {
+					// Omit until we prove it should be kept
+					willBeInEbwt = false;
+					for(uint32_t j = i; j < sz; j++) {
+						if(j > i && recs_[j].first) break;
+						if(recs_[j].len >= 2) {
+							willBeInEbwt = true;
+							break;
+						}
+					}
+				}
+				if(recs_[i].len > 0 && willBeInEbwt) {
+					// Remember that this is the first record for this
+					// reference sequence (and the last record for the one
+					// before)
+					refRecOffs_.push_back(i);
+					refOffs_.push_back(cumsz);
+					expandIdx_.push_back(nrefs_);
+					shrinkIdx_.push_back(nNoGapRefs_);
+					nNoGapRefs_++;
+					isGaps_.push_back(false);
+				} else {
+					shrinkIdx_.push_back(nNoGapRefs_);
+					isGaps_.push_back(true);
+				}
 				cumlen = 0;
+				unambiglen = 0;
+				maxlen = 0;
 				nrefs_++;
+				assert_eq(nNoGapRefs_, expandIdx_.size());
+				assert_eq(nrefs_, shrinkIdx_.size());
 			} else if(i == 0) {
-				cerr << "First record in reference index file was not marked as 'first'" << endl;
-				throw 1;
+				//cerr << "First record in reference index file was not marked as 'first'" << endl;
+				//throw 1;
 			}
-			cumsz += recs_.back().len;
-			cumlen += recs_.back().off;
-			cumlen += recs_.back().len;
+			cumsz += recs_[i].len;
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
+			cumlen += recs_[i].off;
+			cumlen += recs_[i].len;
+#else
+			if(recs_[i].len > 0) {
+				cumlen += recs_[i].off;
+				cumlen += recs_[i].len;
+			}
+#endif
+			unambiglen += recs_[i].len;
+			if(recs_[i].len > maxlen) maxlen = recs_[i].len;
 		}
 		if(verbose_ || startVerbose) {
-			cerr << "Read " << nrefs_ << " reference strings from " << sz << " records: ";
+			cerr << "Read " << nrefs_ << " reference strings (" << nNoGapRefs_ << " non-empty) from " << sz << " records: ";
 			logTime(cerr);
 		}
 		// Store a cap entry for the end of the last reference seq
 		refRecOffs_.push_back(recs_.size());
 		refOffs_.push_back(cumsz);
+		if(unambiglen > 0 && (!color || maxlen > 1)) {
+			refApproxLens_.push_back(cumlen);
+		}
 		refLens_.push_back(cumlen);
 		bufSz_ = cumsz;
-		assert_eq(nrefs_, refLens_.size());
+		assert_eq(nNoGapRefs_, refApproxLens_.size());
 		assert_eq(sz, recs_.size());
 		MM_FILE_CLOSE(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
@@ -184,6 +238,7 @@ public:
 		}
 		bufAllocSz_ = cumsz >> 2;
 		assert_eq(0, cumsz & 3); // should be rounded up to nearest 4
+		if(!loadSequence) return;
 		if(useMm_) {
 #ifdef BOWTIE_MM
 			buf_ = (uint8_t*)mmFile;
@@ -574,10 +629,45 @@ public:
 		return nrefs_;
 	}
 
-	/// Return the number of reference sequences.
+	/// Return the number of reference sequences that don't consist
+	/// entirely of stretches of ambiguous characters.
+	uint32_t numNonGapRefs() const {
+		return nNoGapRefs_;
+	}
+
+	/**
+	 *
+	 */
+	uint32_t shrinkIdx(uint32_t idx) const {
+		assert_lt(idx, shrinkIdx_.size());
+		return shrinkIdx_[idx];
+	}
+
+	/**
+	 *
+	 */
+	uint32_t expandIdx(uint32_t idx) const {
+		assert_lt(idx, expandIdx_.size());
+		return expandIdx_[idx];
+	}
+
+	/// Return the lengths of reference sequences.
 	uint32_t approxLen(uint32_t elt) const {
 		assert_lt(elt, nrefs_);
+		return refApproxLens_[elt];
+	}
+
+	/// Return the lengths of reference sequences.
+	uint32_t len(uint32_t elt) const {
+		assert_lt(elt, nrefs_);
 		return refLens_[elt];
+	}
+
+	/// Return true iff ref 'elt' is all gaps
+	bool isAllGaps(uint32_t elt) const {
+		assert_lt(elt, nrefs_);
+		assert_eq(isGaps_.size(), nrefs_);
+		return isGaps_[elt];
 	}
 
 	/// Return true iff buf_ and all the vectors are populated.
@@ -585,19 +675,29 @@ public:
 		return loaded_;
 	}
 
+	/**
+	 * Return constant reference to the RefRecord list.
+	 */
+	const std::vector<RefRecord>& refRecords() const { return recs_; }
+
 protected:
 
 	uint32_t byteToU32_[256];
 
 	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
+	std::vector<uint32_t>  refApproxLens_; /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<uint32_t>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
 	std::vector<uint32_t>  refRecOffs_; /// record begin/end offsets per ref seq
+	std::vector<uint32_t>  expandIdx_; /// map from small idxs (e.g. w/r/t plen) to large ones (w/r/t refnames)
+	std::vector<uint32_t>  shrinkIdx_; /// map from large idxs to small
+	std::vector<bool>      isGaps_;    /// ref i is all gaps?
 	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
 	uint8_t *sanityBuf_;/// for sanity-checking buf_
 	uint32_t bufSz_;    /// size of buf_
 	uint32_t bufAllocSz_;
-	uint32_t nrefs_;    /// the number of reference sequences
+	uint32_t nrefs_;      /// the number of reference sequences
+	uint32_t nNoGapRefs_; /// the number of reference sequences that aren't totally ambiguous
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking
 	bool     useMm_;    /// load the reference as a memory-mapped file

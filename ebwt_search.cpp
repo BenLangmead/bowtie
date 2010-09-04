@@ -1369,7 +1369,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
 	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
@@ -1595,7 +1595,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
 	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	mismatchSearch_refs = refs;
@@ -1927,7 +1927,7 @@ static void twoOrThreeMismatchSearchFull(
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
 	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	twoOrThreeMismatchSearch_refs     = refs;
@@ -2324,7 +2324,7 @@ static void seededQualCutoffSearchFull(
 	bool pair = mates1.size() > 0 || mates12.size() > 0;
 	if(color || (pair && mixedThresh < 0xffffffff)) {
 		Timer _t(cerr, "Time loading reference: ", timing);
-		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, useMm, useShmem, mmSweep, verbose, startVerbose);
+		refs = new BitPairReference(adjustedEbwtFileBase, color, sanityCheck, NULL, &os, false, true, useMm, useShmem, mmSweep, verbose, startVerbose);
 		if(!refs->loaded()) throw 1;
 	}
 	seededQualSearch_refs = refs;

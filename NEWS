@@ -26,6 +26,15 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+September 3, 2010
+   * The version of bowtie-build distributed in Bowtie 0.12.6 IS
+     BROKEN.  It could not handle stretches of ambiguous reference
+     characters compatibly with prior versions of Bowtie.  Please use
+     Bowtie 0.12.5's bowtie-build instead.  Bowtie 0.12.7, due out
+     soon, will contain a complete set of working tools.  Bowtie 0.12.7
+     will revert to old way of building the reverse index.  Sorry for
+     the inconvenience.
+
 Version 0.12.6 - August 29, 2010
    * Modified bowtie-inspect's default mode to use the bit-encoded
      reference portion of the index to reconstruct the reference

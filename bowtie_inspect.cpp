@@ -19,6 +19,7 @@ static int names_only   = 0;  // just print the sequence names in the index
 static int summarize_only = 0; // just print summary of index and quit
 static int across       = 60; // number of characters across in FASTA output
 static bool extra       = false; // print extra summary info
+static bool exclAllGaps = false; // print extra summary info
 static bool refFromEbwt = false; // true -> when printing reference, decode it from Ebwt instead of reading it from BitPairReference
 
 static const char *short_options = "vhnsea:";
@@ -26,7 +27,8 @@ static const char *short_options = "vhnsea:";
 enum {
 	ARG_VERSION = 256,
 	ARG_USAGE,
-	ARG_EXTRA
+	ARG_EXTRA,
+	ARG_EXCL_AMBIG
 };
 
 static struct option long_options[] = {
@@ -34,6 +36,7 @@ static struct option long_options[] = {
 	{(char*)"version",  no_argument,        0, ARG_VERSION},
 	{(char*)"usage",    no_argument,        0, ARG_USAGE},
 	{(char*)"extra",    no_argument,        0, ARG_EXTRA},
+	{(char*)"excl-ambig",no_argument,       0, ARG_EXCL_AMBIG},
 	{(char*)"names",    no_argument,        0, 'n'},
 	{(char*)"summary",  no_argument,        0, 's'},
 	{(char*)"help",     no_argument,        0, 'h'},
@@ -104,6 +107,7 @@ static void parseOptions(int argc, char **argv) {
 				break;
 			case 'v': verbose = true; break;
 			case ARG_VERSION: showVersion = true; break;
+			case ARG_EXCL_AMBIG: exclAllGaps = true; break;
 			case ARG_EXTRA: extra = true; break;
 			case 'e': refFromEbwt = true; break;
 			case 'n': names_only = true; break;
@@ -138,6 +142,26 @@ void print_fasta_record(ostream& fout,
 			fout << seq.substr(i) << endl;
 	} else {
 		fout << seq << endl;
+	}
+}
+
+/**
+ * Given output stream, name and length, print a string of Ns with the
+ * appropriate number of columns.
+ */
+void print_alln_ref_sequence(
+	ostream& fout,
+	const string& name,
+	size_t len)
+{
+	fout << ">" << name << "\n";
+	size_t j = 0;
+	for(size_t i = 0; i < len; i += across) {
+		while(j < len && j < i+across) {
+			fout << 'N';
+			j++;
+		}
+		fout << "\n";
 	}
 }
 
@@ -192,13 +216,31 @@ void print_ref_sequences(
 		NULL,                 // infiles
 		NULL,                 // originals
 		false,                // infiles are sequences
+		true,                 // load sequence
 		false,                // memory-map
 		false,                // use shared memory
 		false,                // sweep mm-mapped ref
 		verbose,              // be talkative
 		verbose);             // be talkative at startup
-	assert_eq(ref.numRefs(), refnames.size());
+#ifdef ACCOUNT_FOR_ALL_GAP_REFS
 	for(size_t i = 0; i < ref.numRefs(); i++) {
+		if(ref.isAllGaps(i) && !exclAllGaps) {
+			print_alln_ref_sequence(
+				fout,
+				refnames[i],
+				ref.len(i));
+		} else {
+			print_ref_sequence(
+				fout,
+				ref,
+				refnames[i],
+				ref.shrinkIdx(i),
+				ref.len(i));
+		}
+	}
+#else
+	assert_eq(refnames.size(), ref.numNonGapRefs());
+	for(size_t i = 0; i < ref.numNonGapRefs(); i++) {
 		print_ref_sequence(
 			fout,
 			ref,
@@ -206,6 +248,7 @@ void print_ref_sequences(
 			i,
 			plen[i] + (color ? 1 : 0));
 	}
+#endif
 }
 
 /**
@@ -213,7 +256,10 @@ void print_ref_sequences(
  * entire thing.
  */
 template<typename TStr>
-void print_index_sequences(ostream& fout, Ebwt<TStr>& ebwt)
+void print_index_sequences(
+	ostream& fout,
+	Ebwt<TStr>& ebwt,
+	const BitPairReference& refs)
 {
 	vector<string>* refnames = &(ebwt.refnames());
 
@@ -292,7 +338,8 @@ typedef Ebwt<String<Dna, Packed<Alloc<> > > > TPackedEbwt;
  */
 void print_index_summary(
 	const string& fname,
-	ostream& fout)
+	ostream& fout,
+	const BitPairReference& refs)
 {
 	int32_t flags = readFlags(fname);
 	int32_t flagsr = readFlags(fname + ".rev");
@@ -325,15 +372,25 @@ void print_index_summary(
 	if(extra) {
 		cout << "Concat then reverse" << '\t' << (entireReverse ? "1" : "0") << endl;
 		cout << "Reverse then concat" << '\t' << (entireReverse ? "0" : "1") << endl;
+		cout << "nPat" << '\t' << ebwt.nPat() << endl;
+		cout << "refnames.size()" << '\t' << p_refnames.size() << endl;
+		cout << "refs.numRefs()" << '\t' << refs.numRefs() << endl;
+		cout << "refs.numNonGapRefs()" << '\t' << refs.numNonGapRefs() << endl;
 	}
 	cout << "SA-Sample" << "\t1 in " << (1 << ebwt.eh().offRate()) << endl;
 	cout << "FTab-Chars" << '\t' << ebwt.eh().ftabChars() << endl;
-	assert_eq(ebwt.nPat(), p_refnames.size());
-	for(size_t i = 0; i < p_refnames.size(); i++) {
+	for(size_t i = 0; i < ebwt.nPat(); i++) {
 		cout << "Sequence-" << (i+1)
-		     << '\t' << p_refnames[i]
+		     << '\t' << p_refnames[refs.expandIdx(i)]
 		     << '\t' << (ebwt.plen()[i] + (color ? 1 : 0))
 		     << endl;
+	}
+	if(extra) {
+		cout << "RefRecords:\n";
+		for(size_t i = 0; i < refs.refRecords().size(); i++) {
+			RefRecord r = refs.refRecords()[i];
+			cout << r.first << "\t(" << r.off << ", " << r.len << ")" << endl;
+		}
 	}
 }
 
@@ -343,14 +400,28 @@ static void driver(
 {
 	// Adjust
 	string adjustedEbwtFileBase = adjustEbwtBase(argv0, ebwtFileBase, verbose);
-
 	if (names_only) {
 		print_index_sequence_names(adjustedEbwtFileBase, cout);
-	} else if(summarize_only) {
-		print_index_summary(adjustedEbwtFileBase, cout);
+		return;
+	}
+	bool color = readEbwtColor(adjustedEbwtFileBase);
+	BitPairReference refs(
+		adjustedEbwtFileBase,
+		color,
+		false,
+		NULL,
+		NULL,
+		false,
+		false, // don't load sequence (yet)
+		false,
+		false,
+		false, // mmSweep
+		verbose,
+		verbose);
+	if(summarize_only) {
+		print_index_summary(adjustedEbwtFileBase, cout, refs);
 	} else {
 		// Initialize Ebwt object
-		bool color = readEbwtColor(adjustedEbwtFileBase);
 		TPackedEbwt ebwt(
 			adjustedEbwtFileBase,
 			color,                // index is colorspace
@@ -371,7 +442,7 @@ static void driver(
 		// Load whole index into memory
 		if(refFromEbwt) {
 			ebwt.loadIntoMemory(-1, -1, true, false);
-			print_index_sequences(cout, ebwt);
+			print_index_sequences(cout, ebwt, refs);
 		} else {
 			vector<string> refnames;
 			readEbwtRefnames(adjustedEbwtFileBase, refnames);

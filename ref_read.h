@@ -90,23 +90,27 @@ struct RefReadInParams {
 };
 
 extern RefRecord
-fastaRefReadSize(FileBuf& in,
-                 const RefReadInParams& rparms,
-                 bool first,
-                 BitpairOutFileBuf* bpout = NULL);
+fastaRefReadSize(
+	FileBuf& in,
+	const RefReadInParams& rparms,
+	bool first,
+	BitpairOutFileBuf* bpout = NULL);
 
 extern std::pair<size_t, size_t>
-fastaRefReadSizes(vector<FileBuf*>& in,
-                  vector<RefRecord>& recs,
-                  const RefReadInParams& rparms,
-                  BitpairOutFileBuf* bpout,
-                  int& numSeqs);
+fastaRefReadSizes(
+	vector<FileBuf*>& in,
+	vector<RefRecord>& recs,
+	vector<uint32_t>& plens,
+	const RefReadInParams& rparms,
+	BitpairOutFileBuf* bpout,
+	int& numSeqs);
 
 extern void
-reverseRefRecords(const vector<RefRecord>& src,
-                  vector<RefRecord>& dst,
-                  bool recursive = false,
-                  bool verbose = false);
+reverseRefRecords(
+	const vector<RefRecord>& src,
+	vector<RefRecord>& dst,
+	bool recursive = false,
+	bool verbose = false);
 
 /**
  * Reads the next sequence from the given FASTA file and appends it to
