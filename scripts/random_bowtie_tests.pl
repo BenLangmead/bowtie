@@ -56,7 +56,7 @@ srand $seed;
 # make all the relevant binaries, unless we were asked not to
 unless($noCompile) {
 	run("make bowtie bowtie-debug bowtie-build-debug ".
-	       "bowtie-inspect-debug") == 0 || die "Error building";
+	       "bowtie-inspect-debug bowtie-inspect bowtie-build") == 0 || die "Error building";
 }
 
 # Alignment policies
@@ -445,6 +445,8 @@ sub build {
 		$cmd = "${bowtie_build}-debug -a -p $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(runBacktick("$cmd 2>&1"));
+		$out =~ s/Warning: Encountered reference sequence with only gaps//g;
+		$out = trim($out);
 		if($out eq "") {
 			if(run("diff .tmp$seed.1.ebwt .tmp$seed.packed.1.ebwt") != 0) {
 				die if $exitOnFail;
@@ -454,7 +456,7 @@ sub build {
 				$ret++;
 			}
 		} else {
-			print "$out\n";
+			print "Expected no output, got:\n$out\n";
 			if($exitOnFail) {
 				exit 1;
 			}
