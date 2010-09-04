@@ -170,7 +170,7 @@ for my $ca (@cases) {
 		my $bi = $debug ? $bowtie_inspect_d : $bowtie_inspect;
 		$bi .= " -a -1";
 		if($bowtie_build2 ne "") {
-			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | awk '/^Sequence/ {p=1} p==1 {print}'";
+			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn";
 			my $bbo = $debug ? $bowtie_build2_d : $bowtie_build2;
 			$bbo .= " -C" if $col;
 			my $cmd = "$bbo $cmdEnd";
@@ -181,7 +181,7 @@ for my $ca (@cases) {
 			print "$cmd\n";
 			my $bbout = `$cmd`;
 			print "New bowtie-build:\n$bbout\n";
-			$bbout eq $bb2out || die "RefRecords from new and old bowtie-build (above) didn't match";
+			match($bbout, $bb2out, "RefRecords from new and old bowtie-build (above) didn't match");
 		}
 		my $cmd = "$bb $fn $fn >/dev/null";
 		print "$cmd\n";
