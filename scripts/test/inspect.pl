@@ -20,6 +20,7 @@ my $bowtie_inspect = "./bowtie-inspect";
 my $bowtie_inspect2 = "./bowtie-inspect";
 my $ref = "";
 my $debug = 0;
+my $debug_old = 0;
 
 GetOptions (
 	"ref:s"                => \$ref,
@@ -28,7 +29,8 @@ GetOptions (
 	"bowtie-build2:s"      => \$bowtie_build2,
 	"bowtie-inspect:s"     => \$bowtie_inspect,
 	"bowtie-inspect2:s"    => \$bowtie_inspect2,
-	"debug"                => \$debug);
+	"debug"                => \$debug,
+	"debug2"               => \$debug_old);
 
 my $bowtie_d = "${bowtie}-debug";
 my $bowtie_build_d = "${bowtie_build}-debug";
@@ -170,8 +172,8 @@ for my $ca (@cases) {
 		my $bi = $debug ? $bowtie_inspect_d : $bowtie_inspect;
 		$bi .= " -a -1";
 		if($bowtie_build2 ne "") {
-			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn";
-			my $bbo = $debug ? $bowtie_build2_d : $bowtie_build2;
+			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | grep -v '^Sequence'";
+			my $bbo = $debug_old ? $bowtie_build2_d : $bowtie_build2;
 			$bbo .= " -C" if $col;
 			my $cmd = "$bbo $cmdEnd";
 			print "$cmd\n";
@@ -216,7 +218,7 @@ for my $ca (@cases) {
 		}
 		print $io;
 		if($bowtie_inspect2 ne "") {
-			my $bio = $debug ? $bowtie_inspect2_d : $bowtie_inspect2;
+			my $bio = $debug_old ? $bowtie_inspect2_d : $bowtie_inspect2;
 			$bio .= " -a -1";
 			$cmd = "$bio $fn";
 			print "$cmd\n";

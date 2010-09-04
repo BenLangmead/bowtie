@@ -1004,7 +1004,14 @@ for(; $outer > 0; $outer--) {
 	# For each reference sequence...
 	for(my $i = 0; $i < $nt; $i++) {
 		my $tlen = $tbase + int(rand($trand));
-		my $tt = randDna($tlen);             # add text meat
+		# Add some all-gap references to try to confuse bowtie-build
+		# and bowtie-inspect
+		my $tt;
+		if(rand() < 0.15) {
+			$tt = 'N' x $tlen; # add text meat
+		} else {
+			$tt = randDna($tlen); # add text meat
+		}
 		push(@nts, $tt);
 		push(@cts, colorize($tt, 1));
 		my $newt = randGap() . $tt . randGap();
