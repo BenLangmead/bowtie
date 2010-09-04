@@ -372,16 +372,32 @@ public:
 			// Go through the loaded reference files base-by-base and
 			// sanity check against what we get by calling getBase and
 			// getStretch
+			size_t refi = 0;
+			int longestStretch = 0;
+			int curStretch = 0;
 			for(size_t i = 0; i < os->size(); i++) {
 				size_t olen = seqan::length((*os)[i]);
+				for(size_t j = i; j < olen; j++) {
+					if((int)(*os)[i][j] < 4) {
+						curStretch++;
+						if(curStretch > longestStretch) longestStretch = curStretch;
+					} else {
+						curStretch = 0;
+					}
+				}
+				if(longestStretch == 0 || (color && longestStretch == 1)) {
+					continue;
+				}
+				longestStretch = 0;
 				size_t olenU32 = (olen + 12) / 4;
 				uint32_t *buf = new uint32_t[olenU32];
 				uint8_t *bufadj = (uint8_t*)buf;
-				bufadj += getStretch(buf, i, 0, olen);
+				bufadj += getStretch(buf, refi, 0, olen);
 				for(size_t j = 0; j < olen; j++) {
 					assert_eq((int)(*os)[i][j], (int)bufadj[j]);
-					assert_eq((int)(*os)[i][j], (int)getBase(i, j));
+					assert_eq((int)(*os)[i][j], (int)getBase(refi, j));
 				}
+				refi++;
 				delete[] buf;
 			}
 		}

@@ -172,7 +172,7 @@ for my $ca (@cases) {
 		my $bi = $debug ? $bowtie_inspect_d : $bowtie_inspect;
 		$bi .= " -a -1";
 		if($bowtie_build2 ne "") {
-			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | grep -v '^Sequence'";
+			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | grep -v '^Sequence' | grep -v 'refnames.size'";
 			my $bbo = $debug_old ? $bowtie_build2_d : $bowtie_build2;
 			$bbo .= " -C" if $col;
 			my $cmd = "$bbo $cmdEnd";
@@ -200,7 +200,7 @@ for my $ca (@cases) {
 			my $c2 = trim(stripAllGaps($c, $col));
 			match($io, $c2, "$msg$c2");
 		}
-		print $io;
+		print "$io\n";
 		$cmd = "$bi -e $fn";
 		print "$cmd\n";
 		$io = trim(`$cmd`);
@@ -216,7 +216,7 @@ for my $ca (@cases) {
 			$c2 = trim(stripAllGaps($c2, 0));
 			match($io, $c2, "$msg$c2");
 		}
-		print $io;
+		print "$io\n";
 		if($bowtie_inspect2 ne "") {
 			my $bio = $debug_old ? $bowtie_inspect2_d : $bowtie_inspect2;
 			$bio .= " -a -1";
@@ -232,7 +232,7 @@ for my $ca (@cases) {
 				my $c2 = trim(stripAllGaps($c, $col));
 				match($io, $c2, "$msg$c2");
 			}
-			print $io;
+			print "$io\n";
 		}
 		print "PASSED\n";
 	}

@@ -3896,6 +3896,9 @@ TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
 		bool first = true;
 		while(!l[i]->eof()) {
 			RefRecord rec = fastaRefReadAppend(*l[i], first, ret, rpcp);
+#ifndef ACCOUNT_FOR_ALL_GAP_REFS
+			if(rec.first && rec.len == 0) rec.first = false;
+#endif
 			first = false;
 			size_t bases = rec.len;
 			assert_eq(rec.off, szs[szsi].off);
