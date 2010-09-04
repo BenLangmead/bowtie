@@ -174,7 +174,7 @@ for my $ca (@cases) {
 		my $bi = $debug ? $bowtie_inspect_d : $bowtie_inspect;
 		$bi .= " -a -1";
 		if($bowtie_build2 ne "") {
-			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | grep -v '^Sequence' | grep -v 'refnames.size'";
+			my $cmdEnd = "$fn $fn >/dev/null && $bowtie_inspect -s --extra $fn | grep -v '^Sequence' | grep -v 'refnames.size' | grep -v 'Reverse'";
 			my $bbo = $debug_old ? $bowtie_build2_d : $bowtie_build2;
 			$bbo .= " -C" if $col;
 			my $cmd = "$bbo $cmdEnd";
