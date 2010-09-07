@@ -2201,21 +2201,6 @@ architectures).
 
 Use `<int>` as the seed for pseudo-random number generator.
 
-</td></tr><tr><td id="bowtie-build-options-old-reverse">
-
-    --old-reverse
-
-</td><td>
-
-`bowtie-build` versions prior to 0.12.6 would construct the reverse
-index (in the `.rev.1.ebwt` and `.rev.2.ebwt`) by first reversing each
-unambiguous stretch of nucleotides then concatenating the reversed
-strings.  Starting with `bowtie-build` 0.12.6, the reverse index is
-constructed by first concatenating the unambiguous stretches of
-nucleotides, then reversing the concatenated string.  Specify
-`--old-reverse` to revert to the old behavior.  Both types of index are
-fully forward and backward compatible, unless otherwise noted.
-
 </td></tr><tr><td>
 
     --cutoff <int>

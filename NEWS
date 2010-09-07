@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.6.
+available to the public for download.  The current version is 0.12.7.
 
 Reporting Issues
 ================
@@ -25,6 +25,22 @@ subscribe to our mailing list:
 
 Version Release History
 =======================
+
+Version 0.12.7 - September 7, 2010
+   * Fixes the all-gap reference sequence issue that was present in
+     Bowtie 0.12.6.  Index files produced by bowtie-build 0.12.5 and
+     earlier (back to 0.10.*) are compatible with bowtie 0.12.7.  Index
+     files produced by bowtie-build 0.12.7 are backward compatible with
+     bowtie 0.12.5 and earlier as long as the first reference sequence
+     is not all-gaps (or, when colorspace indexes, as long as the first
+     reference sequence has two consecutive ACGT characters in it
+     somewhere).
+   * Indexes where the first sequence consists of all gaps or other
+     non-ACGT characters are not handled properly by Bowtie versions
+     0.12.5 and older, but are handled properly by Bowtie 0.12.7.
+   * REMOVED: bowtie-build's --old-reverse option; the old reverse-
+     index scheme is again the default.  The new scheme is disabled
+     pending further refinement.
 
 September 3, 2010
    * The version of bowtie-build distributed in Bowtie 0.12.6 IS
