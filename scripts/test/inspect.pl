@@ -23,6 +23,7 @@ my $ref = "";
 my $seed = 0;
 my $debug = 0;
 my $debug_old = 0;
+my $nodie = 0;
 
 GetOptions (
 	"ref:s"                => \$ref,
@@ -33,6 +34,7 @@ GetOptions (
 	"bowtie-inspect:s"     => \$bowtie_inspect,
 	"bowtie-inspect2:s"    => \$bowtie_inspect2,
 	"seed:i"               => \$seed,
+	"nodie"                => \$nodie,
 	"debug"                => \$debug,
 	"debug2"               => \$debug_old);
 
@@ -57,6 +59,17 @@ my @cases = (
 	">a\nAN\n>a\nNNNATCTAGNNA\n>b\nNNN\n>a\nNNNNNN\n>d\nAN\n"
 );
 
+sub mydie($) {
+	my $msg = shift;
+	print STDERR "$msg\n";
+	if($nodie) {
+		print "Press enter to continue...";
+		my $tmp = <STDIN>;
+	} else {
+		die;
+	}
+}
+
 ##
 # Given a fasta file string, strip away all sequences that consist
 # entirely of gaps.
@@ -68,7 +81,7 @@ sub stripAllGaps($$) {
 	while(1) {
 		my $name = shift @l;
 		last unless defined($name);
-		substr($name, 0, 1) eq ">" || die "Unexpected name line:\n$name\nin fasta:\n$_[0]";
+		substr($name, 0, 1) eq ">" || mydie("Unexpected name line:\n$name\nin fasta:\n$_[0]");
 		my $seq = shift @l;
 		if($col) {
 			if($seq =~ /[ACGT][ACGT]/i) {
@@ -103,7 +116,7 @@ sub colorize($$) {
 	for(my $i = 0; $i < length($s)-1; $i++) {
 		my $di = uc substr($s, $i, 2);
 		$di =~ tr/-NnMmRrWwSsYyKkVvHhDdBbXx/N/;
-		defined($cmap{$di}) || die "Bad dinuc: $di\n";
+		defined($cmap{$di}) || mydie("Bad dinuc: $di\n");
 		$ret .= ($nucs ? $nmap{$cmap{$di}} : $cmap{$di});
 	}
 	return $ret;
@@ -202,8 +215,8 @@ sub reconcileAlsWithRefs($$$) {
 		$hits{$ref} = $seq if ($rd eq $ref && $fw eq '+');
 	}
 	for my $i (keys %{$rm{trimseq}}) {
-		defined($hits{$i}) || die "No hit for reference $i:\n$als";
-		defined($rm{trimseq}->{$i}->{$hits{$i}}) || die "Hit sequence:\n$hits{$i}\n doesn't match ref sequence:\n$rm{$i}\n$als";
+		defined($hits{$i}) || mydie("No hit for reference $i:\n$als");
+		defined($rm{trimseq}->{$i}->{$hits{$i}}) || mydie("Hit sequence:\n$hits{$i}\n doesn't match ref sequence:\n$rm{$i}\n$als");
 	}
 }
 
@@ -221,7 +234,7 @@ sub match($$$) {
 		close(D1);
 		close(D2);
 		system("diff -uw .inspect.pl.$seed.d1 .inspect.pl.$seed.d2");
-		die "$_[2]";
+		mydie("$_[2]");
 	}
 }
 
@@ -244,7 +257,7 @@ sub colorizeFasta($) {
 }
 
 if($ref ne "") {
-	open(REF, $ref) || die "Could not open -ref $ref";
+	open(REF, $ref) || mydie("Could not open -ref $ref");
 	@cases = ();
 	push @cases, "";
 	while(<REF>) {
@@ -286,11 +299,11 @@ for my $ca (@cases) {
 		}
 		my $cmd = "$bb $fn $fn >/dev/null";
 		print "$cmd\n";
-		system($cmd) == 0 || die "Exitlevel $? from command '$cmd'\n";
+		system($cmd) == 0 || mydie("Exitlevel $? from command '$cmd'");
 		$cmd = "$bi $fn";
 		print "$cmd\n";
 		my $io = trim(`$cmd`);
-		$? == 0 || die "Exitlevel $? from command '$cmd'\n";
+		$? == 0 || mydie("Exitlevel $? from command '$cmd'");
 		my $msg = "Output from bowtie-inspect:\n$io\ndidn't match input:\n";
 		if(defined($e)) {
 			my $e2 = trim(stripAllGaps($e, $col));
@@ -303,7 +316,7 @@ for my $ca (@cases) {
 		$cmd = "$bi -e $fn";
 		print "$cmd\n";
 		$io = trim(`$cmd`);
-		$? == 0 || die "Exitlevel $? from command '$cmd'\n";
+		$? == 0 || mydie("Exitlevel $? from command '$cmd'");
 		$msg = "Output from bowtie-inspect -e:\n$io\ndidn't match input:\n";
 		if(defined($e)) {
 			# Colorspace quandry: strip gaps then colorize, or vice versa?
@@ -322,7 +335,7 @@ for my $ca (@cases) {
 			$cmd = "$bio $fn";
 			print "$cmd\n";
 			$io = trim(`$cmd`);
-			$? == 0 || die "Exitlevel $? from command '$cmd'\n";
+			$? == 0 || mydie("Exitlevel $? from command '$cmd'");
 			$msg = "Output from bowtie-inspect:\n$io\ndidn't match input:\n";
 			if(defined($e)) {
 				my $e2 = trim(stripAllGaps($e, $col));
