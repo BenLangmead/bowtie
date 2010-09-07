@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # Run from bowtie directory
+# Usually should do 'make allall' first
 
 d=`dirname $0`
 

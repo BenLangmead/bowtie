@@ -30,8 +30,16 @@ if(system("$bowtie_d --version") != 0) {
 
 if(! -f "e_coli_c.1.ebwt") {
 	print STDERR "Making colorspace e_coli index\n";
-	system("make bowtie-build") && die;
-	system("bowtie-build -C genomes/NC_008253.fna e_coli_c") && die;
+	my $bowtie_build = "./bowtie-build";
+	if(system("$bowtie_build --version") != 0) {
+		print STDERR "Could not execute ./bowtie-build; looking in PATH...\n";
+		$bowtie_build = `which $bowtie_build`;
+		chomp($bowtie_build);
+		if(system("$bowtie_build --version") != 0) {
+			die "Could not find bowtie-build in current directory or in PATH\n";
+		}
+	}
+	system("$bowtie_build -C genomes/NC_008253.fna e_coli_c") && die;
 } else {
 	print STDERR "Colorspace e_coli index already present...\n";
 }
