@@ -4119,25 +4119,6 @@ T2302111203131231130300111123220
 >Use <code
   >&lt;int&gt;</code
   > as the seed for pseudo-random number generator.</p
-></td></tr><tr><td id="bowtie-build-options-old-reverse">
-<pre
-><code
-  >--old-reverse
-</code
-  ></pre
-></td><td>
-<p
-><code
-  >bowtie-build</code
-  > versions prior to 0.12.6 would construct the reverse index (in the <code
-  >.rev.1.ebwt</code
-  > and <code
-  >.rev.2.ebwt</code
-  >) by first reversing each unambiguous stretch of nucleotides then concatenating the reversed strings. Starting with <code
-  >bowtie-build</code
-  > 0.12.6, the reverse index is constructed by first concatenating the unambiguous stretches of nucleotides, then reversing the concatenated string. Specify <code
-  >--old-reverse</code
-  > to revert to the old behavior. Both types of index are fully forward and backward compatible, unless otherwise noted.</p
 ></td></tr><tr><td>
 <pre
 ><code
