@@ -14,6 +14,7 @@ use warnings;
 use Getopt::Long;
 
 my $bowtie = "./bowtie";
+my $bowtie2 = "./bowtie";
 my $bowtie_build = "./bowtie-build";
 my $bowtie_build2 = "./bowtie-build";
 my $bowtie_inspect = "./bowtie-inspect";
@@ -26,6 +27,7 @@ my $debug_old = 0;
 GetOptions (
 	"ref:s"                => \$ref,
 	"bowtie:s"             => \$bowtie,
+	"bowtie2:s"            => \$bowtie2,
 	"bowtie-build:s"       => \$bowtie_build,
 	"bowtie-build2:s"      => \$bowtie_build2,
 	"bowtie-inspect:s"     => \$bowtie_inspect,
@@ -35,16 +37,17 @@ GetOptions (
 	"debug2"               => \$debug_old);
 
 my $bowtie_d = "${bowtie}-debug";
+my $bowtie2_d = "${bowtie2}-debug";
 my $bowtie_build_d = "${bowtie_build}-debug";
 my $bowtie_build2_d = "${bowtie_build2}-debug";
 my $bowtie_inspect_d = "${bowtie_inspect}-debug";
 my $bowtie_inspect2_d = "${bowtie_inspect2}-debug";
 
 my @cases = (
+	">\nN\n>0\nATCTAG\n>\nN\n",
 	">-\nNA\n",
 	">-\nNNA\n",
 	">-\nNAA\n",
-	">\nN\n>0\nATCTAG\n>\nN\n",
 	">\nN\n>0\nATCTAG\n>\nN\n",
 	">a\nN\n>b\nATCTAG\n>c\nN\n>d\nATCTAG\n",
 	">a\nN\n>b\nATCTAG\n>c\nN\n",
@@ -106,6 +109,9 @@ sub colorize($$) {
 	return $ret;
 }
 
+##
+# Return version of argument with whitespace trimmed off either end.
+#
 sub trim($) {
 	my $ret = $_[0];
 	$ret =~ s/^\s+//; $ret =~ s/\s+$//;
@@ -113,7 +119,98 @@ sub trim($) {
 }
 
 ##
+# Return version of argument with given character trimmed off either end.
 #
+sub trimc($$) {
+	my $ret = $_[0];
+	my $c = $_[1];
+	$ret =~ s/^$c+//; $ret =~ s/$c+$//;
+	return $ret;
+}
+
+##
+# Given a fasta string of references, parse out the sequences and
+# return them joined with commas.
+#
+sub refsToReads($$) {
+	my ($fa, $col) = @_;
+	my @l = split(/[\r\n]+/, $fa);
+	my $fn = ".inspect.pl.refsToReads.fa";
+	open(OUT, ">$fn") || die;
+	while(1) {
+		my $name = shift @l;
+		last unless defined($name);
+		my $seq = shift @l;
+		$seq = trimc($seq, 'N');
+		$seq = colorize($seq, 1) if $col;
+		$seq =~ s/N.*$//i;
+		$seq !~ /N/i || die;
+		if(length($seq) > 0) {
+			print OUT "$name\n$seq\n";
+		}
+	}
+	close(OUT);
+	return $fn;
+}
+
+##
+# Given a fasta string or references and a hash ref, fill the hash ref
+# with with reference sequences keyed by name.
+#
+sub refmap($$$) {
+	my ($fa, $map, $col) = @_;
+	my @l = split(/[\r\n]+/, $fa);
+	my $namelessref = 0;
+	while(1) {
+		my $name = shift @l;
+		last unless defined($name);
+		$name = substr($name, 1);
+		next if scalar(@l) == 0 || $l[0] =~ /^>/;
+		my $seq = shift @l;
+		next if !defined($seq) || length($seq) == 0;
+		if($name eq "") {
+			$name = $namelessref;
+			$namelessref++;
+		}
+		my $trimseq = trimc($seq, 'N');
+		$trimseq =~ s/N.*$//i;
+		$trimseq !~ /N/i || die;
+		if($col) {
+			$trimseq = "" unless $trimseq =~ /[acgt][acgt]/i;
+		}
+		$map->{seq}->{$name}->{$seq}++ if $seq ne "";
+		$map->{trimseq}->{$name}->{$trimseq}++ if $trimseq ne "";
+	}
+}
+
+##
+# Given output from running bowtie (first arg) and the fasta string of
+# references (second), make sure that every reference is represented
+# at least once in the bowtie output.  (at least b/c some references
+# might be substrings of others.)
+#
+sub reconcileAlsWithRefs($$$) {
+	my ($als, $fa, $col) = @_;
+	my %rm = ();
+	refmap($fa, \%rm, $col);
+	# Make a map from ref strs to the alignments that mapped
+	my @l = split(/[\r\n]+/, $als);
+	my %hits = ();
+	for my $al (@l) {
+		my @ls = split(/\t/, $al);
+		my ($rd, $fw, $ref, $off, $seq) = ($ls[0], $ls[1], $ls[2], $ls[3], $ls[4]);
+		$hits{$ref} = $seq if ($rd eq $ref && $fw eq '+');
+	}
+	for my $i (keys %{$rm{trimseq}}) {
+		defined($hits{$i}) || die "No hit for reference $i:\n$als";
+		defined($rm{trimseq}->{$i}->{$hits{$i}}) || die "Hit sequence:\n$hits{$i}\n doesn't match ref sequence:\n$rm{$i}\n$als";
+	}
+}
+
+##
+# Check that two strings are the same and, if they're not, print the
+# provided error message along with the output of a 'diff' between
+# them.
 #
 sub match($$$) {
 	if($_[0] ne $_[1]) {
@@ -236,6 +333,28 @@ for my $ca (@cases) {
 			}
 			print "$io\n";
 		}
+		
+		#
+		# Now query the index using all of the reference strings as
+		# queries and using '-a -v 0'.  This will test whether bowtie
+		# (and potentially also an older version of bowtie) agrees with
+		# bowtie-inspect and bowtie-build about what's in the index.
+		#
+		my $ba = $debug ? $bowtie_d : $bowtie;
+		$ba .= " -C --col-keepends" if $col;
+		$cmd = "$ba -f -a -v 0 $fn ".refsToReads($c, $col);
+		print "$cmd\n";
+		my $bao = trim(`$cmd`);
+		reconcileAlsWithRefs($bao, $c, $col);
+		if($bowtie2 ne "") {
+			my $ba2 = $debug ? $bowtie2_d : $bowtie2;
+			$ba2 .= " -C --col-keepends" if $col;
+			$cmd = "$ba2 -f -a -v 0 $fn ".refsToReads($c, $col);
+			print "$cmd\n";
+			my $bao2 = trim(`$cmd`);
+			reconcileAlsWithRefs($bao2, $c, $col);
+		}
+		
 		print "PASSED\n";
 	}
 }
