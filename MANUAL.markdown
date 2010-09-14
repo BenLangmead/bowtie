@@ -1289,8 +1289,9 @@ Print the amount of wall-clock time taken by each phase.
 
 </td><td>
 
-When outputting alignments, number the first base of a reference
-sequence as `<int>`.  Default: 0.
+When outputting alignments in Bowtie format, consider the first base of
+a reference sequence to have offset `<int>`.  This option has no effect
+in [`-S`/`--sam`] mode, since SAM mandates 1-based offsets.  Default: 0.
 
 </td></tr><tr><td id="bowtie-options-quiet">
 
