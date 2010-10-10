@@ -82,13 +82,10 @@ while(<M1>) {
 	my $fw2 = (($flags2 & 16) == 0) ? "F" : "R";
 	my $frag = $off2 - $off1;
 	# This can overestimate if one mate is entirely subsumed in the other
-	if($frag > 0) {
-		$frag += $slen2;
-	} else {
-		$frag += $slen1;
-	}
+	if($frag > 0) { $frag += $slen2; }
+	else          { $frag -= $slen1; }
 	# Install into bin
-	$frag = ($frag + ($binsz/2))/$binsz; # Round to nearest bin
+	$frag = int(($frag + ($binsz/2))/$binsz); # Round to nearest bin
 	$fragments{"$fw1$fw2"}{$frag}++;
 }
 close(M1);
