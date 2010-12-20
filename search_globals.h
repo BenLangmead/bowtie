@@ -18,6 +18,7 @@ extern bool colorQual;
 extern int  snpPhred;
 extern bool showSeed;
 extern bool quiet;
+extern bool gAllowMateContainment;
 
 extern MUTEX_T gLock;
 

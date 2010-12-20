@@ -66,6 +66,72 @@ my @cases = (
 	                "-n 0" ],
 	  pairhits => { "2,7" => 1 } },
 
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                   ACGAAAG
+	#                  ^2   ^7
+	#                   CTTTCGT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "CTTTCGT",
+	  args     => [ "-v 0",
+	                "-n 0" ],
+	  pairhits => { } },
+
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                   ACGAAAG
+	#                  ^2   ^7
+	#                   CTTTCGT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "CTTTCGT",
+	  args     => [ "--allow-contain -v 0",
+	                "--allow-contain -n 0" ],
+	  pairhits => { "2,3" => 1 } },
+
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                  AACGAAAG
+	#                  ^2   ^7
+	#                  CTTTCGTT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "CTTTCGTT",
+	  args     => [ "--allow-contain -v 0",
+	                "--allow-contain -n 0" ],
+	  pairhits => { "2,2" => 1 } },
+
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                  AACGAAAG
+	#                  ^2   ^7
+	#                  CTTTCGTT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "CTTTCGTT",
+	  args     => [ "--allow-contain -v 0 -m 1",
+	                "--allow-contain -n 0 -m 1" ],
+	  pairhits => { "2,2" => 1 } },
+
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                  AACGAAAG
+	#                  ^2   ^7
+	#                  CTTTCGTT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "AACGAAAG",
+	  args     => [ "--allow-contain --ff -v 0 -m 1",
+	                "--allow-contain --ff -n 0 -m 1" ],
+	  pairhits => { "2,2" => 1 } },
+
+	{ ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	#                  AACGAAAG 
+	#                  AACGAAAG
+	#                  ^2   ^7
+	#                  CTTTCGTT
+	  mate1s   =>   "AACGAAAG",
+	  mate2s   =>   "AACGATAG",
+	  args     => [ "--allow-contain --ff -v 1 -m 1",
+	                "--allow-contain --ff -n 1 -m 1" ],
+	  pairhits => { "2,2" => 1 } },
+
 	# Check basic -m funtionality
 
 	{ ref    => [ "TTGTTCGTTTGTTCGT" ],

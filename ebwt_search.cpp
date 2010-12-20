@@ -143,6 +143,7 @@ bool showSeed;
 static vector<string> qualities;
 static vector<string> qualities1;
 static vector<string> qualities2;
+bool gAllowMateContainment;
 MUTEX_T gLock;
 
 static void resetOptions() {
@@ -252,6 +253,7 @@ static void resetOptions() {
 	qualities.clear();
 	qualities1.clear();
 	qualities2.clear();
+	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
 	MUTEX_INIT(gLock);
 }
 
@@ -338,7 +340,8 @@ enum {
 	ARG_COLOR_KEEP_ENDS,
 	ARG_SHOWSEED,
 	ARG_QUALS1,
-	ARG_QUALS2
+	ARG_QUALS2,
+	ARG_ALLOW_CONTAIN
 };
 
 static struct option long_options[] = {
@@ -447,6 +450,7 @@ static struct option long_options[] = {
 	{(char*)"col-keepends", no_argument,       0,            ARG_COLOR_KEEP_ENDS},
 	{(char*)"cost",         no_argument,       0,            ARG_COST},
 	{(char*)"showseed",     no_argument,       0,            ARG_SHOWSEED},
+	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -675,6 +679,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_COLOR_SEQ: colorSeq = true; break;
 			case ARG_COLOR_QUAL: colorQual = true; break;
 			case ARG_SHOWSEED: showSeed = true; break;
+			case ARG_ALLOW_CONTAIN: gAllowMateContainment = true; break;
 			case ARG_SUPPRESS_FIELDS: {
 				vector<string> supp;
 				tokenize(optarg, ",", supp);
