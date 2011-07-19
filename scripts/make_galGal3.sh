@@ -6,14 +6,14 @@
 #
 
 BASE_CHRS=chr1
-# Add autosomes 2-24
+# Add autosomes 2-28
 i=2
-while [ $i -lt 25 ] ; do
+while [ $i -lt 29 ] ; do
 	BASE_CHRS="$BASE_CHRS chr$i"
 	i=`expr $i + 1`
 done
-# Add autosomes 26-28
-BASE_CHRS="$BASE_CHRS chr26 chr27 chr28 chr32"
+# Add autosome 32
+BASE_CHRS="$BASE_CHRS chr32"
 # Add sex chromosomes
 BASE_CHRS="$BASE_CHRS chrW chrZ"
 # Add mitochondrial
