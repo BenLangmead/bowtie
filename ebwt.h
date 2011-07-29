@@ -2941,7 +2941,7 @@ void Ebwt<TStr>::readIntoMemory(
 		}
 
 #ifdef BOWTIE_MM
-		if(_useMm && !justHeader) {
+		if(_useMm /*&& !justHeader*/) {
 			const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
 			int fds[] = { _in1, _in2 };
 			for(int i = 0; i < 2; i++) {
