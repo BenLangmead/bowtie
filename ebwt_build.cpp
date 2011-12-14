@@ -103,7 +103,7 @@ static void printUsage(ostream& out) {
 	    << "    -C/--color              build a colorspace index" << endl
 	    << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
 	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
-	    << "    -B                      build both letter- and colorspace indexes" << endl
+	    //<< "    -B                      build both letter- and colorspace indexes" << endl
 	    << "    --bmax <int>            max bucket sz for blockwise suffix-array builder" << endl
 	    //<< "    --bmaxmultsqrt <int>    max bucket sz as multiple of sqrt(ref len)" << endl
 	    << "    --bmaxdivn <int>        max bucket sz as divisor of ref len (default: 4)" << endl
