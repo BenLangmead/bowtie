@@ -951,7 +951,7 @@ static void parseOptions(int argc, const char **argv) {
 		throw 1;
 	}
 	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
-		cerr << "--strata has no effect unless combined with -k, -m or -a" << endl;
+		cerr << "--strata has no effect unless combined with -m, -a, or -k N where N > 1" << endl;
 		throw 1;
 	}
 	if(fuzzy && (!stateful && !paired)) {
