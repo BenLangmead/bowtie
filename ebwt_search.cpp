@@ -8,7 +8,9 @@
 #include <seqan/find.h>
 #include <getopt.h>
 #include <vector>
+#ifdef BOWTIE_PTHREADS
 #include <pthread.h>
+#endif
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian_swap.h"
