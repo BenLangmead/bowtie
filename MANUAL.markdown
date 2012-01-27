@@ -1343,8 +1343,8 @@ input, without any of the trimming or translation of quality values
 that may have taken place within `bowtie`.  Paired-end reads will be
 written to two parallel files with `_1` and `_2` inserted in the
 filename, e.g., if `<filename>` is `aligned.fq`, the #1 and #2 mates
-that fail to align will be written to `aligned_1.fq` and `aligned_2.fq`
-respectively.
+that align at least once will be written to `aligned_1.fq` and
+`aligned_2.fq` respectively.
 
 </td></tr><tr><td id="bowtie-options-un">
 

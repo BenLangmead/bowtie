@@ -26,7 +26,14 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
-Version 0.12.8 - September ??, 2010
+Version 0.12.8 - January 27, 2012
+   * Fixed a bug that would sometimes cause an immediate segmentation
+     fault in --sam mode
+   * Fixed make_galGal3.sh script to not omit chromosome 25.
+   * Removed -B option from usage message for bowtie-build; that option
+     is not implemented
+   * Fixed issue that could cause Bowtie not to compile when
+     BOWTIE_PTHREADS is left undefined and pthreads.h is not present
    * Elaborated documentation for -B/--offbase option to indicate that
      it only affects offsets in the default output mode, not in SAM
      mode.

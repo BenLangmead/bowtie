@@ -2695,9 +2695,15 @@ T2302111203131231130300111123220
   ></pre
 ></td><td>
 <p
->When outputting alignments, number the first base of a reference sequence as <code
+>When outputting alignments in Bowtie format, consider the first base of a reference sequence to have offset <code
   >&lt;int&gt;</code
-  >. Default: 0.</p
+  >. This option has no effect in <a href="#bowtie-options-S"
+  ><code
+    >-S</code
+    >/<code
+    >--sam</code
+    ></a
+  > mode, since SAM mandates 1-based offsets. Default: 0.</p
 ></td></tr><tr><td id="bowtie-options-quiet">
 
 
@@ -2759,7 +2765,7 @@ T2302111203131231130300111123220
   >&lt;filename&gt;</code
   > is <code
   >aligned.fq</code
-  >, the #1 and #2 mates that fail to align will be written to <code
+  >, the #1 and #2 mates that align at least once will be written to <code
   >aligned_1.fq</code
   > and <code
   >aligned_2.fq</code
