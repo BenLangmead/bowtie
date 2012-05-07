@@ -193,6 +193,7 @@ sub refmap($$$) {
 		}
 		$map->{seq}->{$name}->{$seq}++ if $seq ne "";
 		$map->{trimseq}->{$name}->{$trimseq}++ if $trimseq ne "";
+		$map->{trimseq}->{$name}{str} = $trimseq if $trimseq ne "";
 	}
 }
 
@@ -206,6 +207,7 @@ sub reconcileAlsWithRefs($$$) {
 	my ($als, $fa, $col) = @_;
 	my %rm = ();
 	refmap($fa, \%rm, $col);
+	return if $col;
 	# Make a map from ref strs to the alignments that mapped
 	my @l = split(/[\r\n]+/, $als);
 	my %hits = ();
@@ -216,7 +218,9 @@ sub reconcileAlsWithRefs($$$) {
 	}
 	for my $i (keys %{$rm{trimseq}}) {
 		defined($hits{$i}) || mydie("No hit for reference $i:\n$als");
-		defined($rm{trimseq}->{$i}->{$hits{$i}}) || mydie("Hit sequence:\n$hits{$i}\n doesn't match ref sequence:\n$rm{$i}\n$als");
+		defined($rm{trimseq}{$i}{$hits{$i}}) ||
+			mydie("Hit sequence:\n\"$hits{$i}\"\n doesn't match ref ".
+			      "sequence:\n\"".$rm{trimseq}{$i}{str}."\"\n$als");
 	}
 }
 

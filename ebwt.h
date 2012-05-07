@@ -1088,8 +1088,8 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline uint32_t countUpTo(const SideLocus& l, int c) const;
@@ -1241,6 +1241,8 @@ public:
 	               String<char>* quals, // read quality values
 	               String<char>* name,  // read name
 	               bool color,          // true -> read is colorspace
+	               char primer,         // primer base trimmed from beginning
+	               char trimc,          // first color trimmed from beginning
 	               bool colExEnds,      // true -> exclude nucleotides at extreme ends after decoding
 	               int snpPhred,        // penalty for a SNP
 	               const BitPairReference* ref, // reference (= NULL if not necessary)
@@ -1482,6 +1484,8 @@ public:
 		hit.oms = oms;
 		hit.mate = mate;
 		hit.color = color;
+		hit.primer = primer;
+		hit.trimc = trimc;
 		hit.seed = seed;
 		assert(hit.repOk());
 		return sink().reportHit(hit, stratum);
@@ -2493,6 +2497,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                String<char>* quals,
                                String<char>* name,
                                bool color,
+                               char primer,
+                               char trimc,
                                bool colExEnds,
                                int snpPhred,
                                const BitPairReference* ref,
@@ -2524,6 +2530,8 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			quals,                    // read quality values
 			name,                     // read name
 			color,                    // true -> read is colorspace
+			primer,
+			trimc,
 			colExEnds,                // true -> exclude nucleotides on ends
 			snpPhred,                 // phred probability of SNP
 			ref,                      // reference sequence
@@ -2561,6 +2569,8 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        String<char>* quals,
                                        String<char>* name,
                                        bool color,
+                                       char primer,
+                                       char trimc,
                                        bool colExEnds,
                                        int snpPhred,
                                        const BitPairReference* ref,
@@ -2621,9 +2631,9 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 		assert_eq(rcoff, off);
 	}
 #endif
-	return report(query, quals, name, color, colExEnds, snpPhred, ref,
-	              mmui32, refcs, numMms, off, top, bot, qlen, stratum,
-	              cost, patid, seed, params);
+	return report(query, quals, name, color, primer, trimc, colExEnds,
+	              snpPhred, ref, mmui32, refcs, numMms, off, top, bot,
+	              qlen, stratum, cost, patid, seed, params);
 }
 
 /**

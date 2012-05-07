@@ -138,6 +138,8 @@ public:
 		_color = r.color;
 		_seed = r.seed;
 		_patid = r.patid;
+		_primer = r.primer;
+		_trimc = r.trimc;
 		_rand.init(r.seed);
 	}
 
@@ -1546,8 +1548,9 @@ protected:
 			// of their offset from the 3' or 5' end.
 			assert_geq(cost, (uint32_t)(stratum << 14));
 			if(_ebwt->reportChaseOne((*_qry), _qual, _name,
-			                         _color, colorExEnds, snpPhred, _refs, _mms,
-			                         _refcs, stackDepth, ri, top, bot,
+			                         _color, _primer, _trimc, colorExEnds,
+			                         snpPhred, _refs, _mms, _refcs,
+			                         stackDepth, ri, top, bot,
 			                         _qlen, stratum, cost, _patid, _seed,
 			                         _params))
 			{
@@ -1776,6 +1779,8 @@ protected:
 	// Current range to expose to consumers
 	Range               _curRange;
 	uint32_t            _patid;
+	char                _primer;
+	char                _trimc;
 	uint32_t            _seed;
 #ifndef NDEBUG
 	std::set<int64_t>   allTops_;

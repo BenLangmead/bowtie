@@ -375,8 +375,7 @@ sub build {
 	
 	$cmd = "perl $Bin/test/inspect.pl --debug --seed $seed --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa";
 	print "$cmd\n";
-	system($cmd) == 0
-		|| die "inspect.pl died with exitlevel $?";
+	system($cmd) == 0 || die "inspect.pl died with exitlevel $?";
 	
 	# Make a version of the FASTA file where all non-A/C/G/T characters
 	# are Ns.  This is useful if we'd like to compare to the output of

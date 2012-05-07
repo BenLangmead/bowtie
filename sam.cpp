@@ -68,12 +68,12 @@ void SAMHitSink::appendAligned(ostream& ss,
 	if(h.mate > 0) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
-			if(isspace(h.patName[i])) break;
+			if(isspace((int)h.patName[i])) break;
 			ss << h.patName[i];
 		}
 	} else {
 		for(int i = 0; i < (int)seqan::length(h.patName); i++) {
-			if(isspace(h.patName[i])) break;
+			if(isspace((int)h.patName[i])) break;
 			ss << h.patName[i];
 		}
 	}
@@ -192,6 +192,18 @@ void SAMHitSink::appendAligned(ostream& ss,
 	// Add optional edit distance field
 	ss << "\tNM:i:" << nm;
 	if(h.color) ss << "\tCM:i:" << h.cmms.count();
+	// Add optional fields reporting the primer base and the downstream color,
+	// which, if they were present, were clipped when the read was read in
+	if(h.color && gReportColorPrimer) {
+		if(h.primer != '?') {
+			ss << "\tZP:Z:" << h.primer;
+			assert(isprint(h.primer));
+		}
+		if(h.trimc != '?') {
+			ss << "\tZp:Z:" << h.trimc;
+			assert(isprint(h.trimc));
+		}
+	}
 	if(xms > 0)  ss << "\tXM:i:" << xms;
 	ss << endl;
 }
@@ -272,7 +284,20 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 	   << "\t0\t0\t*\t*\t0\t0\t"
 	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << (paired ? (hssz+1)/2 : hssz) << endl;
+	   << (paired ? (hssz+1)/2 : hssz);
+	// Add optional fields reporting the primer base and the downstream color,
+	// which, if they were present, were clipped when the read was read in
+	if(p.bufa().color && gReportColorPrimer) {
+		if(p.bufa().primer != '?') {
+			ss << "\tZP:Z:" << p.bufa().primer;
+			assert(isprint(p.bufa().primer));
+		}
+		if(p.bufa().trimc != '?') {
+			ss << "\tZp:Z:" << p.bufa().trimc;
+			assert(isprint(p.bufa().trimc));
+		}
+	}
+	ss << endl;
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
@@ -282,7 +307,20 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
 		   << "\t0\t0\t*\t*\t0\t0\t"
 		   << p.bufb().patFw << "\t" << p.bufb().qual << "\tXM:i:"
-		   << (hssz+1)/2 << endl;
+		   << (hssz+1)/2;
+		// Add optional fields reporting the primer base and the downstream color,
+		// which, if they were present, were clipped when the read was read in
+		if(p.bufb().color && gReportColorPrimer) {
+			if(p.bufb().primer != '?') {
+				ss << "\tZP:Z:" << p.bufb().primer;
+				assert(isprint(p.bufb().primer));
+			}
+			if(p.bufb().trimc != '?') {
+				ss << "\tZp:Z:" << p.bufb().trimc;
+				assert(isprint(p.bufb().trimc));
+			}
+		}
+		ss << endl;
 	}
 	lock(0);
 	out(0).writeString(ss.str());

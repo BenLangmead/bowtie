@@ -19,6 +19,7 @@ extern int  snpPhred;
 extern bool showSeed;
 extern bool quiet;
 extern bool gAllowMateContainment;
+extern bool gReportColorPrimer;
 
 extern MUTEX_T gLock;
 

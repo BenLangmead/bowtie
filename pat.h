@@ -318,17 +318,6 @@ struct ReadBuf {
 		}
 	}
 
-	/**
-	 * Write read details to a HitSet object.
-	 */
-	void toHitSet(HitSet& hs) {
-		assert(!empty());
-		hs.name = name;
-		hs.seq = patFw;
-		hs.qual = qual;
-		hs.color = color;
-	}
-
 	static const int BUF_SIZE = 1024;
 
 	String<Dna5>  patFw;               // forward-strand sequence

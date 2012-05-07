@@ -146,6 +146,7 @@ static vector<string> qualities;
 static vector<string> qualities1;
 static vector<string> qualities2;
 bool gAllowMateContainment;
+bool gReportColorPrimer;
 MUTEX_T gLock;
 
 static void resetOptions() {
@@ -256,6 +257,7 @@ static void resetOptions() {
 	qualities1.clear();
 	qualities2.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
+	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
 	MUTEX_INIT(gLock);
 }
 
@@ -320,8 +322,6 @@ enum {
 	ARG_RECAL,
 	ARG_STRATA,
 	ARG_PEV2,
-	ARG_CHAINOUT,
-	ARG_CHAININ,
 	ARG_REFMAP,
 	ARG_ANNOTMAP,
 	ARG_REPORTSE,
@@ -343,7 +343,8 @@ enum {
 	ARG_SHOWSEED,
 	ARG_QUALS1,
 	ARG_QUALS2,
-	ARG_ALLOW_CONTAIN
+	ARG_ALLOW_CONTAIN,
+	ARG_COLOR_PRIMER
 };
 
 static struct option long_options[] = {
@@ -428,8 +429,6 @@ static struct option long_options[] = {
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
 	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
-	{(char*)"chainout",     no_argument,       0,            ARG_CHAINOUT},
-	{(char*)"chainin",      no_argument,       0,            ARG_CHAININ},
 	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
@@ -453,6 +452,7 @@ static struct option long_options[] = {
 	{(char*)"cost",         no_argument,       0,            ARG_COST},
 	{(char*)"showseed",     no_argument,       0,            ARG_SHOWSEED},
 	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
+	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -650,7 +650,6 @@ static void parseOptions(int argc, const char **argv) {
 			case 'r': format = RAW; break;
 			case 'c': format = CMDLINE; break;
 			case 'C': color = true; break;
-			case ARG_CHAININ: format = INPUT_CHAIN; break;
 			case 'I':
 				minInsert = (uint32_t)parseInt(0, "-I arg must be positive");
 				break;
@@ -670,7 +669,6 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			case ARG_RANGE: rangeMode = true; break;
 			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
-			case ARG_CHAINOUT: outType = OUTPUT_CHAIN; break;
 			case 'S': outType = OUTPUT_SAM; break;
 			case ARG_REFOUT: refOut = true; break;
 			case ARG_NOOUT: outType = OUTPUT_NONE; break;
@@ -682,6 +680,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_COLOR_QUAL: colorQual = true; break;
 			case ARG_SHOWSEED: showSeed = true; break;
 			case ARG_ALLOW_CONTAIN: gAllowMateContainment = true; break;
+			case ARG_COLOR_PRIMER: gReportColorPrimer = true; break;
 			case ARG_SUPPRESS_FIELDS: {
 				vector<string> supp;
 				tokenize(optarg, ",", supp);
@@ -973,35 +972,6 @@ static void parseOptions(int argc, const char **argv) {
 	if(snpPhred <= 10 && color && !quiet) {
 		cerr << "Warning: the colorspace SNP penalty (--snpphred) is very low: " << snpPhred << endl;
 	}
-	if(format == INPUT_CHAIN) {
-		bool error = false;
-		if(!stateful) {
-			cerr << "Error: --chainin must be combined with --best; aborting..." << endl;
-			error = true;
-		}
-		if(paired) {
-			cerr << "Error: --chainin cannot be combined with paired-end alignment; aborting..." << endl;
-			error = true;
-		}
-		if(error) throw 1;
-	}
-
-	if(outType == OUTPUT_CHAIN) {
-		bool error = false;
-		if(refOut) {
-			cerr << "Error: --chainout is not compatible with --refout; aborting..." << endl;
-			error = true;
-		}
-		if(!stateful) {
-			cerr << "Error: --chainout must be combined with --best; aborting..." << endl;
-			error = true;
-		}
-		if(paired) {
-			cerr << "Error: --chainout cannot be combined with paired-end alignment; aborting..." << endl;
-			error = true;
-		}
-		if(error) throw 1;
-	}
 	if(outType == OUTPUT_SAM && refOut) {
 		cerr << "Error: --refout cannot be combined with -S/--sam" << endl;
 		throw 1;
@@ -1165,10 +1135,7 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 static HitSinkPerThreadFactory*
 createSinkFactory(HitSink& _sink) {
 	HitSinkPerThreadFactory *sink = NULL;
-	if(format == INPUT_CHAIN) {
-		assert(stateful);
-		sink = new ChainingHitSinkPerThreadFactory(_sink, allHits ? 0xffffffff : khits, mhits, strata);
-	} else if(!strata) {
+	if(!strata) {
 		// Unstratified
 		if(!allHits) {
 			// First N good; "good" inherently ignores strata
@@ -2433,9 +2400,6 @@ patsrcFromStrings(int format,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
-		case INPUT_CHAIN:
-			return new ChainPatternSource (seed, reads, useSpinlock, patDumpfile,
-			                               verbose, skipReads);
 		case RANDOM:
 			return new RandomPatternSource(seed, 2000000, lenRandomReads,
 			                               useSpinlock, patDumpfile,
@@ -2613,10 +2577,6 @@ static void driver(const char * type,
 			fout = new OutFileBuf(outfile.c_str(), false);
 		}
 	} else {
-		if(outType == OUTPUT_CHAIN && !refOut) {
-			cerr << "Error: Must specify an output file when output mode is --chain" << endl;
-			throw 1;
-		}
 		fout = new OutFileBuf();
 	}
 	ReferenceMap* rmap = NULL;
@@ -2781,14 +2741,6 @@ static void driver(const char * type,
 							format == TAB_MATE,  sampleMax,
 							table, refnames, reportOpps);
 				}
-				break;
-			case OUTPUT_CHAIN:
-				assert(stateful);
-				sink = new ChainingHitSink(
-						fout, strata, amap,
-						PASS_DUMP_FILES,
-						true, sampleMax,
-						table, refnames);
 				break;
 			case OUTPUT_NONE:
 				sink = new StubHitSink();
