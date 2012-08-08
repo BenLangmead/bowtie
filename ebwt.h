@@ -2967,7 +2967,7 @@ void Ebwt<TStr>::readIntoMemory(
 				}
 				mmFile[i] = (char*)mmap((void *)0, sbuf.st_size,
 										PROT_READ, MAP_SHARED, fds[i], 0);
-				if(mmFile == (void *)(-1)) {
+				if(mmFile[i] == (void *)(-1)) {
 					perror("mmap");
 					cerr << "Error: Could not memory-map the index file " << names[i] << endl;
 					throw 1;
@@ -3810,7 +3810,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 			cout << "Re-reading \"" << out1 << "\"/\"" << out2 << "\" for sanity check" << endl;
 		Ebwt copy(out1, out2, _verbose, _sanity);
 		assert(!isInMemory());
-		copy.loadIntoMemory(eh._color ? 1 : 0, false, false);
+		copy.loadIntoMemory(eh._color ? 1 : 0, -1, false, false);
 		assert(isInMemory());
 	    assert_eq(eh._lineRate,     copy.eh()._lineRate);
 	    assert_eq(eh._linesPerSide, copy.eh()._linesPerSide);
@@ -3840,7 +3840,7 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 			assert_eq(this->_isa[i], copy.isa()[i]);
 		for(uint32_t i = 0; i < eh._ebwtTotLen; i++)
 			assert_eq(this->ebwt()[i], copy.ebwt()[i]);
-		copy.sanityCheckAll();
+		//copy.sanityCheckAll();
 		if(_verbose)
 			cout << "Read-in check passed for \"" << out1 << "\"/\"" << out2 << "\"" << endl;
 	}
