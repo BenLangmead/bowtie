@@ -77,7 +77,7 @@ LIBS =
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
 
-OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.c shmem.cpp \
+OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
@@ -97,16 +97,6 @@ BITS_FLAG = -m32
 endif
 ifeq (64,$(BITS))
 BITS_FLAG = -m64
-endif
-
-# Convert CHUD=1 to CHUD-related flags
-CHUD=0
-CHUD_DEF =
-ifeq (1,$(CHUD))
-EXTRA_FLAGS += -g3
-ifeq (1,$(MACOS))
-CHUD_DEF = -F/System/Library/PrivateFrameworks -weak_framework CHUD -DCHUD_PROFILING
-endif
 endif
 
 DEBUG_FLAGS = -O0 -g3 $(BITS_FLAG)
@@ -170,12 +160,7 @@ DEFS=-fno-strict-aliasing \
      $(PTHREAD_DEF) \
      $(PREF_DEF) \
      $(MM_DEF) \
-     $(SHMEM_DEF) \
-     $(CHUD_DEF)
-
-define checksum
-  cat $^ | md5sum | awk '{print $$1}' > .$@.md5
-endef
+     $(SHMEM_DEF)
 
 ALL_FLAGS=$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(ALL_FLAGS)\""
@@ -186,9 +171,7 @@ RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 #
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -196,9 +179,7 @@ bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 		$(LIBS) $(BUILD_LIBS)
 
 bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(ALL_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -206,9 +187,7 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 		$(LIBS) $(BUILD_LIBS)
 
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) \
-		-DEBWT_BUILD_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -220,9 +199,7 @@ bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 #
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -230,10 +207,8 @@ bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMEN
 		$(LIBS) $(SEARCH_LIBS)
 
 bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) -pg -p -g3 $(ALL_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -241,10 +216,8 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 		$(LIBS) $(SEARCH_LIBS)
 
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
-	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
-		-DEBWT_SEARCH_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) \
 		-o $@ $< \
@@ -256,10 +229,8 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 #
 
 bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
-	$(checksum)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(ALL_FLAGS) \
-		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
 		-o $@ $< \
@@ -267,10 +238,8 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(LIBS)
 
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
-	$(checksum)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
-		-DEBWT_INSPECT_HASH=`cat .$@.md5` \
 		$(DEFS) -Wall \
 		$(INC) -I . \
 		-o $@ $< \
