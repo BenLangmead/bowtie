@@ -340,9 +340,7 @@ static void driver(const string& infile,
 				refparams.color = false;
 				// Make sure the .3.ebwt and .4.ebwt files contain
 				// nucleotides; not colors
-				int numSeqs = 0;
-				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
+				ASSERT_ONLY(int numSeqs = 0);
 				refparams.color = true;
 				writeU32(fout3, szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) {
@@ -355,7 +353,6 @@ static void driver(const string& infile,
 				int numSeqs2 = 0;
 				sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs2);
 				assert_geq(numSeqs, numSeqs2);
-				//assert_eq(sztot2.second, sztot.second + numSeqs);
 			} else {
 				int numSeqs = 0;
 				sztot = fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
@@ -398,11 +395,8 @@ static void driver(const string& infile,
 				vector<RefRecord> szs2;
 				vector<uint32_t> plens2;
 				int numSeqs2 = 0;
-				std::pair<size_t, size_t> sztot2 =
-					fastaRefReadSizes(is, szs2, plens2, refparams, NULL, numSeqs2);
 				assert_leq(numSeqs, numSeqs2);
 				// One less color than base
-				//assert_geq(sztot2.second, sztot.second + numSeqs);
 				refparams.color = true;
 			}
 #endif
