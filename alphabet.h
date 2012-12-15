@@ -11,6 +11,18 @@
 using namespace std;
 using namespace seqan;
 
+/// Reverse a string in-place
+template <typename TStr>
+static inline void reverseInPlace(TStr& s) {
+	typedef typename Value<TStr>::Type TVal;
+	size_t len = length(s);
+	for(size_t i = 0; i < (len>>1); i++) {
+		TVal tmp = s[i];
+		s[i] = s[len-i-1];
+		s[len-i-1] = tmp;
+	}
+}
+
 /**
  * Return a new TStr containing the reverse-complement of s.  Ns go to
  * Ns.
@@ -66,18 +78,6 @@ static inline void reverseComplementInPlace(TStr& s, bool color) {
 	}
 	if((len & 1) != 0 && (int)s[len >> 1] != 4) {
 		s[len >> 1] = (TVal)((int)s[len >> 1] ^ 3);
-	}
-}
-
-/// Reverse a string in-place
-template <typename TStr>
-static inline void reverseInPlace(TStr& s) {
-	typedef typename Value<TStr>::Type TVal;
-	size_t len = length(s);
-	for(size_t i = 0; i < (len>>1); i++) {
-		TVal tmp = s[i];
-		s[i] = s[len-i-1];
-		s[len-i-1] = tmp;
 	}
 }
 

@@ -127,33 +127,38 @@ protected:
 	/**
 	 *
 	 */
-	void reportUnOrMax(PatternSourcePerThread& p,
-	                   vector<Hit>* hs,
-	                   bool un);
+	void reportUnOrMax(
+		PatternSourcePerThread& p,
+		vector<Hit>* hs,
+		bool un);
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream.
 	 */
 	virtual void reportHit(const Hit& h) {
-		reportHit(h, defaultMapq_, 0);
+		reportSamHit(h, defaultMapq_, 0);
 	}
 
 	/**
 	 * Report a SAM alignment with the given mapping quality and XM
 	 * field.
 	 */
-	virtual void reportHit(const Hit& h, int mapq, int xms);
+	virtual void reportSamHit(
+		const Hit& h,
+		int mapq,
+		int xms);
 
 	/**
 	 * Report a batch of SAM alignments (e.g. two mates that should be
 	 * printed together) with the given mapping quality and XM field.
 	 */
-	virtual void reportHits(vector<Hit>& hs,
-	                        size_t start,
-	                        size_t end,
-	                        int mapq,
-	                        int xms);
+	virtual void reportSamHits(
+		vector<Hit>& hs,
+		size_t start,
+		size_t end,
+		int mapq,
+		int xms);
 
 	/**
 	 * See sam.cpp
