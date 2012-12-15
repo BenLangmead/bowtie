@@ -769,7 +769,7 @@ public:
 				uint32_t icur = 0;
 				// The common case is that eligibleSz == 1
 				if(eligibleNum > 1 || elignore) {
-					bool foundTarget = false;
+					ASSERT_ONLY(bool foundTarget = false);
 					// Walk from left to right
 					for(; i >= depth; i--) {
 						assert_geq(i, unrevOff);
@@ -798,7 +798,7 @@ public:
 									if(r < spread) {
 										// This is our randomly-selected
 										// backtrack target
-										foundTarget = true;
+										ASSERT_ONLY(foundTarget = true);
 										bttop = pairTop(pairs, i, j);
 										btbot = pairBot(pairs, i, j);
 										btham += mmPenalty(_maqPenalty, qi);

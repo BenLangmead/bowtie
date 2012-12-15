@@ -1668,7 +1668,7 @@ template<typename TStr>
 void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 	assert(isInMemory());
 	uint32_t occ[] = {0, 0, 0, 0};
-	uint32_t occ_save[] = {0, 0};
+	ASSERT_ONLY(uint32_t occ_save[] = {0, 0});
 	uint32_t cur = 0; // byte pointer
 	const EbwtParams& eh = this->_eh;
 	bool fw = false;
@@ -1702,8 +1702,8 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 			ASSERT_ONLY(uint32_t cs = u32ebwt[1]);
 			assert(as == occ[0] || as == occ[0]-1); // one 'a' is a skipped '$' and doesn't count toward occ[]
 			assert_eq(cs, occ[1]);
-			occ_save[0] = occ[2]; // save gs
-			occ_save[1] = occ[3]; // save ts
+			ASSERT_ONLY(occ_save[0] = occ[2]); // save gs
+			ASSERT_ONLY(occ_save[1] = occ[3]); // save ts
 			fw = true;
 		}
 		cur += eh._sideSz;
@@ -4198,7 +4198,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 
 	// Did we just finish writing a forward bucket?  (Must be true when
 	// we exit the loop.)
-	bool wroteFwBucket = false;
+	ASSERT_ONLY(bool wroteFwBucket = false);
 
 	// Have we skipped the '$' in the last column yet?
 	ASSERT_ONLY(bool dollarSkipped = false);
@@ -4212,7 +4212,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	VMSG_NL("Entering Ebwt loop");
 	ASSERT_ONLY(uint32_t beforeEbwtOff = (uint32_t)out1.tellp());
 	while(side < ebwtTotSz) {
-		wroteFwBucket = false;
+		ASSERT_ONLY(wroteFwBucket = false);
 		// Sanity-check our cursor into the side buffer
 		assert_geq(sideCur, 0);
 		assert_lt(sideCur, (int)eh._sideBwtSz);
@@ -4353,7 +4353,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 #else
 			sideCur = eh._sideBwtSz - 1;
 #endif
-			assert(fw); fw = false; wroteFwBucket = true;
+			assert(fw); fw = false;
+			ASSERT_ONLY(wroteFwBucket = true);
 			// Write 'G' and 'T'
 			assert_leq(occSave[0], occ[2]);
 			assert_leq(occSave[1], occ[3]);

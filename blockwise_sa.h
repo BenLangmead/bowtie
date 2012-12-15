@@ -350,8 +350,8 @@ template<>
 void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<uint32_t>& bucket) {
 	const String<Dna, Packed<> >& t = this->text();
 	uint32_t *s = begin(bucket);
-	uint32_t slen = seqan::length(bucket);
-	uint32_t len = seqan::length(t);
+	uint32_t slen = (uint32_t)seqan::length(bucket);
+	uint32_t len = (uint32_t)seqan::length(t);
 	if(_dc != NULL) {
 		// Use the difference cover as a tie-breaker if we have it
 		VMSG_NL("  (Using difference cover)");
