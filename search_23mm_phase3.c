@@ -24,7 +24,7 @@
 		}
 
 		// Try a half-and-half on the forward read
-		bool gaveUp = false;
+		//bool gaveUp = false;
 		bthh3.setQuery(patsrc->bufa());
 		// Processing the forward pattern with the forward index;
 		// s3 ("lo") half is on the right
@@ -34,9 +34,9 @@
 		              two ? s  : s3,
 		              s);
 		done = bthh3.backtrack();
-		if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
-			gaveUp = true;
-		}
+		//if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
+			//gaveUp = true;
+		//}
 		bthh3.resetNumBacktracks();
 		if(done) {
 			continue;
@@ -45,7 +45,7 @@
 
 	if(!norc) {
 		// Try a half-and-half on the reverse complement read
-		bool gaveUp = false;
+		//bool gaveUp = false;
 		params.setFw(false);
 		bthh3.setQuery(patsrc->bufa());
 		// Processing the forward pattern with the forward index;
@@ -56,9 +56,9 @@
 					  two ? s  : s5,
 					  s);
 		bool done = bthh3.backtrack();
-		if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
-			gaveUp = true;
-		}
+		//if(bthh3.numBacktracks() == bthh3.maxBacktracks()) {
+		//	gaveUp = true;
+		//}
 		bthh3.resetNumBacktracks();
 		if(done) {
 			continue;

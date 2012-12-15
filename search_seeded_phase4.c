@@ -63,7 +63,7 @@
 		// try the final case that might apply to the forward
 		// pattern: 1 mismatch in each of the 3' and 5' halves of
 		// the seed.
-		bool gaveUp = false;
+		//bool gaveUp = false;
 		if(seedMms >= 2) {
 			btf24.setQuery(patsrc->bufa());
 			// Set up seed bounds
@@ -81,9 +81,9 @@
 							  s);                      // 3revOff
 			}
 			done = btf24.backtrack();
-			if(btf24.numBacktracks() == btf24.maxBacktracks()) {
-				gaveUp = true;
-			}
+			//if(btf24.numBacktracks() == btf24.maxBacktracks()) {
+			//	gaveUp = true;
+			//}
 			if(done) {
 				btf24.resetNumBacktracks();
 				continue;

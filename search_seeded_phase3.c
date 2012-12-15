@@ -61,7 +61,7 @@
 		// try the final case that might apply to the reverse
 		// complement pattern: 1 mismatch in each of the 3' and 5'
 		// halves of the seed.
-		bool gaveUp = false;
+		//bool gaveUp = false;
 		if(seedMms >= 2) {
 			btr23.setQuery(patsrc->bufa());
 			// Set up special seed bounds
@@ -79,9 +79,9 @@
 							  s);                      // 3revOff
 			}
 			done = btr23.backtrack();
-			if(btr23.numBacktracks() == btr23.maxBacktracks()) {
-				gaveUp = true;
-			}
+			//if(btr23.numBacktracks() == btr23.maxBacktracks()) {
+			//	gaveUp = true;
+			//}
 			if(done) {
 				DONEMASK_SET(patid);
 				btr23.resetNumBacktracks();

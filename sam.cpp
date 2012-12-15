@@ -147,12 +147,12 @@ void SAMHitSink::appendAligned(ostream& ss,
 	int run = 0;
 	ss << "\tMD:Z:";
 	const FixedBitset<1024> *mms = &h.mms;
-	const String<Dna5>* pat = &h.patSeq;
+	ASSERT_ONLY(const String<Dna5>* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
 	if(h.color && false) {
 		// Disabled: print MD:Z string w/r/t to colors, not letters
 		mms = &h.cmms;
-		pat = &h.colSeq;
+		ASSERT_ONLY(pat = &h.colSeq);
 		assert_eq(length(h.colSeq), len+1);
 		len = length(h.colSeq);
 		refcs = &h.crefcs;

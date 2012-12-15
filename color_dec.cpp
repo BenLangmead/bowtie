@@ -184,12 +184,10 @@ void decodeHit(
 
 	// Successive columns examine successive alignment positions
 	int omin = INT_MAX, t = 0;
-	int lastOmin = INT_MAX;
 	for(size_t c = readi; c < readf; c++) {
 		const int readc = (int)read[c];
 		assert_leq(readc, 4);
 		assert_geq(readc, 0);
-		lastOmin = omin;
 		omin = INT_MAX;
 		// t <- index of column in dynamic programming table
 		t = c - readi + 1;
