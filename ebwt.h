@@ -303,7 +303,7 @@ static inline int64_t fileSize(const char* name) {
 }
 
 // Forward declarations for Ebwt class
-class SideLocus;
+struct SideLocus;
 template<typename TStr> class EbwtSearchParams;
 
 /**
@@ -1070,7 +1070,7 @@ public:
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t seed);
 	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t seed);
-	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed);
+	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed = 0);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -3945,7 +3945,7 @@ void Ebwt<TStr>::joinToDisk(
 	TStr& ret,
 	ostream& out1,
 	ostream& out2,
-	uint32_t seed = 0)
+	uint32_t seed)
 {
 	RandomSource rand; // reproducible given same seed
 	rand.init(seed);

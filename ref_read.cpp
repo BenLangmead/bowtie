@@ -240,7 +240,6 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 {
 	uint32_t unambigTot = 0;
 	uint32_t bothTot = 0;
-	RefReadInParams rpcp = rparms;
 	assert_gt(in.size(), 0);
 	uint32_t both = 0, unambig = 0;
 	// For each input istream
