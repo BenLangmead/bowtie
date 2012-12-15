@@ -172,7 +172,7 @@ RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
-		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(DEFS) $(NOASSERT_FLAGS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
@@ -180,7 +180,7 @@ bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(RELEASE_FLAGS) -pg -p -g3 $(RELEASE_DEFS) $(ALL_FLAGS) \
-		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(DEFS) $(NOASSERT_FLAGS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
@@ -188,7 +188,7 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) \
-		$(DEFS) -Wall \
+		$(DEFS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
@@ -200,7 +200,7 @@ bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 
 bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
-		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(DEFS) $(NOASSERT_FLAGS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
@@ -209,7 +209,7 @@ bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMEN
 bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) -pg -p -g3 $(ALL_FLAGS) \
-		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(DEFS) $(NOASSERT_FLAGS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
@@ -218,7 +218,7 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
-		$(DEFS) -Wall \
+		$(DEFS) -Wall -Wno-enum-compare \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
@@ -231,7 +231,7 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(ALL_FLAGS) \
-		$(DEFS) -Wall \
+		$(DEFS) -Wall -Wno-enum-compare \
 		$(INC) -I . \
 		-o $@ $< \
 		$(OTHER_CPPS) \
@@ -240,14 +240,11 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
-		$(DEFS) -Wall \
+		$(DEFS) -Wall -Wno-enum-compare \
 		$(INC) -I . \
 		-o $@ $< \
 		$(OTHER_CPPS) \
 		$(LIBS)
-
-chaincat: chaincat.cpp hit_set.h filebuf.h hit_set.cpp alphabet.h alphabet.c
-	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) -Wall $(INC) -I . -o $@ $< hit_set.cpp alphabet.c
 
 bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl

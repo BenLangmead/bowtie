@@ -26,6 +26,13 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+Version 0.12.9 - December 14, 2012
+   * Fixed a bug whereby read names would not be truncated at first
+     whitespace character in unmapped or maxed-out SAM records.
+   * Fixed errors and warnings when compiling with clang++.
+   * Fixed errors and warnings when compiling with recent versions of
+     g++.
+
 Version 0.12.8 - January 27, 2012
    * Fixed a bug that would sometimes cause an immediate segmentation
      fault in --sam mode
