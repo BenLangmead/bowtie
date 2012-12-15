@@ -229,9 +229,12 @@ void SAMHitSink::reportHit(const Hit& h, int mapq, int xms) {
 /**
  * Report a batch of hits from a vector, perhaps subsetting it.
  */
-void SAMHitSink::reportHits(vector<Hit>& hs,
-                            size_t start, size_t end,
-                            int mapq, int xms)
+void SAMHitSink::reportHits(
+	vector<Hit>& hs,
+    size_t start,
+    size_t end,
+    int mapq,
+    int xms)
 {
 	assert_geq(end, start);
 	if(end-start == 0) return;
@@ -275,10 +278,14 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
+			if(isspace((int)p.bufa().name[i])) break;
 			ss << p.bufa().name[i];
 		}
 	} else {
-		ss << p.bufa().name;
+		for(int i = 0; i < (int)seqan::length(p.bufa().name); i++) {
+			if(isspace((int)p.bufa().name[i])) break;
+			ss << p.bufa().name[i];
+		}
 	}
 	ss << "\t"
 	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
