@@ -44,11 +44,13 @@ public:
 	           ReferenceMap *rmap,
 	           AnnotationMap *amap,
 	           bool fullRef,
+	           bool noQnameTrunc,
 	           int defaultMapq,
 	           DECL_HIT_DUMPS2) :
 	HitSink(out, PASS_HIT_DUMPS2),
 	offBase_(offBase), defaultMapq_(defaultMapq),
-	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
+	rmap_(rmap), amap_(amap), fullRef_(fullRef),
+	noQnameTrunc_(noQnameTrunc) { }
 
 	/**
 	 * Construct a multi-stream VerboseHitSink with one stream per
@@ -76,6 +78,7 @@ public:
 	                   ReferenceMap *rmap,
 	                   AnnotationMap *amap,
 	                   bool fullRef,
+	                   bool noQnameTrunc,
 	                   int offBase);
 
 	/**
@@ -90,6 +93,7 @@ public:
 	                          ReferenceMap *rmap,
 	                          AnnotationMap *amap,
 	                          bool fullRef,
+	                          bool noQnameTrunc,
 	                          int offBase);
 
 	/**
@@ -97,7 +101,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h) {
-		SAMHitSink::append(ss, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, offBase_);
+		SAMHitSink::append(ss, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
 	}
 
 	/**
@@ -105,7 +109,7 @@ public:
 	 * corresponding to the hit.
 	 */
 	virtual void append(ostream& ss, const Hit& h, int mapq, int xms) {
-		SAMHitSink::append(ss, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, offBase_);
+		SAMHitSink::append(ss, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
 	}
 
 	/**
@@ -119,6 +123,7 @@ public:
 	                   ReferenceMap *rmap,
 	                   const uint32_t* plen,
 	                   bool fullRef,
+	                   bool noQnameTrunc,
 	                   const char *cmdline,
 	                   const char *rgline);
 
@@ -181,6 +186,7 @@ private:
 	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
 	AnnotationMap *amap_; ///
 	bool fullRef_;        /// print full reference name, not just up to whitespace
+	bool noQnameTrunc_;   /// true -> don't truncate QNAME at first whitespace
 };
 
 #endif /* SAM_H_ */

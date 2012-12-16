@@ -129,6 +129,7 @@ static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
 static bool fuzzy;
 static bool fullRef;
+static bool samNoQnameTrunc; // don't truncate QNAME field at first whitespace
 static bool samNoHead; // don't print any header lines in SAM output
 static bool samNoSQ;   // don't print @SQ header lines
 bool color;     // true -> inputs are colorspace
@@ -331,6 +332,7 @@ enum {
 	ARG_USAGE,
 	ARG_SNPPHRED,
 	ARG_SNPFRAC,
+	ARG_SAM_NO_QNAME_TRUNC,
 	ARG_SAM_NOHEAD,
 	ARG_SAM_NOSQ,
 	ARG_SAM_RG,
@@ -437,6 +439,7 @@ static struct option long_options[] = {
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"sam",          no_argument,       0,            'S'},
+	{(char*)"sam-no-qname-trunc", no_argument, 0,            ARG_SAM_NO_QNAME_TRUNC},
 	{(char*)"sam-nohead",   no_argument,       0,            ARG_SAM_NOHEAD},
 	{(char*)"sam-nosq",     no_argument,       0,            ARG_SAM_NOSQ},
 	{(char*)"sam-noSQ",     no_argument,       0,            ARG_SAM_NOSQ},
@@ -828,6 +831,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_NO_RC: norc = true; break;
 			case ARG_STATS: stats = true; break;
 			case ARG_PEV2: useV1 = false; break;
+			case ARG_SAM_NO_QNAME_TRUNC: samNoQnameTrunc = true; break;
 			case ARG_SAM_NOHEAD: samNoHead = true; break;
 			case ARG_SAM_NOSQ: samNoSQ = true; break;
 			case ARG_SAM_RG: {
@@ -2708,7 +2712,7 @@ static void driver(const char * type,
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
 							fout, 1, rmap, amap,
-							fullRef, defaultMapq,
+							fullRef, samNoQnameTrunc, defaultMapq,
 							PASS_DUMP_FILES,
 							format == TAB_MATE, sampleMax,
 							table, refnames);
@@ -2721,6 +2725,7 @@ static void driver(const char * type,
 								sam->out(0), ebwt.nPat(),
 								refnames, color, samNoSQ, rmap,
 								ebwt.plen(), fullRef,
+								samNoQnameTrunc,
 								argstr.c_str(),
 								rgs.empty() ? NULL : rgs.c_str());
 					}

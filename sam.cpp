@@ -25,6 +25,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
                                ReferenceMap *rmap,
                                const uint32_t* plen,
                                bool fullRef,
+                               bool noQnameTrunc,
                                const char *cmdline,
                                const char *rgline)
 {
@@ -62,18 +63,19 @@ void SAMHitSink::appendAligned(ostream& ss,
                                ReferenceMap *rmap,
                                AnnotationMap *amap,
                                bool fullRef,
+                               bool noQnameTrunc,
                                int offBase)
 {
 	// QNAME
 	if(h.mate > 0) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
-			if(isspace((int)h.patName[i])) break;
+			if(!noQnameTrunc && isspace((int)h.patName[i])) break;
 			ss << h.patName[i];
 		}
 	} else {
 		for(int i = 0; i < (int)seqan::length(h.patName); i++) {
-			if(isspace((int)h.patName[i])) break;
+			if(!noQnameTrunc && isspace((int)h.patName[i])) break;
 			ss << h.patName[i];
 		}
 	}
@@ -278,12 +280,12 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
-			if(isspace((int)p.bufa().name[i])) break;
+			if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
 			ss << p.bufa().name[i];
 		}
 	} else {
 		for(int i = 0; i < (int)seqan::length(p.bufa().name); i++) {
-			if(isspace((int)p.bufa().name[i])) break;
+			if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
 			ss << p.bufa().name[i];
 		}
 	}
@@ -345,9 +347,10 @@ void SAMHitSink::append(ostream& ss,
                         ReferenceMap *rmap,
                         AnnotationMap *amap,
                         bool fullRef,
+                        bool noQnameTrunc,
                         int offBase)
 {
-	appendAligned(ss, h, mapq, xms, refnames, rmap, amap, fullRef, offBase);
+	appendAligned(ss, h, mapq, xms, refnames, rmap, amap, fullRef, noQnameTrunc, offBase);
 }
 
 /**
