@@ -40,12 +40,12 @@
       <table width="100%">
       <tr>
         <td>
-          <a href="./bowtie2">Bowtie 2</a>: Fast, accurate read alignment
+          <a href="./bowtie2/index.shtml">Bowtie 2</a>: Fast, accurate read alignment
         </td>
       </tr>
       <tr>
         <td>
-          <a href="./crossbow">Crossbow</a>: Genotyping, cloud computing
+          <a href="./crossbow/index.shtml">Crossbow</a>: Genotyping, cloud computing
         </td>
       </tr>
       <tr>
