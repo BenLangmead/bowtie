@@ -1,4 +1,4 @@
-<h2>Hiring Postdocs - 9/12/2012</h2>
+<h2>Hiring Postdocs</h2>
 <ul>
 <li>
 The
@@ -11,7 +11,7 @@ and please apply if you're interested in working with either or both of us.
 </li>
 </ul>
 
-<h2>0.12.9 release - Coming soon</h2>
+<h2>0.12.9 release - 12/16/12</h2>
 <ul>
  <li>Fixed a bug whereby read names would not be truncated at first
      whitespace character in unmapped or maxed-out SAM records.</li>
