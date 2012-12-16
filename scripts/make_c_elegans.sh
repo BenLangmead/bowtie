@@ -1,11 +1,12 @@
 #!/bin/sh
 
 #
-# Downloads sequence and builds Bowtie index for for C. elegans
-# versions WS200 from wormbase.
+# Downloads sequence of C. elegans from WormBase and builds Bowtie index.
 #
 
-GENOMES_MIRROR=ftp://ftp.gramene.org/pub/wormbase/genomes/c_elegans/sequences/dna
+GENOMES_MIRROR=ftp://ftp.wormbase.org/pub/wormbase/species/c_elegans/sequence/genomic
+
+/
 
 BOWTIE_BUILD_EXE=./bowtie-build
 if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
@@ -32,17 +33,17 @@ get() {
 	fi
 }
 
-F=c_elegans.WS200.dna.fa
+F=c_elegans.WS235.genomic.fa
 if [ ! -f $F ] ; then
-	FGZ=c_elegans.WS200.dna.fa.gz
+	FGZ=$F.gz
 	wget ${GENOMES_MIRROR}/$FGZ || (echo "Error getting $F" && exit 1)
 	gunzip $FGZ || (echo "Error unzipping $F" && exit 1)
 fi
 
-CMD="${BOWTIE_BUILD_EXE} $* $F c_elegans_ws200"
+CMD="${BOWTIE_BUILD_EXE} $* $F c_elegans_ws235"
 echo "Running $CMD"
 if $CMD ; then
-	echo "c_elegans_ws200 index built; you may remove fasta files"
+	echo "c_elegans_ws235 index built; you may remove fasta files"
 else
 	echo "Index building failed; see error message"
 fi
