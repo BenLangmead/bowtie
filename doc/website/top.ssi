@@ -1,12 +1,18 @@
   <div id="top">
     <div class="lefts">
     <table width="100%" cellpadding="2">
-      <tr><td>
-        <a href="./index.shtml"><h1>Bowtie</h1></a>
-        <h2>An ultrafast memory-efficient short read aligner</h2>
-      </td><td align="right" valign="middle">
-        <a href="http://www.jhu.edu/"><img style="padding-top: 7pt; padding-right: 7pt" border=0 height="55" src="images/JHU_white_sm.png"></a>
-      </td></tr>
+      <tr>
+        <td align="left" valign="middle" width="145">
+          <a href="./index.shtml"><img style="padding-left: 7pt; padding-top: 6pt" height="65" src="images/bowtie_logo.png"/></a>
+        </td>
+        <td align="left" valign="top">
+          <a href="./index.shtml"><h1>Bowtie</h1></a>
+          <h2>An ultrafast memory-efficient short read aligner</h2>
+        </td>
+        <td align="right" valign="middle">
+          <a href="http://www.jhu.edu/"><img style="padding-top: 7pt; padding-right: 7pt" border=0 height="55" src="images/JHU_white_sm.png"></a>
+        </td>
+      </tr>
     </table>
     </div>
   </div>
