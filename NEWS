@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `COPYING') and freely
-available to the public for download.  The current version is 0.12.8.
+available to the public for download.  The current version is 0.12.9.
 
 Reporting Issues
 ================
@@ -30,10 +30,11 @@ Version 0.12.9 - December 14, 2012
    * Fixed a bug whereby read names would not be truncated at first
      whitespace character in unmapped or maxed-out SAM records.
    * Fixed errors and warnings when compiling with clang++.
-   * Fixed errors and warnings when compiling with recent versions of
-     g++.
+   * Fixed most errors and warnings when compiling with recent versions
+     of g++, though you may need to add EXTRA_FLAGS=-Wno-enum-compare
+     to avoid all warnings.
 
-Version 0.12.8 - January 27, 2012
+Version 0.12.8 - May 6, 2012
    * Fixed a bug that would sometimes cause an immediate segmentation
      fault in --sam mode
    * Fixed make_galGal3.sh script to not omit chromosome 25.
