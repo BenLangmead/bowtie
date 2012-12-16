@@ -1,0 +1,63 @@
+Instructions for releasing a new version of Bowtie
+==================================================
+
+Author: BTL
+Date: 12/15/2012
+
+1. Check that the code compiles with no issues, including with very recent
+   versions of g++, and with clang on a Mac.
+   - To compile with clang on the Mac: "make clean ; make CPP=clang++ allall"
+   - Note: B/c of some of the SeqAn code, I have never been able to get bowtie
+     to compile without warnings on very recent versions of g++.  I get a
+     bunch of warning that can be suppressed with -Wno-enum-compare, but that
+     flag isn't recognized by all g++ versions and could itself cause an error
+     in versions where it's not supported.
+
+2. Check that all the simple tests pass:
+   - perl scripts/test/simple_tests.pl --bowtie=./bowtie-debug --bowtie-build=./bowtie-build-debug
+
+3. Check that random tests pass:
+   - sh scripts/random_bowtie_tests_p.sh
+
+4. Check that performance, sensitivity and accuracy are not substantially
+   changed.  (Need infrastructure for this!)
+
+5. Update VERSION with new version number
+
+6. Update NEWS and doc/website/recent_news.ssi
+   - In both cases, add a section at the top describing the new release, along
+     with bullet points describing improvements and changes in that release.
+   - For recent_news.ssi, hyperlink concepts or command-line options so that
+     they point into the manual.
+   - Make sure to update the version numbers mentioned in the paragraph at the
+     beginning of the NEWS file.
+   - Potentially move an entry or two from the bottom of
+     doc/website/recent_news.ssi to the top of doc/website/old_news.ssi if it
+	 gets too long.
+
+7. Update the manual
+   - In Bowtie root directory, do "make doc" (you'll have to have 'pandoc'
+     installed).  The output will be stored both in MANUAL and doc/manual.html.
+   - In doc/manual.html, highlight and copy everything from <div id="TOC"> down
+     to but not including </body>.  Then paste it in the corresponding part of
+	 doc/website/manual.ssi.
+   - Update the version number at the top of doc/website/manual.ssi.
+
+8. Upload updated webpages
+   - In doc/website directory, do "sh push.sh"
+
+9. Make source archive: "make bowtie-src.zip"
+
+10. Make Mac OS X 32-bit and 64-bit binaries.
+   - On a computer with Mac OS X 10.6, run "make BITS=32 bowtie-bin.zip".  Then
+     rename and upload.
+   - On a computer with Mac OS X 10.6, run "make BITS=64 bowtie-bin.zip".  Then
+     rename and upload.
+
+11. Make Linux 32-bit and 64-bit binaries.
+   - On a Linux machine, run "make BITS=32 bowtie-bin.zip".  Then rename and
+     upload.
+   - On a Linux machine, run "make BITS=64 bowtie-bin.zip".  Then rename and
+     upload.
+
+X. Make an SVN tag for the new version
