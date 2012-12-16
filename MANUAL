@@ -1212,7 +1212,12 @@ Default `bowtie` output
 `bowtie` outputs one alignment per line.  Each line is a collection of
 8 fields separated by tabs; from left to right, the fields are:
 
-1.  Name of read that aligned
+1.  Name of read that aligned.
+
+    Note that the [SAM specification] disallows whitespace in the read name.
+	If the read name contains any whitespace characters, Bowtie 2 will truncate
+	the name at the first whitespace character.  This is similar to the
+	behavior of other tools.
 
 2.  Reference strand aligned to, `+` for forward strand, `-` for
     reverse
