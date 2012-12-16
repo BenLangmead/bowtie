@@ -1,7 +1,7 @@
 #!/bin/sh
 
 #
-# Downloads sequence for the hg18 version of H. spiens (human) from
+# Downloads sequence for the hg18 version of H. sapiens (human) from
 # UCSC.
 #
 # Note that UCSC's hg18 build has three categories of compressed fasta
