@@ -1,0 +1,218 @@
+<h2>Hiring Postdocs - 9/12/2012</h2>
+<ul>
+<li>
+The
+<a href="http://www.cs.jhu.edu/~langmea">Langmead</a>
+and
+<a href="http://bioinformatics.igm.jhmi.edu/salzberg">Salzberg</a>
+labs have open positions for postdoctoral researchers.  See
+<a href="http://www.cs.jhu.edu/~langmea/positions.shtml">the posting</a>
+and please apply if you're interested in working with either or both of us.
+</li>
+</ul>
+
+<h2>0.12.9 release - Coming soon</h2>
+<ul>
+ <li>Fixed a bug whereby read names would not be truncated at first
+     whitespace character in unmapped or maxed-out SAM records.</li>
+ <li>Fixed errors and warnings when compiling with <tt>clang++</tt>.</li>
+ <li>Fixed most errors and warnings when compiling with recent versions
+     of <tt>g++</tt>, though you may need to add <tt>EXTRA_FLAGS=-Wno-enum-compare</tt>
+     to avoid all warnings.</li>
+</ul>
+
+<h2>0.12.8 release - 5/6/12</h2>
+<ul>
+   <li>Fixed a bug that would sometimes cause an immediate segmentation
+     fault in
+     <tt><a href="manual.shtml#bowtie-options-sam">--sam</a></tt>
+     mode.</li>
+   <li>Fixed <tt>make_galGal3.sh</tt> script to not omit chromosome 25.</li>
+   <li>Removed <tt>-B</tt> option from usage message for <tt>bowtie-build</tt>; that option
+     is not implemented.</li>
+   <li>Fixed issue that could cause Bowtie not to compile when
+     <tt>BOWTIE_PTHREADS</tt> is left undefined and <tt>pthreads.h</tt> is not present.</li>
+   <li>Elaborated documentation for
+     <tt><a href="">-B/--offbase</a></tt> option to indicate that
+     it only affects offsets in the default output mode, not in SAM
+     mode.</li>
+</ul>
+
+<h2><a href="bowtie2">Bowtie 2</a> beta released - 10/16/2011</h2>
+<ul>
+  <li><a href="bowtie2">Bowtie 2</a> 2.0.0-beta2 is available now.</li>
+  <li>Differences between <a href="bowtie2">Bowtie 2</a> and Bowtie 1 include:</li>
+  <li>
+    <ul>
+      <li>For reads longer than about 50 bp Bowtie 2 is generally faster, more
+          sensitive, and uses less memory than Bowtie 1.  For relatively short
+          reads (e.g. less than 50 bp) Bowtie 1 is sometimes faster and/or more
+          sensitive.</li>
+      <li>Bowtie 2 supports gapped alignment with affine gap penalties. Number
+          of gaps and gap lengths are not restricted, except by way of the
+          configurable scoring scheme.  Bowtie 1 finds just ungapped
+          alignments.</li>
+      <li>Bowtie 2 supports
+          <a href="bowtie2/manual.shtml#end-to-end-alignment-versus-local-alignment">local alignment</a>,
+          which doesn't require reads to align end-to-end.  Local alignments
+          might be "trimmed" ("soft clipped") at one or both extremes in a way
+          that optimizes alignment score. Bowtie 2 also supports
+          <a href="bowtie2/manual.shtml#end-to-end-alignment-versus-local-alignment">end-to-end alignment</a>
+          which, like Bowtie 1, requires that the read align entirely.</li>
+      <li>There is no upper limit on read length in Bowtie 2.  Bowtie 1 has an
+          upper limit of around 1000 bp.</li>
+      <li>Bowtie 2 allows alignments to
+          <a href="bowtie2/manual.shtml#ambiguous-characters">overlap ambiguous characters</a>
+          (e.g. <tt>N</tt>s) in the reference.  Bowtie 1 does not.</li>
+      <li>Bowtie 2 does away with Bowtie 1's notion of alignment "stratum", and
+          its distinction between "Maq-like" and "end-to-end" modes.  In Bowtie
+          2 all alignments lie along a continuous spectrum of alignment scores
+          where the
+          <a href="bowtie2/manual.shtml#ambiguous-characters#scores-higher-more-similar">scoring scheme</a>,
+          similar to
+          <a href="http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm">Needleman-Wunsch</a>
+          and
+          <a href="http://en.wikipedia.org/wiki/Smith_waterman">Smith-Waterman</a>.</li>
+      <li>Bowtie 2's
+          <a href="bowtie2/manual.shtml#aligning-pairs">paired-end alignment</a>
+          is more flexible.  E.g. for pairs that do not align in a paired
+          fashion, Bowtie 2 attempts to find unpaired alignments for each
+          mate.</li>
+      <li>Bowtie 2 does not align colorspace reads.</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>Fixed chicken index - 7/19/2011</h2>
+<ul>
+  <li><b>The pre-built chicken genome available from this website was missing
+      chr25</b>.  chr25_random was included, but chr25 was erroneously excluded.
+      This is fixed as of today - the index files linked to from the sidebar
+      now contains all chicken chromosomes.
+</ul>
+
+<h2>0.12.7 release - 9/7/10</h2>
+<ul>
+  <li> Fixes the all-gap reference sequence issue that was present in
+     Bowtie 0.12.6.  Index files produced by <tt>bowtie-build</tt> 0.12.5 and
+     earlier (back to 0.10.*) are compatible with <tt>bowtie</tt> 0.12.7.  Index
+     files produced by <tt>bowtie-build</tt> 0.12.7 are backward compatible with
+     <tt>bowtie</tt> 0.12.5 and earlier as long as the first reference sequence
+     is not all-gaps (or, when colorspace indexes, as long as the first
+     reference sequence has two consecutive ACGT characters in it
+     somewhere).
+  <li> Indexes where the first sequence consists of all gaps or other
+     non-ACGT characters are not handled properly by Bowtie versions
+     0.12.5 and older, but are handled properly by Bowtie 0.12.7.
+  <li> REMOVED: bowtie-build's <tt>--old-reverse</tt> option; the old reverse-
+     index scheme is again the default.  The new scheme is disabled
+     pending further refinement.
+</ul>
+
+<h2>0.12.6 release - 8/29/10</h2>
+<ul>
+ <li>
+     Modified <a href="manual.shtml#the-bowtie-inspect-index-inspector"><tt>bowtie-inspect</tt></a>'s default mode to use the bit-encoded
+     reference portion of the index to reconstruct the reference
+     sequence, rather than the ebwt portion.  This makes <a href="manual.shtml#the-bowtie-inspect-index-inspector"><tt>bowtie-inspect</tt></a>
+     much faster and uses less memory, and the output for a colorspace
+     index will now be in nucleotide space.  To get the behavior of the
+     old default, use the new
+     <a href="manual.shtml#bowtie-inspect-options-e"><tt>-e/--ebwt-ref</tt></a>
+     option.
+ <li>
+     Fixed bug whereby SOLiD QV strings
+     without a trailing space would fail to parse.
+ <li>
+     Moved to a new default way of building the reverse index.  Revert
+     to the old behavior with <tt>bowtie-build</tt>'s new
+     <tt>--old-reverse</tt>
+     option.
+     The new reverse index format is forward and backward compatible
+     with `bowtie`, unless otherwise noted in a future version.
+ <li>
+     Fixed issue that would sometimes cause bowtie-build to crash when
+     building a large index with a low <a href="manual.shtml#bowtie-build-options-o"><tt>--offrate</tt></a>.
+ <li>
+     Fixed build issue that would cause <tt>bowtie-build</tt> built on one version of
+     Linux to die with a "floating point error" on other versions.
+     bowtie now simply skips reads with 0 characters.  Previously it
+     would print an error and exit.
+ <li>
+     Fixed a bug whereby alignment cost could sometimes be
+     miscalculated.  Stratum was unaffected.
+ <li>
+     <tt>bowtie</tt> now simply skips reads with 0 characters.  Previously it
+     would print an error and exit.
+</ul>
+
+<h2>Myrna paper out - 8/11/10</h2>
+<ul>
+ <li>
+   The provisional version of the <a href="http://genomebiology.com/2010/11/8/R83/abstract">Myrna paper</a>
+   appeared today in <a href="http://genomebiology.com/">Genome Biology</a>.  See the <a href="http://bowtie-bio.sourceforge.net/myrna">Myrna site</a>
+   for details about the software.
+</ul>
+
+<h2>Myrna released - 7/22/10</h2>
+<ul>
+  <li><a href="myrna">Myrna</a> is cloud-scale tool for calculating differential gene
+      expression in large RNA-seq datasets.  It is very similar to
+      Crossbow in design and philosophy; e.g. it uses Bowtie, it's
+      "tri-mode" (runs in the cloud or on a Hadoop cluster or a single
+      computer), it has a <a href="myrna/ui.html">web-form-based GUI</a> for
+      composing and submitting cloud jobs, and its cloud mode uses
+      <a href="http://aws.amazon.com/elasticmapreduce/">Elastic MapReduce</a>.
+</ul>
+
+<h2>Major update to Crossbow - 7/22/10</h2>
+<ul>
+  <li><a href="crossbow">Crossbow</a> has received a major update to
+      version 1.0.4.  New features:
+  <ul>
+   <li>New "tri-mode" design; Crossbow jobs can be run in the cloud
+      (on <a href="http://aws.amazon.com/">Amazon AWS</a>),
+      on a <a href="http://hadoop.apache.org/">Hadoop</a> cluster,
+      or on a single computer, exploiting multiple processor cores
+   <li>Added a <a href="crossbow/ui.html">web-form-based GUI</a> for composing and submitting cloud jobs.
+   <li>Cloud version of Crossbow now runs on
+       <a href="http://aws.amazon.com/elasticmapreduce/">Elastic MapReduce</a>
+       (EMR) rather than directly on
+       <a href="http://aws.amazon.com/ec2/">Elastic Compute Cloud</a> (EC2).
+  </ul>
+</ul>
+
+<h2>Cufflinks paper out - 5/3/10</h2>
+<ul>
+  <li>The <a href="http://www.nature.com/nbt/journal/vaop/ncurrent/abs/nbt.1621.html#/">Cufflinks paper</a>,
+  by <a href="http://www.cs.umd.edu/~cole/">Cole Trapnell</a> <i>et al</i> is out
+  in <a href="http://www.nature.com/nbt/index.html">Nature Biotechnology</a>.
+  See the supplement for a detailed discussion of the methods behind 
+  <a href="http://cufflinks.cbcb.umd.edu/">Cufflinks</a>.
+</ul>
+
+<h2>0.12.5 release - 4/10/10</h2>
+<ul>
+ <li>Fixed spurious "Error while writing string output; not all
+     characters written" errors in
+     <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a>
+     mode.
+</ul>
+
+<h2>0.12.4 release - 4/5/10</h2>
+<ul>
+ <li>Periods in read sequences are now treated as Ns instead of
+     ignored.  This should help with some problems where Bowtie
+     erroneously reports "Reads file contained a pattern with more than
+     1024 quality values..." for data from recent versions of the
+     Illumina GA pipeline.
+ <li>Fixed a bug whereby some error and warning messages would be
+     printed on top of each other in
+     <a href="manual.shtml#bowtie-options-p"><tt>-p</tt>/<tt>--threads</tt></a>
+     mode.
+ <li>Chunk-exhaustion warnings messages are now suppressed when
+     <a href="manual.shtml#bowtie-options-quiet"><tt>--quiet</tt></a>
+     is specified.
+ <li>Fixed small issue in quality decoding whereby no-confidence colors
+     would incorrectly influence decoded quality of adjacent bases.
+</ul>

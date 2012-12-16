@@ -1,0 +1,401 @@
+  <div class="box">
+    <table width="400" CELLSPACING=0 CELLPADDING=0>
+
+      <!-- hg18 -->
+
+<!--
+walnut:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh hg18* ; md5sum hg18*
+-rw-r--r-- 1 langmead langmead  1.7G Nov 14 09:50 hg18.ebwt.1.zip
+-rw-r--r-- 1 langmead langmead 1021M Nov 14 09:50 hg18.ebwt.2.zip
+-rw-r--r-- 1 langmead langmead  2.7G Nov 14 09:51 hg18.ebwt.zip
+93baa2b0272f7378f7ff3b68e7a5f157  hg18.ebwt.1.zip
+3a2b71dd7d6da9d7a261437391c2ea94  hg18.ebwt.2.zip
+8a313f12579e0fffaf2126d997b94048  hg18.ebwt.zip
+-->
+
+      <tr bgcolor="#dddddd">
+        <td nowrap><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg18.ebwt.zip">hg18.ebwt.zip: <i>H. sapiens</i>, UCSC hg18</a></td>
+        <td align="right" nowrap>&nbsp;&nbsp;2.7 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 8a313f12579e0fffaf2126d997b94048</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg18.ebwt.1.zip">hg18.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.7 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 93baa2b0272f7378f7ff3b68e7a5f157</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg18.ebwt.2.zip">hg18.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;1.0 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 3a2b71dd7d6da9d7a261437391c2ea94</td>
+      </tr>
+
+      <!-- hg19 -->
+
+<!--
+walnut:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh hg19* ; md5sum hg19*
+-rw-r--r-- 1 langmead langmead  1.7G Nov 14 10:15 hg19.ebwt.1.zip
+-rw-r--r-- 1 langmead langmead 1022M Nov 14 10:15 hg19.ebwt.2.zip
+-rw-r--r-- 1 langmead langmead  2.7G Nov 14 10:20 hg19.ebwt.zip
+2a1349072ce21d200421dd12d59aa491  hg19.ebwt.1.zip
+7169cbf5108b1734e0c4e6d0e3931255  hg19.ebwt.2.zip
+388cb76f35d7e39ab3696623a21b78d5  hg19.ebwt.zip
+-->
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg19.ebwt.zip">hg19.ebwt.zip: <i>H. sapiens</i>, UCSC hg19</a></td>
+        <td align="right">&nbsp;&nbsp;2.7 GB</td>
+      </tr>
+      <tr>
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 388cb76f35d7e39ab3696623a21b78d5</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg19.ebwt.1.zip">hg19.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.7 GB</td>
+      </tr>
+      <tr>
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 2a1349072ce21d200421dd12d59aa491</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/hg19.ebwt.2.zip">hg19.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;1.0 GB</td>
+      </tr>
+      <tr>
+        <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 7169cbf5108b1734e0c4e6d0e3931255</td>
+      </tr>
+
+      <!-- NCBI 36.3 assembly -->
+
+<!--
+walnut:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh h_sapiens_asm.ebwt* ; md5sum h_sapiens_asm.ebwt*
+-rw-r--r-- 1 langmead cbcb  1.7G Jun 10 13:54 h_sapiens_asm.ebwt.1.zip
+-rw-r--r-- 1 langmead cbcb 1021M Jun 10 13:55 h_sapiens_asm.ebwt.2.zip
+-rw-r--r-- 1 langmead cbcb  2.7G Feb 18  2009 h_sapiens_asm.ebwt.zip
+b97a9f2640a86ee21175617de6080fbd  h_sapiens_asm.ebwt.1.zip
+c3485ec4572d0ce4bf658314594aba14  h_sapiens_asm.ebwt.2.zip
+1003dd89d77f086c80c8b0b723ecf68b  h_sapiens_asm.ebwt.zip
+-->
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.zip">h_sapiens_asm.ebwt.zip: <i>H. sapiens</i>, NCBI 36.3</a></td>
+        <td align="right">&nbsp;&nbsp;2.7 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 1003dd89d77f086c80c8b0b723ecf68b</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.1.zip">h_sapiens_asm.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.7 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: b97a9f2640a86ee21175617de6080fbd</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.2.zip">h_sapiens_asm.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;1.0 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: c3485ec4572d0ce4bf658314594aba14</td>
+      </tr>
+
+      <!-- H. sapiens NCBI 37.1 assembly -->
+
+<!--
+walnut:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh h_sapiens_37_asm.ebwt* ; md5sum h_sapiens_37_asm.ebwt*
+-rw-r--r-- 1 langmead cbcb  1.7G Aug 27 13:01 h_sapiens_37_asm.ebwt.1.zip
+-rw-r--r-- 1 langmead cbcb 1022M Aug 27 13:01 h_sapiens_37_asm.ebwt.2.zip
+-rw-r--r-- 1 langmead cbcb  2.7G Aug 27 13:03 h_sapiens_37_asm.ebwt.zip
+22e6cd234c8ffdd7195d1bf773fd45c2  h_sapiens_37_asm.ebwt.1.zip
+2cc9d1150b2245251e22475b854064a2  h_sapiens_37_asm.ebwt.2.zip
+ce6db52f78a8bfe3f3353da17430a71c  h_sapiens_37_asm.ebwt.zip
+-->
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_37_asm.ebwt.zip">h_sapiens_37_asm.ebwt.zip: <i>H. sapiens</i>, NCBI 37.1</a></td>
+        <td align="right">&nbsp;&nbsp;2.7 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: ce6db52f78a8bfe3f3353da17430a71c</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_37_asm.ebwt.1.zip">h_sapiens_37_asm.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.7 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 22e6cd234c8ffdd7195d1bf773fd45c2</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/h_sapiens_37_asm.ebwt.2.zip">h_sapiens_37_asm.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;1.0 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 2cc9d1150b2245251e22475b854064a2</td>
+      </tr>
+
+      <!-- mm9 -->
+
+<!--
+sycamore:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh mm9* ; md5sum mm9*
+-rw-r--r--  1 langmead langmead 1.5G Nov 14 09:46 mm9.ebwt.1.zip
+-rw-r--r--  1 langmead langmead 905M Nov 14 09:46 mm9.ebwt.2.zip
+-rw-r--r--  1 langmead langmead 2.4G Nov 14 09:47 mm9.ebwt.zip
+e575e01588bfdc35d3e194863a69aa15  mm9.ebwt.1.zip
+cc1e686038bf9ca46fa7fafcc3262a86  mm9.ebwt.2.zip
+ca3801d768e80a60aa09eede83833b2f  mm9.ebwt.zip
+-->	
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/mm9.ebwt.zip">mm9.ebwt.zip: <i>M. musculus</i>, UCSC mm9</a></td>
+        <td align="right">&nbsp;&nbsp;2.4 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: ca3801d768e80a60aa09eede83833b2f</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/mm9.ebwt.1.zip">mm9.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.5 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: e575e01588bfdc35d3e194863a69aa15</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/mm9.ebwt.2.zip">mm9.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;905 MB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: cc1e686038bf9ca46fa7fafcc3262a86</td>
+      </tr>
+
+      <!-- M. musculus, NCBI 37.1 assembly -->
+
+<!--
+walnut:/fs/ftp-cbcb/pub/data/bowtie_indexes $ ls -lh m_musculus_ncbi37.ebwt.* ; md5sum m_musculus_ncbi37.ebwt.*
+-rw-r--r-- 1 langmead cbcb 1.5G Nov 14 15:38 m_musculus_ncbi37.ebwt.1.zip
+-rw-r--r-- 1 langmead cbcb 905M Nov 14 15:39 m_musculus_ncbi37.ebwt.2.zip
+-rw-r--r-- 1 langmead cbcb 2.4G Nov 14 15:39 m_musculus_ncbi37.ebwt.zip
+90af7e7a75f3ae07c5e20aeb84306812  m_musculus_ncbi37.ebwt.1.zip
+b81eed3027ac562f23aa606e008d5d49  m_musculus_ncbi37.ebwt.2.zip
+cba88978363aa274312f0e7ff1853d69  m_musculus_ncbi37.ebwt.zip
+-->	
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus_ncbi37.ebwt.zip">m_musculus_ncbi37.ebwt.zip: <i>M. musculus</i>, NCBI 37.1</a></td>
+        <td align="right">&nbsp;&nbsp;2.4 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: cba88978363aa274312f0e7ff1853d69</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus_ncbi37.ebwt.1.zip">m_musculus_ncbi37.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.5 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 90af7e7a75f3ae07c5e20aeb84306812</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus_ncbi37.ebwt.2.zip">m_musculus_ncbi37.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;905 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: b81eed3027ac562f23aa606e008d5d49</td>
+      </tr>
+      
+      <!-- B. taurus -->
+      
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/b_taurus.ebwt.zip">b_taurus.ebwt.zip: <i>B. taurus</i>, UMD 3.0</a></td>
+        <td align="right">&nbsp;&nbsp;2.1 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: f15c1dfaa63dc85c7e072bf9ce7b07ef</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/b_taurus.ebwt.1.zip">b_taurus.ebwt.1.zip: Part 1</a></td>
+        <td align="right">&nbsp;&nbsp;1.3 GB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: a40d2edb7332535af93c32fa070a9bd5</td>
+      </tr>
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/b_taurus.ebwt.2.zip">b_taurus.ebwt.2.zip: Part 2</a></td>
+        <td align="right">&nbsp;&nbsp;801 MB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: b920a3b811a040f963d918ae14be8686</td>
+      </tr>
+
+      <!-- R. norvegicus -->
+
+<!--
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/r_norvegicus.ebwt.zip"><i>R. norvegicus</i>, NCBI 4.1, contigs</a></td>
+        <td align="right">&nbsp;&nbsp;2.3 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 36fe7c0f8b2405cb5e157ec904cfb53e</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/r_norvegicus.ebwt.1.zip">r_norvegicus.ebwt.1.zip</a></td>
+        <td align="right">&nbsp;&nbsp;1.5 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 983ac2aa854fce2ddb2440459b651d0b</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/r_norvegicus.ebwt.2.zip">r_norvegicus.ebwt.2.zip</a></td>
+        <td align="right">&nbsp;&nbsp;888 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: e171ec6f17a7aa3824d0293a796eddd0</td>
+      </tr>
+-->
+
+      <!-- M. musculus -->
+
+<!--
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus.ebwt.zip"><i>M. musculus</i>, NCBI 37.1, contigs</a></td>
+        <td align="right">&nbsp;&nbsp;2.4 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 9262de5705b87164087ef3e75eed63af</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus.ebwt.1.zip">m_musculus.ebwt.1.zip</a></td>
+        <td align="right">&nbsp;&nbsp;1.5 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 1a30c57f7592946ac8295a72251ac664</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/m_musculus.ebwt.2.zip">m_musculus.ebwt.2.zip</a></td>
+        <td align="right">&nbsp;&nbsp;919 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 96e2bb065dbd06211b4f4ca0fef1261f</td>
+      </tr>
+-->
+
+      <!-- C. familiaris -->
+<!--
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/c_familiaris.ebwt.zip"><i>C. familiaris</i>, NCBI 2.1, contigs</a></td>
+        <td align="right">&nbsp;&nbsp;2.2 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: e7e77093c9d71223b6054fab8059e8aa</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/c_familiaris.ebwt.1.zip">c_familiaris.ebwt.1.zip</a></td>
+        <td align="right">&nbsp;&nbsp;1.4 GB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 5bbf02d7a41b857bf2851c643682e22e</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/c_familiaris.ebwt.2.zip">c_familiaris.ebwt.2.zip</a></td>
+        <td align="right">&nbsp;&nbsp;843 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 867394f94479d207dffb4cc4495b8bde</td>
+      </tr>
+-->
+
+      <!-- G. gallus -->
+<!--
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/g_gallus.ebwt.zip"><i>G. gallus</i>, NCBI 2.1, contigs</a></td>
+        <td align="right">&nbsp;&nbsp;969 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: e5684b1a044b7ff152335a51bb659b3a</td>
+      </tr>
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/t_rubripes.ebwt.zip"><i>T. rubripes</i>, Fugu Gen. Cons. v4</a></td>
+        <td align="right">&nbsp;&nbsp;348 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 53af46be466e083c733d3d7a4f72fb3e</td>
+      </tr>
+-->
+
+      <!-- D. melanogaster -->
+
+      <tr>
+        <td nowrap><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/d_melanogaster_fb5_22.ebwt.zip">d_melanogaster_fb5_22.ebwt.zip: <i>D. melanogaster</i>, Flybase, r5.22</a></td>
+        <td align="right" nowrap>&nbsp;&nbsp;153 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: c1a8c160bf5cd5c840c242ab0d38bc32</td>
+      </tr>
+      
+      <!-- A. thaliana -->
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/a_thaliana_tair9.ebwt.zip">a_thaliana_tair9.ebwt.zip: <i>A. thaliana</i>, TAIR, TAIR9</a></td>
+        <td align="right">&nbsp;&nbsp;119 MB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 903560fa325061163f44a65f7b572279</td>
+      </tr>
+      
+      <!-- C. elegans -->
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/c_elegans_ws200.ebwt.zip">c_elegans_ws200.ebwt.zip: <i>C. elegans</i>, Wormbase, WS200</a></td>
+        <td align="right">&nbsp;&nbsp;99 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: f7821cf7aa7e119b9afd8724993b778e</td>
+      </tr>
+      
+      <!-- S. cerevisiae -->
+
+      <tr bgcolor="#dddddd">
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/s_cerevisiae.ebwt.zip">s_cerevisiae.ebwt.zip: <i>S. cerevisiae</i>, CYGD</a></td>
+        <td align="right">&nbsp;&nbsp;15 MB</td>
+      </tr>
+      <tr bgcolor="#dddddd">
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: bbd94e88708f7986ac65e3139f53f877</td>
+      </tr>
+
+      <!-- E. coli -->
+
+      <tr>
+        <td><a href="ftp://ftp.cbcb.umd.edu/pub/data/bowtie_indexes/e_coli.ebwt.zip">e_coli.ebwt.zip: <i>E. coli</i>, NCBI, st. 536</a></td>
+        <td align="right">&nbsp;&nbsp;5.0 MB</td>
+      </tr>
+      <tr>
+	    <td style="font-size: x-small; color: #666666;" colspan=2>MD5: 8a00d8b71f41157862b4719d6fb9aa6f</td>
+      </tr>
+      
+    </table>
+  </div>

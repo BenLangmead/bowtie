@@ -1,0 +1,109 @@
+<h2>Tools that use Bowtie 1 and/or 2:</h2>
+<ul>
+  <li>mRNA sequencing:</li>
+  <ul>
+    <li><a href="myrna">Myrna</a> (<a href="http://genomebiology.com/2010/11/8/R83">paper</a>)</li>
+    <li><a href="http://tophat.cbcb.umd.edu/">TopHat, TopHat 2</a> (<a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/btp120">paper</a>)</li>
+    <li><a href="http://cufflinks.cbcb.umd.edu/">Cufflinks</a> (<a href="http://dx.doi.org/10.1038/nbt.1621">paper</a>)</li>
+    <li><a href="http://trinityrnaseq.sourceforge.net/">Trinity</a> (<a href="http://www.nature.com/nbt/journal/v29/n7/abs/nbt.1883.html">paper</a>)</li>
+    <li><a href="http://www.netlab.uky.edu/p/bioinfo/MapSplice/">MapSplice</a> (<a href="http://nar.oxfordjournals.org/content/38/18/e178.full">paper</a>)</li>
+    <li><a href="http://bioinformatics.mdanderson.org/main/SpliceSeq:Methods">SpliceSeq (<a href="http://bioinformatics.oxfordjournals.org/content/early/2012/07/20/bioinformatics.bts452.short">paper</a>)</a></li>
+    <li><a href="https://github.com/rnaseqr/RNASEQR">RNASEQR</a> (<a href="http://nar.oxfordjournals.org/content/early/2011/12/22/nar.gkr1248.short">paper</a>)</li>
+    <li><a href="http://deweylab.biostat.wisc.edu/rsem/">RSEM</a> (<a href="http://www.biomedcentral.com/1471-2105/12/323/">paper</a>)</li>
+    <li><a href="http://changlab.cgrb.oregonstate.edu/node/26">GENE-counter</a> (<a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0025279">paper</a>)</li>
+    <li><a href="http://mapman.gabipd.org/web/guest/robin">RobiNA</a> (<a href="http://nar.oxfordjournals.org/content/early/2012/06/08/nar.gks540">paper</a>)</li>
+    <li><a href="http://blog.expressionplot.com/">ExpressionPlot</a> (<a href="http://genomebiology.com/2011/12/7/R69">paper</a>)</li>
+    <li><a href="http://cbil.upenn.edu/RUM/">RUM</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/18/2518.long">paper</a>)</li>
+    <li><a href="http://www.bio.anl.gov/molecular_and_systems_biology/bowstrap/bowstrap_download.html">BowStrap</a> (<a href="http://www.biomedcentral.com/1756-0500/5/275/abstract">paper</a>)</li>
+    <li><a href="http://www.bio.ifi.lmu.de/softwareservices/contextmap">ContextMap</a> (<a href="http://www.biomedcentral.com/1471-2105/13/S6/S9">paper</a>)</li>
+    <li><a href="http://bio.math.berkeley.edu/eXpress/overview.html">eXpress</a></li>
+  </ul>
+  <li>Bisulfite-seq:</li>
+  <ul>
+    <li><a href="http://rafalab.jhsph.edu/bsmooth/">BSmooth</a> (paper in press)</li>
+    <li><a href="http://www.bioinformatics.bbsrc.ac.uk/projects/bismark/">Bismark</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/11/1571.short">paper</a>)</li>
+    <li><a href="https://github.com/brentp/methylcode">MethylCoder</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/17/2435.short">paper</a>)</li>
+    <li><a href="http://pellegrini.mcdb.ucla.edu/BS_Seeker/BS_Seeker.html">BS-Seeker</a> (<a href="http://www.biomedcentral.com/1471-2105/11/203">paper</a>)</li>
+    <li><a href="http://code.google.com/p/bsolana/">B-SOLANA</a> (<a href="http://bioinformatics.oxfordjournals.org/content/28/3/428.long">paper</a>)</li>
+    <li><a href="http://sing.ei.uvigo.es/bicycle/">Bicycle</a></li>
+  </ul>
+  <li>Re-seqeuncing:</li>
+  <ul>
+    <li><a href="crossbow">Crossbow</a> (<a href="http://genomebiology.com/2009/10/11/R134">paper</a>)</li>
+  </ul>
+  <li>Scaffolding:</li>
+  <ul>
+    <li><a href="http://lge.ibi.unicamp.br/zorro/">Zorro</a></li>
+    <li><a href="http://www.baseclear.com/landingpages/sspacev12/">SSPACE</a> (<a href="http://bioinformatics.oxfordjournals.org/content/early/2010/12/12/bioinformatics.btq683.short">paper</a>)</li>
+  </ul>
+  <li>Workflow:</li>
+  <ul>
+    <li><a href="http://main.g2.bx.psu.edu/">Galaxy</a> (<a href="http://genomebiology.com/2010/11/8/R86">paper</a>)</li>
+    <li><a href="http://chipster.csc.fi/">Chipster</a> (<a href="http://www.biomedcentral.com/1471-2164/12/507/abstract/">paper</a>)</li>
+    <li><a href="http://www.lgtc.nl/services/general_services/software_tools/gapss.php">GAPSS</a></li>
+    <li><a href="http://ugene.unipro.ru/">Unipro UGENE</a> (<a href="http://bioinformatics.oxfordjournals.org/content/28/8/1166.full">paper</a>)</li>
+    <li><a href="http://code.google.com/p/biopieces/">Biopieces</a></li>
+    <li><a href="https://insilico.ulb.ac.be/">InSilico DB</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/22/3204">paper</a>)</li>
+  </ul>
+  <li>Structural variants:</li>
+  <ul>
+    <li><a href="http://sourceforge.net/apps/mediawiki/n-fuse/index.php?title=NFuse_0.0.1">nFuse</a> (<a href="http://genome.cshlp.org/content/early/2012/10/04/gr.136572.111">paper</a>)</li>
+  </ul>
+  <li>Gene fusion:</li>
+  <ul>
+    <li><a href="http://tophat.cbcb.umd.edu/fusion_index.html">TopHat Fusion</a> (<a href="http://genomebiology.com/2011/12/8/R72/abstract">paper</a>)</li>
+    <li><a href="http://compbio.bccrc.ca/software/defuse">deFuse</a> (<a href="http://www.ploscompbiol.org/article/info%3Adoi%2F10.1371%2Fjournal.pcbi.1001138">paper</a>)</li>
+    <li><a href="http://code.google.com/p/comrad/">Comrad</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/11/1481.abstract">paper</a>)</li>
+    <li><a href="https://bitbucket.org/mckinsel/shortfuse">ShortFuse</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/8/1068.full.pdf">paper</a>)</li>
+    <li><a href="http://bioen-compbio.bioen.illinois.edu/FusionHunter/">FusionHunter</a> (<a href="http://bioinformatics.oxfordjournals.org/content/early/2011/05/05/bioinformatics.btr265.abstract">paper</a>)</li>
+    <li><a href="http://mayoresearch.mayo.edu/mayo/research/biostat/stand-alone-packages.cfm">SnowShoes-FD</a> (<a href="http://nar.oxfordjournals.org/content/early/2011/05/27/nar.gkr362.full">paper</a>)</li>
+    <li><a href="http://bioinformatics.childhealthresearch.org.au/software/fusionfinder/">FusionFinder</a> (<a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0039987">paper</a>)</li>
+    <li><a href="http://code.google.com/p/chimerascan/">Chimerascan</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/20/2903.long">paper</a>)</li>
+  </ul>
+  <li>Metagenomics:</li>
+  <ul>
+    <li><a href="http://genomics1.mh-hannover.de/genometa/index.php?Site=Tutorial%201">Genometa</a> (<a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0041224">paper</a>)</li>
+    <li><a href="http://huttenhower.sph.harvard.edu/metaphlan">MetaPhlan</a> (<a href="http://www.nature.com/nmeth/journal/v9/n8/full/nmeth.2066.html">paper</a>)</li>
+    <li><a href="http://blog.metagenomics.anl.gov/howto/quality-control/">MG-RAST</a> (<a href="http://blog.metagenomics.anl.gov/howto/quality-control/">paper</a>)</li>
+    <li><a href="https://github.com/treangen/metAMOS/wiki">metAMOS</a></li>
+  </ul>
+  <li>Other:</li>
+  <ul>
+    <li><a href="http://personalpages.manchester.ac.uk/staff/antonio.marco/seqtrimmap.html">SeqTrimMap</a> (sequential trimming and mapping; <a href="http://bioinformatics.oxfordjournals.org/content/28/3/318.full">paper</a>)
+    <li><a href="http://deqor.mpi-cbg.de/deqor_new/input.html">Deqor v3</a> (design and quality control of siRNAs; <a href="http://nar.oxfordjournals.org/content/32/suppl_2/W113.full">paper</a>)
+    <li><a href="http://b110-wiki.dkfz.de/signaling/wiki/display/nextrnai/NEXT-RNAi">NEXT-RNAi</a> (design of genome-wide RNAi libraries)</li>
+    <li><a href="http://www.mcardle.wisc.edu/mprime/version.html">mPrime</a> (primer design)</li>
+    <li><a href="https://github.com/csmiller/EMIRGE">EMIGRE</a> (ribosomal genes reconstruction)</li>
+    <li><a href="http://www.ebi.ac.uk/enright-srv/MapMi/">MapMi</a> (mapping and analysis of miRNAs; <a href="http://www.biomedcentral.com/1471-2105/11/133">paper</a>)</li>
+    <li><a href="http://sourceforge.net/p/tapdancebio/home/Home/">TAPDANCE</a> (identifies CISs in transposon junction fragment insertion data; <a href="http://www.biomedcentral.com/content/pdf/1471-2105-13-154.pdf">paper</a>)</li>
+    <li><a href="http://users-mb.au.dk/pmgrp/shortran/">shortran</a> (pipeline for small RNA-seq data analysis; <a href="http://bioinformatics.oxfordjournals.org/content/early/2012/08/22/bioinformatics.bts496.full.pdf+html">paper</a>)</li>
+    <li><a href="http://carla.saleh.free.fr/software/paparazzi.html">Paparazzi</a> (reconstruction of viral genomes from small RNA reads; <a href="http://jvi.asm.org/content/85/21/11016.long">paper</a>)</li>
+  </ul>
+</ul>
+
+<h2>OS distributions with Bowtie packages</h2>
+<ul>
+  <li><a href="http://packages.ubuntu.com/search?suite=default&section=all&arch=any&searchon=names&keywords=bowtie">Ubuntu</a></li>
+  <li><a href="http://packages.debian.org/search?searchon=names&keywords=bowtie">Debian</a></li>
+  <li><a href="https://apps.fedoraproject.org/packages/bowtie">Fedora</a></li>
+  <li><a href="http://www.macports.org/ports.php?by=name&substr=bowtie">MacPorts</a></li>
+</ul>
+
+<h2>Commercial products using Bowtie:</h2>
+<ul>
+  <li><a href="http://www.geospiza.com/Products/WhitePaper_06102009.pdf">Geospiza GeneSifter</a></li>
+  <li><a href="http://www.clcbio.com/index.php?id=1408&manual=External_applications_integration_Bowtie.html">CLC Genomics Server</a></li>
+</ul>
+
+<h2>Published protocols using Bowtie 1 and/or 2:</h2>
+<ul>
+  <li>Baslan T, et al.        <a href="http://www.nature.com/nprot/journal/v7/n6/abs/nprot.2012.039.html">  Genome-wide copy number analysis of single cells</a>.  <i>Nature Protocols</i>.</li>
+  <li>Trapnell C, et al.      <a href="http://www.nature.com/nprot/journal/v7/n3/full/nprot.2012.016.html"> Differential gene and transcript expression analysis of RNA-seq experiments with TopHat and Cufflinks</a>.  <i>Nature Protocols</i>.</li>
+  <li>Goodman AL, et al.      <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.417.html">Identifying microbial fitness determinants by insertion sequencing using genome-wide transposon mutant libraries</a>.  <i>Nature Protocols</i>.</li>
+  <li>Ingolia NT, et al.      <a href="http://www.nature.com/nprot/journal/v7/n8/full/nprot.2012.086.html"> The ribosome profiling strategy for monitoring translation in vivo by deep sequencing of ribosome-protected mRNA fragments</a>.  <i>Nature Protocols</i>.</li>
+  <li>Bardet AF, et al.       <a href="http://www.nature.com/nprot/journal/v7/n1/full/nprot.2011.420.html"> A computational pipeline for comparative ChIP-seq analyses</a>.  <i>Nature Protocols</i>.</li>
+  <li>Fanelli M, et al.       <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.406.html">Chromatin immunoprecipitation and high-throughput sequencing from paraffin-embedded pathology tissue</a>.  <i>Nature Protocols</i>.</li>
+  <li>Simon JS, et al.        <a href="http://www.nature.com/nprot/journal/v7/n2/full/nprot.2011.444.html"> Using formaldehyde-assisted isolation of regulatory elements (FAIRE) to isolate active regulatory DNA</a>.  <i>Nature Protocols</i>.</li>
+  <li>Christodoulou DC, et al.<a href="http://onlinelibrary.wiley.com/doi/10.1002/0471142727.mb25b09s93/full">Quantification of Gene Transcripts with Deep Sequencing Analysis of Gene Expression (DSAGE) Using 1 to 2 micrograms Total RNA</a>.  <i>Current Protocols in Molecular Biology</i>.</li>
+</a></li>
+</ul>

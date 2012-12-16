@@ -1,0 +1,780 @@
+<h2>0.12.3 release - 2/17/10</h2>
+<ul>
+ <li>Fixed a significant bug in
+      <a href="manual.shtml#bowtie-options-C"><tt>-C</tt>/<tt>--color</tt></a>
+     mode whereby quality values for SNP nucleotide positions are
+     erroneously penalized.
+ <li>Fixed a bug in
+     <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a>
+     mode whereby if whitespace occurred in the original read name, it would be
+     printed in the QNAME field in violation of the SAM spec.  Bowtie
+     now truncates read names at the first whitespace character before
+     printing.
+ <li>When input is FASTQ and
+     <a href="manual.shtml#bowtie-options-C"><tt>-C</tt>/<tt>--color</tt></a>
+     is enabled, Bowtie is now tolerant of output from FASTQ converters that
+     include the primer base and where the quality string is one character
+     shorter than the sequence string (due to the primer).  This fixes issues
+     users have reported using output from BFAST's solid2fastq.
+ <li>Added support for SOLiD-style <tt>_QV</tt> files, via the 
+     <a href="manual.shtml#bowtie-options-Q"><tt>-Q/--quals</tt></a>,
+     <a href="manual.shtml#bowtie-options-Q1"><tt>--Q1</tt></a> and
+     <a href="manual.shtml#bowtie-options-Q2"><tt>--Q2</tt></a>
+     options.  These options are used in combination with 
+     <a href="manual.shtml#bowtie-options-C"><tt>-C</tt>/<tt>--color</tt></a>
+     and
+     <a href="manual.shtml#bowtie-options-f"><tt>-f</tt></a>
+     to align parallel colorspace read/quality files without having
+     to convert to FASTQ.
+</ul>
+
+<h2>0.12.2 release - 2/2/10</h2>
+<ul>
+ <li>When
+     <a href="manual.shtml#bowtie-options-C"><tt>-C</tt>/<tt>--color</tt></a>
+     is enabled, the default paired-end orientation is
+     now
+     <a href="manual.shtml#bowtie-options-ff"><tt>--ff</tt></a>,
+     not
+     <a href="manual.shtml#bowtie-options-fr"><tt>--fr</tt></a>.
+     The new default fits typical SOLiD output.
+ <li>Fixed a bug whereby very large reads could cause <tt>bowtie</tt> to crash
+     in
+     <a href="manual.shtml#bowtie-options-best"><tt>--best</tt></a>
+     mode
+ <li>After 0.12.1, some issues remained whereby <tt>bowtie</tt> would fail to
+     trim the primer in colorspace (e.g. in
+     <a href="manual.shtml#bowtie-options-c"><tt>-c</tt></a>
+     mode).  All input modes should now have fully-functioning
+     colorspace primer trimming.
+ <li>Fixed a bug whereby decoded colorspace qualities could overflow
+     and erroneously become low qualities.
+ <li>Fixed a bug that could produce incorrect paired-end alignment
+     results in
+     <a href="manual.shtml#bowtie-options-n"><tt>-n</tt></a>
+     mode when using paired-end orientation modes other than
+     <a href="manual.shtml#bowtie-options-fr"><tt>--fr</tt></a>
+     Even with the bug, reported results are reasonable;
+     but the seed edit constraint (
+     <a href="manual.shtml#bowtie-options-n"><tt>-n</tt></a>
+     ) may have been applied to the wrong end of one of the mates.
+ <li>Changed
+     <a href="manual.shtml#bowtie-options-chunkmbs"><tt>--chunkmbs</tt></a>
+     default up to 64 from 32.
+ <li>Better error checking and reporting for some <tt>bowtie</tt> options.
+ <li>Some basic testing scripts are now bundled with Bowtie (in
+     <tt>scripts/test</tt>), which should make it easier to regression-test.
+</ul>
+
+<h2>Fixed mm9 colorspace index</h2>
+<ul>
+ <li>Previously posted version of the colorspace
+     <a href="http://hgdownload.cse.ucsc.edu/downloads.html#mouse">mm9</a>
+     index was not actually colorspace.  This has been fixed.</li>
+</ul>
+
+<h2>0.12.1 release - 1/8/10</h2>
+<ul>
+ <li>IMPORTANT: Fixed bug whereby bowtie would fail to remove both the
+     primer base and the first color when parsing .csfasta files with
+     primer bases in
+     <a href="manual.shtml#bowtie-options-C"><tt>-C</tt></a>
+     <a href="manual.shtml#bowtie-options-f"><tt>-f</tt></a>
+     mode.  A workaround for users of version
+     0.12.0 is to use
+     <a href="manual.shtml#bowtie-options-5"><tt>-5</tt></a>
+     <tt>1</tt>
+     in that situation.
+ <li>Fixed bug whereby, when
+     <a href="manual.shtml#bowtie-options-M"><tt>-M</tt></a> limit was
+     exceeded for an unpaired read, the number output in the <a href="manual.shtml#default-bowtie-output">7th column</a>
+     (or the
+     <a href="manual.shtml#sam-bowtie-output"><tt>XM:i</tt></a>
+     optional field)
+     for the randomly-selected alignment was too low by 1.
+ <li>Added
+     <a href="manual.shtml#paired-end-colorspace-alignment">discussion</a>
+     to manual about a pitfall regarding SOLiD paired-end input, i.e., not
+     all entries necessarily have corresponding mates in the other file.
+</ul>
+
+<h2>0.12.0 release - 12/23/09</h2>
+<ul>
+ <li>Added missing <tt>README.markdown</tt> file
+ <li>Minor documentation additions
+</ul>
+
+<h2>0.12.0-beta1 release - 12/15/09</h2>
+<ul>
+ <li>Added SOLiD colorspace support
+ <ul>
+  <li>Colorspace indexes are distinct from standard letterspace
+      indexes and must be built with a separate invocation of
+      bowtie-build (with <a href="manual.shtml#bowtie-options-C"><tt>-C</tt></a> option)
+  <li>Running bowtie with <a href="manual.shtml#bowtie-options-C"><tt>-C</tt></a> causes Bowtie to align in colorspace.
+      Both index and reads must be in colorspace.
+  <li>Colorspace memory requirement is the same as paired-end alignment in
+      letterspace (normal) mode.  Paired-end alignment does not increase the
+      memory requirement further in colorspace.
+  <li><tt>csfasta</tt>, <tt>csfastq</tt>, and "raw" read formats are all supported with
+      <a href="manual.shtml#bowtie-options-C"><tt>-C</tt></a>.  In read sequences, <tt>0</tt> means "blue" and is intechangeable with
+      <tt>A</tt>, likewise <tt>1</tt> (<tt>C</tt>) means "green",
+      <tt>2</tt> (<tt>G</tt>) means "orange" and <tt>3</tt>
+      (<tt>T</tt>) means "red".
+  <li>Colorspace versions of indexes added (see sidebar)
+  <li>New manual section discussing <a href="manual.shtml#colorspace-alignment">colorspace features</a>
+ </ul>
+ <li>Fixed a few SAM output issues
+ <ul>
+  <li><tt>@PG</tt> line now properly uses colons instead of equals signs
+  <li>Removed <tt>/1</tt>, <tt>/2</tt> suffixes for paired-end reads in SAM mode
+  <li>Added <a href="manual.shtml#bowtie-options-sam-RG"><tt>--sam-RG</tt></a> option that permits the user to insert set values
+      for flags that appear on the <tt>@RG</tt> line
+ </ul>
+ <li>Fixed lingering pthreads bugs that could cause Bowtie to hang or
+     crash toward the end of execution with <a href="manual.shtml#bowtie-options-p"><tt>-p</tt></a> > 1.
+ <li>Fixed performance-related bug that would cause paired-end
+     alignment to be artificially slow in many situations.
+ <li>Fixed issue with random number generation that would result in
+     non-random selection of alignments in some situations.
+ <li><tt>bowtie -f</tt> now supports fasta files with reads split across
+     multiple lines 
+ <li>New <a href="manual.shtml#bowtie-options-suppress"><tt>--suppress</tt></a> option suppresses unwanted columns of output
+ <li>The <tt>MANUAL</tt> file was converted to <a href="http://daringfireball.net/projects/markdown/syntax">markdown</a> format, facilitating
+     conversion to various other formats using tools like <a href="http://johnmacfarlane.net/pandoc/">pandoc</a>
+ <li><b>Deprecated</b>: <tt>bowtie</tt>: <tt>--concise</tt>, <tt>bowtie-build</tt>: <tt>--big</tt>, <tt>--little</tt>
+ <li><b>Removed</b>: <tt>-z/--phased</tt>, <tt>-b/--binout</tt>, <tt>bowtie-maptool</tt>,
+     <tt>bowtie-maqconvert</tt>
+</ul>
+
+<h2>Crossbow paper out - 11/20/09</h2>
+<ul>
+ <li>
+   The provisional version of the <a href="http://genomebiology.com/2009/10/11/R134">Crossbow paper</a>
+   appeared today in <a href="http://genomebiology.com/">Genome Biology</a>.
+</ul>
+
+<h2>New pre-built index list - 11/14/09</h2>
+<ul>
+  <li>The roster of pre-built indexes has been changed to address a number
+      of user requests and issues and to streamline maintenance.
+      Now:
+  <ul>
+    <li>All indexes are for well known assemblies.  Contig indexes have been removed.</li>
+    <li>Indexes for UCSC builds <a href="http://hgdownload.cse.ucsc.edu/downloads.html#human">hg18</a>, <a href="http://hgdownload.cse.ucsc.edu/downloads.html#human">hg19</a> and <a href="http://hgdownload.cse.ucsc.edu/downloads.html#mouse">mm9</a> have been added.</li>
+    <li>Rarely used indexes (chimp, rat, dog, chicken) have been removed.</li>
+  </ul>
+  <li>If there is an index not on the list that you use on a regular basis
+      and would like to be made availble pre-built, contact us.
+      We may add more if enough users request them.
+  <li>Note: neither UCSC nor NCBI indexes contain unplaced contigs (UCSC:
+      "random" files, NCBI: Chromosome "Un") or alternative haplotype
+      assemblies.
+</ul>
+
+<h2>Bowtie on Galaxy - 10/15/09</h2>
+<ul>
+  <li>The <a href="http://main.g2.bx.psu.edu/">Galaxy project</a> has
+      integrated Bowtie as one of the tools available for aligning short
+      reads (under "NGS: Mapping" on in the "Tools" box).  Many thanks to
+      Anton Nekrutenko for his work on that.
+</ul>
+
+
+<h2>0.11.3 release - 10/12/09</h2>
+<ul>
+   <li>Fixed crashing bug in <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a> mode when the number of reference
+     sequences in the index is very large.
+   <li>Added <a href="manual.shtml#bowtie-options-sam-nohead"><tt>--sam-nohead</tt></a> option to suppress output of SAM headers in
+     <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</a></tt> mode.
+   <li>Added <a href="manual.shtml#bowtie-options-sam-nosq"><tt>--sam-nosq</tt></a> option to suppress output of <tt>@SQ</tt> SAM headers in
+     <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</a></tt> mode.  These can become a nuisance when the reference
+     index contains a very large number of sequences.
+   <li>Fixed a bug in <tt>bowtie-build</tt>'s auto-configure mode that would cause
+     it to underestimate the amount of memory required by a set of
+     parameters.  This in turn would cause the index to be corrupted.
+</ul>
+
+<h2>Crossbow released - 10/9/09</h2>
+<ul>
+   <li><a href="./crossbow">Crossbow</a> is a cloud-computing pipeline for whole genome resequencing. 
+  It combines Bowtie and <a href="http://soap.genomics.org.cn/soapsnp.html">SoapSNP</a>, an accurate
+  genotyper, on top of <a href="http://hadoop.apache.org">Hadoop</a>.  Crossbow includes scripts that
+  run automatically on <a href="http://aws.amazon.com">Amazon's EC2 utility computing
+  service</a> for a fee, allowing researchers without extravagant computing resources to conduct
+  large experiments efficiently.  Authors are <a href="http://faculty.jhsph.edu/default.cfm?faculty_id=2209&grouped=false&searchText=&department_id=3&departmentName=Biostatistics">Ben Langmead</a> and <a href="http://www.cbcb.umd.edu/~mschatz/">Michael C. Schatz</a>.
+</ul>
+
+<h2>0.11.2 release - 10/7/09</h2>
+<ul>
+   <li>Fixed issue whereby <tt>--max</tt> option was disabled.
+</ul>
+
+
+<h2>0.11.1 mini-release - 10/5/09</h2>
+<ul>
+   <li>SAM output: changed <tt>XS:i</tt> optional field to be named
+       <tt>XA:i</tt> to avoid a conflict with TopHat's <tt>XS:i</tt> field.
+</ul>
+
+<h2>0.11.0 release - 10/5/09</h2>
+<ul>
+   <li>Initial <a href="http://samtools.sf.net">SAM</a> output support with
+   <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a>
+   option.  <tt>bowtie</tt> sets all
+     fields according to the <a href="http://samtools.sourceforge.net/SAM1.pdf">SAM spec</a> (Version 0.1.2-draft, 20090820).
+     See the new
+     <a href="manual.shtml#sam-bowtie-output">SAM Output</a>
+     section of the manual for details.
+   <li>The <a href="tutorial.shtml">Getting Started Guide</a> and <tt>TUTORIAL</tt> file have been updated to
+     use <a href="http://samtools.sf.net">SAMtools</a> instead of <a href="http://maq.sf.net">Maq</a> for the SNP calling step.
+   <li>Added
+     <a href="manual.shtml#bowtie-options-shmem"><tt>--shmem</tt></a>
+     option:
+     <a href="manual.shtml#bowtie-options-shmem"><tt>--shmem</tt></a>
+     is similar to
+     <a href="manual.shtml#bowtie-options-mm"><tt>--mm</tt></a>
+     in that it allows
+     concurrent <tt>bowtie</tt> processes querying the same index to share a
+     single memory image of the index.  Unlike
+     <a href="manual.shtml#bowtie-options-mm"><tt>--mm</tt></a>,
+     shared memory
+     alocated by
+     <a href="manual.shtml#bowtie-options-shmem"><tt>--shmem</tt></a> is permanent.
+   <li>The alignment summary printed to stderr at the end of an alignment
+     run is now more friendly and includes data about the number and
+     proportion of reads that aligned, failed to align, or were
+     suppressed via the
+     <a href="manual.shtml#bowtie-options-m"><tt>-m</tt></a>
+     option.
+   <li>When too-short reads are encountered, <tt>bowtie</tt> now always prints
+     warnings, not errors.
+     <a href="manual.shtml#bowtie-options-quiet"><tt>--quiet</tt></a>
+     now suppresses those warnings.
+   <li>By default, when <tt>bowtie</tt> prints a reference sequence name it now
+     stops at the first whitespace.  In 0.10.1, the default was to
+     print the entire name, which could cause confusion when parsing
+     <tt>bowtie</tt> output.  To revert to printing the full name, use the new
+     <a href="manual.shtml#bowtie-options-fullref"><tt>--fullref</tt></a>
+     option.
+   <li><tt>bowtie</tt> now prints the command-line before exiting with an error.
+   <li>Fixed mistake in the manual's "Default output" section: the offset
+     in field 4 is 0-based, not 1-based.  To obtain a 1-based offset
+     instead, use the <tt>-B 1</tt> option.
+   <li>Various minor bug fixes.
+   <li><b>Deprecated</b>: <tt>-z/--phased</tt>, <tt>-b/--binout</tt>, <tt>bowtie-maptool</tt>,
+     <tt>bowtie-maqconvert</tt>.  These features will be removed in a future
+     version of Bowtie.  Note that <tt>-b/--binout</tt>, <tt>bowtie-maptool</tt>, and
+     <tt>bowtie-maqconvert</tt> are largely superseded by the SAM output format
+     (<a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a>), BAM, and <a href="http://samtools.sf.net">SAMtools</a>.  Contact
+     the authors if this is a problem.
+   <li><b>Removed</b>: <tt>--unfq/--unfa/--maxfq/--maxfa/--alfq/--alfa</tt>.  Please use
+     <tt>--un/--max/--al</tt> instead.  Contact the authors if this is a
+     problem.
+</ul>
+
+<h2>Cufflinks released - 9/28/09</h2>
+<ul>
+   <li><a href="http://cufflinks.cbcb.umd.edu/">Cufflinks</a>, a tool that assembles transcripts and estimates their
+       abundances in RNA-Seq samples was released today.  The author is
+       Cole Trapnell, who is also the author of <a href="http://tophat.cbcb.umd.edu/">TopHat</a>.</li>
+</ul>
+
+
+<h2>10,000 downloads - 9/21/09</h2>
+<ul>
+   <li>Since the first version was released a little over a year ago,
+       Bowtie has been downloaded more than 10,000 times.  Our sincere
+       thanks to users whose bug reports, suggestions and help have
+       made this possible.  Thank you!</li>
+</ul>
+
+<h2>New human index - 8/26/09</h2>
+<ul>
+   <li>Added index files for NCBI 37.1 assembly.</li>
+</ul>
+
+
+<h2>New cow index - 8/26/09</h2>
+<ul>
+   <li>Added index files for the 3.0 version of the University of
+       Maryland <i>Bos Taurus</i> (cow) assembly.  See sidebar.</li>
+</ul>
+
+<h2>0.10.1 release - 7/19/09</h2>
+<ul>
+   <li>Now when <tt><a href="manual.shtml#bowtie-options-3">-3/-5</a></tt>
+     are used in combination with
+     <tt><a href="manual.shtml#bowtie-options-I">-I/-X</a></tt>, the
+     <tt><a href="manual.shtml#bowtie-options-I">-I/-X</a></tt>
+     constraints are interpreted as applying to the original insert,
+     not the trimmed insert.
+   <li>Fixed issue whereby
+    <tt><a href="manual.shtml#bowtie-options-I">-I</a></tt>
+    option was ignored;
+    <tt><a href="manual.shtml#bowtie-options-I">-I</a></tt> option works now.
+   <li>Fixed a bug whereby some large indexes were incorrectly reported
+     as corrupt by bowtie-build.
+   <li>Fixed issue whereby negative quality values were wrongly rejected
+     when both
+     <tt><a href="manual.shtml#bowtie-options-integer-quals">--integer-quals</a></tt>
+     and
+     <tt><a href="manual.shtml#bowtie-options-solexa-quals">--solexa-quals</a></tt>
+     were specified.
+   <li>The
+     <tt><a href="manual.shtml#bowtie-options-l">-l/--seedlen</a></tt>
+     parameter can now be adjusted down to 5 (previously had to be >= 20).
+   <li>Fixed several minor memory leaks and out-of-bounds issues.  The
+     Linux version of the <tt>bowtie</tt> aligner now receives a clean bill of
+     health from
+     <a href="http://valgrind.org/">valgrind's</a>
+     <a href="http://valgrind.org/docs/manual/mc-manual.html">memcheck</a>.
+   <li>Other minor bugfixes.
+</ul>
+
+<h2>0.10.0.2 release - 6/28/09</h2>
+<ul>
+   <li>Second bugfix for Windows version.  <tt>src</tt> and
+   <tt>bin-win32</tt> packages updated.  Linux and Mac users are not
+   affected.  Thanks for your bug reports and patience.
+</ul>
+<br/>
+
+<h2>0.10.0.1 release - 6/23/09</h2>
+<ul>
+   <li>Fix for crashing bug in Windows version.  <tt>src</tt> and
+   <tt>bin-win32</tt> packages updated.  Linux and Mac users are not
+   affected.
+</ul>
+<br/>
+
+<h2>Note to TopHat users</h2>
+<ul>
+   <li><a href="http://tophat.cbcb.umd.edu">TopHat</a> is not yet
+   compatible with Bowtie 0.10.0.  Stay tuned to the
+   <a href="http://tophat.cbcb.umd.edu">TopHat site</a> for updated
+   information on <a href="http://tophat.cbcb.umd.edu">TopHat</a>/Bowtie
+   0.10.0 compatibility.
+</ul>
+<br/>
+
+<h2>0.10.0 release - 6/15/09</h2>
+<ul>
+   <li>Major change: All alignment modes are now unstratified by default.
+     The <tt>--nostrata</tt> option has been removed, since it is now the
+     default.  A
+     <a href="manual.shtml#bowtie-options-strata"><tt>--strata</tt></a>
+     option has been added to override the default
+     and force stratified reporting.  Reporting is stratified if and
+     only if
+     <a href="manual.shtml#bowtie-options-strata"><tt>--strata</tt></a> is specified.
+     <a href="manual.shtml#bowtie-options-strata"><tt>--strata</tt></a> now cannot be specified
+     without also specifying <a href="manual.shtml#bowtie-options-best"><tt>--best</tt></a>.  
+     Please note that, because of this
+     change, specifying the same arguments to this version of Bowtie
+     may yield different reported results.
+   <li>Replaced the <tt>--unfa/--unfq</tt> options with a single
+     <a href="manual.shtml#bowtie-options-un"><tt>--un</tt></a> option,
+     which writes unaligned reads to an output file (or pair of output
+     files) but keeps reads in their original form.  This is in
+     contrast to the old <tt>--unfa/--unfq</tt> options, which only supported
+     FASTA or FASTQ formats, and which would print a post-trimming and
+     post-quality-value translation version of the read.  Likewise, the
+     <tt>--alfa/--alfq</tt> and <tt>--maxfa/--maxfq</tt> options have been replaced with
+     <a href="manual.shtml#bowtie-options-al"><tt>--al</tt></a>
+     and <a href="manual.shtml#bowtie-options-max">
+     <tt>--max</tt></a> options.  The old options are still present, but
+     are deprecated and will be removed in a future version.
+   <li>Added <a href="manual.shtml#bowtie-options-nofw"><tt>--nofw</tt></a>
+     and <a href="manual.shtml#bowtie-options-norc"><tt>--norc</tt></a> options, allowing
+     alignment to just one reference strand or the other.
+   <li>Added <a href="manual.shtml#bowtie-options-mm"><tt>--mm</tt></a> option that causes <tt>bowtie</tt> to use memory-mapped files
+     instead of traditional file I/O to access the reference index.
+     This allows multiple <tt>bowtie</tt> processes running on the same computer
+     to share a single in-memory image of a given index.  This is a
+     useful feature for parallelizing <tt>bowtie</tt> in situations where memory
+     is limited and where <a href="manual.shtml#bowtie-options-p">-p</a> is inappropriate or insufficient.
+     This feature is not available in the Windows version of Bowtie.
+   <li>Added a section to the manual (&quot;<a href="manual.shtml#reporting-modes">Reporting Modes</a>&quot;) clarifying and
+     giving examples of how to use Bowtie's reporting options.
+   <li>The <a href="manual.shtml#bowtie-options-al"><tt>--al</tt></a> and <tt>-z/--phased</tt> options previously interacted in such a
+     way that the <a href="manual.shtml#bowtie-options-al"><tt>--al</tt></a> file could contain multiple entries for the same
+     aligned read.  <a href="manual.shtml#bowtie-options-al"><tt>--al</tt></a> and <tt>-z/--phased</tt> are now incompatible.
+   <li>The <tt>--oldpmap</tt> option, deprecated in version 0.9.8, has been
+     removed.
+</ul>
+<br/>
+
+<h2>0.9.9.3 release - 5/12/09</h2>
+<ul>
+   <li>Fixed an issue where <a href="manual.shtml#bowtie-options-best"><tt>bowtie --best</tt></a> would sometimes use excessive
+     amounts of memory to store path descriptors.  There is now a per-thread
+     32-MB ceiling (configurable with new option <a href="manual.shtml#bowtie-options-chunkmbs"><tt>--chunkmbs &lt;int&gt;</tt></a>)
+     on the memory taken by path descriptors.  If the ceiling is
+     exceeded Bowtie will skip the offending read, print a warning
+     message identifying the read, and continue.
+   <li>More options are available for defining the quality-value format,
+     including new <a href="manual.shtml#bowtie-options-phred64-quals"><tt nowrap>--phred64-quals</tt>/<tt nowrap>--solexa1.3-quals</tt></a> options
+     appropriate for the 64-based-Phred output of Illumina's GA
+     Pipeline 1.3.  Added option <a href="manual.shtml#bowtie-options-phred33-quals"><tt nowrap>--phred33-quals</tt></a> to to handle the more
+     typical 33-based-Phred scale (the default).  The <a href="manual.shtml#bowtie-options-solexa-quals"><tt nowrap>--solexa-quals</tt></a>
+     option still handles the 64-based-Solexa scale output by GA
+     Pipeline versions prior to 1.3.
+   <li><tt>bowtie-build</tt> now checks output files for obvious corruption due,
+     for example, to disk exhaustion.
+   <li>Specifying <tt>-</tt> (meaning <tt>stdin</tt>) as an input to <tt>bowtie</tt> is now
+     supported and documented.
+   <li>Fixed a bug whereby <tt nowrap>bowtie-maqconvert</tt> could fail to notice that it
+     had exhausted memory and output a corrupt Maq map file.
+   <li>Fixed a bug whereby <tt>bowtie</tt> would crash when trying to use an index
+     built on a machine with different endianness.
+   <li>Fixed several issues that prevented Bowtie from compiling on
+     Solaris.  I confirm that Bowtie builds and runs on Solaris 10.
+   <li>Added <tt>_LARGEFILE_SOURCE _FILE_OFFSET_BITS=64 _GNU_SOURCE</tt> to the
+     default build options in an attempt to resolve some of the large-file
+     issues users are having.
+   <li>Clarified column 7 in the manual.  We received many queries from
+     users curious about this number.
+   <li>Moderate speed improvements in <a href="manual.shtml#bowtie-options-best"><tt>--best</tt></a> mode.
+</ul>
+<br/>
+
+<h2>0.9.9.2 release - 4/6/09</h2>
+<ul>
+   <li>Paired-end alignment is now available in all alignment modes,
+     including all <a href="manual.shtml#bowtie-options-n"><tt>-n</tt></a> modes.
+   <li><a href="manual.shtml#bowtie-options-best"><tt>--best</tt></a> now provides better guarantees.  Reported alignments are
+     now guaranteed to be "best" both in terms of stratum (i.e. number of
+     mismatches, or mismatches in the seed in the case of <a href="manual.shtml#bowtie-options-n"><tt>-n</tt></a> mode),
+     and in terms of the quality values at the mismatched position(s).
+     Stratum always trumps quality when determining best alignments.
+     Also, <a href="manual.shtml#bowtie-options-best"><tt>--best</tt></a> mode resolves the strand bias issue that is present
+     in the default mode (see manual
+     for a discussion of the issue).
+   <li>Speed improvements for <tt>--best</tt> mode in most alignment modes.
+   <li>Major speed improvement for the <a href="manual.shtml#bowtie-options-v"><tt>-v 3</tt></a> alignment mode (except when <tt>-z</tt> is also used).
+   <li>The "Reported X alignments..." message is now printed to stderr
+     rather than stdout.  Only alignments are written to stdout.
+   <li>In <tt>bowtie-maqconvert</tt>, read names longer than Maq's limit (36) are now
+     truncated to a suffix of the original name, rather than a prefix.
+     This mimics Maq's behavior and prevents <tt>/1</tt> and <tt>/2</tt> suffixes for
+     paired-end reads from being destroyed.
+   <li>Added <tt>--alfq/--alfa</tt> options to dump aligned reads to FASTQ and/or
+     FASTA files.</li>
+   <li>Removed many extraneous source files.</li>
+</ul>
+<br/>
+
+<h2>TopHat paper out - 3/17/09</h2>
+<ul>
+  <li>The <a href="http://bioinformatics.oxfordjournals.org/cgi/content/abstract/btp120">TopHat paper</a>,
+  by <a href="http://www.cs.umd.edu/~cole/">Cole Trapnell</a>, <a href="http://math.berkeley.edu/~lpachter/">Lior Pachter</a>, and <a href="http://www.cbcb.umd.edu/~salzberg/">Steven L. Salzberg</a> is out
+  in <a href="http://bioinformatics.oxfordjournals.org/">Bioinformatics</a>
+  advance access.</li>
+</ul>
+<br/>
+<h2>0.9.9.1 release - 3/11/09</h2>
+<ul>
+   <li>Added paired-end alignment for <tt>-v 2</tt> and <tt>-v 3</tt> alignment modes (<tt>-n</tt>
+     modes coming soon).</li>
+   <li>Minor bug fixes and speed improvements for all paired-end modes.</li>
+   <li>Added <a href="manual.shtml#bowtie-options-s"><tt>-s/--skip &lt;int&gt;</tt></a> option to skip over the first <tt>&lt;int&gt;</tt> reads or
+     pairs in the input.</li>
+   <li><tt>--unfq/--unfa/--maxfq/--maxfa</tt> modes no longer create empty output
+     files. </li>
+   <li>All Bowtie tools now compile under GCC 4.3.3.</li>
+   <li>Fixed bug whereby <tt>bowtie -b</tt> would sometimes write garbage into the
+     reference offset field.</li>
+   <li>Paired-end info is now persisted in the <tt>-b</tt> format, allowing
+     <tt>bowtie-maptool</tt> output to add <tt>/1</tt> and <tt>/2</tt> suffixes as
+     appropriate.</li>
+</ul>
+<br/>
+<h2>Final paper out - 3/10/09</h2>
+<ul>
+   <li>The <a href="http://genomebiology.com/2009/10/3/R25">Bowtie paper</a>
+   in <a href="http://genomebiology.com">Genome Biology</a> is now final.
+</ul>
+<br/>
+<h2>0.9.9 release - 2/19/09</h2>
+<ul>
+   <li>Added some preliminary support for paired-end alignment in <a href="manual.shtml#bowtie-options-v"><tt>-v 0</tt></a>
+     and <a href="manual.shtml#bowtie-options-v"><tt>-v 1</tt></a> modes.  <a href="manual.shtml#command-line-1"><tt>-1</tt></a>/<a href="manual.shtml#command-line-1"><tt>-2</tt></a> options to specify the paired-end files,
+     <a href="manual.shtml#bowtie-options-I"><tt>-I</tt></a>/<a href="manual.shtml#bowtie-options-I"><tt>-X</tt></a> to specify min and max insert sizes, and <a href="manual.shtml#bowtie-options-fr"><tt>--fr</tt>/<tt>--rf</tt>/<tt>--ff</tt></a>
+     specify relative orientation of upstream and downstream mates.
+     bowtie-build now builds two additional files: <tt>NAME.3.ebwt</tt> and
+     <tt>NAME.4.ebwt</tt>.  Together, these files store a bitpacked version of
+     the reference and they are required for paired-end alignment.  If
+     your index does not include these files and you would like to
+     perform a paired-end alignment, you will have to rebuild the index
+     with <tt>bowtie-build</tt> version 0.9.9 or later.  Paired-end alignment is
+     not compatible with <tt>-z</tt> mode, and it incurs about a 30% greater
+     memory overhead than single-end mode.
+   <li>Pre-built indexes available from Bowtie website have been updated
+     to include <tt>.3</tt>/<tt>.4.ebwt</tt> index files.  These new pre-built indexes
+     are no longer compatible with bowtie versions prior to 0.9.8.
+   <li>New <a href="manual.shtml#bowtie-options-B"><tt>-B</tt>/<tt>--offbase</tt></a> option allows user to specify how bowtie numbers
+     reference positions in its output.  E.g. <tt>-B 1</tt> causes bowtie to
+     number leftmost char as 1.  <tt>-B 0</tt> is the default, but <tt>-B 1</tt> will
+     likely become the default in the 1.0 release.
+   <li>Fixed a bug that caused trimming options <a href="manual.shtml#bowtie-options-3"><tt>-3</tt></a> and <a href="manual.shtml#bowtie-options-5"><tt>-5</tt></a> not to work
+     properly in <a href="manual.shtml#bowtie-options-r"><tt>-r</tt></a> (raw input) mode.
+   <li><tt>bowtie-build</tt> now prints a friendly error message and exits if an
+     input file doesn't exist.
+   <li>Fixed a bug that caused the Win32 version of <tt>bowtie</tt> to hang just
+     before it would normally have exited.
+   <li>Fixed bug that could prevent successful read-in of very large
+     (>1GB) <tt>.2.ebwt</tt> index files.
+   <li>Removed <tt>--maxns</tt> option since it's mostly redundant with what <tt>-v</tt>
+     and <tt>-n</tt> already do.
+   <li>Removed <tt>--ntoa</tt> option.
+   <li><tt>bowtie</tt> usage message is now divided into sections for clarity.
+ </ul>
+  <br/>
+
+<h2>Added AGBT poster - 2/5/09</h2>
+ <ul>
+   <li>...to Other Documentation section in the right-hand sidebar</li>
+ </ul>
+ <br/>
+
+<h2>Paper coming soon - 1/27/09</h2>
+ <ul>
+   <li>Bowtie paper <i>Ultrafast and memory-efficient alignment of short DNA sequences
+   to the human genome</i> is accepted at <a href="http://genomebiology.com">Genome Biology</a>.
+   A link to the paper will be posted when available.</li>
+   <li>Added Related Tools, Publications, Other Documentation sections to right-hand sidebar.</li>
+ </ul>
+ <br/>
+<h2>Paper out - 3/4/09</h2>
+<ul>
+   <li>The <a href="http://genomebiology.com/2009/10/3/R25">provisional PDF</a> of our paper <i>Ultrafast and
+   memory-efficient alignment of short DNA sequences to the human genome</i>
+   is available at <a href="http://genomebiology.com">Genome Biology</a>.
+</ul>
+<br/>
+<h2>Current goals - 3/4/09</h2>
+<ul>
+   <li>Current goals in rough order of priority are:</li>
+   <ul>
+     <li>Expanding preliminary paired-end support (new in 0.9.9) into full paired-end support.</li>
+     <li>Better alignment guarantees.</li>
+     <li>Gapped alignment.</li>
+   </ul>
+   <li>Also of interest: colorspace support and mapping qualities.</li>
+</ul>
+<br/>
+<h2>0.9.8.1 release - 1/7/09</h2>
+ <ul>
+ <li>Fixed all known problems with the <tt>--unfa/--unfq</tt> options:</li>
+  <ul>
+  <li>They now work properly with multiple threads.</li>
+  <li>Fixed issue where sequence and quals were sometimes reversed.</li>
+  <li>Fixed other issues causing spurious omission of unaligned reads.</li>
+  </ul>
+ <li>Added <tt>--maxfa/--maxfq</tt> options so that reads that don't align due
+ to the -m limit can be dumped separately from reads that don't
+ align at all.</li>
+ <li>Alignment output is now guaranteed to be "deterministic" even when
+ multiple threads are used.  I.e., given the same input reads (in
+ any order) and the same <a href="manual.shtml#bowtie-options-seed"><tt>--seed</tt></a>, <tt>bowtie</tt> will produce the same
+ alignments every time it is run, though not necessarily in the
+ same order.  This does not hold across different versions of
+ Bowtie.</li>
+ <li>Multiple other bug fixes.</li>
+ </ul>
+  <br/>
+<h2>0.9.7 release - 11/8/08</h2>
+  <ul>
+  <li>Added new reporting option <a href="manual.shtml#bowtie-options-m"><tt>-m &lt;int&gt;</tt></a> which suppresses all
+ 	alignments for a particular read if more than <tt>&lt;int&gt;</tt> reportable
+ 	alignments exist for it.</li>
+  <li>Threads now buffer all alignments for a particular read/phase then
+ output all alignments in one critical section.  This guarantees
+ that all alignments for a given read/phase appear in one
+ consecutive block of the output, even when multiple threads are
+ operating in parallel. </li>
+ <li>Separated the quality-conversion and parsing aspects of the old
+ <tt>--solexa-quals</tt> argument into separate arguments: <a href="manual.shtml#bowtie-options-solexa-quals"><tt>--solexa-quals</tt></a>
+ (quality conversion) and <a href="manual.shtml#bowtie-options-integer-quals"><tt>--integer-quals</tt></a> (parsing).</li>
+ <li>bowtie-convert now handles the new (post-0.7.0) Maq alignment
+ format.  The new format allows Maq tools to handle reads up to
+ 127 bases, whereas the old format was limited to 63 bases.  Added
+ a -o option to opt for the old Maq format.</li> 
+ <li>New <a href="manual.shtml#bowtie-options-refout"><tt>--refout</tt></a> argument sends alignments to a set of files named
+ <tt>refXXXXX.map</tt>, where <tt>XXXXX</tt> is the 0-padded index of the reference
+ sequence aligned to.  Useful for dealing with large datasets
+ aligned to, e.g., the assembled human genome.
+ <li>Improved tutorial to use a simple simulated read set (included)
+ to do SNP calls with Maq.</li>
+ <li>Added <a href="manual.shtml#bowtie-build-options-ntoa"><tt>--nota</tt></a> option to <tt>bowtie-build</tt></li>
+ <li>Fixed <tt>make_h_sapiens_asm.sh</tt> script to include mitochondrial DNA.</li>
+  </ul>
+  <br/>
+<h2>0.9.8 release - 11/25/08</h2>
+  <ul>
+  <li><tt>--unfa</tt>/<tt>--unfq &lt;filename&gt;</tt> options cause bowtie to dump unaligned
+      reads to FASTA and/or FASTQ files.</li>
+  <li><tt>bowtie-build</tt> now selects its memory-efficiency parameters (<tt>--bmax</tt>,
+ <tt>--dcv</tt>, <tt>--packed</tt>) automatically by default; this makes it far
+ easier to build an index under memory constraints by eliminating
+ tedious trail-and-error.  New <a href="manual.shtml#bowtie-build-options-a"><tt>-a</tt></a> option disables this, yielding
+ old behavior.</li>
+  <li><tt>bowtie-build-packed</tt> is no longer a separate binary.  Supplying the
+ new <a href="manual.shtml#bowtie-build-options-p"><tt>-p</tt>/<tt>--packed</tt></a> argument to <tt>bowtie-build</tt> is the new equivalent.</li>
+  <li>New tool <tt>bowtie-maptool</tt> converts between Bowtie's output formats.</li>
+  <li>New tool <a href="manual.shtml#the-bowtie-inspect-index-inspector"><tt>bowtie-inspect</tt></a> recreates reference strings from Bowtie
+ index.</li>
+  <li>Renamed <tt>bowtie-convert</tt> to <tt>bowtie-maqconvert</tt> for clarity.</li>
+  <li>New universal Mac binary combines i386 & x86_64 binaries.  PowerPC
+ still not supported.</li>
+  <li>Added <a href="manual.shtml#bowtie-options-nomaqround"><tt>--nomaqround</tt></a> option to <tt>bowtie</tt>.</li>
+  <li>Fixed memory leaks in <tt>bowtie</tt>.</li>
+  <li>Switched to a new scheme for mapping positions in "joined"
+ reference string to positions in original strings.  This changes
+ the index format.  <tt>bowtie-build</tt>'s <tt>--oldpmap</tt> parameter reverts to
+ the old format.  Versions of <tt>bowtie</tt> prior to 0.9.8 cannot search
+ indexes produced by <tt>bowtie-build</tt> 0.9.8 unless <tt>bowtie-build</tt> is
+ run with <tt>--oldpmap</tt>.  <tt>bowtie</tt> 0.9.8 can search either index format.
+ Pre-built indexes are still in the old format, but will switch to
+ new format when Bowtie 1.0 is released.</li>
+  </ul>
+  <br/>
+
+<h2>0.9.7.1 release - 11/11/08</h2>
+  <ul>
+  <li>Fixed an issue that caused a spurious loss of sensitivity between
+ Bowtie versions 0.9.6 and 0.9.7 in certain modes.  Many thanks to
+ Ali Mortazavi for bringing this to our attention.</li>
+  </ul>
+  <br/>
+
+<h2>TopHat released - 11/8/08</h2>
+  <ul>
+  <li>Cole Trapnell has completed the initial release of
+      <a href="http://tophat.cbcb.umd.edu">TopHat</a>, a fast splice junction mapper
+      for RNA-Seq reads. TopHat aligns RNA-Seq reads to mammalian-sized genomes using
+      Bowtie, and then analyzes the mapping results to identify splice junctions
+      between exons. 
+  </li>
+  </ul>
+  <br/>
+  <h2>Illumina link - 10/22/08</h2>
+  <ul>
+  <li>Bowtie is now listed on Illumina's <a href="http://www.illumina.com/pagesnrn.ilmn?ID=245">third-party tools</a> page</li>
+  </ul>
+  <br/>
+  <h2>Coming soon...</h2>
+  <ul>
+  	<li>A new addition to the Bowtie family: Tophat.  Tophat is a complete
+  	Bowtie-based toolchain for RNA-seq applications.  Check back soon for the
+  	official release.</li>
+  </ul>
+  <br/>
+  <h2>0.9.6 release - 10/10/08</h2>
+  <ul>
+  	<li><tt>bowtie</tt> now supports a host of options that allow the user to
+    specify which and how many valid alignments to report per read.
+    The default is still to report 1 "good" alignment, which is by far
+    the fastest mode.  See <a href="manual.shtml#reporting-modes"><tt>-k/-a/--best/--nostrata</tt></a> options described
+    in the manual for details.</li>
+ 	<li><tt>bowtie</tt> now supports reads up to 1024 bases long.  Note that for
+    reads much longer than, say, 35 bases, the user must be careful to
+    set alignment policy parameters (especially <tt>-e</tt>) appropriately.</li>
+ 	<li><tt>--fast</tt> flag eliminated, double-index mode is now the default.
+    Added the <tt>-z/--phased</tt> flag to revert to phased, half-index mode.</li>
+ 	<li><tt>--concise</tt> output mode now officially supported.  Now outputs one
+    alignment per line.</li>
+ 	<li>Changed <tt>bowtie-build</tt> default back to <tt>--bmaxdivn 4</tt>.</li>
+ 	<li><tt>-h/--help</tt> now prints much more verbose help for <tt>bowtie</tt> and
+    <tt>bowtie-build</tt> (verbatim from <tt>MANUAL</tt> file).</li>
+ 	<li>BWT-searching code streamlined; much old code eliminated</li>
+  </ul>
+  <br/>
+  <h2>0.9.5 release - 9/27/08</h2>
+  <ul>
+      <li>Last column of output now additionally reports the reference and
+      query bases (in that order) for mismatches.  E.g., old: <tt>30,32</tt>
+      new: <tt>30:C>A,32:C>T</tt>.</li>
+      <li>Eliminated spurious trailing space in first column of output.</tt>
+      <li>Minor performance and sensitivity improvements.</li>
+      <li>New option <tt>-p</tt> spawns a user-specified number of pthreads for
+      parallel processing of reads.  For example, use <tt>-p 4</tt> to run
+      <tt>bowtie</tt> on 4 processor cores simultaneously.</li>
+      <li>Due to the new <tt>-p</tt> option, <tt>bowtie</tt> needs pthreads to compile and run.
+      To compile <tt>bowtie</tt> without pthreads support (which disables the
+      <tt>-p</tt> option), use <tt>make BOWTIE_PTHREADS=0</tt>.</li>
+      <li>Also due to '-p' option, the Windows version of Bowtie now comes with
+      the <tt>pthreadGC2.dll</tt> file from the <a href="http://sourceware.org/pthreads-win32">pthreads for Win32 project</a>.
+      This library is released under the <a href="http://sourceware.org/pthreads-win32/copying.html">LGPL license</a>.
+      <li>New option <tt>--fast</tt> causes Bowtie to load both the "forward" and
+      "mirror" halves of the index at once, which eliminates the need
+      for multiple phases and speeds up matching at the cost of using
+      about twice as much memory.  <tt>--fast</tt> also causes <tt>bowtie</tt> to
+      scale better when used in combination with <tt>-p</tt>.</li>
+      <li>Fixed crashing bug with <tt>-o/--offrate</tt> in <tt>bowtie</tt>.
+      <li>Improved error reporting.</li>
+  </ul>
+  <br/>
+  <h2>0.9.4 release - 9/16/08</h2>
+  <ul>
+      <li>New method for handling gaps and ambiguity codes in the reference.
+      New <tt>bowtie-build</tt> handles long stretches of gaps
+      gracefully.  New <tt>bowtie</tt> rejects alignments that overlap a gap or
+      ambiguous character in the reference.</li>
+      <li>Due to above change, index file format has been changed.  All
+      pre-built indexes available on this site have been updated to the
+      new format.  To obtain indexes with the old format, contact us.</li>
+      <li>In <tt>bowtie</tt> unnamed reads are now given ordinal names (rather than
+      "default") in the alignment output.  Works for all input modes.</li>
+      <li>New <tt>bowtie</tt> input mode: Raw, activated with <tt>-r</tt>.  Expects one read
+      sequence per line; no quality values or names.</li>
+      <li>Fixed <tt>bowtie</tt> bug whereby trimming did not work in <tt>-c</tt> mode.</li>
+      <li>Changed <tt>bowtie-build</tt> default to not use blockwise mode.</li>
+      <li>Fixed <tt>bowtie-build</tt> to avoid certain infinite-loop and
+      very-long-runtime scenarios.</li>
+      <li>Packaging improvements: archives now explode into subdirectories
+      and scripts are executable.</li>
+  </ul>
+  <br/>
+  <h2>0.9.3 release - 9/6/08</h2>
+  <ul>
+      <li>Major reference-name bug fixes to <tt>bowtie-convert</tt></li>
+  </ul>
+  <br/>
+  <h2>0.9.2 release - 9/4/08</h2>
+  <ul>
+      <li>Now allows 3-mismatches: <tt>-n</tt> and <tt>-v</tt> options accept 3</li>
+      <li>Output format prints reference name instead of id in third column</li>
+      <li>Pre-built indexes updated to encode reference names</li>
+      <li>Ns in reads now match nothing (previously, they matched As/Ts)</li>
+      <li>Dropped <tt>-l/--linerate</tt> and <tt>-i/--linesperside</tt> arguments to <tt>bowtie-build</tt></li>
+      <li>Fixed bug in Maq-like mode that allowed some poor alignments</tt>
+      <li>Minor speed improvements</li>
+  </ul>
+  <br/>
+  <h2>0.9.1 release - 8/25/08</h2>
+  <ul>
+      <li>Integrated relevant SeqAn-1.1 sources into Bowtie source release</li>
+      <li>Now builds on Windows under <a href="http://www.mingw.org/">MinGW</a> (needs <a href="http://sourceware.org/pthreads-win32/">pthreads</a> and <a href="http://cygwin.com/packages/mingw-zlib/">zlib</a>)</li>
+      <li>Binary releases for Linux (i386, x86_64), Windows (i386) and MacOS X (i386)</li>
+  </ul>
+  <br/>
+  <h2>0.9.0 release - 8/18/08</h2>
+  <p>The first public release of the Bowtie source is now available for
+     download.  The release includes the three core Bowtie tools: the
+     indexer <span style="FONT-FAMILY:Courier New">bowtie-build</span>,
+     the read aligner <span style="FONT-FAMILY:Courier New">bowtie</span> and
+     the converter from Bowtie's to Maq's mapping output format,
+     <span style="FONT-FAMILY:Courier New">bowtie-convert</span>.  This is a stable release, and compatible
+     pre-built indexes for many model organisms are also available.  See
+     "Source releases" and "Pre-built indexes" on the sidebar.  Please
+     report any issues using the Sourceforge
+     <a href="https://sourceforge.net/tracker/?atid=1101606&group_id=236897&func=browse">bug tracker</a>.</p>
+  <p>Features of this release include:
+  <ul>
+      <li>FASTA, FASTQ inputs supported; tested with Solexa FASTQ</li>
+      <li>Supports Maq alignment policy (<tt>-n</tt> and <tt>-e</tt> behave as in Maq)</li>
+      <li>Supports X-mismatch policy (<tt>-v</tt> option behaves as in SOAP)</li>
+      <li><tt>-n</tt> and <tt>-v</tt> options accept 0, 1, or 2</li>
+  </ul>

@@ -1,0 +1,215 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>Bowtie: Tutorial</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link rel="stylesheet" type="text/css" href="css/style.css" media="screen" />
+<meta name="verify-v1" content="YJT1CfXN3kzE9cr+jvNB+Q73lTfHrv8eivoY+xjblc0=" />
+</head>
+<body>
+<div id="wrap">
+  <!--#include virtual="top.ssi" -->
+  <div id="main">
+  	<!--#include virtual="rhsidebar.ssi" -->
+    <div id="leftside">
+  	<table><tr><td cellpadding=7>
+  	<h1> Getting started</h1><br/>
+      <div id="toc">
+  	    <ul>
+  	    <li><a href="#algn">Performing alignments</a></li>
+  	    <li><a href="#preb">Installing a pre-built index</a></li>
+  	    <li><a href="#newi">Building a new index</a></li>
+  	    <li><a href="#sam">Finding variations with SAMtools</a></li>
+  	    </ul><br/>
+  	  </div>
+	  	<p>Download and extract the appropriate
+	  	<a href="https://sourceforge.net/project/showfiles.php?group_id=236897&package_id=288231">
+	  	Bowtie binary release</a> into a fresh directory.
+	  	Change to that directory.</p>
+	<br/>
+  	<h2 id="algn">Performing alignments</h2><br/>
+	  	<p>The Bowtie source and binary packages come with a pre-built index
+	  	    of the <i>E. coli</i> genome,
+	  	    and a set of 1,000 35-bp reads simulated from that genome.  To use
+	  	    Bowtie to align those reads, issue the following command.  If you
+	  	    get an error message "command not found", try adding a <tt>./</tt>
+	  	    before the <tt>bowtie</tt>.</p>
+	  	    <br/>
+	  	    <blockquote>bowtie e_coli reads/e_coli_1000.fq</blockquote>
+	  	    <br/>
+	  	    <p>
+ The first argument to <tt>bowtie</tt> is the basename of the index for the
+ genome to be searched. The second argument is the name of a FASTQ file
+ containing the reads.
+	  	    </p>
+	  	    <p>
+ Depending on your computer, the run might take a few seconds up to
+ about a minute. You will see bowtie print many lines of output. Each
+ line is an alignment for a read. The name of the aligned read appears
+ in the leftmost column. The final line should say <tt>Reported 699
+ alignments to 1 output stream(s)</tt> or something similar. 
+	  	    </p>
+	  	<p>Next, issue this command:</p>
+	  	    <br/>
+		  	<blockquote>bowtie -t e_coli reads/e_coli_1000.fq e_coli.map</blockquote>
+	  	    <br/>
+	  	<p>This run calculates the same alignments as the previous run, but the
+	  	   alignments are written to <tt>e_coli.map</tt> (the final argument)
+	  	   rather than to the screen.
+	  	   Also, the <tt>-t</tt> option
+	  	   instructs Bowtie to print timing statistics.  The output should look something like this:
+	  	   </p>
+	  	    <br/>
+	  	   <blockquote>
+    Time loading forward index: 00:00:00<br/>
+    Time loading mirror index: 00:00:00<br/>
+    Seeded quality full-index search: 00:00:00<br/>
+    # reads processed: 1000<br/>
+    # reads with at least one reported alignment: 699 (69.90%)<br/>
+    # reads that failed to align: 301 (30.10%)<br/>
+    Reported 699 alignments to 1 output stream(s)<br/>
+    Time searching: 00:00:00<br/>
+    Overall time: 00:00:00<br/>
+	  	   </blockquote>
+	  	</p><br/>
+  	<h2 id="preb">Installing a pre-built index</h2><br/>
+  	  <p>Download the pre-built <i>S. cerevisiae</i> genome package by
+  	     right-clicking the "<i>S. cerevisiae</i>, CYGD" link in the
+  	     "Pre-built indexes" section of the right-hand sidebar and
+  	     selecting "Save Link As..." or "Save Target As...".  All
+  	     pre-built indexes are packaged as <tt>.zip</tt> archives, and
+  	     the <i>S. cerevisiae</i> archive is named
+  	     <tt>s_cerevisiae.ebwt.zip</tt>.  When it has finished
+  	     downloading, extract the archive into the Bowtie
+  	     <tt>indexes</tt> subdirectory using your preferred unzip tool.
+  	     The index is now installed.</p>
+  	  <p>To test that the index is properly installed, issue this
+  	     command from the Bowtie install directory:</p>
+  	  <br/>
+  	  <blockquote>bowtie -c s_cerevisiae ATTGTAGTTCGAGTAAGTAATGTGGGTTTG</blockquote>
+  	  <br/>
+  	  <p>This command searches the <i>S. cerevisiae</i> index with a
+  	     single read.  The <tt>-c</tt> argument instructs Bowtie to
+  	     obtain read sequences directly from the command line rather
+  	     than from a file.  If the index is installed properly, this
+  	     command should print a single alignment and then exit.</p>
+  	  <p>If you would rather install pre-built indexes somewhere other
+  	     than the <tt>indexes</tt> subdirectory of the Bowtie install
+  	     directory, simply set the <tt>BOWTIE_INDEXES</tt> environment
+  	     variable to point to your preferred directory and extract
+  	     indexes there instead.</p>
+  	<br/>
+  	<h2 id="newi">Building a new index</h2><br/>
+  	  <p>The pre-built <i>E. coli</i> index included with Bowtie is built
+  	     from the sequence
+  	     for strain 536, known to cause urinary tract infections.  We will
+  	     create a new index from the sequence
+  	     of <i>E. coli</i> strain O157:H7, a strain known to cause food poisoning.
+  	     Download the
+  	     <a href="ftp://ftp.ncbi.nlm.nih.gov/genomes/Bacteria/Escherichia_coli_O157_H7_Sakai_uid57781/NC_002127.fna">sequence file by right-clicking this link</a>
+  	     and selecting "Save Link As..." or "Save Target As...".  The
+  	     sequence file is named <tt>NC_002127.fna</tt>.  When the
+  	     sequence file is finished downloading, move it to the Bowtie
+  	     install directory and issue this command:</p>
+  	     <br/>
+  	     <blockquote>bowtie-build NC_002127.fna e_coli_O157_H7</blockquote>
+  	     <br/>
+  	  <p>The command should finish quickly, and print several lines of status messages.
+  	     When the command has completed, note that the current directory
+  	     contains four new files named <tt>e_coli_O157_H7.1.ebwt</tt>,
+  	     <tt>e_coli_O157_H7.2.ebwt</tt>,
+  	     <tt>e_coli_O157_H7.rev.1.ebwt</tt>, and
+  	     <tt>e_coli_O157_H7.rev.2.ebwt</tt>.  These files constitute
+  	     the index.  Move these files to the <tt>indexes</tt>
+  	     subdirectory to install it.
+  	  <p>To test that the index is properly installed, issue this
+  	     command:</p>
+  	     <br/>
+  	     <blockquote>bowtie -c e_coli_O157_H7 GCGTGAGCTATGAGAAAGCGCCACGCTTCC</blockquote>
+  	     <br/>
+  	  <p>If the index is installed properly, this
+  	     command should print a single alignment and then exit.</p>
+  	<br/>
+  	
+  	<h2 id="sam">Finding variations with SAMtools</h2><br/>
+  	<p><a href="http://samtools.sf.net">SAMtools</a> is a suite of tools for storing,
+ manipulating, and analyzing alignments such as those output by Bowtie.
+ SAMtools understands alignments in either of two complementary
+ formats: the human-readable SAM format, or the binary BAM format.
+ Because Bowtie can output SAM (using the <tt>-S/--sam</tt> option), and SAM can
+ can be converted to BAM using SAMtools, Bowtie users can make full use
+ of the analyses implemented in SAMtools, or in any other tools
+ supporting SAM or BAM.
+  	   </p> 
+  	   <p>
+ We will use SAMtools to find SNPs in a set of simulated reads included
+ with Bowtie.  The reads cover the first 10,000 bases of the pre-built
+ E. coli genome and contain 10 SNPs throughout.  First, we run <tt>bowtie</tt>
+ to align the reads, being sure to specify the <tt>-S</tt> option.  We also
+ specify an output file that we will use as input for the next step
+ (though pipes can be used to accomplish the same thing without the
+ intermediate file):
+       </p>
+       <br/>
+       <blockquote>
+           bowtie -S e_coli reads/e_coli_10000snp.fq ec_snp.sam
+       </blockquote>
+       <br/>
+       <p>
+ Next, we convert the SAM file to BAM in preparation for sorting.  We
+ assume that SAMtools is installed and that the samtools binary is
+ accessible in the PATH.
+       </p>
+       <br/>
+       <blockquote>
+           samtools view -bS -o ec_snp.bam ec_snp.sam
+       </blockquote>
+       <br/>
+       <p>
+ Next, we sort the BAM file, in preparation for SNP calling:
+       </p>
+       <br/>
+       <blockquote>
+           samtools sort ec_snp.bam ec_snp.sorted
+       </blockquote>
+       <br/>
+       <p>
+ We now have a sorted BAM file called <tt>ec_snp.sorted.bam</tt>.  Sorted BAM is
+ a useful format because the alignments are both compressed, which is
+ convenient for long-term storage, and sorted, which is conveneint for
+ variant discovery.  Finally, we call variants from the Sorted BAM:
+        </p>
+       <br/>
+       <blockquote>
+           samtools pileup -cv -f genomes/NC_008253.fna ec_snp.sorted.bam
+       </blockquote>
+       <br/>
+       <p>
+ For this sample data, the <tt>samtools pileup</tt> command should print
+ records for 10 distinct SNPs, the first being at position 541 in the
+ reference.
+        </p>
+       <p>
+ See the <a href="http://samtools.sf.net/">SAMtools web site</a> for details
+ on how to use these and other
+ tools in the SAMtools suite.
+       </p>
+  	</td></tr></table>
+    </div>
+  </div>
+  <!--#include virtual="foot.ssi" -->
+</div>
+
+<!-- Google analytics code -->
+<script type="text/javascript">
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<script type="text/javascript">
+var pageTracker = _gat._getTracker("UA-5334290-1");
+pageTracker._trackPageview();
+</script>
+<!-- End google analytics code -->
+
+</body>
+</html>

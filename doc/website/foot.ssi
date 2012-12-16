@@ -1,0 +1,7 @@
+  <div id="footer">
+  	<table width="100%" cellspacing=15><tr><td>
+    This research was supported in part by NIH grants<br/>R01-LM006845, R01-GM083873 and P41HG004059.
+    </td></tr>
+    </table>
+    <center><a href="http://www.sourceforge.net"><img src="./images/sflogo.png" alt="Sourceforge.net" style="border-style: none"></img></a></center>
+  </div>
