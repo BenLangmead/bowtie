@@ -41,7 +41,7 @@ for c in 1 2 3 4 5 C M ; do
 		get $F || (echo "Error getting $F" && exit 1)
 	fi
 	
-	if [ ! -f chr$c.fas ] ; then
+	if [ ! -f TAIR10_chr$c.fas ] ; then
 		echo "Could not find chr$c.fas file!"
 		exit 2
 	fi
