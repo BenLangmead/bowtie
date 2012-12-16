@@ -241,6 +241,7 @@ static void resetOptions() {
 	hadoopOut				= false; // print Hadoop status and summary messages
 	fuzzy					= false; // reads will have alternate basecalls w/ qualities
 	fullRef					= false; // print entire reference name instead of just up to 1st space
+	samNoQnameTrunc         = false; // don't truncate at first whitespace?
 	samNoHead				= false; // don't print any header lines in SAM output
 	samNoSQ					= false; // don't print @SQ header lines
 	color					= false; // don't align in colorspace by default
