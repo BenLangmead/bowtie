@@ -6,8 +6,6 @@
 
 GENOMES_MIRROR=ftp://ftp.wormbase.org/pub/wormbase/species/c_elegans/sequence/genomic
 
-/
-
 BOWTIE_BUILD_EXE=./bowtie-build
 if [ ! -x "$BOWTIE_BUILD_EXE" ] ; then
 	if ! which bowtie-build ; then
