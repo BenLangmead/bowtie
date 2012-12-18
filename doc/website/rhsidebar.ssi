@@ -348,8 +348,8 @@
   <h2>Authors</h2>
   <div class="box">
     <ul>
-      <li><a href="http://www.cbcb.umd.edu/~langmead">Ben Langmead</a></li>
-      <li><a href="http://www.cs.umd.edu/~cole/">Cole Trapnell</a></li>
+      <li><a href="http://www.cs.jhu.edu/~langmea/index.shtml">Ben Langmead</a></li>
+      <li><a href="http://www.broadinstitute.org/~cole/">Cole Trapnell</a></li>
     </ul>
   </div>
   <h2>Links</h2>
@@ -362,14 +362,10 @@
         <li>&nbsp;&nbsp;<a href="https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce">Mailing list</li>
       </ul></li>
       <li><a href="http://scholar.google.com/scholar?cites=9743535340779752835&as_sdt=20000005&sciodt=0,21&hl=en">Papers citing Bowtie</a></li>
-      <li><a href="http://samtools.sf.net/">SAMtools</a></li>
+      <li><a href="http://www.jhu.edu/">Johns Hopkins University</a></li>
+      <li><a href="http://www.cs.jhu.edu/">JHU Computer Science</a></li>
+      <li><a href="http://www.biostat.jhsph.edu/">JHSPH Biostatistics</a></li>
       <li><a href="http://seqanswers.com/">SEQanswers</a></li>
-      <li><a href="http://www.umd.edu/">University of Maryland</a></li>
-      <li>&nbsp;<a href="http://www.cbcb.umd.edu/">UMD CBCB</a></li>
-      <li>&nbsp;<a href="http://www.cs.umd.edu/">UMD Computer Science</a></li>
-      <li>&nbsp;<a href="http://www.umiacs.umd.edu/">UMIACS</a></li>
-      <li><a href="http://www.jhsph.edu/">J.H. Bloomberg School of Public Health</a></li>
-      <li>&nbsp;<a href="http://www.biostat.jhsph.edu/">JHSPH Biostatistics</a></li>
     </ul>
   </div>
 </div> <!-- End of "rightside" -->
