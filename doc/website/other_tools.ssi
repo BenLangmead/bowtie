@@ -16,11 +16,12 @@
     <li><a href="http://cbil.upenn.edu/RUM/">RUM</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/18/2518.long">paper</a>)</li>
     <li><a href="http://www.bio.anl.gov/molecular_and_systems_biology/bowstrap/bowstrap_download.html">BowStrap</a> (<a href="http://www.biomedcentral.com/1756-0500/5/275/abstract">paper</a>)</li>
     <li><a href="http://www.bio.ifi.lmu.de/softwareservices/contextmap">ContextMap</a> (<a href="http://www.biomedcentral.com/1471-2105/13/S6/S9">paper</a>)</li>
-    <li><a href="http://bio.math.berkeley.edu/eXpress/overview.html">eXpress</a></li>
+    <li><a href="http://bio.math.berkeley.edu/eXpress/overview.html">eXpress</a> (<a href="http://www.nature.com/nmeth/journal/vaop/ncurrent/full/nmeth.2251.html">paper</a>)</li>
+    <li><a href="http://bioen-compbio.bioen.illinois.edu/TrueSight/">TrueSight</a> (<a href="http://nar.oxfordjournals.org/content/early/2012/12/18/nar.gks1311.full.pdf">paper</a>)</li>
   </ul>
   <li>Bisulfite-seq:</li>
   <ul>
-    <li><a href="http://rafalab.jhsph.edu/bsmooth/">BSmooth</a> (paper in press)</li>
+    <li><a href="http://rafalab.jhsph.edu/bsmooth/">BSmooth</a> (<a href="http://genomebiology.com/2012/13/10/R83">paper</a>)</li>
     <li><a href="http://www.bioinformatics.bbsrc.ac.uk/projects/bismark/">Bismark</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/11/1571.short">paper</a>)</li>
     <li><a href="https://github.com/brentp/methylcode">MethylCoder</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/17/2435.short">paper</a>)</li>
     <li><a href="http://pellegrini.mcdb.ucla.edu/BS_Seeker/BS_Seeker.html">BS-Seeker</a> (<a href="http://www.biomedcentral.com/1471-2105/11/203">paper</a>)</li>
