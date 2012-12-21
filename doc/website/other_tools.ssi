@@ -1,4 +1,4 @@
-<h2>Tools that use Bowtie 1 and/or 2:</h2>
+<h2>Tools that use Bowtie (or Bowtie 2):</h2>
 <ul>
   <li>mRNA sequencing:</li>
   <ul>
@@ -32,10 +32,11 @@
   <ul>
     <li><a href="crossbow">Crossbow</a> (<a href="http://genomebiology.com/2009/10/11/R134">paper</a>)</li>
   </ul>
-  <li>Scaffolding:</li>
+  <li>Assembly and scaffolding:</li>
   <ul>
     <li><a href="http://lge.ibi.unicamp.br/zorro/">Zorro</a></li>
     <li><a href="http://www.baseclear.com/landingpages/sspacev12/">SSPACE</a> (<a href="http://bioinformatics.oxfordjournals.org/content/early/2010/12/12/bioinformatics.btq683.short">paper</a>)</li>
+    <li><a href="http://impact.crhc.illinois.edu">TIGER</a> (<a href="http://www.biomedcentral.com/1471-2105/13/S19/S18">paper</a>)</li>
   </ul>
   <li>Workflow:</li>
   <ul>
@@ -45,6 +46,7 @@
     <li><a href="http://ugene.unipro.ru/">Unipro UGENE</a> (<a href="http://bioinformatics.oxfordjournals.org/content/28/8/1166.full">paper</a>)</li>
     <li><a href="http://code.google.com/p/biopieces/">Biopieces</a></li>
     <li><a href="https://insilico.ulb.ac.be/">InSilico DB</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/22/3204">paper</a>)</li>
+    <li><a href="http://pipeline.loni.ucla.edu">LONI Pipeline</a> (<a href="http://www.biomedcentral.com/1471-2105/12/304">paper</a>)</li>
   </ul>
   <li>Structural variants:</li>
   <ul>
@@ -68,17 +70,27 @@
     <li><a href="http://blog.metagenomics.anl.gov/howto/quality-control/">MG-RAST</a> (<a href="http://blog.metagenomics.anl.gov/howto/quality-control/">paper</a>)</li>
     <li><a href="https://github.com/treangen/metAMOS/wiki">metAMOS</a></li>
   </ul>
+  <li>Small RNA:</li>
+  <ul>
+    <li><a href="http://deqor.mpi-cbg.de/deqor_new/input.html">Deqor v3</a> (<a href="http://nar.oxfordjournals.org/content/32/suppl_2/W113.full">paper</a>)
+    <li><a href="http://b110-wiki.dkfz.de/signaling/wiki/display/nextrnai/NEXT-RNAi">NEXT-RNAi</a> (design of genome-wide RNAi libraries)</li>
+    <li><a href="http://evolution.sysu.edu.cn/software/mirevo.htm">miREvo</a> (<a href="http://www.biomedcentral.com/1471-2105/13/140">paper</a>)</li>
+    <li><a href="http://bioinfo2.ugr.es/miRanalyzer/miRanalyzer.php">miRanalyzer</a> (<a href="http://nar.oxfordjournals.org/content/39/suppl_2/W132.full">paper</a>)</li>
+    <li><a href="http://www.ebi.ac.uk/enright-srv/MapMi/">MapMi</a> (<a href="http://www.biomedcentral.com/1471-2105/11/133">paper</a>)</li>
+    <li><a href="http://users-mb.au.dk/pmgrp/shortran/">shortran</a> (<a href="http://bioinformatics.oxfordjournals.org/content/early/2012/08/22/bioinformatics.bts496.full.pdf+html">paper</a>)</li>
+    <li><a href="http://www.mdc-berlin.de/en/research/research_teams/systems_biology_of_gene_regulatory_elements/projects/miRDeep/index.html">miRDeep2</a> (<a href="http://nar.oxfordjournals.org/content/40/1/37.full">paper</a>)</li>
+    <li><a href="http://ngs.ym.edu.tw/ym500/">YM500</a> (<a href="http://nar.oxfordjournals.org/content/41/D1/D285.full">paper</a>)</li>
+    <li><a href="http://starbase.sysu.edu.cn">starBase</a> (<a href="http://nar.oxfordjournals.org/content/39/suppl_1/D202.full">paper</a>)</li>
+  </ul>
   <li>Other:</li>
   <ul>
     <li><a href="http://personalpages.manchester.ac.uk/staff/antonio.marco/seqtrimmap.html">SeqTrimMap</a> (sequential trimming and mapping; <a href="http://bioinformatics.oxfordjournals.org/content/28/3/318.full">paper</a>)
-    <li><a href="http://deqor.mpi-cbg.de/deqor_new/input.html">Deqor v3</a> (design and quality control of siRNAs; <a href="http://nar.oxfordjournals.org/content/32/suppl_2/W113.full">paper</a>)
-    <li><a href="http://b110-wiki.dkfz.de/signaling/wiki/display/nextrnai/NEXT-RNAi">NEXT-RNAi</a> (design of genome-wide RNAi libraries)</li>
     <li><a href="http://www.mcardle.wisc.edu/mprime/version.html">mPrime</a> (primer design)</li>
     <li><a href="https://github.com/csmiller/EMIRGE">EMIGRE</a> (ribosomal genes reconstruction)</li>
-    <li><a href="http://www.ebi.ac.uk/enright-srv/MapMi/">MapMi</a> (mapping and analysis of miRNAs; <a href="http://www.biomedcentral.com/1471-2105/11/133">paper</a>)</li>
     <li><a href="http://sourceforge.net/p/tapdancebio/home/Home/">TAPDANCE</a> (identifies CISs in transposon junction fragment insertion data; <a href="http://www.biomedcentral.com/content/pdf/1471-2105-13-154.pdf">paper</a>)</li>
-    <li><a href="http://users-mb.au.dk/pmgrp/shortran/">shortran</a> (pipeline for small RNA-seq data analysis; <a href="http://bioinformatics.oxfordjournals.org/content/early/2012/08/22/bioinformatics.bts496.full.pdf+html">paper</a>)</li>
     <li><a href="http://carla.saleh.free.fr/software/paparazzi.html">Paparazzi</a> (reconstruction of viral genomes from small RNA reads; <a href="http://jvi.asm.org/content/85/21/11016.long">paper</a>)</li>
+    <li><a href="https://github.com/capsid/capsid">CaPSID</a> (pathogen detection; <a href="http://www.biomedcentral.com/1471-2105/13/206">paper</a>)
+    <li><a href="http://eupathdb.org/eupathdb/">EuPathDB</a> (eukaryotic pathogen detection; <a href="http://nar.oxfordjournals.org/content/41/D1/D684.full">paper</a>)
   </ul>
 </ul>
 
