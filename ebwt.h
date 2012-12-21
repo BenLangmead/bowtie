@@ -4198,7 +4198,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 
 	// Did we just finish writing a forward bucket?  (Must be true when
 	// we exit the loop.)
-	bool wroteFwBucket = false;
+	ASSERT_ONLY(bool wroteFwBucket = false);
 
 	// Have we skipped the '$' in the last column yet?
 	ASSERT_ONLY(bool dollarSkipped = false);
@@ -4212,7 +4212,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	VMSG_NL("Entering Ebwt loop");
 	ASSERT_ONLY(uint32_t beforeEbwtOff = (uint32_t)out1.tellp());
 	while(side < ebwtTotSz) {
-		wroteFwBucket = false;
+		ASSERT_ONLY(wroteFwBucket = false);
 		// Sanity-check our cursor into the side buffer
 		assert_geq(sideCur, 0);
 		assert_lt(sideCur, (int)eh._sideBwtSz);
@@ -4353,7 +4353,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 #else
 			sideCur = eh._sideBwtSz - 1;
 #endif
-			assert(fw); fw = false; wroteFwBucket = true;
+			assert(fw); fw = false;
+			ASSERT_ONLY(wroteFwBucket = true);
 			// Write 'G' and 'T'
 			assert_leq(occSave[0], occ[2]);
 			assert_leq(occSave[1], occ[3]);
