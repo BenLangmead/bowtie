@@ -124,7 +124,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                reads/e_coli_10000snp.fq \
                $(PTHREAD_PKG) \
                AUTHORS \
-               COPYING \
+               LICENSE \
                NEWS \
                MANUAL \
                MANUAL.markdown \
