@@ -2209,15 +2209,6 @@ Use `<int>` as the seed for pseudo-random number generator.
 
 </td></tr><tr><td>
 
-    --cutoff <int>
-
-</td><td>
-
-Index only the first `<int>` bases of the reference sequences
-(cumulative across sequences) and ignore the rest.
-
-</td></tr><tr><td>
-
     -q/--quiet
 
 </td><td>

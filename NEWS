@@ -31,6 +31,8 @@ Version 0.12.10 - Coming soon
    * Tokenizer no longer has limit of 10,000 tokens, which was a
      problem for users trying to index a very large number of FASTA
      files.
+   * Removed references to no-longer-implemented --cutoff option for
+     bowtie-build
 
 Version 0.12.9 - December 14, 2012
    * Fixed a bug whereby read names would not be truncated at first
