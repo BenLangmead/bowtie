@@ -775,7 +775,7 @@ static void parseOptions(int argc, const char **argv) {
 				mixedThresh = (uint32_t)parseInt(0, "-x arg must be at least 0");
 				break;
 			case ARG_MIXED_ATTEMPTS:
-				mixedAttemptLim = (uint32_t)parseInt(1, "--mixatt arg must be at least 1");
+				mixedAttemptLim = (uint32_t)parseInt(1, "--pairtries arg must be at least 1");
 				break;
 			case ARG_CACHE_LIM:
 				cacheLimit = (uint32_t)parseInt(1, "--cachelim arg must be at least 1");
