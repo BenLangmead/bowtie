@@ -47,9 +47,9 @@ struct Packed;
 ...default:@Spec.Alloc String.Alloc<>@
 */
 
-/*???TODO Optimierungsmöglichkeiten:
+/*???TODO Optimierungsmï¿½glichkeiten:
 - _clearSpace kopiert Zeichenweise im Packed-String, und nicht im Host-String
-- _clearSpace verwendet resize, um den Host zu vergrößern, d.h. der Inhalt wird eventuell doppelt kopiert.
+- _clearSpace verwendet resize, um den Host zu vergrï¿½ï¿½ern, d.h. der Inhalt wird eventuell doppelt kopiert.
 */
 
 //////////////////////////////////////////////////////////////////////////////

@@ -22,14 +22,18 @@ CXXFLAGS += $(EXTRA_CXXFLAGS)
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
+CYGWIN = 0
+MINGW = 0
 ifneq (,$(findstring CYGWIN,$(shell uname)))
 WINDOWS = 1
+CYGWIN = 1
 # POSIX memory-mapped files not currently supported on Windows
 BOWTIE_MM = 0
 BOWTIE_SHARED_MEM = 0
 else
 ifneq (,$(findstring MINGW,$(shell uname)))
 WINDOWS = 1
+CYGWIN = 1
 # POSIX memory-mapped files not currently supported on Windows
 BOWTIE_MM = 0
 BOWTIE_SHARED_MEM = 0
@@ -60,12 +64,10 @@ PTHREAD_LIB =
 PTHREAD_DEF =
 ifeq (1,$(BOWTIE_PTHREADS))
 PTHREAD_DEF = -DBOWTIE_PTHREADS
-ifeq (1,$(WINDOWS))
+PTHREAD_LIB = -lpthread
+ifeq (1,$(MINGW))
 # pthreads for windows forces us to be specific about the library
-PTHREAD_LIB = -L . -lpthreadGC2
-PTHREAD_PKG = pthreadGC2.dll
-else
-# There's also -pthread, but that only seems to work on Linux
+EXTRA_FLAGS = -static-libgcc -static-libstdc++
 PTHREAD_LIB = -lpthread
 endif
 endif
@@ -76,6 +78,12 @@ PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 LIBS = 
 SEARCH_LIBS = $(PTHREAD_LIB)
 BUILD_LIBS =
+INSPECT_LIBS = 
+
+ifeq (1,$(MINGW))
+BUILD_LIBS = $(PTHREAD_LIB)
+INSPECT_LIBS = $(PTHREAD_LIB)
+endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp
@@ -89,6 +97,11 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
+
+# msys will always be 32 bit so look at the cpu arch instead.
+ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
+BITS=64
+endif
 
 # Convert BITS=?? to a -m flag
 BITS_FLAG =
