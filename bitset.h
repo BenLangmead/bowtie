@@ -57,7 +57,6 @@ public:
 	 * error message and quit if allocation fails.
 	 */
 	SyncBitset(uint32_t sz, const char *errmsg = NULL) : _errmsg(errmsg) {
-		MUTEX_INIT(_lock);
 		uint32_t nwords = (sz >> 5)+1; // divide by 32 and add 1
 		try {
 			_words = new uint32_t[nwords];
@@ -94,9 +93,9 @@ public:
 	 */
 	bool test(uint32_t i) {
 		bool ret;
-		MUTEX_LOCK(_lock);
+		mutex_m.lock();
 		ret = testUnsync(i);
-		MUTEX_UNLOCK(_lock);
+		mutex_m.unlock();
 		return ret;
 	}
 
@@ -105,7 +104,7 @@ public:
 	 * it has been set.  Uses synchronization.
 	 */
 	void set(uint32_t i) {
-		MUTEX_LOCK(_lock);
+		mutex_m.lock();
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
@@ -118,7 +117,7 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
-		MUTEX_UNLOCK(_lock);
+		mutex_m.unlock();
 	}
 
 	/**
@@ -126,7 +125,7 @@ public:
 	 * synchronization.
 	 */
 	void setOver(uint32_t i) {
-		MUTEX_LOCK(_lock);
+		mutex_m.lock();
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
@@ -138,7 +137,7 @@ public:
 		assert_lt(i, _sz);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
-		MUTEX_UNLOCK(_lock);
+		mutex_m.unlock();
 	}
 
 
@@ -156,7 +155,7 @@ private:
 
 	const char *_errmsg; // error message if an allocation fails
 	uint32_t _sz;        // size as # of bits
-	MUTEX_T _lock;       // mutex
+	MUTEX_T mutex_m;       // mutex
 	uint32_t *_words;    // storage
 };
 

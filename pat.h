@@ -404,7 +404,6 @@ public:
 				throw 1;
 			}
 		}
-		MUTEX_INIT(lock_);
 	}
 
 	virtual ~PatternSource() { }
@@ -524,17 +523,7 @@ public:
 	 */
 	void lock() {
 		if(!doLocking_) return; // no contention
-#ifdef USE_SPINLOCK
-		if(useSpinlock_) {
-			// User can ask to use the normal pthreads lock even if
-			// spinlocks are compiled in.
-			spinlock_.Enter();
-		} else {
-#endif
-			MUTEX_LOCK(lock_);
-#ifdef USE_SPINLOCK
-		}
-#endif
+		mutex_m.lock();
 	}
 
 	/**
@@ -543,17 +532,7 @@ public:
 	 */
 	void unlock() {
 		if(!doLocking_) return; // no contention
-#ifdef USE_SPINLOCK
-		if(useSpinlock_) {
-			// User can ask to use the normal pthreads lock even if
-			// spinlocks are compiled in.
-			spinlock_.Leave();
-		} else {
-#endif
-			MUTEX_UNLOCK(lock_);
-#ifdef USE_SPINLOCK
-		}
-#endif
+		mutex_m.unlock();
 	}
 
 	/**
@@ -627,10 +606,7 @@ protected:
 	/// if we expect bad I/O latency on some reads.
 	bool useSpinlock_;
 	bool randomizeQuals_;  /// true -> mess up qualities in a random way
-#ifdef USE_SPINLOCK
-	SpinLock spinlock_;
-#endif
-	MUTEX_T lock_; /// mutex for locking critical regions
+	MUTEX_T mutex_m; /// mutex for locking critical regions
 	bool verbose_;
 };
 
@@ -641,7 +617,6 @@ protected:
 class PairedPatternSource {
 public:
 	PairedPatternSource(uint32_t seed) {
-		MUTEX_INIT(lock_);
 		seed_ = seed;
 	}
 	virtual ~PairedPatternSource() { }
@@ -656,30 +631,19 @@ public:
 	 * fields is being updated.
 	 */
 	void lock() {
-#ifdef USE_SPINLOCK
-		spinlock_.Enter();
-#else
-		MUTEX_LOCK(lock_);
-#endif
+                mutex_m.lock();
 	}
 
 	/**
 	 * Unlock this PairedPatternSource.
 	 */
 	void unlock() {
-#ifdef USE_SPINLOCK
-		spinlock_.Leave();
-#else
-		MUTEX_UNLOCK(lock_);
-#endif
+		mutex_m.unlock();
 	}
 
 protected:
 
-#ifdef USE_SPINLOCK
-	SpinLock spinlock_;
-#endif
-	MUTEX_T lock_; /// mutex for locking critical regions
+	MUTEX_T mutex_m; /// mutex for locking critical regions
 	uint32_t seed_;
 };
 
