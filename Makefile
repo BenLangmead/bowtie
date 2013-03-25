@@ -81,7 +81,7 @@ ifeq (1,$(MINGW))
 endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
-             edit.cpp ebwt.cpp
+             edit.cpp ebwt.cpp tinythread.cpp
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
               color.cpp color_dec.cpp hit.cpp

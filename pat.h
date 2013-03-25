@@ -14,7 +14,6 @@
 #include "assert_helpers.h"
 #include "tokenize.h"
 #include "random_source.h"
-#include "spinlock.h"
 #include "threading.h"
 #include "filebuf.h"
 #include "qual.h"

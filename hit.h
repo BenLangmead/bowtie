@@ -11,7 +11,6 @@
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "spinlock.h"
 #include "threading.h"
 #include "bitset.h"
 #include "tokenize.h"
