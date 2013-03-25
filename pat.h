@@ -393,7 +393,7 @@ public:
 		doLocking_(true),
 		useSpinlock_(useSpinlock),
 		randomizeQuals_(randomizeQuals),
-		lock_(),
+		mutex_m(),
 		verbose_(verbose)
 	{
 		// Open dumpfile, if specified

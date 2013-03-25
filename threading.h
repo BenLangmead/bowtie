@@ -8,7 +8,7 @@
 #ifdef NO_SPINLOCK
 #   define MUTEX_T tthread::mutex
 #else
-#  	define MUTEX_T tthread::fast_mutex
+#   define MUTEX_T tthread::fast_mutex
 #endif /* NO_SPINLOCK */
 
 

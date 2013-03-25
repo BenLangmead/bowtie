@@ -260,7 +260,6 @@ static void resetOptions() {
 	qualities2.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
 	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
-	MUTEX_INIT(gLock);
 }
 
 // mating constraints

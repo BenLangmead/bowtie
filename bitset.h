@@ -93,9 +93,8 @@ public:
 	 */
 	bool test(uint32_t i) {
 		bool ret;
-		mutex_m.lock();
+                tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		ret = testUnsync(i);
-		mutex_m.unlock();
 		return ret;
 	}
 
@@ -104,7 +103,7 @@ public:
 	 * it has been set.  Uses synchronization.
 	 */
 	void set(uint32_t i) {
-		mutex_m.lock();
+                tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
@@ -117,7 +116,6 @@ public:
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 0);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
-		mutex_m.unlock();
 	}
 
 	/**
@@ -125,7 +123,7 @@ public:
 	 * synchronization.
 	 */
 	void setOver(uint32_t i) {
-		mutex_m.lock();
+                tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
@@ -137,7 +135,6 @@ public:
 		assert_lt(i, _sz);
 		_words[i >> 5] |= (1 << (i & 0x1f));
 		assert(((_words[i >> 5] >> (i & 0x1f)) & 1) == 1);
-		mutex_m.unlock();
 	}
 
 

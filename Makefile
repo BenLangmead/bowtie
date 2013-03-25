@@ -30,7 +30,7 @@ ifneq (,$(findstring CYGWIN,$(shell uname)))
 else
     ifneq (,$(findstring MINGW,$(shell uname)))
 	WINDOWS = 1
-	CYGWIN = 1
+	MINGW = 1
 	# POSIX memory-mapped files not currently supported on Windows
 	BOWTIE_MM = 0
 	BOWTIE_SHARED_MEM = 0
@@ -62,7 +62,7 @@ PTHREAD_DEF =
 
 ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
-	EXTRA_FLAGS = -static-libgcc -static-libstdc++
+	EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
 	PTHREAD_LIB = -lpthread
 endif
@@ -166,7 +166,7 @@ DEFS=-fno-strict-aliasing \
      $(MM_DEF) \
      $(SHMEM_DEF)
 
-ALL_FLAGS=$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
+ALL_FLAGS = $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(ALL_FLAGS)\""
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 
@@ -175,7 +175,7 @@ RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 #
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS)  \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
