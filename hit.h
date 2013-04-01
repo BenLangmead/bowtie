@@ -382,7 +382,9 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
-		_numWrappers++;
+            numWrapper_mutex_m.lock();
+            _numWrappers++;
+            numWrapper_mutex_m.unlock();
 	}
 
 	/**
@@ -829,6 +831,7 @@ protected:
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
 	vector<MUTEX_T*>     _locks;       /// pthreads mutexes for per-file critical sections
 	MUTEX_T             main_mutex_m;    /// pthreads mutexes for fields of this object
+        MUTEX_T             numWrapper_mutex_m;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
