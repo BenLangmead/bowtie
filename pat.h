@@ -413,7 +413,9 @@ public:
 	 * whether locks will be contended.
 	 */
 	void addWrapper() {
-		numWrappers_++;
+            lock();
+            numWrappers_++;
+            unlock();
 	}
 
 	/**
@@ -800,7 +802,9 @@ public:
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		uint32_t cur = cur_;
+            lock();
+            uint32_t cur = cur_;
+            unlock();
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
 				// Patterns from srca_[cur_] are unpaired
