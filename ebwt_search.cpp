@@ -85,7 +85,6 @@ static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
-static bool useSpinlock;  // false -> don't use of spinlocks even if they're #defines
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
 static bool useMm;        // use memory-mapped files to hold the index
@@ -197,7 +196,6 @@ static void resetOptions() {
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
-	useSpinlock				= true;  // false -> don't use of spinlocks even if they're #defines
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
 	useMm					= false; // use memory-mapped files to hold the index
@@ -291,7 +289,6 @@ enum {
 	ARG_PARTITION,
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
-	ARG_USE_SPINLOCK,
 	ARG_FILEPAR,
 	ARG_SHMEM,
 	ARG_MM,
@@ -397,7 +394,6 @@ static struct option long_options[] = {
 	{(char*)"phased",       no_argument,       0,            'z'},
 	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
-	{(char*)"nospin",       no_argument,       0,            ARG_USE_SPINLOCK},
 	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
 	{(char*)"ff",           no_argument,       0,            ARG_FF},
@@ -672,7 +668,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_NOOUT: outType = OUTPUT_NONE; break;
 			case ARG_REFMAP: refMapFile = optarg; break;
 			case ARG_ANNOTMAP: annotMapFile = optarg; break;
-			case ARG_USE_SPINLOCK: useSpinlock = false; break;
 			case ARG_SHMEM: useShmem = true; break;
 			case ARG_COLOR_SEQ: colorSeq = true; break;
 			case ARG_COLOR_QUAL: colorQual = true; break;
@@ -2291,7 +2286,6 @@ patsrcFromStrings(int format,
 		case FASTA:
 			return new FastaPatternSource (seed, reads, quals, color,
 			                               randomizeQuals,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
@@ -2301,20 +2295,17 @@ patsrcFromStrings(int format,
 			return new FastaContinuousPatternSource (
 			                               seed, reads, fastaContLen,
 			                               fastaContFreq,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               skipReads);
 		case RAW:
 			return new RawPatternSource   (seed, reads, color,
 			                               randomizeQuals,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
 			return new FastqPatternSource (seed, reads, color,
 			                               randomizeQuals,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
@@ -2323,20 +2314,18 @@ patsrcFromStrings(int format,
 		case TAB_MATE:
 			return new TabbedPatternSource(seed, reads, color,
 			                               randomizeQuals,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case CMDLINE:
 			return new VectorPatternSource(seed, reads, color,
 			                               randomizeQuals,
-			                               useSpinlock,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
 		case RANDOM:
 			return new RandomPatternSource(seed, 2000000, lenRandomReads,
-			                               useSpinlock, patDumpfile,
+			                               patDumpfile,
 			                               verbose);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;

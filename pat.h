@@ -382,7 +382,6 @@ class PatternSource {
 public:
 	PatternSource(uint32_t seed,
 	              bool randomizeQuals = false,
-	              bool useSpinlock = true,
 	              const char *dumpfile = NULL,
 	              bool verbose = false) :
 		seed_(seed),
@@ -390,7 +389,6 @@ public:
 		dumpfile_(dumpfile),
 		numWrappers_(0),
 		doLocking_(true),
-		useSpinlock_(useSpinlock),
 		randomizeQuals_(randomizeQuals),
 		mutex_m(),
 		verbose_(verbose)
@@ -602,10 +600,6 @@ protected:
 	ofstream out_;         /// output stream for dumpfile
 	int numWrappers_;      /// # threads that own a wrapper for this PatternSource
 	bool doLocking_;       /// override whether to lock (true = don't override)
-	/// User can ask to use the normal pthreads-style lock even if
-	/// spinlocks is enabled and compiled in.  This is sometimes better
-	/// if we expect bad I/O latency on some reads.
-	bool useSpinlock_;
 	bool randomizeQuals_;  /// true -> mess up qualities in a random way
 	MUTEX_T mutex_m; /// mutex for locking critical regions
 	bool verbose_;
@@ -1045,12 +1039,11 @@ class TrimmingPatternSource : public PatternSource {
 public:
 	TrimmingPatternSource(uint32_t seed,
 	                      bool randomizeQuals = false,
-	                      bool useSpinlock = true,
 	                      const char *dumpfile = NULL,
 	                      bool verbose = false,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(seed, randomizeQuals, useSpinlock, dumpfile, verbose),
+		PatternSource(seed, randomizeQuals, dumpfile, verbose),
 		trim3_(trim3), trim5_(trim5) { }
 protected:
 	int trim3_;
@@ -1067,10 +1060,9 @@ public:
 	RandomPatternSource(uint32_t seed,
 	                    uint32_t numReads = 2000000,
 	                    int length = 35,
-	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
 	                    bool verbose = false) :
-		PatternSource(seed, false, useSpinlock, dumpfile, verbose),
+		PatternSource(seed, false, dumpfile, verbose),
 		numReads_(numReads),
 		length_(length),
 		seed_(seed)
@@ -1316,13 +1308,12 @@ public:
 	                    const vector<string>& v,
 	                    bool color,
 	                    bool randomizeQuals = false,
-	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
 	                    bool verbose = false,
 	                    int trim3 = 0,
 	                    int trim5 = 0,
 		                uint32_t skip = 0) :
-		TrimmingPatternSource(seed, randomizeQuals, useSpinlock,
+		TrimmingPatternSource(seed, randomizeQuals,
 		                      dumpfile, verbose, trim3, trim5),
 		color_(color), cur_(skip), skip_(skip), paired_(false), v_(),
 		quals_()
@@ -1502,13 +1493,12 @@ public:
 	                          const vector<string>& infiles,
 	                          const vector<string>* qinfiles,
 	                          bool randomizeQuals = false,
-	                          bool useSpinlock = true,
 	                          const char *dumpfile = NULL,
 	                          bool verbose = false,
 	                          int trim3 = 0,
 	                          int trim5 = 0,
 	                          uint32_t skip = 0) :
-		TrimmingPatternSource(seed, randomizeQuals, useSpinlock,
+		TrimmingPatternSource(seed, randomizeQuals,
 		                      dumpfile, verbose, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
@@ -1728,7 +1718,6 @@ public:
 	                   const vector<string>* qinfiles,
 	                   bool color,
 	                   bool randomizeQuals,
-	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
 	                   bool verbose = false,
 	                   int trim3 = 0,
@@ -1738,7 +1727,7 @@ public:
 	                   bool intQuals = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(seed, infiles, qinfiles, randomizeQuals,
-		                          useSpinlock, dumpfile, verbose, trim3,
+		                          dumpfile, verbose, trim3,
 		                          trim5, skip),
 		first_(true), color_(color), solexa64_(solexa64),
 		phred64_(phred64), intQuals_(intQuals)
@@ -1978,7 +1967,6 @@ public:
 	                    const vector<string>& infiles,
 	                    bool color,
 	                    bool randomizeQuals = false,
-	                    bool useSpinlock = true,
 	                    const char *dumpfile = NULL,
 	                    bool verbose = false,
 	                    int trim3 = 0,
@@ -1988,7 +1976,7 @@ public:
 	                    bool intQuals = false,
 	                    uint32_t skip = 0) :
 		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
-		                          useSpinlock, dumpfile, verbose,
+		                          dumpfile, verbose,
 		                          trim3, trim5, skip),
 		color_(color),
 		solQuals_(solQuals),
@@ -2334,11 +2322,10 @@ public:
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
-			bool useSpinlock = true,
 			const char *dumpfile = NULL,
 			bool verbose = false,
 			uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, NULL, false, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, NULL, false,
 		                          dumpfile, verbose, 0, 0, skip),
 		length_(length), freq_(freq),
 		eat_(length_-1), beginning_(true),
@@ -2476,7 +2463,6 @@ public:
 	                   const vector<string>& infiles,
 	                   bool color,
 	                   bool randomizeQuals = false,
-	                   bool useSpinlock = true,
 	                   const char *dumpfile = NULL,
 	                   bool verbose = false,
 	                   int trim3 = 0,
@@ -2487,7 +2473,7 @@ public:
 	                   bool fuzzy = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
-		                          useSpinlock, dumpfile, verbose,
+		                          dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
 		solQuals_(solexa_quals),
@@ -2887,13 +2873,12 @@ public:
 	                 const vector<string>& infiles,
 	                 bool color,
 	                 bool randomizeQuals = false,
-	                 bool useSpinlock = true,
 	                 const char *dumpfile = NULL,
 	                 bool verbose = false,
 	                 int trim3 = 0,
 	                 int trim5 = 0,
 	                 uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals, useSpinlock,
+		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals, 
 		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true), color_(color)
 	{ }
@@ -3032,12 +3017,11 @@ class ChainPatternSource : public BufferedFilePatternSource {
 public:
 	ChainPatternSource(uint32_t seed,
 	                   const vector<string>& infiles,
-	                   bool useSpinlock,
 	                   const char *dumpfile,
 	                   bool verbose,
 	                   uint32_t skip) :
 	BufferedFilePatternSource(
-		seed, infiles, NULL, false, useSpinlock, dumpfile, verbose, 0, 0, skip) { }
+		seed, infiles, NULL, false, dumpfile, verbose, 0, 0, skip) { }
 
 protected:
 
