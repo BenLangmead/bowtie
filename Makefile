@@ -5,9 +5,9 @@
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
-CPP ?= g++
+CPP = g++
 CXX = $(CPP)
-CC ?= gcc
+CC = gcc
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
