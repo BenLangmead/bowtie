@@ -87,7 +87,7 @@
 <h2 id="building-from-source"><a href="#TOC">Building from source</a></h2>
 <p>Building Bowtie from source requires a GNU-like environment that includes GCC, GNU Make and other basics. It should be possible to build Bowtie on a vanilla Linux or Mac installation. Bowtie can also be built on Windows using <a href="http://www.cygwin.com/">Cygwin</a> or <a href="http://www.mingw.org/">MinGW</a>. We recommend <a href="http://www.tdragon.net/recentgcc/">TDM's MinGW Build</a>. If using <a href="http://www.mingw.org/">MinGW</a>, you must also have <a href="http://www.mingw.org/wiki/msys">MSYS</a> installed.</p>
 <p>To build Bowtie, extract the sources, change to the extracted directory, and run GNU <code>make</code> (usually with the command <code>make</code>, but sometimes with <code>gmake</code>) with no arguments. If building with <a href="http://www.mingw.org/">MinGW</a>, run <code>make</code> from the <a href="http://www.mingw.org/wiki/msys">MSYS</a> command line.</p>
-<p>To support the <a href="#bowtie-options-p"><code>-p</code></a> (multithreading) option, Bowtie needs the <code>pthreads</code> library. To compile Bowtie without <code>pthreads</code> (which disables <a href="#bowtie-options-p"><code>-p</code></a>), use <code>make BOWTIE_PTHREADS=0</code>.</p>
+<p>To support the <a href="#bowtie-options-p"><code>-p</code></a> (multithreading) option, Bowtie needs the <code>pthreads</code> library on posix platforms like linux or will try to use native Win32 threads on Windows. For threading synchronization bowtie is using by default a spinlocking mechanism. Spinlocking is in general much faster. However if the need arise to not use spinlocking bowtie can also be compiled using EXTRA_FLAGS=-DNO_SPINLOCK parameter.</p>
 <h1 id="the-bowtie-aligner"><a href="#TOC">The <code>bowtie</code> aligner</a></h1>
 <p><code>bowtie</code> takes an index and a set of reads as input and outputs a list of alignments. Alignments are selected according to a combination of the <a href="#bowtie-options-v"><code>-v</code></a>/<a href="#bowtie-options-n"><code>-n</code></a>/<a href="#bowtie-options-e"><code>-e</code></a>/<a href="#bowtie-options-l"><code>-l</code></a> options (plus the <a href="#bowtie-options-I"><code>-I</code></a>/<a href="#bowtie-options-X"><code>-X</code></a>/<a href="#bowtie-options-fr"><code>--fr</code></a>/<a href="#bowtie-options-fr"><code>--rf</code></a>/ <a href="#bowtie-options-fr"><code>--ff</code></a> options for paired-end alignment), which define which alignments are legal, and the <a href="#bowtie-options-k"><code>-k</code></a>/<a href="#bowtie-options-a"><code>-a</code></a>/<a href="#bowtie-options-m"><code>-m</code></a>/<a href="#bowtie-options-m"><code>-M</code></a>/<a href="#bowtie-options-best"><code>--best</code></a>/<a href="#bowtie-options-strata"><code>--strata</code></a> options which define which and how many legal alignments should be reported.</p>
 <p>By default, Bowtie enforces an alignment policy similar to <a href="http://maq.sf.net">Maq</a>'s default quality-aware policy (<a href="#bowtie-options-n"><code>-n</code></a> 2 <a href="#bowtie-options-l"><code>-l</code></a> 28 <a href="#bowtie-options-e"><code>-e</code></a> 70). See <a href="#the--n-alignment-mode">the -n alignment mode</a> section of the manual for details about this mode. But Bowtie can also enforce a simpler end-to-end k-difference policy (e.g. with <a href="#bowtie-options-v"><code>-v</code></a> 2). See <a href="#the--v-alignment-mode">the -v alignment mode</a> section of the manual for details about that mode. <a href="#the--n-alignment-mode">The -n alignment mode</a> and <a href="#the--v-alignment-mode">the -v alignment mode</a> are mutually exclusive.</p>
@@ -1090,12 +1090,6 @@ T2302111203131231130300111123220
 </td><td>
 
 <p>Use <code>&lt;int&gt;</code> as the seed for pseudo-random number generator.</p>
-</td></tr><tr><td>
-
-<pre><code>--cutoff &lt;int&gt;</code></pre>
-</td><td>
-
-<p>Index only the first <code>&lt;int&gt;</code> bases of the reference sequences (cumulative across sequences) and ignore the rest.</p>
 </td></tr><tr><td>
 
 <pre><code>-q/--quiet</code></pre>
