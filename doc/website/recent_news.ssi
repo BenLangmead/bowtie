@@ -1,16 +1,3 @@
-<h2>Hiring Postdocs</h2>
-<ul>
-<li>
-The
-<a href="http://www.cs.jhu.edu/~langmea">Langmead</a>
-and
-<a href="http://bioinformatics.igm.jhmi.edu/salzberg">Salzberg</a>
-labs have open positions for postdoctoral researchers.  See
-<a href="http://www.cs.jhu.edu/~langmea/positions.shtml">the posting</a>
-and please apply if you're interested in working with either or both of us.
-</li>
-</ul>
-
 <h2>0.12.9 release - 12/16/12</h2>
 <ul>
  <li>Fixed a bug whereby read names would not be truncated at first
