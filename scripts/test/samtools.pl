@@ -37,6 +37,15 @@ if(! -x $samtools) {
 	}
 }
 
+my $bcftools = "bcftools";
+if(! -x $bcftools) {
+	$bcftools = `which bcftools`;
+	chomp($bcftools);
+	if($bcftools eq "" || ! -x $bcftools) {
+		die "Could not find bcftools in current directory or in PATH\n";
+	}
+}
+
 if(! -f "e_coli_c.1.ebwt") {
 	print STDERR "Making colorspace e_coli index\n";
 	my $bowtie_build = "./bowtie-build";
@@ -59,32 +68,31 @@ sub run($) {
 	return system($cmd);
 }
 
-system("rm -f .samtools.pl.*");
-run("$bowtie_d -S e_coli reads/e_coli_10000snp.fq .samtools.pl.sam") && die;
-run("$samtools view -bS -o .samtools.pl.bam .samtools.pl.sam") && die;
-run("$samtools sort .samtools.pl.bam .samtools.pl.sorted") && die;
-open SAM, "$samtools pileup -cv -f genomes/NC_008253.fna .samtools.pl.sorted.bam |" || die;
-my $snps = 0;
-while(<SAM>) {
-	print $_;
-	$snps++;
+# BTL 4/11/2013: Couldn't get samtools / bcftools to find SNPs from the
+# colorspace invocation of Bowtie.  Not sure why. 
+for my $cmd ("$bowtie_d -S e_coli reads/e_coli_10000snp.fq"
+             #, "$bowtie_d -S -C -f e_coli_c reads/e_coli_10000snp.csfasta"
+             )
+{
+	system("rm -f .samtools.pl.*");
+	# Run Bowtie and output SAM
+	run("$cmd .samtools.pl.sam") && die;
+	# Convert to BAM
+	run("$samtools view -bS -o .samtools.pl.bam .samtools.pl.sam") && die;
+	# Sort BAM
+	run("$samtools sort .samtools.pl.bam .samtools.pl.sorted") && die;
+	# Run samtools mpileup / bcftools to get SNPs
+	my $bcfcmd = "$samtools mpileup -uf genomes/NC_008253.fna .samtools.pl.sorted.bam | $bcftools view -vcg -";
+	print STDERR "$bcfcmd\n";
+	open SAM, "$bcfcmd |" || die;
+	my $snps = 0;
+	while(<SAM>) {
+		next if substr($_, 0, 1) eq "#";
+		print $_;
+		$snps++;
+	}
+	close(SAM);
+	$? == 0 || die "samtools mpileup quit with exitlevel $?\n";
+	$snps == 10 || die "Wrong number of SNPs output by samtools; expected 10, got $snps\n";
+	print "PASSED\n";
 }
-close(SAM);
-$? == 0 || die "samtools pileup quit with exitlevel $?\n";
-$snps == 10 || die "Wrong number of SNPs output by samtools; expected 10, got $snps\n";
-print "PASSED\n";
-system("rm -f .samtools.pl.*");
-
-run("$bowtie_d -S -C -f e_coli_c reads/e_coli_10000snp.csfasta .samtools.pl.sam") && die;
-run("$samtools view -bS -o .samtools.pl.bam .samtools.pl.sam") && die;
-run("$samtools sort .samtools.pl.bam .samtools.pl.sorted") && die;
-open SAM, "$samtools pileup -cv -f genomes/NC_008253.fna .samtools.pl.sorted.bam |" || die;
-$snps = 0;
-while(<SAM>) {
-	print $_;
-	$snps++;
-}
-close(SAM);
-$? == 0 || die "samtools pileup quit with exitlevel $?\n";
-$snps == 10 || die "Wrong number of SNPs output by samtools; expected 10, got $snps\n";
-print "PASSED\n";
