@@ -4,26 +4,25 @@
 #include <iostream>
 #include "threading.h"
 
+using tthread::lock_guard;
+
 class SyncLogger {
 public:
 	SyncLogger() {
-		MUTEX_INIT(lock_);
 	}
 
 	void msg(const char *s) {
-		MUTEX_LOCK(lock_);
+                lock_guard<MUTEX_T> guard(mutex_m);
 		std::cout << s << std::endl;
-		MUTEX_UNLOCK(lock_);
 	}
 
 	void msg(const std::string& s) {
-		MUTEX_LOCK(lock_);
+                lock_guard<MUTEX_T> guard(mutex_m);
 		std::cout << s << std::endl;
-		MUTEX_UNLOCK(lock_);
 	}
 
 private:
-	MUTEX_T lock_;
+	MUTEX_T mutex_m;
 };
 
 extern SyncLogger glog;

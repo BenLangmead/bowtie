@@ -11,7 +11,6 @@
 #include <seqan/sequence.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
-#include "spinlock.h"
 #include "threading.h"
 #include "bitset.h"
 #include "tokenize.h"
@@ -28,6 +27,7 @@
 
 using namespace std;
 using namespace seqan;
+using tthread::lock_guard;
 
 /// Constants for the various output modes
 enum output_types {
@@ -322,9 +322,9 @@ public:
 		ssmode_(ios_base::out)
 	{
 		_outs.push_back(out);
-		_locks.resize(1);
-		MUTEX_INIT(_locks[0]);
-		MUTEX_INIT(_mainlock);
+                vector<MUTEX_T*>::iterator it;
+                
+                _locks.push_back(new MUTEX_T);
 		initDumps();
 	}
 
@@ -354,10 +354,8 @@ public:
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
 			_outs.push_back(NULL); // we open output streams lazily
-			_locks.resize(i+1);
-			MUTEX_INIT(_locks[i]);
+			_locks.push_back(new MUTEX_T);
 		}
-		MUTEX_INIT(_mainlock);
 		initDumps();
 	}
 
@@ -384,7 +382,9 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
-		_numWrappers++;
+            numWrapper_mutex_m.lock();
+            _numWrappers++;
+            numWrapper_mutex_m.unlock();
 	}
 
 	/**
@@ -438,13 +438,12 @@ public:
 			out(h.h.first).writeChars(buf, ss.tellp());
 		}
 		unlock(hs[end-1].h.first);
-		mainlock();
+                lock_guard<MUTEX_T> guard(main_mutex_m);
 		commitHits(hs);
 		first_ = false;
 		numAligned_++;
 		if(paired) numReportedPaired_ += (end-start);
 		else       numReported_ += (end-start);
-		mainunlock();
 	}
 
 	void commitHit(const Hit& hit) {
@@ -557,7 +556,7 @@ public:
 	 * for example, outputting a read to an unaligned-read file.
 	 */
 	void mainlock() {
-		MUTEX_LOCK(_mainlock);
+                main_mutex_m.lock();
 	}
 
 	/**
@@ -565,7 +564,7 @@ public:
 	 * when, for example, outputting a read to an unaligned-read file.
 	 */
 	void mainunlock() {
-		MUTEX_UNLOCK(_mainlock);
+                main_mutex_m.unlock();
 	}
 
 	/**
@@ -611,7 +610,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
-				MUTEX_LOCK(dumpAlignLock_);
+                                lock_guard<MUTEX_T> guard(dumpAlignLock_);
 				if(dumpAl_ == NULL) {
 					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
@@ -625,13 +624,12 @@ public:
 				if(dumpAlQv_ != NULL) {
 					dumpAlQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpAlignLock_);
 			}
 		} else {
 			// Dump paired-end read to an aligned-read file (or pair of
 			// files) of the same format
 			if(!dumpAlBase_.empty()) {
-				MUTEX_LOCK(dumpAlignLockPE_);
+                                lock_guard<MUTEX_T> guard(dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
 					assert(dumpAlQv_1_ == NULL);
 					assert(dumpAlQv_2_ == NULL);
@@ -652,7 +650,6 @@ public:
 					dumpAlQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 					dumpAlQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpAlignLockPE_);
 			}
 		}
 	}
@@ -667,7 +664,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
-				MUTEX_LOCK(dumpUnalLock_);
+                                lock_guard<MUTEX_T> guard(dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
 					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
@@ -681,13 +678,12 @@ public:
 				if(dumpUnalQv_ != NULL) {
 					dumpUnalQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpUnalLock_);
 			}
 		} else {
 			// Dump paired-end read to an unaligned-read file (or pair
 			// of files) of the same format
 			if(!dumpUnalBase_.empty()) {
-				MUTEX_LOCK(dumpUnalLockPE_);
+                                lock_guard<MUTEX_T> guard(dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
 					assert(dumpUnal_1_ == NULL);
 					assert(dumpUnal_2_ == NULL);
@@ -706,7 +702,6 @@ public:
 					dumpUnalQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 					dumpUnalQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpUnalLockPE_);
 			}
 		}
 	}
@@ -724,7 +719,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
-				MUTEX_LOCK(dumpMaxLock_);
+                                lock_guard<MUTEX_T> guard(dumpMaxLock_);
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
@@ -736,13 +731,12 @@ public:
 				if(dumpMaxQv_ != NULL) {
 					dumpMaxQv_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpMaxLock_);
 			}
 		} else {
 			// Dump paired-end read to a maxed-out-read file (or pair
 			// of files) of the same format
 			if(!dumpMaxBase_.empty()) {
-				MUTEX_LOCK(dumpMaxLockPE_);
+                                lock_guard<MUTEX_T> guard(dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
 					assert(dumpMaxQv_1_ == NULL);
 					assert(dumpMaxQv_2_ == NULL);
@@ -761,7 +755,6 @@ public:
 					dumpMaxQv_1_->write(p.bufa().qualOrigBuf, p.bufa().qualOrigBufLen);
 					dumpMaxQv_2_->write(p.bufb().qualOrigBuf, p.bufb().qualOrigBufLen);
 				}
-				MUTEX_UNLOCK(dumpMaxLockPE_);
 			}
 		}
 	}
@@ -771,9 +764,8 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-		mainlock();
+		lock_guard<MUTEX_T> guard(main_mutex_m);
 		numMaxed_++;
-		mainunlock();
 	}
 
 	/**
@@ -781,9 +773,8 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		mainlock();
+                lock_guard<MUTEX_T> guard(main_mutex_m);
 		numUnaligned_++;
-		mainunlock();
 	}
 
 protected:
@@ -791,13 +782,12 @@ protected:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
 		assert(h.repOk());
-		mainlock();
+                lock_guard<MUTEX_T> guard(main_mutex_m);
 		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
 		else           numReported_++;
 		numAligned_++;
-		mainunlock();
 	}
 
 	/**
@@ -820,7 +810,7 @@ protected:
 	 */
 	void lock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
-		MUTEX_LOCK(_locks[strIdx]);
+		_locks[strIdx]->lock();
 	}
 
 	/**
@@ -831,7 +821,7 @@ protected:
 	 */
 	void unlock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
-		MUTEX_UNLOCK(_locks[strIdx]);
+		_locks[strIdx]->unlock();
 	}
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
@@ -839,8 +829,9 @@ protected:
 	RecalTable         *recalTable_;  /// recalibration table
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
-	vector<MUTEX_T>     _locks;       /// pthreads mutexes for per-file critical sections
-	MUTEX_T             _mainlock;    /// pthreads mutexes for fields of this object
+	vector<MUTEX_T*>     _locks;       /// pthreads mutexes for per-file critical sections
+	MUTEX_T             main_mutex_m;    /// pthreads mutexes for fields of this object
+        MUTEX_T             numWrapper_mutex_m;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -922,12 +913,6 @@ protected:
 		dumpAlignFlag_   = !dumpAlBase_.empty();
 		dumpUnalignFlag_ = !dumpUnalBase_.empty();
 		dumpMaxedFlag_   = !dumpMaxBase_.empty();
-		MUTEX_INIT(dumpAlignLock_);
-		MUTEX_INIT(dumpAlignLockPE_);
-		MUTEX_INIT(dumpUnalLock_);
-		MUTEX_INIT(dumpUnalLockPE_);
-		MUTEX_INIT(dumpMaxLock_);
-		MUTEX_INIT(dumpMaxLockPE_);
 	}
 
 	void destroyDumps() {

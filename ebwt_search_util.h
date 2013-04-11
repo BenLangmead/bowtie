@@ -167,7 +167,6 @@ void printHit(const vector<String<Dna5> >& os,
 class PartialAlignmentManager {
 public:
 	PartialAlignmentManager(size_t listSz = 10 * 1024 * 1024) {
-		MUTEX_INIT(_partialLock);
 		// Reserve space for 10M partialsList entries = 40 MB
 		_partialsList.reserve(listSz);
 	}
@@ -182,7 +181,7 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
-		MUTEX_LOCK(_partialLock);
+                tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		size_t origPlSz = _partialsList.size();
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
@@ -231,7 +230,6 @@ public:
 		}
 		// Assert that we added an entry
 		assert(_partialsMap.find(patid) != _partialsMap.end());
-		MUTEX_UNLOCK(_partialLock);
 	}
 
 	/**
@@ -240,9 +238,8 @@ public:
 	 */
 	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
-		MUTEX_LOCK(_partialLock);
+                tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		getPartialsUnsync(patid, ps);
-		MUTEX_UNLOCK(_partialLock);
 	}
 
 	/**
@@ -369,7 +366,7 @@ private:
 	vector<PartialAlignment> _partialsList;
 	/// Lock for 'partialsMap' and 'partialsList'; necessary because
 	/// search threads will be reading and writing them
-	MUTEX_T _partialLock;
+	MUTEX_T mutex_m;
 };
 
 #endif /* EBWT_SEARCH_UTIL_H_ */

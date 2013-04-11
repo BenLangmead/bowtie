@@ -5,13 +5,10 @@
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC)
-GCC_PREFIX = $(shell dirname `which gcc`)
-GCC_SUFFIX =
-CC = $(GCC_PREFIX)/gcc$(GCC_SUFFIX)
-CPP = $(GCC_PREFIX)/g++$(GCC_SUFFIX)
+CPP = g++
 CXX = $(CPP)
+CC = gcc
 HEADERS = $(wildcard *.h)
-BOWTIE_PTHREADS = 1
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
 EXTRA_FLAGS =
@@ -22,63 +19,69 @@ CXXFLAGS += $(EXTRA_CXXFLAGS)
 
 # Detect Cygwin or MinGW
 WINDOWS = 0
+CYGWIN = 0
+MINGW = 0
 ifneq (,$(findstring CYGWIN,$(shell uname)))
-WINDOWS = 1
-# POSIX memory-mapped files not currently supported on Windows
-BOWTIE_MM = 0
-BOWTIE_SHARED_MEM = 0
+    WINDOWS = 1
+    CYGWIN = 1
+    # POSIX memory-mapped files not currently supported on Windows
+    BOWTIE_MM = 0
+    BOWTIE_SHARED_MEM = 0
 else
-ifneq (,$(findstring MINGW,$(shell uname)))
-WINDOWS = 1
-# POSIX memory-mapped files not currently supported on Windows
-BOWTIE_MM = 0
-BOWTIE_SHARED_MEM = 0
-endif
+    ifneq (,$(findstring MINGW,$(shell uname)))
+	WINDOWS = 1
+	MINGW = 1
+	# POSIX memory-mapped files not currently supported on Windows
+	BOWTIE_MM = 0
+	BOWTIE_SHARED_MEM = 0
+    endif
 endif
 
 MACOS = 0
 ifneq (,$(findstring Darwin,$(shell uname)))
-MACOS = 1
+    MACOS = 1
 endif
 
 LINUX = 0
 ifneq (,$(findstring Linux,$(shell uname)))
-LINUX = 1
-EXTRA_FLAGS += -Wl,--hash-style=both
+    LINUX = 1
+    EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
 MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
-MM_DEF = -DBOWTIE_MM
+    MM_DEF = -DBOWTIE_MM
 endif
 SHMEM_DEF = 
 ifeq (1,$(BOWTIE_SHARED_MEM))
-SHMEM_DEF = -DBOWTIE_SHARED_MEM
+    SHMEM_DEF = -DBOWTIE_SHARED_MEM
 endif
 PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
-ifeq (1,$(BOWTIE_PTHREADS))
-PTHREAD_DEF = -DBOWTIE_PTHREADS
-ifeq (1,$(WINDOWS))
-# pthreads for windows forces us to be specific about the library
-PTHREAD_LIB = -L . -lpthreadGC2
-PTHREAD_PKG = pthreadGC2.dll
+
+ifeq (1,$(MINGW))
+	PTHREAD_LIB = 
+	EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
-# There's also -pthread, but that only seems to work on Linux
-PTHREAD_LIB = -lpthread
-endif
+	PTHREAD_LIB = -lpthread
 endif
 
 PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
-LIBS = 
-SEARCH_LIBS = $(PTHREAD_LIB)
+LIBS = $(PTHREAD_LIB)
+SEARCH_LIBS = 
 BUILD_LIBS =
+INSPECT_LIBS = 
+
+ifeq (1,$(MINGW))
+    BUILD_LIBS = 
+    INSPECT_LIBS = 
+endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
-             edit.cpp ebwt.cpp
+             edit.cpp ebwt.cpp tinythread.cpp
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
               color.cpp color_dec.cpp hit.cpp
@@ -90,13 +93,20 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
+# msys will always be 32 bit so look at the cpu arch instead.
+ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
+    ifeq (1,$(MINGW))
+	BITS=64
+    endif
+endif
+
 # Convert BITS=?? to a -m flag
 BITS_FLAG =
 ifeq (32,$(BITS))
-BITS_FLAG = -m32
+    BITS_FLAG = -m32
 endif
 ifeq (64,$(BITS))
-BITS_FLAG = -m64
+    BITS_FLAG = -m64
 endif
 
 DEBUG_FLAGS = -O0 -g3 $(BITS_FLAG)
@@ -131,16 +141,10 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                TUTORIAL \
                VERSION
 
-# This is helpful on Windows under MinGW/MSYS, where Make might go for
-# the Windows FIND tool instead.
-FIND=$(shell which find)
-
 SRC_PKG_LIST = $(wildcard *.h) \
                $(wildcard *.hh) \
                $(wildcard *.c) \
                $(wildcard *.cpp) \
-               $(shell $(FIND) SeqAn-1.1 -name "*.h") \
-               $(shell $(FIND) SeqAn-1.1 -name "*.txt") \
                doc/strip_markdown.pl \
                Makefile \
                $(GENERAL_LIST)
@@ -162,7 +166,7 @@ DEFS=-fno-strict-aliasing \
      $(MM_DEF) \
      $(SHMEM_DEF)
 
-ALL_FLAGS=$(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
+ALL_FLAGS = $(EXTRA_FLAGS) $(CFLAGS) $(CXXFLAGS)
 DEBUG_DEFS = -DCOMPILER_OPTIONS="\"$(DEBUG_FLAGS) $(ALL_FLAGS)\""
 RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 
@@ -171,7 +175,7 @@ RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 #
 
 bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
-	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS)  \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \

@@ -1,3 +1,32 @@
+<h2>Hiring Postdocs</h2>
+<ul>
+<li>
+The
+<a href="http://www.cs.jhu.edu/~langmea">Langmead</a>
+and
+<a href="http://bioinformatics.igm.jhmi.edu/salzberg">Salzberg</a>
+labs have open positions for postdoctoral researchers.  See
+<a href="http://www.cs.jhu.edu/~langmea/positions.shtml">the posting</a>
+and please apply if you're interested in working with either or both of us.
+</li>
+</ul>
+
+<h2>1.0.0 release - 04/09/13</h2>
+<ul>
+ <li>Due to general performance improvements spinlocking 
+     is now used by default. The <tt>EXTRA_FLAGS=-DNO_SPINLOCK</tt> may be 
+     used to reverse this during compilation.</li>
+ <li>Fixed some racing conditions.</li>
+ <li>CygWin builds are using now pthreah lib.</li>
+ <li>Changed MinGW to optionally use pthread lib on Win32 platforms.</li>
+ <li>Changed the Windows build to use native Windows threads by default.</li>
+ <li>Renamed COPYING to LICENSE to be more GitHub-friendly.</li>
+ <li>Tokenizer no longer has limit of 10,000 tokens, which was a
+     problem for users trying to index a very large number of FASTA
+     files.</li>
+ <li>Removed references to no-longer-implemented --cutoff option for
+     bowtie-build</li>
+</ul>
 <h2>0.12.9 release - 12/16/12</h2>
 <ul>
  <li>Fixed a bug whereby read names would not be truncated at first

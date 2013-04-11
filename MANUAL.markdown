@@ -83,8 +83,11 @@ sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
 To support the [`-p`] (multithreading) option, Bowtie needs the
-`pthreads` library.  To compile Bowtie without `pthreads` (which
-disables [`-p`]), use `make BOWTIE_PTHREADS=0`.
+`pthreads` library on posix platforms like linux or will try to 
+use native Win32 threads on Windows. For threading synchronization
+bowtie is using by default a spinlocking mechanism. Spinlocking is
+in general much faster. However if the need arise to not use spinlocking
+bowtie can also be compiled using EXTRA_FLAGS=-DNO_SPINLOCK parameter.
 
 [Cygwin]:   http://www.cygwin.com/
 [MinGW]:    http://www.mingw.org/
