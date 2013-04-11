@@ -1,4 +1,9 @@
-<h2>1.0.0 release - 04/09/13</h2>
+<h2>Bowtie on GitHub - 4/11/13</h2>
+<ul>
+ <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
+</ul>
+
+<h2>1.0.0 release - 4/9/13</h2>
 <ul>
  <li>Finally, a 64-bit Windows binary!</li>
  <li>Due to general performance improvements spinlocking 
@@ -184,39 +189,4 @@
        (EMR) rather than directly on
        <a href="http://aws.amazon.com/ec2/">Elastic Compute Cloud</a> (EC2).
   </ul>
-</ul>
-
-<h2>Cufflinks paper out - 5/3/10</h2>
-<ul>
-  <li>The <a href="http://www.nature.com/nbt/journal/vaop/ncurrent/abs/nbt.1621.html#/">Cufflinks paper</a>,
-  by <a href="http://www.cs.umd.edu/~cole/">Cole Trapnell</a> <i>et al</i> is out
-  in <a href="http://www.nature.com/nbt/index.html">Nature Biotechnology</a>.
-  See the supplement for a detailed discussion of the methods behind 
-  <a href="http://cufflinks.cbcb.umd.edu/">Cufflinks</a>.
-</ul>
-
-<h2>0.12.5 release - 4/10/10</h2>
-<ul>
- <li>Fixed spurious "Error while writing string output; not all
-     characters written" errors in
-     <a href="manual.shtml#bowtie-options-S"><tt>-S/--sam</tt></a>
-     mode.
-</ul>
-
-<h2>0.12.4 release - 4/5/10</h2>
-<ul>
- <li>Periods in read sequences are now treated as Ns instead of
-     ignored.  This should help with some problems where Bowtie
-     erroneously reports "Reads file contained a pattern with more than
-     1024 quality values..." for data from recent versions of the
-     Illumina GA pipeline.
- <li>Fixed a bug whereby some error and warning messages would be
-     printed on top of each other in
-     <a href="manual.shtml#bowtie-options-p"><tt>-p</tt>/<tt>--threads</tt></a>
-     mode.
- <li>Chunk-exhaustion warnings messages are now suppressed when
-     <a href="manual.shtml#bowtie-options-quiet"><tt>--quiet</tt></a>
-     is specified.
- <li>Fixed small issue in quality decoding whereby no-confidence colors
-     would incorrectly influence decoded quality of adjacent bases.
 </ul>
