@@ -93,10 +93,16 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
-# msys will always be 32 bit so look at the cpu arch instead.
-ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
-    ifeq (1,$(MINGW))
-	BITS=64
+BITS=32
+# cygwin will stay 32 bit for now.
+ifeq (1,$(MINGW))
+    # msys will always be 32 bit so look at the cpu arch.
+    ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
+        BITS=64
+    else
+        ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITECTURE)))
+            BITS=64
+        endif
     endif
 endif
 
