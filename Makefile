@@ -133,6 +133,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
+               SeqAn-1.1 \
                doc/manual.html \
                doc/README \
                doc/style.css \
@@ -260,7 +261,7 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
 	mkdir .src.tmp
 	mkdir .src.tmp/bowtie-$(VERSION)
-	zip tmp.zip $(SRC_PKG_LIST)
+	zip -r tmp.zip $(SRC_PKG_LIST)
 	mv tmp.zip .src.tmp/bowtie-$(VERSION)
 	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
 	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)

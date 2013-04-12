@@ -1,8 +1,0 @@
-.settings
-.project
-.cproject
-*.dSYM
-*.tar.gz
-bowtie2-align
-bowtie2-build
-bowtie2-inspect
