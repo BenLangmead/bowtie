@@ -106,6 +106,12 @@ ifeq (1,$(MINGW))
     endif
 endif
 
+ifeq (1,$(LINUX))
+	ifeq (x86_64, $(shell uname -p))
+		BITS=64
+	endif
+endif
+
 # Convert BITS=?? to a -m flag
 BITS_FLAG =
 ifeq (32,$(BITS))
