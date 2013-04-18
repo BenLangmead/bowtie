@@ -107,9 +107,9 @@ ifeq (1,$(MINGW))
 endif
 
 ifeq (1,$(LINUX))
-	ifeq (x86_64, $(shell uname -p))
-		BITS=64
-	endif
+    ifeq (x86_64, $(shell uname -p))
+        BITS=64
+    endif
 endif
 
 # Convert BITS=?? to a -m flag
