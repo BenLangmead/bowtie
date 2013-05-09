@@ -85,6 +85,7 @@
   </ul>
   <li>Other:</li>
   <ul>
+    <li><a href="http://ab.inf.uni-tuebingen.de/software/pauda/">PADUA</a> (alignment of DNA to protein databases; <a href="http://bioinformatics.oxfordjournals.org/content/early/2013/05/07/bioinformatics.btt254.full.pdf+html">paper</a>)
     <li><a href="http://personalpages.manchester.ac.uk/staff/antonio.marco/seqtrimmap.html">SeqTrimMap</a> (sequential trimming and mapping; <a href="http://bioinformatics.oxfordjournals.org/content/28/3/318.full">paper</a>)
     <li><a href="http://www.mcardle.wisc.edu/mprime/version.html">mPrime</a> (primer design)</li>
     <li><a href="https://github.com/csmiller/EMIRGE">EMIGRE</a> (ribosomal genes reconstruction)</li>
