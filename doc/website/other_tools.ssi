@@ -70,7 +70,7 @@
     <li><a href="http://genomics1.mh-hannover.de/genometa/index.php?Site=Tutorial%201">Genometa</a> (<a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0041224">paper</a>)</li>
     <li><a href="http://huttenhower.sph.harvard.edu/metaphlan">MetaPhlan</a> (<a href="http://www.nature.com/nmeth/journal/v9/n8/full/nmeth.2066.html">paper</a>)</li>
     <li><a href="http://blog.metagenomics.anl.gov/howto/quality-control/">MG-RAST</a> (<a href="http://blog.metagenomics.anl.gov/howto/quality-control/">paper</a>)</li>
-    <li><a href="https://github.com/treangen/metAMOS/wiki">metAMOS</a></li>
+    <li><a href="https://github.com/treangen/metAMOS/wiki">metAMOS</a> (<a href="http://genomebiology.com/2013/14/1/R2/abstract">paper</a>)</li>
   </ul>
   <li>Small RNA:</li>
   <ul>
@@ -89,7 +89,7 @@
     <li><a href="http://ab.inf.uni-tuebingen.de/software/pauda/">PADUA</a> (alignment of DNA to protein databases; <a href="http://bioinformatics.oxfordjournals.org/content/early/2013/05/07/bioinformatics.btt254.full.pdf+html">paper</a>)
     <li><a href="http://personalpages.manchester.ac.uk/staff/antonio.marco/seqtrimmap.html">SeqTrimMap</a> (sequential trimming and mapping; <a href="http://bioinformatics.oxfordjournals.org/content/28/3/318.full">paper</a>)
     <li><a href="http://www.mcardle.wisc.edu/mprime/version.html">mPrime</a> (primer design)</li>
-    <li><a href="https://github.com/csmiller/EMIRGE">EMIGRE</a> (ribosomal genes reconstruction)</li>
+    <li><a href="https://github.com/csmiller/EMIRGE">EMIGRE</a> (ribosomal genes reconstruction; <a href="http://genomebiology.com/2011/12/5/R44">paper</a>)</li>
     <li><a href="http://sourceforge.net/p/tapdancebio/home/Home/">TAPDANCE</a> (identifies CISs in transposon junction fragment insertion data; <a href="http://www.biomedcentral.com/content/pdf/1471-2105-13-154.pdf">paper</a>)</li>
     <li><a href="http://carla.saleh.free.fr/software/paparazzi.html">Paparazzi</a> (reconstruction of viral genomes from small RNA reads; <a href="http://jvi.asm.org/content/85/21/11016.long">paper</a>)</li>
     <li><a href="https://github.com/capsid/capsid">CaPSID</a> (pathogen detection; <a href="http://www.biomedcentral.com/1471-2105/13/206">paper</a>)
