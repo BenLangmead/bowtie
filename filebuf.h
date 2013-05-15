@@ -424,6 +424,8 @@ public:
 			std::cerr << "Error: Could not open alignment output file " << out << std::endl;
 			throw 1;
 		}
+		if(setvbuf(out_, NULL, _IOFBF, 10* 1024* 1024)) 
+			std::cerr << "Warning: Could not allocate the proper buffer size for output file stream. " << std::endl;
 	}
 
 	/**

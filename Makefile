@@ -93,10 +93,22 @@ BUILD_CPPS_MAIN = $(BUILD_CPPS) bowtie_build_main.cpp
 SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
-# msys will always be 32 bit so look at the cpu arch instead.
-ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
-    ifeq (1,$(MINGW))
-	BITS=64
+BITS=32
+# cygwin will stay 32 bit for now.
+ifeq (1,$(MINGW))
+    # msys will always be 32 bit so look at the cpu arch.
+    ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
+        BITS=64
+    else
+        ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITECTURE)))
+            BITS=64
+        endif
+    endif
+endif
+
+ifeq (1,$(LINUX))
+    ifeq (x86_64, $(shell uname -p))
+        BITS=64
     endif
 endif
 
@@ -127,6 +139,7 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
+               SeqAn-1.1 \
                doc/manual.html \
                doc/README \
                doc/style.css \
@@ -254,7 +267,7 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	chmod a+x scripts/*.sh scripts/*.pl
 	mkdir .src.tmp
 	mkdir .src.tmp/bowtie-$(VERSION)
-	zip tmp.zip $(SRC_PKG_LIST)
+	zip -r tmp.zip $(SRC_PKG_LIST)
 	mv tmp.zip .src.tmp/bowtie-$(VERSION)
 	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
 	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)
