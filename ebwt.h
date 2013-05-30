@@ -39,6 +39,10 @@
 #include "color_dec.h"
 #include "reference.h"
 
+#ifdef POPCNT_CAPABILITY 
+#   include “processor_support.h” 
+#endif 
+
 using namespace std;
 using namespace seqan;
 
@@ -388,6 +392,10 @@ public:
 	     Ebwt_STAT_INITS
 	{
 		assert(!useMm || !useShmem);
+#ifdef POPCNT_CAPABILITY 
+        ProcessorSupport ps; 
+        _usePOPCNTinstruction = ps.POPCNTenabled(); 
+#endif 
 		rmap_ = rmap;
 		_useMm = useMm;
 		useShmem_ = useShmem;
@@ -454,6 +462,10 @@ public:
 	         color,
 	         refparams.reverse == REF_READ_REVERSE)
 	{
+#ifdef POPCNT_CAPABILITY 
+        ProcessorSupport ps; 
+        _usePOPCNTinstruction = ps.POPCNTenabled(); 
+#endif 
 		_in1Str = file + ".1.ebwt";
 		_in2Str = file + ".2.ebwt";
 		// Open output files
@@ -837,6 +849,9 @@ public:
 	bool        sanityCheck() const  { return _sanity; }
 	vector<string>& refnames()       { return _refnames; }
 	bool        fw() const           { return _fw; }
+#ifdef POPCNT_CAPABILITY 
+    bool _usePOPCNTinstruction; 
+#endif 
 
 	/// Return true iff the Ebwt is currently in memory
 	bool isInMemory() const {
@@ -1870,6 +1885,9 @@ inline static int pop64(uint64_t x) {
 	       popcntU8Table[p[7]];
 }
 #else
+#ifdef POPCNT_CAPABILITY   // wrapping of "struct"
+struct USE_POPCNT_GENERIC {
+#endif
 // Use this standard bit-bashing population count
 inline static int pop64(uint64_t x) {
    x = x - ((x >> 1) & 0x5555555555555555llu);
@@ -1880,19 +1898,38 @@ inline static int pop64(uint64_t x) {
    x = x + (x >> 32);
    return x & 0x3F;
 }
+#ifdef POPCNT_CAPABILITY  // wrapping a "struct"
+};
+#endif
+
+#ifdef POPCNT_CAPABILITY
+    struct USE_POPCNT_INSTRUCTION {
+        inline static int pop64(uint64_t x) {
+            return _mm_popcnt_u64(x);
+        }
+    };
+#endif
+
 #endif
 
 /**
  * Tricky-bit-bashing bitpair counting for given two-bit value (0-3)
  * within a 64-bit argument.
  */
+#ifdef POPCNT_CAPABILITY
+template<typename Operation>
+#endif
 inline static int countInU64(int c, uint64_t dw) {
 	uint64_t c0 = c_table[c];
 	uint64_t x0 = dw ^ c0;
 	uint64_t x1 = (x0 >> 1);
 	uint64_t x2 = x1 & (0x5555555555555555llu);
 	uint64_t x3 = x0 & x2;
-	uint64_t tmp = pop64(x3);
+#ifdef POPCNT_CAPABILITY
+    uint64_t tmp = Operation().pop64(x3);
+#else
+    uint64_t tmp = pop64(x3);
+#endif
 	return (int) tmp;
 }
 
@@ -1902,13 +1939,24 @@ inline static int countInU64(int c, uint64_t dw) {
  *
  * Function gets 2.32% in profile
  */
+ #ifdef POPCNT_CAPABILITY
+template<typename Operation>
+#endif
 inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
-	uint64_t dwA  = dw &  0xAAAAAAAAAAAAAAAAllu;
-	uint64_t dwNA = dw & ~0xAAAAAAAAAAAAAAAAllu;
-	arrs[0] += (32 - pop64((dwA >> 1) | dwNA));
-	arrs[1] += pop64(~(dwA >> 1) & dwNA);
-	arrs[2] += pop64((dwA >> 1) & ~dwNA);
-	arrs[3] += pop64((dwA >> 1) & dwNA);
+#pragma unroll(4)
+    for (int i = 0; i < 4; i++){
+        uint64_t c0 = c_table[i];
+        uint64_t x0 = dw ^ c0;
+        uint64_t x1 = (x0 >> 1);
+        uint64_t x2 = x1 & (0x5555555555555555);
+        uint64_t x3 = x0 & x2;
+#ifdef POPCNT_CAPABILITY
+        uint64_t tmp = Operation().pop64(x3);
+#else
+        uint64_t tmp = pop64(x3);
+#endif
+        arrs[i] += (uint32_t) tmp;
+    }
 }
 
 /**
@@ -1974,16 +2022,42 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
 	// Someday the countInU64() and pop() functions should be
 	// vectorized/SSE-ized in case that helps.
 	const uint8_t *side = l.side(this->_ebwt);
+
+#ifdef POPCNT_CAPABILITY
+    if (_usePOPCNTinstruction) {
+        for(; i+7 < l._by; i += 8) {
+            countInU64Ex<USE_POPCNT_INSTRUCTION>(*(uint64_t*)&side[i], arrs);
+        }
+    } 
+    else {
+        for(; i+7 < l._by; i += 8) {
+            countInU64Ex<USE_POPCNT_GENERIC>(*(uint64_t*)&side[i], arrs);
+        }
+    }
+#else 
 	for(; i+7 < l._by; i += 8) {
 		countInU64Ex(*(uint64_t*)&side[i], arrs);
 	}
+#endif
+
 #ifdef SIXTY4_FORMAT
 	// Calculate number of bit pairs to shift off the end
 	const int bpShiftoff = 32 - (((l._by & 7) << 2) + l._bp);
 	assert_leq(bpShiftoff, 32);
 	if(bpShiftoff < 32) {
 		const uint64_t sw = (*(uint64_t*)&l.side(this->_ebwt)[i]) << (bpShiftoff << 1);
+
+#ifdef POPCNT_CAPABILITY
+        if (_usePOPCNTinstruction) {
+            countInU64Ex<USE_POPCNT_INSTRUCTION>(sw, arrs);
+        }
+        else{
+            countInU64Ex<USE_POPCNT_GENERIC>(sw, arrs);
+        }
+#else       
 		countInU64Ex(sw, arrs);
+#endif
+
 		arrs[0] -= bpShiftoff;
 	}
 #else

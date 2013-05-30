@@ -64,7 +64,11 @@ ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
 	EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
-	PTHREAD_LIB = -lpthread
+    PTHREAD_LIB = -lpthread
+endif
+
+ifeq (1, $(POPCNT_CAPABILITY))
+    EXTRA_FLAGS += -DPOPCNT_CAPABILITY –msse4.2
 endif
 
 PREFETCH_LOCALITY = 2
