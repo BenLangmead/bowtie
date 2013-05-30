@@ -51,10 +51,10 @@ using namespace seqan;
 extern uint8_t cCntLUT_4[4][4][256];
 
 static const uint64_t c_table[4] = {
-	0xffffffffffffffff,
-	0xaaaaaaaaaaaaaaaa,
-	0x5555555555555555,
-	0x0000000000000000
+	0xffffffffffffffffllu,
+	0xaaaaaaaaaaaaaaaallu,
+	0x5555555555555555llu,
+	0x0000000000000000llu
 };
 
 #ifndef VMSG_NL
@@ -1890,7 +1890,7 @@ inline static int countInU64(int c, uint64_t dw) {
 	uint64_t c0 = c_table[c];
 	uint64_t x0 = dw ^ c0;
 	uint64_t x1 = (x0 >> 1);
-	uint64_t x2 = x1 & (0x5555555555555555);
+	uint64_t x2 = x1 & (0x5555555555555555llu);
 	uint64_t x3 = x0 & x2;
 	uint64_t tmp = pop64(x3);
 	return (int) tmp;
