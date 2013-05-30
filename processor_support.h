@@ -51,7 +51,7 @@ public:
         __cpuid((void *) &regs,0x1); // POPCNT bit is bit 23 in ECX
 #elif defined(USING_GCC_COMPILER)
         __get_cpuid(0x1, &regs.EAX, &regs.EBX, &regs.ECX, &regs.EDX);
-#elif
+#else
         std::cerr << “ERROR: please define __cpuid() for this build.\n”; 
         assert(0);
 #endif

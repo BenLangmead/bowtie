@@ -40,7 +40,7 @@
 #include "reference.h"
 
 #ifdef POPCNT_CAPABILITY 
-#   include “processor_support.h” 
+    #include "processor_support.h" 
 #endif 
 
 using namespace std;
@@ -1939,22 +1939,22 @@ inline static int countInU64(int c, uint64_t dw) {
  *
  * Function gets 2.32% in profile
  */
- #ifdef POPCNT_CAPABILITY
+#ifdef POPCNT_CAPABILITY
 template<typename Operation>
 #endif
 inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
-#pragma unroll(4)
+    #pragma unroll(4)
     for (int i = 0; i < 4; i++){
         uint64_t c0 = c_table[i];
         uint64_t x0 = dw ^ c0;
         uint64_t x1 = (x0 >> 1);
         uint64_t x2 = x1 & (0x5555555555555555);
         uint64_t x3 = x0 & x2;
-#ifdef POPCNT_CAPABILITY
+        #ifdef POPCNT_CAPABILITY
         uint64_t tmp = Operation().pop64(x3);
-#else
+        #else
         uint64_t tmp = pop64(x3);
-#endif
+        #endif
         arrs[i] += (uint32_t) tmp;
     }
 }
@@ -1977,9 +1977,22 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 	const uint8_t *side = l.side(this->_ebwt);
 	int i = 0;
 #if 1
-	for(; i + 7 < l._by; i += 8) {
-		cCnt += countInU64(c, *(uint64_t*)&side[i]);
-	}
+    #ifdef POPCNT_CAPABILITY
+    if ( _usePOPCNTinstruction) {
+        for(; i + 7 < l._by; i += 8) {
+            cCnt += countInU64<USE_POPCNT_INSTRUCTION>(c, *(uint64_t*)&side[i]);
+        }
+    } 
+    else {
+        for(; i + 7 < l._by; i += 8) {
+            cCnt += countInU64<USE_POPCNT_GENERIC>(c, *(uint64_t*)&side[i]);
+        }
+    }
+    #else
+    for(; i + 7 < l._by; i += 8) {
+        cCnt += countInU64(c, *(uint64_t*)&side[i]);
+    }
+    #endif
 #else
 	for(; i + 2 < l._by; i += 2) {
 		cCnt += cCntLUT_16b_4[c][*(uint16_t*)&side[i]];
@@ -1991,7 +2004,18 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 	if(bpShiftoff < 32) {
 		assert_lt(bpShiftoff, 32);
 		const uint64_t sw = (*(uint64_t*)&side[i]) << (bpShiftoff << 1);
+        
+        #ifdef POPCNT_CAPABILITY
+        if (_usePOPCNTinstruction) {
+            cCnt += countInU64<USE_POPCNT_INSTRUCTION>(c, sw);
+        } 
+        else {
+            cCnt += countInU64<USE_POPCNT_GENERIC>(c, sw);
+        }
+        #else
 		cCnt += countInU64(c, sw);
+        #endif
+        
 		if(c == 0) cCnt -= bpShiftoff; // we turned these into As
 	}
 #else
