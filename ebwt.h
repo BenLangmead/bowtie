@@ -1943,20 +1943,53 @@ inline static int countInU64(int c, uint64_t dw) {
 template<typename Operation>
 #endif
 inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
-    #pragma unroll(4)
-    for (int i = 0; i < 4; i++){
-        uint64_t c0 = c_table[i];
-        uint64_t x0 = dw ^ c0;
-        uint64_t x1 = (x0 >> 1);
-        uint64_t x2 = x1 & (0x5555555555555555);
-        uint64_t x3 = x0 & x2;
-        #ifdef POPCNT_CAPABILITY
-        uint64_t tmp = Operation().pop64(x3);
-        #else
-        uint64_t tmp = pop64(x3);
-        #endif
-        arrs[i] += (uint32_t) tmp;
-    }
+	uint64_t c0 = c_table[0];
+	uint64_t x0 = dw ^ c0;
+	uint64_t x1 = (x0 >> 1);
+	uint64_t x2 = x1 & (0x5555555555555555llu);
+	uint64_t x3 = x0 & x2;
+#ifdef POPCNT_CAPABILITY
+	uint64_t tmp = Operation().pop64(x3);
+#else
+	uint64_t tmp = pop64(x3);
+#endif
+	arrs[0] += (uint32_t) tmp;
+
+        c0 = c_table[1];
+        x0 = dw ^ c0;
+        x1 = (x0 >> 1);
+        x2 = x1 & (0x5555555555555555llu);
+        x3 = x0 & x2;
+#ifdef POPCNT_CAPABILITY
+        tmp = Operation().pop64(x3);
+#else
+        tmp = pop64(x3);
+#endif
+        arrs[1] += (uint32_t) tmp;
+
+        c0 = c_table[2];
+        x0 = dw ^ c0;
+        x1 = (x0 >> 1);
+        x2 = x1 & (0x5555555555555555llu);
+        x3 = x0 & x2;
+#ifdef POPCNT_CAPABILITY
+        tmp = Operation().pop64(x3);
+#else
+        tmp = pop64(x3);
+#endif
+        arrs[2] += (uint32_t) tmp;
+	
+        c0 = c_table[3];
+        x0 = dw ^ c0;
+        x1 = (x0 >> 1);
+        x2 = x1 & (0x5555555555555555llu);
+        x3 = x0 & x2;
+#ifdef POPCNT_CAPABILITY
+        tmp = Operation().pop64(x3);
+#else
+        tmp = pop64(x3);
+#endif
+        arrs[3] += (uint32_t) tmp;
 }
 
 /**
