@@ -70,6 +70,9 @@ endif
 POPCNT_CAPABILITY ?= 0
 ifeq (1, $(POPCNT_CAPABILITY))
     EXTRA_FLAGS += -DPOPCNT_CAPABILITY -msse4.2
+    ifeq (1,$(MACOS))
+        INC += -I third_party/macos
+    endif
 endif
 
 PREFETCH_LOCALITY = 2
