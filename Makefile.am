@@ -1,13 +1,5 @@
 AUTOMAKE_OPTIONS = foreign
-#CXXFLAGS =
-#AM_CXXFLAGS = -fno-strict-aliasing -O3 -m64 -Wl,-hash-style=both
 AM_CPPFLAGS = -ISeqAn-1.1
-
-#if ENABLE_DEBUG
-#AM_CXXFLAGS += -O0 -g3 
-#else
-#AM_CXXFLAGS += -O3 
-#endif
 
 CFLAGS=
 LDFLAGS= -lpthread
