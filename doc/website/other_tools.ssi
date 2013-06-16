@@ -20,6 +20,7 @@
     <li><a href="http://bio.math.berkeley.edu/ReXpress/">ReXpress</a> (<a href="http://bioinformatics.oxfordjournals.org/content/early/2013/05/14/bioinformatics.btt197.short?rss=1">paper</a>)</li>
     <li><a href="http://bioen-compbio.bioen.illinois.edu/TrueSight/">TrueSight</a> (<a href="http://nar.oxfordjournals.org/content/early/2012/12/18/nar.gks1311.full.pdf">paper</a>)</li>
     <li><a href="http://genome.ufl.edu/rivalab/PASTA/">PASTA</a> (<a href="http://www.biomedcentral.com/content/pdf/1471-2105-14-116.pdf">paper</a>)</li>
+    <li><a href="https://sites.google.com/site/qrnaseq/">QRNAseq</a></li>
   </ul>
   <li>Bisulfite-seq:</li>
   <ul>
@@ -64,6 +65,7 @@
     <li><a href="http://mayoresearch.mayo.edu/mayo/research/biostat/stand-alone-packages.cfm">SnowShoes-FD</a> (<a href="http://nar.oxfordjournals.org/content/early/2011/05/27/nar.gkr362.full">paper</a>)</li>
     <li><a href="http://bioinformatics.childhealthresearch.org.au/software/fusionfinder/">FusionFinder</a> (<a href="http://www.plosone.org/article/info%3Adoi%2F10.1371%2Fjournal.pone.0039987">paper</a>)</li>
     <li><a href="http://code.google.com/p/chimerascan/">Chimerascan</a> (<a href="http://bioinformatics.oxfordjournals.org/content/27/20/2903.long">paper</a>)</li>
+    <li><a href="https://sites.google.com/site/fusionq1/home/">FusionQ</a> (<a href="http://www.biomedcentral.com/1471-2105/14/193/abstract">paper</a>)</li>
   </ul>
   <li>Metagenomics:</li>
   <ul>
