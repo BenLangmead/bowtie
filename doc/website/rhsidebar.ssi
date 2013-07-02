@@ -74,7 +74,13 @@
   <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/"><h2><u>Pre-built indexes</u></h2></a>
   <div class="box">
     <table width="100%">
-
+    <p style="font-size: small; line-height: 130%">
+      Consider using Illumina's
+      <a href="http://support.illumina.com/sequencing/sequencing_software/igenome.ilmn">iGenomes</a>
+      collection.  Each iGenomes archive contains pre-built
+      Bowtie and <a href="bowtie2">Bowtie 2</a> indexes.
+      <br/><br/>
+    </p>
       <!-- hg18 -->
       <tr><td>
         <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.zip"><i>H. sapiens</i>, UCSC hg18</a>
@@ -325,7 +331,6 @@
     problems downloading or unzipping a >2 GB index, try downloading
     in two parts.</p>
     <p style="font-size: x-small; line-height: 130%">Check .zip file integrity with <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/md5sum.txt">MD5s</a>.</p>
-    <p style="font-size: x-small; line-height: 130%">Pre-built indexes are compatible with Bowtie versions 0.9.8 and later.  For older indexes, please contact us.</p>
   </div>
   <h2>Publications</h2>
   <div class="box">
