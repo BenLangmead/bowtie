@@ -79,6 +79,7 @@
   </ul>
   <li>Small RNA:</li>
   <ul>
+    <li><a href="http://www.ufrgs.br/RNAi/isomiRID/">isomiRID</a> (<a href="http://bioinformatics.oxfordjournals.org/content/29/20/2521.full">paper</a>)
     <li><a href="http://deqor.mpi-cbg.de/deqor_new/input.html">Deqor v3</a> (<a href="http://nar.oxfordjournals.org/content/32/suppl_2/W113.full">paper</a>)
     <li><a href="http://b110-wiki.dkfz.de/signaling/wiki/display/nextrnai/NEXT-RNAi">NEXT-RNAi</a> (design of genome-wide RNAi libraries)</li>
     <li><a href="http://evolution.sysu.edu.cn/software/mirevo.htm">miREvo</a> (<a href="http://www.biomedcentral.com/1471-2105/13/140">paper</a>)</li>
@@ -114,17 +115,25 @@
 <ul>
   <li><a href="http://www.geospiza.com/Products/WhitePaper_06102009.pdf">Geospiza GeneSifter</a></li>
   <li><a href="http://www.clcbio.com/index.php?id=1408&manual=External_applications_integration_Bowtie.html">CLC Genomics Server</a></li>
+  <li><a href="http://www.partek.com/flow">Partek Flow</a></li>
 </ul>
 
 <h2>Published protocols using Bowtie 1 and/or 2:</h2>
 <ul>
+  <li>Wang S, et al.          <a href="http://www.nature.com/nprot/journal/v8/n12/full/nprot.2013.150.html">Target analysis by integration of transcriptome and ChIP-seq data with BETA</a>.  <i>Nature Protocols</i>.</li>
+  <li>Hisano M, et al.        <a href="http://www.nature.com/nprot/journal/v8/n12/full/nprot.2013.145.html">Genome-wide chromatin analysis in mature mouse and human spermatozoa</a>.  <i>Nature Protocols</i>.</li>
+  <li>Becker AH, et al.       <a href="http://www.nature.com/nprot/journal/v8/n11/full/nprot.2013.133.html">Selective ribosome profiling as a tool for studying the interaction of chaperones and targeting factors with nascent polypeptide chains and ribosomes</a>.  <i>Nature Protocols</i>.</li>
+  <li>Anders S, et al.        <a href="http://www.nature.com/nprot/journal/v8/n9/full/nprot.2013.099.html">Count-based differential expression analysis of RNA sequencing data using R and Bioconductor</a>.  <i>Nature Protocols</i>.</li>
+  <li>Wan Y, et al.           <a href="http://www.nature.com/nprot/journal/v8/n5/full/nprot.2013.045.html">Genome-wide mapping of RNA structure using nuclease digestion and high-throughput sequencing</a>.  <i>Nature Protocols</i>.</li>
+  <li>Haas BJ, et al.         <a href="http://www.nature.com/nprot/journal/v8/n8/full/nprot.2013.084.html">De novo transcript sequence reconstruction from RNA-seq using the Trinity platform for reference generation and analysis</a>.  <i>Nature Protocols</i>.</li>
+  <li>Ingolia NT, et al.      <a href="http://onlinelibrary.wiley.com/doi/10.1002/0471142727.mb0418s103/full"> Genome-Wide Annotation and Quantitation of Translation by Ribosome Profiling</a>.  <i>Current Protocols in Molecular Biology</i>.</li>
   <li>Baslan T, et al.        <a href="http://www.nature.com/nprot/journal/v7/n6/abs/nprot.2012.039.html">  Genome-wide copy number analysis of single cells</a>.  <i>Nature Protocols</i>.</li>
   <li>Trapnell C, et al.      <a href="http://www.nature.com/nprot/journal/v7/n3/full/nprot.2012.016.html"> Differential gene and transcript expression analysis of RNA-seq experiments with TopHat and Cufflinks</a>.  <i>Nature Protocols</i>.</li>
-  <li>Goodman AL, et al.      <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.417.html">Identifying microbial fitness determinants by insertion sequencing using genome-wide transposon mutant libraries</a>.  <i>Nature Protocols</i>.</li>
   <li>Ingolia NT, et al.      <a href="http://www.nature.com/nprot/journal/v7/n8/full/nprot.2012.086.html"> The ribosome profiling strategy for monitoring translation in vivo by deep sequencing of ribosome-protected mRNA fragments</a>.  <i>Nature Protocols</i>.</li>
   <li>Bardet AF, et al.       <a href="http://www.nature.com/nprot/journal/v7/n1/full/nprot.2011.420.html"> A computational pipeline for comparative ChIP-seq analyses</a>.  <i>Nature Protocols</i>.</li>
-  <li>Fanelli M, et al.       <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.406.html">Chromatin immunoprecipitation and high-throughput sequencing from paraffin-embedded pathology tissue</a>.  <i>Nature Protocols</i>.</li>
   <li>Simon JS, et al.        <a href="http://www.nature.com/nprot/journal/v7/n2/full/nprot.2011.444.html"> Using formaldehyde-assisted isolation of regulatory elements (FAIRE) to isolate active regulatory DNA</a>.  <i>Nature Protocols</i>.</li>
+  <li>Goodman AL, et al.      <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.417.html">Identifying microbial fitness determinants by insertion sequencing using genome-wide transposon mutant libraries</a>.  <i>Nature Protocols</i>.</li>
+  <li>Fanelli M, et al.       <a href="http://www.nature.com/nprot/journal/v6/n12/full/nprot.2011.406.html">Chromatin immunoprecipitation and high-throughput sequencing from paraffin-embedded pathology tissue</a>.  <i>Nature Protocols</i>.</li>
   <li>Christodoulou DC, et al.<a href="http://onlinelibrary.wiley.com/doi/10.1002/0471142727.mb25b09s93/full">Quantification of Gene Transcripts with Deep Sequencing Analysis of Gene Expression (DSAGE) Using 1 to 2 micrograms Total RNA</a>.  <i>Current Protocols in Molecular Biology</i>.</li>
 </a></li>
 </ul>
