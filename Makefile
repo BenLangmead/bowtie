@@ -67,9 +67,9 @@ else
     PTHREAD_LIB = -lpthread
 endif
 
-POPCNT_CAPABILITY ?= 0
+POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
-    EXTRA_FLAGS += -DPOPCNT_CAPABILITY -msse4.2
+    EXTRA_FLAGS += -DPOPCNT_CAPABILITY
     ifeq (1,$(MACOS))
         INC += -I third_party/macos
     endif
