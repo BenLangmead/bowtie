@@ -12,11 +12,7 @@
   <div id="main">
     <!--#include virtual="rhsidebar.ssi" -->
     <div id="manual">
-      <table>
-        <tr><td cellpadding=7>
-        <!--#include virtual="manual.ssi" -->
-        </td></tr>
-      </table>
+      <!--#include virtual="manual.ssi" -->
     </div>
   </div>
   <!--#include virtual="foot.ssi" -->
