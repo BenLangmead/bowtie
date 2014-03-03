@@ -21,14 +21,15 @@ static int across       = 60; // number of characters across in FASTA output
 static bool extra       = false; // print extra summary info
 static bool exclAllGaps = false; // print extra summary info
 static bool refFromEbwt = false; // true -> when printing reference, decode it from Ebwt instead of reading it from BitPairReference
-
+static string wrapper;
 static const char *short_options = "vhnsea:";
 
 enum {
 	ARG_VERSION = 256,
 	ARG_USAGE,
 	ARG_EXTRA,
-	ARG_EXCL_AMBIG
+	ARG_EXCL_AMBIG,
+	ARG_WRAPPER
 };
 
 static struct option long_options[] = {
@@ -42,6 +43,7 @@ static struct option long_options[] = {
 	{(char*)"help",     no_argument,        0, 'h'},
 	{(char*)"across",   required_argument,  0, 'a'},
 	{(char*)"ebwt-ref", no_argument,        0, 'e'},
+	{(char*)"wrapper",  required_argument,  0, ARG_WRAPPER},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -57,8 +59,12 @@ static void printUsage(ostream& out) {
 	<< "  standard out.  With -n, just prints names.  With -s, just prints a summary of" << endl
 	<< "  the index parameters and sequences.  With -e, preserves colors if applicable." << endl
 	<< endl
-	<< "Options:" << endl
-	<< "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
+	<< "Options:" << endl;
+	if(wrapper == "basic-0") {
+		out << "  --large-index      force inspection of the 'large' index, even if a" << endl
+			<< "                     'small' one is present." << endl;
+	}
+	out << "  -a/--across <int>  Number of characters across in FASTA output (default: 60)" << endl
 	<< "  -n/--names         Print reference sequence names only" << endl
 	<< "  -s/--summary       Print summary incl. ref names, lengths, index properties" << endl
 	<< "  -e/--ebwt-ref      Reconstruct reference from ebwt (slow, preserves colors)" << endl
@@ -66,6 +72,13 @@ static void printUsage(ostream& out) {
 	<< "  -h/--help          print detailed description of tool and its options" << endl
 	<< "  --help             print this usage message" << endl
 	;
+	if(wrapper.empty()) {
+		cerr << endl
+		     << "*** Warning ***" << endl
+			 << "'boowtie-inspect' was run directly.  It is recommended "
+			 << "to use the wrapper script instead."
+			 << endl << endl;
+	}
 }
 
 /**
@@ -100,6 +113,9 @@ static void parseOptions(int argc, char **argv) {
 	do {
 		next_option = getopt_long(argc, argv, short_options, long_options, &option_index);
 		switch (next_option) {
+			case ARG_WRAPPER:
+				wrapper = optarg;
+				break;
 			case ARG_USAGE:
 			case 'h':
 				printUsage(cout);

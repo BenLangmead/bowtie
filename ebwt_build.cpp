@@ -46,6 +46,7 @@ static bool packed;
 static bool writeRef;
 static bool justRef;
 static int reverseType;
+static string wrapper;
 bool color;
 
 static void resetOptions() {
@@ -73,6 +74,7 @@ static void resetOptions() {
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
 	reverseType  = REF_READ_REVERSE_EACH;
+	wrapper.clear();
 	color        = false;
 }
 
@@ -86,20 +88,34 @@ enum {
 	ARG_PMAP,
 	ARG_NTOA,
 	ARG_USAGE,
-	ARG_NEW_REVERSE
+	ARG_NEW_REVERSE,
+	ARG_WRAPPER
 };
 
 /**
  * Print a detailed usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>" << endl
+#ifdef BOWTIE_64BIT_INDEX
+	string tool_name = "bowtie2-build-l";
+#else
+	string tool_name = "bowtie2-build-s";
+#endif
+	if(wrapper == "basic-0") {
+		tool_name = "bowtie-build";
+	}
+
+	out << "Usage: "<< tool_name <<" [options]* <reference_in> <ebwt_outfile_base>" << endl
 	    << "    reference_in            comma-separated list of files with ref sequences" << endl
 	    << "    ebwt_outfile_base       write Ebwt data to files with this dir/basename" << endl
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
-	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
-	    << "    -C/--color              build a colorspace index" << endl
+	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl;
+		if(wrapper == "basic-0") {
+		out << "    --large-index           force generated index to be 'large', even if ref" << endl
+			<< "                            has fewer than 4 billion nucleotides" << endl;
+		}
+	    out << "    -C/--color              build a colorspace index" << endl
 	    << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
 	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
 	    //<< "    -B                      build both letter- and colorspace indexes" << endl
@@ -122,6 +138,14 @@ static void printUsage(ostream& out) {
 	    << "    --usage                 print this usage message" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
+		if(wrapper.empty()) {
+			cerr << endl
+			     << "*** Warning ***" << endl
+				 << "'" << tool_name << "' was run directly.  It is recommended "
+				 << "that you run the wrapper script 'bowtie-build' instead."
+				 << endl << endl;
+		}
+
 }
 
 static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
@@ -152,6 +176,7 @@ static struct option long_options[] = {
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
+	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"new-reverse",  no_argument,       0,            ARG_NEW_REVERSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -190,6 +215,7 @@ static void parseOptions(int argc, const char **argv) {
 			argc, const_cast<char**>(argv),
 			short_options, long_options, &option_index);
 		switch (next_option) {
+			case ARG_WRAPPER: wrapper = optarg;	break;
 			case 'f': format = FASTA; break;
 			case 'c': format = CMDLINE; break;
 			case 'p': packed = true; break;
