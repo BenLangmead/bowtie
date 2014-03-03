@@ -132,20 +132,30 @@ RELEASE_FLAGS = -O3 $(BITS_FLAG)
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
-BIN_LIST = bowtie-build \
-           bowtie \
-           bowtie-inspect
-BIN_LIST_AUX = bowtie-build-debug \
-               bowtie-debug \
-               bowtie-inspect-debug
+BIN_LIST = bowtie-build-s \
+           bowtie-build-l \
+           bowtie-align-s \
+           bowtie-align-l \
+           bowtie-inspect-s \
+           bowtie-inspect-l
+BIN_LIST_AUX = bowtie-build-s-debug \
+               bowtie-build-l-debug \
+               bowtie-align-s-debug \
+               bowtie-align-l-debug \
+               bowtie-inspect-s-debug \
+               bowtie-inspect-l-debug
 
 GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard scripts/*.pl) \
+               $(wildcard scripts/*.py) \
                $(wildcard indexes/e_coli*) \
                $(wildcard genomes/NC_008253.fna) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
                SeqAn-1.1 \
+               bowtie \
+               bowtie-build \
+               bowtie-inspect \
                doc/manual.html \
                doc/README \
                doc/style.css \
@@ -193,9 +203,17 @@ RELEASE_DEFS = -DCOMPILER_OPTIONS="\"$(RELEASE_FLAGS) $(ALL_FLAGS)\""
 # bowtie-build targets
 #
 
-bowtie-build: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
+bowtie-build-s: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS)  \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(INC) \
+		-o $@ $< \
+		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
+		$(LIBS) $(BUILD_LIBS)
+
+bowtie-build-l: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS)  \
+		$(DEFS) -DBOWTIE_64BIT_INDEX $(NOASSERT_FLAGS) -Wall \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
@@ -209,9 +227,17 @@ bowtie-build_prof: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
 		$(LIBS) $(BUILD_LIBS)
 
-bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
+bowtie-build-s-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
+		$(INC) \
+		-o $@ $< \
+		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
+		$(LIBS) $(BUILD_LIBS)
+
+bowtie-build-l-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
+	$(CXX) $(DEBUG_FLAGS) $(DEBUG_DEFS) $(ALL_FLAGS) \
+		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(BUILD_CPPS_MAIN) \
@@ -221,9 +247,17 @@ bowtie-build-debug: ebwt_build.cpp $(OTHER_CPPS) $(HEADERS)
 # bowtie targets
 #
 
-bowtie: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
+bowtie-align-s: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
 		$(DEFS) $(NOASSERT_FLAGS) -Wall \
+		$(INC) \
+		-o $@ $< \
+		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
+		$(LIBS) $(SEARCH_LIBS)
+
+bowtie-align-l: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
+	$(CXX) $(RELEASE_FLAGS) $(RELEASE_DEFS) $(ALL_FLAGS) \
+		$(DEFS) $(NOASSERT_FLAGS) -DBOWTIE_64BIT_INDEX -Wall \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
@@ -238,10 +272,19 @@ bowtie_prof: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FR
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
 		$(LIBS) $(SEARCH_LIBS)
 
-bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
+bowtie-align-s-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
+		$(INC) \
+		-o $@ $< \
+		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
+		$(LIBS) $(SEARCH_LIBS)
+
+bowtie-align-l-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_FRAGMENTS)
+	$(CXX) $(DEBUG_FLAGS) \
+		$(DEBUG_DEFS) $(ALL_FLAGS) \
+		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
 		$(INC) \
 		-o $@ $< \
 		$(OTHER_CPPS) $(SEARCH_CPPS_MAIN) \
@@ -251,7 +294,7 @@ bowtie-debug: ebwt_search.cpp $(SEARCH_CPPS) $(OTHER_CPPS) $(HEADERS) $(SEARCH_F
 # bowtie-inspect targets
 #
 
-bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
+bowtie-inspect-s: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(RELEASE_FLAGS) \
 		$(RELEASE_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
@@ -260,10 +303,28 @@ bowtie-inspect: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
+bowtie-inspect-l: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
+	$(CXX) $(RELEASE_FLAGS) \
+		$(RELEASE_DEFS) $(ALL_FLAGS) \
+		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
+		$(INC) -I . \
+		-o $@ $< \
+		$(OTHER_CPPS) \
+		$(LIBS)
+
+bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
+		$(INC) -I . \
+		-o $@ $< \
+		$(OTHER_CPPS) \
+		$(LIBS)
+
+bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
+	$(CXX) $(DEBUG_FLAGS) \
+		$(DEBUG_DEFS) $(ALL_FLAGS) \
+		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
 		$(INC) -I . \
 		-o $@ $< \
 		$(OTHER_CPPS) \
