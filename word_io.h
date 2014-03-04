@@ -6,6 +6,7 @@
 #include <fstream>
 #include "assert_helpers.h"
 #include "endian_swap.h"
+#include "btypes.h"
 
 /**
  * Write a 32-bit unsigned to an output stream being careful to
