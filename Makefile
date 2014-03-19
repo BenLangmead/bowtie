@@ -4,7 +4,7 @@
 
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
-INC = $(SEQAN_INC)
+INC = $(SEQAN_INC) -I third_party
 CPP = g++
 CXX = $(CPP)
 CC = gcc
@@ -70,9 +70,6 @@ endif
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
     EXTRA_FLAGS += -DPOPCNT_CAPABILITY
-    ifeq (1,$(MACOS))
-        INC += -I third_party/macos
-    endif
 endif
 
 PREFETCH_LOCALITY = 2
@@ -166,6 +163,10 @@ SRC_PKG_LIST = $(wildcard *.h) \
                $(wildcard *.hh) \
                $(wildcard *.c) \
                $(wildcard *.cpp) \
+               $(wildcard third_party/*.h) \
+               $(wildcard third_party/*.hh) \
+               $(wildcard third_party/*.c) \
+               $(wildcard third_party/*.cpp) \
                doc/strip_markdown.pl \
                Makefile \
                $(GENERAL_LIST)
