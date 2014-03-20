@@ -117,6 +117,13 @@ ifeq (1,$(LINUX))
     endif
 endif
 
+ifeq (1,$(MACOS))
+    ifeq (x86_64, $(shell uname -m))
+        BITS=64
+    endif
+    EXTRA_FLAGS += -Wl,-macosx_version_min,10.6
+endif
+
 # Convert BITS=?? to a -m flag
 BITS_FLAG =
 ifeq (32,$(BITS))
@@ -298,6 +305,13 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
 	cp .bin.tmp/$@ .
 	rm -rf .bin.tmp
+
+print-%:
+	@echo '$*=$($*)'
+	@echo '  origin = $(origin $*)'
+	@echo '  flavor = $(flavor $*)'
+	@echo '   value = $(value  $*)'
+
 
 .PHONY: doc
 doc: doc/manual.html MANUAL
