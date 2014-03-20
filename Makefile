@@ -306,13 +306,6 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	cp .bin.tmp/$@ .
 	rm -rf .bin.tmp
 
-print-%:
-	@echo '$*=$($*)'
-	@echo '  origin = $(origin $*)'
-	@echo '  flavor = $(flavor $*)'
-	@echo '   value = $(value  $*)'
-
-
 .PHONY: doc
 doc: doc/manual.html MANUAL
 
