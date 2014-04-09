@@ -15,7 +15,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	static int lastc = '>'; // last character seen
 
 	// RefRecord params
-	size_t len = 0; // 'len' counts toward total length
+	TIndexOffU len = 0; // 'len' counts toward total length
 	// 'off' counts number of ambiguous characters before first
 	// unambiguous character
 	size_t off = 0;
@@ -58,7 +58,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			// Don't emit a warning, since this might legitimately be
 			// a gap on the end of the final sequence in the file
 			lastc = -1;
-			return RefRecord(off, len, first);
+			return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 		}
 	}
 
@@ -95,7 +95,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			return RefRecord(off, 0, first);
+			return RefRecord((TIndexOffU)off, 0, first);
 		}
 		c = in.get();
 		if(c == -1) {
@@ -106,7 +106,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			return RefRecord(off, 0, first);
+			return RefRecord((TIndexOffU)off, 0, first);
 		}
 	}
 	assert(!rparms.color || (lc != -1));
@@ -145,7 +145,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			// It's an N or a gap
 			lastc = c;
 			assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
-			return RefRecord(off, len, first);
+			return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 		} else {
 			// Not DNA and not a gap, ignore it
 #ifndef NDEBUG
@@ -162,7 +162,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 		c = in.get();
 	}
 	lastc = c;
-	return RefRecord(off, len, first);
+	return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 }
 
 static void
@@ -233,10 +233,10 @@ fastaRefReadSizes(vector<FileBuf*>& in,
                   vector<uint32_t>& plens,
                   const RefReadInParams& rparms,
                   BitpairOutFileBuf* bpout,
-                  int& numSeqs)
+                  TIndexOff& numSeqs)
 {
 	TIndexOffU unambigTot = 0;
-	uint32_t bothTot = 0;
+	size_t bothTot = 0;
 	assert_gt(in.size(), 0);
 	uint32_t both = 0, unambig = 0;
 	// For each input istream

@@ -49,6 +49,7 @@ static int reverseType;
 static string wrapper;
 bool color;
 
+
 static void resetOptions() {
 	verbose      = true;  // be talkative (default)
 	sanityCheck  = 0;     // do slow sanity checks

@@ -561,7 +561,7 @@ private:
 
 	const char *name_;
 	FILE       *out_;
-	uint32_t    cur_;
+	size_t    cur_;
 	char        buf_[BUF_SZ]; // (large) input buffer
 	bool        closed_;
 };

@@ -13,6 +13,19 @@
 
 using namespace std;
 
+#ifdef BOWTIE_64BIT_INDEX
+
+const std::string gEbwt_ext("bt2l");
+
+#else
+
+const std::string gEbwt_ext("bt2");
+
+#endif  // BOWTIE_64BIT_INDEX
+
+string gLastIOErrMsg;
+
+
 /**
  * Try to find the Bowtie index specified by the user.  First try the
  * exact path given by the user.  Then try the user-provided string
@@ -27,7 +40,7 @@ string adjustEbwtBase(const string& cmdline,
 	string str = ebwtFileBase;
 	ifstream in;
 	if(verbose) cout << "Trying " << str << endl;
-	in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 	if(!in.is_open()) {
 		if(verbose) cout << "  didn't work" << endl;
 		in.close();
@@ -41,7 +54,7 @@ string adjustEbwtBase(const string& cmdline,
 		}
 		str += ebwtFileBase;
 		if(verbose) cout << "Trying " << str << endl;
-		in.open((str + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+		in.open((str + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 		if(!in.is_open()) {
 			if(verbose) cout << "  didn't work" << endl;
 			in.close();

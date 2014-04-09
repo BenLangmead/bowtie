@@ -53,7 +53,7 @@ static struct option long_options[] = {
 static void printUsage(ostream& out) {
 	out
 	<< "Usage: bowtie-inspect [options]* <ebwt_base>" << endl
-	<< "  <ebwt_base>        ebwt filename minus trailing .1.ebwt/.2.ebwt" << endl
+	<< "  <ebwt_base>        ebwt filename minus trailing .1." + gEbwt_ext + "/.2." + gEbwt_ext << endl
 	<< endl
 	<< "  By default, prints FASTA records of the indexed nucleotide sequences to" << endl
 	<< "  standard out.  With -n, just prints names.  With -s, just prints a summary of" << endl
@@ -222,7 +222,7 @@ void print_ref_sequences(
 	ostream& fout,
 	bool color,
 	const vector<string>& refnames,
-	const uint32_t* plen,
+	const TIndexOffU* plen,
 	const string& adjustedEbwtFileBase)
 {
 	BitPairReference ref(
@@ -282,25 +282,25 @@ void print_index_sequences(
 	TStr cat_ref;
 	ebwt.restore(cat_ref);
 
-	uint32_t curr_ref = 0xffffffff;
+	TIndexOffU curr_ref = OFF_MASK;
 	string curr_ref_seq = "";
-	uint32_t curr_ref_len = 0xffffffff;
+	TIndexOffU curr_ref_len = OFF_MASK;
 	uint32_t last_text_off = 0;
 	size_t orig_len = seqan::length(cat_ref);
-	uint32_t tlen = 0xffffffff;
+	TIndexOffU tlen = OFF_MASK;
 	bool first = true;
 	for(size_t i = 0; i < orig_len; i++) {
-		uint32_t tidx = 0xffffffff;
-		uint32_t textoff = 0xffffffff;
-		tlen = 0xffffffff;
+		TIndexOffU tidx = OFF_MASK;
+		TIndexOffU textoff = OFF_MASK;
+		tlen = OFF_MASK;
 
-		ebwt.joinedToTextOff(1 /* qlen */, i, tidx, textoff, tlen);
+		ebwt.joinedToTextOff(1 /* qlen */, (TIndexOffU)i, tidx, textoff, tlen);
 
-		if (tidx != 0xffffffff && textoff < tlen)
+		if (tidx != OFF_MASK && textoff < tlen)
 		{
 			if (curr_ref != tidx)
 			{
-				if (curr_ref != 0xffffffff)
+				if (curr_ref != OFF_MASK)
 				{
 					// Add trailing gaps, if any exist
 					if(curr_ref_seq.length() < curr_ref_len) {
@@ -315,7 +315,7 @@ void print_index_sequences(
 				first = true;
 			}
 
-			uint32_t textoff_adj = textoff;
+			TIndexOffU textoff_adj = textoff;
 			if(first && textoff > 0) textoff_adj++;
 			if (textoff_adj - last_text_off > 1)
 				curr_ref_seq += string(textoff_adj - last_text_off - 1, 'N');
