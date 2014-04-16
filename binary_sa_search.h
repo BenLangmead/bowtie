@@ -30,15 +30,15 @@ TIndexOffU binarySASearch(const TStr& host,
             const String<TSufElt>& sa)
 {
 	TIndexOffU lLcp = 0, rLcp = 0; // greatest observed LCPs on left and right
-	TIndexOffU l = 0, r = (TIndexOffU)sa.size()+1; // binary-search window
-	TIndexOffU hostLen = (TIndexOffU)host.length();
+	TIndexOffU l = 0, r = length(sa)+1; // binary-search window
+	TIndexOffU hostLen = TIndexOffU(length(host));
 	while(true) {
 		assert_gt(r, l);
 		TIndexOffU m = (l+r) >> 1;
 		if(m == l) {
 			// Binary-search window has closed: we have an answer
 			if(m > 0 && sa[m-1] == qry) return std::numeric_limits<TIndexOffU>::max(); // qry matches
-			assert_leq(m, sa.size());
+			assert_leq(m, length(sa));
 			return m; // Return index of right-hand suffix
 		}
 		assert_gt(m, 0);

@@ -450,7 +450,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	while(--limit >= 0) {
 		// Calculate bucket sizes by doing a binary search for each
 		// suffix and noting where it lands
-		TIndexOffU numBuckets = (TIndexOffU)_sampleSuffs.size()+1;
+		TIndexOffU numBuckets = TIndexOffU(length(_sampleSuffs))+1;
 		String<TIndexOffU> bucketSzs; // holds computed bucket sizes
 		String<TIndexOffU> bucketReps; // holds 1 member of each bucket (for splitting)
 		try {
@@ -532,7 +532,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 					// Add an additional sample from the bucketReps[]
 					// set accumulated in the binarySASearch loop; this
 					// effectively splits the bucket
-					insertValue(_sampleSuffs, (TIndexOffU)(i + (added++), bucketReps[i]));
+					insertValue(_sampleSuffs, TIndexOffU(i + (added++)), bucketReps[i]);
 				}
 			}
 		}
@@ -564,7 +564,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 template<typename T> inline
 static TIndexOffU suffixLcp(const T& t, TIndexOffU aOff, TIndexOffU bOff) {
 	TIndexOffU c = 0;
-	size_t len = t.length();
+	size_t len = length(t);
 	assert_leq(aOff, len);
 	assert_leq(bOff, len);
 	while(aOff + c < len && bOff + c < len && t[aOff + c] == t[bOff + c]) c++;
@@ -585,7 +585,7 @@ bool KarkkainenBlockwiseSA<TStr>::tieBreakingLcp(TIndexOffU aOff,
 {
 	const TStr& t = this->text();
 	TIndexOffU c = 0;
-	TIndexOffU tlen = (TIndexOffU)t.length();
+	TIndexOffU tlen = TIndexOffU(length(t));
 	assert_leq(aOff, tlen);
 	assert_leq(bOff, tlen);
 	assert(_dc != NULL);
@@ -624,7 +624,7 @@ static TIndexOffU lookupSuffixZ(const T& t,
 								TIndexOffU off,
                               const String<TIndexOffU>& z)
 {
-	if(zOff < z.size()) {
+	if(zOff < length(z)) {
 		TIndexOffU ret = z[zOff];
 		assert_eq(ret, suffixLcp(t, off + zOff, off));
 		return ret;
@@ -646,7 +646,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(TIndexOffU cmp,
                                             const String<TIndexOffU>& z)
 {
 	const TStr& t = this->text();
-	TIndexOffU len = (TIndexOffU)t.length();
+	TIndexOffU len = TIndexOffU(length(t));
 	// i is not covered by any previous match
 	TIndexOffU l;
 	if(i > k) {
@@ -757,7 +757,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock() {
 	assert_gt(_dcV, 3);
 	assert_leq(_cur, length(_sampleSuffs));
 	const TStr& t = this->text();
-	TIndexOffU len = (TIndexOffU)t.length();
+	TIndexOffU len = TIndexOffU(length(t));
 	// Set up the bucket
 	clear(bucket);
 	TIndexOffU lo = OFF_MASK, hi = OFF_MASK;

@@ -123,5 +123,43 @@ static inline T readI(FILE* in, bool swap) {
 	}
 }
 
+template <typename T>
+static inline T readU(int in, bool swap) {
+	T x;
+	if(read(in, (void *)&x, sizeof(T)) != sizeof(T)) {
+		assert(false);
+	}
+	if(swap) {
+		if(sizeof(T) == 4) {
+			return endianSwapU32(x);
+		} else if(sizeof(T) == 8) {
+			return endianSwapU64(x);
+		} else {
+			assert(false);
+		}
+	} else {
+		return x;
+	}
+}
+
+template <typename T>
+static inline T readI(int in, bool swap) {
+	T x;
+	if(read(in, (void *)&x, sizeof(T)) != sizeof(T)) {
+		assert(false);
+	}
+	if(swap) {
+		if(sizeof(T) == 4) {
+			return endianSwapI32(x);
+		} else if(sizeof(T) == 8) {
+			return endianSwapI64(x);
+		} else {
+			assert(false);
+		}
+	} else {
+		return x;
+	}
+}
+
 
 #endif /*WORD_IO_H_*/

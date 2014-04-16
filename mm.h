@@ -11,6 +11,7 @@
  */
 
 #ifdef BOWTIE_MM
+#define MM_IS_IO_ERR(fdesc, ret, count) is_read_err(fdesc, ret, count)
 #define MM_FILE_CLOSE(x) if(x > 3) { close(x); }
 #define MM_READ_RET ssize_t
 #define MM_READ read
@@ -18,6 +19,7 @@
 #define MM_FILE int
 #define MM_FILE_INIT -1
 #else
+#define MM_IS_IO_ERR(file_hd, ret, count) is_fread_err(file_hd, ret, count)
 #define MM_FILE_CLOSE(x) if(x != NULL) { fclose(x); }
 #define MM_READ_RET size_t
 #define MM_READ(file, dest, sz) fread(dest, 1, sz, file)

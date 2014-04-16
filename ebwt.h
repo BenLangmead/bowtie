@@ -90,6 +90,27 @@ enum EBWT_FLAGS {
 	                    // each stretch reversed
 };
 
+extern string gLastIOErrMsg;
+
+inline bool is_read_err(int fdesc, ssize_t ret, size_t count){
+	if (ret < 0) {
+		std::stringstream sstm;
+		sstm << "ERRNO: " << errno << " ERR Msg:" << strerror(errno) << std::endl;
+		gLastIOErrMsg = sstm.str();
+		return true;
+	}
+	return false;
+}
+
+/* Checks whether a call to fread() failed or not. */
+inline bool is_fread_err(FILE* file_hd, size_t ret, size_t count){
+	if (ferror(file_hd)) {
+		gLastIOErrMsg = "Error Reading File!";
+		return true;
+	}
+	return false;
+}
+
 /**
  * Extended Burrows-Wheeler transform header.  This together with the
  * actual data arrays and other text-specific parameters defined in
@@ -3174,7 +3195,7 @@ void Ebwt<TStr>::readIntoMemory(
 	bytesRead += 4;
 	// chunkRate was deprecated in an earlier version of Bowtie; now
 	// we use it to hold flags.
-	int32_t flags = readI32(_in1, switchEndian);
+	int32_t flags = readI<int32_t>(_in1, switchEndian);
 	bool entireRev = false;
 	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
 		if(color != -1 && !color) {
@@ -3560,7 +3581,7 @@ void Ebwt<TStr>::readIntoMemory(
 			} else {
 				if(_useMm) {
 #ifdef BOWTIE_MM
-					_offs.init((TIndexOffU*)(mmFile[1] + bytesRead), offsLen, false);
+					this->_offs = (TIndexOffU*)(mmFile[1] + bytesRead);
 					bytesRead += offsSz;
 					// Argument to lseek can be 64 bits if compiled with
 					// _FILE_OFFSET_BITS
@@ -4512,11 +4533,11 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
 #ifdef BOWTIE_64BIT_INDEX
-			u32side[(sideSz >> 3)-2] = endianizeU32(occ[0], this->toBe());
-			u32side[(sideSz >> 3)-1] = endianizeU32(occ[1], this->toBe());
+			u32side[(sideSz >> 3)-2] = endianizeU<TIndexOffU>(occ[0], this->toBe());
+			u32side[(sideSz >> 3)-1] = endianizeU<TIndexOffU>(occ[1], this->toBe());
 #else
-			u32side[(sideSz >> 2)-2] = endianizeU32(occ[0], this->toBe());
-			u32side[(sideSz >> 2)-1] = endianizeU32(occ[1], this->toBe());
+			u32side[(sideSz >> 2)-2] = endianizeU<TIndexOffU>(occ[0], this->toBe());
+			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occ[1], this->toBe());
 #endif
 			occSave[0] = occ[2]; // save 'G' count
 			occSave[1] = occ[3]; // save 'T' count

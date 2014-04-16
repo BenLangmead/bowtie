@@ -25,7 +25,6 @@ const std::string gEbwt_ext("bt2");
 
 string gLastIOErrMsg;
 
-
 /**
  * Try to find the Bowtie index specified by the user.  First try the
  * exact path given by the user.  Then try the user-provided string

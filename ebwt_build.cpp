@@ -64,7 +64,7 @@ static void resetOptions() {
 	showVersion  = 0;     // just print version and quit?
 	doubleEbwt   = true;  // build forward and reverse Ebwts
 	//   Ebwt parameters
-	lineRate     = Ebwt::default_lineRate;  // a "line" is 64 bytes
+	lineRate     = Ebwt<String<Dna> >::default_lineRate;  // a "line" is 64 bytes
 	linesPerSide = 1;  // 1 64-byte line on a side
 	offRate      = 5;  // sample 1 out of 32 SA elts
 	ftabChars    = 10; // 10 chars in initial lookup table
