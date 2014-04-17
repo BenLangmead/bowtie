@@ -549,7 +549,7 @@ public:
 				// Clear pairs
 				memset(&pairs[d*8], 0, 8 * 4);
 				// Calculate next quartet of ranges
-				ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
+				ebwt.mapLFEx(ltop, lbot, (TIndexOffU*)&pairs[d*8], (TIndexOffU*)&pairs[(d*8)+4]);
 				// Update top and bot
 				if(c < 4) {
 					top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c);
@@ -2217,18 +2217,18 @@ public:
 					rs->bots[3]               = 0;
 					if(br->lbot_.valid()) {
 						if(metrics_ != NULL) metrics_->curBwtOps_++;
-						ebwt.mapLFEx(br->ltop_, br->lbot_, rs->tops, rs->bots);
+						ebwt.mapLFEx(br->ltop_, br->lbot_, (TIndexOffU*)rs->tops, (TIndexOffU*)rs->bots);
 					} else {
 #ifndef NDEBUG
-						uint32_t tmptops[] = {0, 0, 0, 0};
-						uint32_t tmpbots[] = {0, 0, 0, 0};
+						TIndexOffU tmptops[] = {0, 0, 0, 0};
+						TIndexOffU tmpbots[] = {0, 0, 0, 0};
 						SideLocus ltop, lbot;
 						ltop.initFromRow(otop, ebwt_->_eh, ebwt_->_ebwt);
 						lbot.initFromRow(obot, ebwt_->_eh, ebwt_->_ebwt);
 						ebwt.mapLFEx(ltop, lbot, tmptops, tmpbots);
 #endif
 						if(metrics_ != NULL) metrics_->curBwtOps_++;
-						int cc = ebwt.mapLF1(otop, br->ltop_);
+						int cc = ebwt.mapLF1((TIndexOffU&)otop, br->ltop_);
 						br->top_ = otop;
 						assert(cc == -1 || (cc >= 0 && cc < 4));
 						if(cc >= 0) {

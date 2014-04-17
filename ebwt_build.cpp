@@ -377,7 +377,7 @@ static void driver(const string& infile,
 				plens.clear();
 				// Now read in the colorspace size records; these are
 				// the ones that were indexed
-				int numSeqs2 = 0;
+				TIndexOff numSeqs2 = 0;
 				sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs2);
 				assert_geq(numSeqs, numSeqs2);
 			} else {
@@ -414,7 +414,7 @@ static void driver(const string& infile,
 		} else {
 			// Read in the sizes of all the unambiguous stretches of the
 			// genome into a vector of RefRecords
-			int numSeqs = 0;
+			TIndexOff numSeqs = 0;
 			sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs);
 #ifndef NDEBUG
 			if(refparams.color) {

@@ -556,8 +556,8 @@ protected:
 template<typename TRangeSource>
 class PairedBWAlignerV1 : public Aligner {
 
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
+	typedef std::vector<UPair> UPairVec;
 	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
@@ -919,7 +919,7 @@ protected:
 	 * mate) aligns such that mating constraint is satisfied.
 	 */
 	bool resolveOutstandingInRef(const bool off1,
-	                             const U32Pair& off,
+	                             const UPair& off,
 	                             const uint32_t tlen,
 	                             const Range& range)
 	{
@@ -1364,20 +1364,20 @@ protected:
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;
 	TDriver*      driver1Rc_;
-	U32PairVec    offs1FwArr_[32];
+	UPairVec    offs1FwArr_[32];
 	TRangeVec     ranges1FwArr_[32];
 	uint32_t      offs1FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs1RcArr_[32];
+	UPairVec    offs1RcArr_[32];
 	TRangeVec     ranges1RcArr_[32];
 	uint32_t      offs1RcSz_; // total size of all ranges found in this category
 
 	// Range-finding state for second mate
 	TDriver*      driver2Fw_;
 	TDriver*      driver2Rc_;
-	U32PairVec    offs2FwArr_[32];
+	UPairVec    offs2FwArr_[32];
 	TRangeVec     ranges2FwArr_[32];
 	uint32_t      offs2FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs2RcArr_[32];
+	UPairVec    offs2RcArr_[32];
 	TRangeVec     ranges2RcArr_[32];
 	uint32_t      offs2RcSz_; // total size of all ranges found in this category
 
@@ -1387,8 +1387,8 @@ protected:
 	bool&       delayedchaseR_fw_;
 	TDriver&    drL_fw_;
 	TDriver&    drR_fw_;
-	U32PairVec* offsLarr_fw_;
-	U32PairVec* offsRarr_fw_;
+	UPairVec* offsLarr_fw_;
+	UPairVec* offsRarr_fw_;
 	TRangeVec*  rangesLarr_fw_;
 	TRangeVec*  rangesRarr_fw_;
 	uint32_t&   offsLsz_fw_;
@@ -1400,8 +1400,8 @@ protected:
 	bool&       delayedchaseR_rc_;
 	TDriver&    drL_rc_;
 	TDriver&    drR_rc_;
-	U32PairVec* offsLarr_rc_;
-	U32PairVec* offsRarr_rc_;
+	UPairVec* offsLarr_rc_;
+	UPairVec* offsRarr_rc_;
 	TRangeVec*  rangesLarr_rc_;
 	TRangeVec*  rangesRarr_rc_;
 	uint32_t&   offsLsz_rc_;
@@ -1413,8 +1413,8 @@ protected:
 	bool*       delayedchaseR_;
 	TDriver*    drL_;
 	TDriver*    drR_;
-	U32PairVec* offsLarr_;
-	U32PairVec* offsRarr_;
+	UPairVec* offsLarr_;
+	UPairVec* offsRarr_;
 	TRangeVec*  rangesLarr_;
 	TRangeVec*  rangesRarr_;
 	uint32_t*   offsLsz_;
@@ -1443,7 +1443,7 @@ protected:
  */
 struct RangeWithCoords {
 	Range r;
-	U32Pair h;
+	UPair h;
 };
 
 /**
@@ -1453,8 +1453,8 @@ struct RangeWithCoords {
 template<typename TRangeSource>
 class PairedBWAlignerV2 : public Aligner {
 
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
+	typedef std::vector<UPair> UPairVec;
 	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
@@ -1782,7 +1782,7 @@ protected:
 	 * a paired alignment by reporting two consecutive alignments, one
 	 * for each mate.
 	 */
-	void reportSe(const Range& r, U32Pair h, uint32_t tlen) {
+	void reportSe(const Range& r, UPair h, uint32_t tlen) {
 		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
 		assert(!(r.mate1 ? doneSe1_ : doneSe2_));
 		params->setFw(r.fw);
@@ -1828,7 +1828,7 @@ protected:
 		}
 	}
 
-	void resolveOutstanding(const U32Pair& off,
+	void resolveOutstanding(const UPair& off,
 	                        const uint32_t tlen,
 	                        const Range& range)
 	{
@@ -1865,7 +1865,7 @@ protected:
 	 * This function picks up to 'pick' anchors at random from the
 	 * 'offs' array.  It returns the number that it actually picked.
 	 */
-	bool resolveOutstandingInRef(const U32Pair& off,
+	bool resolveOutstandingInRef(const UPair& off,
 	                             const uint32_t tlen,
 	                             const Range& range)
 	{

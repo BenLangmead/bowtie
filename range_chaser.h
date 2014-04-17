@@ -21,8 +21,8 @@ template<typename TStr>
 class RangeChaser {
 
 	typedef Ebwt<TStr> TEbwt;
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
+	typedef std::vector<UPair> UPairVec;
 	typedef RowChaser<TStr> TRowChaser;
 
 public:
@@ -33,11 +33,11 @@ public:
 		ebwt_(NULL),
 		qlen_(0),
 		cacheThresh_(cacheThresh),
-		top_(0xffffffff),
-		bot_(0xffffffff),
-		irow_(0xffffffff),
-		row_(0xffffffff),
-		off_(make_pair(0xffffffff, 0)),
+		top_(OFF_MASK),
+		bot_(OFF_MASK),
+		irow_(OFF_MASK),
+		row_(OFF_MASK),
+		off_(make_pair(OFF_MASK, 0)),
 		tlen_(0),
 		chaser_(metrics),
 		cached_(false),
@@ -52,11 +52,11 @@ public:
 	 * a u32 pair of <ref-idx, ref-offset>.
 	 */
 	static void toOffs(const TEbwt& ebwt,
-	                   uint32_t qlen,
+			TIndexOffU qlen,
 	                   RandomSource& rand,
-	                   uint32_t top,
-	                   uint32_t bot,
-	                   U32PairVec& dest)
+	                   TIndexOffU top,
+	                   TIndexOffU bot,
+	                   UPairVec& dest)
 	{
 		RangeChaser rc(ebwt, rand);
 		rc.setTopBot(top, bot, qlen);
@@ -75,7 +75,7 @@ public:
 	/**
 	 * Set the row to chase
 	 */
-	void setRow(uint32_t row) {
+	void setRow(TIndexOffU row) {
 		// Must be within bounds of range
 		assert_lt(row, bot_);
 		assert_geq(row, top_);
@@ -84,7 +84,7 @@ public:
 			// First thing to try is the cache
 			if(cached_) {
 				assert(cacheEnt_.valid());
-				uint32_t cached = cacheEnt_.get(row_ - top_);
+				TIndexOffU cached = cacheEnt_.get(row_ - top_);
 				assert(cacheEnt_.valid());
 				if(cached != RANGE_NOT_SET) {
 					// Assert that it matches what we would have got...
@@ -96,7 +96,7 @@ public:
 					ebwt_->joinedToTextOff(qlen_, cached, off_.first, off_.second, tlen_);
 					// Note: tidx may be 0xffffffff, if alignment overlaps a
 					// reference boundary
-					if(off_.first != 0xffffffff) {
+					if(off_.first != OFF_MASK) {
 						// Bingo, we found a valid result using the cache
 						assert(foundOff());
 						return;
@@ -112,7 +112,7 @@ public:
 			if(chaser_.done) {
 				// We're done immediately
 				off_ = chaser_.off();
-				if(off_.first != 0xffffffff) {
+				if(off_.first != OFF_MASK) {
 					// This is a valid result
 					if(cached_) {
 						// Install the result in the cache
@@ -138,7 +138,7 @@ public:
 			if(row_ == irow_) {
 				// Exhausted all possible rows
 				done = true;
-				assert_eq(0xffffffff, off_.first);
+				assert_eq(OFF_MASK, off_.first);
 				return;
 			}
 		}
@@ -149,14 +149,14 @@ public:
 	 * Set the next range for us to "chase" (i.e. convert row-by-row
 	 * to reference loci).
 	 */
-	void setTopBot(uint32_t top,
-	               uint32_t bot,
-	               uint32_t qlen,
+	void setTopBot(TIndexOffU top,
+					TIndexOffU bot,
+					TIndexOffU qlen,
 	               RandomSource& rand,
 	               const TEbwt* ebwt)
 	{
-		assert_neq(0xffffffff, top);
-		assert_neq(0xffffffff, bot);
+		assert_neq(OFF_MASK, top);
+		assert_neq(OFF_MASK, bot);
 		assert_gt(bot, top);
 		assert_gt(qlen, 0);
 		assert(ebwt != NULL);
@@ -164,7 +164,7 @@ public:
 		qlen_ = qlen;
 		top_ = top;
 		bot_ = bot;
-		uint32_t spread = bot - top;
+		TIndexOffU spread = bot - top;
 		irow_ = top + (rand.nextU32() % spread); // initial row
 		done = false;
 		cached_ = false;
@@ -207,7 +207,7 @@ public:
 			if(row_ == irow_) {
 				// Exhausted all possible rows
 				done = true;
-				assert_eq(0xffffffff, off_.first);
+				assert_eq(OFF_MASK, off_.first);
 				return;
 			}
 			setRow(row_);
@@ -218,7 +218,7 @@ public:
 			if(chaser_.done) {
 				// We're done immediately
 				off_ = chaser_.off();
-				if(off_.first != 0xffffffff) {
+				if(off_.first != OFF_MASK) {
 					if(cached_) {
 						// Install the result in the cache
 						assert(cacheEnt_.valid());
@@ -247,7 +247,7 @@ public:
 	 * this range.
 	 */
 	bool foundOff() const {
-		return off_.first != 0xffffffff;
+		return off_.first != OFF_MASK;
 	}
 
 	/**
@@ -255,20 +255,20 @@ public:
 	 * foundOff() returns false.
 	 */
 	void reset() {
-		off_.first = 0xffffffff;
+		off_.first = OFF_MASK;
 	}
 
 	/**
 	 * Get the calculated offset.
 	 */
-	U32Pair off() const {
+	UPair off() const {
 		return off_;
 	}
 
 	/**
 	 * Get the length of the hit reference.
 	 */
-	uint32_t tlen() const {
+	TIndexOffU tlen() const {
 		return tlen_;
 	}
 
@@ -277,14 +277,14 @@ public:
 protected:
 
 	const TEbwt* ebwt_;    /// index to resolve row in
-	uint32_t qlen_;        /// length of read; needed to convert to ref. coordinates
+	TIndexOffU qlen_;        /// length of read; needed to convert to ref. coordinates
 	uint32_t cacheThresh_; /// ranges wider than thresh use cacheing
-	uint32_t top_;         /// range top
-	uint32_t bot_;         /// range bottom
-	uint32_t irow_;        /// initial randomly-chosen row within range
-	uint32_t row_;         /// current row within range
-	U32Pair off_;          /// calculated offset (0xffffffff if not done)
-	uint32_t tlen_;        /// length of text hit
+	TIndexOffU top_;         /// range top
+	TIndexOffU bot_;         /// range bottom
+	TIndexOffU irow_;        /// initial randomly-chosen row within range
+	TIndexOffU row_;         /// current row within range
+	UPair off_;          /// calculated offset (0xffffffff if not done)
+	TIndexOffU tlen_;        /// length of text hit
 	TRowChaser chaser_;    /// stateful row chaser
 	RangeCacheEntry cacheEnt_; /// current cache entry
 	bool cached_;          /// cacheEnt is active for current range?

@@ -801,7 +801,7 @@ inline uint8_t get_uint8(const String<Dna, Packed<> >& t, uint32_t off) {
 template<typename TStr>
 static inline int char_at_suf_u8(const TStr& host,
                                  uint32_t hlen,
-                                 uint32_t* s,
+                                 TIndexOffU* s,
                                  uint32_t si,
                                  uint32_t off,
                                  uint8_t hi)

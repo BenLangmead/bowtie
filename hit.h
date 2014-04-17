@@ -48,7 +48,7 @@ static const std::string output_type_names[] = {
 	"None"
 };
 
-typedef pair<uint32_t,uint32_t> U32Pair;
+typedef pair<TIndexOffU,TIndexOffU> UPair;
 
 /**
  * Encapsulates a hit, including a text-id/text-offset pair, a pattern
@@ -59,8 +59,8 @@ class Hit {
 public:
 	Hit() : stratum(-1) { }
 
-	U32Pair             h;       /// reference index & offset
-	U32Pair             mh;      /// reference index & offset for mate
+	UPair             h;       /// reference index & offset
+	UPair             mh;      /// reference index & offset for mate
 	uint32_t            patId;   /// read index
 	String<char>        patName; /// read name
 	String<Dna5>        patSeq;  /// read sequence

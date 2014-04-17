@@ -17,13 +17,14 @@
 #include "alphabet.h"
 #include "annot.h"
 #include "refmap.h"
+#include "btypes.h"
 
 /**
  * Encapsulates a hit contained within a HitSet that can be
  * (de)serialized to/from FileBufs.  Used for chaining.
  */
 struct HitSetEnt {
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 
 	HitSetEnt() { }
 
@@ -209,7 +210,7 @@ struct HitSetEnt {
 	 */
 	friend std::ostream& operator << (std::ostream& os, const HitSetEnt& hse);
 
-	U32Pair h; // reference coordinates
+	UPair h; // reference coordinates
 	uint8_t fw; // orientation
 	int8_t stratum; // stratum
 	uint16_t cost; // cost, including stratum
@@ -226,7 +227,7 @@ struct HitSet {
 
 	typedef std::vector<HitSetEnt> EntVec;
 	typedef EntVec::const_iterator Iter;
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 
 	HitSet() {
 		maxedStratum = -1;
@@ -438,7 +439,7 @@ struct HitSet {
 	/**
 	 *
 	 */
-	bool tryReplacing(U32Pair h,
+	bool tryReplacing(UPair h,
 	                  bool fw,
 	                  uint16_t cost,
 	                  size_t& pos)
@@ -454,7 +455,7 @@ struct HitSet {
 					pos = i;
 					return true;
 				} else {
-					pos = 0xffffffff;
+					pos = OFF_MASK;
 					return true;
 				}
 			}

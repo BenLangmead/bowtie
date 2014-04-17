@@ -566,7 +566,7 @@ public:
 	ostream& log() const                 { return _logger; }
 
 	void     build();
-	TIndexOffU tieBreakOff(TIndexOffU i, TIndexOffU j) const;
+	uint32_t tieBreakOff(TIndexOffU i, TIndexOffU j) const;
 	int64_t  breakTie(TIndexOffU i, TIndexOffU j) const;
 	bool     isCovered(TIndexOffU i) const;
 	TIndexOffU rank(TIndexOffU i) const;
@@ -790,11 +790,11 @@ void DifferenceCoverSample<TStr>::build() {
 			// Extract backing-store array from sPrime and sPrimeOrder;
 			// the mkeyQSortSuf2 routine works on the array for maximum
 			// efficiency
-			TIndexOffU *sPrimeArr = (uint32_t*)begin(sPrime);
+			TIndexOffU *sPrimeArr = (TIndexOffU*)begin(sPrime);
 			size_t slen = length(sPrime);
 			assert_eq(sPrimeArr[0], sPrime[0]);
 			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
-			TIndexOffU *sPrimeOrderArr = (uint32_t*)begin(sPrimeOrder);
+			TIndexOffU *sPrimeOrderArr = (TIndexOffU*)begin(sPrimeOrder);
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
 			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
 			// Sort sample suffixes up to the vth character using a

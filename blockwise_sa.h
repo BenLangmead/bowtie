@@ -501,8 +501,8 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 		// and split/merge as necessary
 		TIndexOff added = 0;
 		TIndexOff merged = 0;
-		assert_eq(bucketSzs.size(), numBuckets);
-		assert_eq(bucketReps.size(), numBuckets);
+		assert_eq(length(bucketSzs), numBuckets);
+		assert_eq(length(bucketReps), numBuckets);
 		{
 			Timer timer(cout, "  Splitting and merging time: ", this->verbose());
 			VMSG_NL("Splitting and merging");

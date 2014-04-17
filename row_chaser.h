@@ -21,7 +21,7 @@
 template<typename TStr>
 class RowChaser {
 
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 	typedef Ebwt<TStr> TEbwt;
 
 public:
@@ -31,10 +31,10 @@ public:
 		ebwt_(NULL),
 		qlen_(0),
 		eh_(NULL),
-		row_(0xffffffff),
+		row_(OFF_MASK),
 		jumps_(0),
 		sideloc_(),
-		off_(0xffffffff),
+		off_(OFF_MASK),
 		tlen_(0),
 		metrics_(metrics)
 	{ }
@@ -44,7 +44,7 @@ public:
 	 * converted to understand where it is w/r/t the reference hit and
 	 * offset within it.
 	 */
-	static uint32_t toFlatRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
+	static TIndexOffU toFlatRefOff(const TEbwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done) {
@@ -56,7 +56,7 @@ public:
 	/**
 	 * Convert a row to a reference offset.
 	 */
-	static U32Pair toRefOff(const TEbwt* ebwt, uint32_t qlen, uint32_t row) {
+	static UPair toRefOff(const TEbwt* ebwt, TIndexOffU qlen, TIndexOffU row) {
 		RowChaser rc;
 		rc.setRow(row, qlen, ebwt);
 		while(!rc.done) {
@@ -69,8 +69,8 @@ public:
 	 * Set the next row for us to "chase" (i.e. map to a reference
 	 * location using the BWT step-left operation).
 	 */
-	void setRow(uint32_t row, uint32_t qlen, const TEbwt* ebwt) {
-		assert_neq(0xffffffff, row);
+	void setRow(TIndexOffU row, TIndexOffU qlen, const TEbwt* ebwt) {
+		assert_neq(OFF_MASK, row);
 		assert_gt(qlen, 0);
 		assert(ebwt != NULL);
 		ebwt_ = ebwt;
@@ -91,7 +91,7 @@ public:
 		}
 		done = false;
 		jumps_ = 0;
-		off_ = 0xffffffff;
+		off_ = OFF_MASK;
 		prepped_ = false;
 		prep();
 	}
@@ -146,25 +146,25 @@ public:
 	 * to Ebwt::joinedToTextOff() to understand where it is w/r/t the
 	 * reference hit and offset within it.
 	 */
-	uint32_t flatOff() const {
+	TIndexOffU flatOff() const {
 		return off_;
 	}
 
 	/**
 	 * Get the calculated offset.
 	 */
-	U32Pair off() {
-		uint32_t off = flatOff();
-		assert_neq(0xffffffff, off);
-		uint32_t tidx;
-		uint32_t textoff = 0xffffffff;
+	UPair off() {
+		TIndexOffU off = flatOff();
+		assert_neq(OFF_MASK, off);
+		TIndexOffU tidx;
+		TIndexOffU textoff = OFF_MASK;
 		ebwt_->joinedToTextOff(qlen_, off, tidx, textoff, tlen_);
 		// Note: tidx may be 0xffffffff, if alignment overlaps a
 		// reference boundary
 		return make_pair(tidx, textoff);
 	}
 
-	uint32_t tlen() const {
+	TIndexOffU tlen() const {
 		return tlen_;
 	}
 
@@ -174,13 +174,13 @@ public:
 protected:
 
 	const TEbwt* ebwt_;      /// index to resolve row in
-	uint32_t qlen_;          /// length of read; needed to convert to ref. coordinates
+	TIndexOffU qlen_;          /// length of read; needed to convert to ref. coordinates
 	const EbwtParams* eh_;   /// eh field from index
-	uint32_t row_;           /// current row
+	TIndexOffU row_;           /// current row
 	uint32_t jumps_;         /// # steps so far
 	SideLocus sideloc_;      /// current side locus
-	uint32_t off_;           /// calculated offset (0xffffffff if not done)
-	uint32_t tlen_;          /// hit text length
+	TIndexOffU off_;           /// calculated offset (0xffffffff if not done)
+	TIndexOffU tlen_;          /// hit text length
 	AlignerMetrics *metrics_;
 };
 
