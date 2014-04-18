@@ -3,6 +3,14 @@
  <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
 </ul>
 
+<h2>1.0.1 release -  - March 14, 2014</h2>
+<ul>
+ <li>Improved index querying efficiency using "population count" instructions
+     available since SSE4.2.</li>
+ <li>Credits to the Intel(r) enabling team for performance optimizations
+     included in this release.  Thank you!</li>
+</ul>
+
 <h2>1.0.0 release - 4/9/13</h2>
 <ul>
  <li>Finally, a 64-bit Windows binary!</li>
