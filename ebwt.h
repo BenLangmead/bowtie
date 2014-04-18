@@ -3037,23 +3037,6 @@ void Ebwt<TStr>::readIntoMemory(
 			cerr << "  About to open input files: ";
 			logTime(cerr);
 		}
-#ifdef BOWTIE_MM
-		// Initialize our primary and secondary input-stream fields
-		if(_in1 != -1) close(_in1);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in1Str << "\"" << endl;
-		}
-		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in1Str << endl;
-		}
-		if(_in2 != -1) close(_in2);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in2Str << "\"" << endl;
-		}
-		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in2Str << endl;
-		}
-#else
 		// Initialize our primary and secondary input-stream fields
 		if(_in1 != NULL) fclose(_in1);
 		if(_verbose || startVerbose) cerr << "Opening \"" << _in1Str << "\"" << endl;
@@ -3065,7 +3048,6 @@ void Ebwt<TStr>::readIntoMemory(
 		if((_in2 = fopen(_in2Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
-#endif
 		if(_verbose || startVerbose) {
 			cerr << "  Finished opening input files: ";
 			logTime(cerr);
@@ -3074,7 +3056,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		if(_useMm /*&& !justHeader*/) {
 			const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
-			int fds[] = { _in1, _in2 };
+			int fds[] = { fileno(_in1), fileno(_in2) };
 			for(int i = 0; i < 2; i++) {
 				if(_verbose || startVerbose) {
 					cerr << "  Memory-mapping input file " << (i+1) << ": ";
@@ -3259,7 +3241,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_plen = (uint32_t*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nPat*4;
-		lseek(_in1, this->_nPat*4, SEEK_CUR);
+		lseek(fileno(_in1), this->_nPat*4, SEEK_CUR);
 #endif
 	} else {
 		try {
@@ -3305,7 +3287,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_rstarts = (uint32_t*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nFrag*4*3;
-		lseek(_in1, this->_nFrag*4*3, SEEK_CUR);
+		lseek(fileno(_in1), this->_nFrag*4*3, SEEK_CUR);
 #endif
 	} else {
 		this->_rstarts = new uint32_t[this->_nFrag*3];
@@ -3330,7 +3312,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_ebwt = (uint8_t*)(mmFile[0] + bytesRead);
 		bytesRead += eh->_ebwtTotLen;
-		lseek(_in1, eh->_ebwtTotLen, SEEK_CUR);
+		lseek(fileno(_in1), eh->_ebwtTotLen, SEEK_CUR);
 #endif
 	} else {
 		// Allocate ebwt (big allocation)
@@ -3396,7 +3378,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_fchr = (uint32_t*)(mmFile[0] + bytesRead);
 			bytesRead += 5*4;
-			lseek(_in1, 5*4, SEEK_CUR);
+			lseek(fileno(_in1), 5*4, SEEK_CUR);
 #endif
 		} else {
 			this->_fchr = new uint32_t[5];
@@ -3416,7 +3398,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_ftab = (uint32_t*)(mmFile[0] + bytesRead);
 			bytesRead += eh->_ftabLen*4;
-			lseek(_in1, eh->_ftabLen*4, SEEK_CUR);
+			lseek(fileno(_in1), eh->_ftabLen*4, SEEK_CUR);
 #endif
 		} else {
 			this->_ftab = new uint32_t[eh->_ftabLen];
@@ -3440,7 +3422,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_eftab = (uint32_t*)(mmFile[0] + bytesRead);
 			bytesRead += eh->_eftabLen*4;
-			lseek(_in1, eh->_eftabLen*4, SEEK_CUR);
+			lseek(fileno(_in1), eh->_eftabLen*4, SEEK_CUR);
 #endif
 		} else {
 			this->_eftab = new uint32_t[eh->_eftabLen];
@@ -3547,7 +3529,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 					this->_offs = (uint32_t*)(mmFile[1] + bytesRead);
 					bytesRead += (offsLen << 2);
-					lseek(_in2, (offsLen << 2), SEEK_CUR);
+					lseek(fileno(_in2), (offsLen << 2), SEEK_CUR);
 #endif
 				} else {
 					// If any of the high two bits are set
@@ -3630,7 +3612,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_isa = (uint32_t*)(mmFile[1] + bytesRead);
 			bytesRead += (isaLen << 2);
-			lseek(_in2, (isaLen << 2), SEEK_CUR);
+			lseek(fileno(_in2), (isaLen << 2), SEEK_CUR);
 #endif
 		} else {
 			MM_READ_RET r = MM_READ(_in2, (void *)this->_isa, isaLen*4);
@@ -3662,8 +3644,8 @@ void Ebwt<TStr>::readIntoMemory(
 	// Be kind
 	if(deleteEh) delete eh;
 #ifdef BOWTIE_MM
-	lseek(_in1, 0, SEEK_SET);
-	lseek(_in2, 0, SEEK_SET);
+	lseek(fileno(_in1), 0, SEEK_SET);
+	lseek(fileno(_in2), 0, SEEK_SET);
 #else
 	rewind(_in1); rewind(_in2);
 #endif
