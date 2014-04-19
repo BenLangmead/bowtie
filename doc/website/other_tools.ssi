@@ -116,6 +116,9 @@
   <li><a href="http://www.geospiza.com/Products/WhitePaper_06102009.pdf">Geospiza GeneSifter</a></li>
   <li><a href="http://www.clcbio.com/index.php?id=1408&manual=External_applications_integration_Bowtie.html">CLC Genomics Server</a></li>
   <li><a href="http://www.partek.com/flow">Partek Flow</a></li>
+  <li><a href="https://igor.sbgenomics.com/lab/public/pipelines/">SevenBridges genomics</a></li>
+  <li><a href="http://www.appistry.com/products/ngs-pipelines/bioinformatics-pipeline-suite">Appistry</a></li>
+  <li><a href="http://www.maverixbio.com/opensource/">Maverix Biomics</a></li>
 </ul>
 
 <h2>Published protocols using Bowtie 1 and/or 2:</h2>
