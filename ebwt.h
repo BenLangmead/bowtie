@@ -853,7 +853,7 @@ public:
 	const EbwtParams& eh() const     { return _eh; }
 	TIndexOffU    zOff() const         { return _zOff; }
 	TIndexOffU    zEbwtByteOff() const { return _zEbwtByteOff; }
-	TIndexOffU         zEbwtBpOff() const   { return _zEbwtBpOff; }
+	TIndexOff         zEbwtBpOff() const   { return _zEbwtBpOff; }
 	TIndexOffU    nPat() const         { return _nPat; }
 	TIndexOffU    nFrag() const        { return _nFrag; }
 	TIndexOffU*   fchr() const         { return _fchr; }
@@ -1194,7 +1194,7 @@ public:
 	string     _in2Str; // filename for secondary index file
 	TIndexOffU   _zOff;
 	TIndexOffU   _zEbwtByteOff;
-	TIndexOffU        _zEbwtBpOff;
+	TIndexOff        _zEbwtBpOff;
 	TIndexOffU   _nPat;  /// number of reference texts
 	TIndexOffU   _nFrag; /// number of fragments
 	TIndexOffU*  _plen;
@@ -4340,9 +4340,9 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// Points to a byte offset from 'side' within ebwt[] where next
 	// char should be written
 #ifdef SIXTY4_FORMAT
-	TIndexOffU sideCur = (eh._sideBwtSz >> 3) - 1;
+	TIndexOff sideCur = (eh._sideBwtSz >> 3) - 1;
 #else
-	TIndexOffU sideCur = eh._sideBwtSz - 1;
+	TIndexOff sideCur = eh._sideBwtSz - 1;
 #endif
 
 	// Whether we're assembling a forward or a reverse bucket
@@ -4493,9 +4493,9 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		if(fw) sideCur++;
 		else   sideCur--;
 #ifdef SIXTY4_FORMAT
-		if(sideCur == (int)eh._sideBwtSz >> 3)
+		if(sideCur == (TIndexOff)eh._sideBwtSz >> 3)
 #else
-		if(sideCur == (int)eh._sideBwtSz)
+		if(sideCur == (TIndexOff)eh._sideBwtSz)
 #endif
 		{
 			// Forward side boundary

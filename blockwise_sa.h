@@ -509,7 +509,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 			for(TIndexOffU i = 0; i < numBuckets; i++) {
 				TIndexOffU mergedSz = bsz + 1;
 				assert(bucketSzs[i] == 0 || bucketReps[i] != 0xffffffff);
-				if(i < (int64_t)numBuckets-1) {
+				if(i < (TIndexOffU)numBuckets-1) {
 					mergedSz = bucketSzs[(size_t)i] + bucketSzs[(size_t)i+1] + 1;
 				}
 				// Merge?
@@ -649,7 +649,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(TIndexOffU cmp,
 	TIndexOffU len = TIndexOffU(length(t));
 	// i is not covered by any previous match
 	TIndexOffU l;
-	if(i > k) {
+	if((int64_t)i > k) {
 		k = i; // so that i + lHi == kHi
 		l = 0; // erase any previous l
 		kSoft = false;

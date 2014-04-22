@@ -320,8 +320,8 @@ void sanityCheckOrderedSufs(const T& host,
                             TIndexOffU *s,
                             size_t slen,
                             size_t upto,
-                            uint32_t lower = 0,
-                            uint32_t upper = OFF_MASK)
+                            size_t lower = 0,
+                            size_t upper = OFF_MASK)
 {
 	assert_lt(s[0], hlen);
 	upper = min<size_t>(upper, slen-1);
@@ -835,9 +835,9 @@ static void selectionSortSufDcU8(
 	assert_gt(end, begin+1);
 	assert_leq(end-begin, SELECTION_SORT_CUTOFF);
 	assert_eq(hi, 4);
-	uint32_t v = dc.v();
+	TIndexOffU v = dc.v();
 	if(end == begin+2) {
-		uint32_t off = dc.tieBreakOff(s[begin], s[begin+1]);
+		TIndexOffU off = dc.tieBreakOff(s[begin], s[begin+1]);
 		if(off + s[begin] >= hlen ||
 		   off + s[begin+1] >= hlen)
 		{
@@ -865,8 +865,8 @@ static void selectionSortSufDcU8(
 		size_t targoff = depth + s[i];
 		for(size_t j = i+1; j < end; j++) {
 			assert_neq(j, targ);
-			uint32_t joff = depth + s[j];
-			uint32_t k;
+			size_t joff = depth + s[j];
+			size_t k;
 			for(k = 0; k <= lim; k++) {
 				assert_neq(j, targ);
 				uint8_t jc = (k + joff < hlen)    ? get_uint8(host, k + joff)    : hi;
