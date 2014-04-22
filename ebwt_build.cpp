@@ -421,7 +421,7 @@ static void driver(const string& infile,
 				refparams.color = false;
 				vector<RefRecord> szs2;
 				vector<uint32_t> plens2;
-				int numSeqs2 = 0;
+				TIndexOff numSeqs2 = 0;
 				fastaRefReadSizes(is, szs2, plens2, refparams, NULL, numSeqs2);
 				assert_leq(numSeqs, numSeqs2);
 				// One less color than base

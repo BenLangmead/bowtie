@@ -8,7 +8,7 @@
 #
 
 my $bowtie = "./bowtie";
-my $bowtie_d = "./bowtie-debug";
+my $bowtie_build = "./bowtie-build";
 if(system("$bowtie --version") != 0) {
 	print STDERR "Could not execute ./bowtie; looking in PATH...\n";
 	$bowtie = `which bowtie`;
@@ -17,18 +17,9 @@ if(system("$bowtie --version") != 0) {
 		die "Could not find bowtie in current directory or in PATH\n";
 	}
 }
-if(system("$bowtie_d --version") != 0) {
-	print STDERR "Could not execute ./bowtie-debug; looking in PATH...\n";
-	$bowtie_d = `which bowtie-debug`;
-	chomp($bowtie_d);
-	if(system("$bowtie_d --version") != 0) {
-		die "Could not find bowtie-debug in current directory or in PATH\n";
-	}
-}
 
 if(! -f "e_coli_c.1.ebwt") {
 	print STDERR "Making colorspace e_coli index\n";
-	my $bowtie_build = "./bowtie-build";
 	if(system("$bowtie_build --version") != 0) {
 		print STDERR "Could not execute ./bowtie-build; looking in PATH...\n";
 		$bowtie_build = `which $bowtie_build`;
@@ -40,6 +31,12 @@ if(! -f "e_coli_c.1.ebwt") {
 	system("$bowtie_build -C genomes/NC_008253.fna e_coli_c") && die;
 } else {
 	print STDERR "Colorspace e_coli index already present...\n";
+}
+
+if(! -f "e_coli.1.ebwt") {
+    system("$bowtie_build  genomes/NC_008253.fna e_coli") && die;
+} else {
+    print STDERR "e_coli index already present...\n";
 }
 
 open TMP, ">.args.pl.1.fa" || die;
@@ -98,24 +95,24 @@ sub run($) {
 print "Bad:\n";
 for my $a (@bad) {
 	run("$bowtie $a e_coli reads/e_coli_1000.fq /dev/null") != 0 || die "bowtie should have rejected: \"$a\"\n";
-	run("$bowtie_d $a e_coli reads/e_coli_1000.fq /dev/null") != 0 || die "bowtie-debug should have rejected: \"$a\"\n";
+	run("$bowtie --debug $a e_coli reads/e_coli_1000.fq /dev/null") != 0 || die "bowtie-debug should have rejected: \"$a\"\n";
 	print "PASSED: bad args \"$a\"\n";
 }
 print "\nBadEx:\n";
 for my $a (@badEx) {
 	run("$bowtie $a  /dev/null") != 0 || die "bowtie should have rejected: \"$a\"\n";
-	run("$bowtie_d $a  /dev/null") != 0 || die "bowtie-debug should have rejected: \"$a\"\n";
+	run("$bowtie --debug  $a  /dev/null") != 0 || die "bowtie-debug should have rejected: \"$a\"\n";
 	print "PASSED: bad args \"$a\"\n";
 }
 print "\nGood:\n";
 for my $a (@good) {
 	run("$bowtie $a e_coli reads/e_coli_1000.fq /dev/null") == 0 || die "bowtie should have accepted: \"$a\"\n";
-	run("$bowtie_d $a e_coli reads/e_coli_1000.fq /dev/null") == 0 || die "bowtie-debug should have accepted: \"$a\"\n";
+	run("$bowtie --debug  $a e_coli reads/e_coli_1000.fq /dev/null") == 0 || die "bowtie-debug should have accepted: \"$a\"\n";
 	print "PASSED: good args \"$a\"\n";
 }
 print "\nGoodEx:\n";
 for my $a (@goodEx) {
 	run("$bowtie $a /dev/null") == 0 || die "bowtie should have accepted: \"$a\"\n";
-	run("$bowtie_d $a /dev/null") == 0 || die "bowtie-debug should have accepted: \"$a\"\n";
+	run("$bowtie --debug  $a /dev/null") == 0 || die "bowtie-debug should have accepted: \"$a\"\n";
 	print "PASSED: good args \"$a\"\n";
 }

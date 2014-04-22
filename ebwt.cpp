@@ -15,11 +15,11 @@ using namespace std;
 
 #ifdef BOWTIE_64BIT_INDEX
 
-std::string gEbwt_ext("bt2l");
+std::string gEbwt_ext("ebwtl");
 
 #else
 
-std::string gEbwt_ext("bt2");
+std::string gEbwt_ext("ebwt");
 
 #endif  // BOWTIE_64BIT_INDEX
 
