@@ -27,7 +27,6 @@
 
 using namespace std;
 using namespace seqan;
-using tthread::lock_guard;
 
 /// Constants for the various output modes
 enum output_types {
@@ -438,7 +437,7 @@ public:
 			out(h.h.first).writeChars(buf, ss.tellp());
 		}
 		unlock(hs[end-1].h.first);
-                lock_guard<MUTEX_T> guard(main_mutex_m);
+                tthread::lock_guard<MUTEX_T> guard(main_mutex_m);
 		commitHits(hs);
 		first_ = false;
 		numAligned_++;
@@ -610,7 +609,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpAlignLock_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpAlignLock_);
 				if(dumpAl_ == NULL) {
 					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
@@ -629,7 +628,7 @@ public:
 			// Dump paired-end read to an aligned-read file (or pair of
 			// files) of the same format
 			if(!dumpAlBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpAlignLockPE_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
 					assert(dumpAlQv_1_ == NULL);
 					assert(dumpAlQv_2_ == NULL);
@@ -664,7 +663,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpUnalLock_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
 					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
@@ -683,7 +682,7 @@ public:
 			// Dump paired-end read to an unaligned-read file (or pair
 			// of files) of the same format
 			if(!dumpUnalBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpUnalLockPE_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
 					assert(dumpUnal_1_ == NULL);
 					assert(dumpUnal_2_ == NULL);
@@ -719,7 +718,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpMaxLock_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpMaxLock_);
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
@@ -736,7 +735,7 @@ public:
 			// Dump paired-end read to a maxed-out-read file (or pair
 			// of files) of the same format
 			if(!dumpMaxBase_.empty()) {
-                                lock_guard<MUTEX_T> guard(dumpMaxLockPE_);
+                                tthread::lock_guard<MUTEX_T> guard(dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
 					assert(dumpMaxQv_1_ == NULL);
 					assert(dumpMaxQv_2_ == NULL);
@@ -764,7 +763,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-		lock_guard<MUTEX_T> guard(main_mutex_m);
+		tthread::lock_guard<MUTEX_T> guard(main_mutex_m);
 		numMaxed_++;
 	}
 
@@ -773,7 +772,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(PatternSourcePerThread& p) {
-                lock_guard<MUTEX_T> guard(main_mutex_m);
+                tthread::lock_guard<MUTEX_T> guard(main_mutex_m);
 		numUnaligned_++;
 	}
 
@@ -782,7 +781,7 @@ protected:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
 		assert(h.repOk());
-                lock_guard<MUTEX_T> guard(main_mutex_m);
+                tthread::lock_guard<MUTEX_T> guard(main_mutex_m);
 		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
