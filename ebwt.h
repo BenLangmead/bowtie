@@ -158,14 +158,14 @@ public:
 		_eftabLen = _ftabChars*2;
 		_eftabSz = _eftabLen*OFF_SIZE;
 		_ftabLen = (1 << (_ftabChars*2))+1;
-		_ftabSz = _ftabLen*4;
+		_ftabSz = _ftabLen*OFF_SIZE;
 		_offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
 		_offsSz = (uint64_t)_offsLen*OFF_SIZE;
 		_isaLen = (_isaRate == -1)? 0 : ((_bwtLen + (1 << _isaRate) - 1) >> _isaRate);
-		_isaSz = _isaLen*4;
+		_isaSz = _isaLen*OFF_SIZE;
 		_lineSz = 1 << _lineRate;
 		_sideSz = _lineSz * _linesPerSide;
-		_sideBwtSz = _sideSz - 8;
+		_sideBwtSz = _sideSz - 2*OFF_SIZE;
 		_sideBwtLen = _sideBwtSz*4;
 		_numSidePairs = (_bwtSz+(2*_sideBwtSz)-1)/(2*_sideBwtSz);
 		_numSides = _numSidePairs*2;
@@ -1137,9 +1137,9 @@ public:
 	inline int rowL(const SideLocus& l) const;
 	inline TIndexOffU countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, TIndexOffU* pairs) const;
-	inline uint32_t countFwSide(const SideLocus& l, int c) const;
+	inline TIndexOffU countFwSide(const SideLocus& l, int c) const;
 	inline void countFwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
-	inline uint32_t countBwSide(const SideLocus& l, int c) const;
+	inline TIndexOffU countBwSide(const SideLocus& l, int c) const;
 	inline void countBwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
 	inline TIndexOffU mapLF(const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
 	inline void mapLFEx(const SideLocus& l, TIndexOffU *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
@@ -2170,7 +2170,7 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, TIndexOffU* arrs) const 
  * break just prior to the side.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* check */
+inline TIndexOffU Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* check */
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
@@ -2178,7 +2178,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* ch
 	assert_lt(l._bp, 4);
 	assert_geq(l._bp, 0);
 	const uint8_t *side = l.side(this->_ebwt);
-	uint32_t cCnt = countUpTo(l, c);
+	TIndexOffU cCnt = countUpTo(l, c);
 	assert_leq(cCnt, this->_eh._sideBwtLen);
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
@@ -2189,15 +2189,15 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* ch
 			cCnt--; // Adjust for '$' looking like an 'A'
 		}
 	}
-	uint32_t ret;
+	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 8);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
-		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
@@ -2274,7 +2274,7 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, TIndexOffU* arrs) cons
  * occ[] count up to the side break.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
+inline TIndexOffU Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
@@ -2282,7 +2282,7 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	assert_lt(l._bp, 4);
 	assert_geq(l._bp, 0);
 	const uint8_t *side = l.side(this->_ebwt);
-	uint32_t cCnt = countUpTo(l, c);
+	TIndexOffU cCnt = countUpTo(l, c);
 	if(rowL(l) == c) cCnt++;
 	assert_leq(cCnt, this->_eh._sideBwtLen);
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
@@ -2294,15 +2294,15 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 			cCnt--;
 		}
 	}
-	uint32_t ret;
+	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
-		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + (2*this->_eh._sideSz) - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 8); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
@@ -4355,14 +4355,14 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// Have we skipped the '$' in the last column yet?
 	ASSERT_ONLY(bool dollarSkipped = false);
 
-	uint32_t si = 0;   // string offset (chars)
-	ASSERT_ONLY(uint32_t lastSufInt = 0);
+	TIndexOffU si = 0;   // string offset (chars)
+	ASSERT_ONLY(TIndexOffU lastSufInt = 0);
 	ASSERT_ONLY(bool inSA = true); // true iff saI still points inside suffix
 	                               // array (as opposed to the padding at the
 	                               // end)
 	// Iterate over packed bwt bytes
 	VMSG_NL("Entering Ebwt loop");
-	ASSERT_ONLY(uint32_t beforeEbwtOff = (uint32_t)out1.tellp());
+	ASSERT_ONLY(TIndexOffU beforeEbwtOff = (uint32_t)out1.tellp());
 	while(side < ebwtTotSz) {
 		ASSERT_ONLY(wroteFwBucket = false);
 		// Sanity-check our cursor into the side buffer
@@ -4382,7 +4382,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			bool count = true;
 			if(si <= len) {
 				// Still in the SA; extract the bwtChar
-				uint32_t saElt = sa.nextSuffix();
+				TIndexOffU saElt = sa.nextSuffix();
 				// (that might have triggered sa to calc next suf block)
 				if(isaSample != NULL && (saElt & eh._isaMask) == saElt) {
 					// This element belongs in the ISA sample.  Add
@@ -4408,13 +4408,13 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					fchr[bwtChar]++;
 				}
 				// Update ftab
-				if((len-saElt) >= (uint32_t)eh._ftabChars) {
+				if((len-saElt) >= (TIndexOffU)eh._ftabChars) {
 					// Turn the first ftabChars characters of the
 					// suffix into an integer index into ftab
-					uint32_t sufInt = 0;
+					TIndexOffU sufInt = 0;
 					for(int i = 0; i < eh._ftabChars; i++) {
 						sufInt <<= 2;
-						assert_lt(i, (int)(len-saElt));
+						assert_lt((TIndexOffU)i, len-saElt);
 						sufInt |= (unsigned char)(Dna)(s[saElt+i]);
 					}
 					// Assert that this prefix-of-suffix is greater
@@ -4493,9 +4493,9 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		if(fw) sideCur++;
 		else   sideCur--;
 #ifdef SIXTY4_FORMAT
-		if(sideCur == (TIndexOff)eh._sideBwtSz >> 3)
+		if(sideCur == (int)eh._sideBwtSz >> 3)
 #else
-		if(sideCur == (TIndexOff)eh._sideBwtSz)
+		if(sideCur == (int)eh._sideBwtSz)
 #endif
 		{
 			// Forward side boundary
@@ -4514,11 +4514,11 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
 #ifdef BOWTIE_64BIT_INDEX
-			u32side[(sideSz >> 3)-2] = endianizeU<TIndexOffU>(occSave[2], this->toBe());
-			u32side[(sideSz >> 3)-1] = endianizeU<TIndexOffU>(occSave[3], this->toBe());
+			u32side[(sideSz >> 3)-2] = endianizeU<TIndexOffU>(occSave[0], this->toBe());
+			u32side[(sideSz >> 3)-1] = endianizeU<TIndexOffU>(occSave[1], this->toBe());
 #else
-			u32side[(sideSz >> 2)-2] = endianizeU<TIndexOffU>(occSave[2], this->toBe());
-			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occSave[3], this->toBe());
+			u32side[(sideSz >> 2)-2] = endianizeU<TIndexOffU>(occSave[0], this->toBe());
+			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occSave[1], this->toBe());
 #endif
 			// Write forward side to primary file
 			out1.write((const char *)ebwtSide, sideSz);
