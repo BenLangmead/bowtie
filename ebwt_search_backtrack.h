@@ -563,7 +563,7 @@ public:
 				if(c < 4) {
 					if(top+1 == bot) {
 						bot = top = ebwt.mapLF1(top, ltop, c);
-						if(bot != 0xffffffff) bot++;
+						if(bot != OFF_MASK) bot++;
 					} else {
 						top = ebwt.mapLF(ltop, c); bot = ebwt.mapLF(lbot, c);
 						assert_geq(bot, top);
