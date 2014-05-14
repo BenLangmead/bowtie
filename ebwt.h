@@ -1606,8 +1606,8 @@ struct SideLocus {
 		const uint32_t sideSz     = ep._sideSz;
 		// Side length is hard-coded for now; this allows the compiler
 		// to do clever things to accelerate / and %.
-		_sideNum                  = row / (48*OFF_SIZE);
-		_charOff                  = row % (48*OFF_SIZE);
+		_sideNum                  = row / (56*OFF_SIZE);
+		_charOff                  = row % (56*OFF_SIZE);
 		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
