@@ -50,6 +50,13 @@ public:
 		}
 	}
 
+	template <typename T>
+	T nextU() {
+		if(sizeof(T)>4)
+			return nextU64();
+		return nextU32();
+	}
+
 	uint32_t nextU2() {
 		assert(inited_);
 		if(lastOff > 30) {

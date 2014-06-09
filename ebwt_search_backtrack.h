@@ -105,7 +105,7 @@ public:
 				_qlen = length(*_qry);
 				// Resize _pairs
 				if(_pairs != NULL) { delete[] _pairs; }
-				_pairs = new uint32_t[_qlen*_qlen*8];
+				_pairs = new TIndexOffU[_qlen*_qlen*8];
 				// Resize _elims
 				if(_elims != NULL) { delete[] _elims; }
 				_elims = new uint8_t[_qlen*_qlen];
@@ -257,9 +257,9 @@ public:
 		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
 		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
 			uint32_t ftabOff = calcFtabOff();
-			uint32_t top = ebwt.ftabHi(ftabOff);
-			uint32_t bot = ebwt.ftabLo(ftabOff+1);
-			if(_qlen == (uint32_t)ftabChars && bot > top) {
+			TIndexOffU top = ebwt.ftabHi(ftabOff);
+			TIndexOffU bot = ebwt.ftabLo(ftabOff+1);
+			if(_qlen == (TIndexOffU)ftabChars && bot > top) {
 				// We have a match!
 				if(_reportPartials > 0) {
 					// Oops - we're trying to find seedlings, so we've
@@ -335,8 +335,8 @@ public:
 	 * aware backtracking.
 	 */
 	bool backtrack(uint32_t depth,
-	               uint32_t top,
-	               uint32_t bot,
+	               TIndexOffU top,
+	               TIndexOffU bot,
 	               uint32_t iham = 0,
 	               bool disableFtab = false)
 	{
@@ -370,11 +370,11 @@ public:
 	               uint32_t  oneRevOff,// depths < oneRevOff are 1-revisitable
 	               uint32_t  twoRevOff,// depths < twoRevOff are 2-revisitable
 	               uint32_t  threeRevOff,// depths < threeRevOff are 3-revisitable
-	               uint32_t  top,      // top arrow in pair prior to 'depth'
-	               uint32_t  bot,      // bottom arrow in pair prior to 'depth'
+	               TIndexOffU  top,      // top arrow in pair prior to 'depth'
+	               TIndexOffU  bot,      // bottom arrow in pair prior to 'depth'
 	               uint32_t  ham,      // weighted hamming distance so far
 	               uint32_t  iham,     // initial weighted hamming distance
-	               uint32_t* pairs,    // portion of pairs array to be used for this backtrack frame
+	               TIndexOffU* pairs,    // portion of pairs array to be used for this backtrack frame
 	               uint8_t*  elims,    // portion of elims array to be used for this backtrack frame
 	               bool disableFtab = false)
 	{
@@ -441,13 +441,13 @@ public:
 		// # positions tied for "best" outgoing qual
 		uint32_t eligibleNum = 0;
 		// total range-size for all eligibles
-		uint32_t eligibleSz = 0;
+		TIndexOffU eligibleSz = 0;
 		// If there is just one eligible slot at the moment (a common
 		// case), these are its parameters
 		uint32_t eli = 0;
 		bool     elignore = true; // ignore the el values because they didn't come from a recent override
-		uint32_t eltop = 0;
-		uint32_t elbot = 0;
+		TIndexOffU eltop = 0;
+		TIndexOffU elbot = 0;
 		uint32_t elham = ham;
 		char     elchar = 0;
 		int      elcint = 0;
@@ -547,9 +547,9 @@ public:
 				}
 			} else if(curIsAlternative) {
 				// Clear pairs
-				memset(&pairs[d*8], 0, 8 * 4);
+				memset(&pairs[d*8], 0, 8 * OFF_SIZE);
 				// Calculate next quartet of ranges
-				ebwt.mapLFEx(ltop, lbot, (TIndexOffU*)&pairs[d*8], (TIndexOffU*)&pairs[(d*8)+4]);
+				ebwt.mapLFEx(ltop, lbot, &pairs[d*8], &pairs[(d*8)+4]);
 				// Update top and bot
 				if(c < 4) {
 					top = pairTop(pairs, d, c); bot = pairBot(pairs, d, c);
@@ -585,7 +585,7 @@ public:
 				for(int i = 0; i < 4; i++) {
 					if(i == c) continue;
 					assert_leq(pairTop(pairs, d, i), pairBot(pairs, d, i));
-					uint32_t spread = pairSpread(pairs, d, i);
+					TIndexOffU spread = pairSpread(pairs, d, i);
 					if(spread == 0) {
 						// Indicate this char at this position is
 						// eliminated as far as this backtracking frame is
@@ -761,8 +761,8 @@ public:
 				ASSERT_ONLY(uint32_t eligiblesVisited = 0);
 				size_t i = d, j = 0;
 				assert_geq(i, depth);
-				uint32_t bttop = 0;
-				uint32_t btbot = 0;
+				TIndexOffU bttop = 0;
+				TIndexOffU btbot = 0;
 				uint32_t btham = ham;
 				char     btchar = 0;
 				int      btcint = 0;
@@ -779,7 +779,7 @@ public:
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
 							// This is the leftmost eligible position with at
 							// least one remaining backtrack target
-							uint32_t posSz = 0;
+							TIndexOffU posSz = 0;
 							// Add up the spreads for A, C, G, T
 							for(j = 0; j < 4; j++) {
 								if((elims[i] & (1 << j)) == 0) {
@@ -845,7 +845,7 @@ public:
 				// Slide over to the next backtacking frame within
 				// pairs and elims; won't interfere with our frame or
 				// any of our parents' frames
-				uint32_t *newPairs = pairs + (_qlen*8);
+				TIndexOffU *newPairs = pairs + (_qlen*8);
 				uint8_t  *newElims = elims + (_qlen);
 				// If we've selected a backtracking target that's in
 				// the 1-revisitable region, then we ask the recursive
@@ -919,7 +919,7 @@ public:
 					// so we can go ahead and use it
 					// Rightmost char gets least significant bit-pairs
 					int ftabChars = ebwt._eh._ftabChars;
-					uint32_t ftabOff = (*_qry)[_qlen - ftabChars];
+					TIndexOffU ftabOff = (*_qry)[_qlen - ftabChars];
 					assert_lt(ftabOff, 4);
 					assert_lt(ftabOff, ebwt._eh._ftabLen-1);
 					for(int j = ftabChars - 1; j > 0; j--) {
@@ -927,14 +927,14 @@ public:
 						if(_qlen-j == icur) {
 							ftabOff |= btcint;
 						} else {
-							assert_lt((uint32_t)(*_qry)[_qlen-j], 4);
-							ftabOff |= (uint32_t)(*_qry)[_qlen-j];
+							assert_lt((TIndexOffU)(*_qry)[_qlen-j], 4);
+							ftabOff |= (TIndexOffU)(*_qry)[_qlen-j];
 						}
 						assert_lt(ftabOff, ebwt._eh._ftabLen-1);
 					}
 					assert_lt(ftabOff, ebwt._eh._ftabLen-1);
-					uint32_t ftabTop = ebwt.ftabHi(ftabOff);
-					uint32_t ftabBot = ebwt.ftabLo(ftabOff+1);
+					TIndexOffU ftabTop = ebwt.ftabHi(ftabOff);
+					TIndexOffU ftabBot = ebwt.ftabLo(ftabOff+1);
 					assert_geq(ftabBot, ftabTop);
 					if(ftabTop == ftabBot) {
 						ret = false;
@@ -1011,7 +1011,7 @@ public:
 					// 'depth' up to 'd')
 					lowAltQual = 0xff;
 					for(size_t k = d; k >= depth && k <= _qlen; k--) {
-						uint32_t kcur = _qlen - k - 1; // current offset into _qry
+						size_t kcur = _qlen - k - 1; // current offset into _qry
 						uint8_t kq = qualAt(kcur);
 						if(k < unrevOff) break; // already visited all revisitable positions
 						bool kCurIsAlternative = (ham + mmPenalty(_maqPenalty, kq) <= _qualThresh);
@@ -1028,7 +1028,7 @@ public:
 								for(int l = 0; l < 4; l++) {
 									if((elims[k] & (1 << l)) == 0) {
 										// Not yet eliminated
-										uint32_t spread = pairSpread(pairs, k, l);
+										TIndexOffU spread = pairSpread(pairs, k, l);
 										if(kCurOverridesEligible) {
 											// Clear previous eligible results;
 											// this one's better
@@ -1165,7 +1165,7 @@ protected:
 	 * currently under consideration.  Stratum is equal to the number
 	 * of mismatches in the seed portion of the alignment.
 	 */
-	int calcStratum(const std::vector<uint32_t>& mms, uint32_t stackDepth) {
+	int calcStratum(const std::vector<TIndexOffU>& mms, uint32_t stackDepth) {
 		int stratum = 0;
 		for(size_t i = 0; i < stackDepth; i++) {
 			if(mms[i] >= (_qlen - _3revOff)) {
@@ -1204,7 +1204,7 @@ protected:
 	bool hhCheckTop(uint32_t stackDepth,
 	                uint32_t d,
 	                uint32_t iham,
-	                const std::vector<uint32_t>& mms,
+	                const std::vector<TIndexOffU>& mms,
 	                uint64_t prehits = 0xffffffffffffffffllu)
 	{
 		assert_eq(0, _reportPartials);
@@ -1249,7 +1249,7 @@ protected:
 				int loHalfMms = 0, hiHalfMms = 0;
 				assert_geq(mms.size(), stackDepth);
 				for(size_t i = 0; i < stackDepth; i++) {
-					uint32_t d = _qlen - mms[i] - 1;
+					TIndexOffU d = _qlen - mms[i] - 1;
 					if     (d < _5depth) hiHalfMms++;
 					else if(d < _3depth) loHalfMms++;
 					else assert(false);
@@ -1287,18 +1287,18 @@ protected:
 	}
 
 	/// Get the top offset for character c at depth d
-	inline uint32_t pairTop(uint32_t* pairs, size_t d, size_t c) {
+	inline TIndexOffU pairTop(TIndexOffU* pairs, size_t d, size_t c) {
 		return pairs[d*8 + c + 0];
 	}
 
 	/// Get the bot offset for character c at depth d
-	inline uint32_t pairBot(uint32_t* pairs, size_t d, size_t c) {
+	inline TIndexOffU pairBot(TIndexOffU* pairs, size_t d, size_t c) {
 		return pairs[d*8 + c + 4];
 	}
 
 	/// Get the spread between the bot and top offsets for character c
 	/// at depth d
-	inline uint32_t pairSpread(uint32_t* pairs, size_t d, size_t c) {
+	inline TIndexOffU pairSpread(TIndexOffU* pairs, size_t d, size_t c) {
 		assert_geq(pairBot(pairs, d, c), pairTop(pairs, d, c));
 		return pairBot(pairs, d, c) - pairTop(pairs, d, c);
 	}
@@ -1456,8 +1456,8 @@ protected:
 	 * full alignments were successfully reported and the caller can
 	 * stop searching.
 	 */
-	bool reportAlignment(uint32_t stackDepth, uint32_t top,
-	                     uint32_t bot, uint16_t cost)
+	bool reportAlignment(uint32_t stackDepth, TIndexOffU top,
+			TIndexOffU bot, uint16_t cost)
 	{
 #ifndef NDEBUG
 		// No two elements of _mms[] should be the same
@@ -1524,8 +1524,8 @@ protected:
 	 * caller can stop searching.
 	 */
 	bool reportFullAlignment(uint32_t stackDepth,
-	                         uint32_t top,
-	                         uint32_t bot,
+			TIndexOffU top,
+			TIndexOffU bot,
 	                         int stratum,
 	                         uint16_t cost)
 	{
@@ -1537,11 +1537,11 @@ protected:
 			return false;
 		}
 		assert(!_reportRanges);
-		uint32_t spread = bot - top;
+		TIndexOffU spread = bot - top;
 		// Pick a random spot in the range to begin report
-		uint32_t r = top + (_rand.nextU32() % spread);
-		for(uint32_t i = 0; i < spread; i++) {
-			uint32_t ri = r + i;
+		TIndexOffU r = top + (_rand.nextU<TIndexOffU>() % spread);
+		for(TIndexOffU i = 0; i < spread; i++) {
+			TIndexOffU ri = r + i;
 			if(ri >= bot) ri -= spread;
 			// reportChaseOne takes the _mms[] list in terms of
 			// their indices into the query string; not in terms
@@ -1670,7 +1670,7 @@ protected:
 	                            uint32_t  lowAltQual,
 	                            uint32_t  eligibleSz,
 	                            uint32_t  eligibleNum,
-	                            uint32_t* pairs,
+	                            TIndexOffU* pairs,
 	                            uint8_t*  elims)
 	{
 		// Sanity check that the lay of the land is as we
@@ -1716,12 +1716,12 @@ protected:
 	bool                _maqPenalty;
 	uint32_t            _qualThresh; // only accept hits with weighted
 	                             // hamming distance <= _qualThresh
-	uint32_t           *_pairs;  // ranges, leveled in parallel
+	TIndexOffU           *_pairs;  // ranges, leveled in parallel
 	                             // with decision stack
 	uint8_t            *_elims;  // which ranges have been
 	                             // eliminated, leveled in parallel
 	                             // with decision stack
-	std::vector<uint32_t> _mms;  // array for holding mismatches
+	std::vector<TIndexOffU> _mms;  // array for holding mismatches
 	std::vector<uint8_t> _refcs;  // array for holding mismatches
 	// Entries in _mms[] are in terms of offset into
 	// _qry - not in terms of offset from 3' or 5' end

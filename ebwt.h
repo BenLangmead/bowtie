@@ -1131,8 +1131,8 @@ public:
 
 	// Searching and reporting
 	void joinedToTextOff(TIndexOffU qlen, TIndexOffU off, TIndexOffU& tidx, TIndexOffU& textoff, TIndexOffU& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU off, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline TIndexOffU countUpTo(const SideLocus& l, int c) const;
@@ -1297,7 +1297,7 @@ public:
 	               const BitPairReference* ref, // reference (= NULL if not necessary)
 	               const ReferenceMap* rmap, // map to another reference coordinate system
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
-	               const std::vector<uint32_t>& mmui32, // mismatch list
+	               const std::vector<TIndexOffU>& mmui32, // mismatch list
 	               const std::vector<uint8_t>& refcs,  // reference characters
 	               size_t numMms,      // # mismatches
 	               UPair h,          // ref coords
@@ -2650,12 +2650,12 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                bool colExEnds,
                                int snpPhred,
                                const BitPairReference* ref,
-                               const std::vector<uint32_t>& mmui32,
+                               const std::vector<TIndexOffU>& mmui32,
                                const std::vector<uint8_t>& refcs,
                                size_t numMms,
                                TIndexOffU off,
-                               uint32_t top,
-                               uint32_t bot,
+                               TIndexOffU top,
+                               TIndexOffU bot,
                                uint32_t qlen,
                                int stratum,
                                uint16_t cost,
@@ -2689,7 +2689,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			refcs,                    // reference characters for mms
 			numMms,                   // # mismatches
 			make_pair(tidx, textoff), // position
-			make_pair(0, 0),          // (bogus) mate position
+			make_pair<TIndexOffU,TIndexOffU>(0, 0),          // (bogus) mate position
 			true,                     // (bogus) mate orientation
 			0,                        // (bogus) mate length
 			make_pair(top, bot),      // arrows
@@ -2722,12 +2722,12 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        bool colExEnds,
                                        int snpPhred,
                                        const BitPairReference* ref,
-                                       const std::vector<uint32_t>& mmui32,
+                                       const std::vector<TIndexOffU>& mmui32,
                                        const std::vector<uint8_t>& refcs,
                                        size_t numMms,
                                        TIndexOffU i,
-                                       uint32_t top,
-                                       uint32_t bot,
+                                       TIndexOffU top,
+                                       TIndexOffU bot,
                                        uint32_t qlen,
                                        int stratum,
                                        uint16_t cost,
