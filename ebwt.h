@@ -2192,12 +2192,12 @@ inline TIndexOffU Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* 
 	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 2*OFF_SIZE);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
-		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
@@ -2246,8 +2246,8 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, TIndexOffU* arrs) cons
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 8);
-	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8);
+	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 2*OFF_SIZE);
+	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + this->_eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
@@ -2297,12 +2297,12 @@ inline TIndexOffU Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
-		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 2*OFF_SIZE); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
@@ -2345,8 +2345,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, TIndexOffU* arrs) cons
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 8);
-	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 8);
+	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
+	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 2*OFF_SIZE);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + this->_eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
@@ -3405,7 +3405,7 @@ void Ebwt<TStr>::readIntoMemory(
 			if(switchEndian) {
 				uint8_t *side = this->_ebwt;
 				for(size_t i = 0; i < eh->_numSides; i++) {
-					TIndexOffU *cums = reinterpret_cast<TIndexOffU*>(side + eh->_sideSz - 8);
+					TIndexOffU *cums = reinterpret_cast<TIndexOffU*>(side + eh->_sideSz - 2*OFF_SIZE);
 					cums[0] = endianSwapU(cums[0]);
 					cums[1] = endianSwapU(cums[1]);
 					side += this->_eh._sideSz;

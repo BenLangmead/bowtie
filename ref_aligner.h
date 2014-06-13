@@ -299,7 +299,7 @@ protected:
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
 		// Get all naive hits
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 		          re2, pairs, aoff, seedOnLeft);
 #endif
@@ -348,7 +348,7 @@ protected:
 		}
 		// Check whether read is disqualified by Ns outside of the anchor
 		// region
-		for(uint32_t i = anchorBitPairs; i < qlen; i++) {
+		for(size_t i = anchorBitPairs; i < qlen; i++) {
 			if((int)qry[i] == 4) {
 				assert_eq(r2.size(), ranges.size() - rangesInitSz);
 				return; // can't match if query has Ns
@@ -533,7 +533,7 @@ protected:
                    TIndexOffU begin,
                    TIndexOffU end,
 	               TRangeVec& ranges,
-	               TU32Vec& results,
+	               std::vector<TIndexOffU>& results,
 	               TSetPairs* pairs,
 	               TIndexOffU aoff,
 	               bool seedOnLeft) const
@@ -643,7 +643,7 @@ protected:
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 		          re2, pairs, aoff, seedOnLeft);
 #endif
@@ -937,7 +937,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -1062,7 +1062,7 @@ protected:
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -1415,7 +1415,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -1552,7 +1552,7 @@ protected:
 		assert_gt(qlen, 0);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -1990,7 +1990,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -2184,7 +2184,7 @@ protected:
 		size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -2593,7 +2593,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -2809,7 +2809,7 @@ protected:
 		size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -3332,7 +3332,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -3566,7 +3566,7 @@ protected:
 		size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
@@ -4192,7 +4192,7 @@ protected:
 				   TIndexOffU begin,
 				   TIndexOffU end,
 				   TRangeVec& ranges,
-				   TU32Vec& results,
+				   std::vector<TIndexOffU>& results,
 				   TSetPairs* pairs,
 				   TIndexOffU aoff,
 				   bool seedOnLeft) const
@@ -4446,7 +4446,7 @@ protected:
 		size_t slen = min(qlen, this->seedLen_);
 #ifndef NDEBUG
 		// Get results from the naive matcher for sanity-checking
-		TRangeVec r2; TU32Vec re2;
+		TRangeVec r2; std::vector<TIndexOffU> re2;
 		naiveFind(numToFind, tidx, ref, qry, quals, begin, end, r2,
 				  re2, pairs, aoff, seedOnLeft);
 #endif
