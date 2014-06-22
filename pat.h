@@ -19,6 +19,12 @@
 #include "qual.h"
 #include "hit_set.h"
 #include "search_globals.h"
+#include <errno.h>
+
+static inline const char *ext(const char *s) {
+	const char *x;
+	return (x = strrchr(s, '.')) ? x : "";
+}
 
 /**
  * Classes and routines for reading reads from various input sources.
@@ -1631,10 +1637,12 @@ public:
 	 * master thread.
 	 */
 	virtual void reset() {
-		TrimmingPatternSource::reset();
-		filecur_ = 0,
-		open();
-		filecur_++;
+        if (readCnt_ != 0) {
+            TrimmingPatternSource::reset();
+            filecur_ = 0,
+            open();
+            filecur_++;
+        }
 	}
 protected:
 	/// Read another pattern from the input file; this is overridden
@@ -1653,6 +1661,18 @@ protected:
 			FILE *in;
 			if(infiles_[filecur_] == "-") {
 				in = stdin;
+			} else if(!strcmp(ext(infiles_[filecur_].c_str()),".gz")) {
+				string tmp;
+				tmp = "gunzip -c '";
+				tmp += infiles_[filecur_];
+				tmp += "'";
+				in = popen(tmp.c_str(), "r");
+				if (!in) {
+					cerr << "Warning: Could not popen read file \"" << tmp << "\" for reading (" << strerror(errno) << "); skipping..." << endl;
+					errs_[filecur_] = true;
+					filecur_++;
+					continue;
+				}
 			} else if((in = fopen(infiles_[filecur_].c_str(), "rb")) == NULL) {
 				if(!errs_[filecur_]) {
 					cerr << "Warning: Could not open read file \"" << infiles_[filecur_] << "\" for reading; skipping..." << endl;
