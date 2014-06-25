@@ -43,7 +43,7 @@ int main(int argc, const char **argv) {
 				myargs[i] = args[i].c_str();
 			}
 			if(args.size() == 1) continue;
-			lastret = bowtie_build(args.size(), myargs);
+			lastret = bowtie_build((int)args.size(), myargs);
 			free(myargs);
 		}
 		if(lastret == -1) {

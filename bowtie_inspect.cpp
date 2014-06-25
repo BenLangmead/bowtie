@@ -397,7 +397,7 @@ void print_index_summary(
 	cout << "FTab-Chars" << '\t' << ebwt.eh().ftabChars() << endl;
 	for(size_t i = 0; i < ebwt.nPat(); i++) {
 		cout << "Sequence-" << (i+1)
-		     << '\t' << p_refnames[refs.expandIdx(i)]
+		     << '\t' << p_refnames[refs.expandIdx((uint32_t)i)]
 		     << '\t' << (ebwt.plen()[i] + (color ? 1 : 0))
 		     << endl;
 	}

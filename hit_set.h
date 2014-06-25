@@ -42,13 +42,13 @@ struct HitSetEnt {
 		assert_eq(stratum, (cost >> 14));
 		fb.writeChars((const char*)&cost, 2);
 		fb.writeChars((const char*)&oms, 4);
-		uint32_t sz = edits.size();
+		uint32_t sz = (uint32_t)edits.size();
 		fb.writeChars((const char*)&sz, 4);
 		std::vector<Edit>::const_iterator it;
 		for(it = edits.begin(); it != edits.end(); it++) {
 			it->serialize(fb);
 		}
-		sz = cedits.size();
+		sz = (uint32_t)cedits.size();
 		fb.writeChars((const char*)&sz, 4);
 		for(it = cedits.begin(); it != cedits.end(); it++) {
 			it->serialize(fb);
@@ -242,11 +242,11 @@ struct HitSet {
 	 */
 	void serialize(OutFileBuf& fb) const {
 		fb.write(color ? 1 : 0);
-		uint32_t i = seqan::length(name);
+		uint32_t i = (uint32_t)seqan::length(name);
 		assert_gt(i, 0);
 		fb.writeChars((const char*)&i, 4);
 		fb.writeChars(seqan::begin(name), i);
-		i = seqan::length(seq);
+		i = (uint32_t)seqan::length(seq);
 		assert_gt(i, 0);
 		assert_lt(i, 1024);
 		fb.writeChars((const char*)&i, 4);
@@ -254,7 +254,7 @@ struct HitSet {
 			fb.write("ACGTN"[(int)seq[j]]);
 		}
 		fb.writeChars(seqan::begin(qual), i);
-		i = ents.size();
+		i = (uint32_t)ents.size();
 		fb.writeChars((const char*)&i, 4);
 		std::vector<HitSetEnt>::const_iterator it;
 		for(it = ents.begin(); it != ents.end(); it++) {

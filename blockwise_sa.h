@@ -25,19 +25,19 @@ using namespace seqan;
 // Helpers for printing verbose messages
 
 #ifndef VMSG_NL
-#define VMSG_NL(args...) \
+#define VMSG_NL(...) \
 if(this->verbose()) { \
 	stringstream tmp; \
-	tmp << args << endl; \
+	tmp << __VA_ARGS__ << endl; \
 	this->verbose(tmp.str()); \
 }
 #endif
 
 #ifndef VMSG
-#define VMSG(args...) \
+#define VMSG(...) \
 if(this->verbose()) { \
 	stringstream tmp; \
-	tmp << args; \
+	tmp << __VA_ARGS__; \
 	this->verbose(tmp.str()); \
 }
 #endif
@@ -49,7 +49,7 @@ template<typename TStr>
 class BlockwiseSA {
 public:
 	BlockwiseSA(const TStr& __text,
-				TIndexOffU __bucketSz,
+	            TIndexOffU __bucketSz,
 	            bool __sanityCheck = false,
 	            bool __passMemExc = false,
 	            bool __verbose = false,
@@ -130,7 +130,7 @@ public:
 	bool sanityCheck()  const { return _sanityCheck; }
 	bool verbose()      const { return _verbose; }
 	ostream& log()      const { return _logger; }
-	uint32_t size()     const { return length(_text)+1; }
+	size_t size()       const { return length(_text)+1; }
 
 protected:
 	/// Reset back to the first block
@@ -148,7 +148,7 @@ protected:
 	/// Optionally output a verbose message
 	void verbose(const string& s) const {
 		if(this->verbose()) {
-			this->log() << s;
+			this->log() << s.c_str();
 			this->log().flush();
 		}
 	}
@@ -172,7 +172,7 @@ template<typename TStr>
 class InorderBlockwiseSA : public BlockwiseSA<TStr> {
 public:
 	InorderBlockwiseSA(const TStr& __text,
-					   TIndexOffU __bucketSz,
+	                   TIndexOffU __bucketSz,
 	                   bool __sanityCheck = false,
 	   	               bool __passMemExc = false,
 	                   bool __verbose = false,
@@ -191,7 +191,7 @@ public:
 	typedef DifferenceCoverSample<TStr> TDC;
 
 	KarkkainenBlockwiseSA(const TStr& __text,
-						  TIndexOffU __bucketSz,
+	                      TIndexOffU __bucketSz,
 	                      uint32_t __dcV,
 	                      uint32_t __seed = 0,
 	      	              bool __sanityCheck = false,
@@ -288,15 +288,15 @@ private:
 	 * Defined in blockwise_sa.cpp
 	 */
 	inline bool tieBreakingLcp(TIndexOffU aOff,
-							   TIndexOffU bOff,
-							   TIndexOffU& lcp,
+	                           TIndexOffU bOff,
+	                           TIndexOffU& lcp,
 	                           bool& lcpIsSoft);
 
 	/**
 	 * Compare two suffixes using the difference-cover sample.
 	 */
 	inline bool suffixCmp(TIndexOffU cmp,
-						TIndexOffU i,
+	                      TIndexOffU i,
 	                      int64_t& j,
 	                      int64_t& k,
 	                      bool& kSoft,
@@ -320,8 +320,8 @@ void KarkkainenBlockwiseSA<TStr>::qsort(String<TIndexOffU>& bucket) {
 	typedef typename Value<TStr>::Type TAlphabet;
 	const TStr& t = this->text();
 	TIndexOffU *s = begin(bucket);
-	uint32_t slen = seqan::length(bucket);
-	TIndexOffU len = seqan::length(t);
+	TIndexOffU slen = (TIndexOffU)seqan::length(bucket);
+	TIndexOffU len = (TIndexOffU)seqan::length(t);
 	if(_dc != NULL) {
 		// Use the difference cover as a tie-breaker if we have it
 		VMSG_NL("  (Using difference cover)");
@@ -350,8 +350,8 @@ template<>
 void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<TIndexOffU>& bucket) {
 	const String<Dna, Packed<> >& t = this->text();
 	TIndexOffU *s = begin(bucket);
-	uint32_t slen = (uint32_t)seqan::length(bucket);
-	TIndexOffU len = seqan::length(t);
+	TIndexOffU slen = (TIndexOffU)seqan::length(bucket);
+	TIndexOffU len = (TIndexOffU)seqan::length(t);
 	if(_dc != NULL) {
 		// Use the difference cover as a tie-breaker if we have it
 		VMSG_NL("  (Using difference cover)");
@@ -555,7 +555,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 //		VMSG_NL("Iterated too many times; trying again...");
 //		buildSamples();
 //	}
-	VMSG_NL("Avg bucket size: " << ((float)(len-length(_sampleSuffs)) / (length(_sampleSuffs)+1)) << " (target: " << bsz << ")");
+	VMSG_NL("Avg bucket size: " << ((double)(len-length(_sampleSuffs)) / (length(_sampleSuffs)+1)) << " (target: " << bsz << ")");
 }
 
 /**
@@ -579,8 +579,8 @@ static TIndexOffU suffixLcp(const T& t, TIndexOffU aOff, TIndexOffU bOff) {
  */
 template<typename TStr> inline
 bool KarkkainenBlockwiseSA<TStr>::tieBreakingLcp(TIndexOffU aOff,
-												TIndexOffU bOff,
-												TIndexOffU& lcp,
+                                                 TIndexOffU bOff,
+                                                 TIndexOffU& lcp,
                                                  bool& lcpIsSoft)
 {
 	const TStr& t = this->text();
@@ -619,10 +619,11 @@ bool KarkkainenBlockwiseSA<TStr>::tieBreakingLcp(TIndexOffU aOff,
  * filled in then calculate it from scratch.
  */
 template<typename T>
-static TIndexOffU lookupSuffixZ(const T& t,
-								TIndexOffU zOff,
-								TIndexOffU off,
-                              const String<TIndexOffU>& z)
+static TIndexOffU lookupSuffixZ(
+	const T& t,
+	TIndexOffU zOff,
+	TIndexOffU off,
+	const String<TIndexOffU>& z)
 {
 	if(zOff < length(z)) {
 		TIndexOffU ret = z[zOff];
@@ -638,12 +639,13 @@ static TIndexOffU lookupSuffixZ(const T& t,
  * false -> i > cmp
  */
 template<typename TStr> inline
-bool KarkkainenBlockwiseSA<TStr>::suffixCmp(TIndexOffU cmp,
-											TIndexOffU i,
-                                            int64_t& j,
-                                            int64_t& k,
-                                            bool& kSoft,
-                                            const String<TIndexOffU>& z)
+bool KarkkainenBlockwiseSA<TStr>::suffixCmp(
+	TIndexOffU cmp,
+	TIndexOffU i,
+	int64_t& j,
+	int64_t& k,
+	bool& kSoft,
+	const String<TIndexOffU>& z)
 {
 	const TStr& t = this->text();
 	TIndexOffU len = TIndexOffU(length(t));

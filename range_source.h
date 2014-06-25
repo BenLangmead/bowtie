@@ -53,7 +53,7 @@ struct EditList {
 		} else if(sz_ == (numEdits + numMoreEdits)) {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
-			yetMoreEdits_ = pool.alloc(qlen + 10 - numMoreEdits - numEdits);
+			yetMoreEdits_ = pool.alloc((uint32_t)qlen + 10 - numMoreEdits - numEdits);
 			if(yetMoreEdits_ == NULL) {
 				return false;
 			}
@@ -135,7 +135,7 @@ struct EditList {
 	 */
 	void free(AllocOnlyPool<Edit>& epool, size_t qlen) {
 		if(yetMoreEdits_ != NULL)
-			epool.free(yetMoreEdits_, qlen + 10 - numMoreEdits - numEdits);
+			epool.free(yetMoreEdits_, (uint32_t)qlen + 10 - numMoreEdits - numEdits);
 		if(moreEdits_ != NULL)
 			epool.free(moreEdits_, numMoreEdits);
 	}
@@ -636,7 +636,7 @@ public:
 		// jumping over a bunch of unrevisitable positions.
 		for(size_t i = 0; i < len_; i++) {
 			ranges_[i].eliminated_ = true;
-			assert(eliminated(i));
+			assert(eliminated((int)i));
 		}
 		assert(repOk(qlen));
 		return true;

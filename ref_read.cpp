@@ -184,7 +184,7 @@ void reverseRefRecords(const vector<RefRecord>& src,
 	dst.clear();
 	{
 		vector<RefRecord> cur;
-		for(int i = src.size()-1; i >= 0; i--) {
+		for(int64_t i = (int64_t)src.size()-1; i >= 0; i--) {
 			bool first = (i == (int)src.size()-1 || src[i+1].first);
 			if(src[i].len) {
 				cur.push_back(RefRecord(0, src[i].len, first));
@@ -192,9 +192,9 @@ void reverseRefRecords(const vector<RefRecord>& src,
 			}
 			if(src[i].off) cur.push_back(RefRecord(src[i].off, 0, first));
 		}
-		for(int i = 0; i < (int)cur.size(); i++) {
+		for(int64_t i = 0; i < (int64_t)cur.size(); i++) {
 			assert(cur[i].off == 0 || cur[i].len == 0);
-			if(i < (int)cur.size()-1 && cur[i].off != 0 && !cur[i+1].first) {
+			if(i < (int64_t)cur.size()-1 && cur[i].off != 0 && !cur[i+1].first) {
 				dst.push_back(RefRecord(cur[i].off, cur[i+1].len, cur[i].first));
 				i++;
 			} else {

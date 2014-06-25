@@ -220,7 +220,7 @@ public:
 	 */
 	void setQlen(uint32_t qlen) {
 		assert(_qry != NULL);
-		_qlen = min<uint32_t>(length(*_qry), qlen);
+		_qlen = min<uint32_t>((uint32_t)length(*_qry), qlen);
 	}
 
 	/// Return the maximum number of allowed backtracks in a given call
@@ -254,7 +254,7 @@ public:
 		bool ret;
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
-		uint32_t m = min<uint32_t>(_unrevOff, _qlen);
+		uint32_t m = min<uint32_t>(_unrevOff, (uint32_t)_qlen);
 		if(nsInFtab == 0 && m >= (uint32_t)ftabChars) {
 			uint32_t ftabOff = calcFtabOff();
 			TIndexOffU top = ebwt.ftabHi(ftabOff);
@@ -313,7 +313,7 @@ public:
 			if(_partialsBuf.size() > 0) {
 #ifndef NDEBUG
 				for(size_t i = 0; i < _partialsBuf.size(); i++) {
-					assert(_partialsBuf[i].repOk(_qualThresh, _qlen, (*_qual), _maqPenalty));
+					assert(_partialsBuf[i].repOk(_qualThresh, (uint32_t)_qlen, (*_qual), _maqPenalty));
 				}
 #endif
 				_partials->addPartials(_params.patId(), _partialsBuf);
@@ -456,7 +456,7 @@ public:
 		// eligible
 		uint8_t lowAltQual = 0xff;
 		uint32_t d = depth;
-		uint32_t cur = _qlen - d - 1; // current offset into _qry
+		uint32_t cur = (uint32_t)_qlen - d - 1; // current offset into _qry
 		while(cur < _qlen) {
 			// Try to advance further given that
 			if(_verbose) {
@@ -696,7 +696,7 @@ public:
 					uint32_t loHalfMms = 0, hiHalfMms = 0;
 					assert_geq(_mms.size(), stackDepth);
 					for(size_t i = 0; i < stackDepth; i++) {
-						uint32_t d = _qlen - _mms[i] - 1;
+						uint32_t d = (uint32_t)_qlen - _mms[i] - 1;
 						if     (d < _5depth) hiHalfMms++;
 						else if(d < _3depth) loHalfMms++;
 						else assert(false);
@@ -773,7 +773,7 @@ public:
 					// Walk from left to right
 					for(; i >= depth; i--) {
 						assert_geq(i, unrevOff);
-						icur = _qlen - i - 1; // current offset into _qry
+						icur = (uint32_t)(_qlen - i - 1); // current offset into _qry
 						uint8_t qi = qualAt(icur);
 						assert_lt(elims[i], 16);
 						if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
@@ -802,7 +802,7 @@ public:
 										bttop = pairTop(pairs, i, j);
 										btbot = pairBot(pairs, i, j);
 										btham += mmPenalty(_maqPenalty, qi);
-										btcint = j;
+										btcint = (uint32_t)j;
 										btchar = "acgt"[j];
 										assert_leq(btham, _qualThresh);
 										break; // found our target; we can stop
@@ -841,7 +841,7 @@ public:
 				SideLocus::initFromTopBot(bttop, btbot,
 				                          ebwt._eh, ebwt._ebwt,
 				                          _preLtop, _preLbot);
-				icur = _qlen - i - 1; // current offset into _qry
+				icur = (uint32_t)(_qlen - i - 1); // current offset into _qry
 				// Slide over to the next backtacking frame within
 				// pairs and elims; won't interfere with our frame or
 				// any of our parents' frames
@@ -919,7 +919,7 @@ public:
 					// so we can go ahead and use it
 					// Rightmost char gets least significant bit-pairs
 					int ftabChars = ebwt._eh._ftabChars;
-					TIndexOffU ftabOff = (*_qry)[_qlen - ftabChars];
+					TIndexOffU ftabOff = (TIndexOffU)(int)(*_qry)[_qlen - ftabChars];
 					assert_lt(ftabOff, 4);
 					assert_lt(ftabOff, ebwt._eh._ftabLen-1);
 					for(int j = ftabChars - 1; j > 0; j--) {
@@ -927,8 +927,8 @@ public:
 						if(_qlen-j == icur) {
 							ftabOff |= btcint;
 						} else {
-							assert_lt((TIndexOffU)(*_qry)[_qlen-j], 4);
-							ftabOff |= (TIndexOffU)(*_qry)[_qlen-j];
+							assert_lt((int)(*_qry)[_qlen-j], 4);
+							ftabOff |= (int)(*_qry)[_qlen-j];
 						}
 						assert_lt(ftabOff, ebwt._eh._ftabLen-1);
 					}
@@ -961,7 +961,7 @@ public:
 					assert_leq(iham, _qualThresh);
 					// Continue from selected alternative range
 					ret = backtrack(stackDepth+1,// added 1 mismatch to alignment
-					                i+1,         // start from next position after
+					                (uint32_t)i+1, // start from next position after
 					                btUnrevOff,  // new unrevisitable boundary
 					                btOneRevOff, // new 1-revisitable boundary
 					                btTwoRevOff, // new 2-revisitable boundary
@@ -1042,7 +1042,7 @@ public:
 											// recalculate them
 											eligibleNum = 0;
 											eligibleSz = 0;
-											eli = k;
+											eli = (uint32_t)k;
 											eltop = pairTop(pairs, k, l);
 											elbot = pairBot(pairs, k, l);
 											assert_eq(elbot-eltop, spread);
@@ -1141,7 +1141,7 @@ protected:
 			// Count the mismatches in the lo and hi halves
 			uint32_t loHalfMms = 0, hiHalfMms = 0;
 			for(size_t i = 0; i < stackDepth; i++) {
-				uint32_t depth = _qlen - mms[i] - 1;
+				uint32_t depth = (uint32_t)(_qlen - mms[i] - 1);
 				if     (depth < _5depth) hiHalfMms++;
 				else if(depth < _3depth) loHalfMms++;
 				else assert(false);
@@ -1249,7 +1249,7 @@ protected:
 				int loHalfMms = 0, hiHalfMms = 0;
 				assert_geq(mms.size(), stackDepth);
 				for(size_t i = 0; i < stackDepth; i++) {
-					TIndexOffU d = _qlen - mms[i] - 1;
+					TIndexOffU d = (TIndexOffU)(_qlen - mms[i] - 1);
 					if     (d < _5depth) hiHalfMms++;
 					else if(d < _3depth) loHalfMms++;
 					else assert(false);
@@ -1503,7 +1503,7 @@ protected:
 			cost |= (stratum << 14);
 			assert_geq(cost, (uint32_t)(stratum << 14));
 			// Report the range of full alignments
-			hit = reportFullAlignment(stackDepth + numMuts, top, bot, stratum, cost);
+			hit = reportFullAlignment((uint32_t)(stackDepth + numMuts), top, bot, stratum, cost);
 			// Re-apply partial-alignment mutations
 			applyPartialMutations();
 			assert_eq(tmp, (*_qry));
@@ -1551,8 +1551,8 @@ protected:
 			                         _color, _primer, _trimc, colorExEnds,
 			                         snpPhred, _refs, _mms, _refcs,
 			                         stackDepth, ri, top, bot,
-			                         _qlen, stratum, cost, _patid, _seed,
-			                         _params))
+			                         (uint32_t)_qlen, stratum, cost, _patid,
+			                         _seed, _params))
 			{
 				// Return value of true means that we can stop
 				return true;
@@ -1599,7 +1599,7 @@ protected:
 		al.entry.pos0 = (uint16_t)_mms[0]; // pos
 		ASSERT_ONLY(uint8_t qual0 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[0]])));
 		ASSERT_ONLY(qualTot += qual0);
-		uint32_t ci = _qlen - _mms[0] - 1;
+		uint32_t ci = (uint32_t)(_qlen - _mms[0] - 1);
 		// _chars[] is index in terms of RHS-relative depth
 		int c = (int)(Dna5)_chars[ci];
 		assert_lt(c, 4);
@@ -1615,7 +1615,7 @@ protected:
 			al.entry.pos1 = (uint16_t)_mms[1]; // pos
 			ASSERT_ONLY(uint8_t qual1 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[1]])));
 			ASSERT_ONLY(qualTot += qual1);
-			ci = _qlen - _mms[1] - 1;
+			ci = (uint32_t)(_qlen - _mms[1] - 1);
 			// _chars[] is index in terms of RHS-relative depth
 			c = (int)(Dna5)_chars[ci];
 			assert_lt(c, 4);
@@ -1630,7 +1630,7 @@ protected:
 				al.entry.pos2 = (uint16_t)_mms[2]; // pos
 				ASSERT_ONLY(uint8_t qual2 = mmPenalty(_maqPenalty, phredCharToPhredQual((*_qual)[_mms[2]])));
 				ASSERT_ONLY(qualTot += qual2);
-				ci = _qlen - _mms[2] - 1;
+				ci = (uint32_t)(_qlen - _mms[2] - 1);
 				// _chars[] is index in terms of RHS-relative depth
 				c = (int)(Dna5)_chars[ci];
 				assert_lt(c, 4);
@@ -1649,7 +1649,7 @@ protected:
 		assert_leq(qualTot, _qualThresh);
 		assert(validPartialAlignment(al));
 #ifndef NDEBUG
-		assert(al.repOk(_qualThresh, _qlen, (*_qual), _maqPenalty));
+		assert(al.repOk(_qualThresh, (uint32_t)_qlen, (*_qual), _maqPenalty));
 		for(size_t i = 0; i < _partialsBuf.size(); i++) {
 			assert(validPartialAlignment(_partialsBuf[i]));
 			assert(!samePartialAlignment(_partialsBuf[i], al));
@@ -1679,7 +1679,7 @@ protected:
 		uint32_t cumSz = 0;
 		uint32_t eligiblesVisited = 0;
 		for(; i <= d; i++) {
-			uint32_t icur = _qlen - i - 1; // current offset into _qry
+			uint32_t icur = (uint32_t)(_qlen - i - 1); // current offset into _qry
 			uint8_t qi = qualAt(icur);
 			assert_lt(elims[i], 16);
 			if((qi == lowAltQual || !_considerQuals) && elims[i] != 15) {
@@ -1931,7 +1931,7 @@ public:
 	 */
 	void setQlen(uint32_t qlen) {
 		assert(qry_ != NULL);
-		qlen_ = min<uint32_t>(length(*qry_), qlen);
+		qlen_ = min<uint32_t>((uint32_t)length(*qry_), qlen);
 	}
 
 	/**
@@ -1985,7 +1985,7 @@ public:
 		assert_leq(iham, qualLim_);
 		// m = depth beyond which ftab must not extend or else we might
 		// miss some legitimate paths
-		uint32_t m = min<uint32_t>(offRev0_, qlen_);
+		uint32_t m = min<uint32_t>(offRev0_, (uint32_t)qlen_);
 		// Let skipInvalidExact = true if using the ftab would be a
 		// waste because it would jump directly to an alignment we
 		// couldn't use.
@@ -2029,7 +2029,7 @@ public:
 					return;
 				}
 				if(!b->init(
-				        pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+				        pm.rpool, pm.epool, pm.bpool.lastId(), (uint32_t)qlen_,
 				        offRev0_, offRev1_, offRev2_, offRev3_,
 				        0, ftabChars, icost, iham, top, bot,
 				        ebwt._eh, ebwt._ebwt))
@@ -2056,7 +2056,7 @@ public:
 				assert(pm.empty());
 				return;
 			}
-			if(!b->init(pm.rpool, pm.epool, pm.bpool.lastId(), qlen_,
+			if(!b->init(pm.rpool, pm.epool, pm.bpool.lastId(), (uint32_t)qlen_,
 			        offRev0_, offRev1_, offRev2_, offRev3_,
 			        0, 0, icost, iham, 0, 0, ebwt._eh, ebwt._ebwt))
 			{
@@ -2118,7 +2118,7 @@ public:
 				}
 
 			}
-			assert(br->repOk(qlen_));
+			assert(br->repOk((uint32_t)qlen_));
 
 			ASSERT_ONLY(int stratum = br->cost_ >> 14); // shift the stratum over
 			assert_lt(stratum, 4);
@@ -2141,11 +2141,11 @@ public:
 				// Stop extending this branch because it violates a half-
 				// and-half constraint
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, qlen_, depth3_, qualOrder_);
+				pm.curtail(br, (uint32_t)qlen_, depth3_, qualOrder_);
 				goto bail;
 			}
 
-			cur = qlen_ - depth - 1; // current offset into qry_
+			cur = (uint32_t)(qlen_ - depth - 1); // current offset into qry_
 			if(depth < qlen_) {
 				// Determine whether ranges at this location are candidates
 				// for backtracking
@@ -2291,7 +2291,7 @@ public:
 
 			// Check whether we've obtained an exact alignment when
 			// we've been instructed not to report exact alignments
-			nedits = br->edits_.size();
+			nedits = (uint32_t)br->edits_.size();
 			invalidExact = (hit && nedits == 0 && !reportExacts_);
 			assert_leq(br->ham_, qualLim_);
 
@@ -2301,7 +2301,7 @@ public:
 				// This alignment doesn't satisfy the half-and-half
 				// requirements; reject it
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, qlen_, depth3_, qualOrder_);
+				pm.curtail(br, (uint32_t)qlen_, depth3_, qualOrder_);
 				goto bail;
 			}
 
@@ -2333,7 +2333,7 @@ public:
 				curRange_.mms.clear();
 				curRange_.refcs.clear();
 				for(size_t i = 0; i < nedits; i++) {
-					curRange_.mms.push_back(qlen_ - br->edits_.get(i).pos - 1);
+					curRange_.mms.push_back((uint32_t)(qlen_ - br->edits_.get(i).pos - 1));
 					curRange_.refcs.push_back((char)br->edits_.get(i).chr);
 				}
 				addPartialEdits();
@@ -2349,11 +2349,11 @@ public:
 				assert(curRange_.repOk());
 				// Must curtail because we've consumed the whole pattern
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, qlen_, depth3_, qualOrder_);
+				pm.curtail(br, (uint32_t)qlen_, depth3_, qualOrder_);
 			} else if(empty || cur == 0) {
 				// The branch couldn't be extended further
 				if(metrics_ != NULL) metrics_->curBacktracks_++;
-				pm.curtail(br, qlen_, depth3_, qualOrder_);
+				pm.curtail(br, (uint32_t)qlen_, depth3_, qualOrder_);
 			} else {
 				// Extend the branch by one position; no change to its cost
 				// so there's no need to reconsider where it lies in the
@@ -2364,7 +2364,7 @@ public:
 		bail:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
-			if(!pm.splitAndPrep(rand_, qlen_, qualLim_, depth3_,
+			if(!pm.splitAndPrep(rand_, (uint32_t)qlen_, qualLim_, depth3_,
 			                    qualOrder_, fuzzy_,
 			                    ebwt_->_eh, ebwt_->_ebwt, ebwt_->_fw))
 			{
@@ -2407,7 +2407,7 @@ protected:
 		if(seedRange_.valid()) {
 			const size_t srSz = seedRange_.mms.size();
 			for(size_t i = 0; i < srSz; i++) {
-				curRange_.mms.push_back(qlen_ - seedRange_.mms[i] - 1);
+				curRange_.mms.push_back((uint32_t)(qlen_ - seedRange_.mms[i] - 1));
 				curRange_.refcs.push_back(seedRange_.refcs[i]);
 			}
 			curRange_.numMms += srSz;
@@ -2423,7 +2423,7 @@ protected:
 	 * true.
 	 */
 	bool hhCheck(Branch *b, uint32_t depth, bool empty) {
-		const uint32_t nedits = b->edits_.size();
+		const uint32_t nedits = (uint32_t)b->edits_.size();
 		ASSERT_ONLY(uint32_t lim3 = (offRev3_ == offRev2_)? 2 : 3);
 		ASSERT_ONLY(uint32_t lim5 = (offRev1_ == offRev0_)? 2 : 1);
 		if((depth == (depth5_-1)) && !empty) {
@@ -2477,7 +2477,7 @@ protected:
 		// Crossing from the hi-half into the lo-half
 		ASSERT_ONLY(uint32_t lim3 = (offRev3_ == offRev2_)? 2 : 3);
 		ASSERT_ONLY(uint32_t lim5 = (offRev1_ == offRev0_)? 2 : 1);
-		const uint32_t nedits = b->edits_.size();
+		const uint32_t nedits = (uint32_t)b->edits_.size();
 		if(d == depth5_) {
 			assert_leq(nedits, lim5);
 			if(nedits == 0) {
@@ -2768,7 +2768,7 @@ public:
 		uint32_t rev2Off = cextToDepth(rev2Off_, sRight, s, len_);
 		uint32_t rev3Off = cextToDepth(rev3Off_, sRight, s, len_);
 		// Truncate the pattern if necessary
-		uint32_t qlen = seqan::length(qual);
+		uint32_t qlen = (uint32_t)seqan::length(qual);
 		if(seed_) {
 			if(len_ > s) {
 				rs_->setQlen(s);

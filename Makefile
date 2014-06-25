@@ -100,16 +100,17 @@ SEARCH_FRAGMENTS = $(wildcard search_*_phase*.c)
 VERSION = $(shell cat VERSION)
 
 BITS=32
-# cygwin will stay 32 bit for now.
-ifeq (1,$(MINGW))
-    # msys will always be 32 bit so look at the cpu arch.
-    ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
-        BITS=64
-    else
-        ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITECTURE)))
-            BITS=64
-        endif
-    endif
+ifeq (x86_64,$(shell uname -m))
+	BITS=64
+endif
+# msys will always be 32 bit so look at the cpu arch instead.
+ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
+	ifeq (1,$(MINGW))
+		BITS=64
+	endif
+endif
+ifeq (32,$(BITS))
+  $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
 ifeq (1,$(LINUX))

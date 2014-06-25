@@ -31,9 +31,9 @@ public:
 		time_t passed = elapsed();
 		// Print the message supplied at construction time followed
 		// by time elapsed formatted HH:MM:SS 
-		unsigned int hours   = (passed / 60) / 60;
-		unsigned int minutes = (passed / 60) % 60;
-		unsigned int seconds = (passed % 60);
+		unsigned int hours   = (unsigned int)((passed / 60) / 60);
+		unsigned int minutes = (unsigned int)((passed / 60) % 60);
+		unsigned int seconds = (unsigned int)((passed % 60));
 		out << _msg << setfill ('0') << setw (2) << hours << ":"
 		            << setfill ('0') << setw (2) << minutes << ":"
 		            << setfill ('0') << setw (2) << seconds << endl;

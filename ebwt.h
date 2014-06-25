@@ -1443,8 +1443,8 @@ public:
 					hit.quals[destpos] = '!';
 				}
 				if(nmm[i] != 'M') {
-					uint32_t off = i - (colExEnds? 1:0);
-					if(!_fw) off = nqlen - off - 1;
+					uint32_t off = (uint32_t)i - (colExEnds? 1:0);
+					if(!_fw) off = (uint32_t)nqlen - off - 1;
 					assert_lt(off, nqlen);
 					hit.mms.set(off);
 					hit.refcs[off] = "ACGT"[ref->getBase(h.first, h.second+i)];
@@ -1493,7 +1493,7 @@ public:
 				assert_neq(4, (int)_texts[h.first][h.second + i]);
 				// Forward pattern appears at h
 				if((int)hit.patSeq[i] != (int)_texts[h.first][h.second + i]) {
-					uint32_t qoff = i;
+					uint32_t qoff = (uint32_t)i;
 					// if ebwtFw != _fw the 3' end is on on the
 					// left end of the pattern, but the diff vector
 					// should encode mismatches w/r/t the 5' end,

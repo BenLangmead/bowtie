@@ -14,19 +14,19 @@ using namespace std;
 using namespace seqan;
 
 #ifndef VMSG_NL
-#define VMSG_NL(args...) \
+#define VMSG_NL(...) \
 if(this->verbose()) { \
 	stringstream tmp; \
-	tmp << args << endl; \
+	tmp << __VA_ARGS__ << endl; \
 	this->verbose(tmp.str()); \
 }
 #endif
 
 #ifndef VMSG
-#define VMSG(args...) \
+#define VMSG(...) \
 if(this->verbose()) { \
 	stringstream tmp; \
-	tmp << args; \
+	tmp << __VA_ARGS__; \
 	this->verbose(tmp.str()); \
 }
 #endif
@@ -496,7 +496,7 @@ template<typename T>
 static unsigned int myLog2(T i) {
 	assert_eq(1, popCount(i)); // must be power of 2
 	for(size_t j = 0; j < sizeof(T)*8; j++) {
-		if(i & 1) return j;
+		if(i & 1) return (int)j;
 		i >>= 1;
 	}
 	assert(false);
@@ -521,7 +521,7 @@ public:
 		_sanity(__sanity),
 		_ds(getDiffCover(_v, _verbose, _sanity)),
 		_dmap(getDeltaMap(_v, _ds)),
-		_d(length(_ds)),
+		_d((uint32_t)length(_ds)),
 		_doffs(),
 		_isaPrime(),
 		_dInv(),
@@ -533,7 +533,10 @@ public:
 		assert_eq(1, popCount(_v)); // must be power of 2
 		// Build map from d's to idx's
 		fill(_dInv, _v, 0xffffffff, Exact());
-		for(size_t i = 0; i < length(_ds); i++) _dInv[_ds[i]] = i;
+		uint32_t lim = (uint32_t)length(_ds);
+		for(uint32_t i = 0; i < lim; i++) {
+			_dInv[_ds[i]] = i;
+		}
 	}
 	
 	/**
@@ -600,7 +603,7 @@ private:
 
 	void verbose(const string& s) const {
 		if(this->verbose()) {
-			this->log() << s;
+			this->log() << s.c_str();
 			this->log().flush();
 		}
 	}
@@ -625,10 +628,10 @@ private:
  * string 'host' are identical up to depth 'v'.
  */
 template <typename TStr>
-static inline bool suffixLt(const TStr& host, uint32_t suf1, uint32_t suf2) {
-	uint32_t hlen = length(host);
+static inline bool suffixLt(const TStr& host, TIndexOffU suf1, TIndexOffU suf2) {
+	TIndexOffU hlen = (TIndexOffU)length(host);
 	assert_neq(suf1, suf2);
-	uint32_t i = 0;
+	TIndexOffU i = 0;
 	while(suf1 + i < hlen && suf2 + i < hlen) {
 		if(host[suf1+i] < host[suf2+i]) return true;
 		if(host[suf1+i] > host[suf2+i]) return false;
@@ -652,7 +655,7 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
 	assert(built());
 	VMSG_NL("  Doing sanity check");
 	TIndexOffU added = 0;
-	String<uint32_t> sorted;
+	String<TIndexOffU> sorted;
 	fill(sorted, length(_isaPrime), OFF_MASK, Exact());
 	for(size_t di = 0; di < this->d(); di++) {
 		uint32_t d = _ds[di];
@@ -682,7 +685,7 @@ template <typename TStr>
 void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
 	const TStr& t = this->text();
 	const String<uint32_t>& ds = this->ds();
-	TIndexOffU tlen = length(t);
+	TIndexOffU tlen = (TIndexOffU)length(t);
 	uint32_t v = this->v();
 	uint32_t d = this->d();
 	assert_gt(v, 2);
@@ -702,7 +705,7 @@ void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
 		sPrimeSz += sz;
 	}
 	appendValue(_doffs, sPrimeSz);
-	#ifndef NDEBUG
+#ifndef NDEBUG
 	if(tlenDivV > 0) {
 		for(size_t i = 0; i < d; i++) {
 			assert_gt(_doffs[i+1], _doffs[i]);
@@ -710,7 +713,7 @@ void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
 			assert(diff == tlenDivV || diff == tlenDivV+1);
 		}
 	}
-	#endif
+#endif
 	assert_eq(length(_doffs), d+1);
 	// Size sPrime appropriately
 	reserve(sPrime, sPrimeSz+1, Exact()); // reserve extra slot for LS
@@ -721,7 +724,7 @@ void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
 	TIndexOffU i = 0;
 	for(uint64_t ti = 0; ti <= tlen; ti += v) {
 		for(uint32_t di = 0; di < d; di++) {
-			TIndexOffU tti = ti + ds[di];
+			TIndexOffU tti = (TIndexOffU)(ti + ds[di]);
 			if(tti > tlen) break;
 			TIndexOffU spi = _doffs[di] + i;
 			assert_lt(spi, _doffs[di+1]);
@@ -740,10 +743,11 @@ void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
  * string 'host' are identical up to depth 'v'.
  */
 template <typename TStr>
-static inline bool suffixSameUpTo(const TStr& host,
-		TIndexOffU suf1,
-		TIndexOffU suf2,
-		TIndexOffU v)
+static inline bool suffixSameUpTo(
+	const TStr& host,
+	TIndexOffU suf1,
+	TIndexOffU suf2,
+	TIndexOffU v)
 {
 	for(TIndexOffU i = 0; i < v; i++) {
 		bool endSuf1 = suf1+i >= length(host);
@@ -780,7 +784,7 @@ void DifferenceCoverSample<TStr>::build() {
 		String<TIndexOffU> sPrimeOrder;
 		reserve(sPrimeOrder, length(sPrime)+1, Exact()); // reserve extra slot for LS
 		resize(sPrimeOrder, length(sPrime), Exact());
-		for(size_t i = 0; i < length(sPrimeOrder); i++) {
+		for(TIndexOffU i = 0; i < (TIndexOffU)length(sPrimeOrder); i++) {
 			sPrimeOrder[i] = i;
 		}
 		// sPrime now holds suffix-offsets for DC samples.
@@ -849,7 +853,13 @@ void DifferenceCoverSample<TStr>::build() {
 	{
 		Timer timer(cout, "  Invoking Larsson-Sadakane on ranks time: ", this->verbose());
 		VMSG_NL("  Invoking Larsson-Sadakane on ranks");
-		createSuffixArray(sPrime, _isaPrime, LarssonSadakane(), length(_isaPrime));
+		_Context_LSS<TIndexOff> c;
+		c.suffixsort(
+			(TIndexOff*)begin(_isaPrime, Standard()),
+			(TIndexOff*)begin(sPrime, Standard()),
+			length(sPrime) - 1,
+			(unsigned)length(_isaPrime),
+			0);
 	}
 	// sPrime now contains the suffix array (which we ignore)
 	assert_eq(length(_isaPrime), length(sPrime));

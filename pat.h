@@ -164,7 +164,7 @@ struct ReadBuf {
 
 	/// Return length of the read in the buffer
 	uint32_t length() const {
-		return seqan::length(patFw);
+		return (uint32_t)seqan::length(patFw);
 	}
 
 	/**
@@ -1084,7 +1084,7 @@ public:
 			return;
 		}
 		uint32_t ra = rand_.nextU32();
-		patid = readCnt_;
+		patid = (uint32_t)readCnt_;
 		readCnt_++;
 		unlock();
 		fillRandomRead(r, ra, length_, patid);
@@ -1102,7 +1102,7 @@ public:
 		}
 		uint32_t rna = rand_.nextU32();
 		uint32_t rnb = rand_.nextU32();
-		patid = readCnt_;
+		patid = (uint32_t)readCnt_;
 		readCnt_++;
 		unlock();
 		fillRandomRead(ra, rna, length_, patid);
@@ -1422,7 +1422,7 @@ public:
 		r.name = os.str();
 		cur_++;
 		readCnt_++;
-		patid = readCnt_;
+		patid = (uint32_t)readCnt_;
 		unlock();
 	}
 	/**
@@ -1464,7 +1464,7 @@ public:
 		ra.color = rb.color = color_;
 		cur_++;
 		readCnt_++;
-		patid = readCnt_;
+		patid = (uint32_t)readCnt_;
 		unlock();
 	}
 	virtual void reset() {
@@ -1884,7 +1884,7 @@ protected:
 				fb_.resetLastN();
 				// Count the read
 				readCnt_++;
-				patid = readCnt_-1;
+				patid = (uint32_t)readCnt_-1;
 				return;
 			}
 		}
@@ -1892,14 +1892,14 @@ protected:
 		_setLength(r.qual,  dstLen);
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
-			itoa10(readCnt_, r.nameBuf);
+			itoa10((int)readCnt_, r.nameBuf);
 			_setBegin(r.name, r.nameBuf);
-			nameLen = strlen(r.nameBuf);
+			nameLen = (int)strlen(r.nameBuf);
 			_setLength(r.name, nameLen);
 		}
 		assert_gt(nameLen, 0);
 		readCnt_++;
-		patid = readCnt_-1;
+		patid = (uint32_t)(readCnt_-1);
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
 		fb_.resetLastN();
 		if(doquals) {
@@ -2028,7 +2028,7 @@ protected:
 		// '\n'
 
 		readCnt_++;
-		patid = readCnt_-1;
+		patid = (uint32_t)(readCnt_-1);
 	}
 
 	/// Read another pair of patterns from a FASTA input file
@@ -2078,7 +2078,7 @@ protected:
 			ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
 			fb_.resetLastN();
 			readCnt_++;
-			patid = readCnt_-1;
+			patid = (uint32_t)(readCnt_-1);
 			return;
 		}
 		assert_neq('\t', fb_.peek());
@@ -2121,7 +2121,7 @@ protected:
 		// '\n'
 
 		readCnt_++;
-		patid = readCnt_-1;
+		patid = (uint32_t)(readCnt_-1);
 	}
 
 	/**
@@ -2169,12 +2169,12 @@ private:
 		}
 		// Set up a default name if one hasn't been set
 		if(nameLen == 0) {
-			itoa10(readCnt_, r.nameBuf);
+			itoa10((int)readCnt_, r.nameBuf);
 			_setBegin(r.name, r.nameBuf);
-			nameLen = strlen(r.nameBuf);
+			nameLen = (int)strlen(r.nameBuf);
 			_setLength(r.name, nameLen);
 			if(r2 != NULL) {
-				itoa10(readCnt_, (*r2).nameBuf);
+				itoa10((int)readCnt_, (*r2).nameBuf);
 				_setBegin((*r2).name, (*r2).nameBuf);
 				_setLength((*r2).name, nameLen);
 			}
@@ -2405,13 +2405,13 @@ protected:
 					for(size_t i = 0; i < nameChars_; i++) {
 						r.nameBuf[i] = nameBuf_[i];
 					}
-					itoa10(readCnt_ - subReadCnt_, &r.nameBuf[nameChars_]);
+					itoa10((int)(readCnt_ - subReadCnt_), &r.nameBuf[nameChars_]);
 					_setBegin(r.name, r.nameBuf);
 					_setLength(r.name, strlen(r.nameBuf));
 					eat_ = freq_-1;
 					readCnt_++;
 					beginning_ = false;
-					patid = readCnt_-1;
+					patid = (uint32_t)(readCnt_-1);
 					break;
 				}
 			}
@@ -2810,16 +2810,16 @@ protected:
 
 			// Set up a default name if one hasn't been set
 			if(nameLen == 0) {
-				itoa10(readCnt_, r.nameBuf);
+				itoa10((int)readCnt_, r.nameBuf);
 				_setBegin(r.name, r.nameBuf);
-				nameLen = strlen(r.nameBuf);
+				nameLen = (int)strlen(r.nameBuf);
 				_setLength(r.name, nameLen);
 			}
 			r.trimmed3 = this->trim3_;
 			r.trimmed5 = mytrim5;
 			assert_gt(nameLen, 0);
 			readCnt_++;
-			patid = readCnt_-1;
+			patid = (uint32_t)(readCnt_-1);
 			return;
 		}
 	}
@@ -2967,13 +2967,13 @@ protected:
 		fb_.resetLastN();
 
 		// Set up name
-		itoa10(readCnt_, r.nameBuf);
+		itoa10((int)readCnt_, r.nameBuf);
 		_setBegin(r.name, r.nameBuf);
-		nameLen = strlen(r.nameBuf);
+		nameLen = (int)strlen(r.nameBuf);
 		_setLength(r.name, nameLen);
 		readCnt_++;
 
-		patid = readCnt_-1;
+		patid = (uint32_t)(readCnt_-1);
 	}
 	/// Read another read pair from a FASTQ input file
 	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
@@ -3059,7 +3059,7 @@ protected:
 		fb_.resetLastN();
 
 		readCnt_++;
-		patid = readCnt_-1;
+		patid = (uint32_t)(readCnt_-1);
 	}
 
 	/// Read another read pair

@@ -944,7 +944,7 @@ protected:
 		                                        patsrc_->bufa().qual) :
 		                                (off1 ? patsrc_->bufb().qualRev  :
 		                                        patsrc_->bufa().qualRev);
-		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (off1 ? patsrc_->bufa().length() :
 		                        patsrc_->bufb().length());
 		int minins = minInsert_;
@@ -1894,7 +1894,7 @@ protected:
 			                    patsrc_->bufa().qual) :
 			     (range.mate1 ? patsrc_->bufb().qualRev :
 			                    patsrc_->bufa().qualRev);
-		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
 		int minins = minInsert_;

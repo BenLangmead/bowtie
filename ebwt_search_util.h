@@ -181,7 +181,7 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
-                tthread::lock_guard<MUTEX_T> guard(mutex_m);
+		tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		size_t origPlSz = _partialsList.size();
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
@@ -238,7 +238,7 @@ public:
 	 */
 	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
-                tthread::lock_guard<MUTEX_T> guard(mutex_m);
+		tthread::lock_guard<MUTEX_T> guard(mutex_m);
 		getPartialsUnsync(patid, ps);
 	}
 
@@ -263,7 +263,7 @@ public:
 		} else {
 			// list
 			assert_eq(1, type);
-			uint32_t off = al.off.off;
+			uint32_t off = (uint32_t)al.off.off;
 			do {
 				assert_lt(off, _partialsList.size());
 				ASSERT_ONLY(type = _partialsList[off].entry.type);
@@ -314,7 +314,7 @@ public:
 	{
 		reserve(muts, 4);
 		assert_eq(0, length(muts));
-		uint32_t plen = length(seq);
+		uint32_t plen = (uint32_t)length(seq);
 		assert_gt(plen, 0);
 		assert_neq(1, pal.unk.type);
 		// Do first mutation

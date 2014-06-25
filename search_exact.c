@@ -5,7 +5,7 @@
  * paired and unpaired alignment.
  */
 {
-	uint32_t plen = length(patsrc->bufa().patFw);
+	uint32_t plen = (uint32_t)length(patsrc->bufa().patFw);
 	if(!nofw) {
 		// Match against forward strand
 		params.setFw(true);

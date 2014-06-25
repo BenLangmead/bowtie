@@ -30,7 +30,7 @@ TIndexOffU binarySASearch(const TStr& host,
             const String<TSufElt>& sa)
 {
 	TIndexOffU lLcp = 0, rLcp = 0; // greatest observed LCPs on left and right
-	TIndexOffU l = 0, r = length(sa)+1; // binary-search window
+	TIndexOffU l = 0, r = (TIndexOffU)length(sa)+1; // binary-search window
 	TIndexOffU hostLen = TIndexOffU(length(host));
 	while(true) {
 		assert_gt(r, l);
