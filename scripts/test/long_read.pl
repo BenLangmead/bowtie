@@ -10,7 +10,8 @@ use strict;
 use warnings;
 
 my $bowtie   = "./bowtie";
-my $bowtie_d = "./bowtie-debug";
+my $bowtie_d = $bowtie . " --debug";
+my $bowtie_l = $bowtie . " --large-index --debug";
 if(system("$bowtie --version") != 0) {
 	$bowtie = `which bowtie`;
 	chomp($bowtie);
@@ -19,11 +20,10 @@ if(system("$bowtie --version") != 0) {
 	}
 }
 if(system("$bowtie_d --version") != 0) {
-	$bowtie_d = `which bowtie-debug`;
-	chomp($bowtie_d);
-	if(system("$bowtie_d --version") != 0) {
-		die "Could not find bowtie-debug in current directory or in PATH\n";
-	}
+	die "Could not find bowtie-debug in current directory or in PATH\n";
+}
+if(system("$bowtie_l --version") != 0) {
+	die "Could not find bowtie large index support build in current directory or in PATH\n";
 }
 
 if(! -f "e_coli_c.1.ebwt") {
@@ -41,6 +41,23 @@ if(! -f "e_coli_c.1.ebwt") {
 } else {
 	print STDERR "Colorspace e_coli index already present...\n";
 }
+
+if(! -f "e_coli_c.1.ebwtl") {
+	print STDERR "Making large colorspace e_coli index\n";
+	my $bowtie_build = "./bowtie-build --large-index";
+	if(system("$bowtie_build --version") != 0) {
+		print STDERR "Could not execute ./bowtie-build; looking in PATH...\n";
+		$bowtie_build = `which $bowtie_build`;
+		chomp($bowtie_build);
+		if(system("$bowtie_build --version") != 0) {
+			die "Could not find bowtie-build in current directory or in PATH\n";
+		}
+	}
+	system("$bowtie_build  --large-index -C genomes/NC_008253.fna e_coli_c") && die;
+} else {
+	print STDERR "Colorspace e_coli index already present...\n";
+}
+
 
 my @reads = (
 	# 70:
@@ -229,6 +246,14 @@ sub btrun {
 	}
 	close(BTIE);
 	#$als == $exalns || die "# alignments $als didn't match expected number $exalns\n";
+	$cmd = "$bowtie_l $args -c e_coli \"$read\"";
+	print "\n$cmd\n\n";
+	$als = 0;
+	open BTIE, "$cmd |" || die "Could not open pipe '$cmd |'\n";
+	while(<BTIE>) {
+		$als++;
+	}
+	close(BTIE);
 	print "PASSED: \"$args\"\n";
 }
 

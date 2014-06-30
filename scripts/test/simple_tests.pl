@@ -31,6 +31,8 @@ if(! -x $bowtie || ! -x $bowtie_build) {
 (-x $bowtie)       || die "Cannot run '$bowtie'";
 (-x $bowtie_build) || die "Cannot run '$bowtie_build'";
 
+my %prog_pairs = ($bowtie => $bowtie_build, $bowtie." --large-index " => $bowtie_build." --large-index ");
+ 
 my @cases = (
 
 	# Check paired-end exclusions
@@ -220,8 +222,9 @@ sub writeFasta($$) {
 ##
 # Run bowtie with given arguments
 #
-sub runBowtie($$$$$$$$$) {
-	my (
+sub runBowtie {
+	my ($run_prog,
+        $build_prog,
 		$args,
 		$color,
 		$fa,
@@ -236,14 +239,14 @@ sub runBowtie($$$$$$$$$) {
 	$args .= " $reportargs";
 	# Write the reference to a fasta file
 	my $build_args = ($color ? "-C" : "");
-	my $cmd = "$bowtie_build --quiet $build_args $fa .simple_tests.tmp";
+	my $cmd = "$build_prog --quiet $build_args $fa .simple_tests.tmp";
 	print "$cmd\n";
 	system($cmd);
 	($? == 0) || die "Bad exitlevel from bowtie-build: $?";
 	my $pe = (defined($mate1s) && $mate1s ne "");
 	if($pe) {
 		# Paired-end case
-		$cmd = "$bowtie $args .simple_tests.tmp -1 $mate1s -2 $mate2s";
+		$cmd = "$run_prog $args .simple_tests.tmp -1 $mate1s -2 $mate2s";
 		print "$cmd\n";
 		open(BT, "$cmd |") || die "Could not open pipe '$cmd |'";
 		while(<BT>) {
@@ -262,7 +265,7 @@ sub runBowtie($$$$$$$$$) {
 		close(BT);
 	} else {
 		# Unpaired case
-		$cmd = "$bowtie $args .simple_tests.tmp $reads";
+		$cmd = "$run_prog $args .simple_tests.tmp $reads";
 		print "$cmd\n";
 		open(BT, "$cmd |") || die "Could not open pipe '$cmd |'";
 		while(<BT>) {
@@ -278,56 +281,60 @@ sub runBowtie($$$$$$$$$) {
 
 my $tmpfafn = ".simple_tests.pl.fa";
 for my $c (@cases) {
-	writeFasta($c->{ref}, $tmpfafn);
-	# For each set of arguments...
-	for my $a (@{$c->{args}}) {
-		# Run bowtie
-		my @lines = ();
-		my @rawlines = ();
-		my %hits = ();
-		%hits = %{$c->{hits}} if defined($c->{hits});
-		my %pairhits = ();
-		%pairhits = %{$c->{pairhits}} if defined($c->{pairhits});
-		print $c->{name}."\n" if defined($c->{name});
-		my $color = 0;
-		$color = $c->{color} if defined($c->{color});
-		runBowtie(
-			"$a -c",
-			$color,
-			$tmpfafn,
-			$c->{report},
-			$c->{reads},
-			$c->{mate1s},
-			$c->{mate2s},
-			\@lines,
-			\@rawlines);
-		my $pe = defined($c->{mate1s}) && $c->{mate1s} ne "";
-		my ($lastchr, $lastoff) = ("", -1);
-		for(my $li = 0; $li < scalar(@lines); $li++) {
-			my $l = $lines[$li];
-			scalar(@$l) == 8 || die "Bad number of fields; expected 8 got ".scalar(@$l).":\n$rawlines[$li]\n";
-			next if $l->[1] eq '*';
-			my ($chr, $off) = ($l->[0], $l->[3]);
-			if($pe && $lastchr ne "") {
-				my $offkey = min($lastoff, $off).",".max($lastoff, $off);
-				defined($pairhits{$offkey}) || die "No such paired off as $offkey in pairhits list: ".%{$c->{pairhits}}."\n";
-				$pairhits{$offkey}--;
-				delete $pairhits{$offkey} if $pairhits{$offkey} == 0;
-				($lastchr, $lastoff) = ("", -1);
-			} elsif($pe) {
-				($lastchr, $lastoff) = ($chr, $off);
-			} else {
-				defined($hits{$off}) || die "No such off as $off in hits list: ".%{$c->{hits}}."\n";
-				$hits{$off}--;
-				delete $hits{$off} if $hits{$off} == 0;
-			}
-			my $eds = $l->[-1];
-			!defined($c->{edits})  || $eds eq $c->{edits}  || die "For edit string, expected \"$c->{edits}\" got \"$eds\"\n";
-		}
-		my $hitsLeft = scalar(keys %hits);
-		$hitsLeft == 0 || die "Had $hitsLeft hit(s) left over";
-		my $pairhitsLeft = scalar(keys %pairhits);
-		$pairhitsLeft == 0 || die "Had $pairhitsLeft hit(s) left over";
-	}
+    while( my ($run_prg, $bld_prg) = each(%prog_pairs)){
+	   writeFasta($c->{ref}, $tmpfafn);
+	   # For each set of arguments...
+	   for my $a (@{$c->{args}}) {
+		   # Run bowtie
+		   my @lines = ();
+		   my @rawlines = ();
+		   my %hits = ();
+		   %hits = %{$c->{hits}} if defined($c->{hits});
+		   my %pairhits = ();
+		   %pairhits = %{$c->{pairhits}} if defined($c->{pairhits});
+		   print $c->{name}."\n" if defined($c->{name});
+		   my $color = 0;
+		   $color = $c->{color} if defined($c->{color});
+		   runBowtie(
+               $run_prg,
+               $bld_prg,
+			   "$a -c",
+			   $color,
+			   $tmpfafn,
+			   $c->{report},
+			   $c->{reads},
+			   $c->{mate1s},
+			   $c->{mate2s},
+			   \@lines,
+			   \@rawlines);
+		   my $pe = defined($c->{mate1s}) && $c->{mate1s} ne "";
+		   my ($lastchr, $lastoff) = ("", -1);
+		   for(my $li = 0; $li < scalar(@lines); $li++) {
+			   my $l = $lines[$li];
+			   scalar(@$l) == 8 || die "Bad number of fields; expected 8 got ".scalar(@$l).":\n$rawlines[$li]\n";
+			   next if $l->[1] eq '*';
+			   my ($chr, $off) = ($l->[0], $l->[3]);
+			   if($pe && $lastchr ne "") {
+				   my $offkey = min($lastoff, $off).",".max($lastoff, $off);
+				   defined($pairhits{$offkey}) || die "No such paired off as $offkey in pairhits list: ".%{$c->{pairhits}}."\n";
+				   $pairhits{$offkey}--;
+				   delete $pairhits{$offkey} if $pairhits{$offkey} == 0;
+				   ($lastchr, $lastoff) = ("", -1);
+			   } elsif($pe) {
+				   ($lastchr, $lastoff) = ($chr, $off);
+			   } else {
+				   defined($hits{$off}) || die "No such off as $off in hits list: ".%{$c->{hits}}."\n";
+				   $hits{$off}--;
+				   delete $hits{$off} if $hits{$off} == 0;
+			   }
+			   my $eds = $l->[-1];
+			   !defined($c->{edits})  || $eds eq $c->{edits}  || die "For edit string, expected \"$c->{edits}\" got \"$eds\"\n";
+		   }
+		   my $hitsLeft = scalar(keys %hits);
+		   $hitsLeft == 0 || die "Had $hitsLeft hit(s) left over";
+		   my $pairhitsLeft = scalar(keys %pairhits);
+		   $pairhitsLeft == 0 || die "Had $pairhitsLeft hit(s) left over";
+	   }
+   }
 }
 print "PASSED\n";

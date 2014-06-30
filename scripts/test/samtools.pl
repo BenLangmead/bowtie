@@ -19,7 +19,7 @@ if(system("$bowtie --version") != 0) {
 	}
 }
 
-my $bowtie_d = "./bowtie-debug";
+my $bowtie_d = $bowtie . " --debug";
 if(system("$bowtie_d --version") != 0) {
 	$bowtie_d = `which bowtie-debug`;
 	chomp($bowtie_d);
