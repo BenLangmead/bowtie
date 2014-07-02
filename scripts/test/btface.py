@@ -7,11 +7,11 @@ import subprocess
 
 class BowtieSuite(object):
     
-    def __init__(self,bt2_path=''):
-        curr_path           = os.path.realpath(bt2_path)
-        self.bowtie_bin     = os.path.join(curr_path,'bowtie2')
-        self.bowtie_build   = os.path.join(curr_path,'bowtie2-build')
-        self.bowtie_inspect = os.path.join(curr_path,'bowtie2-inspect')
+    def __init__(self,bt_path=''):
+        curr_path           = os.path.realpath(bt_path)
+        self.bowtie_bin     = os.path.join(curr_path,'bowtie')
+        self.bowtie_build   = os.path.join(curr_path,'bowtie-build')
+        self.bowtie_inspect = os.path.join(curr_path,'bowtie-inspect')
 
 
     def run(self, *args):

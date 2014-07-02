@@ -16,9 +16,9 @@ class LargeTestsData(object):
     are present before starting the time consuming tests.
     """
     
-    def __init__(self,bt2_path=''):
+    def __init__(self,bt_path=''):
         self.data_dir       = 'big_data'
-        curr_path           = os.path.realpath(bt2_path)
+        curr_path           = os.path.realpath(bt_path)
 
         curr_path           = os.path.join(curr_path,'scripts')
         curr_path           = os.path.join(curr_path,'test')
@@ -178,12 +178,11 @@ class ExampleData(object):
     """ The example data.
     """
     
-    def __init__(self,bt2_path=''):
-        curr_path           = os.path.realpath(bt2_path)
-        curr_path           = os.path.join(curr_path,'example')
-        self.index_dir_path = os.path.join(curr_path,'index')
+    def __init__(self,bt_path=''):
+        curr_path           = os.path.realpath(bt_path)
+        self.index_dir_path = os.path.join(curr_path,'indexes')
         self.reads_dir_path = os.path.join(curr_path,'reads')
-        self.ref_dir_path   = os.path.join(curr_path,'reference')
+        self.ref_dir_path   = os.path.join(curr_path,'genomes')
         
         try:
             os.stat(curr_path)

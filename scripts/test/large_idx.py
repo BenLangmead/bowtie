@@ -6,7 +6,7 @@ import urllib2
 import inspect
 import unittest
 import logging
-import bt2face
+import btface
 import btdata
 import subprocess
 from optparse import OptionParser
@@ -99,12 +99,12 @@ if __name__ == "__main__":
    
     src_file_path  = os.path.realpath(inspect.getsourcefile(parse_args))
     curr_path      = os.path.dirname(src_file_path)
-    bw2_subdir     = 'bowtie2'
+    bw_subdir     = 'bowtie2'
 
-    i = curr_path.find(bw2_subdir)
-    bt2_path = curr_path[:i+len(bw2_subdir)] 
+    i = curr_path.find(bw_subdir)
+    bt_path = curr_path[:i+len(bw_subdir)] 
     
-    g_bdata = btdata.LargeTestsData(bt2_path)
-    g_bt    = bt2face.BowtieSuite(bt2_path)
+    g_bdata = btdata.LargeTestsData(bt_path)
+    g_bt    = bt2face.BowtieSuite(bt_path)
     runner.run(get_suite())
 
