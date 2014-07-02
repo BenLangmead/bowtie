@@ -99,7 +99,7 @@ if __name__ == "__main__":
    
     src_file_path  = os.path.realpath(inspect.getsourcefile(parse_args))
     curr_path      = os.path.dirname(src_file_path)
-    bw_subdir     = 'bowtie2'
+    bw_subdir     = 'bowtie'
 
     i = curr_path.find(bw_subdir)
     bt_path = curr_path[:i+len(bw_subdir)] 
