@@ -317,7 +317,7 @@ struct RangeState {
 	 * now.
 	 */
 	Edit pickEdit(int pos, RandomSource& rand, bool fuzzy,
-	              uint32_t& top, uint32_t& bot, bool indels,
+	              TIndexOffU& top, TIndexOffU& bot, bool indels,
 	              bool& last)
 	{
 		bool color = false;
@@ -541,8 +541,8 @@ struct RangeState {
 	// legitimate jumping-off point for a branch, tops[] and bots[]
 	// will be filled with 0s and all possibilities in eq will be
 	// eliminated
-	uint32_t tops[4]; // A, C, G, T top offsets
-	uint32_t bots[4]; // A, C, G, T bot offsets
+	TIndexOffU tops[4]; // A, C, G, T top offsets
+	TIndexOffU bots[4]; // A, C, G, T bot offsets
 	ElimsAndQual eq;  // Which outgoing paths have been tried already
 	bool eliminated_;  // Whether all outgoing paths have been eliminated
 };
@@ -554,7 +554,7 @@ struct RangeState {
  * path.
  */
 class Branch {
-	typedef std::pair<uint32_t, uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU, TIndexOffU> UPair;
 public:
 	Branch() :
 		delayedCost_(0), curtailed_(false), exhausted_(false),
@@ -575,8 +575,8 @@ public:
 	          uint16_t len,
 	          uint16_t cost,
 	          uint16_t ham,
-	          uint32_t itop,
-	          uint32_t ibot,
+	          TIndexOffU itop,
+	          TIndexOffU ibot,
 	          const EbwtParams& ep,
 	          const uint8_t* ebwt,
 	          const EditList* edits = NULL)
@@ -771,7 +771,7 @@ public:
 		// (using randomness to break ties).  If the selected edit is
 		// the last remaining one at this position, 'last' is set to
 		// true.
-		uint32_t top = 0, bot = 0;
+		TIndexOffU top = 0, bot = 0;
 		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, fuzzy, top,
 		                               bot, false, last);
 		assert_gt(bot, top);
@@ -1163,8 +1163,8 @@ public:
 	uint16_t ham_;    // quality-weighted hamming distance so far
 	RangeState *ranges_; // Allocated from the RangeStatePool
 	uint16_t rangesSz_;
-	uint32_t top_;    // top offset leading to the root of this subtree
-	uint32_t bot_;    // bot offset leading to the root of this subtree
+	TIndexOffU top_;    // top offset leading to the root of this subtree
+	TIndexOffU bot_;    // bot offset leading to the root of this subtree
 	SideLocus ltop_;
 	SideLocus lbot_;
 	EditList edits_;   // edits leading to the root of the branch
@@ -2070,7 +2070,7 @@ public:
 				this->foundRange = rss_[cur_]->foundRange;
 			} else {
 				// No RangeSources in list; done
-				cur_ = 0xffffffff;
+				cur_ = OFF_MASK;
 				this->done = true;
 			}
 		} else {
@@ -2102,7 +2102,7 @@ public:
 
 protected:
 
-	uint32_t cur_;
+	TIndexOffU cur_;
 	uint32_t ham_;
 	TRangeSrcDrPtrVec rss_;
 	PatternSourcePerThread* patsrc_;

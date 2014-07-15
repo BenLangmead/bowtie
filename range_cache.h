@@ -132,14 +132,14 @@ public:
 	 *
 	 */
 	RangeCacheEntry(bool sanity = false) :
-		top_(0xffffffff), jumps_(0), len_(0), ents_(NULL), ebwt_(NULL),
+		top_(OFF_MASK), jumps_(0), len_(0), ents_(NULL), ebwt_(NULL),
 		sanity_(sanity)
 	{ }
 
 	/**
 	 * Create a new RangeCacheEntry from the data in the pool at 'ents'.
 	 */
-	RangeCacheEntry(RangeCacheMemPool& pool, uint32_t top,
+	RangeCacheEntry(RangeCacheMemPool& pool, TIndexOffU top,
 	                uint32_t ent, TEbwt* ebwt, bool sanity = false) :
 	    sanity_(sanity)
 	{
@@ -149,7 +149,7 @@ public:
 	/**
 	 * Initialize a RangeCacheEntry from the data in the pool at 'ents'.
 	 */
-	void init(RangeCacheMemPool& pool, uint32_t top, uint32_t ent, TEbwt* ebwt) {
+	void init(RangeCacheMemPool& pool, TIndexOffU top, uint32_t ent, TEbwt* ebwt) {
 		assert(ebwt != NULL);
 		top_ = top;
 		ebwt_ = ebwt;
@@ -189,7 +189,7 @@ public:
 	 * Initialize a wrapper with given number of jumps and given target
 	 * entry index.
 	 */
-	void init(RangeCacheMemPool& pool, uint32_t top, uint32_t jumps,
+	void init(RangeCacheMemPool& pool, TIndexOffU top, uint32_t jumps,
 	          uint32_t ent, TEbwt* ebwt)
 	{
 		assert(ebwt != NULL);
@@ -330,7 +330,7 @@ public:
 
 private:
 
-	uint32_t top_;   /// top pointer for this range
+	TIndexOffU top_;   /// top pointer for this range
 	uint32_t jumps_; /// how many tunnel-jumps it is away from the requester
 	uint32_t len_;   /// # of entries in cache entry
 	uint32_t *ents_; /// ptr to entries, which are flat offs within joined ref
@@ -361,7 +361,7 @@ public:
 	 * entry that lies "at the end of the tunnel" when top and bot are
 	 * walked backward.
 	 */
-	bool lookup(uint32_t top, uint32_t bot, RangeCacheEntry& ent) {
+	bool lookup(TIndexOffU top, TIndexOffU bot, RangeCacheEntry& ent) {
 		if(ebwt_ == NULL || lim_ == 0) return false;
 		assert_gt(bot, top);
 		ent.reset();
@@ -394,8 +394,8 @@ public:
 	bool repOk() {
 #ifndef NDEBUG
 		for(TMapItr itr = map_.begin(); itr != map_.end(); itr++) {
-			uint32_t top = itr->first;
-			uint32_t idx = itr->second;
+			TIndexOffU top = itr->first;
+			TIndexOffU idx = itr->second;
 			uint32_t jumps = 0;
 			assert_leq(top, ebwt_->_eh._len);
 			uint32_t *ents = pool_.get(idx);
@@ -423,7 +423,7 @@ protected:
 	bool tunnel(uint32_t top, uint32_t bot, RangeCacheEntry& ent) {
 		assert_gt(bot, top);
 		TU32Vec tops;
-		const uint32_t spread = bot - top;
+		const TIndexOffU spread = bot - top;
 		SideLocus tloc, bloc;
 		SideLocus::initFromTopBot(top, bot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
 		uint32_t newtop = top, newbot = bot;
@@ -502,7 +502,7 @@ protected:
 			newent[0] = spread;
 			assert_lt(newent[0], 0x80000000);
 			assert_eq(spread, newent[0]);
-			uint32_t entTop = top;
+			TIndexOffU entTop = top;
 			uint32_t jumps = 0;
 			if(tops.size() > 0) {
 				entTop = tops.back();
