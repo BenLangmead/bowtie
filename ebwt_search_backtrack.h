@@ -1801,7 +1801,7 @@ public:
 	EbwtRangeSource(
 			const TEbwt* ebwt,
 			bool         fw,
-			uint32_t     qualLim,
+			TIndexOffU   qualLim,
 			bool         reportExacts,
 			bool         verbose,
 			bool         quiet,
@@ -1997,8 +1997,8 @@ public:
 			// Use the ftab to jump 'ftabChars' chars into the read
 			// from the right
 			uint32_t ftabOff = calcFtabOff();
-			uint32_t top = ebwt.ftabHi(ftabOff);
-			uint32_t bot = ebwt.ftabLo(ftabOff+1);
+			TIndexOffU top = ebwt.ftabHi(ftabOff);
+			TIndexOffU bot = ebwt.ftabLo(ftabOff+1);
 			if(qlen_ == (uint32_t)ftabChars && bot > top) {
 				// We found a range with 0 mismatches immediately.  Set
 				// fields to indicate we found a range.
@@ -2171,8 +2171,8 @@ public:
 				// be exceeded
 				bool curIsAlternative = (depth >= br->depth0_) &&
 				                        (br->ham_ + bestq <= qualLim_);
-				ASSERT_ONLY(uint32_t obot = br->bot_);
-				uint32_t otop = br->top_;
+				ASSERT_ONLY(TIndexOffU obot = br->bot_);
+				TIndexOffU otop = br->top_;
 
 				// If c is 'N', then it's a mismatch
 				if(c == 4 && depth > 0) {
@@ -2267,7 +2267,7 @@ public:
 						if(br->top_ + 1 == br->bot_) {
 							if(metrics_ != NULL) metrics_->curBwtOps_++;
 							br->bot_ = br->top_ = ebwt.mapLF1(br->top_, br->ltop_, c);
-							if(br->bot_ != 0xffffffff) br->bot_++;
+							if(br->bot_ != OFF_MASK) br->bot_++;
 						} else {
 							if(metrics_ != NULL) metrics_->curBwtOps_++;
 							br->top_ = ebwt.mapLF(br->ltop_, c);
@@ -3058,7 +3058,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			int64_t top = (int64_t)range().top;
+			TIndexOffU top = (TIndexOffU)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());

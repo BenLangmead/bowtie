@@ -76,9 +76,9 @@ public:
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw = new EbwtRangeSource(
-			&ebwtFw_, true,  0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true,  OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * driverFw = new EbwtRangeSourceDriver(
 			*params, rFw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -255,7 +255,7 @@ public:
 		TRangeSrcDr * driver2Rc = NULL;
 		if(do1Fw) {
 			r1Fw = new EbwtRangeSource(
-				&ebwtFw_, true,  0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true,  OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			driver1Fw = new EbwtRangeSourceDriver(
 				*params, r1Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen
@@ -268,7 +268,7 @@ public:
 		}
 		if(do2Fw) {
 			r2Fw = new EbwtRangeSource(
-				&ebwtFw_, true,  0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true,  OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			driver2Fw = new EbwtRangeSourceDriver(
 				*params, r2Fw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen
@@ -281,7 +281,7 @@ public:
 		}
 		if(do1Rc) {
 			r1Rc = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			driver1Rc = new EbwtRangeSourceDriver(
 				*params, r1Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen
@@ -294,7 +294,7 @@ public:
 		}
 		if(do2Rc) {
 			r2Rc = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			driver2Rc = new EbwtRangeSourceDriver(
 				*params, r2Rc, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
 				0,          // seedLen

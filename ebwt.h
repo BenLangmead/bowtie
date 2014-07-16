@@ -1133,7 +1133,7 @@ public:
 	void joinedToTextOff(TIndexOffU qlen, TIndexOffU off, TIndexOffU& tidx, TIndexOffU& textoff, TIndexOffU& tlen) const;
 	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU off, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
 	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
-	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const TIndexOffU *mmui32, const char* refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
 	inline TIndexOffU countUpTo(const SideLocus& l, int c) const;
 	inline void countUpToEx(const SideLocus& l, TIndexOffU* pairs) const;
@@ -2797,12 +2797,12 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
                                           String<char>* name,
                                           String<Dna5>& lbuf,
                                           String<Dna5>& rbuf,
-                                          const uint32_t *mmui32,
+                                          const TIndexOffU *mmui32,
                                           const char* refcs,
                                           size_t numMms,
-                                          uint32_t i,
-                                          uint32_t top,
-                                          uint32_t bot,
+                                          TIndexOffU i,
+                                          TIndexOffU top,
+                                          TIndexOffU bot,
                                           uint32_t qlen,
                                           int stratum,
                                           const EbwtSearchParams<TStr>& params,
@@ -2810,13 +2810,13 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 {
 	VMSG_NL("In reportReconstruct");
 	assert_gt(_eh._isaLen, 0); // Must have inverse suffix array to reconstruct
-	uint32_t off;
-	uint32_t jumps = 0;
+	TIndexOffU off;
+	TIndexOffU jumps = 0;
 	SideLocus myl;
-	const uint32_t offMask = this->_eh._offMask;
-	const uint32_t offRate = this->_eh._offRate;
-	const uint32_t* offs = this->_offs;
-	const uint32_t* isa = this->_isa;
+	const TIndexOffU offMask = this->_eh._offMask;
+	const TIndexOffU offRate = this->_eh._offRate;
+	const TIndexOffU* offs = this->_offs;
+	const TIndexOffU* isa = this->_isa;
 	assert(isa != NULL);
 	if(l == NULL) {
 		l = &myl;
@@ -2829,7 +2829,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		// Not a marked row; walk left one more char
 		int c = rowL(*l);
 		appendValue(lbuf, (Dna5)c);
-		uint32_t newi;
+		TIndexOffU newi;
 		assert_lt(c, 4);
 		assert_geq(c, 0);
 		if(l->_fw) newi = countFwSide(*l, c); // Forward side
@@ -2857,11 +2857,11 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	// check whether the seed is valid (i.e., does not straddle a
 	// boundary between two reference seuqences) and to obtain its
 	// extents
-	uint32_t tidx;    // the index (id) of the reference we hit in
-	uint32_t textoff; // the offset of the alignment within the reference
-	uint32_t tlen;    // length of reference seed hit in
+	TIndexOffU tidx;    // the index (id) of the reference we hit in
+	TIndexOffU textoff; // the offset of the alignment within the reference
+	TIndexOffU tlen;    // length of reference seed hit in
 	joinedToTextOff(qlen, off, tidx, textoff, tlen);
-	if(tidx == 0xffffffff) {
+	if(tidx == OFF_MASK) {
 		// The seed straddled a reference boundary, and so is spurious.
 		// Return false, indicating that we shouldn't stop.
 		return false;
@@ -2878,12 +2878,12 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	} else if(jumps < textoff) {
 		// Keep walking until we reach the end of the reference
 		assert_neq(i, _zOff);
-		uint32_t diff = textoff-jumps;
+		TIndexOffU diff = textoff-jumps;
 		for(size_t j = 0; j < diff; j++) {
 			// Not a marked row; walk left one more char
 			int c = rowL(*l);
 			appendValue(lbuf, (Dna5)c);
-			uint32_t newi;
+			TIndexOffU newi;
 			assert_lt(c, 4);
 			assert_geq(c, 0);
 			if(l->_fw) newi = countFwSide(*l, c); // Forward side
@@ -2901,10 +2901,10 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	assert_eq(textoff, jumps);
 	assert_eq(textoff, length(lbuf));
 	// Calculate the right-hand extent of the reference
-	uint32_t ref_right = off - textoff + tlen;
+	TIndexOffU ref_right = off - textoff + tlen;
 	// Round the right-hand extent to the nearest ISA element that maps
 	// to it or a character to its right
-	uint32_t ref_right_rounded = ref_right;
+	TIndexOffU ref_right_rounded = ref_right;
 	if((ref_right_rounded & _eh._isaMask) != ref_right_rounded) {
 		ref_right_rounded = ((ref_right_rounded >> _eh._isaRate)+1) << _eh._isaRate;
 	}
@@ -2916,14 +2916,14 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	} else {
 		i = isa[ref_right_rounded >> _eh._isaRate];
 	}
-	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
-	uint32_t right_steps = ref_right - (off + qlen);
+	TIndexOffU right_steps_rounded = ref_right_rounded - (off + qlen);
+	TIndexOffU right_steps = ref_right - (off + qlen);
 	l->initFromRow(i, this->_eh, this->_ebwt); // update locus
 	for(size_t j = 0; j < right_steps_rounded; j++) {
 		// Not a marked row; walk left one more char
 		int c = rowL(*l);
 		appendValue(rbuf, (Dna5)c);
-		uint32_t newi;
+		TIndexOffU newi;
 		assert_lt(c, 4); assert_geq(c, 0);
 		if(l->_fw) newi = countFwSide(*l, c); // Forward side
 		else       newi = countBwSide(*l, c); // Backward side

@@ -15,8 +15,8 @@
 #include "ebwt.h"
 #include "row_chaser.h"
 
-#define RANGE_NOT_SET 0xffffffff
-#define RANGE_CACHE_BAD_ALLOC 0xffffffff
+#define RANGE_NOT_SET OFF_MASK
+#define RANGE_CACHE_BAD_ALLOC OFF_MASK
 
 /**
  * Manages a pool of memory used exclusively for range cache entries.
@@ -32,13 +32,13 @@
  */
 class RangeCacheMemPool {
 public:
-	RangeCacheMemPool(uint32_t lim /* max cache size in bytes */) :
+	RangeCacheMemPool(TIndexOffU lim /* max cache size in bytes */) :
 		lim_(lim >> 2 /* convert to words */), occ_(0), buf_(NULL),
 		closed_(false)
 	{
 		if(lim_ > 0) {
 			try {
-				buf_ = new uint32_t[lim_];
+				buf_ = new TIndexOffU[lim_];
 				if(buf_ == NULL) throw std::bad_alloc();
 			} catch(std::bad_alloc& e) {
 				cerr << "Allocation error allocating " << lim
@@ -60,21 +60,21 @@ public:
 	/**
 	 * Allocate numElts elements from the word pool.
 	 */
-	uint32_t alloc(uint32_t numElts) {
+	TIndexOffU alloc(TIndexOffU numElts) {
 		assert_gt(numElts, 0);
 		assert_leq(occ_, lim_);
-		if(occ_ + numElts > lim_ || numElts >= 0x80000000) {
+		if(occ_ + numElts > lim_ || numElts >= CACHE_WRAPER_BIT) {
 			return RANGE_CACHE_BAD_ALLOC;
 		}
 		assert_gt(lim_, 0);
-		uint32_t ret = occ_;
+		TIndexOffU ret = occ_;
 		assert(allocs_.find(ret) == allocs_.end());
 		ASSERT_ONLY(allocs_.insert(ret));
 		// Clear the first elt so that we don't think there's already
 		// something there
 #ifndef NDEBUG
-		for(size_t i = 0; i < numElts; i++) {
-			assert_eq(0xffffffff, buf_[occ_ + i]);
+		for(TIndexOffU i = 0; i < numElts; i++) {
+			assert_eq(OFF_MASK, buf_[occ_ + i]);
 		}
 #endif
 		buf_[occ_] = 0;
@@ -91,13 +91,13 @@ public:
 	 * Turn a pool-array index into a pointer; check that it doesn't
 	 * fall outside the pool first.
 	 */
-	inline uint32_t *get(uint32_t off) {
+	inline TIndexOffU *get(TIndexOffU off) {
 		assert_gt(lim_, 0);
 		assert_lt(off, lim_);
 		assert(allocs_.find(off) != allocs_.end());
-		uint32_t *ret = buf_ + off;
-		assert_neq(0x80000000, ret[0]);
-		assert_neq(0xffffffff, ret[0]);
+		TIndexOffU *ret = buf_ + off;
+		assert_neq(CACHE_WRAPER_BIT, ret[0]);
+		assert_neq(OFF_MASK, ret[0]);
 		return ret;
 	}
 
@@ -109,12 +109,12 @@ public:
 	}
 
 private:
-	uint32_t lim_;  /// limit on number of 32-bit words to dish out in total
-	uint32_t occ_;  /// number of occupied words
-	uint32_t *buf_; /// buffer of 32-bit words
+	TIndexOffU lim_;  /// limit on number of 32-bit words to dish out in total
+	TIndexOffU occ_;  /// number of occupied words
+	TIndexOffU *buf_; /// buffer of 32-bit words
 	bool closed_;   ///
 #ifndef NDEBUG
-	std::set<uint32_t> allocs_; // elements allocated
+	std::set<TIndexOffU> allocs_; // elements allocated
 #endif
 };
 
@@ -124,7 +124,6 @@ private:
 class RangeCacheEntry {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
 	typedef RowChaser<String<Dna> > TRowChaser;
 
 public:
@@ -140,7 +139,7 @@ public:
 	 * Create a new RangeCacheEntry from the data in the pool at 'ents'.
 	 */
 	RangeCacheEntry(RangeCacheMemPool& pool, TIndexOffU top,
-	                uint32_t ent, TEbwt* ebwt, bool sanity = false) :
+			TIndexOffU ent, TEbwt* ebwt, bool sanity = false) :
 	    sanity_(sanity)
 	{
 		init(pool, top, ent, ebwt);
@@ -149,21 +148,21 @@ public:
 	/**
 	 * Initialize a RangeCacheEntry from the data in the pool at 'ents'.
 	 */
-	void init(RangeCacheMemPool& pool, TIndexOffU top, uint32_t ent, TEbwt* ebwt) {
+	void init(RangeCacheMemPool& pool, TIndexOffU top, TIndexOffU ent, TEbwt* ebwt) {
 		assert(ebwt != NULL);
 		top_ = top;
 		ebwt_ = ebwt;
-		uint32_t *ents = pool.get(ent);
-		assert_neq(0x80000000, ents[0]);
+		TIndexOffU *ents = pool.get(ent);
+		assert_neq(CACHE_WRAPER_BIT, ents[0]);
 		// Is hi bit set?
-		if((ents[0] & 0x80000000) != 0) {
+		if((ents[0] & CACHE_WRAPER_BIT) != 0) {
 			// If so, the target is a wrapper and the non-hi bits
 			// contain the # jumps
-			jumps_ = (ents[0] & ~0x80000000);
+			jumps_ = (ents[0] & ~CACHE_WRAPER_BIT);
 			assert_gt(jumps_, 0);
 			assert_leq(jumps_, ebwt_->_eh._len);
 			// Get the target entry
-			uint32_t *dest = pool.get(ents[1]);
+			TIndexOffU *dest = pool.get(ents[1]);
 			// Get the length from the target entry
 			len_ = dest[0];
 			assert_leq(top_ + len_, ebwt_->_eh._len);
@@ -189,16 +188,16 @@ public:
 	 * Initialize a wrapper with given number of jumps and given target
 	 * entry index.
 	 */
-	void init(RangeCacheMemPool& pool, TIndexOffU top, uint32_t jumps,
-	          uint32_t ent, TEbwt* ebwt)
+	void init(RangeCacheMemPool& pool, TIndexOffU top, TIndexOffU jumps,
+			TIndexOffU ent, TEbwt* ebwt)
 	{
 		assert(ebwt != NULL);
 		ebwt_ = ebwt;
 		top_ = top;
 		jumps_ = jumps;
-		uint32_t *ents = pool.get(ent);
+		TIndexOffU *ents = pool.get(ent);
 		// Must not be a wrapper
-		assert_eq(0, ents[0] & 0x80000000);
+		assert_eq(0, ents[0] & CACHE_WRAPER_BIT);
 		// Get the length from the target entry
 		len_ = ents[0];
 		assert_gt(len_, 0);
@@ -209,13 +208,13 @@ public:
 		assert(sanityCheckEnts());
 	}
 
-	uint32_t len() const   {
+	TIndexOffU len() const   {
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
 		return len_;
 	}
 
-	uint32_t jumps() const {
+	TIndexOffU jumps() const {
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
 		return jumps_;
@@ -244,7 +243,7 @@ public:
 	 * adjust for how many jumps down the tunnel the cache entry is
 	 * situated.
 	 */
-	void install(uint32_t elt, uint32_t val) {
+	void install(TIndexOffU elt, TIndexOffU val) {
 		if(ents_ == NULL) {
 			// This is not a valid cache entry; do nothing
 			return;
@@ -252,12 +251,12 @@ public:
 		assert(ents_ != NULL);
 		assert(ebwt_ != NULL);
 		assert_leq(jumps_, val);
-		assert_neq(0xffffffff, val);
+		assert_neq(OFF_MASK, val);
 		assert_leq(top_ + len_, ebwt_->_eh._len);
 		if(elt < len_) {
 			val -= jumps_;
 			if(verbose_) cout << "Installed reference offset: " << (top_ + elt) << endl;
-			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
+			ASSERT_ONLY(TIndexOffU sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, val);
 #ifndef NDEBUG
 			for(size_t i = 0; i < len_; i++) {
@@ -275,7 +274,7 @@ public:
 	/**
 	 * Get an element from the cache, adjusted for tunnel jumps.
 	 */
-	inline uint32_t get(uint32_t elt) const {
+	inline TIndexOffU get(TIndexOffU elt) const {
 		if(ents_ == NULL) {
 			// This is not a valid cache entry; do nothing
 			return RANGE_NOT_SET;
@@ -285,8 +284,8 @@ public:
 		assert_leq(top_ + len_, ebwt_->_eh._len);
 		if(elt < len_ && ents_[elt] != RANGE_NOT_SET) {
 			if(verbose_) cout << "Retrieved result from cache: " << (top_ + elt) << endl;
-			uint32_t ret = ents_[elt] + jumps_;
-			ASSERT_ONLY(uint32_t sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
+			TIndexOffU ret = ents_[elt] + jumps_;
+			ASSERT_ONLY(TIndexOffU sanity = TRowChaser::toFlatRefOff(ebwt_, 1, top_ + elt));
 			assert_eq(sanity, ret);
 			return ret;
 		} else {
@@ -298,22 +297,22 @@ public:
 	/**
 	 * Check that len_ and the ents_ array both make sense.
 	 */
-	static bool sanityCheckEnts(uint32_t len, uint32_t *ents, TEbwt* ebwt) {
+	static bool sanityCheckEnts(TIndexOffU len, TIndexOffU *ents, TEbwt* ebwt) {
 		assert_gt(len, 0);
 		assert_leq(len, ebwt->_eh._len);
 		if(len < 10) {
 			for(size_t i = 0; i < len; i++) {
-				if(ents[i] == 0xffffffff) continue;
+				if(ents[i] == OFF_MASK) continue;
 				assert_leq(ents[i], ebwt->_eh._len);
 				for(size_t j = i+1; j < len; j++) {
-					if(ents[j] == 0xffffffff) continue;
+					if(ents[j] == OFF_MASK) continue;
 					assert_neq(ents[i], ents[j]);
 				}
 			}
 		} else {
-			std::set<uint32_t> seen;
+			std::set<TIndexOffU> seen;
 			for(size_t i = 0; i < len; i++) {
-				if(ents[i] == 0xffffffff) continue;
+				if(ents[i] == OFF_MASK) continue;
 				assert(seen.find(ents[i]) == seen.end());
 				seen.insert(ents[i]);
 			}
@@ -331,10 +330,9 @@ public:
 private:
 
 	TIndexOffU top_;   /// top pointer for this range
-	uint32_t jumps_; /// how many tunnel-jumps it is away from the requester
-	uint32_t len_;   /// # of entries in cache entry
-	uint32_t *ents_; /// ptr to entries, which are flat offs within joined ref
-	//U32Pair *ents_;  /// pointer to entries, which are tidx,toff pairs
+	TIndexOffU jumps_; /// how many tunnel-jumps it is away from the requester
+	TIndexOffU len_;   /// # of entries in cache entry
+	TIndexOffU *ents_; /// ptr to entries, which are flat offs within joined ref
 	TEbwt    *ebwt_; /// index that alignments are in
 	bool     verbose_; /// be talkative?
 	bool     sanity_;  /// do consistency checks?
@@ -346,12 +344,12 @@ private:
 class RangeCache {
 
 	typedef Ebwt<String<Dna> > TEbwt;
-	typedef std::vector<uint32_t> TU32Vec;
-	typedef std::map<uint32_t, uint32_t> TMap;
-	typedef std::map<uint32_t, uint32_t>::iterator TMapItr;
+	typedef std::vector<TIndexOffU> TUVec;
+	typedef std::map<TIndexOffU, TIndexOffU> TMap;
+	typedef std::map<TIndexOffU, TIndexOffU>::iterator TMapItr;
 
 public:
-	RangeCache(uint32_t lim, TEbwt* ebwt) :
+	RangeCache(size_t lim, TEbwt* ebwt) :
 		lim_(lim), map_(), pool_(lim), closed_(false), ebwt_(ebwt), sanity_(true) { }
 
 	/**
@@ -381,7 +379,7 @@ public:
 			return ret;
 		} else {
 			// There is a cache entry for the given 'top' offset
-			uint32_t ret = itr->second;
+			TIndexOffU ret = itr->second;
 			ent.init(pool_, top, ret, ebwt_);
 			return true; // success
 		}
@@ -396,16 +394,16 @@ public:
 		for(TMapItr itr = map_.begin(); itr != map_.end(); itr++) {
 			TIndexOffU top = itr->first;
 			TIndexOffU idx = itr->second;
-			uint32_t jumps = 0;
+			TIndexOffU jumps = 0;
 			assert_leq(top, ebwt_->_eh._len);
-			uint32_t *ents = pool_.get(idx);
-			if((ents[0] & 0x80000000) != 0) {
-				jumps = ents[0] & ~0x80000000;
+			TIndexOffU *ents = pool_.get(idx);
+			if((ents[0] & CACHE_WRAPER_BIT) != 0) {
+				jumps = ents[0] & ~CACHE_WRAPER_BIT;
 				assert_leq(jumps, ebwt_->_eh._len);
 				idx = ents[1];
 				ents = pool_.get(idx);
 			}
-			uint32_t len = ents[0];
+			TIndexOffU len = ents[0];
 			assert_leq(top + len, ebwt_->_eh._len);
 			RangeCacheEntry::sanityCheckEnts(len, ents + 1, ebwt_);
 		}
@@ -420,14 +418,14 @@ protected:
 	 * suffixes (though longer) as the given range, and 2) has a cache
 	 * entry for it.
 	 */
-	bool tunnel(uint32_t top, uint32_t bot, RangeCacheEntry& ent) {
+	bool tunnel(TIndexOffU top, TIndexOffU bot, RangeCacheEntry& ent) {
 		assert_gt(bot, top);
-		TU32Vec tops;
+		TUVec tops;
 		const TIndexOffU spread = bot - top;
 		SideLocus tloc, bloc;
 		SideLocus::initFromTopBot(top, bot, ebwt_->_eh, ebwt_->_ebwt, tloc, bloc);
-		uint32_t newtop = top, newbot = bot;
-		uint32_t jumps = 0;
+		TIndexOffU newtop = top, newbot = bot;
+		TIndexOffU jumps = 0;
 		// Walk left through the tunnel
 		while(true) {
 			if(ebwt_->rowL(tloc) != ebwt_->rowL(bloc)) {
@@ -453,23 +451,23 @@ protected:
 					// This range, which is further to the left in the
 					// same tunnel as the query range, has a cache
 					// entry already, so use that
-					uint32_t idx = itr->second;
-					uint32_t *ents = pool_.get(idx);
-					if((ents[0] & 0x80000000) != 0) {
+					TIndexOffU idx = itr->second;
+					TIndexOffU *ents = pool_.get(idx);
+					if((ents[0] & CACHE_WRAPER_BIT) != 0) {
 						// The cache entry we found was a wrapper; make
 						// a new wrapper that points to that wrapper's
 						// target, with the appropriate number of jumps
-						jumps += (ents[0] & ~0x80000000);
+						jumps += (ents[0] & ~CACHE_WRAPER_BIT);
 						idx = ents[1];
 					}
 					// Allocate a new wrapper
-					uint32_t newentIdx = pool_.alloc(2);
+					TIndexOffU newentIdx = pool_.alloc(2);
 					if(newentIdx != RANGE_CACHE_BAD_ALLOC) {
 						// We successfully made a new wrapper entry;
 						// now populate it and install it in map_
-						uint32_t *newent = pool_.get(newentIdx); // get ptr to it
+						TIndexOffU *newent = pool_.get(newentIdx); // get ptr to it
 						assert_eq(0, newent[0]);
-						newent[0] = 0x80000000 | jumps; // set jumps
+						newent[0] = CACHE_WRAPER_BIT | jumps; // set jumps
 						newent[1] = idx;                // set target
 						assert(map_.find(top) == map_.end());
 						map_[top] = newentIdx;
@@ -493,20 +491,20 @@ protected:
 		assert_eq(jumps, tops.size());
 		// Try to create a new cache entry for the leftmost range in
 		// the tunnel (which might be the query range)
-		uint32_t newentIdx = pool_.alloc(spread + 1);
+		TIndexOffU newentIdx = pool_.alloc(spread + 1);
 		if(newentIdx != RANGE_CACHE_BAD_ALLOC) {
 			// Successfully allocated new range cache entry; install it
-			uint32_t *newent = pool_.get(newentIdx);
+			TIndexOffU *newent = pool_.get(newentIdx);
 			assert_eq(0, newent[0]);
 			// Store cache-range length in first word
 			newent[0] = spread;
-			assert_lt(newent[0], 0x80000000);
+			assert_lt(newent[0], CACHE_WRAPER_BIT);
 			assert_eq(spread, newent[0]);
 			TIndexOffU entTop = top;
-			uint32_t jumps = 0;
+			TIndexOffU jumps = 0;
 			if(tops.size() > 0) {
 				entTop = tops.back();
-				jumps = (uint32_t)tops.size();
+				jumps = tops.size();
 			}
 			// Cache the entry for the end of the tunnel
 			assert(map_.find(entTop) == map_.end());
@@ -517,11 +515,11 @@ protected:
 			if(jumps > 0) {
 				assert_neq(entTop, top);
 				// Cache a wrapper entry for the query range (if possible)
-				uint32_t wrapentIdx = pool_.alloc(2);
+				TIndexOffU wrapentIdx = pool_.alloc(2);
 				if(wrapentIdx != RANGE_CACHE_BAD_ALLOC) {
-					uint32_t *wrapent = pool_.get(wrapentIdx);
+					TIndexOffU *wrapent = pool_.get(wrapentIdx);
 					assert_eq(0, wrapent[0]);
-					wrapent[0] = 0x80000000 | jumps;
+					wrapent[0] = CACHE_WRAPER_BIT | jumps;
 					wrapent[1] = newentIdx;
 					assert(map_.find(top) == map_.end());
 					map_[top] = wrapentIdx;
@@ -535,7 +533,7 @@ protected:
 		}
 	}
 
-	uint32_t lim_;           /// Total number of key/val bytes to keep in cache
+	TIndexOffU lim_;           /// Total number of key/val bytes to keep in cache
 	TMap map_;               ///
 	RangeCacheMemPool pool_; /// Memory pool
 	bool closed_;            /// Out of space; no new entries

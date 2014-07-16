@@ -80,9 +80,9 @@ public:
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, true, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rFw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * drFw_Bw = new EbwtRangeSourceDriver(
 			*params, rFw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -110,9 +110,9 @@ public:
 		}
 
 		EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 		EbwtRangeSourceDriver * drRc_Fw = new EbwtRangeSourceDriver(
 			*params, rRc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -289,9 +289,9 @@ public:
 		dr1FwVec = new TRangeSrcDrPtrVec();
 		if(do1Fw) {
 			EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
 				*params, r1Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -324,9 +324,9 @@ public:
 		}
 		if(do1Rc) {
 			EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
 				*params, r1Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -358,9 +358,9 @@ public:
 		}
 		if(do2Fw) {
 			EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
 				*params, r2Fw_Bw, true, false, maqPenalty_, qualOrder_, sink_, sinkPt,
@@ -392,9 +392,9 @@ public:
 		}
 		if(do2Rc) {
 			EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, halfAndHalf, seeded, maqPenalty_, qualOrder_);
 
 			EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(
 				*params, r2Rc_Fw, false, false, maqPenalty_, qualOrder_, sink_, sinkPt,

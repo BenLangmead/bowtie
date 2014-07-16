@@ -177,9 +177,9 @@ protected:
 	TIndexOffU qlen_;          /// length of read; needed to convert to ref. coordinates
 	const EbwtParams* eh_;   /// eh field from index
 	TIndexOffU row_;           /// current row
-	uint32_t jumps_;         /// # steps so far
+	TIndexOffU jumps_;         /// # steps so far
 	SideLocus sideloc_;      /// current side locus
-	TIndexOffU off_;           /// calculated offset (0xffffffff if not done)
+	TIndexOffU off_;           /// calculated offset (OFF_MASK if not done)
 	TIndexOffU tlen_;          /// hit text length
 	AlignerMetrics *metrics_;
 };

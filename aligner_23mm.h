@@ -80,15 +80,15 @@ public:
 		const bool seeded = false;
 
 		EbwtRangeSource *rFw_Bw = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, true, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, true, OFF_MASK, true, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rFw_Fw = new EbwtRangeSource(
-			&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rFw_BwHalf = new EbwtRangeSource(
-			 ebwtBw_, true, 0xffffffff, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, true, OFF_MASK, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rFw_FwHalf = NULL;
 		if(!two_) {
 			rFw_FwHalf = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
 		}
 
 		// Driver wrapper for rFw_Bw
@@ -146,15 +146,15 @@ public:
 		}
 
 		EbwtRangeSource *rRc_Fw = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc_Bw = new EbwtRangeSource(
-			 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+			 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc_FwHalf = new EbwtRangeSource(
-			&ebwtFw_, false, 0xffffffff, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
+			&ebwtFw_, false, OFF_MASK, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
 		EbwtRangeSource *rRc_BwHalf = NULL;
 		if(!two_) {
 			rRc_BwHalf = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
 		}
 
 		// Driver wrapper for rRc_Fw
@@ -361,13 +361,13 @@ public:
 
 		if(do1Fw) {
 			EbwtRangeSource *r1Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Fw_BwHalf = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
 
 			// Driver wrapper for rFw_Bw
 			EbwtRangeSourceDriver * dr1Fw_Bw = new EbwtRangeSourceDriver(
@@ -426,13 +426,13 @@ public:
 
 		if(do1Rc) {
 			EbwtRangeSource *r1Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Rc_FwHalf = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r1Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
 
 			// Driver wrapper for rRc_Fw
 			EbwtRangeSourceDriver * dr1Rc_Fw = new EbwtRangeSourceDriver(
@@ -491,13 +491,13 @@ public:
 
 		if(do2Fw) {
 			EbwtRangeSource *r2Fw_Bw = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Fw_Fw = new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Fw_BwHalf = new EbwtRangeSource(
-				 ebwtBw_, true, 0xffffffff, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, true, OFF_MASK, false, verbose_, quiet_, 2, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Fw_FwHalf = two_ ? NULL : new EbwtRangeSource(
-				&ebwtFw_, true, 0xffffffff, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, true, OFF_MASK, false, verbose_, quiet_, 3, seeded, maqPenalty_, qualOrder_);
 
 			// Driver wrapper for rFw_Bw
 			EbwtRangeSourceDriver * dr2Fw_Bw = new EbwtRangeSourceDriver(
@@ -555,13 +555,13 @@ public:
 
 		if(do2Rc) {
 			EbwtRangeSource *r2Rc_Fw = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, true,  verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Rc_Bw = new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 0, seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Rc_FwHalf = new EbwtRangeSource(
-				&ebwtFw_, false, 0xffffffff, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
+				&ebwtFw_, false, OFF_MASK, false, verbose_, quiet_, 2,  seeded, maqPenalty_, qualOrder_);
 			EbwtRangeSource *r2Rc_BwHalf = two_ ? NULL : new EbwtRangeSource(
-				 ebwtBw_, false, 0xffffffff, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
+				 ebwtBw_, false, OFF_MASK, false, verbose_, quiet_, 3,  seeded, maqPenalty_, qualOrder_);
 
 			// Driver wrapper for rRc_Fw
 			EbwtRangeSourceDriver * dr2Rc_Fw = new EbwtRangeSourceDriver(

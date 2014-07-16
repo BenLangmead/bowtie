@@ -283,7 +283,7 @@ protected:
 	TIndexOffU bot_;         /// range bottom
 	TIndexOffU irow_;        /// initial randomly-chosen row within range
 	TIndexOffU row_;         /// current row within range
-	UPair off_;          /// calculated offset (0xffffffff if not done)
+	UPair off_;          /// calculated offset (OFF_MASK if not done)
 	TIndexOffU tlen_;        /// length of text hit
 	TRowChaser chaser_;    /// stateful row chaser
 	RangeCacheEntry cacheEnt_; /// current cache entry

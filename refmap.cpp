@@ -41,7 +41,7 @@ void ReferenceMap::parse() {
 		if(c == '>') {
 			// This appears to be a name line
 			in.get(); // chop off the initial '>'
-			uint32_t off;
+			TIndexOffU off;
 			in >> off;
 			in.get(); // chop off tab
 			char buf[1024];
@@ -52,7 +52,7 @@ void ReferenceMap::parse() {
 			}
 			continue;
 		}
-		uint32_t id, off;
+		TIndexOffU id, off;
 		in >> id >> off;
 		map_.resize(map_.size()+1);
 		map_.back().first = id;

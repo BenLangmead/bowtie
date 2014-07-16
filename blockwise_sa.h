@@ -508,7 +508,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 			VMSG_NL("Splitting and merging");
 			for(TIndexOffU i = 0; i < numBuckets; i++) {
 				TIndexOffU mergedSz = bsz + 1;
-				assert(bucketSzs[i] == 0 || bucketReps[i] != 0xffffffff);
+				assert(bucketSzs[i] == 0 || bucketReps[i] != OFF_MASK);
 				if(i < (TIndexOffU)numBuckets-1) {
 					mergedSz = bucketSzs[(size_t)i] + bucketSzs[(size_t)i+1] + 1;
 				}

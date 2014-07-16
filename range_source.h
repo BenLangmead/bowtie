@@ -339,7 +339,7 @@ struct RangeState {
 		if(num > 1 && (!fuzzy || eq.flags.quallo == lo2)) {
 			last = false; // not the last at this pos
 			// Sum up range sizes and do a random weighted pick
-			uint32_t tot = 0;
+			TIndexOffU tot = 0;
 			bool candA = !eq.flags.mmA; bool candC = !eq.flags.mmC;
 			bool candG = !eq.flags.mmG; bool candT = !eq.flags.mmT;
 			bool candInsA = false, candInsC = false;
