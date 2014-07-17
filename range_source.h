@@ -1729,7 +1729,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			int64_t top = (int64_t)range().top;
+			TIndexOff top = (TIndexOff)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());
@@ -1787,7 +1787,7 @@ public:
 protected:
 
 #ifndef NDEBUG
-	std::set<int64_t> allTops_;
+	std::set<TIndexOff> allTops_;
 #endif
 };
 
@@ -1910,7 +1910,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			int64_t top = (int64_t)range().top;
+			TIndexOff top = (TIndexOff)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());
@@ -1965,7 +1965,7 @@ protected:
 	TRangeSource*                   rs_; // delete this in destructor
 	bool ebwtFw_;
 	PathManager pm_;
-	ASSERT_ONLY(std::set<int64_t> allTops_);
+	ASSERT_ONLY(std::set<TIndexOff> allTops_);
 };
 
 /**
@@ -2378,7 +2378,7 @@ protected:
 		// top offset
 		assert_gt(r->bot, r->top);
 		assert(r->ebwt != NULL);
-		int64_t top = (int64_t)r->top;
+		TIndexOff top = (TIndexOff)r->top;
 		top++; // ensure it's not 0
 		if(!r->ebwt->fw()) top = -top;
 		if(r->fw) {
@@ -2549,7 +2549,7 @@ protected:
 	bool verbose_;
 	bool quiet_;
 	bool mixesReads_;
-	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
+	ASSERT_ONLY(std::set<TIndexOff> allTopsRc_);
 };
 
 #endif /* RANGE_SOURCE_H_ */

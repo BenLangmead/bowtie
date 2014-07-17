@@ -1783,7 +1783,7 @@ protected:
 	char                _trimc;
 	uint32_t            _seed;
 #ifndef NDEBUG
-	std::set<int64_t>   allTops_;
+	std::set<TIndexOff> allTops_;
 #endif
 };
 
@@ -2340,7 +2340,7 @@ public:
 				curRange_.ebwt    = ebwt_;
 				this->foundRange  = true;
 	#ifndef NDEBUG
-				int64_t top2 = (int64_t)br->top_;
+				TIndexOff top2 = (TIndexOff)br->top_;
 				top2++; // ensure it's not 0
 				if(ebwt_->fw()) top2 = -top2;
 				assert(allTops_.find(top2) == allTops_.end());
@@ -2627,7 +2627,7 @@ protected:
 	// Object encapsulating metrics
 	AlignerMetrics*     metrics_;
 #ifndef NDEBUG
-	std::set<int64_t>   allTops_;
+	std::set<TIndexOff> allTops_;
 #endif
 };
 
@@ -3058,7 +3058,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			TIndexOffU top = (TIndexOffU)range().top;
+			TIndexOff top = (TIndexOff)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());
