@@ -105,6 +105,6 @@ if __name__ == "__main__":
     bt_path = curr_path[:i+len(bw_subdir)] 
     
     g_bdata = btdata.LargeTestsData(bt_path)
-    g_bt    = bt2face.BowtieSuite(bt_path)
+    g_bt    = btface.BowtieSuite(bt_path)
     runner.run(get_suite())
 
