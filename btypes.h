@@ -8,7 +8,7 @@
 #define OFF_LEN_MASK 0xc000000000000000
 #define LS_SIZE 0x100000000000000
 #define OFF_SIZE 8
-#define CACHE_WRAPER_BIT 0x8000000000000000
+#define CACHE_WRAPPER_BIT 0x8000000000000000
 
 typedef uint64_t TIndexOffU;
 typedef int64_t TIndexOff;
@@ -18,7 +18,7 @@ typedef int64_t TIndexOff;
 #define OFF_LEN_MASK 0xc0000000
 #define LS_SIZE 0x10000000
 #define OFF_SIZE 4
-#define CACHE_WRAPER_BIT 0x80000000
+#define CACHE_WRAPPER_BIT 0x80000000
 
 typedef uint32_t TIndexOffU;
 typedef int TIndexOff;

@@ -63,7 +63,7 @@ public:
 	TIndexOffU alloc(TIndexOffU numElts) {
 		assert_gt(numElts, 0);
 		assert_leq(occ_, lim_);
-		if(occ_ + numElts > lim_ || numElts >= CACHE_WRAPER_BIT) {
+		if(occ_ + numElts > lim_ || numElts >= CACHE_WRAPPER_BIT) {
 			return RANGE_CACHE_BAD_ALLOC;
 		}
 		assert_gt(lim_, 0);
@@ -96,7 +96,7 @@ public:
 		assert_lt(off, lim_);
 		assert(allocs_.find(off) != allocs_.end());
 		TIndexOffU *ret = buf_ + off;
-		assert_neq(CACHE_WRAPER_BIT, ret[0]);
+		assert_neq(CACHE_WRAPPER_BIT, ret[0]);
 		assert_neq(OFF_MASK, ret[0]);
 		return ret;
 	}
@@ -153,12 +153,12 @@ public:
 		top_ = top;
 		ebwt_ = ebwt;
 		TIndexOffU *ents = pool.get(ent);
-		assert_neq(CACHE_WRAPER_BIT, ents[0]);
+		assert_neq(CACHE_WRAPPER_BIT, ents[0]);
 		// Is hi bit set?
-		if((ents[0] & CACHE_WRAPER_BIT) != 0) {
+		if((ents[0] & CACHE_WRAPPER_BIT) != 0) {
 			// If so, the target is a wrapper and the non-hi bits
 			// contain the # jumps
-			jumps_ = (ents[0] & ~CACHE_WRAPER_BIT);
+			jumps_ = (ents[0] & ~CACHE_WRAPPER_BIT);
 			assert_gt(jumps_, 0);
 			assert_leq(jumps_, ebwt_->_eh._len);
 			// Get the target entry
@@ -197,7 +197,7 @@ public:
 		jumps_ = jumps;
 		TIndexOffU *ents = pool.get(ent);
 		// Must not be a wrapper
-		assert_eq(0, ents[0] & CACHE_WRAPER_BIT);
+		assert_eq(0, ents[0] & CACHE_WRAPPER_BIT);
 		// Get the length from the target entry
 		len_ = ents[0];
 		assert_gt(len_, 0);
@@ -397,8 +397,8 @@ public:
 			TIndexOffU jumps = 0;
 			assert_leq(top, ebwt_->_eh._len);
 			TIndexOffU *ents = pool_.get(idx);
-			if((ents[0] & CACHE_WRAPER_BIT) != 0) {
-				jumps = ents[0] & ~CACHE_WRAPER_BIT;
+			if((ents[0] & CACHE_WRAPPER_BIT) != 0) {
+				jumps = ents[0] & ~CACHE_WRAPPER_BIT;
 				assert_leq(jumps, ebwt_->_eh._len);
 				idx = ents[1];
 				ents = pool_.get(idx);
@@ -453,11 +453,11 @@ protected:
 					// entry already, so use that
 					TIndexOffU idx = itr->second;
 					TIndexOffU *ents = pool_.get(idx);
-					if((ents[0] & CACHE_WRAPER_BIT) != 0) {
+					if((ents[0] & CACHE_WRAPPER_BIT) != 0) {
 						// The cache entry we found was a wrapper; make
 						// a new wrapper that points to that wrapper's
 						// target, with the appropriate number of jumps
-						jumps += (ents[0] & ~CACHE_WRAPER_BIT);
+						jumps += (ents[0] & ~CACHE_WRAPPER_BIT);
 						idx = ents[1];
 					}
 					// Allocate a new wrapper
@@ -467,7 +467,7 @@ protected:
 						// now populate it and install it in map_
 						TIndexOffU *newent = pool_.get(newentIdx); // get ptr to it
 						assert_eq(0, newent[0]);
-						newent[0] = CACHE_WRAPER_BIT | jumps; // set jumps
+						newent[0] = CACHE_WRAPPER_BIT | jumps; // set jumps
 						newent[1] = idx;                // set target
 						assert(map_.find(top) == map_.end());
 						map_[top] = newentIdx;
@@ -498,7 +498,7 @@ protected:
 			assert_eq(0, newent[0]);
 			// Store cache-range length in first word
 			newent[0] = spread;
-			assert_lt(newent[0], CACHE_WRAPER_BIT);
+			assert_lt(newent[0], CACHE_WRAPPER_BIT);
 			assert_eq(spread, newent[0]);
 			TIndexOffU entTop = top;
 			TIndexOffU jumps = 0;
@@ -519,7 +519,7 @@ protected:
 				if(wrapentIdx != RANGE_CACHE_BAD_ALLOC) {
 					TIndexOffU *wrapent = pool_.get(wrapentIdx);
 					assert_eq(0, wrapent[0]);
-					wrapent[0] = CACHE_WRAPER_BIT | jumps;
+					wrapent[0] = CACHE_WRAPPER_BIT | jumps;
 					wrapent[1] = newentIdx;
 					assert(map_.find(top) == map_.end());
 					map_[top] = wrapentIdx;
