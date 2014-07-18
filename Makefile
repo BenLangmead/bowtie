@@ -109,9 +109,6 @@ ifneq (,$(findstring AMD64,$(PROCESSOR_ARCHITEW6432)))
 		BITS=64
 	endif
 endif
-ifeq (32,$(BITS))
-  $(error bowtie2 compilation requires a 64-bit platform )
-endif
 
 ifeq (1,$(LINUX))
     ifeq (x86_64, $(shell uname -p))
@@ -119,17 +116,12 @@ ifeq (1,$(LINUX))
     endif
 endif
 
-# Convert BITS=?? to a -m flag
-BITS_FLAG =
 ifeq (32,$(BITS))
-    BITS_FLAG = -m32
-endif
-ifeq (64,$(BITS))
-    BITS_FLAG = -m64
+    $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 $(BITS_FLAG)
-RELEASE_FLAGS = -O3 $(BITS_FLAG)
+DEBUG_FLAGS = -O0 -g3 -m64
+RELEASE_FLAGS = -O3 -m64
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
