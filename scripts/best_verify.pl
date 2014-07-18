@@ -57,7 +57,7 @@ if(defined($C)) {
 
 my $bowtie_dir = ".";
 my $bowtie_exe = "bowtie";
-$bowtie_exe .= "-debug" if $debug;
+$bowtie_exe .= " --debug" if $debug;
 
 my $index  = "e_coli";
 $index = $ARGV[0] if defined($ARGV[0]);

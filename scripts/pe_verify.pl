@@ -77,7 +77,7 @@ print "Using match mode: $match_mode\n";
 
 my $bowtie_dir = ".";
 my $bowtie_exe = "bowtie";
-$bowtie_exe .= "-debug" if $d;
+$bowtie_exe .= " --debug" if $d;
 
 my $index  = "e_coli";
 $index = $ARGV[0] if defined($ARGV[0]);

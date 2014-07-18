@@ -55,8 +55,7 @@ srand $seed;
 
 # make all the relevant binaries, unless we were asked not to
 unless($noCompile) {
-	run("make bowtie bowtie-debug bowtie-build-debug ".
-	       "bowtie-inspect-debug bowtie-inspect bowtie-build") == 0 || die "Error building";
+	run("make allall ") == 0 || die "Error building";
 }
 
 # Alignment policies
@@ -373,7 +372,7 @@ sub build {
 	}
 	close(FA);
 	
-	$cmd = "perl $Bin/test/inspect.pl --debug --seed $seed --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa";
+	$cmd = "perl $Bin/inspect.pl --debug --seed $seed --bowtie-build2=$bowtie_build_old --ref=.randtmp$seed.fa";
 	print "$cmd\n";
 	system($cmd) == 0 || die "inspect.pl died with exitlevel $?";
 	
@@ -423,7 +422,7 @@ sub build {
 	my $args = "-q --sanity $color $file1 $noauto $offRate $ftabChars $bucketArg $file2";
 	
 	# Do unpacked version
-	my $cmd = "${bowtie_build}-debug $args .tmp$seed";
+	my $cmd = "${bowtie_build} --debug $args .tmp$seed";
 	run("echo \"$cmd\" > .tmp$seed.cmd");
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>&1"));
@@ -441,7 +440,7 @@ sub build {
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
 	if(int(rand(4)) == 0) {
-		$cmd = "${bowtie_build}-debug -a -p $args .tmp$seed.packed";
+		$cmd = "${bowtie_build} --debug -a -p $args .tmp$seed.packed";
 		print "$cmd\n";
 		$out = trim(runBacktick("$cmd 2>&1"));
 		$out =~ s/Warning: Encountered reference sequence with only gaps//g;
@@ -735,7 +734,7 @@ sub doSearch($$$$$$$$$$) {
 	defined($khits) || die;
 	defined($offRateStr) || die;
 	defined($nstr) || die;
-	my $cmd = "${bowtie}-debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	my $cmd = "${bowtie} --debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout"));
 	
@@ -889,7 +888,7 @@ sub doSearch($$$$$$$$$$) {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "${bowtie}-debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "${bowtie} --debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 	# Parse output to see if any of it is bad

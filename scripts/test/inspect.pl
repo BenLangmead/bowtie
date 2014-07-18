@@ -38,12 +38,12 @@ GetOptions (
 	"debug"                => \$debug,
 	"debug2"               => \$debug_old);
 
-my $bowtie_d = "${bowtie}-debug";
-my $bowtie2_d = "${bowtie2}-debug";
-my $bowtie_build_d = "${bowtie_build}-debug";
-my $bowtie_build2_d = "${bowtie_build2}-debug";
-my $bowtie_inspect_d = "${bowtie_inspect}-debug";
-my $bowtie_inspect2_d = "${bowtie_inspect2}-debug";
+my $bowtie_d = "${bowtie} --debug";
+my $bowtie2_d = "${bowtie2} --debug";
+my $bowtie_build_d = "${bowtie_build} --debug";
+my $bowtie_build2_d = "${bowtie_build2} --debug";
+my $bowtie_inspect_d = "${bowtie_inspect} --debug";
+my $bowtie_inspect2_d = "${bowtie_inspect2} --debug";
 
 my @cases = (
 	">\nN\n>0\nATCTAG\n>\nN\n",
