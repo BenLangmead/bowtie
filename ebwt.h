@@ -360,8 +360,8 @@ public:
 	    _passMemExc(passMemExc), \
 	    _sanity(sanityCheck), \
 	    _fw(__fw), \
-	    _in1(MM_FILE_INIT), \
-	    _in2(MM_FILE_INIT), \
+	    _in1(NULL), \
+	    _in2(NULL), \
 	    _zOff(OFF_MASK), \
 	    _zEbwtByteOff(OFF_MASK), \
 	    _zEbwtBpOff(-1), \
@@ -837,8 +837,8 @@ public:
 				FREE_SHARED(_ebwt);
 			}
 		}
-		MM_FILE_CLOSE(_in1);
-		MM_FILE_CLOSE(_in2);
+		if (_in1 != NULL) fclose(_in1);
+		if (_in2 != NULL) fclose(_in2);
 #ifdef EBWT_STATS
 		cout << (_fw ? "Forward index:" : "Mirror index:") << endl;
 		cout << "  mapLFEx:   " << mapLFExs_ << endl;
@@ -1188,8 +1188,8 @@ public:
 	bool       _passMemExc;
 	bool       _sanity;
 	bool       _fw;     // true iff this is a forward index
-	MM_FILE  _in1;    // input fd for primary index file
-	MM_FILE  _in2;    // input fd for secondary index file
+	FILE      *_in1;    // input fd for primary index file
+	FILE      *_in2;    // input fd for secondary index file
 	string     _in1Str; // filename for primary index file
 	string     _in2Str; // filename for secondary index file
 	TIndexOffU   _zOff;
@@ -3064,23 +3064,6 @@ void Ebwt<TStr>::readIntoMemory(
 			cerr << "  About to open input files: ";
 			logTime(cerr);
 		}
-#ifdef BOWTIE_MM
-		// Initialize our primary and secondary input-stream fields
-		if(_in1 != -1) close(_in1);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in1Str << "\"" << endl;
-		}
-		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in1Str << endl;
-		}
-		if(_in2 != -1) close(_in2);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in2Str << "\"" << endl;
-		}
-		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in2Str << endl;
-		}
-#else
 		// Initialize our primary and secondary input-stream fields
 		if(_in1 != NULL) fclose(_in1);
 		if(_verbose || startVerbose) cerr << "Opening \"" << _in1Str << "\"" << endl;
@@ -3092,7 +3075,7 @@ void Ebwt<TStr>::readIntoMemory(
 		if((_in2 = fopen(_in2Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
-#endif
+
 		if(_verbose || startVerbose) {
 			cerr << "  Finished opening input files: ";
 			logTime(cerr);
@@ -3101,7 +3084,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		if(_useMm /*&& !justHeader*/) {
 			const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
-			int fds[] = { _in1, _in2 };
+			int fds[] = { fileno(_in1), fileno(_in2) };
 			for(int i = 0; i < 2; i++) {
 				if(_verbose || startVerbose) {
 					cerr << "  Memory-mapping input file " << (i+1) << ": ";
@@ -3287,7 +3270,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_plen = (TIndexOffU*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nPat*OFF_SIZE;
-		lseek(_in1, this->_nPat*OFF_SIZE, SEEK_CUR);
+		fseeko(_in1, this->_nPat*OFF_SIZE, SEEK_CUR);
 #endif
 	} else {
 		try {
@@ -3301,8 +3284,8 @@ void Ebwt<TStr>::readIntoMemory(
 					this->_plen[i] = readU<TIndexOffU>(_in1, switchEndian);
 				}
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void*)this->_plen, this->_nPat*OFF_SIZE);
-				if(r != (MM_READ_RET)(this->_nPat*OFF_SIZE)) {
+				size_t r = MM_READ(_in1, (void*)this->_plen, this->_nPat*OFF_SIZE);
+				if(r != (size_t)(this->_nPat*OFF_SIZE)) {
 					cerr << "Error reading _plen[] array: " << r << ", " << (this->_nPat*OFF_SIZE) << endl;
 					throw 1;
 				}
@@ -3333,7 +3316,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_rstarts = (TIndexOffU*)(mmFile[0] + bytesRead);
 		bytesRead += this->_nFrag*OFF_SIZE*3;
-		lseek(_in1, this->_nFrag*OFF_SIZE*3, SEEK_CUR);
+		fseeko(_in1, this->_nFrag*OFF_SIZE*3, SEEK_CUR);
 #endif
 	} else {
 		this->_rstarts = new TIndexOffU[this->_nFrag*3];
@@ -3346,8 +3329,8 @@ void Ebwt<TStr>::readIntoMemory(
 				this->_rstarts[i+2] = readU<TIndexOffU>(_in1, switchEndian);
 			}
 		} else {
-			MM_READ_RET r = MM_READ(_in1, (void *)this->_rstarts, this->_nFrag*OFF_SIZE*3);
-			if(r != (MM_READ_RET)(this->_nFrag*OFF_SIZE*3)) {
+			size_t r = MM_READ(_in1, (void *)this->_rstarts, this->_nFrag*OFF_SIZE*3);
+			if(r != (size_t)(this->_nFrag*OFF_SIZE*3)) {
 				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*OFF_SIZE*3) << endl;
 				throw 1;
 			}
@@ -3358,7 +3341,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_ebwt = (uint8_t*)(mmFile[0] + bytesRead);
 		bytesRead += eh->_ebwtTotLen;
-		lseek(_in1, eh->_ebwtTotLen, SEEK_CUR);
+		fseeko(_in1, eh->_ebwtTotLen, SEEK_CUR);
 #endif
 	} else {
 		// Allocate ebwt (big allocation)
@@ -3389,7 +3372,7 @@ void Ebwt<TStr>::readIntoMemory(
 			char *pebwt = (char*)this->ebwt();
 
 			while (bytesLeft>0){
-				MM_READ_RET r = MM_READ(_in1, (void *)pebwt, bytesLeft);
+				size_t r = MM_READ(_in1, (void *)pebwt, bytesLeft);
 				if(MM_IS_IO_ERR(_in1,r,bytesLeft)) {
 					cerr << "Error reading ebwt array: returned " << r << ", length was " << (eh->_ebwtTotLen) << endl
 					     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
@@ -3414,7 +3397,7 @@ void Ebwt<TStr>::readIntoMemory(
 			if(useShmem_) NOTIFY_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		} else {
 			// Seek past the data and wait until master is finished
-			MM_SEEK(_in1, eh->_ebwtTotLen, SEEK_CUR);
+			fseeko(_in1, eh->_ebwtTotLen, SEEK_CUR);
 			if(useShmem_) WAIT_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		}
 	}
@@ -3431,7 +3414,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_fchr = (TIndexOffU*)(mmFile[0] + bytesRead);
 			bytesRead += 5*OFF_SIZE;
-			lseek(_in1, 5*OFF_SIZE, SEEK_CUR);
+			fseeko(_in1, 5*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
 			this->_fchr = new TIndexOffU[5];
@@ -3451,7 +3434,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_ftab = (TIndexOffU*)(mmFile[0] + bytesRead);
 			bytesRead += eh->_ftabLen*OFF_SIZE;
-			lseek(_in1, eh->_ftabLen*OFF_SIZE, SEEK_CUR);
+			fseeko(_in1, eh->_ftabLen*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
 			this->_ftab = new TIndexOffU[eh->_ftabLen];
@@ -3459,8 +3442,8 @@ void Ebwt<TStr>::readIntoMemory(
 				for(TIndexOffU i = 0; i < eh->_ftabLen; i++)
 					this->_ftab[i] = readU<TIndexOffU>(_in1, switchEndian);
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void *)this->_ftab, eh->_ftabLen*OFF_SIZE);
-				if(r != (MM_READ_RET)(eh->_ftabLen*OFF_SIZE)) {
+				size_t r = MM_READ(_in1, (void *)this->_ftab, eh->_ftabLen*OFF_SIZE);
+				if(r != (size_t)(eh->_ftabLen*OFF_SIZE)) {
 					cerr << "Error reading _ftab[] array: " << r << ", " << (eh->_ftabLen*OFF_SIZE) << endl;
 					throw 1;
 				}
@@ -3475,7 +3458,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_eftab = (TIndexOffU*)(mmFile[0] + bytesRead);
 			bytesRead += eh->_eftabLen*OFF_SIZE;
-			lseek(_in1, eh->_eftabLen*OFF_SIZE, SEEK_CUR);
+			fseeko(_in1, eh->_eftabLen*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
 			this->_eftab = new TIndexOffU[eh->_eftabLen];
@@ -3483,8 +3466,8 @@ void Ebwt<TStr>::readIntoMemory(
 				for(TIndexOffU i = 0; i < eh->_eftabLen; i++)
 					this->_eftab[i] = readU<TIndexOffU>(_in1, switchEndian);
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void *)this->_eftab, eh->_eftabLen*OFF_SIZE);
-				if(r != (MM_READ_RET)(eh->_eftabLen*OFF_SIZE)) {
+				size_t r = MM_READ(_in1, (void *)this->_eftab, eh->_eftabLen*OFF_SIZE);
+				if(r != (size_t)(eh->_eftabLen*OFF_SIZE)) {
 					cerr << "Error reading _eftab[] array: " << r << ", " << (eh->_eftabLen*OFF_SIZE) << endl;
 					throw 1;
 				}
@@ -3508,7 +3491,7 @@ void Ebwt<TStr>::readIntoMemory(
 	if(loadNames) {
 		while(true) {
 			char c = '\0';
-			if(MM_READ(_in1, (void *)(&c), (size_t)1) != (MM_READ_RET)1) break;
+			if(MM_READ(_in1, (void *)(&c), (size_t)1) != (size_t)1) break;
 			bytesRead++;
 			if(c == '\0') break;
 			else if(c == '\n') {
@@ -3556,8 +3539,8 @@ void Ebwt<TStr>::readIntoMemory(
 				char *buf = new char[blockMaxSz];
 				for(TIndexOffU i = 0; i < offsLen; i += blockMaxSzU) {
 					TIndexOffU block = min<TIndexOffU>(blockMaxSzU, offsLen - i);
-					MM_READ_RET r = MM_READ(_in2, (void *)buf, block << (OFF_SIZE/4 + 1));
-					if(r != (MM_READ_RET)(block << (OFF_SIZE/4 + 1))) {
+					size_t r = MM_READ(_in2, (void *)buf, block << (OFF_SIZE/4 + 1));
+					if(r != (size_t)(block << (OFF_SIZE/4 + 1))) {
 						cerr << "Error reading block of offs array: " << r << ", " << (block << (OFF_SIZE/4 + 1)) << endl
 						     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
 						     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
@@ -3584,7 +3567,7 @@ void Ebwt<TStr>::readIntoMemory(
 					bytesRead += offsSz;
 					// Argument to lseek can be 64 bits if compiled with
 					// _FILE_OFFSET_BITS
-					MM_SEEK(_in2, offsSz, SEEK_CUR);
+					fseeko(_in2, offsSz, SEEK_CUR);
 #endif
 				} else {
 					// If any of the high two bits are set
@@ -3595,7 +3578,7 @@ void Ebwt<TStr>::readIntoMemory(
 					char *offs = (char *)this->offs();
 
 					while(bytesLeft > 0) {
-						MM_READ_RET r = MM_READ(_in2, (void*)offs, bytesLeft);
+						size_t r = MM_READ(_in2, (void*)offs, bytesLeft);
 						if(MM_IS_IO_ERR(_in2,r,bytesLeft)) {
 							cerr << "Error reading block of _offs[] array: "
 							     << r << ", " << bytesLeft << gLastIOErrMsg << endl;
@@ -3619,7 +3602,7 @@ void Ebwt<TStr>::readIntoMemory(
 			if(useShmem_) NOTIFY_SHARED(this->_offs, offsLenSampled*OFF_SIZE);
 		} else {
 			// Not the shmem leader
-			MM_SEEK(_in2, offsLenSampled*OFF_SIZE, SEEK_CUR);
+			fseeko(_in2, offsLenSampled*OFF_SIZE, SEEK_CUR);
 			if(useShmem_) WAIT_SHARED(this->_offs, offsLenSampled*OFF_SIZE);
 		}
 	}
@@ -3644,8 +3627,8 @@ void Ebwt<TStr>::readIntoMemory(
 		for(TIndexOffU i = 0; i < isaLen; i++) {
 			if((i & ~(OFF_MASK << isaRateDiff)) != 0) {
 				char tmp[OFF_SIZE];
-				MM_READ_RET r = MM_READ(_in2, (void *)tmp, OFF_SIZE);
-				if(r != (MM_READ_RET)OFF_SIZE) {
+				size_t r = MM_READ(_in2, (void *)tmp, OFF_SIZE);
+				if(r != (size_t)OFF_SIZE) {
 					cerr << "Error reading a word of the _isa[] array: " << r << ", 4" << endl;
 					throw 1;
 				}
@@ -3660,11 +3643,11 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 			this->_isa = (TIndexOffU*)(mmFile[1] + bytesRead);
 			bytesRead += (isaLen << 2);
-			lseek(_in2, (isaLen << 2), SEEK_CUR);
+			fseeko(_in2, (isaLen << 2), SEEK_CUR);
 #endif
 		} else {
-			MM_READ_RET r = MM_READ(_in2, (void *)this->_isa, isaLen*OFF_SIZE);
-			if(r != (MM_READ_RET)(isaLen*OFF_SIZE)) {
+			size_t r = MM_READ(_in2, (void *)this->_isa, isaLen*OFF_SIZE);
+			if(r != (size_t)(isaLen*OFF_SIZE)) {
 				cerr << "Error reading _isa[] array: " << r << ", " << (isaLen*OFF_SIZE) << endl;
 				throw 1;
 			}
@@ -3691,12 +3674,8 @@ void Ebwt<TStr>::readIntoMemory(
 
 	// Be kind
 	if(deleteEh) delete eh;
-#ifdef BOWTIE_MM
-	lseek(_in1, 0, SEEK_SET);
-	lseek(_in2, 0, SEEK_SET);
-#else
+
 	rewind(_in1); rewind(_in2);
-#endif
 }
 
 /**
