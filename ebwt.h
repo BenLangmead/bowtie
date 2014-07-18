@@ -3674,8 +3674,8 @@ void Ebwt<TStr>::readIntoMemory(
 
 	// Be kind
 	if(deleteEh) delete eh;
-
-	rewind(_in1); rewind(_in2);
+	if (_in1 != NULL) rewind(_in1);
+	if (_in2 != NULL) rewind(_in2);
 }
 
 /**
