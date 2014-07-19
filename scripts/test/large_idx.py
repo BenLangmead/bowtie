@@ -28,7 +28,7 @@ class TestLargeIndex(unittest.TestCase):
         reads        = os.path.join(rdir,'human_reads.fa')
         ret = g_bt.build("%s human" % genome_fasta)
         self.assertEqual(ret,0)
-        args = "-x %s -f -U %s" % (genome_index,reads)
+        args = " %s -f %s" % (genome_index,reads)
         ret = g_bt.run(args)
         self.assertEqual(ret,0)
     
@@ -43,7 +43,7 @@ class TestLargeIndex(unittest.TestCase):
         reads        = os.path.join(rdir,'mouse_reads.fa')
         ret = g_bt.build("%s mouse" % genome_fasta)
         self.assertEqual(ret,0)
-        args = "-x %s -f -U %s" % (genome_index,reads)
+        args = " %s -f %s" % (genome_index,reads)
         ret = g_bt.run(args)
         self.assertEqual(ret,0)
     
@@ -59,9 +59,9 @@ class TestLargeIndex(unittest.TestCase):
         reads_mouse  = os.path.join(rdir,'mouse_reads.fa')
         ret = g_bt.build("%s ms_hum" % genome_fasta)
         self.assertEqual(ret,0)
-        args = "-x %s -f -U %s" % (genome_index,reads_human)
+        args = " %s -f %s" % (genome_index,reads_human)
         ret = g_bt.run(args)
-        args = "-x %s -f -U %s" % (genome_index,reads_mouse)
+        args = " %s -f %s" % (genome_index,reads_mouse)
         ret = g_bt.run(args)
         self.assertEqual(ret,0)
 
