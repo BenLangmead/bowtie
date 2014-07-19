@@ -23,7 +23,7 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
                                bool color,
                                bool nosq,
                                ReferenceMap *rmap,
-                               const uint32_t* plen,
+                               const TIndexOffU* plen,
                                bool fullRef,
                                bool noQnameTrunc,
                                const char *cmdline,
@@ -175,7 +175,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 			}
 		}
 	} else {
-		for (int i = len-1; i >= 0; -- i) {
+		for (int i = (int)len-1; i >= 0; -- i) {
 			if(mms->test(i)) {
 				nm++;
 				// There's a mismatch at this position
@@ -384,7 +384,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == r) {
-						reportSamHits(hs, i, i+2, 0, hs.size()/2+1);
+						reportSamHits(hs, i, i+2, 0, (int)(hs.size()/2)+1);
 						break;
 					}
 					num++;
@@ -399,7 +399,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			}
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
-			reportSamHit(hs[r], /*MAPQ*/0, /*XM:I*/hs.size()+1);
+			reportSamHit(hs[r], /*MAPQ*/0, /*XM:I*/(int)hs.size()+1);
 		}
 	} else {
 		reportUnOrMax(p, &hs, false);

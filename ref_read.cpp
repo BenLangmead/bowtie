@@ -15,7 +15,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 	static int lastc = '>'; // last character seen
 
 	// RefRecord params
-	size_t len = 0; // 'len' counts toward total length
+	TIndexOffU len = 0; // 'len' counts toward total length
 	// 'off' counts number of ambiguous characters before first
 	// unambiguous character
 	size_t off = 0;
@@ -58,7 +58,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			// Don't emit a warning, since this might legitimately be
 			// a gap on the end of the final sequence in the file
 			lastc = -1;
-			return RefRecord(off, len, first);
+			return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 		}
 	}
 
@@ -95,7 +95,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = '>';
-			return RefRecord(off, 0, first);
+			return RefRecord((TIndexOffU)off, 0, first);
 		}
 		c = in.get();
 		if(c == -1) {
@@ -106,7 +106,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 				cerr << "Warning: Encountered empty reference sequence" << endl;
 			}
 			lastc = -1;
-			return RefRecord(off, 0, first);
+			return RefRecord((TIndexOffU)off, 0, first);
 		}
 	}
 	assert(!rparms.color || (lc != -1));
@@ -145,7 +145,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 			// It's an N or a gap
 			lastc = c;
 			assert(cc != 'A' && cc != 'C' && cc != 'G' && cc != 'T');
-			return RefRecord(off, len, first);
+			return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 		} else {
 			// Not DNA and not a gap, ignore it
 #ifndef NDEBUG
@@ -162,7 +162,7 @@ RefRecord fastaRefReadSize(FileBuf& in,
 		c = in.get();
 	}
 	lastc = c;
-	return RefRecord(off, len, first);
+	return RefRecord((TIndexOffU)off, (TIndexOffU)len, first);
 }
 
 static void
@@ -184,7 +184,7 @@ void reverseRefRecords(const vector<RefRecord>& src,
 	dst.clear();
 	{
 		vector<RefRecord> cur;
-		for(int i = src.size()-1; i >= 0; i--) {
+		for(int64_t i = (int64_t)src.size()-1; i >= 0; i--) {
 			bool first = (i == (int)src.size()-1 || src[i+1].first);
 			if(src[i].len) {
 				cur.push_back(RefRecord(0, src[i].len, first));
@@ -192,9 +192,9 @@ void reverseRefRecords(const vector<RefRecord>& src,
 			}
 			if(src[i].off) cur.push_back(RefRecord(src[i].off, 0, first));
 		}
-		for(int i = 0; i < (int)cur.size(); i++) {
+		for(int64_t i = 0; i < (int64_t)cur.size(); i++) {
 			assert(cur[i].off == 0 || cur[i].len == 0);
-			if(i < (int)cur.size()-1 && cur[i].off != 0 && !cur[i+1].first) {
+			if(i < (int64_t)cur.size()-1 && cur[i].off != 0 && !cur[i+1].first) {
 				dst.push_back(RefRecord(cur[i].off, cur[i+1].len, cur[i].first));
 				i++;
 			} else {
@@ -233,10 +233,10 @@ fastaRefReadSizes(vector<FileBuf*>& in,
                   vector<uint32_t>& plens,
                   const RefReadInParams& rparms,
                   BitpairOutFileBuf* bpout,
-                  int& numSeqs)
+                  TIndexOff& numSeqs)
 {
-	uint32_t unambigTot = 0;
-	uint32_t bothTot = 0;
+	TIndexOffU unambigTot = 0;
+	size_t bothTot = 0;
 	assert_gt(in.size(), 0);
 	uint32_t both = 0, unambig = 0;
 	// For each input istream
@@ -258,9 +258,13 @@ fastaRefReadSizes(vector<FileBuf*>& in,
 			if(rec.len == 0) rec.first = false;
 #endif
 			if((unambigTot + rec.len) < unambigTot) {
+#ifdef BOWTIE_64BIT_INDEX
 				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please divide the" << endl
-				     << "reference into batches or chunks of about 3.6 billion characters or less each" << endl
-				     << "and index each independently." << endl;
+				     << "reference into smaller chunks and index each independently." << endl;
+#else
+				cerr << "Error: Reference sequence has more than 2^32-1 characters!  Please try to" << endl
+				     << "build a large index instead using the appropiate options." << endl;
+#endif
 				throw 1;
 			}
 			// Add the length of this record.

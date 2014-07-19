@@ -33,6 +33,30 @@ public:
 		return ret;
 	}
 
+    uint64_t nextU64() {
+		assert(inited_);
+		uint64_t first = nextU32();
+		first = first << 32;
+		uint64_t second = nextU32();
+		return first | second;
+	}
+
+
+	size_t nextSizeT() {
+		if(sizeof(size_t) == 4) {
+			return nextU32();
+		} else {
+			return nextU64();
+		}
+	}
+
+	template <typename T>
+	T nextU() {
+		if(sizeof(T)>4)
+			return nextU64();
+		return nextU32();
+	}
+
 	uint32_t nextU2() {
 		assert(inited_);
 		if(lastOff > 30) {

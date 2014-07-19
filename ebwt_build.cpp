@@ -25,8 +25,8 @@
 static bool verbose;
 static int sanityCheck;
 static int format;
-static uint32_t bmax;
-static uint32_t bmaxMultSqrt;
+static TIndexOffU bmax;
+static TIndexOffU bmaxMultSqrt;
 static uint32_t bmaxDivN;
 static int dcv;
 static int noDc;
@@ -46,14 +46,16 @@ static bool packed;
 static bool writeRef;
 static bool justRef;
 static int reverseType;
+static string wrapper;
 bool color;
+
 
 static void resetOptions() {
 	verbose      = true;  // be talkative (default)
 	sanityCheck  = 0;     // do slow sanity checks
 	format       = FASTA; // input sequence format
-	bmax         = 0xffffffff; // max blockwise SA bucket size
-	bmaxMultSqrt = 0xffffffff; // same, as multplier of sqrt(n)
+	bmax         = OFF_MASK; // max blockwise SA bucket size
+	bmaxMultSqrt = OFF_MASK; // same, as multplier of sqrt(n)
 	bmaxDivN     = 4;          // same, as divisor of n
 	dcv          = 1024;  // bwise SA difference-cover sample sz
 	noDc         = 0;     // disable difference-cover sample
@@ -62,7 +64,7 @@ static void resetOptions() {
 	showVersion  = 0;     // just print version and quit?
 	doubleEbwt   = true;  // build forward and reverse Ebwts
 	//   Ebwt parameters
-	lineRate     = 6;  // a "line" is 64 bytes
+	lineRate     = Ebwt<String<Dna> >::default_lineRate;  // a "line" is 64 bytes
 	linesPerSide = 1;  // 1 64-byte line on a side
 	offRate      = 5;  // sample 1 out of 32 SA elts
 	ftabChars    = 10; // 10 chars in initial lookup table
@@ -73,6 +75,7 @@ static void resetOptions() {
 	writeRef     = true;  // write compact reference to .3.ebwt/.4.ebwt
 	justRef      = false; // *just* write compact reference, don't index
 	reverseType  = REF_READ_REVERSE_EACH;
+	wrapper.clear();
 	color        = false;
 }
 
@@ -86,20 +89,34 @@ enum {
 	ARG_PMAP,
 	ARG_NTOA,
 	ARG_USAGE,
-	ARG_NEW_REVERSE
+	ARG_NEW_REVERSE,
+	ARG_WRAPPER
 };
 
 /**
  * Print a detailed usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
-	out << "Usage: bowtie-build [options]* <reference_in> <ebwt_outfile_base>" << endl
+#ifdef BOWTIE_64BIT_INDEX
+	string tool_name = "bowtie2-build-l";
+#else
+	string tool_name = "bowtie2-build-s";
+#endif
+	if(wrapper == "basic-0") {
+		tool_name = "bowtie-build";
+	}
+
+	out << "Usage: "<< tool_name <<" [options]* <reference_in> <ebwt_outfile_base>" << endl
 	    << "    reference_in            comma-separated list of files with ref sequences" << endl
 	    << "    ebwt_outfile_base       write Ebwt data to files with this dir/basename" << endl
 	    << "Options:" << endl
 	    << "    -f                      reference files are Fasta (default)" << endl
-	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl
-	    << "    -C/--color              build a colorspace index" << endl
+	    << "    -c                      reference sequences given on cmd line (as <seq_in>)" << endl;
+		if(wrapper == "basic-0") {
+		out << "    --large-index           force generated index to be 'large', even if ref" << endl
+			<< "                            has fewer than 4 billion nucleotides" << endl;
+		}
+	    out << "    -C/--color              build a colorspace index" << endl
 	    << "    -a/--noauto             disable automatic -p/--bmax/--dcv memory-fitting" << endl
 	    << "    -p/--packed             use packed strings internally; slower, uses less mem" << endl
 	    //<< "    -B                      build both letter- and colorspace indexes" << endl
@@ -122,6 +139,14 @@ static void printUsage(ostream& out) {
 	    << "    --usage                 print this usage message" << endl
 	    << "    --version               print version information and quit" << endl
 	    ;
+		if(wrapper.empty()) {
+			cerr << endl
+			     << "*** Warning ***" << endl
+				 << "'" << tool_name << "' was run directly.  It is recommended "
+				 << "that you run the wrapper script 'bowtie-build' instead."
+				 << endl << endl;
+		}
+
 }
 
 static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
@@ -152,6 +177,7 @@ static struct option long_options[] = {
 	{(char*)"noref",        no_argument,       0,            'r'},
 	{(char*)"color",        no_argument,       0,            'C'},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
+	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"new-reverse",  no_argument,       0,            ARG_NEW_REVERSE},
 	{(char*)0, 0, 0, 0} // terminator
 };
@@ -190,6 +216,7 @@ static void parseOptions(int argc, const char **argv) {
 			argc, const_cast<char**>(argv),
 			short_options, long_options, &option_index);
 		switch (next_option) {
+			case ARG_WRAPPER: wrapper = optarg;	break;
 			case 'f': format = FASTA; break;
 			case 'c': format = CMDLINE; break;
 			case 'p': packed = true; break;
@@ -219,19 +246,19 @@ static void parseOptions(int argc, const char **argv) {
 				throw 0;
 				break;
 			case ARG_BMAX:
-				bmax = parseNumber<uint32_t>(1, "--bmax arg must be at least 1");
-				bmaxMultSqrt = 0xffffffff; // don't use multSqrt
+				bmax = parseNumber<TIndexOffU>(1, "--bmax arg must be at least 1");
+				bmaxMultSqrt = OFF_MASK; // don't use multSqrt
 				bmaxDivN = 0xffffffff;     // don't use multSqrt
 				break;
 			case ARG_BMAX_MULT:
-				bmaxMultSqrt = parseNumber<uint32_t>(1, "--bmaxmultsqrt arg must be at least 1");
-				bmax = 0xffffffff;     // don't use bmax
+				bmaxMultSqrt = parseNumber<TIndexOffU>(1, "--bmaxmultsqrt arg must be at least 1");
+				bmax = OFF_MASK;     // don't use bmax
 				bmaxDivN = 0xffffffff; // don't use multSqrt
 				break;
 			case ARG_BMAX_DIV:
 				bmaxDivN = parseNumber<uint32_t>(1, "--bmaxdivn arg must be at least 1");
-				bmax = 0xffffffff;         // don't use bmax
-				bmaxMultSqrt = 0xffffffff; // don't use multSqrt
+				bmax = OFF_MASK;         // don't use bmax
+				bmaxMultSqrt = OFF_MASK; // don't use multSqrt
 				break;
 			case ARG_DCV:
 				dcv = parseNumber<int>(3, "--dcv arg must be at least 3");
@@ -293,7 +320,7 @@ static void driver(const string& infile,
 	} else {
 		// Adapt sequence files to ifstreams
 		for(size_t i = 0; i < infiles.size(); i++) {
-			FILE *f = fopen(infiles[i].c_str(), "r");
+			FILE *f = fopen(infiles[i].c_str(), "rb");
 			if (f == NULL) {
 				cerr << "Error: could not open "<< infiles[i] << endl;
 				throw 1;
@@ -319,8 +346,8 @@ static void driver(const string& infile,
 		if(!reverse && (writeRef || justRef)) {
 			// For forward reference, dump it to .3.ebwt and .4.ebwt
 			// files
-			string file3 = outfile + ".3.ebwt";
-			string file4 = outfile + ".4.ebwt";
+			string file3 = outfile + ".3." + gEbwt_ext;
+			string file4 = outfile + ".4." + gEbwt_ext;
 			// Open output stream for the '.3.ebwt' file which will
 			// hold the size records.
 			ofstream fout3(file3.c_str(), ios::binary);
@@ -334,15 +361,15 @@ static void driver(const string& infile,
 			// Read in the sizes of all the unambiguous stretches of
 			// the genome into a vector of RefRecords.  The input
 			// streams are reset once it's done.
-			writeU32(fout3, 1, bigEndian); // endianness sentinel
+			writeU<int32_t>(fout3, 1, bigEndian); // endianness sentinel
 			if(color) {
 				refparams.color = false;
 				// Make sure the .3.ebwt and .4.ebwt files contain
 				// nucleotides; not colors
-				int numSeqs = 0;
+				TIndexOff numSeqs = 0;
 				fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
 				refparams.color = true;
-				writeU32(fout3, szs.size(), bigEndian); // write # records
+				writeU<TIndexOffU>(fout3, (TIndexOffU)szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) {
 					szs[i].write(fout3, bigEndian);
 				}
@@ -350,13 +377,13 @@ static void driver(const string& infile,
 				plens.clear();
 				// Now read in the colorspace size records; these are
 				// the ones that were indexed
-				int numSeqs2 = 0;
+				TIndexOff numSeqs2 = 0;
 				sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs2);
 				assert_geq(numSeqs, numSeqs2);
 			} else {
-				int numSeqs = 0;
+				TIndexOff numSeqs = 0;
 				sztot = fastaRefReadSizes(is, szs, plens, refparams, &bpout, numSeqs);
-				writeU32(fout3, szs.size(), bigEndian); // write # records
+				writeU<TIndexOffU>(fout3, (TIndexOffU)szs.size(), bigEndian); // write # records
 				for(size_t i = 0; i < szs.size(); i++) szs[i].write(fout3, bigEndian);
 			}
 			if(sztot.first == 0) {
@@ -387,14 +414,14 @@ static void driver(const string& infile,
 		} else {
 			// Read in the sizes of all the unambiguous stretches of the
 			// genome into a vector of RefRecords
-			int numSeqs = 0;
+			TIndexOff numSeqs = 0;
 			sztot = fastaRefReadSizes(is, szs, plens, refparams, NULL, numSeqs);
 #ifndef NDEBUG
 			if(refparams.color) {
 				refparams.color = false;
 				vector<RefRecord> szs2;
 				vector<uint32_t> plens2;
-				int numSeqs2 = 0;
+				TIndexOff numSeqs2 = 0;
 				fastaRefReadSizes(is, szs2, plens2, refparams, NULL, numSeqs2);
 				assert_leq(numSeqs, numSeqs2);
 				// One less color than base
@@ -424,7 +451,7 @@ static void driver(const string& infile,
 	                is,           // list of input streams
 	                szs,          // list of reference sizes
 	                plens,        // list of not-all-gap reference sequence lengths
-	                sztot.first,  // total size of all unambiguous ref chars
+	                (TIndexOffU)sztot.first,  // total size of all unambiguous ref chars
 	                refparams,    // reference read-in parameters
 	                seed,         // pseudo-random number generator seed
 	                -1,           // override offRate
@@ -453,7 +480,7 @@ static void driver(const string& infile,
 			TStr joinedss = Ebwt<TStr>::join(
 				is,          // list of input streams
 				szs,         // list of reference sizes
-				sztot.first, // total size of all unambiguous ref chars
+				(TIndexOffU)sztot.first, // total size of all unambiguous ref chars
 				refparams,   // reference read-in parameters
 				seed);       // pseudo-random number generator seed
 			if(refparams.reverse == REF_READ_REVERSE) {
@@ -537,19 +564,19 @@ int bowtie_build(int argc, const char **argv) {
 		// Optionally summarize
 		if(verbose) {
 			cout << "Settings:" << endl
-				 << "  Output files: \"" << outfile << ".*.ebwt\"" << endl
+				 << "  Output files: \"" << outfile << ".*." + gEbwt_ext + "\"" << endl
 				 << "  Line rate: " << lineRate << " (line is " << (1<<lineRate) << " bytes)" << endl
 				 << "  Lines per side: " << linesPerSide << " (side is " << ((1<<lineRate)*linesPerSide) << " bytes)" << endl
 				 << "  Offset rate: " << offRate << " (one in " << (1<<offRate) << ")" << endl
 				 << "  FTable chars: " << ftabChars << endl
 				 << "  Strings: " << (packed? "packed" : "unpacked") << endl
 				 ;
-			if(bmax == 0xffffffff) {
+			if(bmax == OFF_MASK) {
 				cout << "  Max bucket size: default" << endl;
 			} else {
 				cout << "  Max bucket size: " << bmax << endl;
 			}
-			if(bmaxMultSqrt == 0xffffffff) {
+			if(bmaxMultSqrt == OFF_MASK) {
 				cout << "  Max bucket size, sqrt multiplier: default" << endl;
 			} else {
 				cout << "  Max bucket size, sqrt multiplier: " << bmaxMultSqrt << endl;

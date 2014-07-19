@@ -6,6 +6,8 @@
 #include "mm.h"
 #include "shmem.h"
 #include "timer.h"
+#include "btypes.h"
+
 
 /**
  * Concrete reference representation that bulk-loads the reference from
@@ -51,12 +53,11 @@ public:
 	useShmem_(useShmem),
 	verbose_(verbose)
 	{
-		string s3 = in + ".3.ebwt";
-		string s4 = in + ".4.ebwt";
+		string s3 = in + ".3." + gEbwt_ext;
+		string s4 = in + ".4." + gEbwt_ext;
 
-#ifdef BOWTIE_MM
-		int f3, f4;
-		if((f3 = open(s3.c_str(), O_RDONLY)) < 0) {
+		FILE *f3, *f4;
+		if((f3 = fopen(s3.c_str(), "rb")) == NULL) {
 			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
 			cerr << "This is most likely because your index was built with an older version" << endl
 			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
@@ -64,11 +65,12 @@ public:
 			loaded_ = false;
 			return;
 		}
-		if((f4 = open(s4.c_str(), O_RDONLY)) < 0) {
+		if((f4 = fopen(s4.c_str(), "rb")) ==NULL) {
 			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
 			loaded_ = false;
 			return;
 		}
+#ifdef BOWTIE_MM
 		char *mmFile = NULL;
 		if(useMm_) {
 			if(verbose_ || startVerbose) {
@@ -82,16 +84,16 @@ public:
 				throw 1;
 			}
 			mmFile = (char*)mmap((void *)0, sbuf.st_size,
-			                     PROT_READ, MAP_SHARED, f4, 0);
+			                     PROT_READ, MAP_SHARED, fileno(f4), 0);
 			if(mmFile == (void *)(-1) || mmFile == NULL) {
 				perror("mmap");
 				cerr << "Error: Could not memory-map the index file " << s4.c_str() << endl;
 				throw 1;
 			}
 			if(mmSweep) {
-				int sum = 0;
+				TIndexOff sum = 0;
 				for(off_t i = 0; i < sbuf.st_size; i += 1024) {
-					sum += (int) mmFile[i];
+					sum += (TIndexOff) mmFile[i];
 				}
 				if(startVerbose) {
 					cerr << "  Swept the memory-mapped ref index file; checksum: " << sum << ": ";
@@ -99,27 +101,12 @@ public:
 				}
 			}
 		}
-#else
-		FILE *f3, *f4;
-		if((f3 = fopen(s3.c_str(), "rb")) == NULL) {
-			cerr << "Could not open reference-string index file " << s3 << " for reading." << endl;
-			cerr << "This is most likely because your index was built with an older version" << endl
-			     << "(<= 0.9.8.1) of bowtie-build.  Please re-run bowtie-build to generate a new" << endl
-			     << "index (or download one from the Bowtie website) and try again." << endl;
-			loaded_ = false;
-			return;
-		}
-		if((f4 = fopen(s4.c_str(), "rb"))  == NULL) {
-			cerr << "Could not open reference-string index file " << s4 << " for reading." << endl;
-			loaded_ = false;
-			return;
-		}
 #endif
 
 		// Read endianness sentinel, set 'swap'
 		uint32_t one;
 		bool swap = false;
-		one = readU32(f3, swap);
+		one = readU<int32_t>(f3, swap);
 		if(one != 1) {
 			if(useMm_) {
 				cerr << "Error: Can't use memory-mapped files when the index is the opposite endianness" << endl;
@@ -130,8 +117,8 @@ public:
 		}
 
 		// Read # records
-		uint32_t sz;
-		sz = readU32(f3, swap);
+		TIndexOffU sz;
+		sz = readU<TIndexOffU>(f3, swap);
 		if(sz == 0) {
 			cerr << "Error: number of reference records is 0 in " << s3 << endl;
 			throw 1;
@@ -144,12 +131,12 @@ public:
 		// Cumulative count of all unambiguous characters on a per-
 		// stretch 8-bit alignment (i.e. count of bytes we need to
 		// allocate in buf_)
-		uint32_t cumsz = 0;
-		uint32_t cumlen = 0;
-		uint32_t unambiglen = 0;
-		uint32_t maxlen = 0;
+		TIndexOffU cumsz = 0;
+		TIndexOffU cumlen = 0;
+		TIndexOffU unambiglen = 0;
+		TIndexOffU maxlen = 0;
 		// For each unambiguous stretch...
-		for(uint32_t i = 0; i < sz; i++) {
+		for(TIndexOffU i = 0; i < sz; i++) {
 			recs_.push_back(RefRecord(f3, swap));
 		}
 		for(uint32_t i = 0; i < sz; i++) {
@@ -222,7 +209,7 @@ public:
 			logTime(cerr);
 		}
 		// Store a cap entry for the end of the last reference seq
-		refRecOffs_.push_back(recs_.size());
+		refRecOffs_.push_back((TIndexOffU)recs_.size());
 		refOffs_.push_back(cumsz);
 		if(unambiglen > 0 && (!color || maxlen > 1)) {
 			refApproxLens_.push_back(cumlen);
@@ -231,7 +218,7 @@ public:
 		bufSz_ = cumsz;
 		assert_eq(nNoGapRefs_, refApproxLens_.size());
 		assert_eq(sz, recs_.size());
-		MM_FILE_CLOSE(f3); // done with .3.ebwt file
+		if (f3 != NULL) fclose(f3); // done with .3.ebwt file
 		// Round cumsz up to nearest byte boundary
 		if((cumsz & 3) != 0) {
 			cumsz += (4 - (cumsz & 3));
@@ -418,27 +405,27 @@ public:
 	 * unambiguous stretches of the target reference sequence.  When
 	 * there are many records, binary search would be more appropriate.
 	 */
-	int getBase(uint32_t tidx, uint32_t toff) const {
-		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
-		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
+	int getBase(size_t tidx, size_t toff) const {
+		uint64_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint64_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
-		uint32_t bufOff = refOffs_[tidx];
-		uint32_t off = 0;
+		uint64_t bufOff = refOffs_[tidx];
+		uint64_t off = 0;
 		// For all records pertaining to the target reference sequence...
-		for(uint32_t i = reci; i < recf; i++) {
+		for(uint64_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
 			off += recs_[i].off;
 			if(toff < off) {
 				return 4;
 			}
 			assert_geq(toff, off);
-			uint32_t recOff = off + recs_[i].len;
+			uint64_t recOff = off + recs_[i].len;
 			if(toff < recOff) {
 				toff -= off;
 				bufOff += toff;
 				assert_lt(bufOff, bufSz_);
-				const uint32_t bufElt = (bufOff) >> 2;
-				const uint32_t shift = (bufOff & 3) << 1;
+				const uint64_t bufElt = (bufOff) >> 2;
+				const uint64_t shift = (bufOff & 3) << 1;
 				return ((buf_[bufElt] >> shift) & 3);
 			}
 			bufOff += recs_[i].len;
@@ -456,19 +443,19 @@ public:
 	 * there are many records, binary search would be more appropriate.
 	 */
 	int getStretchNaive(uint32_t *destU32,
-	                    uint32_t tidx,
-	                    uint32_t toff,
-	                    uint32_t count) const
+	                    size_t tidx,
+	                    size_t toff,
+	                    size_t count) const
 	{
 		uint8_t *dest = (uint8_t*)destU32;
-		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
-		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
+		uint64_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint64_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
-		uint32_t cur = 0;
-		uint32_t bufOff = refOffs_[tidx];
-		uint32_t off = 0;
+		uint64_t cur = 0;
+		uint64_t bufOff = refOffs_[tidx];
+		uint64_t off = 0;
 		// For all records pertaining to the target reference sequence...
-		for(uint32_t i = reci; i < recf; i++) {
+		for(uint64_t i = reci; i < recf; i++) {
 			assert_geq(toff, off);
 			off += recs_[i].off;
 			for(; toff < off && count > 0; toff++) {
@@ -478,15 +465,15 @@ public:
 			if(count == 0) break;
 			assert_geq(toff, off);
 			if(toff < off + recs_[i].len) {
-				bufOff += (toff - off); // move bufOff pointer forward
+				bufOff += (TIndexOffU)(toff - off); // move bufOff pointer forward
 			} else {
 				bufOff += recs_[i].len;
 			}
 			off += recs_[i].len;
 			for(; toff < off && count > 0; toff++) {
 				assert_lt(bufOff, bufSz_);
-				const uint32_t bufElt = (bufOff) >> 2;
-				const uint32_t shift = (bufOff & 3) << 1;
+				const uint64_t bufElt = (bufOff) >> 2;
+				const uint64_t shift = (bufOff & 3) << 1;
 				dest[cur++] = (buf_[bufElt] >> shift) & 3;
 				bufOff++;
 				count--;
@@ -512,12 +499,12 @@ public:
 	 * there are many records, binary search would be more appropriate.
 	 */
 	int getStretch(uint32_t *destU32,
-	               uint32_t tidx,
-	               uint32_t toff,
-	               uint32_t count) const
+	               size_t tidx,
+	               size_t toff,
+	               size_t count) const
 	{
-		ASSERT_ONLY(uint32_t origCount = count);
-		ASSERT_ONLY(uint32_t origToff = toff);
+		ASSERT_ONLY(size_t origCount = count);
+		ASSERT_ONLY(size_t origToff = toff);
 		if(count == 0) return 0;
 		uint8_t *dest = (uint8_t*)destU32;
 #ifndef NDEBUG
@@ -526,22 +513,22 @@ public:
 		uint8_t *dest_2 = ((uint8_t*)destU32_2) + off2;
 #endif
 		destU32[0] = 0x04040404; // Add Ns, which we might end up using later
-		uint32_t reci = refRecOffs_[tidx];   // first record for target reference sequence
-		uint32_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
+		uint64_t reci = refRecOffs_[tidx];   // first record for target reference sequence
+		uint64_t recf = refRecOffs_[tidx+1]; // last record (exclusive) for target seq
 		assert_gt(recf, reci);
-		uint32_t cur = 4; // keep a cushion of 4 bases at the beginning
-		uint32_t bufOff = refOffs_[tidx];
-		uint32_t off = 0;
-		int offset = 4;
+		uint64_t cur = 4; // keep a cushion of 4 bases at the beginning
+		uint64_t bufOff = refOffs_[tidx];
+		uint64_t off = 0;
+		int64_t offset = 4;
 		bool firstStretch = true;
 		// For all records pertaining to the target reference sequence...
-		for(uint32_t i = reci; i < recf; i++) {
-			ASSERT_ONLY(uint32_t origBufOff = bufOff);
+		for(uint64_t i = reci; i < recf; i++) {
+			ASSERT_ONLY(uint64_t origBufOff = bufOff);
 			assert_geq(toff, off);
 			off += recs_[i].off;
 			assert_gt(count, 0);
 			if(toff < off) {
-				uint32_t cpycnt = min(off - toff, count);
+				size_t cpycnt = min((size_t)(off - toff), count);
 				memset(&dest[cur], 4, cpycnt);
 				count -= cpycnt;
 				toff += cpycnt;
@@ -564,29 +551,29 @@ public:
 						if(cur & 3) {
 							offset -= (cur & 3);
 						}
-						uint32_t curU32 = cur >> 2;
+						uint64_t curU32 = cur >> 2;
 						// Do the initial few bases
 						if(bufOff & 3) {
-							const uint32_t bufElt = (bufOff) >> 2;
-							const int low2 = bufOff & 3;
+							const uint64_t bufElt = (bufOff) >> 2;
+							const int64_t low2 = bufOff & 3;
 							destU32[curU32] = byteToU32_[buf_[bufElt]];
 							for(int j = 0; j < low2; j++) {
 								((char *)(&destU32[curU32]))[j] = 4;
 							}
 							curU32++;
 							offset += low2;
-							const int chars = 4 - low2;
+							const int64_t chars = 4 - low2;
 							count -= chars;
 							bufOff += chars;
 							toff += chars;
 						}
 						assert_eq(0, bufOff & 3);
-						uint32_t bufOffU32 = bufOff >> 2;
-						uint32_t countLim = count >> 2;
-						uint32_t offLim = (off - (toff + 4)) >> 2;
-						uint32_t lim = min(countLim, offLim);
+						uint64_t bufOffU32 = bufOff >> 2;
+						uint64_t countLim = count >> 2;
+						uint64_t offLim = (off - (toff + 4)) >> 2;
+						uint64_t lim = min(countLim, offLim);
 						// Do the fast thing for as far as possible
-						for(uint32_t j = 0; j < lim; j++) {
+						for(uint64_t j = 0; j < lim; j++) {
 							destU32[curU32] = byteToU32_[buf_[bufOffU32++]];
 							assert_eq(dest[(curU32 << 2) + 0], dest_2[(curU32 << 2) - offset + 0]);
 							assert_eq(dest[(curU32 << 2) + 1], dest_2[(curU32 << 2) - offset + 1]);
@@ -604,8 +591,8 @@ public:
 					// Do the slow thing for the rest
 					for(; toff < off && count > 0; toff++) {
 						assert_lt(bufOff, bufSz_);
-						const uint32_t bufElt = (bufOff) >> 2;
-						const uint32_t shift = (bufOff & 3) << 1;
+						const uint64_t bufElt = (bufOff) >> 2;
+						const uint64_t shift = (bufOff & 3) << 1;
 						dest[cur++] = (buf_[bufElt] >> shift) & 3;
 						bufOff++;
 						count--;
@@ -615,8 +602,8 @@ public:
 					// Do the slow thing
 					for(; toff < off && count > 0; toff++) {
 						assert_lt(bufOff, bufSz_);
-						const uint32_t bufElt = (bufOff) >> 2;
-						const uint32_t shift = (bufOff & 3) << 1;
+						const uint64_t bufElt = (bufOff) >> 2;
+						const uint64_t shift = (bufOff & 3) << 1;
 						dest[cur++] = (buf_[bufElt] >> shift) & 3;
 						bufOff++;
 						count--;
@@ -637,11 +624,11 @@ public:
 #ifndef NDEBUG
 		delete[] destU32_2;
 #endif
-		return offset;
+		return (int)offset;
 	}
 
 	/// Return the number of reference sequences.
-	uint32_t numRefs() const {
+	TIndexOffU numRefs() const {
 		return nrefs_;
 	}
 
@@ -668,7 +655,7 @@ public:
 	}
 
 	/// Return the lengths of reference sequences.
-	uint32_t approxLen(uint32_t elt) const {
+	TIndexOffU approxLen(TIndexOffU elt) const {
 		assert_lt(elt, nrefs_);
 		return refApproxLens_[elt];
 	}
@@ -702,17 +689,17 @@ protected:
 
 	std::vector<RefRecord> recs_;       /// records describing unambiguous stretches
 	std::vector<uint32_t>  refApproxLens_; /// approx lens of ref seqs (excludes trailing ambig chars)
-	std::vector<uint32_t>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
-	std::vector<uint32_t>  refOffs_;    /// buf_ begin offsets per ref seq
-	std::vector<uint32_t>  refRecOffs_; /// record begin/end offsets per ref seq
+	std::vector<TIndexOffU>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
+	std::vector<TIndexOffU>  refOffs_;    /// buf_ begin offsets per ref seq
+	std::vector<TIndexOffU>  refRecOffs_; /// record begin/end offsets per ref seq
 	std::vector<uint32_t>  expandIdx_; /// map from small idxs (e.g. w/r/t plen) to large ones (w/r/t refnames)
 	std::vector<uint32_t>  shrinkIdx_; /// map from large idxs to small
 	std::vector<bool>      isGaps_;    /// ref i is all gaps?
 	uint8_t *buf_;      /// the whole reference as a big bitpacked byte array
 	uint8_t *sanityBuf_;/// for sanity-checking buf_
-	uint32_t bufSz_;    /// size of buf_
-	uint32_t bufAllocSz_;
-	uint32_t nrefs_;      /// the number of reference sequences
+	TIndexOffU bufSz_;    /// size of buf_
+	TIndexOffU bufAllocSz_;
+	TIndexOffU nrefs_;      /// the number of reference sequences
 	uint32_t nNoGapRefs_; /// the number of reference sequences that aren't totally ambiguous
 	bool     loaded_;   /// whether it's loaded
 	bool     sanity_;   /// do sanity checking

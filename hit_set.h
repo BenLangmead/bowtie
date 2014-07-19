@@ -17,13 +17,14 @@
 #include "alphabet.h"
 #include "annot.h"
 #include "refmap.h"
+#include "btypes.h"
 
 /**
  * Encapsulates a hit contained within a HitSet that can be
  * (de)serialized to/from FileBufs.  Used for chaining.
  */
 struct HitSetEnt {
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 
 	HitSetEnt() { }
 
@@ -41,13 +42,13 @@ struct HitSetEnt {
 		assert_eq(stratum, (cost >> 14));
 		fb.writeChars((const char*)&cost, 2);
 		fb.writeChars((const char*)&oms, 4);
-		uint32_t sz = edits.size();
+		uint32_t sz = (uint32_t)edits.size();
 		fb.writeChars((const char*)&sz, 4);
 		std::vector<Edit>::const_iterator it;
 		for(it = edits.begin(); it != edits.end(); it++) {
 			it->serialize(fb);
 		}
-		sz = cedits.size();
+		sz = (uint32_t)cedits.size();
 		fb.writeChars((const char*)&sz, 4);
 		for(it = cedits.begin(); it != cedits.end(); it++) {
 			it->serialize(fb);
@@ -209,7 +210,7 @@ struct HitSetEnt {
 	 */
 	friend std::ostream& operator << (std::ostream& os, const HitSetEnt& hse);
 
-	U32Pair h; // reference coordinates
+	UPair h; // reference coordinates
 	uint8_t fw; // orientation
 	int8_t stratum; // stratum
 	uint16_t cost; // cost, including stratum
@@ -226,7 +227,7 @@ struct HitSet {
 
 	typedef std::vector<HitSetEnt> EntVec;
 	typedef EntVec::const_iterator Iter;
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
 
 	HitSet() {
 		maxedStratum = -1;
@@ -241,11 +242,11 @@ struct HitSet {
 	 */
 	void serialize(OutFileBuf& fb) const {
 		fb.write(color ? 1 : 0);
-		uint32_t i = seqan::length(name);
+		uint32_t i = (uint32_t)seqan::length(name);
 		assert_gt(i, 0);
 		fb.writeChars((const char*)&i, 4);
 		fb.writeChars(seqan::begin(name), i);
-		i = seqan::length(seq);
+		i = (uint32_t)seqan::length(seq);
 		assert_gt(i, 0);
 		assert_lt(i, 1024);
 		fb.writeChars((const char*)&i, 4);
@@ -253,7 +254,7 @@ struct HitSet {
 			fb.write("ACGTN"[(int)seq[j]]);
 		}
 		fb.writeChars(seqan::begin(qual), i);
-		i = ents.size();
+		i = (uint32_t)ents.size();
 		fb.writeChars((const char*)&i, 4);
 		std::vector<HitSetEnt>::const_iterator it;
 		for(it = ents.begin(); it != ents.end(); it++) {
@@ -438,7 +439,7 @@ struct HitSet {
 	/**
 	 *
 	 */
-	bool tryReplacing(U32Pair h,
+	bool tryReplacing(UPair h,
 	                  bool fw,
 	                  uint16_t cost,
 	                  size_t& pos)
@@ -454,7 +455,7 @@ struct HitSet {
 					pos = i;
 					return true;
 				} else {
-					pos = 0xffffffff;
+					pos = OFF_MASK;
 					return true;
 				}
 			}

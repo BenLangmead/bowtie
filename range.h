@@ -13,7 +13,7 @@
  */
 struct Range {
 	Range() :
-		top(0xffffffff), bot(0), cost(0), stratum(0), numMms(0),
+		top(OFF_MASK), bot(0), cost(0), stratum(0), numMms(0),
 		fw(true), mate1(true), ebwt(NULL)
 	{
 		mms.clear();
@@ -21,21 +21,21 @@ struct Range {
 	}
 
 	bool valid() const {
-		return top < 0xffffffff;
+		return top < OFF_MASK;
 	}
 
 	void invalidate() {
-		top = 0xffffffff;
+		top = OFF_MASK;
 	}
 
-	uint32_t top;     // top of range
-	uint32_t bot;     // bottom of range
+	TIndexOffU top;     // top of range
+	TIndexOffU bot;     // bottom of range
 	uint16_t cost;    // cost
 	uint32_t stratum; // stratum
 	uint32_t numMms;  // # mismatches
 	bool fw;          // the forward orientation of read aligned?
 	bool mate1;       // read aligned is #1 mate/single?
-	std::vector<uint32_t> mms;   // list of positions with mismatches
+	std::vector<TIndexOffU> mms;   // list of positions with mismatches
 	std::vector<uint8_t>  refcs; // reference characters at mismatch positions
 	const Ebwt<seqan::String<seqan::Dna> > *ebwt;
 

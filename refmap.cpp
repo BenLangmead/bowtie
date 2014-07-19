@@ -16,7 +16,7 @@ using namespace std;
  * reference coordinate space according to the reference mappings
  * provided by the user.
  */
-void ReferenceMap::map(U32Pair& h) const {
+void ReferenceMap::map(UPair& h) const {
 	if(h.first >= map_.size()) {
 		cerr << "Could not find a reference-map entry for reference "
 				  << h.first << " in map file \"" << fname_ << "\""
@@ -41,7 +41,7 @@ void ReferenceMap::parse() {
 		if(c == '>') {
 			// This appears to be a name line
 			in.get(); // chop off the initial '>'
-			uint32_t off;
+			TIndexOffU off;
 			in >> off;
 			in.get(); // chop off tab
 			char buf[1024];
@@ -52,7 +52,7 @@ void ReferenceMap::parse() {
 			}
 			continue;
 		}
-		uint32_t id, off;
+		TIndexOffU id, off;
 		in >> id >> off;
 		map_.resize(map_.size()+1);
 		map_.back().first = id;

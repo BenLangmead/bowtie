@@ -20,7 +20,7 @@ void AnnotationMap::parse() {
 		throw 1;
 	}
 	while(in.peek() != EOF) {
-		U32Pair pos;
+		UPair pos;
 		CharPair an;
 		in >> pos.first >> pos.second >> an.first >> an.second;
 		map_[pos] = an;

@@ -408,8 +408,8 @@ public:
 	 * Helper for reporting an alignment.
 	 */
 	inline bool report(const Range& ra,
-	                   uint32_t first,
-	                   uint32_t second,
+			TIndexOffU first,
+			TIndexOffU second,
 	                   uint32_t tlen)
 	{
 		bool ebwtFw = ra.ebwt->fw();
@@ -433,7 +433,7 @@ public:
 				ra.refcs,                 // reference characters for mms
 				ra.numMms,                // # mismatches
 				make_pair(first, second), // position
-				make_pair(0, 0),          // (bogus) mate position
+				make_pair<TIndexOffU,TIndexOffU>(0, 0),          // (bogus) mate position
 				true,                     // (bogus) mate orientation
 				0,                        // (bogus) mate length
 				make_pair(ra.top, ra.bot),// arrows
@@ -556,8 +556,8 @@ protected:
 template<typename TRangeSource>
 class PairedBWAlignerV1 : public Aligner {
 
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
+	typedef std::vector<UPair> UPairVec;
 	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
@@ -808,23 +808,23 @@ protected:
 	 */
 	bool report(const Range& rL, // range for upstream mate
 	            const Range& rR, // range for downstream mate
-	            uint32_t first,  // ref idx
-	            uint32_t upstreamOff, // offset for upstream mate
-	            uint32_t dnstreamOff, // offset for downstream mate
-	            uint32_t tlen, // length of ref
+	            TIndexOffU first,  // ref idx
+	            TIndexOffU upstreamOff, // offset for upstream mate
+	            TIndexOffU dnstreamOff, // offset for downstream mate
+	            TIndexOffU tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
 	            bool ebwtFwR,
 	            const ReferenceMap* rmap)
 	{
 		assert(gAllowMateContainment || upstreamOff < dnstreamOff);
-		uint32_t spreadL = rL.bot - rL.top;
-		uint32_t spreadR = rR.bot - rR.top;
-		uint32_t oms = min(spreadL, spreadR) - 1;
+		TIndexOffU spreadL = rL.bot - rL.top;
+		TIndexOffU spreadR = rR.bot - rR.top;
+		TIndexOffU oms = min(spreadL, spreadR) - 1;
 		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
 		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
-		uint32_t lenL = pairFw ? alen_ : blen_;
-		uint32_t lenR = pairFw ? blen_ : alen_;
+		TIndexOffU lenL = pairFw ? alen_ : blen_;
+		TIndexOffU lenR = pairFw ? blen_ : alen_;
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
@@ -900,10 +900,10 @@ protected:
 
 	bool report(const Range& rL, // range for upstream mate
 	            const Range& rR, // range for downstream mate
-	            uint32_t first,  // ref idx
-	            uint32_t upstreamOff, // offset for upstream mate
-	            uint32_t dnstreamOff, // offset for downstream mate
-	            uint32_t tlen, // length of ref
+	            TIndexOffU first,  // ref idx
+	            TIndexOffU upstreamOff, // offset for upstream mate
+	            TIndexOffU dnstreamOff, // offset for downstream mate
+	            TIndexOffU tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            const ReferenceMap* rmap)
 	{
@@ -919,8 +919,8 @@ protected:
 	 * mate) aligns such that mating constraint is satisfied.
 	 */
 	bool resolveOutstandingInRef(const bool off1,
-	                             const U32Pair& off,
-	                             const uint32_t tlen,
+	                             const UPair& off,
+	                             const TIndexOffU tlen,
 	                             const Range& range)
 	{
 		assert(refs_->loaded());
@@ -944,7 +944,7 @@ protected:
 		                                        patsrc_->bufa().qual) :
 		                                (off1 ? patsrc_->bufb().qualRev  :
 		                                        patsrc_->bufa().qualRev);
-		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (off1 ? patsrc_->bufa().length() :
 		                        patsrc_->bufb().length());
 		int minins = minInsert_;
@@ -976,8 +976,8 @@ protected:
 		if((uint32_t)maxins <= max(qlen, alen)) {
 			return false;
 		}
-		const uint32_t tidx = off.first;
-		const uint32_t toff = off.second;
+		const TIndexOffU tidx = off.first;
+		const TIndexOffU toff = off.second;
 		// Set begin/end to be a range of all reference
 		// positions that are legally permitted to be involved in
 		// the alignment of the outstanding mate.
@@ -985,8 +985,8 @@ protected:
 		// Note that one of the constraints imposed on which positions
 		// go into this range is that the opposite mate cannot be
 		// contained entirely within the anchor mate, or vice versa.
-		uint32_t begin, end;
-		uint32_t insDiff = maxins - minins;
+		TIndexOffU begin, end;
+		TIndexOffU insDiff = maxins - minins;
 		if(matchRight) {
 			end = toff + maxins;
 			// Adding 1 disallows the opposite from starting at the
@@ -999,12 +999,12 @@ protected:
 				begin += alen-qlen;
 			}
 			if(end > insDiff + qlen) {
-				begin = max<uint32_t>(begin, end - insDiff - qlen);
+				begin = max<TIndexOffU>(begin, end - insDiff - qlen);
 			}
-			end = min<uint32_t>(refs_->approxLen(tidx), end);
-			begin = min<uint32_t>(refs_->approxLen(tidx), begin);
+			end = min<TIndexOffU>(refs_->approxLen(tidx), end);
+			begin = min<TIndexOffU>(refs_->approxLen(tidx), begin);
 		} else {
-			if(toff + alen < (uint32_t)maxins) {
+			if(toff + alen < (TIndexOffU)maxins) {
 				begin = 0;
 			} else {
 				begin = toff + alen - maxins;
@@ -1014,7 +1014,7 @@ protected:
 				end = toff + alen;
 			} else {
 				end = toff + mi - 1;
-				end = min<uint32_t>(end, toff + alen - minins + qlen - 1);
+				end = min<TIndexOffU>(end, toff + alen - minins + qlen - 1);
 				if(toff + alen + qlen < (uint32_t)minins + 1) end = 0;
 			}
 		}
@@ -1022,7 +1022,7 @@ protected:
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
 		std::vector<Range> ranges;
-		std::vector<uint32_t> offs;
+		std::vector<TIndexOffU> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, doneFw_ ? &pairs_rc_ : &pairs_fw_,
 		                  toff, fw);
@@ -1033,7 +1033,7 @@ protected:
 			r.fw = fw;
 			r.cost |= (r.stratum << 14);
 			r.mate1 = !off1;
-			const uint32_t result = offs[i];
+			const TIndexOffU result = offs[i];
 			// NOTE: We have no idea what the BW range delimiting the
 			// opposite hit is, because we were operating entirely in
 			// reference space when we found it.  For now, we just copy
@@ -1102,8 +1102,8 @@ protected:
 					assert(drR_->foundRange);
 					const Range& r = drR_->range();
 					assert(r.repOk());
-					uint32_t top = r.top;
-					uint32_t bot = r.bot;
+					TIndexOffU top = r.top;
+					TIndexOffU bot = r.bot;
 					uint32_t qlen = doneFw_? qlen1_ : qlen2_;
 					rchase_->setTopBot(top, bot, qlen, rand_, r.ebwt);
 					*chaseR_ = true;
@@ -1147,8 +1147,8 @@ protected:
 					assert(drL_->foundRange);
 					const Range& r = drL_->range();
 					assert(r.repOk());
-					uint32_t top = r.top;
-					uint32_t bot = r.bot;
+					TIndexOffU top = r.top;
+					TIndexOffU bot = r.bot;
 					uint32_t qlen = doneFw_? qlen2_ : qlen1_;
 					rchase_->setTopBot(top, bot, qlen, rand_, r.ebwt);
 					*chaseL_ = true;
@@ -1364,20 +1364,20 @@ protected:
 	// Range-finding state for first mate
 	TDriver*      driver1Fw_;
 	TDriver*      driver1Rc_;
-	U32PairVec    offs1FwArr_[32];
+	UPairVec    offs1FwArr_[32];
 	TRangeVec     ranges1FwArr_[32];
 	uint32_t      offs1FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs1RcArr_[32];
+	UPairVec    offs1RcArr_[32];
 	TRangeVec     ranges1RcArr_[32];
 	uint32_t      offs1RcSz_; // total size of all ranges found in this category
 
 	// Range-finding state for second mate
 	TDriver*      driver2Fw_;
 	TDriver*      driver2Rc_;
-	U32PairVec    offs2FwArr_[32];
+	UPairVec    offs2FwArr_[32];
 	TRangeVec     ranges2FwArr_[32];
 	uint32_t      offs2FwSz_; // total size of all ranges found in this category
-	U32PairVec    offs2RcArr_[32];
+	UPairVec    offs2RcArr_[32];
 	TRangeVec     ranges2RcArr_[32];
 	uint32_t      offs2RcSz_; // total size of all ranges found in this category
 
@@ -1387,8 +1387,8 @@ protected:
 	bool&       delayedchaseR_fw_;
 	TDriver&    drL_fw_;
 	TDriver&    drR_fw_;
-	U32PairVec* offsLarr_fw_;
-	U32PairVec* offsRarr_fw_;
+	UPairVec* offsLarr_fw_;
+	UPairVec* offsRarr_fw_;
 	TRangeVec*  rangesLarr_fw_;
 	TRangeVec*  rangesRarr_fw_;
 	uint32_t&   offsLsz_fw_;
@@ -1400,8 +1400,8 @@ protected:
 	bool&       delayedchaseR_rc_;
 	TDriver&    drL_rc_;
 	TDriver&    drR_rc_;
-	U32PairVec* offsLarr_rc_;
-	U32PairVec* offsRarr_rc_;
+	UPairVec* offsLarr_rc_;
+	UPairVec* offsRarr_rc_;
 	TRangeVec*  rangesLarr_rc_;
 	TRangeVec*  rangesRarr_rc_;
 	uint32_t&   offsLsz_rc_;
@@ -1413,8 +1413,8 @@ protected:
 	bool*       delayedchaseR_;
 	TDriver*    drL_;
 	TDriver*    drR_;
-	U32PairVec* offsLarr_;
-	U32PairVec* offsRarr_;
+	UPairVec* offsLarr_;
+	UPairVec* offsRarr_;
 	TRangeVec*  rangesLarr_;
 	TRangeVec*  rangesRarr_;
 	uint32_t*   offsLsz_;
@@ -1443,7 +1443,7 @@ protected:
  */
 struct RangeWithCoords {
 	Range r;
-	U32Pair h;
+	UPair h;
 };
 
 /**
@@ -1453,8 +1453,8 @@ struct RangeWithCoords {
 template<typename TRangeSource>
 class PairedBWAlignerV2 : public Aligner {
 
-	typedef std::pair<uint32_t,uint32_t> U32Pair;
-	typedef std::vector<U32Pair> U32PairVec;
+	typedef std::pair<TIndexOffU,TIndexOffU> UPair;
+	typedef std::vector<UPair> UPairVec;
 	typedef std::vector<Range> TRangeVec;
 	typedef RangeSourceDriver<TRangeSource> TDriver;
 	typedef std::pair<uint64_t, uint64_t> TU64Pair;
@@ -1687,23 +1687,23 @@ protected:
 	 */
 	bool report(const Range& rL, // range for upstream mate
 	            const Range& rR, // range for downstream mate
-	            uint32_t first,  // ref idx
-	            uint32_t upstreamOff, // offset for upstream mate
-	            uint32_t dnstreamOff, // offset for downstream mate
-	            uint32_t tlen, // length of ref
+	            TIndexOffU first,  // ref idx
+	            TIndexOffU upstreamOff, // offset for upstream mate
+	            TIndexOffU dnstreamOff, // offset for downstream mate
+	            TIndexOffU tlen, // length of ref
 	            bool pairFw,   // whether the pair is being mapped to fw strand
 	            bool ebwtFwL,
 	            bool ebwtFwR,
 	            const ReferenceMap *rmap)
 	{
 		assert(gAllowMateContainment || upstreamOff < dnstreamOff);
-		uint32_t spreadL = rL.bot - rL.top;
-		uint32_t spreadR = rR.bot - rR.top;
-		uint32_t oms = min(spreadL, spreadR) - 1;
+		TIndexOffU spreadL = rL.bot - rL.top;
+		TIndexOffU spreadR = rR.bot - rR.top;
+		TIndexOffU oms = min(spreadL, spreadR) - 1;
 		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
 		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
-		uint32_t lenL = pairFw ? alen_ : blen_;
-		uint32_t lenR = pairFw ? blen_ : alen_;
+		TIndexOffU lenL = pairFw ? alen_ : blen_;
+		TIndexOffU lenR = pairFw ? blen_ : alen_;
 		bool ret;
 		assert(!params_->sink().exceededOverThresh());
 		params_->setFw(rL.fw);
@@ -1782,7 +1782,7 @@ protected:
 	 * a paired alignment by reporting two consecutive alignments, one
 	 * for each mate.
 	 */
-	void reportSe(const Range& r, U32Pair h, uint32_t tlen) {
+	void reportSe(const Range& r, UPair h, uint32_t tlen) {
 		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
 		assert(!(r.mate1 ? doneSe1_ : doneSe2_));
 		params->setFw(r.fw);
@@ -1828,8 +1828,8 @@ protected:
 		}
 	}
 
-	void resolveOutstanding(const U32Pair& off,
-	                        const uint32_t tlen,
+	void resolveOutstanding(const UPair& off,
+	                        const TIndexOffU tlen,
 	                        const Range& range)
 	{
 		assert(!this->done);
@@ -1865,8 +1865,8 @@ protected:
 	 * This function picks up to 'pick' anchors at random from the
 	 * 'offs' array.  It returns the number that it actually picked.
 	 */
-	bool resolveOutstandingInRef(const U32Pair& off,
-	                             const uint32_t tlen,
+	bool resolveOutstandingInRef(const UPair& off,
+	                             const TIndexOffU tlen,
 	                             const Range& range)
 	{
 		assert(!donePe_);
@@ -1894,7 +1894,7 @@ protected:
 			                    patsrc_->bufa().qual) :
 			     (range.mate1 ? patsrc_->bufb().qualRev :
 			                    patsrc_->bufa().qualRev);
-		uint32_t qlen = seqan::length(seq);  // length of outstanding mate
+		uint32_t qlen = (uint32_t)seqan::length(seq);  // length of outstanding mate
 		uint32_t alen = (range.mate1 ? patsrc_->bufa().length() :
 		                               patsrc_->bufb().length());
 		int minins = minInsert_;
@@ -1920,14 +1920,14 @@ protected:
 		if((uint32_t)maxins <= max(qlen, alen)) {
 			return false;
 		}
-		const uint32_t tidx = off.first;  // text id where anchor mate hit
-		const uint32_t toff = off.second; // offset where anchor mate hit
+		const TIndexOffU tidx = off.first;  // text id where anchor mate hit
+		const TIndexOffU toff = off.second; // offset where anchor mate hit
 		// Set begin/end to the range of reference positions where
 		// outstanding mate may align while fulfilling insert-length
 		// constraints.
-		uint32_t begin, end;
+		TIndexOffU begin, end;
 		assert_geq(maxins, minins);
-		uint32_t insDiff = maxins - minins;
+		TIndexOffU insDiff = maxins - minins;
 		if(matchRight) {
 			end = toff + maxins;
 			// Adding 1 disallows the opposite from starting at the
@@ -1940,12 +1940,12 @@ protected:
 				begin += alen-qlen;
 			}
 			if(end > insDiff + qlen) {
-				begin = max<uint32_t>(begin, end - insDiff - qlen);
+				begin = max<TIndexOffU>(begin, end - insDiff - qlen);
 			}
-			end = min<uint32_t>(refs_->approxLen(tidx), end);
-			begin = min<uint32_t>(refs_->approxLen(tidx), begin);
+			end = min<TIndexOffU>(refs_->approxLen(tidx), end);
+			begin = min<TIndexOffU>(refs_->approxLen(tidx), begin);
 		} else {
-			if(toff + alen < (uint32_t)maxins) {
+			if(toff + alen < (TIndexOffU)maxins) {
 				begin = 0;
 			} else {
 				begin = toff + alen - maxins;
@@ -1955,15 +1955,15 @@ protected:
 				end = toff + alen - 1;
 			} else {
 				end = toff + mi - 1;
-				end = min<uint32_t>(end, toff + alen - minins + qlen - 1);
-				if(toff + alen + qlen < (uint32_t)minins + 1) end = 0;
+				end = min<TIndexOffU>(end, toff + alen - minins + qlen - 1);
+				if(toff + alen + qlen < (TIndexOffU)minins + 1) end = 0;
 			}
 		}
 		// Check if there's not enough space in the range to fit an
 		// alignment for the outstanding mate.
 		if(end - begin < qlen) return false;
 		std::vector<Range> ranges;
-		std::vector<uint32_t> offs;
+		std::vector<TIndexOffU> offs;
 		refAligner_->find(1, tidx, refs_, seq, qual, begin, end, ranges,
 		                  offs, pairFw ? &pairs_fw_ : &pairs_rc_,
 		                  toff, fw);
@@ -1973,7 +1973,7 @@ protected:
 			r.fw = fw;
 			r.cost |= (r.stratum << 14);
 			r.mate1 = !range.mate1;
-			const uint32_t result = offs[i];
+			const TIndexOffU result = offs[i];
 			// Just copy the known range's top and bot for now
 			r.top = range.top;
 			r.bot = range.bot;

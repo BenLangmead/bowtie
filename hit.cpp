@@ -40,7 +40,7 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == r) {
-						hs[i].oms = hs[i+1].oms = hs.size()/2;
+						hs[i].oms = hs[i+1].oms = (uint32_t)(hs.size()/2);
 						reportHits(hs, i, i+2);
 						break;
 					}
@@ -57,7 +57,7 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
 			Hit& h = hs[r];
-			h.oms = hs.size();
+			h.oms = (uint32_t)hs.size();
 			reportHit(h, false);
 		}
 	}
@@ -97,7 +97,7 @@ void VerboseHitSink::append(ostream& ss,
 		bool firstfield = true;
 		if(partition != 0) {
 			int pospart = abs(partition);
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				// Output a partitioning key
@@ -126,7 +126,7 @@ void VerboseHitSink::append(ostream& ss,
 				// output another alignment for that partition
 				spill = true;
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				// Print partition id with leading 0s so that Hadoop
@@ -144,7 +144,7 @@ void VerboseHitSink::append(ostream& ss,
 				}
 				ss << s2.c_str();
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				// Print offset with leading 0s
@@ -155,7 +155,7 @@ void VerboseHitSink::append(ostream& ss,
 				}
 				ss << s3;
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (h.fw? "+":"-");
@@ -163,17 +163,17 @@ void VerboseHitSink::append(ostream& ss,
 			// end if(partition != 0)
 		} else {
 			assert(!dospill);
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << h.patName;
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (h.fw? '+' : '-');
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				// .first is text id, .second is offset
@@ -185,33 +185,33 @@ void VerboseHitSink::append(ostream& ss,
 					ss << h.h.first;
 				}
 			}
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (h.h.second + offBase);
 			}
 			// end else clause of if(partition != 0)
 		}
-		if(!suppress.test(field++)) {
+		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else ss << '\t';
 			const String<Dna5>* pat = &h.patSeq;
 			if(h.color && colorSeq) pat = &h.colSeq;
 			ss << *pat;
 		}
-		if(!suppress.test(field++)) {
+		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else ss << '\t';
 			const String<char>* qual = &h.quals;
 			if(h.color && colorQual) qual = &h.colQuals;
 			ss << *qual;
 		}
-		if(!suppress.test(field++)) {
+		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else ss << '\t';
 			ss << h.oms;
 		}
-		if(!suppress.test(field++)) {
+		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
 			else ss << '\t';
 			// Look for SNP annotations falling within the alignment
@@ -235,7 +235,7 @@ void VerboseHitSink::append(ostream& ss,
 					}
 					size_t off = ai->first.second - h.h.second;
 					if(!h.fw) off = len - off - 1;
-					snpAnnots[off] = ai->second.second;
+					snpAnnots[(int)off] = ai->second.second;
 				}
 			}
 			// Output mismatch column
@@ -263,13 +263,13 @@ void VerboseHitSink::append(ostream& ss,
 		}
 		if(partition != 0) {
 			// Fields addded as of Crossbow 0.1.4
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (int)h.mate;
 			}
 			// Print label, or whole read name if label isn't found
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				int labelOff = -1;
@@ -296,13 +296,13 @@ void VerboseHitSink::append(ostream& ss,
 		}
 		if(cost) {
 			// Stratum
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (int)h.stratum;
 			}
 			// Cost
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << (int)h.cost;
@@ -310,7 +310,7 @@ void VerboseHitSink::append(ostream& ss,
 		}
 		if(showSeed) {
 			// Seed
-			if(!suppress.test(field++)) {
+			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
 				else ss << '\t';
 				ss << h.seed;

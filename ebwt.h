@@ -89,6 +89,27 @@ enum EBWT_FLAGS {
 	                    // each stretch reversed
 };
 
+extern string gLastIOErrMsg;
+
+inline bool is_read_err(int fdesc, ssize_t ret, size_t count){
+	if (ret < 0) {
+		std::stringstream sstm;
+		sstm << "ERRNO: " << errno << " ERR Msg:" << strerror(errno) << std::endl;
+		gLastIOErrMsg = sstm.str();
+		return true;
+	}
+	return false;
+}
+
+/* Checks whether a call to fread() failed or not. */
+inline bool is_fread_err(FILE* file_hd, size_t ret, size_t count){
+	if (ferror(file_hd)) {
+		gLastIOErrMsg = "Error Reading File!";
+		return true;
+	}
+	return false;
+}
+
 /**
  * Extended Burrows-Wheeler transform header.  This together with the
  * actual data arrays and other text-specific parameters defined in
@@ -99,7 +120,7 @@ class EbwtParams {
 public:
 	EbwtParams() { }
 
-	EbwtParams(uint32_t len,
+	EbwtParams(TIndexOffU len,
 	           int32_t lineRate,
 	           int32_t linesPerSide,
 	           int32_t offRate,
@@ -116,7 +137,7 @@ public:
 		     eh._isaRate, eh._ftabChars, eh._color, eh._entireReverse);
 	}
 
-	void init(uint32_t len, int32_t lineRate, int32_t linesPerSide,
+	void init(TIndexOffU len, int32_t lineRate, int32_t linesPerSide,
 	          int32_t offRate, int32_t isaRate, int32_t ftabChars,
 	          bool color, bool entireReverse)
 	{
@@ -130,21 +151,21 @@ public:
 		_linesPerSide = linesPerSide;
 		_origOffRate = offRate;
 		_offRate = offRate;
-		_offMask = 0xffffffff << _offRate;
+		_offMask = OFF_MASK << _offRate;
 		_isaRate = isaRate;
-		_isaMask = 0xffffffff << ((_isaRate >= 0) ? _isaRate : 0);
+		_isaMask = OFF_MASK << ((_isaRate >= 0) ? _isaRate : 0);
 		_ftabChars = ftabChars;
 		_eftabLen = _ftabChars*2;
-		_eftabSz = _eftabLen*4;
+		_eftabSz = _eftabLen*OFF_SIZE;
 		_ftabLen = (1 << (_ftabChars*2))+1;
-		_ftabSz = _ftabLen*4;
+		_ftabSz = _ftabLen*OFF_SIZE;
 		_offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
-		_offsSz = _offsLen*4;
+		_offsSz = (uint64_t)_offsLen*OFF_SIZE;
 		_isaLen = (_isaRate == -1)? 0 : ((_bwtLen + (1 << _isaRate) - 1) >> _isaRate);
-		_isaSz = _isaLen*4;
+		_isaSz = _isaLen*OFF_SIZE;
 		_lineSz = 1 << _lineRate;
 		_sideSz = _lineSz * _linesPerSide;
-		_sideBwtSz = _sideSz - 8;
+		_sideBwtSz = _sideSz - 2*OFF_SIZE;
 		_sideBwtLen = _sideBwtSz*4;
 		_numSidePairs = (_bwtSz+(2*_sideBwtSz)-1)/(2*_sideBwtSz);
 		_numSides = _numSidePairs*2;
@@ -154,35 +175,35 @@ public:
 		assert(repOk());
 	}
 
-	uint32_t len() const           { return _len; }
-	uint32_t bwtLen() const        { return _bwtLen; }
-	uint32_t sz() const            { return _sz; }
-	uint32_t bwtSz() const         { return _bwtSz; }
+	TIndexOffU len() const           { return _len; }
+	TIndexOffU bwtLen() const        { return _bwtLen; }
+	TIndexOffU sz() const            { return _sz; }
+	TIndexOffU bwtSz() const         { return _bwtSz; }
 	int32_t  lineRate() const      { return _lineRate; }
 	int32_t  linesPerSide() const  { return _linesPerSide; }
 	int32_t  origOffRate() const   { return _origOffRate; }
 	int32_t  offRate() const       { return _offRate; }
-	uint32_t offMask() const       { return _offMask; }
+	TIndexOffU offMask() const       { return _offMask; }
 	int32_t  isaRate() const       { return _isaRate; }
 	uint32_t isaMask() const       { return _isaMask; }
 	int32_t  ftabChars() const     { return _ftabChars; }
 	uint32_t eftabLen() const      { return _eftabLen; }
 	uint32_t eftabSz() const       { return _eftabSz; }
-	uint32_t ftabLen() const       { return _ftabLen; }
-	uint32_t ftabSz() const        { return _ftabSz; }
-	uint32_t offsLen() const       { return _offsLen; }
-	uint32_t offsSz() const        { return _offsSz; }
-	uint32_t isaLen() const        { return _isaLen; }
-	uint32_t isaSz() const         { return _isaSz; }
+	TIndexOffU ftabLen() const       { return _ftabLen; }
+	TIndexOffU ftabSz() const        { return _ftabSz; }
+	TIndexOffU offsLen() const       { return _offsLen; }
+	uint64_t offsSz() const        { return _offsSz; }
+	TIndexOffU isaLen() const        { return _isaLen; }
+	uint64_t isaSz() const         { return _isaSz; }
 	uint32_t lineSz() const        { return _lineSz; }
 	uint32_t sideSz() const        { return _sideSz; }
 	uint32_t sideBwtSz() const     { return _sideBwtSz; }
 	uint32_t sideBwtLen() const    { return _sideBwtLen; }
-	uint32_t numSidePairs() const  { return _numSidePairs; }
-	uint32_t numSides() const      { return _numSides; }
-	uint32_t numLines() const      { return _numLines; }
-	uint32_t ebwtTotLen() const    { return _ebwtTotLen; }
-	uint32_t ebwtTotSz() const     { return _ebwtTotSz; }
+	uint32_t numSidePairs() const  { return _numSidePairs; } /* check */
+	TIndexOffU numSides() const      { return _numSides; }
+	TIndexOffU numLines() const      { return _numLines; }
+	TIndexOffU ebwtTotLen() const    { return _ebwtTotLen; }
+	TIndexOffU ebwtTotSz() const     { return _ebwtTotSz; }
 	bool color() const             { return _color; }
 	bool entireReverse() const     { return _entireReverse; }
 
@@ -192,9 +213,9 @@ public:
 	 */
 	void setOffRate(int __offRate) {
 		_offRate = __offRate;
-		_offMask = 0xffffffff << _offRate;
+		_offMask = OFF_MASK << _offRate;
 		_offsLen = (_bwtLen + (1 << _offRate) - 1) >> _offRate;
-		_offsSz = _offsLen*4;
+		_offsSz = (uint64_t) _offsLen*OFF_SIZE;
 	}
 
 	/**
@@ -203,9 +224,9 @@ public:
 	 */
 	void setIsaRate(int __isaRate) {
 		_isaRate = __isaRate;
-		_isaMask = 0xffffffff << _isaRate;
+		_isaMask = OFF_MASK << _isaRate;
 		_isaLen = (_bwtLen + (1 << _isaRate) - 1) >> _isaRate;
-		_isaSz = _isaLen*4;
+		_isaSz = (uint64_t)_isaLen*OFF_SIZE;
 	}
 
 	/// Check that this EbwtParams is internally consistent
@@ -258,35 +279,35 @@ public:
 		    << "    reverse: "      << _entireReverse << endl;
 	}
 
-	uint32_t _len;
-	uint32_t _bwtLen;
-	uint32_t _sz;
-	uint32_t _bwtSz;
+	TIndexOffU _len;
+	TIndexOffU _bwtLen;
+	TIndexOffU _sz;
+	TIndexOffU _bwtSz;
 	int32_t  _lineRate;
 	int32_t  _linesPerSide;
 	int32_t  _origOffRate;
 	int32_t  _offRate;
-	uint32_t _offMask;
+	TIndexOffU _offMask;
 	int32_t  _isaRate;
 	uint32_t _isaMask;
 	int32_t  _ftabChars;
 	uint32_t _eftabLen;
 	uint32_t _eftabSz;
-	uint32_t _ftabLen;
-	uint32_t _ftabSz;
-	uint32_t _offsLen;
-	uint32_t _offsSz;
-	uint32_t _isaLen;
-	uint32_t _isaSz;
+	TIndexOffU _ftabLen;
+	TIndexOffU _ftabSz;
+	TIndexOffU _offsLen;
+	uint64_t _offsSz;
+	TIndexOffU _isaLen;
+	uint64_t _isaSz;
 	uint32_t _lineSz;
 	uint32_t _sideSz;
 	uint32_t _sideBwtSz;
 	uint32_t _sideBwtLen;
 	uint32_t _numSidePairs;
-	uint32_t _numSides;
-	uint32_t _numLines;
-	uint32_t _ebwtTotLen;
-	uint32_t _ebwtTotSz;
+	TIndexOffU _numSides;
+	TIndexOffU _numLines;
+	TIndexOffU _ebwtTotLen;
+	TIndexOffU _ebwtTotSz;
 	bool     _color;
 	bool     _entireReverse;
 };
@@ -339,10 +360,10 @@ public:
 	    _passMemExc(passMemExc), \
 	    _sanity(sanityCheck), \
 	    _fw(__fw), \
-	    _in1(MM_FILE_INIT), \
-	    _in2(MM_FILE_INIT), \
-	    _zOff(0xffffffff), \
-	    _zEbwtByteOff(0xffffffff), \
+	    _in1(NULL), \
+	    _in2(NULL), \
+	    _zOff(OFF_MASK), \
+	    _zEbwtByteOff(OFF_MASK), \
 	    _zEbwtBpOff(-1), \
 	    _nPat(0), \
 	    _nFrag(0), \
@@ -399,8 +420,8 @@ public:
 		rmap_ = rmap;
 		_useMm = useMm;
 		useShmem_ = useShmem;
-		_in1Str = in + ".1.ebwt";
-		_in2Str = in + ".2.ebwt";
+		_in1Str = in + ".1." + gEbwt_ext;
+		_in2Str = in + ".2." + gEbwt_ext;
 		readIntoMemory(
 			color,         // expect colorspace reference?
 			__fw ? -1 : needEntireReverse, // need REF_READ_REVERSE
@@ -436,14 +457,14 @@ public:
 	     const string& file,   // base filename for EBWT files
 	     bool __fw,
 	     bool useBlockwise,
-	     uint32_t bmax,
-	     uint32_t bmaxSqrtMult,
-	     uint32_t bmaxDivN,
+	     TIndexOffU bmax,
+	     TIndexOffU bmaxSqrtMult,
+	     TIndexOffU bmaxDivN,
 	     int dcv,
 	     vector<FileBuf*>& is,
 	     vector<RefRecord>& szs,
 	     vector<uint32_t>& plens,
-	     uint32_t sztot,
+	     TIndexOffU sztot,
 	     const RefReadInParams& refparams,
 	     uint32_t seed,
 	     int32_t __overrideOffRate = -1,
@@ -466,8 +487,8 @@ public:
         ProcessorSupport ps; 
         _usePOPCNTinstruction = ps.POPCNTenabled(); 
 #endif 
-		_in1Str = file + ".1.ebwt";
-		_in2Str = file + ".2.ebwt";
+		_in1Str = file + ".1." + gEbwt_ext;
+		_in2Str = file + ".2." + gEbwt_ext;
 		// Open output files
 		ofstream fout1(_in1Str.c_str(), ios::binary);
 		if(!fout1.good()) {
@@ -548,9 +569,9 @@ public:
 	 * Write the rstarts array given the szs array for the reference.
 	 */
 	void szsToDisk(const vector<RefRecord>& szs, ostream& os, int reverse) {
-		size_t seq = 0;
-		uint32_t off = 0;
-		uint32_t totlen = 0;
+		TIndexOffU seq = 0;
+		TIndexOffU off = 0;
+		TIndexOffU totlen = 0;
 		for(unsigned int i = 0; i < szs.size(); i++) {
 			if(szs[i].len == 0) continue;
 			if(szs[i].first) off = 0;
@@ -560,9 +581,9 @@ public:
 #else
 			if(szs[i].first) seq++;
 #endif
-			size_t seqm1 = seq-1;
+			TIndexOffU seqm1 = seq-1;
 			assert_lt(seqm1, _nPat);
-			size_t fwoff = off;
+			TIndexOffU fwoff = off;
 			if(reverse == REF_READ_REVERSE) {
 				// Invert pattern idxs
 				seqm1 = _nPat - seqm1 - 1;
@@ -570,9 +591,9 @@ public:
 				assert_leq(off + szs[i].len, _plen[seqm1]);
 				fwoff = _plen[seqm1] - (off + szs[i].len);
 			}
-			writeU32(os, totlen, this->toBe()); // offset from beginning of joined string
-			writeU32(os, seqm1,  this->toBe()); // sequence id
-			writeU32(os, fwoff,  this->toBe()); // offset into sequence
+			writeU<TIndexOffU>(os, totlen, this->toBe()); // offset from beginning of joined string
+			writeU<TIndexOffU>(os, seqm1,  this->toBe()); // sequence id
+			writeU<TIndexOffU>(os, fwoff,  this->toBe()); // offset into sequence
 			totlen += szs[i].len;
 			off += szs[i].len;
 		}
@@ -592,21 +613,21 @@ public:
 		vector<FileBuf*>& is,
 		vector<RefRecord>& szs,
 		vector<uint32_t>& plens,
-		uint32_t sztot,
+		TIndexOffU sztot,
 		const RefReadInParams& refparams,
 		ofstream& out1,
 		ofstream& out2,
 		bool useBlockwise,
-		uint32_t bmax,
-		uint32_t bmaxSqrtMult,
-		uint32_t bmaxDivN,
+		TIndexOffU bmax,
+		TIndexOffU bmaxSqrtMult,
+		TIndexOffU bmaxDivN,
 		int dcv,
 		uint32_t seed)
 	{
 		// Compose text strings into single string
 		VMSG_NL("Calculating joined length");
 		TStr s; // holds the entire joined reference after call to joinToDisk
-		uint32_t jlen;
+		TIndexOffU jlen;
 		jlen = joinedLen(szs);
 		assert_geq(jlen, sztot);
 		VMSG_NL("Writing header");
@@ -663,19 +684,19 @@ public:
 		}
 		// Succesfully obtained joined reference string
 		assert_geq(length(s), jlen);
-		if(bmax != 0xffffffff) {
+		if(bmax != OFF_MASK) {
 			VMSG_NL("bmax according to bmax setting: " << bmax);
 		}
-		else if(bmaxSqrtMult != 0xffffffff) {
+		else if(bmaxSqrtMult != OFF_MASK) {
 			bmax *= bmaxSqrtMult;
 			VMSG_NL("bmax according to bmaxSqrtMult setting: " << bmax);
 		}
-		else if(bmaxDivN != 0xffffffff) {
-			bmax = max<uint32_t>(jlen / bmaxDivN, 1);
+		else if(bmaxDivN != OFF_MASK) {
+			bmax = max<TIndexOffU>(jlen / bmaxDivN, 1);
 			VMSG_NL("bmax according to bmaxDivN setting: " << bmax);
 		}
 		else {
-			bmax = (uint32_t)sqrt(length(s));
+			bmax = (TIndexOffU)sqrt(length(s));
 			VMSG_NL("bmax defaulted to: " << bmax);
 		}
 		int iter = 0;
@@ -718,15 +739,15 @@ public:
 					// we would have thrown one eventually as part of
 					// constructing the DifferenceCoverSample
 					dcv <<= 1;
-					size_t sz = DifferenceCoverSample<TStr>::simulateAllocs(s, dcv >> 1);
+					TIndexOffU sz = (TIndexOffU)DifferenceCoverSample<TStr>::simulateAllocs(s, dcv >> 1);
 					AutoArray<uint8_t> tmp(sz);
 					dcv >>= 1;
 					// Likewise with the KarkkainenBlockwiseSA
-					sz = KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
+					sz = (TIndexOffU)KarkkainenBlockwiseSA<TStr>::simulateAllocs(s, bmax);
 					AutoArray<uint8_t> tmp2(sz);
 					// Now throw in the 'ftab' and 'isaSample' structures
 					// that we'll eventually allocate in buildToDisk
-					AutoArray<uint32_t> ftab(_eh._ftabLen * 2);
+					AutoArray<TIndexOffU> ftab(_eh._ftabLen * 2);
 					AutoArray<uint8_t> side(_eh._sideSz);
 					// Grab another 20 MB out of caution
 					AutoArray<uint32_t> extra(20*1024*1024);
@@ -768,7 +789,7 @@ public:
 #else
 		assert_eq(this->_refnames.size(), this->_nPat);
 #endif
-		for(size_t i = 0; i < this->_refnames.size(); i++) {
+		for(TIndexOffU i = 0; i < this->_refnames.size(); i++) {
 			out1 << this->_refnames[i] << endl;
 		}
 		out1 << '\0';
@@ -786,8 +807,8 @@ public:
 	 * fragments correspond to input sequences - it just cares about
 	 * the lengths of the fragments.
 	 */
-	uint32_t joinedLen(vector<RefRecord>& szs) {
-		uint32_t ret = 0;
+	TIndexOffU joinedLen(vector<RefRecord>& szs) {
+		TIndexOffU ret = 0;
 		for(unsigned int i = 0; i < szs.size(); i++) {
 			ret += szs[i].len;
 		}
@@ -816,8 +837,8 @@ public:
 				FREE_SHARED(_ebwt);
 			}
 		}
-		MM_FILE_CLOSE(_in1);
-		MM_FILE_CLOSE(_in2);
+		if (_in1 != NULL) fclose(_in1);
+		if (_in2 != NULL) fclose(_in2);
 #ifdef EBWT_STATS
 		cout << (_fw ? "Forward index:" : "Mirror index:") << endl;
 		cout << "  mapLFEx:   " << mapLFExs_ << endl;
@@ -830,18 +851,18 @@ public:
 
 	/// Accessors
 	const EbwtParams& eh() const     { return _eh; }
-	uint32_t    zOff() const         { return _zOff; }
-	uint32_t    zEbwtByteOff() const { return _zEbwtByteOff; }
-	int         zEbwtBpOff() const   { return _zEbwtBpOff; }
-	uint32_t    nPat() const         { return _nPat; }
-	uint32_t    nFrag() const        { return _nFrag; }
-	uint32_t*   fchr() const         { return _fchr; }
-	uint32_t*   ftab() const         { return _ftab; }
-	uint32_t*   eftab() const        { return _eftab; }
-	uint32_t*   offs() const         { return _offs; }
-	uint32_t*   isa() const          { return _isa; }
-	uint32_t*   plen() const         { return _plen; }
-	uint32_t*   rstarts() const      { return _rstarts; }
+	TIndexOffU    zOff() const         { return _zOff; }
+	TIndexOffU    zEbwtByteOff() const { return _zEbwtByteOff; }
+	TIndexOff         zEbwtBpOff() const   { return _zEbwtBpOff; }
+	TIndexOffU    nPat() const         { return _nPat; }
+	TIndexOffU    nFrag() const        { return _nFrag; }
+	TIndexOffU*   fchr() const         { return _fchr; }
+	TIndexOffU*   ftab() const         { return _ftab; }
+	TIndexOffU*   eftab() const        { return _eftab; }
+	TIndexOffU*   offs() const         { return _offs; }
+	uint32_t*   isa() const          { return _isa; } /* check */
+	TIndexOffU*   plen() const         { return _plen; }
+	TIndexOffU*   rstarts() const      { return _rstarts; }
 	uint8_t*    ebwt() const         { return _ebwt; }
 	const ReferenceMap* rmap() const { return rmap_; }
 	bool        toBe() const         { return _toBigEndian; }
@@ -863,7 +884,7 @@ public:
 			assert(_offs != NULL);
 			assert(_isa != NULL);
 			assert(_rstarts != NULL);
-			assert_neq(_zEbwtByteOff, 0xffffffff);
+			assert_neq(_zEbwtByteOff, OFF_MASK);
 			assert_neq(_zEbwtBpOff, -1);
 			return true;
 		} else {
@@ -872,7 +893,7 @@ public:
 			assert(_fchr == NULL);
 			assert(_offs == NULL);
 			assert(_rstarts == NULL);
-			assert_eq(_zEbwtByteOff, 0xffffffff);
+			assert_eq(_zEbwtByteOff, OFF_MASK);
 			assert_eq(_zEbwtBpOff, -1);
 			return false;
 		}
@@ -930,14 +951,14 @@ public:
 		//_plen  = NULL;
 		_rstarts = NULL;
 		_ebwt    = NULL;
-		_zEbwtByteOff = 0xffffffff;
+		_zEbwtByteOff = OFF_MASK;
 		_zEbwtBpOff = -1;
 	}
 
 	/**
 	 * Non-static facade for static function ftabHi.
 	 */
-	uint32_t ftabHi(uint32_t i) const {
+	TIndexOffU ftabHi(TIndexOffU i) const {
 		return Ebwt::ftabHi(_ftab, _eftab, _eh._len, _eh._ftabLen,
 		                    _eh._eftabLen, i);
 	}
@@ -951,18 +972,18 @@ public:
 	 * It's a static member because it's convenient to ask this
 	 * question before the Ebwt is fully initialized.
 	 */
-	static uint32_t ftabHi(uint32_t *ftab,
-	                       uint32_t *eftab,
-	                       uint32_t len,
-	                       uint32_t ftabLen,
-	                       uint32_t eftabLen,
-	                       uint32_t i)
+	static TIndexOffU ftabHi(TIndexOffU *ftab,
+			TIndexOffU *eftab,
+			TIndexOffU len,
+			TIndexOffU ftabLen,
+			TIndexOffU eftabLen,
+			TIndexOffU i)
 	{
 		assert_lt(i, ftabLen);
 		if(ftab[i] <= len) {
 			return ftab[i];
 		} else {
-			uint32_t efIdx = ftab[i] ^ 0xffffffff;
+			TIndexOffU efIdx = ftab[i] ^ OFF_MASK;
 			assert_lt(efIdx*2+1, eftabLen);
 			return eftab[efIdx*2+1];
 		}
@@ -971,7 +992,7 @@ public:
 	/**
 	 * Non-static facade for static function ftabLo.
 	 */
-	uint32_t ftabLo(uint32_t i) const {
+	TIndexOffU ftabLo(TIndexOffU i) const {
 		return Ebwt::ftabLo(_ftab, _eftab, _eh._len, _eh._ftabLen,
 		                    _eh._eftabLen, i);
 	}
@@ -985,18 +1006,18 @@ public:
 	 * It's a static member because it's convenient to ask this
 	 * question before the Ebwt is fully initialized.
 	 */
-	static uint32_t ftabLo(uint32_t *ftab,
-	                       uint32_t *eftab,
-	                       uint32_t len,
-	                       uint32_t ftabLen,
-	                       uint32_t eftabLen,
-	                       uint32_t i)
+	static TIndexOffU ftabLo(TIndexOffU *ftab,
+			TIndexOffU *eftab,
+			TIndexOffU len,
+			TIndexOffU ftabLen,
+			TIndexOffU eftabLen,
+			TIndexOffU i)
 	{
 		assert_lt(i, ftabLen);
 		if(ftab[i] <= len) {
 			return ftab[i];
 		} else {
-			uint32_t efIdx = ftab[i] ^ 0xffffffff;
+			TIndexOffU efIdx = ftab[i] ^ OFF_MASK;
 			assert_lt(efIdx*2+1, eftabLen);
 			return eftab[efIdx*2];
 		}
@@ -1010,9 +1031,9 @@ public:
 	 * _zEbwtBpOff from _zOff.
 	 */
 	void postReadInit(EbwtParams& eh) {
-		uint32_t sideNum     = _zOff / eh._sideBwtLen;
-		uint32_t sideCharOff = _zOff % eh._sideBwtLen;
-		uint32_t sideByteOff = sideNum * eh._sideSz;
+		TIndexOffU sideNum     = _zOff / eh._sideBwtLen;
+		TIndexOffU sideCharOff = _zOff % eh._sideBwtLen;
+		TIndexOffU sideByteOff = sideNum * eh._sideSz;
 		_zEbwtByteOff = sideCharOff >> 2;
 		assert_lt(_zEbwtByteOff, eh._sideBwtSz);
 		_zEbwtBpOff = sideCharOff & 3;
@@ -1091,8 +1112,8 @@ public:
 
 	// Building
 	static TStr join(vector<TStr>& l, uint32_t seed);
-	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, uint32_t sztot, const RefReadInParams& refparams, uint32_t seed);
-	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, uint32_t sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed = 0);
+	static TStr join(vector<FileBuf*>& l, vector<RefRecord>& szs, TIndexOffU sztot, const RefReadInParams& refparams, uint32_t seed);
+	void joinToDisk(vector<FileBuf*>& l, vector<RefRecord>& szs, vector<uint32_t>& plens, TIndexOffU sztot, const RefReadInParams& refparams, TStr& ret, ostream& out1, ostream& out2, uint32_t seed = 0);
 	void buildToDisk(InorderBlockwiseSA<TStr>& sa, const TStr& s, ostream& out1, ostream& out2);
 
 	// I/O
@@ -1103,29 +1124,29 @@ public:
 	// Sanity checking
 	void printRangeFw(uint32_t begin, uint32_t end) const;
 	void printRangeBw(uint32_t begin, uint32_t end) const;
-	void sanityCheckUpToSide(int upToSide) const;
+	void sanityCheckUpToSide(TIndexOff upToSide) const;
 	void sanityCheckAll(int reverse) const;
 	void restore(TStr& s) const;
 	void checkOrigs(const vector<String<Dna5> >& os, bool color, bool mirror) const;
 
 	// Searching and reporting
-	void joinedToTextOff(uint32_t qlen, uint32_t off, uint32_t& tidx, uint32_t& textoff, uint32_t& tlen) const;
-	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t off, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
-	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<uint32_t>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
-	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const uint32_t *mmui32, const char* refcs, size_t numMms, uint32_t i, uint32_t top, uint32_t bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	void joinedToTextOff(TIndexOffU qlen, TIndexOffU off, TIndexOffU& tidx, TIndexOffU& textoff, TIndexOffU& tlen) const;
+	inline bool report(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU off, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params) const;
+	inline bool reportChaseOne(const String<Dna5>& query, String<char>* quals, String<char>* name, bool color, char primer, char trimc, bool colExEnds, int snpPhred, const BitPairReference* ref, const std::vector<TIndexOffU>& mmui32, const std::vector<uint8_t>& refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, uint16_t cost, uint32_t patid, uint32_t seed, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
+	inline bool reportReconstruct(const String<Dna5>& query, String<char>* quals, String<char>* name, String<Dna5>& lbuf, String<Dna5>& rbuf, const TIndexOffU *mmui32, const char* refcs, size_t numMms, TIndexOffU i, TIndexOffU top, TIndexOffU bot, uint32_t qlen, int stratum, const EbwtSearchParams<TStr>& params, SideLocus *l = NULL) const;
 	inline int rowL(const SideLocus& l) const;
-	inline uint32_t countUpTo(const SideLocus& l, int c) const;
-	inline void countUpToEx(const SideLocus& l, uint32_t* pairs) const;
-	inline uint32_t countFwSide(const SideLocus& l, int c) const;
-	inline void countFwSideEx(const SideLocus& l, uint32_t *pairs) const;
-	inline uint32_t countBwSide(const SideLocus& l, int c) const;
-	inline void countBwSideEx(const SideLocus& l, uint32_t *pairs) const;
-	inline uint32_t mapLF(const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline void mapLFEx(const SideLocus& l, uint32_t *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, uint32_t *tops, uint32_t *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline uint32_t mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline uint32_t mapLF1(uint32_t row, const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
-	inline int mapLF1(uint32_t& row, const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline TIndexOffU countUpTo(const SideLocus& l, int c) const;
+	inline void countUpToEx(const SideLocus& l, TIndexOffU* pairs) const;
+	inline TIndexOffU countFwSide(const SideLocus& l, int c) const;
+	inline void countFwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
+	inline TIndexOffU countBwSide(const SideLocus& l, int c) const;
+	inline void countBwSideEx(const SideLocus& l, TIndexOffU *pairs) const;
+	inline TIndexOffU mapLF(const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline void mapLFEx(const SideLocus& l, TIndexOffU *pairs ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline void mapLFEx(const SideLocus& ltop, const SideLocus& lbot, TIndexOffU *tops, TIndexOffU *bots ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline TIndexOffU mapLF(const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline TIndexOffU mapLF1(TIndexOffU row, const SideLocus& l, int c ASSERT_ONLY(, bool overrideSanity = false)) const;
+	inline int mapLF1(TIndexOffU& row, const SideLocus& l ASSERT_ONLY(, bool overrideSanity = false)) const;
 	/// Check that in-memory Ebwt is internally consistent with respect
 	/// to given EbwtParams; assert if not
 	bool inMemoryRepOk(const EbwtParams& eh) const {
@@ -1167,29 +1188,29 @@ public:
 	bool       _passMemExc;
 	bool       _sanity;
 	bool       _fw;     // true iff this is a forward index
-	MM_FILE  _in1;    // input fd for primary index file
-	MM_FILE  _in2;    // input fd for secondary index file
+	FILE      *_in1;    // input fd for primary index file
+	FILE      *_in2;    // input fd for secondary index file
 	string     _in1Str; // filename for primary index file
 	string     _in2Str; // filename for secondary index file
-	uint32_t   _zOff;
-	uint32_t   _zEbwtByteOff;
-	int        _zEbwtBpOff;
-	uint32_t   _nPat;  /// number of reference texts
-	uint32_t   _nFrag; /// number of fragments
-	uint32_t*  _plen;
-	uint32_t*  _rstarts; // starting offset of fragments / text indexes
+	TIndexOffU   _zOff;
+	TIndexOffU   _zEbwtByteOff;
+	TIndexOff        _zEbwtBpOff;
+	TIndexOffU   _nPat;  /// number of reference texts
+	TIndexOffU   _nFrag; /// number of fragments
+	TIndexOffU*  _plen;
+	TIndexOffU*  _rstarts; // starting offset of fragments / text indexes
 	// _fchr, _ftab and _eftab are expected to be relatively small
 	// (usually < 1MB, perhaps a few MB if _fchr is particularly large
 	// - like, say, 11).  For this reason, we don't bother with writing
 	// them to disk through separate output streams; we
-	uint32_t*  _fchr;
-	uint32_t*  _ftab;
-	uint32_t*  _eftab; // "extended" entries for _ftab
+	TIndexOffU*  _fchr;
+	TIndexOffU*  _ftab;
+	TIndexOffU*  _eftab; // "extended" entries for _ftab
 	// _offs may be extremely large.  E.g. for DNA w/ offRate=4 (one
 	// offset every 16 rows), the total size of _offs is the same as
 	// the total size of the input sequence
-	uint32_t*  _offs;
-	uint32_t*  _isa;
+	TIndexOffU*  _offs;
+	TIndexOffU*  _isa;
 	// _ebwt is the Extended Burrows-Wheeler Transform itself, and thus
 	// is at least as large as the input sequence.
 	uint8_t*   _ebwt;
@@ -1201,7 +1222,13 @@ public:
 	char *mmFile2_;
 	EbwtParams _eh;
 
-#ifdef EBWT_STATS
+#ifdef BOWTIE_64BIT_INDEX
+	static const int      default_lineRate = 7;
+#else
+	static const int      default_lineRate = 6;
+#endif
+
+	#ifdef EBWT_STATS
 	uint64_t   mapLFExs_;
 	uint64_t   mapLFs_;
 	uint64_t   mapLFcs_;
@@ -1270,14 +1297,14 @@ public:
 	               const BitPairReference* ref, // reference (= NULL if not necessary)
 	               const ReferenceMap* rmap, // map to another reference coordinate system
 	               bool ebwtFw,         // whether index is forward (true) or mirror (false)
-	               const std::vector<uint32_t>& mmui32, // mismatch list
+	               const std::vector<TIndexOffU>& mmui32, // mismatch list
 	               const std::vector<uint8_t>& refcs,  // reference characters
 	               size_t numMms,      // # mismatches
-	               U32Pair h,          // ref coords
-	               U32Pair mh,         // mate's ref coords
+	               UPair h,          // ref coords
+	               UPair mh,         // mate's ref coords
 	               bool mfw,           // mate's orientation
 	               uint16_t mlen,      // mate length
-	               U32Pair a,          // arrow pair
+	               UPair a,          // arrow pair
 	               uint32_t tlen,      // length of text
 	               uint32_t qlen,      // length of query
 	               int stratum,        // alignment stratum
@@ -1416,8 +1443,8 @@ public:
 					hit.quals[destpos] = '!';
 				}
 				if(nmm[i] != 'M') {
-					uint32_t off = i - (colExEnds? 1:0);
-					if(!_fw) off = nqlen - off - 1;
+					uint32_t off = (uint32_t)i - (colExEnds? 1:0);
+					if(!_fw) off = (uint32_t)nqlen - off - 1;
 					assert_lt(off, nqlen);
 					hit.mms.set(off);
 					hit.refcs[off] = "ACGT"[ref->getBase(h.first, h.second+i)];
@@ -1466,7 +1493,7 @@ public:
 				assert_neq(4, (int)_texts[h.first][h.second + i]);
 				// Forward pattern appears at h
 				if((int)hit.patSeq[i] != (int)_texts[h.first][h.second + i]) {
-					uint32_t qoff = i;
+					uint32_t qoff = (uint32_t)i;
 					// if ebwtFw != _fw the 3' end is on on the
 					// left end of the pattern, but the diff vector
 					// should encode mismatches w/r/t the 5' end,
@@ -1536,7 +1563,7 @@ struct SideLocus {
 	/**
 	 * Construct from row and other relevant information about the Ebwt.
 	 */
-	SideLocus(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
+	SideLocus(TIndexOffU row, const EbwtParams& ep, const uint8_t* ebwt) {
 		initFromRow(row, ep, ebwt);
 	}
 
@@ -1544,20 +1571,20 @@ struct SideLocus {
 	 * Init two SideLocus objects from a top/bot pair, using the result
 	 * from one call to initFromRow to possibly avoid a second call.
 	 */
-	static void initFromTopBot(uint32_t top,
-	                           uint32_t bot,
+	static void initFromTopBot(TIndexOffU top,
+								TIndexOffU bot,
 	                           const EbwtParams& ep,
 	                           const uint8_t* ebwt,
 	                           SideLocus& ltop,
 	                           SideLocus& lbot)
 	{
-		const uint32_t sideBwtLen = ep._sideBwtLen;
+		const TIndexOffU sideBwtLen = ep._sideBwtLen;
 		const uint32_t sideBwtSz  = ep._sideBwtSz;
 		assert_gt(bot, top);
 		ltop.initFromRow(top, ep, ebwt);
-		uint32_t spread = bot - top;
+		TIndexOffU spread = bot - top;
 		if(ltop._charOff + spread < sideBwtLen) {
-			lbot._charOff = ltop._charOff + spread;
+			lbot._charOff = (uint32_t)(ltop._charOff + spread);
 			lbot._sideNum = ltop._sideNum;
 			lbot._sideByteOff = ltop._sideByteOff;
 			lbot._fw = ltop._fw;
@@ -1575,12 +1602,12 @@ struct SideLocus {
 	 * Calculate SideLocus based on a row and other relevant
 	 * information about the shape of the Ebwt.
 	 */
-	void initFromRow(uint32_t row, const EbwtParams& ep, const uint8_t* ebwt) {
+	void initFromRow(TIndexOffU row, const EbwtParams& ep, const uint8_t* ebwt) {
 		const uint32_t sideSz     = ep._sideSz;
 		// Side length is hard-coded for now; this allows the compiler
 		// to do clever things to accelerate / and %.
-		_sideNum                  = row / 224;
-		_charOff                  = row % 224;
+		_sideNum                  = row / (56*OFF_SIZE);
+		_charOff                  = row % (56*OFF_SIZE);
 		_sideByteOff              = _sideNum * sideSz;
 		assert_leq(row, ep._len);
 		assert_leq(_sideByteOff + sideSz, ep._ebwtTotSz);
@@ -1589,7 +1616,7 @@ struct SideLocus {
 		                   0 /* prepare for read */,
 		                   PREFETCH_LOCALITY);
 #endif
-		// prefetch tjside too
+		// prefetch this side too
 		_fw = (_sideNum & 1) != 0; // odd-numbered sides are forward
 		_by = _charOff >> 2; // byte within side
 		assert_lt(_by, (int)ep._sideBwtSz);
@@ -1618,8 +1645,8 @@ struct SideLocus {
 		return ebwt + _sideByteOff + (_fw? (-128) : (128));
 	}
 
-	uint32_t _sideByteOff; // offset of top side within ebwt[]
-	uint32_t _sideNum;     // index of side
+	TIndexOffU _sideByteOff; // offset of top side within ebwt[]
+	TIndexOffU _sideNum;     // index of side
 	uint16_t _charOff;     // character offset within side
 	bool _fw;              // side is forward or backward?
 	int16_t _by;           // byte within side (not adjusted for bw sides)
@@ -1662,7 +1689,7 @@ void Ebwt<TStr>::printRangeFw(uint32_t begin, uint32_t end) const {
  * of a backward side, print the characters at those positions along
  * with a summary occ[] array.
  */
-template<typename TStr>
+template<typename TStr> /* check - update */
 void Ebwt<TStr>::printRangeBw(uint32_t begin, uint32_t end) const {
 	assert(isInMemory());
 	uint32_t occ[] = {0, 0, 0, 0};
@@ -1687,14 +1714,14 @@ void Ebwt<TStr>::printRangeBw(uint32_t begin, uint32_t end) const {
  * comparing against the embedded occ[] arrays.
  */
 template<typename TStr>
-void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
+void Ebwt<TStr>::sanityCheckUpToSide(TIndexOff upToSide) const {
 	assert(isInMemory());
-	uint32_t occ[] = {0, 0, 0, 0};
-	ASSERT_ONLY(uint32_t occ_save[] = {0, 0});
-	uint32_t cur = 0; // byte pointer
+	TIndexOffU occ[] = {0, 0, 0, 0};
+	ASSERT_ONLY(TIndexOffU occ_save[] = {0, 0});
+	TIndexOffU cur = 0; // byte pointer
 	const EbwtParams& eh = this->_eh;
 	bool fw = false;
-	while(cur < (upToSide * eh._sideSz)) {
+	while(cur < (TIndexOffU)(upToSide * eh._sideSz)) {
 		assert_leq(cur + eh._sideSz, eh._ebwtTotLen);
 		for(uint32_t i = 0; i < eh._sideBwtSz; i++) {
 			uint8_t by = this->_ebwt[cur + (fw ? i : eh._sideBwtSz-i-1)];
@@ -1710,18 +1737,18 @@ void Ebwt<TStr>::sanityCheckUpToSide(int upToSide) const {
 		if(fw) {
 			// Finished forward bucket; check saved [G] and [T]
 			// against the two uint32_ts encoded here
-			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->_ebwt[cur + eh._sideBwtSz]));
-			ASSERT_ONLY(uint32_t gs = u32ebwt[0]);
-			ASSERT_ONLY(uint32_t ts = u32ebwt[1]);
+			ASSERT_ONLY(TIndexOffU *u32ebwt = reinterpret_cast<TIndexOffU*>(&this->_ebwt[cur + eh._sideBwtSz]));
+			ASSERT_ONLY(TIndexOffU gs = u32ebwt[0]);
+			ASSERT_ONLY(TIndexOffU ts = u32ebwt[1]);
 			assert_eq(gs, occ_save[0]);
 			assert_eq(ts, occ_save[1]);
 			fw = false;
 		} else {
 			// Finished backward bucket; check current [A] and [C]
 			// against the two uint32_ts encoded here
-			ASSERT_ONLY(uint32_t *u32ebwt = reinterpret_cast<uint32_t*>(&this->_ebwt[cur + eh._sideBwtSz]));
-			ASSERT_ONLY(uint32_t as = u32ebwt[0]);
-			ASSERT_ONLY(uint32_t cs = u32ebwt[1]);
+			ASSERT_ONLY(TIndexOffU *u32ebwt = reinterpret_cast<TIndexOffU*>(&this->_ebwt[cur + eh._sideBwtSz]));
+			ASSERT_ONLY(TIndexOffU as = u32ebwt[0]);
+			ASSERT_ONLY(TIndexOffU cs = u32ebwt[1]);
 			assert(as == occ[0] || as == occ[0]-1); // one 'a' is a skipped '$' and doesn't count toward occ[]
 			assert_eq(cs, occ[1]);
 			ASSERT_ONLY(occ_save[0] = occ[2]); // save gs
@@ -1740,7 +1767,7 @@ void Ebwt<TStr>::sanityCheckAll(int reverse) const {
 	const EbwtParams& eh = this->_eh;
 	assert(isInMemory());
 	// Check ftab
-	for(uint32_t i = 1; i < eh._ftabLen; i++) {
+	for(TIndexOffU i = 1; i < eh._ftabLen; i++) {
 		assert_geq(this->ftabHi(i), this->ftabLo(i-1));
 		assert_geq(this->ftabLo(i), this->ftabHi(i-1));
 		assert_leq(this->ftabHi(i), eh._bwtLen+1);
@@ -1748,20 +1775,20 @@ void Ebwt<TStr>::sanityCheckAll(int reverse) const {
 	assert_eq(this->ftabHi(eh._ftabLen-1), eh._bwtLen);
 
 	// Check offs
-	int seenLen = (eh._bwtLen + 31) >> 5;
-	uint32_t *seen;
+	TIndexOff seenLen = (eh._bwtLen + 31) >> ((TIndexOffU)5);
+	TIndexOff *seen;
 	try {
-		seen = new uint32_t[seenLen]; // bitvector marking seen offsets
+		seen = new TIndexOff[seenLen]; // bitvector marking seen offsets
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating seen[] at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
-	memset(seen, 0, 4 * seenLen);
-	uint32_t offsLen = eh._offsLen;
-	for(uint32_t i = 0; i < offsLen; i++) {
+	memset(seen, 0, OFF_SIZE * seenLen);
+	TIndexOffU offsLen = eh._offsLen;
+	for(TIndexOffU i = 0; i < offsLen; i++) {
 		assert_lt(this->_offs[i], eh._bwtLen);
-		int w = this->_offs[i] >> 5;
-		int r = this->_offs[i] & 31;
+		TIndexOff w = this->_offs[i] >> 5;
+		TIndexOff r = this->_offs[i] & 31;
 		assert_eq(0, (seen[w] >> r) & 1); // shouldn't have been seen before
 		seen[w] |= (1 << r);
 	}
@@ -1771,12 +1798,12 @@ void Ebwt<TStr>::sanityCheckAll(int reverse) const {
 	assert_gt(this->_nPat, 0);
 
 	// Check plen, flen
-	for(uint32_t i = 0; i < this->_nPat; i++) {
+	for(TIndexOffU i = 0; i < this->_nPat; i++) {
 		assert_geq(this->_plen[i], 0);
 	}
 
 	// Check rstarts
-	for(uint32_t i = 0; i < this->_nFrag-1; i++) {
+	for(TIndexOffU i = 0; i < this->_nFrag-1; i++) {
 		assert_gt(this->_rstarts[(i+1)*3], this->_rstarts[i*3]);
 		if(reverse == REF_READ_REVERSE) {
 			assert(this->_rstarts[(i*3)+1] >= this->_rstarts[((i+1)*3)+1]);
@@ -1944,7 +1971,7 @@ inline static int countInU64(int c, uint64_t dw) {
 #ifdef POPCNT_CAPABILITY
 template<typename Operation>
 #endif
-inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
+inline static void countInU64Ex(uint64_t dw, TIndexOffU* arrs) {
 	uint64_t c0 = c_table[0];
 	uint64_t x0 = dw ^ c0;
 	uint64_t x1 = (x0 >> 1);
@@ -2004,11 +2031,11 @@ inline static void countInU64Ex(uint64_t dw, uint32_t* arrs) {
  * Function gets 11.09% in profile
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
+inline TIndexOffU Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
 	// Count occurrences of c in each 64-bit (using bit trickery);
 	// Someday countInU64() and pop() functions should be
 	// vectorized/SSE-ized in case that helps.
-	uint32_t cCnt = 0;
+	TIndexOffU cCnt = 0;
 	const uint8_t *side = l.side(this->_ebwt);
 	int i = 0;
 #if 1
@@ -2071,7 +2098,7 @@ inline uint32_t Ebwt<TStr>::countUpTo(const SideLocus& l, int c) const {
  * side up to (but not including) the given byte/bitpair (by/bp).
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
+inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, TIndexOffU* arrs) const {
 	int i = 0;
 	// Count occurrences of c in each 64-bit (using bit trickery);
 	// note: this seems does not seem to lend a significant boost to
@@ -2143,7 +2170,7 @@ inline void Ebwt<TStr>::countUpToEx(const SideLocus& l, uint32_t* arrs) const {
  * break just prior to the side.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
+inline TIndexOffU Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const { /* check */
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
@@ -2151,7 +2178,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 	assert_lt(l._bp, 4);
 	assert_geq(l._bp, 0);
 	const uint8_t *side = l.side(this->_ebwt);
-	uint32_t cCnt = countUpTo(l, c);
+	TIndexOffU cCnt = countUpTo(l, c);
 	assert_leq(cCnt, this->_eh._sideBwtLen);
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
 		// Adjust for the fact that we represented $ with an 'A', but
@@ -2162,15 +2189,15 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
 			cCnt--; // Adjust for '$' looking like an 'A'
 		}
 	}
-	uint32_t ret;
+	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 2*OFF_SIZE);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] + cCnt + this->_fchr[c];
 	} else {
-		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] + cCnt + this->_fchr[c];
 	}
@@ -2191,7 +2218,7 @@ inline uint32_t Ebwt<TStr>::countFwSide(const SideLocus& l, int c) const {
  * break just prior to the side.
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
+inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, TIndexOffU* arrs) const
 {
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
 	assert_geq(l._by, 0);
@@ -2219,8 +2246,8 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	const uint32_t *ac = reinterpret_cast<const uint32_t*>(side - 8);
-	const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8);
+	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side - 2*OFF_SIZE);
+	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + this->_eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
@@ -2247,7 +2274,7 @@ inline void Ebwt<TStr>::countFwSideEx(const SideLocus& l, uint32_t* arrs) const
  * occ[] count up to the side break.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
+inline TIndexOffU Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
@@ -2255,7 +2282,7 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 	assert_lt(l._bp, 4);
 	assert_geq(l._bp, 0);
 	const uint8_t *side = l.side(this->_ebwt);
-	uint32_t cCnt = countUpTo(l, c);
+	TIndexOffU cCnt = countUpTo(l, c);
 	if(rowL(l) == c) cCnt++;
 	assert_leq(cCnt, this->_eh._sideBwtLen);
 	if(c == 0 && l._sideByteOff <= _zEbwtByteOff && l._sideByteOff + l._by >= _zEbwtByteOff) {
@@ -2267,15 +2294,15 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
 			cCnt--;
 		}
 	}
-	uint32_t ret;
+	TIndexOffU ret;
 	// Now factor in the occ[] count at the side break
 	if(c < 2) {
-		const uint32_t *ac = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8);
+		const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
 		assert_leq(ac[0], this->_eh._numSides * this->_eh._sideBwtLen); // b/c it's used as padding
 		assert_leq(ac[1], this->_eh._len);
 		ret = ac[c] - cCnt + this->_fchr[c];
 	} else {
-		const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + (2*this->_eh._sideSz) - 8); // next
+		const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 2*OFF_SIZE); // next
 		assert_leq(gt[0], this->_eh._len); assert_leq(gt[1], this->_eh._len);
 		ret = gt[c-2] - cCnt + this->_fchr[c];
 	}
@@ -2296,7 +2323,7 @@ inline uint32_t Ebwt<TStr>::countBwSide(const SideLocus& l, int c) const {
  * occ[] count up to the side break.
  */
 template<typename TStr>
-inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const {
+inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, TIndexOffU* arrs) const {
 	assert_lt(l._by, (int)this->_eh._sideBwtSz);
 	assert_geq(l._by, 0);
 	assert_lt(l._bp, 4);
@@ -2318,8 +2345,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 		}
 	}
 	// Now factor in the occ[] count at the side break
-	const uint32_t *ac = reinterpret_cast<const uint32_t*>(side + this->_eh._sideSz - 8);
-	const uint32_t *gt = reinterpret_cast<const uint32_t*>(side + (2*this->_eh._sideSz) - 8);
+	const TIndexOffU *ac = reinterpret_cast<const TIndexOffU*>(side + this->_eh._sideSz - 2*OFF_SIZE);
+	const TIndexOffU *gt = reinterpret_cast<const TIndexOffU*>(side + (2*this->_eh._sideSz) - 2*OFF_SIZE);
 #ifndef NDEBUG
 	assert_leq(ac[0], this->_fchr[1] + this->_eh.sideBwtLen());
 	assert_leq(ac[1], this->_fchr[2]-this->_fchr[1]);
@@ -2347,8 +2374,8 @@ inline void Ebwt<TStr>::countBwSideEx(const SideLocus& l, uint32_t* arrs) const 
 template<typename TStr>
 inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
                                 const SideLocus& lbot,
-                                uint32_t *tops,
-                                uint32_t *bots
+                                TIndexOffU *tops,
+                                TIndexOffU *bots
                                 ASSERT_ONLY(, bool overrideSanity)
                                 ) const
 {
@@ -2389,7 +2416,7 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& ltop,
  */
 template<typename TStr>
 inline void Ebwt<TStr>::mapLFEx(const SideLocus& l,
-                                uint32_t *arrs
+		TIndexOffU *arrs
                                 ASSERT_ONLY(, bool overrideSanity)
                                 ) const
 {
@@ -2417,14 +2444,14 @@ inline void Ebwt<TStr>::mapLFEx(const SideLocus& l,
  * Given row i, return the row that the LF mapping maps i to.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
+inline TIndexOffU Ebwt<TStr>::mapLF(const SideLocus& l
                                   ASSERT_ONLY(, bool overrideSanity)
                                   ) const
 {
 #ifdef EBWT_STATS
 	const_cast<Ebwt<TStr>*>(this)->mapLFs_++;
 #endif
-	uint32_t ret;
+	TIndexOffU ret;
 	assert(l.side(this->_ebwt) != NULL);
 	int c = rowL(l);
 	assert_lt(c, 4);
@@ -2437,7 +2464,7 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
 		// Make sure results match up with results from mapLFEx;
 		// be sure to override sanity-checking in the callee, or we'll
 		// have infinite recursion
-		uint32_t arrs[] = { 0, 0, 0, 0 };
+		TIndexOffU arrs[] = { 0, 0, 0, 0 };
 		mapLFEx(l, arrs, true);
 		assert_eq(arrs[c], ret);
 	}
@@ -2450,14 +2477,14 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l
  * i to on character c.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
+inline TIndexOffU Ebwt<TStr>::mapLF(const SideLocus& l, int c
                                   ASSERT_ONLY(, bool overrideSanity)
                                   ) const
 {
 #ifdef EBWT_STATS
 	const_cast<Ebwt<TStr>*>(this)->mapLFcs_++;
 #endif
-	uint32_t ret;
+	TIndexOffU ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
@@ -2468,7 +2495,7 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
 		// Make sure results match up with results from mapLFEx;
 		// be sure to override sanity-checking in the callee, or we'll
 		// have infinite recursion
-		uint32_t arrs[] = { 0, 0, 0, 0 };
+		TIndexOffU arrs[] = { 0, 0, 0, 0 };
 		mapLFEx(l, arrs, true);
 		assert_eq(arrs[c], ret);
 	}
@@ -2481,15 +2508,15 @@ inline uint32_t Ebwt<TStr>::mapLF(const SideLocus& l, int c
  * i to on character c.
  */
 template<typename TStr>
-inline uint32_t Ebwt<TStr>::mapLF1(uint32_t row, const SideLocus& l, int c
+inline TIndexOffU Ebwt<TStr>::mapLF1(TIndexOffU row, const SideLocus& l, int c
                                    ASSERT_ONLY(, bool overrideSanity)
                                    ) const
 {
 #ifdef EBWT_STATS
 	const_cast<Ebwt<TStr>*>(this)->mapLF1cs_++;
 #endif
-	if(rowL(l) != c || row == _zOff) return 0xffffffff;
-	uint32_t ret;
+	if(rowL(l) != c || row == _zOff) return OFF_MASK;
+	TIndexOffU ret;
 	assert_lt(c, 4);
 	assert_geq(c, 0);
 	if(l._fw) ret = countFwSide(l, c); // Forward side
@@ -2500,7 +2527,7 @@ inline uint32_t Ebwt<TStr>::mapLF1(uint32_t row, const SideLocus& l, int c
 		// Make sure results match up with results from mapLFEx;
 		// be sure to override sanity-checking in the callee, or we'll
 		// have infinite recursion
-		uint32_t arrs[] = { 0, 0, 0, 0 };
+		TIndexOffU arrs[] = { 0, 0, 0, 0 };
 		mapLFEx(l, arrs, true);
 		assert_eq(arrs[c], ret);
 	}
@@ -2513,7 +2540,7 @@ inline uint32_t Ebwt<TStr>::mapLF1(uint32_t row, const SideLocus& l, int c
  * i to on character c.
  */
 template<typename TStr>
-inline int Ebwt<TStr>::mapLF1(uint32_t& row, const SideLocus& l
+inline int Ebwt<TStr>::mapLF1(TIndexOffU& row, const SideLocus& l
                               ASSERT_ONLY(, bool overrideSanity)
                               ) const
 {
@@ -2532,7 +2559,7 @@ inline int Ebwt<TStr>::mapLF1(uint32_t& row, const SideLocus& l
 		// Make sure results match up with results from mapLFEx;
 		// be sure to override sanity-checking in the callee, or we'll
 		// have infinite recursion
-		uint32_t arrs[] = { 0, 0, 0, 0 };
+		TIndexOffU arrs[] = { 0, 0, 0, 0 };
 		mapLFEx(l, arrs, true);
 		assert_eq(arrs[c], row);
 	}
@@ -2547,34 +2574,34 @@ inline int Ebwt<TStr>::mapLF1(uint32_t& row, const SideLocus& l
  * sorted list of reference fragment ranges t
  */
 template<typename TStr>
-void Ebwt<TStr>::joinedToTextOff(uint32_t qlen, uint32_t off,
-                                 uint32_t& tidx,
-                                 uint32_t& textoff,
-                                 uint32_t& tlen) const
+void Ebwt<TStr>::joinedToTextOff(TIndexOffU qlen, TIndexOffU off,
+								TIndexOffU& tidx,
+								TIndexOffU& textoff,
+								TIndexOffU& tlen) const
 {
-	uint32_t top = 0;
-	uint32_t bot = _nFrag; // 1 greater than largest addressable element
-	uint32_t elt = 0xffffffff;
+	TIndexOffU top = 0;
+	TIndexOffU bot = _nFrag; // 1 greater than largest addressable element
+	TIndexOffU elt = OFF_MASK;
 	// Begin binary search
 	while(true) {
-		ASSERT_ONLY(uint32_t oldelt = elt);
+		ASSERT_ONLY(TIndexOffU oldelt = elt);
 		elt = top + ((bot - top) >> 1);
 		assert_neq(oldelt, elt); // must have made progress
-		uint32_t lower = _rstarts[elt*3];
-		uint32_t upper;
+		TIndexOffU lower = _rstarts[elt*3];
+		TIndexOffU upper;
 		if(elt == _nFrag-1) {
 			upper = _eh._len;
 		} else {
 			upper = _rstarts[((elt+1)*3)];
 		}
 		assert_gt(upper, lower);
-		uint32_t fraglen = upper - lower;
+		TIndexOffU fraglen = upper - lower;
 		if(lower <= off) {
 			if(upper > off) { // not last element, but it's within
 				// off is in this range; check if it falls off
 				if(off + qlen > upper) {
 					// it falls off; signal no-go and return
-					tidx = 0xffffffff;
+					tidx = OFF_MASK;
 					assert_lt(elt, _nFrag-1);
 					return;
 				}
@@ -2623,12 +2650,12 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
                                bool colExEnds,
                                int snpPhred,
                                const BitPairReference* ref,
-                               const std::vector<uint32_t>& mmui32,
+                               const std::vector<TIndexOffU>& mmui32,
                                const std::vector<uint8_t>& refcs,
                                size_t numMms,
-                               uint32_t off,
-                               uint32_t top,
-                               uint32_t bot,
+                               TIndexOffU off,
+                               TIndexOffU top,
+                               TIndexOffU bot,
                                uint32_t qlen,
                                int stratum,
                                uint16_t cost,
@@ -2639,11 +2666,11 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 	VMSG_NL("In report");
 	assert_geq(cost, (uint32_t)(stratum << 14));
 	assert_lt(off, this->_eh._len);
-	uint32_t tidx;
-	uint32_t textoff;
-	uint32_t tlen;
+	TIndexOffU tidx;
+	TIndexOffU textoff;
+	TIndexOffU tlen;
 	joinedToTextOff(qlen, off, tidx, textoff, tlen);
-	if(tidx == 0xffffffff) {
+	if(tidx == OFF_MASK) {
 		return false;
 	}
 	return params.reportHit(
@@ -2662,7 +2689,7 @@ inline bool Ebwt<TStr>::report(const String<Dna5>& query,
 			refcs,                    // reference characters for mms
 			numMms,                   // # mismatches
 			make_pair(tidx, textoff), // position
-			make_pair(0, 0),          // (bogus) mate position
+			make_pair<TIndexOffU,TIndexOffU>(0, 0),          // (bogus) mate position
 			true,                     // (bogus) mate orientation
 			0,                        // (bogus) mate length
 			make_pair(top, bot),      // arrows
@@ -2695,12 +2722,12 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        bool colExEnds,
                                        int snpPhred,
                                        const BitPairReference* ref,
-                                       const std::vector<uint32_t>& mmui32,
+                                       const std::vector<TIndexOffU>& mmui32,
                                        const std::vector<uint8_t>& refcs,
                                        size_t numMms,
-                                       uint32_t i,
-                                       uint32_t top,
-                                       uint32_t bot,
+                                       TIndexOffU i,
+                                       TIndexOffU top,
+                                       TIndexOffU bot,
                                        uint32_t qlen,
                                        int stratum,
                                        uint16_t cost,
@@ -2710,13 +2737,13 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
                                        SideLocus *l) const
 {
 	VMSG_NL("In reportChaseOne");
-	uint32_t off;
+	TIndexOffU off;
 	uint32_t jumps = 0;
 	ASSERT_ONLY(uint32_t origi = i);
 	SideLocus myl;
-	const uint32_t offMask = this->_eh._offMask;
+	const TIndexOffU offMask = this->_eh._offMask;
 	const uint32_t offRate = this->_eh._offRate;
-	const uint32_t* offs = this->_offs;
+	const TIndexOffU* offs = this->_offs;
 	// If the caller didn't give us a pre-calculated (and prefetched)
 	// locus, then we have to do that now
 	if(l == NULL) {
@@ -2728,7 +2755,7 @@ inline bool Ebwt<TStr>::reportChaseOne(const String<Dna5>& query,
 	// Walk along until we reach the next marked row to the left
 	while(((i & offMask) != i) && i != _zOff) {
 		// Not a marked row; walk left one more char
-		uint32_t newi = mapLF(*l); // calc next row
+		TIndexOffU newi = mapLF(*l); // calc next row
 		assert_neq(newi, i);
 		i = newi;                                  // update row
 		l->initFromRow(i, this->_eh, this->_ebwt); // update locus
@@ -2770,12 +2797,12 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
                                           String<char>* name,
                                           String<Dna5>& lbuf,
                                           String<Dna5>& rbuf,
-                                          const uint32_t *mmui32,
+                                          const TIndexOffU *mmui32,
                                           const char* refcs,
                                           size_t numMms,
-                                          uint32_t i,
-                                          uint32_t top,
-                                          uint32_t bot,
+                                          TIndexOffU i,
+                                          TIndexOffU top,
+                                          TIndexOffU bot,
                                           uint32_t qlen,
                                           int stratum,
                                           const EbwtSearchParams<TStr>& params,
@@ -2783,13 +2810,13 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 {
 	VMSG_NL("In reportReconstruct");
 	assert_gt(_eh._isaLen, 0); // Must have inverse suffix array to reconstruct
-	uint32_t off;
-	uint32_t jumps = 0;
+	TIndexOffU off;
+	TIndexOffU jumps = 0;
 	SideLocus myl;
-	const uint32_t offMask = this->_eh._offMask;
-	const uint32_t offRate = this->_eh._offRate;
-	const uint32_t* offs = this->_offs;
-	const uint32_t* isa = this->_isa;
+	const TIndexOffU offMask = this->_eh._offMask;
+	const TIndexOffU offRate = this->_eh._offRate;
+	const TIndexOffU* offs = this->_offs;
+	const TIndexOffU* isa = this->_isa;
 	assert(isa != NULL);
 	if(l == NULL) {
 		l = &myl;
@@ -2802,7 +2829,7 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 		// Not a marked row; walk left one more char
 		int c = rowL(*l);
 		appendValue(lbuf, (Dna5)c);
-		uint32_t newi;
+		TIndexOffU newi;
 		assert_lt(c, 4);
 		assert_geq(c, 0);
 		if(l->_fw) newi = countFwSide(*l, c); // Forward side
@@ -2830,11 +2857,11 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	// check whether the seed is valid (i.e., does not straddle a
 	// boundary between two reference seuqences) and to obtain its
 	// extents
-	uint32_t tidx;    // the index (id) of the reference we hit in
-	uint32_t textoff; // the offset of the alignment within the reference
-	uint32_t tlen;    // length of reference seed hit in
+	TIndexOffU tidx;    // the index (id) of the reference we hit in
+	TIndexOffU textoff; // the offset of the alignment within the reference
+	TIndexOffU tlen;    // length of reference seed hit in
 	joinedToTextOff(qlen, off, tidx, textoff, tlen);
-	if(tidx == 0xffffffff) {
+	if(tidx == OFF_MASK) {
 		// The seed straddled a reference boundary, and so is spurious.
 		// Return false, indicating that we shouldn't stop.
 		return false;
@@ -2851,12 +2878,12 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	} else if(jumps < textoff) {
 		// Keep walking until we reach the end of the reference
 		assert_neq(i, _zOff);
-		uint32_t diff = textoff-jumps;
+		TIndexOffU diff = textoff-jumps;
 		for(size_t j = 0; j < diff; j++) {
 			// Not a marked row; walk left one more char
 			int c = rowL(*l);
 			appendValue(lbuf, (Dna5)c);
-			uint32_t newi;
+			TIndexOffU newi;
 			assert_lt(c, 4);
 			assert_geq(c, 0);
 			if(l->_fw) newi = countFwSide(*l, c); // Forward side
@@ -2874,10 +2901,10 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	assert_eq(textoff, jumps);
 	assert_eq(textoff, length(lbuf));
 	// Calculate the right-hand extent of the reference
-	uint32_t ref_right = off - textoff + tlen;
+	TIndexOffU ref_right = off - textoff + tlen;
 	// Round the right-hand extent to the nearest ISA element that maps
 	// to it or a character to its right
-	uint32_t ref_right_rounded = ref_right;
+	TIndexOffU ref_right_rounded = ref_right;
 	if((ref_right_rounded & _eh._isaMask) != ref_right_rounded) {
 		ref_right_rounded = ((ref_right_rounded >> _eh._isaRate)+1) << _eh._isaRate;
 	}
@@ -2889,14 +2916,14 @@ inline bool Ebwt<TStr>::reportReconstruct(const String<Dna5>& query,
 	} else {
 		i = isa[ref_right_rounded >> _eh._isaRate];
 	}
-	uint32_t right_steps_rounded = ref_right_rounded - (off + qlen);
-	uint32_t right_steps = ref_right - (off + qlen);
+	TIndexOffU right_steps_rounded = ref_right_rounded - (off + qlen);
+	TIndexOffU right_steps = ref_right - (off + qlen);
 	l->initFromRow(i, this->_eh, this->_ebwt); // update locus
 	for(size_t j = 0; j < right_steps_rounded; j++) {
 		// Not a marked row; walk left one more char
 		int c = rowL(*l);
 		appendValue(rbuf, (Dna5)c);
-		uint32_t newi;
+		TIndexOffU newi;
 		assert_lt(c, 4); assert_geq(c, 0);
 		if(l->_fw) newi = countFwSide(*l, c); // Forward side
 		else       newi = countBwSide(*l, c); // Backward side
@@ -2936,14 +2963,14 @@ template<typename TStr>
 void Ebwt<TStr>::restore(TStr& s) const {
 	assert(isInMemory());
 	resize(s, this->_eh._len, Exact());
-	uint32_t jumps = 0;
-	uint32_t i = this->_eh._len; // should point to final SA elt (starting with '$')
+	TIndexOffU jumps = 0;
+	TIndexOffU i = this->_eh._len; // should point to final SA elt (starting with '$')
 	SideLocus l(i, this->_eh, this->_ebwt);
 	while(i != _zOff) {
 		assert_lt(jumps, this->_eh._len);
 		//if(_verbose) cout << "restore: i: " << i << endl;
 		// Not a marked row; go back a char in the original string
-		uint32_t newi = mapLF(l);
+		TIndexOffU newi = mapLF(l);
 		assert_neq(newi, i);
 		s[this->_eh._len - jumps - 1] = rowL(l);
 		i = newi;
@@ -2963,7 +2990,7 @@ void Ebwt<TStr>::checkOrigs(const vector<String<Dna5> >& os,
 {
 	TStr rest;
 	restore(rest);
-	uint32_t restOff = 0;
+	TIndexOffU restOff = 0;
 	size_t i = 0, j = 0;
 	if(mirror) {
 		// TODO: FIXME
@@ -3037,23 +3064,6 @@ void Ebwt<TStr>::readIntoMemory(
 			cerr << "  About to open input files: ";
 			logTime(cerr);
 		}
-#ifdef BOWTIE_MM
-		// Initialize our primary and secondary input-stream fields
-		if(_in1 != -1) close(_in1);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in1Str << "\"" << endl;
-		}
-		if((_in1 = open(_in1Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in1Str << endl;
-		}
-		if(_in2 != -1) close(_in2);
-		if(_verbose || startVerbose) {
-			cerr << "Opening \"" << _in2Str << "\"" << endl;
-		}
-		if((_in2 = open(_in2Str.c_str(), O_RDONLY)) < 0) {
-			cerr << "Could not open index file " << _in2Str << endl;
-		}
-#else
 		// Initialize our primary and secondary input-stream fields
 		if(_in1 != NULL) fclose(_in1);
 		if(_verbose || startVerbose) cerr << "Opening \"" << _in1Str << "\"" << endl;
@@ -3065,7 +3075,7 @@ void Ebwt<TStr>::readIntoMemory(
 		if((_in2 = fopen(_in2Str.c_str(), "rb")) == NULL) {
 			cerr << "Could not open index file " << _in2Str << endl;
 		}
-#endif
+
 		if(_verbose || startVerbose) {
 			cerr << "  Finished opening input files: ";
 			logTime(cerr);
@@ -3074,7 +3084,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		if(_useMm /*&& !justHeader*/) {
 			const char *names[] = {_in1Str.c_str(), _in2Str.c_str()};
-			int fds[] = { _in1, _in2 };
+			int fds[] = { fileno(_in1), fileno(_in2) };
 			for(int i = 0; i < 2; i++) {
 				if(_verbose || startVerbose) {
 					cerr << "  Memory-mapping input file " << (i+1) << ": ";
@@ -3126,14 +3136,14 @@ void Ebwt<TStr>::readIntoMemory(
 	}
 
 	// Read endianness hints from both streams
-	size_t bytesRead = 0;
+	uint64_t bytesRead = 0;
 	switchEndian = false;
-	uint32_t one = readU32(_in1, switchEndian); // 1st word of primary stream
+	uint32_t one = readU<uint32_t>(_in1, switchEndian); // 1st word of primary stream
 	bytesRead += 4;
 	#ifndef NDEBUG
-	assert_eq(one, readU32(_in2, switchEndian)); // should match!
+	assert_eq(one, readU<uint32_t>(_in2, switchEndian)); // should match!
 	#else
-	readU32(_in2, switchEndian);
+	readU<uint32_t>(_in2, switchEndian);
 	#endif
 	if(one != 1) {
 		assert_eq((1u<<24), one);
@@ -3151,23 +3161,23 @@ void Ebwt<TStr>::readIntoMemory(
 	}
 
 	// Reads header entries one by one from primary stream
-	uint32_t len          = readU32(_in1, switchEndian);
+	TIndexOffU len          = readU<TIndexOffU>(_in1, switchEndian);
+	bytesRead += OFF_SIZE;
+	int32_t  lineRate     = readI<int32_t>(_in1, switchEndian);
 	bytesRead += 4;
-	int32_t  lineRate     = readI32(_in1, switchEndian);
+	int32_t  linesPerSide = readI<int32_t>(_in1, switchEndian);
 	bytesRead += 4;
-	int32_t  linesPerSide = readI32(_in1, switchEndian);
-	bytesRead += 4;
-	int32_t  offRate      = readI32(_in1, switchEndian);
+	int32_t  offRate      = readI<int32_t>(_in1, switchEndian);
 	bytesRead += 4;
 	// TODO: add isaRate to the actual file format (right now, the
 	// user has to tell us whether there's an ISA sample and what the
 	// sampling rate is.
 	int32_t  isaRate      = _overrideIsaRate;
-	int32_t  ftabChars    = readI32(_in1, switchEndian);
+	int32_t  ftabChars    = readI<int32_t>(_in1, switchEndian);
 	bytesRead += 4;
 	// chunkRate was deprecated in an earlier version of Bowtie; now
 	// we use it to hold flags.
-	int32_t flags = readI32(_in1, switchEndian);
+	int32_t flags = readI<int32_t>(_in1, switchEndian);
 	bool entireRev = false;
 	if(flags < 0 && (((-flags) & EBWT_COLOR) != 0)) {
 		if(color != -1 && !color) {
@@ -3210,29 +3220,30 @@ void Ebwt<TStr>::readIntoMemory(
 	}
 
 	// Set up overridden suffix-array-sample parameters
-	uint32_t offsLen = eh->_offsLen;
-	uint32_t offRateDiff = 0;
-	uint32_t offsLenSampled = offsLen;
+	TIndexOffU offsLen = eh->_offsLen;
+	uint64_t offsSz = eh->_offsSz;
+	TIndexOffU offRateDiff = 0;
+	TIndexOffU offsLenSampled = offsLen;
 	if(_overrideOffRate > offRate) {
 		offRateDiff = _overrideOffRate - offRate;
 	}
 	if(offRateDiff > 0) {
 		offsLenSampled >>= offRateDiff;
-		if((offsLen & ~(0xffffffff << offRateDiff)) != 0) {
+		if((offsLen & ~(OFF_MASK << offRateDiff)) != 0) {
 			offsLenSampled++;
 		}
 	}
 
 	// Set up overridden inverted-suffix-array-sample parameters
-	uint32_t isaLen = eh->_isaLen;
-	uint32_t isaRateDiff = 0;
-	uint32_t isaLenSampled = isaLen;
+	TIndexOffU isaLen = eh->_isaLen;
+	TIndexOffU isaRateDiff = 0;
+	TIndexOffU isaLenSampled = isaLen;
 	if(_overrideIsaRate > isaRate) {
 		isaRateDiff = _overrideIsaRate - isaRate;
 	}
 	if(isaRateDiff > 0) {
 		isaLenSampled >>= isaRateDiff;
-		if((isaLen & ~(0xffffffff << isaRateDiff)) != 0) {
+		if((isaLen & ~(OFF_MASK << isaRateDiff)) != 0) {
 			isaLenSampled++;
 		}
 	}
@@ -3246,8 +3257,8 @@ void Ebwt<TStr>::readIntoMemory(
 	}
 
 	// Read nPat from primary stream
-	this->_nPat = readI32(_in1, switchEndian);
-	bytesRead += 4;
+	this->_nPat = readI<TIndexOffU>(_in1, switchEndian);
+	bytesRead += OFF_SIZE;
 	if(this->_plen != NULL && !_useMm) {
 		// Delete it so that we can re-read it
 		delete[] this->_plen;
@@ -3257,9 +3268,9 @@ void Ebwt<TStr>::readIntoMemory(
 	// Read plen from primary stream
 	if(_useMm) {
 #ifdef BOWTIE_MM
-		this->_plen = (uint32_t*)(mmFile[0] + bytesRead);
-		bytesRead += this->_nPat*4;
-		lseek(_in1, this->_nPat*4, SEEK_CUR);
+		this->_plen = (TIndexOffU*)(mmFile[0] + bytesRead);
+		bytesRead += this->_nPat*OFF_SIZE;
+		fseeko(_in1, this->_nPat*OFF_SIZE, SEEK_CUR);
 #endif
 	} else {
 		try {
@@ -3267,15 +3278,15 @@ void Ebwt<TStr>::readIntoMemory(
 				cerr << "Reading plen (" << this->_nPat << "): ";
 				logTime(cerr);
 			}
-			this->_plen = new uint32_t[this->_nPat];
+			this->_plen = new TIndexOffU[this->_nPat];
 			if(switchEndian) {
-				for(uint32_t i = 0; i < this->_nPat; i++) {
-					this->_plen[i] = readU32(_in1, switchEndian);
+				for(TIndexOffU i = 0; i < this->_nPat; i++) {
+					this->_plen[i] = readU<TIndexOffU>(_in1, switchEndian);
 				}
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void*)this->_plen, this->_nPat*4);
-				if(r != (MM_READ_RET)(this->_nPat*4)) {
-					cerr << "Error reading _plen[] array: " << r << ", " << (this->_nPat*4) << endl;
+				size_t r = MM_READ(_in1, (void*)this->_plen, this->_nPat*OFF_SIZE);
+				if(r != (size_t)(this->_nPat*OFF_SIZE)) {
+					cerr << "Error reading _plen[] array: " << r << ", " << (this->_nPat*OFF_SIZE) << endl;
 					throw 1;
 				}
 			}
@@ -3294,8 +3305,8 @@ void Ebwt<TStr>::readIntoMemory(
 	// (i.e. everything up to and including join()).
 	if(justHeader) goto done;
 
-	this->_nFrag = readU32(_in1, switchEndian);
-	bytesRead += 4;
+	this->_nFrag = readU<TIndexOffU>(_in1, switchEndian);
+	bytesRead += OFF_SIZE;
 	if(_verbose || startVerbose) {
 		cerr << "Reading rstarts (" << this->_nFrag*3 << "): ";
 		logTime(cerr);
@@ -3303,24 +3314,24 @@ void Ebwt<TStr>::readIntoMemory(
 	assert_geq(this->_nFrag, this->_nPat);
 	if(_useMm) {
 #ifdef BOWTIE_MM
-		this->_rstarts = (uint32_t*)(mmFile[0] + bytesRead);
-		bytesRead += this->_nFrag*4*3;
-		lseek(_in1, this->_nFrag*4*3, SEEK_CUR);
+		this->_rstarts = (TIndexOffU*)(mmFile[0] + bytesRead);
+		bytesRead += this->_nFrag*OFF_SIZE*3;
+		fseeko(_in1, this->_nFrag*OFF_SIZE*3, SEEK_CUR);
 #endif
 	} else {
-		this->_rstarts = new uint32_t[this->_nFrag*3];
+		this->_rstarts = new TIndexOffU[this->_nFrag*3];
 		if(switchEndian) {
-			for(uint32_t i = 0; i < this->_nFrag*3; i += 3) {
+			for(TIndexOffU i = 0; i < this->_nFrag*3; i += 3) {
 				// fragment starting position in joined reference
 				// string, text id, and fragment offset within text
-				this->_rstarts[i]   = readU32(_in1, switchEndian);
-				this->_rstarts[i+1] = readU32(_in1, switchEndian);
-				this->_rstarts[i+2] = readU32(_in1, switchEndian);
+				this->_rstarts[i]   = readU<TIndexOffU>(_in1, switchEndian);
+				this->_rstarts[i+1] = readU<TIndexOffU>(_in1, switchEndian);
+				this->_rstarts[i+2] = readU<TIndexOffU>(_in1, switchEndian);
 			}
 		} else {
-			MM_READ_RET r = MM_READ(_in1, (void *)this->_rstarts, this->_nFrag*4*3);
-			if(r != (MM_READ_RET)(this->_nFrag*4*3)) {
-				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*4*3) << endl;
+			size_t r = MM_READ(_in1, (void *)this->_rstarts, this->_nFrag*OFF_SIZE*3);
+			if(r != (size_t)(this->_nFrag*OFF_SIZE*3)) {
+				cerr << "Error reading _rstarts[] array: " << r << ", " << (this->_nFrag*OFF_SIZE*3) << endl;
 				throw 1;
 			}
 		}
@@ -3330,7 +3341,7 @@ void Ebwt<TStr>::readIntoMemory(
 #ifdef BOWTIE_MM
 		this->_ebwt = (uint8_t*)(mmFile[0] + bytesRead);
 		bytesRead += eh->_ebwtTotLen;
-		lseek(_in1, eh->_ebwtTotLen, SEEK_CUR);
+		fseeko(_in1, eh->_ebwtTotLen, SEEK_CUR);
 #endif
 	} else {
 		// Allocate ebwt (big allocation)
@@ -3357,36 +3368,43 @@ void Ebwt<TStr>::readIntoMemory(
 		}
 		if(shmemLeader) {
 			// Read ebwt from primary stream
-			MM_READ_RET r = MM_READ(_in1, (void *)this->_ebwt, eh->_ebwtTotLen);
-			if(r != (MM_READ_RET)eh->_ebwtTotLen) {
-				cerr << "Error reading ebwt array: returned " << r << ", length was " << (eh->_ebwtTotLen) << endl
-				     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
-				     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
-				     << "XYZ.4.ebwt, XYZ.rev.1.ebwt, and XYZ.rev.2.ebwt.  The XYZ.1.ebwt and " << endl
-				     << "XYZ.rev.1.ebwt files should have the same size, as should the XYZ.2.ebwt and" << endl
-				     << "XYZ.rev.2.ebwt files." << endl;
-				throw 1;
+			uint64_t bytesLeft = eh->_ebwtTotLen;
+			char *pebwt = (char*)this->ebwt();
+
+			while (bytesLeft>0){
+				size_t r = MM_READ(_in1, (void *)pebwt, bytesLeft);
+				if(MM_IS_IO_ERR(_in1,r,bytesLeft)) {
+					cerr << "Error reading ebwt array: returned " << r << ", length was " << (eh->_ebwtTotLen) << endl
+					     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
+					     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
+					     << "XYZ.4.ebwt, XYZ.rev.1.ebwt, and XYZ.rev.2.ebwt.  The XYZ.1.ebwt and " << endl
+					     << "XYZ.rev.1.ebwt files should have the same size, as should the XYZ.2.ebwt and" << endl
+					     << "XYZ.rev.2.ebwt files." << endl;
+					throw 1;
+				}
+				pebwt += r;
+				bytesLeft -= r;
 			}
 			if(switchEndian) {
 				uint8_t *side = this->_ebwt;
 				for(size_t i = 0; i < eh->_numSides; i++) {
-					uint32_t *cums = reinterpret_cast<uint32_t*>(side + eh->_sideSz - 8);
-					cums[0] = endianSwapU32(cums[0]);
-					cums[1] = endianSwapU32(cums[1]);
+					TIndexOffU *cums = reinterpret_cast<TIndexOffU*>(side + eh->_sideSz - 2*OFF_SIZE);
+					cums[0] = endianSwapU(cums[0]);
+					cums[1] = endianSwapU(cums[1]);
 					side += this->_eh._sideSz;
 				}
 			}
 			if(useShmem_) NOTIFY_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		} else {
 			// Seek past the data and wait until master is finished
-			MM_SEEK(_in1, eh->_ebwtTotLen, SEEK_CUR);
+			fseeko(_in1, eh->_ebwtTotLen, SEEK_CUR);
 			if(useShmem_) WAIT_SHARED(this->_ebwt, eh->_ebwtTotLen);
 		}
 	}
 
 	// Read zOff from primary stream
-	_zOff = readU32(_in1, switchEndian);
-	bytesRead += 4;
+	_zOff = readU<TIndexOffU>(_in1, switchEndian);
+	bytesRead += OFF_SIZE;
 	assert_lt(_zOff, len);
 
 	try {
@@ -3394,14 +3412,14 @@ void Ebwt<TStr>::readIntoMemory(
 		if(_verbose || startVerbose) cerr << "Reading fchr (5)" << endl;
 		if(_useMm) {
 #ifdef BOWTIE_MM
-			this->_fchr = (uint32_t*)(mmFile[0] + bytesRead);
-			bytesRead += 5*4;
-			lseek(_in1, 5*4, SEEK_CUR);
+			this->_fchr = (TIndexOffU*)(mmFile[0] + bytesRead);
+			bytesRead += 5*OFF_SIZE;
+			fseeko(_in1, 5*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
-			this->_fchr = new uint32_t[5];
+			this->_fchr = new TIndexOffU[5];
 			for(int i = 0; i < 5; i++) {
-				this->_fchr[i] = readU32(_in1, switchEndian);
+				this->_fchr[i] = readU<TIndexOffU>(_in1, switchEndian);
 				assert_leq(this->_fchr[i], len);
 				if(i > 0) assert_geq(this->_fchr[i], this->_fchr[i-1]);
 			}
@@ -3414,19 +3432,19 @@ void Ebwt<TStr>::readIntoMemory(
 		}
 		if(_useMm) {
 #ifdef BOWTIE_MM
-			this->_ftab = (uint32_t*)(mmFile[0] + bytesRead);
-			bytesRead += eh->_ftabLen*4;
-			lseek(_in1, eh->_ftabLen*4, SEEK_CUR);
+			this->_ftab = (TIndexOffU*)(mmFile[0] + bytesRead);
+			bytesRead += eh->_ftabLen*OFF_SIZE;
+			fseeko(_in1, eh->_ftabLen*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
-			this->_ftab = new uint32_t[eh->_ftabLen];
+			this->_ftab = new TIndexOffU[eh->_ftabLen];
 			if(switchEndian) {
-				for(uint32_t i = 0; i < eh->_ftabLen; i++)
-					this->_ftab[i] = readU32(_in1, switchEndian);
+				for(TIndexOffU i = 0; i < eh->_ftabLen; i++)
+					this->_ftab[i] = readU<TIndexOffU>(_in1, switchEndian);
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void *)this->_ftab, eh->_ftabLen*4);
-				if(r != (MM_READ_RET)(eh->_ftabLen*4)) {
-					cerr << "Error reading _ftab[] array: " << r << ", " << (eh->_ftabLen*4) << endl;
+				size_t r = MM_READ(_in1, (void *)this->_ftab, eh->_ftabLen*OFF_SIZE);
+				if(r != (size_t)(eh->_ftabLen*OFF_SIZE)) {
+					cerr << "Error reading _ftab[] array: " << r << ", " << (eh->_ftabLen*OFF_SIZE) << endl;
 					throw 1;
 				}
 			}
@@ -3438,24 +3456,24 @@ void Ebwt<TStr>::readIntoMemory(
 		}
 		if(_useMm) {
 #ifdef BOWTIE_MM
-			this->_eftab = (uint32_t*)(mmFile[0] + bytesRead);
-			bytesRead += eh->_eftabLen*4;
-			lseek(_in1, eh->_eftabLen*4, SEEK_CUR);
+			this->_eftab = (TIndexOffU*)(mmFile[0] + bytesRead);
+			bytesRead += eh->_eftabLen*OFF_SIZE;
+			fseeko(_in1, eh->_eftabLen*OFF_SIZE, SEEK_CUR);
 #endif
 		} else {
-			this->_eftab = new uint32_t[eh->_eftabLen];
+			this->_eftab = new TIndexOffU[eh->_eftabLen];
 			if(switchEndian) {
-				for(uint32_t i = 0; i < eh->_eftabLen; i++)
-					this->_eftab[i] = readU32(_in1, switchEndian);
+				for(TIndexOffU i = 0; i < eh->_eftabLen; i++)
+					this->_eftab[i] = readU<TIndexOffU>(_in1, switchEndian);
 			} else {
-				MM_READ_RET r = MM_READ(_in1, (void *)this->_eftab, eh->_eftabLen*4);
-				if(r != (MM_READ_RET)(eh->_eftabLen*4)) {
-					cerr << "Error reading _eftab[] array: " << r << ", " << (eh->_eftabLen*4) << endl;
+				size_t r = MM_READ(_in1, (void *)this->_eftab, eh->_eftabLen*OFF_SIZE);
+				if(r != (size_t)(eh->_eftabLen*OFF_SIZE)) {
+					cerr << "Error reading _eftab[] array: " << r << ", " << (eh->_eftabLen*OFF_SIZE) << endl;
 					throw 1;
 				}
 			}
 		}
-		for(uint32_t i = 0; i < eh->_eftabLen; i++) {
+		for(TIndexOffU i = 0; i < eh->_eftabLen; i++) {
 			if(i > 0 && this->_eftab[i] > 0) {
 				assert_geq(this->_eftab[i], this->_eftab[i-1]);
 			} else if(i > 0 && this->_eftab[i-1] == 0) {
@@ -3473,7 +3491,7 @@ void Ebwt<TStr>::readIntoMemory(
 	if(loadNames) {
 		while(true) {
 			char c = '\0';
-			if(MM_READ(_in1, (void *)(&c), (size_t)1) != (MM_READ_RET)1) break;
+			if(MM_READ(_in1, (void *)(&c), (size_t)1) != (size_t)1) break;
 			bytesRead++;
 			if(c == '\0') break;
 			else if(c == '\n') {
@@ -3498,15 +3516,15 @@ void Ebwt<TStr>::readIntoMemory(
 		if(!useShmem_) {
 			// Allocate offs_
 			try {
-				this->_offs = new uint32_t[offsLenSampled];
+				this->_offs = new TIndexOffU[offsLenSampled];
 			} catch(bad_alloc& e) {
 				cerr << "Out of memory allocating the offs[] array  for the Bowtie index." << endl
 					 << "Please try again on a computer with more memory." << endl;
 				throw 1;
 			}
 		} else {
-			shmemLeader = ALLOC_SHARED_U32(
-				(_in2Str + "[offs]"), offsLenSampled*4, &this->_offs,
+			shmemLeader = ALLOC_SHARED_U(
+				(_in2Str + "[offs]"), offsLenSampled*OFF_SIZE, &this->_offs,
 				"offs", (_verbose || startVerbose));
 		}
 	}
@@ -3516,14 +3534,14 @@ void Ebwt<TStr>::readIntoMemory(
 			// Allocate offs (big allocation)
 			if(switchEndian || offRateDiff > 0) {
 				assert(!_useMm);
-				const uint32_t blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
-				const uint32_t blockMaxSzU32 = (blockMaxSz >> 2); // # U32s per block
+				const TIndexOffU blockMaxSz = (2 * 1024 * 1024); // 2 MB block size
+				const TIndexOffU blockMaxSzU = (blockMaxSz >> (OFF_SIZE/4 +1)); // # U32s per block
 				char *buf = new char[blockMaxSz];
-				for(uint32_t i = 0; i < offsLen; i += blockMaxSzU32) {
-					uint32_t block = min<uint32_t>(blockMaxSzU32, offsLen - i);
-					MM_READ_RET r = MM_READ(_in2, (void *)buf, block << 2);
-					if(r != (MM_READ_RET)(block << 2)) {
-						cerr << "Error reading block of offs array: " << r << ", " << (block << 2) << endl
+				for(TIndexOffU i = 0; i < offsLen; i += blockMaxSzU) {
+					TIndexOffU block = min<TIndexOffU>(blockMaxSzU, offsLen - i);
+					size_t r = MM_READ(_in2, (void *)buf, block << (OFF_SIZE/4 + 1));
+					if(r != (size_t)(block << (OFF_SIZE/4 + 1))) {
+						cerr << "Error reading block of offs array: " << r << ", " << (block << (OFF_SIZE/4 + 1)) << endl
 						     << "Your index files may be corrupt; please try re-building or re-downloading." << endl
 						     << "A complete index consists of 6 files: XYZ.1.ebwt, XYZ.2.ebwt, XYZ.3.ebwt," << endl
 						     << "XYZ.4.ebwt, XYZ.rev.1.ebwt, and XYZ.rev.2.ebwt.  The XYZ.1.ebwt and " << endl
@@ -3531,12 +3549,12 @@ void Ebwt<TStr>::readIntoMemory(
 						     << "XYZ.rev.2.ebwt files." << endl;
 						throw 1;
 					}
-					uint32_t idx = i >> offRateDiff;
-					for(uint32_t j = 0; j < block; j += (1 << offRateDiff)) {
+					TIndexOffU idx = i >> offRateDiff;
+					for(TIndexOffU j = 0; j < block; j += (1 << offRateDiff)) {
 						assert_lt(idx, offsLenSampled);
-						this->_offs[idx] = ((uint32_t*)buf)[j];
+						this->_offs[idx] = ((TIndexOffU*)buf)[j];
 						if(switchEndian) {
-							this->_offs[idx] = endianSwapU32(this->_offs[idx]);
+							this->_offs[idx] = endianSwapU(this->_offs[idx]);
 						}
 						idx++;
 					}
@@ -3545,52 +3563,47 @@ void Ebwt<TStr>::readIntoMemory(
 			} else {
 				if(_useMm) {
 #ifdef BOWTIE_MM
-					this->_offs = (uint32_t*)(mmFile[1] + bytesRead);
-					bytesRead += (offsLen << 2);
-					lseek(_in2, (offsLen << 2), SEEK_CUR);
+					this->_offs = (TIndexOffU*)(mmFile[1] + bytesRead);
+					bytesRead += offsSz;
+					// Argument to lseek can be 64 bits if compiled with
+					// _FILE_OFFSET_BITS
+					fseeko(_in2, offsSz, SEEK_CUR);
 #endif
 				} else {
 					// If any of the high two bits are set
-					if((offsLen & 0xf0000000) != 0) {
-						if(sizeof(char *) <= 4) {
-							cerr << "Sanity error: sizeof(char *) <= 4 but offsLen is " << hex << offsLen << endl;
+					// Workaround for small-index mode where MM_READ may
+					// not be able to handle read amounts greater than 2^32
+					// bytes.
+					uint64_t bytesLeft = offsSz;
+					char *offs = (char *)this->offs();
+
+					while(bytesLeft > 0) {
+						size_t r = MM_READ(_in2, (void*)offs, bytesLeft);
+						if(MM_IS_IO_ERR(_in2,r,bytesLeft)) {
+							cerr << "Error reading block of _offs[] array: "
+							     << r << ", " << bytesLeft << gLastIOErrMsg << endl;
 							throw 1;
 						}
-						// offsLen << 4 overflows sometimes, so do it in four reads
-						char *offs = (char *)this->_offs;
-						for(int i = 0; i < 16; i++) {
-							MM_READ_RET r = MM_READ(_in2, (void*)offs, offsLen >> 2);
-							if(r != (MM_READ_RET)(offsLen >> 2)) {
-								cerr << "Error reading block of _offs[] array: " << r << ", " << (offsLen >> 2) << endl;
-								throw 1;
-							}
-							offs += (offsLen >> 2);
-						}
-					} else {
-						// Do it all in one read
-						MM_READ_RET r = MM_READ(_in2, (void*)this->_offs, offsLen << 2);
-						if(r != (MM_READ_RET)(offsLen << 2)) {
-							cerr << "Error reading _offs[] array: " << r << ", " << (offsLen << 2) << endl;
-							throw 1;
-						}
+						offs += r;
+						bytesLeft -= r;
 					}
 				}
 			}
 
 			{
 				ASSERT_ONLY(Bitset offsSeen(len+1));
-				for(uint32_t i = 0; i < offsLenSampled; i++) {
+				for(TIndexOffU i = 0; i < offsLenSampled; i++) {
 					assert(!offsSeen.test(this->_offs[i]));
 					ASSERT_ONLY(offsSeen.set(this->_offs[i]));
 					assert_leq(this->_offs[i], len);
 				}
 			}
 
-			if(useShmem_) NOTIFY_SHARED(this->_offs, offsLenSampled*4);
+			if(useShmem_) NOTIFY_SHARED(this->_offs, offsLenSampled*OFF_SIZE);
 		} else {
 			// Not the shmem leader
-			MM_SEEK(_in2, offsLenSampled*4, SEEK_CUR);
-			if(useShmem_) WAIT_SHARED(this->_offs, offsLenSampled*4);
+			fseeko(_in2, offsLenSampled*OFF_SIZE, SEEK_CUR);
+			if(useShmem_) WAIT_SHARED(this->_offs, offsLenSampled*OFF_SIZE);
 		}
 	}
 
@@ -3601,7 +3614,7 @@ void Ebwt<TStr>::readIntoMemory(
 	}
 	if(!_useMm) {
 		try {
-			this->_isa = new uint32_t[isaLenSampled];
+			this->_isa = new TIndexOffU[isaLenSampled];
 		} catch(bad_alloc& e) {
 			cerr << "Out of memory allocating the isa[] array  for the Bowtie index." << endl
 				 << "Please try again on a computer with more memory." << endl;
@@ -3611,31 +3624,31 @@ void Ebwt<TStr>::readIntoMemory(
 	// Read _isa[]
 	if(switchEndian || isaRateDiff > 0) {
 		assert(!_useMm);
-		for(uint32_t i = 0; i < isaLen; i++) {
-			if((i & ~(0xffffffff << isaRateDiff)) != 0) {
-				char tmp[4];
-				MM_READ_RET r = MM_READ(_in2, (void *)tmp, 4);
-				if(r != (MM_READ_RET)4) {
+		for(TIndexOffU i = 0; i < isaLen; i++) {
+			if((i & ~(OFF_MASK << isaRateDiff)) != 0) {
+				char tmp[OFF_SIZE];
+				size_t r = MM_READ(_in2, (void *)tmp, OFF_SIZE);
+				if(r != (size_t)OFF_SIZE) {
 					cerr << "Error reading a word of the _isa[] array: " << r << ", 4" << endl;
 					throw 1;
 				}
 			} else {
-				uint32_t idx = i >> isaRateDiff;
+				TIndexOffU idx = i >> isaRateDiff;
 				assert_lt(idx, isaLenSampled);
-				this->_isa[idx] = readU32(_in2, switchEndian);
+				this->_isa[idx] = readU<TIndexOffU>(_in2, switchEndian);
 			}
 		}
 	} else {
 		if(_useMm) {
 #ifdef BOWTIE_MM
-			this->_isa = (uint32_t*)(mmFile[1] + bytesRead);
+			this->_isa = (TIndexOffU*)(mmFile[1] + bytesRead);
 			bytesRead += (isaLen << 2);
-			lseek(_in2, (isaLen << 2), SEEK_CUR);
+			fseeko(_in2, (isaLen << 2), SEEK_CUR);
 #endif
 		} else {
-			MM_READ_RET r = MM_READ(_in2, (void *)this->_isa, isaLen*4);
-			if(r != (MM_READ_RET)(isaLen*4)) {
-				cerr << "Error reading _isa[] array: " << r << ", " << (isaLen*4) << endl;
+			size_t r = MM_READ(_in2, (void *)this->_isa, isaLen*OFF_SIZE);
+			if(r != (size_t)(isaLen*OFF_SIZE)) {
+				cerr << "Error reading _isa[] array: " << r << ", " << (isaLen*OFF_SIZE) << endl;
 				throw 1;
 			}
 		}
@@ -3643,7 +3656,7 @@ void Ebwt<TStr>::readIntoMemory(
 
 	{
 		ASSERT_ONLY(Bitset isasSeen(len+1));
-		for(uint32_t i = 0; i < isaLenSampled; i++) {
+		for(TIndexOffU i = 0; i < isaLenSampled; i++) {
 			assert(!isasSeen.test(this->_isa[i]));
 			ASSERT_ONLY(isasSeen.set(this->_isa[i]));
 			assert_leq(this->_isa[i], len);
@@ -3661,12 +3674,8 @@ void Ebwt<TStr>::readIntoMemory(
 
 	// Be kind
 	if(deleteEh) delete eh;
-#ifdef BOWTIE_MM
-	lseek(_in1, 0, SEEK_SET);
-	lseek(_in2, 0, SEEK_SET);
-#else
-	rewind(_in1); rewind(_in2);
-#endif
+	if (_in1 != NULL) rewind(_in1);
+	if (_in2 != NULL) rewind(_in2);
 }
 
 /**
@@ -3674,28 +3683,28 @@ void Ebwt<TStr>::readIntoMemory(
  * file and store them in 'refnames'.
  */
 static inline void
-readEbwtRefnames(istream& in, vector<string>& refnames) {
+readEbwtRefnames(FILE* fin, vector<string>& refnames) {
 	// _in1 must already be open with the get cursor at the
 	// beginning and no error flags set.
-	assert(in.good());
-	assert_eq((streamoff)in.tellg(), ios::beg);
+	assert(fin != NULL);
+	assert_eq(ftello(fin), 0);
 
 	// Read endianness hints from both streams
 	bool switchEndian = false;
-	uint32_t one = readU32(in, switchEndian); // 1st word of primary stream
+	uint32_t one = readU<uint32_t>(fin, switchEndian); // 1st word of primary stream
 	if(one != 1) {
 		assert_eq((1u<<24), one);
 		switchEndian = true;
 	}
 
 	// Reads header entries one by one from primary stream
-	uint32_t len          = readU32(in, switchEndian);
-	int32_t  lineRate     = readI32(in, switchEndian);
-	int32_t  linesPerSide = readI32(in, switchEndian);
-	int32_t  offRate      = readI32(in, switchEndian);
-	int32_t  ftabChars    = readI32(in, switchEndian);
+	TIndexOffU len          = readU<TIndexOffU>(fin, switchEndian);
+	int32_t  lineRate     = readI<int32_t>(fin, switchEndian);
+	int32_t  linesPerSide = readI<int32_t>(fin, switchEndian);
+	int32_t  offRate      = readI<int32_t>(fin, switchEndian);
+	int32_t  ftabChars    = readI<int32_t>(fin, switchEndian);
 	// BTL: chunkRate is now deprecated
-	int32_t flags = readI32(in, switchEndian);
+	int32_t flags = readI<int32_t>(fin, switchEndian);
 	bool color = false;
 	bool entireReverse = false;
 	if(flags < 0) {
@@ -3706,33 +3715,35 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	// Create a new EbwtParams from the entries read from primary stream
 	EbwtParams eh(len, lineRate, linesPerSide, offRate, -1, ftabChars, color, entireReverse);
 
-	uint32_t nPat = readI32(in, switchEndian); // nPat
-	in.seekg(nPat*4, ios_base::cur); // skip plen
+	TIndexOffU nPat = readI<TIndexOffU>(fin, switchEndian); // nPat
+	fseeko(fin, nPat*OFF_SIZE, SEEK_CUR);
 
 	// Skip rstarts
-	uint32_t nFrag = readU32(in, switchEndian);
-	in.seekg(nFrag*4*3, ios_base::cur);
+	TIndexOffU nFrag = readU<TIndexOffU>(fin, switchEndian);
+	fseeko(fin, nFrag*OFF_SIZE*3, SEEK_CUR);
 
 	// Skip ebwt
-	in.seekg(eh._ebwtTotLen, ios_base::cur);
+	fseeko(fin, eh._ebwtTotLen, SEEK_CUR);
 
 	// Skip zOff from primary stream
-	readU32(in, switchEndian);
+	readU<TIndexOffU>(fin, switchEndian);
 
 	// Skip fchr
-	in.seekg(5 * 4, ios_base::cur);
+	fseeko(fin, 5 * OFF_SIZE, SEEK_CUR);
 
 	// Skip ftab
-	in.seekg(eh._ftabLen*4, ios_base::cur);
+	fseeko(fin, eh._ftabLen*OFF_SIZE, SEEK_CUR);
 
 	// Skip eftab
-	in.seekg(eh._eftabLen*4, ios_base::cur);
+	fseeko(fin, eh._eftabLen*OFF_SIZE, SEEK_CUR);
 
 	// Read reference sequence names from primary index file
 	while(true) {
 		char c = '\0';
-		in.read(&c, 1);
-		if(in.eof()) break;
+		int read_value = 0;
+        read_value = fgetc(fin);
+		if(read_value == EOF) break;
+        c = read_value;
 		if(c == '\0') break;
 		else if(c == '\n') {
 			refnames.push_back("");
@@ -3748,8 +3759,8 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
 	}
 
 	// Be kind
-	in.clear(); in.seekg(0, ios::beg);
-	assert(in.good());
+    fseeko(fin, 0, SEEK_SET);
+	assert(ferror(fin) == 0);
 }
 
 /**
@@ -3758,16 +3769,15 @@ readEbwtRefnames(istream& in, vector<string>& refnames) {
  */
 static inline void
 readEbwtRefnames(const string& instr, vector<string>& refnames) {
-	ifstream in;
+    FILE* fin;
 	// Initialize our primary and secondary input-stream fields
-	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
-	if(!in.is_open()) {
+    fin = fopen((instr + ".1." + gEbwt_ext).c_str(),"rb");
+	if(fin == NULL) {
 		throw EbwtFileOpenException("Cannot open file " + instr);
 	}
-	assert(in.is_open());
-	assert(in.good());
-	assert_eq((streamoff)in.tellg(), ios::beg);
-	readEbwtRefnames(in, refnames);
+	assert_eq(ftello(fin), 0);
+	readEbwtRefnames(fin, refnames);
+    fclose(fin);
 }
 
 /**
@@ -3776,25 +3786,25 @@ readEbwtRefnames(const string& instr, vector<string>& refnames) {
 static inline int32_t readFlags(const string& instr) {
 	ifstream in;
 	// Initialize our primary and secondary input-stream fields
-	in.open((instr + ".1.ebwt").c_str(), ios_base::in | ios::binary);
+	in.open((instr + ".1." + gEbwt_ext).c_str(), ios_base::in | ios::binary);
 	if(!in.is_open()) {
 		throw EbwtFileOpenException("Cannot open file " + instr);
 	}
 	assert(in.is_open());
 	assert(in.good());
 	bool switchEndian = false;
-	uint32_t one = readU32(in, switchEndian); // 1st word of primary stream
+	uint32_t one = readU<uint32_t>(in, switchEndian); // 1st word of primary stream
 	if(one != 1) {
 		assert_eq((1u<<24), one);
 		assert_eq(1, endianSwapU32(one));
 		switchEndian = true;
 	}
-	readU32(in, switchEndian);
-	readI32(in, switchEndian);
-	readI32(in, switchEndian);
-	readI32(in, switchEndian);
-	readI32(in, switchEndian);
-	int32_t flags = readI32(in, switchEndian);
+	readU<TIndexOffU>(in, switchEndian);
+	readI<int32_t>(in, switchEndian);
+	readI<int32_t>(in, switchEndian);
+	readI<int32_t>(in, switchEndian);
+	readI<int32_t>(in, switchEndian);
+	int32_t flags = readI<int32_t>(in, switchEndian);
 	return flags;
 }
 
@@ -3848,30 +3858,30 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	// When building an Ebwt, these header parameters are known
 	// "up-front", i.e., they can be written to disk immediately,
 	// before we join() or buildToDisk()
-	writeI32(out1, 1, be); // endian hint for priamry stream
-	writeI32(out2, 1, be); // endian hint for secondary stream
-	writeU32(out1, eh._len,          be); // length of string (and bwt and suffix array)
-	writeI32(out1, eh._lineRate,     be); // 2^lineRate = size in bytes of 1 line
-	writeI32(out1, eh._linesPerSide, be); // not used
-	writeI32(out1, eh._offRate,      be); // every 2^offRate chars is "marked"
-	writeI32(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
+	writeI<int32_t>(out1, 1, be); // endian hint for priamry stream
+	writeI<int32_t>(out2, 1, be); // endian hint for secondary stream
+	writeU<TIndexOffU>(out1, eh._len,          be); // length of string (and bwt and suffix array)
+	writeI<int32_t>(out1, eh._lineRate,     be); // 2^lineRate = size in bytes of 1 line
+	writeI<int32_t>(out1, eh._linesPerSide, be); // not used
+	writeI<int32_t>(out1, eh._offRate,      be); // every 2^offRate chars is "marked"
+	writeI<int32_t>(out1, eh._ftabChars,    be); // number of 2-bit chars used to address ftab
 	int32_t flags = 1;
 	if(eh._color) flags |= EBWT_COLOR;
 	if(eh._entireReverse) flags |= EBWT_ENTIRE_REV;
-	writeI32(out1, -flags, be); // BTL: chunkRate is now deprecated
+	writeI<int32_t>(out1, -flags, be); // BTL: chunkRate is now deprecated
 
 	if(!justHeader) {
 		assert(isInMemory());
 		// These Ebwt parameters are known after the inputs strings have
 		// been joined() but before they have been built().  These can
 		// written to the disk next and then discarded from memory.
-		writeU32(out1, this->_nPat,      be);
-		for(uint32_t i = 0; i < this->_nPat; i++)
-		writeU32(out1, this->_plen[i], be);
+		writeU<TIndexOffU>(out1, this->_nPat,      be);
+		for(TIndexOffU i = 0; i < this->_nPat; i++)
+			writeU<TIndexOffU>(out1, this->_plen[i], be);
 		assert_geq(this->_nFrag, this->_nPat);
-		writeU32(out1, this->_nFrag, be);
-		for(uint32_t i = 0; i < this->_nFrag*3; i++)
-			writeU32(out1, this->_rstarts[i], be);
+		writeU<TIndexOffU>(out1, this->_nFrag, be);
+		for(TIndexOffU i = 0; i < this->_nFrag*3; i++)
+			writeU<TIndexOffU>(out1, this->_rstarts[i], be);
 
 		// These Ebwt parameters are discovered only as the Ebwt is being
 		// built (in buildToDisk()).  Of these, only 'offs' and 'ebwt' are
@@ -3879,24 +3889,24 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 		// discarded from memory as it is built; 'offs' is similarly
 		// written to the secondary file and discarded.
 		out1.write((const char *)this->ebwt(), eh._ebwtTotLen);
-		writeU32(out1, this->zOff(), be);
-		uint32_t offsLen = eh._offsLen;
-		for(uint32_t i = 0; i < offsLen; i++)
-			writeU32(out2, this->_offs[i], be);
+		writeU<TIndexOffU>(out1, this->zOff(), be);
+		TIndexOffU offsLen = eh._offsLen;
+		for(TIndexOffU i = 0; i < offsLen; i++)
+			writeU<TIndexOffU>(out2, this->_offs[i], be);
 		uint32_t isaLen = eh._isaLen;
-		for(uint32_t i = 0; i < isaLen; i++)
-			writeU32(out2, this->_isa[i], be);
+		for(TIndexOffU i = 0; i < isaLen; i++)
+			writeU<TIndexOffU>(out2, this->_isa[i], be);
 
 		// 'fchr', 'ftab' and 'eftab' are not fully determined until the
 		// loop is finished, so they are written to the primary file after
 		// all of 'ebwt' has already been written and only then discarded
 		// from memory.
 		for(int i = 0; i < 5; i++)
-			writeU32(out1, this->_fchr[i], be);
-		for(uint32_t i = 0; i < eh._ftabLen; i++)
-			writeU32(out1, this->ftab()[i], be);
-		for(uint32_t i = 0; i < eh._eftabLen; i++)
-			writeU32(out1, this->eftab()[i], be);
+			writeU<TIndexOffU>(out1, this->_fchr[i], be);
+		for(TIndexOffU i = 0; i < eh._ftabLen; i++)
+			writeU<TIndexOffU>(out1, this->ftab()[i], be);
+		for(TIndexOffU i = 0; i < eh._eftabLen; i++)
+			writeU<TIndexOffU>(out1, this->eftab()[i], be);
 	}
 }
 
@@ -3943,23 +3953,23 @@ void Ebwt<TStr>::writeFromMemory(bool justHeader,
 	    assert_eq(_zEbwtBpOff,       copy.zEbwtBpOff());
 	    assert_eq(_zEbwtByteOff,     copy.zEbwtByteOff());
 		assert_eq(_nPat,             copy.nPat());
-		for(uint32_t i = 0; i < _nPat; i++)
+		for(TIndexOffU i = 0; i < _nPat; i++)
 			assert_eq(this->_plen[i], copy.plen()[i]);
 		assert_eq(this->_nFrag, copy.nFrag());
-		for(uint32_t i = 0; i < this->nFrag*3; i++) {
+		for(TIndexOffU i = 0; i < this->nFrag*3; i++) {
 			assert_eq(this->_rstarts[i], copy.rstarts()[i]);
 		}
 		for(uint32_t i = 0; i < 5; i++)
 			assert_eq(this->_fchr[i], copy.fchr()[i]);
-		for(uint32_t i = 0; i < eh._ftabLen; i++)
+		for(TIndexOffU i = 0; i < eh._ftabLen; i++)
 			assert_eq(this->ftab()[i], copy.ftab()[i]);
-		for(uint32_t i = 0; i < eh._eftabLen; i++)
+		for(TIndexOffU i = 0; i < eh._eftabLen; i++)
 			assert_eq(this->eftab()[i], copy.eftab()[i]);
-		for(uint32_t i = 0; i < eh._offsLen; i++)
+		for(TIndexOffU i = 0; i < eh._offsLen; i++)
 			assert_eq(this->_offs[i], copy.offs()[i]);
-		for(uint32_t i = 0; i < eh._isaLen; i++)
+		for(TIndexOffU i = 0; i < eh._isaLen; i++)
 			assert_eq(this->_isa[i], copy.isa()[i]);
-		for(uint32_t i = 0; i < eh._ebwtTotLen; i++)
+		for(TIndexOffU i = 0; i < eh._ebwtTotLen; i++)
 			assert_eq(this->ebwt()[i], copy.ebwt()[i]);
 		//copy.sanityCheckAll();
 		if(_verbose)
@@ -4010,7 +4020,7 @@ TStr Ebwt<TStr>::join(vector<TStr>& l, uint32_t seed) {
 template<typename TStr>
 TStr Ebwt<TStr>::join(vector<FileBuf*>& l,
                       vector<RefRecord>& szs,
-                      uint32_t sztot,
+                      TIndexOffU sztot,
                       const RefReadInParams& refparams,
                       uint32_t seed)
 {
@@ -4061,7 +4071,7 @@ void Ebwt<TStr>::joinToDisk(
 	vector<FileBuf*>& l,
 	vector<RefRecord>& szs,
 	vector<uint32_t>& plens,
-	uint32_t sztot,
+	TIndexOffU sztot,
 	const RefReadInParams& refparams,
 	TStr& ret,
 	ostream& out1,
@@ -4097,31 +4107,31 @@ void Ebwt<TStr>::joinToDisk(
 	assert_gt(this->_nPat, 0);
 	assert_geq(this->_nFrag, this->_nPat);
 	this->_rstarts = NULL;
-	writeU32(out1, this->_nPat, this->toBe());
+	writeU<TIndexOffU>(out1, this->_nPat, this->toBe());
 	assert_eq(plens.size(), this->_nPat);
 	// Allocate plen[]
 	try {
-		this->_plen = new uint32_t[this->_nPat];
+		this->_plen = new TIndexOffU[this->_nPat];
 	} catch(bad_alloc& e) {
 		cerr << "Out of memory allocating plen[] in Ebwt::join()"
 		     << " at " << __FILE__ << ":" << __LINE__ << endl;
 		throw e;
 	}
 	// For each pattern, set plen
-	for(size_t i = 0; i < plens.size(); i++) {
+	for(TIndexOffU i = 0; i < plens.size(); i++) {
 		this->_plen[i] = plens[i];
-		writeU32(out1, this->_plen[i], this->toBe());
+		writeU<TIndexOffU>(out1, this->_plen[i], this->toBe());
 	}
 	// Write the number of fragments
-	writeU32(out1, this->_nFrag, this->toBe());
-	size_t seqsRead = 0;
-	ASSERT_ONLY(uint32_t szsi = 0);
-	ASSERT_ONLY(uint32_t entsWritten = 0);
+	writeU<TIndexOffU>(out1, this->_nFrag, this->toBe());
+	TIndexOffU seqsRead = 0;
+	ASSERT_ONLY(TIndexOffU szsi = 0);
+	ASSERT_ONLY(TIndexOffU entsWritten = 0);
 	// For each filebuf
 	for(unsigned int i = 0; i < l.size(); i++) {
 		assert(!l[i]->eof());
 		bool first = true;
-		uint32_t patoff = 0;
+		TIndexOffU patoff = 0;
 		// For each *fragment* (not necessary an entire sequence) we
 		// can pull out of istream l[i]...
 		while(!l[i]->eof()) {
@@ -4231,18 +4241,18 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	assert(sa.suffixItrIsReset());
 	assert_leq((int)ValueSize<Dna>::VALUE, 4);
 
-	uint32_t  len = eh._len;
-	uint32_t  ftabLen = eh._ftabLen;
-	uint32_t  sideSz = eh._sideSz;
-	uint32_t  ebwtTotSz = eh._ebwtTotSz;
-	uint32_t  fchr[] = {0, 0, 0, 0, 0};
-	uint32_t* ftab = NULL;
-	uint32_t  zOff = 0xffffffff;
+	TIndexOffU  len = eh._len;
+	TIndexOffU  ftabLen = eh._ftabLen;
+	TIndexOffU  sideSz = eh._sideSz;
+	TIndexOffU  ebwtTotSz = eh._ebwtTotSz;
+	TIndexOffU  fchr[] = {0, 0, 0, 0, 0};
+	TIndexOffU* ftab = NULL;
+	TIndexOffU  zOff = OFF_MASK;
 
 	// Save # of occurrences of each character as we walk along the bwt
-	uint32_t occ[4] = {0, 0, 0, 0};
+	TIndexOffU occ[4] = {0, 0, 0, 0};
 	// Save 'G' and 'T' occurrences between backward and forward buckets
-	uint32_t occSave[2] = {0, 0};
+	TIndexOffU occSave[2] = {0, 0};
 
 	// Record rows that should "absorb" adjacent rows in the ftab.
 	// The absorbed rows represent suffixes shorter than the ftabChars
@@ -4251,8 +4261,8 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	uint8_t *absorbFtab;
 	try {
 		VMSG_NL("Allocating ftab, absorbFtab");
-		ftab = new uint32_t[ftabLen];
-		memset(ftab, 0, 4 * ftabLen);
+		ftab = new TIndexOffU[ftabLen];
+		memset(ftab, 0, OFF_SIZE * ftabLen);
 		absorbFtab = new uint8_t[ftabLen];
 		memset(absorbFtab, 0, ftabLen);
 	} catch(bad_alloc &e) {
@@ -4305,13 +4315,13 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 
 	// Points to the base offset within ebwt for the side currently
 	// being written
-	uint32_t side = 0;
+	TIndexOffU side = 0;
 	// Points to a byte offset from 'side' within ebwt[] where next
 	// char should be written
 #ifdef SIXTY4_FORMAT
-	int sideCur = (eh._sideBwtSz >> 3) - 1;
+	TIndexOff sideCur = (eh._sideBwtSz >> 3) - 1;
 #else
-	int sideCur = eh._sideBwtSz - 1;
+	TIndexOff sideCur = eh._sideBwtSz - 1;
 #endif
 
 	// Whether we're assembling a forward or a reverse bucket
@@ -4324,14 +4334,14 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// Have we skipped the '$' in the last column yet?
 	ASSERT_ONLY(bool dollarSkipped = false);
 
-	uint32_t si = 0;   // string offset (chars)
-	ASSERT_ONLY(uint32_t lastSufInt = 0);
+	TIndexOffU si = 0;   // string offset (chars)
+	ASSERT_ONLY(TIndexOffU lastSufInt = 0);
 	ASSERT_ONLY(bool inSA = true); // true iff saI still points inside suffix
 	                               // array (as opposed to the padding at the
 	                               // end)
 	// Iterate over packed bwt bytes
 	VMSG_NL("Entering Ebwt loop");
-	ASSERT_ONLY(uint32_t beforeEbwtOff = (uint32_t)out1.tellp());
+	ASSERT_ONLY(TIndexOffU beforeEbwtOff = (uint32_t)out1.tellp());
 	while(side < ebwtTotSz) {
 		ASSERT_ONLY(wroteFwBucket = false);
 		// Sanity-check our cursor into the side buffer
@@ -4351,7 +4361,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			bool count = true;
 			if(si <= len) {
 				// Still in the SA; extract the bwtChar
-				uint32_t saElt = sa.nextSuffix();
+				TIndexOffU saElt = sa.nextSuffix();
 				// (that might have triggered sa to calc next suf block)
 				if(isaSample != NULL && (saElt & eh._isaMask) == saElt) {
 					// This element belongs in the ISA sample.  Add
@@ -4377,13 +4387,13 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					fchr[bwtChar]++;
 				}
 				// Update ftab
-				if((len-saElt) >= (uint32_t)eh._ftabChars) {
+				if((len-saElt) >= (TIndexOffU)eh._ftabChars) {
 					// Turn the first ftabChars characters of the
 					// suffix into an integer index into ftab
-					uint32_t sufInt = 0;
+					TIndexOffU sufInt = 0;
 					for(int i = 0; i < eh._ftabChars; i++) {
 						sufInt <<= 2;
-						assert_lt(i, (int)(len-saElt));
+						assert_lt((TIndexOffU)i, len-saElt);
 						sufInt |= (unsigned char)(Dna)(s[saElt+i]);
 					}
 					// Assert that this prefix-of-suffix is greater
@@ -4414,7 +4424,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 					assert_lt((si >> eh._offRate), eh._offsLen);
 					// Write offsets directly to the secondary output
 					// stream, thereby avoiding keeping them in memory
-					writeU32(out2, saElt, this->toBe());
+					writeU<TIndexOffU>(out2, saElt, this->toBe());
 				}
 			} else {
 				// Strayed off the end of the SA, now we're just
@@ -4479,11 +4489,16 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			// Write 'G' and 'T'
 			assert_leq(occSave[0], occ[2]);
 			assert_leq(occSave[1], occ[3]);
-			uint32_t *u32side = reinterpret_cast<uint32_t*>(ebwtSide);
+			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide);
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
-			u32side[(sideSz >> 2)-2] = endianizeU32(occSave[0], this->toBe());
-			u32side[(sideSz >> 2)-1] = endianizeU32(occSave[1], this->toBe());
+#ifdef BOWTIE_64BIT_INDEX
+			u32side[(sideSz >> 3)-2] = endianizeU<TIndexOffU>(occSave[0], this->toBe());
+			u32side[(sideSz >> 3)-1] = endianizeU<TIndexOffU>(occSave[1], this->toBe());
+#else
+			u32side[(sideSz >> 2)-2] = endianizeU<TIndexOffU>(occSave[0], this->toBe());
+			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occSave[1], this->toBe());
+#endif
 			// Write forward side to primary file
 			out1.write((const char *)ebwtSide, sideSz);
 		} else if (sideCur == -1) {
@@ -4492,11 +4507,16 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 			sideCur = 0;
 			assert(!fw); fw = true;
 			// Write 'A' and 'C'
-			uint32_t *u32side = reinterpret_cast<uint32_t*>(ebwtSide);
+			TIndexOffU *u32side = reinterpret_cast<TIndexOffU*>(ebwtSide);
 			side += sideSz;
 			assert_leq(side, eh._ebwtTotSz);
-			u32side[(sideSz >> 2)-2] = endianizeU32(occ[0], this->toBe());
-			u32side[(sideSz >> 2)-1] = endianizeU32(occ[1], this->toBe());
+#ifdef BOWTIE_64BIT_INDEX
+			u32side[(sideSz >> 3)-2] = endianizeU<TIndexOffU>(occ[0], this->toBe());
+			u32side[(sideSz >> 3)-1] = endianizeU<TIndexOffU>(occ[1], this->toBe());
+#else
+			u32side[(sideSz >> 2)-2] = endianizeU<TIndexOffU>(occ[0], this->toBe());
+			u32side[(sideSz >> 2)-1] = endianizeU<TIndexOffU>(occ[1], this->toBe());
+#endif
 			occSave[0] = occ[2]; // save 'G' count
 			occSave[1] = occ[3]; // save 'T' count
 			// Write backward side to primary file
@@ -4505,7 +4525,7 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	}
 	VMSG_NL("Exited Ebwt loop");
 	assert(ftab != NULL);
-	assert_neq(zOff, 0xffffffff);
+	assert_neq(zOff, OFF_MASK);
 	if(absorbCnt > 0) {
 		// Absorb any trailing, as-yet-unabsorbed short suffixes into
 		// the last element of ftab
@@ -4514,14 +4534,14 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	// Assert that our loop counter got incremented right to the end
 	assert_eq(side, eh._ebwtTotSz);
 	// Assert that we wrote the expected amount to out1
-	assert_eq(((uint32_t)out1.tellp() - beforeEbwtOff), eh._ebwtTotSz);
+	assert_eq(((TIndexOffU)out1.tellp() - beforeEbwtOff), eh._ebwtTotSz);
 	// assert that the last thing we did was write a forward bucket
 	assert(wroteFwBucket);
 
 	//
 	// Write zOff to primary stream
 	//
-	writeU32(out1, zOff, this->toBe());
+	writeU<TIndexOffU>(out1, zOff, this->toBe());
 
 	//
 	// Finish building fchr
@@ -4542,24 +4562,24 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	}
 	// Write fchr to primary file
 	for(int i = 0; i < 5; i++) {
-		writeU32(out1, fchr[i], this->toBe());
+		writeU<TIndexOffU>(out1, fchr[i], this->toBe());
 	}
 
 	//
 	// Finish building ftab and build eftab
 	//
 	// Prefix sum on ftable
-	uint32_t eftabLen = 0;
+	TIndexOffU eftabLen = 0;
 	assert_eq(0, absorbFtab[0]);
-	for(uint32_t i = 1; i < ftabLen; i++) {
+	for(TIndexOffU i = 1; i < ftabLen; i++) {
 		if(absorbFtab[i] > 0) eftabLen += 2;
 	}
-	assert_leq(eftabLen, (uint32_t)eh._ftabChars*2);
+	assert_leq(eftabLen, (TIndexOffU)eh._ftabChars*2);
 	eftabLen = eh._ftabChars*2;
-	uint32_t *eftab = NULL;
+	TIndexOffU *eftab = NULL;
 	try {
-		eftab = new uint32_t[eftabLen];
-		memset(eftab, 0, 4 * eftabLen);
+		eftab = new TIndexOffU[eftabLen];
+		memset(eftab, 0, OFF_SIZE * eftabLen);
 	} catch(bad_alloc &e) {
 		cerr << "Out of memory allocating eftab[] "
 		     << "in Ebwt::buildToDisk() at " << __FILE__ << ":"
@@ -4567,16 +4587,16 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 		throw e;
 	}
 	assert(eftab != NULL);
-	uint32_t eftabCur = 0;
-	for(uint32_t i = 1; i < ftabLen; i++) {
-		uint32_t lo = ftab[i] + Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, i-1);
+	TIndexOffU eftabCur = 0;
+	for(TIndexOffU i = 1; i < ftabLen; i++) {
+		TIndexOffU lo = ftab[i] + Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, i-1);
 		if(absorbFtab[i] > 0) {
 			// Skip a number of short pattern indicated by absorbFtab[i]
-			uint32_t hi = lo + absorbFtab[i];
+			TIndexOffU hi = lo + absorbFtab[i];
 			assert_lt(eftabCur*2+1, eftabLen);
 			eftab[eftabCur*2] = lo;
 			eftab[eftabCur*2+1] = hi;
-			ftab[i] = (eftabCur++) ^ 0xffffffff; // insert pointer into eftab
+			ftab[i] = (eftabCur++) ^ OFF_MASK; // insert pointer into eftab
 			assert_eq(lo, Ebwt::ftabLo(ftab, eftab, len, ftabLen, eftabLen, i));
 			assert_eq(hi, Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, i));
 		} else {
@@ -4585,22 +4605,22 @@ void Ebwt<TStr>::buildToDisk(InorderBlockwiseSA<TStr>& sa,
 	}
 	assert_eq(Ebwt::ftabHi(ftab, eftab, len, ftabLen, eftabLen, ftabLen-1), len+1);
 	// Write ftab to primary file
-	for(uint32_t i = 0; i < ftabLen; i++) {
-		writeU32(out1, ftab[i], this->toBe());
+	for(TIndexOffU i = 0; i < ftabLen; i++) {
+		writeU<TIndexOffU>(out1, ftab[i], this->toBe());
 	}
 	// Write eftab to primary file
-	for(uint32_t i = 0; i < eftabLen; i++) {
-		writeU32(out1, eftab[i], this->toBe());
+	for(TIndexOffU i = 0; i < eftabLen; i++) {
+		writeU<TIndexOffU>(out1, eftab[i], this->toBe());
 	}
 	// Write isa to primary file
 	if(isaSample != NULL) {
 		ASSERT_ONLY(Bitset sawISA(eh._len+1));
-		for(uint32_t i = 0; i < eh._isaLen; i++) {
-			uint32_t s = isaSample[i];
+		for(TIndexOffU i = 0; i < eh._isaLen; i++) {
+			TIndexOffU s = isaSample[i];
 			assert_leq(s, eh._len);
 			assert(!sawISA.test(s));
 			ASSERT_ONLY(sawISA.set(s));
-			writeU32(out2, s, this->toBe());
+			writeU<TIndexOffU>(out2, s, this->toBe());
 		}
 		delete[] isaSample;
 	}

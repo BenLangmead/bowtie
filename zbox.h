@@ -9,8 +9,8 @@
  */
 template<typename T>
 void calcZ(const T& s,
-           uint32_t off,
-           String<uint32_t>& z,
+		TIndexOffU off,
+           String<TIndexOffU>& z,
            bool verbose = false,
            bool sanityCheck = false)
 {
@@ -27,7 +27,7 @@ void calcZ(const T& s,
 			// compare starting at k with prefix starting at 0
 			size_t ki = k;
 			while(off+ki < length(s) && s[off+ki] == s[off+ki-k]) ki++;
-			z[k] = ki - k;
+			z[k] = (TIndexOffU)(ki - k);
 			assert_lt(off+z[k], slen);
 			if(z[k] > 0) {
 				lCur = k;
@@ -45,7 +45,7 @@ void calcZ(const T& s,
 			} else if (z[kPrime] > 0) {
 				int q = 0;
 				while (off+q+rCur+1 < length(s) && s[off+q+rCur+1] == s[off+betaLen+q]) q++;
-				z[k] = betaLen + q;
+				z[k] = (TIndexOffU)(betaLen + q);
 				assert_lt(off+z[k], slen);
 				rCur = rCur + q;
 				assert_geq(k, lCur);

@@ -142,6 +142,7 @@ bool showSeed;
 static vector<string> qualities;
 static vector<string> qualities1;
 static vector<string> qualities2;
+static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
 bool gReportColorPrimer;
 MUTEX_T gLock;
@@ -253,6 +254,7 @@ static void resetOptions() {
 	qualities.clear();
 	qualities1.clear();
 	qualities2.clear();
+	wrapper.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
 	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
 }
@@ -340,7 +342,8 @@ enum {
 	ARG_QUALS1,
 	ARG_QUALS2,
 	ARG_ALLOW_CONTAIN,
-	ARG_COLOR_PRIMER
+	ARG_COLOR_PRIMER,
+	ARG_WRAPPER
 };
 
 static struct option long_options[] = {
@@ -449,6 +452,7 @@ static struct option long_options[] = {
 	{(char*)"showseed",     no_argument,       0,            ARG_SHOWSEED},
 	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
 	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
+	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -456,8 +460,17 @@ static struct option long_options[] = {
  * Print a summary usage message to the provided output stream.
  */
 static void printUsage(ostream& out) {
+#ifdef BOWTIE_64BIT_INDEX
+	string tool_name = "bowtie-build-l";
+#else
+	string tool_name = "bowtie-build-s";
+#endif
+	if(wrapper == "basic-0") {
+		tool_name = "bowtie";
+	}
+
 	out << "Usage: " << endl
-        << "  bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]" << endl
+        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]" << endl
         << endl
 	    << "  <m1>    Comma-separated list of files containing upstream mates (or the" << endl
 	    << "          sequences themselves, if -c is set) paired with mates in <m2>" << endl
@@ -484,8 +497,11 @@ static void printUsage(ostream& out) {
 		<< "  --phred64-quals    input quals are Phred+64 (same as --solexa1.3-quals)" << endl
 		<< "  --solexa-quals     input quals are from GA Pipeline ver. < 1.3" << endl
 		<< "  --solexa1.3-quals  input quals are from GA Pipeline ver. >= 1.3" << endl
-		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl
-	    << "Alignment:" << endl
+		<< "  --integer-quals    qualities are given as space-separated integers (not ASCII)" << endl;
+		if(wrapper == "basic-0") {
+		out << "  --large-index      force usage of a 'large' index, even if a small one is present" << endl;
+		}
+		out << "Alignment:" << endl
 	    << "  -v <int>           report end-to-end hits w/ <=v mismatches; ignore qualities" << endl
 	    << "    or" << endl
 	    << "  -n/--seedmms <int> max mismatches in seed (can be 0-3, default: -n 2)" << endl
@@ -546,6 +562,12 @@ static void printUsage(ostream& out) {
 	    << "  --version          print version information and quit" << endl
 	    << "  -h/--help          print this usage message" << endl
 	    ;
+	if(wrapper.empty()) {
+		cerr << endl
+		     << "*** Warning ***" << endl
+			 << tool_name << " was run directly.  It is recommended that you run the wrapper script 'bowtie' instead." << endl
+			 << endl;
+	}
 }
 
 /**
@@ -629,6 +651,7 @@ static void parseOptions(int argc, const char **argv) {
 			argc, const_cast<char**>(argv),
 			short_options, long_options, &option_index);
 		switch (next_option) {
+			case ARG_WRAPPER: wrapper = optarg; break;
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
 			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
@@ -988,39 +1011,6 @@ static const char *argv0 = NULL;
 		sink->finishRead(*p, true, !skipped); \
 	} \
 	skipped = false;
-
-static inline void finishReadWithHitmask(PatternSourcePerThread* p,
-                                         HitSinkPerThread* sink,
-                                         SyncBitset& hitMask,
-                                         bool r,
-                                         bool& skipped)
-{
-	/* Don't do finishRead if the read isn't legit */
-	if(!p->empty()) {
-		/* r = whether to consider reporting the read as unaligned */
-		bool reportUnAl = r;
-		if(reportUnAl) {
-			/* If the done-mask already shows the read as done, */
-			/* then we already reported the unaligned read and */
-			/* should refrain from re-reporting*/
-			reportUnAl = !skipped;
-			if(reportUnAl) {
-				/* If there hasn't been a hit reported, then report */
-				/* read as unaligned */
-				reportUnAl = !hitMask.test(p->patid());
-			}
-		}
-		if(sink->finishRead(*p, true, reportUnAl) > 0) {
-			/* We reported a hit for the read, so we set the */
-			/* appropriate bit in the hitMask to prevent it from */
-			/* being reported as unaligned. */
-			if(!reportUnAl && sink->dumpsReads()) {
-				hitMask.setOver(p->patid());
-			}
-		}
-	}
-	skipped = false;
-}
 
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
@@ -2066,7 +2056,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	while(true) {
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
-		size_t plen = length(patFw);
+		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
 		uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */

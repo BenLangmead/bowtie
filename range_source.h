@@ -53,7 +53,7 @@ struct EditList {
 		} else if(sz_ == (numEdits + numMoreEdits)) {
 			assert(moreEdits_ != NULL);
 			assert(yetMoreEdits_ == NULL);
-			yetMoreEdits_ = pool.alloc(qlen + 10 - numMoreEdits - numEdits);
+			yetMoreEdits_ = pool.alloc((uint32_t)qlen + 10 - numMoreEdits - numEdits);
 			if(yetMoreEdits_ == NULL) {
 				return false;
 			}
@@ -135,7 +135,7 @@ struct EditList {
 	 */
 	void free(AllocOnlyPool<Edit>& epool, size_t qlen) {
 		if(yetMoreEdits_ != NULL)
-			epool.free(yetMoreEdits_, qlen + 10 - numMoreEdits - numEdits);
+			epool.free(yetMoreEdits_, (uint32_t)qlen + 10 - numMoreEdits - numEdits);
 		if(moreEdits_ != NULL)
 			epool.free(moreEdits_, numMoreEdits);
 	}
@@ -317,7 +317,7 @@ struct RangeState {
 	 * now.
 	 */
 	Edit pickEdit(int pos, RandomSource& rand, bool fuzzy,
-	              uint32_t& top, uint32_t& bot, bool indels,
+	              TIndexOffU& top, TIndexOffU& bot, bool indels,
 	              bool& last)
 	{
 		bool color = false;
@@ -339,7 +339,7 @@ struct RangeState {
 		if(num > 1 && (!fuzzy || eq.flags.quallo == lo2)) {
 			last = false; // not the last at this pos
 			// Sum up range sizes and do a random weighted pick
-			uint32_t tot = 0;
+			TIndexOffU tot = 0;
 			bool candA = !eq.flags.mmA; bool candC = !eq.flags.mmC;
 			bool candG = !eq.flags.mmG; bool candT = !eq.flags.mmT;
 			bool candInsA = false, candInsC = false;
@@ -541,8 +541,8 @@ struct RangeState {
 	// legitimate jumping-off point for a branch, tops[] and bots[]
 	// will be filled with 0s and all possibilities in eq will be
 	// eliminated
-	uint32_t tops[4]; // A, C, G, T top offsets
-	uint32_t bots[4]; // A, C, G, T bot offsets
+	TIndexOffU tops[4]; // A, C, G, T top offsets
+	TIndexOffU bots[4]; // A, C, G, T bot offsets
 	ElimsAndQual eq;  // Which outgoing paths have been tried already
 	bool eliminated_;  // Whether all outgoing paths have been eliminated
 };
@@ -554,7 +554,7 @@ struct RangeState {
  * path.
  */
 class Branch {
-	typedef std::pair<uint32_t, uint32_t> U32Pair;
+	typedef std::pair<TIndexOffU, TIndexOffU> UPair;
 public:
 	Branch() :
 		delayedCost_(0), curtailed_(false), exhausted_(false),
@@ -575,8 +575,8 @@ public:
 	          uint16_t len,
 	          uint16_t cost,
 	          uint16_t ham,
-	          uint32_t itop,
-	          uint32_t ibot,
+	          TIndexOffU itop,
+	          TIndexOffU ibot,
 	          const EbwtParams& ep,
 	          const uint8_t* ebwt,
 	          const EditList* edits = NULL)
@@ -636,7 +636,7 @@ public:
 		// jumping over a bunch of unrevisitable positions.
 		for(size_t i = 0; i < len_; i++) {
 			ranges_[i].eliminated_ = true;
-			assert(eliminated(i));
+			assert(eliminated((int)i));
 		}
 		assert(repOk(qlen));
 		return true;
@@ -771,7 +771,7 @@ public:
 		// (using randomness to break ties).  If the selected edit is
 		// the last remaining one at this position, 'last' is set to
 		// true.
-		uint32_t top = 0, bot = 0;
+		TIndexOffU top = 0, bot = 0;
 		Edit e = ranges_[pos].pickEdit(pos + rdepth_, rand, fuzzy, top,
 		                               bot, false, last);
 		assert_gt(bot, top);
@@ -1163,8 +1163,8 @@ public:
 	uint16_t ham_;    // quality-weighted hamming distance so far
 	RangeState *ranges_; // Allocated from the RangeStatePool
 	uint16_t rangesSz_;
-	uint32_t top_;    // top offset leading to the root of this subtree
-	uint32_t bot_;    // bot offset leading to the root of this subtree
+	TIndexOffU top_;    // top offset leading to the root of this subtree
+	TIndexOffU bot_;    // bot offset leading to the root of this subtree
 	SideLocus ltop_;
 	SideLocus lbot_;
 	EditList edits_;   // edits leading to the root of the branch
@@ -1729,7 +1729,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			int64_t top = (int64_t)range().top;
+			TIndexOff top = (TIndexOff)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());
@@ -1787,7 +1787,7 @@ public:
 protected:
 
 #ifndef NDEBUG
-	std::set<int64_t> allTops_;
+	std::set<TIndexOff> allTops_;
 #endif
 };
 
@@ -1910,7 +1910,7 @@ public:
 			// top offset
 			assert_gt(range().bot, range().top);
 			assert(range().ebwt != NULL);
-			int64_t top = (int64_t)range().top;
+			TIndexOff top = (TIndexOff)range().top;
 			top++; // ensure it's not 0
 			if(!range().ebwt->fw()) top = -top;
 			assert(allTops_.find(top) == allTops_.end());
@@ -1965,7 +1965,7 @@ protected:
 	TRangeSource*                   rs_; // delete this in destructor
 	bool ebwtFw_;
 	PathManager pm_;
-	ASSERT_ONLY(std::set<int64_t> allTops_);
+	ASSERT_ONLY(std::set<TIndexOff> allTops_);
 };
 
 /**
@@ -2070,7 +2070,7 @@ public:
 				this->foundRange = rss_[cur_]->foundRange;
 			} else {
 				// No RangeSources in list; done
-				cur_ = 0xffffffff;
+				cur_ = OFF_MASK;
 				this->done = true;
 			}
 		} else {
@@ -2102,7 +2102,7 @@ public:
 
 protected:
 
-	uint32_t cur_;
+	TIndexOffU cur_;
 	uint32_t ham_;
 	TRangeSrcDrPtrVec rss_;
 	PatternSourcePerThread* patsrc_;
@@ -2378,7 +2378,7 @@ protected:
 		// top offset
 		assert_gt(r->bot, r->top);
 		assert(r->ebwt != NULL);
-		int64_t top = (int64_t)r->top;
+		TIndexOff top = (TIndexOff)r->top;
 		top++; // ensure it's not 0
 		if(!r->ebwt->fw()) top = -top;
 		if(r->fw) {
@@ -2549,7 +2549,7 @@ protected:
 	bool verbose_;
 	bool quiet_;
 	bool mixesReads_;
-	ASSERT_ONLY(std::set<int64_t> allTopsRc_);
+	ASSERT_ONLY(std::set<TIndexOff> allTopsRc_);
 };
 
 #endif /* RANGE_SOURCE_H_ */

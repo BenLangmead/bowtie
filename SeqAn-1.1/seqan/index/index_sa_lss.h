@@ -57,7 +57,7 @@ struct _Context_LSS
 	{
 	   TValue g;
 
-	   g=pm-I;                      /* group number.*/
+	   g=(TValue)(pm-I);                      /* group number.*/
 	   V[*pl]=g;                    /* update group number of first position.*/
 	   if (pl==pm)
 		  *pl=-1;                   /* one element, sorted group.*/
@@ -90,7 +90,7 @@ struct _Context_LSS
 		  pa=pb;                    /* continue sorting rest of the subarray.*/
 	   }
 	   if (pa==pn) {                /* check if last part is single element.*/
-		  V[*pa]=pa-I;
+		  V[*pa]=(TValue)(pa-I);
 		  *pa=-1;                   /* sorted group.*/
 	   }
 	}
@@ -157,17 +157,17 @@ struct _Context_LSS
 		  --pc;
 	   }
 	   pn=p+n;
-	   if ((s=pa-p)>(t=pb-pa))
+	   if ((s=(TValue)(pa-p))>(t=(TValue)(pb-pa)))
 		  s=t;
 	   for (pl=p, pm=pb-s; s; --s, ++pl, ++pm)
 		  SEQAN_LSSSWAP(pl, pm);
-	   if ((s=pd-pc)>(t=pn-pd-1))
+	   if ((s=(TValue)(pd-pc))>(t=(TValue)(pn-pd-1)))
 		  s=t;
 	   for (pl=pb, pm=pn-s; s; --s, ++pl, ++pm)
 		  SEQAN_LSSSWAP(pl, pm);
 
-	   s=pb-pa;
-	   t=pd-pc;
+	   s=(TValue)(pb-pa);
+	   t=(TValue)(pd-pc);
 	   if (s>0)
 		  sort_split(p, s);
 	   update_group(p+s, p+n-t-1);
@@ -197,13 +197,13 @@ struct _Context_LSS
 	   for (pi=p+k-1, i=n; pi>=p; --pi) {
 		  d=x[c=*pi];               /* c is position, d is next in list.*/
 		  x[c]=g=i;                 /* last position equals group number.*/
-		  if (d>=0) {               /* if more than one element in group.*/
+		  if (d == 0 || d > 0) {               /* if more than one element in group.*/
 			 p[i--]=c;              /* p is permutation for the sorted x.*/
 			 do {
 				d=x[c=d];           /* next in linked list.*/
 				x[c]=g;             /* group number in x.*/
 				p[i--]=c;           /* permutation in p.*/
-			 } while (d>=0);
+			 } while (d == 0 || d > 0);
 		  } else
 			 p[i--]=-1;             /* one element, sorted group.*/
 	   }
@@ -237,7 +237,7 @@ struct _Context_LSS
 		  b=b<<s|(x[r]-l+1);        /* b is start of x in chunk alphabet.*/
 		  d=c;                      /* d is max symbol in chunk alphabet.*/
 	   }
-	   m=(1<<(r-1)*s)-1;            /* m masks off top old symbol from chunk.*/
+	   m=(((TValue)1)<<(r-1)*s)-1;            /* m masks off top old symbol from chunk.*/
 	   x[n]=l-1;                    /* emulate zero terminator.*/
 	   if (d<=n) {                  /* if bucketing possible, compact alphabet.*/
 		  for (pi=p; pi<=p+d; ++pi)
@@ -305,7 +305,7 @@ struct _Context_LSS
 		  pi=I;                     /* pi is first position of group.*/
 		  sl=0;                     /* sl is negated length of sorted groups.*/
 		  do {
-			 if ((s=*pi)<0) {
+			 if ((s=*pi) <= 0 && (s=*pi) != 0) {
 				pi-=s;              /* skip over sorted group.*/
 				sl+=s;              /* add negated length to sl.*/
 			 } else {
@@ -314,7 +314,7 @@ struct _Context_LSS
 				   sl=0;
 				}
 				pk=I+V[s]+1;        /* pk-1 is last position of unsorted group.*/
-				sort_split(pi, pk-pi);
+				sort_split(pi, (TValue)(pk-pi));
 				pi=pk;              /* next group.*/
 			 }
 		  } while (pi<=I+n);
