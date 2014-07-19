@@ -75,17 +75,6 @@ struct RefRecord {
 		first = fgetc(in) ? true : false;
 	}
 
-	RefRecord(int in, bool swap) {
-		off = readU<TIndexOffU>(in, swap);
-		len = readU<TIndexOffU>(in, swap);
-		char c;
-		if(!read(in, &c, 1)) {
-			cerr << "Error reading RefRecord 'first' flag" << endl;
-			throw 1;
-		}
-		first = (c ? true : false);
-	}
-
 	void write(std::ostream& out, bool be) {
 		writeU<TIndexOffU>(out, off, be);
 		writeU<TIndexOffU>(out, len, be);
