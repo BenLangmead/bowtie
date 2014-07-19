@@ -3,6 +3,16 @@
  <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
 </ul>
 
+<h2>2.0.0 - July 19, 2014</h2>
+<ul>
+   <li> Added support for large and small indexes, removing 4-billion-nucleotide
+     barrier.  Bowtie can now be used with reference genomes of any size.</li>
+   <li> No longer releasing 32-bit binaries. Simplified manual and Makefile accordingly.</li>
+   <li> Phased out CygWin support.</li>
+   <li> Improved efficiency of index files loading.</li>
+   <li> Fixed a bug that made the inspector fail in some situations.</li>
+</ul>
+
 <h2>1.0.1 release -  - March 14, 2014</h2>
 <ul>
  <li>Improved index querying efficiency using "population count" instructions

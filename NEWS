@@ -26,6 +26,16 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+Version 2.0.0 - July 19, 2014
+   * Added support for large and small indexes, removing 4-billion-nucleotide
+     barrier.  Bowtie can now be used with reference genomes of any size.
+   * No longer releasing 32-bit binaries.  Simplified manual and Makefile
+     accordingly.
+   * Phased out CygWin support.
+   * Improved efficiency of index files loading.
+   * Fixed a bug that made the inspector fail in some situations.
+
+
 Version 1.0.1 - March 14, 2014
    * Improved index querying efficiency using "population count" instructions
      available since SSE4.2.
