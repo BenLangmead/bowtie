@@ -26,7 +26,7 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
-Version 2.0.0 - July 19, 2014
+Version 1.1.0 - July 19, 2014
    * Added support for large and small indexes, removing 4-billion-nucleotide
      barrier.  Bowtie can now be used with reference genomes of any size.
    * No longer releasing 32-bit binaries.  Simplified manual and Makefile

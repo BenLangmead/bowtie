@@ -3,7 +3,7 @@
  <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
 </ul>
 
-<h2>2.0.0 - July 19, 2014</h2>
+<h2>1.1.0 - July 19, 2014</h2>
 <ul>
    <li> Added support for large and small indexes, removing 4-billion-nucleotide
      barrier.  Bowtie can now be used with reference genomes of any size.</li>

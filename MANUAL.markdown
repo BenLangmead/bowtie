@@ -88,7 +88,6 @@ bowtie is using by default a spinlocking mechanism. Spinlocking is
 in general much faster. However if the need arise to not use spinlocking
 bowtie can also be compiled using EXTRA_FLAGS=-DNO_SPINLOCK parameter.
 
-[Cygwin]:   http://www.cygwin.com/
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
@@ -542,11 +541,17 @@ sidebar).
 [Decoding colorspace alignments]: #decoding-colorspace-alignments
 [BWA paper]: http://bioinformatics.oxfordjournals.org/cgi/content/abstract/25/14/1754
 
+Wrapper scripts
+---------------
+
 [Wrapper scripts]: #wrapper-scripts
 
 The bowtie, bowtie-build and bowtie-inspect executables are actually wrapper scripts that call binary programs as appropriate. The wrappers shield users from having to distinguish between "small" and "large" index formats, discussed briefly in the following section. The appropiate index type is selected based on the input size.
 
 It is recommended that you always run the bowtie wrappers and not run the binaries directly.
+
+Small and large indexes
+-----------------------
 
 [Small and large indexes]: #small-large-indexes
 
