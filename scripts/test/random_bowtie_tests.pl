@@ -436,6 +436,20 @@ sub build {
 			exit 1;
 		}
 	}
+    $cmd = "${bowtie_build} --large-index --debug $args .tmp$seed";
+    run("echo \"$cmd\" > .tmp$seed.cmd");
+    print "$cmd\n";
+    $out = trim(runBacktick("$cmd 2>&1"));
+    $out =~ s/Warning: Encountered reference sequence with only gaps//g;
+    $out = trim($out);
+    if($out eq "") {
+        $ret++;
+    } else {
+        print "Expected no output, got:\n$out\n";
+        if($exitOnFail) {
+            exit 1;
+        }
+    }
 	
 	# Do packed version and assert that it matches unpacked version
 	# (sometimes, but not all the time because it takes a while)
@@ -459,6 +473,25 @@ sub build {
 				exit 1;
 			}
 		}
+        $cmd = "${bowtie_build} --large-index --debug -a -p $args .tmp$seed.packed";
+        print "$cmd\n";
+        $out = trim(runBacktick("$cmd 2>&1"));
+        $out =~ s/Warning: Encountered reference sequence with only gaps//g;
+        $out = trim($out);
+        if($out eq "") {
+            if(run("diff .tmp$seed.1.ebwtl .tmp$seed.packed.1.ebwtl") != 0) {
+                die if $exitOnFail;
+            } elsif(run("diff .tmp$seed.2.ebwtl .tmp$seed.packed.2.ebwtl") != 0) {
+                die if $exitOnFail;
+            } else {
+                $ret++;
+            }
+        } else {
+            print "Expected no output, got:\n$out\n";
+            if($exitOnFail) {
+                exit 1;
+            }
+        }
 	}
 	
 	return $ret;
@@ -470,9 +503,9 @@ sub deleteReadParts {
 	run("rm -f .tmp.al$seed". ".* .tmp.al$seed". "_1.* .tmp.al$seed". "_2.*");
 }
 
-sub search($$$$$$$$$$) {
-	my($tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
-	my $ret = doSearch($tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
+sub search($$$$$$$$$$$) {
+	my($bowtie_command, $tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+	my $ret = doSearch($bowtie_command, $tstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate);
 	deleteReadParts();
 	return $ret;
 }
@@ -503,8 +536,8 @@ sub checkRefVerbose($$$$) {
 }
 
 # Search for a pattern in an existing Ebwt
-sub doSearch($$$$$$$$$$) {
-	my($nstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
+sub doSearch($$$$$$$$$$$) {
+	my($bowtie_command, $nstr, $cstr, $pe, $color, $p1, $p2, $policy, $oneHit, $requireResult, $offRate) = @_;
 	
 	my @nts = split(/,/, $nstr); # nucleotide texts
 	my @cts = split(/,/, $cstr); # color texts
@@ -512,7 +545,7 @@ sub doSearch($$$$$$$$$$) {
 	my $patarg = "-c";
 	my $patstr = "\"$p1\"";
 	$patstr = "-1 \"$p1\" -2 \"$p2\"" if $pe;
-	my $outfile = ".tmp$seed.out";
+	my $outfile   = ".tmp$seed.out";
 
 	my $alnuc = 1;
 	if($color) {
@@ -655,30 +688,30 @@ sub doSearch($$$$$$$$$$) {
 	my $unalignReconArg = "";
 	my $unalign = int(rand(5));
 	if($unalign == 0 || $unalign == 2) {
-		$unalignArg .= "--un .tmp.un$seed$ext ";
+		$unalignArg   .= "--un .tmp.un$seed$ext ";
 		if($pe) {
-			$unalignReconArg .= " .tmp.un$seed"."_1$ext .tmp.un$seed"."_2$ext";
+			$unalignReconArg   .= " .tmp.un$seed"."_1$ext .tmp.un$seed"."_2$ext";
 		} else {
-			$unalignReconArg .= " .tmp.un$seed$ext";
+			$unalignReconArg   .= " .tmp.un$seed$ext";
 		}
 	}
 	if($unalign == 1 || $unalign == 2) {
-		$unalignArg .= "--max .tmp.max$seed$ext ";
+		$unalignArg   .= "--max .tmp.max$seed$ext ";
 		if($unalign == 2) {
 			if($pe) {
-				$unalignReconArg .= " .tmp.max$seed"."_1$ext .tmp.max$seed"."_2$ext";
+				$unalignReconArg   .= " .tmp.max$seed"."_1$ext .tmp.max$seed"."_2$ext";
 			} else {
-				$unalignReconArg .= " .tmp.max$seed$ext";
+				$unalignReconArg   .= " .tmp.max$seed$ext";
 			}
 		}
 	}
 	if($unalign == 2 || $unalign == 3) {
-		$unalignArg .= "--al .tmp.al$seed$ext ";
+		$unalignArg   .= "--al .tmp.al$seed$ext ";
 		if($unalign == 2) {
 			if($pe) {
-				$unalignReconArg .= " .tmp.al$seed"."_1$ext .tmp.al$seed"."_2$ext";
+				$unalignReconArg   .= " .tmp.al$seed"."_1$ext .tmp.al$seed"."_2$ext";
 			} else {
-				$unalignReconArg .= " .tmp.al$seed$ext";
+				$unalignReconArg   .= " .tmp.al$seed$ext";
 			}
 		}
 	}
@@ -734,7 +767,7 @@ sub doSearch($$$$$$$$$$) {
 	defined($khits) || die;
 	defined($offRateStr) || die;
 	defined($nstr) || die;
-	my $cmd = "${bowtie} --debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	my $cmd = "$bowtie_command --debug $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	my $out = trim(runBacktick("$cmd 2>.tmp$seed.stderr | tee .tmp$seed.stdout"));
 	
@@ -749,19 +782,18 @@ sub doSearch($$$$$$$$$$) {
 		return 0;
 	}
 	my $err = `cat .tmp$seed.stderr 2> /dev/null`;
-
-	# No output?
-	if($out eq "" && $requireResult) {
-		print "Expected results but got \"No Results\"\n";
-		if($exitOnFail) {
-			print "Stdout:\n$out\nStderr:\n$err\n";
-			exit 1;
-		}
-		return 0;
-	}
+    # No output?
+    if($out eq "" && $requireResult) {
+        print "Expected results but got \"No Results\"\n";
+        if($exitOnFail) {
+            print "Stdout:\n$out\nStderr:\n$err\n";
+            exit 1;
+        }
+        return 0;
+    }
+    print $out;
 	
 	# Parse output to see if any of it is bad
-	print $out;
 	my @outlines = split(/[\r\n]+/, $out);
 	my %outhash = ();
 	my %readcount = ();
@@ -871,16 +903,16 @@ sub doSearch($$$$$$$$$$) {
 	}
 
 	{
-		$cmd = "${bowtie} $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+		$cmd = "$bowtie_command $policy $color $strand $unalignArg $khits $offRateStr --cost --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 		print "$cmd\n";
 		my $out2 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out2 eq $out || die "Normal bowtie output did not match debug bowtie output";
 
-		$cmd = "${bowtie} $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "$bowtie_command $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out3 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 
-		$cmd = "${bowtie} --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
+		$cmd = "$bowtie_command --mm $policy $color $strand $unalignArg $khits --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr $outfile";
 		print "$cmd\n";
 		my $out4 = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 		$out3 eq $out4 || die "Normal bowtie output did not match memory-mapped bowtie output";
@@ -888,7 +920,7 @@ sub doSearch($$$$$$$$$$) {
 	
 	# Now do another run with verbose output so that we can check the
 	# mismatch strings
-	$cmd = "${bowtie} --debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
+	$cmd = "$bowtie_command --debug $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr";
 	print "$cmd\n";
 	$out = trim(runBacktick("$cmd 2>.tmp$seed.stderr"));
 	# Parse output to see if any of it is bad
@@ -946,7 +978,7 @@ sub doSearch($$$$$$$$$$) {
 	# .tmp$seed.verbose.out
 	if($format >= 0 && $format <= 2 && $unalignReconArg ne "") {
 		deleteReadParts();
-		my $cmd = "${bowtie} $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
+		my $cmd = "$bowtie_command $policy $color $strand $unalignArg $khits $offRateStr --orig \"$nstr\" $oneHit --sanity $patarg .tmp$seed $patstr .tmp$seed.verbose.out";
 		print "$cmd\n";
 		run($cmd) == 0 || die "Error performing reconciler run\n";
 		$khits =~ s/--strata --best//;
@@ -1153,8 +1185,9 @@ for(; $outer > 0; $outer--) {
 		} else {
 			$expectResult = 0;
 		}
-		$pass += search($tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
-		last if(++$tests > $limit);
+		$pass += search("${bowtie}",$tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
+        $pass += search("${bowtie} --large-index",$tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, $expectResult, $offRate); # require 1 or more results
+		last if(++$tests > $limit * 2);
 	}
 
 	$in = $inner;
@@ -1186,8 +1219,9 @@ for(; $outer > 0; $outer--) {
 		# Run the command to search for the pattern from the Ebwt
 		my $oneHit = (int(rand(3)) == 0);
 		my $policy = pickPolicy($pe);
-		$pass += search($tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
-		last if(++$tests > $limit);
+		$pass += search("${bowtie}",$tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
+        $pass += search("${bowtie} --large-index",$tstr, $cstr, $pe, $color, $pfinal1, $pfinal2, $policy, $oneHit, 0, $offRate); # do not require any results
+		last if(++$tests > $limit * 2);
 	}
 }
 
