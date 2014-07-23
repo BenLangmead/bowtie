@@ -64,8 +64,8 @@ Obtaining Bowtie
 
 You may download either Bowtie sources or binaries for your platform
 from the [Download] section of the Sourceforge project site.  Binaries
-are currently available for Intel architectures (`i386` and `x86_64`)
-running Linux, Windows, and Mac OS X.
+are currently available for 64-bit Intel architectures running Linux,
+Windows, and Mac OS X.
 
 Building from source
 --------------------
@@ -82,11 +82,11 @@ sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
 To support the [`-p`] (multithreading) option, Bowtie needs the
-`pthreads` library on posix platforms like linux or will try to 
-use native Win32 threads on Windows. For threading synchronization
-bowtie is using by default a spinlocking mechanism. Spinlocking is
-in general much faster. However if the need arise to not use spinlocking
-bowtie can also be compiled using EXTRA_FLAGS=-DNO_SPINLOCK parameter.
+`pthreads` library on posix platforms like linux or will try to use
+native threads on Windows. For threading synchronization Bowtie is using
+by default a spinlocking mechanism. Spinlocking is in general much
+faster. However if the need arise to not use spinlocking Bowtie can also
+be compiled using `EXTRA_FLAGS=-DNO_SPINLOCK` parameter.
 
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
@@ -546,35 +546,36 @@ Wrapper scripts
 
 [Wrapper scripts]: #wrapper-scripts
 
-The bowtie, bowtie-build and bowtie-inspect executables are actually wrapper scripts that call binary programs as appropriate. The wrappers shield users from having to distinguish between "small" and "large" index formats, discussed briefly in the following section. The appropiate index type is selected based on the input size.
+The `bowtie`, `bowtie-build` and `bowtie-inspect` executables are
+actually wrapper scripts that call binary programs as appropriate. The
+wrappers shield users from having to distinguish between "small" and
+"large" index formats, discussed briefly in the following section. The
+appropiate index type is selected based on the input size.
 
-It is recommended that you always run the bowtie wrappers and not run the binaries directly.
+It is recommended that you always run the bowtie wrappers and not run
+the binaries directly.
 
 Small and large indexes
 -----------------------
 
 [Small and large indexes]: #small-large-indexes
 
-bowtie-build can index reference genomes of any size. For genomes less than about 4 billion nucleotides in length, bowtie-build builds a "small" index using 32-bit numbers in various parts of the index. When the genome is longer, bowtie-build builds a "large" index using 64-bit numbers. Small indexes are stored in files with the .ebwt extension, and large indexes are stored in files with the .ebwtl extension. The user need not worry about whether a particular index is small or large; the wrapper scripts will automatically build and use the appropriate index.
+`bowtie-build` can index reference genomes of any size. For genomes less
+than about 4 billion nucleotides in length, `bowtie-build` builds a
+"small" index using 32-bit numbers in various parts of the index. When
+the genome is longer, `bowtie-build` builds a "large" index using 64-bit
+numbers. Small indexes are stored in files with the `.ebwt` extension,
+and large indexes are stored in files with the `.ebwtl` extension. The
+user need not worry about whether a particular index is small or large;
+the wrapper scripts will automatically build and use the appropriate
+index.
 
 Performance Tuning
 ------------------
 
 [Performance tuning]: #performance-tuning
 
-1.  Use 64-bit bowtie if possible
-
-    The 64-bit version of Bowtie is substantially (usually more then
-    50%) faster than the 32-bit version, owing to its use of 64-bit
-    arithmetic.  If possible, download the 64-bit binaries for Bowtie
-    and run on a 64-bit computer.  If you are building Bowtie from
-    sources, you may need to pass the `-m64` option to `g++` to compile
-    the 64-bit version; you can do this by including `BITS=64` in the
-    arguments to the `make` command; e.g.: `make BITS=64 bowtie`.  To
-    determine whether your version of bowtie is 64-bit or 32-bit, run
-    `bowtie --version`.
-
-2.  If your computer has multiple processors/cores, use `-p`
+1.  If your computer has multiple processors/cores, use `-p`
 
     The [`-p`] option causes Bowtie to launch a specified number of
     parallel search threads.  Each thread runs on a different
@@ -583,7 +584,7 @@ Performance Tuning
     number of threads (though in practice, speedup is somewhat worse
     than linear).
 
-3.  If reporting many alignments per read, try tweaking
+2.  If reporting many alignments per read, try tweaking
     `bowtie-build --offrate`
 
     If you are using the [`-k`], [`-a`] or [`-m`] options and Bowtie is
@@ -607,7 +608,7 @@ Performance Tuning
     the SA sample, and decreasing by 2 quadruples the memory taken,
     etc.
 
-4.  If bowtie "thrashes", try increasing `bowtie --offrate`
+3.  If bowtie "thrashes", try increasing `bowtie --offrate`
 
     If `bowtie` runs very slow on a relatively low-memory machine
     (having less than about 4 GB of memory), then try setting `bowtie`
