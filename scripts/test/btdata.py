@@ -23,7 +23,7 @@ class LargeTestsData(object):
         curr_path           = os.path.join(curr_path,'scripts')
         curr_path           = os.path.join(curr_path,'test')
         self.data_dir_path  = os.path.join(curr_path,self.data_dir)
-        self.reads_dir_path = os.path.join(curr_path,'reads')
+        self.reads_dir_path = os.path.join(self.data_dir_path,'reads')
         
         try:
             os.stat(self.data_dir_path)
