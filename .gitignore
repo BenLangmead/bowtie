@@ -1,0 +1,15 @@
+bowtie-align-l
+bowtie-align-l-debug
+bowtie-align-s
+bowtie-align-s-debug
+bowtie-build-l
+bowtie-build-l-debug
+bowtie-build-s
+bowtie-build-s-debug
+bowtie-inspect-l
+bowtie-inspect-l-debug
+bowtie-inspect-s
+bowtie-inspect-s-debug
+.tmp*
+*.dSYM
+*.xcodeproj

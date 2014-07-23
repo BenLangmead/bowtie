@@ -5,7 +5,7 @@ Bowtie NEWS
 
    Bowtie is now available for download.  0.9.0 is the first version to
 be released under the OSI Artistic License (see `LICENSE') and freely
-available to the public for download.  The current version is 0.12.10.
+available to the public for download.  The current version is 1.1.0.
 
 Reporting Issues
 ================
@@ -33,8 +33,9 @@ Version 1.1.0 - July 19, 2014
      accordingly.
    * Phased out CygWin support.
    * Improved efficiency of index files loading.
-   * Fixed a bug that made the inspector fail in some situations.
-
+   * Fixed a bug that made bowtie-inspect fail in some situations.
+   * (This release was briefly given version number 2.0.0, but we changed it
+     to 1.1.0 to avoid confusion with Bowtie 2.)
 
 Version 1.0.1 - March 14, 2014
    * Improved index querying efficiency using "population count" instructions
