@@ -161,13 +161,14 @@ eliminates strand bias by forcing Bowtie to select one strand or the
 other with a probability that is proportional to the number of best
 sites on the strand.
 
-Gapped alignments are not currently supported, but support is planned
-for a future release.
+Gapped alignments are not currently supported in Bowtie, but they are
+supported in [Bowtie 2].
 
 [the -n alignment mode]: #the--n-alignment-mode
 [the -v alignment mode]: #the--v-alignment-mode
 [High Performance Tips]: #high-performance-tips
 [Maq]: http://maq.sf.net
+[Bowtie 2]: http://bowtie-bio.sourceforge.net/bowtie2
 
 The `-n` alignment mode
 -----------------------
@@ -1958,11 +1959,13 @@ The `bowtie-build` indexer
 ==========================
 
 `bowtie-build` builds a Bowtie index from a set of DNA sequences.
-`bowtie-build` outputs a set of 6 files with suffixes
-`.1.ebwt`, `.2.ebwt`, `.3.ebwt`, `.4.ebwt`, `.rev.1.ebwt`, and
-`.rev.2.ebwt`.  These files together constitute the index: they are all
-that is needed to align reads to that reference.  The original sequence
-files are no longer used by Bowtie once the index is built.  
+`bowtie-build` outputs a set of 6 files with suffixes `.1.ebwt`,
+`.2.ebwt`, `.3.ebwt`, `.4.ebwt`, `.rev.1.ebwt`, and `.rev.2.ebwt`.  (If
+the total length of all the input sequences is greater than about 4
+billion, then the index files will end in `ebwtl` instead of `ebwt`.) 
+These files together constitute the index: they are all that is needed
+to align reads to that reference.  The original sequence files are no
+longer used by Bowtie once the index is built.  
 
 Use of Karkkainen's [blockwise algorithm] allows `bowtie-build` to
 trade off between running time and memory usage. `bowtie-build` has
