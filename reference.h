@@ -139,7 +139,7 @@ public:
 		for(TIndexOffU i = 0; i < sz; i++) {
 			recs_.push_back(RefRecord(f3, swap));
 		}
-		for(uint32_t i = 0; i < sz; i++) {
+		for(TIndexOffU i = 0; i < sz; i++) {
 			if(recs_[i].first) {
 				if(nrefs_ > 0) {
 					refLens_.push_back(cumlen);
@@ -191,6 +191,8 @@ public:
 				//cerr << "First record in reference index file was not marked as 'first'" << endl;
 				//throw 1;
 			}
+			cumUnambig_.push_back(cumsz);
+			cumRefOff_.push_back(cumlen);
 			cumsz += recs_[i].len;
 #ifdef ACCOUNT_FOR_ALL_GAP_REFS
 			cumlen += recs_[i].off;
@@ -215,6 +217,8 @@ public:
 			refApproxLens_.push_back(cumlen);
 		}
 		refLens_.push_back(cumlen);
+		cumUnambig_.push_back(cumsz);
+		cumRefOff_.push_back(cumlen);
 		bufSz_ = cumsz;
 		assert_eq(nNoGapRefs_, refApproxLens_.size());
 		assert_eq(sz, recs_.size());
@@ -521,21 +525,49 @@ public:
 		uint64_t off = 0;
 		int64_t offset = 4;
 		bool firstStretch = true;
+	        bool binarySearched = false;
+	        uint64_t left  = reci;
+	        uint64_t right = recf;
+	        uint64_t mid   = 0;
 		// For all records pertaining to the target reference sequence...
 		for(uint64_t i = reci; i < recf; i++) {
-			ASSERT_ONLY(uint64_t origBufOff = bufOff);
+			uint64_t origBufOff = bufOff;
 			assert_geq(toff, off);
-			off += recs_[i].off;
-			assert_gt(count, 0);
-			if(toff < off) {
-				size_t cpycnt = min((size_t)(off - toff), count);
-				memset(&dest[cur], 4, cpycnt);
-				count -= cpycnt;
-				toff += cpycnt;
-				cur += cpycnt;
-				if(count == 0) break;
+		if (firstStretch && recf > reci + 16){
+			// binary search finds smallest i s.t. toff >= cumRefOff_[i]
+			while (left < right-1) {
+				mid = left + ((right - left) >> 1);
+				if (cumRefOff_[mid] <= toff)
+					left = mid;
+				else
+					right = mid;
 			}
-			assert_geq(toff, off);
+			off = cumRefOff_[left];
+			bufOff = cumUnambig_[left];
+			origBufOff = bufOff;
+			i = left;
+			assert(cumRefOff_[i+1] == 0 || cumRefOff_[i+1] > toff);
+			binarySearched = true;
+		}
+		off += recs_[i].off; // skip Ns at beginning of stretch
+		assert_gt(count, 0);
+		if(toff < off) {
+			size_t cpycnt = min((size_t)(off - toff), count);
+			memset(&dest[cur], 4, cpycnt);
+			count -= cpycnt;
+			toff += cpycnt;
+			cur += cpycnt;
+			if(count == 0) break;
+		}
+		assert_geq(toff, off);
+		if(toff < off + recs_[i].len) {
+			bufOff += toff - off; // move bufOff pointer forward
+		} else {
+			bufOff += recs_[i].len;
+		}
+		off += recs_[i].len;
+		assert(off == cumRefOff_[i+1] || cumRefOff_[i+1] == 0);
+		assert(!binarySearched || toff < off);
 			if(toff < off + recs_[i].len) {
 				bufOff += (toff - off); // move bufOff pointer forward
 			} else {
@@ -691,6 +723,8 @@ protected:
 	std::vector<uint32_t>  refApproxLens_; /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<TIndexOffU>  refLens_;    /// approx lens of ref seqs (excludes trailing ambig chars)
 	std::vector<TIndexOffU>  refOffs_;    /// buf_ begin offsets per ref seq
+	std::vector<TIndexOffU>  cumUnambig_;    /// # unambig ref chars up to each record
+	std::vector<TIndexOffU>  cumRefOff_;    /// # ref chars up to each record
 	std::vector<TIndexOffU>  refRecOffs_; /// record begin/end offsets per ref seq
 	std::vector<uint32_t>  expandIdx_; /// map from small idxs (e.g. w/r/t plen) to large ones (w/r/t refnames)
 	std::vector<uint32_t>  shrinkIdx_; /// map from large idxs to small
