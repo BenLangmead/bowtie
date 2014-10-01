@@ -14,10 +14,10 @@ Date: 12/15/2012
      in versions where it's not supported.
 
 2. Check that all the simple tests pass:
-   - perl scripts/test/simple_tests.pl --bowtie=./bowtie-debug --bowtie-build=./bowtie-build-debug
+   perl scripts/test/simple_tests.pl --bowtie=./bowtie --bowtie-build=./bowtie-build
 
 3. Check that random tests pass:
-   - sh scripts/random_bowtie_tests_p.sh
+   sh scripts/test/random_bowtie_tests_p.sh
 
 4. Check that performance, sensitivity and accuracy are not substantially
    changed.  (Need infrastructure for this!)

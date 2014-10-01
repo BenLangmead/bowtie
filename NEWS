@@ -26,6 +26,13 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+Version 1.1.1 - Oct 1, 2014
+   * Fixed a compiling linkage problem related with Mavericks OSX.
+   * Improved performance for cases where the reference contains ambiguous 
+     or masked nucleobases represented by Ns.
+   * Some minor automatic tests updates. 
+
+
 Version 1.1.0 - July 19, 2014
    * Added support for large and small indexes, removing 4-billion-nucleotide
      barrier.  Bowtie can now be used with reference genomes of any size.

@@ -349,7 +349,7 @@ bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
 	rm -rf .bin.tmp
 	mkdir .bin.tmp
 	mkdir .bin.tmp/bowtie-$(VERSION)
-	if [ -f bowtie.exe ] ; then \
+	if [ -f bowtie-align-s.exe ] ; then \
 		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
 		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \

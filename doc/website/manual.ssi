@@ -1,5 +1,5 @@
 <h1>Table of Contents</h1>
-<p>Bowtie 1.1.0</p>
+<p>Bowtie 1.1.1</p>
 
 <div id="TOC">
 <ul>
@@ -1177,3 +1177,4 @@ Sequence-N  &lt;name&gt;  &lt;len&gt;</code></pre>
 
 <p>Print usage information and quit.</p>
 </td></tr></table>
+
