@@ -144,7 +144,8 @@ BIN_LIST = bowtie-build-s \
            bowtie-align-s \
            bowtie-align-l \
            bowtie-inspect-s \
-           bowtie-inspect-l
+           bowtie-inspect-l 
+
 BIN_LIST_AUX = bowtie-build-s-debug \
                bowtie-build-l-debug \
                bowtie-align-s-debug \
@@ -160,7 +161,6 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
                SeqAn-1.1 \
-               bowtie \
                bowtie-build \
                bowtie-inspect \
                doc/manual.html \
