@@ -5,8 +5,8 @@
 
 <h2>1.1.1 - 10/1/2014</h2>
 <ul>
-   <li> Fixed a compiling linkage problem related with Mavericks OSX.</li>
-   <li> Improved performance for cases where the reference contains ambiguous or masked nucleobases represented by Ns.</li>
+   <li> Fixed a compiling linkage problem related with Mac OS X Mavericks.</li>
+   <li> Improved performance for cases where the reference contains many stretches of Ns.</li>
    <li> Some minor automatic tests updates.</li>
 </ul>
 
