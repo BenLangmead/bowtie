@@ -10,12 +10,12 @@ public:
 	}
 
 	void msg(const char *s) {
-		tthread::lock_guard<MUTEX_T> guard(mutex_m);
+		GUARD_LOCK(mutex_m);
 		std::cout << s << std::endl;
 	}
 
 	void msg(const std::string& s) {
-		tthread::lock_guard<MUTEX_T> guard(mutex_m);
+		GUARD_LOCK(mutex_m);
 		std::cout << s << std::endl;
 	}
 

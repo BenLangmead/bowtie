@@ -29,6 +29,7 @@
 #include "aligner_seed_mm.h"
 #include "aligner_metrics.h"
 #include "sam.h"
+#include "ebwt_search.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
 #endif
@@ -1136,8 +1137,12 @@ static HitSink*               exactSearch_sink;
 static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
+#ifdef WITH_TBB
+void exactSearchWorker::operator()() {
+#else
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1180,8 +1185,12 @@ static void exactSearchWorker(void *vp) {
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
+#ifdef WITH_TBB
+void exactSearchWorkerStateful::operator()() {
+#else
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
@@ -1304,16 +1313,27 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		if(!refs->loaded()) throw 1;
 	}
 	exactSearch_refs   = refs;
-
+#ifdef WITH_TBB
+	tbb::task_group tbb_grp;
+#else
 	AutoArray<tthread::thread*> threads(nthreads);
 	AutoArray<int> tids(nthreads);
-
+#endif
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 
-		for(int i = 0; i < nthreads; i++) {
-			tids[i] = i+1;
+		for(int i = 1; i <= nthreads; i++) {
+#ifdef WITH_TBB
+			if(stateful) {
+				tbb_grp.run(exactSearchWorkerStateful(i));
+			} else {
+				tbb_grp.run(exactSearchWorker(i));
+			}
+		}
+		tbb_grp.wait();
+#else
+			tids[i] = i;
 			if(stateful) {
                                 threads[i] = new tthread::thread(exactSearchWorkerStateful, (void*)&tids[i]);
 			} else {
@@ -1321,9 +1341,9 @@ static void exactSearch(PairedPatternSource& _patsrc,
 			}
 		}
 
-		for(int i = 0; i < nthreads; i++) 
+		for(int i = 1; i <= nthreads; i++)
                     threads[i]->join();
-
+#endif
 	}
 	if(refs != NULL) delete refs;
 }
@@ -1349,8 +1369,12 @@ static BitPairReference*              mismatchSearch_refs;
 /**
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
+#ifdef WITH_TBB
+void mismatchSearchWorkerFullStateful::operator()() {
+#else
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource&   _patsrc = *mismatchSearch_patsrc;
 	HitSink&               _sink   = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
@@ -1430,9 +1454,12 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	delete pool;
 	return;
 }
-
+#ifdef WITH_TBB
+void mismatchSearchWorkerFull::operator()(){
+#else
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource&   _patsrc   = *mismatchSearch_patsrc;
 	HitSink&               _sink     = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw    = *mismatchSearch_ebwtFw;
@@ -1520,24 +1547,38 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	}
 	mismatchSearch_refs = refs;
 
+#ifdef WITH_TBB
+	tbb::task_group tbb_grp;
+#else
 	AutoArray<tthread::thread*> threads(nthreads);
 	AutoArray<int> tids(nthreads);
+#endif
 
     CHUD_START();
     {
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
 
-		for(int i = 0; i < nthreads; i++) {
-			tids[i] = i+1;
-			if(stateful)
+		for(int i = 1; i <= nthreads; i++) {
+#ifdef WITH_TBB
+			if(stateful) {
+				tbb_grp.run(mismatchSearchWorkerFullStateful(i));
+			} else {
+				tbb_grp.run(mismatchSearchWorkerFull(i));
+			}
+		}
+		tbb_grp.wait();
+#else
+			tids[i] = i;
+			if(stateful) {
                                 threads[i] = new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids[i]);
-			else
+			} else {
                                 threads[i] = new tthread::thread(mismatchSearchWorkerFull, (void*)&tids[i]);
+			}
 		}
 
-		for(int i = 0; i < nthreads; i++) 
+		for(int i = 1; i <= nthreads; i++)
                     threads[i]->join();
-
+#endif
     }
 	if(refs != NULL) delete refs;
 }
@@ -1624,28 +1665,16 @@ static SyncBitset*                    twoOrThreeMismatchSearch_hitMask;
 static bool                           twoOrThreeMismatchSearch_two;
 static BitPairReference*              twoOrThreeMismatchSearch_refs;
 
-#define TWOTHREE_WORKER_SETUP() \
-	int tid = *((int*)vp); \
-	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;   \
-	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;     \
-	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;       \
-	bool                           two      = twoOrThreeMismatchSearch_two; \
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
-	PatternSourcePerThread* patsrc = patsrcFact->create(); \
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink); \
-	HitSinkPerThread* sink = sinkFact->create(); \
-	/* Per-thread initialization */ \
-	EbwtSearchParams<String<Dna> > params( \
-			*sink,       /* HitSink */ \
-	        os,          /* reference sequences */ \
-	        true,        /* read is forward */ \
-	        true);       /* index is forward */
 
 /**
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
+#ifdef WITH_TBB
+void twoOrThreeMismatchSearchWorkerStateful::operator()(){
+#else
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
@@ -1728,9 +1757,26 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	delete pool;
 	return;
 }
-
+#ifdef WITH_TBB
+void twoOrThreeMismatchSearchWorkerFull::operator()(){
+#else
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
-	TWOTHREE_WORKER_SETUP();
+	int tid = *((int*)vp);
+#endif
+	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
+	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
+	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
+	bool                           two      = twoOrThreeMismatchSearch_two;
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread* patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThread* sink = sinkFact->create();
+	/* Per-thread initialization */
+	EbwtSearchParams<String<Dna> > params(
+			*sink,       /* HitSink */
+	        os,          /* reference sequences */
+	        true,        /* read is forward */
+	        true);       /* index is forward */
 	Ebwt<String<Dna> >& ebwtFw = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *twoOrThreeMismatchSearch_ebwtBw;
 	const BitPairReference* refs = twoOrThreeMismatchSearch_refs;
@@ -1851,22 +1897,37 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_hitMask  = NULL;
 	twoOrThreeMismatchSearch_two      = two;
 
+#ifdef WITH_TBB
+	tbb::task_group tbb_grp;
+#else
 	AutoArray<tthread::thread*> threads(nthreads);
 	AutoArray<int> tids(nthreads);
+#endif
 
         CHUD_START();
     {
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
-		for(int i = 0; i < nthreads; i++) {
-			tids[i] = i+1;
-			if(stateful)
-                            threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids[i]);
-			else
-                            threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)&tids[i]);
+		for(int i = 1; i <= nthreads; i++) {
+#ifdef WITH_TBB
+			if(stateful) {
+				tbb_grp.run(twoOrThreeMismatchSearchWorkerStateful(i));
+			} else {
+				tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(i));
+			}
+		}
+		tbb_grp.wait();
+#else
+			tids[i] = i;
+			if(stateful) {
+                                threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids[i]);
+			} else {
+                                threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids[i]);
+			}
 		}
 
-		for(int i = 0; i < nthreads; i++) 
+		for(int i = 1; i <= nthreads; i++)
                     threads[i]->join();
+#endif
     }
 	if(refs != NULL) delete refs;
 	return;
@@ -1884,25 +1945,26 @@ static PartialAlignmentManager* seededQualSearch_pamRc;
 static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
-#define SEEDEDQUAL_WORKER_SETUP() \
-	int tid = *((int*)vp); \
-	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;    \
-	HitSink&                 _sink      = *seededQualSearch_sink;      \
-	vector<String<Dna5> >&   os         = *seededQualSearch_os;        \
-	int                      qualCutoff = seededQualSearch_qualCutoff; \
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid); \
-	PatternSourcePerThread* patsrc = patsrcFact->create(); \
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink); \
-	HitSinkPerThread* sink = sinkFact->create(); \
-	/* Per-thread initialization */ \
-	EbwtSearchParams<String<Dna> > params( \
-	        *sink,       /* HitSink */ \
-	        os,          /* reference sequences */ \
-	        true,        /* read is forward */ \
-	        true);       /* index is forward */
-
+#ifdef WITH_TBB
+void seededQualSearchWorkerFull::operator()(){
+#else
 static void seededQualSearchWorkerFull(void *vp) {
-	SEEDEDQUAL_WORKER_SETUP();
+	int tid = *((int*)vp);
+#endif
+	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	HitSink&                 _sink      = *seededQualSearch_sink;
+	vector<String<Dna5> >&   os         = *seededQualSearch_os;
+	int                      qualCutoff = seededQualSearch_qualCutoff;
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThread* patsrc = patsrcFact->create();
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThread* sink = sinkFact->create();
+	/* Per-thread initialization */
+	EbwtSearchParams<String<Dna> > params(
+	        *sink,       /* HitSink */
+	        os,          /* reference sequences */
+	        true,        /* read is forward */
+	        true);       /* index is forward */
 	Ebwt<String<Dna> >& ebwtFw = *seededQualSearch_ebwtFw;
 	Ebwt<String<Dna> >& ebwtBw = *seededQualSearch_ebwtBw;
 	PartialAlignmentManager * pamRc = NULL;
@@ -2077,9 +2139,12 @@ static void seededQualSearchWorkerFull(void *vp) {
 	}
 	WORKER_EXIT();
 }
-
+#ifdef WITH_TBB
+void seededQualSearchWorkerFullStateful::operator()(){
+#else
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
+#endif
 	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
@@ -2229,8 +2294,12 @@ static void seededQualCutoffSearchFull(
 	}
 	seededQualSearch_refs = refs;
 
+#ifdef WITH_TBB
+	tbb::task_group tbb_grp;
+#else
 	AutoArray<tthread::thread*> threads(nthreads);
 	AutoArray<int> tids(nthreads);
+#endif
 
 	SWITCH_TO_FW_INDEX();
 	assert(!ebwtBw.isInMemory());
@@ -2244,17 +2313,27 @@ static void seededQualCutoffSearchFull(
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
 
-		for(int i = 0; i < nthreads; i++) {
-			tids[i] = i+1;
-			if(stateful)
+		for(int i = 1; i <= nthreads; i++) {
+#ifdef WITH_TBB
+			if(stateful) {
+				tbb_grp.run(seededQualSearchWorkerFullStateful(i));
+			} else {
+				tbb_grp.run(seededQualSearchWorkerFull(i));
+			}
+		}
+		tbb_grp.wait();
+#else
+			tids[i] = i;
+			if(stateful) {
                                 threads[i] = new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids[i]);
-			else
+			} else {
                                 threads[i] = new tthread::thread(seededQualSearchWorkerFull, (void*)&tids[i]);
+			}
 		}
 
-		for(int i = 0; i < nthreads; i++) 
+		for(int i = 1; i <= nthreads; i++)
                     threads[i]->join();
-
+#endif
 	}
 	if(refs != NULL) {
 		delete refs;
