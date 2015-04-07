@@ -238,7 +238,7 @@ public:
 	 */
 	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
-		tbb::spin_mutex(mutex_m);
+		GUARD_LOCK(mutex_m);
 		getPartialsUnsync(patid, ps);
 	}
 
