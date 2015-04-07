@@ -81,7 +81,13 @@ endif
 PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
-LIBS = $(PTHREAD_LIB)
+ifeq (1,$(WITH_TBB))
+	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+	EXTRA_FLAGS += -DWITH_TBB
+else
+	LIBS = $(PTHREAD_LIB)
+endif
+
 SEARCH_LIBS = 
 BUILD_LIBS =
 INSPECT_LIBS = 
@@ -92,7 +98,11 @@ ifeq (1,$(MINGW))
 endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
-             edit.cpp ebwt.cpp tinythread.cpp
+             edit.cpp ebwt.cpp
+ifneq (1,$(WITH_TBB))
+	OTHER_CPPS += tinythread.cpp
+endif
+
 SEARCH_CPPS = qual.cpp pat.cpp ebwt_search_util.cpp ref_aligner.cpp \
               log.cpp hit_set.cpp refmap.cpp annot.cpp sam.cpp \
               color.cpp color_dec.cpp hit.cpp
