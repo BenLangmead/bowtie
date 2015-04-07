@@ -1316,8 +1316,8 @@ static void exactSearch(PairedPatternSource& _patsrc,
 #ifdef WITH_TBB
 	tbb::task_group tbb_grp;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	AutoArray<tthread::thread*> threads(nthreads+1);
+	AutoArray<int> tids(nthreads+1);
 #endif
 	CHUD_START();
 	{
@@ -1550,8 +1550,8 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #ifdef WITH_TBB
 	tbb::task_group tbb_grp;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	AutoArray<tthread::thread*> threads(nthreads+1);
+	AutoArray<int> tids(nthreads+1);
 #endif
 
     CHUD_START();
@@ -1900,8 +1900,8 @@ static void twoOrThreeMismatchSearchFull(
 #ifdef WITH_TBB
 	tbb::task_group tbb_grp;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	AutoArray<tthread::thread*> threads(nthreads+1);
+	AutoArray<int> tids(nthreads+1);
 #endif
 
         CHUD_START();
@@ -2297,8 +2297,8 @@ static void seededQualCutoffSearchFull(
 #ifdef WITH_TBB
 	tbb::task_group tbb_grp;
 #else
-	AutoArray<tthread::thread*> threads(nthreads);
-	AutoArray<int> tids(nthreads);
+	AutoArray<tthread::thread*> threads(nthreads+1);
+	AutoArray<int> tids(nthreads+1);
 #endif
 
 	SWITCH_TO_FW_INDEX();
