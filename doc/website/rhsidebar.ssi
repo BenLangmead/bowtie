@@ -154,6 +154,13 @@
       </tr></table>
       </td></tr>
 
+      <!-- H. sapiens, NCBI GRCh38 no_alt -->
+      <tr><td>
+        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/GRCh38_no_alt.zip"><i>H. sapiens</i>, NCBI GRCh38</a>
+        </td><td align="right">
+          <b>2.7 GB</b>
+      </td></tr>
+
       <!-- mm8 -->
       <tr><td>
         <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/mm8.ebwt.zip"><i>M. musculus</i>, UCSC mm8</a>
