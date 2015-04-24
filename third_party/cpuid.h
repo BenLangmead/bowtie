@@ -65,6 +65,7 @@
 #define bit_FSGSBASE	(1 << 0)
 #define bit_BMI		(1 << 3)
 
+#ifndef __aarch64__
 #if defined(__i386__) && defined(__PIC__)
 /* %ebx may be the PIC register.  */
 #if __GNUC__ >= 3
@@ -122,41 +123,6 @@ __get_cpuid_max (unsigned int __ext, unsigned int *__sig)
 {
   unsigned int __eax, __ebx, __ecx, __edx;
 
-#ifndef __x86_64__
-#if __GNUC__ >= 3
-  /* See if we can use cpuid.  On AMD64 we always can.  */
-  __asm__ ("pushf{l|d}\n\t"
-	   "pushf{l|d}\n\t"
-	   "pop{l}\t%0\n\t"
-	   "mov{l}\t{%0, %1|%1, %0}\n\t"
-	   "xor{l}\t{%2, %0|%0, %2}\n\t"
-	   "push{l}\t%0\n\t"
-	   "popf{l|d}\n\t"
-	   "pushf{l|d}\n\t"
-	   "pop{l}\t%0\n\t"
-	   "popf{l|d}\n\t"
-	   : "=&r" (__eax), "=&r" (__ebx)
-	   : "i" (0x00200000));
-#else
-/* Host GCCs older than 3.0 weren't supporting Intel asm syntax
-   nor alternatives in i386 code.  */
-  __asm__ ("pushfl\n\t"
-	   "pushfl\n\t"
-	   "popl\t%0\n\t"
-	   "movl\t%0, %1\n\t"
-	   "xorl\t%2, %0\n\t"
-	   "pushl\t%0\n\t"
-	   "popfl\n\t"
-	   "pushfl\n\t"
-	   "popl\t%0\n\t"
-	   "popfl\n\t"
-	   : "=&r" (__eax), "=&r" (__ebx)
-	   : "i" (0x00200000));
-#endif
-
-  if (!((__eax ^ __ebx) & 0x00200000))
-    return 0;
-#endif
 
   /* Host supports cpuid.  Return highest supported cpuid input value.  */
   __cpuid (__ext, __eax, __ebx, __ecx, __edx);
@@ -182,6 +148,16 @@ __get_cpuid (unsigned int __level,
   if (__get_cpuid_max (__ext, 0) < __level)
     return 0;
 
-  __cpuid (__level, *__eax, *__ebx, *__ecx, *__edx);
+   __cpuid (__level, *__eax, *__ebx, *__ecx, *__edx);
   return 1;
 }
+#endif
+#ifdef __aarch64__ 
+static __inline int
+__get_cpuid (unsigned int __level,
+             unsigned int *__eax, unsigned int *__ebx,
+             unsigned int *__ecx, unsigned int *__edx)
+{
+  return 1;
+}
+#endif

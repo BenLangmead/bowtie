@@ -119,14 +119,22 @@ ifeq (1,$(LINUX))
     ifeq (x86_64, $(shell uname -p))
         BITS=64
     endif
+    ifeq (aarch64, $(shell uname -p))
+        BITS=64
+    endif
 endif
 
 ifeq (32,$(BITS))
     $(error bowtie2 compilation requires a 64-bit platform )
 endif
 
-DEBUG_FLAGS = -O0 -g3 -m64
-RELEASE_FLAGS = -O3 -m64
+ifeq (aarch64, $(shell uname -p))
+    DEBUG_FLAGS = -O0 -g3
+    RELEASE_FLAGS = -O3
+else
+    DEBUG_FLAGS = -O0 -g3 -m64
+    RELEASE_FLAGS = -O3 -m64
+endif
 NOASSERT_FLAGS = -DNDEBUG
 FILE_FLAGS = -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
 
@@ -135,7 +143,8 @@ BIN_LIST = bowtie-build-s \
            bowtie-align-s \
            bowtie-align-l \
            bowtie-inspect-s \
-           bowtie-inspect-l
+           bowtie-inspect-l 
+
 BIN_LIST_AUX = bowtie-build-s-debug \
                bowtie-build-l-debug \
                bowtie-align-s-debug \
@@ -151,7 +160,6 @@ GENERAL_LIST = $(wildcard scripts/*.sh) \
                $(wildcard reads/e_coli_1000.*) \
                $(wildcard reads/e_coli_1000_*) \
                SeqAn-1.1 \
-               bowtie \
                bowtie-build \
                bowtie-inspect \
                doc/manual.html \
