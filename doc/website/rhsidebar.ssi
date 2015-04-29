@@ -86,21 +86,12 @@
       Bowtie and <a href="bowtie2">Bowtie 2</a> indexes.
       <br/><br/>
     </p>
-      <!-- hg18 -->
+
+      <!-- H. sapiens, NCBI GRCh38 no_alt -->
       <tr><td>
-        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.zip"><i>H. sapiens</i>, UCSC hg18</a>
+        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/GRCh38_no_alt.zip"><i>H. sapiens</i>, NCBI GRCh38</a>
         </td><td align="right">
           <b>2.7 GB</b>
-      </td></tr>
-      <tr><td colspan=2><table width="100%"><tr>
-        <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.1.zip">part 1</a> - 1.7 GB,
-                      <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.2.zip">part 2</a> - 1.0 GB</td>
-      </tr><tr>
-        <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.zip">full</a>, or
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.1.zip">part 1</a>,
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.2.zip">part 2</a></td>
-      </tr></table>
       </td></tr>
 
       <!-- hg19 -->
@@ -120,20 +111,20 @@
       </tr></table>
       </td></tr>
 
-      <!-- H. sapiens, NCBI 36.3 -->
+      <!-- hg18 -->
       <tr><td>
-        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.zip"><i>H. sapiens</i>, NCBI v36</a>
+        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.zip"><i>H. sapiens</i>, UCSC hg18</a>
         </td><td align="right">
           <b>2.7 GB</b>
       </td></tr>
       <tr><td colspan=2><table width="100%"><tr>
-        <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.1.zip">part 1</a> - 1.7 GB,
-                      <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.2.zip">part 2</a> - 1.0 GB</td>
+        <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.1.zip">part 1</a> - 1.7 GB,
+                      <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18.ebwt.2.zip">part 2</a> - 1.0 GB</td>
       </tr><tr>
         <td>&nbsp;colorspace:
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.zip">full</a>, or
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.1.zip">part 1</a>,
-          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.2.zip">part 2</a></td>
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.1.zip">part 1</a>,
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/hg18_c.ebwt.2.zip">part 2</a></td>
       </tr></table>
       </td></tr>
 
@@ -154,11 +145,21 @@
       </tr></table>
       </td></tr>
 
-      <!-- H. sapiens, NCBI GRCh38 no_alt -->
+      <!-- H. sapiens, NCBI 36.3 -->
       <tr><td>
-        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/GRCh38_no_alt.zip"><i>H. sapiens</i>, NCBI GRCh38</a>
+        <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.zip"><i>H. sapiens</i>, NCBI v36</a>
         </td><td align="right">
           <b>2.7 GB</b>
+      </td></tr>
+      <tr><td colspan=2><table width="100%"><tr>
+        <td>&nbsp;or: <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.1.zip">part 1</a> - 1.7 GB,
+                      <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm.ebwt.2.zip">part 2</a> - 1.0 GB</td>
+      </tr><tr>
+        <td>&nbsp;colorspace:
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.zip">full</a>, or
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.1.zip">part 1</a>,
+          <a href="ftp://ftp.ccb.jhu.edu/pub/data/bowtie_indexes/h_sapiens_asm_c.ebwt.2.zip">part 2</a></td>
+      </tr></table>
       </td></tr>
 
       <!-- mm8 -->
