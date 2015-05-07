@@ -50,12 +50,13 @@ def main():
         bin_l += '-debug'
         
     if '--large-index' in options:
-        bin_spec = os.path.join(ex_path,bin_l)
-    elif len(arguments) >= 1:
-        idx_basename = arguments[-1]
+        bin_spec = os.path.join(ex_path, bin_l)
+    elif len(arguments) >= 2:
+        idx_basename = arguments[-2]
         large_idx_exists = os.path.exists(idx_basename + idx_ext_l)
         small_idx_exists = os.path.exists(idx_basename + idx_ext_s)
         if large_idx_exists and not small_idx_exists:
+            logging.info("No small index but a large one is present. Using large index.")
             bin_spec = os.path.join(ex_path,bin_l)
     
     arguments[0] = bin_name
