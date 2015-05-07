@@ -56,6 +56,7 @@ def main():
         large_idx_exists = os.path.exists(idx_basename + idx_ext_l)
         small_idx_exists = os.path.exists(idx_basename + idx_ext_s)
         if large_idx_exists and not small_idx_exists:
+            logging.info("No small index but a large one is present. Inspecting the large index.")
             inspect_bin_spec = os.path.join(ex_path,inspect_bin_l)
     
     arguments[0] = inspect_bin_name
