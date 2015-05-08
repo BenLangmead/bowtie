@@ -2657,7 +2657,8 @@ protected:
 			}
 			// Trim from 3' end
 			dstLen = dstLens[0];
-			charsRead = dstLen + mytrim5;
+			if (fuzzy_)
+				charsRead = dstLen + mytrim5;
 			dstLen -= this->trim3_;
 			// Set trimmed bounds of buffers
 			_setBegin(r.patFw, (Dna5*)r.patBufFw);
@@ -2740,7 +2741,9 @@ protected:
 					}
 				}
 				qualsRead[0] -= this->trim3_;
-				int qRead = (int)(qualsRead[0] - itrim5);
+				int qRead = 0;
+				if (qualsRead[0] > itrim5)
+					qRead = (int)(qualsRead[0] - itrim5);
 				if(qRead < dstLen) {
 					tooFewQualities(r.name);
 				} else if(qRead > dstLen+1) {
