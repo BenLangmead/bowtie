@@ -2740,7 +2740,9 @@ protected:
 					}
 				}
 				qualsRead[0] -= this->trim3_;
-				int qRead = (int)(qualsRead[0] - itrim5);
+				int qRead = 0;
+				if (qualsRead[0] > itrim5)
+					qRead = (int)(qualsRead[0] - itrim5);
 				if(qRead < dstLen) {
 					tooFewQualities(r.name);
 				} else if(qRead > dstLen+1) {
