@@ -938,6 +938,17 @@ ASCII characters, e.g., `II?I`....  Integers are treated as being on
 the [Phred quality] scale unless [`--solexa-quals`] is also specified.
 Default: off.
 
+</td></tr><tr><td id="bowtie-options-large-index">
+
+[`--large-index`]: #bowtie-options-large-index
+
+    --large-index
+
+</td><td>
+
+Force usage of a 'large' index (those ending in '.ebwtl'), even if a
+small one is present. Default: off.
+
 </td></tr></table>
 
 #### Alignment
