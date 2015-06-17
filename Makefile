@@ -2,6 +2,9 @@
 # Makefile for bowtie, bowtie-build, bowtie-inspect
 #
 
+prefix = /usr/local
+bindir = $(prefix)/bin
+
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC) -I third_party
@@ -381,6 +384,14 @@ doc/manual.html: MANUAL.markdown
 
 MANUAL: MANUAL.markdown
 	perl doc/strip_markdown.pl < $^ > $@
+
+.PHONY: install
+install: all
+	mkdir -p $(DESTDIR)$(bindir)
+	for file in $(BIN_LIST) bowtie-inspect bowtie-build bowtie ; do \
+		cp -f $$file $(DESTDIR)$(bindir) ; \
+	done
+
 
 .PHONY: clean
 clean:
