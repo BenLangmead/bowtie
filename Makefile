@@ -48,6 +48,11 @@ ifneq (,$(findstring Darwin,$(shell uname)))
 		CC = clang
 		EXTRA_FLAGS += -stdlib=libstdc++
 	endif
+	ifneq (,$(findstring 14,$(shell uname -r)))
+		CPP = clang++
+		CC = clang
+		EXTRA_FLAGS += -stdlib=libstdc++
+	endif
 endif
 
 LINUX = 0
