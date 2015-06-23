@@ -76,16 +76,24 @@ directory, and run GNU `make` (usually with the command `make`, but
 sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
-To support the `-p` (multithreading) option, Bowtie needs the
-`pthreads` library on posix platforms like linux or will try to use
-native threads on Windows. For threading synchronization Bowtie is using
-by default a spinlocking mechanism. Spinlocking is in general much
-faster. However if the need arise to not use spinlocking Bowtie can also
-be compiled using `EXTRA_FLAGS=-DNO_SPINLOCK` parameter.
+To build Bowtie including support for the `-p` (multithreading) option,
+we recommend that you first install the [Thread Building Blocks library],
+also known as TBB, and build using `make WITH_TBB=1`.  TBB is installed
+by default on many operating systems.
+
+If TBB is not available, then omit the `WITH_TBB=1` option.  On Linux or
+Mac OS X, this requires the pthreads library, which is installed by
+default.  On Windows, native Windows threads will be used, which require
+no special libraries.
+
+For threading synchronization Bowtie uses by default a spinlocking
+mechanism. This can be disabled (leading to a more heavyweight locking
+mechanism) by specifying `EXTRA_FLAGS=-DNO_SPINLOCK` when building.
 
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
+[Thread Building Blocks library]: https://www.threadingbuildingblocks.org
 [Download]: https://sourceforge.net/projects/bowtie-bio/files/bowtie/
 
 The `bowtie` aligner
@@ -566,7 +574,13 @@ Performance Tuning
     number of threads (though in practice, speedup is somewhat worse
     than linear).
 
-2.  If reporting many alignments per read, try tweaking
+2.  If using `-p`, use the Threading Building Blocks library if possible
+
+    In our experiments, we find the Threading Building Blocks (TBB)
+    library gives the best thread scaling.  TBB is disabled by default
+    but it can be enabled by building from source using `make WITH_TBB=1`.
+
+3.  If reporting many alignments per read, try tweaking
     `bowtie-build --offrate`
 
     If you are using the `-k`, `-a` or `-m` options and Bowtie is
@@ -590,7 +604,7 @@ Performance Tuning
     the SA sample, and decreasing by 2 quadruples the memory taken,
     etc.
 
-3.  If bowtie "thrashes", try increasing `bowtie --offrate`
+4.  If bowtie "thrashes", try increasing `bowtie --offrate`
 
     If `bowtie` runs very slow on a relatively low-memory machine
     (having less than about 4 GB of memory), then try setting `bowtie`

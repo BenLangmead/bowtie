@@ -26,6 +26,22 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
+Version 1.1.2 - Jun 23, 2015
+   * Fixed the building process for OSX Yosemite.
+   * Added the install target for linux to better aid package building process 
+     and the overall installation process.
+   * Added the Intel TBB option which provides in most situations a better performance
+     output. TBB is not present by default in the current build but can be added 
+     by compiling the source code with WITH_TBB=1 option.
+   * Fixed a minor issue related with managing the number of threads spawned.
+   * Fixed a minor issue which may have caused a memory leak after an exception
+     was thrown.
+   * Fixed a bug that caused bowtie to crash if a read was trimmed more than the 
+     read's lenght on 5 prime end.
+   * Added some minor corrections/addition to the manual.
+   * Fixed a bug that caused the wrapper to incorrectly identify the bowtie binary.
+
+
 Version 1.1.1 - Oct 1, 2014
    * Fixed a compiling linkage problem related with Mavericks OSX.
    * Improved performance for cases where the reference contains ambiguous 

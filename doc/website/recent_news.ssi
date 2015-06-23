@@ -3,6 +3,18 @@
    <li>Lighter is an extremely fast and memory-efficient program for correcting sequencing errors in DNA sequencing data.  For details on how error correction can help improve the speed and accuracy of downstream analysis tools, see the <a href="http://genomebiology.com/2014/15/11/509">paper in Genome Biology</a>.  Source and software <a href="https://github.com/mourisl/Lighter">available at GitHub</a>.
 </ul>
 
+<h2>1.1.2 - 6/23/2015</h2>
+<ul>
+   <li>  Fixed the building process for OSX Yosemite.</li>
+   <li>  Added the install target for linux to better aid package building process and the overall installation process.</li>
+   <li>  Added the Intel TBB option which provides in most situations a better performance output. TBB is not present by default in the current build but can be added by compiling the source code with WITH_TBB=1 option.</li>
+   <li>  Fixed a minor issue related with managing the number of threads spawned.</li>
+   <li>  Fixed a minor issue which may have caused a memory leak after an exception was thrown.</li>
+   <li>  Fixed a bug that caused bowtie to crash if a read was trimmed more than the read's lenght on 5 prime end.</li>
+   <li>  Added some minor corrections/addition to the manual.</li>
+   <li>  Fixed a bug that caused the wrapper to incorrectly identify the bowtie binary.</li>
+</ul>
+
 <h2>1.1.1 - 10/1/2014</h2>
 <ul>
    <li> Fixed a compiling linkage problem related with Mac OS X Mavericks.</li>
