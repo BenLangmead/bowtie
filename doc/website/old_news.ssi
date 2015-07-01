@@ -1,3 +1,39 @@
+<h2>Myrna paper out - 8/11/10</h2>
+<ul>
+ <li>
+   The provisional version of the <a href="http://genomebiology.com/2010/11/8/R83/abstract">Myrna paper</a>
+   appeared today in <a href="http://genomebiology.com/">Genome Biology</a>.  See the <a href="http://bowtie-bio.sourceforge.net/myrna">Myrna site</a>
+   for details about the software.
+</ul>
+
+<h2>Myrna released - 7/22/10</h2>
+<ul>
+  <li><a href="myrna">Myrna</a> is cloud-scale tool for calculating differential gene
+      expression in large RNA-seq datasets.  It is very similar to
+      Crossbow in design and philosophy; e.g. it uses Bowtie, it's
+      "tri-mode" (runs in the cloud or on a Hadoop cluster or a single
+      computer), it has a <a href="myrna/ui.html">web-form-based GUI</a> for
+      composing and submitting cloud jobs, and its cloud mode uses
+      <a href="http://aws.amazon.com/elasticmapreduce/">Elastic MapReduce</a>.
+</ul>
+
+<h2>Major update to Crossbow - 7/22/10</h2>
+<ul>
+  <li><a href="crossbow">Crossbow</a> has received a major update to
+      version 1.0.4.  New features:
+  <ul>
+   <li>New "tri-mode" design; Crossbow jobs can be run in the cloud
+      (on <a href="http://aws.amazon.com/">Amazon AWS</a>),
+      on a <a href="http://hadoop.apache.org/">Hadoop</a> cluster,
+      or on a single computer, exploiting multiple processor cores
+   <li>Added a <a href="crossbow/ui.html">web-form-based GUI</a> for composing and submitting cloud jobs.
+   <li>Cloud version of Crossbow now runs on
+       <a href="http://aws.amazon.com/elasticmapreduce/">Elastic MapReduce</a>
+       (EMR) rather than directly on
+       <a href="http://aws.amazon.com/ec2/">Elastic Compute Cloud</a> (EC2).
+  </ul>
+</ul>
+
 <h2>Cufflinks paper out - 5/3/10</h2>
 <ul>
   <li>The <a href="http://www.nature.com/nbt/journal/vaop/ncurrent/abs/nbt.1621.html#/">Cufflinks paper</a>,
