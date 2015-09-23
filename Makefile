@@ -8,7 +8,7 @@ bindir = $(prefix)/bin
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC) -I third_party
-CPP = g++
+CPP = g++ -w
 CXX = $(CPP)
 CC = gcc
 HEADERS = $(wildcard *.h)
@@ -80,6 +80,13 @@ else
     PTHREAD_LIB = -lpthread
 endif
 
+ifeq (1,$(WITH_TBB))
+	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+	EXTRA_FLAGS += -DWITH_TBB
+else
+	LIBS = $(PTHREAD_LIB)
+endif
+
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
     EXTRA_FLAGS += -DPOPCNT_CAPABILITY
@@ -89,12 +96,6 @@ endif
 PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
-ifeq (1,$(WITH_TBB))
-	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
-	EXTRA_FLAGS += -DWITH_TBB
-else
-	LIBS = $(PTHREAD_LIB)
-endif
 
 SEARCH_LIBS = 
 BUILD_LIBS =
@@ -103,6 +104,14 @@ INSPECT_LIBS =
 ifeq (1,$(MINGW))
     BUILD_LIBS = 
     INSPECT_LIBS = 
+endif
+
+ifeq (1,$(WITH_THREAD_PROFILING))
+	override EXTRA_FLAGS += -DPER_THREAD_TIMING=1
+endif
+
+ifeq (1,$(WITH_FINE_TIMER))
+	override EXTRA_FLAGS += -DUSE_FINE_TIMER=1
 endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
@@ -405,3 +414,4 @@ clean:
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
 	rm -f core.*
+	rm -f bowtie-align-s-master* bowtie-align-s-no-io* 

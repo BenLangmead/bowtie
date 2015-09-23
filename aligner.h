@@ -22,6 +22,16 @@
 #include "aligner_metrics.h"
 #include "search_globals.h"
 
+#ifdef PER_THREAD_TIMING
+/// Based on http://stackoverflow.com/questions/16862620/numa-get-current-node-core
+void get_cpu_and_node(int& cpu, int& node) {
+	unsigned long a,d,c;
+	__asm__ volatile("rdtscp" : "=a" (a), "=d" (d), "=c" (c));
+	node = (c & 0xFFF000)>>12;
+	cpu = c & 0xFFF;
+}
+#endif
+
 /**
  * State machine for carrying out an alignment, which usually consists
  * of a series of phases that conduct different alignments using
@@ -229,13 +239,38 @@ public:
 	 * Advance an array of aligners in parallel, using prefetches to
 	 * try to hide all the latency.
 	 */
-	void run(bool verbose = false) {
+	void run(bool verbose = false, int tid = -1) {
+#ifdef PER_THREAD_TIMING
+		uint64_t ncpu_changeovers = 0;
+		uint64_t nnuma_changeovers = 0;
+		
+		int current_cpu = 0, current_node = 0;
+		get_cpu_and_node(current_cpu, current_node);
+	
+		std::stringstream ss;
+		std::string msg;
+		ss << "thread: " << tid << " time: ";
+		msg = ss.str();
+		Timer timer(std::cout, msg.c_str());
+#endif
 		bool done = false;
 		bool first = true;
 		if(n_ == 1) {
 			Aligner *al = seOrPe_[0] ? (*alignersSE_)[0] : (*alignersPE_)[0];
 			PatternSourcePerThread *ps = (*patsrcs_)[0];
 			while(!done) {
+#ifdef PER_THREAD_TIMING
+				int cpu = 0, node = 0;
+				get_cpu_and_node(cpu, node);
+				if(cpu != current_cpu) {
+					ncpu_changeovers++;
+					current_cpu = cpu;
+				}
+				if(node != current_node) {
+					nnuma_changeovers++;
+					current_node = node;
+				}
+#endif
 				done = true;
 				if(!first && !al->done) {
 					// Advance an aligner already in progress; this is
@@ -267,6 +302,18 @@ public:
 			}
 		} else {
 			while(!done) {
+#ifdef PER_THREAD_TIMING
+				int cpu = 0, node = 0;
+				get_cpu_and_node(cpu, node);
+				if(cpu != current_cpu) {
+					ncpu_changeovers++;
+					current_cpu = cpu;
+				}
+				if(node != current_node) {
+					nnuma_changeovers++;
+					current_node = node;
+				}
+#endif
 				done = true;
 				for(uint32_t i = 0; i < n_; i++) {
 					Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
@@ -301,6 +348,13 @@ public:
 				first = false;
 			}
 		}
+#ifdef PER_THREAD_TIMING
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
+#endif
 	}
 
 protected:

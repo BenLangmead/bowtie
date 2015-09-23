@@ -1260,7 +1260,7 @@ static void exactSearchWorkerStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -1445,7 +1445,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -1748,7 +1748,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -2230,7 +2230,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 	if(metrics != NULL) {
