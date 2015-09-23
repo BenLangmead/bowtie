@@ -1173,12 +1173,44 @@ static void exactSearchWorker(void *vp) {
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		#include "search_exact.c"
 	}
 	FINISH_READ(patsrc);
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	WORKER_EXIT();
 }
 
@@ -1491,7 +1523,32 @@ static void mismatchSearchWorkerFull(void *vp){
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		uint32_t plen = length(patFw);
@@ -1504,6 +1561,13 @@ static void mismatchSearchWorkerFull(void *vp){
 		#undef DONEMASK_SET
 	} // End read loop
 	FINISH_READ(patsrc);
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
     WORKER_EXIT();
 }
 
@@ -1838,7 +1902,32 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false,          // considerQuals
 	        true);          // halfAndHalf
 	bool skipped = false;
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) { // Read read-in loop
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
@@ -1853,6 +1942,13 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#undef DONEMASK_SET
 	}
 	FINISH_READ(patsrc);
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	// Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -2115,7 +2211,32 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        !noMaqRound);
 	String<QueryMutation> muts;
 	bool skipped = false;
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		uint32_t plen = (uint32_t)length(patFw);
@@ -2137,6 +2258,13 @@ static void seededQualSearchWorkerFull(void *vp) {
 		delete pamRc;
 		delete pamFw;
 	}
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	WORKER_EXIT();
 }
 #ifdef WITH_TBB
