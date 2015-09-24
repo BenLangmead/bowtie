@@ -381,9 +381,9 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
-            numWrapper_mutex_m.lock();
+            //numWrapper_mutex_m.lock();
             _numWrappers++;
-            numWrapper_mutex_m.unlock();
+            //numWrapper_mutex_m.unlock();
 	}
 
 	/**
@@ -426,18 +426,18 @@ public:
 			bool diff = false;
 			if(i > start) {
 				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
-				if(diff) unlock(hs[i-1].h.first);
+				//if(diff) unlock(hs[i-1].h.first);
 			}
 			ostringstream ss(ssmode_);
 			ss.rdbuf()->pubsetbuf(buf, 4096);
 			append(ss, h);
 			if(i == start || diff) {
-				lock(h.h.first);
+				//lock(h.h.first);
 			}
 			out(h.h.first).writeChars(buf, ss.tellp());
 		}
-		unlock(hs[end-1].h.first);
-		GUARD_LOCK(main_mutex_m);
+		//unlock(hs[end-1].h.first);
+		//GUARD_LOCK(main_mutex_m);
 		commitHits(hs);
 		first_ = false;
 		numAligned_++;
@@ -555,7 +555,7 @@ public:
 	 * for example, outputting a read to an unaligned-read file.
 	 */
 	void mainlock() {
-                main_mutex_m.lock();
+                //main_mutex_m.lock();
 	}
 
 	/**
@@ -563,7 +563,7 @@ public:
 	 * when, for example, outputting a read to an unaligned-read file.
 	 */
 	void mainunlock() {
-                main_mutex_m.unlock();
+                //main_mutex_m.unlock();
 	}
 
 	/**
@@ -609,7 +609,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
-				GUARD_LOCK(dumpAlignLock_);
+				//GUARD_LOCK(dumpAlignLock_);
 				if(dumpAl_ == NULL) {
 					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
@@ -628,7 +628,7 @@ public:
 			// Dump paired-end read to an aligned-read file (or pair of
 			// files) of the same format
 			if(!dumpAlBase_.empty()) {
-				GUARD_LOCK(dumpAlignLockPE_);
+				//GUARD_LOCK(dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
 					assert(dumpAlQv_1_ == NULL);
 					assert(dumpAlQv_2_ == NULL);
@@ -663,7 +663,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
-				GUARD_LOCK(dumpUnalLock_);
+				//GUARD_LOCK(dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
 					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
@@ -682,7 +682,7 @@ public:
 			// Dump paired-end read to an unaligned-read file (or pair
 			// of files) of the same format
 			if(!dumpUnalBase_.empty()) {
-				GUARD_LOCK(dumpUnalLockPE_);
+				//GUARD_LOCK(dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
 					assert(dumpUnal_1_ == NULL);
 					assert(dumpUnal_2_ == NULL);
@@ -718,7 +718,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
-				GUARD_LOCK(dumpMaxLock_);
+				//GUARD_LOCK(dumpMaxLock_);
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
@@ -735,7 +735,7 @@ public:
 			// Dump paired-end read to a maxed-out-read file (or pair
 			// of files) of the same format
 			if(!dumpMaxBase_.empty()) {
-				GUARD_LOCK(dumpMaxLockPE_);
+				//GUARD_LOCK(dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
 					assert(dumpMaxQv_1_ == NULL);
 					assert(dumpMaxQv_2_ == NULL);
@@ -763,7 +763,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-		GUARD_LOCK(main_mutex_m);
+		//GUARD_LOCK(main_mutex_m);
 		numMaxed_++;
 	}
 
@@ -772,7 +772,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		GUARD_LOCK(main_mutex_m);
+		//GUARD_LOCK(main_mutex_m);
 		numUnaligned_++;
 	}
 
@@ -781,7 +781,7 @@ protected:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
 		assert(h.repOk());
-		GUARD_LOCK(main_mutex_m);
+		//GUARD_LOCK(main_mutex_m);
 		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
@@ -809,7 +809,7 @@ protected:
 	 */
 	void lock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
-		_locks[strIdx]->lock();
+		//_locks[strIdx]->lock();
 	}
 
 	/**
@@ -820,7 +820,7 @@ protected:
 	 */
 	void unlock(size_t refIdx) {
 		size_t strIdx = refIdxToStreamIdx(refIdx);
-		_locks[strIdx]->unlock();
+		//_locks[strIdx]->unlock();
 	}
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
@@ -1536,9 +1536,9 @@ protected:
 		HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
-		lock(h.h.first);
+		//lock(h.h.first);
 		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
+		//unlock(h.h.first);
 	}
 
 private:
@@ -1673,9 +1673,9 @@ protected:
 		ostringstream ss;
 		append(ss, h);
 		// Make sure to grab lock before writing to output stream
-		lock(h.h.first);
+		//lock(h.h.first);
 		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
+		//unlock(h.h.first);
 	}
 
 private:
