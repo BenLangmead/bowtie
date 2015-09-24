@@ -1094,7 +1094,8 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 	if(randReadsNoSync) {
 		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
 	} else {
-		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
+		//patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
+		patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc);
 	}
 	assert(patsrcFact != NULL);
 	return patsrcFact;

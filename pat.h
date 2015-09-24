@@ -370,6 +370,7 @@ struct ReadBuf {
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
+
 /**
  * Encapsulates a synchronized source of patterns; usually a file.
  * Handles dumping patterns to a logfile (useful for debugging).  Also
@@ -696,10 +697,10 @@ public:
 			if(seqan::empty(ra.patFw)) {
 				// If patFw is empty, that's our signal that the
 				// input dried up
-				lock();
+				//lock();
 				if(cur + 1 > cur_) cur_++;
 				cur = cur_;
-				unlock();
+				//unlock();
 				continue; // on to next pair of PatternSources
 			}
 			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
@@ -796,9 +797,9 @@ public:
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-            lock();
+            //lock();
             uint32_t cur = cur_;
-            unlock();
+            //unlock();
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
 				// Patterns from srca_[cur_] are unpaired
@@ -806,10 +807,10 @@ public:
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
-					lock();
+					//lock();
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
-					unlock();
+					//unlock();
 					continue; // on to next pair of PatternSources
 				}
 				ra.patid = patid;
@@ -821,7 +822,7 @@ public:
 				uint32_t patid_b = 0;
 				// Lock to ensure that this thread gets parallel reads
 				// in the two mate files
-				lock();
+				//lock();
 				srca_[cur]->nextRead(ra, patid_a);
 				srcb_[cur]->nextRead(rb, patid_b);
 				bool cont = false;
@@ -843,17 +844,17 @@ public:
 						rb.fixMateName(2);
 					}
 				}
-				unlock();
+				//unlock();
 				if(cont) continue; // on to next pair of PatternSources
 				ra.fixMateName(1);
 				rb.fixMateName(2);
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
-					lock();
+					//lock();
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
-					unlock();
+					//unlock();
 					continue; // on to next pair of PatternSources
 				}
 				assert_eq(patid_a, patid_b);
@@ -996,6 +997,33 @@ private:
 	PairedPatternSource& patsrc_;
 };
 
+struct rawSeq {
+	string id;
+	string seq;
+	string qual;
+};
+
+class MemoryMockPatternSourcePerThread : public PatternSourcePerThread {
+public:
+	MemoryMockPatternSourcePerThread(PairedPatternSource& __patsrc) : i(0),loop_iter(1) {}
+
+	/**
+	 * Get the next paired or unpaired read from the wrapped
+	 * PairedPatternSource.
+	 */
+	virtual void nextReadPair();
+		/*bool& success,
+		bool& done,
+		bool& paired,
+		bool fixName);*/
+
+private:
+	void dump();
+	int i;
+	int loop_iter;
+	static const rawSeq raw_list[];
+};
+
 /**
  * Abstract parent factory for PatternSourcePerThreads.
  */
@@ -1028,6 +1056,37 @@ private:
 	/// Container for obtaining paired reads from PatternSources
 	PairedPatternSource& patsrc_;
 };
+
+class MemoryMockPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
+public:
+	MemoryMockPatternSourcePerThreadFactory(PairedPatternSource& patsrc) :
+		patsrc_(patsrc) { }
+
+	/**
+	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
+	 */
+	virtual PatternSourcePerThread* create() const {
+		return new MemoryMockPatternSourcePerThread(patsrc_);
+	}
+
+	/**
+	 * Create a new heap-allocated vector of heap-allocated
+	 * WrappedPatternSourcePerThreads.
+	 */
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
+		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+		for(size_t i = 0; i < n; i++) {
+			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
+
+private:
+	/// Container for obtaining paired reads from PatternSources
+	PairedPatternSource& patsrc_;
+};
+
 
 /**
  * Encapsualtes a source of patterns where each raw pattern is trimmed
@@ -1077,34 +1136,34 @@ public:
 	/** Get the next random read and set patid */
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// Begin critical section
-		lock();
+		//lock();
 		if(readCnt_ >= numReads_) {
 			r.clearAll();
-			unlock();
+			//unlock();
 			return;
 		}
 		uint32_t ra = rand_.nextU32();
 		patid = (uint32_t)readCnt_;
 		readCnt_++;
-		unlock();
+		//unlock();
 		fillRandomRead(r, ra, length_, patid);
 	}
 
 	/** Get the next random read and set patid */
 	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// Begin critical section
-		lock();
+		//lock();
 		if(readCnt_ >= numReads_) {
 			ra.clearAll();
 			rb.clearAll();
-			unlock();
+			//unlock();
 			return;
 		}
 		uint32_t rna = rand_.nextU32();
 		uint32_t rnb = rand_.nextU32();
 		patid = (uint32_t)readCnt_;
 		readCnt_++;
-		unlock();
+		//unlock();
 		fillRandomRead(ra, rna, length_, patid);
 		fillRandomRead(rb, rnb, length_, patid);
 	}
@@ -1402,9 +1461,9 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
-		lock();
+		//lock();
 		if(cur_ >= v_.size()) {
-			unlock();
+			//unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
 			r.clearAll();
@@ -1423,7 +1482,7 @@ public:
 		cur_++;
 		readCnt_++;
 		patid = (uint32_t)readCnt_;
-		unlock();
+		//unlock();
 	}
 	/**
 	 * This is unused, but implementation is given for completeness.
@@ -1436,9 +1495,9 @@ public:
 			paired_ = true;
 			cur_ <<= 1;
 		}
-		lock();
+		//lock();
 		if(cur_ >= v_.size()-1) {
-			unlock();
+			//unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
 			ra.clearAll();
@@ -1465,7 +1524,7 @@ public:
 		cur_++;
 		readCnt_++;
 		patid = (uint32_t)readCnt_;
-		unlock();
+		//unlock();
 	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
@@ -1540,7 +1599,7 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		lock();
+		//lock();
 		bool notDone = true;
 		do {
 			read(r, patid);
@@ -1550,7 +1609,7 @@ public:
 			notDone = seqan::empty(r.patFw) && !fb_.eof();
 		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
-			unlock();
+			//unlock();
 			r.clearAll();
 			assert(seqan::empty(r.patFw));
 			return;
@@ -1575,7 +1634,7 @@ public:
 			filecur_++;
 		}
 		// Leaving critical region
-		unlock();
+		//unlock();
 		// If r.patFw is empty, then the caller knows that we are
 		// finished with the reads
 	}
@@ -1585,7 +1644,7 @@ public:
 	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		lock();
+		//lock();
 		bool notDone = true;
 		do {
 			readPair(ra, rb, patid);
@@ -1595,7 +1654,7 @@ public:
 			notDone = seqan::empty(ra.patFw) && !fb_.eof();
 		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
-			unlock();
+			//unlock();
 			ra.clearAll();
 			rb.clearAll();
 			assert(seqan::empty(ra.patFw));
@@ -1621,7 +1680,7 @@ public:
 			filecur_++;
 		}
 		// Leaving critical region
-		unlock();
+		//unlock();
 		// If ra.patFw is empty, then the caller knows that we are
 		// finished with the reads
 	}

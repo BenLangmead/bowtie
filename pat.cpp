@@ -11,6 +11,51 @@
 using namespace std;
 using namespace seqan;
 
+const rawSeq MemoryMockPatternSourcePerThread::raw_list[] = {
+#include "rawseqs.h"
+};
+
+void MemoryMockPatternSourcePerThread::dump(){
+	// not needed it for general debuggin purpose
+	using std::cerr;
+	using std::endl;
+	cerr << raw_list[this->i].id.c_str() << endl;
+}
+
+void MemoryMockPatternSourcePerThread::nextReadPair()
+	/*bool& success,
+	bool& done,
+	bool& paired,
+	bool fixName)*/
+{
+	// automate conversion from FASTQ to raw_list
+	ASSERT_ONLY(TReadId lastRdId = rdid_);
+	if (this->i > 1999) {
+		if (this->loop_iter > 99) {
+			done = true;
+			//return false;
+			return;
+		}
+		else {
+			this->i = 0;
+			this->loop_iter++;
+		}
+	}
+	//ASSERT_ONLY(dump());
+	success = true;
+	paired = false;
+	buf1_.init(
+			raw_list[this->i].id.c_str(),
+			raw_list[this->i].seq.c_str(),
+			raw_list[this->i].qual.c_str()
+	);
+	this->i++;
+	this->rdid_ = this->endid_ = this->i;
+	assert(!success || rdid_ != lastRdId);
+	//return success;
+	return;
+}
+
 /**
  * Parse a single quality string from fb and store qualities in r.
  * Assume the next character obtained via fb.get() is the first
