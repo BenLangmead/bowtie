@@ -22,6 +22,31 @@ void MemoryMockPatternSourcePerThread::dump(){
 	cerr << raw_list[this->i].id.c_str() << endl;
 }
 
+void MemoryMockPatternSourcePerThread::init_read(const char* patname,const char* seq,const char* quals)
+{
+		int length = strlen(seq);
+		for(int i = 0; i < length; i++) {
+			//ra = RandomSource::nextU32(ra) >> 8;
+			//r.patBufFw[i]           = (ra & 3);
+			assert_in(toupper(seq[i]), "ACGTN");
+			buf1_.patBufFw[i]           = charToDna5[seq[i]];
+			//char c                  = 'I' - ((ra >> 2) & 31);
+			buf1_.qualBuf[i]            = quals[i];
+		}
+		//buf1_.nameBuf = patname;
+		memcpy(buf1_.nameBuf, patname, strlen(patname));
+		_setBegin (buf1_.patFw, (Dna5*)buf1_.patBufFw);
+		_setLength(buf1_.patFw, length);
+		_setBegin (buf1_.qual, buf1_.qualBuf);
+		_setLength(buf1_.qual, length);
+		//itoa10(patid, buf1_.nameBuf);
+		_setBegin(buf1_.name, buf1_.nameBuf);
+		_setLength(buf1_.name, strlen(buf1_.nameBuf));
+		buf1_.constructRevComps();
+		buf1_.constructReverses();
+		//printf("done initing new read %s %s %s\n",buf1_.patBufFw,buf1_.qualBuf,buf1_.nameBuf);
+}
+
 void MemoryMockPatternSourcePerThread::nextReadPair()
 	/*bool& success,
 	bool& done,
@@ -29,11 +54,13 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 	bool fixName)*/
 {
 	// automate conversion from FASTQ to raw_list
-	ASSERT_ONLY(TReadId lastRdId = rdid_);
+	ASSERT_ONLY(uint32_t lastRdId = patid_);
 	if (this->i > 1999) {
 		if (this->loop_iter > 99) {
-			done = true;
+			//done = true;
 			//return false;
+			buf1_.clearAll();
+			buf2_.clearAll();
 			return;
 		}
 		else {
@@ -42,16 +69,18 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 		}
 	}
 	//ASSERT_ONLY(dump());
-	success = true;
-	paired = false;
-	buf1_.init(
+	//success = true;
+	//paired = false;
+		//printf("just about to init a new read\n");
+	init_read(
 			raw_list[this->i].id.c_str(),
 			raw_list[this->i].seq.c_str(),
 			raw_list[this->i].qual.c_str()
 	);
+		//printf("just after to init a new read\n");
 	this->i++;
-	this->rdid_ = this->endid_ = this->i;
-	assert(!success || rdid_ != lastRdId);
+	this->patid_ = this->i;
+	//assert(!success || rdid_ != lastRdId);
 	//return success;
 	return;
 }

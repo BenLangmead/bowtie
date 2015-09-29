@@ -1016,9 +1016,11 @@ public:
 		bool& done,
 		bool& paired,
 		bool fixName);*/
+	
 
 private:
 	void dump();
+	void init_read(const char* patname,const char* seq,const char* quals);
 	int i;
 	int loop_iter;
 	static const rawSeq raw_list[];
