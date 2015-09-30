@@ -12,7 +12,7 @@ using namespace std;
 using namespace seqan;
 
 const rawSeq MemoryMockPatternSourcePerThread::raw_list[] = {
-#include "rawseqs.h"
+#include "rawseqs50.h"
 };
 
 void MemoryMockPatternSourcePerThread::dump(){
