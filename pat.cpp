@@ -56,7 +56,7 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 	// automate conversion from FASTQ to raw_list
 	ASSERT_ONLY(uint32_t lastRdId = patid_);
 	if (this->i > 1999) {
-		if (this->loop_iter > 99) {
+		if (this->loop_iter > 120) {
 			//done = true;
 			//return false;
 			buf1_.clearAll();
