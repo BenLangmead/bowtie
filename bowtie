@@ -52,7 +52,7 @@ def main():
     if '--large-index' in options:
         bin_spec = os.path.join(ex_path, bin_l)
     elif len(arguments) >= 2:
-        idx_basename = arguments[-2]
+        idx_basename = arguments[-3]
         large_idx_exists = os.path.exists(idx_basename + idx_ext_l)
         small_idx_exists = os.path.exists(idx_basename + idx_ext_s)
         if large_idx_exists and not small_idx_exists:
