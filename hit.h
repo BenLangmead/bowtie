@@ -419,7 +419,8 @@ public:
 		if(_outs.size() > 1 && end-start > 2) {
 			sort(hs.begin() + start, hs.begin() + end);
 		}
-		char buf[4096];
+		string buf(4096, (char) 0);
+		ostringstream ss(buf, ssmode_);
 		for(size_t i = start; i < end; i++) {
 			const Hit& h = hs[i];
 			assert(h.repOk());
@@ -428,13 +429,13 @@ public:
 				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
 				if(diff) unlock(hs[i-1].h.first);
 			}
-			ostringstream ss(ssmode_);
-			ss.rdbuf()->pubsetbuf(buf, 4096);
+
 			append(ss, h);
 			if(i == start || diff) {
 				lock(h.h.first);
 			}
-			out(h.h.first).writeChars(buf, ss.tellp());
+			out(h.h.first).writeChars(ss.str().c_str(), ss.tellp());
+			ss.seekp(0);
 		}
 		unlock(hs[end-1].h.first);
 		GUARD_LOCK(main_mutex_m);
