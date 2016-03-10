@@ -34,6 +34,14 @@
       </table>
     </ul>
   </div>
+  <h2>Links</h2>
+  <div class="box">
+    <ul>
+      <li><a href="https://github.com/BenLangmead/bowtie">Bowtie GitHub repository</a></li>
+      <li><a href="https://github.com/BenLangmead/bowtie/issues">Report an issue</a></li>
+      <li><a href="https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce">Bowtie Mailing list</a></li>
+    </ul>
+  </div>
   <h2>Related Tools</h2>
   <div class="box">
     <ul>
@@ -373,16 +381,9 @@
       <li>Chris Wilks</li>
     </ul>
   </div>
-  <h2>Links</h2>
+  <h2>Related links</h2>
   <div class="box">
     <ul>
-      <li>Bowtie <a href="https://github.com/BenLangmead/bowtie">GitHub repo</a></li>
-      <li>Bowtie <a href="https://sourceforge.net/projects/bowtie-bio/">sourceforge.net project</a></li>
-      <li><ul>
-        <li>&nbsp;&nbsp;<a href="https://sourceforge.net/tracker/?func=add&group_id=236897&atid=1101609">Request a feature</li>
-        <li>&nbsp;&nbsp;<a href="https://sourceforge.net/tracker/?func=add&group_id=236897&atid=1101606">Report a bug</li>
-        <li>&nbsp;&nbsp;<a href="https://lists.sourceforge.net/lists/listinfo/bowtie-bio-announce">Mailing list</li>
-      </ul></li>
       <li><a href="http://scholar.google.com/scholar?cites=9743535340779752835&as_sdt=20000005&sciodt=0,21&hl=en">Papers citing Bowtie</a></li>
       <li><a href="http://www.jhu.edu/">Johns Hopkins University</a></li>
       <li><a href="http://www.cs.jhu.edu/">JHU Computer Science</a></li>
