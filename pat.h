@@ -411,9 +411,8 @@ public:
 	 * whether locks will be contended.
 	 */
 	void addWrapper() {
-            lock();
-            numWrappers_++;
-            unlock();
+		ThreadSafe ts(&mutex_m);
+		numWrappers_++;
 	}
 
 	/**
@@ -517,24 +516,6 @@ public:
 	virtual void reset() { readCnt_ = 0; }
 
 	/**
-	 * Concrete subclasses call lock() to enter a critical region.
-	 * What constitutes a critical region depends on the subclass.
-	 */
-	void lock() {
-		if(!doLocking_) return; // no contention
-		mutex_m.lock();
-	}
-
-	/**
-	 * Concrete subclasses call unlock() to exit a critical region
-	 * What constitutes a critical region depends on the subclass.
-	 */
-	void unlock() {
-		if(!doLocking_) return; // no contention
-		mutex_m.unlock();
-	}
-
-	/**
 	 * Return the number of reads attempted.
 	 */
 	uint64_t readCnt() const { return readCnt_ - 1; }
@@ -621,21 +602,6 @@ public:
 	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
 	virtual pair<uint64_t,uint64_t> readCnt() const = 0;
 
-	/**
-	 * Lock this PairedPatternSource, usually because one of its shared
-	 * fields is being updated.
-	 */
-	void lock() {
-                mutex_m.lock();
-	}
-
-	/**
-	 * Unlock this PairedPatternSource.
-	 */
-	void unlock() {
-		mutex_m.unlock();
-	}
-
 protected:
 
 	MUTEX_T mutex_m; /// mutex for locking critical regions
@@ -696,10 +662,9 @@ public:
 			if(seqan::empty(ra.patFw)) {
 				// If patFw is empty, that's our signal that the
 				// input dried up
-				lock();
+				ThreadSafe ts(&mutex_m);
 				if(cur + 1 > cur_) cur_++;
 				cur = cur_;
-				unlock();
 				continue; // on to next pair of PatternSources
 			}
 			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
@@ -796,9 +761,8 @@ public:
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
 	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-            lock();
-            uint32_t cur = cur_;
-            unlock();
+		// 'cur' indexes the current pair of PatternSources
+		uint32_t cur = cur_;
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
 				// Patterns from srca_[cur_] are unpaired
@@ -806,10 +770,9 @@ public:
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
-					lock();
+					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
-					unlock();
 					continue; // on to next pair of PatternSources
 				}
 				ra.patid = patid;
@@ -819,41 +782,41 @@ public:
 				// Patterns from srca_[cur_] and srcb_[cur_] are paired
 				uint32_t patid_a = 0;
 				uint32_t patid_b = 0;
+				bool cont = false;
 				// Lock to ensure that this thread gets parallel reads
 				// in the two mate files
-				lock();
-				srca_[cur]->nextRead(ra, patid_a);
-				srcb_[cur]->nextRead(rb, patid_b);
-				bool cont = false;
-				// Did the pair obtained fail to match up?
-				while(patid_a != patid_b) {
-					// Is either input exhausted?  If so, bail.
-					if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
-						seqan::clear(ra.patFw);
-						if(cur + 1 > cur_) cur_++;
-						cur = cur_;
-						cont = true;
-						break;
-					}
-					if(patid_a < patid_b) {
-						srca_[cur]->nextRead(ra, patid_a);
-						ra.fixMateName(1);
-					} else {
-						srcb_[cur]->nextRead(rb, patid_b);
-						rb.fixMateName(2);
+				{
+					ThreadSafe ts(&mutex_m);
+					srca_[cur]->nextRead(ra, patid_a);
+					srcb_[cur]->nextRead(rb, patid_b);
+					// Did the pair obtained fail to match up?
+					while(patid_a != patid_b) {
+						// Is either input exhausted?  If so, bail.
+						if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
+							seqan::clear(ra.patFw);
+							if(cur + 1 > cur_) cur_++;
+							cur = cur_;
+							cont = true;
+							break;
+						}
+						if(patid_a < patid_b) {
+							srca_[cur]->nextRead(ra, patid_a);
+							ra.fixMateName(1);
+						} else {
+							srcb_[cur]->nextRead(rb, patid_b);
+							rb.fixMateName(2);
+						}
 					}
 				}
-				unlock();
 				if(cont) continue; // on to next pair of PatternSources
 				ra.fixMateName(1);
 				rb.fixMateName(2);
 				if(seqan::empty(ra.patFw)) {
 					// If patFw is empty, that's our signal that the
 					// input dried up
-					lock();
+					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
-					unlock();
 					continue; // on to next pair of PatternSources
 				}
 				assert_eq(patid_a, patid_b);
@@ -1076,35 +1039,35 @@ public:
 
 	/** Get the next random read and set patid */
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
-		// Begin critical section
-		lock();
-		if(readCnt_ >= numReads_) {
-			r.clearAll();
-			unlock();
-			return;
+		uint32_t ra;
+		{
+			ThreadSafe ts(&mutex_m);
+			if(readCnt_ >= numReads_) {
+				r.clearAll();
+				return;
+			}
+			ra = rand_.nextU32();
+			patid = (uint32_t)readCnt_;
+			readCnt_++;
 		}
-		uint32_t ra = rand_.nextU32();
-		patid = (uint32_t)readCnt_;
-		readCnt_++;
-		unlock();
 		fillRandomRead(r, ra, length_, patid);
 	}
 
 	/** Get the next random read and set patid */
 	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		// Begin critical section
-		lock();
-		if(readCnt_ >= numReads_) {
-			ra.clearAll();
-			rb.clearAll();
-			unlock();
-			return;
+		uint32_t rna, rnb;
+		{
+			ThreadSafe ts(&mutex_m);
+			if(readCnt_ >= numReads_) {
+				ra.clearAll();
+				rb.clearAll();
+				return;
+			}
+			rna = rand_.nextU32();
+			rnb = rand_.nextU32();
+			patid = (uint32_t)readCnt_;
+			readCnt_++;
 		}
-		uint32_t rna = rand_.nextU32();
-		uint32_t rnb = rand_.nextU32();
-		patid = (uint32_t)readCnt_;
-		readCnt_++;
-		unlock();
 		fillRandomRead(ra, rna, length_, patid);
 		fillRandomRead(rb, rnb, length_, patid);
 	}
@@ -1402,9 +1365,8 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
-		lock();
+		ThreadSafe ts(&mutex_m);
 		if(cur_ >= v_.size()) {
-			unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
 			r.clearAll();
@@ -1423,7 +1385,6 @@ public:
 		cur_++;
 		readCnt_++;
 		patid = (uint32_t)readCnt_;
-		unlock();
 	}
 	/**
 	 * This is unused, but implementation is given for completeness.
@@ -1436,9 +1397,8 @@ public:
 			paired_ = true;
 			cur_ <<= 1;
 		}
-		lock();
+		ThreadSafe ts(&mutex_m);
 		if(cur_ >= v_.size()-1) {
-			unlock();
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
 			ra.clearAll();
@@ -1465,7 +1425,6 @@ public:
 		cur_++;
 		readCnt_++;
 		patid = (uint32_t)readCnt_;
-		unlock();
 	}
 	virtual void reset() {
 		TrimmingPatternSource::reset();
@@ -1480,8 +1439,8 @@ private:
 	vector<String<Dna5> > v_;     /// forward sequences
 	vector<String<char> > quals_; /// quality values parallel to v_
 	vector<String<char> > names_; /// names
-	vector<int> trimmed3_; // names
-	vector<int> trimmed5_; // names
+	vector<int> trimmed3_;        /// # bases trimmed from 3' end
+	vector<int> trimmed5_;        /// # bases trimmed from 5' end
 };
 
 /**
@@ -1540,7 +1499,7 @@ public:
 	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		lock();
+		ThreadSafe ts(&mutex_m);
 		bool notDone = true;
 		do {
 			read(r, patid);
@@ -1550,7 +1509,6 @@ public:
 			notDone = seqan::empty(r.patFw) && !fb_.eof();
 		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
-			unlock();
 			r.clearAll();
 			assert(seqan::empty(r.patFw));
 			return;
@@ -1574,8 +1532,6 @@ public:
 			}
 			filecur_++;
 		}
-		// Leaving critical region
-		unlock();
 		// If r.patFw is empty, then the caller knows that we are
 		// finished with the reads
 	}
@@ -1585,7 +1541,7 @@ public:
 	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		lock();
+		ThreadSafe ts(&mutex_m);
 		bool notDone = true;
 		do {
 			readPair(ra, rb, patid);
@@ -1595,7 +1551,6 @@ public:
 			notDone = seqan::empty(ra.patFw) && !fb_.eof();
 		} while(notDone || (!fb_.eof() && patid < skip_));
 		if(patid < skip_) {
-			unlock();
 			ra.clearAll();
 			rb.clearAll();
 			assert(seqan::empty(ra.patFw));
@@ -1620,8 +1575,6 @@ public:
 			}
 			filecur_++;
 		}
-		// Leaving critical region
-		unlock();
 		// If ra.patFw is empty, then the caller knows that we are
 		// finished with the reads
 	}

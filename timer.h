@@ -3,6 +3,7 @@
 
 #include <ctime>
 #include <iostream>
+#include <sstream>
 #include <iomanip>
 #ifdef USE_FINE_TIMER
 #include <sys/time.h>
@@ -110,13 +111,15 @@ public:
 	void write(ostream& out) {
 		time_t passed = elapsed();
 		// Print the message supplied at construction time followed
-		// by time elapsed formatted HH:MM:SS 
-		unsigned int hours   = (unsigned int)((passed / 60) / 60);
-		unsigned int minutes = (unsigned int)((passed / 60) % 60);
-		unsigned int seconds = (unsigned int)((passed % 60));
-		out << _msg << setfill ('0') << setw (2) << hours << ":"
-		            << setfill ('0') << setw (2) << minutes << ":"
-		            << setfill ('0') << setw (2) << seconds << endl;
+		// by time elapsed formatted HH:MM:SS
+		time_t hours   = (passed / 60) / 60;
+		time_t minutes = (passed / 60) % 60;
+		time_t seconds = (passed % 60);
+		std::ostringstream oss;
+		oss << _msg << setfill ('0') << setw (2) << hours << ":"
+			<< setfill ('0') << setw (2) << minutes << ":"
+			<< setfill ('0') << setw (2) << seconds << endl;
+		out << oss.str().c_str();
 	}
 	
 private:
@@ -132,13 +135,15 @@ static inline void logTime(std::ostream& os, bool nl = true) {
 	time_t now;
 	time(&now);
 	current = localtime(&now);
-	os << setfill('0') << setw(2)
+	std::ostringstream oss;
+	oss << setfill('0') << setw(2)
 	    << current->tm_hour << ":"
 	    << setfill('0') << setw(2)
 	    << current->tm_min << ":"
 	    << setfill('0') << setw(2)
 	    << current->tm_sec;
-	if(nl) os << std::endl;
+	if(nl) oss << std::endl;
+	os << oss.str().c_str();
 }
 
 #endif /*TIMER_H_*/

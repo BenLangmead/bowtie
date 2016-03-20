@@ -250,12 +250,11 @@ void SAMHitSink::reportSamHits(
 		out(0).writeChars(buf, ss.tellp());
 	}
 	unlock(0);
-	mainlock();
+	ThreadSafe ts(&main_mutex_m);
 	commitHits(hs);
 	first_ = false;
 	numAligned_++;
 	numReportedPaired_ += (end-start);
-	mainunlock();
 }
 
 /**

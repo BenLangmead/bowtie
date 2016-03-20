@@ -63,7 +63,6 @@ void _write_impl(TFile& target, Align<TSource, TSpec>& align, TStringContainer& 
 	SEQAN_CHECKPOINT
 
 	typedef Align<TSource, TSpec> const TAlign;
-	typedef typename Row<TAlign>::Type TRow;
 	typedef typename Position<typename Rows<TAlign>::Type>::Type TRowsPosition;
 	typedef typename Position<TAlign>::Type TPosition;
 	TRowsPosition row_count = length(rows(align));

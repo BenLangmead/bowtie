@@ -181,7 +181,7 @@ public:
 	 */
 	void addPartials(uint32_t patid, const vector<PartialAlignment>& ps) {
 		if(ps.size() == 0) return;
-		GUARD_LOCK(mutex_m);
+		ThreadSafe _ts(&mutex_m);
 		size_t origPlSz = _partialsList.size();
 		// Assert that the entry doesn't exist yet
 		assert(_partialsMap.find(patid) == _partialsMap.end());
@@ -238,7 +238,7 @@ public:
 	 */
 	void getPartials(uint32_t patid, vector<PartialAlignment>& ps) {
 		assert_eq(0, ps.size());
-		GUARD_LOCK(mutex_m);
+		ThreadSafe _ts(&mutex_m);
 		getPartialsUnsync(patid, ps);
 	}
 
