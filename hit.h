@@ -805,6 +805,7 @@ protected:
 	void unlock(size_t refIdx) {
 		assert(ts_wrap != NULL);
 		delete ts_wrap;
+		ts_wrap = NULL;
 	}
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
