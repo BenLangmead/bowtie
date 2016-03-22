@@ -70,28 +70,21 @@
 		starvation_counters = new int [num_numa_nodes]();
 		own_global = new bool [num_numa_nodes]();
 		local_locks = new LocalLock [num_numa_nodes];
-		lock_called = new int [num_numa_nodes];
-		lock_released = new int [num_numa_nodes];
 		uint64_t i = 0;
 		for(i=0;i<num_numa_nodes;i++)
 		{
 			local_locks[i].set_id(i+1);
+			starvation_counters[i] = 0;
+			own_global[i] = false;
 		}
 		global_lock = new MUTEX_G();
 	}
 	
 	CohortLock::~CohortLock()
 	{
-		/*uint64_t i=0;
-		for(i=0;i<num_numa_nodes;i++)
-		{
-			printf("thread: %p lock calls/releases for %d numa node: %d/%d\n",this,i,lock_called[i],lock_released[i]);
-		}*/
 		delete[] starvation_counters;
 		delete[] own_global;
 		delete[] local_locks;
-		delete[] lock_called;
-		delete[] lock_released;
 		delete global_lock;
 	}
 
@@ -123,13 +116,11 @@
 		
 	void CohortLock::lock(int numa_idx)
 	{
-		//printf("thread: lock called %d\n",numa_idx);
-		lock_called[numa_idx]++;
-		//get the local lock
+		// get the local lock
 		local_locks[numa_idx].lock();
 		if(!own_global[numa_idx])
 		{
-			//now try for global
+			// now try for global
 			global_lock->lock();
 		}
 		starvation_counters[numa_idx]++;
@@ -148,13 +139,10 @@
 		if(local_locks[numa_idx].fetch_counter() == 0 
 			|| starvation_counters[numa_idx] > STARVATION_LIMIT)
 		{
-			//relinquish global lock
-			//printf("thread: giving up global lock %d\n",numa_idx);
-			lock_released[numa_idx]++;
 			global_lock->unlock();
 			//reset NUMA node specific vars
-			starvation_counters[numa_idx]=0;
-			own_global[numa_idx]=false;
+			starvation_counters[numa_idx] = 0;
+			own_global[numa_idx] = false;
 		}
 		local_locks[numa_idx].unlock();
 	}	
