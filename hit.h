@@ -419,23 +419,23 @@ public:
 			sort(hs.begin() + start, hs.begin() + end);
 		}
 		char buf[4096];
-		for(size_t i = start; i < end; i++) {
-			const Hit& h = hs[i];
-			assert(h.repOk());
-			bool diff = false;
-			if(i > start) {
-				diff = (refIdxToStreamIdx(h.h.first) != refIdxToStreamIdx(hs[i-1].h.first));
-				if(diff) unlock(hs[i-1].h.first);
+		ostringstream ss(ssmode_);
+		ss.rdbuf()->pubsetbuf(buf, 4096);
+		size_t i = start;
+		while(i < end) {
+			size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
+			{
+				ThreadSafe _ts(_locks[strIdx]);
+				do {
+					assert(hs[i].repOk());
+					append(ss, hs[i]);
+					out(hs[i].h.first).writeChars(buf, ss.tellp());
+					ss.clear();
+					i++;
+				} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);
 			}
-			ostringstream ss(ssmode_);
-			ss.rdbuf()->pubsetbuf(buf, 4096);
-			append(ss, h);
-			if(i == start || diff) {
-				lock(h.h.first);
-			}
-			out(h.h.first).writeChars(buf, ss.tellp());
 		}
-		unlock(hs[end-1].h.first);
+		
         ThreadSafe _ts(&main_mutex_m);
 		commitHits(hs);
 		first_ = false;
@@ -782,30 +782,6 @@ protected:
 				_outs[i]->close();
 			}
 		}
-	}
-
-	/**
-	 * Lock the output buffer for the output stream for reference with
-	 * index 'refIdx'.  By default, hits for all references are
-	 * directed to the same output stream, but if --refout is
-	 * specified, each reference has its own reference stream.
-	 */
-	void lock(size_t refIdx) {
-		size_t strIdx = refIdxToStreamIdx(refIdx);
-		assert(ts_wrap == NULL);
-		ts_wrap = new ThreadSafe(_locks[strIdx]);
-	}
-
-	/**
-	 * Lock the output buffer for the output stream for reference with
-	 * index 'refIdx'.  By default, hits for all references are
-	 * directed to the same output stream, but if --refout is
-	 * specified, each reference has its own reference stream.
-	 */
-	void unlock(size_t refIdx) {
-		assert(ts_wrap != NULL);
-		delete ts_wrap;
-		ts_wrap = NULL;
 	}
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
@@ -1522,9 +1498,9 @@ protected:
 		HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
-		lock(h.h.first);
+		
+		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
 	}
 
 private:
@@ -1658,10 +1634,10 @@ protected:
 		if(count) HitSink::reportHit(h);
 		ostringstream ss;
 		append(ss, h);
+
 		// Make sure to grab lock before writing to output stream
-		lock(h.h.first);
+		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 		out(h.h.first).writeString(ss.str());
-		unlock(h.h.first);
 	}
 
 private:
