@@ -89,14 +89,6 @@ struct ReadBuf {
 		_setBegin(patRcRev, NULL);
 		_setBegin(qualRev, NULL);
 		_setBegin(name, NULL);
-		for(int j = 0; j < 3; j++) {
-			_setBegin(altPatFw[j], NULL);
-			_setBegin(altPatFwRev[j], NULL);
-			_setBegin(altPatRc[j], NULL);
-			_setBegin(altPatRcRev[j], NULL);
-			_setBegin(altQual[j], NULL);
-			_setBegin(altQualRev[j], NULL);
-		}
 	}
 
 #define RESET_BUF(str, buf, typ) _setBegin(str, (typ*)buf); _setLength(str, 0); _setCapacity(str, BUF_SIZE);
@@ -108,9 +100,7 @@ struct ReadBuf {
 		patid = 0;
 		readOrigBufLen = 0;
 		qualOrigBufLen = 0;
-		alts = 0;
 		trimmed5 = trimmed3 = 0;
-		fuzzy = false;
 		color = false;
 		primer = '?';
 		trimc = '?';
@@ -122,14 +112,6 @@ struct ReadBuf {
 		RESET_BUF(patRcRev, patBufRcRev, Dna5);
 		RESET_BUF(qualRev, qualBufRev, char);
 		RESET_BUF(name, nameBuf, char);
-		for(int j = 0; j < 3; j++) {
-			RESET_BUF(altPatFw[j], altPatBufFw[j], Dna5);
-			RESET_BUF(altPatFwRev[j], altPatBufFwRev[j], Dna5);
-			RESET_BUF(altPatRc[j], altPatBufRc[j], Dna5);
-			RESET_BUF(altPatRcRev[j], altPatBufRcRev[j], Dna5);
-			RESET_BUF(altQual[j], altQualBuf[j], char);
-			RESET_BUF(altQualRev[j], altQualBufRev[j], char);
-		}
 	}
 
 	void clearAll() {
@@ -140,18 +122,10 @@ struct ReadBuf {
 		seqan::clear(patRcRev);
 		seqan::clear(qualRev);
 		seqan::clear(name);
-		for(int j = 0; j < 3; j++) {
-			seqan::clear(altPatFw[j]);
-			seqan::clear(altPatFwRev[j]);
-			seqan::clear(altPatRc[j]);
-			seqan::clear(altPatRcRev[j]);
-			seqan::clear(altQual[j]);
-			seqan::clear(altQualRev[j]);
-		}
 		trimmed5 = trimmed3 = 0;
 		readOrigBufLen = 0;
 		qualOrigBufLen = 0;
-		color = fuzzy = false;
+		color = false;
 		primer = '?';
 		trimc = '?';
 		seed = 0;
@@ -168,34 +142,22 @@ struct ReadBuf {
 	}
 
 	/**
-	 * Construct reverse complement of the pattern and the fuzzy
-	 * alternative patters.  If read is in colorspace, just reverse
-	 * them.
+	 * Construct reverse complement of the pattern.  If read is in
+	 * colorspace, reverse color string.
 	 */
 	void constructRevComps() {
 		uint32_t len = length();
 		assert_gt(len, 0);
 		RESET_BUF_LEN(patRc, patBufRc, len, Dna5);
-		for(int j = 0; j < alts; j++) {
-			RESET_BUF_LEN(altPatRc[j], altPatBufRc[j], len, Dna5);
-		}
 		if(color) {
 			for(uint32_t i = 0; i < len; i++) {
 				// Reverse the sequence
 				patBufRc[i]  = patBufFw[len-i-1];
-				for(int j = 0; j < alts; j++) {
-					// Reverse the fuzzy alternatives
-					altPatBufRc[j][i] = altPatBufFw[j][len-i-1];
-				}
 			}
 		} else {
 			for(uint32_t i = 0; i < len; i++) {
 				// Reverse-complement the sequence
 				patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
-				for(int j = 0; j < alts; j++) {
-					// Reverse-complement the fuzzy alternatives
-					altPatBufRc[j][i] = (altPatBufFw[j][len-i-1] == 4) ? 4 : (altPatBufFw[j][len-i-1] ^ 3);
-				}
 			}
 		}
 	}
@@ -210,20 +172,10 @@ struct ReadBuf {
 		RESET_BUF_LEN(patFwRev, patBufFwRev, len, Dna5);
 		RESET_BUF_LEN(patRcRev, patBufRcRev, len, Dna5);
 		RESET_BUF_LEN(qualRev, qualBufRev, len, char);
-		for(int j = 0; j < alts; j++) {
-			RESET_BUF_LEN(altPatFwRev[j], altPatBufFwRev[j], len, Dna5);
-			RESET_BUF_LEN(altPatRcRev[j], altPatBufRcRev[j], len, Dna5);
-			RESET_BUF_LEN(altQualRev[j], altQualBufRev[j], len, char);
-		}
 		for(uint32_t i = 0; i < len; i++) {
 			patFwRev[i]  = patFw[len-i-1];
 			patRcRev[i]  = patRc[len-i-1];
 			qualRev[i]   = qual[len-i-1];
-			for(int j = 0; j < alts; j++) {
-				altPatFwRev[j][i] = altPatFw[j][len-i-1];
-				altPatRcRev[j][i] = altPatRc[j][len-i-1];
-				altQualRev[j][i]  = altQual[j][len-i-1];
-			}
 		}
 	}
 
@@ -271,50 +223,7 @@ struct ReadBuf {
 		} else {
 			os << patFw;
 		}
-		os << ' ';
-		// Print out the fuzzy alternative sequences
-		for(int j = 0; j < 3; j++) {
-			bool started = false;
-			if(seqan::length(altQual[j]) > 0) {
-				for(size_t i = 0; i < length(); i++) {
-					if(altQual[j][i] != '!') {
-						started = true;
-					}
-					if(started) {
-						if(altQual[j][i] == '!') {
-							os << '-';
-						} else {
-							if(color) {
-								os << "0123."[(int)altPatFw[j][i]];
-							} else {
-								os << altPatFw[j][i];
-							}
-						}
-					}
-				}
-			}
-			cout << " ";
-		}
 		os << qual << " ";
-		// Print out the fuzzy alternative quality strings
-		for(int j = 0; j < 3; j++) {
-			bool started = false;
-			if(seqan::length(altQual[j]) > 0) {
-				for(size_t i = 0; i < length(); i++) {
-					if(altQual[j][i] != '!') {
-						started = true;
-					}
-					if(started) {
-						os << altQual[j][i];
-					}
-				}
-			}
-			if(j == 2) {
-				os << endl;
-			} else {
-				os << " ";
-			}
-		}
 	}
 
 	static const int BUF_SIZE = 1024;
@@ -326,26 +235,12 @@ struct ReadBuf {
 	String<char>  qual;                // quality values
 	char          qualBuf[BUF_SIZE];   // quality value buffer
 
-	String<Dna5>  altPatFw[3];              // forward-strand sequence
-	uint8_t       altPatBufFw[3][BUF_SIZE]; // forward-strand sequence buffer
-	String<Dna5>  altPatRc[3];              // reverse-complement sequence
-	uint8_t       altPatBufRc[3][BUF_SIZE]; // reverse-complement sequence buffer
-	String<char>  altQual[3];               // quality values for alternate basecalls
-	char          altQualBuf[3][BUF_SIZE];  // quality value buffer for alternate basecalls
-
 	String<Dna5>  patFwRev;               // forward-strand sequence reversed
 	uint8_t       patBufFwRev[BUF_SIZE];  // forward-strand sequence buffer reversed
 	String<Dna5>  patRcRev;               // reverse-complement sequence reversed
 	uint8_t       patBufRcRev[BUF_SIZE];  // reverse-complement sequence buffer reversed
 	String<char>  qualRev;                // quality values reversed
 	char          qualBufRev[BUF_SIZE];   // quality value buffer reversed
-
-	String<Dna5>  altPatFwRev[3];              // forward-strand sequence reversed
-	uint8_t       altPatBufFwRev[3][BUF_SIZE]; // forward-strand sequence buffer reversed
-	String<Dna5>  altPatRcRev[3];              // reverse-complement sequence reversed
-	uint8_t       altPatBufRcRev[3][BUF_SIZE]; // reverse-complement sequence buffer reversed
-	String<char>  altQualRev[3];              // quality values for alternate basecalls reversed
-	char          altQualBufRev[3][BUF_SIZE]; // quality value buffer for alternate basecalls reversed
 
 	// For remembering the exact input text used to define a read
 	char          readOrigBuf[FileBuf::LASTN_BUF_SZ];
@@ -360,8 +255,6 @@ struct ReadBuf {
 	uint32_t      patid;               // unique 0-based id based on order in read file(s)
 	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
 	uint32_t      seed;                // random seed
-	int           alts;                // number of alternatives
-	bool          fuzzy;               // whether to employ fuzziness
 	bool          color;               // whether read is in color space
 	char          primer;              // primer base, for csfasta files
 	char          trimc;               // trimmed color, for csfasta files
@@ -376,7 +269,7 @@ struct ReadBuf {
  * optionally reverses reads and quality strings before returning them,
  * though that is usually more efficiently done by the concrete
  * subclass.  Concrete subclasses should delimit critical sections with
- * calls to lock() and unlock().
+ * ThreadSafe objects.
  */
 class PatternSource {
 public:
@@ -2423,7 +2316,6 @@ public:
 	                   bool solexa_quals = false,
 	                   bool phred64Quals = false,
 	                   bool integer_quals = false,
-	                   bool fuzzy = false,
 	                   uint32_t skip = 0) :
 		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
 		                          dumpfile, verbose,
@@ -2432,7 +2324,6 @@ public:
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals),
-		fuzzy_(fuzzy),
 		color_(color)
 	{ }
 	virtual void reset() {
@@ -2492,10 +2383,8 @@ protected:
 			int c;
 			int dstLen = 0;
 			int nameLen = 0;
-			r.fuzzy = fuzzy_;
 			r.color = color_;
 			r.primer = -1;
-			r.alts = 0;
 			// Pick off the first at
 			if(first_) {
 				c = fb_.get();
@@ -2547,7 +2436,6 @@ protected:
 			int dstLens[] = {0, 0, 0, 0};
 			int *dstLenCur = &dstLens[0];
 			int mytrim5 = this->trim5_;
-			int altBufIdx = 0;
 			if(color_) {
 				// This may be a primer character.  If so, keep it in the
 				// 'primer' field of the read buf and parse the rest of the
@@ -2581,7 +2469,6 @@ protected:
 					if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
 				}
 				if(c == '.') c = 'N';
-				if(fuzzy_ && c == '-') c = 'A';
 				if(isalpha(c)) {
 					// If it's past the 5'-end trim point
 					assert_in(toupper(c), "ACGTN");
@@ -2590,20 +2477,6 @@ protected:
 						sbuf[(*dstLenCur)++] = charToDna5[c];
 					}
 					charsRead++;
-				} else if(fuzzy_ && c == ' ') {
-					trim5 = 0; // disable 5' trimming for now
-					if(charsRead == 0) {
-						c = fb_.get();
-						continue;
-					}
-					charsRead = 0;
-					if(altBufIdx >= 3) {
-						cerr << "At most 3 alternate sequence strings permitted; offending read: " << r.name << endl;
-						throw 1;
-					}
-					// Move on to the next alternate-sequence buffer
-					sbuf = r.altPatBufFw[altBufIdx++];
-					dstLenCur = &dstLens[altBufIdx];
 				}
 				c = fb_.get();
 				if(c < 0) { bail(r); return; }
@@ -2622,7 +2495,6 @@ protected:
 
 			// Now read the qualities
 			if (intQuals_) {
-				assert(!fuzzy_);
 				int qualsRead = 0;
 				char buf[4096];
 				if(color_ && r.primer != -1) mytrim5--;
@@ -2657,7 +2529,6 @@ protected:
 			} else {
 				// Non-integer qualities
 				char *qbuf = r.qualBuf;
-				altBufIdx = 0;
 				trim5 = mytrim5;
 				if(color_ && r.primer != -1) trim5--;
 				int itrim5 = trim5;
@@ -2665,18 +2536,8 @@ protected:
 				int *qualsReadCur = &qualsRead[0];
 				while(true) {
 					c = fb_.get();
-					if (!fuzzy_ && c == ' ') {
+					if(c == ' ') {
 						wrongQualityFormat(r.name);
-					} else if(c == ' ') {
-						trim5 = 0; // disable 5' trimming for now
-						if((*qualsReadCur) == 0) continue;
-						if(altBufIdx >= 3) {
-							cerr << "At most 3 alternate quality strings permitted; offending read: " << r.name << endl;
-							throw 1;
-						}
-						qbuf = r.altQualBuf[altBufIdx++];
-						qualsReadCur = &qualsRead[altBufIdx];
-						continue;
 					}
 					if(c < 0) { bail(r); return; }
 					if (c != '\r' && c != '\n') {
@@ -2708,48 +2569,6 @@ protected:
 				}
 				_setBegin (r.qual, (char*)r.qualBuf);
 				_setLength(r.qual, dstLen);
-
-				if(fuzzy_) {
-					// Trim from 3' end of alternate basecall and quality strings
-					if(this->trim3_ > 0) {
-						for(int i = 1; i < 4; i++) {
-							assert_eq(qualsRead[i], dstLens[i]);
-							qualsRead[i] = dstLens[i] =
-								max<int>(0, dstLens[i] - this->trim3_);
-						}
-					}
-					// Shift to RHS, and install in Strings
-					assert_eq(0, r.alts);
-					for(int i = 1; i < 4; i++) {
-						if(qualsRead[i] == 0) continue;
-						if(qualsRead[i] > dstLen) {
-							// Shift everybody up
-							int shiftAmt = qualsRead[i] - dstLen;
-							for(int j = 0; j < dstLen; j++) {
-								r.altQualBuf[i-1][j]  = r.altQualBuf[i-1][j+shiftAmt];
-								r.altPatBufFw[i-1][j] = r.altPatBufFw[i-1][j+shiftAmt];
-							}
-						} else if (qualsRead[i] < dstLen) {
-							// Shift everybody down
-							int shiftAmt = dstLen - qualsRead[i];
-							for(int j = dstLen-1; j >= shiftAmt; j--) {
-								r.altQualBuf[i-1][j]  = r.altQualBuf[i-1][j-shiftAmt];
-								r.altPatBufFw[i-1][j] = r.altPatBufFw[i-1][j-shiftAmt];
-							}
-							// Fill in unset positions
-							for(int j = 0; j < shiftAmt; j++) {
-								// '!' - indicates no alternate basecall at
-								// this position
-								r.altQualBuf[i-1][j] = (char)33;
-							}
-						}
-						_setBegin (r.altPatFw[i-1], (Dna5*)r.altPatBufFw[i-1]);
-						_setLength(r.altPatFw[i-1], dstLen);
-						_setBegin (r.altQual[i-1], (char*)r.altQualBuf[i-1]);
-						_setLength(r.altQual[i-1], dstLen);
-						r.alts++;
-					}
-				}
 
 				if(c == '\r' || c == '\n') {
 					c = peekOverNewline(fb_);
@@ -2813,7 +2632,6 @@ private:
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
-	bool fuzzy_;
 	bool color_;
 };
 

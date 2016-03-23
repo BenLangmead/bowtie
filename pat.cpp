@@ -101,8 +101,7 @@ int parseQuals(ReadBuf& r,
 void wrongQualityFormat(const String<char>& read_name) {
 	cerr << "Encountered a space parsing the quality string for read " << read_name << endl
 	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl
-	     << "re-run Bowtie with the --integer-quals option.  If this is a FASTQ file with" << endl
-	     << "alternate basecall information, please re-run Bowtie with the --fuzzy option." << endl;
+	     << "re-run Bowtie with the --integer-quals option." << endl;
 	throw 1;
 }
 

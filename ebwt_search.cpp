@@ -124,7 +124,6 @@ static const char * annotMapFile;  // file containing a map from reference coord
 static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
-static bool fuzzy;
 static bool fullRef;
 static bool samNoQnameTrunc; // don't truncate QNAME field at first whitespace
 static bool samNoHead; // don't print any header lines in SAM output
@@ -236,7 +235,6 @@ static void resetOptions() {
 	fastaContLen			= 0;
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
-	fuzzy					= false; // reads will have alternate basecalls w/ qualities
 	fullRef					= false; // print entire reference name instead of just up to 1st space
 	samNoQnameTrunc         = false; // don't truncate at first whitespace?
 	samNoHead				= false; // don't print any header lines in SAM output
@@ -432,7 +430,6 @@ static struct option long_options[] = {
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
-	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"sam",          no_argument,       0,            'S'},
@@ -749,7 +746,6 @@ static void parseOptions(int argc, const char **argv) {
 			}
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
-			case ARG_FUZZY: fuzzy = true; break;
 			case ARG_REPORTSE: reportSe = true; break;
 			case ARG_FULLREF: fullRef = true; break;
 			case ARG_PREFETCH_WIDTH:
@@ -963,10 +959,6 @@ static void parseOptions(int argc, const char **argv) {
 	}
 	if(strata && !allHits && khits == 1 && mhits == 0xffffffff) {
 		cerr << "--strata has no effect unless combined with -m, -a, or -k N where N > 1" << endl;
-		throw 1;
-	}
-	if(fuzzy && (!stateful && !paired)) {
-		cerr << "--fuzzy must be combined with --best or paired-end alignment" << endl;
 		throw 1;
 	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
@@ -2506,7 +2498,7 @@ patsrcFromStrings(int format,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals, fuzzy,
+			                               integerQuals,
 			                               skipReads);
 		case TAB_MATE:
 			return new TabbedPatternSource(seed, reads, color,
