@@ -58,6 +58,7 @@ private:
 	int starvation_limit;
 	volatile int* starvation_counters;
 	volatile bool* own_global;
+	volatile int lockers_numa_idx;
 	MUTEX_G* global_lock;
 	LocalLock* local_locks;
 };

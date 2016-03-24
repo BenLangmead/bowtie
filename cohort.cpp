@@ -2,11 +2,12 @@
 
 #include "cohort.hpp"
 
-	LocalLock::LocalLock()
+	LocalLock::LocalLock() : id(0), local_lock(NULL), local_counter()
 	{
-		this->id=0;
 		local_lock = new MUTEX_L();
-		local_counter = 0;
+		if(local_lock == NULL) {
+			throw 1;
+		}
 #if WITH_QUEUELOCK
 		last_scoped_lock = NULL;
 #endif
@@ -17,9 +18,9 @@
 		//printf("LocalLock destructor b4 %d\n",id);
 		/*if(last_scoped_lock)
 			delete last_scoped_lock;*/
-		if(local_lock)
-			delete local_lock;
-		//printf("LocalLock destructor af %d\n",id);
+		assert(local_lock != NULL);
+		delete local_lock;
+		local_lock = NULL;
 	}
 
 	void LocalLock::set_id(int id)
@@ -78,6 +79,7 @@
 			own_global[i] = false;
 		}
 		global_lock = new MUTEX_G();
+		lockers_numa_idx = -1;
 	}
 	
 	CohortLock::~CohortLock()
@@ -111,7 +113,10 @@
 
 	void CohortLock::lock()
 	{
-		this->lock(this->determine_numa_idx());
+		assert(lockers_numa_idx == -1);
+		int idx = this->determine_numa_idx();
+		this->lock(idx);
+		lockers_numa_idx = idx;
 	}
 		
 	void CohortLock::lock(int numa_idx)
@@ -129,7 +134,10 @@
 	
 	void CohortLock::unlock()
 	{
-		this->unlock(this->determine_numa_idx());
+		assert(lockers_numa_idx != -1);
+		int idx = lockers_numa_idx;
+		lockers_numa_idx = -1;
+		this->unlock(idx);
 	}
 
 	void CohortLock::unlock(int numa_idx)
