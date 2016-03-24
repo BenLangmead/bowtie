@@ -2934,6 +2934,13 @@ extern "C" {
  */
 int bowtie(int argc, const char **argv) {
 	try {
+  #ifdef WITH_TBB
+  #ifdef WITH_AFFINITY
+    //CWILKS: adjust this depending on # of hyperthreads per core
+    pinning_observer pinner( 2 /* the number of hyper threads on each core */ );
+          pinner.observe( true );
+  #endif
+  #endif
 		// Reset all global state, including getopt state
 		opterr = optind = 1;
 		resetOptions();
@@ -3056,6 +3063,13 @@ int bowtie(int argc, const char **argv) {
 #ifdef CHUD_PROFILING
 		chudReleaseRemoteAccess();
 #endif
+  #ifdef WITH_TBB
+  #ifdef WITH_AFFINITY
+    // Always disable observation before observers destruction
+        //tracker.observe( false );
+        pinner.observe( false );
+  #endif
+  #endif
 		return 0;
 	} catch(exception& e) {
 		cerr << "Command: ";
