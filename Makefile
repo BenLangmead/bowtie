@@ -130,7 +130,6 @@ OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp
 
 ifeq (1,$(WITH_COHORTLOCK))
-	LIBS += -lnuma
 	override EXTRA_FLAGS += -DWITH_COHORTLOCK=1
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
