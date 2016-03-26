@@ -430,6 +430,7 @@ public:
 					assert(hs[i].repOk());
 					append(ss, hs[i]);
 					out(hs[i].h.first).writeChars(buf, ss.tellp());
+					ss.seekp(0);
 					ss.clear();
 					i++;
 				} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);

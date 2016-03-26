@@ -98,6 +98,166 @@ int parseQuals(ReadBuf& r,
 	return qualsRead;
 }
 
+/**
+ * "Light" parser.  This is inside the critical section, so the key is to do
+ * just enough parsing so that another function downstream (finalize()) can do
+ * the rest of the parsing.  Really this function's only job is to stick every
+ * for lines worth of the input file into a buffer (r.readOrigBuf).  finalize()
+ * then parses the contents of r.readOrigBuf later.
+ */
+pair<bool, bool> FastqPatternSource::readLight(ReadBuf& r) {
+	int c = 0;
+	size_t& len = r.readOrigBufLen;
+	len = 0;
+	if(first_) {
+		c = getc_unlocked(fp_);
+		while(c == '\r' || c == '\n') {
+			c = getc_unlocked(fp_);
+		}
+		if(c != '@') {
+			cerr << "Error: reads file does not look like a FASTQ file" << endl;
+			throw 1;
+		}
+		r.readOrigBuf[len++] = c;
+		assert_eq('@', c);
+		first_ = false;
+	}
+	// Note: to reduce the number of times we have to enter the critical
+	// section (each entrance has some assocaited overhead), we could populate
+	// the buffer with several reads worth of data here, instead of just one.
+	int newlines = 4;
+	while(newlines) {
+		c = getc_unlocked(fp_);
+		if(c == '\n' || (c < 0 && newlines == 1)) {
+			newlines--;
+			c = '\n';
+		} else if(c < 0) {
+			return make_pair(false, true);
+		}
+		r.readOrigBuf[len++] = c;
+	}
+	readCnt_++;
+	r.patid = (uint32_t)(readCnt_-1);
+	return make_pair(true, c < 0);
+}
+
+/// Read another pattern from a FASTQ input file
+void FastqPatternSource::finalize(ReadBuf &r) const {
+	int c;
+	size_t name_len = 0;
+	size_t cur = 1;
+	r.color = color_;
+	r.primer = -1;
+
+	// Parse read name
+	while(true) {
+		assert(cur < r.readOrigBufLen);
+		c = r.readOrigBuf[cur++];
+		if(c == '\n' || c == '\r') {
+			do {
+				c = r.readOrigBuf[cur++];
+			} while(c == '\n' || c == '\r');
+			break;
+		}
+		r.nameBuf[name_len++] = c;
+	}
+	_setBegin(r.name, r.nameBuf);
+	_setLength(r.name, name_len);
+
+	if(color_) {
+		// May be a primer character.  If so, keep it 'primer' field
+		// of read buf and parse the rest of the read without it.
+//		c = toupper(c);
+//		if(asc2dnacat[c] > 0) {
+//			// First char is a DNA char
+//			int c2 = toupper(fb_.peek());
+//			// Second char is a color char
+//			if(asc2colcat[c2] > 0) {
+//				r.primer = c;
+//				r.trimc = c2;
+//				mytrim5 += 2; // trim primer and first color
+//			}
+//		}
+//		if(c < 0) { bail(r); return; }
+		throw 1;
+	}
+	
+	// Parse sequence
+	int nchar = 0;
+	uint8_t *seqbuf = r.patBufFw;
+	while(c != '+') {
+		if(c == '.') {
+			c = 'N';
+		}
+		if(color_ && c >= '0' && c <= '4') {
+			c = "ACGTN"[(int)c - '0'];
+		}
+		if(isalpha(c)) {
+			// If it's past the 5'-end trim point
+			if(nchar++ >= trim5_) {
+				*seqbuf++ = charToDna5[c];
+			}
+		}
+		assert(cur < r.readOrigBufLen);
+		c = r.readOrigBuf[cur++];
+	}
+	int seq_len = (int)(seqbuf - r.patBufFw);
+	r.trimmed5 = (int)(nchar - seq_len);
+	r.trimmed3 = min(seq_len, trim3_);
+	seq_len = max(seq_len - trim3_, 0);
+	_setBegin(r.patFw, (Dna5*)r.patBufFw);
+	_setLength(r.patFw, seq_len);
+	
+	assert_eq('+', c);
+	do {
+		assert(cur < r.readOrigBufLen);
+		c = r.readOrigBuf[cur++];
+	} while(c != '\n' && c != '\r');
+	do {
+		assert(cur < r.readOrigBufLen);
+		c = r.readOrigBuf[cur++];
+	} while(c == '\n' || c == '\r');
+	
+	// Now we're on the next non-blank line after the + line
+	if(seq_len == 0) {
+		return; // done parsing empty read
+	}
+
+	int nqual = 0;
+	char *qualbuf = r.qualBuf;
+	if (intQuals_) {
+		// TODO: must implement this for compatibility with other Bowtie
+		throw 1; // not yet implemented
+	} else {
+		while(c != '\r' && c != '\n') {
+			c = charToPhred33(c, solQuals_, phred64Quals_);
+			if(c == ' ') {
+				wrongQualityFormat(r.name);
+			}
+			if(nqual++ >= r.trimmed5) {
+				*qualbuf++ = c;
+			}
+			c = r.readOrigBuf[cur++];
+		}
+		int qual_len = (int)(qualbuf - r.qualBuf);
+		qual_len = max(0, qual_len - r.trimmed3);
+		if(qual_len < seq_len) {
+			tooFewQualities(r.name);
+		} else if(qual_len > seq_len+1) {
+			tooManyQualities(r.name);
+		}
+		_setBegin(r.qual, (char*)r.qualBuf);
+		_setLength(r.qual, seq_len);
+	}
+	// Set up a default name if one hasn't been set
+	if(name_len == 0) {
+		itoa10((int)readCnt_, r.nameBuf);
+		_setBegin(r.name, r.nameBuf);
+		name_len = (int)strlen(r.nameBuf);
+		_setLength(r.name, name_len);
+	}
+}
+
 void wrongQualityFormat(const String<char>& read_name) {
 	cerr << "Encountered a space parsing the quality string for read " << read_name << endl
 	     << "If this is a FASTQ file with integer (non-ASCII-encoded) qualities, please" << endl

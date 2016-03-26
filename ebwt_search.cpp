@@ -273,8 +273,6 @@ enum {
 	ARG_VERBOSE,
 	ARG_STARTVERBOSE,
 	ARG_QUIET,
-	ARG_RANDOM_READS,
-	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
 	ARG_FAST,
 	ARG_AL,
@@ -391,8 +389,6 @@ static struct option long_options[] = {
 	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
 	{(char*)"range",        no_argument,       0,            ARG_RANGE},
 	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
-	{(char*)"randread",     no_argument,       0,            ARG_RANDOM_READS},
-	{(char*)"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{(char*)"phased",       no_argument,       0,            'z'},
 	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
@@ -677,11 +673,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_FF: mate1fw = true;  mate2fw = true;  mateFwSet = true; break;
 			case ARG_RF: mate1fw = false; mate2fw = true;  mateFwSet = true; break;
 			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
-			case ARG_RANDOM_READS: format = RANDOM; break;
-			case ARG_RANDOM_READS_NOSYNC:
-				format = RANDOM;
-				randReadsNoSync = true;
-				break;
 			case ARG_RANGE: rangeMode = true; break;
 			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case 'S': outType = OUTPUT_SAM; break;
@@ -871,7 +862,7 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
-	bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
+	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
 		// Tell the Ebwt loader to ignore the suffix-array portion of
 		// the index.  We don't need it because the user isn't asking
@@ -1076,11 +1067,7 @@ static const char *argv0 = NULL;
 static PatternSourcePerThreadFactory*
 createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 	PatternSourcePerThreadFactory *patsrcFact;
-	if(randReadsNoSync) {
-		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
-	} else {
-		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
-	}
+	patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -2512,10 +2499,6 @@ patsrcFromStrings(int format,
 			                               patDumpfile, verbose,
 			                               trim3, trim5,
 			                               skipReads);
-		case RANDOM:
-			return new RandomPatternSource(seed, 2000000, lenRandomReads,
-			                               patDumpfile,
-			                               verbose);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;

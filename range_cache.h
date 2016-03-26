@@ -349,7 +349,7 @@ class RangeCache {
 	typedef std::map<TIndexOffU, TIndexOffU>::iterator TMapItr;
 
 public:
-	RangeCache(size_t lim, TEbwt* ebwt) :
+	RangeCache(TIndexOffU lim, TEbwt* ebwt) :
 		lim_(lim), map_(), pool_(lim), closed_(false), ebwt_(ebwt), sanity_(true) { }
 
 	/**

@@ -151,6 +151,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	const FixedBitset<1024> *mms = &h.mms;
 	ASSERT_ONLY(const String<Dna5>* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
+#if 0
 	if(h.color && false) {
 		// Disabled: print MD:Z string w/r/t to colors, not letters
 		mms = &h.cmms;
@@ -159,6 +160,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 		len = length(h.colSeq);
 		refcs = &h.crefcs;
 	}
+#endif
 	if(h.fw) {
 		for (int i = 0; i < (int)len; ++ i) {
 			if(mms->test(i)) {

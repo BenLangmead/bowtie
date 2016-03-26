@@ -263,6 +263,17 @@ struct ReadBuf {
 	HitSet        hitset;              // holds previously-found hits; for chaining
 };
 
+struct BoolTriple {
+
+	BoolTriple() : a(false), b(false), c(false) { }
+
+	BoolTriple(bool a_, bool b_, bool c_) : a(a_), b(b_), c(c_) { }
+
+	bool a;
+	bool b;
+	bool c;
+};
+
 /**
  * Encapsulates a synchronized source of patterns; usually a file.
  * Handles dumping patterns to a logfile (useful for debugging).  Also
@@ -309,92 +320,13 @@ public:
 	}
 
 	/**
-	 * The main member function for dispensing patterns.
-	 */
-	virtual void nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		// nextPatternImpl does the reading from the ultimate source;
-		// it is implemented in concrete subclasses
-		nextReadPairImpl(ra, rb, patid);
-		if(!ra.empty()) {
-			// Possibly randomize the qualities so that they're more
-			// scattered throughout the range of possible values
-			if(randomizeQuals_) {
-				randomizeQuals(ra);
-				if(!rb.empty()) {
-					randomizeQuals(rb);
-				}
-			}
-			// TODO: Perhaps bundle all of the following up into a
-			// finalize() member in the ReadBuf class?
-
-			// Construct the reversed versions of the fw and rc seqs
-			// and quals
-			ra.constructRevComps();
-			ra.constructReverses();
-			if(!rb.empty()) {
-				rb.constructRevComps();
-				rb.constructReverses();
-			}
-			// Fill in the random-seed field using a combination of
-			// information from the user-specified seed and the read
-			// sequence, qualities, and name
-			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-			if(!rb.empty()) {
-				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
-			}
-			// Output it, if desired
-			if(dumpfile_ != NULL) {
-				dumpBuf(ra);
-				if(!rb.empty()) {
-					dumpBuf(rb);
-				}
-			}
-			if(verbose_) {
-				cout << "Parsed mate 1: "; ra.dump(cout);
-				cout << "Parsed mate 2: "; rb.dump(cout);
-			}
-		}
-	}
-
-	/**
-	 * The main member function for dispensing patterns.
-	 */
-	virtual void nextRead(ReadBuf& r, uint32_t& patid) {
-		// nextPatternImpl does the reading from the ultimate source;
-		// it is implemented in concrete subclasses
-		nextReadImpl(r, patid);
-		if(!r.empty()) {
-			// Possibly randomize the qualities so that they're more
-			// scattered throughout the range of possible values
-			if(randomizeQuals_) {
-				randomizeQuals(r);
-			}
-			// Construct the reversed versions of the fw and rc seqs
-			// and quals
-			r.constructRevComps();
-			r.constructReverses();
-			// Fill in the random-seed field using a combination of
-			// information from the user-specified seed and the read
-			// sequence, qualities, and name
-			r.seed = genRandSeed(r.patFw, r.qual, r.name, seed_);
-			// Output it, if desired
-			if(dumpfile_ != NULL) {
-				dumpBuf(r);
-			}
-			if(verbose_) {
-				cout << "Parsed read: "; r.dump(cout);
-			}
-		}
-	}
-
-	/**
 	 * Implementation to be provided by concrete subclasses.  An
 	 * implementation for this member is only relevant for formats that
 	 * can read in a pair of reads in a single transaction with a
 	 * single input source.  If paired-end input is given as a pair of
 	 * parallel files, this member should throw an error and exit.
 	 */
-	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) = 0;
 
 	/**
 	 * Implementation to be provided by concrete subclasses.  An
@@ -403,7 +335,12 @@ public:
 	 * sources, e.g., formats where paired-end reads are specified in
 	 * parallel read files.
 	 */
-	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) = 0;
+	virtual bool nextRead(ReadBuf& r) = 0;
+
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual void finalize(ReadBuf& r) const = 0;
 
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
@@ -447,10 +384,10 @@ protected:
 		assert(dumpfile_ != NULL);
 		dump(out_, r.patFw,
 		     empty(r.qual) ? String<char>("(empty)") : r.qual,
-		     empty(r.name)   ? String<char>("(empty)") : r.name);
+		     empty(r.name) ? String<char>("(empty)") : r.name);
 		dump(out_, r.patRc,
 		     empty(r.qualRev) ? String<char>("(empty)") : r.qualRev,
-		     empty(r.name)   ? String<char>("(empty)") : r.name);
+		     empty(r.name) ? String<char>("(empty)") : r.name);
 	}
 
 	/**
@@ -491,8 +428,11 @@ public:
 	virtual ~PairedPatternSource() { }
 
 	virtual void addWrapper() = 0;
+	
 	virtual void reset() = 0;
-	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+	
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) = 0;
+	
 	virtual pair<uint64_t,uint64_t> readCnt() const = 0;
 
 protected:
@@ -547,31 +487,36 @@ public:
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
-	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		uint32_t cur = cur_;
 		while(cur < src_.size()) {
 			// Patterns from srca_[cur_] are unpaired
-			src_[cur]->nextReadPair(ra, rb, patid);
-			if(seqan::empty(ra.patFw)) {
-				// If patFw is empty, that's our signal that the
-				// input dried up
+			pair<bool, bool> flags = src_[cur]->nextReadPair(ra, rb);
+			if(!flags.first) {
 				ThreadSafe ts(&mutex_m);
-				if(cur + 1 > cur_) cur_++;
+				if(cur + 1 > cur_) {
+					cur_++;
+				}
 				cur = cur_;
 				continue; // on to next pair of PatternSources
 			}
+			ra.mate = 1;
+			src_[cur]->finalize(ra);
 			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-			if(!rb.empty()) {
+			ra.constructRevComps();
+			ra.constructReverses();
+			if(flags.second) {
+				rb.mate = 2;
+				src_[cur]->finalize(rb);
 				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
+				rb.constructRevComps();
+				rb.constructReverses();
 				ra.fixMateName(1);
 				rb.fixMateName(2);
 			}
-			ra.patid = patid;
-			ra.mate  = 1;
-			rb.mate  = 2;
-			return true; // paired
+			return make_pair(true, flags.second);
 		}
-		return false;
+		return make_pair(false, false);
 	}
 
 	/**
@@ -653,75 +598,70 @@ public:
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
-	virtual bool nextReadPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// 'cur' indexes the current pair of PatternSources
 		uint32_t cur = cur_;
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
 				// Patterns from srca_[cur_] are unpaired
-				srca_[cur]->nextRead(ra, patid);
-				if(seqan::empty(ra.patFw)) {
-					// If patFw is empty, that's our signal that the
-					// input dried up
+				if(!srca_[cur]->nextRead(ra)) {
+					// no more input
 					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
 					continue; // on to next pair of PatternSources
 				}
-				ra.patid = patid;
-				ra.mate  = 0;
-				return false; // unpaired
+				ra.mate = 0;
+				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+				srca_[cur]->finalize(ra);
+				ra.constructRevComps();
+				ra.constructReverses();
+				return make_pair(true, false);
 			} else {
-				// Patterns from srca_[cur_] and srcb_[cur_] are paired
-				uint32_t patid_a = 0;
-				uint32_t patid_b = 0;
-				bool cont = false;
 				// Lock to ensure that this thread gets parallel reads
 				// in the two mate files
+				bool success_a, success_b;
 				{
 					ThreadSafe ts(&mutex_m);
-					srca_[cur]->nextRead(ra, patid_a);
-					srcb_[cur]->nextRead(rb, patid_b);
+					success_a = srca_[cur]->nextRead(ra);
+					success_b = srcb_[cur]->nextRead(rb);
 					// Did the pair obtained fail to match up?
-					while(patid_a != patid_b) {
-						// Is either input exhausted?  If so, bail.
-						if(seqan::empty(ra.patFw) || seqan::empty(rb.patFw)) {
-							seqan::clear(ra.patFw);
-							if(cur + 1 > cur_) cur_++;
-							cur = cur_;
-							cont = true;
-							break;
-						}
-						if(patid_a < patid_b) {
-							srca_[cur]->nextRead(ra, patid_a);
-							ra.fixMateName(1);
+					while(success_a && success_b && ra.patid != rb.patid) {
+						if(ra.patid < rb.patid) {
+							success_a = srca_[cur]->nextRead(ra);
 						} else {
-							srcb_[cur]->nextRead(rb, patid_b);
-							rb.fixMateName(2);
+							success_b = srcb_[cur]->nextRead(rb);
 						}
 					}
 				}
-				if(cont) continue; // on to next pair of PatternSources
-				ra.fixMateName(1);
-				rb.fixMateName(2);
-				if(seqan::empty(ra.patFw)) {
-					// If patFw is empty, that's our signal that the
-					// input dried up
-					ThreadSafe ts(&mutex_m);
-					if(cur + 1 > cur_) cur_++;
+				if(!success_a || !success_b) {
+					seqan::clear(ra.patFw);
+					if(cur + 1 > cur_) {
+						cur_++;
+					}
 					cur = cur_;
 					continue; // on to next pair of PatternSources
 				}
-				assert_eq(patid_a, patid_b);
-				patid = patid_a;
-				ra.patid = patid;
-				rb.patid = patid;
-				ra.mate  = 1;
-				rb.mate  = 2;
-				return true; // paired
+
+				ra.fixMateName(1);
+				rb.fixMateName(2);
+				
+				ra.mate = 1;
+				srca_[cur]->finalize(ra);
+				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+				ra.constructRevComps();
+				ra.constructReverses();
+				
+				rb.mate = 2;
+				srcb_[cur]->finalize(rb);
+				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
+				rb.constructRevComps();
+				rb.constructReverses();
+
+				return make_pair(true, true); // paired
 			}
 		}
-		return false;
+		return make_pair(false, false);
 	}
 
 	/**
@@ -755,9 +695,10 @@ protected:
  * is thread-safe.
  */
 class PatternSourcePerThread {
+
 public:
-	PatternSourcePerThread() :
-		buf1_(), buf2_(), patid_(0xffffffff) { }
+
+	PatternSourcePerThread() : buf1_(), buf2_() { }
 
 	virtual ~PatternSourcePerThread() { }
 
@@ -766,12 +707,22 @@ public:
 	 */
 	virtual void nextReadPair() { }
 
-	ReadBuf& bufa()        { return buf1_;         }
-	ReadBuf& bufb()        { return buf2_;         }
+	ReadBuf& bufa() { return buf1_; }
+	ReadBuf& bufb() { return buf2_; }
 
-	uint32_t      patid() const { return patid_;        }
-	virtual void  reset()       { patid_ = 0xffffffff;  }
-	bool          empty() const { return buf1_.empty(); }
+	uint32_t patid() const {
+		return buf1_.patid;
+	}
+	
+	virtual void reset() {
+		buf1_.reset();
+		buf2_.reset();
+	}
+	
+	bool empty() const {
+		return buf1_.empty();
+	}
+	
 	uint32_t length(int mate) const {
 		return (mate == 1)? buf1_.length() : buf2_.length();
 	}
@@ -788,7 +739,6 @@ public:
 protected:
 	ReadBuf  buf1_;    // read buffer for mate a
 	ReadBuf  buf2_;    // read buffer for mate b
-	uint32_t patid_;   // index of read just read
 };
 
 /**
@@ -839,11 +789,9 @@ public:
 	 */
 	virtual void nextReadPair() {
 		PatternSourcePerThread::nextReadPair();
-		ASSERT_ONLY(uint32_t lastPatid = patid_);
 		buf1_.clearAll();
 		buf2_.clearAll();
-		patsrc_.nextReadPair(buf1_, buf2_, patid_);
-		assert(buf1_.empty() || patid_ != lastPatid);
+		patsrc_.nextReadPair(buf1_, buf2_);
 	}
 
 private:
@@ -904,197 +852,6 @@ public:
 protected:
 	int trim3_;
 	int trim5_;
-};
-
-/**
- * A synchronized pattern source that simply returns random reads
- * without reading from the disk or storing lists of reads in memory.
- * Reads are generated with a RandomSource.
- */
-class RandomPatternSource : public PatternSource {
-public:
-	RandomPatternSource(uint32_t seed,
-	                    uint32_t numReads = 2000000,
-	                    int length = 35,
-	                    const char *dumpfile = NULL,
-	                    bool verbose = false) :
-		PatternSource(seed, false, dumpfile, verbose),
-		numReads_(numReads),
-		length_(length),
-		seed_(seed)
-	{
-		if(length_ > 1024) {
-			cerr << "Read length for RandomPatternSource may not exceed 1024; got " << length_ << endl;
-			throw 1;
-		}
-		rand_.init(seed_);
-	}
-
-	/** Get the next random read and set patid */
-	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
-		uint32_t ra;
-		{
-			ThreadSafe ts(&mutex_m);
-			if(readCnt_ >= numReads_) {
-				r.clearAll();
-				return;
-			}
-			ra = rand_.nextU32();
-			patid = (uint32_t)readCnt_;
-			readCnt_++;
-		}
-		fillRandomRead(r, ra, length_, patid);
-	}
-
-	/** Get the next random read and set patid */
-	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		uint32_t rna, rnb;
-		{
-			ThreadSafe ts(&mutex_m);
-			if(readCnt_ >= numReads_) {
-				ra.clearAll();
-				rb.clearAll();
-				return;
-			}
-			rna = rand_.nextU32();
-			rnb = rand_.nextU32();
-			patid = (uint32_t)readCnt_;
-			readCnt_++;
-		}
-		fillRandomRead(ra, rna, length_, patid);
-		fillRandomRead(rb, rnb, length_, patid);
-	}
-
-	/** */
-	static void fillRandomRead(ReadBuf& r,
-	                           uint32_t ra,
-	                           int length,
-	                           uint32_t patid)
-	{
-		// End critical section
-		for(int i = 0; i < length; i++) {
-			ra = RandomSource::nextU32(ra) >> 8;
-			r.patBufFw[i]           = (ra & 3);
-			char c                  = 'I' - ((ra >> 2) & 31);
-			r.qualBuf[i]            = c;
-		}
-		_setBegin (r.patFw, (Dna5*)r.patBufFw);
-		_setLength(r.patFw, length);
-		_setBegin (r.qual, r.qualBuf);
-		_setLength(r.qual, length);
-		itoa10(patid, r.nameBuf);
-		_setBegin(r.name, r.nameBuf);
-		_setLength(r.name, strlen(r.nameBuf));
-	}
-
-	/** Reset the pattern source to the beginning */
-	virtual void reset() {
-		PatternSource::reset();
-		// reset pseudo-random generator; next string of calls to
-		// nextU32() will return same pseudo-randoms as the last
-		rand_.init(seed_);
-	}
-private:
-	uint32_t     numReads_; /// number of reads to dish out
-	int          length_;   /// length of reads
-	uint32_t     seed_;     /// seed for pseudo-randoms
-	RandomSource rand_;     /// pseudo-random generator
-};
-
-/**
- * A version of PatternSourcePerThread that dishes out random patterns
- * without any synchronization.
- */
-class RandomPatternSourcePerThread : public PatternSourcePerThread {
-public:
-	RandomPatternSourcePerThread(uint32_t numreads,
-	                             int length,
-	                             int numthreads,
-	                             int thread) :
-		PatternSourcePerThread(),
-		numreads_(numreads),
-		length_(length),
-		numthreads_(numthreads),
-		thread_(thread)
-	{
-		patid_ = thread_;
-		if(length_ > 1024) {
-			cerr << "Read length for RandomPatternSourcePerThread may not exceed 1024; got " << length_ << endl;
-			throw 1;
-		}
-		rand_.init(thread_);
-	}
-
-	virtual void nextReadPair() {
-		PatternSourcePerThread::nextReadPair();
-		if(patid_ >= numreads_) {
-			buf1_.clearAll();
-			buf2_.clearAll();
-			return;
-		}
-		RandomPatternSource::fillRandomRead(
-			buf1_, rand_.nextU32(), length_, patid_);
-		RandomPatternSource::fillRandomRead(
-			buf2_, rand_.nextU32(), length_, patid_);
-		patid_ += numthreads_;
-	}
-
-	virtual void reset() {
-		PatternSourcePerThread::reset();
-		patid_ = thread_;
-		rand_.init(thread_);
-	}
-
-private:
-	uint32_t     numreads_;
-	int          length_;
-	int          numthreads_;
-	int          thread_;
-	RandomSource rand_;
-};
-
-/**
- * Abstract parent factory for PatternSourcePerThreads.
- */
-class RandomPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
-public:
-	RandomPatternSourcePerThreadFactory(
-	        uint32_t numreads,
-	        int length,
-	        int numthreads,
-	        int thread) :
-	        numreads_(numreads),
-	        length_(length),
-	        numthreads_(numthreads),
-	        thread_(thread) { }
-
-	/**
-	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
-	 */
-	virtual PatternSourcePerThread* create() const {
-		return new RandomPatternSourcePerThread(
-			numreads_, length_, numthreads_, thread_);
-	}
-
-	/**
-	 * Create a new heap-allocated vector of heap-allocated
-	 * WrappedPatternSourcePerThreads.
-	 */
-	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
-		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
-		for(size_t i = 0; i < n; i++) {
-			v->push_back(new RandomPatternSourcePerThread(
-				numreads_, length_, numthreads_, thread_));
-			assert(v->back() != NULL);
-		}
-		return v;
-	}
-
-private:
-	uint32_t numreads_;
-	int length_;
-	int numthreads_;
-	int thread_;
 };
 
 /// Skip to the end of the current string of newline chars and return
@@ -1254,8 +1011,10 @@ public:
 		}
 		assert_eq(v_.size(), quals_.size());
 	}
+	
 	virtual ~VectorPatternSource() { }
-	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+	
+	virtual bool nextRead(ReadBuf& r) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
 		ThreadSafe ts(&mutex_m);
@@ -1264,7 +1023,7 @@ public:
 			// we're out of reads
 			r.clearAll();
 			assert(r.empty());
-			return;
+			return false;
 		}
 		// Copy v_*, quals_* strings into the respective Strings
 		r.color = color_;
@@ -1277,53 +1036,62 @@ public:
 		r.name = os.str();
 		cur_++;
 		readCnt_++;
-		patid = (uint32_t)readCnt_;
+		r.patid = (uint32_t)readCnt_;
+		return true;
 	}
+	
 	/**
 	 * This is unused, but implementation is given for completeness.
 	 */
-	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// Let Strings begin at the beginning of the respective bufs
-		ra.reset();
-		rb.reset();
-		if(!paired_) {
-			paired_ = true;
-			cur_ <<= 1;
-		}
-		ThreadSafe ts(&mutex_m);
-		if(cur_ >= v_.size()-1) {
-			// Clear all the Strings, as a signal to the caller that
-			// we're out of reads
-			ra.clearAll();
-			rb.clearAll();
-			assert(ra.empty());
-			assert(rb.empty());
-			return;
-		}
-		// Copy v_*, quals_* strings into the respective Strings
-		ra.patFw  = v_[cur_];
-		ra.qual = quals_[cur_];
-		ra.trimmed3 = trimmed3_[cur_];
-		ra.trimmed5 = trimmed5_[cur_];
-		cur_++;
-		rb.patFw  = v_[cur_];
-		rb.qual = quals_[cur_];
-		rb.trimmed3 = trimmed3_[cur_];
-		rb.trimmed5 = trimmed5_[cur_];
-		ostringstream os;
-		os << readCnt_;
-		ra.name = os.str();
-		rb.name = os.str();
-		ra.color = rb.color = color_;
-		cur_++;
-		readCnt_++;
-		patid = (uint32_t)readCnt_;
+		throw 1;
+		return make_pair(false, false);
+//		ra.reset();
+//		rb.reset();
+//		if(!paired_) {
+//			paired_ = true;
+//			cur_ <<= 1;
+//		}
+//		ThreadSafe ts(&mutex_m);
+//		if(cur_ >= v_.size()-1) {
+//			// Clear all the Strings, as a signal to the caller that
+//			// we're out of reads
+//			ra.clearAll();
+//			rb.clearAll();
+//			assert(ra.empty());
+//			assert(rb.empty());
+//			return;
+//		}
+//		// Copy v_*, quals_* strings into the respective Strings
+//		ra.patFw  = v_[cur_];
+//		ra.qual = quals_[cur_];
+//		ra.trimmed3 = trimmed3_[cur_];
+//		ra.trimmed5 = trimmed5_[cur_];
+//		cur_++;
+//		rb.patFw  = v_[cur_];
+//		rb.qual = quals_[cur_];
+//		rb.trimmed3 = trimmed3_[cur_];
+//		rb.trimmed5 = trimmed5_[cur_];
+//		ostringstream os;
+//		os << readCnt_;
+//		ra.name = os.str();
+//		rb.name = os.str();
+//		ra.color = rb.color = color_;
+//		cur_++;
+//		readCnt_++;
+//		paired = true;
+//		ra.patid = rb.patid = (uint32_t)readCnt_;
 	}
+	
 	virtual void reset() {
 		TrimmingPatternSource::reset();
 		cur_ = skip_;
 		paired_ = false;
 	}
+	
+	virtual void finalize(ReadBuf& r) const { }
+
 private:
 	bool color_;
 	size_t cur_;
@@ -1389,88 +1157,77 @@ public:
 	 * read in the list of read files.  This function gets called by
 	 * all the search threads, so we must handle synchronization.
 	 */
-	virtual void nextReadImpl(ReadBuf& r, uint32_t& patid) {
+	virtual bool nextRead(ReadBuf& r) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
 		ThreadSafe ts(&mutex_m);
-		bool notDone = true;
-		do {
-			read(r, patid);
-			// Try again if r is empty (indicating an error) and input
-			// is not yet exhausted, OR if we have more reads to skip
-			// over
-			notDone = seqan::empty(r.patFw) && !fb_.eof();
-		} while(notDone || (!fb_.eof() && patid < skip_));
-		if(patid < skip_) {
-			r.clearAll();
-			assert(seqan::empty(r.patFw));
-			return;
+		pair<bool, bool> flags = make_pair(false, false);
+		while(!flags.first && !flags.second) {
+			flags = readLight(r);
 		}
-		if(first_ && seqan::empty(r.patFw) /* && !quiet_ */) {
-			// No reads could be extracted from the first _infile
-			cerr << "Warning: Could not find any reads in \"" << infiles_[0] << "\"" << endl;
+		if(first_ && !flags.first) {
+			cerr << "Warning: Could not find any reads in \""
+			     << infiles_[0] << "\"" << endl;
 		}
 		first_ = false;
-		while(seqan::empty(r.patFw) && filecur_ < infiles_.size()) {
+		while(!flags.first && filecur_ < infiles_.size()) {
+			assert(flags.second);
 			// Open next file
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
-			do {
-				read(r, patid);
-			} while((seqan::empty(r.patFw) && !fb_.eof()));
-			assert_geq(patid, skip_);
-			if(seqan::empty(r.patFw) /*&& !quiet_ */) {
+			flags.first = flags.second = false;
+			while(!flags.first && !flags.second) {
+				flags = readLight(r);
+			}
+			assert_geq(r.patid, skip_);
+			if(!flags.first) {
 				// No reads could be extracted from this _infile
-				cerr << "Warning: Could not find any reads in \"" << infiles_[filecur_] << "\"" << endl;
+				cerr << "Warning: Could not find any reads in \""
+				     << infiles_[filecur_] << "\"" << endl;
 			}
 			filecur_++;
 		}
-		// If r.patFw is empty, then the caller knows that we are
-		// finished with the reads
+		return flags.first;
 	}
+	
 	/**
 	 *
 	 */
-	virtual void nextReadPairImpl(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
 		ThreadSafe ts(&mutex_m);
-		bool notDone = true;
+		bool success, eof, paired;
 		do {
-			readPair(ra, rb, patid);
-			// Try again if ra is empty (indicating an error) and input
-			// is not yet exhausted, OR if we have more reads to skip
-			// over
-			notDone = seqan::empty(ra.patFw) && !fb_.eof();
-		} while(notDone || (!fb_.eof() && patid < skip_));
-		if(patid < skip_) {
-			ra.clearAll();
-			rb.clearAll();
-			assert(seqan::empty(ra.patFw));
-			return;
-		}
-		if(first_ && seqan::empty(ra.patFw) /*&& !quiet_*/) {
-			// No reads could be extracted from the first _infile
-			cerr << "Warning: Could not find any read pairs in \"" << infiles_[0] << "\"" << endl;
+			BoolTriple result = readPairLight(ra, rb);
+			success = result.a;
+			eof = result.b;
+			paired = result.c;
+		} while(!success && !eof);
+		if(first_ && !success) {
+			cerr << "Warning: Could not find any read pairs in \""
+			     << infiles_[0] << "\"" << endl;
 		}
 		first_ = false;
-		while(seqan::empty(ra.patFw) && filecur_ < infiles_.size()) {
+		while(!success && filecur_ < infiles_.size()) {
 			// Open next file
 			open();
 			resetForNextFile(); // reset state to handle a fresh file
 			do {
-				readPair(ra, rb, patid);
-			} while((seqan::empty(ra.patFw) && !fb_.eof()));
-			assert_geq(patid, skip_);
-			if(seqan::empty(ra.patFw) /*&& !quiet_*/) {
-				// No reads could be extracted from this _infile
-				cerr << "Warning: Could not find any reads in \"" << infiles_[filecur_] << "\"" << endl;
+				BoolTriple result = readPairLight(ra, rb);
+				success = result.a;
+				eof = result.b;
+				paired = result.c;
+			} while(!success && !eof);
+			if(!success && eof) {
+				cerr << "Warning: Could not find any reads in \""
+				     << infiles_[filecur_] << "\"" << endl;
 			}
 			filecur_++;
 		}
-		// If ra.patFw is empty, then the caller knows that we are
-		// finished with the reads
+		return make_pair(success, paired);
 	}
+	
 	/**
 	 * Reset state so that we read start reading again from the
 	 * beginning of the first file.  Should only be called by the
@@ -1482,15 +1239,22 @@ public:
 		open();
 		filecur_++;
 	}
+	
 protected:
+
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
-	virtual void read(ReadBuf& r, uint32_t& patid) = 0;
+	virtual pair<bool, bool> readLight(ReadBuf& r) = 0;
+	
 	/// Read another pattern pair from the input file; this is
 	/// overridden to deal with specific file formats
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) = 0;
+	virtual BoolTriple readPairLight(
+		ReadBuf& ra,
+		ReadBuf& rb) = 0;
+	
 	/// Reset state to handle a fresh file
 	virtual void resetForNextFile() { }
+	
 	void open() {
 		if(fb_.isOpen()) fb_.close();
 		if(qfb_.isOpen()) qfb_.close();
@@ -1527,6 +1291,7 @@ protected:
 		}
 		throw 1;
 	}
+	
 	vector<string> infiles_; /// filenames for read files
 	vector<string> qinfiles_; /// filenames for quality files
 	vector<bool> errs_; /// whether we've already printed an error for each file
@@ -1535,6 +1300,212 @@ protected:
 	FileBuf qfb_; /// quality file currently being read from
 	uint32_t skip_;     /// number of reads to skip
 	bool first_;
+};
+
+/**
+ *
+ */
+class CFilePatternSource : public TrimmingPatternSource {
+public:
+	CFilePatternSource(
+	    uint32_t seed,
+	    const vector<string>& infiles,
+	    const vector<string>* qinfiles,
+	    bool randomizeQuals = false,
+	    const char *dumpfile = NULL,
+	    bool verbose = false,
+	    int trim3 = 0,
+	    int trim5 = 0,
+	    uint32_t skip = 0) :
+		TrimmingPatternSource(seed, randomizeQuals,
+		                      dumpfile, verbose, trim3, trim5),
+		infiles_(infiles),
+		filecur_(0),
+		fp_(NULL),
+		qfp_(NULL),
+		is_open_(false),
+		skip_(skip),
+		first_(true)
+	{
+		qinfiles_.clear();
+		if(qinfiles != NULL) qinfiles_ = *qinfiles;
+		assert_gt(infiles.size(), 0);
+		errs_.resize(infiles_.size(), false);
+		if(qinfiles_.size() > 0 &&
+		   qinfiles_.size() != infiles_.size())
+		{
+			cerr << "Error: Different numbers of input FASTA/quality files ("
+			     << infiles_.size() << "/" << qinfiles_.size() << ")" << endl;
+			throw 1;
+		}
+		open(); // open first file in the list
+		filecur_++;
+	}
+
+	virtual ~CFilePatternSource() {
+		if(is_open_) {
+			assert(fp_ != NULL);
+			fclose(fp_);
+			fp_ = NULL;
+			if(qfp_ != NULL) {
+				fclose(qfp_);
+				qfp_ = NULL;
+			}
+		}
+	}
+
+	/**
+	 * Fill ReadBuf with the sequence, quality and name for the next
+	 * read in the list of read files.  This function gets called by
+	 * all the search threads, so we must handle synchronization.
+	 */
+	virtual bool nextRead(ReadBuf& r) {
+		// We are entering a critical region, because we're
+		// manipulating our file handle and filecur_ state
+		ThreadSafe ts(&mutex_m);
+		pair<bool, bool> flags = make_pair(false, false);
+		while(!flags.first && !flags.second) {
+			 flags = readLight(r);
+		}
+		if(first_ && !flags.first) {
+			cerr << "Warning: Could not find any reads in \""
+			     << infiles_[0] << "\"" << endl;
+		}
+		first_ = false;
+		while(!flags.first && filecur_ < infiles_.size()) {
+			assert(flags.second);
+			// Open next file
+			open();
+			resetForNextFile(); // reset state to handle a fresh file
+			flags.first = flags.second = false;
+			while(!flags.first && !flags.second) {
+				 flags = readLight(r);
+			}
+			assert_geq(r.patid, skip_);
+			if(!flags.first) {
+				cerr << "Warning: Could not find any reads in \""
+				     << infiles_[filecur_] << "\"" << endl;
+			}
+			filecur_++;
+		}
+		return flags.first;
+	}
+	
+	/**
+	 *
+	 */
+	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
+		// We are entering a critical region, because we're
+		// manipulating our file handle and filecur_ state
+		ThreadSafe ts(&mutex_m);
+		bool success, eof, paired;
+		do {
+			BoolTriple result = readPairLight(ra, rb);
+			success = result.a;
+			eof = result.b;
+			paired = result.c;
+		} while(!success && !eof);
+		if(first_ && !success) {
+			cerr << "Warning: Could not find any read pairs in \""
+			     << infiles_[0] << "\"" << endl;
+		}
+		first_ = false;
+		while(!success && filecur_ < infiles_.size()) {
+			// Open next file
+			open();
+			resetForNextFile(); // reset state to handle a fresh file
+			do {
+				BoolTriple result = readPairLight(ra, rb);
+				success = result.a;
+				eof = result.b;
+				paired = result.c;
+			} while(!success && !eof);
+			if(!success && eof) {
+				cerr << "Warning: Could not find any reads in \""
+				     << infiles_[filecur_] << "\"" << endl;
+			}
+			filecur_++;
+		}
+		return make_pair(success, paired);
+	}
+	
+	/**
+	 * Reset state so that we read start reading again from the
+	 * beginning of the first file.  Should only be called by the
+	 * master thread.
+	 */
+	virtual void reset() {
+		TrimmingPatternSource::reset();
+		filecur_ = 0,
+		open();
+		filecur_++;
+	}
+	
+protected:
+	
+	/// Read another pattern from the input file; this is overridden
+	/// to deal with specific file formats
+	virtual pair<bool, bool> readLight(ReadBuf& r) = 0;
+	
+	/// Read another pattern pair from the input file; this is
+	/// overridden to deal with specific file formats
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) = 0;
+	
+	/// Reset state to handle a fresh file
+	virtual void resetForNextFile() { }
+	
+	void open() {
+		if(is_open_) {
+			is_open_ = false;
+			fclose(fp_);
+			fp_ = NULL;
+			fclose(qfp_);
+			qfp_ = NULL;
+		}
+		while(filecur_ < infiles_.size()) {
+			// Open read
+			if(infiles_[filecur_] == "-") {
+				fp_ = stdin;
+			} else if((fp_ = fopen(infiles_[filecur_].c_str(), "rb")) == NULL) {
+				if(!errs_[filecur_]) {
+					cerr << "Warning: Could not open read file \"" << infiles_[filecur_] << "\" for reading; skipping..." << endl;
+					errs_[filecur_] = true;
+				}
+				filecur_++;
+				continue;
+			}
+			is_open_ = true;
+			setvbuf(fp_, buf_, _IOFBF, 64*1024);
+			if(!qinfiles_.empty()) {
+				if(qinfiles_[filecur_] == "-") {
+					qfp_ = stdin;
+				} else if((qfp_ = fopen(qinfiles_[filecur_].c_str(), "rb")) == NULL) {
+					if(!errs_[filecur_]) {
+						cerr << "Warning: Could not open quality file \"" << qinfiles_[filecur_] << "\" for reading; skipping..." << endl;
+						errs_[filecur_] = true;
+					}
+					filecur_++;
+					continue;
+				}
+				assert(qfp_ != NULL);
+				setvbuf(qfp_, qbuf_, _IOFBF, 64*1024);
+			}
+			return;
+		}
+		throw 1;
+	}
+	
+	vector<string> infiles_; /// filenames for read files
+	vector<string> qinfiles_; /// filenames for quality files
+	vector<bool> errs_; /// whether we've already printed an error for each file
+	size_t filecur_;   /// index into infiles_ of next file to read
+	FILE *fp_; /// read file currently being read from
+	FILE *qfp_; /// quality file currently being read from
+	bool is_open_; /// whether fp_ is currently open
+	uint32_t skip_;     /// number of reads to skip
+	bool first_;
+	char buf_[64*1024]; /// file buffer for sequences
+	char qbuf_[64*1024]; /// file buffer for qualities
 };
 
 /**
@@ -1603,7 +1574,7 @@ protected:
 	}
 
 	/// Read another pattern from a FASTA input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
+	virtual pair<bool, bool> readLight(ReadBuf& r) {
 		int c, qc = 0;
 		int dstLen = 0;
 		int nameLen = 0;
@@ -1614,7 +1585,10 @@ protected:
 
 		// Skip over between-read comments.  Note that SOLiD's comments use #s
 		c = fb_.get();
-		if(c < 0) { bail(r); return; }
+		if(c < 0) {
+			bail(r);
+			return make_pair(false, true);
+		}
 		while(c == '#' || c == ';') {
 			c = fb_.peekUptoNewline();
 			fb_.resetLastN();
@@ -1623,7 +1597,10 @@ protected:
 		assert_eq(1, fb_.lastNCur());
 		if(doquals) {
 			qc = qfb_.get();
-			if(qc < 0) { bail(r); return; }
+			if(qc < 0) {
+				bail(r);
+				return make_pair(false, true);
+			}
 			while(qc == '#' || qc == ';') {
 				qc = qfb_.peekUptoNewline();
 				qfb_.resetLastN();
@@ -1653,13 +1630,16 @@ protected:
 		// into *name
 		bool warning = false;
 		while(true) {
-			if(c < 0 || qc < 0) { bail(r); return; }
+			if(c < 0 || qc < 0) {
+				bail(r);
+				return make_pair(false, true);
+			}
 			if(c == '\n' || c == '\r') {
 				// Break at end of line, after consuming all \r's, \n's
 				while(c == '\n' || c == '\r') {
 					c = fb_.get();
 					if(doquals) qc = qfb_.get();
-					if(c < 0 || qc < 0) { bail(r); return; }
+					if(c < 0 || qc < 0) { bail(r); return make_pair(false, true); }
 				}
 				break;
 			}
@@ -1695,7 +1675,10 @@ protected:
 					mytrim5 += 2;
 				}
 			}
-			if(c < 0) { bail(r); return; }
+			if(c < 0) {
+				bail(r);
+				return make_pair(false, true);
+			}
 		}
 		while(c != '>' && c >= 0) {
 			if(color_) {
@@ -1708,7 +1691,9 @@ protected:
 				if(!doquals) r.qualBuf[dstLen]  = 'I';
 				dstLen++;
 			}
-			if(fb_.peek() == '>') break;
+			if(fb_.peek() == '>') {
+				break;
+			}
 			c = fb_.get();
 		}
 		dstLen -= this->trim3_;
@@ -1730,8 +1715,8 @@ protected:
 				fb_.resetLastN();
 				// Count the read
 				readCnt_++;
-				patid = (uint32_t)readCnt_-1;
-				return;
+				r.patid = (uint32_t)readCnt_-1;
+				return make_pair(true, false);
 			}
 		}
 		_setBegin (r.qual,  r.qualBuf);
@@ -1745,7 +1730,7 @@ protected:
 		}
 		assert_gt(nameLen, 0);
 		readCnt_++;
-		patid = (uint32_t)(readCnt_-1);
+		r.patid = (uint32_t)(readCnt_-1);
 		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
 		fb_.resetLastN();
 		if(doquals) {
@@ -1762,16 +1747,22 @@ protected:
 				cout << endl;
 			}
 		}
+		return make_pair(true, false);
 	}
+	
 	/// Read another pair of patterns from a FASTA input file
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastaPatternSource.readPair()" << endl;
 		throw 1;
-		read(ra, patid);
-		readCnt_--;
-		read(rb, patid);
+		return BoolTriple();
 	}
+
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual void finalize(ReadBuf& r) const { }
+	
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
@@ -1833,7 +1824,7 @@ public:
 protected:
 
 	/// Read another pattern from a FASTA input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
+	virtual pair<bool, bool> readLight(ReadBuf& r) {
 		r.color = color_;
 		int trim5 = this->trim5_;
 		// fb_ is about to dish out the first character of the
@@ -1841,7 +1832,7 @@ protected:
 		if(parseName(r, NULL, '\t') == -1) {
 			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
-			return;
+			return make_pair(false, true);
 		}
 		assert_neq('\t', fb_.peek());
 
@@ -1853,7 +1844,7 @@ protected:
 		if(dstLen <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
-			return;
+			return make_pair(false, true);
 		}
 
 		// fb_ is about to dish out the first character of the
@@ -1862,7 +1853,7 @@ protected:
 		if(parseQuals(r, charsRead, dstLen, trim5, ct, '\n') <= 0) {
 			peekOverNewline(fb_); // skip rest of line
 			r.clearAll();
-			return;
+			return make_pair(false, true);
 		}
 		r.trimmed3 = this->trim3_;
 		r.trimmed5 = trim5;
@@ -1874,11 +1865,12 @@ protected:
 		// '\n'
 
 		readCnt_++;
-		patid = (uint32_t)(readCnt_-1);
+		r.patid = (uint32_t)(readCnt_-1);
+		return make_pair(true, false);
 	}
 
 	/// Read another pair of patterns from a FASTA input file
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) {
 		// fb_ is about to dish out the first character of the
 		// name field
 		int mytrim5_1 = this->trim5_;
@@ -1887,7 +1879,8 @@ protected:
 			ra.clearAll();
 			rb.clearAll();
 			fb_.resetLastN();
-			return;
+			// !success, eof, !paired
+			return BoolTriple(false, true, false);
 		}
 		assert_neq('\t', fb_.peek());
 
@@ -1900,7 +1893,8 @@ protected:
 			ra.clearAll();
 			rb.clearAll();
 			fb_.resetLastN();
-			return;
+			// !success, eof, !paired
+			return BoolTriple(false, true, false);
 		}
 		assert_neq('\t', fb_.peek());
 
@@ -1912,7 +1906,8 @@ protected:
 			ra.clearAll();
 			rb.clearAll();
 			fb_.resetLastN();
-			return;
+			// !success, eof, !paired
+			return BoolTriple(false, true, false);
 		}
 		ra.trimmed3 = this->trim3_;
 		ra.trimmed5 = mytrim5_1;
@@ -1924,8 +1919,9 @@ protected:
 			ra.readOrigBufLen = fb_.copyLastN(ra.readOrigBuf);
 			fb_.resetLastN();
 			readCnt_++;
-			patid = (uint32_t)(readCnt_-1);
-			return;
+			ra.patid = (uint32_t)(readCnt_-1);
+			// success, !eof, !paired
+			return BoolTriple(true, false, false);
 		}
 		assert_neq('\t', fb_.peek());
 
@@ -1939,7 +1935,8 @@ protected:
 			ra.clearAll();
 			rb.clearAll();
 			fb_.resetLastN();
-			return;
+			// !success, !eof, !paired
+			return BoolTriple(false, false, false);
 		}
 		assert_neq('\t', fb_.peek());
 
@@ -1950,7 +1947,8 @@ protected:
 			ra.clearAll();
 			rb.clearAll();
 			fb_.resetLastN();
-			return;
+			// !success, !eof, !paired
+			return BoolTriple(false, false, false);
 		}
 		assert_eq('\n', ct);
 		if(fb_.peek() == '\n') {
@@ -1967,9 +1965,16 @@ protected:
 		// '\n'
 
 		readCnt_++;
-		patid = (uint32_t)(readCnt_-1);
+		ra.patid = rb.patid = (uint32_t)(readCnt_-1);
+		// success, !eof, paired
+		return BoolTriple(true, false, true);
 	}
 
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual void finalize(ReadBuf& r) const { }
+	
 	/**
 	 * Dump a FASTQ-style record for the read.
 	 */
@@ -2188,12 +2193,12 @@ public:
 
 protected:
 	/// Read another pattern from a FASTA input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
+	virtual pair<bool, bool> readLight(ReadBuf& r) {
 		while(true) {
 			int c = fb_.get();
 			if(c < 0) {
 				seqan::clear(r.patFw);
-				return;
+				return make_pair(false, true);
 			}
 			if(c == '>') {
 				resetForNextFile();
@@ -2257,18 +2262,25 @@ protected:
 					eat_ = freq_-1;
 					readCnt_++;
 					beginning_ = false;
-					patid = (uint32_t)(readCnt_-1);
+					r.patid = (uint32_t)(readCnt_-1);
 					break;
 				}
 			}
 		}
+		return make_pair(true, false);
 	}
 	/// Shouldn't ever be here; it's not sensible to obtain read pairs
 	// from a continuous input.
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) {
 		cerr << "In FastaContinuousPatternSource.readPair()" << endl;
 		throw 1;
+		return BoolTriple();
 	}
+
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual void finalize(ReadBuf& r) const { }
 
 	/**
 	 * Reset state to be read for the next file.
@@ -2303,7 +2315,7 @@ private:
  * Read a FASTQ-format file.
  * See: http://maq.sourceforge.net/fastq.shtml
  */
-class FastqPatternSource : public BufferedFilePatternSource {
+class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(uint32_t seed,
 	                   const vector<string>& infiles,
@@ -2317,7 +2329,7 @@ public:
 	                   bool phred64Quals = false,
 	                   bool integer_quals = false,
 	                   uint32_t skip = 0) :
-		BufferedFilePatternSource(seed, infiles, NULL, randomizeQuals,
+		CFilePatternSource(seed, infiles, NULL, randomizeQuals,
 		                          dumpfile, verbose,
 		                          trim3, trim5, skip),
 		first_(true),
@@ -2328,287 +2340,247 @@ public:
 	{ }
 	virtual void reset() {
 		first_ = true;
-		fb_.resetLastN();
-		BufferedFilePatternSource::reset();
+		CFilePatternSource::reset();
 	}
 protected:
-	/**
-	 * Scan to the next FASTQ record (starting with @) and return the first
-	 * character of the record (which will always be @).  Since the quality
-	 * line may start with @, we keep scanning until we've seen a line
-	 * beginning with @ where the line two lines back began with +.
-	 */
-	static int skipToNextFastqRecord(FileBuf& in, bool sawPlus) {
-		int line = 0;
-		int plusLine = -1;
-		int c = in.get();
-		int firstc = c;
-		while(true) {
-			if(line > 20) {
-				// If we couldn't find our desired '@' in the first 20
-				// lines, it's time to give up
-				if(firstc == '>') {
-					// That firstc is '>' may be a hint that this is
-					// actually a FASTA file, so return it intact
-					return '>';
-				}
-				// Return an error
-				return -1;
-			}
-			if(c == -1) return -1;
-			if(c == '\n') {
-				c = in.get();
-				if(c == '@' && sawPlus && plusLine == (line-2)) {
-					return '@';
-				}
-				else if(c == '+') {
-					// Saw a '+' at the beginning of a line; remember where
-					// we saw it
-					sawPlus = true;
-					plusLine = line;
-				}
-				else if(c == -1) {
-					return -1;
-				}
-				line++;
-			}
-			c = in.get();
-		}
-	}
+
+	pair<bool, bool> readLight(ReadBuf& r);
+
+	void finalize(ReadBuf &r) const;
 
 	/// Read another pattern from a FASTQ input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
-		const int bufSz = ReadBuf::BUF_SIZE;
-		while(true) {
-			int c;
-			int dstLen = 0;
-			int nameLen = 0;
-			r.color = color_;
-			r.primer = -1;
-			// Pick off the first at
-			if(first_) {
-				c = fb_.get();
-				if(c != '@') {
-					c = getOverNewline(fb_);
-					if(c < 0) { bail(r); return; }
-				}
-				if(c != '@') {
-					cerr << "Error: reads file does not look like a FASTQ file" << endl;
-					throw 1;
-				}
-				assert_eq('@', c);
-				first_ = false;
-			}
-
-			// Read to the end of the id line, sticking everything after the '@'
-			// into *name
-			while(true) {
-				c = fb_.get();
-				if(c < 0) { bail(r); return; }
-				if(c == '\n' || c == '\r') {
-					// Break at end of line, after consuming all \r's, \n's
-					while(c == '\n' || c == '\r') {
-						c = fb_.get();
-						if(c < 0) { bail(r); return; }
-					}
-					break;
-				}
-				r.nameBuf[nameLen++] = c;
-				if(nameLen > bufSz-2) {
-					// Too many chars in read name; print friendly error message
-					_setBegin(r.name, r.nameBuf);
-					_setLength(r.name, nameLen);
-					cerr << "FASTQ read name is too long; read names must be " << (bufSz-2) << " characters or fewer." << endl;
-					cerr << "Beginning of bad read name: " << r.name << endl;
-					throw 1;
-				}
-			}
-			_setBegin(r.name, r.nameBuf);
-			assert_leq(nameLen, bufSz-2);
-			_setLength(r.name, nameLen);
-			// c now holds the first character on the line after the
-			// @name line
-
-			// fb_ now points just past the first character of a
-			// sequence line, and c holds the first character
-			int charsRead = 0;
-			uint8_t *sbuf = r.patBufFw;
-			int dstLens[] = {0, 0, 0, 0};
-			int *dstLenCur = &dstLens[0];
-			int mytrim5 = this->trim5_;
-			if(color_) {
-				// This may be a primer character.  If so, keep it in the
-				// 'primer' field of the read buf and parse the rest of the
-				// read without it.
-				c = toupper(c);
-				if(asc2dnacat[c] > 0) {
-					// First char is a DNA char
-					int c2 = toupper(fb_.peek());
-					// Second char is a color char
-					if(asc2colcat[c2] > 0) {
-						r.primer = c;
-						r.trimc = c2;
-						mytrim5 += 2; // trim primer and first color
-					}
-				}
-				if(c < 0) { bail(r); return; }
-			}
-			int trim5 = mytrim5;
-			if(c == '+') {
-				// Read had length 0; print warning (if not quiet) and quit
-				if(!quiet) {
-					cerr << "Warning: Skipping read (" << r.name << ") because it had length 0" << endl;
-				}
-				peekToEndOfLine(fb_);
-				fb_.get();
-				continue;
-			}
-			while(c != '+') {
-				// Convert color numbers to letters if necessary
-				if(color_) {
-					if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
-				}
-				if(c == '.') c = 'N';
-				if(isalpha(c)) {
-					// If it's past the 5'-end trim point
-					assert_in(toupper(c), "ACGTN");
-					if(charsRead >= trim5) {
-						if((*dstLenCur) >= 1024) tooManySeqChars(r.name);
-						sbuf[(*dstLenCur)++] = charToDna5[c];
-					}
-					charsRead++;
-				}
-				c = fb_.get();
-				if(c < 0) { bail(r); return; }
-			}
-			// Trim from 3' end
-			dstLen = dstLens[0];
-			charsRead = dstLen + mytrim5;
-			dstLen -= this->trim3_;
-			// Set trimmed bounds of buffers
-			_setBegin(r.patFw, (Dna5*)r.patBufFw);
-			_setLength(r.patFw, dstLen);
-			assert_eq('+', c);
-
-			// Chew up the optional name on the '+' line
-			peekToEndOfLine(fb_);
-
-			// Now read the qualities
-			if (intQuals_) {
-				int qualsRead = 0;
-				char buf[4096];
-				if(color_ && r.primer != -1) mytrim5--;
-				while (qualsRead < charsRead) {
-					vector<string> s_quals;
-					if(!tokenizeQualLine(fb_, buf, 4096, s_quals)) break;
-					for (unsigned int j = 0; j < s_quals.size(); ++j) {
-						char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
-						assert_geq(c, 33);
-						if (qualsRead >= mytrim5) {
-							size_t off = qualsRead - mytrim5;
-							if(off >= 1024) tooManyQualities(r.name);
-							r.qualBuf[off] = c;
-						}
-						++qualsRead;
-					}
-				} // done reading integer quality lines
-				if(color_ && r.primer != -1) mytrim5++;
-				if(qualsRead < charsRead-mytrim5) {
-					tooFewQualities(r.name);
-				} else if(qualsRead > charsRead-mytrim5+1) {
-					tooManyQualities(r.name);
-				}
-				if(qualsRead == charsRead-mytrim5+1 && color_ && r.primer != -1) {
-					for(int i = 0; i < qualsRead-1; i++) {
-						r.qualBuf[i] = r.qualBuf[i+1];
-					}
-				}
-				_setBegin(r.qual, (char*)r.qualBuf);
-				_setLength(r.qual, dstLen);
-				peekOverNewline(fb_);
-			} else {
-				// Non-integer qualities
-				char *qbuf = r.qualBuf;
-				trim5 = mytrim5;
-				if(color_ && r.primer != -1) trim5--;
-				int itrim5 = trim5;
-				int qualsRead[4] = {0, 0, 0, 0};
-				int *qualsReadCur = &qualsRead[0];
-				while(true) {
-					c = fb_.get();
-					if(c == ' ') {
-						wrongQualityFormat(r.name);
-					}
-					if(c < 0) { bail(r); return; }
-					if (c != '\r' && c != '\n') {
-						if (*qualsReadCur >= trim5) {
-							size_t off = (*qualsReadCur) - trim5;
-							if(off >= 1024) tooManyQualities(r.name);
-							c = charToPhred33(c, solQuals_, phred64Quals_);
-							assert_geq(c, 33);
-							qbuf[off] = c;
-						}
-						(*qualsReadCur)++;
-					} else {
-						break;
-					}
-				}
-				qualsRead[0] -= this->trim3_;
-				int qRead = 0;
-				if (qualsRead[0] > itrim5)
-					qRead = (int)(qualsRead[0] - itrim5);
-				if(qRead < dstLen) {
-					tooFewQualities(r.name);
-				} else if(qRead > dstLen+1) {
-					tooManyQualities(r.name);
-				}
-				if(qRead == dstLen+1 && color_ && r.primer != -1) {
-					for(int i = 0; i < dstLen; i++) {
-						r.qualBuf[i] = r.qualBuf[i+1];
-					}
-				}
-				_setBegin (r.qual, (char*)r.qualBuf);
-				_setLength(r.qual, dstLen);
-
-				if(c == '\r' || c == '\n') {
-					c = peekOverNewline(fb_);
-				} else {
-					c = peekToEndOfLine(fb_);
-				}
-			}
-			r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
-			fb_.resetLastN();
-
-			c = fb_.get();
-			assert(c == -1 || c == '@');
-
-			// Set up a default name if one hasn't been set
-			if(nameLen == 0) {
-				itoa10((int)readCnt_, r.nameBuf);
-				_setBegin(r.name, r.nameBuf);
-				nameLen = (int)strlen(r.nameBuf);
-				_setLength(r.name, nameLen);
-			}
-			r.trimmed3 = this->trim3_;
-			r.trimmed5 = mytrim5;
-			assert_gt(nameLen, 0);
-			readCnt_++;
-			patid = (uint32_t)(readCnt_-1);
-			return;
-		}
-	}
+//	virtual void readHeavy(ReadBuf& r, uint32_t& patid) {
+//		const int bufSz = ReadBuf::BUF_SIZE;
+//		while(true) {
+//			int c;
+//			int dstLen = 0;
+//			int nameLen = 0;
+//			r.color = color_;
+//			r.primer = -1;
+//			// Pick off the first at
+//			if(first_) {
+//				c = fb_.get();
+//				if(c != '@') {
+//					c = getOverNewline(fb_);
+//					if(c < 0) { bail(r); return; }
+//				}
+//				if(c != '@') {
+//					cerr << "Error: reads file does not look like a FASTQ file" << endl;
+//					throw 1;
+//				}
+//				assert_eq('@', c);
+//				first_ = false;
+//			}
+//
+//			// Read to the end of the id line, sticking everything after the '@'
+//			// into *name
+//			while(true) {
+//				c = fb_.get();
+//				if(c < 0) { bail(r); return; }
+//				if(c == '\n' || c == '\r') {
+//					// Break at end of line, after consuming all \r's, \n's
+//					while(c == '\n' || c == '\r') {
+//						c = fb_.get();
+//						if(c < 0) { bail(r); return; }
+//					}
+//					break;
+//				}
+//				r.nameBuf[nameLen++] = c;
+//				if(nameLen > bufSz-2) {
+//					// Too many chars in read name; print friendly error message
+//					_setBegin(r.name, r.nameBuf);
+//					_setLength(r.name, nameLen);
+//					cerr << "FASTQ read name is too long; read names must be " << (bufSz-2) << " characters or fewer." << endl;
+//					cerr << "Beginning of bad read name: " << r.name << endl;
+//					throw 1;
+//				}
+//			}
+//			_setBegin(r.name, r.nameBuf);
+//			assert_leq(nameLen, bufSz-2);
+//			_setLength(r.name, nameLen);
+//			// c now holds the first character on the line after the
+//			// @name line
+//
+//			// fb_ now points just past the first character of a
+//			// sequence line, and c holds the first character
+//			int charsRead = 0;
+//			uint8_t *sbuf = r.patBufFw;
+//			int dstLens[] = {0, 0, 0, 0};
+//			int *dstLenCur = &dstLens[0];
+//			int mytrim5 = this->trim5_;
+//			if(color_) {
+//				// This may be a primer character.  If so, keep it in the
+//				// 'primer' field of the read buf and parse the rest of the
+//				// read without it.
+//				c = toupper(c);
+//				if(asc2dnacat[c] > 0) {
+//					// First char is a DNA char
+//					int c2 = toupper(fb_.peek());
+//					// Second char is a color char
+//					if(asc2colcat[c2] > 0) {
+//						r.primer = c;
+//						r.trimc = c2;
+//						mytrim5 += 2; // trim primer and first color
+//					}
+//				}
+//				if(c < 0) { bail(r); return; }
+//			}
+//			int trim5 = mytrim5;
+//			if(c == '+') {
+//				// Read had length 0; print warning (if not quiet) and quit
+//				if(!quiet) {
+//					cerr << "Warning: Skipping read (" << r.name << ") because it had length 0" << endl;
+//				}
+//				peekToEndOfLine(fb_);
+//				fb_.get();
+//				continue;
+//			}
+//			while(c != '+') {
+//				// Convert color numbers to letters if necessary
+//				if(color_) {
+//					if(c >= '0' && c <= '4') c = "ACGTN"[(int)c - '0'];
+//				}
+//				if(c == '.') c = 'N';
+//				if(isalpha(c)) {
+//					// If it's past the 5'-end trim point
+//					assert_in(toupper(c), "ACGTN");
+//					if(charsRead >= trim5) {
+//						if((*dstLenCur) >= 1024) tooManySeqChars(r.name);
+//						sbuf[(*dstLenCur)++] = charToDna5[c];
+//					}
+//					charsRead++;
+//				}
+//				c = fb_.get();
+//				if(c < 0) { bail(r); return; }
+//			}
+//			// Trim from 3' end
+//			dstLen = dstLens[0];
+//			charsRead = dstLen + mytrim5;
+//			dstLen -= this->trim3_;
+//			// Set trimmed bounds of buffers
+//			_setBegin(r.patFw, (Dna5*)r.patBufFw);
+//			_setLength(r.patFw, dstLen);
+//			assert_eq('+', c);
+//
+//			// Chew up the optional name on the '+' line
+//			peekToEndOfLine(fb_);
+//
+//			// Now read the qualities
+//			if (intQuals_) {
+//				int qualsRead = 0;
+//				char buf[4096];
+//				if(color_ && r.primer != -1) mytrim5--;
+//				while (qualsRead < charsRead) {
+//					vector<string> s_quals;
+//					if(!tokenizeQualLine(fb_, buf, 4096, s_quals)) break;
+//					for (unsigned int j = 0; j < s_quals.size(); ++j) {
+//						char c = intToPhred33(atoi(s_quals[j].c_str()), solQuals_);
+//						assert_geq(c, 33);
+//						if (qualsRead >= mytrim5) {
+//							size_t off = qualsRead - mytrim5;
+//							if(off >= 1024) tooManyQualities(r.name);
+//							r.qualBuf[off] = c;
+//						}
+//						++qualsRead;
+//					}
+//				} // done reading integer quality lines
+//				if(color_ && r.primer != -1) mytrim5++;
+//				if(qualsRead < charsRead-mytrim5) {
+//					tooFewQualities(r.name);
+//				} else if(qualsRead > charsRead-mytrim5+1) {
+//					tooManyQualities(r.name);
+//				}
+//				if(qualsRead == charsRead-mytrim5+1 && color_ && r.primer != -1) {
+//					for(int i = 0; i < qualsRead-1; i++) {
+//						r.qualBuf[i] = r.qualBuf[i+1];
+//					}
+//				}
+//				_setBegin(r.qual, (char*)r.qualBuf);
+//				_setLength(r.qual, dstLen);
+//				peekOverNewline(fb_);
+//			} else {
+//				// Non-integer qualities
+//				char *qbuf = r.qualBuf;
+//				trim5 = mytrim5;
+//				if(color_ && r.primer != -1) trim5--;
+//				int itrim5 = trim5;
+//				int qualsRead[4] = {0, 0, 0, 0};
+//				int *qualsReadCur = &qualsRead[0];
+//				while(true) {
+//					c = fb_.get();
+//					if(c == ' ') {
+//						wrongQualityFormat(r.name);
+//					}
+//					if(c < 0) { bail(r); return; }
+//					if (c != '\r' && c != '\n') {
+//						if (*qualsReadCur >= trim5) {
+//							size_t off = (*qualsReadCur) - trim5;
+//							if(off >= 1024) tooManyQualities(r.name);
+//							c = charToPhred33(c, solQuals_, phred64Quals_);
+//							assert_geq(c, 33);
+//							qbuf[off] = c;
+//						}
+//						(*qualsReadCur)++;
+//					} else {
+//						break;
+//					}
+//				}
+//				qualsRead[0] -= this->trim3_;
+//				int qRead = 0;
+//				if (qualsRead[0] > itrim5)
+//					qRead = (int)(qualsRead[0] - itrim5);
+//				if(qRead < dstLen) {
+//					tooFewQualities(r.name);
+//				} else if(qRead > dstLen+1) {
+//					tooManyQualities(r.name);
+//				}
+//				if(qRead == dstLen+1 && color_ && r.primer != -1) {
+//					for(int i = 0; i < dstLen; i++) {
+//						r.qualBuf[i] = r.qualBuf[i+1];
+//					}
+//				}
+//				_setBegin (r.qual, (char*)r.qualBuf);
+//				_setLength(r.qual, dstLen);
+//
+//				if(c == '\r' || c == '\n') {
+//					c = peekOverNewline(fb_);
+//				} else {
+//					c = peekToEndOfLine(fb_);
+//				}
+//			}
+//			r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
+//			fb_.resetLastN();
+//
+//			c = fb_.get();
+//			assert(c == -1 || c == '@');
+//
+//			// Set up a default name if one hasn't been set
+//			if(nameLen == 0) {
+//				itoa10((int)readCnt_, r.nameBuf);
+//				_setBegin(r.name, r.nameBuf);
+//				nameLen = (int)strlen(r.nameBuf);
+//				_setLength(r.name, nameLen);
+//			}
+//			r.trimmed3 = this->trim3_;
+//			r.trimmed5 = mytrim5;
+//			assert_gt(nameLen, 0);
+//			readCnt_++;
+//			patid = (uint32_t)(readCnt_-1);
+//			return;
+//		}
+//	}
 	/// Read another read pair from a FASTQ input file
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In FastqPatternSource.readPair()" << endl;
 		throw 1;
-		read(ra, patid);
-		readCnt_--;
-		read(rb, patid);
+		return BoolTriple();
 	}
+
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
+
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
@@ -2616,6 +2588,7 @@ protected:
 	{
 		out << "@" << name << endl << seq << endl << "+" << endl << qual << endl;
 	}
+
 private:
 
 	/**
@@ -2625,7 +2598,7 @@ private:
 	 */
 	void bail(ReadBuf& r) {
 		seqan::clear(r.patFw);
-		fb_.resetLastN();
+		r.readOrigBufLen = 0;
 	}
 
 	bool first_;
@@ -2641,7 +2614,9 @@ private:
  * scale).
  */
 class RawPatternSource : public BufferedFilePatternSource {
+
 public:
+
 	RawPatternSource(uint32_t seed,
 	                 const vector<string>& infiles,
 	                 bool color,
@@ -2655,18 +2630,21 @@ public:
 		                          dumpfile, verbose, trim3, trim5, skip),
 		first_(true), color_(color)
 	{ }
+
 	virtual void reset() {
 		first_ = true;
 		BufferedFilePatternSource::reset();
 	}
+
 protected:
+
 	/// Read another pattern from a Raw input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
+	virtual pair<bool, bool> readLight(ReadBuf& r) {
 		int c;
 		int dstLen = 0;
 		int nameLen = 0;
 		c = getOverNewline(this->fb_);
-		if(c < 0) { bail(r); return; }
+		if(c < 0) { bail(r); return make_pair(false, false); }
 		assert(!isspace(c));
 		r.color = color_;
 		int mytrim5 = this->trim5_;
@@ -2704,7 +2682,7 @@ protected:
 					mytrim5 += 2; // trim primer and first color
 				}
 			}
-			if(c < 0) { bail(r); return; }
+			if(c < 0) { bail(r); return make_pair(false, false); }
 		}
 		// _in now points just past the first character of a sequence
 		// line, and c holds the first character
@@ -2746,20 +2724,27 @@ protected:
 		_setLength(r.name, nameLen);
 		readCnt_++;
 
-		patid = (uint32_t)(readCnt_-1);
+		r.patid = (uint32_t)(readCnt_-1);
+		return make_pair(true, false);
 	}
+	
 	/// Read another read pair from a FASTQ input file
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
+	virtual BoolTriple readPairLight(ReadBuf& ra, ReadBuf& rb) {
 		// (For now, we shouldn't ever be here)
 		cerr << "In RawPatternSource.readPair()" << endl;
 		throw 1;
-		read(ra, patid);
-		readCnt_--;
-		read(rb, patid);
+		return BoolTriple();
 	}
+
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual void finalize(ReadBuf& r) const { }
+	
 	virtual void resetForNextFile() {
 		first_ = true;
 	}
+	
 	virtual void dump(ostream& out,
 	                  const String<Dna5>& seq,
 	                  const String<char>& qual,
@@ -2767,6 +2752,7 @@ protected:
 	{
 		out << seq << endl;
 	}
+	
 private:
 	/**
 	 * Do things we need to do if we have to bail in the middle of a
@@ -2777,70 +2763,9 @@ private:
 		seqan::clear(r.patFw);
 		fb_.resetLastN();
 	}
+	
 	bool first_;
 	bool color_;
-};
-
-/**
- * Read a Raw-format file (one sequence per line).  No quality strings
- * allowed.  All qualities are assumed to be 'I' (40 on the Phred-33
- * scale).
- */
-class ChainPatternSource : public BufferedFilePatternSource {
-public:
-	ChainPatternSource(uint32_t seed,
-	                   const vector<string>& infiles,
-	                   const char *dumpfile,
-	                   bool verbose,
-	                   uint32_t skip) :
-	BufferedFilePatternSource(
-		seed, infiles, NULL, false, dumpfile, verbose, 0, 0, skip) { }
-
-protected:
-
-	/// Read another pattern from a Raw input file
-	virtual void read(ReadBuf& r, uint32_t& patid) {
-		fb_.peek();
-		if(fb_.eof()) {
-			fb_.resetLastN();
-			seqan::clear(r.patFw);
-			return;
-		}
-		do {
-			r.hitset.deserialize(fb_);
-		} while(!r.hitset.initialized() && !fb_.eof());
-		if(!r.hitset.initialized()) {
-			fb_.resetLastN();
-			seqan::clear(r.patFw);
-			return;
-		}
-		// Now copy the name/sequence/quals into r.name/r.patFw/r.qualFw
-		_setBegin(r.name, (char*)r.nameBuf);
-		_setCapacity(r.name, seqan::length(r.hitset.name));
-		_setLength(r.name, seqan::length(r.hitset.name));
-		memcpy(r.nameBuf, seqan::begin(r.hitset.name), seqan::length(r.hitset.name));
-		_setBegin (r.patFw, (Dna5*)r.patBufFw);
-		_setCapacity(r.patFw, seqan::length(r.hitset.seq));
-		_setLength(r.patFw, seqan::length(r.hitset.seq));
-		memcpy(r.patBufFw, seqan::begin(r.hitset.seq), seqan::length(r.hitset.seq));
-		_setBegin (r.qual, r.qualBuf);
-		_setCapacity(r.qual, seqan::length(r.hitset.qual));
-		_setLength(r.qual, seqan::length(r.hitset.qual));
-		memcpy(r.qualBuf, seqan::begin(r.hitset.qual), seqan::length(r.hitset.qual));
-
-		r.readOrigBufLen = fb_.copyLastN(r.readOrigBuf);
-		fb_.resetLastN();
-
-		readCnt_++;
-		patid = (uint32_t)(readCnt_-1);
-	}
-
-	/// Read another read pair
-	virtual void readPair(ReadBuf& ra, ReadBuf& rb, uint32_t& patid) {
-		// (For now, we shouldn't ever be here)
-		cerr << "In ChainPatternSource.readPair()" << endl;
-		throw 1;
-	}
 };
 
 #endif /*PAT_H_*/

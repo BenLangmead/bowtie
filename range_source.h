@@ -332,7 +332,6 @@ struct RangeState {
 		int num = !eq.flags.mmA + !eq.flags.mmC + !eq.flags.mmG + !eq.flags.mmT;
 		assert_leq(num, 4);
 		assert_gt(num, 0);
-		uint8_t lo2 = eq.flags.quallo2;
 		if(num == 2) eq.flags.quallo2 = 127;
 		// Only need to pick randomly if there's a quality tie
 		if(num > 1) {
