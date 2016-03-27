@@ -15,36 +15,40 @@ const rawSeq MemoryMockPatternSourcePerThread::raw_list[] = {
 #include "rawseqs50.h"
 };
 
+const rawSeq MemoryMockPatternSourcePerThread::raw_list_1[] = {
+#include "rawseqs50_1.h"
+};
+
+const rawSeq MemoryMockPatternSourcePerThread::raw_list_2[] = {
+#include "rawseqs50_2.h"
+};
+
 void MemoryMockPatternSourcePerThread::dump(){
 	// not needed it for general debuggin purpose
-	using std::cerr;
-	using std::endl;
-	cerr << raw_list[this->i].id.c_str() << endl;
+	std::cerr << raw_list[i_].id.c_str() << std::endl;
 }
 
-void MemoryMockPatternSourcePerThread::init_read(const char* patname,const char* seq,const char* quals)
+void MemoryMockPatternSourcePerThread::init_read(
+	ReadBuf& buf,
+	const char* patname,
+	const char* seq,
+	const char* quals)
 {
-		int length = strlen(seq);
-		for(int i = 0; i < length; i++) {
-			//ra = RandomSource::nextU32(ra) >> 8;
-			//r.patBufFw[i]           = (ra & 3);
-			assert_in(toupper(seq[i]), "ACGTN");
-			buf1_.patBufFw[i]           = charToDna5[seq[i]];
-			//char c                  = 'I' - ((ra >> 2) & 31);
-			buf1_.qualBuf[i]            = quals[i];
-		}
-		//buf1_.nameBuf = patname;
-		memcpy(buf1_.nameBuf, patname, strlen(patname));
-		_setBegin (buf1_.patFw, (Dna5*)buf1_.patBufFw);
-		_setLength(buf1_.patFw, length);
-		_setBegin (buf1_.qual, buf1_.qualBuf);
-		_setLength(buf1_.qual, length);
-		//itoa10(patid, buf1_.nameBuf);
-		_setBegin(buf1_.name, buf1_.nameBuf);
-		_setLength(buf1_.name, strlen(buf1_.nameBuf));
-		buf1_.constructRevComps();
-		buf1_.constructReverses();
-		//printf("done initing new read %s %s %s\n",buf1_.patBufFw,buf1_.qualBuf,buf1_.nameBuf);
+	int length = strlen(seq);
+	for(int i = 0; i < length; i++) {
+		assert_in(toupper(seq[i]), "ACGTN");
+		buf.patBufFw[i] = charToDna5[seq[i]];
+		buf.qualBuf[i] = quals[i];
+	}
+	strcpy(buf.nameBuf, patname);
+	_setBegin(buf.patFw, (Dna5*)buf.patBufFw);
+	_setLength(buf.patFw, length);
+	_setBegin(buf.qual, buf.qualBuf);
+	_setLength(buf.qual, length);
+	_setBegin(buf.name, buf.nameBuf);
+	_setLength(buf.name, strlen(buf.nameBuf));
+	buf.constructRevComps();
+	buf.constructReverses();
 }
 
 void MemoryMockPatternSourcePerThread::nextReadPair()
@@ -53,35 +57,39 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 	bool& paired,
 	bool fixName)*/
 {
-	// automate conversion from FASTQ to raw_list
-	ASSERT_ONLY(uint32_t lastRdId = patid_);
-	if (this->i > 1999) {
-		if (this->loop_iter > 120) {
-			//done = true;
-			//return false;
-			buf1_.clearAll();
-			buf2_.clearAll();
-			return;
-		}
-		else {
-			this->i = 0;
-			this->loop_iter++;
-		}
-	}
-	//ASSERT_ONLY(dump());
+	if(i_ > 1999) { // NOTE: length of read list is hard-coded here
+		i_ = 0;
+		loop_iter_++;
+ 	}
 	//success = true;
-	//paired = false;
-		//printf("just about to init a new read\n");
-	init_read(
-			raw_list[this->i].id.c_str(),
-			raw_list[this->i].seq.c_str(),
-			raw_list[this->i].qual.c_str()
-	);
-		//printf("just after to init a new read\n");
-	this->i++;
-	this->patid_ = this->i;
-	//assert(!success || rdid_ != lastRdId);
-	//return success;
+	//paired = paired_;
+	if(!paired_) {
+		init_read(
+			buf1_,
+			raw_list[i_].id.c_str(),
+			raw_list[i_].seq.c_str(),
+			raw_list[i_].qual.c_str()
+		);
+		buf1_.mate = 1;
+		buf1_.patid = patid_ = cur_;
+	} else {
+		init_read(
+			buf1_,
+			raw_list_1[i_].id.c_str(),
+			raw_list_1[i_].seq.c_str(),
+			raw_list_1[i_].qual.c_str()
+		);
+		init_read(
+			buf2_,
+			raw_list_2[i_].id.c_str(),
+			raw_list_2[i_].seq.c_str(),
+			raw_list_2[i_].qual.c_str()
+		);
+		buf1_.mate = 1;
+		buf2_.mate = 2;
+		buf1_.patid = buf2_.patid = patid_ = cur_;
+	}
+	i_++; cur_++;
 	return;
 }
 

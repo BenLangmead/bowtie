@@ -1004,8 +1004,14 @@ struct rawSeq {
 };
 
 class MemoryMockPatternSourcePerThread : public PatternSourcePerThread {
+
 public:
-	MemoryMockPatternSourcePerThread(PairedPatternSource& __patsrc) : i(0),loop_iter(1) {}
+
+	MemoryMockPatternSourcePerThread(
+		PairedPatternSource& __patsrc,
+		size_t n,
+		bool paired) :
+		i_(0), cur_(0), loop_iter_(1), n_(n), paired_(paired) {}
 
 	/**
 	 * Get the next paired or unpaired read from the wrapped
@@ -1017,13 +1023,25 @@ public:
 		bool& paired,
 		bool fixName);*/
 	
-
 private:
+
 	void dump();
-	void init_read(const char* patname,const char* seq,const char* quals);
-	int i;
-	int loop_iter;
+	
+	void init_read(
+		ReadBuf& buf,
+		const char* patname,
+		const char* seq,
+		const char* quals);
+
+	size_t i_;
+	size_t cur_;
+	int loop_iter_;
+	size_t n_;
+	bool paired_;
+ 
 	static const rawSeq raw_list[];
+	static const rawSeq raw_list_1[];
+	static const rawSeq raw_list_2[];
 };
 
 /**
@@ -1061,14 +1079,14 @@ private:
 
 class MemoryMockPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
 public:
-	MemoryMockPatternSourcePerThreadFactory(PairedPatternSource& patsrc) :
-		patsrc_(patsrc) { }
+	MemoryMockPatternSourcePerThreadFactory(PairedPatternSource& patsrc, size_t n, bool paired) :
+		patsrc_(patsrc), n_(n), paired_(paired) { }
 
 	/**
 	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
-		return new MemoryMockPatternSourcePerThread(patsrc_);
+		return new MemoryMockPatternSourcePerThread(patsrc_, n_, paired_);
 	}
 
 	/**
@@ -1078,7 +1096,7 @@ public:
 	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
-			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_));
+			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, n_, paired_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -1087,6 +1105,8 @@ public:
 private:
 	/// Container for obtaining paired reads from PatternSources
 	PairedPatternSource& patsrc_;
+	size_t n_;  /// total # reads each thread should iterate through
+	bool paired_;  /// generate paired-end reads?
 };
 
 

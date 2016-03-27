@@ -1009,7 +1009,10 @@ patDumpfile = NULL;
 		cerr << "         --suppress is only available for the default output type." << endl;
 		suppressOuts.clear();
 	}
-}
+
+	// BTL: important change for no-io
+	qUpto /= nthreads;
+ }
 
 static const char *argv0 = NULL;
 
@@ -1094,8 +1097,8 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 	if(randReadsNoSync) {
 		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
 	} else {
-		//patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
-		patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc);
+		bool paired = !mates2.empty();
+		patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc, qUpto, paired);
 	}
 	assert(patsrcFact != NULL);
 	return patsrcFact;
