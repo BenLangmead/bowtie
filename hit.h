@@ -425,11 +425,13 @@ public:
 		while(i < end) {
 			size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
 			{
-				ThreadSafe _ts(_locks[strIdx]);
 				do {
 					assert(hs[i].repOk());
 					append(ss, hs[i]);
-					out(hs[i].h.first).writeChars(buf, ss.tellp());
+					{
+						ThreadSafe _ts(_locks[strIdx]);
+						out(hs[i].h.first).writeChars(buf, ss.tellp());
+					}
 					ss.seekp(0);
 					ss.clear();
 					i++;
