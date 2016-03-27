@@ -1098,7 +1098,7 @@ createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
 		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
 	} else {
 		bool paired = !mates2.empty();
-		patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc, qUpto, paired);
+		patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc, tid, qUpto, seed, paired);
 	}
 	assert(patsrcFact != NULL);
 	return patsrcFact;
@@ -2222,6 +2222,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        !noMaqRound);
 	String<QueryMutation> muts;
 	bool skipped = false;
+	int reads = 0;
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
@@ -2249,7 +2250,29 @@ static void seededQualSearchWorkerFull(void *vp) {
 		}
 #endif
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		patsrc->nextReadPair();
+		if(patsrc->empty() || patsrc->patid() >= qUpto) {
+			patsrc->bufa().clearAll();
+			break;
+		}
+		reads++;
+		assert(!empty(patsrc->bufa().patFw));
+		String<Dna5>& patFw  = patsrc->bufa().patFw;
+		patFw.data_begin += 0; /* suppress "unused" compiler warning */
+		String<Dna5>& patRc  = patsrc->bufa().patRc;
+		patRc.data_begin += 0; /* suppress "unused" compiler warning */
+		String<char>& qual = patsrc->bufa().qual;
+		qual.data_begin += 0; /* suppress "unused" compiler warning */
+		String<char>& qualRev = patsrc->bufa().qualRev;
+		qualRev.data_begin += 0; /* suppress "unused" compiler warning */
+		String<Dna5>& patFwRev  = patsrc->bufa().patFwRev;
+		patFwRev.data_begin += 0; /* suppress "unused" compiler warning */
+		String<Dna5>& patRcRev  = patsrc->bufa().patRcRev;
+		patRcRev.data_begin += 0; /* suppress "unused" compiler warning */
+		String<char>& name   = patsrc->bufa().name;
+		name.data_begin += 0; /* suppress "unused" compiler warning */
+		uint32_t patid  = patsrc->patid();
+		params.setPatId(patid);
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2272,9 +2295,13 @@ static void seededQualSearchWorkerFull(void *vp) {
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
-	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+	ss << "thread: " << tid << " cpu_changeovers: \n"
+	   << "thread: " << tid << " node_changeovers: \n"
+	   << "thread: " << tid << " # reads: " << reads << '\n';
+	{
+		ThreadSafe ts_(&gLock);
+		std::cout << ss.str() << std::flush;
+	}
 #endif
 	WORKER_EXIT();
 }

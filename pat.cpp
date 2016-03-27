@@ -66,24 +66,24 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 	if(!paired_) {
 		init_read(
 			buf1_,
-			raw_list[i_].id.c_str(),
-			raw_list[i_].seq.c_str(),
-			raw_list[i_].qual.c_str()
+			raw_list[permutation_[i_]].id.c_str(),
+			raw_list[permutation_[i_]].seq.c_str(),
+			raw_list[permutation_[i_]].qual.c_str()
 		);
 		buf1_.mate = 1;
 		buf1_.patid = patid_ = cur_;
 	} else {
 		init_read(
 			buf1_,
-			raw_list_1[i_].id.c_str(),
-			raw_list_1[i_].seq.c_str(),
-			raw_list_1[i_].qual.c_str()
+			raw_list_1[permutation_[i_]].id.c_str(),
+			raw_list_1[permutation_[i_]].seq.c_str(),
+			raw_list_1[permutation_[i_]].qual.c_str()
 		);
 		init_read(
 			buf2_,
-			raw_list_2[i_].id.c_str(),
-			raw_list_2[i_].seq.c_str(),
-			raw_list_2[i_].qual.c_str()
+			raw_list_2[permutation_[i_]].id.c_str(),
+			raw_list_2[permutation_[i_]].seq.c_str(),
+			raw_list_2[permutation_[i_]].qual.c_str()
 		);
 		buf1_.mate = 1;
 		buf2_.mate = 2;

@@ -1009,9 +1009,25 @@ public:
 
 	MemoryMockPatternSourcePerThread(
 		PairedPatternSource& __patsrc,
+		int threadid,
 		size_t n,
+		uint32_t seed,
 		bool paired) :
-		i_(0), cur_(0), loop_iter_(1), n_(n), paired_(paired) {}
+		i_(0), cur_(0), loop_iter_(1), n_(n), rnd_(), paired_(paired)
+	{
+		rnd_.init((seed + 31) * 7 * threadid);
+		for(size_t i = 0; i < 2000; i++) {
+			permutation_[i] = i;
+		}
+		for(size_t i = 0; i < 5000; i++) {
+			size_t j = rnd_.nextU32() % 2000;
+			size_t k = rnd_.nextU32() % 2000;
+			assert(j != k);
+			size_t tmp = permutation_[j];
+			permutation_[j] = permutation_[k];
+			permutation_[k] = tmp;
+		}
+	}
 
 	/**
 	 * Get the next paired or unpaired read from the wrapped
@@ -1037,8 +1053,11 @@ private:
 	size_t cur_;
 	int loop_iter_;
 	size_t n_;
+	RandomSource rnd_;
 	bool paired_;
  
+	size_t permutation_[2000];
+	
 	static const rawSeq raw_list[];
 	static const rawSeq raw_list_1[];
 	static const rawSeq raw_list_2[];
@@ -1079,14 +1098,19 @@ private:
 
 class MemoryMockPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
 public:
-	MemoryMockPatternSourcePerThreadFactory(PairedPatternSource& patsrc, size_t n, bool paired) :
-		patsrc_(patsrc), n_(n), paired_(paired) { }
+	MemoryMockPatternSourcePerThreadFactory(
+		PairedPatternSource& patsrc,
+		int tid,
+		size_t n,
+		uint32_t seed,
+		bool paired) :
+		patsrc_(patsrc), tid_(tid), n_(n), seed_(seed), paired_(paired) { }
 
 	/**
 	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
-		return new MemoryMockPatternSourcePerThread(patsrc_, n_, paired_);
+		return new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_);
 	}
 
 	/**
@@ -1096,7 +1120,7 @@ public:
 	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
-			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, n_, paired_));
+			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -1105,7 +1129,9 @@ public:
 private:
 	/// Container for obtaining paired reads from PatternSources
 	PairedPatternSource& patsrc_;
+	int tid_;  /// thread id
 	size_t n_;  /// total # reads each thread should iterate through
+	uint32_t seed_;  /// random seed
 	bool paired_;  /// generate paired-end reads?
 };
 
