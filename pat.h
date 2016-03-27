@@ -1459,8 +1459,10 @@ protected:
 			is_open_ = false;
 			fclose(fp_);
 			fp_ = NULL;
-			fclose(qfp_);
-			qfp_ = NULL;
+			if(qfp_ != NULL) {
+				fclose(qfp_);
+				qfp_ = NULL;
+			}
 		}
 		while(filecur_ < infiles_.size()) {
 			// Open read
