@@ -612,8 +612,8 @@ public:
 					continue; // on to next pair of PatternSources
 				}
 				ra.mate = 0;
-				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
 				srca_[cur]->finalize(ra);
+				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
 				ra.constructRevComps();
 				ra.constructReverses();
 				return make_pair(true, false);
