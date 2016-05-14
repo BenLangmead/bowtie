@@ -1149,7 +1149,7 @@ static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
 #ifdef WITH_TBB
-void exactSearchWorker::operator()() {
+void exactSearchWorker::operator()() const {
 #else
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
@@ -1229,7 +1229,7 @@ static void exactSearchWorker(void *vp) {
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void exactSearchWorkerStateful::operator()() {
+void exactSearchWorkerStateful::operator()() const {
 #else
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1413,7 +1413,7 @@ static BitPairReference*              mismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
 #ifdef WITH_TBB
-void mismatchSearchWorkerFullStateful::operator()() {
+void mismatchSearchWorkerFullStateful::operator()() const {
 #else
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1498,7 +1498,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	return;
 }
 #ifdef WITH_TBB
-void mismatchSearchWorkerFull::operator()(){
+void mismatchSearchWorkerFull::operator()() const {
 #else
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
@@ -1745,7 +1745,7 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerStateful::operator()(){
+void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
 #else
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1833,7 +1833,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	return;
 }
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerFull::operator()(){
+void twoOrThreeMismatchSearchWorkerFull::operator()() const {
 #else
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
@@ -2053,7 +2053,7 @@ static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
 #ifdef WITH_TBB
-void seededQualSearchWorkerFull::operator()(){
+void seededQualSearchWorkerFull::operator()() const {
 #else
 static void seededQualSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
@@ -2306,7 +2306,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	WORKER_EXIT();
 }
 #ifdef WITH_TBB
-void seededQualSearchWorkerFullStateful::operator()(){
+void seededQualSearchWorkerFullStateful::operator()() const {
 #else
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
