@@ -14,6 +14,9 @@
     <ul>
       <table width="100%">
         <tr>
+	<td colspan="2"><a href="http://bioconda.github.io/recipes/bowtie/README.html"><img src="https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat-square"/></a></td>
+	</tr>
+        <tr>
           <td>
             <a href="https://sourceforge.net/projects/bowtie-bio/files/bowtie/1.1.2">Bowtie 1.1.2</a>
           </td>
