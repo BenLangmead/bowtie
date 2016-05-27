@@ -985,6 +985,8 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "         --suppress is only available for the default output type." << endl;
 		suppressOuts.clear();
 	}
+	// BTL: important change for no-io
+	qUpto /= nthreads;
 }
 
 static const char *argv0 = NULL;
@@ -1066,8 +1068,8 @@ static const char *argv0 = NULL;
 /// to the global params and return a pointer to it
 static PatternSourcePerThreadFactory*
 createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
-	PatternSourcePerThreadFactory *patsrcFact;
-	patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
+	bool paired = !mates2.empty();
+	PatternSourcePerThreadFactory *patsrcFact = new MemoryMockPatternSourcePerThreadFactory(_patsrc, tid, qUpto, seed, paired);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -2242,7 +2244,10 @@ static void seededQualSearchWorkerFull(void *vp) {
 	ss.clear();
 	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+	{
+		ThreadSafe ts_(&gLock);
+		std::cout << ss.str();
+	}
 #endif
 	WORKER_EXIT();
 }

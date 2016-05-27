@@ -493,7 +493,7 @@ public:
 			// Patterns from srca_[cur_] are unpaired
 			pair<bool, bool> flags = src_[cur]->nextReadPair(ra, rb);
 			if(!flags.first) {
-				ThreadSafe ts(&mutex_m);
+				//ThreadSafe ts(&mutex_m);
 				if(cur + 1 > cur_) {
 					cur_++;
 				}
@@ -606,7 +606,7 @@ public:
 				// Patterns from srca_[cur_] are unpaired
 				if(!srca_[cur]->nextRead(ra)) {
 					// no more input
-					ThreadSafe ts(&mutex_m);
+					//ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
 					continue; // on to next pair of PatternSources
@@ -622,7 +622,7 @@ public:
 				// in the two mate files
 				bool success_a, success_b;
 				{
-					ThreadSafe ts(&mutex_m);
+					//ThreadSafe ts(&mutex_m);
 					success_a = srca_[cur]->nextRead(ra);
 					success_b = srcb_[cur]->nextRead(rb);
 					// Did the pair obtained fail to match up?
@@ -833,6 +833,111 @@ private:
 	PairedPatternSource& patsrc_;
 };
 
+struct rawSeq {
+	string id;
+	string seq;
+	string qual;
+};
+
+class MemoryMockPatternSourcePerThread : public PatternSourcePerThread {
+
+public:
+
+	MemoryMockPatternSourcePerThread(
+		PairedPatternSource& __patsrc,
+		int threadid,
+		size_t n,
+		uint32_t seed,
+		bool paired) :
+		i_(0), cur_(0), loop_iter_(1), n_(n), rnd_(), paired_(paired)
+	{
+		rnd_.init((seed + 31) * 7 * threadid);
+		for(size_t i = 0; i < 2000; i++) {
+			permutation_[i] = i;
+		}
+		for(size_t i = 0; i < 5000; i++) {
+			size_t j = rnd_.nextU32() % 2000;
+			size_t k = rnd_.nextU32() % 2000;
+			assert(j != k);
+			size_t tmp = permutation_[j];
+			permutation_[j] = permutation_[k];
+			permutation_[k] = tmp;
+		}
+	}
+
+	/**
+	 * Get the next paired or unpaired read from the wrapped
+	 * PairedPatternSource.
+	 */
+	virtual void nextReadPair();
+		/*bool& success,
+		bool& done,
+		bool& paired,
+		bool fixName);*/
+	
+private:
+
+	void dump();
+	
+	void init_read(
+		ReadBuf& buf,
+		const char* patname,
+		const char* seq,
+		const char* quals);
+
+	size_t i_;
+	size_t cur_;
+	int loop_iter_;
+	size_t n_;
+	RandomSource rnd_;
+	bool paired_;
+ 
+	size_t permutation_[2000];
+	
+	static const rawSeq raw_list[];
+	static const rawSeq raw_list_1[];
+	static const rawSeq raw_list_2[];
+};
+
+class MemoryMockPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
+public:
+	MemoryMockPatternSourcePerThreadFactory(
+		PairedPatternSource& patsrc,
+		int tid,
+		size_t n,
+		uint32_t seed,
+		bool paired) :
+		patsrc_(patsrc), tid_(tid), n_(n), seed_(seed), paired_(paired) { }
+
+	/**
+	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
+	 */
+	virtual PatternSourcePerThread* create() const {
+		return new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_);
+	}
+
+	/**
+	 * Create a new heap-allocated vector of heap-allocated
+	 * WrappedPatternSourcePerThreads.
+	 */
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
+		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+		for(size_t i = 0; i < n; i++) {
+			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
+
+private:
+	/// Container for obtaining paired reads from PatternSources
+	PairedPatternSource& patsrc_;
+	int tid_;  /// thread id
+	size_t n_;  /// total # reads each thread should iterate through
+	uint32_t seed_;  /// random seed
+	bool paired_;  /// generate paired-end reads?
+};
+
 /**
  * Encapsualtes a source of patterns where each raw pattern is trimmed
  * by some user-defined amount on the 3' and 5' ends.  Doesn't
@@ -1017,7 +1122,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		if(cur_ >= v_.size()) {
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
@@ -1160,7 +1265,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		pair<bool, bool> flags = make_pair(false, false);
 		while(!flags.first && !flags.second) {
 			flags = readLight(r);
@@ -1196,7 +1301,7 @@ public:
 	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		bool success, eof, paired;
 		do {
 			BoolTriple result = readPairLight(ra, rb);
@@ -1362,7 +1467,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		pair<bool, bool> flags = make_pair(false, false);
 		while(!flags.first && !flags.second) {
 			 flags = readLight(r);
@@ -1397,7 +1502,7 @@ public:
 	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		bool success, eof, paired;
 		do {
 			BoolTriple result = readPairLight(ra, rb);

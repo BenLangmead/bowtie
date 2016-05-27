@@ -11,6 +11,90 @@
 using namespace std;
 using namespace seqan;
 
+const rawSeq MemoryMockPatternSourcePerThread::raw_list[] = {
+#include "rawseqs50.h"
+};
+
+const rawSeq MemoryMockPatternSourcePerThread::raw_list_1[] = {
+#include "rawseqs50_1.h"
+};
+
+const rawSeq MemoryMockPatternSourcePerThread::raw_list_2[] = {
+#include "rawseqs50_2.h"
+};
+
+void MemoryMockPatternSourcePerThread::dump(){
+	// not needed it for general debuggin purpose
+	std::cerr << raw_list[i_].id.c_str() << std::endl;
+}
+
+void MemoryMockPatternSourcePerThread::init_read(
+	ReadBuf& buf,
+	const char* patname,
+	const char* seq,
+	const char* quals)
+{
+	int length = strlen(seq);
+	for(int i = 0; i < length; i++) {
+		assert_in(toupper(seq[i]), "ACGTN");
+		buf.patBufFw[i] = charToDna5[seq[i]];
+		buf.qualBuf[i] = quals[i];
+	}
+	strcpy(buf.nameBuf, patname);
+	_setBegin(buf.patFw, (Dna5*)buf.patBufFw);
+	_setLength(buf.patFw, length);
+	_setBegin(buf.qual, buf.qualBuf);
+	_setLength(buf.qual, length);
+	_setBegin(buf.name, buf.nameBuf);
+	_setLength(buf.name, strlen(buf.nameBuf));
+	buf.constructRevComps();
+	buf.constructReverses();
+}
+
+void MemoryMockPatternSourcePerThread::nextReadPair()
+	/*bool& success,
+	bool& done,
+	bool& paired,
+	bool fixName)*/
+{
+	if(i_ > 1999) { // NOTE: length of read list is hard-coded here
+		i_ = 0;
+		loop_iter_++;
+ 	}
+	//success = true;
+	//paired = paired_;
+	if(!paired_) {
+		init_read(
+			buf1_,
+			raw_list[permutation_[i_]].id.c_str(),
+			raw_list[permutation_[i_]].seq.c_str(),
+			raw_list[permutation_[i_]].qual.c_str()
+		);
+		buf1_.mate = 1;
+		//buf1_.patid = patid_ = cur_;
+		buf1_.patid = cur_;
+	} else {
+		init_read(
+			buf1_,
+			raw_list_1[permutation_[i_]].id.c_str(),
+			raw_list_1[permutation_[i_]].seq.c_str(),
+			raw_list_1[permutation_[i_]].qual.c_str()
+		);
+		init_read(
+			buf2_,
+			raw_list_2[permutation_[i_]].id.c_str(),
+			raw_list_2[permutation_[i_]].seq.c_str(),
+			raw_list_2[permutation_[i_]].qual.c_str()
+		);
+		buf1_.mate = 1;
+		buf2_.mate = 2;
+		//buf1_.patid = buf2_.patid = patid_ = cur_;
+		buf1_.patid = buf2_.patid = cur_;
+	}
+	i_++; cur_++;
+	return;
+}
+
 /**
  * Parse a single quality string from fb and store qualities in r.
  * Assume the next character obtained via fb.get() is the first
