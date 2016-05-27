@@ -855,14 +855,14 @@ public:
 		for(size_t i = 0; i < 2000; i++) {
 			permutation_[i] = i;
 		}
-		for(size_t i = 0; i < 5000; i++) {
+		/*for(size_t i = 0; i < 5000; i++) {
 			size_t j = rnd_.nextU32() % 2000;
 			size_t k = rnd_.nextU32() % 2000;
 			assert(j != k);
 			size_t tmp = permutation_[j];
 			permutation_[j] = permutation_[k];
 			permutation_[k] = tmp;
-		}
+		}*/
 	}
 
 	/**
