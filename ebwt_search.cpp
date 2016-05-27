@@ -1001,7 +1001,7 @@ static const char *argv0 = NULL;
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
-#define GET_READ(p) \
+#define GET_READ(p,r) \
 	p->nextReadPair(); \
 	if(p->empty() || p->patid() >= qUpto) { \
 		p->bufa().clearAll(); \
@@ -1023,7 +1023,8 @@ static const char *argv0 = NULL;
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
 	uint32_t      patid  = p->patid();       \
-	params.setPatId(patid);
+	params.setPatId(patid); \
+	(*r)++;
 
 /// Macro for getting the forward oriented version of next read,
 /// possibly aborting depending on whether the result is empty or the
@@ -1157,6 +1158,7 @@ static void exactSearchWorker(void *vp) {
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
+	int reads = 0;
 	
 	int current_cpu = 0, current_node = 0;
 	get_cpu_and_node(current_cpu, current_node);
@@ -1181,7 +1183,7 @@ static void exactSearchWorker(void *vp) {
 		}
 #endif
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		GET_READ(patsrc,&reads);
 		#include "search_exact.c"
 	}
 	FINISH_READ(patsrc);
@@ -1507,6 +1509,7 @@ static void mismatchSearchWorkerFull(void *vp){
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
+	int reads = 0;
 	
 	int current_cpu = 0, current_node = 0;
 	get_cpu_and_node(current_cpu, current_node);
@@ -1531,7 +1534,7 @@ static void mismatchSearchWorkerFull(void *vp){
 		}
 #endif
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		GET_READ(patsrc,&reads);
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1886,6 +1889,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
+	int reads = 0;
 	
 	int current_cpu = 0, current_node = 0;
 	get_cpu_and_node(current_cpu, current_node);
@@ -1910,7 +1914,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		}
 #endif
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		GET_READ(patsrc,&reads);
 		patid += 0; // kill unused variable warning
 		uint32_t plen = length(patFw);
 		uint32_t s = plen;
@@ -2195,6 +2199,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
+	int reads = 0;
 	
 	int current_cpu = 0, current_node = 0;
 	get_cpu_and_node(current_cpu, current_node);
@@ -2219,7 +2224,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 		}
 #endif
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		GET_READ(patsrc,&reads);
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2243,7 +2248,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 	ss.str("");
 	ss.clear();
 	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl
+	   << "thread: " << tid << " # reads: " << reads << '\n';
 	{
 		ThreadSafe ts_(&gLock);
 		std::cout << ss.str();
