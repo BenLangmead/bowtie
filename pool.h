@@ -37,7 +37,7 @@ public:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
-			ThreadSafe _ts(&gLock);
+			//ThreadSafe _ts(&gLock);
 			std::cerr << "Error: Could not allocate ChunkPool of "
 			          << totSz << " bytes" << std::endl;
 			exhausted();
@@ -340,7 +340,7 @@ protected:
 				throw std::bad_alloc();
 			}
 		} catch(std::bad_alloc& e) {
-			ThreadSafe _ts(&gLock);
+			//ThreadSafe _ts(&gLock);
 			pool_->exhausted();
 			return false;
 		}
@@ -360,7 +360,7 @@ protected:
 					throw std::bad_alloc();
 				}
 			} catch(std::bad_alloc& e) {
-				ThreadSafe _ts(&gLock);
+				//ThreadSafe _ts(&gLock);
 				pool_->exhausted();
 				return false;
 			}

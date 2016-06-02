@@ -9,12 +9,12 @@ public:
 	SyncLogger() : mutex_m() { }
 
 	void msg(const char *s) {
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		std::cout << s << std::endl;
 	}
 
 	void msg(const std::string& s) {
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		std::cout << s << std::endl;
 	}
 

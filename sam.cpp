@@ -225,7 +225,7 @@ void SAMHitSink::reportSamHit(const Hit& h, int mapq, int xms) {
 	ostringstream ss;
 	append(ss, h, mapq, xms);
 	// Make sure to grab lock before writing to output stream
-	ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
+	//ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 	out(h.h.first).writeString(ss.str());
 }
 
@@ -244,7 +244,7 @@ void SAMHitSink::reportSamHits(
 	assert_gt(hs[start].mate, 0);
 	char buf[4096];
 	{
-		ThreadSafe _ts(_locks[0]);
+		//ThreadSafe _ts(_locks[0]);
 		for(size_t i = start; i < end; i++) {
 			ostringstream ss(ssmode_);
 			ss.rdbuf()->pubsetbuf(buf, 4096);
@@ -252,7 +252,7 @@ void SAMHitSink::reportSamHits(
 			out(0).writeChars(buf, ss.tellp());
 		}
 	}
-	ThreadSafe ts(&main_mutex_m);
+	//ThreadSafe ts(&main_mutex_m);
 	commitHits(hs);
 	first_ = false;
 	numAligned_++;
@@ -332,7 +332,7 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 		}
 		ss << endl;
 	}
-	ThreadSafe _ts(_locks[0]);
+	//ThreadSafe _ts(_locks[0]);
 	out(0).writeString(ss.str());
 }
 

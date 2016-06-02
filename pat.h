@@ -315,7 +315,7 @@ public:
 	 * whether locks will be contended.
 	 */
 	void addWrapper() {
-		ThreadSafe ts(&mutex_m);
+		//ThreadSafe ts(&mutex_m);
 		numWrappers_++;
 	}
 

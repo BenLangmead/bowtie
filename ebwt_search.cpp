@@ -2251,7 +2251,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl
 	   << "thread: " << tid << " # reads: " << reads << '\n';
 	{
-		ThreadSafe ts_(&gLock);
+		//ThreadSafe ts_(&gLock);
 		std::cout << ss.str();
 	}
 #endif
