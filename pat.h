@@ -30,6 +30,8 @@ using namespace seqan;
 /// Constructs string base-10 representation of integer 'value'
 extern char* itoa10(int value, char* result);
 
+typedef uint64_t TReadId;
+
 /**
  * Calculate a per-read random seed based on a combination of
  * the read data (incl. sequence, name, quals) and the global
@@ -275,6 +277,87 @@ struct BoolTriple {
 };
 
 /**
+ * All per-thread storage for input read data.
+ */
+struct PerThreadReadBuf {
+	
+	PerThreadReadBuf(size_t max_buf) :
+		max_buf_(max_buf),
+		bufa_(max_buf),
+		bufb_(max_buf),
+		rdid_()
+	{
+		bufa_.resize(max_buf);
+		bufb_.resize(max_buf);
+		reset();
+	}
+	
+	ReadBuf& read_a() { return bufa_[cur_buf_]; }
+	ReadBuf& read_b() { return bufb_[cur_buf_]; }
+	
+	const ReadBuf& read_a() const { return bufa_[cur_buf_]; }
+	const ReadBuf& read_b() const { return bufb_[cur_buf_]; }
+	
+	/**
+	 * Return read id for read/pair currently in the buffer.
+	 */
+	TReadId rdid() const {
+		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
+		return rdid_ + cur_buf_;
+	}
+	
+	/**
+	 * Reset state as though no reads have been read.
+	 */
+	void reset() {
+		cur_buf_ = bufa_.size();
+		for(size_t i = 0; i < max_buf_; i++) {
+			bufa_[i].reset();
+			bufb_[i].reset();
+		}
+		rdid_ = std::numeric_limits<TReadId>::max();
+	}
+	
+	/**
+	 * Advance cursor to next element
+	 */
+	void next() {
+		assert_lt(cur_buf_, bufa_.size());
+		cur_buf_++;
+	}
+	
+	/**
+	 * Return true when there's nothing left to dish out.
+	 */
+	bool exhausted() {
+		assert_leq(cur_buf_, bufa_.size());
+		return cur_buf_ >= bufa_.size()-1;
+	}
+	
+	/**
+	 * Just after a new batch has been loaded, use init to
+	 * set the cuf_buf_ and rdid_ fields appropriately.
+	 */
+	void init() {
+		cur_buf_ = 0;
+	}
+	
+	/**
+	 * Set the read id of the first read in the buffer.
+	 */
+	void setReadId(TReadId rdid) {
+		rdid_ = rdid;
+	}
+	
+	const size_t max_buf_; // max # reads to read into buffer at once
+	vector<ReadBuf> bufa_;     // Read buffer for mate as
+	vector<ReadBuf> bufb_;     // Read buffer for mate bs
+	size_t cur_buf_;       // Read buffer currently active
+	TReadId rdid_;         // index of read at offset 0 of bufa_/bufb_
+};
+
+
+/**
  * Encapsulates a synchronized source of patterns; usually a file.
  * Handles dumping patterns to a logfile (useful for debugging).  Also
  * optionally reverses reads and quality strings before returning them,
@@ -314,6 +397,7 @@ public:
 	 * WrappedPatternSourcePerThread.  This helps us keep track of
 	 * whether locks will be contended.
 	 */
+	//BP: remove?
 	void addWrapper() {
 		ThreadSafe ts(&mutex_m);
 		numWrappers_++;
@@ -341,14 +425,32 @@ public:
 	 * Finishes parsing outside the critical section
 	 */
 	virtual void finalize(ReadBuf& r) const = 0;
-
+	
+	/**
+	 * Implementation to be provided by concrete subclasses.  An
+	 * implementation for this member is only relevant for formats
+	 * where individual input sources look like single-end-read
+	 * sources, e.g., formats where paired-end reads are specified in
+	 * parallel read files.
+	 */
+	virtual std::pair<bool, int> nextBatch(
+		PerThreadReadBuf& pt,
+		bool batch_a,
+		bool lock = true) = 0;
+	
+	/**
+	 * Finishes parsing a given read.  Happens outside the critical section.
+	 */
+	virtual bool parse(ReadBuf& ra, ReadBuf& rb) const = 0;
+	
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
 
 	/**
 	 * Return the number of reads attempted.
 	 */
-	uint64_t readCnt() const { return readCnt_ - 1; }
+	//BP: changed, but should I have?
+	uint64_t readCnt() const { return readCnt_; }
 
 protected:
 
@@ -405,7 +507,7 @@ protected:
 	uint32_t seed_;
 
 	/// The number of reads read by this PatternSource
-	uint64_t readCnt_;
+	volatile uint64_t readCnt_;
 
 	const char *dumpfile_; /// dump patterns to this file before returning them
 	ofstream out_;         /// output stream for dumpfile
@@ -1091,6 +1193,40 @@ public:
 	}
 	
 	virtual void finalize(ReadBuf& r) const { }
+	
+	/**
+	 * Read next batch.  However, batch concept is not very applicable for this
+	 * PatternSource where all the info has already been parsed into the fields
+	 * in the contsructor.  This essentially modifies the pt as though we read
+	 * in some number of patterns.
+	 */
+	pair<bool, int> nextBatch(
+		PerThreadReadBuf& pt,
+		bool batch_a,
+		bool lock)
+	{
+		bool success = true;
+		int nread = 0;
+		pt.reset();
+		ThreadSafe ts(&mutex_m, lock);
+		pt.setReadId(readCnt_);
+#if 0
+		// TODO: set nread to min of pt.size() and total - cur_
+		// TODO: implement something like following function
+		pt.install_dummies(nread);
+#endif
+		readCnt_ += nread;
+		return make_pair(success, nread);
+	}
+	
+	/**
+	 * Finishes parsing outside the critical section
+	 */
+	virtual bool parse(ReadBuf& ra, ReadBuf& rb) const {
+		cerr << "In VectorPatternSource.parse()" << endl;
+		throw 1;
+		return false;
+	}
 
 private:
 	bool color_;
@@ -1240,11 +1376,63 @@ public:
 		filecur_++;
 	}
 	
+	/**
+	 * Fill Read with the sequence, quality and name for the next
+	 * read in the list of read files.  This function gets called by
+	 * all the search threads, so we must handle synchronization.
+	 *
+	 * What does the return value signal?
+	 * In the event that we read more data, it should at least signal how many
+	 * reads were read, and whether we're totally done.  It's debatable whether
+	 * it should convey anything about the individual read files, like whether
+	 * we finished one of them.
+	 */
+	pair<bool, int> nextBatch(
+		PerThreadReadBuf& pt,
+		bool batch_a,
+		bool lock)
+	{
+		bool done = false;
+		int nread = 0;
+		
+		// synchronization at this level because both reading and manipulation of
+		// current file pointer have to be protected
+		ThreadSafe ts(&mutex_m, lock);
+		pt.setReadId(readCnt_);
+		while(true) { // loop that moves on to next file when needed
+			do {
+				pair<bool, int> ret = nextBatchFromFile(pt, batch_a);
+				done = ret.first;
+				nread = ret.second;
+			} while(!done && nread == 0); // not sure why this would happen
+			if(done && filecur_ < infiles_.size()) { // finished with this file
+				open();
+				resetForNextFile(); // reset state to handle a fresh file
+				filecur_++;
+				if(nread == 0) {
+					continue;
+				}
+			}
+			break;
+		}
+		assert_geq(nread, 0);
+		readCnt_ += nread;
+		return make_pair(done, nread);
+	}
+	
 protected:
 
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
 	virtual pair<bool, bool> readLight(ReadBuf& r) = 0;
+	
+	/**
+	 * Light-parse a batch of unpaired reads from current file into the given
+	 * buffer.  Called from CFilePatternSource.nextBatch().
+	 */
+	virtual std::pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a) = 0;
 	
 	/// Read another pattern pair from the input file; this is
 	/// overridden to deal with specific file formats
@@ -1428,6 +1616,47 @@ public:
 		}
 		return make_pair(success, paired);
 	}
+
+	/**
+	 * Fill Read with the sequence, quality and name for the next
+	 * read in the list of read files.  This function gets called by
+	 * all the search threads, so we must handle synchronization.
+	 *
+	 * Returns pair<bool, int> where bool indicates whether we're
+	 * completely done, and int indicates how many reads were read.
+	 */
+	pair<bool, int> nextBatch(
+		PerThreadReadBuf& pt,
+		bool batch_a,
+		bool lock)
+	{
+		bool done = false;
+		int nread = 0;
+		
+		// synchronization at this level because both reading and manipulation of
+		// current file pointer have to be protected
+		ThreadSafe ts(&mutex_m, lock);
+		pt.setReadId(readCnt_);
+		while(true) { // loop that moves on to next file when needed
+			do {
+				pair<bool, int> ret = nextBatchFromFile(pt, batch_a);
+				done = ret.first;
+				nread = ret.second;
+			} while(!done && nread == 0); // not sure why this would happen
+			if(done && filecur_ < infiles_.size()) { // finished with this file
+				open();
+				resetForNextFile(); // reset state to handle a fresh file
+				filecur_++;
+				if(nread == 0) {
+					continue;
+				}
+			}
+			break;
+		}
+		assert_geq(nread, 0);
+		readCnt_ += nread;
+		return make_pair(done, nread);
+	}
 	
 	/**
 	 * Reset state so that we read start reading again from the
@@ -1442,10 +1671,19 @@ public:
 	}
 	
 protected:
+
+	/**
+	 * Light-parse a batch of unpaired reads from current file into the given
+	 * buffer.  Called from CFilePatternSource.nextBatch().
+	 */
+	virtual std::pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a) = 0;
 	
 	/// Read another pattern from the input file; this is overridden
 	/// to deal with specific file formats
 	virtual pair<bool, bool> readLight(ReadBuf& r) = 0;
+	
 	
 	/// Read another pattern pair from the input file; this is
 	/// overridden to deal with specific file formats
@@ -1555,7 +1793,27 @@ public:
 		first_ = true;
 		BufferedFilePatternSource::reset();
 	}
+
+
 protected:
+
+	/// Read another pattern from a FASTA input file
+	pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a)
+	{
+		throw 1;
+		return make_pair(false, 0);
+	}
+
+	/// Read another pattern from a FASTA input file
+	bool parse(ReadBuf& r, ReadBuf& rb) const {
+		r.reset();
+		cerr << "In FastaPatternSource.parse()" << endl;
+		throw 1;
+		return false;
+	}
+
 	/**
 	 * Scan to the next FASTA record (starting with >) and return the first
 	 * character of the record (which will always be >).
@@ -1824,6 +2082,29 @@ public:
 	{ }
 
 protected:
+	
+	/**
+	 * "Light" parser.  This is inside the critical section, so the key is to do
+	 * just enough parsing so that another function downstream (finalize()) can do
+	 * the rest of the parsing.  Really this function's only job is to stick every
+	 * for lines worth of the input file into a buffer (r.readOrigBuf).  finalize()
+	 * then parses the contents of r.readOrigBuf later.
+	 */
+	pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a)
+	{
+		throw 1;
+		return make_pair(false, 0);
+	}
+
+	/// Read another pattern from a FASTA input file
+	bool parse(ReadBuf& r, ReadBuf& rb) const {
+		r.reset();
+		cerr << "In TabbedPatternSource.parse()" << endl;
+		throw 1;
+		return false;
+	}
 
 	/// Read another pattern from a FASTA input file
 	virtual pair<bool, bool> readLight(ReadBuf& r) {
@@ -1976,6 +2257,7 @@ protected:
 	 * Finishes parsing outside the critical section
 	 */
 	virtual void finalize(ReadBuf& r) const { }
+	
 	
 	/**
 	 * Dump a FASTQ-style record for the read.
@@ -2194,6 +2476,30 @@ public:
 	}
 
 protected:
+	
+	/**
+	 * "Light" parser.  This is inside the critical section, so the key is to do
+	 * just enough parsing so that another function downstream (finalize()) can do
+	 * the rest of the parsing.  Really this function's only job is to stick every
+	 * for lines worth of the input file into a buffer (r.readOrigBuf).  finalize()
+	 * then parses the contents of r.readOrigBuf later.
+	 */
+	pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a)
+	{
+		throw 1;
+		return make_pair(false, 0);
+	}
+
+	/// Read another pattern from a FASTA input file
+	bool parse(ReadBuf& r, ReadBuf& rb) const {
+		assert(r.empty());
+		assert(rb.empty());
+		cerr << "In FastaContinuousPatternSource.parse()" << endl;
+		throw 1;
+	}
+
 	/// Read another pattern from a FASTA input file
 	virtual pair<bool, bool> readLight(ReadBuf& r) {
 		while(true) {
@@ -2283,6 +2589,7 @@ protected:
 	 * Finishes parsing outside the critical section
 	 */
 	virtual void finalize(ReadBuf& r) const { }
+	
 
 	/**
 	 * Reset state to be read for the next file.
@@ -2344,7 +2651,198 @@ public:
 		first_ = true;
 		CFilePatternSource::reset();
 	}
+
 protected:
+	
+	/**
+	 * "Light" parser.  This is inside the critical section, so the key is to do
+	 * just enough parsing so that another function downstream (finalize()) can do
+	 * the rest of the parsing.  Really this function's only job is to stick every
+	 * for lines worth of the input file into a buffer (r.readOrigBuf).  finalize()
+	 * then parses the contents of r.readOrigBuf later.
+	 */
+	pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a)
+	{
+		int c = 0;
+		vector<ReadBuf>& readBuf = batch_a ? pt.bufa_ : pt.bufb_;
+		size_t& len = readBuf[0].readOrigBufLen;
+		len = 0;
+		if(first_) {
+			c = getc_unlocked(fp_);
+			while(c == '\r' || c == '\n') {
+				c = getc_unlocked(fp_);
+			}
+			if(c != '@') {
+				cerr << "Error: reads file does not look like a FASTQ file" << endl;
+				throw 1;
+			}
+			readBuf[0].readOrigBuf[len++] = c;
+			assert_eq('@', c);
+			first_ = false;
+		}
+		// Note: to reduce the number of times we have to enter the critical
+		// section (each entrance has some assocaited overhead), we could populate
+		// the buffer with several reads worth of data here, instead of just one.
+		bool done = false, aborted = false;
+		size_t readi = 0;
+		// Read until we run out of input or until we've filled the buffer
+		for(; readi < pt.max_buf_ && !done; readi++) {
+			char* buf = readBuf[readi].readOrigBuf;
+			assert(readi == 0 || strlen(buf) == 0);
+			len = readBuf[readi].readOrigBufLen;
+			len = 0;
+			int newlines = 4;
+			while(newlines) {
+				c = getc_unlocked(fp_);
+				done = c < 0;
+				if(c == '\n' || (done && newlines == 1)) {
+					newlines--;
+					c = '\n';
+				} else if(done) {
+					//return make_pair(false, true);
+					aborted = true; //Unexpected EOF
+					break;
+				}
+				buf[len++] = c;
+			}
+			readCnt_++;
+			readBuf[readi].patid = readCnt_-1;
+		}
+		if(aborted) {
+			readi--;
+			readCnt_--;
+		}
+		return make_pair(done, readi);
+		//return make_pair(false, 0);
+	}
+
+	/// Read another pattern from a FASTQ input file
+	bool parse(ReadBuf& r, ReadBuf& rb) const {
+		assert(strlen(r.readOrigBuf) != 0);
+		assert(r.empty());
+		int c;
+		size_t name_len = 0;
+		size_t cur = 1;
+		r.color = color_;
+		r.primer = -1;
+
+		// Parse read name
+		while(true) {
+			assert(cur < r.readOrigBufLen);
+			c = r.readOrigBuf[cur++];
+			if(c == '\n' || c == '\r') {
+				do {
+					c = r.readOrigBuf[cur++];
+				} while(c == '\n' || c == '\r');
+				break;
+			}
+			r.nameBuf[name_len++] = c;
+		}
+		_setBegin(r.name, r.nameBuf);
+		_setLength(r.name, name_len);
+
+		if(color_) {
+			// May be a primer character.  If so, keep it 'primer' field
+			// of read buf and parse the rest of the read without it.
+	//		c = toupper(c);
+	//		if(asc2dnacat[c] > 0) {
+	//			// First char is a DNA char
+	//			int c2 = toupper(fb_.peek());
+	//			// Second char is a color char
+	//			if(asc2colcat[c2] > 0) {
+	//				r.primer = c;
+	//				r.trimc = c2;
+	//				mytrim5 += 2; // trim primer and first color
+	//			}
+	//		}
+	//		if(c < 0) { bail(r); return; }
+			throw 1;
+		}
+		
+		// Parse sequence
+		int nchar = 0;
+		uint8_t *seqbuf = r.patBufFw;
+		while(c != '+') {
+			if(c == '.') {
+				c = 'N';
+			}
+			if(color_ && c >= '0' && c <= '4') {
+				c = "ACGTN"[(int)c - '0'];
+			}
+			if(isalpha(c)) {
+				// If it's past the 5'-end trim point
+				if(nchar++ >= trim5_) {
+					*seqbuf++ = charToDna5[c];
+				}
+			}
+			assert(cur < r.readOrigBufLen);
+			c = r.readOrigBuf[cur++];
+		}
+		int seq_len = (int)(seqbuf - r.patBufFw);
+		r.trimmed5 = (int)(nchar - seq_len);
+		r.trimmed3 = min(seq_len, trim3_);
+		seq_len = max(seq_len - trim3_, 0);
+		_setBegin(r.patFw, (Dna5*)r.patBufFw);
+		_setLength(r.patFw, seq_len);
+		
+		assert_eq('+', c);
+		do {
+			assert(cur < r.readOrigBufLen);
+			c = r.readOrigBuf[cur++];
+		} while(c != '\n' && c != '\r');
+		do {
+			assert(cur < r.readOrigBufLen);
+			c = r.readOrigBuf[cur++];
+		} while(c == '\n' || c == '\r');
+		
+		// Now we're on the next non-blank line after the + line
+		if(seq_len == 0) {
+			return true; // done parsing empty read
+		}
+
+		int nqual = 0;
+		char *qualbuf = r.qualBuf;
+		if (intQuals_) {
+			// TODO: must implement this for compatibility with other Bowtie
+			throw 1; // not yet implemented
+		} else {
+			while(c != '\r' && c != '\n') {
+				c = charToPhred33(c, solQuals_, phred64Quals_);
+				if(c == ' ') {
+					wrongQualityFormat(r.name);
+					return false;
+				}
+				if(nqual++ >= r.trimmed5) {
+					*qualbuf++ = c;
+				}
+				c = r.readOrigBuf[cur++];
+			}
+			int qual_len = (int)(qualbuf - r.qualBuf);
+			qual_len = max(0, qual_len - r.trimmed3);
+			if(qual_len < seq_len) {
+				tooFewQualities(r.name);
+				return false;
+			} else if(qual_len > seq_len+1) {
+				tooManyQualities(r.name);
+				return false;
+			}
+			_setBegin(r.qual, (char*)r.qualBuf);
+			_setLength(r.qual, seq_len);
+		}
+		// Set up a default name if one hasn't been set
+		if(name_len == 0) {
+			itoa10(static_cast<int>(readCnt_), r.nameBuf);
+			_setBegin(r.name, r.nameBuf);
+			name_len = (int)strlen(r.nameBuf);
+			_setLength(r.name, name_len);
+		}
+		if(strlen(rb.readOrigBuf) != 0 && empty(rb.patFw)) {
+			return parse(rb, r);
+		}
+		return true;
+	}
 
 	pair<bool, bool> readLight(ReadBuf& r);
 
@@ -2639,6 +3137,28 @@ public:
 	}
 
 protected:
+	
+	/**
+	 * "Light" parser.  This is inside the critical section, so the key is to do
+	 * just enough parsing so that another function downstream (finalize()) can do
+	 * the rest of the parsing.  Really this function's only job is to stick every
+	 * for lines worth of the input file into a buffer (r.readOrigBuf).  finalize()
+	 * then parses the contents of r.readOrigBuf later.
+	 */
+	pair<bool, int> nextBatchFromFile(
+		PerThreadReadBuf& pt,
+		bool batch_a)
+	{
+		throw 1;
+		return make_pair(false, 0);
+	}
+
+	/// Read another pattern from a FASTA input file
+	bool parse(ReadBuf& r, ReadBuf& rb) const {
+		cerr << "In RawPatternSource.parse()" << endl;
+		throw 1;
+		return false;
+	}
 
 	/// Read another pattern from a Raw input file
 	virtual pair<bool, bool> readLight(ReadBuf& r) {
@@ -2754,6 +3274,7 @@ protected:
 	{
 		out << seq << endl;
 	}
+	
 	
 private:
 	/**
