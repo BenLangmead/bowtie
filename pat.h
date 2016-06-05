@@ -450,7 +450,7 @@ public:
 	 * Return the number of reads attempted.
 	 */
 	//BP: changed, but should I have?
-	uint64_t readCnt() const { return readCnt_; }
+	uint64_t readCount() const { return readCnt_; }
 
 protected:
 
@@ -522,20 +522,33 @@ protected:
  * Abstract parent class for synhconized sources of paired-end reads
  * (and possibly also single-end reads).
  */
-class PairedPatternSource {
+class PatternComposer {
 public:
-	PairedPatternSource(uint32_t seed) {
+	PatternComposer(uint32_t seed) {
 		seed_ = seed;
 	}
-	virtual ~PairedPatternSource() { }
+	virtual ~PatternComposer() { }
 
-	virtual void addWrapper() = 0;
-	
 	virtual void reset() = 0;
 	
-	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) = 0;
+	//virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) = 0;
 	
-	virtual pair<uint64_t,uint64_t> readCnt() const = 0;
+	/**
+	 * Member function override by concrete, format-specific classes.
+	 */
+	virtual std::pair<bool, int> nextBatch(PerThreadReadBuf& pt) = 0;
+	
+	/**
+	 * Make appropriate call into the format layer to parse individual read.
+	 */
+	virtual bool parse(ReadBuf& ra, ReadBuf& rb) = 0;
+
+	virtual void free_pmembers( const vector<PatternSource*> &elist) {
+    		for (size_t i = 0; i < elist.size(); i++) {
+        		if (elist[i] != NULL)
+            			delete elist[i];
+		}
+	}
 
 protected:
 
@@ -547,31 +560,20 @@ protected:
  * Encapsulates a synchronized source of both paired-end reads and
  * unpaired reads, where the paired-end must come from parallel files.
  */
-class PairedSoloPatternSource : public PairedPatternSource {
+class SoloPatternComposer : public PatternComposer {
 
 public:
 
-	PairedSoloPatternSource(const vector<PatternSource*>& src,
+	SoloPatternComposer(const vector<PatternSource*>& src,
 	                        uint32_t seed) :
-		PairedPatternSource(seed), cur_(0), src_(src)
+		PatternComposer(seed), cur_(0), src_(src)
 	{
 	    for(size_t i = 0; i < src_.size(); i++) {
 	    	assert(src_[i] != NULL);
 	    }
 	}
 
-	virtual ~PairedSoloPatternSource() { }
-
-	/**
-	 * Call this whenever this PairedPatternSource is wrapped by a new
-	 * WrappedPatternSourcePerThread.  This helps us keep track of
-	 * whether locks within PatternSources will be contended.
-	 */
-	virtual void addWrapper() {
-		for(size_t i = 0; i < src_.size(); i++) {
-			src_[i]->addWrapper();
-		}
-	}
+	virtual ~SoloPatternComposer() { free_pmembers(src_); }
 
 	/**
 	 * Reset this object and all the PatternSources under it so that
@@ -589,12 +591,18 @@ public:
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
-	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
+	pair<bool, int> nextBatch(PerThreadReadBuf& pt) {
 		uint32_t cur = cur_;
 		while(cur < src_.size()) {
 			// Patterns from srca_[cur_] are unpaired
-			pair<bool, bool> flags = src_[cur]->nextReadPair(ra, rb);
-			if(!flags.first) {
+			pair<bool, int> res;
+			do {
+				res = src_[cur]->nextBatch(
+					pt,
+					true,  // batch A (or pairs)
+					true); // grab lock below
+			} while(!res.first && res.second == 0);
+			if(res.second == 0) {
 				ThreadSafe ts(&mutex_m);
 				if(cur + 1 > cur_) {
 					cur_++;
@@ -602,35 +610,17 @@ public:
 				cur = cur_;
 				continue; // on to next pair of PatternSources
 			}
-			ra.mate = 1;
-			src_[cur]->finalize(ra);
-			ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-			ra.constructRevComps();
-			ra.constructReverses();
-			if(flags.second) {
-				rb.mate = 2;
-				src_[cur]->finalize(rb);
-				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
-				rb.constructRevComps();
-				rb.constructReverses();
-				ra.fixMateName(1);
-				rb.fixMateName(2);
-			}
-			return make_pair(true, flags.second);
+			return res;
 		}
-		return make_pair(false, false);
+		assert_leq(cur, src_.size());
+		return make_pair(true, 0);
 	}
-
+	
 	/**
-	 * Return the number of reads attempted.
+	 * Make appropriate call into the format layer to parse individual read.
 	 */
-	virtual pair<uint64_t,uint64_t> readCnt() const {
-		uint64_t ret = 0llu;
-		vector<PatternSource*>::const_iterator it;
-		for(it = src_.begin(); it != src_.end(); it++) {
-			ret += (*it)->readCnt();
-		}
-		return make_pair(ret, 0llu);
+	virtual bool parse(ReadBuf& ra, ReadBuf& rb) {
+		return src_[0]->parse(ra, rb);
 	}
 
 protected:
@@ -643,14 +633,14 @@ protected:
  * Encapsulates a synchronized source of both paired-end reads and
  * unpaired reads, where the paired-end must come from parallel files.
  */
-class PairedDualPatternSource : public PairedPatternSource {
+class DualPatternComposer : public PatternComposer {
 
 public:
 
-	PairedDualPatternSource(const vector<PatternSource*>& srca,
+	DualPatternComposer(const vector<PatternSource*>& srca,
 	                        const vector<PatternSource*>& srcb,
 	                        uint32_t seed) :
-		PairedPatternSource(seed), cur_(0), srca_(srca), srcb_(srcb)
+		PatternComposer(seed), cur_(0), srca_(srca), srcb_(srcb)
 	{
 		// srca_ and srcb_ must be parallel
 		assert_eq(srca_.size(), srcb_.size());
@@ -665,20 +655,9 @@ public:
 		}
 	}
 
-	virtual ~PairedDualPatternSource() { }
-
-	/**
-	 * Call this whenever this PairedPatternSource is wrapped by a new
-	 * WrappedPatternSourcePerThread.  This helps us keep track of
-	 * whether locks within PatternSources will be contended.
-	 */
-	virtual void addWrapper() {
-		for(size_t i = 0; i < srca_.size(); i++) {
-			srca_[i]->addWrapper();
-			if(srcb_[i] != NULL) {
-				srcb_[i]->addWrapper();
-			}
-		}
+	virtual ~DualPatternComposer() {
+		free_pmembers(srca_);
+		free_pmembers(srcb_);
 	}
 
 	/**
@@ -700,87 +679,72 @@ public:
 	 * singleton reads.  Returns true iff ra and rb contain a new
 	 * pair; returns false if ra contains a new unpaired read.
 	 */
-	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
+	pair<bool, int> nextBatch(PerThreadReadBuf& pt) {
 		// 'cur' indexes the current pair of PatternSources
 		uint32_t cur = cur_;
 		while(cur < srca_.size()) {
 			if(srcb_[cur] == NULL) {
-				// Patterns from srca_[cur_] are unpaired
-				if(!srca_[cur]->nextRead(ra)) {
-					// no more input
+				pair<bool, int> res = srca_[cur]->nextBatch(
+					pt,
+					true,  // batch A (or pairs)
+					true); // grab lock below
+				bool done = res.first;
+				if(!done && res.second == 0) {
 					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
-					cur = cur_;
+					cur = cur_; // Move on to next PatternSource
 					continue; // on to next pair of PatternSources
 				}
-				ra.mate = 0;
-				srca_[cur]->finalize(ra);
-				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-				ra.constructRevComps();
-				ra.constructReverses();
-				return make_pair(true, false);
+				return make_pair(done, res.second);
 			} else {
+				pair<bool, int> resa, resb;
 				// Lock to ensure that this thread gets parallel reads
 				// in the two mate files
-				bool success_a, success_b;
 				{
 					ThreadSafe ts(&mutex_m);
-					success_a = srca_[cur]->nextRead(ra);
-					success_b = srcb_[cur]->nextRead(rb);
-					// Did the pair obtained fail to match up?
-					while(success_a && success_b && ra.patid != rb.patid) {
-						if(ra.patid < rb.patid) {
-							success_a = srca_[cur]->nextRead(ra);
-						} else {
-							success_b = srcb_[cur]->nextRead(rb);
-						}
-					}
+					resa = srca_[cur]->nextBatch(
+						pt,
+						true,   // batch A
+						false); // don't grab lock below
+					resb = srcb_[cur]->nextBatch(
+						pt,
+						false,  // batch B
+						false); // don't grab lock below
+					assert_eq(srca_[cur]->readCount(),
+						  srcb_[cur]->readCount());
 				}
-				if(!success_a || !success_b) {
-					seqan::clear(ra.patFw);
+				if(resa.second < resb.second) {
+					cerr << "Error, fewer reads in file specified with -1 "
+					     << "than in file specified with -2" << endl;
+					throw 1;
+				} else if(resa.second == 0 && resb.second == 0) {
+					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) {
 						cur_++;
 					}
-					cur = cur_;
+					cur = cur_; // Move on to next PatternSource
 					continue; // on to next pair of PatternSources
+				} else if(resb.second < resa.second) {
+					cerr << "Error, fewer reads in file specified with -2 "
+					     << "than in file specified with -1" << endl;
+					throw 1;
 				}
-
-				ra.fixMateName(1);
-				rb.fixMateName(2);
-				
-				ra.mate = 1;
-				srca_[cur]->finalize(ra);
-				ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
-				ra.constructRevComps();
-				ra.constructReverses();
-				
-				rb.mate = 2;
-				srcb_[cur]->finalize(rb);
-				rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
-				rb.constructRevComps();
-				rb.constructReverses();
-
-				return make_pair(true, true); // paired
+				assert_eq(resa.first, resb.first);
+				assert_eq(resa.second, resb.second);
+				return make_pair(resa.first, resa.second);
 			}
 		}
-		return make_pair(false, false);
+		assert_leq(cur, srca_.size());
+		return make_pair(true, 0);
 	}
-
+	
 	/**
-	 * Return the number of reads attempted.
+	 * Make appropriate call into the format layer to parse individual read.
 	 */
-	virtual pair<uint64_t,uint64_t> readCnt() const {
-		uint64_t rets = 0llu, retp = 0llu;
-		for(size_t i = 0; i < srca_.size(); i++) {
-			if(srcb_[i] == NULL) {
-				rets += srca_[i]->readCnt();
-			} else {
-				assert_eq(srca_[i]->readCnt(), srcb_[i]->readCnt());
-				retp += srca_[i]->readCnt();
-			}
-		}
-		return make_pair(rets, retp);
+	virtual bool parse(ReadBuf& ra, ReadBuf& rb) {
+		return srca_[0]->parse(ra, rb);
 	}
+
 
 protected:
 
@@ -800,47 +764,130 @@ class PatternSourcePerThread {
 
 public:
 
-	PatternSourcePerThread() : buf1_(), buf2_() { }
-
-	virtual ~PatternSourcePerThread() { }
-
-	/**
-	 * Read the next read pair.
-	 */
-	virtual void nextReadPair() { }
-
-	ReadBuf& bufa() { return buf1_; }
-	ReadBuf& bufb() { return buf2_; }
-
+	PatternSourcePerThread(PatternComposer& patsrc, uint32_t max_buf, uint32_t seed) : 
+						patsrc_(patsrc), buf_(max_buf),
+      						last_batch_(false), last_batch_size_(0), seed_(seed)	{ }
+	
 	uint32_t patid() const {
-		return buf1_.patid;
+		return buf_.read_a().patid;
 	}
 	
 	virtual void reset() {
-		buf1_.reset();
-		buf2_.reset();
+		buf_.reset();
 	}
 	
 	bool empty() const {
-		return buf1_.empty();
+		return buf_.read_a().empty();
 	}
 	
 	uint32_t length(int mate) const {
-		return (mate == 1)? buf1_.length() : buf2_.length();
+		return (mate == 1)? buf_.read_a().length() : buf_.read_a().length();
 	}
 
 	/**
 	 * Return true iff the buffers jointly contain a paired-end read.
 	 */
 	bool paired() {
-		bool ret = !buf2_.empty();
+		bool ret = !buf_.read_b().empty();
 		assert(!ret || !empty());
 		return ret;
 	}
 
-protected:
-	ReadBuf  buf1_;    // read buffer for mate a
-	ReadBuf  buf2_;    // read buffer for mate b
+	/**
+	 * Get the next paired or unpaired read from the wrapped
+	 * PatternComposer.  Returns a pair of bools; first indicates
+	 * whether we were successful, second indicates whether we're
+	 * done.
+	 */
+	pair<bool, bool> nextReadPair() {
+		// Prepare batch
+		if(buf_.exhausted()) {
+			pair<bool, int> res = nextBatch();
+			if(res.first && res.second == 0) {
+				return make_pair(false, true);
+			}
+			last_batch_ = res.first;
+			last_batch_size_ = res.second;
+			assert_eq(0, buf_.cur_buf_);
+		} else {
+			buf_.next(); // advance cursor
+			assert_gt(buf_.cur_buf_, 0);
+		}
+		// Parse read/pair
+		assert(strlen(buf_.read_a().readOrigBuf) != 0);
+		assert(buf_.read_a().empty());
+		if(!parse(buf_.read_a(), buf_.read_b())) {
+			return make_pair(false, false);
+		}
+		// Finalize read/pair
+		if(strlen(buf_.read_b().readOrigBuf) != 0) {
+			finalizePair(buf_.read_a(), buf_.read_b());
+		} else {
+			finalize(buf_.read_a());
+		}
+		bool this_is_last = buf_.cur_buf_ == last_batch_size_-1;
+		return make_pair(true, this_is_last ? last_batch_ : false);
+	}
+	virtual void finalize(ReadBuf& ra) {
+		ra.mate = 1;
+		ra.patid = buf_.rdid();
+		ra.constructRevComps();
+		ra.constructReverses();
+		ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+		//ra.fixMateName(1);
+	}
+
+
+	virtual void finalizePair(ReadBuf& ra, ReadBuf& rb) {
+		ra.patid = rb.patid = buf_.rdid();
+		
+		ra.mate = 1;
+		ra.constructRevComps();
+		ra.constructReverses();
+		ra.fixMateName(1);
+		ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
+		
+		rb.mate = 2;
+		rb.constructRevComps();
+		rb.constructReverses();
+		rb.fixMateName(2);
+		rb.seed = genRandSeed(rb.patFw, rb.qual, rb.name, seed_);
+	}
+
+	ReadBuf& bufa() { return buf_.read_a(); }
+	ReadBuf& bufb() { return buf_.read_b(); }
+	
+	const ReadBuf& bufa() const { return buf_.read_a(); }
+	const ReadBuf& bufb() const { return buf_.read_b(); }
+
+	
+private:
+
+	/**
+	 * When we've finished fully parsing and dishing out reads in
+	 * the current batch, we go get the next one by calling into
+	 * the composition layer.
+	 */
+	std::pair<bool, int> nextBatch() {
+		buf_.reset();
+		std::pair<bool, int> res = patsrc_.nextBatch(buf_);
+		buf_.init();
+		return res;
+	}
+	
+	/**
+	 * Call into composition layer (which in turn calls into
+	 * format layer) to parse the read.
+	 */
+	bool parse(ReadBuf& ra, ReadBuf& rb) {
+		return patsrc_.parse(ra, rb);
+	}
+
+	PatternComposer& patsrc_; // pattern composer
+	PerThreadReadBuf buf_;    // read data buffer
+	bool last_batch_;         // true if this is final batch
+	int last_batch_size_;     // # reads read in previous batch
+	uint32_t seed_;
 };
 
 /**
@@ -848,9 +895,26 @@ protected:
  */
 class PatternSourcePerThreadFactory {
 public:
-	virtual ~PatternSourcePerThreadFactory() { }
-	virtual PatternSourcePerThread* create() const = 0;
-	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const = 0;
+	PatternSourcePerThreadFactory(
+		PatternComposer& patsrc, uint32_t max_buf, uint32_t seed): 
+		patsrc_(patsrc), max_buf_(max_buf), seed_(seed) {}
+
+	virtual PatternSourcePerThread* create() const {
+		return new PatternSourcePerThread(patsrc_, max_buf_, seed_);
+	}
+
+	/**
+	 * Create a new heap-allocated vector of heap-allocated
+	 * WrappedPatternSourcePerThreads.
+	 */
+	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
+		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
+		for(size_t i = 0; i < n; i++) {
+			v->push_back(new PatternSourcePerThread(patsrc_, max_buf_, seed_));
+			assert(v->back() != NULL);
+		}
+		return v;
+	}
 
 	/// Free memory associated with a pattern source
 	virtual void destroy(PatternSourcePerThread* patsrc) const {
@@ -872,67 +936,12 @@ public:
 		// Free the vector
 		delete patsrcs;
 	}
-};
-
-/**
- * A per-thread wrapper for a PairedPatternSource.
- */
-class WrappedPatternSourcePerThread : public PatternSourcePerThread {
-public:
-	WrappedPatternSourcePerThread(PairedPatternSource& __patsrc) :
-		patsrc_(__patsrc)
-	{
-		patsrc_.addWrapper();
-	}
-
-	/**
-	 * Get the next paired or unpaired read from the wrapped
-	 * PairedPatternSource.
-	 */
-	virtual void nextReadPair() {
-		PatternSourcePerThread::nextReadPair();
-		buf1_.clearAll();
-		buf2_.clearAll();
-		patsrc_.nextReadPair(buf1_, buf2_);
-	}
-
-private:
-
-	/// Container for obtaining paired reads from PatternSources
-	PairedPatternSource& patsrc_;
-};
-
-/**
- * Abstract parent factory for PatternSourcePerThreads.
- */
-class WrappedPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
-public:
-	WrappedPatternSourcePerThreadFactory(PairedPatternSource& patsrc) :
-		patsrc_(patsrc) { }
-
-	/**
-	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
-	 */
-	virtual PatternSourcePerThread* create() const {
-		return new WrappedPatternSourcePerThread(patsrc_);
-	}
-
-	/**
-	 * Create a new heap-allocated vector of heap-allocated
-	 * WrappedPatternSourcePerThreads.
-	 */
-	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
-		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
-		for(size_t i = 0; i < n; i++) {
-			v->push_back(new WrappedPatternSourcePerThread(patsrc_));
-			assert(v->back() != NULL);
-		}
-		return v;
-	}
-
 private:
 	/// Container for obtaining paired reads from PatternSources
-	PairedPatternSource& patsrc_;
+	PatternComposer& patsrc_;
+	/// Maximum size of batch to read in
+	uint32_t max_buf_;
+	uint32_t seed_;
 };
 
 /**

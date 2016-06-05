@@ -1062,12 +1062,14 @@ static const char *argv0 = NULL;
 #define CHUD_STOP()
 #endif
 
+uint32_t readsPerBatch=32;
+
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
 static PatternSourcePerThreadFactory*
-createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
+createPatsrcFactory(PatternComposer& _patsrc, int tid, uint32_t max_buf) {
 	PatternSourcePerThreadFactory *patsrcFact;
-	patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
+	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, max_buf, seed);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -1111,7 +1113,7 @@ createSinkFactory(HitSink& _sink) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static PairedPatternSource*   exactSearch_patsrc;
+static PatternComposer*   exactSearch_patsrc;
 static HitSink*               exactSearch_sink;
 static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
@@ -1122,14 +1124,14 @@ void exactSearchWorker::operator()() const {
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	const BitPairReference* refs =  exactSearch_refs;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread *patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1202,14 +1204,14 @@ void exactSearchWorkerStateful::operator()() const {
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	BitPairReference* refs       =  exactSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -1298,7 +1300,7 @@ static void exactSearchWorkerStateful(void *vp) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void exactSearch(PairedPatternSource& _patsrc,
+static void exactSearch(PatternComposer& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
                         vector<String<Dna5> >& os)
@@ -1368,7 +1370,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
  * Forward Ebwt (ebwtFw) is already loaded into memory and backward
  * Ebwt (ebwtBw) is not loaded into memory.
  */
-static PairedPatternSource*           mismatchSearch_patsrc;
+static PatternComposer*           mismatchSearch_patsrc;
 static HitSink*                       mismatchSearch_sink;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
@@ -1386,7 +1388,7 @@ void mismatchSearchWorkerFullStateful::operator()() const {
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&   _patsrc = *mismatchSearch_patsrc;
+	PatternComposer&   _patsrc = *mismatchSearch_patsrc;
 	HitSink&               _sink   = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw  = *mismatchSearch_ebwtBw;
@@ -1394,7 +1396,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	BitPairReference*      refs    =  mismatchSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -1471,7 +1473,7 @@ void mismatchSearchWorkerFull::operator()() const {
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&   _patsrc   = *mismatchSearch_patsrc;
+	PatternComposer&   _patsrc   = *mismatchSearch_patsrc;
 	HitSink&               _sink     = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw    = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw    = *mismatchSearch_ebwtBw;
@@ -1479,7 +1481,7 @@ static void mismatchSearchWorkerFull(void *vp){
 	const BitPairReference* refs     =  mismatchSearch_refs;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1554,7 +1556,7 @@ static void mismatchSearchWorkerFull(void *vp){
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void mismatchSearchFull(PairedPatternSource& _patsrc,
+static void mismatchSearchFull(PatternComposer& _patsrc,
                                HitSink& _sink,
                                Ebwt<String<Dna> >& ebwtFw,
                                Ebwt<String<Dna> >& ebwtBw,
@@ -1698,7 +1700,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		assert_eq(0, hits.size()); \
 	}
 
-static PairedPatternSource*           twoOrThreeMismatchSearch_patsrc;
+static PatternComposer*           twoOrThreeMismatchSearch_patsrc;
 static HitSink*                       twoOrThreeMismatchSearch_sink;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtBw;
@@ -1718,7 +1720,7 @@ void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
+	PatternComposer&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
@@ -1727,7 +1729,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	static bool            two     =  twoOrThreeMismatchSearch_two;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -1806,11 +1808,11 @@ void twoOrThreeMismatchSearchWorkerFull::operator()() const {
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
+	PatternComposer&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
 	bool                           two      = twoOrThreeMismatchSearch_two;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1934,7 +1936,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 
 template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
-		PairedPatternSource& _patsrc,   /// pattern source
+		PatternComposer& _patsrc,   /// pattern source
 		HitSink& _sink,                 /// hit sink
 		Ebwt<TStr>& ebwtFw,             /// index of original text
 		Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2008,7 +2010,7 @@ static void twoOrThreeMismatchSearchFull(
 	return;
 }
 
-static PairedPatternSource*     seededQualSearch_patsrc;
+static PatternComposer*     seededQualSearch_patsrc;
 static HitSink*                 seededQualSearch_sink;
 static Ebwt<String<Dna> >*      seededQualSearch_ebwtFw;
 static Ebwt<String<Dna> >*      seededQualSearch_ebwtBw;
@@ -2026,11 +2028,11 @@ void seededQualSearchWorkerFull::operator()() const {
 static void seededQualSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;
 	int                      qualCutoff = seededQualSearch_qualCutoff;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -2252,7 +2254,7 @@ void seededQualSearchWorkerFullStateful::operator()() const {
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
 	Ebwt<String<Dna> >&      ebwtBw     = *seededQualSearch_ebwtBw;
@@ -2261,7 +2263,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	BitPairReference*        refs       = seededQualSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -2371,7 +2373,7 @@ static void seededQualCutoffSearchFull(
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
-        PairedPatternSource& _patsrc,   /// pattern source
+        PatternComposer& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2650,11 +2652,11 @@ static void driver(const char * type,
 	if(verbose || startVerbose) {
 		cerr << "Creating PatternSource: "; logTime(cerr, true);
 	}
-	PairedPatternSource *patsrc = NULL;
+	PatternComposer *patsrc = NULL;
 	if(mates12.size() > 0) {
-		patsrc = new PairedSoloPatternSource(patsrcs_ab, seed);
+		patsrc = new SoloPatternComposer(patsrcs_ab, seed);
 	} else {
-		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b, seed);
+		patsrc = new DualPatternComposer(patsrcs_a, patsrcs_b, seed);
 	}
 
 	// Open hit output file
