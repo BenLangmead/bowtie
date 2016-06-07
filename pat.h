@@ -573,8 +573,6 @@ public:
 	    }
 	}
 
-	virtual ~SoloPatternComposer() { free_pmembers(src_); }
-
 	/**
 	 * Reset this object and all the PatternSources under it so that
 	 * the next call to nextReadPair gets the very first read pair.
@@ -653,11 +651,6 @@ public:
 				assert_neq(srca_[i], srcb_[j]);
 			}
 		}
-	}
-
-	virtual ~DualPatternComposer() {
-		free_pmembers(srca_);
-		free_pmembers(srcb_);
 	}
 
 	/**
@@ -781,14 +774,14 @@ public:
 	}
 	
 	uint32_t length(int mate) const {
-		return (mate == 1)? buf_.read_a().length() : buf_.read_a().length();
+		return (mate == 1)? buf_.read_a().length() : buf_.read_b().length();
 	}
 
 	/**
 	 * Return true iff the buffers jointly contain a paired-end read.
 	 */
 	bool paired() {
-		bool ret = !buf_.read_b().empty();
+		bool ret = !(buf_.read_b().empty());
 		assert(!ret || !empty());
 		return ret;
 	}
@@ -830,7 +823,7 @@ public:
 	}
 	virtual void finalize(ReadBuf& ra) {
 		ra.mate = 1;
-		ra.patid = buf_.rdid();
+		//ra.patid = buf_.rdid();
 		ra.constructRevComps();
 		ra.constructReverses();
 		ra.seed = genRandSeed(ra.patFw, ra.qual, ra.name, seed_);
@@ -839,7 +832,7 @@ public:
 
 
 	virtual void finalizePair(ReadBuf& ra, ReadBuf& rb) {
-		ra.patid = rb.patid = buf_.rdid();
+		//ra.patid = rb.patid = buf_.rdid();
 		
 		ra.mate = 1;
 		ra.constructRevComps();
@@ -1663,7 +1656,8 @@ public:
 			break;
 		}
 		assert_geq(nread, 0);
-		readCnt_ += nread;
+		//updating readCnt_ in nextBatchFromFile
+		//readCnt_ += nread;
 		return make_pair(done, nread);
 	}
 	
