@@ -85,6 +85,7 @@ static bool better;     // true -> guarantee alignments from best possible strat
 static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
+static int readsPerBatch; // # reads to read from input file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -196,6 +197,7 @@ static void resetOptions() {
 	strata					= false; // true -> don't stop at stratum boundaries
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
+	readsPerBatch			= 16;    // # reads to read from input file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
@@ -286,6 +288,7 @@ enum {
 	ARG_REFOUT,
 	ARG_ISARATE,
 	ARG_PARTITION,
+	ARG_READS_PER_BATCH,
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
 	ARG_FILEPAR,
@@ -367,6 +370,7 @@ static struct option long_options[] = {
 	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
+	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
 	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{(char*)"maqerr",       required_argument, 0,            'e'},
 	{(char*)"seedlen",      required_argument, 0,            'l'},
@@ -845,6 +849,15 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_STRAND_FIX: strandFix = true; break;
 			case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
+			case ARG_READS_PER_BATCH: {
+				if(optarg == NULL || parse<int>(optarg) < 1) {
+				cerr << "--reads-per-batch arg must be at least 1" << endl;
+				printUsage(cerr);
+				throw 1;
+				}
+				readsPerBatch = parse<int>(optarg);
+				break;
+			}
 			case ARG_ORIG:
 				if(optarg == NULL || strlen(optarg) == 0) {
 					cerr << "--orig arg must be followed by a string" << endl;
@@ -1061,8 +1074,6 @@ static const char *argv0 = NULL;
 #define CHUD_START()
 #define CHUD_STOP()
 #endif
-
-uint32_t readsPerBatch=32;
 
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
