@@ -2694,8 +2694,11 @@ protected:
 		for(; readi < pt.max_buf_ && !done; readi++) {
 			char* buf = readBuf[readi].readOrigBuf;
 			assert(readi == 0 || strlen(buf) == 0);
-			len = readBuf[readi].readOrigBufLen;
-			len = 0;
+			if(readi > 0)
+			{
+				len = readBuf[readi].readOrigBufLen;
+				len = 0;
+			}
 			int newlines = 4;
 			while(newlines) {
 				c = getc_unlocked(fp_);
