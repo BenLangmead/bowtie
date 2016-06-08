@@ -862,6 +862,13 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
+refOut = false;
+outType = OUTPUT_NONE;
+dumpAlBase = "";
+dumpUnalBase = "";
+dumpMaxBase = "";
+reportSe = false;
+patDumpfile = NULL;
 	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
 		// Tell the Ebwt loader to ignore the suffix-array portion of
