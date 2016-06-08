@@ -381,7 +381,7 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
-		//ThreadSafe ts(&numWrapper_mutex_m);
+		ThreadSafe ts(&numWrapper_mutex_m);
 		_numWrappers++;
 	}
 
@@ -429,7 +429,7 @@ public:
 					assert(hs[i].repOk());
 					append(ss, hs[i]);
 					{
-						//ThreadSafe _ts(_locks[strIdx]);
+						ThreadSafe _ts(_locks[strIdx]);
 						out(hs[i].h.first).writeChars(buf, ss.tellp());
 					}
 					ss.seekp(0);
@@ -439,7 +439,7 @@ public:
 			}
 		}
 		
-        //ThreadSafe _ts(&main_mutex_m);
+        ThreadSafe _ts(&main_mutex_m);
 		commitHits(hs);
 		first_ = false;
 		numAligned_++;
@@ -595,7 +595,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
-				//ThreadSafe _ts(&dumpAlignLock_);
+				ThreadSafe _ts(&dumpAlignLock_);
 				if(dumpAl_ == NULL) {
 					assert(dumpAlQv_ == NULL);
 					dumpAl_ = openOf(dumpAlBase_, 0, "");
@@ -614,7 +614,7 @@ public:
 			// Dump paired-end read to an aligned-read file (or pair of
 			// files) of the same format
 			if(!dumpAlBase_.empty()) {
-				//ThreadSafe _ts(&dumpAlignLockPE_);
+				ThreadSafe _ts(&dumpAlignLockPE_);
 				if(dumpAl_1_ == NULL) {
 					assert(dumpAlQv_1_ == NULL);
 					assert(dumpAlQv_2_ == NULL);
@@ -649,7 +649,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
-				//ThreadSafe _ts(&dumpUnalLock_);
+				ThreadSafe _ts(&dumpUnalLock_);
 				if(dumpUnal_ == NULL) {
 					assert(dumpUnalQv_ == NULL);
 					dumpUnal_ = openOf(dumpUnalBase_, 0, "");
@@ -668,7 +668,7 @@ public:
 			// Dump paired-end read to an unaligned-read file (or pair
 			// of files) of the same format
 			if(!dumpUnalBase_.empty()) {
-				//ThreadSafe _ts(&dumpUnalLockPE_);
+				ThreadSafe _ts(&dumpUnalLockPE_);
 				if(dumpUnal_1_ == NULL) {
 					assert(dumpUnal_1_ == NULL);
 					assert(dumpUnal_2_ == NULL);
@@ -704,7 +704,7 @@ public:
 		if(!p.paired() || onePairFile_) {
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
-				//ThreadSafe _ts(&dumpMaxLock_);
+				ThreadSafe _ts(&dumpMaxLock_);
 				if(dumpMax_ == NULL) {
 					dumpMax_ = openOf(dumpMaxBase_, 0, "");
 					assert(dumpMax_ != NULL);
@@ -721,7 +721,7 @@ public:
 			// Dump paired-end read to a maxed-out-read file (or pair
 			// of files) of the same format
 			if(!dumpMaxBase_.empty()) {
-				//ThreadSafe _ts(&dumpMaxLockPE_);
+				ThreadSafe _ts(&dumpMaxLockPE_);
 				if(dumpMax_1_ == NULL) {
 					assert(dumpMaxQv_1_ == NULL);
 					assert(dumpMaxQv_2_ == NULL);
@@ -749,7 +749,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-		//ThreadSafe _ts(&main_mutex_m);
+		ThreadSafe _ts(&main_mutex_m);
 		numMaxed_++;
 	}
 
@@ -758,7 +758,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		//ThreadSafe _ts(&main_mutex_m);
+		ThreadSafe _ts(&main_mutex_m);
 		numUnaligned_++;
 	}
 
@@ -767,7 +767,7 @@ protected:
 	/// Implementation of hit-report
 	virtual void reportHit(const Hit& h) {
 		assert(h.repOk());
-		//ThreadSafe _ts(&main_mutex_m);
+		ThreadSafe _ts(&main_mutex_m);
 		commitHit(h);
 		first_ = false;
 		if(h.mate > 0) numReportedPaired_++;
@@ -1502,7 +1502,7 @@ protected:
 		ostringstream ss;
 		append(ss, h);
 		
-		//ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
+		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 		out(h.h.first).writeString(ss.str());
 	}
 
@@ -1639,7 +1639,7 @@ protected:
 		append(ss, h);
 
 		// Make sure to grab lock before writing to output stream
-		//ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
+		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 		out(h.h.first).writeString(ss.str());
 	}
 

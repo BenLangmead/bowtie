@@ -493,7 +493,7 @@ public:
 			// Patterns from srca_[cur_] are unpaired
 			pair<bool, bool> flags = src_[cur]->nextReadPair(ra, rb);
 			if(!flags.first) {
-				//ThreadSafe ts(&mutex_m);
+				ThreadSafe ts(&mutex_m);
 				if(cur + 1 > cur_) {
 					cur_++;
 				}
@@ -606,7 +606,7 @@ public:
 				// Patterns from srca_[cur_] are unpaired
 				if(!srca_[cur]->nextRead(ra)) {
 					// no more input
-					//ThreadSafe ts(&mutex_m);
+					ThreadSafe ts(&mutex_m);
 					if(cur + 1 > cur_) cur_++;
 					cur = cur_;
 					continue; // on to next pair of PatternSources
@@ -622,7 +622,7 @@ public:
 				// in the two mate files
 				bool success_a, success_b;
 				{
-					//ThreadSafe ts(&mutex_m);
+					ThreadSafe ts(&mutex_m);
 					success_a = srca_[cur]->nextRead(ra);
 					success_b = srcb_[cur]->nextRead(rb);
 					// Did the pair obtained fail to match up?
@@ -848,21 +848,22 @@ public:
 		int threadid,
 		size_t n,
 		uint32_t seed,
+		const MUTEX_T& mutex_m_,
 		bool paired) :
-		i_(0), cur_(0), loop_iter_(1), n_(n), rnd_(), paired_(paired)
+		i_(0), cur_(0), loop_iter_(1), n_(n), rnd_(), mutex_m(mutex_m_), paired_(paired)
 	{
 		rnd_.init((seed + 31) * 7 * threadid);
 		for(size_t i = 0; i < 2000; i++) {
 			permutation_[i] = i;
 		}
-		/*for(size_t i = 0; i < 5000; i++) {
+		for(size_t i = 0; i < 5000; i++) {
 			size_t j = rnd_.nextU32() % 2000;
 			size_t k = rnd_.nextU32() % 2000;
 			assert(j != k);
 			size_t tmp = permutation_[j];
 			permutation_[j] = permutation_[k];
 			permutation_[k] = tmp;
-		}*/
+		}
 	}
 
 	/**
@@ -897,6 +898,7 @@ private:
 	static const rawSeq raw_list[];
 	static const rawSeq raw_list_1[];
 	static const rawSeq raw_list_2[];
+	MUTEX_T mutex_m; /// mutex for locking critical regions
 };
 
 class MemoryMockPatternSourcePerThreadFactory : public PatternSourcePerThreadFactory {
@@ -906,14 +908,15 @@ public:
 		int tid,
 		size_t n,
 		uint32_t seed,
+		const MUTEX_T& mutex_m,
 		bool paired) :
-		patsrc_(patsrc), tid_(tid), n_(n), seed_(seed), paired_(paired) { }
+		patsrc_(patsrc), tid_(tid), n_(n), seed_(seed), mutex_m_(mutex_m), paired_(paired) { }
 
 	/**
 	 * Create a new heap-allocated WrappedPatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
-		return new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_);
+		return new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, mutex_m_, paired_);
 	}
 
 	/**
@@ -923,7 +926,7 @@ public:
 	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
-			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, paired_));
+			v->push_back(new MemoryMockPatternSourcePerThread(patsrc_, tid_, n_, seed_, mutex_m_, paired_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -936,6 +939,7 @@ private:
 	size_t n_;  /// total # reads each thread should iterate through
 	uint32_t seed_;  /// random seed
 	bool paired_;  /// generate paired-end reads?
+	MUTEX_T mutex_m_;
 };
 
 /**
@@ -1122,7 +1126,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// Let Strings begin at the beginning of the respective bufs
 		r.reset();
-		//ThreadSafe ts(&mutex_m);
+		ThreadSafe ts(&mutex_m);
 		if(cur_ >= v_.size()) {
 			// Clear all the Strings, as a signal to the caller that
 			// we're out of reads
@@ -1265,7 +1269,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		//ThreadSafe ts(&mutex_m);
+		ThreadSafe ts(&mutex_m);
 		pair<bool, bool> flags = make_pair(false, false);
 		while(!flags.first && !flags.second) {
 			flags = readLight(r);
@@ -1301,7 +1305,7 @@ public:
 	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		//ThreadSafe ts(&mutex_m);
+		ThreadSafe ts(&mutex_m);
 		bool success, eof, paired;
 		do {
 			BoolTriple result = readPairLight(ra, rb);
@@ -1467,7 +1471,7 @@ public:
 	virtual bool nextRead(ReadBuf& r) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		//ThreadSafe ts(&mutex_m);
+		ThreadSafe ts(&mutex_m);
 		pair<bool, bool> flags = make_pair(false, false);
 		while(!flags.first && !flags.second) {
 			 flags = readLight(r);
@@ -1502,7 +1506,7 @@ public:
 	virtual pair<bool, bool> nextReadPair(ReadBuf& ra, ReadBuf& rb) {
 		// We are entering a critical region, because we're
 		// manipulating our file handle and filecur_ state
-		//ThreadSafe ts(&mutex_m);
+		ThreadSafe ts(&mutex_m);
 		bool success, eof, paired;
 		do {
 			BoolTriple result = readPairLight(ra, rb);

@@ -57,6 +57,7 @@ void MemoryMockPatternSourcePerThread::nextReadPair()
 	bool& paired,
 	bool fixName)*/
 {
+	ThreadSafe ts(&mutex_m);
 	if(i_ > 1999) { // NOTE: length of read list is hard-coded here
 		i_ = 0;
 		loop_iter_++;
