@@ -241,13 +241,12 @@ void SAMHitSink::reportSamHits(
 	assert_geq(end, start);
 	if(end-start == 0) return;
 	assert_gt(hs[start].mate, 0);
-	char buf[4096];
+	string buf(4096, (char) 0);
 	lock(0);
+	ostringstream ss(buf, ssmode_);
 	for(size_t i = start; i < end; i++) {
-		ostringstream ss(ssmode_);
-		ss.rdbuf()->pubsetbuf(buf, 4096);
 		append(ss, hs[i], mapq, xms);
-		out(0).writeChars(buf, ss.tellp());
+		out(0).writeChars(ss.str().c_str(), ss.tellp());
 	}
 	unlock(0);
 	mainlock();
