@@ -8,9 +8,9 @@ bindir = $(prefix)/bin
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC) -I third_party
-CPP = g++
-CXX = $(CPP)
-CC = gcc
+CPP ?= g++
+CXX ?= $(CPP)
+CC ?= gcc
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -58,6 +58,12 @@ endif
 LINUX = 0
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
+    EXTRA_FLAGS += -Wl,--hash-style=both
+endif
+
+FREEBSD = 0
+ifneq (,$(findstring FreeBSD,$(shell uname)))
+    FREEBSD = 1
     EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
@@ -135,6 +141,12 @@ endif
 
 ifeq (1,$(LINUX))
     ifeq (x86_64, $(shell uname -p))
+        BITS=64
+    endif
+endif
+
+ifeq (1,$(FREEBSD))
+    ifeq (amd64, $(shell uname -p))
         BITS=64
     endif
 endif
