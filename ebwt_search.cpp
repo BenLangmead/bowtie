@@ -1229,7 +1229,7 @@ static int read_dir(const char* dirname,int* num_pids) {
 #ifdef WITH_TBB
 static bool steal_thread(int pid, int orig_nthreads, tbb::task_group* tbb_grp)
 #else
-static bool steal_thread(int pid, int orig_nthreads, vector<int>& tids, vector<tthread::thread*>& threads)
+static bool steal_thread(int pid, int orig_nthreads, int *tids, vector<tthread::thread*>& threads)
 #endif
 {
 	int ncpu = thread_ceiling;
@@ -1459,8 +1459,9 @@ static void exactSearch(PairedPatternSource& _patsrc,
 	tbb::task_group tbb_grp;
 #else
 	vector<tthread::thread*> threads;
-	vector<int> tids;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
+
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
@@ -1480,16 +1481,14 @@ static void exactSearch(PairedPatternSource& _patsrc,
 				tbb_grp.run(exactSearchWorker(i));
 			}
 #else
-			tids.push_back(i);
-			assert_eq(i, (int)tids.size());
+			tids[i-1] = i;
 			if(stateful) {
-				threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + i - 1)));
 			} else {
-				threads.push_back(new tthread::thread(exactSearchWorker, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + i - 1)));
 			}
 #endif
 		}
-		assert_eq((int)tids.size(), nthreads);
 
 		if(thread_stealing) {
 			int orig_threads = nthreads, steal_ctr = 1;
@@ -1513,11 +1512,11 @@ static void exactSearch(PairedPatternSource& _patsrc,
 						tbb_grp.run(exactSearchWorker(nthreads));
 					}
 #else
-					tids.push_back(nthreads);
+					tids[nthreads-1] = nthreads;
 					if(stateful) {
-						threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(exactSearchWorkerStateful, (void *)(tids + nthreads - 1)));
 					} else {
-						threads.push_back(new tthread::thread(exactSearchWorker, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(exactSearchWorker, (void *)(tids + nthreads - 1)));
 					}
 #endif
 					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
@@ -1535,6 +1534,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
+		delete tids;
 #endif
 
 		if(thread_stealing) {
@@ -1766,7 +1766,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 	tbb::task_group tbb_grp;
 #else
 	vector<tthread::thread*> threads;
-	vector<int> tids;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 	CHUD_START();
@@ -1788,16 +1788,14 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 				tbb_grp.run(mismatchSearchWorkerFull(i));
 			}
 #else
-			tids.push_back(i);
-			assert_eq(i, (int)tids.size());
+			tids[i-1] = i;
 			if(stateful) {
-				threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + i - 1)));
 			} else {
-				threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + i - 1)));
 			}
 #endif
 		}
-		assert_eq((int)tids.size(), nthreads);
 
 		if(thread_stealing) {
 			int orig_threads = nthreads, steal_ctr = 1;
@@ -1821,11 +1819,11 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 						tbb_grp.run(mismatchSearchWorkerFull(nthreads));
 					}
 #else
-					tids.push_back(nthreads);
+					tids[nthreads-1] = nthreads;
 					if(stateful) {
-						threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(mismatchSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
 					} else {
-						threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(mismatchSearchWorkerFull, (void *)(tids + nthreads - 1)));
 					}
 #endif
 					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
@@ -1843,6 +1841,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
+		delete tids;
 #endif
 
 		if(thread_stealing) {
@@ -2190,7 +2189,7 @@ static void twoOrThreeMismatchSearchFull(
 	tbb::task_group tbb_grp;
 #else
 	vector<tthread::thread*> threads;
-	vector<int> tids;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 	CHUD_START();
@@ -2212,16 +2211,14 @@ static void twoOrThreeMismatchSearchFull(
 				tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(i));
 			}
 #else
-			tids.push_back(i);
-			assert_eq(i, (int)tids.size());
+			tids[i-1] = i;
 			if(stateful) {
-				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + i - 1)));
 			} else {
-				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + i - 1)));
 			}
 #endif
 		}
-		assert_eq((int)tids.size(), nthreads);
 
 		if(thread_stealing) {
 			int orig_threads = nthreads, steal_ctr = 1;
@@ -2245,11 +2242,11 @@ static void twoOrThreeMismatchSearchFull(
 						tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(nthreads));
 					}
 #else
-					tids.push_back(nthreads);
+					tids[nthreads-1] = nthreads;
 					if(stateful) {
-						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void *)(tids + nthreads - 1)));
 					} else {
-						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void *)(tids + nthreads - 1)));
 					}
 #endif
 					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
@@ -2267,6 +2264,7 @@ static void twoOrThreeMismatchSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
+		delete tids;
 #endif
 
 		if(thread_stealing) {
@@ -2659,7 +2657,7 @@ static void seededQualCutoffSearchFull(
 	tbb::task_group tbb_grp;
 #else
 	vector<tthread::thread*> threads;
-	vector<int> tids;
+	int *tids = new int[max(nthreads, thread_ceiling)];
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -2689,16 +2687,14 @@ static void seededQualCutoffSearchFull(
 				tbb_grp.run(seededQualSearchWorkerFull(i));
 			}
 #else
-			tids.push_back(i);
-			assert_eq(i, (int)tids.size());
+			tids[i-1] = i;
 			if(stateful) {
-				threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + i - 1)));
 			} else {
-				threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void*)&tids.back()));
+				threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + i - 1)));
 			}
 #endif
 		}
-		assert_eq((int)tids.size(), nthreads);
 
 		if(thread_stealing) {
 			int orig_threads = nthreads, steal_ctr = 1;
@@ -2722,11 +2718,11 @@ static void seededQualCutoffSearchFull(
 						tbb_grp.run(seededQualSearchWorkerFull(nthreads));
 					}
 #else
-					tids.push_back(nthreads);
+					tids[nthreads-1] = nthreads;
 					if(stateful) {
-						threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(seededQualSearchWorkerFullStateful, (void *)(tids + nthreads - 1)));
 					} else {
-						threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void*)&tids.back()));
+						threads.push_back(new tthread::thread(seededQualSearchWorkerFull, (void *)(tids + nthreads - 1)));
 					}
 #endif
 					cerr << "pid " << pid << " started new worker # " << nthreads << endl;
@@ -2744,6 +2740,7 @@ static void seededQualCutoffSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
+		delete tids;
 #endif
 
 		if(thread_stealing) {
