@@ -83,8 +83,8 @@ static int maxBtsBetter;  // max # backtracks allowed in half-and-half mode
 static int maxBts;        // max # backtracks allowed in half-and-half mode
 static int nthreads;      // number of pthreads operating concurrently
 static int thread_ceiling;// maximum number of threads user wants bowtie to use
+static string thread_stealing_dir; // keep track of pids in this directory
 static bool thread_stealing;// true iff thread stealing is in use
-static string pid_dir;    // directory to store this process' pid and to look for other bt2 process's pids
 static output_types outType;  // style of output
 static bool randReadsNoSync;  // true -> generate reads from per-thread random source
 static int numRandomReads;    // # random reads (see Random*PatternSource in pat.h)
@@ -198,8 +198,8 @@ static void resetOptions() {
 	maxBts					= 800; // max # backtracks allowed in half-and-half mode
 	nthreads				= 1;     // number of pthreads operating concurrently
 	thread_ceiling			= 0;     // max # threads user asked for
+	thread_stealing_dir		= ""; // keep track of pids in this directory
 	thread_stealing			= false; // true iff thread stealing is in use
-	pid_dir					= "/tmp/bt_pids"; // hold pids of concurrent work-stealing processes
 	FNAME_SIZE				= 200;
 	outType					= OUTPUT_FULL;  // style of output
 	randReadsNoSync			= false; // true -> generate reads from per-thread random source
@@ -363,7 +363,8 @@ enum {
 	ARG_ALLOW_CONTAIN,
 	ARG_COLOR_PRIMER,
 	ARG_WRAPPER,
-	ARG_THREAD_CEILING
+	ARG_THREAD_CEILING,
+	ARG_THREAD_PIDDIR
 };
 
 static struct option long_options[] = {
@@ -474,6 +475,7 @@ static struct option long_options[] = {
 	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"thread-ceiling",required_argument, 0,           ARG_THREAD_CEILING},
+	{(char*)"thread-piddir",    required_argument, 0,        ARG_THREAD_PIDDIR},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -826,6 +828,9 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_THREAD_CEILING:
 				thread_ceiling = parseInt(0, "--thread-ceiling must be at least 0");
 				break;
+			case ARG_THREAD_PIDDIR:
+				thread_stealing_dir = optarg;
+				break;
 			case ARG_FILEPAR:
 				fileParallel = true;
 				break;
@@ -1026,6 +1031,10 @@ static void parseOptions(int argc, const char **argv) {
 		suppressOuts.clear();
 	}
 	thread_stealing = thread_ceiling > nthreads;
+	if(thread_stealing && thread_stealing_dir.empty()) {
+		cerr << "When --thread-ceiling is specified, must also specify --thread-piddir" << endl;
+		throw 1;
+	}
 }
 
 static const char *argv0 = NULL;
@@ -1237,7 +1246,7 @@ static bool steal_thread(int pid, int orig_nthreads, int *tids, vector<tthread::
 		return false;
 	}
 	int num_pids = 0;
-	int lowest_pid = read_dir(pid_dir.c_str(), &num_pids);
+	int lowest_pid = read_dir(thread_stealing_dir.c_str(), &num_pids);
 	if(lowest_pid != pid) {
 		return false;
 	}
@@ -1469,7 +1478,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 		int pid = 0;
 		if(thread_stealing) {
 			pid = getpid();
-			write_pid(pid_dir.c_str(), pid);
+			write_pid(thread_stealing_dir.c_str(), pid);
 			thread_counter = 0;
 		}
 		
@@ -1538,7 +1547,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 #endif
 
 		if(thread_stealing) {
-			del_pid(pid_dir.c_str(), pid);
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 	}
 	if(refs != NULL) delete refs;
@@ -1776,7 +1785,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		int pid = 0;
 		if(thread_stealing) {
 			pid = getpid();
-			write_pid(pid_dir.c_str(), pid);
+			write_pid(thread_stealing_dir.c_str(), pid);
 			thread_counter = 0;
 		}
 
@@ -1845,7 +1854,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 #endif
 
 		if(thread_stealing) {
-			del_pid(pid_dir.c_str(), pid);
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 	}
 	if(refs != NULL) delete refs;
@@ -2199,7 +2208,7 @@ static void twoOrThreeMismatchSearchFull(
 		int pid = 0;
 		if(thread_stealing) {
 			pid = getpid();
-			write_pid(pid_dir.c_str(), pid);
+			write_pid(thread_stealing_dir.c_str(), pid);
 			thread_counter = 0;
 		}
 
@@ -2268,7 +2277,7 @@ static void twoOrThreeMismatchSearchFull(
 #endif
 
 		if(thread_stealing) {
-			del_pid(pid_dir.c_str(), pid);
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 	}
 	if(refs != NULL) delete refs;
@@ -2675,7 +2684,7 @@ static void seededQualCutoffSearchFull(
 		int pid = 0;
 		if(thread_stealing) {
 			pid = getpid();
-			write_pid(pid_dir.c_str(), pid);
+			write_pid(thread_stealing_dir.c_str(), pid);
 			thread_counter = 0;
 		}
 
@@ -2744,7 +2753,7 @@ static void seededQualCutoffSearchFull(
 #endif
 
 		if(thread_stealing) {
-			del_pid(pid_dir.c_str(), pid);
+			del_pid(thread_stealing_dir.c_str(), pid);
 		}
 	}
 	if(refs != NULL) {
