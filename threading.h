@@ -7,15 +7,10 @@
 #include <cstring>
 
 #ifdef WITH_TBB
-# include "tkt.hpp"
-# include "ptl.hpp"
 # include <tbb/mutex.h>
 # include <tbb/spin_mutex.h>
 # include <tbb/queuing_mutex.h>
 # ifdef WITH_AFFINITY
-#  ifdef WITH_COHORTLOCK
-#   include "cohort.hpp"
-#  endif
 #  include <sched.h>
 #  include <tbb/task_group.h>
 #  include <tbb/task_scheduler_observer.h>
@@ -28,61 +23,53 @@
 #endif
 
 #ifdef NO_SPINLOCK
-#  ifdef WITH_TBB
-#    ifdef WITH_QUEUELOCK
-#  	   define MUTEX_T tbb::queuing_mutex
-#    else
-#      define MUTEX_T tbb::mutex
-#    endif
-#  else
-#    define MUTEX_T tthread::mutex
-#  endif
+# ifdef WITH_TBB
+#   ifdef WITH_QUEUELOCK
+#  	define MUTEX_T tbb::queuing_mutex
+#   else
+#       define MUTEX_T tbb::mutex
+#   endif
+# else
+#   define MUTEX_T tthread::mutex
+# endif
 #else
-#  ifdef WITH_TBB
-#    ifdef WITH_AFFINITY
-#      ifdef WITH_COHORTLOCK
-#        define MUTEX_T CohortLock
-#	   else
-#  		 define MUTEX_T tbb::spin_mutex
-#	   endif
-#    else
-#  	   define MUTEX_T tbb::spin_mutex
-#    endif
-#  else
-#  	 define MUTEX_T tthread::fast_mutex
-#  endif
+# ifdef WITH_TBB
+#   define MUTEX_T tbb::spin_mutex
+# else
+#   define MUTEX_T tthread::fast_mutex
+# endif
 #endif /* NO_SPINLOCK */
+
 
 /**
  * Wrap a lock; obtain lock upon construction, release upon destruction.
  */
 class ThreadSafe {
 public:
-    ThreadSafe(MUTEX_T* ptr_mutex, bool locked = true) {
+
+	ThreadSafe() : ptr_mutex(NULL) { }
+	
+	ThreadSafe(MUTEX_T* ptr_mutex, bool locked = true) : ptr_mutex(NULL) {
 		if(locked) {
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-		    //have to use the heap as we can't copy
-		    //the scoped lock
-		    this->ptr_mutex = new MUTEX_T::scoped_lock(*ptr_mutex);
+			//have to use the heap as we can't copy
+			//the scoped lock
+			this->ptr_mutex = new MUTEX_T::scoped_lock(*ptr_mutex);
 #else
-//TODO: need to add special conditional for CohortLock here
-		    this->ptr_mutex = ptr_mutex;
-		    ptr_mutex->lock();
+			this->ptr_mutex = ptr_mutex;
+			ptr_mutex->lock();
 #endif
 		}
-		else
-		    this->ptr_mutex = NULL;
 	}
 
 	~ThreadSafe() {
-	    if (ptr_mutex != NULL)
+		if (ptr_mutex != NULL)
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-	    	delete ptr_mutex;
-	}
+			delete ptr_mutex;
 #else
-	    	ptr_mutex->unlock();
-	}
+			ptr_mutex->unlock();
 #endif
+	}
 
 private:
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
@@ -193,4 +180,3 @@ public:
 #endif
 
 #endif
-
