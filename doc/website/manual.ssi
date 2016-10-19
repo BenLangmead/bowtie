@@ -791,14 +791,12 @@ T2302111203131231130300111123220
 </td><td>
 
 <p>Aligned read belongs to stratum <code>&lt;N&gt;</code>. See <a href="#strata">Strata</a> for definition.</p></li>
-</ol>
-<pre><code>&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;
+</td></tr><tr><td>
 
-    XM:i:&lt;N&gt;
+<pre><code>XM:i:&lt;N&gt;</code></pre>
+</td><td>
 
-&lt;/td&gt;&lt;td&gt;
-
-For a read with no reported alignments, `&lt;N&gt;` is 0 if the read had
+<p>For a read with no reported alignments, `&lt;N&gt;` is 0 if the read had
 no alignments.  If [`-m`] was specified and the read&#39;s alignments
 were supressed because the [`-m`] ceiling was exceeded, `&lt;N&gt;` equals
 the [`-m`] ceiling + 1, to indicate that there were at least that
@@ -806,9 +804,10 @@ many valid alignments (but all were suppressed).  In [`-M`] mode, if
 the alignment was randomly selected because the [`-M`] ceiling was
 exceeded, `&lt;N&gt;` equals the [`-M`] ceiling + 1, to indicate that there
 were at least that many valid alignments (of which one was reported
-at random).
+at random).</p>
+</td></tr>
 
-&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre>
+</table></ol>
 <h1 id="the-bowtie-build-indexer">The <code>bowtie-build</code> indexer</h1>
 <p><code>bowtie-build</code> builds a Bowtie index from a set of DNA sequences. <code>bowtie-build</code> outputs a set of 6 files with suffixes <code>.1.ebwt</code>, <code>.2.ebwt</code>, <code>.3.ebwt</code>, <code>.4.ebwt</code>, <code>.rev.1.ebwt</code>, and <code>.rev.2.ebwt</code>. (If the total length of all the input sequences is greater than about 4 billion, then the index files will end in <code>ebwtl</code> instead of <code>ebwt</code>.) These files together constitute the index: they are all that is needed to align reads to that reference. The original sequence files are no longer used by Bowtie once the index is built.</p>
 <p>Use of Karkkainen's <a href="http://portal.acm.org/citation.cfm?id=1314852">blockwise algorithm</a> allows <code>bowtie-build</code> to trade off between running time and memory usage. <code>bowtie-build</code> has three options governing how it makes this trade: <a href="#bowtie-build-options-p"><code>-p</code>/<code>--packed</code></a>, <a href="#bowtie-build-options-bmax"><code>--bmax</code></a>/<a href="#bowtie-build-options-bmaxdivn"><code>--bmaxdivn</code></a>, and <a href="#bowtie-build-options-dcv"><code>--dcv</code></a>. By default, <code>bowtie-build</code> will automatically search for the settings that yield the best running time without exhausting memory. This behavior can be disabled using the <a href="#bowtie-build-options-a"><code>-a</code>/<code>--noauto</code></a> option.</p>
