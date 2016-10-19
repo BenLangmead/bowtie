@@ -109,7 +109,6 @@ static uint32_t skipReads;       // # reads/read pairs to skip
 static bool nofw; // don't align fw orientation of read
 static bool norc; // don't align rc orientation of read
 static bool strandFix;  // attempt to fix strand bias
-static bool randomizeQuals; // randomize quality values
 static bool stats; // print performance stats
 static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
 static int chunkSz;    // size of single chunk disbursed by ChunkPool
@@ -221,7 +220,6 @@ static void resetOptions() {
 	nofw					= false; // don't align fw orientation of read
 	norc					= false; // don't align rc orientation of read
 	strandFix				= true;  // attempt to fix strand bias
-	randomizeQuals			= false; // randomize quality values
 	stats					= false; // print performance stats
 	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
 	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
@@ -308,7 +306,6 @@ enum {
 	ARG_NO_RC,
 	ARG_SKIP,
 	ARG_STRAND_FIX,
-	ARG_RANDOMIZE_QUALS,
 	ARG_STATS,
 	ARG_ONETWO,
 	ARG_PHRED64,
@@ -412,7 +409,6 @@ static struct option long_options[] = {
 	{(char*)"tryhard",      no_argument,       0,            'y'},
 	{(char*)"skip",         required_argument, 0,            's'},
 	{(char*)"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
-	{(char*)"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
 	{(char*)"stats",        no_argument,       0,            ARG_STATS},
 	{(char*)"12",           required_argument, 0,            ARG_ONETWO},
 	{(char*)"phred33-quals", no_argument,      0,            ARG_PHRED33},
@@ -847,7 +843,6 @@ static void parseOptions(int argc, const char **argv) {
 			}
 			case ARG_DUMP_PATS: patDumpfile = optarg; break;
 			case ARG_STRAND_FIX: strandFix = true; break;
-			case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_READS_PER_BATCH: {
 				if(optarg == NULL || parse<int>(optarg) < 1) {
@@ -1004,7 +999,7 @@ static const char *argv0 = NULL;
 
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
-	if(!p->empty()) { \
+	if(get_read_ret.first) { \
 		sink->finishRead(*p, true, !skipped); \
 	} \
 	skipped = false;
@@ -1013,8 +1008,9 @@ static const char *argv0 = NULL;
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
-	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) { \
+	if(get_read_ret.second) break; \
+	get_read_ret = p->nextReadPair(); \
+	if(!get_read_ret.first || p->rdid() >= qUpto) { \
 		p->bufa().clearAll(); \
 		break; \
 	} \
@@ -1033,32 +1029,8 @@ static const char *argv0 = NULL;
 	patRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
-	uint32_t      patid  = p->patid();       \
+	uint32_t      patid  = (uint32_t)p->rdid();       \
 	params.setPatId(patid);
-
-/// Macro for getting the forward oriented version of next read,
-/// possibly aborting depending on whether the result is empty or the
-/// patid exceeds the limit, and marshaling the read into convenient
-/// variables.
-#define GET_READ_FW(p) \
-	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) { \
-		p->bufa().clearAll(); \
-		break; \
-	} \
-	params.setPatId(p->patid()); \
-	assert(!empty(p->bufa().patFw)); \
-	String<Dna5>& patFw  = p->bufa().patFw;  \
-	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qual = p->bufa().qual; \
-	qual.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
-	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualRev = p->bufa().qualRev; \
-	qualRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& name   = p->bufa().name;   \
-	name.data_begin += 0; /* suppress "unused" compiler warning */ \
-	uint32_t      patid  = p->patid();
 
 #define WORKER_EXIT() \
 	patsrcFact->destroy(patsrc); \
@@ -1164,6 +1136,7 @@ static void exactSearchWorker(void *vp) {
 	        verbose,        // verbose
 	        &os,
 	        false);         // considerQuals
+	pair<bool, bool> get_read_ret = make_pair(false, false);
 	bool skipped = false;
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
@@ -1515,6 +1488,7 @@ static void mismatchSearchWorkerFull(void *vp){
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
@@ -1543,7 +1517,7 @@ static void mismatchSearchWorkerFull(void *vp){
 #endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
-		uint32_t plen = length(patFw);
+		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -1894,6 +1868,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false,          // considerQuals
 	        true);          // halfAndHalf
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
@@ -1923,7 +1898,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
-		uint32_t plen = length(patFw);
+		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -2203,6 +2178,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        !noMaqRound);
 	String<QueryMutation> muts;
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
 #ifdef PER_THREAD_TIMING
 	uint64_t ncpu_changeovers = 0;
 	uint64_t nnuma_changeovers = 0;
@@ -2473,43 +2449,38 @@ patsrcFromStrings(int format,
 {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (seed, reads, quals, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new FastaPatternSource (reads, quals, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals,
 			                               skipReads);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               seed, reads, fastaContLen,
+			                               reads, fastaContLen,
 			                               fastaContFreq,
-			                               patDumpfile, verbose,
+			                               patDumpfile,
 			                               skipReads);
 		case RAW:
-			return new RawPatternSource   (seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new RawPatternSource   (reads, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               skipReads);
 		case FASTQ:
-			return new FastqPatternSource (seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new FastqPatternSource (reads, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals,
 			                               skipReads);
 		case TAB_MATE:
-			return new TabbedPatternSource(seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new TabbedPatternSource(reads, false, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               skipReads);
 		case CMDLINE:
-			return new VectorPatternSource(seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new VectorPatternSource(reads, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               skipReads);
 		default: {
@@ -2665,9 +2636,9 @@ static void driver(const char * type,
 	}
 	PatternComposer *patsrc = NULL;
 	if(mates12.size() > 0) {
-		patsrc = new SoloPatternComposer(patsrcs_ab, seed);
+		patsrc = new SoloPatternComposer(patsrcs_ab);
 	} else {
-		patsrc = new DualPatternComposer(patsrcs_a, patsrcs_b, seed);
+		patsrc = new DualPatternComposer(patsrcs_a, patsrcs_b);
 	}
 
 	// Open hit output file

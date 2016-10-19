@@ -1587,7 +1587,7 @@ public:
 	virtual ~RangeSource() { }
 
 	/// Set query to find ranges for
-	virtual void setQuery(ReadBuf& r, Range *partial) = 0;
+	virtual void setQuery(Read& r, Range *partial) = 0;
 	/// Set up the range search.
 	virtual void initBranch(PathManager& pm) = 0;
 	/// Advance the range search by one memory op
@@ -1752,8 +1752,8 @@ public:
 	 */
 	virtual void setQueryImpl(PatternSourcePerThread* patsrc, Range *r) {
 		this->done = false;
-		pm_.reset(patsrc->patid());
-		ReadBuf* buf = mate1_ ? &patsrc->bufa() : &patsrc->bufb();
+		pm_.reset((uint32_t)patsrc->rdid());
+		Read* buf = mate1_ ? &patsrc->bufa() : &patsrc->bufb();
 		len_ = buf->length();
 		rs_->setQuery(*buf, r);
 		initRangeSource((fw_ == ebwtFw_) ? buf->qual : buf->qualRev);

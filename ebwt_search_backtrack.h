@@ -88,7 +88,7 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	void setQuery(ReadBuf& r) {
+	void setQuery(Read& r) {
 		const bool fw = _params.fw();
 		const bool ebwtFw = _ebwt->fw();
 		if(ebwtFw) {
@@ -1838,7 +1838,7 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	virtual void setQuery(ReadBuf& r, Range *seedRange) {
+	virtual void setQuery(Read& r, Range *seedRange) {
 		const bool ebwtFw = ebwt_->fw();
 		if(ebwtFw) {
 			qry_  = fw_ ? &r.patFw : &r.patRc;

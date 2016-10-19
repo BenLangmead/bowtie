@@ -592,7 +592,8 @@ public:
 	 */
 	void dumpAlign(PatternSourcePerThread& p) {
 		if(!dumpAlignFlag_) return;
-		if(!p.paired() || onePairFile_) {
+		const bool paired = p.bufa().mate > 0;
+		if(!paired || onePairFile_) {
 			// Dump unpaired read to an aligned-read file of the same format
 			if(!dumpAlBase_.empty()) {
 				ThreadSafe _ts(&dumpAlignLock_);
@@ -646,7 +647,8 @@ public:
 	 */
 	void dumpUnal(PatternSourcePerThread& p) {
 		if(!dumpUnalignFlag_) return;
-		if(!p.paired() || onePairFile_) {
+		const bool paired = p.bufa().mate > 0;
+		if(!paired || onePairFile_) {
 			// Dump unpaired read to an unaligned-read file of the same format
 			if(!dumpUnalBase_.empty()) {
 				ThreadSafe _ts(&dumpUnalLock_);
@@ -701,7 +703,8 @@ public:
 			if(dumpUnalignFlag_) dumpUnal(p);
 			return;
 		}
-		if(!p.paired() || onePairFile_) {
+		const bool paired = p.bufa().mate > 0;
+		if(!paired || onePairFile_) {
 			// Dump unpaired read to an maxed-out-read file of the same format
 			if(!dumpMaxBase_.empty()) {
 				ThreadSafe _ts(&dumpMaxLock_);
