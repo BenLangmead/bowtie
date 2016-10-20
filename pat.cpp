@@ -105,6 +105,10 @@ pair<bool, bool> PatternSourcePerThread::nextReadPair() {
 		buf_.next(); // advance cursor
 		assert_gt(buf_.cur_buf_, 0);
 	}
+	bool this_is_last = buf_.cur_buf_ == last_batch_size_-1;
+	if(buf_.rdid() < skip_) {
+		return make_pair(false, this_is_last ? last_batch_ : false);
+	}
 	// Parse read/pair
 	assert(strlen(buf_.read_a().readOrigBuf) != 0);
 	assert(buf_.read_a().empty());
@@ -117,7 +121,6 @@ pair<bool, bool> PatternSourcePerThread::nextReadPair() {
 	} else {
 		finalize(buf_.read_a());
 	}
-	bool this_is_last = buf_.cur_buf_ == last_batch_size_-1;
 	return make_pair(true, this_is_last ? last_batch_ : false);
 }
 
@@ -316,12 +319,10 @@ VectorPatternSource::VectorPatternSource(
 	bool color,
 	const char *dumpfile,
 	int trim3,
-	int trim5,
-	uint32_t skip) :
+	int trim5) :
 	TrimmingPatternSource(dumpfile, trim3, trim5),
 	color_(color),
-	cur_(skip),
-	skip_(skip),
+	cur_(0),
 	paired_(false),
 	tokbuf_(),
 	bufs_()
@@ -398,7 +399,7 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 	// Loop over the two ends
 	for(int endi = 0; endi < 2 && c == '\t'; endi++) {
 		Read& r = ((endi == 0) ? ra : rb);
-		assert_eq(0, seqan::length(r.nameBuf));
+		assert_eq(0, seqan::length(r.name));
 		// Parse name if (a) this is the first end, or
 		// (b) this is tab6
 		size_t nameoff = 0;
@@ -694,6 +695,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 		}
 		if(c == '>') {
 			resetForNextFile();
+			nameoff = 0;
 			c = getc_unlocked(fp_);
 			bool sawSpace = false;
 			while(c != '\n' && c != '\r') {
@@ -701,6 +703,9 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					sawSpace = isspace(c);
 				}
 				if(!sawSpace) {
+					// Put it in the name prefix buffer so we
+					// can re-use this prefix for all the reads
+					// that are substrings of this FASTA sequence
 					name_prefix_buf_[nameoff++] = c;
 				}
 				c = getc_unlocked(fp_);
@@ -750,7 +755,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					// Rotate
 					c = buf_[bufCur_ - (length_ - i) + 1024];
 				}
-				readbuf[readi].readOrigBuf[bufoff++] = 'c';
+				readbuf[readi].readOrigBuf[bufoff++] = c;
 			}
 			readbuf[readi].readOrigBufLen = bufoff;
 			eat_ = freq_-1;
@@ -1299,6 +1304,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		}
 		r.color = true;
 	} else {
+		cur--;
 		while(cur < buflen) {
 			c = r.readOrigBuf[cur++];
 			assert(c != '\r' && c != '\n');

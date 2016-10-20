@@ -734,7 +734,6 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
-		assert(!patsrc->bufa().empty());
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
@@ -1587,7 +1586,6 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
-		assert(!patsrc->bufa().empty());
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info

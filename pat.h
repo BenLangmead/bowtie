@@ -181,7 +181,6 @@ struct Read {
 	 */
 	void constructRevComps() {
 		uint32_t len = length();
-		assert_gt(len, 0);
 		RESET_BUF_LEN(patRc, patBufRc, len, Dna5);
 		if(color) {
 			for(uint32_t i = 0; i < len; i++) {
@@ -202,7 +201,6 @@ struct Read {
 	 */
 	void constructReverses() {
 		uint32_t len = length();
-		assert_gt(len, 0);
 		RESET_BUF_LEN(patFwRev, patBufFwRev, len, Dna5);
 		RESET_BUF_LEN(patRcRev, patBufRcRev, len, Dna5);
 		RESET_BUF_LEN(qualRev, qualBufRev, len, char);
@@ -503,8 +501,7 @@ public:
 	    bool color,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
-	    int trim5 = 0,
-		uint32_t skip = 0);
+	    int trim5 = 0);
 	
 	virtual ~VectorPatternSource() { }
 	
@@ -524,7 +521,7 @@ public:
 	 */
 	virtual void reset() {
 		TrimmingPatternSource::reset();
-		cur_ = skip_;
+		cur_ = 0;
 		paired_ = false;
 	}
 	
@@ -537,7 +534,6 @@ private:
 
 	bool color_;                      // colorspace?
 	size_t cur_;                      // index for first read of next batch
-	uint32_t skip_;                   // # reads to skip
 	bool paired_;                     // whether reads are paired
 	std::vector<std::string> tokbuf_; // buffer for storing parsed tokens
 	std::vector<std::string> bufs_;   // per-read buffers
@@ -557,15 +553,13 @@ public:
 	    const vector<string>* qinfiles,
 	    const char *dumpfile = NULL,
 	    int trim3 = 0,
-	    int trim5 = 0,
-	    uint32_t skip = 0) :
+	    int trim5 = 0) :
 		TrimmingPatternSource(dumpfile, trim3, trim5),
 		infiles_(infiles),
 		filecur_(0),
 		fp_(NULL),
 		qfp_(NULL),
 		is_open_(false),
-		skip_(skip),
 		first_(true)
 	{
 		qinfiles_.clear();
@@ -646,7 +640,6 @@ protected:
 	FILE *fp_; /// read file currently being read from
 	FILE *qfp_; /// quality file currently being read from
 	bool is_open_; /// whether fp_ is currently open
-	uint32_t skip_;     /// number of reads to skip
 	bool first_;
 	char buf_[64*1024]; /// file buffer for sequences
 	char qbuf_[64*1024]; /// file buffer for qualities
@@ -669,15 +662,13 @@ public:
 	    int trim5 = 0,
 	    bool solexa64 = false,
 	    bool phred64 = false,
-	    bool intQuals = false,
-	    uint32_t skip = 0) :
+	    bool intQuals = false) :
 		CFilePatternSource(
 			infiles,
 			qinfiles,
 		    dumpfile,
 			trim3,
-		    trim5,
-			skip),
+		    trim5),
 		first_(true),
 		color_(color),
 		solexa64_(solexa64),
@@ -706,18 +697,6 @@ protected:
 	virtual std::pair<bool, int> nextBatchFromFile(
 		PerThreadReadBuf& pt,
 		bool batch_a);
-
-	/**
-	 * Scan to the next FASTA record (starting with >) and return the first
-	 * character of the record (which will always be >).
-	 */
-	static int skipToNextFastaRecord(FileBuf& in) {
-		int c;
-		while((c = in.get()) != '>') {
-			if(in.eof()) return -1;
-		}
-		return c;
-	}
 
 	/**
 	 * Reset state to handle a fresh file
@@ -771,15 +750,13 @@ public:
 	    int trim5 = 0,
 	    bool solQuals = false,
 	    bool phred64Quals = false,
-	    bool intQuals = false,
-	    uint32_t skip = 0) :
+	    bool intQuals = false) :
 		CFilePatternSource(
 			infiles,
 			NULL,
 		    dumpfile,
 		    trim3,
-			trim5,
-			skip),
+			trim5),
 		color_(color),
 		solQuals_(solQuals),
 		phred64Quals_(phred64Quals),
@@ -830,15 +807,13 @@ public:
 			const vector<string>& infiles,
 			size_t length,
 			size_t freq,
-			const char *dumpfile = NULL,
-			uint32_t skip = 0) :
+			const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
 		    dumpfile,
 			0,
-			0,
-			skip),
+			0),
 		length_(length),
 		freq_(freq),
 		eat_(length_-1),
@@ -920,8 +895,7 @@ public:
 			NULL,
 		    dumpfile,
 		    trim3,
-			trim5,
-			skip),
+			trim5),
 		first_(true),
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
@@ -986,15 +960,13 @@ public:
 	    bool color,
 	    const char *dumpfile = NULL,
 		int trim3 = 0,
-	    int trim5 = 0,
-	    uint32_t skip = 0) :
+	    int trim5 = 0) :
 		CFilePatternSource(
 			infiles,
 			NULL,
 		    dumpfile,
 			trim3,
-			trim5,
-			skip),
+			trim5),
 		first_(true),
 		color_(color) { }
 
@@ -1197,11 +1169,13 @@ public:
 	PatternSourcePerThread(
 		PatternComposer& composer,
 		uint32_t max_buf,
+		uint32_t skip,
 		uint32_t seed) :
 		composer_(composer),
 		buf_(max_buf),
       	last_batch_(false),
 		last_batch_size_(0),
+		skip_(skip),
 		seed_(seed) { }
 
 	/**
@@ -1271,6 +1245,7 @@ private:
 	PerThreadReadBuf buf_;    // read data buffer
 	bool last_batch_;         // true if this is final batch
 	int last_batch_size_;     // # reads read in previous batch
+	uint32_t skip_;           // skip reads with rdids less than this
 	uint32_t seed_;           // pseudo-random seed based on read content
 };
 
@@ -1282,16 +1257,18 @@ public:
 	PatternSourcePerThreadFactory(
 		PatternComposer& composer,
 		uint32_t max_buf,
+		uint32_t skip,
 		uint32_t seed):
 		composer_(composer),
 		max_buf_(max_buf),
+		skip_(skip),
 		seed_(seed) {}
 
 	/**
 	 * Create a new heap-allocated PatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
-		return new PatternSourcePerThread(composer_, max_buf_, seed_);
+		return new PatternSourcePerThread(composer_, max_buf_, skip_, seed_);
 	}
 
 	/**
@@ -1301,7 +1278,7 @@ public:
 	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
-			v->push_back(new PatternSourcePerThread(composer_, max_buf_, seed_));
+			v->push_back(new PatternSourcePerThread(composer_, max_buf_, skip_, seed_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -1333,6 +1310,7 @@ private:
 	PatternComposer& composer_;
 	/// Maximum size of batch to read in
 	uint32_t max_buf_;
+	uint32_t skip_;
 	uint32_t seed_;
 };
 

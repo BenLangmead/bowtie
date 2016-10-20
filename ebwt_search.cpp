@@ -1011,11 +1011,15 @@ static const char *argv0 = NULL;
 #define GET_READ(p) \
 	if(get_read_ret.second) break; \
 	get_read_ret = p->nextReadPair(); \
-	if(!get_read_ret.first || p->rdid() >= qUpto) { \
-		p->bufa().clearAll(); \
-		break; \
+	if(p->rdid() >= qUpto) { \
+		get_read_ret = make_pair(false, true); \
 	} \
-	assert(!empty(p->bufa().patFw)); \
+	if(!get_read_ret.first) { \
+		if(get_read_ret.second) { \
+			break; \
+		} \
+		continue; \
+	} \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patRc  = p->bufa().patRc;  \
@@ -1053,7 +1057,7 @@ static const char *argv0 = NULL;
 static PatternSourcePerThreadFactory*
 createPatsrcFactory(PatternComposer& _patsrc, int tid, uint32_t max_buf) {
 	PatternSourcePerThreadFactory *patsrcFact;
-	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, max_buf, seed);
+	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, max_buf, skipReads, seed);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -2454,36 +2458,30 @@ patsrcFromStrings(int format,
 			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals,
-			                               skipReads);
+			                               integerQuals);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
 			                               reads, fastaContLen,
 			                               fastaContFreq,
-			                               patDumpfile,
-			                               skipReads);
+			                               patDumpfile);
 		case RAW:
 			return new RawPatternSource   (reads, color,
 			                               patDumpfile,
-			                               trim3, trim5,
-			                               skipReads);
+			                               trim3, trim5);
 		case FASTQ:
 			return new FastqPatternSource (reads, color,
 			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals,
-			                               skipReads);
+			                               integerQuals);
 		case TAB_MATE:
 			return new TabbedPatternSource(reads, false, color,
 			                               patDumpfile,
-			                               trim3, trim5,
-			                               skipReads);
+			                               trim3, trim5);
 		case CMDLINE:
 			return new VectorPatternSource(reads, color,
 			                               patDumpfile,
-			                               trim3, trim5,
-			                               skipReads);
+			                               trim3, trim5);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;
