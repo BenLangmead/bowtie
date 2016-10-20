@@ -426,18 +426,16 @@ bool VectorPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		assert_eq(0, seqan::length(r.patFw));
 		c = ra.readOrigBuf[cur++];
 		int nchar = 0, seqoff = 0;
-		if(color_) {
-			if(asc2dnacat[c] > 0) {
-				// First char is a DNA char (primer)
-				ra.primer = c;
-				int c2 = toupper(ra.readOrigBuf[cur++]);
-				// Is second char a color?
-				if(asc2colcat[c2] <= 0) {
-					// No -- so we don't assue this is primer
-					cur -= 2;
-					c = ra.readOrigBuf[cur++];
-				}
+		if(color_ && asc2dnacat[c] > 0) {
+			// First char is a DNA char (primer)
+			if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
+				// 2nd char isn't a color, so don't assume 'c' is primer
+				cur -= 2;
+			} else {
+				// 'c' is primer
+				r.primer = c;
 			}
+			c = r.readOrigBuf[cur++];
 		}
 		if(color_) {
 			while(c != '\t' && cur < buflen) {
@@ -600,14 +598,14 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 
 	if(color_ && asc2dnacat[c] > 0) {
 		// First char is a DNA char (primer)
-		r.primer = c;
-		int c2 = toupper(r.readOrigBuf[cur++]);
-		// Is second char a color?
-		if(asc2colcat[c2] <= 0) {
-			// No -- so we don't assue this is primer
+		if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
+			// 2nd char isn't a color, so don't assume 'c' is primer
 			cur -= 2;
-			c = r.readOrigBuf[cur++];
+		} else {
+			// 'c' is primer
+			r.primer = c;
 		}
+		c = r.readOrigBuf[cur++];
 	}
 	if(color_) {
 		while(c != '\n' && cur < buflen) {
@@ -922,18 +920,16 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	// Parse sequence
 	int nchar = 0, seqoff = 0;
 	assert_eq(0, seqan::length(r.patFw));
-	if(color_) {
-		if(asc2dnacat[c] > 0) {
-			// First char is a DNA char (primer)
+	if(color_ && asc2dnacat[c] > 0) {
+		// First char is a DNA char (primer)
+		if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
+			// 2nd char isn't a color, so don't assume 'c' is primer
+			cur -= 2;
+		} else {
+			// 'c' is primer
 			r.primer = c;
-			int c2 = toupper(r.readOrigBuf[cur++]);
-			// Is second char a color?
-			if(asc2colcat[c2] <= 0) {
-				// No -- so we don't assue this is primer
-				cur -= 2;
-				c = r.readOrigBuf[cur++];
-			}
 		}
+		c = r.readOrigBuf[cur++];
 	}
 	if(color_) {
 		while(c != '+' && cur < buflen) {
@@ -1129,14 +1125,14 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		int nchar = 0, seqoff = 0;
 		if(color_ && asc2dnacat[c] > 0) {
 			// First char is a DNA char (primer)
-			r.primer = c;
-			int c2 = toupper(r.readOrigBuf[cur++]);
-			// Is second char a color?
-			if(asc2colcat[c2] <= 0) {
-				// No -- so we don't assue this is primer
+			if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
+				// 2nd char isn't a color, so don't assume 'c' is primer
 				cur -= 2;
-				c = r.readOrigBuf[cur++];
+			} else {
+				// 'c' is primer
+				r.primer = c;
 			}
+			c = r.readOrigBuf[cur++];
 		}
 		if(color_) {
 			while(c != '\t' && cur < buflen) {
@@ -1274,14 +1270,14 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 
 	if(color_ && asc2dnacat[c] > 0) {
 		// First char is a DNA char (primer)
-		r.primer = c;
-		int c2 = toupper(r.readOrigBuf[cur++]);
-		// Is second char a color?
-		if(asc2colcat[c2] <= 0) {
-			// No -- so we don't assue this is primer
+		if(asc2colcat[toupper(r.readOrigBuf[cur++])] <= 0) {
+			// 2nd char isn't a color, so don't assume 'c' is primer
 			cur -= 2;
-			c = r.readOrigBuf[cur++];
+		} else {
+			// 'c' is primer
+			r.primer = c;
 		}
+		c = r.readOrigBuf[cur++];
 	}
 	if(color_) {
 		while(cur < buflen) {

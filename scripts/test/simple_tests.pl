@@ -215,12 +215,32 @@ my @cases = (
 	  hits  => [ { 3 => 1 } ],
 	  color => 1 },
 
+	# Colorspace conversion chart
+	#
+	#     A C G T
+	#  A  0 1 2 3
+	#  C  1 0 3 2
+	#  G  2 3 0 1
+	#  T  3 2 1 0
+
 	{ name  => "Colorspace FASTA",
 	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
 	  #           0123456789012345678901234
 	  #                     1         2
 	  #               CGAAAGCTTGTATAGAT
 	  fasta =>   ">r0\n132002320113332231\n",
+	  args  => [ "-C -v 2",
+				 "-C -n 2" ],
+	  hits  => [ { 4 => 1 } ],
+	  color => 1 },
+
+	{ name  => "Colorspace FASTA with primer",
+	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  #           0123456789012345678901234
+	  #                     1         2
+	  #              ACGAAAGCTTTTATAGATG
+	  #             T3132002320113332231
+	  fasta =>   ">r0\nT3132002320113332231\n",
 	  args  => [ "-C -v 2",
 				 "-C -n 2" ],
 	  hits  => [ { 4 => 1 } ],
@@ -234,6 +254,14 @@ my @cases = (
 	  hits  => [ { 4 => 1 } ],
 	  color => 1 },
 
+	{ name  => "Colorspace FASTQ with primer",
+	  ref   => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  fastq =>   "\@r0\nA0132002320113332231\n+\nIIIIIIIIIIIIIIIIII\n",
+	  args  => [ "-C -v 2",
+				 "-C -n 2" ],
+	  hits  => [ { 4 => 1 } ],
+	  color => 1 },
+
 	{ name   => "Colorspace Tabbed",
 	  ref    => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
 	  tabbed =>   "r0\t132002320113332231\tIIIIIIIIIIIIIIIIII\n",
@@ -242,9 +270,25 @@ my @cases = (
 	  hits   => [ { 4 => 1 } ],
 	  color  => 1 },
 
+	{ name   => "Colorspace Tabbed with primer",
+	  ref    => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  tabbed =>   "r0\tC1132002320113332231\tIIIIIIIIIIIIIIIIII\n",
+	  args   => [ "-C -v 2",
+	              "-C -n 2" ],
+	  hits   => [ { 4 => 1 } ],
+	  color  => 1 },
+
 	{ name   => "Colorspace raw",
 	  ref    => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
 	  raw    =>   "132002320113332231\n",
+	  args   => [ "-C -v 2",
+	              "-C -n 2" ],
+	  hits   => [ { 4 => 1 } ],
+	  color  => 1 },
+
+	{ name   => "Colorspace raw with primer",
+	  ref    => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
+	  raw    =>   "G2132002320113332231\n",
 	  args   => [ "-C -v 2",
 	              "-C -n 2" ],
 	  hits   => [ { 4 => 1 } ],
