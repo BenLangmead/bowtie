@@ -219,6 +219,18 @@ my @cases = (
 	                   "AGCATCGATC:IIIIIIIIII",
 	  pairhits => [ { "0,8" => 1 }, { } ] },
 
+	# Paired-end reads with left end entirely trimmed away
+	{ name     => "Cline paired 4",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-3 7",
+	  #                  AGCATCG
+	  #                        GATCAAAAACTGA
+	  #                  0123456789012345678
+	  cline_reads1  => "AGCATCG:IIIIIII",
+	  cline_reads2  => "GATCAAAAACTGA:IIIIIIIIIIIII",
+		#                               GATCAGTTTTTGA
+	  pairhits => [ { "*,*" => 1 } ] },
+
 	# -q
 
 	{ name   => "Fastq 1",
@@ -326,214 +338,349 @@ my @cases = (
 	             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
 	  pairhits => [ { }, { "0,8" => 1 } ] },
 
-		# Paired-end reads that should align
-		{ name     => "Fastq paired 3",
+	# Paired-end reads that should align
+	{ name     => "Fastq paired 3",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-u 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fastq1  => "\@r0\nAGCATCGATC\r\n+\nIIIIIIIIII\n".
+	             "\@r1\nTCAGTTTTTGA\r\n+\nIIIIIIIIIII\n",
+	  fastq2  => "\@r0\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n".
+	             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
+	  pairhits => [ { "0,8" => 1 }, { } ] },
+
+
+		# Paired-end reads with left end entirely trimmed away
+		{ name     => "Fastq paired 4",
 		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-u 1",
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
+		  args     => "-3 7",
+		  #                  AGCATCG
+		  #                        GATCAAAAACTGA
 		  #                  0123456789012345678
-		  fastq1  => "\@r0\nAGCATCGATC\r\n+\nIIIIIIIIII\n".
-		             "\@r1\nTCAGTTTTTGA\r\n+\nIIIIIIIIIII\n",
-		  fastq2  => "\@r0\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n".
-		             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
-		  pairhits => [ { "0,8" => 1 }, { } ] },
+		  fastq1  => "\@r0\nAGCATCG\n+\nIIIIIII\n",
+		  fastq2  => "\@r0\nGATCAAAAACTGA\n+\nIIIIIIIIIIIII\n",
+			#                               GATCAGTTTTTGA
+		  pairhits => [ { "*,*" => 1 } ] },
 
-		# -f
+	# -f
 
-		{ name   => "Fasta 1",
-		  ref    => [  "AGCATCGATCAGTATCTGA" ],
-		  fasta  => ">r0\nCATCGATCAGTATCTG",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Fasta 1",
+	  ref    => [  "AGCATCGATCAGTATCTGA" ],
+	  fasta  => ">r0\nCATCGATCAGTATCTG",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Fasta 2",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => ">r0\nCATCGATCAGTATCTG\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Fasta 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => ">r0\nCATCGATCAGTATCTG\n",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Fasta 3",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Fasta 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n\n",
+	  hits   => [{ 2 => 1 }] },
 
-		# Name line doesn't start with >
-		{ name   => "Fasta 5",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\nr0\nCATCGATCAGTATCTG\r",
-		  should_abort => 1,
-		  hits   => [{ }] },
+	# Name line doesn't start with >
+	{ name   => "Fasta 5",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\nr0\nCATCGATCAGTATCTG\r",
+	  should_abort => 1,
+	  hits   => [{ }] },
 
-		# Name line doesn't start with > (2)
-		{ name   => "Fasta 6",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "r0\nCATCGATCAGTATCTG\r",
-		  should_abort => 1,
-		  hits   => [{ }] },
+	# Name line doesn't start with > (2)
+	{ name   => "Fasta 6",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "r0\nCATCGATCAGTATCTG\r",
+	  should_abort => 1,
+	  hits   => [{ }] },
 
-		{ name   => "Fasta 7",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
-		  args   => "--trim3 4",
-		  norc   => 1,
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Fasta 7",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
+	  args   => "--trim3 4",
+	  norc   => 1,
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Fasta 8",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
-		  args   => "--trim3 16",
-		  hits   => [{ }] },
+	{ name   => "Fasta 8",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
+	  args   => "--trim3 16",
+	  hits   => [{ }] },
 
-		{ name   => "Fasta 9",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n",
-		  args   => "-s 1",
-		  hits   => [{ }] },
+	{ name   => "Fasta 9",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n",
+	  args   => "-s 1",
+	  hits   => [{ }] },
 
-		{ name   => "Fasta multiread 1",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\n\n".
-		            "\n\n\r\n>r1\nATCGATCAGTATCTG\n\n",
-		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+	{ name   => "Fasta multiread 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\n\n".
+	            "\n\n\r\n>r1\nATCGATCAGTATCTG\n\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
 
-		{ name   => "Fasta multiread 2",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  args   =>   "-u 1",
-		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
-		            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Fasta multiread 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 1",
+	  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
+	            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Fasta multiread 3",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  args   =>   "-u 2",
-		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
-		            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
-		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+	{ name   => "Fasta multiread 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 2",
+	  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
+	            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
 
-		{ name     => "Fasta paired 1",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
-		             "\n\n>r1\nTCAGTTTTTGA\r\n",
-		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
-		             "\n\n\r\n>r1\nAGCATCGATC",
-		  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+	{ name     => "Fasta paired 1",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
+	             "\n\n>r1\nTCAGTTTTTGA\r\n",
+	  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+	             "\n\n\r\n>r1\nAGCATCGATC",
+	  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
 
-		{ name     => "Fasta paired 2",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-s 1",
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  fasta1  => ">r0\nAGCATCGATC\r\n".
-		             "\n\n>r1\nTCAGTTTTTGA\n",
-		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
-		             "\n\n\r\n>r1\nAGCATCGATC",
-		  pairhits => [ { }, { "0,8" => 1 } ] },
+	{ name     => "Fasta paired 2",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-s 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fasta1  => ">r0\nAGCATCGATC\r\n".
+	             "\n\n>r1\nTCAGTTTTTGA\n",
+	  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+	             "\n\n\r\n>r1\nAGCATCGATC",
+	  pairhits => [ { }, { "0,8" => 1 } ] },
 
-		{ name     => "Fasta paired 3",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-u 1",
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
-		             "\n\n>r1\nTCAGTTTTTGA\r\n",
-		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
-		             "\n\n\r\n>r1\nAGCATCGATC",
-		  pairhits => [ { "0,8" => 1 }, { } ] },
+	{ name     => "Fasta paired 3",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-u 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
+	             "\n\n>r1\nTCAGTTTTTGA\r\n",
+	  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+	             "\n\n\r\n>r1\nAGCATCGATC",
+	  pairhits => [ { "0,8" => 1 }, { } ] },
 
-		# -r
+	# Paired-end reads with left end entirely trimmed away
+	{ name     => "Fasta paired 4",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-3 7",
+	  #                  AGCATCG
+	  #                        GATCAAAAACTGA
+	  #                  0123456789012345678
+	  fasta1  => ">\nAGCATCG\n",
+	  fasta2  => ">\nGATCAAAAACTGA\n",
+		#                               GATCAGTTTTTGA
+	  pairhits => [ { "*,*" => 1 } ] },
 
-		{ name   => "Raw 1",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    =>     "CATCGATCAGTATCTG",
-		  hits   => [{ 2 => 1 }] },
+	# -r
 
-		{ name   => "Raw 2",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    => "CATCGATCAGTATCTG\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Raw 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    =>     "CATCGATCAGTATCTG",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Raw 3",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    => "\n\n\nCATCGATCAGTATCTG\n\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Raw 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    => "CATCGATCAGTATCTG\n",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Raw 7",
-		  ref    => [     "AGCATCGATCAGTATCTGA" ],
-		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
-		  args   => "--trim3 4",
-		  norc   => 1,
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Raw 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    => "\n\n\nCATCGATCAGTATCTG\n\n",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Raw 8",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
-		  args   => "--trim3 16",
-		  hits   => [{ }] },
+	{ name   => "Raw 7",
+	  ref    => [     "AGCATCGATCAGTATCTGA" ],
+	  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
+	  args   => "--trim3 4",
+	  norc   => 1,
+	  hits   => [{ 2 => 1 }] },
 
-		{ name   => "Raw 9",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    => "CATCGATCAGTATCTG\n",
-		  args   => "-s 1",
-		  hits   => [{ }] },
+	{ name   => "Raw 8",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
+	  args   => "--trim3 16",
+	  hits   => [{ }] },
 
-		{ name   => "Raw multiread 1",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  raw    => "\n\n\r\nCATCGATCAGTATCTG\n\n".
-		            "\n\n\r\nATCGATCAGTATCTG\n\n",
-		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+	{ name   => "Raw 9",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    => "CATCGATCAGTATCTG\n",
+	  args   => "-s 1",
+	  hits   => [{ }] },
 
-		{ name   => "Raw multiread 2",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  args   =>   "-u 1",
-		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
-		            "\n\n\r\nATCGATCAGTATCTG\r\n",
-		  hits   => [{ 2 => 1 }] },
+	{ name   => "Raw multiread 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  raw    => "\n\n\r\nCATCGATCAGTATCTG\n\n".
+	            "\n\n\r\nATCGATCAGTATCTG\n\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
 
-		{ name   => "Raw multiread 3",
-		  ref    => [ "AGCATCGATCAGTATCTGA" ],
-		  args   =>   "-u 2",
-		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
-		            "\n\n\r\nATCGATCAGTATCTG\r\n",
-		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+	{ name   => "Raw multiread 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 1",
+	  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
+	            "\n\n\r\nATCGATCAGTATCTG\r\n",
+	  hits   => [{ 2 => 1 }] },
 
-		{ name     => "Raw paired 1",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  raw1    => "\n\n\r\nAGCATCGATC\r\n".
-		             "\n\nTCAGTTTTTGA\r\n",
-		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
-		             "\n\n\r\nAGCATCGATC",
-		  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+	{ name   => "Raw multiread 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 2",
+	  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
+	            "\n\n\r\nATCGATCAGTATCTG\r\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
 
-		{ name     => "Raw paired 2",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-s 1",
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  raw1    => "AGCATCGATC\r\n".
-		             "\n\nTCAGTTTTTGA\n",
-		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
-		             "\n\n\r\nAGCATCGATC",
-		  pairhits => [ { }, { "0,8" => 1 } ] },
+	{ name     => "Raw paired 1",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  raw1    => "\n\n\r\nAGCATCGATC\r\n".
+	             "\n\nTCAGTTTTTGA\r\n",
+	  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+	             "\n\n\r\nAGCATCGATC",
+	  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
 
-		{ name     => "Raw paired 3",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-u 1",
-		  #                  AGCATCGATC
-		  #                          TCAAAAACTGA
-		  #                  0123456789012345678
-		  raw1    => "\n\n\r\nAGCATCGATC\r\n".
-		             "\n\nTCAGTTTTTGA\r\n",
-		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
-		             "\n\n\r\nAGCATCGATC",
-		  pairhits => [ { "0,8" => 1 }, { } ] },
+	{ name     => "Raw paired 2",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-s 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  raw1    => "AGCATCGATC\r\n".
+	             "\n\nTCAGTTTTTGA\n",
+	  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+	             "\n\n\r\nAGCATCGATC",
+	  pairhits => [ { }, { "0,8" => 1 } ] },
+
+	{ name     => "Raw paired 3",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-u 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  raw1    => "\n\n\r\nAGCATCGATC\r\n".
+	             "\n\nTCAGTTTTTGA\r\n",
+	  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+	             "\n\n\r\nAGCATCGATC",
+	  pairhits => [ { "0,8" => 1 }, { } ] },
+
+	# Paired-end reads with left end entirely trimmed away
+	{ name     => "Raw paired 4",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-3 7",
+	  #                  AGCATCG
+	  #                        GATCAAAAACTGA
+	  #                  0123456789012345678
+	  raw1     => "\nAGCATCG\n",
+	  raw2     => "\nGATCAAAAACTGA\n",
+		#                               GATCAGTTTTTGA
+	  pairhits => [ { "*,*" => 1 } ] },
+
+	# --12 / --tab5 / --tab6
+
+	{ name   => "Tabbed 1",
+	  ref    => [   "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "r0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Tabbed 2",
+	  ref    => [   "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "r0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n",  # extra newline
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Tabbed 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Tabbed 4",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIII\n\n", # qual too short
+	  should_abort => 1},
+
+	{ name   => "Tabbed 5",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIIII\n\n", # qual too long
+	  should_abort => 1},
+
+	{ name   => "Tabbed 7",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n",
+	  args   => "--trim3 4",
+	  norc   => 1,
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Tabbed 8",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n",
+	  args   => "--trim5 16",
+	  hits   => [{ }] },
+
+	{ name   => "Tabbed 9",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n",
+	  args   => "-s 1",
+	  hits   => [{ }] },
+
+	{ name   => "Tabbed multiread 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n".
+	            "\n\n\r\nr1\tATCGATCAGTATCTG\tIIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	{ name   => "Tabbed multiread 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 1",
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n".
+	            "\n\n\r\nr1\tATCGATCAGTATCTG\tIIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Tabbed multiread 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 2",
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n".
+	            "\n\n\r\nr1\tATCGATCAGTATCTG\tIIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	{ name     => "Tabbed paired 1",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  tabbed  => "\n\n\r\nr0\tAGCATCGATC\tIIIIIIIIII\tTCAGTTTTTGA\tIIIIIIIIIII\n\n".
+	             "\n\nr1\tTCAGTTTTTGA\tIIIIIIIIIII\tAGCATCGATC\tIIIIIIIIII\n\n",
+	  paired => 1,
+	  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+
+	{ name     => "Tabbed paired 2",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-s 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  tabbed   => "r0\tAGCATCGATC\tIIIIIIIIII\tTCAGTTTTTGA\tIIIIIIIIIII\n\n".
+	             "\nr1\tTCAGTTTTTGA\tIIIIIIIIIII\tAGCATCGATC\tIIIIIIIIII",
+	  paired   => 1,
+	  pairhits => [ { }, { "0,8" => 1 } ] },
+
+	{ name     => "Tabbed paired 3",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-u 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  tabbed   => "\n\n\r\nr0\tAGCATCGATC\tIIIIIIIIII\tTCAGTTTTTGA\tIIIIIIIIIII\n\n".
+	              "\n\nr1\tTCAGTTTTTGA\tIIIIIIIIIII\tAGCATCGATC\tIIIIIIIIII",
+	  paired   => 1,
+	  pairhits => [ { "0,8" => 1 }, { } ] },
 
 	# Check paired-end exclusions
 
