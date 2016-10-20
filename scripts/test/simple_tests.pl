@@ -364,6 +364,19 @@ my @cases = (
 		#                               GATCAGTTTTTGA
 	  pairhits => [ { "*,*" => 1 } ] },
 
+	{ name   => "Fastq empty 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\n\@r0\n\n+\n\n",
+	  hits   => [{ }] },
+
+	{ name   => "Fastq empty 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\n".
+		          "\@r0\nCATCGATCAGTATCTG\n+\nIIIIIIIIIIIIIIII\n".
+		          "\@r1\n\n+\n\n".
+							"\@r2\nCATCGATCAGTATCTG\n+\nIIIIIIIIIIIIIIII",
+	  hits   => [{ 2 => 1 }, {}, { 2 => 1}] },
+
 	# -f
 
 	{ name   => "Fasta 1",
@@ -480,6 +493,16 @@ my @cases = (
 	  fasta2  => ">\nGATCAAAAACTGA\n",
 		#                               GATCAGTTTTTGA
 	  pairhits => [ { "*,*" => 1 } ] },
+
+	{ name   => "Fasta empty 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\n>r0\n\n",
+	  hits   => [{ }] },
+
+	{ name   => "Fasta empty 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\n>r0\nCATCGATCAGTATCTG\n\n>r1\n\n>r2\nCATCGATCAGTATCTG",
+	  hits   => [{ 2 => 1 }, {}, { 2 => 1}] },
 
 	# -r
 
@@ -629,6 +652,16 @@ my @cases = (
 	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\n",
 	  args   => "-s 1",
 	  hits   => [{ }] },
+
+	{ name   => "Tabbed empty 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\t\t\n\n",
+	  hits   => [{ }] },
+
+	{ name   => "Tabbed empty 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  tabbed => "\n\n\r\nr0\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII\n\nr1\t\t\nr2\tCATCGATCAGTATCTG\tIIIIIIIIIIIIIIII",
+	  hits   => [{ 2 => 1 }, {}, { 2 => 1}] },
 
 	{ name   => "Tabbed multiread 1",
 	  ref    => [ "AGCATCGATCAGTATCTGA" ],
