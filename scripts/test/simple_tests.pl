@@ -352,17 +352,17 @@ my @cases = (
 	  pairhits => [ { "0,8" => 1 }, { } ] },
 
 
-		# Paired-end reads with left end entirely trimmed away
-		{ name     => "Fastq paired 4",
-		  ref      => [     "AGCATCGATCAAAAACTGA" ],
-		  args     => "-3 7",
-		  #                  AGCATCG
-		  #                        GATCAAAAACTGA
-		  #                  0123456789012345678
-		  fastq1  => "\@r0\nAGCATCG\n+\nIIIIIII\n",
-		  fastq2  => "\@r0\nGATCAAAAACTGA\n+\nIIIIIIIIIIIII\n",
-			#                               GATCAGTTTTTGA
-		  pairhits => [ { "*,*" => 1 } ] },
+	# Paired-end reads with left end entirely trimmed away
+	{ name     => "Fastq paired 4",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-3 7",
+	  #                  AGCATCG
+	  #                        GATCAAAAACTGA
+	  #                  0123456789012345678
+	  fastq1  => "\@r0\nAGCATCG\n+\nIIIIIII\n",
+	  fastq2  => "\@r0\nGATCAAAAACTGA\n+\nIIIIIIIIIIIII\n",
+		#                               GATCAGTTTTTGA
+	  pairhits => [ { "*,*" => 1 } ] },
 
 	# -f
 
@@ -681,6 +681,17 @@ my @cases = (
 	              "\n\nr1\tTCAGTTTTTGA\tIIIIIIIIIII\tAGCATCGATC\tIIIIIIIIII",
 	  paired   => 1,
 	  pairhits => [ { "0,8" => 1 }, { } ] },
+
+	# Paired-end reads with left end entirely trimmed away
+	{ name     => "Tabbed paired 4",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-3 7",
+	  #                  AGCATCG
+	  #                        GATCAAAAACTGA
+	  #                  0123456789012345678
+	  tabbed     => "\nr0\tAGCATCG\tIIIIIII\tGATCAAAAACTGA\tIIIIIIIIIIIII\n",
+		paired   => 1,
+	  pairhits => [ { "*,*" => 1 } ] },
 
 	# Check paired-end exclusions
 
