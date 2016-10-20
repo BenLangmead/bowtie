@@ -987,11 +987,6 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 		c = r.readOrigBuf[cur++];
 	}
 	
-	// Now we're on the next non-blank line after the + line
-	if(seqan::length(r.patFw) == 0) {
-		return true; // done parsing empty read
-	}
-
 	assert_eq(0, seqan::length(r.qual));
 	int nqual = 0, qualoff = 0;
 	if (intQuals_) {
@@ -1113,14 +1108,14 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 			if(cur >= buflen) {
 				return false; // record ended prematurely
 			}
+			r.nameBuf[nameoff] = '\0';
+			_setBegin(r.name, r.nameBuf);
+			_setLength(r.name, nameoff);
 		} else if(endi > 0) {
 			// if this is the second end and we're parsing
 			// tab5, copy name from first end
-			rb.name = ra.name;
+			rb.name = ra.name; // not a deep copy
 		}
-		r.nameBuf[nameoff] = '\0';
-		_setBegin(r.name, r.nameBuf);
-		_setLength(r.name, nameoff);
 		
 		paired = endi > 0;
 
