@@ -7,7 +7,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use FindBin qw($Bin); 
+use FindBin qw($Bin);
 use lib $Bin;
 use List::Util qw(max min);
 use Data::Dumper;
@@ -36,8 +36,504 @@ if(! -x $bowtie || ! -x $bowtie_build) {
 (-x $bowtie_build) || die "Cannot run '$bowtie_build'";
 
 my %prog_pairs = ($bowtie => $bowtie_build, $bowtie." --large-index " => $bowtie_build." --large-index ");
- 
+
 my @cases = (
+
+	# File format cases
+
+	# -F: FASTA continuous
+
+	{ name   => "FASTA-continuous 1",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		#            0123456789012345678
+		#            AGCATCGATC
+		#                     CAGTATCTGA
+		cont_fasta_reads => ">seq1\nAGCATCGATCAGTATCTGA\n",
+		idx_map => { "seq1_0" => 0, "seq1_9" => 1 },
+		args   => "-F 10,9",
+		hits   => [{ 0 => 1 }, { 9 => 1 }] },
+
+	{ name   => "FASTA-continuous 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		#            0123456789012345678
+		#      seq1: AGCATCGATCAGTATCTG
+		#            AGCATCGATC
+		#      seq2: AGCATCGATCAGTATCTGA
+		#            AGCATCGATC
+		#                     CAGTATCTGA
+		cont_fasta_reads => ">seq1\nAGCATCGATCAGTATCTG\n".
+		                    ">seq2\nAGCATCGATCAGTATCTGA\n",
+		idx_map => { "seq1_0" => 0, "seq2_0" => 1, "seq2_9" => 2 },
+		args   => "-F 10,9",
+		hits   => [{ 0 => 1 }, { 0 => 1 }, { 9 => 1 }] },
+
+	{ name   => "FASTA-continuous 3",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		#            0123456789012345678
+		#            AGCATCGATC
+		#                     CAGTATCTGA
+		cont_fasta_reads => ">seq1\nAGCATCGATCAGTATCTGA\n",
+		idx_map => { "seq1_0" => 0 },
+		args   => "-F 10,9 -u 1",
+		hits   => [{ 0 => 1 }] },
+
+	{ name   => "FASTA-continuous 4",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		#            0123456789012345678
+		#            AGCATCGATC
+		#                     CAGTATCTGA
+		cont_fasta_reads => ">seq1\nAGCATCGATCAGTATCTGA\n",
+		idx_map => { "seq1_9" => 0 },
+		args   => "-F 10,9 -s 1",
+		hits   => [{ 9 => 1 }] },
+
+	{ name   => "FASTA-continuous 5",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		#            0123456789012345678
+		#      seq1: AGCATCGATCAGTATCTG
+		#            AGCATCGATC
+		#      seq2: AGCATCGATCAGTATCTGA
+		#            AGCATCGATC
+		#                     CAGTATCTGA
+		cont_fasta_reads => ">seq1\nAGCATCGATCAGTATCTG\n".
+		                    ">seq2\nAGCATCGATCAGTATCTGA\n",
+		idx_map => { "seq2_0" => 0 },
+		args   => "-F 10,9 -u 1 -s 1",
+		hits   => [{ 0 => 1 }] },
+
+	{ name   => "FASTA-continuous 6",
+		ref    => [ "AGCATCGATCAG" ],
+		#            012345678901
+		#      seq1: AGCATCGATC
+		#             GCATCGATCA
+		#              CATCGATCAG
+		cont_fasta_reads => ">seq1\nAGCATCGATCAG\n",
+		idx_map => { "seq1_0" => 0, "seq1_1" => 1, "seq1_2" => 2 },
+		args   => "-F 10,1",
+		hits   => [{ 0 => 1 }, { 1 => 1 }, { 2 => 1 }] },
+
+		# -c
+
+	{ name   => "Cline 1",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		cline_reads => "CATCGATCAGTATCTG",
+		hits   => [{ 2 => 1 }] },
+
+	{ name   => "Cline 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII",
+		hits   => [{ 2 => 1 }] },
+
+	{ name   => "Cline 2",
+		ref    => [ "AGCATCGATCAGTATCTGA" ],
+		cline_reads => "CATCGATCAGTATCTG:ABCDEDGHIJKLMNOP",
+		hits   => [{ 2 => 1 }] },
+
+	{ name   => "Cline 4",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads  => "CATCGATCAGTATCTG:ABCDEDGHIJKLMNO", # qual too short
+	  should_abort => 1},
+
+	{ name   => "Cline 5",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads  => "CATCGATCAGTATCTG:ABCDEDGHIJKLMNOPQ", # qual too long
+	  should_abort => 1},
+
+	# Part of sequence is trimmed
+	{ name   => "Cline 7",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII\n",
+	  args   => "--trim3 4",
+	  norc   => 1,
+	  hits   => [{ 2 => 1 }] },
+
+	# Whole sequence is trimmed
+	{ name   => "Cline 8",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII",
+	  args   => "--trim5 16",
+	  hits   => [{ }] },
+
+	# Sequence is skipped
+	{ name   => "Cline 9",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII",
+	  args   => "-s 1",
+	  hits   => [{ }] },
+
+	{ name   => "Cline multiread 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII,".
+	                 "ATCGATCAGTATCTG:IIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	{ name   => "Cline multiread 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		args   =>   "-u 1",
+	  cline_reads => "CATCGATCAGTATCTG:IIIIIIIIIIIIIIII,".
+	                 "ATCGATCAGTATCTG:IIIIIIIIIIIIIII\n\n",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Cline multiread 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 2",
+	  cline_reads  => "CATCGATCAGTATCTG,".
+	                  "ATCGATCAGTATCTG\r\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	# Paired-end reads that should align
+	{ name     => "Cline paired 1",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  cline_reads1  => "AGCATCGATC:IIIIIIIIII,".
+	                   "TCAGTTTTTGA",
+	  cline_reads2  => "TCAGTTTTTGA,".
+	                   "AGCATCGATC:IIIIIIIIII",
+	  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+
+	# Paired-end reads that should align
+	{ name     => "Cline paired 2",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-s 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  cline_reads1  => "AGCATCGATC:IIIIIIIIII,".
+	                   "TCAGTTTTTGA:IIIIIIIIIII",
+	  cline_reads2  => "TCAGTTTTTGA:IIIIIIIIIII,".
+	                   "AGCATCGATC:IIIIIIIIII",
+	  pairhits => [ { }, { "0,8" => 1 } ] },
+
+	# Paired-end reads that should align
+	{ name     => "Cline paired 3",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-u 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  cline_reads1  => "AGCATCGATC:IIIIIIIIII,".
+	                   "TCAGTTTTTGA:IIIIIIIIIII",
+	  cline_reads2  => "TCAGTTTTTGA:IIIIIIIIIII,".
+	                   "AGCATCGATC:IIIIIIIIII",
+	  pairhits => [ { "0,8" => 1 }, { } ] },
+
+	# -q
+
+	{ name   => "Fastq 1",
+	  ref    => [   "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\n+\nIIIIIIIIIIIIIIII",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Fastq 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\n+\nIIIIIIIIIIIIIIII\n", # extra newline
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Fastq 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n",
+	  hits   => [{ 2 => 1 }] },
+
+	{ name   => "Fastq 4",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n", # qual too short
+		#                                       CATCGATCAGTATCTG
+	  should_abort => 1},
+
+	# Name line doesn't start with @
+	{ name   => "Fastq 5",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n",
+	  should_abort => 1,
+	  hits   => [{ }] },
+
+	# Name line doesn't start with @ (2)
+	{ name   => "Fastq 6",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n",
+	  should_abort => 1,
+	  hits   => [{ }] },
+
+	# Part of sequence is trimmed
+	{ name   => "Fastq 7",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n",
+	  args   => "--trim3 4",
+	  norc   => 1,
+	  hits   => [{ 2 => 1 }] },
+
+	# Whole sequence is trimmed
+	{ name   => "Fastq 8",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n",
+	  args   => "--trim5 16",
+	  hits   => [{ }] },
+
+	# Sequence is skipped
+	{ name   => "Fastq 9",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n",
+	  args   => "-s 1",
+	  hits   => [{ }] },
+
+	# Like Fastq 1 but with many extra newlines
+	{ name   => "Fastq multiread 1",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n".
+	            "\@r1\nATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	# Like Fastq multiread 1 but with -u 1
+	{ name   => "Fastq multiread 2",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 1",
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n".
+	            "\@r1\nATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n",
+	  hits   => [{ 2 => 1 }] },
+
+	# Like Fastq multiread 1 but with -u 2
+	{ name   => "Fastq multiread 3",
+	  ref    => [ "AGCATCGATCAGTATCTGA" ],
+	  args   =>   "-u 2",
+	  fastq  => "\@r0\nCATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIIII\n".
+	            "\@r1\nATCGATCAGTATCTG\r\n+\nIIIIIIIIIIIIIII\n",
+	  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+	# Paired-end reads that should align
+	{ name     => "Fastq paired 1",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fastq1  => "\@r0\nAGCATCGATC\r\n+\nIIIIIIIIII\n".
+	             "\@r1\nTCAGTTTTTGA\r\n+\nIIIIIIIIIII\n",
+	  fastq2  => "\@r0\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n".
+	             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
+	  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+
+	# Paired-end reads that should align
+	{ name     => "Fastq paired 2",
+	  ref      => [     "AGCATCGATCAAAAACTGA" ],
+	  args     => "-s 1",
+	  #                  AGCATCGATC
+	  #                          TCAAAAACTGA
+	  #                  0123456789012345678
+	  fastq1  => "\@r0\nAGCATCGATC\r\n+\nIIIIIIIIII\n".
+	             "\@r1\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n",
+	  fastq2  => "\@r0\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n".
+	             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
+	  pairhits => [ { }, { "0,8" => 1 } ] },
+
+		# Paired-end reads that should align
+		{ name     => "Fastq paired 3",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  args     => "-u 1",
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  fastq1  => "\@r0\nAGCATCGATC\r\n+\nIIIIIIIIII\n".
+		             "\@r1\nTCAGTTTTTGA\r\n+\nIIIIIIIIIII\n",
+		  fastq2  => "\@r0\nTCAGTTTTTGA\n+\nIIIIIIIIIII\n".
+		             "\@r1\nAGCATCGATC\r\n+\nIIIIIIIIII",
+		  pairhits => [ { "0,8" => 1 }, { } ] },
+
+		# -f
+
+		{ name   => "Fasta 1",
+		  ref    => [  "AGCATCGATCAGTATCTGA" ],
+		  fasta  => ">r0\nCATCGATCAGTATCTG",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Fasta 2",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => ">r0\nCATCGATCAGTATCTG\n",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Fasta 3",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n\n",
+		  hits   => [{ 2 => 1 }] },
+
+		# Name line doesn't start with >
+		{ name   => "Fasta 5",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\nr0\nCATCGATCAGTATCTG\r",
+		  should_abort => 1,
+		  hits   => [{ }] },
+
+		# Name line doesn't start with > (2)
+		{ name   => "Fasta 6",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "r0\nCATCGATCAGTATCTG\r",
+		  should_abort => 1,
+		  hits   => [{ }] },
+
+		{ name   => "Fasta 7",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
+		  args   => "--trim3 4",
+		  norc   => 1,
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Fasta 8",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\n\>r0\nCATCGATCAGTATCTG\r\n",
+		  args   => "--trim3 16",
+		  hits   => [{ }] },
+
+		{ name   => "Fasta 9",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n",
+		  args   => "-s 1",
+		  hits   => [{ }] },
+
+		{ name   => "Fasta multiread 1",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\n\n".
+		            "\n\n\r\n>r1\nATCGATCAGTATCTG\n\n",
+		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+		{ name   => "Fasta multiread 2",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  args   =>   "-u 1",
+		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
+		            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Fasta multiread 3",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  args   =>   "-u 2",
+		  fasta  => "\n\n\r\n>r0\nCATCGATCAGTATCTG\r\n".
+		            "\n\n\r\n>r1\nATCGATCAGTATCTG\r\n",
+		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+		{ name     => "Fasta paired 1",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
+		             "\n\n>r1\nTCAGTTTTTGA\r\n",
+		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+		             "\n\n\r\n>r1\nAGCATCGATC",
+		  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+
+		{ name     => "Fasta paired 2",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  args     => "-s 1",
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  fasta1  => ">r0\nAGCATCGATC\r\n".
+		             "\n\n>r1\nTCAGTTTTTGA\n",
+		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+		             "\n\n\r\n>r1\nAGCATCGATC",
+		  pairhits => [ { }, { "0,8" => 1 } ] },
+
+		{ name     => "Fasta paired 3",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  args     => "-u 1",
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  fasta1  => "\n\n\r\n>r0\nAGCATCGATC\r\n".
+		             "\n\n>r1\nTCAGTTTTTGA\r\n",
+		  fasta2  => "\n\n\r\n>r0\nTCAGTTTTTGA\n".
+		             "\n\n\r\n>r1\nAGCATCGATC",
+		  pairhits => [ { "0,8" => 1 }, { } ] },
+
+		# -r
+
+		{ name   => "Raw 1",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    =>     "CATCGATCAGTATCTG",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Raw 2",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    => "CATCGATCAGTATCTG\n",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Raw 3",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    => "\n\n\nCATCGATCAGTATCTG\n\n",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Raw 7",
+		  ref    => [     "AGCATCGATCAGTATCTGA" ],
+		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
+		  args   => "--trim3 4",
+		  norc   => 1,
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Raw 8",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n",
+		  args   => "--trim3 16",
+		  hits   => [{ }] },
+
+		{ name   => "Raw 9",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    => "CATCGATCAGTATCTG\n",
+		  args   => "-s 1",
+		  hits   => [{ }] },
+
+		{ name   => "Raw multiread 1",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  raw    => "\n\n\r\nCATCGATCAGTATCTG\n\n".
+		            "\n\n\r\nATCGATCAGTATCTG\n\n",
+		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+		{ name   => "Raw multiread 2",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  args   =>   "-u 1",
+		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
+		            "\n\n\r\nATCGATCAGTATCTG\r\n",
+		  hits   => [{ 2 => 1 }] },
+
+		{ name   => "Raw multiread 3",
+		  ref    => [ "AGCATCGATCAGTATCTGA" ],
+		  args   =>   "-u 2",
+		  raw    => "\n\n\r\nCATCGATCAGTATCTG\r\n".
+		            "\n\n\r\nATCGATCAGTATCTG\r\n",
+		  hits   => [{ 2 => 1 }, { 3 => 1 }] },
+
+		{ name     => "Raw paired 1",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  raw1    => "\n\n\r\nAGCATCGATC\r\n".
+		             "\n\nTCAGTTTTTGA\r\n",
+		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+		             "\n\n\r\nAGCATCGATC",
+		  pairhits => [ { "0,8" => 1 }, { "0,8" => 1 } ] },
+
+		{ name     => "Raw paired 2",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  args     => "-s 1",
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  raw1    => "AGCATCGATC\r\n".
+		             "\n\nTCAGTTTTTGA\n",
+		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+		             "\n\n\r\nAGCATCGATC",
+		  pairhits => [ { }, { "0,8" => 1 } ] },
+
+		{ name     => "Raw paired 3",
+		  ref      => [     "AGCATCGATCAAAAACTGA" ],
+		  args     => "-u 1",
+		  #                  AGCATCGATC
+		  #                          TCAAAAACTGA
+		  #                  0123456789012345678
+		  raw1    => "\n\n\r\nAGCATCGATC\r\n".
+		             "\n\nTCAGTTTTTGA\r\n",
+		  raw2    => "\n\n\r\nTCAGTTTTTGA\n".
+		             "\n\n\r\nAGCATCGATC",
+		  pairhits => [ { "0,8" => 1 }, { } ] },
 
 	# Check paired-end exclusions
 
@@ -65,7 +561,7 @@ my @cases = (
 
 	{ name     => "Paired-end 3",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                       AAGCTTT
 	#                  ^2   ^7
 	#                       AAAGCTT
@@ -77,7 +573,7 @@ my @cases = (
 
 	{ name     => "Paired-end 4, containment excluded",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                   ACGAAAG
 	#                  ^2   ^7
 	#                   CTTTCGT
@@ -89,7 +585,7 @@ my @cases = (
 
 	{ name     => "Paired-end 5, allow contain",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                   ACGAAAG
 	#                  ^2   ^7
 	#                   CTTTCGT
@@ -101,7 +597,7 @@ my @cases = (
 
 	{ name     => "Paired-end 6, allow contain",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                  AACGAAAG
 	#                  ^2   ^7
 	#                  CTTTCGTT
@@ -113,7 +609,7 @@ my @cases = (
 
 	{ name     => "Paired-end 7, allow contain",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                  AACGAAAG
 	#                  ^2   ^7
 	#                  CTTTCGTT
@@ -125,7 +621,7 @@ my @cases = (
 
 	{ name     => "Paired-end 8, allow contain",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                  AACGAAAG
 	#                  ^2   ^7
 	#                  CTTTCGTT
@@ -137,7 +633,7 @@ my @cases = (
 
 	{ name     => "Paired-end 9, allow contain",
 	  ref      => [ "AAAACGAAAGCTTTTATAGATGGGG" ],
-	#                  AACGAAAG 
+	#                  AACGAAAG
 	#                  AACGAAAG
 	#                  ^2   ^7
 	#                  CTTTCGTT
@@ -164,7 +660,7 @@ my @cases = (
 	              "-n 0" ],
 	  report =>   "-m 2 -a",
 	  hits   => [ { } ] },
-	
+
 	# Check basic aedits field functionality
 
 	{ name     => "Checking edits 1",
@@ -190,7 +686,7 @@ my @cases = (
 	  args  => [ "-v 0",
 	             "-n 0" ],
 	  hits  => [ { 2 => 1 } ] },
-	
+
 	{ name  => "Colorspace 1",
 	  ref   => [ "AAACGAAAGCTTTTATAGATGGGG" ],
 	  reads => [    "132002320003332231" ],
@@ -578,6 +1074,10 @@ foreach my $large_idx (undef,1) {
 				writeFasta($c->{ref}, $tmpfafn);
 				$do_build = 1;
 			}
+			# If args was not specified as an array ref, turn it into a
+			# 1-element array ref
+			$c->{args} = [] if not defined($c->{args});
+			$c->{args} = [$c->{args}] if not ref $c->{args} eq "ARRAY";
 			for my $a (@{$c->{args}}) {
 				$last_ref = $c->{ref};
 				# For each set of arguments...
