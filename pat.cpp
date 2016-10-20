@@ -597,18 +597,50 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	assert_eq(0, seqan::length(r.patFw));
 	assert(c != '\n' && c != '\r');
 	assert_lt(cur, buflen);
-	while(c != '\n' && cur < buflen) {
-		if(c == '.') {
-			c = 'N';
+
+	if(color_ && asc2dnacat[c] > 0) {
+		// First char is a DNA char (primer)
+		r.primer = c;
+		int c2 = toupper(r.readOrigBuf[cur++]);
+		// Is second char a color?
+		if(asc2colcat[c2] <= 0) {
+			// No -- so we don't assue this is primer
+			cur -= 2;
+			c = r.readOrigBuf[cur++];
 		}
-		if(isalpha(c)) {
-			// If it's past the 5'-end trim point
-			if(nchar++ >= this->trim5_) {
-				r.patBufFw[seqoff++] = charToDna5[c];
+	}
+	if(color_) {
+		while(c != '\n' && cur < buflen) {
+			if(c >= '0' && c < '4') {
+				c = "ACGTN"[(int)c - '0'];
 			}
+			if(c == '.') {
+				c = 'N';
+			}
+			if(isalpha(c)) {
+				assert_in(toupper(c), "ACGTN");
+				if(nchar++ >= this->trim5_) {
+					assert_neq(0, asc2dnacat[c]);
+					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
+				}
+			}
+			c = r.readOrigBuf[cur++];
 		}
-		assert_lt(cur, buflen);
-		c = r.readOrigBuf[cur++];
+		r.color = true;
+	} else {
+		while(c != '\n' && cur < buflen) {
+			if(c == '.') {
+				c = 'N';
+			}
+			if(isalpha(c)) {
+				// If it's past the 5'-end trim point
+				if(nchar++ >= this->trim5_) {
+					r.patBufFw[seqoff++] = charToDna5[c];
+				}
+			}
+			assert_lt(cur, buflen);
+			c = r.readOrigBuf[cur++];
+		}
 	}
 	r.patBufFw[seqoff] = '\0';
 	_setBegin(r.patFw, (Dna5*)r.patBufFw);
@@ -624,7 +656,7 @@ bool FastaPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	}
 	r.qualBuf[seqoff - trim3] = '\0';
 	_setBegin(r.qual, r.qualBuf);
-	_setLength(r.qual, nameoff);
+	_setLength(r.qual, seqoff - trim3);
 
 	// Set up a default name if one hasn't been set
 	if(nameoff == 0) {
@@ -815,8 +847,6 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 {
 	int c = 0;
 	vector<Read>& readBuf = batch_a ? pt.bufa_ : pt.bufb_;
-	size_t& len = readBuf[0].readOrigBufLen;
-	len = 0;
 	if(first_) {
 		c = getc_unlocked(fp_);
 		while(c == '\r' || c == '\n') {
@@ -826,44 +856,34 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 			cerr << "Error: reads file does not look like a FASTQ file" << endl;
 			throw 1;
 		}
-		readBuf[0].readOrigBuf[len++] = c;
-		assert_eq('@', c);
 		first_ = false;
+		readBuf[0].readOrigBuf[0] = c;
+		readBuf[0].readOrigBufLen = 1;
 	}
-	// Note: to reduce the number of times we have to enter the critical
-	// section (each entrance has some assocaited overhead), we could populate
-	// the buffer with several reads worth of data here, instead of just one.
 	bool done = false, aborted = false;
 	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && !done; readi++) {
 		char* buf = readBuf[readi].readOrigBuf;
 		assert(readi == 0 || strlen(buf) == 0);
-		if(readi > 0)
-		{
-			len = readBuf[readi].readOrigBufLen;
-			len = 0;
-		}
 		int newlines = 4;
 		while(newlines) {
 			c = getc_unlocked(fp_);
 			done = c < 0;
 			if(c == '\n' || (done && newlines == 1)) {
+				// Saw newline, or EOF that we're
+				// interpreting as final newline
 				newlines--;
 				c = '\n';
 			} else if(done) {
-				//return make_pair(false, true);
-				aborted = true; //Unexpected EOF
+				aborted = true; // Unexpected EOF
 				break;
 			}
-			buf[len++] = c;
+			buf[readBuf[readi].readOrigBufLen++] = c;
 		}
-		readCnt_++;
-		readBuf[readi].patid = (uint32_t)(readCnt_-1);
 	}
 	if(aborted) {
 		readi--;
-		readCnt_--;
 	}
 	return make_pair(done, readi);
 }
@@ -902,18 +922,51 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 	// Parse sequence
 	int nchar = 0, seqoff = 0;
 	assert_eq(0, seqan::length(r.patFw));
-	while(c != '+') {
-		if(c == '.') {
-			c = 'N';
-		}
-		if(isalpha(c)) {
-			// If it's past the 5'-end trim point
-			if(nchar++ >= this->trim5_) {
-				r.patBufFw[seqoff++] = charToDna5[c];
+	if(color_) {
+		if(asc2dnacat[c] > 0) {
+			// First char is a DNA char (primer)
+			r.primer = c;
+			int c2 = toupper(r.readOrigBuf[cur++]);
+			// Is second char a color?
+			if(asc2colcat[c2] <= 0) {
+				// No -- so we don't assue this is primer
+				cur -= 2;
+				c = r.readOrigBuf[cur++];
 			}
 		}
-		assert_lt(cur, buflen);
-		c = r.readOrigBuf[cur++];
+	}
+	if(color_) {
+		while(c != '+' && cur < buflen) {
+			if(c >= '0' && c < '4') {
+				c = "ACGTN"[(int)c - '0'];
+			}
+			if(c == '.') {
+				c = 'N';
+			}
+			if(isalpha(c)) {
+				assert_in(toupper(c), "ACGTN");
+				if(nchar++ >= this->trim5_) {
+					assert_neq(0, asc2dnacat[c]);
+					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
+				}
+			}
+			c = r.readOrigBuf[cur++];
+		}
+		r.color = true;
+	} else {
+		while(c != '+' && cur < buflen) {
+			if(c == '.') {
+				c = 'N';
+			}
+			if(isalpha(c)) {
+				// If it's past the 5'-end trim point
+				if(nchar++ >= this->trim5_) {
+					r.patBufFw[seqoff++] = charToDna5[c];
+				}
+			}
+			assert_lt(cur, buflen);
+			c = r.readOrigBuf[cur++];
+		}
 	}
 	_setBegin(r.patFw, (Dna5*)r.patBufFw);
 	// record amt trimmed from 5' end due to --trim5
@@ -1074,15 +1127,46 @@ bool TabbedPatternSource::parse(Read& ra, Read& rb, TReadId rdid) const {
 		assert_eq(0, seqan::length(r.patFw));
 		c = ra.readOrigBuf[cur++];
 		int nchar = 0, seqoff = 0;
-		while(c != '\t' && cur < buflen) {
-			if(isalpha(c)) {
-				assert_in(toupper(c), "ACGTN");
-				if(nchar++ >= this->trim5_) {
-					assert_neq(0, asc2dnacat[c]);
-					r.patBufFw[seqoff++] = charToDna5[c];
-				}
+		if(color_ && asc2dnacat[c] > 0) {
+			// First char is a DNA char (primer)
+			r.primer = c;
+			int c2 = toupper(r.readOrigBuf[cur++]);
+			// Is second char a color?
+			if(asc2colcat[c2] <= 0) {
+				// No -- so we don't assue this is primer
+				cur -= 2;
+				c = r.readOrigBuf[cur++];
 			}
-			c = ra.readOrigBuf[cur++];
+		}
+		if(color_) {
+			while(c != '\t' && cur < buflen) {
+				if(c >= '0' && c < '4') {
+					c = "ACGTN"[(int)c - '0'];
+				}
+				if(c == '.') {
+					c = 'N';
+				}
+				if(isalpha(c)) {
+					assert_in(toupper(c), "ACGTN");
+					if(nchar++ >= this->trim5_) {
+						assert_neq(0, asc2dnacat[c]);
+						r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
+					}
+				}
+				c = r.readOrigBuf[cur++];
+			}
+			r.color = true;
+		} else {
+			while(c != '\t' && cur < buflen) {
+				if(isalpha(c)) {
+					assert_in(toupper(c), "ACGTN");
+					if(nchar++ >= this->trim5_) {
+						assert_neq(0, asc2dnacat[c]);
+						r.patBufFw[seqoff++] = charToDna5[c];
+					}
+				}
+				c = ra.readOrigBuf[cur++];
+			}
 		}
 		assert_eq('\t', c);
 		if(cur >= buflen) {
@@ -1180,21 +1264,54 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 	assert(r.empty());
 	assert_gt(r.readOrigBufLen, 0);
-	int c = '\n';
 	size_t cur = 0;
 	const size_t buflen = r.readOrigBufLen;
 
 	// Parse sequence
 	assert_eq(0, seqan::length(r.patFw));
 	int nchar = 0, seqoff = 0;
-	while(cur < buflen) {
-		c = r.readOrigBuf[cur++];
-		assert(c != '\r' && c != '\n');
-		if(isalpha(c)) {
-			assert_in(toupper(c), "ACGTN");
-			if(nchar++ >= this->trim5_) {
-				assert_neq(0, asc2dnacat[c]);
-				r.patBufFw[seqoff++] = charToDna5[c];
+	int c = r.readOrigBuf[cur++];
+
+	if(color_ && asc2dnacat[c] > 0) {
+		// First char is a DNA char (primer)
+		r.primer = c;
+		int c2 = toupper(r.readOrigBuf[cur++]);
+		// Is second char a color?
+		if(asc2colcat[c2] <= 0) {
+			// No -- so we don't assue this is primer
+			cur -= 2;
+			c = r.readOrigBuf[cur++];
+		}
+	}
+	if(color_) {
+		while(cur < buflen) {
+			assert(c != '\r' && c != '\n');
+			if(c >= '0' && c < '4') {
+				c = "ACGTN"[(int)c - '0'];
+			}
+			if(c == '.') {
+				c = 'N';
+			}
+			if(isalpha(c)) {
+				assert_in(toupper(c), "ACGTN");
+				if(nchar++ >= this->trim5_) {
+					assert_neq(0, asc2dnacat[c]);
+					r.patBufFw[seqoff++] = charToDna5[c]; // ascii to int
+				}
+			}
+			c = r.readOrigBuf[cur++];
+		}
+		r.color = true;
+	} else {
+		while(cur < buflen) {
+			c = r.readOrigBuf[cur++];
+			assert(c != '\r' && c != '\n');
+			if(isalpha(c)) {
+				assert_in(toupper(c), "ACGTN");
+				if(nchar++ >= this->trim5_) {
+					assert_neq(0, asc2dnacat[c]);
+					r.patBufFw[seqoff++] = charToDna5[c];
+				}
 			}
 		}
 	}

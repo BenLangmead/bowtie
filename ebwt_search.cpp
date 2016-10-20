@@ -1001,6 +1001,7 @@ static const char *argv0 = NULL;
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(get_read_ret.first) { \
 		sink->finishRead(*p, true, !skipped); \
+		get_read_ret.first = false; \
 	} \
 	skipped = false;
 
