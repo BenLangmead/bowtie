@@ -43,12 +43,9 @@ endif
 MACOS = 0
 ifneq (,$(findstring Darwin,$(shell uname)))
     MACOS = 1
-	ifneq (,$(findstring 13,$(shell uname -r)))
-		CPP = clang++
-		CC = clang
-		override EXTRA_FLAGS += -stdlib=libstdc++
-	endif
-	ifneq (,$(findstring 14,$(shell uname -r)))
+    MACOS_VER_MAJOR = $(shell uname -r | cut -d. -f1)
+    MACOS_VER_GT_12 = $(shell [ $(MACOS_VER_MAJOR) -gt 12 ] && echo true)
+	ifeq (true, $(MACOS_VER_GT_12))
 		CPP = clang++
 		CC = clang
 		override EXTRA_FLAGS += -stdlib=libstdc++
