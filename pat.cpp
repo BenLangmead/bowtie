@@ -868,7 +868,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && !done; readi++) {
 		char* buf = readBuf[readi].readOrigBuf;
-		assert(readi == 0 || strlen(buf) == 0);
+		assert(readi == 0 || readBuf[readi].readOrigBufLen == 0);
 		int newlines = 4;
 		while(newlines) {
 			c = getc_unlocked(fp_);
@@ -998,6 +998,8 @@ bool FastqPatternSource::parse(Read &r, Read& rb, TReadId rdid) const {
 			if(c == ' ' || c == '\t' || c == '\n' || c == '\r') {
 				char cadd = intToPhred33(cur_int, solQuals_);
 				cur_int = 0;
+				if (c == ' ')
+					c = r.readOrigBuf[cur++];
 				assert_geq(cadd, 33);
 				if(++nqual > this->trim5_) {
 					r.qualBuf[qualoff++] = cadd;
@@ -1280,7 +1282,7 @@ bool RawPatternSource::parse(Read& r, Read& rb, TReadId rdid) const {
 		c = r.readOrigBuf[cur++];
 	}
 	if(color_) {
-		while(cur < buflen) {
+		while(c != '\0') {
 			assert(c != '\r' && c != '\n');
 			if(c >= '0' && c < '4') {
 				c = "ACGTN"[(int)c - '0'];
