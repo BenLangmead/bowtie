@@ -418,9 +418,8 @@ public:
 		if(_outs.size() > 1 && end-start > 2) {
 			sort(hs.begin() + start, hs.begin() + end);
 		}
-		char buf[4096];
+		string buf(4096, (char) 0);
 		ostringstream ss(ssmode_);
-		ss.rdbuf()->pubsetbuf(buf, 4096);
 		size_t i = start;
 		while(i < end) {
 			size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
@@ -430,7 +429,7 @@ public:
 					append(ss, hs[i]);
 					{
 						ThreadSafe _ts(_locks[strIdx]);
-						out(hs[i].h.first).writeChars(buf, ss.tellp());
+						out(hs[i].h.first).writeChars(ss.str().c_str(), ss.tellp());
 					}
 					ss.seekp(0);
 					ss.clear();
