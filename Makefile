@@ -429,6 +429,9 @@ install: all
 		cp -f $$file $(DESTDIR)$(bindir) ; \
 	done
 
+.PHONY: test
+test: allall
+	perl ./scripts/test/simple_tests.pl --bowtie=./bowtie --bowtie-build=./bowtie-build
 
 .PHONY: clean
 clean:
