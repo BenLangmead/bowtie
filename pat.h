@@ -20,6 +20,10 @@
 #include "hit_set.h"
 #include "search_globals.h"
 
+#ifdef _WIN32
+#define getc_unlocked _fgetc_nolock
+#endif
+
 /**
  * Classes and routines for reading reads from various input sources.
  */
