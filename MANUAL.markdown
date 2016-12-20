@@ -1182,6 +1182,17 @@ you receive an error message saying that chunk memory has been
 exhausted in [`--best`] mode, try adjusting this parameter up to
 dedicate more memory to the descriptors.  Default: 64.
 
+</td></tr><tr><td id="bowtie-options-reads-per-batch">
+
+[`--reads-per-batch`]: #bowtie-options-reads-per-batch
+	--reads-per-batch <int>
+
+</td><td>
+
+Part of bowtie's batch parsing and used to specify the number of
+reads that bowtie will consume from the input file at once. Default:
+16
+
 </td></tr></table>
 
 #### Reporting

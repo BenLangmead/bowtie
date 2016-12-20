@@ -15,7 +15,7 @@ Bowtie Getting Started Guide
  genome. To use Bowtie to align those reads, issue the following
  command.  If you get an error message "command not found", try adding
  a "./" before the "bowtie".
- 
+
     bowtie e_coli reads/e_coli_1000.fq
 
  The first argument to bowtie is the basename of the index for the
@@ -26,7 +26,7 @@ Bowtie Getting Started Guide
  about a minute. You will see bowtie print many lines of output. Each
  line is an alignment for a read. The name of the aligned read appears
  in the leftmost column. The final line should say "Reported 698
- alignments to 1 output stream(s)" or something similar. 
+ alignments to 1 output stream(s)" or something similar.
 
  Next, issue this command:
 
@@ -82,14 +82,15 @@ Bowtie Getting Started Guide
  The pre-built E. coli index included with Bowtie is built from the
  sequence for strain 536, known to cause urinary tract infections. We
  will create a new index from the sequence of E. coli strain O157:H7, a
- strain known to cause food poisoning. Download the sequence file from:
+ strain known to cause food poisoning. Download and decompress the
+ sequence file from:
 
-    ftp://ftp.ncbi.nlm.nih.gov/genomes/Bacteria/Escherichia_coli_O157H7/NC_002127.fna
+    ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/bacteria/Escherichia_coli/all_assembly_versions/GCF_000513035.1_E._coli_O157/GCF_000513035.1_E._coli_O157_genomic.fna.gz
 
- When the sequence file is finished downloading, move it to the Bowtie
+ Once it has been downloaded and decompressed, move it to the Bowtie
  install directory and issue this command:
 
-    bowtie-build NC_002127.fna e_coli_O157_H7
+    bowtie-build GCF_000513035.1_E._coli_O157_genomic.fna e_coli_O157_H7
 
  The command should finish quickly, and print several lines of status
  messages. When the command has completed, note that the current
@@ -100,7 +101,7 @@ Bowtie Getting Started Guide
 
  To test that the index is properly installed, issue this command:
 
-    bowtie -c e_coli_O157_H7 GCGTGAGCTATGAGAAAGCGCCACGCTTCC
+    bowtie -c e_coli_O157_H7 GAACCGTATTCACCCGCCATCCCCATGCCG
 
  If the index is installed properly, this command should print a single
  alignment and then exit.
@@ -132,16 +133,16 @@ Bowtie Getting Started Guide
  accessible in the PATH.
 
     samtools view -bS -o ec_snp.bam ec_snp.sam
- 
+
  Next, we sort the BAM file, in preparation for SNP calling:
 
     samtools sort ec_snp.bam ec_snp.sorted
- 
+
  We now have a sorted BAM file called ec_snp.sorted.bam.  Sorted BAM is
  a useful format because the alignments are both compressed, which is
  convenient for long-term storage, and sorted, which is conveneint for
  variant discovery.  Finally, we call variants from the Sorted BAM:
- 
+
     samtools pileup -cv -f genomes/NC_008253.fna ec_snp.sorted.bam
 
  For this sample data, the 'samtools pileup' command should print

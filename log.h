@@ -6,16 +6,15 @@
 
 class SyncLogger {
 public:
-	SyncLogger() {
-	}
+	SyncLogger() : mutex_m() { }
 
 	void msg(const char *s) {
-		GUARD_LOCK(mutex_m);
+		ThreadSafe ts(&mutex_m);
 		std::cout << s << std::endl;
 	}
 
 	void msg(const std::string& s) {
-		GUARD_LOCK(mutex_m);
+		ThreadSafe ts(&mutex_m);
 		std::cout << s << std::endl;
 	}
 

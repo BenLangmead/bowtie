@@ -93,7 +93,7 @@ public:
 	 */
 	bool test(uint32_t i) {
 		bool ret;
-        GUARD_LOCK(mutex_m);
+        ThreadSafe _ts(&mutex_m);
 		ret = testUnsync(i);
 		return ret;
 	}
@@ -103,7 +103,7 @@ public:
 	 * it has been set.  Uses synchronization.
 	 */
 	void set(uint32_t i) {
-		GUARD_LOCK(mutex_m);
+        ThreadSafe _ts(&mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set
@@ -123,7 +123,7 @@ public:
 	 * synchronization.
 	 */
 	void setOver(uint32_t i) {
-		GUARD_LOCK(mutex_m);
+        ThreadSafe _ts(&mutex_m);
 		while(i >= _sz) {
 			// Slow path: bitset needs to be expanded before the
 			// specified bit can be set

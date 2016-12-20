@@ -22,6 +22,16 @@
 #include "aligner_metrics.h"
 #include "search_globals.h"
 
+#ifdef PER_THREAD_TIMING
+/// Based on http://stackoverflow.com/questions/16862620/numa-get-current-node-core
+void get_cpu_and_node(int& cpu, int& node) {
+	unsigned long a,d,c;
+	__asm__ volatile("rdtscp" : "=a" (a), "=d" (d), "=c" (c));
+	node = (c & 0xFFF000)>>12;
+	cpu = c & 0xFFF;
+}
+#endif
+
 /**
  * State machine for carrying out an alignment, which usually consists
  * of a series of phases that conduct different alignments using
@@ -62,9 +72,9 @@ protected:
 
 	// Current read pair
 	PatternSourcePerThread* patsrc_;
-	ReadBuf* bufa_;
+	Read* bufa_;
 	uint32_t alen_;
-	ReadBuf* bufb_;
+	Read* bufb_;
 	uint32_t blen_;
 	bool rangeMode_;
 	RandomSource rand_;
@@ -145,24 +155,21 @@ public:
 	 * try to hide all the latency.
 	 */
 	void run() {
-		bool done = false;
-		while(!done) {
-			done = true;
+		bool saw_last_read = false;
+		while(!saw_last_read) {
 			for(uint32_t i = 0; i < n_; i++) {
 				if(!(*aligners_)[i]->done) {
 					// Advance an aligner already in progress
-					done = false;
 					(*aligners_)[i]->advance();
 				} else {
+					if(saw_last_read) {
+						break;
+					}
 					// Get a new read and initialize an aligner with it
-					(*patsrcs_)[i]->nextReadPair();
-					if(!(*patsrcs_)[i]->empty() && (*patsrcs_)[i]->patid() < qUpto_) {
+					pair<bool, bool> ret = (*patsrcs_)[i]->nextReadPair();
+					saw_last_read = ret.second;
+					if(ret.first && (*patsrcs_)[i]->rdid() < qUpto_) {
 						(*aligners_)[i]->setQuery((*patsrcs_)[i]);
-						assert(!(*aligners_)[i]->done);
-						done = false;
-					} else {
-						// No more reads; if done == true, it remains
-						// true
 					}
 				}
 			}
@@ -229,23 +236,50 @@ public:
 	 * Advance an array of aligners in parallel, using prefetches to
 	 * try to hide all the latency.
 	 */
-	void run(bool verbose = false) {
-		bool done = false;
+	void run(bool verbose = false, int tid = -1) {
+#ifdef PER_THREAD_TIMING
+		uint64_t ncpu_changeovers = 0;
+		uint64_t nnuma_changeovers = 0;
+		
+		int current_cpu = 0, current_node = 0;
+		get_cpu_and_node(current_cpu, current_node);
+	
+		std::stringstream ss;
+		std::string msg;
+		ss << "thread: " << tid << " time: ";
+		msg = ss.str();
+		Timer timer(std::cout, msg.c_str());
+#endif
 		bool first = true;
+		bool saw_last_read = false;
 		if(n_ == 1) {
 			Aligner *al = seOrPe_[0] ? (*alignersSE_)[0] : (*alignersPE_)[0];
 			PatternSourcePerThread *ps = (*patsrcs_)[0];
-			while(!done) {
-				done = true;
+			while(true) {
+#ifdef PER_THREAD_TIMING
+				int cpu = 0, node = 0;
+				get_cpu_and_node(cpu, node);
+				if(cpu != current_cpu) {
+					ncpu_changeovers++;
+					current_cpu = cpu;
+				}
+				if(node != current_node) {
+					nnuma_changeovers++;
+					current_node = node;
+				}
+#endif
 				if(!first && !al->done) {
 					// Advance an aligner already in progress; this is
 					// the common case
-					done = false;
 					al->advance();
 				} else {
+					if(saw_last_read) {
+						break;
+					}
 					// Get a new read
-					ps->nextReadPair();
-					if(ps->patid() < qUpto_ && !ps->empty()) {
+					pair<bool, bool> ret = ps->nextReadPair();
+					saw_last_read = ret.second;
+					if(ps->rdid() < qUpto_ && ret.first) {
 						if(ps->paired()) {
 							// Read currently in buffer is paired-end
 							(*alignersPE_)[0]->setQuery(ps);
@@ -257,31 +291,42 @@ public:
 							al = (*alignersSE_)[0];
 							seOrPe_[0] = true; // true = unpaired
 						}
-						done = false;
-					} else {
-						// No more reads; if done == true, it remains
-						// true
 					}
 				}
 				first = false;
 			}
 		} else {
-			while(!done) {
-				done = true;
+			while(true) {
+#ifdef PER_THREAD_TIMING
+				int cpu = 0, node = 0;
+				get_cpu_and_node(cpu, node);
+				if(cpu != current_cpu) {
+					ncpu_changeovers++;
+					current_cpu = cpu;
+				}
+				if(node != current_node) {
+					nnuma_changeovers++;
+					current_node = node;
+				}
+#endif
+				bool saw_last_read = false;
 				for(uint32_t i = 0; i < n_; i++) {
 					Aligner *al = seOrPe_[i] ? (*alignersSE_)[i] :
 											   (*alignersPE_)[i];
 					if(!first && !al->done) {
 						// Advance an aligner already in progress; this is
 						// the common case
-						done = false;
 						al->advance();
 					} else {
+						if(saw_last_read) {
+							break;
+						}
 						// Feed a new read to a vacant aligner
 						PatternSourcePerThread *ps = (*patsrcs_)[i];
 						// Get a new read
-						ps->nextReadPair();
-						if(ps->patid() < qUpto_ && !ps->empty()) {
+						pair<bool, bool> ret = ps->nextReadPair();
+						saw_last_read = ret.second;
+						if(ps->rdid() < qUpto_ && ret.first) {
 							if(ps->paired()) {
 								// Read currently in buffer is paired-end
 								(*alignersPE_)[i]->setQuery(ps);
@@ -291,16 +336,19 @@ public:
 								(*alignersSE_)[i]->setQuery(ps);
 								seOrPe_[i] = true; // true = unpaired
 							}
-							done = false;
-						} else {
-							// No more reads; if done == true, it remains
-							// true
 						}
 					}
 				}
 				first = false;
 			}
 		}
+#ifdef PER_THREAD_TIMING
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
+#endif
 	}
 
 protected:
@@ -379,7 +427,7 @@ public:
 		if(metrics_ != NULL) {
 			metrics_->nextRead(patsrc->bufa().patFw);
 		}
-		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		pool_->reset(&patsrc->bufa().name, (uint32_t)patsrc->rdid());
 		if(patsrc->bufa().length() < 4) {
 			if(!quiet_) {
 				cerr << "Warning: Skipping read " << patsrc->bufa().name
@@ -442,7 +490,7 @@ public:
 				ra.stratum,               // alignment stratum
 				ra.cost,                  // cost, including qual penalty
 				ra.bot - ra.top - 1,      // # other hits
-				patsrc_->patid(),         // pattern id
+				(uint32_t)patsrc_->rdid(),// pattern id
 				bufa_->seed,              // pseudo-random seed
 				0);                       // mate (0 = unpaired)
 	}
@@ -686,12 +734,11 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
-		assert(!patsrc->bufa().empty());
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
-		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		pool_->reset(&patsrc->bufa().name, (uint32_t)patsrc->rdid());
 		if(patsrc->bufa().length() < 4 || patsrc->bufb().length() < 4) {
 			if(!quiet_) {
 				cerr << "Warning: Skipping pair " << patsrc->bufa().name
@@ -821,8 +868,8 @@ protected:
 		TIndexOffU spreadL = rL.bot - rL.top;
 		TIndexOffU spreadR = rR.bot - rR.top;
 		TIndexOffU oms = min(spreadL, spreadR) - 1;
-		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
-		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
+		Read* bufL = pairFw ? bufa_ : bufb_;
+		Read* bufR = pairFw ? bufb_ : bufa_;
 		TIndexOffU lenL = pairFw ? alen_ : blen_;
 		TIndexOffU lenR = pairFw ? blen_ : alen_;
 		bool ret;
@@ -1539,12 +1586,11 @@ public:
 	 * Prepare this aligner for the next read.
 	 */
 	virtual void setQuery(PatternSourcePerThread* patsrc) {
-		assert(!patsrc->bufa().empty());
 		Aligner::setQuery(patsrc); // set fields & random seed
 		assert(!patsrc->bufb().empty());
 		// Give all of the drivers pointers to the relevant read info
 		patsrc_ = patsrc;
-		pool_->reset(&patsrc->bufa().name, patsrc->patid());
+		pool_->reset(&patsrc->bufa().name, (uint32_t)patsrc->rdid());
 		if(patsrc->bufa().length() < 4 || patsrc->bufb().length() < 4) {
 			if(!quiet_) {
 				cerr << "Warning: Skipping pair " << patsrc->bufa().name
@@ -1700,8 +1746,8 @@ protected:
 		TIndexOffU spreadL = rL.bot - rL.top;
 		TIndexOffU spreadR = rR.bot - rR.top;
 		TIndexOffU oms = min(spreadL, spreadR) - 1;
-		ReadBuf* bufL = pairFw ? bufa_ : bufb_;
-		ReadBuf* bufR = pairFw ? bufb_ : bufa_;
+		Read* bufL = pairFw ? bufa_ : bufb_;
+		Read* bufR = pairFw ? bufb_ : bufa_;
 		TIndexOffU lenL = pairFw ? alen_ : blen_;
 		TIndexOffU lenR = pairFw ? blen_ : alen_;
 		bool ret;
@@ -1786,7 +1832,7 @@ protected:
 		EbwtSearchParams<String<Dna> >*params = (r.mate1 ? paramsSe1_ : paramsSe2_);
 		assert(!(r.mate1 ? doneSe1_ : doneSe2_));
 		params->setFw(r.fw);
-		ReadBuf* buf = r.mate1 ? bufa_ : bufb_;
+		Read* buf = r.mate1 ? bufa_ : bufb_;
 		bool ebwtFw = r.ebwt->fw();
 		uint32_t len = r.mate1 ? alen_ : blen_;
 		assert_eq(buf->color, color);

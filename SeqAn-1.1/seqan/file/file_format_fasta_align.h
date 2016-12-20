@@ -134,9 +134,6 @@ SEQAN_CHECKPOINT
 	TSize numRows=length(beg_end_length) / 3;
 	resize(rows(align), numRows);	//rows
 		
-	typedef Align<TSource, TSpec> TAlign;
-	typedef typename Row<TAlign>::Type TRow;
-	
 	for(TSize i=0;i<numRows;++i) {
 		TSize begin = beg_end_length[i*3];
 //		TSize end = beg_end_length[i*3+1];
@@ -249,7 +246,6 @@ void _write_impl(TFile& file, Align<TSource, TSpec>& align, TStringContainer& id
 	typedef Align<TSource, TSpec> const TAlign;
 	typedef typename Row<TAlign>::Type TRow;
 	typedef typename Position<typename Rows<TAlign>::Type>::Type TRowsPosition;
-	typedef typename Position<TAlign>::Type TPosition;
 	TRowsPosition row_count = length(rows(align));
 
 	for(TRowsPosition i=0;i<row_count;++i) {

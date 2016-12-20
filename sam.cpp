@@ -151,6 +151,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	const FixedBitset<1024> *mms = &h.mms;
 	ASSERT_ONLY(const String<Dna5>* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
+#if 0
 	if(h.color && false) {
 		// Disabled: print MD:Z string w/r/t to colors, not letters
 		mms = &h.cmms;
@@ -159,6 +160,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 		len = length(h.colSeq);
 		refcs = &h.crefcs;
 	}
+#endif
 	if(h.fw) {
 		for (int i = 0; i < (int)len; ++ i) {
 			if(mms->test(i)) {
@@ -223,9 +225,8 @@ void SAMHitSink::reportSamHit(const Hit& h, int mapq, int xms) {
 	ostringstream ss;
 	append(ss, h, mapq, xms);
 	// Make sure to grab lock before writing to output stream
-	lock(h.h.first);
+	ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
 	out(h.h.first).writeString(ss.str());
-	unlock(h.h.first);
 }
 
 /**
@@ -241,21 +242,20 @@ void SAMHitSink::reportSamHits(
 	assert_geq(end, start);
 	if(end-start == 0) return;
 	assert_gt(hs[start].mate, 0);
-	char buf[4096];
-	lock(0);
-	for(size_t i = start; i < end; i++) {
-		ostringstream ss(ssmode_);
-		ss.rdbuf()->pubsetbuf(buf, 4096);
-		append(ss, hs[i], mapq, xms);
-		out(0).writeChars(buf, ss.tellp());
+	string buf(4096, (char) 0);
+	ostringstream ss(buf, ssmode_);
+	{
+		ThreadSafe _ts(_locks[0]);
+		for(size_t i = start; i < end; i++) {
+			append(ss, hs[i], mapq, xms);
+			out(0).writeChars(ss.str().c_str(), ss.tellp());
+		}
 	}
-	unlock(0);
-	mainlock();
+	ThreadSafe ts(&main_mutex_m);
 	commitHits(hs);
 	first_ = false;
 	numAligned_++;
 	numReportedPaired_ += (end-start);
-	mainunlock();
 }
 
 /**
@@ -331,9 +331,8 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 		}
 		ss << endl;
 	}
-	lock(0);
+	ThreadSafe _ts(_locks[0]);
 	out(0).writeString(ss.str());
-	unlock(0);
 }
 
 /**

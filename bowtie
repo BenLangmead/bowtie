@@ -19,57 +19,73 @@
  along with Bowtie.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-
 import os
-import imp
-import inspect
 import logging
-
-
+import argparse
 
 def main():
+    parser = argparse.ArgumentParser()
+
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-b', '--build', action='store_true')
+    group.add_argument('-i', '--inspect', action='store_true')
+
+    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--large-index', action='store_true')
+    parser.add_argument('--index', type=str)
+
+    # parse the args specific to the wrapper script
+    # all other args will be passed verbatim to bowtie
+    args, bowtie_args = parser.parse_known_args()
+
+    action = 'align'
+    if args.inspect:
+        action = 'inspect'
+    elif args.build:
+        action = 'build'
+
     logging.basicConfig(level=logging.ERROR,
                         format='%(levelname)s: %(message)s'
                         )
-    bin_name            = "bowtie"
-    bin_s               = "bowtie-align-s"
-    bin_l               = "bowtie-align-l"
+    bin_name            = 'bowtie' + '-' + action
+    bin_s               = 'bowtie-%s-s' % action
+    bin_l               = 'bowtie-%s-l' % action
     idx_ext_l           = '.1.ebwtl' 
     idx_ext_s           = '.1.ebwt' 
-    curr_script         = os.path.realpath(inspect.getsourcefile(main))
-    ex_path             = os.path.dirname(curr_script)
-    bin_spec            = os.path.join(ex_path,bin_s)
-    bld                 = imp.load_source('bowtie-build', os.path.join(ex_path, 'bowtie-build'))
-    options,arguments   = bld.build_args()
+    ex_path             = os.path.dirname(__file__)
+    bin_spec            = os.path.join(ex_path, bin_s)
 
-    if '--verbose' in options:
+    if args.verbose:
         logging.getLogger().setLevel(logging.INFO)
-        
-    if '--debug' in options:
-        bin_spec += '-debug'
-        bin_l += '-debug'
-        
-    if '--large-index' in options:
-        bin_spec = os.path.join(ex_path, bin_l)
-    elif len(arguments) >= 2:
-        idx_basename = arguments[-2]
-        large_idx_exists = os.path.exists(idx_basename + idx_ext_l)
-        small_idx_exists = os.path.exists(idx_basename + idx_ext_s)
-        if large_idx_exists and not small_idx_exists:
-            logging.info("No small index but a large one is present. Using large index.")
-            bin_spec = os.path.join(ex_path,bin_l)
     
-    arguments[0] = bin_name
-    arguments.insert(1, 'basic-0')
-    arguments.insert(1, '--wrapper')
-    logging.info('Command: %s %s' %  (bin_spec,' '.join(arguments[1:])))
-    os.execv(bin_spec, arguments)        
-        
-        
+    if args.large_index:
+        bin_spec = os.path.join(ex_path, bin_l)
+
+    if args.index:
+        if args.build:
+            delta = 200
+            small_index_max_size = 4 * 1024 ** 3 - delta
+            tot_size = sum([os.stat(fn).st_size
+                            for fn in args.index.split(',')
+                            if os.path.exists(fn)])
+
+            if tot_size > small_index_max_size:
+                bin_spec = os.path.join(ex_path, bin_l)
+        else:
+            if os.path.exists(args.index + idx_ext_l):
+                bin_spec = os.path.join(ex_path, bin_l)
+        bowtie_args.insert(0, args.index)
+
+    if args.debug:
+        bin_spec += '-debug'
+
+    bowtie_args.insert(0, bin_name)
+    bowtie_args.insert(1, 'basic-0')
+    bowtie_args.insert(1, '--wrapper')
+
+    logging.info('Command: %s %s' %  (bin_spec,' '.join(bowtie_args[1:])))
+    os.execv(bin_spec, bowtie_args)
+
 if __name__ == "__main__":
     main()
-
-
-
-
-

@@ -525,10 +525,10 @@ public:
 		uint64_t off = 0;
 		int64_t offset = 4;
 		bool firstStretch = true;
-	        bool binarySearched = false;
-	        uint64_t left  = reci;
-	        uint64_t right = recf;
-	        uint64_t mid   = 0;
+		ASSERT_ONLY(bool binarySearched = false);
+		uint64_t left  = reci;
+		uint64_t right = recf;
+		uint64_t mid   = 0;
 		// For all records pertaining to the target reference sequence...
 		for(uint64_t i = reci; i < recf; i++) {
 			uint64_t origBufOff = bufOff;
@@ -547,7 +547,7 @@ public:
 			origBufOff = bufOff;
 			i = left;
 			assert(cumRefOff_[i+1] == 0 || cumRefOff_[i+1] > toff);
-			binarySearched = true;
+			ASSERT_ONLY(binarySearched = true);
 		}
 		off += recs_[i].off; // skip Ns at beginning of stretch
 		assert_gt(count, 0);
