@@ -510,6 +510,7 @@ static void printUsage(ostream& out) {
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
 	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 64)" << endl
+        << " --reads-per-batch   # of reads to read from input file at once
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl

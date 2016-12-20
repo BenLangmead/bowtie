@@ -931,6 +931,12 @@ you receive an error message saying that chunk memory has been
 exhausted in `--best` mode, try adjusting this parameter up to
 dedicate more memory to the descriptors.  Default: 64.
 
+	--reads-per-batch <int>
+
+Part of bowtie's batch parsing and used to specify the number of
+reads that bowtie will consume from the input file at once. Default:
+16
+
     Reporting
 
     -k <int>
