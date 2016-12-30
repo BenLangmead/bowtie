@@ -18,6 +18,7 @@
 #include "alphabet.h"
 #include "timer.h"
 #include "auto_array.h"
+#include "word_io.h"
 
 using namespace std;
 using namespace seqan;
@@ -70,23 +71,7 @@ public:
 	/**
 	 * Get the next suffix; compute the next bucket if necessary.
 	 */
-	TIndexOffU nextSuffix() {
-		if(_itrPushedBackSuffix != OFF_MASK) {
-			TIndexOffU tmp = _itrPushedBackSuffix;
-			_itrPushedBackSuffix = OFF_MASK;
-			return tmp;
-		}
-		while(_itrBucketPos >= length(_itrBucket) ||
-		      length(_itrBucket) == 0)
-		{
-			if(!hasMoreBlocks()) {
-				throw out_of_range("No more suffixes");
-			}
-			nextBlock();
-			_itrBucketPos = 0;
-		}
-		return _itrBucket[_itrBucketPos++];
-	}
+	virtual TIndexOffU nextSuffix() = 0;
 
 	/**
 	 * Return true iff the next call to nextSuffix will succeed.
@@ -142,7 +127,7 @@ protected:
 	 * Grab the next block of sorted suffixes.  The block is guaranteed
 	 * to have at most _bucketSz elements.
 	 */
-	virtual void nextBlock() = 0;
+	virtual void nextBlock(int cur_block, int tid = 0) = 0;
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const = 0;
 	/// Optionally output a verbose message
@@ -195,7 +180,7 @@ public:
 	                      uint32_t __dcV,
 	                      uint32_t __seed = 0,
 	      	              bool __sanityCheck = false,
-	   	                  bool __passMemExc = false,
+	   	              bool __passMemExc = false,
 	      	              bool __verbose = false,
 	      	              ostream& __logger = cout) :
 	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
