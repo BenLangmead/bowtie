@@ -25,7 +25,7 @@
   <div id="main">
   	<!--#include virtual="rhsidebar.ssi" -->
     <div id="leftside">
-      <h2>Recent news</h2>
+      <!--<h2>Recent news</h2>-->
       <!--#include virtual="recent_news.ssi" -->
       <br/>
       <a href="news.shtml#old">Older news</a>
