@@ -1,4 +1,4 @@
-#ifndef MULTIKEY_QSORT_H_
+ #ifndef MULTIKEY_QSORT_H_
 #define MULTIKEY_QSORT_H_
 
 #include <iostream>
@@ -474,13 +474,12 @@ void mkeyQSortSuf(
 	if(sanityCheck) sanityCheckOrderedSufs(host, hlen, s, slen, upto);
 }
 
-/**
- * Just like mkeyQSortSuf but all swaps are applied to s2 as well as s.
- * This is a helpful variant if, for example, the caller would like to
- * see how their input was permuted by the sort routine (in that case,
- * the caller would let s2 be an array s2[] where s2 is the same length
- * as s and s2[i] = i).
- */
+struct QSortRange {
+  size_t begin;
+  size_t end;
+  size_t depth;
+};
+
 template<typename T>
 void mkeyQSortSuf2(
 	const T& host,
@@ -492,7 +491,8 @@ void mkeyQSortSuf2(
 	size_t begin,
 	size_t end,
 	size_t depth,
-	size_t upto = OFF_MASK)
+	size_t upto = OFF_MASK,
+	EList<size_t>* boundaries = NULL)
 {
 	// Helper for making the recursive call; sanity-checks arguments to
 	// make sure that the problem actually got smaller.
