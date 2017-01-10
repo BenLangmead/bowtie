@@ -234,7 +234,7 @@ public:
 	      cerr << "Could not open file for writing a reference graph: \"" << fname << "\"" << endl;
 	      throw 1;
             }
-            const EList<TIndexOffU>& bucket = sa->_itrBuckets[tid];
+            const std::vector<TIndexOffU>& bucket = sa->_itrBuckets[tid];
             writeU<TIndexOffU>(sa_file, (TIndexOffU)bucket.size(), sa->_bigEndian);
             for(size_t i = 0; i < bucket.size(); i++) {
 	      writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
@@ -404,10 +404,10 @@ private:
 	MUTEX_T                 _mutex;       /// synchronization of output message
 	string                  _base_fname;  /// base file name for storing SA blocks
 	bool                    _bigEndian;   /// bigEndian?
-	EList<tthread::thread*> _threads;     /// thread list
-	EList<pair<KarkkainenBlockwiseSA*, int> > _tparams;
-	ELList<TIndexOffU>      _itrBuckets;  /// buckets
-	EList<bool>             _done;        /// is a block processed?
+	std::vector<tthread::thread*> _threads;     /// thread list
+	std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
+	std::vector<TIndexOffU>      _itrBuckets;  /// buckets
+	std::vector<bool>             _done;        /// is a block processed?
 };
 
 /**
@@ -470,9 +470,9 @@ void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<TIndexOffU>& b
 template<typename TStr>
 struct BinarySortingParam {
   const TStr*              t;
-  const EList<TIndexOffU>* sampleSuffs;
-  EList<TIndexOffU>        bucketSzs;
-  EList<TIndexOffU>        bucketReps;
+  const std::vector<TIndexOffU>* sampleSuffs;
+  std::vector<TIndexOffU>        bucketSzs;
+  std::vector<TIndexOffU>        bucketReps;
   size_t                   begin;
   size_t                   end;
 };
@@ -483,9 +483,9 @@ static void BinarySorting_worker(void *vp)
   BinarySortingParam<TStr>* param = (BinarySortingParam<TStr>*)vp;
   const TStr& t = *(param->t);
   size_t len = t.length();
-  const EList<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
-  EList<TIndexOffU>& bucketSzs = param->bucketSzs;
-  EList<TIndexOffU>& bucketReps = param->bucketReps;
+  const std::vector<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
+  std::vector<TIndexOffU>& bucketSzs = param->bucketSzs;
+  std::vector<TIndexOffU>& bucketReps = param->bucketReps;
   ASSERT_ONLY(size_t numBuckets = bucketSzs.size());
   size_t begin = param->begin;
   size_t end = param->end;
@@ -589,7 +589,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
   while(--limit >= 0) {
     TIndexOffU numBuckets = (TIndexOffU)_sampleSuffs.size()+1;
     AutoArray<tthread::thread*> threads(this->_nthreads);
-    EList<BinarySortingParam<TStr> > tparams;
+    std::vector<BinarySortingParam<TStr> > tparams;
     for(int tid = 0; tid < this->_nthreads; tid++) {
       // Calculate bucket sizes by doing a binary search for each
       // suffix and noting where it lands
@@ -628,8 +628,8 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
       }
     }
         
-    EList<TIndexOffU>& bucketSzs = tparams[0].bucketSzs;
-    EList<TIndexOffU>& bucketReps = tparams[0].bucketReps;
+    std::vector<TIndexOffU>& bucketSzs = tparams[0].bucketSzs;
+    std::vector<TIndexOffU>& bucketReps = tparams[0].bucketReps;
     for(int tid = 1; tid < this->_nthreads; tid++) {
       for(size_t j = 0; j < numBuckets; j++) {
 	bucketSzs[j] += tparams[tid].bucketSzs[j];
@@ -899,7 +899,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
     assert_lt(tid, this->_itrBuckets.size());
   }
 #endif
-  EList<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);
+  std::vector<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);
   {
     ThreadSafe ts(&_mutex, this->_nthreads > 1);
     VMSG_NL("Getting block " << (cur_block+1) << " of " << _sampleSuffs.size()+1);
@@ -962,7 +962,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
     // Select upper and lower bounds from _sampleSuffs[] and
     // calculate the Z array up to the difference-cover periodicity
     // for both.  Be careful about first/last buckets.
-    EList<TIndexOffU> zLo(EBWTB_CAT), zHi(EBWTB_CAT);
+    std::vector<TIndexOffU> zLo(EBWTB_CAT), zHi(EBWTB_CAT);
     assert_geq(cur_block, 0);
     assert_leq((size_t)cur_block, _sampleSuffs.size());
     bool first = (cur_block == 0);

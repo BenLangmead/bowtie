@@ -488,13 +488,13 @@ void mkeyQSortSuf2(
 	size_t slen,
 	TIndexOffU *s2,
 	int hi,
-	size_t begin,
-	size_t end,
-	size_t depth,
+	size_t _begin,
+	size_t _end,
+	size_t _depth,
 	size_t upto = OFF_MASK,
-	EList<size_t>* boundaries = NULL)
+	std::vector<size_t>* boundaries = NULL) 
 {
-  ELList<QSortRange, 3, 1024> block_list;
+  std::vector<QSortRange> block_list(3, 1024); //NOTE: CHANGED WITH UNKNOWN EFFECT
   while(true) {
     size_t begin = 0, end = 0, depth = 0;
     if(block_list.size() == 0) {
@@ -612,7 +612,7 @@ void mkeyQSortSuf2(
 	bool verbose = false,
 	bool sanityCheck = false,
 	size_t upto = OFF_MASK,
-	EList<size_t>* boundaries = NULL)
+	std::vector<size_t>* boundaries = NULL)
 {
 	size_t hlen = length(host);
 	if(sanityCheck) sanityCheckInputSufs(s, slen);

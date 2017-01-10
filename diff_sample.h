@@ -766,7 +766,7 @@ struct VSortingParam {
   size_t                       sPrimeSz;
   TIndexOffU*                  sPrimeOrderArr;
   size_t                       depth;
-  const EList<size_t>*         boundaries;
+  const std::vector<size_t>*         boundaries;
   size_t*                      cur;
   MUTEX_T*                     mutex;
 };
@@ -866,7 +866,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    query_depth++;
 			    tmp_nthreads >>= 1;
 			  }
-			  EList<size_t> boundaries; // bucket boundaries for parallelization
+			  std::vector<size_t> boundaries; // bucket boundaries for parallelization
 			  TIndexOffU *sOrig = NULL;
 			  if(this->sanityCheck()) {
 			    sOrig = new TIndexOffU[sPrimeSz];
@@ -876,7 +876,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					this->verbose(), false, query_depth, &boundaries);
 			  if(boundaries.size() > 0) {
 			    AutoArray<tthread::thread*> threads(nthreads);
-			    EList<VSortingParam<TStr> > tparams;
+			    std::vector<VSortingParam<TStr> > tparams;
 			    size_t cur = 0;
 			    MUTEX_T mutex;
 			    for(int tid = 0; tid < nthreads; tid++) {
