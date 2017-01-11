@@ -20,10 +20,26 @@
 """
 
 import os
+import sys
 import logging
 import argparse
 
 def main():
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg.startswith('-'):
+            continue
+        if arg.lower().endswith(('.gz', '.Z', '.bz', '.bz2')):
+            basename, ext = os.path.splitext(arg.lower())
+            out_file = open(basename, 'wb')
+            if ext in ('.gz', '.z'):
+                import gzip
+                out_file.write(gzip.open(arg, 'rb').read())
+            elif ext in ('.bz2', '.bz'):
+                import bz2
+                out_file.write(bz2.BZ2File(arg).read())
+            out_file.close()
+            sys.argv[i+1] = basename
+
     parser = argparse.ArgumentParser()
 
     group = parser.add_mutually_exclusive_group()
@@ -51,14 +67,14 @@ def main():
     bin_name            = 'bowtie' + '-' + action
     bin_s               = 'bowtie-%s-s' % action
     bin_l               = 'bowtie-%s-l' % action
-    idx_ext_l           = '.1.ebwtl' 
-    idx_ext_s           = '.1.ebwt' 
+    idx_ext_l           = '.1.ebwtl'
+    idx_ext_s           = '.1.ebwt'
     ex_path             = os.path.dirname(__file__)
     bin_spec            = os.path.join(ex_path, bin_s)
 
     if args.verbose:
         logging.getLogger().setLevel(logging.INFO)
-    
+
     if args.large_index:
         bin_spec = os.path.join(ex_path, bin_l)
 
