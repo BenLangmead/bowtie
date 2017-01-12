@@ -494,7 +494,11 @@ void mkeyQSortSuf2(
 	size_t upto = OFF_MASK,
 	std::vector<size_t>* boundaries = NULL) 
 {
-  std::vector<QSortRange> block_list(3, 1024); //NOTE: CHANGED WITH UNKNOWN EFFECT
+  std::vector<std::vector<QSortRange> > block_list;
+  for (int i = 0; i < 3; i++) {
+    std::vector<QSortRange> temp;
+    block_list.push_back(temp);
+  }
   while(true) {
     size_t begin = 0, end = 0, depth = 0;
     if(block_list.size() == 0) {
@@ -506,7 +510,7 @@ void mkeyQSortSuf2(
 	begin = block_list.back()[0].begin;
 	end = block_list.back()[0].end;
 	depth = block_list.back()[0].depth;
-	block_list.back().erase(0);
+	block_list.back().erase(block_list.back().begin());
       } else {
 	block_list.resize(block_list.size() - 1);
 	if(block_list.size() == 0) {
@@ -579,10 +583,12 @@ void mkeyQSortSuf2(
     r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
     assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
     r = b-a; // r <- # of <'s
-    block_list.expand();
+    std::vector<QSortRange> QSRVec;
+    block_list.push_back(QSRVec);
     block_list.back().clear();
     if(r > 0) { // recurse on <'s
-      block_list.back().expand();
+      QSortRange QSR1;
+      block_list.back().push_back(QSR1);
       block_list.back().back().begin = begin;
       block_list.back().back().end = begin + r;
       block_list.back().back().depth = depth;
@@ -590,12 +596,14 @@ void mkeyQSortSuf2(
     // Do not recurse on ='s if the pivot was the off-the-end value;
     // they're already fully sorted
     if(v != hi) { // recurse on ='s
-      block_list.back().expand();
+      QSortRange QSR2;
+      block_list.back().push_back(QSR2);
       block_list.back().back().begin = begin + r;
       block_list.back().back().end = begin + r + (a-begin) + (end-d-1);
       block_list.back().back().depth = depth + 1;
     }
     r = d-c;   // r <- # of >'s exclu
+  }
 }
 
 /**
@@ -993,7 +1001,11 @@ static void bucketSortSufDcU8(
   for(size_t i = 0; i < 4; i++) {
     bkts[i] = new TIndexOffU[4 * 1024 * 1024];
   }
-  ELList<size_t, 5, 1024> block_list;
+  std::vector<std::vector<size_t> > block_list;
+  for (int i = 0; i < 5; i++) {
+    std::vector<size_t> temp;
+    block_list.push_back(temp);
+  }
   while(true) {
     size_t begin = 0, end = 0;
     if(block_list.size() == 0) {
@@ -1053,7 +1065,8 @@ static void bucketSortSufDcU8(
     // This frame is now totally finished with bkts[][], so recursive
     // callees can safely clobber it; we're not done with cnts[], but
     // that's local to the stack frame.
-    block_list.expand();
+    std::vector<size_t> temp;
+    block_list.push_back(temp);
     block_list.back().clear();
     block_list.back().push_back(begin);
     for(size_t i = 0; i < 4; i++) {
