@@ -820,14 +820,14 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	uint32_t v = this->v();
 	assert_gt(v, 2);
 	// Build s'
-	std::vector<TIndexOffU> sPrime;
+	String<TIndexOffU> sPrime;
 	// Need to allocate 2 extra elements at the end of the sPrime and _isaPrime
 	// arrays.  One element that's less than all others, and another that acts
 	// as needed padding for the Larsson-Sadakane sorting code.
 	size_t padding = 1;
 	VMSG_NL("  Building sPrime");
 	buildSPrime(sPrime);
-	size_t sPrimeSz = sPrime.size() - padding;
+	size_t sPrimeSz = length(sPrime) - padding;
 	assert_gt(length(sPrime), 0);
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
 	TIndexOffU nextRank = 0;

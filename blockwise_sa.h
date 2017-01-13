@@ -177,6 +177,7 @@ public:
 
 	KarkkainenBlockwiseSA(const TStr& __text,
 	                      TIndexOffU __bucketSz,
+			      int __nthreads,
 	                      uint32_t __dcV,
 	                      uint32_t __seed = 0,
 	      	              bool __sanityCheck = false,
@@ -252,8 +253,10 @@ public:
 	  // Launch threads if not
 	  if(this->_nthreads > 1) {
             if(_threads.size() == 0) {
-	      _done.resize(_sampleSuffs.size() + 1);
-	      _done.fill(false);
+	      _done.resize(length(_sampleSuffs) + 1);
+	      for(std::vector<bool>::iterator it = _done.begin(); it != _done.end(); it++) {
+		*it = false;
+	      }
 	      _itrBuckets.resize(this->_nthreads);
 	      for(int tid = 0; tid < this->_nthreads; tid++) {
 		_tparams.expand();
@@ -310,7 +313,7 @@ public:
 	}
 
 	/// Defined in blockwise_sa.cpp
-	virtual void nextBlock();
+	virtual void nextBlock(int cur_block, int tid = 0);
 
 	/// Defined in blockwise_sa.cpp
 	virtual void qsort(String<TIndexOffU>& bucket);
@@ -394,7 +397,7 @@ private:
 	void buildSamples();
 
 	String<TIndexOffU> _sampleSuffs; /// sample suffixes
-	int                n_threadss; /// # of threads
+	int                _nthreads; /// # of threads
 	TIndexOffU         _itrBucketIdx;
 	TIndexOffU         _cur;         /// offset to 1st elt of next block
 	const uint32_t   _dcV;         /// difference-cover periodicity
@@ -406,7 +409,7 @@ private:
 	bool                    _bigEndian;   /// bigEndian?
 	std::vector<tthread::thread*> _threads;     /// thread list
 	std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
-	std::vector<TIndexOffU>      _itrBuckets;  /// buckets
+	std::vector<std::vector<TIndexOffU> >     _itrBuckets;  /// buckets
 	std::vector<bool>             _done;        /// is a block processed?
 };
 
@@ -587,7 +590,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
   int limit = 5;
   // Iterate until all buckets are less than
   while(--limit >= 0) {
-    TIndexOffU numBuckets = (TIndexOffU)_sampleSuffs.size()+1;
+    TIndexOffU numBuckets = (TIndexOffU)length(_sampleSuffs)+1;
     AutoArray<tthread::thread*> threads(this->_nthreads);
     std::vector<BinarySortingParam<TStr> > tparams;
     for(int tid = 0; tid < this->_nthreads; tid++) {
