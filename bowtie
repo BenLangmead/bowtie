@@ -28,7 +28,7 @@ def main():
     for i, arg in enumerate(sys.argv[1:]):
         if arg.startswith('-'):
             continue
-        if arg.lower().endswith(('.gz', '.Z', '.bz', '.bz2')):
+        if arg.lower().endswith(('.gz', '.z', '.bz', '.bz2')):
             basename, ext = os.path.splitext(arg.lower())
             out_file = open(basename, 'wb')
             if ext in ('.gz', '.z'):
