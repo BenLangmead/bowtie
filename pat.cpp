@@ -265,9 +265,11 @@ pair<bool, int> CFilePatternSource::nextBatch(
 void CFilePatternSource::open() {
 	if(is_open_) {
 		is_open_ = false;
-		fclose(fp_);
-		fp_ = NULL;
-		if(qfp_ != NULL) {
+		if (fp_ != stdin) {
+			fclose(fp_);
+			fp_ = NULL;
+		}
+		if(qfp_ != NULL && qfp_ != stdin) {
 			fclose(qfp_);
 			qfp_ = NULL;
 		}
