@@ -514,7 +514,7 @@ extern "C" {
 /**
  * main function.  Parses command-line arguments.
  */
-int bowtie_build(int argc, const char **argv) {
+  int bowtie_build(int argc, const char **argv) {
 	try {
 		// Reset all global state, including getopt state
 		opterr = optind = 1;
@@ -664,5 +664,5 @@ int bowtie_build(int argc, const char **argv) {
 		}
 		return e;
 	}
-}
+  }
 }

@@ -887,7 +887,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    for(int tid = 0; tid < nthreads; tid++) {
 			      // Calculate bucket sizes by doing a binary search for each
 			      // suffix and noting where it lands
-			      tparams.expand();
+			      VSortingParam<TStr> temp;
+			      tparams.push_back(temp); // tparams.expand();
 			      tparams.back().dcs = this;
 			      tparams.back().sPrimeArr = sPrimeArr;
 			      tparams.back().sPrimeSz = sPrimeSz;

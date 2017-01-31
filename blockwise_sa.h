@@ -43,6 +43,23 @@ if(this->verbose()) { \
 }
 #endif
 
+//Helpers for vector use
+/**
+template <typename T>
+inline void resizeExact(std::vector<T> &vec, size_t size) {
+  std::vector<T> new_vec;
+  for (int i = 0; i < size; i++) {
+    if (i < vec.size()){
+      new_vec.push_back(vec[i]);
+    } else {
+      T temp;
+      new_vec.push_back(temp);
+    }
+  }
+  vec = new_vec;
+}
+*/
+
 /**
  * Abstract parent class for blockwise suffix-array building schemes.
  */
@@ -92,11 +109,11 @@ public:
 	 * returns the lexicographically-first suffix.
 	 */
 	void resetSuffixItr() {
-		clear(_itrBucket);
-		_itrBucketPos = OFF_MASK;
-		_itrPushedBackSuffix = OFF_MASK;
-		reset();
-		assert(suffixItrIsReset());
+	  _itrBucket.clear();
+	  _itrBucketPos = OFF_MASK;
+	  _itrPushedBackSuffix = OFF_MASK;
+	  reset();
+	  assert(suffixItrIsReset());
 	}
 
 	/**
@@ -143,7 +160,7 @@ protected:
 	const bool       _sanityCheck; /// whether to perform sanity checks
 	const bool       _passMemExc;  /// true -> pass on memory exceptions
 	const bool       _verbose;     /// be talkative
-	String<TIndexOffU> _itrBucket;   /// current bucket
+	std::vector<TIndexOffU> _itrBucket;   /// current bucket
 	TIndexOffU         _itrBucketPos;/// offset into current bucket
 	TIndexOffU         _itrPushedBackSuffix; /// temporary slot for lookahead
 	ostream&         _logger;      /// write log messages here
@@ -259,7 +276,8 @@ public:
 	      }
 	      _itrBuckets.resize(this->_nthreads);
 	      for(int tid = 0; tid < this->_nthreads; tid++) {
-		_tparams.expand();
+		pair<KarkkainenBlockwiseSA*, int> temp;
+		_tparams.push_back(temp);
 		_tparams.back().first = this;
 		_tparams.back().second = tid;
 		_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams.back()));
@@ -299,7 +317,7 @@ public:
 		  throw 1;
                 }
                 size_t numSAs = readU<TIndexOffU>(sa_file, _bigEndian);
-                this->_itrBucket.resizeExact(numSAs);
+                this->_itrBucket.resize(numSAs);
                 for(size_t i = 0; i < numSAs; i++) {
 		  this->_itrBucket[i] = readU<TIndexOffU>(sa_file, _bigEndian);
                 }
@@ -316,7 +334,7 @@ public:
 	virtual void nextBlock(int cur_block, int tid = 0);
 
 	/// Defined in blockwise_sa.cpp
-	virtual void qsort(String<TIndexOffU>& bucket);
+	virtual void qsort(std::vector<TIndexOffU>& bucket);
 
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const {
@@ -357,7 +375,7 @@ private:
 	  assert(_dc == NULL);
 	  if(_dcV != 0) {
 	    _dc = new TDC(this->text(), _dcV, this->verbose(), this->sanityCheck());
-	    _dc->build();
+	    _dc->build(this->_nthreads);
 	  }
 	  // Calculate sample suffixes
 	  if(this->bucketSz() <= length(this->text())) {
@@ -391,12 +409,12 @@ private:
 	                      int64_t& j,
 	                      int64_t& k,
 	                      bool& kSoft,
-	                      const String<TIndexOffU>& z);
+	                      const std::vector<TIndexOffU>& z);
 
 
 	void buildSamples();
 
-	String<TIndexOffU> _sampleSuffs; /// sample suffixes
+	std::vector<TIndexOffU> _sampleSuffs; /// sample suffixes
 	int                _nthreads; /// # of threads
 	TIndexOffU         _itrBucketIdx;
 	TIndexOffU         _cur;         /// offset to 1st elt of next block
@@ -417,11 +435,11 @@ private:
  * Qsort the set of suffixes whose offsets are in 'bucket'.
  */
 template<typename TStr>
-void KarkkainenBlockwiseSA<TStr>::qsort(String<TIndexOffU>& bucket) {
+void KarkkainenBlockwiseSA<TStr>::qsort(std::vector<TIndexOffU>& bucket) {
 	typedef typename Value<TStr>::Type TAlphabet;
 	const TStr& t = this->text();
-	TIndexOffU *s = begin(bucket);
-	TIndexOffU slen = (TIndexOffU)seqan::length(bucket);
+	TIndexOffU *s = bucket.begin();
+	TIndexOffU slen = (TIndexOffU)bucket.size();
 	TIndexOffU len = (TIndexOffU)seqan::length(t);
 	if(_dc != NULL) {
 		// Use the difference cover as a tie-breaker if we have it
@@ -448,10 +466,10 @@ void KarkkainenBlockwiseSA<TStr>::qsort(String<TIndexOffU>& bucket) {
  * packed means that the array cannot be sorted directly.
  */
 template<>
-void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<TIndexOffU>& bucket) {
+void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(std::vector<TIndexOffU>& bucket) {
 	const String<Dna, Packed<> >& t = this->text();
-	TIndexOffU *s = begin(bucket);
-	TIndexOffU slen = (TIndexOffU)seqan::length(bucket);
+	TIndexOffU *s = &bucket.front();
+	TIndexOffU slen = (TIndexOffU) bucket.size();
 	TIndexOffU len = (TIndexOffU)seqan::length(t);
 	if(_dc != NULL) {
 		// Use the difference cover as a tie-breaker if we have it
@@ -485,7 +503,7 @@ static void BinarySorting_worker(void *vp)
 {
   BinarySortingParam<TStr>* param = (BinarySortingParam<TStr>*)vp;
   const TStr& t = *(param->t);
-  size_t len = t.length();
+  size_t len = length(t);
   const std::vector<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
   std::vector<TIndexOffU>& bucketSzs = param->bucketSzs;
   std::vector<TIndexOffU>& bucketReps = param->bucketReps;
@@ -524,12 +542,12 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
   TIndexOffU bsz = this->bucketSz()-1; // subtract 1 to leave room for sample
   size_t len = length(this->text());
   // Prepare _sampleSuffs array
-  clear(_sampleSuffs);
+  _sampleSuffs.clear();
   TIndexOffU numSamples = (TIndexOffU)((len/bsz)+1)<<1; // ~len/bsz x 2
   assert_gt(numSamples, 0);
   VMSG_NL("Reserving space for " << numSamples << " sample suffixes");
   if(this->_passMemExc) {
-    reserve(_sampleSuffs, numSamples, Exact());
+    _sampleSuffs.reserve(numSamples); //Exact() ??
     // Randomly generate samples.  Allow duplicates for now.
     VMSG_NL("Generating random suffixes");
     for(size_t i = 0; i < numSamples; i++) {
@@ -541,7 +559,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
     }
   } else {
     try {
-      reserve(_sampleSuffs, numSamples, Exact());
+      _sampleSuffs.reserve(numSamples); //Exact()??
       // Randomly generate samples.  Allow duplicates for now.
       VMSG_NL("Generating random suffixes");
       for(size_t i = 0; i < numSamples; i++) {
@@ -790,7 +808,7 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(
 	int64_t& j,
 	int64_t& k,
 	bool& kSoft,
-	const String<TIndexOffU>& z)
+	const std::vector<TIndexOffU>& z)
 {
 	const TStr& t = this->text();
 	TIndexOffU len = TIndexOffU(length(t));
@@ -891,15 +909,15 @@ bool KarkkainenBlockwiseSA<TStr>::suffixCmp(
 	}
 }
 
-/**
- * Retrieve the next block.  This is the most performance-critical part
- * of the blockwise suffix sorting process.
- */
+	/**
+	 * Retrieve the next block.  This is the most performance-critical part
+	 * of the blockwise suffix sorting process.
+	 */
 template<typename TStr>
 void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
-  #ifndef NDEBUG
+#ifndef NDEBUG
   if(this->_nthreads > 1) {
-    assert_lt(tid, this->_itrBuckets.size());
+    assert_lt(tid, (int)this->_itrBuckets.size());
   }
 #endif
   std::vector<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);
@@ -909,9 +927,9 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
   }
   assert(_built);
   assert_gt(_dcV, 3);
-  assert_leq(cur_block, _sampleSuffs.size());
+  assert_leq(cur_block, (int)_sampleSuffs.size());
   const TStr& t = this->text();
-  TIndexOffU len = (TIndexOffU)t.length();
+  TIndexOffU len = (TIndexOffU)length(t);
   // Set up the bucket
   bucket.clear();
   TIndexOffU lo = OFF_MASK, hi = OFF_MASK;
@@ -925,7 +943,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
     assert_eq(0, cur_block);
     try {
       if(bucket.capacity() < this->bucketSz()) {
-	bucket.reserveExact(len+1);
+	bucket.reserve(len+1);
       }
       bucket.resize(len);
       for(TIndexOffU i = 0; i < len; i++) {
@@ -950,7 +968,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
       // BTL: Add a +100 fudge factor; there seem to be instances
       // where a bucket ends up having one more elt than bucketSz()
       if(bucket.size() < this->bucketSz()+100) {
-	bucket.reserveExact(this->bucketSz()+100);
+	bucket.reserve(this->bucketSz()+100);
       }
     } catch(bad_alloc &e) {
       if(this->_passMemExc) {
@@ -978,7 +996,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
       }
       if(!last) {
 	// Not the last bucket
-	assert_lt(cur_block, _sampleSuffs.size());
+	assert_lt(cur_block, (int)_sampleSuffs.size());
 	hi = _sampleSuffs[cur_block];
 	zHi.resizeExact(_dcV);
 	zHi.fillZero();
@@ -988,13 +1006,107 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
       if(!first) {
 	// Not the first bucket
 	assert_gt(cur_block, 0);
-	assert_leq(cur_block, _sampleSuffs.size());
+	assert_leq(cur_block, (int)_sampleSuffs.size());
 	lo = _sampleSuffs[cur_block-1];
 	zLo.resizeExact(_dcV);
 	zLo.fillZero();
 	assert_gt(_dcV, 3);
-	assert_eq(zLo[0], 0);
-	calcZ(t, lo, zLo, this->verbose(), this->sanit            
-}
+        assert_eq(zLo[0], 0);
+	calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
+      }
+    } catch(bad_alloc &e) {
+      if(this->_passMemExc) {
+	throw e; // rethrow immediately
+      } else {
+	cerr << "Could not allocate a z-array of " << (_dcV * 4) << " bytes" << endl;
+	cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+	     << "a larger --bmaxdivn" << endl;
+	throw 1;
+      }
+    }
+
+    // This is the most critical loop in the algorithm; this is where
+    // we iterate over all suffixes in the text and pick out those that
+    // fall into the current bucket.
+    //
+    // This loop is based on the SMALLERSUFFIXES function outlined on
+    // p7 of the "Fast BWT" paper
+    //
+    int64_t kHi = -1, kLo = -1;
+    int64_t jHi = -1, jLo = -1;
+    bool kHiSoft = false, kLoSoft = false;
+    assert_eq(0, bucket.size());
+    {
+      // Timer timer(cout, "  Block accumulator loop time: ", this->verbose());
+      {
+	ThreadSafe ts(&_mutex, this->_nthreads > 1);
+	VMSG_NL("  Entering block accumulator loop for bucket " << (cur_block+1) << ":");
+      }
+      TIndexOffU lenDiv10 = (len + 9) / 10;
+      for(TIndexOffU iten = 0, ten = 0; iten < len; iten += lenDiv10, ten++) {
+	TIndexOffU itenNext = iten + lenDiv10;
+	{
+	  ThreadSafe ts(&_mutex, this->_nthreads > 1);
+	  if(ten > 0) VMSG_NL("  bucket " << (cur_block+1) << ": " << (ten * 10) << "%");
+	}
+	for(TIndexOffU i = iten; i < itenNext && i < len; i++) {
+	  assert_lt(jLo, (TIndexOff)i); assert_lt(jHi, (TIndexOff)i);
+	  // Advance the upper-bound comparison by one character
+	  if(i == hi || i == lo) continue; // equal to one of the bookends
+	  if(hi != OFF_MASK && !suffixCmp(hi, i, jHi, kHi, kHiSoft, zHi)) {
+	    continue; // not in the bucket
+	  }
+	  if(lo != OFF_MASK && suffixCmp(lo, i, jLo, kLo, kLoSoft, zLo)) {
+	    continue; // not in the bucket
+	  }
+	  // In the bucket! - add it
+	  assert_lt(i, len);
+	  try {
+	    bucket.push_back(i);
+	  } catch(bad_alloc &e) {
+	    cerr << "Could not append element to block of " << ((bucket.size()) * OFF_SIZE) << " bytes" << endl;
+	    if(this->_passMemExc) {
+	      throw e; // rethrow immediately
+	    } else {
+                            cerr << "Please try using a larger number of blocks by specifying a smaller --bmax or" << endl
+				 << "a larger --bmaxdivn" << endl;
+                            throw 1;
+	    }
+	  }
+	  // Not necessarily true; we allow overflowing buckets
+	  // since we can't guarantee that a good set of sample
+	  // suffixes can be found in a reasonable amount of time
+	  //assert_lt(bucket.size(), this->bucketSz());
+	}
+      } // end loop over all suffixes of t
+      {
+	ThreadSafe ts(&_mutex, this->_nthreads > 1);
+	VMSG_NL("  bucket " << (cur_block+1) << ": 100%");
+      }
+    }
+  } // end else clause of if(_sampleSuffs.size() == 0)
+    // Sort the bucket
+  if(bucket.size() > 0) {
+    Timer timer(cout, "  Sorting block time: ", this->verbose());
+    {
+      ThreadSafe ts(&_mutex, this->_nthreads > 1);
+      VMSG_NL("  Sorting block of length " << bucket.size() << " for bucket " << (cur_block+1));
+    }
+    this->qsort(bucket);
+  }
+  
+  if(hi != OFF_MASK) {
+    // Not the final bucket; throw in the sample on the RHS
+    bucket.push_back(hi);
+  } else {
+    // Final bucket; throw in $ suffix
+    bucket.push_back(len);
+  }
+  {
+    ThreadSafe ts(&_mutex, this->_nthreads > 1);
+    VMSG_NL("Returning block of " << bucket.size() << " for bucket " << (cur_block+1));
+  }
+ }    
+
 
 #endif /*BLOCKWISE_SA_H_*/
