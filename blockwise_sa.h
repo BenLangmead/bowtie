@@ -43,22 +43,7 @@ if(this->verbose()) { \
 }
 #endif
 
-//Helpers for vector use
-/**
-template <typename T>
-inline void resizeExact(std::vector<T> &vec, size_t size) {
-  std::vector<T> new_vec;
-  for (int i = 0; i < size; i++) {
-    if (i < vec.size()){
-      new_vec.push_back(vec[i]);
-    } else {
-      T temp;
-      new_vec.push_back(temp);
-    }
-  }
-  vec = new_vec;
-}
-*/
+#define EBWTB_CAT (int (2))
 
 /**
  * Abstract parent class for blockwise suffix-array building schemes.
@@ -438,7 +423,7 @@ template<typename TStr>
 void KarkkainenBlockwiseSA<TStr>::qsort(std::vector<TIndexOffU>& bucket) {
 	typedef typename Value<TStr>::Type TAlphabet;
 	const TStr& t = this->text();
-	TIndexOffU *s = bucket.begin();
+	TIndexOffU *s = &bucket.front();
 	TIndexOffU slen = (TIndexOffU)bucket.size();
 	TIndexOffU len = (TIndexOffU)seqan::length(t);
 	if(_dc != NULL) {
@@ -552,9 +537,9 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
     VMSG_NL("Generating random suffixes");
     for(size_t i = 0; i < numSamples; i++) {
 #ifdef BOWTIE_64BIT_INDEX
-      appendValue(_sampleSuffs, (TIndexOffU)(_randomSrc.nextU64() % len));
+      _sampleSuffs.push_back((TIndexOffU)(_randomSrc.nextU64() % len));
 #else
-      appendValue(_sampleSuffs, (TIndexOffU)(_randomSrc.nextU32() % len));
+      _sampleSuffs.push_back((TIndexOffU)(_randomSrc.nextU32() % len));
 #endif
     }
   } else {
@@ -564,9 +549,9 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
       VMSG_NL("Generating random suffixes");
       for(size_t i = 0; i < numSamples; i++) {
 #ifdef BOWTIE_64BIT_INDEX
-	appendValue(_sampleSuffs, (TIndexOffU)(_randomSrc.nextU64() % len));
+	_sampleSuffs.push_back((TIndexOffU)(_randomSrc.nextU64() % len));
 #else
-	appendValue(_sampleSuffs, (TIndexOffU)(_randomSrc.nextU32() % len));
+	_sampleSuffs.push_back((TIndexOffU)(_randomSrc.nextU32() % len));
 #endif
       }
     } catch(bad_alloc &e) {
@@ -614,14 +599,19 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
     for(int tid = 0; tid < this->_nthreads; tid++) {
       // Calculate bucket sizes by doing a binary search for each
       // suffix and noting where it lands
-      tparams.expand();
+      //tparams.expand();
+      BinarySortingParam<TStr> temp;
+      tparams.push_back(temp);
       try {
 	// Allocate and initialize containers for holding bucket
 	// sizes and representatives.
-	tparams.back().bucketSzs.resizeExact(numBuckets);
-	tparams.back().bucketReps.resizeExact(numBuckets);
+	tparams.back().bucketSzs.resize(numBuckets);
+	tparams.back().bucketReps.resize(numBuckets);
 	tparams.back().bucketSzs.fillZero();
-	tparams.back().bucketReps.fill(OFF_MASK);
+	//fill(OFF_MASK);
+	for (std::vector<TIndexOffU>::iterator it = tparams.back().bucketReps.begin(); it != tparams.back().bucketReps.end(); it++) {
+	  *it = OFF_MASK;
+	}
       } catch(bad_alloc &e) {
 	if(this->_passMemExc) {
 	  throw e; // rethrow immediately
@@ -695,7 +685,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	  // Add an additional sample from the bucketReps[]
 	  // set accumulated in the binarySASearch loop; this
 	  // effectively splits the bucket
-	  insertValue(_sampleSuffs, TIndexOffU(i + (added++)), bucketReps[i]);
+	  _sampleSuffs.insert(_sampleSuffs.begin() + TIndexOffU(i + (added++)), bucketReps[i]);
 	}
       }
     }
@@ -786,9 +776,9 @@ static TIndexOffU lookupSuffixZ(
 	const T& t,
 	TIndexOffU zOff,
 	TIndexOffU off,
-	const String<TIndexOffU>& z)
+	const std::vector<TIndexOffU>& z)
 {
-	if(zOff < length(z)) {
+        if(zOff < z.size()) {
 		TIndexOffU ret = z[zOff];
 		assert_eq(ret, suffixLcp(t, off + zOff, off));
 		return ret;
@@ -998,7 +988,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 	// Not the last bucket
 	assert_lt(cur_block, (int)_sampleSuffs.size());
 	hi = _sampleSuffs[cur_block];
-	zHi.resizeExact(_dcV);
+	zHi.resize(_dcV);
 	zHi.fillZero();
 	assert_eq(zHi[0], 0);
 	calcZ(t, hi, zHi, this->verbose(), this->sanityCheck());
@@ -1008,7 +998,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 	assert_gt(cur_block, 0);
 	assert_leq(cur_block, (int)_sampleSuffs.size());
 	lo = _sampleSuffs[cur_block-1];
-	zLo.resizeExact(_dcV);
+	zLo.resize(_dcV);
 	zLo.fillZero();
 	assert_gt(_dcV, 3);
         assert_eq(zLo[0], 0);
