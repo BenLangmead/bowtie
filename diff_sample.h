@@ -766,7 +766,7 @@ struct VSortingParam {
   size_t                       sPrimeSz;
   TIndexOffU*                  sPrimeOrderArr;
   size_t                       depth;
-  const EList<size_t>*         boundaries;
+  const std::vector<size_t>*         boundaries;
   size_t*                      cur;
   MUTEX_T*                     mutex;
 };
@@ -823,6 +823,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	String<TIndexOffU> sPrime;
 	VMSG_NL("  Building sPrime");
 	buildSPrime(sPrime);
+	size_t sPrimeSz = length(sPrime) - 1;
 	assert_gt(length(sPrime), 0);
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
 	TIndexOffU nextRank = 0;
@@ -866,7 +867,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    query_depth++;
 			    tmp_nthreads >>= 1;
 			  }
-			  EList<size_t> boundaries; // bucket boundaries for parallelization
+			  std::vector<size_t> boundaries; // bucket boundaries for parallelization
 			  TIndexOffU *sOrig = NULL;
 			  if(this->sanityCheck()) {
 			    sOrig = new TIndexOffU[sPrimeSz];
@@ -876,13 +877,14 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					this->verbose(), false, query_depth, &boundaries);
 			  if(boundaries.size() > 0) {
 			    AutoArray<tthread::thread*> threads(nthreads);
-			    EList<VSortingParam<TStr> > tparams;
+			    std::vector<VSortingParam<TStr> > tparams;
 			    size_t cur = 0;
 			    MUTEX_T mutex;
 			    for(int tid = 0; tid < nthreads; tid++) {
 			      // Calculate bucket sizes by doing a binary search for each
 			      // suffix and noting where it lands
-			      tparams.expand();
+			      VSortingParam<TStr> tmp;
+			      tparams.push_back(tmp);
 			      tparams.back().dcs = this;
 			      tparams.back().sPrimeArr = sPrimeArr;
 			      tparams.back().sPrimeSz = sPrimeSz;
