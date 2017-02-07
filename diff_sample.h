@@ -766,7 +766,7 @@ struct VSortingParam {
   size_t                       sPrimeSz;
   TIndexOffU*                  sPrimeOrderArr;
   size_t                       depth;
-  const std::vector<size_t>*         boundaries;
+  const EList<size_t>*         boundaries;
   size_t*                      cur;
   MUTEX_T*                     mutex;
 };
@@ -777,7 +777,7 @@ static void VSorting_worker(void *vp)
   VSortingParam<TStr>* param = (VSortingParam<TStr>*)vp;
   DifferenceCoverSample<TStr>* dcs = param->dcs;
   const TStr& host = dcs->text();
-  const size_t hlen = length(host);
+  const size_t hlen = host.length();
   uint32_t v = dcs->v();
   while(true) {
     size_t cur = 0;
@@ -821,13 +821,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	assert_gt(v, 2);
 	// Build s'
 	String<TIndexOffU> sPrime;
-	// Need to allocate 2 extra elements at the end of the sPrime and _isaPrime
-	// arrays.  One element that's less than all others, and another that acts
-	// as needed padding for the Larsson-Sadakane sorting code.
-	size_t padding = 1;
 	VMSG_NL("  Building sPrime");
 	buildSPrime(sPrime);
-	size_t sPrimeSz = length(sPrime) - padding;
 	assert_gt(length(sPrime), 0);
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
 	TIndexOffU nextRank = 0;
@@ -871,7 +866,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    query_depth++;
 			    tmp_nthreads >>= 1;
 			  }
-			  std::vector<size_t> boundaries; // bucket boundaries for parallelization
+			  EList<size_t> boundaries; // bucket boundaries for parallelization
 			  TIndexOffU *sOrig = NULL;
 			  if(this->sanityCheck()) {
 			    sOrig = new TIndexOffU[sPrimeSz];
@@ -881,14 +876,13 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					this->verbose(), false, query_depth, &boundaries);
 			  if(boundaries.size() > 0) {
 			    AutoArray<tthread::thread*> threads(nthreads);
-			    std::vector<VSortingParam<TStr> > tparams;
+			    EList<VSortingParam<TStr> > tparams;
 			    size_t cur = 0;
 			    MUTEX_T mutex;
 			    for(int tid = 0; tid < nthreads; tid++) {
 			      // Calculate bucket sizes by doing a binary search for each
 			      // suffix and noting where it lands
-			      VSortingParam<TStr> temp;
-			      tparams.push_back(temp); // tparams.expand();
+			      tparams.expand();
 			      tparams.back().dcs = this;
 			      tparams.back().sPrimeArr = sPrimeArr;
 			      tparams.back().sPrimeSz = sPrimeSz;
@@ -904,7 +898,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    }
 			  }
 			  if(this->sanityCheck()) {
-			    sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
+			    sanityCheckOrderedSufs(t, t.length(), sPrimeArr, sPrimeSz, v);
 			    for(size_t i = 0; i < sPrimeSz; i++) {
 			      assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
 			    }

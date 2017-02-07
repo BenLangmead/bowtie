@@ -150,7 +150,7 @@ static void printUsage(ostream& out) {
 				 << "that you run the wrapper script 'bowtie-build' instead."
 				 << endl << endl;
 		}
-
+		
 }
 
 static const char *short_options = "qraph?nscfl:i:o:t:h:3C";
@@ -666,3 +666,4 @@ extern "C" {
 	}
   }
 }
+

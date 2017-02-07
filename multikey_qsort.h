@@ -488,17 +488,13 @@ void mkeyQSortSuf2(
 	size_t slen,
 	TIndexOffU *s2,
 	int hi,
-	size_t _begin,
-	size_t _end,
-	size_t _depth,
+	size_t begin,
+	size_t end,
+	size_t depth,
 	size_t upto = OFF_MASK,
-	std::vector<size_t>* boundaries = NULL) 
+	EList<size_t>* boundaries = NULL)
 {
-  std::vector<std::vector<QSortRange> > block_list;
-  for (int i = 0; i < 3; i++) {
-    std::vector<QSortRange> temp;
-    block_list.push_back(temp);
-  }
+  ELList<QSortRange, 3, 1024> block_list;
   while(true) {
     size_t begin = 0, end = 0, depth = 0;
     if(block_list.size() == 0) {
@@ -510,7 +506,7 @@ void mkeyQSortSuf2(
 	begin = block_list.back()[0].begin;
 	end = block_list.back()[0].end;
 	depth = block_list.back()[0].depth;
-	block_list.back().erase(block_list.back().begin());
+	block_list.back().erase(0);
       } else {
 	block_list.resize(block_list.size() - 1);
 	if(block_list.size() == 0) {
@@ -583,12 +579,10 @@ void mkeyQSortSuf2(
     r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
     assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
     r = b-a; // r <- # of <'s
-    std::vector<QSortRange> QSRVec;
-    block_list.push_back(QSRVec);
+    block_list.expand();
     block_list.back().clear();
     if(r > 0) { // recurse on <'s
-      QSortRange QSR1;
-      block_list.back().push_back(QSR1);
+      block_list.back().expand();
       block_list.back().back().begin = begin;
       block_list.back().back().end = begin + r;
       block_list.back().back().depth = depth;
@@ -596,15 +590,21 @@ void mkeyQSortSuf2(
     // Do not recurse on ='s if the pivot was the off-the-end value;
     // they're already fully sorted
     if(v != hi) { // recurse on ='s
-      QSortRange QSR2;
-      block_list.back().push_back(QSR2);
+      block_list.back().expand();
       block_list.back().back().begin = begin + r;
       block_list.back().back().end = begin + r + (a-begin) + (end-d-1);
       block_list.back().back().depth = depth + 1;
     }
-    r = d-c;   // r <- # of >'s exclu
+    r = d-c;   // r <- # of >'s excluding those exhausted
+    if(r > 0 && v < hi-1) { // recurse on >'s
+      block_list.back().expand();
+      block_list.back().back().begin = end - r;
+      block_list.back().back().end = end;
+      block_list.back().back().depth = depth;
+    }
   }
 }
+
 
 /**
  * Toplevel function for multikey quicksort over suffixes with double
@@ -620,7 +620,7 @@ void mkeyQSortSuf2(
 	bool verbose = false,
 	bool sanityCheck = false,
 	size_t upto = OFF_MASK,
-	std::vector<size_t>* boundaries = NULL)
+	EList<size_t>* boundaries = NULL)
 {
 	size_t hlen = length(host);
 	if(sanityCheck) sanityCheckInputSufs(s, slen);
@@ -1001,11 +1001,7 @@ static void bucketSortSufDcU8(
   for(size_t i = 0; i < 4; i++) {
     bkts[i] = new TIndexOffU[4 * 1024 * 1024];
   }
-  std::vector<std::vector<size_t> > block_list;
-  for (int i = 0; i < 5; i++) {
-    std::vector<size_t> temp;
-    block_list.push_back(temp);
-  }
+  ELList<size_t, 5, 1024> block_list;
   while(true) {
     size_t begin = 0, end = 0;
     if(block_list.size() == 0) {
@@ -1065,8 +1061,7 @@ static void bucketSortSufDcU8(
     // This frame is now totally finished with bkts[][], so recursive
     // callees can safely clobber it; we're not done with cnts[], but
     // that's local to the stack frame.
-    std::vector<size_t> temp;
-    block_list.push_back(temp);
+    block_list.expand();
     block_list.back().clear();
     block_list.back().push_back(begin);
     for(size_t i = 0; i < 4; i++) {

@@ -10,12 +10,12 @@
 template<typename T>
 void calcZ(const T& s,
 		TIndexOffU off,
-           std::vector<TIndexOffU>& z,
+           String<TIndexOffU>& z,
            bool verbose = false,
            bool sanityCheck = false)
 {
 	size_t lCur = 0, rCur = 0;
-	size_t zlen = z.size();
+	size_t zlen = length(z);
 	size_t slen = length(s);
 	assert_gt(zlen, 0);
 	assert_eq(z[0], 0);
