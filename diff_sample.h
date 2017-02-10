@@ -1,6 +1,11 @@
 #ifndef DIFF_SAMPLE_H_
 #define DIFF_SAMPLE_H_
 
+#ifdef WITH_TBB
+#include <tbb/tbb.h>
+#include <tbb/task_group.h>
+#endif
+
 #include <stdint.h>
 #include <seqan/sequence.h>
 #include <seqan/index.h> // for LarssonSadakane
