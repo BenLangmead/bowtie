@@ -249,7 +249,7 @@ public:
 	      writeU<TIndexOffU>(sa_file, bucket[i], sa->_bigEndian);
             }
             sa_file.close();
-            sa->_itrBuckets[tid].clear();
+            clear(sa->_itrBuckets[tid]);
             sa->_done[cur] = true;
 	  }
 	}
@@ -263,9 +263,10 @@ public:
             if(_threads.size() == 0) {
 	      _done.resize(length(_sampleSuffs) + 1);
 	      fill(_done.begin(), _done.end(), false);
-	      _itrBuckets.resize(this->_nthreads);
+	      resize(_itrBuckets, this->_nthreads);
 	      for(int tid = 0; tid < this->_nthreads; tid++) {
-		_tparams.expand();
+		pair<KarkkainenBlockwiseSA*, int> tmp;
+		_tparams.push_back(tmp);
 		_tparams.back().first = this;
 		_tparams.back().second = tid;
 		_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams.back()));
@@ -305,7 +306,7 @@ public:
 		  throw 1;
                 }
                 size_t numSAs = readU<TIndexOffU>(sa_file, _bigEndian);
-                this->_itrBucket.resizeExact(numSAs);
+                resize(this->_itrBucket, numSAs);
                 for(size_t i = 0; i < numSAs; i++) {
 		  this->_itrBucket[i] = readU<TIndexOffU>(sa_file, _bigEndian);
                 }
@@ -326,7 +327,7 @@ public:
 
 	/// Return true iff more blocks are available
 	virtual bool hasMoreBlocks() const {
-		return this->_itrBuckerIdx <= length(_sampleSuffs);
+		return this->_itrBucketIdx <= length(_sampleSuffs);
 	}
 
 	/// Return the difference-cover period
@@ -363,7 +364,7 @@ private:
 	  assert(_dc == NULL);
 	  if(_dcV != 0) {
 	    _dc = new TDC(this->text(), _dcV, this->verbose(), this->sanityCheck());
-	    _dc->build();
+	    _dc->build(this->_nthreads);
 	  }
 	  // Calculate sample suffixes
 	  if(this->bucketSz() <= length(this->text())) {
@@ -415,7 +416,7 @@ private:
 	bool                    _bigEndian;   /// bigEndian?
 	std::vector<tthread::thread*> _threads;     /// thread list
 	std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
-	std::vector<TIndexOffU>      _itrBuckets;  /// buckets
+	String<String<TIndexOffU> >     _itrBuckets;  /// buckets
 	std::vector<bool>             _done;        /// is a block processed?
 };
 
@@ -479,7 +480,7 @@ void KarkkainenBlockwiseSA<String<Dna, Packed<> > >::qsort(String<TIndexOffU>& b
 template<typename TStr>
 struct BinarySortingParam {
   const TStr*              t;
-  const std::vector<TIndexOffU>* sampleSuffs;
+  const String<TIndexOffU>* sampleSuffs;
   String<TIndexOffU>        bucketSzs;
   String<TIndexOffU>        bucketReps;
   size_t                   begin;
@@ -491,8 +492,8 @@ static void BinarySorting_worker(void *vp)
 {
   BinarySortingParam<TStr>* param = (BinarySortingParam<TStr>*)vp;
   const TStr& t = *(param->t);
-  size_t len = t.length();
-  const std::vector<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
+  size_t len = length(t);
+  const String<TIndexOffU>& sampleSuffs = *(param->sampleSuffs);
   String<TIndexOffU>& bucketSzs = param->bucketSzs;
   String<TIndexOffU>& bucketReps = param->bucketReps;
   ASSERT_ONLY(size_t numBuckets = length(bucketSzs));
@@ -598,18 +599,16 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
   while(--limit >= 0) {
     TIndexOffU numBuckets = (TIndexOffU)length(_sampleSuffs)+1;
     AutoArray<tthread::thread*> threads(this->_nthreads);
-    std::vector<BinarySortingParam<TStr> > tparams;
+    String<BinarySortingParam<TStr> > tparams;
     for(int tid = 0; tid < this->_nthreads; tid++) {
       // Calculate bucket sizes by doing a binary search for each
       // suffix and noting where it lands
-      tparams.expand();
+      resize(tparams, length(tparams) + 1);
       try {
 	// Allocate and initialize containers for holding bucket
 	// sizes and representatives.
-	tparams.back().bucketSzs.resizeExact(numBuckets);
-	tparams.back().bucketReps.resizeExact(numBuckets);
-	tparams.back().bucketSzs.fillZero();
-	tparams.back().bucketReps.fill(OFF_MASK);
+	fill(back(tparams).bucketSzs, numBuckets, 0, Exact());
+	fill(back(tparams).bucketReps, numBuckets, OFF_MASK, Exact());
       } catch(bad_alloc &e) {
 	if(this->_passMemExc) {
 	  throw e; // rethrow immediately
@@ -620,14 +619,14 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	  throw 1;
 	}
       }
-      tparams.back().t = &t;
-      tparams.back().sampleSuffs = &_sampleSuffs;
-      tparams.back().begin = (tid == 0 ? 0 : len / this->_nthreads * tid);
-      tparams.back().end = (tid + 1 == this->_nthreads ? len : len / this->_nthreads * (tid + 1));
+      back(tparams).t = &t;
+      back(tparams).sampleSuffs = &_sampleSuffs;
+      back(tparams).begin = (tid == 0 ? 0 : len / this->_nthreads * tid);
+      back(tparams).end = (tid + 1 == this->_nthreads ? len : len / this->_nthreads * (tid + 1));
       if(this->_nthreads == 1) {
-	BinarySorting_worker<TStr>((void*)&tparams.back());
+	BinarySorting_worker<TStr>((void*)&back(tparams));
       } else {
-	threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&tparams.back());
+	threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&back(tparams));
       }
     }
         
@@ -905,7 +904,7 @@ template<typename TStr>
 void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
   #ifndef NDEBUG
   if(this->_nthreads > 1) {
-    assert_lt(tid, this->_itrBuckets.size());
+    assert_lt(tid, length(this->_itrBuckets));
   }
 #endif
   String<TIndexOffU>& bucket = (this->_nthreads > 1 ? this->_itrBuckets[tid] : this->_itrBucket);

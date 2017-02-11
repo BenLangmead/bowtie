@@ -782,7 +782,7 @@ static void VSorting_worker(void *vp)
   VSortingParam<TStr>* param = (VSortingParam<TStr>*)vp;
   DifferenceCoverSample<TStr>* dcs = param->dcs;
   const TStr& host = dcs->text();
-  const size_t hlen = host.length();
+  const size_t hlen = length(host);
   uint32_t v = dcs->v();
   while(true) {
     size_t cur = 0;
@@ -905,7 +905,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    }
 			  }
 			  if(this->sanityCheck()) {
-			    sanityCheckOrderedSufs(t, t.length(), sPrimeArr, sPrimeSz, v);
+			    sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
 			    for(size_t i = 0; i < sPrimeSz; i++) {
 			      assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
 			    }
