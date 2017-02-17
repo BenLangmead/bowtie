@@ -906,9 +906,8 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    MUTEX_T mutex;
 			    for(int tid = 0; tid < nthreads; tid++) {
 			      // Calculate bucket sizes by doing a binary search for each
-			      // suffix and noting where it lands
-			      VSortingParam<TStr> tmp;
-			      tparams.push_back(tmp);
+			      // suffix and noting where it lands			  
+			      tparams.resize(tparams.size() + 1);
 			      tparams.back().dcs = this;
 			      tparams.back().sPrimeArr = sPrimeArr;
 			      tparams.back().sPrimeSz = sPrimeSz;
@@ -918,11 +917,11 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			      tparams.back().cur = &cur;
 			      tparams.back().mutex = &mutex;
 #ifdef WITH_TBB
-			      tbb_grp.run(VSorting_worker<TStr>(((void*)&tparams[tid])));
+			      tbb_grp.run(VSorting_worker<TStr>(((void*)&(tparams[tid]))));
 			    }
 			    tbb_grp.wait();
 #else
-			      threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams.back());
+			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*) &(tparams.back()));
 			    }
 			    for (int tid = 0; tid < nthreads; tid++) {
 			      threads[tid]->join();

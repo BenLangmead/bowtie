@@ -1036,7 +1036,9 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
     // Select upper and lower bounds from _sampleSuffs[] and
     // calculate the Z array up to the difference-cover periodicity
     // for both.  Be careful about first/last buckets.
-    String<TIndexOffU> zLo(EBWTB_CAT), zHi(EBWTB_CAT);
+
+    //String<TIndexOffU> zLo(EBWTB_CAT), zHi(EBWTB_CAT);
+    String<TIndexOffU> zLo, zHi;
     assert_geq(cur_block, 0);
     assert_leq((size_t)cur_block, length(_sampleSuffs));
     bool first = (cur_block == 0);
@@ -1054,7 +1056,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 	//zHi.resizeExact(_dcV);
 	//zHi.fillZero();
 	fill(zHi, _dcV, 0, Exact());
-	assert_eq(zHi[0], 0);
+	assert_eq(getValue(zHi, 0), 0);
 	calcZ(t, hi, zHi, this->verbose(), this->sanityCheck());
       }
       if(!first) {
@@ -1066,7 +1068,7 @@ void KarkkainenBlockwiseSA<TStr>::nextBlock(int cur_block, int tid) {
 	//zLo.fillZero();
 	fill(zLo, _dcV, 0, Exact());
 	assert_gt(_dcV, 3);
-	assert_eq(zLo[0], 0);
+	assert_eq(getValue(zLo, 0), 0);
 	calcZ(t, lo, zLo, this->verbose(), this->sanityCheck());
       }
     } catch(bad_alloc &e) {
