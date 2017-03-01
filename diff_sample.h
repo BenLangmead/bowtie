@@ -902,26 +902,26 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			    AutoArray<tthread::thread*> threads(nthreads);
 #endif
 			    std::vector<VSortingParam<TStr> > tparams;
+			    tparams.resize(nthreads);
 			    size_t cur = 0;
 			    MUTEX_T mutex;
 			    for(int tid = 0; tid < nthreads; tid++) {
 			      // Calculate bucket sizes by doing a binary search for each
-			      // suffix and noting where it lands			  
-			      tparams.resize(tparams.size() + 1);
-			      tparams.back().dcs = this;
-			      tparams.back().sPrimeArr = sPrimeArr;
-			      tparams.back().sPrimeSz = sPrimeSz;
-			      tparams.back().sPrimeOrderArr = sPrimeOrderArr;
-			      tparams.back().depth = query_depth;
-			      tparams.back().boundaries = &boundaries;
-			      tparams.back().cur = &cur;
-			      tparams.back().mutex = &mutex;
+			      // suffix and noting where it lands			  			      
+			      tparams[tid].dcs = this;
+			      tparams[tid].sPrimeArr = sPrimeArr;
+			      tparams[tid].sPrimeSz = sPrimeSz;
+			      tparams[tid].sPrimeOrderArr = sPrimeOrderArr;
+			      tparams[tid].depth = query_depth;
+			      tparams[tid].boundaries = &boundaries;
+			      tparams[tid].cur = &cur;
+			      tparams[tid].mutex = &mutex;
 #ifdef WITH_TBB
 			      tbb_grp.run(VSorting_worker<TStr>(((void*)&(tparams[tid]))));
 			    }
 			    tbb_grp.wait();
 #else
-			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*) &(tparams.back()));
+			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*) &(tparams[tid]));
 			    }
 			    for (int tid = 0; tid < nthreads; tid++) {
 			      threads[tid]->join();

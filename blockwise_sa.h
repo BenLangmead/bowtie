@@ -291,18 +291,17 @@ public:
 	      _done.resize(length(_sampleSuffs) + 1);
 	      fill(_done.begin(), _done.end(), false);
 	      resize(_itrBuckets, this->_nthreads);
+	      _tparams.resize(this->_nthreads);
 	      for(int tid = 0; tid < this->_nthreads; tid++) {
-		pair<KarkkainenBlockwiseSA*, int> tmp;
-		_tparams.push_back(tmp);
-		_tparams.back().first = this;
-		_tparams.back().second = tid;
+		_tparams[tid].first = this;
+		_tparams[tid].second = tid;
 #ifdef WITH_TBB
 		tbb_grp.run(nextBlock_Worker((void*)&_tparams[tid]));
 	      }
 	      thread_group_started = true;
             }
 #else
-		_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams.back()));
+		_threads.push_back(new tthread::thread(nextBlock_Worker, (void*)&_tparams[tid]));
 	      }
 	      assert_eq(_threads.size(), (size_t)this->_nthreads);
             }
@@ -658,15 +657,15 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
     AutoArray<tthread::thread*> threads(this->_nthreads);
 #endif
     String<BinarySortingParam<TStr> > tparams;
+    resize(tparams, this->_nthreads);
     for(int tid = 0; tid < this->_nthreads; tid++) {
       // Calculate bucket sizes by doing a binary search for each
       // suffix and noting where it lands
-      resize(tparams, length(tparams) + 1);
       try {
 	// Allocate and initialize containers for holding bucket
 	// sizes and representatives.
-	fill(back(tparams).bucketSzs, numBuckets, 0, Exact());
-	fill(back(tparams).bucketReps, numBuckets, OFF_MASK, Exact());
+	fill(tparams[tid].bucketSzs, numBuckets, 0, Exact());
+	fill(tparams[tid].bucketReps, numBuckets, OFF_MASK, Exact());
       } catch(bad_alloc &e) {
 	if(this->_passMemExc) {
 	  throw e; // rethrow immediately
@@ -677,12 +676,12 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 	  throw 1;
 	}
       }
-      back(tparams).t = &t;
-      back(tparams).sampleSuffs = &_sampleSuffs;
-      back(tparams).begin = (tid == 0 ? 0 : len / this->_nthreads * tid);
-      back(tparams).end = (tid + 1 == this->_nthreads ? len : len / this->_nthreads * (tid + 1));
+      tparams[tid].t = &t;
+      tparams[tid].sampleSuffs = &_sampleSuffs;
+      tparams[tid].begin = (tid == 0 ? 0 : len / this->_nthreads * tid);
+      tparams[tid].end = (tid + 1 == this->_nthreads ? len : len / this->_nthreads * (tid + 1));
       if(this->_nthreads == 1) {
-	BinarySorting_worker<TStr>((void*)&back(tparams));
+	BinarySorting_worker<TStr>((void*)&tparams[tid]);
       } else {
 #ifdef WITH_TBB
         tbb_grp.run(BinarySorting_worker<TStr>(((void*)&tparams[tid])));
@@ -690,7 +689,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
     }
     tbb_grp.wait();
 #else
-	threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&back(tparams));
+	threads[tid] = new tthread::thread(BinarySorting_worker<TStr>, (void*)&tparams[tid]);
       }
     }
         
