@@ -421,30 +421,44 @@ public:
 		char buf[4096];
 		ostringstream ss(ssmode_);
 		ss.rdbuf()->pubsetbuf(buf, 4096);
-		size_t i = start;
-		while(i < end) {
-			size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
-			{
-				do {
-					assert(hs[i].repOk());
-					append(ss, hs[i]);
-					{
-						ThreadSafe _ts(_locks[strIdx]);
-						out(hs[i].h.first).writeChars(buf, ss.tellp());
-					}
-					ss.seekp(0);
-					ss.clear();
-					i++;
-				} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);
-			}
+		if(_outs.size() == 1 && end - start == 1) {
+			assert(hs[start].repOk());
+			append(ss, hs[start]);
+			const size_t sz = ss.tellp();
+			ThreadSafe _ts(_locks[0]);
+			out(0).writeChars(buf, sz);
+			//commitHits(hs); // should be removed or fixed to not commit whole vector
+			first_ = false;
+			numAligned_++;
+			if(paired) numReportedPaired_++;
+			else       numReported_ ++;
 		}
-		
-        ThreadSafe _ts(&main_mutex_m);
-		commitHits(hs);
-		first_ = false;
-		numAligned_++;
-		if(paired) numReportedPaired_ += (end-start);
-		else       numReported_ += (end-start);
+		else {
+			size_t i = start;
+			while(i < end) {
+				size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
+				{
+					do {
+						assert(hs[i].repOk());
+						append(ss, hs[i]);
+						{
+							ThreadSafe _ts(_locks[strIdx]);
+							out(hs[i].h.first).writeChars(buf, ss.tellp());
+						}
+						ss.seekp(0);
+						ss.clear();
+						i++;
+					} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);
+				}
+			}
+			
+			ThreadSafe _ts(&main_mutex_m);
+			commitHits(hs);
+			first_ = false;
+			numAligned_++;
+			if(paired) numReportedPaired_ += (end-start);
+			else       numReported_ += (end-start);
+		}
 	}
 
 	void commitHit(const Hit& hit) {
