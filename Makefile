@@ -43,9 +43,12 @@ endif
 MACOS = 0
 ifneq (,$(findstring Darwin,$(shell uname)))
     MACOS = 1
-    MACOS_VER_MAJOR = $(shell uname -r | cut -d. -f1)
-    MACOS_VER_GT_12 = $(shell [ $(MACOS_VER_MAJOR) -gt 12 ] && echo true)
-	ifeq (true, $(MACOS_VER_GT_12))
+	ifneq (,$(findstring 13,$(shell uname -r)))
+		CPP = clang++
+		CC = clang
+		override EXTRA_FLAGS += -stdlib=libstdc++
+	endif
+	ifneq (,$(findstring 14,$(shell uname -r)))
 		CPP = clang++
 		CC = clang
 		override EXTRA_FLAGS += -stdlib=libstdc++
@@ -58,11 +61,11 @@ ifneq (,$(findstring Linux,$(shell uname)))
     override EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
-MM_DEF =
+MM_DEF = 
 ifeq (1,$(BOWTIE_MM))
     MM_DEF = -DBOWTIE_MM
 endif
-SHMEM_DEF =
+SHMEM_DEF = 
 ifeq (1,$(BOWTIE_SHARED_MEM))
     SHMEM_DEF = -DBOWTIE_SHARED_MEM
 endif
@@ -70,13 +73,8 @@ PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
 
-#if we're not using TBB, then we can't use queuing locks
-ifeq (1,$(NO_TBB))
-	NO_QUEUELOCK=1
-endif
-
 ifeq (1,$(MINGW))
-	PTHREAD_LIB =
+	PTHREAD_LIB = 
 	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
     PTHREAD_LIB = -lpthread
@@ -86,8 +84,7 @@ ifeq (1,$(NO_SPINLOCK))
 	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
-#default is to use Intel TBB
-ifneq (1,$(NO_TBB))
+ifeq (1,$(WITH_TBB))
 	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
 	override EXTRA_FLAGS += -DWITH_TBB
 else
@@ -104,13 +101,13 @@ PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
 
-SEARCH_LIBS =
+SEARCH_LIBS = 
 BUILD_LIBS =
-INSPECT_LIBS =
+INSPECT_LIBS = 
 
 ifeq (1,$(MINGW))
-    BUILD_LIBS =
-    INSPECT_LIBS =
+    BUILD_LIBS = 
+    INSPECT_LIBS = 
 endif
 
 ifeq (1,$(WITH_THREAD_PROFILING))
@@ -121,9 +118,7 @@ ifeq (1,$(WITH_AFFINITY))
 	override EXTRA_FLAGS += -DWITH_AFFINITY=1
 endif
 
-#default is to use Intel TBB's queuing lock for better thread scaling performance
-ifneq (1,$(NO_QUEUELOCK))
-	override EXTRA_FLAGS += -DNO_SPINLOCK
+ifeq (1,$(WITH_QUEUELOCK))
 	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
 endif
 
@@ -139,7 +134,7 @@ ifeq (1,$(WITH_COHORTLOCK))
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
 
-ifeq (1,$(NO_TBB))
+ifneq (1,$(WITH_TBB))
 	OTHER_CPPS += tinythread.cpp
 endif
 
@@ -364,7 +359,7 @@ bowtie-inspect-l: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
+bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
@@ -373,7 +368,7 @@ bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
+bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
@@ -389,25 +384,24 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	zip -r tmp.zip $(SRC_PKG_LIST)
 	mv tmp.zip .src.tmp/bowtie-$(VERSION)
 	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .src.tmp ; zip -r $@.zip bowtie-$(VERSION)
-	cp .src.tmp/$@.zip .
+	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)
+	cp .src.tmp/$@ .
 	rm -rf .src.tmp
 
-bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
-	$(eval HAS_TBB=$(shell strings bowtie-align-l* | grep tbb))
-	$(eval PKG_DIR=bowtie-$(VERSION)$(if $(HAS_TBB),,-legacy))
+bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
 	chmod a+x scripts/*.sh scripts/*.pl
 	rm -rf .bin.tmp
-	mkdir -p .bin.tmp/$(PKG_DIR)
+	mkdir .bin.tmp
+	mkdir .bin.tmp/bowtie-$(VERSION)
 	if [ -f bowtie-align-s.exe ] ; then \
 		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
 		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
 	fi
-	mv tmp.zip .bin.tmp/$(PKG_DIR)
-	cd .bin.tmp/$(PKG_DIR) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .bin.tmp ; zip -r $(PKG_DIR).zip $(PKG_DIR)
-	cp .bin.tmp/$(PKG_DIR).zip .
+	mv tmp.zip .bin.tmp/bowtie-$(VERSION)
+	cd .bin.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
+	cp .bin.tmp/$@ .
 	rm -rf .bin.tmp
 
 .PHONY: doc
@@ -450,6 +444,7 @@ perl-deps:
 		cpanm Math::Random Clone Test::Deep ; \
 	fi
 
+
 .PHONY: clean
 clean:
 	rm -f $(BIN_LIST) $(BIN_LIST_AUX) \
@@ -457,4 +452,4 @@ clean:
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
 	rm -f core.*
-	rm -f bowtie-align-s-master* bowtie-align-s-no-io*
+	rm -f bowtie-align-s-master* bowtie-align-s-no-io* 
