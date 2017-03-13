@@ -197,6 +197,11 @@ static inline char comp(char c) {
 
 extern uint8_t dna4Cat[];
 extern uint8_t charToDna5[];
+
+/// Convert an ascii char to a 2-bit base: 0=A, 1=C, 2=G, 3=T, 4=N
+extern uint8_t asc2dna[];
+
+/// Convert an ascii char to a 2-bit base: 0=A, 1=C, 2=G, 3=T, 4=N
 extern uint8_t asc2col[];
 extern uint8_t rcCharToDna5[];
 
@@ -217,6 +222,12 @@ extern uint8_t asc2colcat[];
 /// Convert a 2-bit nucleotide (and 4=N) and a color to the
 /// corresponding 2-bit nucleotide
 extern uint8_t nuccol2nuc[5][5];
+
+/// Convert ambiguous ASCII nuceleotide to mask
+extern uint8_t asc2dnamask[];
+
+/// Convert a 4-bit mask into an IUPAC code
+extern char mask2iupac[16];
 
 /**
  * Return true iff c is an unambiguous Dna character.
@@ -246,7 +257,24 @@ static inline bool isColor(char c) {
 	return asc2colcat[(int)c] > 0;
 }
 
+/// Convert bit encoded DNA char to its complement
+extern int dnacomp[5];
+
+/// String of all DNA and IUPAC characters
+extern const char *iupacs;
+
+/**
+ * Return the reverse complement of a bit-encoded nucleotide.
+ */
+static inline int compDna(int c) {
+	assert_leq(c, 4);
+	return dnacomp[c];
+}
+
 /// Convert a pair of 2-bit (and 4=N) encoded DNA bases to a color
 extern uint8_t dinuc2color[5][5];
+
+/// Map from masks to their reverse-complement masks
+extern int maskcomp[16];
 
 #endif /*ALPHABETS_H_*/
