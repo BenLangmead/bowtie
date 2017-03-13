@@ -4,7 +4,6 @@
 #include <vector>
 #include <stdint.h>
 #include <iostream>
-#include <sstream>
 #include <fstream>
 #include <string>
 #include <stdexcept>
@@ -20,6 +19,7 @@
 #include "edit.h"
 #include "refmap.h"
 #include "annot.h"
+#include "sstring.h"
 
 /**
  * Classes for dealing with reporting alignments.
@@ -142,124 +142,6 @@ public:
 /// Sort by text-id then by text-offset
 bool operator< (const Hit& a, const Hit& b);
 
-/**
- * Table for holding recalibration counts, along the lines of the table
- * presented in the SOAPsnp paper in Genome Res.  Each element maps a
- * read allele (o), quality score (q), cycle (c), and reference allele
- * (H), to a count of how many times that combination is observed in a
- * reported alignment.
- *
- * RecalTable is not synchronized, so it's assumed that threads are
- * incrementing the counters from within critical sections.
- */
-class RecalTable {
-public:
-	RecalTable(int maxCycle,
-	           int maxQual,
-	           int qualShift) : maxCycle_(maxCycle),
-	                            maxQual_(maxQual),
-	                            qualShift_(qualShift),
-	                            shift1_(6 - qualShift_),
-	                            shift2_(shift1_ + 2),
-	                            shift3_(shift2_ + 2),
-	                            ents_(NULL), len_(0)
-	{
-		if(maxCycle == 0) {
-			cerr << "Warning: maximum cycle for recalibration table is 0" << endl;
-		} else if(maxQual >> qualShift == 0) {
-			cerr << "Warning: maximum quality value " << maxQual << ", when shifted, is 0" << endl;
-		} else if(qualShift > 5) {
-			cerr << "Warning: quality shift value " << qualShift << " exceeds ceiling of 5" << endl;
-		} else {
-			try {
-				len_ = maxCycle_ * 4 /* subj alleles*/ * 4 /* ref alleles */ * 64 /* quals */;
-				ents_ = new uint32_t[len_];
-				if(ents_ == NULL) {
-					throw std::bad_alloc();
-				}
-				memset(ents_, 0, len_ << 2);
-			} catch(std::bad_alloc& e) {
-				cerr << "Error allocating recalibration table with " << len_ << " entries" << endl;
-				throw 1;
-			}
-		}
-	}
-
-	~RecalTable() {
-		if(ents_ != NULL) delete[] ents_;
-	}
-
-	/**
-	 * Factor a new alignment into the recalibration table.
-	 */
-	void commitHit(const Hit& h) {
-		// Iterate through the pattern from 5' to 3', calculate the
-		// shifted quality value, obtain the reference character, and
-		// increment the appropriate counter
-		assert(h.repOk());
-		for(int i = 0; i < (int)h.length(); i++) {
-			int ii = i;
-			if(!h.fw) {
-				ii = (int)(h.length() - ii - 1);
-			}
-			int qc = (int)h.patSeq[ii];
-			int rc = qc;
-			if(h.mms.test(i)) {
-				rc = charToDna5[(int)h.refcs[i]];
-				assert_neq(rc, qc);
-			}
-			int q = (int)h.quals[ii]-33;
-			assert_lt(q, 64);
-			q >>= qualShift_;
-			ents_[calcIdx(i, qc, rc, q)]++;
-		}
-	}
-
-	/**
-	 * Print the contents of the recalibration table.
-	 */
-	void print (std::ostream& out) const {
-		if(ents_ == NULL) return;
-		const int lim = maxCycle_;
-		for(int i = 0; i < lim; i++) {
-			out << "t" << i << "\t";
-			// Iterate over subject alleles
-			for(int j = 0; j < 4; j++) {
-				// Iterate over reference alleles
-				for(int k = 0; k < 4; k++) {
-					// Iterate over qualities
-					int lim2 = maxQual_ >> qualShift_;
-					for(int l = 0; l < lim2; l++) {
-						out << ents_[calcIdx(i, j, k, l)] << '\t';
-					}
-				}
-			}
-			out << endl;
-		}
-	}
-
-protected:
-
-	/**
-	 * Calculate index into the ents_ array given cycle, subject
-	 * allele, reference allele, and (shifted) quality.
-	 */
-	int calcIdx(int cyc, int sa, int ra, int q) const {
-		int ret = q | (ra << shift1_) | (sa << shift2_) | (cyc << shift3_);
-		assert_lt(ret, len_);
-		return ret;
-	}
-
-	const int maxCycle_;
-	const int maxQual_;
-	const int qualShift_;
-	const int shift1_;
-	const int shift2_;
-	const int shift3_;
-	uint32_t *ents_;
-	int len_;
-};
-
 #define DECL_HIT_DUMPS \
 	const std::string& dumpAl, \
 	const std::string& dumpUnal, \
@@ -274,7 +156,6 @@ protected:
 	DECL_HIT_DUMPS, \
 	bool onePairFile, \
 	bool sampleMax, \
-	RecalTable *recalTable, \
 	std::vector<std::string>* refnames
 
 #define PASS_HIT_DUMPS \
@@ -286,7 +167,6 @@ protected:
 	PASS_HIT_DUMPS, \
 	onePairFile, \
 	sampleMax, \
-	recalTable, \
 	refnames
 
 /**
@@ -300,11 +180,9 @@ public:
 			DECL_HIT_DUMPS,
 			bool onePairFile,
 			bool sampleMax,
-			RecalTable *table,
 			vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(false),
-		recalTable_(table),
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
@@ -318,8 +196,7 @@ public:
 		numMaxed_(0llu),
 		numReported_(0llu),
 		numReportedPaired_(0llu),
-		quiet_(false),
-		ssmode_(ios_base::out)
+		quiet_(false)
 	{
 		_outs.push_back(out);
 		vector<MUTEX_T*>::iterator it;
@@ -337,18 +214,15 @@ public:
 			DECL_HIT_DUMPS,
 			bool onePairFile,
 			bool sampleMax,
-			RecalTable *table,
 			vector<string>* refnames = NULL) :
 		_outs(),
 		_deleteOuts(true),
-		recalTable_(table),
 		_refnames(refnames),
 		_locks(),
 		INIT_HIT_DUMPS,
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
-		quiet_(false),
-		ssmode_(ios_base::out)
+		quiet_(false)
 	{
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
@@ -370,6 +244,10 @@ public:
 					delete _outs[i];
 					_outs[i] = NULL;
 				}
+				if(_locks[i] != NULL) {
+					delete _locks[i];
+					_locks[i] = NULL;
+				}
 			}
 		}
 		destroyDumps();
@@ -381,6 +259,7 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
+		// TODO: opt for atomic in TBB mode, or possibly all modes
 		ThreadSafe ts(&numWrapper_mutex_m);
 		_numWrappers++;
 	}
@@ -397,19 +276,24 @@ public:
 	/**
 	 * Append a single hit to the given output stream.
 	 */
-	virtual void append(ostream& o, const Hit& h) = 0;
+	virtual void append(BTString& o, const Hit& h) = 0;
 
 	/**
 	 * Report a batch of hits; all in the given vector.
 	 */
-	virtual void reportHits(vector<Hit>& hs) {
-		reportHits(hs, 0, hs.size());
+	virtual void reportHits(BTString& o, vector<Hit>& hs) {
+		reportHits(o, hs, 0, hs.size());
 	}
-	
+
 	/**
 	 * Report a batch of hits from a vector, perhaps subsetting it.
 	 */
-	virtual void reportHits(vector<Hit>& hs, size_t start, size_t end) {
+	virtual void reportHits(
+		BTString& o,
+		vector<Hit>& hs,
+		size_t start,
+		size_t end)
+	{
 		assert_geq(end, start);
 		if(end-start == 0) return;
 		bool paired = hs[start].mate > 0;
@@ -418,60 +302,49 @@ public:
 		if(_outs.size() > 1 && end-start > 2) {
 			sort(hs.begin() + start, hs.begin() + end);
 		}
-		char buf[4096];
-		ostringstream ss(ssmode_);
-		ss.rdbuf()->pubsetbuf(buf, 4096);
 		if(_outs.size() == 1 && end - start == 1) {
+			// 1 output stream, 1 alignment
 			assert(hs[start].repOk());
-			append(ss, hs[start]);
-			const size_t sz = ss.tellp();
-			ThreadSafe _ts(_locks[0]);
-			out(0).writeChars(buf, sz);
-			//commitHits(hs); // should be removed or fixed to not commit whole vector
-			first_ = false;
-			numAligned_++;
-			if(paired) numReportedPaired_++;
-			else       numReported_ ++;
-		}
-		else {
+			append(o, hs[start]);
+			{
+				ThreadSafe _ts(_locks[0]);
+				out(0).writeString(o);
+				first_ = false;
+				numAligned_++;
+				if(paired) {
+					numReportedPaired_++;
+				} else {
+					numReported_++;
+				}
+			}
+			o.clear();
+		} else {
+			// multiple output streams or alignments
 			size_t i = start;
 			while(i < end) {
 				size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
 				{
 					do {
 						assert(hs[i].repOk());
-						append(ss, hs[i]);
+						append(o, hs[i]);
 						{
 							ThreadSafe _ts(_locks[strIdx]);
-							out(hs[i].h.first).writeChars(buf, ss.tellp());
+							out(hs[i].h.first).writeString(o);
 						}
-						ss.seekp(0);
-						ss.clear();
+						o.clear();
 						i++;
 					} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);
 				}
 			}
-			
-			ThreadSafe _ts(&main_mutex_m);
-			commitHits(hs);
-			first_ = false;
-			numAligned_++;
-			if(paired) numReportedPaired_ += (end-start);
-			else       numReported_ += (end-start);
-		}
-	}
-
-	void commitHit(const Hit& hit) {
-		if(recalTable_ != NULL) {
-			recalTable_->commitHit(hit);
-		}
-	}
-
-	void commitHits(const std::vector<Hit>& hits) {
-		if(recalTable_ != NULL) {
-			const size_t sz = hits.size();
-			for(size_t i = 0; i < sz; i++) {
-				commitHit(hits[i]);
+			{
+				ThreadSafe _ts(&main_mutex_m);
+				first_ = false;
+				numAligned_++;
+				if(paired) {
+					numReportedPaired_ += (end-start);
+				} else {
+					numReported_ += (end-start);
+				}
 			}
 		}
 	}
@@ -541,28 +414,29 @@ public:
 				cerr << "reporter:counter:Bowtie,Paired alignments reported," << numReportedPaired_ << endl;
 			}
 		}
-		// Print the recalibration table.
-		if(recalTable_ != NULL) {
-			recalTable_->print(cout);
-		}
 	}
 
-	/// Returns the alignment output stream; if the stream needs to be
-	/// created, create it
+	/**
+	 * Returns alignment output stream, lazily created if needed.
+	 */
 	OutFileBuf& out(size_t refIdx) {
-		size_t strIdx = refIdxToStreamIdx(refIdx);
+		const size_t strIdx = refIdxToStreamIdx(refIdx);
 		if(_outs[strIdx] == NULL) {
 			assert(_deleteOuts);
-			ostringstream oss;
-			oss << "ref";
-			if     (strIdx < 10)    oss << "0000";
-			else if(strIdx < 100)   oss << "000";
-			else if(strIdx < 1000)  oss << "00";
-			else if(strIdx < 10000) oss << "0";
-			oss << strIdx << ".map";
-			_outs[strIdx] = new OutFileBuf(oss.str().c_str(), ssmode_ == ios_base::binary);
+			{
+				ThreadSafe _ts(&main_mutex_m);
+				if(_outs[strIdx] == NULL) { // avoid race
+					ostringstream oss;
+					oss << "ref";
+					if     (strIdx < 10)    oss << "0000";
+					else if(strIdx < 100)   oss << "000";
+					else if(strIdx < 1000)  oss << "00";
+					else if(strIdx < 10000) oss << "0";
+					oss << strIdx << ".map";
+					_outs[strIdx] = new OutFileBuf(oss.str().c_str(), false);
+				}
+			}
 		}
-		assert(_outs[strIdx] != NULL);
 		return *(_outs[strIdx]);
 	}
 
@@ -570,32 +444,26 @@ public:
 	 * Return true iff this HitSink dumps aligned reads to an output
 	 * stream (i.e., iff --alfa or --alfq are specified).
 	 */
-	bool dumpsAlignedReads() {
-		return dumpAlignFlag_;
-	}
+	bool dumpsAlignedReads() const { return dumpAlignFlag_; }
 
 	/**
 	 * Return true iff this HitSink dumps unaligned reads to an output
 	 * stream (i.e., iff --unfa or --unfq are specified).
 	 */
-	bool dumpsUnalignedReads() {
-		return dumpUnalignFlag_;
-	}
+	bool dumpsUnalignedReads() const { return dumpUnalignFlag_; }
 
 	/**
 	 * Return true iff this HitSink dumps maxed-out reads to an output
 	 * stream (i.e., iff --maxfa or --maxfq are specified).
 	 */
-	bool dumpsMaxedReads() {
-		return dumpMaxedFlag_ || dumpUnalignFlag_;
-	}
+	bool dumpsMaxedReads() const { return dumpMaxedFlag_ || dumpUnalignFlag_; }
 
 	/**
 	 * Return true iff this HitSink dumps either unaligned or maxed-
 	 * out reads to an output stream (i.e., iff --unfa, --maxfa,
 	 * --unfq, or --maxfq are specified).
 	 */
-	bool dumpsReads() {
+	bool dumpsReads() const {
 		return dumpAlignFlag_ || dumpUnalignFlag_ || dumpMaxedFlag_;
 	}
 
@@ -765,8 +633,14 @@ public:
 	 * Report a maxed-out read.  Typically we do nothing, but we might
 	 * want to print a placeholder when output is chained.
 	 */
-	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-		ThreadSafe _ts(&main_mutex_m);
+	virtual void reportMaxed(
+		BTString& o,
+		vector<Hit>& hs,
+		PatternSourcePerThread& p,
+		bool lock = true)
+	{
+		// TODO: opt for atomic in TBB mode, or possibly all modes
+		ThreadSafe _ts(&main_mutex_m, lock);
 		numMaxed_++;
 	}
 
@@ -774,22 +648,32 @@ public:
 	 * Report an unaligned read.  Typically we do nothing, but we might
 	 * want to print a placeholder when output is chained.
 	 */
-	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		ThreadSafe _ts(&main_mutex_m);
+	virtual void reportUnaligned(
+		PatternSourcePerThread& p,
+		bool lock = true)
+	{
+		// TODO: opt for atomic in TBB mode, or possibly all modes
+		ThreadSafe _ts(&main_mutex_m, lock);
 		numUnaligned_++;
 	}
 
 protected:
 
 	/// Implementation of hit-report
-	virtual void reportHit(const Hit& h) {
+	virtual void reportHit(
+		BTString& o,
+		const Hit& h,
+		bool lock = true)
+	{
+		// TODO: opt for atomic in TBB mode, or possibly all modes
 		assert(h.repOk());
-		ThreadSafe _ts(&main_mutex_m);
-		commitHit(h);
-		first_ = false;
-		if(h.mate > 0) numReportedPaired_++;
-		else           numReported_++;
-		numAligned_++;
+		{
+			ThreadSafe _ts(&main_mutex_m, lock);
+			first_ = false;
+			if(h.mate > 0) numReportedPaired_++;
+			else           numReported_++;
+			numAligned_++;
+		}
 	}
 
 	/**
@@ -806,10 +690,9 @@ protected:
 
 	vector<OutFileBuf*> _outs;        /// the alignment output stream(s)
 	bool                _deleteOuts;  /// Whether to delete elements of _outs upon exit
-	RecalTable         *recalTable_;  /// recalibration table
 	vector<string>*     _refnames;    /// map from reference indexes to names
 	int                 _numWrappers; /// # threads owning a wrapper for this HitSink
-	vector<MUTEX_T*>     _locks;       /// pthreads mutexes for per-file critical sections
+	vector<MUTEX_T*>    _locks;       /// pthreads mutexes for per-file critical sections
 	MUTEX_T             main_mutex_m;    /// pthreads mutexes for fields of this object
 	MUTEX_T             numWrapper_mutex_m;
 	ThreadSafe*         ts_wrap;      /// for mutual exclusion
@@ -937,7 +820,6 @@ protected:
 	volatile uint64_t numReported_; /// # single-ended alignments reported
 	volatile uint64_t numReportedPaired_; /// # paired-end alignments reported
 	bool quiet_;  /// true -> don't print alignment stats at the end
-	ios_base::openmode ssmode_;     /// output mode for stringstreams
 };
 
 /**
@@ -956,7 +838,7 @@ public:
 		_max(max),
 		_n(n)
 	{
-		_sink.addWrapper();
+		sink.addWrapper();
 		assert_gt(_n, 0);
 	}
 
@@ -986,7 +868,7 @@ public:
 		ret = 0;
 		if(maxed) {
 			// Report that the read maxed-out; useful for chaining output
-			if(dump) _sink.reportMaxed(_bufferedHits, p);
+			if(dump) _sink.reportMaxed(obuf_, _bufferedHits, p);
 			_bufferedHits.clear();
 		} else if(unal) {
 			// Report that the read failed to align; useful for chaining output
@@ -997,7 +879,7 @@ public:
 			if(_bufferedHits.size() > _n) {
 				_bufferedHits.resize(_n);
 			}
-			_sink.reportHits(_bufferedHits);
+			_sink.reportHits(obuf_, _bufferedHits);
 			_sink.dumpAlign(p);
 			ret = (uint32_t)_bufferedHits.size();
 			_bufferedHits.clear();
@@ -1009,9 +891,7 @@ public:
 	virtual uint32_t finishReadImpl() = 0;
 
 	/**
-	 * Implementation for hit reporting; update per-thread _hits and
-	 * _numReportableHits variables and call the master HitSink to do the actual
-	 * reporting
+	 * Add a hit to the internal buffer.  Not yet reporting the hits.
 	 */
 	virtual void bufferHit(const Hit& h, int stratum) {
 #ifndef NDEBUG
@@ -1033,8 +913,7 @@ public:
 		return true;
 	}
 
-	/// Return the number of valid hits so far (not necessarily
-	/// reported).  It's up to the concrete subclasses
+	/// Return the number of valid hits so far.
 	uint64_t numValidHits()    { return _numValidHits; }
 
 	/**
@@ -1132,6 +1011,7 @@ protected:
 	uint32_t hitsForThisRead_; /// # hits for this read so far
 	uint32_t _max; /// don't report any hits if there were > _max
 	uint32_t _n;   /// report at most _n hits
+	BTString obuf_; /// expandable output buffer
 };
 
 /**
@@ -1385,9 +1265,9 @@ class AllHitSinkPerThread : public HitSinkPerThread {
 
 public:
 	AllHitSinkPerThread(
-			HitSink& sink,
-	        uint32_t max) :
-		    HitSinkPerThread(sink, max, 0xffffffff) { }
+		HitSink& sink,
+		uint32_t max) :
+		HitSinkPerThread(sink, max, 0xffffffff) { }
 
 	virtual bool spanStrata() {
 		return true; // we span strata
@@ -1489,24 +1369,31 @@ public:
 	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
-	static void append(ostream& ss, const Hit& h, int offBase, bool reportOpps) {
-		ss << h.patId;
+	static void append(
+		BTString& o,
+		const Hit& h,
+		int offBase,
+		bool reportOpps)
+	{
+		o << h.patId;
 		if(h.mate > 0) {
 			assert(h.mate == 1 || h.mate == 2);
-			ss << '/' << (int)h.mate;
+			o << '/' << (int)h.mate;
 		}
-		ss << (h.fw? "+" : "-") << ":";
+		o << (h.fw? '+' : '-') << ':';
 		// .first is text id, .second is offset
-		ss << "<" << h.h.first << "," << (h.h.second + offBase) << "," << h.mms.count();
-		if(reportOpps) ss << "," << h.oms;
-		ss << ">" << endl;
+		o << '<' << h.h.first << ',' << (h.h.second + offBase) << ',' << h.mms.count();
+		if(reportOpps) {
+			o << ',' << h.oms;
+		}
+		o << '>' << '\n';
 	}
 
 	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
-	void append(ostream& ss, const Hit& h) {
-		ConciseHitSink::append(ss, h, this->offBase_, this->_reportOpps);
+	void append(BTString& o, const Hit& h) {
+		ConciseHitSink::append(o, h, this->offBase_, this->_reportOpps);
 	}
 
 protected:
@@ -1514,13 +1401,18 @@ protected:
 	/**
 	 * Report a concise alignment to the appropriate output stream.
 	 */
-	virtual void reportHit(const Hit& h) {
-		HitSink::reportHit(h);
-		ostringstream ss;
-		append(ss, h);
-		
-		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
-		out(h.h.first).writeString(ss.str());
+	virtual void reportHit(
+		BTString& o,
+		const Hit& h,
+		bool lock = true)
+	{
+		append(o, h);
+		{
+			ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)], lock);
+			HitSink::reportHit(o, h, false);
+			out(h.h.first).writeString(o);
+		}
+		o.clear();
 	}
 
 private:
@@ -1535,15 +1427,15 @@ private:
  * including the first space or tab.  Useful for printing reference
  * names.
  */
-inline void printUptoWs(std::ostream& os, const std::string& str, bool ws) {
+inline void printUptoWs(BTString& o, const std::string& str, bool ws) {
 	if(!ws) {
-		os << str;
+		o << str;
 	} else {
 		size_t pos = str.find_first_of(" \t");
 		if(pos != string::npos) {
-			os << str.substr(0, pos);
+			o << str.substr(0, pos);
 		} else {
-			os << str;
+			o << str;
 		}
 	}
 }
@@ -1607,7 +1499,7 @@ public:
 	{ }
 
 	// In hit.cpp
-	static void append(ostream& ss,
+	static void append(BTString& o,
 	                   const Hit& h,
 	                   const vector<string>* refnames,
 	                   ReferenceMap *rmap,
@@ -1624,8 +1516,8 @@ public:
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(ostream& ss, const Hit& h) {
-		VerboseHitSink::append(ss, h, _refnames, rmap_, amap_,
+	virtual void append(BTString& o, const Hit& h) {
+		VerboseHitSink::append(o, h, _refnames, rmap_, amap_,
 		                       fullRef_, partition_, offBase_,
 		                       colorSeq_, colorQual_, cost_,
 		                       suppress_);
@@ -1634,7 +1526,11 @@ public:
 	/**
 	 * See hit.cpp
 	 */
-	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p);
+	virtual void reportMaxed(
+		BTString& o,
+		vector<Hit>& hs,
+		PatternSourcePerThread& p,
+		bool lock = true);
 
 protected:
 
@@ -1642,22 +1538,33 @@ protected:
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream.
 	 */
-	virtual void reportHit(const Hit& h) {
-		reportHit(h, true);
+	virtual void reportHit(
+		BTString& o,
+		const Hit& h,
+		bool lock = true)
+	{
+		reportHit(o, h, true, lock);
 	}
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream.
 	 */
-	virtual void reportHit(const Hit& h, bool count) {
-		if(count) HitSink::reportHit(h);
-		ostringstream ss;
-		append(ss, h);
-
-		// Make sure to grab lock before writing to output stream
-		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
-		out(h.h.first).writeString(ss.str());
+	virtual void reportHit(
+		BTString& o,
+		const Hit& h,
+		bool count,
+		bool lock = true)
+	{
+		append(o, h);
+		{
+			ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)], lock);
+			if(count) {
+				HitSink::reportHit(o, h, false);
+			}
+			out(h.h.first).writeString(o);
+		}
+		o.clear();
 	}
 
 private:
@@ -1680,8 +1587,7 @@ private:
 class StubHitSink : public HitSink {
 public:
 	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL) { }
-	virtual void append(ostream& o, const Hit& h) { }
+	virtual void append(BTString& o, const Hit& h) { }
 };
 
 #endif /*HIT_H_*/
-

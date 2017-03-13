@@ -71,62 +71,65 @@ public:
 	/**
 	 * Append a SAM alignment to the given output stream.
 	 */
-	static void append(ostream& ss,
-	                   const Hit& h,
-	                   int mapq,
-	                   int xms,
-	                   const vector<string>* refnames,
-	                   ReferenceMap *rmap,
-	                   AnnotationMap *amap,
-	                   bool fullRef,
-	                   bool noQnameTrunc,
-	                   int offBase);
+	static void append(
+		BTString& o,
+		const Hit& h,
+		int mapq,
+		int xms,
+		const vector<string>* refnames,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		bool noQnameTrunc,
+		int offBase);
 
 	/**
 	 * Append a SAM alignment for an aligned read to the given output
 	 * stream.
 	 */
-	static void appendAligned(ostream& ss,
-	                          const Hit& h,
-	                          int mapq,
-	                          int xms,
-	                          const vector<string>* refnames,
-	                          ReferenceMap *rmap,
-	                          AnnotationMap *amap,
-	                          bool fullRef,
-	                          bool noQnameTrunc,
-	                          int offBase);
+	static void appendAligned(
+		BTString& o,
+		const Hit& h,
+		int mapq,
+		int xms,
+		const vector<string>* refnames,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		bool noQnameTrunc,
+		int offBase);
 
 	/**
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(ostream& ss, const Hit& h) {
-		SAMHitSink::append(ss, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
+	virtual void append(BTString& o, const Hit& h) {
+		SAMHitSink::append(o, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
 	}
 
 	/**
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(ostream& ss, const Hit& h, int mapq, int xms) {
-		SAMHitSink::append(ss, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
+		SAMHitSink::append(o, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
 	}
 
 	/**
 	 * Write the SAM header lines.
 	 */
-	void appendHeaders(OutFileBuf& os,
-	                   size_t numRefs,
-	                   const vector<string>& refnames,
-	                   bool color,
-	                   bool nosq,
-	                   ReferenceMap *rmap,
-	                   const TIndexOffU* plen,
-	                   bool fullRef,
-	                   bool noQnameTrunc,
-	                   const char *cmdline,
-	                   const char *rgline);
+	void appendHeaders(
+		OutFileBuf& os,
+		size_t numRefs,
+		const vector<string>& refnames,
+		bool color,
+		bool nosq,
+		ReferenceMap *rmap,
+		const TIndexOffU* plen,
+		bool fullRef,
+		bool noQnameTrunc,
+		const char *cmdline,
+		const char *rgline);
 
 protected:
 
@@ -134,6 +137,7 @@ protected:
 	 *
 	 */
 	void reportUnOrMax(
+		BTString& o,
 		PatternSourcePerThread& p,
 		vector<Hit>* hs,
 		bool un);
@@ -142,8 +146,8 @@ protected:
 	 * Report a verbose, human-readable alignment to the appropriate
 	 * output stream.
 	 */
-	virtual void reportHit(const Hit& h) {
-		reportSamHit(h, defaultMapq_, 0);
+	virtual void reportHit(BTString& o, const Hit& h) {
+		reportSamHit(o, h, defaultMapq_, 0);
 	}
 
 	/**
@@ -151,6 +155,7 @@ protected:
 	 * field.
 	 */
 	virtual void reportSamHit(
+		BTString& o,
 		const Hit& h,
 		int mapq,
 		int xms);
@@ -160,6 +165,7 @@ protected:
 	 * printed together) with the given mapping quality and XM field.
 	 */
 	virtual void reportSamHits(
+		BTString& o,
 		vector<Hit>& hs,
 		size_t start,
 		size_t end,
@@ -169,13 +175,19 @@ protected:
 	/**
 	 * See sam.cpp
 	 */
-	virtual void reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p);
+	virtual void reportMaxed(
+		BTString& o,
+		vector<Hit>& hs,
+		PatternSourcePerThread& p);
 
 	/**
 	 * See sam.cpp
 	 */
-	virtual void reportUnaligned(PatternSourcePerThread& p) {
-		reportUnOrMax(p, NULL, true);
+	virtual void reportUnaligned(
+		BTString& o,
+		PatternSourcePerThread& p)
+	{
+		reportUnOrMax(o, p, NULL, true);
 	}
 
 private:

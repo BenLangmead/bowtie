@@ -29,33 +29,33 @@ void SAMHitSink::appendHeaders(OutFileBuf& os,
                                const char *cmdline,
                                const char *rgline)
 {
-	ostringstream ss;
-	ss << "@HD\tVN:1.0\tSO:unsorted" << endl;
+	BTString o;
+	o << "@HD\tVN:1.0\tSO:unsorted\n";
 	if(!nosq) {
 		for(size_t i = 0; i < numRefs; i++) {
 			// RNAME
-			ss << "@SQ\tSN:";
+			o << "@SQ\tSN:";
 			if(!refnames.empty() && rmap != NULL) {
-				printUptoWs(ss, rmap->getName(i), !fullRef);
+				printUptoWs(o, rmap->getName(i), !fullRef);
 			} else if(i < refnames.size()) {
-				printUptoWs(ss, refnames[i], !fullRef);
+				printUptoWs(o, refnames[i], !fullRef);
 			} else {
-				ss << i;
+				o << i;
 			}
-			ss << "\tLN:" << (plen[i] + (color ? 1 : 0)) << endl;
+			o << "\tLN:" << (plen[i] + (color ? 1 : 0)) << '\n';
 		}
 	}
 	if(rgline != NULL) {
-		ss << "@RG\t" << rgline << endl;
+		o << "@RG\t" << rgline << '\n';
 	}
-	ss << "@PG\tID:Bowtie\tVN:" << BOWTIE_VERSION << "\tCL:\"" << cmdline << "\"" << endl;
-	os.writeString(ss.str());
+	o << "@PG\tID:Bowtie\tVN:" << BOWTIE_VERSION << "\tCL:\"" << cmdline << "\"\n";
+	os.writeString(o);
 }
 
 /**
  * Append a SAM output record for an unaligned read.
  */
-void SAMHitSink::appendAligned(ostream& ss,
+void SAMHitSink::appendAligned(BTString& o,
                                const Hit& h,
                                int mapq,
                                int xms, // value for XM:I field
@@ -71,15 +71,15 @@ void SAMHitSink::appendAligned(ostream& ss,
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(h.patName)-2; i++) {
 			if(!noQnameTrunc && isspace((int)h.patName[i])) break;
-			ss << h.patName[i];
+			o << h.patName[i];
 		}
 	} else {
 		for(int i = 0; i < (int)seqan::length(h.patName); i++) {
 			if(!noQnameTrunc && isspace((int)h.patName[i])) break;
-			ss << h.patName[i];
+			o << h.patName[i];
 		}
 	}
-	ss << '\t';
+	o << '\t';
 	// FLAG
 	int flags = 0;
 	if(h.mate == 1) {
@@ -89,35 +89,35 @@ void SAMHitSink::appendAligned(ostream& ss,
 	}
 	if(!h.fw) flags |= SAM_FLAG_QUERY_STRAND;
 	if(h.mate > 0 && !h.mfw) flags |= SAM_FLAG_MATE_STRAND;
-	ss << flags << "\t";
+	o << flags << "\t";
 	// RNAME
 	if(refnames != NULL && rmap != NULL) {
-		printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
+		printUptoWs(o, rmap->getName(h.h.first), !fullRef);
 	} else if(refnames != NULL && h.h.first < refnames->size()) {
-		printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
+		printUptoWs(o, (*refnames)[h.h.first], !fullRef);
 	} else {
-		ss << h.h.first;
+		o << h.h.first;
 	}
 	// POS
-	ss << '\t' << (h.h.second + 1);
+	o << '\t' << (h.h.second + 1);
 	// MAPQ
-	ss << "\t" << mapq;
+	o << '\t' << mapq;
 	// CIGAR
-	ss << '\t' << h.length() << 'M';
+	o << '\t' << h.length() << 'M';
 	// MRNM
 	if(h.mate > 0) {
-		ss << "\t=";
+		o << "\t=";
 	} else {
-		ss << "\t*";
+		o << "\t*";
 	}
 	// MPOS
 	if(h.mate > 0) {
-		ss << '\t' << (h.mh.second + 1);
+		o << '\t' << (h.mh.second + 1);
 	} else {
-		ss << "\t0";
+		o << "\t0";
 	}
 	// ISIZE
-	ss << '\t';
+	o << '\t';
 	if(h.mate > 0) {
 		assert_eq(h.h.first, h.mh.first);
 		int64_t inslen = 0;
@@ -127,19 +127,25 @@ void SAMHitSink::appendAligned(ostream& ss,
 		} else {
 			inslen = (int64_t)h.mh.second - (int64_t)h.h.second + (int64_t)h.mlen;
 		}
-		ss << inslen;
+		o << inslen;
 	} else {
-		ss << '0';
+		o << '0';
 	}
 	// SEQ
-	ss << '\t' << h.patSeq;
+	o << '\t';
+	for(size_t i = 0; i < seqan::length(h.patSeq); i++) {
+		o << (char)h.patSeq[i];
+	}
 	// QUAL
-	ss << '\t' << h.quals;
+	o << '\t';
+	for(size_t i = 0; i < seqan::length(h.quals); i++) {
+		o << (char)h.quals[i];
+	}
 	//
 	// Optional fields
 	//
 	// Always output stratum
-	ss << "\tXA:i:" << (int)h.stratum;
+	o << "\tXA:i:" << (int)h.stratum;
 	// Always output cost
 	//ss << "\tXC:i:" << (int)h.cost;
 	// Look for SNP annotations falling within the alignment
@@ -147,7 +153,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 	size_t len = length(h.patSeq);
 	int nm = 0;
 	int run = 0;
-	ss << "\tMD:Z:";
+	o << "\tMD:Z:";
 	const FixedBitset<1024> *mms = &h.mms;
 	ASSERT_ONLY(const String<Dna5>* pat = &h.patSeq);
 	const vector<char>* refcs = &h.refcs;
@@ -170,7 +176,7 @@ void SAMHitSink::appendAligned(ostream& ss,
 				char refChar = toupper((*refcs)[i]);
 				ASSERT_ONLY(char qryChar = (h.fw ? (*pat)[i] : (*pat)[len-i-1]));
 				assert_neq(refChar, qryChar);
-				ss << run << refChar;
+				o << run << refChar;
 				run = 0;
 			} else {
 				run++;
@@ -185,74 +191,79 @@ void SAMHitSink::appendAligned(ostream& ss,
 				char refChar = toupper((*refcs)[i]);
 				ASSERT_ONLY(char qryChar = (h.fw ? (*pat)[i] : (*pat)[len-i-1]));
 				assert_neq(refChar, qryChar);
-				ss << run << refChar;
+				o << run << refChar;
 				run = 0;
 			} else {
 				run++;
 			}
 		}
 	}
-	ss << run;
+	o << run;
 	// Add optional edit distance field
-	ss << "\tNM:i:" << nm;
-	if(h.color) ss << "\tCM:i:" << h.cmms.count();
+	o << "\tNM:i:" << nm;
+	if(h.color) {
+		o << "\tCM:i:" << h.cmms.count();
+	}
 	// Add optional fields reporting the primer base and the downstream color,
 	// which, if they were present, were clipped when the read was read in
 	if(h.color && gReportColorPrimer) {
 		if(h.primer != '?') {
-			ss << "\tZP:Z:" << h.primer;
+			o << "\tZP:Z:" << h.primer;
 			assert(isprint(h.primer));
 		}
 		if(h.trimc != '?') {
-			ss << "\tZp:Z:" << h.trimc;
+			o << "\tZp:Z:" << h.trimc;
 			assert(isprint(h.trimc));
 		}
 	}
-	if(xms > 0)  ss << "\tXM:i:" << xms;
-	ss << endl;
+	if(xms > 0) {
+		o << "\tXM:i:" << xms;
+	}
+	o << '\n';
 }
 
 /**
  * Report a verbose, human-readable alignment to the appropriate
  * output stream.
  */
-void SAMHitSink::reportSamHit(const Hit& h, int mapq, int xms) {
-	if(xms == 0) {
-		// Otherwise, this is actually a sampled read and belongs in
-		// the same category as maxed reads
-		HitSink::reportHit(h);
+void SAMHitSink::reportSamHit(BTString& o, const Hit& h, int mapq, int xms) {
+	append(o, h, mapq, xms);
+	{
+		ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
+		if(xms == 0) {
+			// Otherwise, this is actually a sampled read and belongs in
+			// the same category as maxed reads
+			HitSink::reportHit(o, h, false);
+		}
+		out(h.h.first).writeString(o);
 	}
-	ostringstream ss;
-	append(ss, h, mapq, xms);
-	// Make sure to grab lock before writing to output stream
-	ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)]);
-	out(h.h.first).writeString(ss.str());
+	o.clear();
 }
 
 /**
  * Report a batch of hits from a vector, perhaps subsetting it.
  */
 void SAMHitSink::reportSamHits(
+	BTString& o,
 	vector<Hit>& hs,
-    size_t start,
-    size_t end,
-    int mapq,
-    int xms)
+	size_t start,
+	size_t end,
+	int mapq,
+	int xms)
 {
 	assert_geq(end, start);
 	if(end-start == 0) return;
 	assert_gt(hs[start].mate, 0);
 	string buf(4096, (char) 0);
-	ostringstream ss(buf, ssmode_);
+	for(size_t i = start; i < end; i++) {
+		append(o, hs[i], mapq, xms);
+	}
 	{
 		ThreadSafe _ts(_locks[0]);
-		for(size_t i = start; i < end; i++) {
-			append(ss, hs[i], mapq, xms);
-			out(0).writeChars(ss.str().c_str(), ss.tellp());
-		}
+		out(0).writeString(o);
 	}
+	o.clear();
 	ThreadSafe ts(&main_mutex_m);
-	commitHits(hs);
 	first_ = false;
 	numAligned_++;
 	numReportedPaired_ += (end-start);
@@ -263,12 +274,14 @@ void SAMHitSink::reportSamHits(
  * ceiling.  We output placeholders for most of the fields in this
  * case.
  */
-void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
-                               vector<Hit>* hs,
-                               bool un) // lower bound on number of other hits
+void SAMHitSink::reportUnOrMax(
+	BTString& o,
+	PatternSourcePerThread& p,
+	vector<Hit>* hs,
+	bool un)
 {
 	if(un) HitSink::reportUnaligned(p);
-	else   HitSink::reportMaxed(*hs, p);
+	else   HitSink::reportMaxed(o, *hs, p);
 	ostringstream ss;
 	bool paired = !p.bufb().empty();
 	assert(paired || p.bufa().mate == 0);
@@ -338,27 +351,32 @@ void SAMHitSink::reportUnOrMax(PatternSourcePerThread& p,
 /**
  * Append a SAM alignment to the given output stream.
  */
-void SAMHitSink::append(ostream& ss,
-                        const Hit& h,
-                        int mapq,
-                        int xms,
-                        const vector<string>* refnames,
-                        ReferenceMap *rmap,
-                        AnnotationMap *amap,
-                        bool fullRef,
-                        bool noQnameTrunc,
-                        int offBase)
+void SAMHitSink::append(
+	BTString& o,
+	const Hit& h,
+	int mapq,
+	int xms,
+	const vector<string>* refnames,
+	ReferenceMap *rmap,
+	AnnotationMap *amap,
+	bool fullRef,
+	bool noQnameTrunc,
+	int offBase)
 {
-	appendAligned(ss, h, mapq, xms, refnames, rmap, amap, fullRef, noQnameTrunc, offBase);
+	appendAligned(o, h, mapq, xms, refnames, rmap, amap, fullRef, noQnameTrunc, offBase);
 }
 
 /**
  * Report maxed-out read; if sampleMax_ is set, then report 1 alignment
  * at random.
  */
-void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
+void SAMHitSink::reportMaxed(
+	BTString& o,
+	vector<Hit>& hs,
+	PatternSourcePerThread& p)
+{
 	if(sampleMax_) {
-		HitSink::reportMaxed(hs, p);
+		HitSink::reportMaxed(o, hs, p);
 		RandomSource rand;
 		rand.init(p.bufa().seed);
 		assert_gt(hs.size(), 0);
@@ -383,7 +401,7 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				int strat = min(hs[i].stratum, hs[i+1].stratum);
 				if(strat == bestStratum) {
 					if(num == r) {
-						reportSamHits(hs, i, i+2, 0, (int)(hs.size()/2)+1);
+						reportSamHits(o, hs, i, i+2, 0, (int)(hs.size()/2)+1);
 						break;
 					}
 					num++;
@@ -398,9 +416,9 @@ void SAMHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			}
 			assert_leq(num, hs.size());
 			uint32_t r = rand.nextU32() % num;
-			reportSamHit(hs[r], /*MAPQ*/0, /*XM:I*/(int)hs.size()+1);
+			reportSamHit(o, hs[r], /*MAPQ*/0, /*XM:I*/(int)hs.size()+1);
 		}
 	} else {
-		reportUnOrMax(p, &hs, false);
+		reportUnOrMax(o, p, &hs, false);
 	}
 }
