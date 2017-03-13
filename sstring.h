@@ -501,7 +501,7 @@ inline const char * sstr_to_cstr<std::basic_string<char> >(
  */
 template<typename T>
 class SString {
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+
 public:
 
 	explicit SString() :
@@ -519,7 +519,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from another SStringExpandable.
+	 * Create an SString from another SString.
 	 */
 	SString(const SString<T>& o) :
 		cs_(NULL),
@@ -530,7 +530,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from a std::basic_string of the
+	 * Create an SString from a std::basic_string of the
 	 * appropriate type.
 	 */
 	explicit SString(const std::basic_string<T>& str) :
@@ -542,7 +542,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from an array and size.
+	 * Create an SString from an array and size.
 	 */
 	explicit SString(const T* b, size_t sz) :
 		cs_(NULL),
@@ -553,7 +553,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from a zero-terminated array.
+	 * Create an SString from a zero-terminated array.
 	 */
 	explicit SString(const T* b) :
 		cs_(NULL),
@@ -907,7 +907,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from a std::basic_string of the
+	 * Create an S2bDnaString from a std::basic_string of the
 	 * appropriate type.
 	 */
 	explicit S2bDnaString(
@@ -930,7 +930,7 @@ public:
 	}
 
 	/**
-	 * Create an SStringExpandable from an array and size.
+	 * Create an S2bDnaString from an array and size.
 	 */
 	explicit S2bDnaString(
 		const char* b,
@@ -2117,6 +2117,57 @@ protected:
 	size_t len_; // # filled-in elements
 	size_t sz_;  // size capacity of cs_
 };
+
+	
+/**
+ * Use stream operator to append char c.
+ */
+template<typename T, int S, int M, int I>
+SStringExpandable<T, S, M, I>& operator<<(
+	SStringExpandable<T, S, M, I>& o,
+	char c)
+{
+	o.append(c);
+	return o;
+}
+
+/**
+ * Use stream operator to append char c.
+ */
+template<typename T, int S, int M, int I, typename A>
+SStringExpandable<T, S, M, I>& operator<<(
+	SStringExpandable<T, S, M, I>& o,
+	const A& i)
+{
+	char buf[1024];
+	itoa10<A>(static_cast<A>(i), buf);
+	o.append(buf);
+	return o;
+}
+
+/**
+ * Use stream operator to append zero-terminated string.
+ */
+template<typename T, int S, int M, int I>
+SStringExpandable<T, S, M, I>& operator<<(
+	SStringExpandable<T, S, M, I>& o,
+	const char *s)
+{
+	o.append(s);
+	return o;
+}
+
+/**
+ * Use stream operator to append C++ string.
+ */
+template<typename T, int S, int M, int I>
+SStringExpandable<T, S, M, I>& operator<<(
+	SStringExpandable<T, S, M, I>& o,
+	const std::string& s)
+{
+	o.append(s.c_str());
+	return o;
+}
 
 /**
  * Simple string class with in-object storage.
