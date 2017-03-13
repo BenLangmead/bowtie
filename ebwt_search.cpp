@@ -113,10 +113,6 @@ static bool stats; // print performance stats
 static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
 static int chunkSz;    // size of single chunk disbursed by ChunkPool
 static bool chunkVerbose; // have chunk allocator output status messages?
-static bool recal;
-static int recalMaxCycle;
-static int recalMaxQual;
-static int recalQualShift;
 static bool useV1;
 static bool reportSe;
 static const char * refMapFile;  // file containing a map from index coordinates to another coordinate system
@@ -224,10 +220,6 @@ static void resetOptions() {
 	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
 	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
 	chunkVerbose			= false; // have chunk allocator output status messages?
-	recal					= false;
-	recalMaxCycle			= 64;
-	recalMaxQual			= 40;
-	recalQualShift			= 2;
 	useV1					= true;
 	reportSe				= false;
 	refMapFile				= NULL;  // file containing a map from index coordinates to another coordinate system
@@ -313,7 +305,6 @@ enum {
 	ARG_CHUNKMBS,
 	ARG_CHUNKSZ,
 	ARG_CHUNKVERBOSE,
-	ARG_RECAL,
 	ARG_STRATA,
 	ARG_PEV2,
 	ARG_REFMAP,
@@ -420,7 +411,6 @@ static struct option long_options[] = {
 	{(char*)"mm",           no_argument,       0,            ARG_MM},
 	{(char*)"shmem",        no_argument,       0,            ARG_SHMEM},
 	{(char*)"mmsweep",      no_argument,       0,            ARG_MMSWEEP},
-	{(char*)"recal",        no_argument,       0,            ARG_RECAL},
 	{(char*)"pev2",         no_argument,       0,            ARG_PEV2},
 	{(char*)"refmap",       required_argument, 0,            ARG_REFMAP},
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
@@ -455,9 +445,9 @@ static struct option long_options[] = {
  */
 static void printUsage(ostream& out) {
 #ifdef BOWTIE_64BIT_INDEX
-	string tool_name = "bowtie-build-l";
+	string tool_name = "bowtie-align-l";
 #else
-	string tool_name = "bowtie-build-s";
+	string tool_name = "bowtie-align-s";
 #endif
 	if(wrapper == "basic-0") {
 		tool_name = "bowtie";
@@ -809,7 +799,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_USAGE: printUsage(cout); throw 0; break;
 			case 'a': allHits = true; break;
 			case 'y': tryHard = true; break;
-			case ARG_RECAL: recal = true; break;
 			case ARG_CHUNKMBS: chunkPoolMegabytes = parseInt(1, "--chunkmbs arg must be at least 1"); break;
 			case ARG_CHUNKSZ: chunkSz = parseInt(1, "--chunksz arg must be at least 1"); break;
 			case ARG_CHUNKVERBOSE: chunkVerbose = true; break;
@@ -2755,10 +2744,6 @@ static void driver(const char * type,
 		// then instruct the sink to "retain" hits in a vector in
 		// memory so that we can easily sanity check them later on
 		HitSink *sink;
-		RecalTable *table = NULL;
-		if(recal) {
-			table = new RecalTable(recalMaxCycle, recalMaxQual, recalQualShift);
-		}
 		vector<string>* refnames = &ebwt.refnames();
 		if(noRefNames) refnames = NULL;
 		switch(outType) {
@@ -2770,7 +2755,7 @@ static void driver(const char * type,
 							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE, sampleMax,
-							table, refnames, partitionSz);
+							refnames, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase,
@@ -2778,7 +2763,7 @@ static void driver(const char * type,
 							suppressOuts, rmap, amap,
 							fullRef, PASS_DUMP_FILES,
 							format == TAB_MATE, sampleMax,
-							table, refnames, partitionSz);
+							refnames, partitionSz);
 				}
 				break;
 			case OUTPUT_SAM:
@@ -2790,7 +2775,7 @@ static void driver(const char * type,
 							fullRef, samNoQnameTrunc, defaultMapq,
 							PASS_DUMP_FILES,
 							format == TAB_MATE, sampleMax,
-							table, refnames);
+							refnames);
 					if(!samNoHead) {
 						vector<string> refnames;
 						if(!samNoSQ) {
@@ -2813,13 +2798,13 @@ static void driver(const char * type,
 							ebwt.nPat(), offBase,
 							PASS_DUMP_FILES,
 							format == TAB_MATE,  sampleMax,
-							table, refnames, reportOpps);
+							refnames, reportOpps);
 				} else {
 					sink = new ConciseHitSink(
 							fout, offBase,
 							PASS_DUMP_FILES,
 							format == TAB_MATE,  sampleMax,
-							table, refnames, reportOpps);
+							refnames, reportOpps);
 				}
 				break;
 			case OUTPUT_NONE:
