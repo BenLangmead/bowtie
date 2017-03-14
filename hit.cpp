@@ -116,8 +116,6 @@ void VerboseHitSink::append(
 					o << h.h.first;
 				}
 			}
-			// TODO: get rid of ostringstream
-			ostringstream ss2, ss3;
 			// Next component of the key is the partition id
 			if(!dospill) {
 				pdiv = (h.h.second + offBase) / pospart;
@@ -126,7 +124,6 @@ void VerboseHitSink::append(
 			assert_neq(0xffffffff, pdiv);
 			assert_neq(0xffffffff, pmod);
 			if(dospill) assert_gt(spillAmt, 0);
-			ss2 << (pdiv + (dospill ? spillAmt : 0));
 			if(partition > 0 &&
 			   (pmod + h.length()) >= ((uint32_t)pospart * (spillAmt + 1))) {
 				// Spills into the next partition so we need to
@@ -134,33 +131,46 @@ void VerboseHitSink::append(
 				spill = true;
 			}
 			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else o << '\t';
+				if(firstfield) {
+					firstfield = false;
+				} else {
+					o << '\t';
+				}
 				// Print partition id with leading 0s so that Hadoop
 				// can do lexicographical sort (modern Hadoop versions
 				// seen to support numeric)
-				string s2 = ss2.str();
-				size_t partDigits = 1;
-				if(pospart >= 10) partDigits++;
-				if(pospart >= 100) partDigits++;
-				if(pospart >= 1000) partDigits++;
-				if(pospart >= 10000) partDigits++;
-				if(pospart >= 100000) partDigits++;
-				for(size_t i = s2.length(); i < (10-partDigits); i++) {
+				int padding = 10;
+				uint32_t part = (pdiv + (dospill ? spillAmt : 0));
+				uint32_t parttmp = part;
+				while(parttmp > 0) {
+					padding--;
+					parttmp /= 10;
+				}
+				assert_geq(padding, 0);
+				for(int i = 0; i < padding; i++) {
 					o << '0';
 				}
-				o << s2.c_str();
+				o << part;
 			}
 			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else o << '\t';
-				// Print offset with leading 0s
-				ss3 << (h.h.second + offBase);
-				string s3 = ss3.str();
-				for(size_t i = s3.length(); i < 9; i++) {
-					o << "0";
+				if(firstfield) {
+					firstfield = false;
+				} else {
+					o << '\t';
 				}
-				o << s3;
+				// Print offset with leading 0s
+				int padding = 9;
+				uint32_t off = h.h.second + offBase;
+				uint32_t offtmp = off;
+				while(offtmp > 0) {
+					padding--;
+					offtmp /= 10;
+				}
+				assert_geq(padding, 0);
+				for(int i = 0; i < padding; i++) {
+					o << '0';
+				}
+				o << off;
 			}
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;

@@ -426,14 +426,14 @@ public:
 			{
 				ThreadSafe _ts(&main_mutex_m);
 				if(_outs[strIdx] == NULL) { // avoid race
-					ostringstream oss;
-					oss << "ref";
-					if     (strIdx < 10)    oss << "0000";
-					else if(strIdx < 100)   oss << "000";
-					else if(strIdx < 1000)  oss << "00";
-					else if(strIdx < 10000) oss << "0";
-					oss << strIdx << ".map";
-					_outs[strIdx] = new OutFileBuf(oss.str().c_str(), false);
+					BTString o;
+					o << "ref";
+					if     (strIdx < 10)    o << "0000";
+					else if(strIdx < 100)   o << "000";
+					else if(strIdx < 1000)  o << "00";
+					else if(strIdx < 10000) o << "0";
+					o << strIdx << ".map";
+					_outs[strIdx] = new OutFileBuf(o.toZBuf(), false);
 				}
 			}
 		}
@@ -649,6 +649,7 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(
+		BTString& o,
 		PatternSourcePerThread& p,
 		bool lock = true)
 	{
@@ -872,7 +873,7 @@ public:
 			_bufferedHits.clear();
 		} else if(unal) {
 			// Report that the read failed to align; useful for chaining output
-			if(dump) _sink.reportUnaligned(p);
+			if(dump) _sink.reportUnaligned(obuf_, p);
 		} else {
 			// Flush buffered hits
 			assert_gt(_bufferedHits.size(), 0);
