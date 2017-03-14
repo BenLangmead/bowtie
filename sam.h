@@ -140,7 +140,8 @@ protected:
 		BTString& o,
 		PatternSourcePerThread& p,
 		vector<Hit>* hs,
-		bool un);
+		bool un,
+		bool lock = true);
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
@@ -185,9 +186,10 @@ protected:
 	 */
 	virtual void reportUnaligned(
 		BTString& o,
-		PatternSourcePerThread& p)
+		PatternSourcePerThread& p,
+		bool lock = true)
 	{
-		reportUnOrMax(o, p, NULL, true);
+		reportUnOrMax(o, p, NULL, true, lock);
 	}
 
 private:
