@@ -278,11 +278,11 @@ void SAMHitSink::reportUnOrMax(
 	BTString& o,
 	PatternSourcePerThread& p,
 	vector<Hit>* hs,
-	bool un)
+	bool un,
+	bool lock)
 {
-	if(un) HitSink::reportUnaligned(p);
+	if(un) HitSink::reportUnaligned(o, p);
 	else   HitSink::reportMaxed(o, *hs, p);
-	ostringstream ss;
 	bool paired = !p.bufb().empty();
 	assert(paired || p.bufa().mate == 0);
 	assert(!paired || p.bufa().mate > 0);
@@ -294,58 +294,73 @@ void SAMHitSink::reportUnOrMax(
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufa().name)-2; i++) {
 			if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
-			ss << p.bufa().name[i];
+			o << p.bufa().name[i];
 		}
 	} else {
 		for(int i = 0; i < (int)seqan::length(p.bufa().name); i++) {
 			if(!noQnameTrunc_ && isspace((int)p.bufa().name[i])) break;
-			ss << p.bufa().name[i];
+			o << p.bufa().name[i];
 		}
 	}
-	ss << "\t"
-	   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
-	   << "\t0\t0\t*\t*\t0\t0\t"
-	   << p.bufa().patFw << "\t" << p.bufa().qual << "\tXM:i:"
-	   << (paired ? (hssz+1)/2 : hssz);
+	o << '\t'
+	  << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_FIRST_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
+	  << "\t0\t0\t*\t*\t0\t0\t";
+	for(size_t i = 0; i < seqan::length(p.bufa().patFw); i++) {
+		o << (char)p.bufa().patFw[i];
+	}
+	o << '\t';
+	for(size_t i = 0; i < seqan::length(p.bufa().qual); i++) {
+		o << (char)p.bufa().qual[i];
+	}
+	o << "\tXM:i:" << (paired ? (hssz+1)/2 : hssz);
 	// Add optional fields reporting the primer base and the downstream color,
 	// which, if they were present, were clipped when the read was read in
 	if(p.bufa().color && gReportColorPrimer) {
 		if(p.bufa().primer != '?') {
-			ss << "\tZP:Z:" << p.bufa().primer;
+			o << "\tZP:Z:" << p.bufa().primer;
 			assert(isprint(p.bufa().primer));
 		}
 		if(p.bufa().trimc != '?') {
-			ss << "\tZp:Z:" << p.bufa().trimc;
+			o << "\tZp:Z:" << p.bufa().trimc;
 			assert(isprint(p.bufa().trimc));
 		}
 	}
-	ss << endl;
+	o << '\n';
 	if(paired) {
 		// truncate final 2 chars
 		for(int i = 0; i < (int)seqan::length(p.bufb().name)-2; i++) {
-			ss << p.bufb().name[i];
+			o << p.bufb().name[i];
 		}
-		ss << "\t"
-		   << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
-		   << "\t0\t0\t*\t*\t0\t0\t"
-		   << p.bufb().patFw << "\t" << p.bufb().qual << "\tXM:i:"
-		   << (hssz+1)/2;
+		o << '\t'
+		  << (SAM_FLAG_UNMAPPED | (paired ? (SAM_FLAG_PAIRED | SAM_FLAG_SECOND_IN_PAIR | SAM_FLAG_MATE_UNMAPPED) : 0)) << "\t*"
+		  << "\t0\t0\t*\t*\t0\t0\t";
+		for(size_t i = 0; i < seqan::length(p.bufb().patFw); i++) {
+			o << (char)p.bufb().patFw[i];
+		}
+		o << '\t';
+		for(size_t i = 0; i < seqan::length(p.bufb().qual); i++) {
+			o << (char)p.bufb().qual[i];
+		}
+		o << "\tXM:i:" << (hssz+1)/2;
 		// Add optional fields reporting the primer base and the downstream color,
 		// which, if they were present, were clipped when the read was read in
 		if(p.bufb().color && gReportColorPrimer) {
 			if(p.bufb().primer != '?') {
-				ss << "\tZP:Z:" << p.bufb().primer;
+				o << "\tZP:Z:" << p.bufb().primer;
 				assert(isprint(p.bufb().primer));
 			}
 			if(p.bufb().trimc != '?') {
-				ss << "\tZp:Z:" << p.bufb().trimc;
+				o << "\tZp:Z:" << p.bufb().trimc;
 				assert(isprint(p.bufb().trimc));
 			}
 		}
-		ss << endl;
+		o << '\n';
 	}
-	ThreadSafe _ts(_locks[0]);
-	out(0).writeString(ss.str());
+	{
+		ThreadSafe _ts(_locks[0], lock);
+		out(0).writeString(o);
+	}
+	o.clear();
 }
 
 /**
