@@ -917,11 +917,11 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			      tparams[tid].cur = &cur;
 			      tparams[tid].mutex = &mutex;
 #ifdef WITH_TBB
-			      tbb_grp.run(VSorting_worker<TStr>(((void*)&(tparams[tid]))));
+			      tbb_grp.run(VSorting_worker<TStr>(((void*)&tparams[tid])));
 			    }
 			    tbb_grp.wait();
 #else
-			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*) &(tparams[tid]));
+			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
 			    }
 			    for (int tid = 0; tid < nthreads; tid++) {
 			      threads[tid]->join();

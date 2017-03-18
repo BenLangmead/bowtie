@@ -195,6 +195,9 @@ public:
 	      	              ostream& __logger = cout) :
 	InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
 	  _sampleSuffs(), _nthreads(__nthreads), _itrBucketIdx(0), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _base_fname(base_fname), _bigEndian(currentlyBigEndian())
+#ifdef WITH_TBB
+	  ,thread_group_started(false)
+#endif
 	{ _randomSrc.init(__seed); reset(); }
 
 	~KarkkainenBlockwiseSA() {
@@ -229,13 +232,13 @@ public:
 	//TBB requires a Functor to be passed to the thread group
 	//hence the nested class
 #ifdef WITH_TBB
-	class nextBlock_Worker {
+class nextBlock_Worker {
 	  void *vp;
 
-	public:
+ public:
 
 	nextBlock_Worker(const nextBlock_Worker& W): vp(W.vp) {};
-	nextBlock_Worker(void *vp_):vp(vp_) {}; 
+        nextBlock_Worker(void *vp_):vp(vp_) {}; 
 	  void operator()() const {
 #else
 
@@ -529,9 +532,9 @@ template<typename TStr>
 #ifdef WITH_TBB
 class BinarySorting_worker {
   void *vp;
-
+  
  public:
-
+  
  BinarySorting_worker(const BinarySorting_worker& W): vp(W.vp) {};
  BinarySorting_worker(void *vp_):vp(vp_) {};
   void operator()() const
