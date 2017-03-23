@@ -56,10 +56,8 @@ static inline T readU(std::istream& in, bool swap) {
 	if(swap) {
 		if(sizeof(T) == 4) {
 			return endianSwapU32(x);
-		} else if(sizeof(T) == 8) {
-			return endianSwapU64(x);
 		} else {
-			assert(false);
+			return endianSwapU64(x);
 		}
 	} else {
 		return x;
@@ -76,10 +74,8 @@ static inline T readU(FILE* in, bool swap) {
 	if(swap) {
 		if(sizeof(T) == 4) {
 			return endianSwapU32(x);
-		} else if(sizeof(T) == 8) {
-			return endianSwapU64(x);
 		} else {
-			assert(false);
+			return endianSwapU64(x);
 		}
 	} else {
 		return x;
@@ -94,10 +90,8 @@ static inline T readI(std::istream& in, bool swap) {
 	if(swap) {
 		if(sizeof(T) == 4) {
 			return endianSwapI32(x);
-		} else if(sizeof(T) == 8) {
-			return endianSwapI64(x);
 		} else {
-			assert(false);
+			return endianSwapI64(x);
 		}
 	} else {
 		return x;
@@ -113,10 +107,8 @@ static inline T readI(FILE* in, bool swap) {
 	if(swap) {
 		if(sizeof(T) == 4) {
 			return endianSwapI32(x);
-		} else if(sizeof(T) == 8) {
-			return endianSwapI64(x);
 		} else {
-			assert(false);
+			return endianSwapI64(x);
 		}
 	} else {
 		return x;
