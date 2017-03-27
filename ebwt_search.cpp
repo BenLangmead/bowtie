@@ -8,6 +8,7 @@
 #include <seqan/find.h>
 #include <getopt.h>
 #include <vector>
+#include <time.h>
 #include "alphabet.h"
 #include "assert_helpers.h"
 #include "endian_swap.h"
@@ -32,6 +33,10 @@
 #include "ebwt_search.h"
 #ifdef CHUD_PROFILING
 #include <CHUD/CHUD.h>
+#endif
+
+#ifdef WITH_TBB
+ #include <tbb/compat/thread>
 #endif
 
 using namespace std;
@@ -1097,7 +1102,10 @@ static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
 #ifdef WITH_TBB
-void exactSearchWorker::operator()() const {
+//void exactSearchWorker::operator()() const {
+static void exactSearchWorker(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
@@ -1171,6 +1179,10 @@ static void exactSearchWorker(void *vp) {
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 	std::cout << ss.str();
 #endif
+
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 	WORKER_EXIT();
 }
 
@@ -1178,7 +1190,10 @@ static void exactSearchWorker(void *vp) {
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void exactSearchWorkerStateful::operator()() const {
+//void exactSearchWorkerStateful::operator()() const {
+static void exactSearchWorkerStateful(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1306,24 +1321,43 @@ static void exactSearch(PatternComposer& _patsrc,
 	}
 	exactSearch_refs   = refs;
 #ifdef WITH_TBB
-	tbb::task_group tbb_grp;
+	//tbb::task_group tbb_grp;
+	AutoArray<std::thread*> threads(nthreads+1);
 #else
 	AutoArray<tthread::thread*> threads(nthreads+1);
 	AutoArray<int> tids(nthreads+1);
+#endif
+
+#ifdef WITH_TBB
+	tbb::atomic<int> all_threads_done;
+	all_threads_done = 0;
 #endif
 	CHUD_START();
 	{
 		Timer _t(cerr, "Time for 0-mismatch search: ", timing);
 
+		int mil = 10;
+		struct timespec ts = {0};
+		ts.tv_sec=0;
+		ts.tv_nsec = mil * 1000000L;
+
 		for(int i = 1; i <= nthreads; i++) {
 #ifdef WITH_TBB
+			thread_tracking_pair tp;
+			tp.tid = i;
+			tp.done = &all_threads_done;
 			if(stateful) {
-				tbb_grp.run(exactSearchWorkerStateful(i));
+				//tbb_grp.run(exactSearchWorkerStateful(i));
+				threads[i] = new std::thread(exactSearchWorkerStateful, (void*) &tp);
 			} else {
-				tbb_grp.run(exactSearchWorker(i));
+				//tbb_grp.run(exactSearchWorker(i));
+				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
 			}
+			threads[i]->detach();
+			nanosleep(&ts, (struct timespec *) NULL);
 		}
-		tbb_grp.wait();
+		while(all_threads_done < nthreads);
+		//tbb_grp.wait();
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -1362,7 +1396,10 @@ static BitPairReference*              mismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
 #ifdef WITH_TBB
-void mismatchSearchWorkerFullStateful::operator()() const {
+//void mismatchSearchWorkerFullStateful::operator()() const {
+static void mismatchSearchWorkerFullStateful(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1447,7 +1484,10 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	return;
 }
 #ifdef WITH_TBB
-void mismatchSearchWorkerFull::operator()() const {
+//void mismatchSearchWorkerFull::operator()() const {
+static void mismatchSearchWorkerFull(void *vp){
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
@@ -1529,6 +1569,10 @@ static void mismatchSearchWorkerFull(void *vp){
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 	std::cout << ss.str();
 #endif
+
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
     WORKER_EXIT();
 }
 
@@ -1573,25 +1617,40 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	mismatchSearch_refs = refs;
 
 #ifdef WITH_TBB
-	tbb::task_group tbb_grp;
+	//tbb::task_group tbb_grp;
+	AutoArray<std::thread*> threads(nthreads+1);
 #else
 	AutoArray<tthread::thread*> threads(nthreads+1);
 	AutoArray<int> tids(nthreads+1);
 #endif
 
+#ifdef WITH_TBB
+	tbb::atomic<int> all_threads_done;
+	all_threads_done = 0;
+#endif
+
     CHUD_START();
     {
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
+		int mil = 10;
+		struct timespec ts = {0};
+		ts.tv_sec=0;
+		ts.tv_nsec = mil * 1000000L;
 
 		for(int i = 1; i <= nthreads; i++) {
 #ifdef WITH_TBB
+			thread_tracking_pair tp;
+			tp.tid = i;
+			tp.done = &all_threads_done;
 			if(stateful) {
-				tbb_grp.run(mismatchSearchWorkerFullStateful(i));
+				threads[i] = new std::thread(mismatchSearchWorkerFullStateful, (void*) &tp);
 			} else {
-				tbb_grp.run(mismatchSearchWorkerFull(i));
+				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*) &tp);
 			}
+			threads[i]->detach();
+			nanosleep(&ts, (struct timespec *) NULL);
 		}
-		tbb_grp.wait();
+		while(all_threads_done < nthreads);
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -1695,7 +1754,10 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
+//void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
+static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -1783,7 +1845,10 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	return;
 }
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerFull::operator()() const {
+//void twoOrThreeMismatchSearchWorkerFull::operator()() const {
+static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
@@ -1911,6 +1976,9 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 	std::cout << ss.str();
 #endif
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 	// Threads join at end of Phase 1
 	WORKER_EXIT();
 }
@@ -1956,24 +2024,44 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef WITH_TBB
-	tbb::task_group tbb_grp;
+	//tbb::task_group tbb_grp;
+	AutoArray<std::thread*> threads(nthreads+1);
 #else
 	AutoArray<tthread::thread*> threads(nthreads+1);
 	AutoArray<int> tids(nthreads+1);
 #endif
 
+#ifdef WITH_TBB
+	tbb::atomic<int> all_threads_done;
+	all_threads_done = 0;
+#endif
+
         CHUD_START();
     {
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
+		
+		int mil = 10;
+		struct timespec ts = {0};
+		ts.tv_sec=0;
+		ts.tv_nsec = mil * 1000000L;
+
 		for(int i = 1; i <= nthreads; i++) {
 #ifdef WITH_TBB
+			thread_tracking_pair tp;
+			tp.tid = i;
+			tp.done = &all_threads_done;
 			if(stateful) {
-				tbb_grp.run(twoOrThreeMismatchSearchWorkerStateful(i));
+				//tbb_grp.run(twoOrThreeMismatchSearchWorkerStateful(i));
+				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp);
 			} else {
-				tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(i));
+				//tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(i));
+				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp);
 			}
+			threads[i]->detach();
+			nanosleep(&ts, (struct timespec *) NULL);
 		}
-		tbb_grp.wait();
+		while(all_threads_done < nthreads);
+		//tbb_grp.wait();
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2004,7 +2092,10 @@ static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
 #ifdef WITH_TBB
-void seededQualSearchWorkerFull::operator()() const {
+//void seededQualSearchWorkerFull::operator()() const {
+static void seededQualSearchWorkerFull(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void seededQualSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
@@ -2228,10 +2319,16 @@ static void seededQualSearchWorkerFull(void *vp) {
 	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 	std::cout << ss.str();
 #endif
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 	WORKER_EXIT();
 }
 #ifdef WITH_TBB
-void seededQualSearchWorkerFullStateful::operator()() const {
+//void seededQualSearchWorkerFullStateful::operator()() const {
+static void seededQualSearchWorkerFullStateful(void *vp) {
+	thread_tracking_pair *p = (thread_tracking_pair*) vp;
+	int tid = p->tid;
 #else
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
@@ -2386,10 +2483,16 @@ static void seededQualCutoffSearchFull(
 	seededQualSearch_refs = refs;
 
 #ifdef WITH_TBB
-	tbb::task_group tbb_grp;
+	//tbb::task_group tbb_grp;
+	AutoArray<std::thread*> threads(nthreads+1);
 #else
 	AutoArray<tthread::thread*> threads(nthreads+1);
 	AutoArray<int> tids(nthreads+1);
+#endif
+
+#ifdef WITH_TBB
+	tbb::atomic<int> all_threads_done;
+	all_threads_done = 0;
 #endif
 
 	SWITCH_TO_FW_INDEX();
@@ -2403,16 +2506,25 @@ static void seededQualCutoffSearchFull(
 	{
 		// Phase 1: Consider cases 1R and 2R
 		Timer _t(cerr, "Seeded quality full-index search: ", timing);
+		int mil = 10;
+		struct timespec ts = {0};
+		ts.tv_sec=0;
+		ts.tv_nsec = mil * 1000000L;
 
 		for(int i = 1; i <= nthreads; i++) {
 #ifdef WITH_TBB
+			thread_tracking_pair tp;
+			tp.tid = i;
+			tp.done = &all_threads_done;
 			if(stateful) {
-				tbb_grp.run(seededQualSearchWorkerFullStateful(i));
+				threads[i] = new std::thread(seededQualSearchWorkerFullStateful, (void*) &tp);
 			} else {
-				tbb_grp.run(seededQualSearchWorkerFull(i));
+				threads[i] = new std::thread(seededQualSearchWorkerFull, (void*) &tp);
 			}
+			threads[i]->detach();
+			nanosleep(&ts, (struct timespec *) NULL);
 		}
-		tbb_grp.wait();
+		while(all_threads_done < nthreads);
 #else
 			tids[i] = i;
 			if(stateful) {
