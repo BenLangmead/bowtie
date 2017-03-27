@@ -1274,6 +1274,9 @@ static void exactSearchWorkerStateful(void *vp) {
 	delete patsrcFact;
 	delete sinkFact;
 	delete pool;
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 	return;
 }
 
@@ -1477,6 +1480,9 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 
 	delete patsrcFact;
 	delete sinkFact;
@@ -1838,6 +1844,9 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 
 	delete patsrcFact;
 	delete sinkFact;
@@ -2425,6 +2434,9 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 		metrics->printSummary();
 		delete metrics;
 	}
+#ifdef WITH_TBB
+	p->done->fetch_and_add(1);
+#endif
 
 	delete patsrcFact;
 	delete sinkFact;
