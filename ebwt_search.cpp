@@ -992,21 +992,23 @@ static void parseOptions(int argc, const char **argv) {
 
 static const char *argv0 = NULL;
 
-#define FINISH_READ(p) \
+#define FINISH_READ(p,psrc) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(get_read_ret.first) { \
 		sink->finishRead(*p, true, !skipped); \
 		get_read_ret.first = false; \
+		psrc.update_total_read_count(1); \
 	} \
 	skipped = false;
 
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
-#define GET_READ(p) \
+#define GET_READ(p,psrc) \
 	if(get_read_ret.second) break; \
 	get_read_ret = p->nextReadPair(); \
-	if(p->rdid() >= qUpto) { \
+	size_t num_reads_aligned = psrc.get_total_read_count(); \
+	if(num_reads_aligned >= qUpto) { \
 		get_read_ret = make_pair(false, true); \
 	} \
 	if(!get_read_ret.first) { \
@@ -1167,11 +1169,11 @@ static void exactSearchWorker(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		FINISH_READ(patsrc,_patsrc)
+		GET_READ(patsrc,_patsrc)
 		#include "search_exact.c"
 	}
-	FINISH_READ(patsrc);
+	FINISH_READ(patsrc,_patsrc)
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -1556,8 +1558,8 @@ static void mismatchSearchWorkerFull(void *vp){
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		FINISH_READ(patsrc,_patsrc)
+		GET_READ(patsrc,_patsrc)
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1567,7 +1569,7 @@ static void mismatchSearchWorkerFull(void *vp){
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	FINISH_READ(patsrc);
+	FINISH_READ(patsrc,_patsrc)
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -1964,8 +1966,8 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		FINISH_READ(patsrc,_patsrc)
+		GET_READ(patsrc,_patsrc)
 		patid += 0; // kill unused variable warning
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
@@ -1977,7 +1979,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
 	}
-	FINISH_READ(patsrc);
+	FINISH_READ(patsrc,_patsrc)
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -2300,8 +2302,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc);
-		GET_READ(patsrc);
+		FINISH_READ(patsrc,_patsrc)
+		GET_READ(patsrc,_patsrc)
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2316,7 +2318,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
 	}
-	FINISH_READ(patsrc);
+	FINISH_READ(patsrc,_patsrc)
 	if(seedMms > 0) {
 		delete pamRc;
 		delete pamFw;
