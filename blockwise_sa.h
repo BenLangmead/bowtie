@@ -328,7 +328,7 @@ class nextBlock_Worker {
                 while(!_done[this->_itrBucketIdx]) {
 #if defined(_TTHREAD_WIN32_)
 		  Sleep(1);
-#elif defined(_TTHREAD_POSIX_)
+#else
 		  const static timespec ts = {0, 1000000};  // 1 millisecond
 		  nanosleep(&ts, NULL);
 #endif
