@@ -17,9 +17,10 @@ void VerboseHitSink::reportMaxed(
 	BTString& o,
 	vector<Hit>& hs,
 	PatternSourcePerThread& p,
-	bool lock)
+	bool lock,
+	size_t threadId)
 {
-	HitSink::reportMaxed(o, hs, p);
+	HitSink::reportMaxed(o, hs, p, threadId);
 	if(sampleMax_) {
 		RandomSource rand;
 		rand.init(p.bufa().seed);
@@ -46,7 +47,7 @@ void VerboseHitSink::reportMaxed(
 				if(strat == bestStratum) {
 					if(num == r) {
 						hs[i].oms = hs[i+1].oms = (uint32_t)(hs.size()/2);
-						reportHits(o, hs, i, i+2);
+						reportHits(o, hs, i, i+2, threadId);
 						break;
 					}
 					num++;

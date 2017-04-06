@@ -279,10 +279,11 @@ void SAMHitSink::reportUnOrMax(
 	PatternSourcePerThread& p,
 	vector<Hit>* hs,
 	bool un,
-	bool lock)
+	bool lock,
+	size_t threadId)
 {
-	if(un) HitSink::reportUnaligned(o, p);
-	else   HitSink::reportMaxed(o, *hs, p);
+	if(un) HitSink::reportUnaligned(o, p, threadId);
+	else   HitSink::reportMaxed(o, *hs, p, threadId);
 	bool paired = !p.bufb().empty();
 	assert(paired || p.bufa().mate == 0);
 	assert(!paired || p.bufa().mate > 0);
@@ -388,10 +389,11 @@ void SAMHitSink::append(
 void SAMHitSink::reportMaxed(
 	BTString& o,
 	vector<Hit>& hs,
-	PatternSourcePerThread& p)
+	PatternSourcePerThread& p,
+	size_t threadId)
 {
 	if(sampleMax_) {
-		HitSink::reportMaxed(o, hs, p);
+		HitSink::reportMaxed(o, hs, p, threadId);
 		RandomSource rand;
 		rand.init(p.bufa().seed);
 		assert_gt(hs.size(), 0);
@@ -434,6 +436,6 @@ void SAMHitSink::reportMaxed(
 			reportSamHit(o, hs[r], /*MAPQ*/0, /*XM:I*/(int)hs.size()+1);
 		}
 	} else {
-		reportUnOrMax(o, p, &hs, false);
+		reportUnOrMax(o, p, &hs, false, threadId);
 	}
 }

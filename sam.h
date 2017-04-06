@@ -47,8 +47,9 @@ public:
 	           bool fullRef,
 	           bool noQnameTrunc,
 	           int defaultMapq,
-	           DECL_HIT_DUMPS2) :
-	HitSink(out, PASS_HIT_DUMPS2),
+	           DECL_HIT_DUMPS2,
+		   int nthreads) :
+	HitSink(out, PASS_HIT_DUMPS2, nthreads),
 	offBase_(offBase), defaultMapq_(defaultMapq),
 	rmap_(rmap), amap_(amap), fullRef_(fullRef),
 	noQnameTrunc_(noQnameTrunc) { }
@@ -141,7 +142,8 @@ protected:
 		PatternSourcePerThread& p,
 		vector<Hit>* hs,
 		bool un,
-		bool lock = true);
+		bool lock = true,
+		size_t threadId = 0);
 
 	/**
 	 * Report a verbose, human-readable alignment to the appropriate
@@ -179,7 +181,8 @@ protected:
 	virtual void reportMaxed(
 		BTString& o,
 		vector<Hit>& hs,
-		PatternSourcePerThread& p);
+		PatternSourcePerThread& p,
+		size_t threadId);
 
 	/**
 	 * See sam.cpp

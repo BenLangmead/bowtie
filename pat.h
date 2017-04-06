@@ -451,7 +451,7 @@ struct PerThreadReadBuf {
 	//const size_t max_buf_; // max # reads to read into buffer at once
 	size_t raw_bufa_length; //actual length of buffer a at any given time	
 	size_t raw_bufb_length; //actual length of buffer b at any given time	
-	static const size_t max_raw_buf_ = 8000; //max # characters to read into buffer at once, 8000 ~32 100 bp reads
+	static const size_t max_raw_buf_ = 128000; //max # characters to read into buffer at once, 8000 ~32 100 bp reads
 	static const size_t max_raw_buf_overrun_ = 2000; //additional head room for the raw buffer to fill to the end of the fastq record
 	char raw_bufa_[max_raw_buf_+max_raw_buf_overrun_];       //raw character buffer for mate as	
 	char raw_bufb_[max_raw_buf_+max_raw_buf_overrun_];       //raw character buffer for mate bs

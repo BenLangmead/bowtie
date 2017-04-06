@@ -1123,6 +1123,7 @@ static void exactSearchWorker(void *vp) {
 	PatternSourcePerThread *patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
+	sink->set_thread_id(tid);
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSink
 	        os,         // reference sequences
@@ -1512,6 +1513,7 @@ static void mismatchSearchWorkerFull(void *vp){
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
+	sink->set_thread_id(tid);
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -1872,6 +1874,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
+	sink->set_thread_id(tid);
 	/* Per-thread initialization */
 	EbwtSearchParams<String<Dna> > params(
 			*sink,       /* HitSink */
@@ -2119,6 +2122,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
+	sink->set_thread_id(tid);
 	/* Per-thread initialization */
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,       /* HitSink */
@@ -2901,7 +2905,7 @@ static void driver(const char * type,
 							fullRef, samNoQnameTrunc, defaultMapq,
 							PASS_DUMP_FILES,
 							format == TAB_MATE, sampleMax,
-							refnames);
+							refnames, nthreads);
 					if(!samNoHead) {
 						vector<string> refnames;
 						if(!samNoSQ) {
