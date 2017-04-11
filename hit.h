@@ -255,21 +255,6 @@ public:
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
-		/*if(nthreads_ > 0)
-		{
-			size_t i = 0;
-			int j = 0;
-			ThreadSafe _ts(_locks[0]);
-			for(i=0;i<=nthreads_;i++)
-			{
-				for(j=0;j<perThreadCounter[i];j++)
-				{
-					out(0).writeString(perThreadBuf[i][j]);
-					first_ = false;
-				}
-				perThreadCounter[i]=0;
-			}
-		}*/
 		closeOuts();
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
@@ -431,10 +416,27 @@ public:
 
 	/**
 	 * Called when all alignments are complete.  It is assumed that no
-	 * synchronization is necessary.
+	 * synchronization is necessary
 	 */
 	void finish(bool hadoopOut) {
 		// Close output streams
+		if(nthreads_ > 0)
+		{
+			size_t i = 0;
+			int j = 0;
+			for(i=0;i<=nthreads_;i++)
+			{
+				for(j=0;j<perThreadCounter[i];j++)
+				{
+					//since we're going thread-by-thread
+					//don't need to sync
+					//ThreadSafe _ts(_locks[0]);
+					out(0).writeString(perThreadBuf[i][j]);
+					first_ = false;
+				}
+				perThreadCounter[i]=0;
+			}
+		}
 		closeOuts();
 		if(!quiet_) {
 			// Print information about how many unpaired and/or paired
