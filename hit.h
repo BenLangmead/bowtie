@@ -180,7 +180,9 @@ public:
 			DECL_HIT_DUMPS,
 			bool onePairFile,
 			bool sampleMax,
-			vector<string>* refnames = NULL) :
+			vector<string>* refnames = NULL,
+			size_t nthreads = 1,
+			int perThreadBufSize = 512) :
 		_outs(),
 		_deleteOuts(false),
 		_refnames(refnames),
@@ -191,15 +193,30 @@ public:
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
 		first_(true),
-		numAligned_(0llu),
+		//numAligned_(0llu),
 		numUnaligned_(0llu),
 		numMaxed_(0llu),
-		numReported_(0llu),
-		numReportedPaired_(0llu),
-		quiet_(false)
+		//numReported_(0llu),
+		//numReportedPaired_(0llu),
+		quiet_(false),
+		nthreads_(nthreads),
+		perThreadBufSize_(perThreadBufSize)
 	{
+		numAligned_=0llu;
+		numReported_=0llu;
+		numReportedPaired_=0llu;
 		_outs.push_back(out);
 		vector<MUTEX_T*>::iterator it;
+		fprintf(stderr,"perThreadBufSize for output is %d\n",perThreadBufSize_);
+		perThreadBuf = new BTString*[nthreads_+1];
+		perThreadCounter = new int[nthreads_+1];
+		size_t i = 0;
+		for(i=0;i<=nthreads_;i++)
+		{
+			perThreadBuf[i] = new BTString[perThreadBufSize_];
+			perThreadCounter[i] = 0;
+		}
+		//had to move this below the array inits, otherwise it get's mangled leading to segfaults on access
 		_locks.push_back(new MUTEX_T);
 		initDumps();
 	}
@@ -222,7 +239,9 @@ public:
 		INIT_HIT_DUMPS,
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
-		quiet_(false)
+		quiet_(false),
+		nthreads_(0),
+		perThreadBufSize_(0)	
 	{
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
@@ -236,6 +255,21 @@ public:
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
+		/*if(nthreads_ > 0)
+		{
+			size_t i = 0;
+			int j = 0;
+			ThreadSafe _ts(_locks[0]);
+			for(i=0;i<=nthreads_;i++)
+			{
+				for(j=0;j<perThreadCounter[i];j++)
+				{
+					out(0).writeString(perThreadBuf[i][j]);
+					first_ = false;
+				}
+				perThreadCounter[i]=0;
+			}
+		}*/
 		closeOuts();
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
@@ -281,8 +315,8 @@ public:
 	/**
 	 * Report a batch of hits; all in the given vector.
 	 */
-	virtual void reportHits(BTString& o, vector<Hit>& hs) {
-		reportHits(o, hs, 0, hs.size());
+	virtual void reportHits(BTString& o, vector<Hit>& hs, size_t threadId) {
+		reportHits(o, hs, 0, hs.size(), threadId);
 	}
 
 	/**
@@ -292,7 +326,8 @@ public:
 		BTString& o,
 		vector<Hit>& hs,
 		size_t start,
-		size_t end)
+		size_t end,
+		size_t threadId)
 	{
 		assert_geq(end, start);
 		if(end-start == 0) return;
@@ -307,14 +342,59 @@ public:
 			assert(hs[start].repOk());
 			append(o, hs[start]);
 			{
-				ThreadSafe _ts(_locks[0]);
-				out(0).writeString(o);
-				first_ = false;
-				numAligned_++;
-				if(paired) {
-					numReportedPaired_++;
-				} else {
-					numReported_++;
+				if(nthreads_ > 0)
+				{
+					if(perThreadCounter[threadId] >= perThreadBufSize_)
+					{
+						int i = 0;
+						for(i=0; i < perThreadBufSize_; i++)
+						{
+							ThreadSafe _ts(_locks[0]);
+							out(0).writeString(perThreadBuf[threadId][i]);
+						}
+						perThreadCounter[threadId] = 0;
+					}
+					perThreadBuf[threadId][perThreadCounter[threadId]++] = o;
+					//TODO: make these atomics to get rid of lock
+					first_ = false;
+#ifdef WITH_TBB	
+					numAligned_.fetch_and_add(1);
+					if(paired) {
+						numReportedPaired_.fetch_and_add(1);
+					} else {
+						numReported_.fetch_and_add(1);
+					}
+#else
+					//TODO: this is segfaulting in the TBB aomtic fetch instruction in the lock
+					ThreadSafe _ts(_locks[0]);
+					numAligned_++;
+					if(paired) {
+						numReportedPaired_++;
+					} else {
+						numReported_++;
+					}
+#endif
+				}
+				else
+				{
+					ThreadSafe _ts(_locks[0]);
+					first_ = false;
+					out(0).writeString(o);
+#ifdef WITH_TBB	
+					numAligned_.fetch_and_add(1);
+					if(paired) {
+						numReportedPaired_.fetch_and_add(1);
+					} else {
+						numReported_.fetch_and_add(1);
+					}
+#else
+					numAligned_++;
+					if(paired) {
+						numReportedPaired_++;
+					} else {
+						numReported_++;
+					}
+#endif
 				}
 			}
 			o.clear();
@@ -637,6 +717,7 @@ public:
 		BTString& o,
 		vector<Hit>& hs,
 		PatternSourcePerThread& p,
+		size_t threadId,
 		bool lock = true)
 	{
 		// TODO: opt for atomic in TBB mode, or possibly all modes
@@ -696,7 +777,14 @@ protected:
 	vector<MUTEX_T*>    _locks;       /// pthreads mutexes for per-file critical sections
 	MUTEX_T             main_mutex_m;    /// pthreads mutexes for fields of this object
 	MUTEX_T             numWrapper_mutex_m;
+	MUTEX_T             firstLock;
 	ThreadSafe*         ts_wrap;      /// for mutual exclusion
+	
+	// used for output read buffer	
+	size_t nthreads_;
+	BTString**	perThreadBuf;
+	int* 		perThreadCounter;
+	int perThreadBufSize_;
 
 	// Output filenames for dumping
 	std::string dumpAlBase_;
@@ -815,11 +903,18 @@ protected:
 	bool dumpMaxedFlag_;
 
 	volatile bool     first_;       /// true -> first hit hasn't yet been reported
-	volatile uint64_t numAligned_;  /// # reads with >= 1 alignment
 	volatile uint64_t numUnaligned_;/// # reads with no alignments
 	volatile uint64_t numMaxed_;    /// # reads with # alignments exceeding -m ceiling
+#ifdef WITH_TBB
+	tbb::atomic<uint64_t> numAligned_;  /// # reads with >= 1 alignment
+	tbb::atomic<uint64_t> numReported_; /// # single-ended alignments reported
+	tbb::atomic<uint64_t> numReportedPaired_; /// # paired-end alignments reported
+#else
+	volatile uint64_t numAligned_;  /// # reads with >= 1 alignment
 	volatile uint64_t numReported_; /// # single-ended alignments reported
 	volatile uint64_t numReportedPaired_; /// # paired-end alignments reported
+#endif
+
 	bool quiet_;  /// true -> don't print alignment stats at the end
 };
 
@@ -837,11 +932,14 @@ public:
 		_bufferedHits(),
 		hitsForThisRead_(),
 		_max(max),
-		_n(n)
+		_n(n),
+		threadId(0)
 	{
 		sink.addWrapper();
 		assert_gt(_n, 0);
 	}
+
+	void set_thread_id(size_t threadId_) { threadId = threadId_; }
 
 	virtual ~HitSinkPerThread() { }
 
@@ -869,18 +967,18 @@ public:
 		ret = 0;
 		if(maxed) {
 			// Report that the read maxed-out; useful for chaining output
-			if(dump) _sink.reportMaxed(obuf_, _bufferedHits, p);
+			if(dump) _sink.reportMaxed(obuf_, _bufferedHits, p, threadId);
 			_bufferedHits.clear();
 		} else if(unal) {
 			// Report that the read failed to align; useful for chaining output
-			if(dump) _sink.reportUnaligned(obuf_, p);
+			if(dump) _sink.reportUnaligned(obuf_, p, threadId);
 		} else {
 			// Flush buffered hits
 			assert_gt(_bufferedHits.size(), 0);
 			if(_bufferedHits.size() > _n) {
 				_bufferedHits.resize(_n);
 			}
-			_sink.reportHits(obuf_, _bufferedHits);
+			_sink.reportHits(obuf_, _bufferedHits, threadId);
 			_sink.dumpAlign(p);
 			ret = (uint32_t)_bufferedHits.size();
 			_bufferedHits.clear();
@@ -1012,6 +1110,7 @@ protected:
 	uint32_t hitsForThisRead_; /// # hits for this read so far
 	uint32_t _max; /// don't report any hits if there were > _max
 	uint32_t _n;   /// report at most _n hits
+	size_t threadId;
 	BTString obuf_; /// expandable output buffer
 };
 
@@ -1531,7 +1630,8 @@ public:
 		BTString& o,
 		vector<Hit>& hs,
 		PatternSourcePerThread& p,
-		bool lock = true);
+		bool lock = true,
+		size_t threadId=0);
 
 protected:
 
