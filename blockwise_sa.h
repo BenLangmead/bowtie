@@ -686,7 +686,7 @@ void KarkkainenBlockwiseSA<TStr>::buildSamples() {
 			       BinarySorting_worker<TStr>((void*)&tparams[tid]);
 		       } else {
 #ifdef WITH_TBB
-			       bb_grp.run(BinarySorting_worker<TStr>(((void*)&tparams[tid])));
+			       tbb_grp.run(BinarySorting_worker<TStr>(((void*)&tparams[tid])));
 		       }
 	       }
 	       tbb_grp.wait();
