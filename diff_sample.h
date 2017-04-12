@@ -766,66 +766,65 @@ static inline bool suffixSameUpTo(
 
 template<typename TStr>
 struct VSortingParam {
-  DifferenceCoverSample<TStr>* dcs;
-  TIndexOffU*                  sPrimeArr;
-  size_t                       sPrimeSz;
-  TIndexOffU*                  sPrimeOrderArr;
-  size_t                       depth;
-  const std::vector<size_t>*         boundaries;
-  size_t*                      cur;
-  MUTEX_T*                     mutex;
+        DifferenceCoverSample<TStr>* dcs;
+        TIndexOffU*                  sPrimeArr;
+        size_t                       sPrimeSz;
+        TIndexOffU*                  sPrimeOrderArr;
+        size_t                       depth;
+        const std::vector<size_t>*         boundaries;
+        size_t*                      cur;
+        MUTEX_T*                     mutex;
 };
 
 template<typename TStr>
 #ifdef WITH_TBB
 class VSorting_worker {
-  void *vp;
+        void *vp;
 
  public:
 
- VSorting_worker(const VSorting_worker& W): vp(W.vp) {};
- VSorting_worker(void *vp_):vp(vp_) {};
-  void operator()() const
-  {
+       VSorting_worker(const VSorting_worker& W): vp(W.vp) {};
+       VSorting_worker(void *vp_):vp(vp_) {};
+	void operator()() const
+	{
 #else
 static void VSorting_worker(void *vp)
 {
 #endif
-  VSortingParam<TStr>* param = (VSortingParam<TStr>*)vp;
-  DifferenceCoverSample<TStr>* dcs = param->dcs;
-  const TStr& host = dcs->text();
-  const size_t hlen = length(host);
-  uint32_t v = dcs->v();
-  while(true) {
-    size_t cur = 0;
-    {
-      ThreadSafe ts(param->mutex, true);
-      cur = *(param->cur);
-      (*param->cur)++;
-    }
-    if(cur >= param->boundaries->size()) return;
-    size_t begin = (cur == 0 ? 0 : (*param->boundaries)[cur-1]);
-    size_t end = (*param->boundaries)[cur];
-    assert_leq(begin, end);
-    if(end - begin <= 1) continue;
-    mkeyQSortSuf2(
-		  host,
-		  hlen,
-		  param->sPrimeArr,
-		  param->sPrimeSz,
-		  param->sPrimeOrderArr,
-		  4,
-		  begin,
-		  end,
-		  param->depth,
-		  v);
-  }
+        VSortingParam<TStr>* param = (VSortingParam<TStr>*)vp;
+	DifferenceCoverSample<TStr>* dcs = param->dcs;
+	const TStr& host = dcs->text();
+	const size_t hlen = length(host);
+	uint32_t v = dcs->v();
+	while(true) {
+	  size_t cur = 0;
+	  {
+	    ThreadSafe ts(param->mutex, true);
+	    cur = *(param->cur);
+	    (*param->cur)++;
+	  }
+	  if(cur >= param->boundaries->size()) return;
+	  size_t begin = (cur == 0 ? 0 : (*param->boundaries)[cur-1]);
+	  size_t end = (*param->boundaries)[cur];
+	  assert_leq(begin, end);
+	  if(end - begin <= 1) continue;
+	  mkeyQSortSuf2(
+			host,
+			hlen,
+			param->sPrimeArr,
+			param->sPrimeSz,
+			param->sPrimeOrderArr,
+			4,
+			begin,
+			end,
+			param->depth,
+			v);
+	}
 }
-
+ 
 #ifdef WITH_TBB
 };
 #endif
-
 /**
  * Calculates a ranking of all suffixes in the sample and stores them,
  * packed according to the mu mapping, in _isaPrime.
@@ -878,64 +877,64 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			// sPrimeOrder too.  This allows us to easily reconstruct
 			// what the sort did.
 			if(nthreads == 1) {
-			  mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
-					this->verbose(), this->sanityCheck(), v);
+			        mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+					      this->verbose(), this->sanityCheck(), v);
 			} else {
-			  int query_depth = 0;
-			  int tmp_nthreads = nthreads;
-			  while(tmp_nthreads > 0) {
-			    query_depth++;
-			    tmp_nthreads >>= 1;
-			  }
-			  std::vector<size_t> boundaries; // bucket boundaries for parallelization
-			  TIndexOffU *sOrig = NULL;
-			  if(this->sanityCheck()) {
-			    sOrig = new TIndexOffU[sPrimeSz];
-			    memcpy(sOrig, sPrimeArr, OFF_SIZE * sPrimeSz);
-			  }
-			  mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
-					this->verbose(), false, query_depth, &boundaries);
-			  if(boundaries.size() > 0) {
+			        int query_depth = 0;
+				int tmp_nthreads = nthreads;
+				while(tmp_nthreads > 0) {
+				        query_depth++;
+					tmp_nthreads >>= 1;
+				}
+				std::vector<size_t> boundaries; // bucket boundaries for parallelization
+				TIndexOffU *sOrig = NULL;
+				if(this->sanityCheck()) {
+				        sOrig = new TIndexOffU[sPrimeSz];
+					memcpy(sOrig, sPrimeArr, OFF_SIZE * sPrimeSz);
+				}
+				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+					      this->verbose(), false, query_depth, &boundaries);
+				if(boundaries.size() > 0) {
 #ifdef WITH_TBB
-			    tbb::task_group tbb_grp;
+				        tbb::task_group tbb_grp;
 #else
-			    AutoArray<tthread::thread*> threads(nthreads);
+					AutoArray<tthread::thread*> threads(nthreads);
 #endif
-			    std::vector<VSortingParam<TStr> > tparams;
-			    tparams.resize(nthreads);
-			    size_t cur = 0;
-			    MUTEX_T mutex;
-			    for(int tid = 0; tid < nthreads; tid++) {
-			      // Calculate bucket sizes by doing a binary search for each
-			      // suffix and noting where it lands			  			      
-			      tparams[tid].dcs = this;
-			      tparams[tid].sPrimeArr = sPrimeArr;
-			      tparams[tid].sPrimeSz = sPrimeSz;
-			      tparams[tid].sPrimeOrderArr = sPrimeOrderArr;
-			      tparams[tid].depth = query_depth;
-			      tparams[tid].boundaries = &boundaries;
-			      tparams[tid].cur = &cur;
-			      tparams[tid].mutex = &mutex;
+					std::vector<VSortingParam<TStr> > tparams;
+					tparams.resize(nthreads);
+					size_t cur = 0;
+					MUTEX_T mutex;
+					for(int tid = 0; tid < nthreads; tid++) {
+					        // Calculate bucket sizes by doing a binary search for each
+					        // suffix and noting where it lands			  			      
+					        tparams[tid].dcs = this;
+						tparams[tid].sPrimeArr = sPrimeArr;
+						tparams[tid].sPrimeSz = sPrimeSz;
+						tparams[tid].sPrimeOrderArr = sPrimeOrderArr;
+						tparams[tid].depth = query_depth;
+						tparams[tid].boundaries = &boundaries;
+						tparams[tid].cur = &cur;
+						tparams[tid].mutex = &mutex;
 #ifdef WITH_TBB
-			      tbb_grp.run(VSorting_worker<TStr>(((void*)&tparams[tid])));
-			    }
-			    tbb_grp.wait();
+						tbb_grp.run(VSorting_worker<TStr>(((void*)&tparams[tid])));
+					}
+					tbb_grp.wait();
 #else
-			    threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
-			    }
-			    for (int tid = 0; tid < nthreads; tid++) {
-			      threads[tid]->join();
+					threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
+				}
+				for (int tid = 0; tid < nthreads; tid++) {
+				        threads[tid]->join();
 			    }
 #endif
-			  }
-			  if(this->sanityCheck()) {
-			    sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
-			    for(size_t i = 0; i < sPrimeSz; i++) {
-			      assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
-			    }
-			    delete[] sOrig;
-			  }
 			}
+			if(this->sanityCheck()) {
+			        sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
+				for(size_t i = 0; i < sPrimeSz; i++) {
+				        assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
+				}
+				delete[] sOrig;
+			}
+		}
 			// Make sure sPrime and sPrimeOrder are consistent with
 			// their respective backing-store arrays
 			assert_eq(sPrimeArr[0], sPrime[0]);
