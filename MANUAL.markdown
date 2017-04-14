@@ -1185,7 +1185,8 @@ dedicate more memory to the descriptors.  Default: 64.
 </td></tr><tr><td id="bowtie-options-reads-per-batch">
 
 [`--reads-per-batch`]: #bowtie-options-reads-per-batch
-	--reads-per-batch <int>
+
+    --reads-per-batch <int>
 
 </td><td>
 
