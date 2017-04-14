@@ -1095,6 +1095,20 @@ forward-oriented. ` --ff` requires both an upstream mate1 and a
 downstream mate2 to be forward-oriented.  Default: `--fr` when [`-C`]
 (colorspace alignment) is not specified, `--ff` when [`-C`] is specified.
 
+</td></tr><tr><td id="bowtie-options-allow-contain">
+
+[`--allow-contain`]: #bowtie-options-allow-contain
+
+    --allow-contain
+
+</td><td>
+
+Normally, Bowtie will not reported a paired-end alignment for a pair
+when the two ends overlap exactly the same reference interval, or if
+the alignment interval for one is contained within the other.  This
+option causes Bowtie to report such cases as normal paired-end
+alignments.
+
 </td></tr><tr><td id="bowtie-options-nofw">
 
 [`--nofw`]: #bowtie-options-nofw
