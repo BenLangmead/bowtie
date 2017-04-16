@@ -843,11 +843,12 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_READS_PER_BATCH: {
 				if(optarg == NULL || parse<int>(optarg) < 1) {
-				cerr << "--reads-per-batch arg must be at least 1" << endl;
-				printUsage(cerr);
-				throw 1;
+					cerr << "--reads-per-batch arg must be at least 1" << endl;
+					printUsage(cerr);
+					throw 1;
 				}
-				readsPerBatch = parse<int>(optarg);
+				// TODO: should output batch size be controlled separately?
+				readsPerBatch = outBatchSz = parse<int>(optarg);
 				break;
 			}
 			case ARG_ORIG:
