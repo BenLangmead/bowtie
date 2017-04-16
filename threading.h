@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cassert>
 
 #ifdef WITH_TBB
 # include <tbb/mutex.h>
@@ -54,35 +55,32 @@ struct thread_tracking_pair {
 class ThreadSafe {
 public:
 
-	ThreadSafe() : ptr_mutex(NULL) { }
-	
-	ThreadSafe(MUTEX_T* ptr_mutex, bool locked = true) : ptr_mutex(NULL) {
-		if(locked) {
+	ThreadSafe(MUTEX_T* ptr_mutex) :
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-			//have to use the heap as we can't copy
-			//the scoped lock
-			this->ptr_mutex = new MUTEX_T::scoped_lock(*ptr_mutex);
+		mutex_(*ptr_mutex)
 #else
-			this->ptr_mutex = ptr_mutex;
-			ptr_mutex->lock();
+		ptr_mutex_(ptr_mutex)
 #endif
-		}
+	{
+#if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
+#else
+		assert(ptr_mutex_ != NULL);
+		ptr_mutex_->lock();
+#endif
 	}
 
 	~ThreadSafe() {
-		if (ptr_mutex != NULL)
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-			delete ptr_mutex;
 #else
-			ptr_mutex->unlock();
+		ptr_mutex_->unlock();
 #endif
 	}
 
 private:
 #if WITH_TBB && NO_SPINLOCK && WITH_QUEUELOCK
-	MUTEX_T::scoped_lock* ptr_mutex;
+	MUTEX_T::scoped_lock mutex_;
 #else
-	MUTEX_T *ptr_mutex;
+	MUTEX_T *ptr_mutex_;
 #endif
 };
 
