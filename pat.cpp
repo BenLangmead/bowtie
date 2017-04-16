@@ -530,6 +530,9 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
 		c = getc_unlocked(fp_);
+		if(c == EOF) {
+			return make_pair(true, 0);
+		}
 		while(c == '\r' || c == '\n') {
 			c = getc_unlocked(fp_);
 		}
@@ -554,6 +557,10 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf[bufoff++] = c;
 		}
 		readbuf[readi].readOrigBufLen = bufoff;
+	}
+	// Immediate EOF case
+	if(done && readbuf[readi-1].readOrigBufLen == 1) {
+		readi--;
 	}
 	return make_pair(done, readi);
 }
