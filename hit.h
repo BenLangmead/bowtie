@@ -156,9 +156,9 @@ public:
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		vector<string>* refnames = NULL,
-		size_t nthreads = 1,
-		int perThreadBufSize = 512) :
+		vector<string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
 		_outs(),
 		_deleteOuts(false),
 		_refnames(refnames),
@@ -204,7 +204,9 @@ public:
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		vector<string>* refnames = NULL) :
+		vector<string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
 		_outs(),
 		_deleteOuts(true),
 		_refnames(refnames),
@@ -1432,6 +1434,8 @@ public:
 		bool onePairFile,
 		bool sampleMax,
 		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
 		bool reportOpps = false) :
 		HitSink(
 			out,
@@ -1440,7 +1444,9 @@ public:
 			dumpMax,
 			onePairFile,
 			sampleMax,
-			refnames),
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1457,6 +1463,8 @@ public:
 		bool onePairFile,
 		bool sampleMax,
 		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
 		bool reportOpps = false) :
 		HitSink(
 			numOuts,
@@ -1465,7 +1473,9 @@ public:
 			dumpMax,
 			onePairFile,
 			sampleMax,
-			refnames),
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1553,6 +1563,8 @@ public:
 		bool onePairFile,
 		bool sampleMax,
 		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
 		int partition = 0) :
 		HitSink(
 			out,
@@ -1561,7 +1573,9 @@ public:
 			dumpMax,
 			onePairFile,
 			sampleMax,
-			refnames),
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		partition_(partition),
 		offBase_(offBase),
 		colorSeq_(colorSeq),
@@ -1592,6 +1606,8 @@ public:
 		bool onePairFile,
 		bool sampleMax,
 		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
 		int partition = 0) :
 		HitSink(
 			numOuts,
@@ -1600,7 +1616,9 @@ public:
 			dumpMax,
 			onePairFile,
 			sampleMax,
-			refnames),
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		partition_(partition),
 		offBase_(offBase),
 		colorSeq_(colorSeq),
@@ -1664,7 +1682,7 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL) { }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL, 1, 1) { }
 	
 	virtual void append(BTString& o, const Hit& h, int mapq, int xms) { }
 };

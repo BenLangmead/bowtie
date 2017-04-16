@@ -47,14 +47,14 @@ public:
 		AnnotationMap *amap,
 		bool fullRef,
 		bool noQnameTrunc,
-		int defaultMapq,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
 		std::vector<std::string>* refnames,
-		int nthreads) :
+		size_t nthreads,
+		int perThreadBufSize) :
 		HitSink(
 			out,
 			dumpAl,
@@ -63,9 +63,12 @@ public:
 			onePairFile,
 			sampleMax,
 			refnames,
-			nthreads),
-		offBase_(offBase), defaultMapq_(defaultMapq),
-		rmap_(rmap), amap_(amap), fullRef_(fullRef),
+			nthreads,
+			perThreadBufSize),
+		offBase_(offBase),
+		rmap_(rmap),
+		amap_(amap),
+		fullRef_(fullRef),
 		noQnameTrunc_(noQnameTrunc) { }
 
 	/**
@@ -78,13 +81,14 @@ public:
 		ReferenceMap *rmap,
 		AnnotationMap *amap,
 		bool fullRef,
-		int defaultMapq,
 		const std::string& dumpAl,
 		const std::string& dumpUnal,
 		const std::string& dumpMax,
 		bool onePairFile,
 		bool sampleMax,
-		std::vector<std::string>* refnames) :
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
 		HitSink(
 			numOuts,
 			dumpAl,
@@ -92,9 +96,13 @@ public:
 			dumpMax,
 			onePairFile,
 			sampleMax,
-			refnames),
-		offBase_(offBase), defaultMapq_(defaultMapq),
-		rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
+			refnames,
+			nthreads,
+			perThreadBufSize),
+		offBase_(offBase),
+		rmap_(rmap),
+		amap_(amap),
+		fullRef_(fullRef) { }
 
 	/**
 	 * Append a verbose, readable hit to the output stream
@@ -151,8 +159,6 @@ private:
 	int  offBase_;        /// Add this to reference offsets before outputting.
 	                      /// (An easy way to make things 1-based instead of
 	                      /// 0-based)
-	int  defaultMapq_;    /// Default mapping quality to report when one is
-	                      /// not specified
 	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
 	AnnotationMap *amap_; ///
 	bool fullRef_;        /// print full reference name, not just up to whitespace

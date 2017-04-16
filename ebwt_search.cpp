@@ -91,6 +91,7 @@ static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
+static int outBatchSz; // # alignments to write to output file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -198,6 +199,7 @@ static void resetOptions() {
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	readsPerBatch			= 16;    // # reads to read from input file at once
+	outBatchSz				= 16;    // # alignments to wrote to output file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
@@ -2598,8 +2600,6 @@ patsrcFromStrings(int format,
 	}
 }
 
-#define PASS_DUMP_FILES dumpAlBase, dumpUnalBase, dumpMaxBase
-
 static string argstr;
 
 template<typename TStr>
@@ -2872,17 +2872,25 @@ static void driver(const char * type,
 							ebwt.nPat(), offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
+							fullRef,
+							dumpAlBase,
+							dumpUnalBase,
+							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
-							refnames, partitionSz);
+							refnames, nthreads,
+							outBatchSz, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
+							fullRef,
+							dumpAlBase,
+							dumpUnalBase,
+							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
-							refnames, partitionSz);
+							refnames, nthreads,
+							outBatchSz, partitionSz);
 				}
 				break;
 			case OUTPUT_SAM:
@@ -2890,23 +2898,29 @@ static void driver(const char * type,
 					throw 1;
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
-							fout, 1, rmap, amap,
-							fullRef, samNoQnameTrunc, defaultMapq,
-							PASS_DUMP_FILES,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads);
+						fout, 1, rmap, amap,
+						fullRef, samNoQnameTrunc,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz);
 					if(!samNoHead) {
 						vector<string> refnames;
 						if(!samNoSQ) {
 							readEbwtRefnames(adjustedEbwtFileBase, refnames);
 						}
 						sam->appendHeaders(
-								sam->out(0), ebwt.nPat(),
-								refnames, color, samNoSQ, rmap,
-								ebwt.plen(), fullRef,
-								samNoQnameTrunc,
-								argstr.c_str(),
-								rgs.empty() ? NULL : rgs.c_str());
+							sam->out(0),
+							ebwt.nPat(),
+							refnames, color, samNoSQ, rmap,
+							ebwt.plen(), fullRef,
+							samNoQnameTrunc,
+							argstr.c_str(),
+							rgs.empty() ? NULL : rgs.c_str());
 					}
 					sink = sam;
 				}
@@ -2914,16 +2928,30 @@ static void driver(const char * type,
 			case OUTPUT_CONCISE:
 				if(refOut) {
 					sink = new ConciseHitSink(
-							ebwt.nPat(), offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,  sampleMax,
-							refnames, reportOpps);
+						ebwt.nPat(),
+						offBase,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz,
+						reportOpps);
 				} else {
 					sink = new ConciseHitSink(
-							fout, offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,  sampleMax,
-							refnames, reportOpps);
+						fout,
+						offBase,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz,
+						reportOpps);
 				}
 				break;
 			case OUTPUT_NONE:
