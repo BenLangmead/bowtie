@@ -142,33 +142,6 @@ public:
 /// Sort by text-id then by text-offset
 bool operator< (const Hit& a, const Hit& b);
 
-#define DECL_HIT_DUMPS \
-	const std::string& dumpAl, \
-	const std::string& dumpUnal, \
-	const std::string& dumpMax
-
-#define INIT_HIT_DUMPS \
-	dumpAlBase_(dumpAl), \
-	dumpUnalBase_(dumpUnal), \
-	dumpMaxBase_(dumpMax)
-
-#define DECL_HIT_DUMPS2 \
-	DECL_HIT_DUMPS, \
-	bool onePairFile, \
-	bool sampleMax, \
-	std::vector<std::string>* refnames
-
-#define PASS_HIT_DUMPS \
-	dumpAl, \
-	dumpUnal, \
-	dumpMax
-
-#define PASS_HIT_DUMPS2 \
-	PASS_HIT_DUMPS, \
-	onePairFile, \
-	sampleMax, \
-	refnames
-
 /**
  * Encapsulates an object that accepts hits, optionally retains them in
  * a vector, and does something else with them according to
@@ -176,46 +149,43 @@ bool operator< (const Hit& a, const Hit& b);
  */
 class HitSink {
 public:
-	explicit HitSink(OutFileBuf* out,
-			DECL_HIT_DUMPS,
-			bool onePairFile,
-			bool sampleMax,
-			vector<string>* refnames = NULL,
-			size_t nthreads = 1,
-			int perThreadBufSize = 512) :
+	explicit HitSink(
+		OutFileBuf* out,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		vector<string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
 		_outs(),
 		_deleteOuts(false),
 		_refnames(refnames),
 		_numWrappers(0),
 		_locks(),
 		ts_wrap(NULL),
-		INIT_HIT_DUMPS,
+		dumpAlBase_(dumpAl),
+		dumpUnalBase_(dumpUnal),
+		dumpMaxBase_(dumpMax),
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
-		first_(true),
-		//numAligned_(0llu),
-		numUnaligned_(0llu),
-		numMaxed_(0llu),
-		//numReported_(0llu),
-		//numReportedPaired_(0llu),
 		quiet_(false),
-		nthreads_(nthreads),
+		nthreads_((nthreads > 0) ? nthreads : 1),
+		ptBufs_(),
+		ptCounts_(nthreads_),
 		perThreadBufSize_(perThreadBufSize)
 	{
-		numAligned_=0llu;
-		numReported_=0llu;
-		numReportedPaired_=0llu;
+		size_t nelt = 5 * nthreads_;
+		ptNumAligned_ = new uint64_t[nelt];
+		std::memset(reinterpret_cast<void*>(const_cast<uint64_t*>(ptNumAligned_)), 0, sizeof(uint64_t) * nelt);
+		ptNumReported_ = ptNumAligned_ + nthreads_;
+		ptNumReportedPaired_ = ptNumReported_ + nthreads_;
+		ptNumUnaligned_ = ptNumReportedPaired_ + nthreads_;
+		ptNumMaxed_ = ptNumUnaligned_ + nthreads_;
 		_outs.push_back(out);
-		vector<MUTEX_T*>::iterator it;
-		fprintf(stderr,"perThreadBufSize for output is %d\n",perThreadBufSize_);
-		perThreadBuf = new BTString*[nthreads_+1];
-		perThreadCounter = new int[nthreads_+1];
-		size_t i = 0;
-		for(i=0;i<=nthreads_;i++)
-		{
-			perThreadBuf[i] = new BTString[perThreadBufSize_];
-			perThreadCounter[i] = 0;
-		}
+		ptBufs_.resize(nthreads_);
+		ptCounts_.resize(nthreads_, 0);
 		//had to move this below the array inits, otherwise it get's mangled leading to segfaults on access
 		_locks.push_back(new MUTEX_T);
 		initDumps();
@@ -227,16 +197,23 @@ public:
 	 * is the 0-padded reference index.  Someday we may want to include
 	 * the name of the reference sequence in the filename somehow.
 	 */
-	explicit HitSink(size_t numOuts,
-			DECL_HIT_DUMPS,
-			bool onePairFile,
-			bool sampleMax,
-			vector<string>* refnames = NULL) :
+	explicit HitSink(
+		size_t numOuts,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		vector<string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
 		_outs(),
 		_deleteOuts(true),
 		_refnames(refnames),
 		_locks(),
-		INIT_HIT_DUMPS,
+		dumpAlBase_(dumpAl),
+		dumpUnalBase_(dumpUnal),
+		dumpMaxBase_(dumpMax),
 		onePairFile_(onePairFile),
 		sampleMax_(sampleMax),
 		quiet_(false),
@@ -255,21 +232,8 @@ public:
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
-		/*if(nthreads_ > 0)
-		{
-			size_t i = 0;
-			int j = 0;
-			ThreadSafe _ts(_locks[0]);
-			for(i=0;i<=nthreads_;i++)
-			{
-				for(j=0;j<perThreadCounter[i];j++)
-				{
-					out(0).writeString(perThreadBuf[i][j]);
-					first_ = false;
-				}
-				perThreadCounter[i]=0;
-			}
-		}*/
+		delete ptNumAligned_;
+		ptNumAligned_ = NULL;
 		closeOuts();
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
@@ -293,7 +257,6 @@ public:
 	 * lock or any of the per-stream locks will be contended.
 	 */
 	void addWrapper() {
-		// TODO: opt for atomic in TBB mode, or possibly all modes
 		ThreadSafe ts(&numWrapper_mutex_m);
 		_numWrappers++;
 	}
@@ -310,188 +273,168 @@ public:
 	/**
 	 * Append a single hit to the given output stream.
 	 */
-	virtual void append(BTString& o, const Hit& h) = 0;
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms) = 0;
 
 	/**
-	 * Report a batch of hits; all in the given vector.
+	 * Add a number of alignments to the tally.  Tally shouldn't
+	 * include reads that fail to align either because they had 0
+	 * alignments or because of -m.
 	 */
-	virtual void reportHits(BTString& o, vector<Hit>& hs, size_t threadId) {
-		reportHits(o, hs, 0, hs.size(), threadId);
+	void tallyAlignments(size_t threadId, size_t numAl, bool paired) {
+		ptNumAligned_[threadId] += numAl;
+		if(paired) {
+			ptNumReportedPaired_[threadId] += numAl;
+		} else {
+			ptNumReported_[threadId] += numAl;
+		}
 	}
 
 	/**
 	 * Report a batch of hits from a vector, perhaps subsetting it.
 	 */
 	virtual void reportHits(
-		BTString& o,
-		vector<Hit>& hs,
+		const Hit *hptr,
+		vector<Hit> *hsptr,
 		size_t start,
 		size_t end,
-		size_t threadId)
+		size_t threadId,
+		int mapq,
+		int xms,
+		bool tally)
 	{
 		assert_geq(end, start);
-		if(end-start == 0) return;
-		bool paired = hs[start].mate > 0;
+		assert(nthreads_ > 1 || threadId == 0);
+		if(end == start) {
+			return;
+		}
+		const Hit& firstHit = (hptr == NULL) ? (*hsptr)[start] : *hptr;
+		bool paired = firstHit.mate > 0;
 		// Sort reads so that those against the same reference sequence
 		// are consecutive.
-		if(_outs.size() > 1 && end-start > 2) {
-			sort(hs.begin() + start, hs.begin() + end);
+		if(hsptr != NULL && _outs.size() > 1 && end - start > 2) {
+			sort(hsptr->begin() + start, hsptr->begin() + end);
 		}
-		if(_outs.size() == 1 && end - start == 1) {
-			// 1 output stream, 1 alignment
-			assert(hs[start].repOk());
-			append(o, hs[start]);
-			{
-				if(nthreads_ > 0)
-				{
-					if(perThreadCounter[threadId] >= perThreadBufSize_)
-					{
-						int i = 0;
-						for(i=0; i < perThreadBufSize_; i++)
-						{
-							ThreadSafe _ts(_locks[0]);
-							out(0).writeString(perThreadBuf[threadId][i]);
-						}
-						perThreadCounter[threadId] = 0;
-					}
-					perThreadBuf[threadId][perThreadCounter[threadId]++] = o;
-					//TODO: make these atomics to get rid of lock
-					first_ = false;
-#ifdef WITH_TBB	
-					numAligned_.fetch_and_add(1);
-					if(paired) {
-						numReportedPaired_.fetch_and_add(1);
-					} else {
-						numReported_.fetch_and_add(1);
-					}
-#else
-					//TODO: this is segfaulting in the TBB aomtic fetch instruction in the lock
-					ThreadSafe _ts(_locks[0]);
-					numAligned_++;
-					if(paired) {
-						numReportedPaired_++;
-					} else {
-						numReported_++;
-					}
-#endif
-				}
-				else
-				{
-					ThreadSafe _ts(_locks[0]);
-					first_ = false;
+		BTString& o = ptBufs_[threadId];
+		if(_outs.size() == 1) {
+			// Per-thread buffering is active
+			for(size_t i = start; i < end; i++) {
+				const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
+				assert(h.repOk());
+				if(nthreads_ > 1) {
+					maybeFlush(threadId, 0);
+					append(o, h, mapq, xms);
+					ptCounts_[threadId]++;
+				} else {
+					append(o, h, mapq, xms);
 					out(0).writeString(o);
-#ifdef WITH_TBB	
-					numAligned_.fetch_and_add(1);
-					if(paired) {
-						numReportedPaired_.fetch_and_add(1);
-					} else {
-						numReported_.fetch_and_add(1);
-					}
-#else
-					numAligned_++;
-					if(paired) {
-						numReportedPaired_++;
-					} else {
-						numReported_++;
-					}
-#endif
+					o.clear();
 				}
 			}
-			o.clear();
 		} else {
 			// multiple output streams or alignments
+			// Note: in this case we basically don't get the benefit
+			// from per-thread buffering, becuase it is too
+			// complicated to provide per-thread, per-output-lock
+			// buffers.
 			size_t i = start;
 			while(i < end) {
-				size_t strIdx = refIdxToStreamIdx(hs[i].h.first);
+				const Hit& h = (hptr == NULL) ? (*hsptr)[i] : *hptr;
+				size_t strIdx = refIdxToStreamIdx(h.h.first);
 				{
+					assert(h.repOk());
 					do {
-						assert(hs[i].repOk());
-						append(o, hs[i]);
+						append(o, h, mapq, xms);
 						{
 							ThreadSafe _ts(_locks[strIdx]);
-							out(hs[i].h.first).writeString(o);
+							out(h.h.first).writeString(o);
 						}
 						o.clear();
 						i++;
-					} while(refIdxToStreamIdx(hs[i].h.first) == strIdx && i < end);
+					} while(refIdxToStreamIdx(h.h.first) == strIdx && i < end);
 				}
 			}
-			{
-				ThreadSafe _ts(&main_mutex_m);
-				first_ = false;
-				numAligned_++;
-				if(paired) {
-					numReportedPaired_ += (end-start);
-				} else {
-					numReported_ += (end-start);
-				}
-			}
+		}
+		if(tally) {
+			tallyAlignments(threadId, end - start, paired);
 		}
 	}
 
 	/**
 	 * Called when all alignments are complete.  It is assumed that no
-	 * synchronization is necessary.
+	 * synchronization is necessary
 	 */
 	void finish(bool hadoopOut) {
-		// Close output streams
+		// Flush all per-thread buffers
+		flushAll(0);
+		
+		// Close all output streams
 		closeOuts();
+		
+		// Print information about how many unpaired and/or paired
+		// reads were aligned.
 		if(!quiet_) {
-			// Print information about how many unpaired and/or paired
-			// reads were aligned.
-			uint64_t tot = numAligned_ + numUnaligned_ + numMaxed_;
+			uint64_t numReported = 0, numReportedPaired = 0;
+			uint64_t numAligned = 0, numUnaligned = 0;
+			uint64_t numMaxed = 0;
+			for(int i = 0; i < nthreads_; i++) {
+				numReported += ptNumReported_[i];
+				numReportedPaired += ptNumReportedPaired_[i];
+				numAligned += ptNumAligned_[i];
+				numUnaligned += ptNumUnaligned_[i];
+				numMaxed += ptNumMaxed_[i];
+			}
+			
+			uint64_t tot = numAligned + numUnaligned + numMaxed;
 			double alPct = 0.0, unalPct = 0.0, maxPct = 0.0;
 			if(tot > 0) {
-				alPct   = 100.0 * (double)numAligned_ / (double)tot;
-				unalPct = 100.0 * (double)numUnaligned_ / (double)tot;
-				maxPct  = 100.0 * (double)numMaxed_ / (double)tot;
+				alPct   = 100.0 * (double)numAligned / (double)tot;
+				unalPct = 100.0 * (double)numUnaligned / (double)tot;
+				maxPct  = 100.0 * (double)numMaxed / (double)tot;
 			}
 			cerr << "# reads processed: " << tot << endl;
 			cerr << "# reads with at least one reported alignment: "
-			     << numAligned_ << " (" << fixed << setprecision(2)
+			     << numAligned << " (" << fixed << setprecision(2)
 			     << alPct << "%)" << endl;
 			cerr << "# reads that failed to align: "
-			     << numUnaligned_ << " (" << fixed << setprecision(2)
+			     << numUnaligned << " (" << fixed << setprecision(2)
 			     << unalPct << "%)" << endl;
-			if(numMaxed_ > 0) {
+			if(numMaxed > 0) {
 				if(sampleMax_) {
 					cerr << "# reads with alignments sampled due to -M: "
-						 << numMaxed_ << " (" << fixed << setprecision(2)
+						 << numMaxed << " (" << fixed << setprecision(2)
 						 << maxPct << "%)" << endl;
 				} else {
 					cerr << "# reads with alignments suppressed due to -m: "
-						 << numMaxed_ << " (" << fixed << setprecision(2)
+						 << numMaxed << " (" << fixed << setprecision(2)
 						 << maxPct << "%)" << endl;
 				}
 			}
-			if(first_) {
-				assert_eq(0llu, numReported_);
+			if(numReported == 0 && numReportedPaired == 0) {
 				cerr << "No alignments" << endl;
 			}
-			else if(numReportedPaired_ > 0 && numReported_ == 0) {
-				cerr << "Reported " << (numReportedPaired_ >> 1)
+			else if(numReportedPaired > 0 && numReported == 0) {
+				cerr << "Reported " << (numReportedPaired >> 1)
 					 << " paired-end alignments to " << _outs.size()
 					 << " output stream(s)" << endl;
 			}
-			else if(numReported_ > 0 && numReportedPaired_ == 0) {
-				cerr << "Reported " << numReported_
+			else if(numReported > 0 && numReportedPaired == 0) {
+				cerr << "Reported " << numReported
 					 << " alignments to " << _outs.size()
 					 << " output stream(s)" << endl;
 			}
 			else {
-				assert_gt(numReported_, 0);
-				assert_gt(numReportedPaired_, 0);
-				cerr << "Reported " << (numReportedPaired_ >> 1)
-					 << " paired-end alignments and " << numReported_
+				assert_gt(numReported + numReportedPaired, 0);
+				cerr << "Reported " << (numReportedPaired >> 1)
+					 << " paired-end alignments and " << numReported
 					 << " singleton alignments to " << _outs.size()
 					 << " output stream(s)" << endl;
 			}
 			if(hadoopOut) {
-				cerr << "reporter:counter:Bowtie,Reads with reported alignments," << numAligned_ << endl;
-				cerr << "reporter:counter:Bowtie,Reads with no alignments," << numUnaligned_ << endl;
-				cerr << "reporter:counter:Bowtie,Reads exceeding -m limit," << numMaxed_ << endl;
-				cerr << "reporter:counter:Bowtie,Unpaired alignments reported," << numReported_ << endl;
-				cerr << "reporter:counter:Bowtie,Paired alignments reported," << numReportedPaired_ << endl;
+				cerr << "reporter:counter:Bowtie,Reads with reported alignments," << numAligned << endl;
+				cerr << "reporter:counter:Bowtie,Reads with no alignments," << numUnaligned << endl;
+				cerr << "reporter:counter:Bowtie,Reads exceeding -m limit," << numMaxed << endl;
+				cerr << "reporter:counter:Bowtie,Unpaired alignments reported," << numReported << endl;
+				cerr << "reporter:counter:Bowtie,Paired alignments reported," << numReportedPaired << endl;
 			}
 		}
 	}
@@ -714,15 +657,11 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportMaxed(
-		BTString& o,
 		vector<Hit>& hs,
-		PatternSourcePerThread& p,
 		size_t threadId,
-		bool lock = true)
+		PatternSourcePerThread& p)
 	{
-		// TODO: opt for atomic in TBB mode, or possibly all modes
-		ThreadSafe _ts(&main_mutex_m, lock);
-		numMaxed_++;
+		ptNumMaxed_[threadId]++;
 	}
 
 	/**
@@ -730,34 +669,45 @@ public:
 	 * want to print a placeholder when output is chained.
 	 */
 	virtual void reportUnaligned(
-		BTString& o,
-		PatternSourcePerThread& p,
-		bool lock = true)
+		size_t threadId,
+		PatternSourcePerThread& p)
 	{
-		// TODO: opt for atomic in TBB mode, or possibly all modes
-		ThreadSafe _ts(&main_mutex_m, lock);
-		numUnaligned_++;
+		ptNumUnaligned_[threadId]++;
 	}
 
 protected:
 
-	/// Implementation of hit-report
-	virtual void reportHit(
-		BTString& o,
-		const Hit& h,
-		bool lock = true)
-	{
-		// TODO: opt for atomic in TBB mode, or possibly all modes
-		assert(h.repOk());
+	/**
+	 * Flush thread's output buffer and reset both buffer and count.
+	 */
+	void flush(size_t threadId, size_t outId) {
 		{
-			ThreadSafe _ts(&main_mutex_m, lock);
-			first_ = false;
-			if(h.mate > 0) numReportedPaired_++;
-			else           numReported_++;
-			numAligned_++;
+			ThreadSafe _ts(_locks[0]); // flush
+			out(outId).writeString(ptBufs_[threadId]);
+		}
+		ptCounts_[threadId] = 0;
+		ptBufs_[threadId].clear();
+	}
+	
+	/**
+	 * Flush all output buffers.
+	 */
+	void flushAll(size_t outId) {
+		for(int i = 0; i < nthreads_; i++) {
+			flush(i, outId);
 		}
 	}
 
+	/**
+	 * If the thread's output buffer is currently full, flush it and
+	 * reset both buffer and count.
+	 */
+	void maybeFlush(size_t threadId, size_t outId) {
+		if(ptCounts_[threadId] >= perThreadBufSize_) {
+			flush(threadId, outId);
+		}
+	}
+	
 	/**
 	 * Close (and flush) all OutFileBufs.
 	 */
@@ -782,8 +732,8 @@ protected:
 	
 	// used for output read buffer	
 	size_t nthreads_;
-	BTString**	perThreadBuf;
-	int* 		perThreadCounter;
+	std::vector<BTString> ptBufs_;
+	std::vector<size_t> ptCounts_;
 	int perThreadBufSize_;
 
 	// Output filenames for dumping
@@ -902,18 +852,12 @@ protected:
 	bool dumpUnalignFlag_;
 	bool dumpMaxedFlag_;
 
-	volatile bool     first_;       /// true -> first hit hasn't yet been reported
-	volatile uint64_t numUnaligned_;/// # reads with no alignments
-	volatile uint64_t numMaxed_;    /// # reads with # alignments exceeding -m ceiling
-#ifdef WITH_TBB
-	tbb::atomic<uint64_t> numAligned_;  /// # reads with >= 1 alignment
-	tbb::atomic<uint64_t> numReported_; /// # single-ended alignments reported
-	tbb::atomic<uint64_t> numReportedPaired_; /// # paired-end alignments reported
-#else
-	volatile uint64_t numAligned_;  /// # reads with >= 1 alignment
-	volatile uint64_t numReported_; /// # single-ended alignments reported
-	volatile uint64_t numReportedPaired_; /// # paired-end alignments reported
-#endif
+	volatile bool first_;       /// true -> first hit hasn't yet been reported
+	volatile uint64_t *ptNumAligned_;
+	volatile uint64_t *ptNumReported_;
+	volatile uint64_t *ptNumReportedPaired_;
+	volatile uint64_t *ptNumUnaligned_;
+	volatile uint64_t *ptNumMaxed_;
 
 	bool quiet_;  /// true -> don't print alignment stats at the end
 };
@@ -924,7 +868,12 @@ protected:
  */
 class HitSinkPerThread {
 public:
-	HitSinkPerThread(HitSink& sink, uint32_t max, uint32_t n) :
+	explicit HitSinkPerThread(
+		HitSink& sink,
+		uint32_t max,
+		uint32_t n,
+		int defaultMapq,
+		size_t threadId) :
 		_sink(sink),
 		_bestRemainingStratum(0),
 		_numValidHits(0llu),
@@ -933,13 +882,11 @@ public:
 		hitsForThisRead_(),
 		_max(max),
 		_n(n),
-		threadId(0)
+		threadId_(threadId)
 	{
 		sink.addWrapper();
 		assert_gt(_n, 0);
 	}
-
-	void set_thread_id(size_t threadId_) { threadId = threadId_; }
 
 	virtual ~HitSinkPerThread() { }
 
@@ -967,18 +914,26 @@ public:
 		ret = 0;
 		if(maxed) {
 			// Report that the read maxed-out; useful for chaining output
-			if(dump) _sink.reportMaxed(obuf_, _bufferedHits, p, threadId);
+			if(dump) _sink.reportMaxed(_bufferedHits, threadId_, p);
 			_bufferedHits.clear();
 		} else if(unal) {
 			// Report that the read failed to align; useful for chaining output
-			if(dump) _sink.reportUnaligned(obuf_, p, threadId);
+			if(dump) _sink.reportUnaligned(threadId_, p);
 		} else {
 			// Flush buffered hits
 			assert_gt(_bufferedHits.size(), 0);
 			if(_bufferedHits.size() > _n) {
 				_bufferedHits.resize(_n);
 			}
-			_sink.reportHits(obuf_, _bufferedHits, threadId);
+			int mapq = defaultMapq_;
+			int xms = (int)(_bufferedHits.size());
+			const bool paired = p.bufa().mate > 0;
+			if(paired) {
+				xms /= 2;
+			}
+			xms++;
+			_sink.reportHits(NULL, &_bufferedHits, 0, _bufferedHits.size(),
+			                 threadId_, mapq, xms, true);
 			_sink.dumpAlign(p);
 			ret = (uint32_t)_bufferedHits.size();
 			_bufferedHits.clear();
@@ -1039,7 +994,7 @@ public:
 	 * Return true if there are no reportable hits with the given cost
 	 * (or worse).
 	 */
-	virtual bool irrelevantCost(uint16_t cost) {
+	virtual bool irrelevantCost(uint16_t cost) const {
 		return false;
 	}
 
@@ -1067,7 +1022,7 @@ public:
 	 * Return true iff the underlying HitSink dumps unaligned or
 	 * maxed-out reads.
 	 */
-	bool dumpsReads() {
+	bool dumpsReads() const {
 		return _sink.dumpsReads();
 	}
 
@@ -1089,7 +1044,7 @@ public:
 	 * Return max # hits to report (*2 in paired-end mode because mates
 	 * count separately)
 	 */
-	virtual uint32_t maxHits() {
+	virtual uint32_t maxHits() const {
 		return _n;
 	}
 
@@ -1110,8 +1065,8 @@ protected:
 	uint32_t hitsForThisRead_; /// # hits for this read so far
 	uint32_t _max; /// don't report any hits if there were > _max
 	uint32_t _n;   /// report at most _n hits
-	size_t threadId;
-	BTString obuf_; /// expandable output buffer
+	int defaultMapq_;
+	size_t threadId_;
 };
 
 /**
@@ -1140,10 +1095,12 @@ class NGoodHitSinkPerThread : public HitSinkPerThread {
 
 public:
 	NGoodHitSinkPerThread(
-			HitSink& sink,
-			uint32_t n,
-			uint32_t max) :
-				HitSinkPerThread(sink, max, n)
+		HitSink& sink,
+		uint32_t n,
+		uint32_t max,
+		int defaultMapq,
+		size_t threadId) :
+		HitSinkPerThread(sink, max, n, defaultMapq, threadId)
 	{ }
 
 	virtual bool spanStrata() {
@@ -1197,31 +1154,38 @@ public:
 class NGoodHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
 	NGoodHitSinkPerThreadFactory(
-			HitSink& sink,
-			uint32_t n,
-			uint32_t max) :
-			sink_(sink),
-			n_(n),
-			max_(max)
-	{ }
+		HitSink& sink,
+		uint32_t n,
+		uint32_t max,
+		int defaultMapq,
+		size_t threadId) :
+		sink_(sink),
+		n_(n),
+		max_(max),
+		defaultMapq_(defaultMapq),
+		threadId_(threadId) { }
 
 	/**
 	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new NGoodHitSinkPerThread(sink_, n_, max_);
+		return new NGoodHitSinkPerThread(sink_, n_, max_, defaultMapq_, threadId_);
 	}
+	
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
 		uint32_t max = max_ * (max_ == 0xffffffff ? 1 : m);
 		uint32_t n = n_ * (n_ == 0xffffffff ? 1 : m);
-		return new NGoodHitSinkPerThread(sink_, n, max);
+		return new NGoodHitSinkPerThread(sink_, n, max, defaultMapq_, threadId_);
 	}
 
 private:
+
 	HitSink& sink_;
 	uint32_t n_;
 	uint32_t max_;
+	int defaultMapq_;
+	size_t threadId_;
 };
 
 /**
@@ -1233,13 +1197,15 @@ class NBestFirstStratHitSinkPerThread : public HitSinkPerThread {
 
 public:
 	NBestFirstStratHitSinkPerThread(
-			HitSink& sink,
-			uint32_t n,
-			uint32_t max,
-			uint32_t mult) :
-				HitSinkPerThread(sink, max, n),
-				bestStratum_(999), mult_(mult)
-	{ }
+		HitSink& sink,
+		uint32_t n,
+		uint32_t max,
+		uint32_t mult,
+		int defaultMapq,
+		size_t threadId) :
+		HitSinkPerThread(sink, max, n, defaultMapq, threadId),
+		bestStratum_(999),
+		mult_(mult) { }
 
 	/**
 	 * false -> we do not allow strata to be spanned
@@ -1331,31 +1297,37 @@ private:
 class NBestFirstStratHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
 	NBestFirstStratHitSinkPerThreadFactory(
-			HitSink& sink,
-			uint32_t n,
-			uint32_t max) :
-			sink_(sink),
-			n_(n),
-			max_(max)
-	{ }
+		HitSink& sink,
+		uint32_t n,
+		uint32_t max,
+		int defaultMapq,
+		size_t threadId) :
+		sink_(sink),
+		n_(n),
+		max_(max),
+		defaultMapq_(defaultMapq),
+		threadId_(threadId) { }
 
 	/**
 	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, 1);
+		return new NBestFirstStratHitSinkPerThread(sink_, n_, max_, 1, defaultMapq_, threadId_);
 	}
+	
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
 		uint32_t max = max_ * (max_ == 0xffffffff ? 1 : m);
 		uint32_t n = n_ * (n_ == 0xffffffff ? 1 : m);
-		return new NBestFirstStratHitSinkPerThread(sink_, n, max, m);
+		return new NBestFirstStratHitSinkPerThread(sink_, n, max, m, defaultMapq_, threadId_);
 	}
 
 private:
 	HitSink& sink_;
 	uint32_t n_;
 	uint32_t max_;
+	int defaultMapq_;
+	size_t threadId_;
 };
 
 /**
@@ -1366,8 +1338,10 @@ class AllHitSinkPerThread : public HitSinkPerThread {
 public:
 	AllHitSinkPerThread(
 		HitSink& sink,
-		uint32_t max) :
-		HitSinkPerThread(sink, max, 0xffffffff) { }
+		uint32_t max,
+		int defaultMapq,
+		size_t threadId) :
+		HitSinkPerThread(sink, max, 0xffffffff, defaultMapq, threadId) { }
 
 	virtual bool spanStrata() {
 		return true; // we span strata
@@ -1412,27 +1386,32 @@ public:
 class AllHitSinkPerThreadFactory : public HitSinkPerThreadFactory {
 public:
 	AllHitSinkPerThreadFactory(
-			HitSink& sink,
-			uint32_t max) :
-			sink_(sink),
-			max_(max)
-	{ }
+		HitSink& sink,
+		uint32_t max,
+		int defaultMapq,
+		size_t threadId) :
+		sink_(sink),
+		max_(max),
+		defaultMapq_(defaultMapq),
+		threadId_(threadId) { }
 
 	/**
 	 * Allocate a new NGoodHitSinkPerThread object on the heap,
 	 * using the parameters given in the constructor.
 	 */
 	virtual HitSinkPerThread* create() const {
-		return new AllHitSinkPerThread(sink_, max_);
+		return new AllHitSinkPerThread(sink_, max_, defaultMapq_, threadId_);
 	}
 	virtual HitSinkPerThread* createMult(uint32_t m) const {
 		uint32_t max = max_ * (max_ == 0xffffffff ? 1 : m);
-		return new AllHitSinkPerThread(sink_, max);
+		return new AllHitSinkPerThread(sink_, max, defaultMapq_, threadId_);
 	}
 
 private:
 	HitSink& sink_;
 	uint32_t max_;
+	int defaultMapq_;
+	size_t threadId_;
 };
 
 /**
@@ -1446,11 +1425,28 @@ public:
 	/**
 	 * Construct a single-stream ConciseHitSink (default)
 	 */
-	ConciseHitSink(OutFileBuf* out,
-			       int offBase,
-	               DECL_HIT_DUMPS2,
-	               bool reportOpps = false) :
-		HitSink(out, PASS_HIT_DUMPS2),
+	ConciseHitSink(
+		OutFileBuf* out,
+		int offBase,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
+		bool reportOpps = false) :
+		HitSink(
+			out,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1458,11 +1454,28 @@ public:
 	 * Construct a multi-stream ConciseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	ConciseHitSink(size_t numOuts,
-	               int offBase,
-	               DECL_HIT_DUMPS2,
-	               bool reportOpps = false) :
-		HitSink(numOuts, PASS_HIT_DUMPS2),
+	ConciseHitSink(
+		size_t numOuts,
+		int offBase,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
+		bool reportOpps = false) :
+		HitSink(
+			numOuts,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
 		_reportOpps(reportOpps),
 		offBase_(offBase) { }
 
@@ -1492,28 +1505,11 @@ public:
 	/**
 	 * Append a verbose, readable hit to the given output stream.
 	 */
-	void append(BTString& o, const Hit& h) {
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
 		ConciseHitSink::append(o, h, this->offBase_, this->_reportOpps);
 	}
 
 protected:
-
-	/**
-	 * Report a concise alignment to the appropriate output stream.
-	 */
-	virtual void reportHit(
-		BTString& o,
-		const Hit& h,
-		bool lock = true)
-	{
-		append(o, h);
-		{
-			ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)], lock);
-			HitSink::reportHit(o, h, false);
-			out(h.h.first).writeString(o);
-		}
-		o.clear();
-	}
 
 private:
 	bool _reportOpps;
@@ -1545,78 +1541,114 @@ inline void printUptoWs(BTString& o, const std::string& str, bool ws) {
  * pat-name \t [-|+] \t ref-name \t ref-off \t pat \t qual \t #-alt-hits \t mm-list
  */
 class VerboseHitSink : public HitSink {
+
 public:
+
 	/**
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
-	VerboseHitSink(OutFileBuf* out,
-	               int offBase,
-	               bool colorSeq,
-	               bool colorQual,
-	               bool printCost,
-	               const Bitset& suppressOuts,
-	               ReferenceMap *rmap,
-	               AnnotationMap *amap,
-	               bool fullRef,
-	               DECL_HIT_DUMPS2,
-				   int partition = 0) :
-	HitSink(out, PASS_HIT_DUMPS2),
-	partition_(partition),
-	offBase_(offBase),
-	colorSeq_(colorSeq),
-	colorQual_(colorQual),
-	cost_(printCost),
-	suppress_(suppressOuts),
-	fullRef_(fullRef),
-	rmap_(rmap), amap_(amap)
-	{ }
+	VerboseHitSink(
+		OutFileBuf* out,
+		int offBase,
+		bool colorSeq,
+		bool colorQual,
+		bool printCost,
+		const Bitset& suppressOuts,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
+		int partition = 0) :
+		HitSink(
+			out,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
+		partition_(partition),
+		offBase_(offBase),
+		colorSeq_(colorSeq),
+		colorQual_(colorQual),
+		cost_(printCost),
+		suppress_(suppressOuts),
+		fullRef_(fullRef),
+		rmap_(rmap), amap_(amap)
+		{ }
 
 	/**
 	 * Construct a multi-stream VerboseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	VerboseHitSink(size_t numOuts,
-	               int offBase,
-	               bool colorSeq,
-	               bool colorQual,
-	               bool printCost,
-	               const Bitset& suppressOuts,
-	               ReferenceMap *rmap,
-	               AnnotationMap *amap,
-	               bool fullRef,
-	               DECL_HIT_DUMPS2,
-				   int partition = 0) :
-	HitSink(numOuts, PASS_HIT_DUMPS2),
-	partition_(partition),
-	offBase_(offBase),
-	colorSeq_(colorSeq),
-	colorQual_(colorQual),
-	cost_(printCost),
-	suppress_(64),
-	fullRef_(fullRef),
-	rmap_(rmap),
-	amap_(amap)
-	{ }
+	VerboseHitSink(
+		size_t numOuts,
+		int offBase,
+		bool colorSeq,
+		bool colorQual,
+		bool printCost,
+		const Bitset& suppressOuts,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize,
+		int partition = 0) :
+		HitSink(
+			numOuts,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
+		partition_(partition),
+		offBase_(offBase),
+		colorSeq_(colorSeq),
+		colorQual_(colorQual),
+		cost_(printCost),
+		suppress_(64),
+		fullRef_(fullRef),
+		rmap_(rmap),
+		amap_(amap)
+		{ }
 
-	// In hit.cpp
-	static void append(BTString& o,
-	                   const Hit& h,
-	                   const vector<string>* refnames,
-	                   ReferenceMap *rmap,
-	                   AnnotationMap *amap,
-	                   bool fullRef,
-	                   int partition,
-	                   int offBase,
-	                   bool colorSeq,
-	                   bool colorQual,
-	                   bool cost,
-	                   const Bitset& suppress);
+	static void append(
+		BTString& o,
+		const Hit& h,
+		const vector<string>* refnames,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		int partition,
+		int offBase,
+		bool colorSeq,
+		bool colorQual,
+		bool cost,
+		const Bitset& suppress);
 
 	/**
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(BTString& o, const Hit& h) {
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
 		VerboseHitSink::append(o, h, _refnames, rmap_, amap_,
 		                       fullRef_, partition_, offBase_,
 		                       colorSeq_, colorQual_, cost_,
@@ -1627,46 +1659,9 @@ public:
 	 * See hit.cpp
 	 */
 	virtual void reportMaxed(
-		BTString& o,
 		vector<Hit>& hs,
-		PatternSourcePerThread& p,
-		bool lock = true,
-		size_t threadId=0);
-
-protected:
-
-	/**
-	 * Report a verbose, human-readable alignment to the appropriate
-	 * output stream.
-	 */
-	virtual void reportHit(
-		BTString& o,
-		const Hit& h,
-		bool lock = true)
-	{
-		reportHit(o, h, true, lock);
-	}
-
-	/**
-	 * Report a verbose, human-readable alignment to the appropriate
-	 * output stream.
-	 */
-	virtual void reportHit(
-		BTString& o,
-		const Hit& h,
-		bool count,
-		bool lock = true)
-	{
-		append(o, h);
-		{
-			ThreadSafe _ts(_locks[refIdxToStreamIdx(h.h.first)], lock);
-			if(count) {
-				HitSink::reportHit(o, h, false);
-			}
-			out(h.h.first).writeString(o);
-		}
-		o.clear();
-	}
+		size_t threadId,
+		PatternSourcePerThread& p);
 
 private:
 	int      partition_;   /// partition size, or 0 if partitioning is disabled
@@ -1687,8 +1682,9 @@ private:
  */
 class StubHitSink : public HitSink {
 public:
-	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL) { }
-	virtual void append(BTString& o, const Hit& h) { }
+	StubHitSink() : HitSink(new OutFileBuf(".tmp"), "", "", "", false, false, NULL, 1, 1) { }
+	
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms) { }
 };
 
 #endif /*HIT_H_*/

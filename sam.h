@@ -40,81 +40,75 @@ public:
 	/**
 	 * Construct a single-stream VerboseHitSink (default)
 	 */
-	SAMHitSink(OutFileBuf* out,
-	           int offBase,
-	           ReferenceMap *rmap,
-	           AnnotationMap *amap,
-	           bool fullRef,
-	           bool noQnameTrunc,
-	           int defaultMapq,
-	           DECL_HIT_DUMPS2,
-		   int nthreads) :
-	HitSink(out, PASS_HIT_DUMPS2, nthreads),
-	offBase_(offBase), defaultMapq_(defaultMapq),
-	rmap_(rmap), amap_(amap), fullRef_(fullRef),
-	noQnameTrunc_(noQnameTrunc) { }
+	SAMHitSink(
+		OutFileBuf* out,
+		int offBase,
+		ReferenceMap *rmap,
+		AnnotationMap *amap,
+		bool fullRef,
+		bool noQnameTrunc,
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
+		HitSink(
+			out,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
+		offBase_(offBase),
+		rmap_(rmap),
+		amap_(amap),
+		fullRef_(fullRef),
+		noQnameTrunc_(noQnameTrunc) { }
 
 	/**
 	 * Construct a multi-stream VerboseHitSink with one stream per
 	 * reference string (see --refout)
 	 */
-	SAMHitSink(size_t numOuts,
-	           int offBase,
-	           ReferenceMap *rmap,
-	           AnnotationMap *amap,
-	           bool fullRef,
-	           int defaultMapq,
-	           DECL_HIT_DUMPS2) :
-	HitSink(numOuts, PASS_HIT_DUMPS2),
-	offBase_(offBase), defaultMapq_(defaultMapq),
-	rmap_(rmap), amap_(amap), fullRef_(fullRef) { }
-
-	/**
-	 * Append a SAM alignment to the given output stream.
-	 */
-	static void append(
-		BTString& o,
-		const Hit& h,
-		int mapq,
-		int xms,
-		const vector<string>* refnames,
+	SAMHitSink(
+		size_t numOuts,
+		int offBase,
 		ReferenceMap *rmap,
 		AnnotationMap *amap,
 		bool fullRef,
-		bool noQnameTrunc,
-		int offBase);
-
-	/**
-	 * Append a SAM alignment for an aligned read to the given output
-	 * stream.
-	 */
-	static void appendAligned(
-		BTString& o,
-		const Hit& h,
-		int mapq,
-		int xms,
-		const vector<string>* refnames,
-		ReferenceMap *rmap,
-		AnnotationMap *amap,
-		bool fullRef,
-		bool noQnameTrunc,
-		int offBase);
+		const std::string& dumpAl,
+		const std::string& dumpUnal,
+		const std::string& dumpMax,
+		bool onePairFile,
+		bool sampleMax,
+		std::vector<std::string>* refnames,
+		size_t nthreads,
+		int perThreadBufSize) :
+		HitSink(
+			numOuts,
+			dumpAl,
+			dumpUnal,
+			dumpMax,
+			onePairFile,
+			sampleMax,
+			refnames,
+			nthreads,
+			perThreadBufSize),
+		offBase_(offBase),
+		rmap_(rmap),
+		amap_(amap),
+		fullRef_(fullRef) { }
 
 	/**
 	 * Append a verbose, readable hit to the output stream
 	 * corresponding to the hit.
 	 */
-	virtual void append(BTString& o, const Hit& h) {
-		SAMHitSink::append(o, h, defaultMapq_, 0, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
-	}
-
-	/**
-	 * Append a verbose, readable hit to the output stream
-	 * corresponding to the hit.
-	 */
-	virtual void append(BTString& o, const Hit& h, int mapq, int xms) {
-		SAMHitSink::append(o, h, mapq, xms, _refnames, rmap_, amap_, fullRef_, noQnameTrunc_, offBase_);
-	}
+	virtual void append(BTString& o, const Hit& h, int mapq, int xms);
 
 	/**
 	 * Write the SAM header lines.
@@ -135,72 +129,36 @@ public:
 protected:
 
 	/**
-	 *
+	 * Both
 	 */
 	void reportUnOrMax(
-		BTString& o,
 		PatternSourcePerThread& p,
-		vector<Hit>* hs,
-		bool un,
-		bool lock = true,
-		size_t threadId = 0);
-
-	/**
-	 * Report a verbose, human-readable alignment to the appropriate
-	 * output stream.
-	 */
-	virtual void reportHit(BTString& o, const Hit& h) {
-		reportSamHit(o, h, defaultMapq_, 0);
-	}
-
-	/**
-	 * Report a SAM alignment with the given mapping quality and XM
-	 * field.
-	 */
-	virtual void reportSamHit(
-		BTString& o,
-		const Hit& h,
-		int mapq,
-		int xms);
-
-	/**
-	 * Report a batch of SAM alignments (e.g. two mates that should be
-	 * printed together) with the given mapping quality and XM field.
-	 */
-	virtual void reportSamHits(
-		BTString& o,
-		vector<Hit>& hs,
-		size_t start,
-		size_t end,
-		int mapq,
-		int xms);
+		vector<Hit>* hs, // could be NULL
+		size_t threadId,
+		bool un);
 
 	/**
 	 * See sam.cpp
 	 */
 	virtual void reportMaxed(
-		BTString& o,
 		vector<Hit>& hs,
-		PatternSourcePerThread& p,
-		size_t threadId);
+		size_t threadId,
+		PatternSourcePerThread& p);
 
 	/**
 	 * See sam.cpp
 	 */
 	virtual void reportUnaligned(
-		BTString& o,
-		PatternSourcePerThread& p,
-		bool lock = true)
+		size_t threadId,
+		PatternSourcePerThread& p)
 	{
-		reportUnOrMax(o, p, NULL, true, lock);
+		reportUnOrMax(p, NULL, threadId, true);
 	}
 
 private:
 	int  offBase_;        /// Add this to reference offsets before outputting.
 	                      /// (An easy way to make things 1-based instead of
 	                      /// 0-based)
-	int  defaultMapq_;    /// Default mapping quality to report when one is
-	                      /// not specified
 	ReferenceMap *rmap_;  /// mapping to reference coordinate system.
 	AnnotationMap *amap_; ///
 	bool fullRef_;        /// print full reference name, not just up to whitespace

@@ -14,13 +14,11 @@ bool operator< (const Hit& a, const Hit& b) {
  * Report a maxed-out read.
  */
 void VerboseHitSink::reportMaxed(
-	BTString& o,
 	vector<Hit>& hs,
-	PatternSourcePerThread& p,
-	bool lock,
-	size_t threadId)
+	size_t threadId,
+	PatternSourcePerThread& p)
 {
-	HitSink::reportMaxed(o, hs, p, threadId);
+	HitSink::reportMaxed(hs, threadId, p);
 	if(sampleMax_) {
 		RandomSource rand;
 		rand.init(p.bufa().seed);
@@ -47,7 +45,7 @@ void VerboseHitSink::reportMaxed(
 				if(strat == bestStratum) {
 					if(num == r) {
 						hs[i].oms = hs[i+1].oms = (uint32_t)(hs.size()/2);
-						reportHits(o, hs, i, i+2, threadId);
+						reportHits(NULL, &hs, i, i+2, threadId, 0, 0, true);
 						break;
 					}
 					num++;
@@ -64,7 +62,7 @@ void VerboseHitSink::reportMaxed(
 			uint32_t r = rand.nextU32() % num;
 			Hit& h = hs[r];
 			h.oms = (uint32_t)hs.size();
-			reportHit(o, h, false, true);
+			reportHits(&h, NULL, 0, 1, threadId, 0, 0, true);
 		}
 	}
 }

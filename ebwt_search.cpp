@@ -91,6 +91,7 @@ static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
 static int readsPerBatch; // # reads to read from input file at once
+static int outBatchSz; // # alignments to write to output file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -198,6 +199,7 @@ static void resetOptions() {
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
 	readsPerBatch			= 16;    // # reads to read from input file at once
+	outBatchSz				= 16;    // # alignments to wrote to output file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
@@ -845,7 +847,8 @@ static void parseOptions(int argc, const char **argv) {
 				printUsage(cerr);
 				throw 1;
 				}
-				readsPerBatch = parse<int>(optarg);
+				// TODO: should output batch size be controlled separately?
+				readsPerBatch = outBatchSz = parse<int>(optarg);
 				break;
 			}
 			case ARG_ORIG:
@@ -1064,16 +1067,16 @@ createPatsrcFactory(PatternComposer& _patsrc, int tid, uint32_t max_buf) {
  * global params and return a pointer to it.
  */
 static HitSinkPerThreadFactory*
-createSinkFactory(HitSink& _sink) {
+createSinkFactory(HitSink& _sink, size_t threadId) {
 	HitSinkPerThreadFactory *sink = NULL;
 	if(!strata) {
 		// Unstratified
 		if(!allHits) {
 			// First N good; "good" inherently ignores strata
-			sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits);
+			sink = new NGoodHitSinkPerThreadFactory(_sink, khits, mhits, defaultMapq, threadId);
 		} else {
 			// All hits, spanning strata
-			sink = new AllHitSinkPerThreadFactory(_sink, mhits);
+			sink = new AllHitSinkPerThreadFactory(_sink, mhits, defaultMapq, threadId);
 		}
 	} else {
 		// Stratified
@@ -1082,12 +1085,12 @@ createSinkFactory(HitSink& _sink) {
 			assert(stateful);
 			// Buffer best hits, assuming they're arriving in best-
 			// to-worst order
-			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, khits, mhits);
+			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, khits, mhits, defaultMapq, threadId);
 		} else {
 			assert(stateful);
 			// Buffer best hits, assuming they're arriving in best-
 			// to-worst order
-			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits);
+			sink = new NBestFirstStratHitSinkPerThreadFactory(_sink, 0xffffffff/2, mhits, defaultMapq, threadId);
 		}
 	}
 	assert(sink != NULL);
@@ -1121,9 +1124,8 @@ static void exactSearchWorker(void *vp) {
 	// Per-thread initialization
 	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread *patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
-	sink->set_thread_id(tid);
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSink
 	        os,         // reference sequences
@@ -1209,7 +1211,7 @@ static void exactSearchWorkerStateful(void *vp) {
 
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	UnpairedExactAlignerV1Factory alSEfact(
@@ -1327,11 +1329,10 @@ static void exactSearch(PatternComposer& _patsrc,
 	}
 	exactSearch_refs   = refs;
 #ifdef WITH_TBB
-	//tbb::task_group tbb_grp;
-	AutoArray<std::thread*> threads(nthreads+1);
+	AutoArray<std::thread*> threads(nthreads);
 #else
-	AutoArray<tthread::thread*> threads(nthreads+1);
-	AutoArray<int> tids(nthreads+1);
+	AutoArray<tthread::thread*> threads(nthreads);
+	AutoArray<int> tids(nthreads);
 #endif
 
 #ifdef WITH_TBB
@@ -1347,23 +1348,20 @@ static void exactSearch(PatternComposer& _patsrc,
 		ts.tv_sec=0;
 		ts.tv_nsec = mil * 1000000L;
 
-		for(int i = 1; i <= nthreads; i++) {
+		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				//tbb_grp.run(exactSearchWorkerStateful(i));
 				threads[i] = new std::thread(exactSearchWorkerStateful, (void*) &tp);
 			} else {
-				//tbb_grp.run(exactSearchWorker(i));
 				threads[i] = new std::thread(exactSearchWorker, (void*) &tp);
 			}
 			threads[i]->detach();
 			nanosleep(&ts, (struct timespec *) NULL);
 		}
 		while(all_threads_done < nthreads);
-		//tbb_grp.wait();
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -1373,8 +1371,9 @@ static void exactSearch(PatternComposer& _patsrc,
 			}
 		}
 
-		for(int i = 1; i <= nthreads; i++)
-                    threads[i]->join();
+		for(int i = 0; i < nthreads; i++) {
+			threads[i]->join();
+		}
 #endif
 	}
 	if(refs != NULL) delete refs;
@@ -1419,7 +1418,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	Unpaired1mmAlignerV1Factory alSEfact(
@@ -1511,9 +1510,8 @@ static void mismatchSearchWorkerFull(void *vp){
 	// Per-thread initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
-	sink->set_thread_id(tid);
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,      // HitSinkPerThread
 	        os,         // reference sequences
@@ -1627,11 +1625,10 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	mismatchSearch_refs = refs;
 
 #ifdef WITH_TBB
-	//tbb::task_group tbb_grp;
-	AutoArray<std::thread*> threads(nthreads+1);
+	AutoArray<std::thread*> threads(nthreads);
 #else
-	AutoArray<tthread::thread*> threads(nthreads+1);
-	AutoArray<int> tids(nthreads+1);
+	AutoArray<tthread::thread*> threads(nthreads);
+	AutoArray<int> tids(nthreads);
 #endif
 
 #ifdef WITH_TBB
@@ -1647,7 +1644,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		ts.tv_sec=0;
 		ts.tv_nsec = mil * 1000000L;
 
-		for(int i = 1; i <= nthreads; i++) {
+		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
@@ -1670,8 +1667,9 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 			}
 		}
 
-		for(int i = 1; i <= nthreads; i++)
-                    threads[i]->join();
+		for(int i = 0; i < nthreads; i++) {
+			threads[i]->join();
+		}
 #endif
     }
 	if(refs != NULL) delete refs;
@@ -1782,7 +1780,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 	Unpaired23mmAlignerV1Factory alSEfact(
@@ -1872,9 +1870,8 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	bool                           two      = twoOrThreeMismatchSearch_two;
     PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
-	sink->set_thread_id(tid);
 	/* Per-thread initialization */
 	EbwtSearchParams<String<Dna> > params(
 			*sink,       /* HitSink */
@@ -2038,11 +2035,10 @@ static void twoOrThreeMismatchSearchFull(
 	twoOrThreeMismatchSearch_two      = two;
 
 #ifdef WITH_TBB
-	//tbb::task_group tbb_grp;
-	AutoArray<std::thread*> threads(nthreads+1);
+	AutoArray<std::thread*> threads(nthreads);
 #else
-	AutoArray<tthread::thread*> threads(nthreads+1);
-	AutoArray<int> tids(nthreads+1);
+	AutoArray<tthread::thread*> threads(nthreads);
+	AutoArray<int> tids(nthreads);
 #endif
 
 #ifdef WITH_TBB
@@ -2059,23 +2055,20 @@ static void twoOrThreeMismatchSearchFull(
 		ts.tv_sec=0;
 		ts.tv_nsec = mil * 1000000L;
 
-		for(int i = 1; i <= nthreads; i++) {
+		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				//tbb_grp.run(twoOrThreeMismatchSearchWorkerStateful(i));
 				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerStateful, (void*) &tp);
 			} else {
-				//tbb_grp.run(twoOrThreeMismatchSearchWorkerFull(i));
 				threads[i] = new std::thread(twoOrThreeMismatchSearchWorkerFull, (void*) &tp);
 			}
 			threads[i]->detach();
 			nanosleep(&ts, (struct timespec *) NULL);
 		}
 		while(all_threads_done < nthreads);
-		//tbb_grp.wait();
 #else
 			tids[i] = i;
 			if(stateful) {
@@ -2085,8 +2078,9 @@ static void twoOrThreeMismatchSearchFull(
 			}
 		}
 
-		for(int i = 1; i <= nthreads; i++)
-                    threads[i]->join();
+		for(int i = 0; i < nthreads; i++) {
+			threads[i]->join();
+		}
 #endif
     }
 	if(refs != NULL) delete refs;
@@ -2120,9 +2114,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 	int                      qualCutoff = seededQualSearch_qualCutoff;
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
-	sink->set_thread_id(tid);
 	/* Per-thread initialization */
 	EbwtSearchParams<String<Dna> > params(
 	        *sink,       /* HitSink */
@@ -2358,7 +2351,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 
 	// Global initialization
 	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
-	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
+	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
 	AlignerMetrics *metrics = NULL;
@@ -2502,10 +2495,10 @@ static void seededQualCutoffSearchFull(
 
 #ifdef WITH_TBB
 	//tbb::task_group tbb_grp;
-	AutoArray<std::thread*> threads(nthreads+1);
+	AutoArray<std::thread*> threads(nthreads);
 #else
-	AutoArray<tthread::thread*> threads(nthreads+1);
-	AutoArray<int> tids(nthreads+1);
+	AutoArray<tthread::thread*> threads(nthreads);
+	AutoArray<int> tids(nthreads);
 #endif
 
 #ifdef WITH_TBB
@@ -2529,7 +2522,7 @@ static void seededQualCutoffSearchFull(
 		ts.tv_sec=0;
 		ts.tv_nsec = mil * 1000000L;
 
-		for(int i = 1; i <= nthreads; i++) {
+		for(int i = 0; i < nthreads; i++) {
 #ifdef WITH_TBB
 			thread_tracking_pair tp;
 			tp.tid = i;
@@ -2552,8 +2545,9 @@ static void seededQualCutoffSearchFull(
 			}
 		}
 
-		for(int i = 1; i <= nthreads; i++)
-                    threads[i]->join();
+		for(int i = 0; i < nthreads; i++) {
+			threads[i]->join();
+		}
 #endif
 	}
 	if(refs != NULL) {
@@ -2608,8 +2602,6 @@ patsrcFromStrings(int format,
 		}
 	}
 }
-
-#define PASS_DUMP_FILES dumpAlBase, dumpUnalBase, dumpMaxBase
 
 static string argstr;
 
@@ -2883,17 +2875,25 @@ static void driver(const char * type,
 							ebwt.nPat(), offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
+							fullRef,
+							dumpAlBase,
+							dumpUnalBase,
+							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
-							refnames, partitionSz);
+							refnames, nthreads,
+							outBatchSz, partitionSz);
 				} else {
 					sink = new VerboseHitSink(
 							fout, offBase,
 							colorSeq, colorQual, printCost,
 							suppressOuts, rmap, amap,
-							fullRef, PASS_DUMP_FILES,
+							fullRef,
+							dumpAlBase,
+							dumpUnalBase,
+							dumpMaxBase,
 							format == TAB_MATE, sampleMax,
-							refnames, partitionSz);
+							refnames, nthreads,
+							outBatchSz, partitionSz);
 				}
 				break;
 			case OUTPUT_SAM:
@@ -2901,23 +2901,29 @@ static void driver(const char * type,
 					throw 1;
 				} else {
 					SAMHitSink *sam = new SAMHitSink(
-							fout, 1, rmap, amap,
-							fullRef, samNoQnameTrunc, defaultMapq,
-							PASS_DUMP_FILES,
-							format == TAB_MATE, sampleMax,
-							refnames, nthreads);
+						fout, 1, rmap, amap,
+						fullRef, samNoQnameTrunc,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz);
 					if(!samNoHead) {
 						vector<string> refnames;
 						if(!samNoSQ) {
 							readEbwtRefnames(adjustedEbwtFileBase, refnames);
 						}
 						sam->appendHeaders(
-								sam->out(0), ebwt.nPat(),
-								refnames, color, samNoSQ, rmap,
-								ebwt.plen(), fullRef,
-								samNoQnameTrunc,
-								argstr.c_str(),
-								rgs.empty() ? NULL : rgs.c_str());
+							sam->out(0),
+							ebwt.nPat(),
+							refnames, color, samNoSQ, rmap,
+							ebwt.plen(), fullRef,
+							samNoQnameTrunc,
+							argstr.c_str(),
+							rgs.empty() ? NULL : rgs.c_str());
 					}
 					sink = sam;
 				}
@@ -2925,16 +2931,30 @@ static void driver(const char * type,
 			case OUTPUT_CONCISE:
 				if(refOut) {
 					sink = new ConciseHitSink(
-							ebwt.nPat(), offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,  sampleMax,
-							refnames, reportOpps);
+						ebwt.nPat(),
+						offBase,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz,
+						reportOpps);
 				} else {
 					sink = new ConciseHitSink(
-							fout, offBase,
-							PASS_DUMP_FILES,
-							format == TAB_MATE,  sampleMax,
-							refnames, reportOpps);
+						fout,
+						offBase,
+						dumpAlBase,
+						dumpUnalBase,
+						dumpMaxBase,
+						format == TAB_MATE,
+						sampleMax,
+						refnames,
+						nthreads,
+						outBatchSz,
+						reportOpps);
 				}
 				break;
 			case OUTPUT_NONE:
@@ -2980,9 +3000,7 @@ static void driver(const char * type,
 		if(ebwtBw != NULL) {
 			delete ebwtBw;
 		}
-		if(!quiet) {
-			sink->finish(hadoopOut); // end the hits section of the hit file
-		}
+		sink->finish(hadoopOut); // end the hits section of the hit file
 		for(size_t i = 0; i < patsrcs_a.size(); i++) {
 			assert(patsrcs_a[i] != NULL);
 			delete patsrcs_a[i];

@@ -244,18 +244,13 @@ size_t PatternComposer::update_total_read_count(size_t read_count) {
  * Returns pair<bool, int> where bool indicates whether we're
  * completely done, and int indicates how many reads were read.
  */
-pair<bool, int> CFilePatternSource::nextBatch(
+pair<bool, int> CFilePatternSource::nextBatchImpl(
 	PerThreadReadBuf& pt,
-	bool batch_a,
-	bool lock)
+	bool batch_a)
 {
 	bool done = false;
 	// will be nbytes if FASTQ parser used
 	int nread = 0;
-	
-	// synchronization at this level because both reading and manipulation of
-	// current file pointer have to be protected
-	ThreadSafe ts(&mutex, lock);
 	pt.setReadId(readCnt_);
 	while(true) { // loop that moves on to next file when needed
 		do {
@@ -276,6 +271,21 @@ pair<bool, int> CFilePatternSource::nextBatch(
 	assert_geq(nread, 0);
 	readCnt_ += nread;
 	return make_pair(done, nread);
+}
+
+pair<bool, int> CFilePatternSource::nextBatch(
+	PerThreadReadBuf& pt,
+	bool batch_a,
+	bool lock)
+{
+	if(lock) {
+		// synchronization at this level because both reading and manipulation of
+		// current file pointer have to be protected
+		ThreadSafe ts(&mutex);
+		return nextBatchImpl(pt, batch_a);
+	} else {
+		return nextBatchImpl(pt, batch_a);
+	}
 }
 
 /**
@@ -385,12 +395,10 @@ VectorPatternSource::VectorPatternSource(
  * in the contsructor.  This essentially modifies the pt as though we read
  * in some number of patterns.
  */
-pair<bool, int> VectorPatternSource::nextBatch(
+pair<bool, int> VectorPatternSource::nextBatchImpl(
 	PerThreadReadBuf& pt,
-	bool batch_a,
-	bool lock)
+	bool batch_a)
 {
-	ThreadSafe ts(&mutex, lock);
 	pt.setReadId(cur_);
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
@@ -401,6 +409,19 @@ pair<bool, int> VectorPatternSource::nextBatch(
 	}
 	readCnt_ += readi;
 	return make_pair(cur_ == bufs_.size(), readi);
+}
+
+pair<bool, int> VectorPatternSource::nextBatch(
+	PerThreadReadBuf& pt,
+	bool batch_a,
+	bool lock)
+{
+	if(lock) {
+		ThreadSafe ts(&mutex);
+		return nextBatchImpl(pt, batch_a);
+	} else {
+		return nextBatchImpl(pt, batch_a);
+	}
 }
 
 /**
@@ -549,6 +570,9 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
 		c = getc_unlocked(fp_);
+		if(c == EOF) {
+			return make_pair(true, 0);
+		}
 		while(c == '\r' || c == '\n') {
 			c = getc_unlocked(fp_);
 		}
@@ -573,6 +597,10 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf[bufoff++] = c;
 		}
 		readbuf[readi].readOrigBufLen = bufoff;
+	}
+	// Immediate EOF case
+	if(done && readbuf[readi-1].readOrigBufLen == 1) {
+		readi--;
 	}
 	return make_pair(done, readi);
 }

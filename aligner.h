@@ -279,7 +279,7 @@ public:
 					// Get a new read
 					pair<bool, bool> ret = ps->nextReadPair();
 					saw_last_read = ret.second;
-					if(ps->rdid() < qUpto_ && ret.first) {
+					if(ret.first && ps->rdid() < qUpto_) {
 						if(ps->paired()) {
 							// Read currently in buffer is paired-end
 							(*alignersPE_)[0]->setQuery(ps);

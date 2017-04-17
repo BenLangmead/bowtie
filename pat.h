@@ -446,6 +446,7 @@ struct PerThreadReadBuf {
 	 */
 	void setReadId(TReadId rdid) {
 		rdid_ = rdid;
+		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
 	}
 	
 	//const size_t max_buf_; // max # reads to read into buffer at once
@@ -621,6 +622,10 @@ public:
 
 private:
 
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
+
 	bool color_;                      // colorspace?
 	size_t cur_;                      // index for first read of next batch
 	bool paired_;                     // whether reads are paired
@@ -732,6 +737,13 @@ protected:
 	bool first_;
 	char buf_[64*1024]; /// file buffer for sequences
 	char qbuf_[64*1024]; /// file buffer for qualities
+
+private:
+
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
+
 };
 
 /**
