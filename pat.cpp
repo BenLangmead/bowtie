@@ -911,7 +911,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	char* readBuf = batch_a ? pt.raw_bufa_ : pt.raw_bufb_;
 	size_t* raw_buf_length = batch_a ? &pt.raw_bufa_length : &pt.raw_bufb_length;
 	size_t bytes_read = 0;
-	if(first_) {
+	/*if(first_) {
 		c = getc_unlocked(fp_);
 		while(c == '\r' || c == '\n') {
 			c = getc_unlocked(fp_);
@@ -922,7 +922,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 		}
 		first_ = false;
 		readBuf[bytes_read++]='@';
-	}
+	}*/
 	bool done = false, aborted = false;
 	//size_t bytes_read = fread(readBuf,1,pt.max_raw_buf_,fp_);
 	for(;bytes_read<pt.max_raw_buf_;bytes_read++)
@@ -931,13 +931,15 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 		if(c < 0)
 			break;
 		readBuf[bytes_read] = c;
-	}	
+	}
+	int reads_read = pt.static_num_reads;
 	if (bytes_read == 0) {
 		done = true;
+		reads_read = 0;
 	}
 	// finish by filling the buffer out to the end of a FASTQ record
 	// so there's no partials
-	else {
+	/*else {
 		size_t headroom = (pt.max_raw_buf_ - bytes_read) + pt.max_raw_buf_overrun_;
 		size_t i = 0;
 		c = getc_unlocked(fp_);
@@ -1001,14 +1003,16 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 				readBuf[bytes_read+i] = c;
 			}
 		}*/
-		*raw_buf_length = bytes_read+i+(i>0?1:0);
-	}
+		//*raw_buf_length = bytes_read+i+(i>0?1:0);
+	//}
+	*raw_buf_length = bytes_read;
 	//currently aborted isn't used, not clear how to check for this
 	//return make_pair(done, aborted?1:0);
 	//fprintf(stderr,"raw buf length:%d\n",*raw_buf_length);
 	//fprintf(stderr,"raw buf contents:\n%s\n",readBuf);
 	//fprintf(stderr,"END raw buf contents\n");
-	return make_pair(done, *raw_buf_length);
+	//return make_pair(done, *raw_buf_length);
+	return make_pair(done, reads_read);
 }
 
 /**

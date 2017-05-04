@@ -843,9 +843,9 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
 			case ARG_READS_PER_BATCH: {
 				if(optarg == NULL || parse<int>(optarg) < 1) {
-				cerr << "--reads-per-batch arg must be at least 1" << endl;
-				printUsage(cerr);
-				throw 1;
+					cerr << "--reads-per-batch arg must be at least 1" << endl;
+					printUsage(cerr);
+					throw 1;
 				}
 				// TODO: should output batch size be controlled separately?
 				readsPerBatch = outBatchSz = parse<int>(optarg);
@@ -995,23 +995,21 @@ static void parseOptions(int argc, const char **argv) {
 
 static const char *argv0 = NULL;
 
-#define FINISH_READ(p,psrc) \
+#define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
 	if(get_read_ret.first) { \
 		sink->finishRead(*p, true, !skipped); \
 		get_read_ret.first = false; \
-		psrc.update_total_read_count(1); \
 	} \
 	skipped = false;
 
 /// Macro for getting the next read, possibly aborting depending on
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
-#define GET_READ(p,psrc) \
+#define GET_READ(p) \
 	if(get_read_ret.second) break; \
 	get_read_ret = p->nextReadPair(); \
-	size_t num_reads_aligned = psrc.get_total_read_count(); \
-	if(num_reads_aligned >= qUpto) { \
+	if(p->rdid() >= qUpto) { \
 		get_read_ret = make_pair(false, true); \
 	} \
 	if(!get_read_ret.first) { \
@@ -1172,11 +1170,11 @@ static void exactSearchWorker(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc,_patsrc)
-		GET_READ(patsrc,_patsrc)
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		#include "search_exact.c"
 	}
-	FINISH_READ(patsrc,_patsrc)
+	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -1365,9 +1363,9 @@ static void exactSearch(PatternComposer& _patsrc,
 #else
 			tids[i] = i;
 			if(stateful) {
-                                threads[i] = new tthread::thread(exactSearchWorkerStateful, (void*)&tids[i]);
+				threads[i] = new tthread::thread(exactSearchWorkerStateful, (void*)&tids[i]);
 			} else {
-                                threads[i] = new tthread::thread(exactSearchWorker, (void*)&tids[i]);
+				threads[i] = new tthread::thread(exactSearchWorker, (void*)&tids[i]);
 			}
 		}
 
@@ -1558,8 +1556,8 @@ static void mismatchSearchWorkerFull(void *vp){
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc,_patsrc)
-		GET_READ(patsrc,_patsrc)
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
@@ -1569,7 +1567,7 @@ static void mismatchSearchWorkerFull(void *vp){
 		#include "search_1mm_phase2.c"
 		#undef DONEMASK_SET
 	} // End read loop
-	FINISH_READ(patsrc,_patsrc)
+	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -1636,8 +1634,8 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 	all_threads_done = 0;
 #endif
 
-    CHUD_START();
-    {
+	CHUD_START();
+	{
 		Timer _t(cerr, "Time for 1-mismatch full-index search: ", timing);
 		int mil = 10;
 		struct timespec ts = {0};
@@ -1650,9 +1648,9 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 			tp.tid = i;
 			tp.done = &all_threads_done;
 			if(stateful) {
-				threads[i] = new std::thread(mismatchSearchWorkerFullStateful, (void*) &tp);
+				threads[i] = new std::thread(mismatchSearchWorkerFullStateful, (void*)&tp);
 			} else {
-				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*) &tp);
+				threads[i] = new std::thread(mismatchSearchWorkerFull, (void*)&tp);
 			}
 			threads[i]->detach();
 			nanosleep(&ts, (struct timespec *) NULL);
@@ -1661,9 +1659,9 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 #else
 			tids[i] = i;
 			if(stateful) {
-                                threads[i] = new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids[i]);
+				threads[i] = new tthread::thread(mismatchSearchWorkerFullStateful, (void*)&tids[i]);
 			} else {
-                                threads[i] = new tthread::thread(mismatchSearchWorkerFull, (void*)&tids[i]);
+				threads[i] = new tthread::thread(mismatchSearchWorkerFull, (void*)&tids[i]);
 			}
 		}
 
@@ -1671,7 +1669,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 			threads[i]->join();
 		}
 #endif
-    }
+	}
 	if(refs != NULL) delete refs;
 }
 
@@ -1868,7 +1866,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
 	bool                           two      = twoOrThreeMismatchSearch_two;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink, tid);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1966,8 +1964,8 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc,_patsrc)
-		GET_READ(patsrc,_patsrc)
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
@@ -1979,7 +1977,7 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#include "search_23mm_phase3.c"
 		#undef DONEMASK_SET
 	}
-	FINISH_READ(patsrc,_patsrc)
+	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
 	ss.str("");
 	ss.clear();
@@ -2046,8 +2044,8 @@ static void twoOrThreeMismatchSearchFull(
 	all_threads_done = 0;
 #endif
 
-        CHUD_START();
-    {
+	CHUD_START();
+	{
 		Timer _t(cerr, "End-to-end 2/3-mismatch full-index search: ", timing);
 		
 		int mil = 10;
@@ -2072,9 +2070,9 @@ static void twoOrThreeMismatchSearchFull(
 #else
 			tids[i] = i;
 			if(stateful) {
-                                threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids[i]);
+				threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerStateful, (void*)&tids[i]);
 			} else {
-                                threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids[i]);
+				threads[i] = new tthread::thread(twoOrThreeMismatchSearchWorkerFull, (void*)&tids[i]);
 			}
 		}
 
@@ -2082,7 +2080,7 @@ static void twoOrThreeMismatchSearchFull(
 			threads[i]->join();
 		}
 #endif
-    }
+	}
 	if(refs != NULL) delete refs;
 	return;
 }
@@ -2299,8 +2297,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 			current_node = node;
 		}
 #endif
-		FINISH_READ(patsrc,_patsrc)
-		GET_READ(patsrc,_patsrc)
+		FINISH_READ(patsrc);
+		GET_READ(patsrc);
 		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = seedLen;
 		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
@@ -2315,7 +2313,7 @@ static void seededQualSearchWorkerFull(void *vp) {
 		#include "search_seeded_phase4.c"
 		#undef DONEMASK_SET
 	}
-	FINISH_READ(patsrc,_patsrc)
+	FINISH_READ(patsrc);
 	if(seedMms > 0) {
 		delete pamRc;
 		delete pamFw;
@@ -2539,9 +2537,9 @@ static void seededQualCutoffSearchFull(
 #else
 			tids[i] = i;
 			if(stateful) {
-                                threads[i] = new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids[i]);
+				threads[i] = new tthread::thread(seededQualSearchWorkerFullStateful, (void*)&tids[i]);
 			} else {
-                                threads[i] = new tthread::thread(seededQualSearchWorkerFull, (void*)&tids[i]);
+				threads[i] = new tthread::thread(seededQualSearchWorkerFull, (void*)&tids[i]);
 			}
 		}
 
