@@ -1155,34 +1155,35 @@ static void exactSearchWorker(void *vp) {
 	std::string msg;
 	ss << "thread: " << tid << " time: ";
 	msg = ss.str();
-	Timer timer(std::cout, msg.c_str());
+	{
+		Timer timer(std::cout, msg.c_str());
 #endif
-	while(true) {
+		while(true) {
 #ifdef PER_THREAD_TIMING
-		int cpu = 0, node = 0;
-		get_cpu_and_node(cpu, node);
-		if(cpu != current_cpu) {
-			ncpu_changeovers++;
-			current_cpu = cpu;
-		}
-		if(node != current_node) {
-			nnuma_changeovers++;
-			current_node = node;
-		}
+			int cpu = 0, node = 0;
+			get_cpu_and_node(cpu, node);
+			if(cpu != current_cpu) {
+				ncpu_changeovers++;
+				current_cpu = cpu;
+			}
+			if(node != current_node) {
+				nnuma_changeovers++;
+				current_node = node;
+			}
 #endif
+			FINISH_READ(patsrc);
+			GET_READ(patsrc);
+			#include "search_exact.c"
+		}
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
-		#include "search_exact.c"
-	}
-	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
-	ss.str("");
-	ss.clear();
-	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
 #endif
-
+	}
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -1541,41 +1542,42 @@ static void mismatchSearchWorkerFull(void *vp){
 	std::string msg;
 	ss << "thread: " << tid << " time: ";
 	msg = ss.str();
-	Timer timer(std::cout, msg.c_str());
+	{	
+		Timer timer(std::cout, msg.c_str());
 #endif
-	while(true) {
+		while(true) {
 #ifdef PER_THREAD_TIMING
-		int cpu = 0, node = 0;
-		get_cpu_and_node(cpu, node);
-		if(cpu != current_cpu) {
-			ncpu_changeovers++;
-			current_cpu = cpu;
-		}
-		if(node != current_node) {
-			nnuma_changeovers++;
-			current_node = node;
-		}
+			int cpu = 0, node = 0;
+			get_cpu_and_node(cpu, node);
+			if(cpu != current_cpu) {
+				ncpu_changeovers++;
+				current_cpu = cpu;
+			}
+			if(node != current_node) {
+				nnuma_changeovers++;
+				current_node = node;
+			}
 #endif
+			FINISH_READ(patsrc);
+			GET_READ(patsrc);
+			uint32_t plen = (uint32_t)length(patFw);
+			uint32_t s = plen;
+			uint32_t s3 = s >> 1; // length of 3' half of seed
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			#define DONEMASK_SET(p)
+			#include "search_1mm_phase1.c"
+			#include "search_1mm_phase2.c"
+			#undef DONEMASK_SET
+		} // End read loop
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
-		uint32_t plen = (uint32_t)length(patFw);
-		uint32_t s = plen;
-		uint32_t s3 = s >> 1; // length of 3' half of seed
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p)
-		#include "search_1mm_phase1.c"
-		#include "search_1mm_phase2.c"
-		#undef DONEMASK_SET
-	} // End read loop
-	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
-	ss.str("");
-	ss.clear();
-	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
 #endif
-
+	}
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -1949,42 +1951,44 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	std::string msg;
 	ss << "thread: " << tid << " time: ";
 	msg = ss.str();
-	Timer timer(std::cout, msg.c_str());
+	{
+		Timer timer(std::cout, msg.c_str());
 #endif
-	while(true) { // Read read-in loop
+		while(true) { // Read read-in loop
 #ifdef PER_THREAD_TIMING
-		int cpu = 0, node = 0;
-		get_cpu_and_node(cpu, node);
-		if(cpu != current_cpu) {
-			ncpu_changeovers++;
-			current_cpu = cpu;
-		}
-		if(node != current_node) {
-			nnuma_changeovers++;
-			current_node = node;
-		}
+			int cpu = 0, node = 0;
+			get_cpu_and_node(cpu, node);
+			if(cpu != current_cpu) {
+				ncpu_changeovers++;
+				current_cpu = cpu;
+			}
+			if(node != current_node) {
+				nnuma_changeovers++;
+				current_node = node;
+			}
 #endif
+			FINISH_READ(patsrc);
+			GET_READ(patsrc);
+			patid += 0; // kill unused variable warning
+			uint32_t plen = (uint32_t)length(patFw);
+			uint32_t s = plen;
+			uint32_t s3 = s >> 1; // length of 3' half of seed
+			uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
+			#define DONEMASK_SET(p)
+			#include "search_23mm_phase1.c"
+			#include "search_23mm_phase2.c"
+			#include "search_23mm_phase3.c"
+			#undef DONEMASK_SET
+		}
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
-		patid += 0; // kill unused variable warning
-		uint32_t plen = (uint32_t)length(patFw);
-		uint32_t s = plen;
-		uint32_t s3 = s >> 1; // length of 3' half of seed
-		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
-		#define DONEMASK_SET(p)
-		#include "search_23mm_phase1.c"
-		#include "search_23mm_phase2.c"
-		#include "search_23mm_phase3.c"
-		#undef DONEMASK_SET
-	}
-	FINISH_READ(patsrc);
 #ifdef PER_THREAD_TIMING
-	ss.str("");
-	ss.clear();
-	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
 #endif
+	}
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -2282,49 +2286,51 @@ static void seededQualSearchWorkerFull(void *vp) {
 	std::string msg;
 	ss << "thread: " << tid << " time: ";
 	msg = ss.str();
-	Timer timer(std::cout, msg.c_str());
+	{
+		Timer timer(std::cout, msg.c_str());
 #endif
-	while(true) {
+		while(true) {
 #ifdef PER_THREAD_TIMING
-		int cpu = 0, node = 0;
-		get_cpu_and_node(cpu, node);
-		if(cpu != current_cpu) {
-			ncpu_changeovers++;
-			current_cpu = cpu;
-		}
-		if(node != current_node) {
-			nnuma_changeovers++;
-			current_node = node;
-		}
+			int cpu = 0, node = 0;
+			get_cpu_and_node(cpu, node);
+			if(cpu != current_cpu) {
+				ncpu_changeovers++;
+				current_cpu = cpu;
+			}
+			if(node != current_node) {
+				nnuma_changeovers++;
+				current_node = node;
+			}
 #endif
+			FINISH_READ(patsrc);
+			GET_READ(patsrc);
+			uint32_t plen = (uint32_t)length(patFw);
+			uint32_t s = seedLen;
+			uint32_t s3 = (s >> 1); /* length of 3' half of seed */
+			uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
+			uint32_t qs = min<uint32_t>(plen, s);
+			uint32_t qs3 = qs >> 1;
+			uint32_t qs5 = (qs >> 1) + (qs & 1);
+			#define DONEMASK_SET(p)
+			#include "search_seeded_phase1.c"
+			#include "search_seeded_phase2.c"
+			#include "search_seeded_phase3.c"
+			#include "search_seeded_phase4.c"
+			#undef DONEMASK_SET
+		}
 		FINISH_READ(patsrc);
-		GET_READ(patsrc);
-		uint32_t plen = (uint32_t)length(patFw);
-		uint32_t s = seedLen;
-		uint32_t s3 = (s >> 1); /* length of 3' half of seed */
-		uint32_t s5 = (s >> 1) + (s & 1); /* length of 5' half of seed */
-		uint32_t qs = min<uint32_t>(plen, s);
-		uint32_t qs3 = qs >> 1;
-		uint32_t qs5 = (qs >> 1) + (qs & 1);
-		#define DONEMASK_SET(p)
-		#include "search_seeded_phase1.c"
-		#include "search_seeded_phase2.c"
-		#include "search_seeded_phase3.c"
-		#include "search_seeded_phase4.c"
-		#undef DONEMASK_SET
-	}
-	FINISH_READ(patsrc);
-	if(seedMms > 0) {
-		delete pamRc;
-		delete pamFw;
-	}
+		if(seedMms > 0) {
+			delete pamRc;
+			delete pamFw;
+		}
 #ifdef PER_THREAD_TIMING
-	ss.str("");
-	ss.clear();
-	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
-	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
-	std::cout << ss.str();
+		ss.str("");
+		ss.clear();
+		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+		std::cout << ss.str();
 #endif
+	}
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
