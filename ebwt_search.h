@@ -18,7 +18,7 @@ class exactSearchWorkerStateful {
 public:
 	exactSearchWorkerStateful(const exactSearchWorkerStateful& W): tid(W.tid) {};
 	exactSearchWorkerStateful(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 };
 
 class exactSearchWorker {
@@ -27,7 +27,7 @@ class exactSearchWorker {
 public:
 	exactSearchWorker(const exactSearchWorker& W): tid(W.tid) {};
 	exactSearchWorker(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 
@@ -37,7 +37,7 @@ class mismatchSearchWorkerFull {
 public:
 	mismatchSearchWorkerFull(const mismatchSearchWorkerFull& W): tid(W.tid) {};
 	mismatchSearchWorkerFull(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 
@@ -47,7 +47,7 @@ class mismatchSearchWorkerFullStateful {
 public:
 	mismatchSearchWorkerFullStateful(const mismatchSearchWorkerFullStateful& W): tid(W.tid) {};
 	mismatchSearchWorkerFullStateful(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 class twoOrThreeMismatchSearchWorkerStateful {
@@ -56,7 +56,7 @@ class twoOrThreeMismatchSearchWorkerStateful {
 public:
 	twoOrThreeMismatchSearchWorkerStateful(const twoOrThreeMismatchSearchWorkerStateful& W): tid(W.tid) {};
 	twoOrThreeMismatchSearchWorkerStateful(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 class twoOrThreeMismatchSearchWorkerFull {
@@ -65,7 +65,7 @@ class twoOrThreeMismatchSearchWorkerFull {
 public:
 	twoOrThreeMismatchSearchWorkerFull(const twoOrThreeMismatchSearchWorkerFull& W): tid(W.tid) {};
 	twoOrThreeMismatchSearchWorkerFull(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 
@@ -75,7 +75,7 @@ class seededQualSearchWorkerFullStateful {
 public:
 	seededQualSearchWorkerFullStateful(const seededQualSearchWorkerFullStateful& W): tid(W.tid) {};
 	seededQualSearchWorkerFullStateful(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 class seededQualSearchWorkerFull {
@@ -84,7 +84,7 @@ class seededQualSearchWorkerFull {
 public:
 	seededQualSearchWorkerFull(const seededQualSearchWorkerFull& W): tid(W.tid) {};
 	seededQualSearchWorkerFull(int id):tid(id) {};
-	void operator()();
+	void operator()() const;
 
 };
 

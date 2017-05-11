@@ -534,7 +534,7 @@ public:
 	}
 
 	void flush() {
-		if(!fwrite((const void *)buf_, cur_, 1, out_)) {
+		if(cur_ != fwrite((const void *)buf_, 1, cur_, out_)) {
 			std::cerr << "Error while flushing and closing output" << std::endl;
 			throw 1;
 		}

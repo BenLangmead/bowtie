@@ -8,7 +8,7 @@ bindir = $(prefix)/bin
 SEQAN_DIR = SeqAn-1.1
 SEQAN_INC = -I $(SEQAN_DIR)
 INC = $(SEQAN_INC) -I third_party
-CPP = g++
+CPP = g++ -w
 CXX = $(CPP)
 CC = gcc
 HEADERS = $(wildcard *.h)
@@ -43,29 +43,26 @@ endif
 MACOS = 0
 ifneq (,$(findstring Darwin,$(shell uname)))
     MACOS = 1
-	ifneq (,$(findstring 13,$(shell uname -r)))
+    MACOS_VER_MAJOR = $(shell uname -r | cut -d. -f1)
+    MACOS_VER_GT_12 = $(shell [ $(MACOS_VER_MAJOR) -gt 12 ] && echo true)
+	ifeq (true, $(MACOS_VER_GT_12))
 		CPP = clang++
 		CC = clang
-		EXTRA_FLAGS += -stdlib=libstdc++
-	endif
-	ifneq (,$(findstring 14,$(shell uname -r)))
-		CPP = clang++
-		CC = clang
-		EXTRA_FLAGS += -stdlib=libstdc++
+		override EXTRA_FLAGS += -stdlib=libstdc++
 	endif
 endif
 
 LINUX = 0
 ifneq (,$(findstring Linux,$(shell uname)))
     LINUX = 1
-    EXTRA_FLAGS += -Wl,--hash-style=both
+    override EXTRA_FLAGS += -Wl,--hash-style=both
 endif
 
-MM_DEF = 
+MM_DEF =
 ifeq (1,$(BOWTIE_MM))
     MM_DEF = -DBOWTIE_MM
 endif
-SHMEM_DEF = 
+SHMEM_DEF =
 ifeq (1,$(BOWTIE_SHARED_MEM))
     SHMEM_DEF = -DBOWTIE_SHARED_MEM
 endif
@@ -73,41 +70,76 @@ PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
 
+#if we're not using TBB, then we can't use queuing locks
+ifeq (1,$(NO_TBB))
+	NO_QUEUELOCK=1
+endif
+
 ifeq (1,$(MINGW))
-	PTHREAD_LIB = 
-	EXTRA_FLAGS += -static-libgcc -static-libstdc++
+	PTHREAD_LIB =
+	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
 else
     PTHREAD_LIB = -lpthread
 endif
 
+ifeq (1,$(NO_SPINLOCK))
+	override EXTRA_FLAGS += -DNO_SPINLOCK
+endif
+
+#default is to use Intel TBB
+ifneq (1,$(NO_TBB))
+	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+	override EXTRA_FLAGS += -DWITH_TBB
+else
+	LIBS = $(PTHREAD_LIB)
+endif
+
 POPCNT_CAPABILITY ?= 1
 ifeq (1, $(POPCNT_CAPABILITY))
-    EXTRA_FLAGS += -DPOPCNT_CAPABILITY
+    override EXTRA_FLAGS += -DPOPCNT_CAPABILITY
     INC += -I third_party
 endif
 
 PREFETCH_LOCALITY = 2
 PREF_DEF = -DPREFETCH_LOCALITY=$(PREFETCH_LOCALITY)
 
-ifeq (1,$(WITH_TBB))
-	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
-	EXTRA_FLAGS += -DWITH_TBB
-else
-	LIBS = $(PTHREAD_LIB)
-endif
 
-SEARCH_LIBS = 
+SEARCH_LIBS =
 BUILD_LIBS =
-INSPECT_LIBS = 
+INSPECT_LIBS =
 
 ifeq (1,$(MINGW))
-    BUILD_LIBS = 
-    INSPECT_LIBS = 
+    BUILD_LIBS =
+    INSPECT_LIBS =
+endif
+
+ifeq (1,$(WITH_THREAD_PROFILING))
+	override EXTRA_FLAGS += -DPER_THREAD_TIMING=1
+endif
+
+ifeq (1,$(WITH_AFFINITY))
+	override EXTRA_FLAGS += -DWITH_AFFINITY=1
+endif
+
+#default is to use Intel TBB's queuing lock for better thread scaling performance
+ifneq (1,$(NO_QUEUELOCK))
+	override EXTRA_FLAGS += -DNO_SPINLOCK
+	override EXTRA_FLAGS += -DWITH_QUEUELOCK=1
+endif
+
+ifeq (1,$(WITH_FINE_TIMER))
+	override EXTRA_FLAGS += -DUSE_FINE_TIMER=1
 endif
 
 OTHER_CPPS = ccnt_lut.cpp ref_read.cpp alphabet.cpp shmem.cpp \
              edit.cpp ebwt.cpp
-ifneq (1,$(WITH_TBB))
+
+ifeq (1,$(WITH_COHORTLOCK))
+	override EXTRA_FLAGS += -DWITH_COHORTLOCK=1
+	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
+endif
+
+ifeq (1,$(NO_TBB))
 	OTHER_CPPS += tinythread.cpp
 endif
 
@@ -332,7 +364,7 @@ bowtie-inspect-l: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
+bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -Wall \
@@ -341,7 +373,7 @@ bowtie-inspect-s-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 		$(OTHER_CPPS) \
 		$(LIBS)
 
-bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS) 
+bowtie-inspect-l-debug: bowtie_inspect.cpp $(HEADERS) $(OTHER_CPPS)
 	$(CXX) $(DEBUG_FLAGS) \
 		$(DEBUG_DEFS) $(ALL_FLAGS) \
 		$(DEFS) -DBOWTIE_64BIT_INDEX -Wall \
@@ -357,24 +389,25 @@ bowtie-src.zip: $(SRC_PKG_LIST)
 	zip -r tmp.zip $(SRC_PKG_LIST)
 	mv tmp.zip .src.tmp/bowtie-$(VERSION)
 	cd .src.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .src.tmp ; zip -r $@ bowtie-$(VERSION)
-	cp .src.tmp/$@ .
+	cd .src.tmp ; zip -r $@.zip bowtie-$(VERSION)
+	cp .src.tmp/$@.zip .
 	rm -rf .src.tmp
 
-bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) 
+bowtie-bin.zip: $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX)
+	$(eval HAS_TBB=$(shell strings bowtie-align-l* | grep tbb))
+	$(eval PKG_DIR=bowtie-$(VERSION)$(if $(HAS_TBB),,-legacy))
 	chmod a+x scripts/*.sh scripts/*.pl
 	rm -rf .bin.tmp
-	mkdir .bin.tmp
-	mkdir .bin.tmp/bowtie-$(VERSION)
+	mkdir -p .bin.tmp/$(PKG_DIR)
 	if [ -f bowtie-align-s.exe ] ; then \
 		zip tmp.zip $(BIN_PKG_LIST) $(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX)) ; \
 	else \
 		zip tmp.zip $(BIN_PKG_LIST) $(BIN_LIST) $(BIN_LIST_AUX) ; \
 	fi
-	mv tmp.zip .bin.tmp/bowtie-$(VERSION)
-	cd .bin.tmp/bowtie-$(VERSION) ; unzip tmp.zip ; rm -f tmp.zip
-	cd .bin.tmp ; zip -r $@ bowtie-$(VERSION)
-	cp .bin.tmp/$@ .
+	mv tmp.zip .bin.tmp/$(PKG_DIR)
+	cd .bin.tmp/$(PKG_DIR) ; unzip tmp.zip ; rm -f tmp.zip
+	cd .bin.tmp ; zip -r $(PKG_DIR).zip $(PKG_DIR)
+	cp .bin.tmp/$(PKG_DIR).zip .
 	rm -rf .bin.tmp
 
 .PHONY: doc
@@ -397,6 +430,25 @@ install: all
 		cp -f $$file $(DESTDIR)$(bindir) ; \
 	done
 
+.PHONY: simple-test
+simple-test: all perl-deps
+	eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
+	./scripts/test/simple_tests.pl --bowtie=./bowtie --bowtie-build=./bowtie-build
+
+.PHONY: random-test
+random-test: all perl-deps
+	eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
+	./scripts/test/random_bowtie_tests.sh
+
+.PHONY: perl-deps
+perl-deps:
+	if [ ! -e .perllib.tmp ]; then \
+		DL=$$([ `which wget` ] && echo wget -O- || echo curl -L) ; \
+		mkdir .perllib.tmp ; \
+		$$DL http://cpanmin.us | perl - -l $(CURDIR)/.perllib.tmp App::cpanminus local::lib ; \
+		eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
+		cpanm Math::Random Clone Test::Deep ; \
+	fi
 
 .PHONY: clean
 clean:
@@ -405,3 +457,4 @@ clean:
 	$(addsuffix .exe,$(BIN_LIST) $(BIN_LIST_AUX) bowtie_prof) \
 	bowtie-src.zip bowtie-bin.zip
 	rm -f core.*
+	rm -f bowtie-align-s-master* bowtie-align-s-no-io*

@@ -99,6 +99,7 @@ static bool better;     // true -> guarantee alignments from best possible strat
 static bool strata;     // true -> don't stop at stratum boundaries
 static bool refOut;     // if true, alignments go to per-ref files
 static int partitionSz; // output a partitioning key in first field
+static int readsPerBatch; // # reads to read from input file at once
 static bool noMaqRound; // true -> don't round quals to nearest 10 like maq
 static bool fileParallel; // separate threads read separate input files in parallel
 static bool useShmem;     // use shared memory to hold the index
@@ -122,7 +123,6 @@ static uint32_t skipReads;       // # reads/read pairs to skip
 static bool nofw; // don't align fw orientation of read
 static bool norc; // don't align rc orientation of read
 static bool strandFix;  // attempt to fix strand bias
-static bool randomizeQuals; // randomize quality values
 static bool stats; // print performance stats
 static int chunkPoolMegabytes;    // max MB to dedicate to best-first search frames per thread
 static int chunkSz;    // size of single chunk disbursed by ChunkPool
@@ -138,7 +138,6 @@ static const char * annotMapFile;  // file containing a map from reference coord
 static size_t fastaContLen;
 static size_t fastaContFreq;
 static bool hadoopOut; // print Hadoop status and summary messages
-static bool fuzzy;
 static bool fullRef;
 static bool samNoQnameTrunc; // don't truncate QNAME field at first whitespace
 static bool samNoHead; // don't print any header lines in SAM output
@@ -215,6 +214,7 @@ static void resetOptions() {
 	strata					= false; // true -> don't stop at stratum boundaries
 	refOut					= false; // if true, alignments go to per-ref files
 	partitionSz				= 0;     // output a partitioning key in first field
+	readsPerBatch			= 16;    // # reads to read from input file at once
 	noMaqRound				= false; // true -> don't round quals to nearest 10 like maq
 	fileParallel			= false; // separate threads read separate input files in parallel
 	useShmem				= false; // use shared memory to hold the index
@@ -238,7 +238,6 @@ static void resetOptions() {
 	nofw					= false; // don't align fw orientation of read
 	norc					= false; // don't align rc orientation of read
 	strandFix				= true;  // attempt to fix strand bias
-	randomizeQuals			= false; // randomize quality values
 	stats					= false; // print performance stats
 	chunkPoolMegabytes		= 64;    // max MB to dedicate to best-first search frames per thread
 	chunkSz					= 256;   // size of single chunk disbursed by ChunkPool (in KB)
@@ -254,7 +253,6 @@ static void resetOptions() {
 	fastaContLen			= 0;
 	fastaContFreq			= 0;
 	hadoopOut				= false; // print Hadoop status and summary messages
-	fuzzy					= false; // reads will have alternate basecalls w/ qualities
 	fullRef					= false; // print entire reference name instead of just up to 1st space
 	samNoQnameTrunc         = false; // don't truncate at first whitespace?
 	samNoHead				= false; // don't print any header lines in SAM output
@@ -293,8 +291,6 @@ enum {
 	ARG_VERBOSE,
 	ARG_STARTVERBOSE,
 	ARG_QUIET,
-	ARG_RANDOM_READS,
-	ARG_RANDOM_READS_NOSYNC,
 	ARG_NOOUT,
 	ARG_FAST,
 	ARG_AL,
@@ -308,6 +304,7 @@ enum {
 	ARG_REFOUT,
 	ARG_ISARATE,
 	ARG_PARTITION,
+	ARG_READS_PER_BATCH,
 	ARG_integerQuals,
 	ARG_NOMAQROUND,
 	ARG_FILEPAR,
@@ -327,7 +324,6 @@ enum {
 	ARG_NO_RC,
 	ARG_SKIP,
 	ARG_STRAND_FIX,
-	ARG_RANDOMIZE_QUALS,
 	ARG_STATS,
 	ARG_ONETWO,
 	ARG_PHRED64,
@@ -391,6 +387,7 @@ static struct option long_options[] = {
 	{(char*)"isarate",      required_argument, 0,            ARG_ISARATE},
 	{(char*)"reportopps",   no_argument,       &reportOpps,  1},
 	{(char*)"version",      no_argument,       &showVersion, 1},
+	{(char*)"reads-per-batch", required_argument, 0,         ARG_READS_PER_BATCH},
 	{(char*)"dumppats",     required_argument, 0,            ARG_DUMP_PATS},
 	{(char*)"maqerr",       required_argument, 0,            'e'},
 	{(char*)"seedlen",      required_argument, 0,            'l'},
@@ -413,8 +410,6 @@ static struct option long_options[] = {
 	{(char*)"refidx",       no_argument,       0,            ARG_REFIDX},
 	{(char*)"range",        no_argument,       0,            ARG_RANGE},
 	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
-	{(char*)"randread",     no_argument,       0,            ARG_RANDOM_READS},
-	{(char*)"randreadnosync", no_argument,     0,            ARG_RANDOM_READS_NOSYNC},
 	{(char*)"phased",       no_argument,       0,            'z'},
 	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
@@ -434,7 +429,6 @@ static struct option long_options[] = {
 	{(char*)"tryhard",      no_argument,       0,            'y'},
 	{(char*)"skip",         required_argument, 0,            's'},
 	{(char*)"strandfix",    no_argument,       0,            ARG_STRAND_FIX},
-	{(char*)"randquals",    no_argument,       0,            ARG_RANDOMIZE_QUALS},
 	{(char*)"stats",        no_argument,       0,            ARG_STATS},
 	{(char*)"12",           required_argument, 0,            ARG_ONETWO},
 	{(char*)"phred33-quals", no_argument,      0,            ARG_PHRED33},
@@ -452,7 +446,6 @@ static struct option long_options[] = {
 	{(char*)"annotmap",     required_argument, 0,            ARG_ANNOTMAP},
 	{(char*)"reportse",     no_argument,       0,            ARG_REPORTSE},
 	{(char*)"hadoopout",    no_argument,       0,            ARG_HADOOPOUT},
-	{(char*)"fuzzy",        no_argument,       0,            ARG_FUZZY},
 	{(char*)"fullref",      no_argument,       0,            ARG_FULLREF},
 	{(char*)"usage",        no_argument,       0,            ARG_USAGE},
 	{(char*)"sam",          no_argument,       0,            'S'},
@@ -539,6 +532,7 @@ static void printUsage(ostream& out) {
 	    << "  --pairtries <int>  max # attempts to find mate for anchor hit (default: 100)" << endl
 	    << "  -y/--tryhard       try hard to find valid alignments, at the expense of speed" << endl
 	    << "  --chunkmbs <int>   max megabytes of RAM for best-first search frames (def: 64)" << endl
+	    << " --reads-per-batch   # of reads to read from input file at once (default: 16)" << endl
 	    << "Reporting:" << endl
 	    << "  -k <int>           report up to <int> good alignments per read (default: 1)" << endl
 	    << "  -a/--all           report all alignments per read (much slower than low -k)" << endl
@@ -702,11 +696,6 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_FF: mate1fw = true;  mate2fw = true;  mateFwSet = true; break;
 			case ARG_RF: mate1fw = false; mate2fw = true;  mateFwSet = true; break;
 			case ARG_FR: mate1fw = true;  mate2fw = false; mateFwSet = true; break;
-			case ARG_RANDOM_READS: format = RANDOM; break;
-			case ARG_RANDOM_READS_NOSYNC:
-				format = RANDOM;
-				randReadsNoSync = true;
-				break;
 			case ARG_RANGE: rangeMode = true; break;
 			case ARG_CONCISE: outType = OUTPUT_CONCISE; break;
 			case 'S': outType = OUTPUT_SAM; break;
@@ -771,7 +760,6 @@ static void parseOptions(int argc, const char **argv) {
 			}
 			case ARG_REFIDX: noRefNames = true; break;
 			case ARG_STATEFUL: stateful = true; break;
-			case ARG_FUZZY: fuzzy = true; break;
 			case ARG_REPORTSE: reportSe = true; break;
 			case ARG_FULLREF: fullRef = true; break;
 			case ARG_PREFETCH_WIDTH:
@@ -884,8 +872,16 @@ static void parseOptions(int argc, const char **argv) {
 			}
 			case ARG_DUMP_PATS: patDumpfile = optarg; break;
 			case ARG_STRAND_FIX: strandFix = true; break;
-			case ARG_RANDOMIZE_QUALS: randomizeQuals = true; break;
 			case ARG_PARTITION: partitionSz = parse<int>(optarg); break;
+			case ARG_READS_PER_BATCH: {
+				if(optarg == NULL || parse<int>(optarg) < 1) {
+				cerr << "--reads-per-batch arg must be at least 1" << endl;
+				printUsage(cerr);
+				throw 1;
+				}
+				readsPerBatch = parse<int>(optarg);
+				break;
+			}
 			case ARG_ORIG:
 				if(optarg == NULL || strlen(optarg) == 0) {
 					cerr << "--orig arg must be followed by a string" << endl;
@@ -903,7 +899,7 @@ static void parseOptions(int argc, const char **argv) {
 				throw 1;
 		}
 	} while(next_option != -1);
-	bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
+	//bool paired = mates1.size() > 0 || mates2.size() > 0 || mates12.size() > 0;
 	if(rangeMode) {
 		// Tell the Ebwt loader to ignore the suffix-array portion of
 		// the index.  We don't need it because the user isn't asking
@@ -993,10 +989,6 @@ static void parseOptions(int argc, const char **argv) {
 		cerr << "--strata has no effect unless combined with -m, -a, or -k N where N > 1" << endl;
 		throw 1;
 	}
-	if(fuzzy && (!stateful && !paired)) {
-		cerr << "--fuzzy must be combined with --best or paired-end alignment" << endl;
-		throw 1;
-	}
 	// If both -s and -u are used, we need to adjust qUpto accordingly
 	// since it uses patid to know if we've reached the -u limit (and
 	// patids are all shifted up by skipReads characters)
@@ -1041,8 +1033,9 @@ static const char *argv0 = NULL;
 
 #define FINISH_READ(p) \
 	/* Don't do finishRead if the read isn't legit or if the read was skipped by the doneMask */ \
-	if(!p->empty()) { \
+	if(get_read_ret.first) { \
 		sink->finishRead(*p, true, !skipped); \
+		get_read_ret.first = false; \
 	} \
 	skipped = false;
 
@@ -1050,12 +1043,17 @@ static const char *argv0 = NULL;
 /// whether the result is empty or the patid exceeds the limit, and
 /// marshaling the read into convenient variables.
 #define GET_READ(p) \
-	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) { \
-		p->bufa().clearAll(); \
-		break; \
+	if(get_read_ret.second) break; \
+	get_read_ret = p->nextReadPair(); \
+	if(p->rdid() >= qUpto) { \
+		get_read_ret = make_pair(false, true); \
 	} \
-	assert(!empty(p->bufa().patFw)); \
+	if(!get_read_ret.first) { \
+		if(get_read_ret.second) { \
+			break; \
+		} \
+		continue; \
+	} \
 	String<Dna5>& patFw  = p->bufa().patFw;  \
 	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<Dna5>& patRc  = p->bufa().patRc;  \
@@ -1070,32 +1068,8 @@ static const char *argv0 = NULL;
 	patRcRev.data_begin += 0; /* suppress "unused" compiler warning */ \
 	String<char>& name   = p->bufa().name;   \
 	name.data_begin += 0; /* suppress "unused" compiler warning */ \
-	uint32_t      patid  = p->patid();       \
+	uint32_t      patid  = (uint32_t)p->rdid();       \
 	params.setPatId(patid);
-
-/// Macro for getting the forward oriented version of next read,
-/// possibly aborting depending on whether the result is empty or the
-/// patid exceeds the limit, and marshaling the read into convenient
-/// variables.
-#define GET_READ_FW(p) \
-	p->nextReadPair(); \
-	if(p->empty() || p->patid() >= qUpto) { \
-		p->bufa().clearAll(); \
-		break; \
-	} \
-	params.setPatId(p->patid()); \
-	assert(!empty(p->bufa().patFw)); \
-	String<Dna5>& patFw  = p->bufa().patFw;  \
-	patFw.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qual = p->bufa().qual; \
-	qual.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<Dna5>& patFwRev  = p->bufa().patFwRev;  \
-	patFwRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& qualRev = p->bufa().qualRev; \
-	qualRev.data_begin += 0; /* suppress "unused" compiler warning */ \
-	String<char>& name   = p->bufa().name;   \
-	name.data_begin += 0; /* suppress "unused" compiler warning */ \
-	uint32_t      patid  = p->patid();
 
 #define WORKER_EXIT() \
 	patsrcFact->destroy(patsrc); \
@@ -1115,13 +1089,9 @@ static const char *argv0 = NULL;
 /// Create a PatternSourcePerThread for the current thread according
 /// to the global params and return a pointer to it
 static PatternSourcePerThreadFactory*
-createPatsrcFactory(PairedPatternSource& _patsrc, int tid) {
+createPatsrcFactory(PatternComposer& _patsrc, int tid, uint32_t max_buf) {
 	PatternSourcePerThreadFactory *patsrcFact;
-	if(randReadsNoSync) {
-		patsrcFact = new RandomPatternSourcePerThreadFactory(numRandomReads, lenRandomReads, nthreads, tid);
-	} else {
-		patsrcFact = new WrappedPatternSourcePerThreadFactory(_patsrc);
-	}
+	patsrcFact = new PatternSourcePerThreadFactory(_patsrc, max_buf, skipReads, seed);
 	assert(patsrcFact != NULL);
 	return patsrcFact;
 }
@@ -1235,12 +1205,7 @@ static int read_dir(const char* dirname,int* num_pids) {
 	return lowest_pid;
 }
 
-#ifdef WITH_TBB
-static bool steal_thread(int pid, int orig_nthreads, tbb::task_group* tbb_grp)
-#else
-static bool steal_thread(int pid, int orig_nthreads, int *tids, vector<tthread::thread*>& threads)
-#endif
-{
+static bool steal_thread(int pid, int orig_nthreads) {
 	int ncpu = thread_ceiling;
 	if(thread_ceiling <= nthreads) {
 		return false;
@@ -1264,30 +1229,28 @@ static bool steal_thread(int pid, int orig_nthreads, int *tids, vector<tthread::
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static PairedPatternSource*   exactSearch_patsrc;
+static PatternComposer*   exactSearch_patsrc;
 static HitSink*               exactSearch_sink;
 static Ebwt<String<Dna> >*    exactSearch_ebwt;
 static vector<String<Dna5> >* exactSearch_os;
 static BitPairReference*      exactSearch_refs;
 #ifdef WITH_TBB
-void exactSearchWorker::operator()() {
+void exactSearchWorker::operator()() const {
 #else
 static void exactSearchWorker(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	const BitPairReference* refs =  exactSearch_refs;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory *patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread *patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1309,18 +1272,49 @@ static void exactSearchWorker(void *vp) {
 	        verbose,        // verbose
 	        &os,
 	        false);         // considerQuals
+	pair<bool, bool> get_read_ret = make_pair(false, false);
 	bool skipped = false;
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		#include "search_exact.c"
 	}
 	FINISH_READ(patsrc);
-	
 	if(thread_stealing) {
 		decrement_thread_counter();
 	}
-	
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	WORKER_EXIT();
 }
 
@@ -1328,24 +1322,22 @@ static void exactSearchWorker(void *vp) {
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void exactSearchWorkerStateful::operator()() {
+void exactSearchWorkerStateful::operator()() const {
 #else
 static void exactSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource& _patsrc = *exactSearch_patsrc;
+	PatternComposer& _patsrc = *exactSearch_patsrc;
 	HitSink& _sink               = *exactSearch_sink;
 	Ebwt<String<Dna> >& ebwt     = *exactSearch_ebwt;
 	vector<String<Dna5> >& os    = *exactSearch_os;
 	BitPairReference* refs       =  exactSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -1407,7 +1399,7 @@ static void exactSearchWorkerStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -1438,7 +1430,7 @@ static void exactSearchWorkerStateful(void *vp) {
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void exactSearch(PairedPatternSource& _patsrc,
+static void exactSearch(PatternComposer& _patsrc,
                         HitSink& _sink,
                         Ebwt<String<Dna> >& ebwt,
                         vector<String<Dna5> >& os)
@@ -1505,14 +1497,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
 				sleep(1);
 			}
 			while(thread_counter > 0) {
-				if(steal_thread(pid, orig_threads
-#ifdef WITH_TBB
-					, tbb_grp
-#else
-					, tids, threads
-#endif
-				))
-				{
+				if(steal_thread(pid, orig_threads)) { 
 					nthreads++;
 #ifdef WITH_TBB
 					if(stateful) {
@@ -1562,7 +1547,7 @@ static void exactSearch(PairedPatternSource& _patsrc,
  * Forward Ebwt (ebwtFw) is already loaded into memory and backward
  * Ebwt (ebwtBw) is not loaded into memory.
  */
-static PairedPatternSource*           mismatchSearch_patsrc;
+static PatternComposer*           mismatchSearch_patsrc;
 static HitSink*                       mismatchSearch_sink;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            mismatchSearch_ebwtBw;
@@ -1575,17 +1560,15 @@ static BitPairReference*              mismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses Unpaired/Paired1mmAlignerV1.
  */
 #ifdef WITH_TBB
-void mismatchSearchWorkerFullStateful::operator()() {
+void mismatchSearchWorkerFullStateful::operator()() const {
 #else
 static void mismatchSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&   _patsrc = *mismatchSearch_patsrc;
+	PatternComposer&   _patsrc = *mismatchSearch_patsrc;
 	HitSink&               _sink   = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw  = *mismatchSearch_ebwtBw;
@@ -1593,7 +1576,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	BitPairReference*      refs    =  mismatchSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -1655,7 +1638,7 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -1669,17 +1652,15 @@ static void mismatchSearchWorkerFullStateful(void *vp) {
 	return;
 }
 #ifdef WITH_TBB
-void mismatchSearchWorkerFull::operator()(){
+void mismatchSearchWorkerFull::operator()() const {
 #else
 static void mismatchSearchWorkerFull(void *vp){
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&   _patsrc   = *mismatchSearch_patsrc;
+	PatternComposer&   _patsrc   = *mismatchSearch_patsrc;
 	HitSink&               _sink     = *mismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw    = *mismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw    = *mismatchSearch_ebwtBw;
@@ -1687,7 +1668,7 @@ static void mismatchSearchWorkerFull(void *vp){
 	const BitPairReference* refs     =  mismatchSearch_refs;
 
 	// Per-thread initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -1710,10 +1691,36 @@ static void mismatchSearchWorkerFull(void *vp){
 	        &os,
 	        false);         // considerQuals
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
-		uint32_t plen = length(patFw);
+		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -1723,11 +1730,16 @@ static void mismatchSearchWorkerFull(void *vp){
 		#undef DONEMASK_SET
 	} // End read loop
 	FINISH_READ(patsrc);
-
 	if(thread_stealing) {
 		decrement_thread_counter();
 	}
-
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
     WORKER_EXIT();
 }
 
@@ -1735,7 +1747,7 @@ static void mismatchSearchWorkerFull(void *vp){
  * Search through a single (forward) Ebwt index for exact end-to-end
  * hits.  Assumes that index is already loaded into memory.
  */
-static void mismatchSearchFull(PairedPatternSource& _patsrc,
+static void mismatchSearchFull(PatternComposer& _patsrc,
                                HitSink& _sink,
                                Ebwt<String<Dna> >& ebwtFw,
                                Ebwt<String<Dna> >& ebwtBw,
@@ -1812,14 +1824,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 				sleep(1);
 			}
 			while(thread_counter > 0) {
-				if(steal_thread(pid, orig_threads
-#ifdef WITH_TBB
-					, tbb_grp
-#else
-					, tids, threads
-#endif
-				))
-				{
+				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 #ifdef WITH_TBB
 					if(stateful) {
@@ -1932,7 +1937,7 @@ static void mismatchSearchFull(PairedPatternSource& _patsrc,
 		assert_eq(0, hits.size()); \
 	}
 
-static PairedPatternSource*           twoOrThreeMismatchSearch_patsrc;
+static PatternComposer*           twoOrThreeMismatchSearch_patsrc;
 static HitSink*                       twoOrThreeMismatchSearch_sink;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtFw;
 static Ebwt<String<Dna> >*            twoOrThreeMismatchSearch_ebwtBw;
@@ -1947,17 +1952,15 @@ static BitPairReference*              twoOrThreeMismatchSearch_refs;
  * A statefulness-aware worker driver.  Uses UnpairedExactAlignerV1.
  */
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerStateful::operator()(){
+void twoOrThreeMismatchSearchWorkerStateful::operator()() const {
 #else
 static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
+	PatternComposer&   _patsrc = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&               _sink   = *twoOrThreeMismatchSearch_sink;
 	Ebwt<String<Dna> >&    ebwtFw  = *twoOrThreeMismatchSearch_ebwtFw;
 	Ebwt<String<Dna> >&    ebwtBw  = *twoOrThreeMismatchSearch_ebwtBw;
@@ -1966,7 +1969,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 	static bool            two     =  twoOrThreeMismatchSearch_two;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
@@ -2030,7 +2033,7 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 
@@ -2045,21 +2048,19 @@ static void twoOrThreeMismatchSearchWorkerStateful(void *vp) {
 }
 
 #ifdef WITH_TBB
-void twoOrThreeMismatchSearchWorkerFull::operator()(){
+void twoOrThreeMismatchSearchWorkerFull::operator()() const {
 #else
 static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
+	PatternComposer&           _patsrc  = *twoOrThreeMismatchSearch_patsrc;
 	HitSink&                       _sink    = *twoOrThreeMismatchSearch_sink;
 	vector<String<Dna5> >&         os       = *twoOrThreeMismatchSearch_os;
 	bool                           two      = twoOrThreeMismatchSearch_two;
-    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+    PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -2130,11 +2131,37 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 	        false,          // considerQuals
 	        true);          // halfAndHalf
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) { // Read read-in loop
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		patid += 0; // kill unused variable warning
-		uint32_t plen = length(patFw);
+		uint32_t plen = (uint32_t)length(patFw);
 		uint32_t s = plen;
 		uint32_t s3 = s >> 1; // length of 3' half of seed
 		uint32_t s5 = (s >> 1) + (s & 1); // length of 5' half of seed
@@ -2145,18 +2172,23 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		#undef DONEMASK_SET
 	}
 	FINISH_READ(patsrc);
-
 	if(thread_stealing) {
 		decrement_thread_counter();
 	}
-
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	// Threads join at end of Phase 1
 	WORKER_EXIT();
 }
 
 template<typename TStr>
 static void twoOrThreeMismatchSearchFull(
-		PairedPatternSource& _patsrc,   /// pattern source
+		PatternComposer& _patsrc,   /// pattern source
 		HitSink& _sink,                 /// hit sink
 		Ebwt<TStr>& ebwtFw,             /// index of original text
 		Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2235,14 +2267,7 @@ static void twoOrThreeMismatchSearchFull(
 				sleep(1);
 			}
 			while(thread_counter > 0) {
-				if(steal_thread(pid, orig_threads
-#ifdef WITH_TBB
-					, tbb_grp
-#else
-					, tids, threads
-#endif
-				))
-				{
+				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 #ifdef WITH_TBB
 					if(stateful) {
@@ -2284,7 +2309,7 @@ static void twoOrThreeMismatchSearchFull(
 	return;
 }
 
-static PairedPatternSource*     seededQualSearch_patsrc;
+static PatternComposer*     seededQualSearch_patsrc;
 static HitSink*                 seededQualSearch_sink;
 static Ebwt<String<Dna> >*      seededQualSearch_ebwtFw;
 static Ebwt<String<Dna> >*      seededQualSearch_ebwtBw;
@@ -2297,21 +2322,19 @@ static int                      seededQualSearch_qualCutoff;
 static BitPairReference*        seededQualSearch_refs;
 
 #ifdef WITH_TBB
-void seededQualSearchWorkerFull::operator()() {
+void seededQualSearchWorkerFull::operator()() const {
 #else
 static void seededQualSearchWorkerFull(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	vector<String<Dna5> >&   os         = *seededQualSearch_os;
 	int                      qualCutoff = seededQualSearch_qualCutoff;
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	PatternSourcePerThread* patsrc = patsrcFact->create();
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	HitSinkPerThread* sink = sinkFact->create();
@@ -2471,7 +2494,33 @@ static void seededQualSearchWorkerFull(void *vp) {
 	        !noMaqRound);
 	String<QueryMutation> muts;
 	bool skipped = false;
+	pair<bool, bool> get_read_ret = make_pair(false, false);
+#ifdef PER_THREAD_TIMING
+	uint64_t ncpu_changeovers = 0;
+	uint64_t nnuma_changeovers = 0;
+	
+	int current_cpu = 0, current_node = 0;
+	get_cpu_and_node(current_cpu, current_node);
+
+	std::stringstream ss;
+	std::string msg;
+	ss << "thread: " << tid << " time: ";
+	msg = ss.str();
+	Timer timer(std::cout, msg.c_str());
+#endif
 	while(true) {
+#ifdef PER_THREAD_TIMING
+		int cpu = 0, node = 0;
+		get_cpu_and_node(cpu, node);
+		if(cpu != current_cpu) {
+			ncpu_changeovers++;
+			current_cpu = cpu;
+		}
+		if(node != current_node) {
+			nnuma_changeovers++;
+			current_node = node;
+		}
+#endif
 		FINISH_READ(patsrc);
 		GET_READ(patsrc);
 		uint32_t plen = (uint32_t)length(patFw);
@@ -2496,20 +2545,25 @@ static void seededQualSearchWorkerFull(void *vp) {
 		delete pamRc;
 		delete pamFw;
 	}
+#ifdef PER_THREAD_TIMING
+	ss.str("");
+	ss.clear();
+	ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
+	   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
+	std::cout << ss.str();
+#endif
 	WORKER_EXIT();
 }
 #ifdef WITH_TBB
-void seededQualSearchWorkerFullStateful::operator()(){
+void seededQualSearchWorkerFullStateful::operator()() const {
 #else
 static void seededQualSearchWorkerFullStateful(void *vp) {
 	int tid = *((int*)vp);
 #endif
-
 	if(thread_stealing) {
 		increment_thread_counter();
 	}
-
-	PairedPatternSource&     _patsrc    = *seededQualSearch_patsrc;
+	PatternComposer&     _patsrc    = *seededQualSearch_patsrc;
 	HitSink&                 _sink      = *seededQualSearch_sink;
 	Ebwt<String<Dna> >&      ebwtFw     = *seededQualSearch_ebwtFw;
 	Ebwt<String<Dna> >&      ebwtBw     = *seededQualSearch_ebwtBw;
@@ -2518,7 +2572,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 	BitPairReference*        refs       = seededQualSearch_refs;
 
 	// Global initialization
-	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid);
+	PatternSourcePerThreadFactory* patsrcFact = createPatsrcFactory(_patsrc, tid, readsPerBatch);
 	HitSinkPerThreadFactory* sinkFact = createSinkFactory(_sink);
 	ChunkPool *pool = new ChunkPool(chunkSz * 1024, chunkPoolMegabytes * 1024 * 1024, chunkVerbose);
 
@@ -2594,7 +2648,7 @@ static void seededQualSearchWorkerFullStateful(void *vp) {
 				alPEfact,
 				*patsrcFact);
 		// Run that mother
-		multi.run();
+		multi.run(false, tid);
 		// MultiAligner must be destroyed before patsrcFact
 	}
 	if(metrics != NULL) {
@@ -2632,7 +2686,7 @@ static void seededQualCutoffSearchFull(
         int seedMms,                    /// max # mismatches allowed in seed
                                         /// (like maq map's -n option)
                                         /// Can only be 1 or 2, default: 1
-        PairedPatternSource& _patsrc,   /// pattern source
+        PatternComposer& _patsrc,   /// pattern source
         HitSink& _sink,                 /// hit sink
         Ebwt<TStr>& ebwtFw,             /// index of original text
         Ebwt<TStr>& ebwtBw,             /// index of mirror text
@@ -2711,14 +2765,7 @@ static void seededQualCutoffSearchFull(
 				sleep(1);
 			}
 			while(thread_counter > 0) {
-				if(steal_thread(pid, orig_threads
-#ifdef WITH_TBB
-					, tbb_grp
-#else
-					, tids, threads
-#endif
-				))
-				{
+				if(steal_thread(pid, orig_threads)) {
 					nthreads++;
 #ifdef WITH_TBB
 					if(stateful) {
@@ -2774,49 +2821,34 @@ patsrcFromStrings(int format,
 {
 	switch(format) {
 		case FASTA:
-			return new FastaPatternSource (seed, reads, quals, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new FastaPatternSource (reads, quals, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals,
-			                               skipReads);
+			                               integerQuals);
 		case FASTA_CONT:
 			return new FastaContinuousPatternSource (
-			                               seed, reads, fastaContLen,
+			                               reads, fastaContLen,
 			                               fastaContFreq,
-			                               patDumpfile, verbose,
-			                               skipReads);
+			                               patDumpfile);
 		case RAW:
-			return new RawPatternSource   (seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
-			                               trim3, trim5,
-			                               skipReads);
+			return new RawPatternSource   (reads, color,
+			                               patDumpfile,
+			                               trim3, trim5);
 		case FASTQ:
-			return new FastqPatternSource (seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
+			return new FastqPatternSource (reads, color,
+			                               patDumpfile,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
-			                               integerQuals, fuzzy,
-			                               skipReads);
+			                               integerQuals);
 		case TAB_MATE:
-			return new TabbedPatternSource(seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
-			                               trim3, trim5,
-			                               skipReads);
-		case CMDLINE:
-			return new VectorPatternSource(seed, reads, color,
-			                               randomizeQuals,
-			                               patDumpfile, verbose,
-			                               trim3, trim5,
-			                               skipReads);
-		case RANDOM:
-			return new RandomPatternSource(seed, 2000000, lenRandomReads,
+			return new TabbedPatternSource(reads, false, color,
 			                               patDumpfile,
-			                               verbose);
+			                               trim3, trim5);
+		case CMDLINE:
+			return new VectorPatternSource(reads, color,
+			                               patDumpfile,
+			                               trim3, trim5);
 		default: {
 			cerr << "Internal error; bad patsrc format: " << format << endl;
 			throw 1;
@@ -2968,11 +3000,11 @@ static void driver(const char * type,
 	if(verbose || startVerbose) {
 		cerr << "Creating PatternSource: "; logTime(cerr, true);
 	}
-	PairedPatternSource *patsrc = NULL;
+	PatternComposer *patsrc = NULL;
 	if(mates12.size() > 0) {
-		patsrc = new PairedSoloPatternSource(patsrcs_ab, seed);
+		patsrc = new SoloPatternComposer(patsrcs_ab);
 	} else {
-		patsrc = new PairedDualPatternSource(patsrcs_a, patsrcs_b, seed);
+		patsrc = new DualPatternComposer(patsrcs_a, patsrcs_b);
 	}
 
 	// Open hit output file
@@ -3235,6 +3267,13 @@ extern "C" {
  */
 int bowtie(int argc, const char **argv) {
 	try {
+  #ifdef WITH_TBB
+  #ifdef WITH_AFFINITY
+    //CWILKS: adjust this depending on # of hyperthreads per core
+    pinning_observer pinner( 2 /* the number of hyper threads on each core */ );
+          pinner.observe( true );
+  #endif
+  #endif
 		// Reset all global state, including getopt state
 		opterr = optind = 1;
 		resetOptions();
@@ -3357,6 +3396,13 @@ int bowtie(int argc, const char **argv) {
 #ifdef CHUD_PROFILING
 		chudReleaseRemoteAccess();
 #endif
+  #ifdef WITH_TBB
+  #ifdef WITH_AFFINITY
+    // Always disable observation before observers destruction
+        //tracker.observe( false );
+        pinner.observe( false );
+  #endif
+  #endif
 		return 0;
 	} catch(exception& e) {
 		cerr << "Command: ";

@@ -88,7 +88,7 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	void setQuery(ReadBuf& r) {
+	void setQuery(Read& r) {
 		const bool fw = _params.fw();
 		const bool ebwtFw = _ebwt->fw();
 		if(ebwtFw) {
@@ -1815,10 +1815,6 @@ public:
 		qlen_(0),
 		qual_(NULL),
 		name_(NULL),
-		altQry_(NULL),
-		altQual_(NULL),
-		alts_(0),
-		fuzzy_(false),
 		ebwt_(ebwt),
 		fw_(fw),
 		offRev0_(0),
@@ -1842,22 +1838,16 @@ public:
 	/**
 	 * Set a new query read.
 	 */
-	virtual void setQuery(ReadBuf& r, Range *seedRange) {
+	virtual void setQuery(Read& r, Range *seedRange) {
 		const bool ebwtFw = ebwt_->fw();
 		if(ebwtFw) {
 			qry_  = fw_ ? &r.patFw : &r.patRc;
 			qual_ = fw_ ? &r.qual  : &r.qualRev;
-			altQry_  = (String<Dna5>*)(fw_ ? r.altPatFw : r.altPatRc);
-			altQual_ = (String<char>*)(fw_ ? r.altQual  : r.altQualRev);
 		} else {
 			qry_  = fw_ ? &r.patFwRev : &r.patRcRev;
 			qual_ = fw_ ? &r.qualRev  : &r.qual;
-			altQry_  = (String<Dna5>*)(fw_ ? r.altPatFwRev : r.altPatRcRev);
-			altQual_ = (String<char>*)(fw_ ? r.altQualRev  : r.altQual);
 		}
-		alts_ = r.alts;
 		name_ = &r.name;
-		fuzzy_ = r.fuzzy;
 		if(seedRange != NULL) seedRange_ = *seedRange;
 		else                  seedRange_.invalidate();
 		qlen_ = length(*qry_);
@@ -1882,9 +1872,6 @@ public:
 		// Make sure every qual is a valid qual ASCII character (>= 33)
 		for(size_t i = 0; i < length(*qual_); i++) {
 			assert_geq((*qual_)[i], 33);
-			for(int j = 0; j < alts_; j++) {
-				assert_geq(altQual_[j][i], 33);
-			}
 		}
 		assert_geq(length(*qual_), qlen_);
 		this->done = false;
@@ -2158,12 +2145,8 @@ public:
 				uint8_t q[4] = {'!', '!', '!', '!'};
 				uint8_t bestq;
 				// get unrounded penalties at this position
-				if(fuzzy_) {
-					bestq = penaltiesAt(cur, q, alts_, *qual_, altQry_, altQual_);
-				} else {
-					bestq = q[0] = q[1] = q[2] = q[3] =
-						mmPenalty(maqPenalty_, qualAt(cur));
-				}
+				bestq = q[0] = q[1] = q[2] = q[3] =
+					mmPenalty(maqPenalty_, qualAt(cur));
 
 				// The current query position is a legit alternative if it a) is
 				// not in the unrevisitable region, and b) its selection would
@@ -2199,7 +2182,7 @@ public:
 					rs->bots[2] = rs->tops[3] = ebwt._fchr[3];
 					rs->bots[3]               = ebwt._fchr[4];
 					ASSERT_ONLY(int r =)
-					br->installRanges(c, nextc, fuzzy_, qualLim_ - br->ham_, q);
+					br->installRanges(c, nextc, qualLim_ - br->ham_, q);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2244,7 +2227,7 @@ public:
 #endif
 					}
 					ASSERT_ONLY(int r =)
-					br->installRanges(c, nextc, fuzzy_, qualLim_ - br->ham_, q);
+					br->installRanges(c, nextc, qualLim_ - br->ham_, q);
 					assert(r < 4 || c == 4);
 					// Update top and bot
 					if(c < 4) {
@@ -2365,7 +2348,7 @@ public:
 			// Make sure the front element of the priority queue is
 			// extendable (i.e. not curtailed) and then prep it.
 			if(!pm.splitAndPrep(rand_, (uint32_t)qlen_, qualLim_, depth3_,
-			                    qualOrder_, fuzzy_,
+			                    qualOrder_,
 			                    ebwt_->_eh, ebwt_->_ebwt, ebwt_->_fw))
 			{
 				pm.reset(0);
@@ -2577,10 +2560,6 @@ protected:
 	String<char>*       qual_;   // quality values for _qry
 	String<char>*       name_;   // name of _qry
 	bool                color_;  // true -> read is colorspace
-	String<Dna5>*       altQry_; // alternate basecalls
-	String<char>*       altQual_; // quality values for alternate basecalls
-	int                 alts_;   // max # alternatives
-	bool                fuzzy_;  // alternate scoring scheme?
 	const Ebwt<String<Dna> >*   ebwt_;   // Ebwt to search in
 	bool                fw_;
 	uint32_t            offRev0_; // unrevisitable chunk
@@ -2752,9 +2731,7 @@ public:
 	 * after setQuery() has been called on the RangeSource but before
 	 * initConts() has been called.
 	 */
-	virtual void initRangeSource(const String<char>& qual, bool fuzzy,
-	                             int alts, const String<char>* altQuals)
-	{
+	virtual void initRangeSource(const String<char>& qual) {
 		// If seedLen_ is huge, then it will always cover the whole
 		// alignment
 		assert_eq(len_, seqan::length(qual));
@@ -2789,19 +2766,11 @@ public:
 				uint8_t lowQual = 0xff;
 				for(uint32_t d = rev0Off; d < s; d++) {
 					uint8_t lowAtPos;
-					if(fuzzy) {
-						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
-					} else {
-						lowAtPos = qual[qlen - d - 1];
-					}
+					lowAtPos = qual[qlen - d - 1];
 					if(lowAtPos < lowQual) lowQual = lowAtPos;
 				}
 				assert_lt(lowQual, 0xff);
-				if(fuzzy) {
-					minCost += lowQual;
-				} else {
-					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual));
-				}
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual));
 			}
 		} else if(rs_->halfAndHalf() && sRight > 0 && sRight < (s-1)) {
 			// Half-and-half constraints are active, so there must be
@@ -2813,28 +2782,16 @@ public:
 				uint8_t lowQual1 = 0xff;
 				for(uint32_t d = 0; d < sRight; d++) {
 					uint8_t lowAtPos;
-					if(fuzzy) {
-						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
-					} else {
-						lowAtPos = qual[qlen - d - 1];
-					}
+					lowAtPos = qual[qlen - d - 1];
 					if(lowAtPos < lowQual1) lowQual1 = lowAtPos;
 				}
 				assert_lt(lowQual1, 0xff);
-				if(fuzzy) {
-					minCost += lowQual1;
-				} else {
-					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
-				}
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual1));
 				uint8_t lowQual2_1 = 0xff;
 				uint8_t lowQual2_2 = 0xff;
 				for(uint32_t d = sRight; d < s; d++) {
 					uint8_t lowAtPos;
-					if(fuzzy) {
-						lowAtPos = loPenaltyAt(qlen-d-1, alts, qual, altQuals);
-					} else {
-						lowAtPos = qual[qlen - d - 1];
-					}
+					lowAtPos = qual[qlen - d - 1];
 					if(lowAtPos < lowQual2_1) {
 						if(lowQual2_1 != 0xff) {
 							lowQual2_2 = lowQual2_1;
@@ -2845,16 +2802,9 @@ public:
 					}
 				}
 				assert_lt(lowQual2_1, 0xff);
-				if(fuzzy) {
-					minCost += lowQual2_1;
-					if(rs_->halfAndHalf() > 2 && lowQual2_2 != 0xff) {
-						minCost += lowQual2_2;
-					}
-				} else {
-					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_1));
-					if(rs_->halfAndHalf() > 2 && lowQual2_2 != 0xff) {
-						minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_2));
-					}
+				minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_1));
+				if(rs_->halfAndHalf() > 2 && lowQual2_2 != 0xff) {
+					minCost += mmPenalty(maqPenalty_, phredCharToPhredQual(lowQual2_2));
 				}
 			}
 		}

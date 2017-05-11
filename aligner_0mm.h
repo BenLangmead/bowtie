@@ -58,8 +58,7 @@ public:
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
-			quiet_(quiet),
-			seed_(seed)
+			quiet_(quiet)
 	{
 		assert(ebwtFw.isInMemory());
 	}
@@ -133,7 +132,6 @@ private:
 	bool rangeMode_;
 	bool verbose_;
 	bool quiet_;
-	uint32_t seed_;
 };
 
 /**
@@ -201,8 +199,7 @@ public:
 			strandFix_(strandFix),
 			rangeMode_(rangeMode),
 			verbose_(verbose),
-			quiet_(quiet),
-			seed_(seed)
+			quiet_(quiet)
 	{
 		assert(ebwtFw.isInMemory());
 	}
@@ -376,7 +373,6 @@ private:
 	const bool rangeMode_;
 	const bool verbose_;
 	const bool quiet_;
-	const uint32_t seed_;
 };
 
 #endif /* ALIGNER_0MM_H_ */

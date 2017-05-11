@@ -1,5 +1,5 @@
 <h1>Table of Contents</h1>
-<p>Bowtie 1.1.2</p>
+<p>Bowtie 1.2.0</p>
 
 <div id="TOC">
 <ul>
@@ -72,8 +72,8 @@
 <h2 id="building-from-source">Building from source</h2>
 <p>Building Bowtie from source requires a GNU-like environment that includes GCC, GNU Make and other basics. It should be possible to build Bowtie on a vanilla Linux or Mac installation. Bowtie can also be built on Windows using <a href="http://www.mingw.org/">MinGW</a>. We recommend <a href="http://www.tdragon.net/recentgcc/">TDM's MinGW Build</a>. You also must also have <a href="http://www.mingw.org/wiki/msys">MSYS</a> installed.</p>
 <p>To build Bowtie, extract the sources, change to the extracted directory, and run GNU <code>make</code> (usually with the command <code>make</code>, but sometimes with <code>gmake</code>) with no arguments. If building with <a href="http://www.mingw.org/">MinGW</a>, run <code>make</code> from the <a href="http://www.mingw.org/wiki/msys">MSYS</a> command line.</p>
-<p>To build Bowtie including support for the <a href="#bowtie-options-p"><code>-p</code></a> (multithreading) option, we recommend that you first install the <a href="https://www.threadingbuildingblocks.org">Thread Building Blocks library</a>, also known as TBB, and build using <code>make WITH_TBB=1</code>. TBB is installed by default on many operating systems.</p>
-<p>If TBB is not available, then omit the <code>WITH_TBB=1</code> option. On Linux or Mac OS X, this requires the pthreads library, which is installed by default. On Windows, native Windows threads will be used, which require no special libraries.</p>
+<p>To build Bowtie including support for the <a href="#bowtie-options-p"><code>-p</code></a> (multithreading) option, we recommend that you first install the <a href="https://www.threadingbuildingblocks.org">Thread Building Blocks library</a>, also known as TBB. TBB is installed by default on many operating systems.</p>
+<p>If TBB is not available, then include the <code>NO_TBB=1</code> option. On Linux or Mac OS X, this requires the pthreads library, which is installed by default. On Windows, native Windows threads will be used, which require no special libraries.</p>
 <p>For threading synchronization Bowtie uses by default a spinlocking mechanism. This can be disabled (leading to a more heavyweight locking mechanism) by specifying <code>EXTRA_FLAGS=-DNO_SPINLOCK</code> when building.</p>
 <h1 id="the-bowtie-aligner">The <code>bowtie</code> aligner</h1>
 <p><code>bowtie</code> takes an index and a set of reads as input and outputs a list of alignments. Alignments are selected according to a combination of the <a href="#bowtie-options-v"><code>-v</code></a>/<a href="#bowtie-options-n"><code>-n</code></a>/<a href="#bowtie-options-e"><code>-e</code></a>/<a href="#bowtie-options-l"><code>-l</code></a> options (plus the <a href="#bowtie-options-I"><code>-I</code></a>/<a href="#bowtie-options-X"><code>-X</code></a>/<a href="#bowtie-options-fr"><code>--fr</code></a>/<a href="#bowtie-options-fr"><code>--rf</code></a>/ <a href="#bowtie-options-fr"><code>--ff</code></a> options for paired-end alignment), which define which alignments are legal, and the <a href="#bowtie-options-k"><code>-k</code></a>/<a href="#bowtie-options-a"><code>-a</code></a>/<a href="#bowtie-options-m"><code>-m</code></a>/<a href="#bowtie-options-m"><code>-M</code></a>/<a href="#bowtie-options-best"><code>--best</code></a>/<a href="#bowtie-options-strata"><code>--strata</code></a> options which define which and how many legal alignments should be reported.</p>
@@ -445,6 +445,12 @@ T2302111203131231130300111123220
 </td><td>
 
 <p>The number of megabytes of memory a given thread is given to store path descriptors in <a href="#bowtie-options-best"><code>--best</code></a> mode. Best-first search must keep track of many paths at once to ensure it is always extending the path with the lowest cumulative cost. Bowtie tries to minimize the memory impact of the descriptors, but they can still grow very large in some cases. If you receive an error message saying that chunk memory has been exhausted in <a href="#bowtie-options-best"><code>--best</code></a> mode, try adjusting this parameter up to dedicate more memory to the descriptors. Default: 64.</p>
+</td></tr><tr><td id="bowtie-options-reads-per-batch">
+
+<pre><code>--reads-per-batch &lt;int&gt;</code></pre>
+</td><td>
+
+<p>Part of bowtie's batch parsing and used to specify the number of reads that bowtie will consume from the input file at once. Default: 16</p>
 </td></tr></table>
 
 <h4 id="reporting">Reporting</h4>
@@ -791,14 +797,12 @@ T2302111203131231130300111123220
 </td><td>
 
 <p>Aligned read belongs to stratum <code>&lt;N&gt;</code>. See <a href="#strata">Strata</a> for definition.</p></li>
-</ol>
-<pre><code>&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;
+</td></tr><tr><td>
 
-    XM:i:&lt;N&gt;
+<pre><code>XM:i:&lt;N&gt;</code></pre>
+</td><td>
 
-&lt;/td&gt;&lt;td&gt;
-
-For a read with no reported alignments, `&lt;N&gt;` is 0 if the read had
+<p>For a read with no reported alignments, `&lt;N&gt;` is 0 if the read had
 no alignments.  If [`-m`] was specified and the read&#39;s alignments
 were supressed because the [`-m`] ceiling was exceeded, `&lt;N&gt;` equals
 the [`-m`] ceiling + 1, to indicate that there were at least that
@@ -806,9 +810,10 @@ many valid alignments (but all were suppressed).  In [`-M`] mode, if
 the alignment was randomly selected because the [`-M`] ceiling was
 exceeded, `&lt;N&gt;` equals the [`-M`] ceiling + 1, to indicate that there
 were at least that many valid alignments (of which one was reported
-at random).
+at random).</p>
+</td></tr>
 
-&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</code></pre>
+</table></ol>
 <h1 id="the-bowtie-build-indexer">The <code>bowtie-build</code> indexer</h1>
 <p><code>bowtie-build</code> builds a Bowtie index from a set of DNA sequences. <code>bowtie-build</code> outputs a set of 6 files with suffixes <code>.1.ebwt</code>, <code>.2.ebwt</code>, <code>.3.ebwt</code>, <code>.4.ebwt</code>, <code>.rev.1.ebwt</code>, and <code>.rev.2.ebwt</code>. (If the total length of all the input sequences is greater than about 4 billion, then the index files will end in <code>ebwtl</code> instead of <code>ebwt</code>.) These files together constitute the index: they are all that is needed to align reads to that reference. The original sequence files are no longer used by Bowtie once the index is built.</p>
 <p>Use of Karkkainen's <a href="http://portal.acm.org/citation.cfm?id=1314852">blockwise algorithm</a> allows <code>bowtie-build</code> to trade off between running time and memory usage. <code>bowtie-build</code> has three options governing how it makes this trade: <a href="#bowtie-build-options-p"><code>-p</code>/<code>--packed</code></a>, <a href="#bowtie-build-options-bmax"><code>--bmax</code></a>/<a href="#bowtie-build-options-bmaxdivn"><code>--bmaxdivn</code></a>, and <a href="#bowtie-build-options-dcv"><code>--dcv</code></a>. By default, <code>bowtie-build</code> will automatically search for the settings that yield the best running time without exhausting memory. This behavior can be disabled using the <a href="#bowtie-build-options-a"><code>-a</code>/<code>--noauto</code></a> option.</p>

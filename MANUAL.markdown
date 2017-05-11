@@ -1095,6 +1095,20 @@ forward-oriented. ` --ff` requires both an upstream mate1 and a
 downstream mate2 to be forward-oriented.  Default: `--fr` when [`-C`]
 (colorspace alignment) is not specified, `--ff` when [`-C`] is specified.
 
+</td></tr><tr><td id="bowtie-options-allow-contain">
+
+[`--allow-contain`]: #bowtie-options-allow-contain
+
+    --allow-contain
+
+</td><td>
+
+Normally, Bowtie will not reported a paired-end alignment for a pair
+when the two ends overlap exactly the same reference interval, or if
+the alignment interval for one is contained within the other.  This
+option causes Bowtie to report such cases as normal paired-end
+alignments.
+
 </td></tr><tr><td id="bowtie-options-nofw">
 
 [`--nofw`]: #bowtie-options-nofw
@@ -1181,6 +1195,18 @@ the descriptors, but they can still grow very large in some cases.  If
 you receive an error message saying that chunk memory has been
 exhausted in [`--best`] mode, try adjusting this parameter up to
 dedicate more memory to the descriptors.  Default: 64.
+
+</td></tr><tr><td id="bowtie-options-reads-per-batch">
+
+[`--reads-per-batch`]: #bowtie-options-reads-per-batch
+
+    --reads-per-batch <int>
+
+</td><td>
+
+Part of bowtie's batch parsing and used to specify the number of
+reads that bowtie will consume from the input file at once. Default:
+16
 
 </td></tr></table>
 
