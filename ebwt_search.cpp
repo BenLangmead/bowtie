@@ -1528,7 +1528,7 @@ static void exactSearch(PatternComposer& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete tids;
+		delete[] tids;
 #endif
 
 		if(thread_stealing) {
@@ -1855,7 +1855,7 @@ static void mismatchSearchFull(PatternComposer& _patsrc,
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete tids;
+		delete[] tids;
 #endif
 
 		if(thread_stealing) {
@@ -2298,7 +2298,7 @@ static void twoOrThreeMismatchSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete tids;
+		delete[] tids;
 #endif
 
 		if(thread_stealing) {
@@ -2796,7 +2796,7 @@ static void seededQualCutoffSearchFull(
 		for (int i = 0; i < nthreads; i++) {
 			threads[i]->join();
 		}
-		delete tids;
+		delete[] tids;
 #endif
 
 		if(thread_stealing) {
