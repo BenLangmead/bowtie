@@ -1182,8 +1182,8 @@ static void exactSearchWorker(void *vp) {
 		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
 		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 		std::cout << ss.str();
-#endif
 	}
+#endif
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -1576,12 +1576,12 @@ static void mismatchSearchWorkerFull(void *vp){
 		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
 		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 		std::cout << ss.str();
-#endif
 	}
+#endif
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
-    WORKER_EXIT();
+    	WORKER_EXIT();
 }
 
 /**
@@ -1987,8 +1987,8 @@ static void twoOrThreeMismatchSearchWorkerFull(void *vp) {
 		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
 		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 		std::cout << ss.str();
-#endif
 	}
+#endif
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
@@ -2329,8 +2329,8 @@ static void seededQualSearchWorkerFull(void *vp) {
 		ss << "thread: " << tid << " cpu_changeovers: " << ncpu_changeovers << std::endl
 		   << "thread: " << tid << " node_changeovers: " << nnuma_changeovers << std::endl;
 		std::cout << ss.str();
-#endif
 	}
+#endif
 #ifdef WITH_TBB
 	p->done->fetch_and_add(1);
 #endif
