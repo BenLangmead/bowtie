@@ -69,7 +69,7 @@ def main():
     bin_l               = 'bowtie-%s-l' % action
     idx_ext_l           = '.1.ebwtl'
     idx_ext_s           = '.1.ebwt'
-    ex_path             = os.path.dirname(__file__)
+    ex_path             = os.path.dirname(os.path.realpath(__file__))
     bin_spec            = os.path.join(ex_path, bin_s)
 
     if args.verbose:

@@ -441,7 +441,7 @@ perl-deps:
 		mkdir .perllib.tmp ; \
 		$$DL http://cpanmin.us | perl - -l $(CURDIR)/.perllib.tmp App::cpanminus local::lib ; \
 		eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
-		cpanm --force Math::Random Clone Test::Deep ; \
+		cpanm -f Math::Random Clone Test::Deep ; \
 	fi
 
 
