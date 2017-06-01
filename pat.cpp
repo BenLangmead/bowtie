@@ -275,7 +275,11 @@ pair<bool, int> CFilePatternSource::nextBatch(
 void CFilePatternSource::open() {
 	if(is_open_) {
 		is_open_ = false;
-		if (fp_ != stdin) {
+        if (compressed_) {
+            gzclose(zfp_);
+            zfp_ = NULL;
+        }
+        else if (fp_ != stdin) {
 			fclose(fp_);
 			fp_ = NULL;
 		}
@@ -287,19 +291,42 @@ void CFilePatternSource::open() {
 	while(filecur_ < infiles_.size()) {
 		// Open read
 		if(infiles_[filecur_] == "-") {
-			fp_ = stdin;
-		} else if((fp_ = fopen(infiles_[filecur_].c_str(), "rb")) == NULL) {
-			if(!errs_[filecur_]) {
-				cerr << "Warning: Could not open read file \""
-				     << infiles_[filecur_] << "\" for reading; skipping..."
-					 << endl;
-				errs_[filecur_] = true;
+            compressed_ = true;
+            int fn = dup(fileno(stdin));
+            zfp_ = gzdopen(fn, "rb");
+		}
+        else {
+            compressed_ = false;
+			if (is_gzipped_file(infiles_[filecur_])) {
+				compressed_ = true;
+				zfp_ = gzopen(infiles_[filecur_].c_str(), "rb");
 			}
-			filecur_++;
-			continue;
+			else {
+				fp_ = fopen(infiles_[filecur_].c_str(), "rb");
+			}
+            if ((compressed_ && zfp_ == NULL) || (!compressed_ && fp_ == NULL)) {
+                if(!errs_[filecur_]) {
+                    cerr << "Warning: Could not open read file \""
+                         << infiles_[filecur_] << "\" for reading; skipping..."
+                         << endl;
+                    errs_[filecur_] = true;
+                }
+                filecur_++;
+                continue;
+            }
 		}
 		is_open_ = true;
-		setvbuf(fp_, buf_, _IOFBF, 64*1024);
+        if (compressed_) {
+#if ZLIB_VERNUM < 0x1235
+            cerr << "Warning: gzbuffer added in zlib v1.2.3.5. Unable to change "
+                    "buffer size from default of 8192." << endl;
+#else
+            gzbuffer(zfp_, 64*1024);
+#endif
+        }
+        else {
+            setvbuf(fp_, buf_, _IOFBF, 64*1024);
+        }
 		if(!qinfiles_.empty()) {
 			if(qinfiles_[filecur_] == "-") {
 				qfp_ = stdin;
@@ -550,12 +577,12 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	int c;
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
-		c = getc_unlocked(fp_);
+		c = getc_wrapper();
 		if(c == EOF) {
 			return make_pair(true, 0);
 		}
 		while(c == '\r' || c == '\n') {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 		if(c != '>') {
 			cerr << "Error: reads file does not look like a FASTA file" << endl;
@@ -570,7 +597,7 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 		readbuf[readi].readOrigBuf[0] = '>';
 		size_t bufoff = 1;
 		while(true) {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 			if(c < 0 || c == '>') {
 				done = c < 0;
 				break;
@@ -719,14 +746,14 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 	size_t readi = 0;
 	int nameoff = 0;
 	while(readi < pt.max_buf_) {
-		c = getc_unlocked(fp_);
+		c = getc_wrapper();
 		if(c < 0) {
 			break;
 		}
 		if(c == '>') {
 			resetForNextFile();
 			nameoff = 0;
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 			bool sawSpace = false;
 			while(c != '\n' && c != '\r') {
 				if(!sawSpace) {
@@ -738,10 +765,10 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 					// that are substrings of this FASTA sequence
 					name_prefix_buf_[nameoff++] = c;
 				}
-				c = getc_unlocked(fp_);
+				c = getc_wrapper();
 			}
 			while(c == '\n' || c == '\r') {
-				c = getc_unlocked(fp_);
+				c = getc_wrapper();
 			}
 			if(c < 0) {
 				break;
@@ -881,9 +908,9 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	int c = 0;
 	vector<Read>& readBuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
-		c = getc_unlocked(fp_);
+		c = getc_wrapper();
 		while(c == '\r' || c == '\n') {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 		if(c != '@') {
 			cerr << "Error: reads file does not look like a FASTQ file" << endl;
@@ -901,7 +928,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 		assert(readi == 0 || readBuf[readi].readOrigBufLen == 0);
 		int newlines = 4;
 		while(newlines) {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 			done = c < 0;
 			if(c == '\n' || (done && newlines == 1)) {
 				// Saw newline, or EOF that we're
@@ -1087,9 +1114,9 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
 	bool batch_a)
 {
-	int c = getc_unlocked(fp_);
+	int c = getc_wrapper();
 	while(c >= 0 && (c == '\n' || c == '\r')) {
-		c = getc_unlocked(fp_);
+		c = getc_wrapper();
 	}
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
@@ -1098,10 +1125,10 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 		readbuf[readi].readOrigBufLen = 0;
 		while(c >= 0 && c != '\n' && c != '\r') {
 			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 		while(c >= 0 && (c == '\n' || c == '\r')) {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 	}
 	return make_pair(c < 0, readi);
@@ -1266,9 +1293,9 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
 	bool batch_a)
 {
-	int c = getc_unlocked(fp_);
+	int c = getc_wrapper();
 	while(c >= 0 && (c == '\n' || c == '\r')) {
-		c = getc_unlocked(fp_);
+		c = getc_wrapper();
 	}
 	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
@@ -1277,10 +1304,10 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 		readbuf[readi].readOrigBufLen = 0;
 		while(c >= 0 && c != '\n' && c != '\r') {
 			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 		while(c >= 0 && (c == '\n' || c == '\r')) {
-			c = getc_unlocked(fp_);
+			c = getc_wrapper();
 		}
 	}
 	return make_pair(c < 0, readi);

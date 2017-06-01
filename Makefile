@@ -11,6 +11,7 @@ INC = $(SEQAN_INC) -I third_party
 CPP = g++ -w
 CXX = $(CPP)
 CC = gcc
+LIBS = -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -85,10 +86,10 @@ ifeq (1,$(NO_SPINLOCK))
 endif
 
 ifeq (1,$(WITH_TBB))
-	LIBS = $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+	LIBS += $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
 	override EXTRA_FLAGS += -DWITH_TBB
 else
-	LIBS = $(PTHREAD_LIB)
+	LIBS += $(PTHREAD_LIB)
 endif
 
 POPCNT_CAPABILITY ?= 1
@@ -441,7 +442,7 @@ perl-deps:
 		mkdir .perllib.tmp ; \
 		$$DL http://cpanmin.us | perl - -l $(CURDIR)/.perllib.tmp App::cpanminus local::lib ; \
 		eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
-		cpanm -f Math::Random Clone Test::Deep ; \
+		cpanm --force Math::Random Clone Test::Deep ; \
 	fi
 
 
