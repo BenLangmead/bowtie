@@ -371,6 +371,7 @@ struct PerThreadReadBuf {
 	 */
 	void setReadId(TReadId rdid) {
 		rdid_ = rdid;
+		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
 	}
 	
 	const size_t max_buf_; // max # reads to read into buffer at once
@@ -502,10 +503,10 @@ class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(
 		const vector<string>& v,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0);
+		bool color,
+		const char *dumpfile = NULL,
+		int trim3 = 0,
+		int trim5 = 0);
 	
 	virtual ~VectorPatternSource() { }
 	
@@ -535,6 +536,10 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 private:
+
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
 
 	bool color_;                      // colorspace?
 	size_t cur_;                      // index for first read of next batch
@@ -647,6 +652,13 @@ protected:
 	bool first_;
 	char buf_[64*1024]; /// file buffer for sequences
 	char qbuf_[64*1024]; /// file buffer for qualities
+
+private:
+
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
+
 };
 
 /**

@@ -7,14 +7,18 @@ using namespace seqan;
 
 /// Sort by text-id then by text-offset
 bool operator< (const Hit& a, const Hit& b) {
-    return a.h < b.h;
+	return a.h < b.h;
 }
 
 /**
  * Report a maxed-out read.
  */
-void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
-	HitSink::reportMaxed(hs, p);
+void VerboseHitSink::reportMaxed(
+	vector<Hit>& hs,
+	size_t threadId,
+	PatternSourcePerThread& p)
+{
+	HitSink::reportMaxed(hs, threadId, p);
 	if(sampleMax_) {
 		RandomSource rand;
 		rand.init(p.bufa().seed);
@@ -41,7 +45,7 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 				if(strat == bestStratum) {
 					if(num == r) {
 						hs[i].oms = hs[i+1].oms = (uint32_t)(hs.size()/2);
-						reportHits(hs, i, i+2);
+						reportHits(NULL, &hs, i, i+2, threadId, 0, 0, true);
 						break;
 					}
 					num++;
@@ -58,7 +62,7 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 			uint32_t r = rand.nextU32() % num;
 			Hit& h = hs[r];
 			h.oms = (uint32_t)hs.size();
-			reportHit(h, false);
+			reportHits(&h, NULL, 0, 1, threadId, 0, 0, true);
 		}
 	}
 }
@@ -66,18 +70,19 @@ void VerboseHitSink::reportMaxed(vector<Hit>& hs, PatternSourcePerThread& p) {
 /**
  * Append a verbose, readable hit to the given output stream.
  */
-void VerboseHitSink::append(ostream& ss,
-                   const Hit& h,
-                   const vector<string>* refnames,
-                   ReferenceMap *rmap,
-                   AnnotationMap *amap,
-                   bool fullRef,
-                   int partition,
-                   int offBase,
-                   bool colorSeq,
-                   bool colorQual,
-                   bool cost,
-                   const Bitset& suppress)
+void VerboseHitSink::append(
+	BTString& o,
+	const Hit& h,
+	const vector<string>* refnames,
+	ReferenceMap *rmap,
+	AnnotationMap *amap,
+	bool fullRef,
+	int partition,
+	int offBase,
+	bool colorSeq,
+	bool colorQual,
+	bool cost,
+	const Bitset& suppress)
 {
 	bool spill = false;
 	int spillAmt = 0;
@@ -99,18 +104,17 @@ void VerboseHitSink::append(ostream& ss,
 			int pospart = abs(partition);
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
+				else o << '\t';
 				// Output a partitioning key
 				// First component of the key is the reference index
 				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
+					printUptoWs(o, rmap->getName(h.h.first), !fullRef);
 				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
+					printUptoWs(o, (*refnames)[h.h.first], !fullRef);
 				} else {
-					ss << h.h.first;
+					o << h.h.first;
 				}
 			}
-			ostringstream ss2, ss3;
 			// Next component of the key is the partition id
 			if(!dospill) {
 				pdiv = (h.h.second + offBase) / pospart;
@@ -119,7 +123,6 @@ void VerboseHitSink::append(ostream& ss,
 			assert_neq(0xffffffff, pdiv);
 			assert_neq(0xffffffff, pmod);
 			if(dospill) assert_gt(spillAmt, 0);
-			ss2 << (pdiv + (dospill ? spillAmt : 0));
 			if(partition > 0 &&
 			   (pmod + h.length()) >= ((uint32_t)pospart * (spillAmt + 1))) {
 				// Spills into the next partition so we need to
@@ -127,93 +130,112 @@ void VerboseHitSink::append(ostream& ss,
 				spill = true;
 			}
 			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else ss << '\t';
+				if(firstfield) {
+					firstfield = false;
+				} else {
+					o << '\t';
+				}
 				// Print partition id with leading 0s so that Hadoop
 				// can do lexicographical sort (modern Hadoop versions
 				// seen to support numeric)
-				string s2 = ss2.str();
-				size_t partDigits = 1;
-				if(pospart >= 10) partDigits++;
-				if(pospart >= 100) partDigits++;
-				if(pospart >= 1000) partDigits++;
-				if(pospart >= 10000) partDigits++;
-				if(pospart >= 100000) partDigits++;
-				for(size_t i = s2.length(); i < (10-partDigits); i++) {
-					ss << "0";
+				int padding = 10;
+				uint32_t part = (pdiv + (dospill ? spillAmt : 0));
+				uint32_t parttmp = part;
+				while(parttmp > 0) {
+					padding--;
+					parttmp /= 10;
 				}
-				ss << s2.c_str();
+				assert_geq(padding, 0);
+				for(int i = 0; i < padding; i++) {
+					o << '0';
+				}
+				o << part;
 			}
 			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else ss << '\t';
+				if(firstfield) {
+					firstfield = false;
+				} else {
+					o << '\t';
+				}
 				// Print offset with leading 0s
-				ss3 << (h.h.second + offBase);
-				string s3 = ss3.str();
-				for(size_t i = s3.length(); i < 9; i++) {
-					ss << "0";
+				int padding = 9;
+				uint32_t off = h.h.second + offBase;
+				uint32_t offtmp = off;
+				while(offtmp > 0) {
+					padding--;
+					offtmp /= 10;
 				}
-				ss << s3;
+				assert_geq(padding, 0);
+				for(int i = 0; i < padding; i++) {
+					o << '0';
+				}
+				o << off;
 			}
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (h.fw? "+":"-");
+				else o << '\t';
+				o << (h.fw? "+":"-");
 			}
 			// end if(partition != 0)
 		} else {
 			assert(!dospill);
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << h.patName;
-			}
-			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (h.fw? '+' : '-');
-			}
-			if(!suppress.test((uint32_t)field++)) {
-				if(firstfield) firstfield = false;
-				else ss << '\t';
-				// .first is text id, .second is offset
-				if(refnames != NULL && rmap != NULL) {
-					printUptoWs(ss, rmap->getName(h.h.first), !fullRef);
-				} else if(refnames != NULL && h.h.first < refnames->size()) {
-					printUptoWs(ss, (*refnames)[h.h.first], !fullRef);
-				} else {
-					ss << h.h.first;
+				else o << '\t';
+				for(size_t i = 0; i < seqan::length(h.patName); i++) {
+					o << (char)(h.patName[i]);
 				}
 			}
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (h.h.second + offBase);
+				else o << '\t';
+				o << (h.fw? '+' : '-');
+			}
+			if(!suppress.test((uint32_t)field++)) {
+				if(firstfield) firstfield = false;
+				else o << '\t';
+				// .first is text id, .second is offset
+				if(refnames != NULL && rmap != NULL) {
+					printUptoWs(o, rmap->getName(h.h.first), !fullRef);
+				} else if(refnames != NULL && h.h.first < refnames->size()) {
+					printUptoWs(o, (*refnames)[h.h.first], !fullRef);
+				} else {
+					o << h.h.first;
+				}
+			}
+			if(!suppress.test((uint32_t)field++)) {
+				if(firstfield) firstfield = false;
+				else o << '\t';
+				o << (h.h.second + offBase);
 			}
 			// end else clause of if(partition != 0)
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
-			else ss << '\t';
+			else o << '\t';
 			const String<Dna5>* pat = &h.patSeq;
 			if(h.color && colorSeq) pat = &h.colSeq;
-			ss << *pat;
+			for(size_t i = 0; i < seqan::length(*pat); i++) {
+				o << (char)((*pat)[i]);
+			}
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
-			else ss << '\t';
+			else o << '\t';
 			const String<char>* qual = &h.quals;
 			if(h.color && colorQual) qual = &h.colQuals;
-			ss << *qual;
+			for(size_t i = 0; i < seqan::length(*qual); i++) {
+				o << (char)((*qual)[i]);
+			}
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
-			else ss << '\t';
-			ss << h.oms;
+			else o << '\t';
+			o << h.oms;
 		}
 		if(!suppress.test((uint32_t)field++)) {
 			if(firstfield) firstfield = false;
-			else ss << '\t';
+			else o << '\t';
 			// Look for SNP annotations falling within the alignment
 			map<int, char> snpAnnots;
 			const size_t len = length(h.patSeq);
@@ -243,35 +265,37 @@ void VerboseHitSink::append(ostream& ss,
 			for (unsigned int i = 0; i < len; ++ i) {
 				if(h.mms.test(i)) {
 					// There's a mismatch at this position
-					if (!firstmm) ss << ",";
-					ss << i; // position
+					if (!firstmm) {
+						o << ",";
+					}
+					o << i; // position
 					assert_gt(h.refcs.size(), i);
 					char refChar = toupper(h.refcs[i]);
 					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
 					assert_neq(refChar, qryChar);
-					ss << ":" << refChar << ">" << qryChar;
+					o << ":" << refChar << ">" << qryChar;
 					firstmm = false;
 				} else if(snpAnnots.find(i) != snpAnnots.end()) {
-					if (!firstmm) ss << ",";
-					ss << i; // position
+					if (!firstmm) o << ",";
+					o << i; // position
 					char qryChar = (h.fw ? h.patSeq[i] : h.patSeq[length(h.patSeq)-i-1]);
-					ss << "S:" << snpAnnots[i] << ">" << qryChar;
+					o << "S:" << snpAnnots[i] << ">" << qryChar;
 					firstmm = false;
 				}
 			}
-			if(partition != 0 && firstmm) ss << '-';
+			if(partition != 0 && firstmm) o << '-';
 		}
 		if(partition != 0) {
 			// Fields addded as of Crossbow 0.1.4
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (int)h.mate;
+				else o << '\t';
+				o << (int)h.mate;
 			}
 			// Print label, or whole read name if label isn't found
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
+				else o << '\t';
 				int labelOff = -1;
 				// If LB: field is present, print its value
 				for(int i = 0; i < (int)seqan::length(h.patName)-3; i++) {
@@ -283,7 +307,7 @@ void VerboseHitSink::append(ostream& ss,
 						labelOff = i+3;
 						for(int j = labelOff; j < (int)seqan::length(h.patName); j++) {
 							if(h.patName[j] != ';') {
-								ss << h.patName[j];
+								o << h.patName[j];
 							} else {
 								break;
 							}
@@ -291,31 +315,35 @@ void VerboseHitSink::append(ostream& ss,
 					}
 				}
 				// Otherwise, print the whole read name
-				if(labelOff == -1) ss << h.patName;
+				if(labelOff == -1) {
+					for(size_t i = 0; i < seqan::length(h.patName); i++) {
+						o << (char)(h.patName[i]);
+					}
+				}
 			}
 		}
 		if(cost) {
 			// Stratum
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (int)h.stratum;
+				else o << '\t';
+				o << (int)h.stratum;
 			}
 			// Cost
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << (int)h.cost;
+				else o << '\t';
+				o << (int)h.cost;
 			}
 		}
 		if(showSeed) {
 			// Seed
 			if(!suppress.test((uint32_t)field++)) {
 				if(firstfield) firstfield = false;
-				else ss << '\t';
-				ss << h.seed;
+				else o << '\t';
+				o << h.seed;
 			}
 		}
-		ss << endl;
+		o << '\n';
 	} while(spill);
 }

@@ -16,6 +16,21 @@
 #include "assert_helpers.h"
 
 /**
+ * Simple, fast helper for determining if a character is a newline.
+ */
+static inline bool isnewline(int c) {
+	return c == '\r' || c == '\n';
+}
+
+/**
+ * Simple, fast helper for determining if a character is a non-newline
+ * whitespace character.
+ */
+static inline bool isspace_notnl(int c) {
+	return isspace(c) && !isnewline(c);
+}
+
+/**
  * Simple wrapper for a FILE*, istream or ifstream that reads it in
  * chunks (with fread) and keeps those chunks in a buffer.  It also
  * services calls to get(), peek() and gets() from the buffer, reading
@@ -45,6 +60,9 @@ public:
 		assert(_ins != NULL);
 	}
 
+	/**
+	 * Return true iff there is a stream ready to read.
+	 */
 	bool isOpen() {
 		return _in != NULL || _inf != NULL || _ins != NULL;
 	}
@@ -161,6 +179,7 @@ public:
 					_buf_sz = _ins->gcount();
 				} else {
 					assert(_in != NULL);
+					// TODO: consider an _unlocked function
 					_buf_sz = fread(_buf, 1, BUF_SZ, _in);
 				}
 				_cur = 0;
@@ -192,12 +211,12 @@ public:
 				buf[stored] = '\0';
 				return stored;
 			}
-			if(stored == len-1 || c == '\n' || c == '\r') {
+			if(stored == len-1 || isnewline(c)) {
 				// End of string
 				buf[stored] = '\0';
 				// Skip over all end-of-line characters
 				int pc = peek();
-				while(pc == '\n' || pc == '\r') {
+				while(isnewline(pc)) {
 					get(); // discard
 					pc = peek();
 				}
@@ -242,8 +261,8 @@ public:
 	 */
 	int getPastNewline() {
 		int c = get();
-		while(c != '\r' && c != '\n' && c != -1) c = get();
-		while(c == '\r' || c == '\n') c = get();
+		while(!isnewline(c) && c != -1) c = get();
+		while(isnewline(c)) c = get();
 		assert_neq(c, '\r');
 		assert_neq(c, '\n');
 		return c;
@@ -256,8 +275,8 @@ public:
 	 */
 	int peekPastNewline() {
 		int c = peek();
-		while(c != '\r' && c != '\n' && c != -1) c = get();
-		while(c == '\r' || c == '\n') c = get();
+		while(!isnewline(c) && c != -1) c = get();
+		while(isnewline(c)) c = get();
 		assert_neq(c, '\r');
 		assert_neq(c, '\n');
 		return c;
@@ -269,10 +288,10 @@ public:
 	 */
 	int peekUptoNewline() {
 		int c = peek();
-		while(c != '\r' && c != '\n' && c != -1) {
+		while(!isnewline(c) && c != -1) {
 			get(); c = peek();
 		}
-		while(c == '\r' || c == '\n') {
+		while(isnewline(c)) {
 			get();
 			c = peek();
 		}
@@ -309,7 +328,7 @@ public:
 	/**
 	 * Get current size of the last-N-chars buffer.
 	 */
-	const size_t lastNLen() const {
+	size_t lastNLen() const {
 		return _lastn_cur;
 	}
 
@@ -415,6 +434,21 @@ public:
 	/**
 	 * Open a new output stream to a file with given name.
 	 */
+	OutFileBuf(const std::string& out, bool binary = false) :
+		name_(out.c_str()), cur_(0), closed_(false)
+	{
+		out_ = fopen(out.c_str(), binary ? "wb" : "w");
+		if(out_ == NULL) {
+			std::cerr << "Error: Could not open alignment output file " << out.c_str() << std::endl;
+			throw 1;
+		}
+		if(setvbuf(out_, NULL, _IOFBF, 10* 1024* 1024))
+			std::cerr << "Warning: Could not allocate the proper buffer size for output file stream. " << std::endl;
+	}
+
+	/**
+	 * Open a new output stream to a file with given name.
+	 */
 	OutFileBuf(const char *out, bool binary = false) :
 		name_(out), cur_(0), closed_(false)
 	{
@@ -434,6 +468,11 @@ public:
 	OutFileBuf() : name_("cout"), cur_(0), closed_(false) {
 		out_ = stdout;
 	}
+
+	/**
+	 * Close buffer when object is destroyed.
+	 */
+	~OutFileBuf() { close(); }
 
 	/**
 	 * Open a new output stream to a file with given name.
@@ -489,6 +528,29 @@ public:
 	/**
 	 * Write a c++ string to the write buffer and, if necessary, flush.
 	 */
+	template<typename T>
+	void writeString(const T& s) {
+		assert(!closed_);
+		size_t slen = s.length();
+		if(cur_ + slen > BUF_SZ) {
+			if(cur_ > 0) flush();
+			if(slen >= BUF_SZ) {
+				fwrite(s.toZBuf(), slen, 1, out_);
+			} else {
+				memcpy(&buf_[cur_], s.toZBuf(), slen);
+				assert_eq(0, cur_);
+				cur_ = slen;
+			}
+		} else {
+			memcpy(&buf_[cur_], s.toZBuf(), slen);
+			cur_ += slen;
+		}
+		assert_leq(cur_, BUF_SZ);
+	}
+
+	/**
+	 * Write a c++ string to the write buffer and, if necessary, flush.
+	 */
 	void writeChars(const char * s, size_t len) {
 		assert(!closed_);
 		if(cur_ + len > BUF_SZ) {
@@ -511,6 +573,13 @@ public:
 			cur_ += len;
 		}
 		assert_leq(cur_, BUF_SZ);
+	}
+
+	/**
+	 * Write a 0-terminated C string to the output stream.
+	 */
+	void writeChars(const char * s) {
+		writeChars(s, strlen(s));
 	}
 
 	/**
