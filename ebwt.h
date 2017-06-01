@@ -454,6 +454,7 @@ public:
 	     int32_t offRate,
 	     int32_t isaRate,
 	     int32_t ftabChars,
+	     int nthreads,
 	     const string& file,   // base filename for EBWT files
 	     bool __fw,
 	     bool useBlockwise,
@@ -513,6 +514,8 @@ public:
 			refparams,
 			fout1,
 			fout2,
+			file,
+			nthreads,
 			useBlockwise,
 			bmax,
 			bmaxSqrtMult,
@@ -617,6 +620,8 @@ public:
 		const RefReadInParams& refparams,
 		ofstream& out1,
 		ofstream& out2,
+		const string& outfile,
+		int nthreads,
 		bool useBlockwise,
 		TIndexOffU bmax,
 		TIndexOffU bmaxSqrtMult,
@@ -740,6 +745,7 @@ public:
 					// constructing the DifferenceCoverSample
 					dcv <<= 1;
 					TIndexOffU sz = (TIndexOffU)DifferenceCoverSample<TStr>::simulateAllocs(s, dcv >> 1);
+					if(nthreads > 1) sz *= (nthreads + 1);
 					AutoArray<uint8_t> tmp(sz);
 					dcv >>= 1;
 					// Likewise with the KarkkainenBlockwiseSA
@@ -760,7 +766,7 @@ public:
 					VMSG_NL("");
 				}
 				VMSG_NL("Constructing suffix-array element generator");
-				KarkkainenBlockwiseSA<TStr> bsa(s, bmax, dcv, seed, _sanity, _passMemExc, _verbose);
+				KarkkainenBlockwiseSA<TStr> bsa(s, bmax, nthreads, dcv, seed, _sanity, _passMemExc, _verbose, outfile);
 				assert(bsa.suffixItrIsReset());
 				assert_eq(bsa.size(), length(s)+1);
 				VMSG_NL("Converting suffix-array elements to index image");
