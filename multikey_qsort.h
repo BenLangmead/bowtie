@@ -475,9 +475,9 @@ void mkeyQSortSuf(
 }
 
 struct QSortRange {
-  size_t begin;
-  size_t end;
-  size_t depth;
+        size_t begin;
+        size_t end;
+        size_t depth;
 };
 
 template<typename T>
@@ -494,119 +494,119 @@ void mkeyQSortSuf2(
 	size_t upto = OFF_MASK,
 	std::vector<size_t>* boundaries = NULL)
 {
-  std::vector<std::vector<QSortRange> > block_list;
-  while(true) {
-    size_t begin = 0, end = 0, depth = 0;
-    if(block_list.size() == 0) {
-      begin = _begin;
-      end = _end;
-      depth = _depth;
-    } else {
-      if(block_list.back().size() > 0) {
-	begin = block_list.back()[0].begin;
-	end = block_list.back()[0].end;
-	depth = block_list.back()[0].depth;
-	block_list.back().erase((block_list.back()).begin());
-      } else {
-	block_list.resize(block_list.size() - 1);
-	if(block_list.size() == 0) {
-	  break;
-	}
-      }
-    }
-    if(depth == upto) {
-      if(boundaries != NULL) {
-	(*boundaries).push_back(end);
-      }
-      continue;
-    }
-    assert_leq(begin, slen);
-    assert_leq(end, slen);
-    size_t a, b, c, d, /*e,*/ r;
-    size_t n = end - begin;
-    if(n <= 1) { // 1-element list already sorted
-      if(n == 1 && boundaries != NULL) {
-	boundaries->push_back(end);
-      }
-      continue;
-    }
-    CHOOSE_AND_SWAP_PIVOT(SWAP2, CHAR_AT_SUF); // pick pivot, swap it into [begin]
-    int v = CHAR_AT_SUF(begin, depth); // v <- randomly-selected pivot value
+        std::vector<std::vector<QSortRange> > block_list;
+	while(true) {
+                size_t begin = 0, end = 0, depth = 0;
+		if(block_list.size() == 0) {
+	                begin = _begin;
+			end = _end;
+			depth = _depth;
+		} else {
+	                if(block_list.back().size() > 0) {
+		                begin = block_list.back()[0].begin;
+				end = block_list.back()[0].end;
+				depth = block_list.back()[0].depth;
+				block_list.back().erase((block_list.back()).begin());
+			} else {
+		                block_list.resize(block_list.size() - 1);
+				if(block_list.size() == 0) {
+			                break;
+				}
+			}
+		}
+		if(depth == upto) {
+	                if(boundaries != NULL) {
+		                (*boundaries).push_back(end);
+			}
+			continue;
+		}
+		assert_leq(begin, slen);
+		assert_leq(end, slen);
+		size_t a, b, c, d, /*e,*/ r;
+		size_t n = end - begin;
+		if(n <= 1) { // 1-element list already sorted
+	          if(n == 1 && boundaries != NULL) {
+		          boundaries->push_back(end);
+		  }
+		  continue;
+		}
+		CHOOSE_AND_SWAP_PIVOT(SWAP2, CHAR_AT_SUF); // pick pivot, swap it into [begin]
+		int v = CHAR_AT_SUF(begin, depth); // v <- randomly-selected pivot value
 #ifndef NDEBUG
-    {
-      bool stillInBounds = false;
-      for(size_t i = begin; i < end; i++) {
-	if(depth < (hlen-s[i])) {
-	  stillInBounds = true;
-	  break;
-	} else { /* already fell off this suffix */ }
-      }
-      assert(stillInBounds); // >=1 suffix must still be in bounds
-    }
+		{
+	                bool stillInBounds = false;
+			for(size_t i = begin; i < end; i++) {
+		                if(depth < (hlen-s[i])) {
+			                stillInBounds = true;
+					break;
+				} else { /* already fell off this suffix */ }
+			}
+			assert(stillInBounds); // >=1 suffix must still be in bounds
+		}
 #endif
-    a = b = begin;
-    c = d = /*e =*/ end-1;
-    while(true) {
-      // Invariant: everything before a is = pivot, everything
-      // between a and b is <
-      int bc = 0; // shouldn't have to init but gcc on Mac complains
-      while(b <= c && v >= (bc = CHAR_AT_SUF(b, depth))) {
-	if(v == bc) {
-	  SWAP2(s, s2, a, b); a++;
+		a = b = begin;
+		c = d = /*e =*/ end-1;
+		while(true) {
+	          // Invariant: everything before a is = pivot, everything
+	          // between a and b is <
+	          int bc = 0; // shouldn't have to init but gcc on Mac complains
+		  while(b <= c && v >= (bc = CHAR_AT_SUF(b, depth))) {
+		          if(v == bc) {
+			          SWAP2(s, s2, a, b); a++;
+			  }
+			  b++;
+		  }
+		  // Invariant: everything after d is = pivot, everything
+		  // between c and d is >
+		  int cc = 0; // shouldn't have to init but gcc on Mac complains
+		  while(b <= c && v <= (cc = CHAR_AT_SUF(c, depth))) {
+		          if(v == cc) {
+			          SWAP2(s, s2, c, d); d--; /*e--;*/
+			  }
+			  //else if(c == e && v == hi) e--;
+			  c--;
+		  }
+		  if(b > c) break;
+		  SWAP2(s, s2, b, c);
+		  b++;
+		  c--;
+		}
+		assert(a > begin || c < end-1);                      // there was at least one =s
+		assert_lt(/*e*/d-c, n); // they can't all have been > pivot
+		assert_lt(b-a, n); // they can't all have been < pivot
+		assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
+		r = min(a-begin, b-a); VECSWAP2(s, s2, begin, b-r,   r);  // swap left = to center
+		r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
+		assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
+		r = b-a; // r <- # of <'s
+		std::vector<QSortRange> tmp1;
+		block_list.push_back(tmp1);
+		block_list.back().clear();
+		if(r > 0) { // recurse on <'s
+	                QSortRange tmp2;
+			block_list.back().push_back(tmp2);
+			block_list.back().back().begin = begin;
+			block_list.back().back().end = begin + r;
+			block_list.back().back().depth = depth;
+		}
+		// Do not recurse on ='s if the pivot was the off-the-end value;
+		// they're already fully sorted
+		if(v != hi) { // recurse on ='s
+	                QSortRange tmp3;
+			block_list.back().push_back(tmp3);
+			block_list.back().back().begin = begin + r;
+			block_list.back().back().end = begin + r + (a-begin) + (end-d-1);
+			block_list.back().back().depth = depth + 1;
+		}
+		r = d-c;   // r <- # of >'s excluding those exhausted
+		if(r > 0 && v < hi-1) { // recurse on >'s
+	                QSortRange tmp4;
+			block_list.back().push_back(tmp4);
+			block_list.back().back().begin = end - r;
+			block_list.back().back().end = end;
+			block_list.back().back().depth = depth;
+		}
 	}
-	b++;
-      }
-      // Invariant: everything after d is = pivot, everything
-      // between c and d is >
-      int cc = 0; // shouldn't have to init but gcc on Mac complains
-      while(b <= c && v <= (cc = CHAR_AT_SUF(c, depth))) {
-	if(v == cc) {
-	  SWAP2(s, s2, c, d); d--; /*e--;*/
-	}
-	//else if(c == e && v == hi) e--;
-	c--;
-      }
-      if(b > c) break;
-      SWAP2(s, s2, b, c);
-      b++;
-      c--;
-    }
-    assert(a > begin || c < end-1);                      // there was at least one =s
-    assert_lt(/*e*/d-c, n); // they can't all have been > pivot
-    assert_lt(b-a, n); // they can't all have been < pivot
-    assert(assertPartitionedSuf(host, s, slen, hi, v, begin, end, depth));  // check pre-=-swap invariant
-    r = min(a-begin, b-a); VECSWAP2(s, s2, begin, b-r,   r);  // swap left = to center
-    r = min(d-c, end-d-1); VECSWAP2(s, s2, b,     end-r, r);  // swap right = to center
-    assert(assertPartitionedSuf2(host, s, slen, hi, v, begin, end, depth)); // check post-=-swap invariant
-    r = b-a; // r <- # of <'s
-    std::vector<QSortRange> tmp1;
-    block_list.push_back(tmp1);
-    block_list.back().clear();
-    if(r > 0) { // recurse on <'s
-      QSortRange tmp2;
-      block_list.back().push_back(tmp2);
-      block_list.back().back().begin = begin;
-      block_list.back().back().end = begin + r;
-      block_list.back().back().depth = depth;
-    }
-    // Do not recurse on ='s if the pivot was the off-the-end value;
-    // they're already fully sorted
-    if(v != hi) { // recurse on ='s
-      QSortRange tmp3;
-      block_list.back().push_back(tmp3);
-      block_list.back().back().begin = begin + r;
-      block_list.back().back().end = begin + r + (a-begin) + (end-d-1);
-      block_list.back().back().depth = depth + 1;
-    }
-    r = d-c;   // r <- # of >'s excluding those exhausted
-    if(r > 0 && v < hi-1) { // recurse on >'s
-      QSortRange tmp4;
-      block_list.back().push_back(tmp4);
-      block_list.back().back().begin = end - r;
-      block_list.back().back().end = end;
-      block_list.back().back().depth = depth;
-    }
-  }
 }
 
 
@@ -1000,87 +1000,92 @@ static void bucketSortSufDcU8(
         size_t _depth,
         bool sanityCheck = false)
 {
-  // 5 64-element buckets for bucket-sorting A, C, G, T, $
-  TIndexOffU* bkts[4];
-  for(size_t i = 0; i < 4; i++) {
-    bkts[i] = new TIndexOffU[4 * 1024 * 1024];
-  }
-  std::vector<std::vector<size_t> > block_list;
-  while(true) {
-    size_t begin = 0, end = 0;
-    if(block_list.size() == 0) {
-      begin = _begin;
-      end = _end;
-    } else {
-      if(block_list.back().size() > 1) {
-	end = block_list.back().back(); 
-	block_list.back().pop_back();
-	begin = block_list.back().back();
-      } else {
-	block_list.resize(block_list.size() - 1);
-	if(block_list.size() == 0) {
-	  break;
+        // 5 64-element buckets for bucket-sorting A, C, G, T, $
+        TIndexOffU* bkts[4];
+	for(size_t i = 0; i < 4; i++) {
+	        bkts[i] = new TIndexOffU[4 * 1024 * 1024];
 	}
-      }
-    }
-    size_t depth = block_list.size() + _depth;
-    assert_leq(end-begin, BUCKET_SORT_CUTOFF);
-    assert_eq(hi, 4);
-    if(end <= begin + 1) { // 1-element list already sorted
-      continue;
-    }
-    if(depth > dc.v()) {
-      // Quicksort the remaining suffixes using difference cover
-      // for constant-time comparisons; this is O(k*log(k)) where
-      // k=(end-begin)
-      qsortSufDcU8<T1,T2>(host1, host, hlen, s, slen, dc, begin, end, sanityCheck);
-      continue;
-    }
-    if(end-begin <= SELECTION_SORT_CUTOFF) {
-      // Bucket sort remaining items
-      selectionSortSufDcU8(host1, host, hlen, s, slen, dc, hi,
-			   begin, end, depth, sanityCheck);
-      if(sanityCheck) {
-	sanityCheckOrderedSufs(host1, hlen, s, slen,
-			       OFF_MASK, begin, end);
-      }
-      continue;
-    }
-    size_t cnts[] = { 0, 0, 0, 0, 0 };
-    for(size_t i = begin; i < end; i++) {
-      size_t off = depth + s[i];
-      uint8_t c = (off < hlen) ? get_uint8(host, off) : hi;
-      assert_leq(c, 4);
-      if(c == 0) {
-	s[begin + cnts[0]++] = s[i];
-      } else {
-	bkts[c-1][cnts[c]++] = s[i];
-      }
-    }
-    assert_eq(cnts[0] + cnts[1] + cnts[2] + cnts[3] + cnts[4], end - begin);
-    size_t cur = begin + cnts[0];
-    if(cnts[1] > 0) { memcpy(&s[cur], bkts[0], cnts[1] << (OFF_SIZE/4 + 1)); cur += cnts[1]; }
-    if(cnts[2] > 0) { memcpy(&s[cur], bkts[1], cnts[2] << (OFF_SIZE/4 + 1)); cur += cnts[2]; }
-    if(cnts[3] > 0) { memcpy(&s[cur], bkts[2], cnts[3] << (OFF_SIZE/4 + 1)); cur += cnts[3]; }
-    if(cnts[4] > 0) { memcpy(&s[cur], bkts[3], cnts[4] << (OFF_SIZE/4 + 1)); }
-    // This frame is now totally finished with bkts[][], so recursive
-    // callees can safely clobber it; we're not done with cnts[], but
-    // that's local to the stack frame.
-    std::vector<size_t> tmp;
-    block_list.push_back(tmp);
-    block_list.back().clear();
-    block_list.back().push_back(begin);
-    for(size_t i = 0; i < 4; i++) {
-      if(cnts[i] > 0) {
-	block_list.back().push_back(block_list.back().back() + cnts[i]);
-      }
-    }
-  }
-  // Done
-    
-  for(size_t i = 0; i < 4; i++) {
-    delete [] bkts[i];
-  }
+	std::vector<std::vector<size_t> > block_list;
+	bool first = true;
+	while(true) {
+	        size_t begin = 0, end = 0;
+		if(first) {
+		        begin = _begin;
+			end = _end;
+			first = false;
+		} else {
+		        if(block_list.size() == 0) {
+			        break;
+			}
+			if(block_list.back().size() > 1) {
+			        end = block_list.back().back(); 
+				block_list.back().pop_back();
+				begin = block_list.back().back();
+			} else {
+			        block_list.resize(block_list.size() - 1);
+				if(block_list.size() == 0) {
+				        break;
+				}
+			}
+		}
+		size_t depth = block_list.size() + _depth;
+		assert_leq(end-begin, BUCKET_SORT_CUTOFF);
+		assert_eq(hi, 4);
+		if(end <= begin + 1) { // 1-element list already sorted
+		        continue;
+		}
+		if(depth > dc.v()) {
+		        // Quicksort the remaining suffixes using difference cover
+		        // for constant-time comparisons; this is O(k*log(k)) where
+		        // k=(end-begin)
+		        qsortSufDcU8<T1,T2>(host1, host, hlen, s, slen, dc, begin, end, sanityCheck);
+			continue;
+		}
+		if(end-begin <= SELECTION_SORT_CUTOFF) {
+		        // Bucket sort remaining items
+		        selectionSortSufDcU8(host1, host, hlen, s, slen, dc, hi,
+					     begin, end, depth, sanityCheck);
+			if(sanityCheck) {
+			        sanityCheckOrderedSufs(host1, hlen, s, slen,
+						       OFF_MASK, begin, end);
+			}
+			continue;
+		}
+		size_t cnts[] = { 0, 0, 0, 0, 0 };
+		for(size_t i = begin; i < end; i++) {
+		        size_t off = depth + s[i];
+			uint8_t c = (off < hlen) ? get_uint8(host, off) : hi;
+			assert_leq(c, 4);
+			if(c == 0) {
+			        s[begin + cnts[0]++] = s[i];
+			} else {
+			        bkts[c-1][cnts[c]++] = s[i];
+			}
+		}
+		assert_eq(cnts[0] + cnts[1] + cnts[2] + cnts[3] + cnts[4], end - begin);
+		size_t cur = begin + cnts[0];
+		if(cnts[1] > 0) { memcpy(&s[cur], bkts[0], cnts[1] << (OFF_SIZE/4 + 1)); cur += cnts[1]; }
+		if(cnts[2] > 0) { memcpy(&s[cur], bkts[1], cnts[2] << (OFF_SIZE/4 + 1)); cur += cnts[2]; }
+		if(cnts[3] > 0) { memcpy(&s[cur], bkts[2], cnts[3] << (OFF_SIZE/4 + 1)); cur += cnts[3]; }
+		if(cnts[4] > 0) { memcpy(&s[cur], bkts[3], cnts[4] << (OFF_SIZE/4 + 1)); }
+		// This frame is now totally finished with bkts[][], so recursive
+		// callees can safely clobber it; we're not done with cnts[], but
+		// that's local to the stack frame.
+		std::vector<size_t> tmp;
+		block_list.push_back(tmp);
+		block_list.back().clear();
+		block_list.back().push_back(begin);
+		for(size_t i = 0; i < 4; i++) {
+		        if(cnts[i] > 0) {
+			        block_list.back().push_back(block_list.back().back() + cnts[i]);
+			}
+		}
+	}
+	// Done
+	
+	for(size_t i = 0; i < 4; i++) {
+	        delete [] bkts[i];
+	}
 }
 
 /**
