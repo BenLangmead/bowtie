@@ -1143,7 +1143,7 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 			readbuf[readi].readOrigBuf[readbuf[readi].readOrigBufLen++] = c;
 			c = getc_wrapper();
 		}
-		while(c >= 0 && (c == '\n' || c == '\r')) {
+		while(c >= 0 && (c == '\n' || c == '\r') && readi < pt.max_buf_ - 1) {
 			c = getc_wrapper();
 		}
 	}
