@@ -338,7 +338,8 @@ enum {
 	ARG_QUALS2,
 	ARG_ALLOW_CONTAIN,
 	ARG_COLOR_PRIMER,
-	ARG_WRAPPER
+	ARG_WRAPPER,
+	ARG_INTERLEAVED_FASTQ,
 };
 
 static struct option long_options[] = {
@@ -444,6 +445,7 @@ static struct option long_options[] = {
 	{(char*)"allow-contain",no_argument,       0,            ARG_ALLOW_CONTAIN},
 	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
+	{(char*)"interleaved",  required_argument, 0,            ARG_INTERLEAVED_FASTQ},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -461,7 +463,7 @@ static void printUsage(ostream& out) {
 	}
 
 	out << "Usage: " << endl
-        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]" << endl
+        << tool_name << " [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]" << endl
         << endl
 	    << "  <m1>    Comma-separated list of files containing upstream mates (or the" << endl
 	    << "          sequences themselves, if -c is set) paired with mates in <m2>" << endl
@@ -469,6 +471,7 @@ static void printUsage(ostream& out) {
 	    << "          sequences themselves if -c is set) paired with mates in <m1>" << endl
 	    << "  <r>     Comma-separated list of files containing Crossbow-style reads.  Can be" << endl
 	    << "          a mixture of paired and unpaired.  Specify \"-\" for stdin." << endl
+	    << "  <i>     Files with interleaved paired-end FASTQ reads." << endl
 	    << "  <s>     Comma-separated list of files containing unpaired reads, or the" << endl
 	    << "          sequences themselves, if -c is set.  Specify \"-\" for stdin." << endl
 	    << "  <hit>   File to write hits to (default: stdout)" << endl
@@ -647,6 +650,7 @@ static void parseOptions(int argc, const char **argv) {
 			case '1': tokenize(optarg, ",", mates1); break;
 			case '2': tokenize(optarg, ",", mates2); break;
 			case ARG_ONETWO: tokenize(optarg, ",", mates12); format = TAB_MATE; break;
+			case ARG_INTERLEAVED_FASTQ: tokenize(optarg, ",", mates12); format = INTERLEAVED; break;
 			case 'f': format = FASTA; break;
 			case 'F': {
 				format = FASTA_CONT;
@@ -2592,6 +2596,12 @@ patsrcFromStrings(int format,
 			                               trim3, trim5,
 			                               solexaQuals, phred64Quals,
 			                               integerQuals);
+		case INTERLEAVED:
+			return new FastqPatternSource (reads, color,
+			                               patDumpfile,
+			                               trim3, trim5,
+			                               solexaQuals, phred64Quals,
+			                               integerQuals, true /* is interleaved */);
 		case TAB_MATE:
 			return new TabbedPatternSource(reads, false, color,
 			                               patDumpfile,

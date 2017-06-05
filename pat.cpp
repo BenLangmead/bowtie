@@ -906,7 +906,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	bool batch_a)
 {
 	int c = 0;
-	vector<Read>& readBuf = batch_a ? pt.bufa_ : pt.bufb_;
+	vector<Read>* readBuf = batch_a ? &pt.bufa_ : &pt.bufb_;
 	if(first_) {
 		c = getc_wrapper();
 		while(c == '\r' || c == '\n') {
@@ -917,15 +917,15 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 			throw 1;
 		}
 		first_ = false;
-		readBuf[0].readOrigBuf[0] = c;
-		readBuf[0].readOrigBufLen = 1;
+		(*readBuf)[0].readOrigBuf[0] = c;
+		(*readBuf)[0].readOrigBufLen = 1;
 	}
 	bool done = false, aborted = false;
 	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
-	for(; readi < pt.max_buf_ && !done; readi++) {
-		char* buf = readBuf[readi].readOrigBuf;
-		assert(readi == 0 || readBuf[readi].readOrigBufLen == 0);
+	while (readi < pt.max_buf_ && !done) {
+		char* buf = (*readBuf)[readi].readOrigBuf;
+		assert(readi == 0 || (*readBuf)[readi].readOrigBufLen == 0);
 		int newlines = 4;
 		while(newlines) {
 			c = getc_wrapper();
@@ -936,10 +936,26 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 				newlines--;
 				c = '\n';
 			} else if(done) {
-				aborted = true; // Unexpected EOF
+				if (newlines == 4) {
+					newlines = 0;
+				} else {
+					aborted = true; // Unexpected EOF
+				}
 				break;
 			}
-			buf[readBuf[readi].readOrigBufLen++] = c;
+			buf[(*readBuf)[readi].readOrigBufLen++] = c;
+		}
+		if (c > 0) {
+			if (interleaved_) {
+				// alternate between read buffers
+				batch_a = !batch_a;
+				readBuf = batch_a ? &pt.bufa_ : &pt.bufb_;
+				// increment read counter after each pair gets read
+				readi = batch_a ? readi + 1 : readi;
+			}
+			else {
+				readi++;
+			}
 		}
 	}
 	if(aborted) {

@@ -934,6 +934,7 @@ public:
 	    bool solexa_quals = false,
 	    bool phred64Quals = false,
 	    bool integer_quals = false,
+	    bool interleaved = false,
 	    uint32_t skip = 0) :
 		CFilePatternSource(
 			infiles,
@@ -945,6 +946,7 @@ public:
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals),
+		interleaved_(interleaved),
 		color_(color) { }
 	
 	virtual void reset() {
@@ -988,6 +990,7 @@ private:
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
+	bool interleaved_;
 	bool color_;
 };
 

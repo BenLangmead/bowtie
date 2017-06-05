@@ -882,6 +882,7 @@ public:
 		hitsForThisRead_(),
 		_max(max),
 		_n(n),
+        defaultMapq_(defaultMapq),
 		threadId_(threadId)
 	{
 		sink.addWrapper();
