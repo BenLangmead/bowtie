@@ -147,6 +147,7 @@ static vector<string> qualities2;
 static string wrapper; // Type of wrapper script
 bool gAllowMateContainment;
 bool gReportColorPrimer;
+bool noUnal; // don't print unaligned reads
 MUTEX_T gLock;
 
 static void resetOptions() {
@@ -255,6 +256,7 @@ static void resetOptions() {
 	wrapper.clear();
 	gAllowMateContainment	= false; // true -> alignments where one mate lies inside the other are valid
 	gReportColorPrimer		= false; // true -> print flag with trimmed color primer and downstream color
+	noUnal					= false; // true -> do not report unaligned reads
 }
 
 // mating constraints
@@ -340,6 +342,7 @@ enum {
 	ARG_COLOR_PRIMER,
 	ARG_WRAPPER,
 	ARG_INTERLEAVED_FASTQ,
+	ARG_SAM_NO_UNAL,
 };
 
 static struct option long_options[] = {
@@ -446,6 +449,7 @@ static struct option long_options[] = {
 	{(char*)"col-primer",   no_argument,       0,            ARG_COLOR_PRIMER},
 	{(char*)"wrapper",      required_argument, 0,            ARG_WRAPPER},
 	{(char*)"interleaved",  required_argument, 0,            ARG_INTERLEAVED_FASTQ},
+	{(char*)"no-unal",      no_argument,       0,            ARG_SAM_NO_UNAL},
 	{(char*)0, 0, 0, 0} // terminator
 };
 
@@ -526,6 +530,7 @@ static void printUsage(ostream& out) {
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
+	    << "  --no-unal          suppress SAM records for unaligned reads" << endl
 	    << "  --max <fname>      write reads/pairs over -m limit to file(s) <fname>" << endl
 	    << "  --suppress <cols>  suppresses given columns (comma-delim'ed) in default output" << endl
 	    << "  --fullref          write entire ref name (default: only up to 1st space)" << endl
@@ -828,6 +833,7 @@ static void parseOptions(int argc, const char **argv) {
 			case ARG_SAM_NO_QNAME_TRUNC: samNoQnameTrunc = true; break;
 			case ARG_SAM_NOHEAD: samNoHead = true; break;
 			case ARG_SAM_NOSQ: samNoSQ = true; break;
+			case ARG_SAM_NO_UNAL: noUnal = true; break;
 			case ARG_SAM_RG: {
 				if(!rgs.empty()) rgs += '\t';
 				rgs += optarg;

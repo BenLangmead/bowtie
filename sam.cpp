@@ -11,6 +11,7 @@
 #include "pat.h"
 #include "hit.h"
 #include "sam.h"
+#include "search_globals.h"
 
 using namespace std;
 
@@ -66,6 +67,9 @@ void SAMHitSink::reportUnOrMax(
 {
 	if(un) {
 		HitSink::reportUnaligned(threadId, p);
+		if (noUnal) {
+			return;
+		}
 	} else {
 		HitSink::reportMaxed(*hs, threadId, p);
 	}
