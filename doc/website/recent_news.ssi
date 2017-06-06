@@ -1,3 +1,17 @@
+<h2>1.2.1 - 06/06/2017<h2>
+<p>Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.</p>
+<ul>
+    <li>Deprecated <tt>--refout</tt> option.  It will be fully removed in the next release</li>
+    <li>Added parallel index building with the bowtie2-build <tt><a href="manual.shtml#bowtie-build-options-threads">--threads</a></tt> option</li>
+    <li>Added native support for gzipped read files.  The wrapper script is no longer responsible for this, which simplifies the wrapper and improves speed and thread scaling.</li>
+    <li>Added support for interleaved paired-end FASTQ inputs (<tt><a href="manual.shtml#command-line">--interleaved</a></tt>)</li>
+    <li>Fixed issue where first character of some read names was omitted from SAM output when using tabbed input formats</li>
+    <li>Fixed issue that caused Bowtie to hang when aligning FASTA inputs with more than one thread</li>
+    <li>Bowtie wrapper now works even when invoked via a symlink in a different directory from the executables</li>
+    <li>Fixed issue preventing reading <tt><a href="manual.shtml#command-line">--12</a></tt> input on stdin</li>
+    <li>Added <tt><a href="manual.shtml#bowtie-options-no-unal">--no-unal</a></tt> option for suppressing unmapped reads in SAM output</li>
+</ul>
+
 <h2>1.2.0 - 12/12/2016</h2>
 <p>This is a major release with some larger and many smaller changes.  These notes emphasize the large changes.  See commit history for details.</p>
 <ul>

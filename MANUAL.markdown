@@ -81,16 +81,19 @@ directory, and run GNU `make` (usually with the command `make`, but
 sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
-To build Bowtie including support for the `bowtie` [`-p`]  and `bowtie-build`
-[`--threads`](#bowtie-build-options-threads) multithreading options, we recommend that you first
-install the [Thread Building Blocks library], also known as TBB, and
-build using `make WITH_TBB=1`.  TBB is installed by default on many
-operating systems.
+To build Bowtie including support for the `bowtie` [`-p`]  and
+`bowtie-build` [`--threads`](#bowtie-build-options-threads)
+multithreading options, we recommend that you first install the
+[Thread Building Blocks library], also known as TBB, the default
+threading library.  TBB is installed by default on many operating
+systems.
 
-If TBB is not available, then omit the `WITH_TBB=1` option.  On Linux or
+If TBB is not available, then use the `NO_TBB=1` option.  On Linux or
 Mac OS X, this requires the pthreads library, which is installed by
 default.  On Windows, native Windows threads will be used, which require
-no special libraries.
+no special libraries. Bowtie binaries that are *not* built with TBB are
+referred to as legacy. Pre-built packages for such builds will include
+"legacy" in the filename e.g. `bowtie-1.2-linux-x86_64.zip`.
 
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
@@ -157,8 +160,8 @@ reference, and (b) the number of such sites on one strand is different
 from the number on the other strand.  When this happens for a given
 read, `bowtie` effectively chooses one strand or the other with 50%
 probability, then reports a randomly-selected alignment for that read
-from among the sites on the selected strand.  This tends to overassign
-alignments to the sites on the strand with fewer sites and underassign
+from among the sites on the selected strand.  This tends to over assign
+alignments to the sites on the strand with fewer sites and under assign
 to sites on the strand with more sites.  The effect is mitigated,
 though it may not be eliminated, when reads are longer or when
 paired-end reads are used.  Running Bowtie in [`--best`] mode
@@ -210,7 +213,7 @@ Bowtie does the same.  Rounding can be suppressed with the
 Bowtie is not fully sensitive in [`-n`] 2 and [`-n`] 3 modes by default.
 In these modes Bowtie imposes a "backtracking limit" to limit effort
 spent trying to find valid alignments for low-quality reads unlikely to
-have any.  This may cause bowtie to miss some legal 2- and 3-mismatch
+have any.  This may cause Bowtie to miss some legal 2- and 3-mismatch
 alignments.  The limit is set to a reasonable default (125 without
 [`--best`], 800 with [`--best`]), but the user may decrease or increase the
 limit using the [`--maxbts`] and/or [`-y`] options.  [`-y`] mode is
@@ -249,7 +252,7 @@ Reporting Modes
 ---------------
 
 With the [`-k`], [`-a`], [`-m`], [`-M`], [`--best`] and [`--strata`] options, the
-user can flexibily select which alignments are reported.  Below we
+user can flexibly select which alignments are reported.  Below we
 demonstrate a few ways in which these options can be combined.  All
 examples are using the `e_coli` index packaged with Bowtie.  The
 [`--suppress`] option is used to keep the output concise and some
@@ -264,8 +267,8 @@ output is elided for clarity.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying [`-a`] instructs bowtie to report *all* valid alignments,
-subject to the alignment policy: [`-v`] 2.  In this case, bowtie finds
+Specifying [`-a`] instructs Bowtie to report *all* valid alignments,
+subject to the alignment policy: [`-v`] 2.  In this case, Bowtie finds
 5 inexact hits in the E. coli genome; 1 hit (the 2nd one listed)
 has 1 mismatch, and the other 4 hits have 2 mismatches.  Four are on
 the reverse reference strand and one is on the forward strand.  Note
@@ -278,7 +281,7 @@ that they are not listed in best-to-worst order.
     -	gi|110640213|ref|NC_008253.1|	2852852	8:T>A
     -	gi|110640213|ref|NC_008253.1|	4930433	4:G>T,6:C>G
 
-Specifying [`-k`] 3 instructs bowtie to report up to 3 valid
+Specifying [`-k`] 3 instructs Bowtie to report up to 3 valid
 alignments.  In this case, a total of 5 valid alignments exist (see
 [Example 1]); `bowtie` reports 3 out of those 5.  [`-k`] can be set to
 any integer greater than 0.
@@ -294,7 +297,7 @@ any integer greater than 0.
     -	gi|110640213|ref|NC_008253.1|	905664	6:A>G,7:G>T
     +	gi|110640213|ref|NC_008253.1|	1093035	2:T>G,15:A>T
 
-Specifying [`-k`] 6 instructs bowtie to report up to 6 valid
+Specifying [`-k`] 6 instructs Bowtie to report up to 6 valid
 alignments.  In this case, a total of 5 valid alignments exist, so
 `bowtie` reports all 5.
 
@@ -305,7 +308,7 @@ alignments.  In this case, a total of 5 valid alignments exist, so
 
 Leaving the reporting options at their defaults causes `bowtie` to
 report the first valid alignment it encounters.  Because [`--best`] was
-not specified, we are not guaranteed that bowtie will report the best
+not specified, we are not guaranteed that Bowtie will report the best
 alignment, and in this case it does not (the 1-mismatch alignment from
 the previous example would have been better).  The default reporting
 mode is equivalent to [`-k`] 1.
@@ -384,8 +387,9 @@ Paired-end Alignment
 
 `bowtie` can align paired-end reads when properly paired read files are
 specified using the [`-1`](#command-line) and [`-2`](#command-line) options (for pairs of raw, FASTA, or
-FASTQ read files), or using the [`--12`](#command-line) option (for Tab-delimited read
-files).  A valid paired-end alignment satisfies these criteria:
+FASTQ read files), the [`--12`](#command-line) option (for Tab-delimited read
+files), or using the [`--interleaved`](#command-line) (for interleaved FASTQ).
+A valid paired-end alignment satisfies these criteria:
 
 1. Both mates have a valid alignment according to the alignment policy
    defined by the [`-v`]/[`-n`]/[`-e`]/[`-l`] options.
@@ -2142,8 +2146,9 @@ The maximum number of suffixes allowed in a block.  Allowing more
 suffixes per block makes indexing faster, but increases peak memory
 usage.  Setting this option overrides any previous setting for
 [`--bmax`], or [`--bmaxdivn`].  Default (in terms of the [`--bmaxdivn`]
-parameter) is [`--bmaxdivn`] 4.  This is configured automatically by
-default; use [`-a`/`--noauto`] to configure manually.
+parameter) is [`--bmaxdivn`] 4 * [`--threads`](#bowtie-build-options-threads).
+This is configured automatically by default; use [`-a`/`--noauto`] to
+configure manually.
 
 </td></tr><tr><td id="bowtie-build-options-bmaxdivn">
 
