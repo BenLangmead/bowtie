@@ -633,7 +633,7 @@ Command Line
 
 Usage:
 
-    bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | <s>} [<hit>]
+    bowtie [options]* <ebwt> {-1 <m1> -2 <m2> | --12 <r> | --interleaved <i> | <s>} [<hit>]
 
 ### Main arguments
 
@@ -697,6 +697,17 @@ scales supported in FASTQ files.  Reads may be a mix of different
 lengths and paired-end and unpaired reads may be intermingled in the
 same file.  If `-` is specified, `bowtie` will read the Tab-delimited
 reads from the "standard in" filehandle.
+
+</td></tr><tr><td>
+
+    <i>
+
+</td><td>
+
+A comma-separated list of interleaved paired-end FASTQ files, where
+the records for the mate #1s are interleaved with the records for the
+mate #2s.  Reads may be a mix of different lengths.  If `-` is
+specified, Bowtie reads from the "standard in" filehandle.
 
 </td></tr><tr><td>
 
