@@ -877,7 +877,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			// sPrimeOrder too.  This allows us to easily reconstruct
 			// what the sort did.
 			if(nthreads == 1) {
-			        mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+			        mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, 4,
 					      this->verbose(), this->sanityCheck(), v);
 			} else {
 			        int query_depth = 0;
