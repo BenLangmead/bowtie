@@ -393,7 +393,6 @@ static struct option long_options[] = {
 	{(char*)"range",        no_argument,       0,            ARG_RANGE},
 	{(char*)"maxbts",       required_argument, 0,            ARG_MAXBTS},
 	{(char*)"phased",       no_argument,       0,            'z'},
-	{(char*)"refout",       no_argument,       0,            ARG_REFOUT},
 	{(char*)"partition",    required_argument, 0,            ARG_PARTITION},
 	{(char*)"stateful",     no_argument,       0,            ARG_STATEFUL},
 	{(char*)"prewidth",     required_argument, 0,            ARG_PREFETCH_WIDTH},
@@ -526,7 +525,6 @@ static void printUsage(ostream& out) {
 	    << "  -t/--time          print wall-clock time taken by search phases" << endl
 	    << "  -B/--offbase <int> leftmost ref offset = <int> in bowtie output (default: 0)" << endl
 	    << "  --quiet            print nothing but the alignments" << endl
-	    << "  --refout           write alignments to files refXXXXX.map, 1 map per reference" << endl
 	    << "  --refidx           refer to ref. seqs by 0-based index rather than name" << endl
 	    << "  --al <fname>       write aligned reads/pairs to file(s) <fname>" << endl
 	    << "  --un <fname>       write unaligned reads/pairs to file(s) <fname>" << endl
