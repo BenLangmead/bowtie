@@ -638,8 +638,8 @@ static inline bool suffixLt(const TStr& host, TIndexOffU suf1, TIndexOffU suf2) 
 	assert_neq(suf1, suf2);
 	TIndexOffU i = 0;
 	while(suf1 + i < hlen && suf2 + i < hlen) {
-		if(value(host, suf1+i) < value(host, suf2+i)) return true;
-		if(value(host, suf1+i) > value(host, suf2+i)) return false;
+		if(host[suf1+i] < host[suf2+i]) return true;
+		if(host[suf1+i] > host[suf2+i]) return false;
 		i++;
 	}
 	if(suf1 + i == hlen) {
@@ -674,7 +674,7 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
 	}
 	assert_eq(added, length(_isaPrime));
 	for(size_t i = 0; i < length(sorted)-1; i++) {
-		assert(suffixLt(this->text(), value(sorted, i), value(sorted, i+1)));
+		assert(suffixLt(this->text(), sorted[i], sorted[i+1]));
 	}
 }
 
