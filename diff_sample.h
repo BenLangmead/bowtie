@@ -892,7 +892,7 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 				        sOrig = new TIndexOffU[sPrimeSz];
 					memcpy(sOrig, sPrimeArr, OFF_SIZE * sPrimeSz);
 				}
-				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+				mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, 4,
 					      this->verbose(), false, query_depth, &boundaries);
 				if(boundaries.size() > 0) {
 #ifdef WITH_TBB
