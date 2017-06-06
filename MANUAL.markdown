@@ -92,10 +92,6 @@ Mac OS X, this requires the pthreads library, which is installed by
 default.  On Windows, native Windows threads will be used, which require
 no special libraries.
 
-For threading synchronization Bowtie uses by default a spinlocking
-mechanism. This can be disabled (leading to a more heavyweight locking
-mechanism) by specifying `EXTRA_FLAGS=-DNO_SPINLOCK` when building.
-
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/
 [MSYS]:     http://www.mingw.org/wiki/msys
