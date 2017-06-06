@@ -1374,20 +1374,6 @@ in [`-S`/`--sam`] mode, since SAM mandates 1-based offsets.  Default: 0.
 
 Print nothing besides alignments.
 
-</td></tr><tr><td id="bowtie-options-refout">
-
-[`--refout`]: #bowtie-options-refout
-
-    --refout
-
-</td><td>
-
-Write alignments to a set of files named `refXXXXX.map`, where `XXXXX`
-is the 0-padded index of the reference sequence aligned to.  This can
-be a useful way to break up work for downstream analyses when dealing
-with, for example, large numbers of reads aligned to the assembled
-human genome.  If `<hits>` is also specified, it will be ignored.
-
 </td></tr><tr><td id="bowtie-options-refidx">
 
 [`--refidx`]: #bowtie-options-refidx
@@ -1583,8 +1569,7 @@ in addition to `-S/--sam`.  To suppress just the `@SQ` headers (e.g. if
 the alignment is against a very large number of reference sequences),
 use [`--sam-nosq`] in addition to `-S/--sam`.  `bowtie` does not write
 BAM files directly, but SAM output can be converted to BAM on the fly
-by piping `bowtie`'s output to `samtools view`.  [`-S`/`--sam`] is not
-compatible with [`--refout`].
+by piping `bowtie`'s output to `samtools view`.
 
 [SAM output]: #sam-bowtie-output
 
