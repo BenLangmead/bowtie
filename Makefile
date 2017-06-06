@@ -74,6 +74,11 @@ PTHREAD_PKG =
 PTHREAD_LIB =
 PTHREAD_DEF =
 
+#if we're not using TBB, then we can't use queuing locks
+ifeq (1,$(NO_TBB))
+	NO_QUEUELOCK=1
+endif
+
 ifeq (1,$(MINGW))
 	PTHREAD_LIB = 
 	override EXTRA_FLAGS += -static-libgcc -static-libstdc++
@@ -85,7 +90,7 @@ ifeq (1,$(NO_SPINLOCK))
 	override EXTRA_FLAGS += -DNO_SPINLOCK
 endif
 
-ifeq (1,$(WITH_TBB))
+ifneq (1,$(NO_TBB))
 	LIBS += $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
 	override EXTRA_FLAGS += -DWITH_TBB
 else
@@ -135,7 +140,7 @@ ifeq (1,$(WITH_COHORTLOCK))
 	OTHER_CPPS += cohort.cpp cpu_numa_info.cpp
 endif
 
-ifneq (1,$(WITH_TBB))
+ifeq (1,$(NO_TBB))
 	OTHER_CPPS += tinythread.cpp
 endif
 
