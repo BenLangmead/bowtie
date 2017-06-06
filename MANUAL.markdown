@@ -1625,6 +1625,16 @@ the `ID` and `SM` fields must both be among them to make the `@RG` line
 legal according to the [SAM Spec][SAM].  `--sam-RG` is ignored unless
 [`-S`/`--sam`] is also specified.
 
+<tr><td id="bowtie-options-no-unal">
+
+[`--no-unal`]: #bowtie-options-no-unal
+
+    --no-unal
+
+</td><td>
+
+Suppress SAM records for reads that failed to align.
+
 </td></tr></table>
 
 #### Performance
