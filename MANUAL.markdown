@@ -581,22 +581,16 @@ Performance Tuning
 
 [Performance tuning]: #performance-tuning
 
-1.  If your computer has multiple processors/cores, use `-p`
+1.  If your computer has multiple processors/cores, use `--threads`
 
-    The [`-p`] option causes Bowtie to launch a specified number of
-    parallel search threads.  Each thread runs on a different
-    processor/core and all threads find alignments in parallel,
-    increasing alignment throughput by approximately a multiple of the
-    number of threads (though in practice, speedup is somewhat worse
-    than linear).
+    [`--threads`] option causes Bowtie to launch a specified number of
+    parallel threads.  Each thread runs on a different processor/core.
+    For alignment, this increases alignment throughput by approximately a
+    multiple of the number of threads (though in practice, it is somewhat
+    worse than linear).  For index building, using multiple threads
+    decreases building time.
 
-2.  If using `-p`, use the Threading Building Blocks library if possible
-
-    In our experiments, we find the Threading Building Blocks (TBB)
-    library gives the best thread scaling.  TBB is disabled by default
-    but it can be enabled by building from source using `make WITH_TBB=1`.
-
-3.  If reporting many alignments per read, try tweaking
+2.  If reporting many alignments per read, try tweaking
     `bowtie-build --offrate`
 
     If you are using the [`-k`], [`-a`] or [`-m`] options and Bowtie is
@@ -620,12 +614,11 @@ Performance Tuning
     the SA sample, and decreasing by 2 quadruples the memory taken,
     etc.
 
-4.  If bowtie "thrashes", try increasing `bowtie --offrate`
+3.  If bowtie "thrashes", try increasing `bowtie --offrate`
 
-    If `bowtie` runs very slow on a relatively low-memory machine
-    (having less than about 4 GB of memory), then try setting `bowtie`
-    [`-o`/`--offrate`] to a *larger* value than the value used to build
-    the index.  For example, `bowtie-build`'s default [`-o`/`--offrate`](#bowtie-build-options-o)
+    If `bowtie` runs very slow on a low-memory machine (with less than
+    about 4 GB of memory), then try setting `bowtie` [`-o`/`--offrate`]
+    to a *larger* value.  `bowtie-build`'s default [`-o`/`--offrate`](#bowtie-build-options-o)
     is 5 and all pre-built indexes available from the Bowtie website
     are built with [`-o`/`--offrate`](#bowtie-build-options-o) 5; so if `bowtie` thrashes when
     querying such an index, try using `bowtie` [`--offrate`] 6.  If
