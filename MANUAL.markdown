@@ -81,10 +81,11 @@ directory, and run GNU `make` (usually with the command `make`, but
 sometimes with `gmake`) with no arguments.  If building with [MinGW],
 run `make` from the [MSYS] command line.
 
-To build Bowtie including support for the [`-p`] (multithreading) option,
-we recommend that you first install the [Thread Building Blocks library],
-also known as TBB, and build using `make WITH_TBB=1`.  TBB is installed
-by default on many operating systems.
+To build Bowtie including support for the `bowtie` [`-p`]  and `bowtie-build`
+[`--threads`](#bowtie-build-options-threads) multithreading options, we recommend that you first
+install the [Thread Building Blocks library], also known as TBB, and
+build using `make WITH_TBB=1`.  TBB is installed by default on many
+operating systems.
 
 If TBB is not available, then omit the `WITH_TBB=1` option.  On Linux or
 Mac OS X, this requires the pthreads library, which is installed by
@@ -2235,6 +2236,19 @@ The ftab is the lookup table used to calculate an initial
 of the query.  A larger `<int>` yields a larger lookup table but faster
 query times.  The ftab has size 4^(`<int>`+1) bytes.  The default
 setting is 10 (ftab is 4MB).
+
+</td></tr><tr><td id="bowtie-build-options-threads">
+
+[`--threads`]: #bowtie-build-options-threads
+
+    --threads <int>
+
+</td><td>
+
+Launch `<int>` parallel index building threads (default: 1). Index
+building is only partly parallelizable, so expect to see average CPU
+utilization less than `<int>` at some times. This option is only
+available if linked against a multithreading library.
 
 </td></tr><tr><td id="bowtie-build-options-ntoa">
 
