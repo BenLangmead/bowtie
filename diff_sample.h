@@ -600,7 +600,7 @@ public:
 private:
 
 	void doBuiltSanityCheck() const;
-	void buildSPrime(String<TIndexOffU>& sPrime);
+	void buildSPrime(String<TIndexOffU>& sPrime, size_t padding);
 
 	bool built() const {
 		return length(_isaPrime) > 0;
@@ -687,7 +687,10 @@ void DifferenceCoverSample<TStr>::doBuiltSanityCheck() const {
  * Also builds _doffs map.
  */
 template <typename TStr>
-void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
+void DifferenceCoverSample<TStr>::buildSPrime(
+	String<TIndexOffU>& sPrime,
+	size_t padding)
+{
 	const TStr& t = this->text();
 	const String<uint32_t>& ds = this->ds();
 	TIndexOffU tlen = (TIndexOffU)length(t);
@@ -721,8 +724,8 @@ void DifferenceCoverSample<TStr>::buildSPrime(String<TIndexOffU>& sPrime) {
 #endif
 	assert_eq(length(_doffs), d+1);
 	// Size sPrime appropriately
-	reserve(sPrime, sPrimeSz+1, Exact()); // reserve extra slot for LS
-	fill(sPrime, sPrimeSz, OFF_MASK, Exact());
+	reserve(sPrime, sPrimeSz + padding, Exact()); // reserve extra slot for LS
+	fill(sPrime, sPrimeSz + padding, OFF_MASK, Exact());
 	// Slot suffixes from text into sPrime according to the mu
 	// mapping; where the mapping would leave a blank, insert a 0
 	TIndexOffU added = 0;
@@ -771,7 +774,7 @@ struct VSortingParam {
         size_t                       sPrimeSz;
         TIndexOffU*                  sPrimeOrderArr;
         size_t                       depth;
-        const std::vector<size_t>*         boundaries;
+        const std::vector<size_t>*   boundaries;
         size_t*                      cur;
         MUTEX_T*                     mutex;
 };
@@ -839,10 +842,11 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 	uint32_t v = this->v();
 	assert_gt(v, 2);
 	// Build s'
+	size_t padding = 1;
 	String<TIndexOffU> sPrime;
 	VMSG_NL("  Building sPrime");
-	buildSPrime(sPrime);
-	size_t sPrimeSz = length(sPrime) - 1;
+	buildSPrime(sPrime, padding);
+	size_t sPrimeSz = length(sPrime) - padding;
 	assert_gt(length(sPrime), 0);
 	assert_leq(length(sPrime), length(t)+1); // +1 is because of the end-cap
 	TIndexOffU nextRank = 0;
@@ -862,12 +866,16 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			// the mkeyQSortSuf2 routine works on the array for maximum
 			// efficiency
 			TIndexOffU *sPrimeArr = (TIndexOffU*)begin(sPrime);
-			size_t slen = length(sPrime);
 			assert_eq(sPrimeArr[0], sPrime[0]);
-			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+			assert_eq(sPrimeArr[sPrimeSz-1], sPrime[sPrimeSz-1]);
 			TIndexOffU *sPrimeOrderArr = (TIndexOffU*)begin(sPrimeOrder);
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
-			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+			assert_eq(sPrimeOrderArr[sPrimeSz-1], sPrimeOrder[sPrimeSz-1]);
+			TIndexOffU *sOrig = NULL;
+			if(this->sanityCheck()) {
+				sOrig = new TIndexOffU[sPrimeSz];
+				memcpy(sOrig, sPrimeArr, OFF_SIZE * sPrimeSz);
+			}
 			// Sort sample suffixes up to the vth character using a
 			// multikey quicksort.  Sort time is proportional to the
 			// number of samples times v.  It isn't quadratic.
@@ -877,26 +885,21 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 			// sPrimeOrder too.  This allows us to easily reconstruct
 			// what the sort did.
 			if(nthreads == 1) {
-			        mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, 4,
-					      this->verbose(), this->sanityCheck(), v);
+				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+				              this->verbose(), this->sanityCheck(), v);
 			} else {
-			        int query_depth = 0;
+				int query_depth = 0;
 				int tmp_nthreads = nthreads;
 				while(tmp_nthreads > 0) {
-				        query_depth++;
+					query_depth++;
 					tmp_nthreads >>= 1;
 				}
 				std::vector<size_t> boundaries; // bucket boundaries for parallelization
-				TIndexOffU *sOrig = NULL;
-				if(this->sanityCheck()) {
-				        sOrig = new TIndexOffU[sPrimeSz];
-					memcpy(sOrig, sPrimeArr, OFF_SIZE * sPrimeSz);
-				}
-				mkeyQSortSuf2(t, sPrimeArr, slen, sPrimeOrderArr, 4,
-					      this->verbose(), false, query_depth, &boundaries);
+				mkeyQSortSuf2(t, sPrimeArr, sPrimeSz, sPrimeOrderArr, 4,
+				              this->verbose(), false, query_depth, &boundaries);
 				if(boundaries.size() > 0) {
 #ifdef WITH_TBB
-				        tbb::task_group tbb_grp;
+					tbb::task_group tbb_grp;
 #else
 					AutoArray<tthread::thread*> threads(nthreads);
 #endif
@@ -905,9 +908,9 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					size_t cur = 0;
 					MUTEX_T mutex;
 					for(int tid = 0; tid < nthreads; tid++) {
-					        // Calculate bucket sizes by doing a binary search for each
-					        // suffix and noting where it lands			  			      
-					        tparams[tid].dcs = this;
+						// Calculate bucket sizes by doing a binary search for each
+						// suffix and noting where it lands
+						tparams[tid].dcs = this;
 						tparams[tid].sPrimeArr = sPrimeArr;
 						tparams[tid].sPrimeSz = sPrimeSz;
 						tparams[tid].sPrimeOrderArr = sPrimeOrderArr;
@@ -921,58 +924,58 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 					tbb_grp.wait();
 #else
 					threads[tid] = new tthread::thread(VSorting_worker<TStr>, (void*)&tparams[tid]);
-				}
-				for (int tid = 0; tid < nthreads; tid++) {
-				        threads[tid]->join();
-			    }
+					}
+					for (int tid = 0; tid < nthreads; tid++) {
+						threads[tid]->join();
+					}
 #endif
+				}
 			}
 			if(this->sanityCheck()) {
-			        sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
+				sanityCheckOrderedSufs(t, length(t), sPrimeArr, sPrimeSz, v);
 				for(size_t i = 0; i < sPrimeSz; i++) {
-				        assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
+					assert_eq(sPrimeArr[i], sOrig[sPrimeOrderArr[i]]);
 				}
 				delete[] sOrig;
 			}
-		}
 			// Make sure sPrime and sPrimeOrder are consistent with
 			// their respective backing-store arrays
 			assert_eq(sPrimeArr[0], sPrime[0]);
-			assert_eq(sPrimeArr[slen-1], sPrime[slen-1]);
+			assert_eq(sPrimeArr[sPrimeSz-1], sPrime[sPrimeSz-1]);
 			assert_eq(sPrimeOrderArr[0], sPrimeOrder[0]);
-			assert_eq(sPrimeOrderArr[slen-1], sPrimeOrder[slen-1]);
+			assert_eq(sPrimeOrderArr[sPrimeSz-1], sPrimeOrder[sPrimeSz-1]);
 		}
 		// Now assign the ranking implied by the sorted sPrime/sPrimeOrder
 		// arrays back into sPrime.
 		VMSG_NL("  Allocating rank array");
-		reserve(_isaPrime, length(sPrime)+1, Exact());
+		reserve(_isaPrime, length(sPrime), Exact());
 		fill(_isaPrime, length(sPrime), OFF_MASK, Exact());
 		assert_gt(length(_isaPrime), 0);
 		{
 			Timer timer(cout, "  Ranking v-sort output time: ", this->verbose());
 			VMSG_NL("  Ranking v-sort output");
-			for(size_t i = 0; i < length(sPrime)-1; i++) {
+			for(size_t i = 0; i < sPrimeSz-1; i++) {
 				// Place the appropriate ranking
 				_isaPrime[sPrimeOrder[i]] = nextRank;
 				// If sPrime[i] and sPrime[i+1] are identical up to v, then we
 				// should give the next suffix the same rank
 				if(!suffixSameUpTo(t, sPrime[i], sPrime[i+1], v)) nextRank++;
 			}
-			_isaPrime[sPrimeOrder[length(sPrime)-1]] = nextRank; // finish off
+			_isaPrime[sPrimeOrder[sPrimeSz-1]] = nextRank; // finish off
 		}
 		// sPrimeOrder is destroyed
 		// All the information we need is now in _isaPrime
 	}
-	#ifndef NDEBUG
+#ifndef NDEBUG
 	// Check that all ranks are sane
-	for(size_t i = 0; i < length(_isaPrime); i++) {
+	for(size_t i = 0; i < sPrimeSz; i++) {
 		assert_neq(_isaPrime[i], OFF_MASK);
-		assert_lt(_isaPrime[i], length(_isaPrime));
+		assert_lt(_isaPrime[i], sPrimeSz);
 	}
-	#endif
+#endif
 	// Now pass the sPrimeRanks[] array to LarssonSadakane (in SeqAn).
-	append(_isaPrime, length(_isaPrime));
-	append(sPrime, length(sPrime));
+	_isaPrime[length(_isaPrime) - 1] = sPrimeSz;
+	sPrime[length(sPrime) - 1] = sPrimeSz;
 	{
 		Timer timer(cout, "  Invoking Larsson-Sadakane on ranks time: ", this->verbose());
 		VMSG_NL("  Invoking Larsson-Sadakane on ranks");
@@ -980,15 +983,15 @@ void DifferenceCoverSample<TStr>::build(int nthreads) {
 		c.suffixsort(
 			(TIndexOff*)begin(_isaPrime, Standard()),
 			(TIndexOff*)begin(sPrime, Standard()),
-			length(sPrime) - 1,
-			(unsigned)length(_isaPrime),
+			(TIndexOff)sPrimeSz,
+			(TIndexOff)length(sPrime),
 			0);
 	}
 	// sPrime now contains the suffix array (which we ignore)
 	assert_eq(length(_isaPrime), length(sPrime));
 	assert_gt(length(_isaPrime), 0);
 	// chop off final character of _isaPrime
-	resize(_isaPrime, length(_isaPrime)-1);
+	resize(_isaPrime, sPrimeSz);
 	// Subtract 1 from each isaPrime (to adjust for LarssonSadakane
 	// always ranking the final suffix as lexicographically first)
 	for(size_t i = 0; i < length(_isaPrime); i++) {
