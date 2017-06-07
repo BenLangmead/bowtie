@@ -1269,7 +1269,7 @@ sub matchSamOptionalFlags($$) {
 my $tmpfafn = ".simple_tests.pl.fa";
 my $last_ref = undef;
 foreach my $large_idx (undef,1) {
-	foreach my $debug_mode (undef,1) {
+	foreach my $debug_mode (1,undef) {
 		for (my $ci = 0; $ci < scalar(@cases); $ci++) {
 			my $c = $cases[$ci];
 			last unless defined($c);
