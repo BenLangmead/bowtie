@@ -431,7 +431,7 @@ install: all
 	done
 
 .PHONY: simple-test
-simple-test: all perl-deps
+simple-test: allall perl-deps
 	eval `perl -I $(CURDIR)/.perllib.tmp/lib/perl5 -Mlocal::lib=$(CURDIR)/.perllib.tmp` ; \
 	./scripts/test/simple_tests.pl --bowtie=./bowtie --bowtie-build=./bowtie-build
 
