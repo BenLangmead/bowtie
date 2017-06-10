@@ -194,7 +194,7 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 				string base_fname = "",
 				ostream& __logger = cout) :
 			InorderBlockwiseSA<TStr>(__text, __bucketSz, __sanityCheck, __passMemExc, __verbose, __logger),
-			_sampleSuffs(), _nthreads(__nthreads), _itrBucketIdx(0), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _base_fname(base_fname), _bigEndian(currentlyBigEndian())
+			_sampleSuffs(), _nthreads(__nthreads), _itrBucketIdx(0), _cur(0), _dcV(__dcV), _dc(NULL), _built(false), _base_fname(base_fname), _bigEndian(currentlyBigEndian()), _done(NULL)
 #ifdef WITH_TBB
 			,thread_group_started(false)
 #endif
@@ -461,7 +461,7 @@ class KarkkainenBlockwiseSA : public InorderBlockwiseSA<TStr> {
 #endif
 		std::vector<pair<KarkkainenBlockwiseSA*, int> > _tparams;
 		String<String<TIndexOffU> >     _itrBuckets;  /// buckets
-		volatile bool* _done = NULL;        /// is a block processed?
+		volatile bool* _done;        /// is a block processed?
 };
 
 /**
