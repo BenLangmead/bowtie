@@ -1,4 +1,4 @@
-<h2>1.2.1 - 06/12/2017<h2>
+<h2>1.2.1 - 06/12/2017</h2>
 <p>Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.<br/>
 Pre-build binaries now include statically linked TBB and zlib libraries no longer requiring</p>
 <ul>
