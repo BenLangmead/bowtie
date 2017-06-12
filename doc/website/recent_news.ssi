@@ -1,8 +1,10 @@
-<h2>1.2.1 - 06/06/2017<h2>
-<p>Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.</p>
+<h2>1.2.1 - 06/12/2017<h2>
+<p>Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.<br/>
+Pre-build binaries now include statically linked TBB and zlib libraries no longer requiring</p>
 <ul>
+    <li>Fixed an issue which caused Bowtie to hang during parallell index building when running an optimized binary</li>
     <li>Deprecated <tt>--refout</tt> option.  It will be fully removed in the next release</li>
-    <li>Added parallel index building with the bowtie2-build <tt><a href="manual.shtml#bowtie-build-options-threads">--threads</a></tt> option</li>
+    <li>Added parallel index building with the bowtie2-build <tt><a href="manual.shtml#bowtie-build-options-threads">--threads</a></tt> option (credit to <a href="https://github.com/aidanreilly8">Aidan Reilly</a>)</li>
     <li>Added native support for gzipped read files.  The wrapper script is no longer responsible for this, which simplifies the wrapper and improves speed and thread scaling.</li>
     <li>Added support for interleaved paired-end FASTQ inputs (<tt><a href="manual.shtml#command-line">--interleaved</a></tt>)</li>
     <li>Fixed issue where first character of some read names was omitted from SAM output when using tabbed input formats</li>
@@ -74,47 +76,3 @@
  <li>Bowtie source now lives in a <a href="https://github.com/BenLangmead/bowtie">public GitHub repository</a>.</li>
 </ul>
 
-
-<h2>1.0.0 release - 4/9/13</h2>
-<ul>
- <li>Finally, a 64-bit Windows binary!</li>
- <li>Due to general performance improvements spinlocking 
-     is now used by default. The <tt>EXTRA_FLAGS=-DNO_SPINLOCK</tt> may be 
-     used to reverse this during compilation.</li>
- <li>Fixed some race conditions.</li>
- <li>CygWin builds now use pthreads library.</li>
- <li>Changed MinGW to optionally use pthread library on Win32 platforms.</li>
- <li>Changed the Windows build to use native Windows threads by default.</li>
- <li>Renamed <tt>COPYING</tt> to <tt>LICENSE</tt> to be more GitHub-friendly.</li>
- <li>Tokenizer no longer has limit of 10,000 tokens, which was a
-     problem for users trying to index a very large number of FASTA
-     files.</li>
- <li>Removed references to no-longer-implemented <tt>--cutoff</tt> option for
-     bowtie-build</li>
-</ul>
-<h2>0.12.9 release - 12/16/12</h2>
-<ul>
- <li>Fixed a bug whereby read names would not be truncated at first
-     whitespace character in unmapped or maxed-out SAM records.</li>
- <li>Fixed errors and warnings when compiling with <tt>clang++</tt>.</li>
- <li>Fixed most errors and warnings when compiling with recent versions
-     of <tt>g++</tt>, though you may need to add <tt>EXTRA_FLAGS=-Wno-enum-compare</tt>
-     to avoid all warnings.</li>
-</ul>
-
-<h2>0.12.8 release - 5/6/12</h2>
-<ul>
-   <li>Fixed a bug that would sometimes cause an immediate segmentation
-     fault in
-     <tt><a href="manual.shtml#bowtie-options-sam">--sam</a></tt>
-     mode.</li>
-   <li>Fixed <tt>make_galGal3.sh</tt> script to not omit chromosome 25.</li>
-   <li>Removed <tt>-B</tt> option from usage message for <tt>bowtie-build</tt>; that option
-     is not implemented.</li>
-   <li>Fixed issue that could cause Bowtie not to compile when
-     <tt>BOWTIE_PTHREADS</tt> is left undefined and <tt>pthreads.h</tt> is not present.</li>
-   <li>Elaborated documentation for
-     <tt><a href="">-B/--offbase</a></tt> option to indicate that
-     it only affects offsets in the default output mode, not in SAM
-     mode.</li>
-</ul>

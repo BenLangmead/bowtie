@@ -86,9 +86,7 @@ systems.
 If TBB is not available, then use the `NO_TBB=1` option.  On Linux or
 Mac OS X, this requires the pthreads library, which is installed by
 default.  On Windows, native Windows threads will be used, which require
-no special libraries. Bowtie binaries that are *not* built with TBB are
-referred to as legacy. Pre-built packages for such builds will include
-"legacy" in the filename e.g. `bowtie-1.2-linux-x86_64.zip`.
+no special libraries.
 
 [MinGW]:    http://www.mingw.org/
 [TDM's MinGW Build]: http://www.tdragon.net/recentgcc/

@@ -26,13 +26,17 @@ subscribe to our mailing list:
 Version Release History
 =======================
 
-Version 1.2.1 - Jun 06, 2017
-Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.
+Version 1.2.1 - Jun 11, 2017
+- Please note that Bowtie will be switching to the Artistic 2.0 license in the next release.
+- Pre-build binaries now include statically linked TBB and zlib libraries no longer requiring
+  these libraries to be pre-installed
 
+    * Fixed an issue which caused Bowtie to hang during parallell index
+      building when running an optimized binary
     * Deprecated --refout option.  It will be fully removed in the next
       release
     * Added parallel index building with the bowtie2-build --threads
-      option
+      option (credit to Aidan Reilly - https://github.com/aidanreilly8)
     * Added native support for gzipped read files.  The wrapper
       script is no longer responsible for this, which simplifies the wrapper
       and improves speed and thread scaling.
