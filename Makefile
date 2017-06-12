@@ -11,7 +11,7 @@ INC = $(SEQAN_INC) -I third_party
 CPP = g++ -w
 CXX = $(CPP)
 CC = gcc
-LIBS = -lz
+LIBS = $(LDFLAGS) -lz
 HEADERS = $(wildcard *.h)
 BOWTIE_MM = 1
 BOWTIE_SHARED_MEM = 1
@@ -91,7 +91,12 @@ ifeq (1,$(NO_SPINLOCK))
 endif
 
 ifneq (1,$(NO_TBB))
-	LIBS += $(PTHREAD_LIB) -ltbb -ltbbmalloc_proxy
+	LIBS += $(PTHREAD_LIB) -ltbb
+	ifeq (1, $(RELEASE_BIN))
+		LIBS += -ltbbmalloc
+	else
+		LIBS += -ltbbmalloc_proxy
+	endif
 	override EXTRA_FLAGS += -DWITH_TBB
 else
 	LIBS += $(PTHREAD_LIB)
