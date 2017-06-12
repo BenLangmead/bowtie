@@ -3,6 +3,8 @@
 
 #include <cassert>
 #include <cmath>
+#include <zlib.h>
+#include <sys/stat.h>
 #include <stdexcept>
 #include <vector>
 #include <string>
@@ -371,6 +373,7 @@ struct PerThreadReadBuf {
 	 */
 	void setReadId(TReadId rdid) {
 		rdid_ = rdid;
+		assert_neq(rdid_, std::numeric_limits<TReadId>::max());
 	}
 	
 	const size_t max_buf_; // max # reads to read into buffer at once
@@ -502,10 +505,10 @@ class VectorPatternSource : public TrimmingPatternSource {
 public:
 	VectorPatternSource(
 		const vector<string>& v,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0);
+		bool color,
+		const char *dumpfile = NULL,
+		int trim3 = 0,
+		int trim5 = 0);
 	
 	virtual ~VectorPatternSource() { }
 	
@@ -535,6 +538,10 @@ public:
 	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
 
 private:
+
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
 
 	bool color_;                      // colorspace?
 	size_t cur_;                      // index for first read of next batch
@@ -636,6 +643,31 @@ protected:
 	 * Open the next file in the list of input files.
 	 */
 	void open();
+
+	int getc_wrapper() {
+		return compressed_ ? gzgetc(zfp_) : getc_unlocked(fp_);
+	}
+
+	int ungetc_wrapper(int c) {
+		return compressed_ ? gzungetc(c, zfp_) : ungetc(c, fp_);
+	}
+
+	bool is_gzipped_file(const std::string& filename) {
+		struct stat s;
+		if (stat(filename.c_str(), &s) != 0) {
+			perror("stat");
+		}
+		else {
+			if (S_ISFIFO(s.st_mode))
+				return true;
+		}
+		size_t pos = filename.find_last_of(".");
+		std::string ext = (pos == std::string::npos) ? "" : filename.substr(pos + 1);
+		if (ext == "" || ext == "gz" || ext == "Z") {
+			return true;
+		}
+		return false;
+	}
 	
 	vector<string> infiles_; /// filenames for read files
 	vector<string> qinfiles_; /// filenames for quality files
@@ -643,10 +675,19 @@ protected:
 	size_t filecur_;   /// index into infiles_ of next file to read
 	FILE *fp_; /// read file currently being read from
 	FILE *qfp_; /// quality file currently being read from
+    gzFile zfp_;
 	bool is_open_; /// whether fp_ is currently open
 	bool first_;
 	char buf_[64*1024]; /// file buffer for sequences
 	char qbuf_[64*1024]; /// file buffer for qualities
+    bool compressed_;
+
+private:
+
+	pair<bool, int> nextBatchImpl(
+		PerThreadReadBuf& pt,
+		bool batch_a);
+
 };
 
 /**
@@ -893,6 +934,7 @@ public:
 	    bool solexa_quals = false,
 	    bool phred64Quals = false,
 	    bool integer_quals = false,
+	    bool interleaved = false,
 	    uint32_t skip = 0) :
 		CFilePatternSource(
 			infiles,
@@ -904,6 +946,7 @@ public:
 		solQuals_(solexa_quals),
 		phred64Quals_(phred64Quals),
 		intQuals_(integer_quals),
+		interleaved_(interleaved),
 		color_(color) { }
 	
 	virtual void reset() {
@@ -947,6 +990,7 @@ private:
 	bool solQuals_;
 	bool phred64Quals_;
 	bool intQuals_;
+	bool interleaved_;
 	bool color_;
 };
 

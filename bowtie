@@ -28,15 +28,11 @@ def main():
     for i, arg in enumerate(sys.argv[1:]):
         if arg.startswith('-'):
             continue
-        if arg.lower().endswith(('.gz', '.z', '.bz', '.bz2')):
+        if arg.lower().endswith(('.bz', '.bz2')):
             basename, ext = os.path.splitext(arg.lower())
             out_file = open(basename, 'wb')
-            if ext in ('.gz', '.z'):
-                import gzip
-                out_file.write(gzip.open(arg, 'rb').read())
-            elif ext in ('.bz2', '.bz'):
-                import bz2
-                out_file.write(bz2.BZ2File(arg).read())
+            import bz2
+            out_file.write(bz2.BZ2File(arg).read())
             out_file.close()
             sys.argv[i+1] = basename
 
