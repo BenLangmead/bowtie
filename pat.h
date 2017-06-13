@@ -590,13 +590,21 @@ public:
 
 	virtual ~CFilePatternSource() {
 		if(is_open_) {
-			assert(fp_ != NULL);
-			fclose(fp_);
-			fp_ = NULL;
-			if(qfp_ != NULL) {
+			if (compressed_) {
+				gzclose(zfp_);
+				zfp_ = NULL;
+			}
+			else if (fp_ != stdin) {
+				fclose(fp_);
+				fp_ = NULL;
+			}
+			if(qfp_ != NULL && qfp_ != stdin) {
 				fclose(qfp_);
 				qfp_ = NULL;
 			}
+			assert(zfp_ == NULL);
+			assert(fp_ == NULL || fp_ == stdin);
+			assert(qfp_ == NULL || qfp_ == stdin);
 		}
 	}
 
