@@ -174,7 +174,8 @@ public:
 		nthreads_((nthreads > 0) ? nthreads : 1),
 		ptBufs_(),
 		ptCounts_(nthreads_),
-		perThreadBufSize_(perThreadBufSize)
+		perThreadBufSize_(perThreadBufSize),
+		ptNumAligned_(NULL)
 	{
 		size_t nelt = 5 * nthreads_;
 		ptNumAligned_ = new uint64_t[nelt];
@@ -218,7 +219,8 @@ public:
 		sampleMax_(sampleMax),
 		quiet_(false),
 		nthreads_(0),
-		perThreadBufSize_(0)	
+		perThreadBufSize_(0),
+		ptNumAligned_(NULL)
 	{
 		// Open all files for writing and initialize all locks
 		for(size_t i = 0; i < numOuts; i++) {
@@ -232,8 +234,10 @@ public:
 	 * Destroy HitSinkobject;
 	 */
 	virtual ~HitSink() {
-		delete ptNumAligned_;
-		ptNumAligned_ = NULL;
+		if(ptNumAligned_ != NULL) {
+			delete ptNumAligned_;
+			ptNumAligned_ = NULL;
+		}
 		closeOuts();
 		if(_deleteOuts) {
 			// Delete all non-NULL output streams
