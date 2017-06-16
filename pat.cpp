@@ -275,11 +275,11 @@ pair<bool, int> CFilePatternSource::nextBatch(
 void CFilePatternSource::open() {
 	if(is_open_) {
 		is_open_ = false;
-        if (compressed_) {
-            gzclose(zfp_);
-            zfp_ = NULL;
-        }
-        else if (fp_ != stdin) {
+		if (compressed_) {
+			gzclose(zfp_);
+			zfp_ = NULL;
+		}
+		else if (fp_ != stdin) {
 			fclose(fp_);
 			fp_ = NULL;
 		}
@@ -291,12 +291,12 @@ void CFilePatternSource::open() {
 	while(filecur_ < infiles_.size()) {
 		// Open read
 		if(infiles_[filecur_] == "-") {
-            compressed_ = true;
-            int fn = dup(fileno(stdin));
-            zfp_ = gzdopen(fn, "rb");
+			compressed_ = true;
+			int fn = dup(fileno(stdin));
+			zfp_ = gzdopen(fn, "rb");
 		}
-        else {
-            compressed_ = false;
+		else {
+			compressed_ = false;
 			if (is_gzipped_file(infiles_[filecur_])) {
 				compressed_ = true;
 				zfp_ = gzopen(infiles_[filecur_].c_str(), "rb");
@@ -304,29 +304,29 @@ void CFilePatternSource::open() {
 			else {
 				fp_ = fopen(infiles_[filecur_].c_str(), "rb");
 			}
-            if ((compressed_ && zfp_ == NULL) || (!compressed_ && fp_ == NULL)) {
-                if(!errs_[filecur_]) {
-                    cerr << "Warning: Could not open read file \""
-                         << infiles_[filecur_] << "\" for reading; skipping..."
-                         << endl;
-                    errs_[filecur_] = true;
-                }
-                filecur_++;
-                continue;
-            }
+			if ((compressed_ && zfp_ == NULL) || (!compressed_ && fp_ == NULL)) {
+				if(!errs_[filecur_]) {
+					cerr << "Warning: Could not open read file \""
+					     << infiles_[filecur_] << "\" for reading; skipping..."
+					     << endl;
+					errs_[filecur_] = true;
+				}
+				filecur_++;
+				continue;
+			}
 		}
 		is_open_ = true;
-        if (compressed_) {
+		if (compressed_) {
 #if ZLIB_VERNUM < 0x1235
-            cerr << "Warning: gzbuffer added in zlib v1.2.3.5. Unable to change "
-                    "buffer size from default of 8192." << endl;
+			cerr << "Warning: gzbuffer added in zlib v1.2.3.5. Unable to change "
+			        "buffer size from default of 8192." << endl;
 #else
-            gzbuffer(zfp_, 64*1024);
+			gzbuffer(zfp_, 64*1024);
 #endif
-        }
-        else {
-            setvbuf(fp_, buf_, _IOFBF, 64*1024);
-        }
+		}
+		else {
+			setvbuf(fp_, buf_, _IOFBF, 64*1024);
+		}
 		if(!qinfiles_.empty()) {
 			if(qinfiles_[filecur_] == "-") {
 				qfp_ = stdin;
