@@ -325,6 +325,7 @@ public:
 					append(o, h, mapq, xms);
 					ptCounts_[threadId]++;
 				} else {
+					assert_leq(mapq, 255);
 					append(o, h, mapq, xms);
 					out(0).writeString(o);
 					o.clear();
@@ -882,8 +883,10 @@ public:
 		hitsForThisRead_(),
 		_max(max),
 		_n(n),
+		defaultMapq_(defaultMapq),
 		threadId_(threadId)
 	{
+		assert_leq(defaultMapq_, 255);
 		sink.addWrapper();
 		assert_gt(_n, 0);
 	}
@@ -926,6 +929,7 @@ public:
 				_bufferedHits.resize(_n);
 			}
 			int mapq = defaultMapq_;
+			assert_leq(mapq, 255);
 			int xms = (int)(_bufferedHits.size());
 			const bool paired = p.bufa().mate > 0;
 			if(paired) {
