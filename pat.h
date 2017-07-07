@@ -104,13 +104,15 @@ struct PerThreadReadBuf {
 	
 	PerThreadReadBuf(size_t max_buf) :
 		max_buf_(max_buf),
-		bufa_(max_buf),
-		bufb_(max_buf),
-		rdid_()
-	{
-		bufa_.resize(max_buf);
-		bufb_.resize(max_buf);
-		reset();
+		bufa_(new Read[max_buf]),
+		bufb_(new Read[max_buf]),
+		cur_buf_(max_buf),
+		rdid_(std::numeric_limits<TReadId>::max())
+	{ }
+	
+	~PerThreadReadBuf() {
+		delete[] bufa_;
+		delete[] bufb_;
 	}
 	
 	Read& read_a() { return bufa_[cur_buf_]; }
@@ -131,7 +133,7 @@ struct PerThreadReadBuf {
 	 * Reset state as though no reads have been read.
 	 */
 	void reset() {
-		cur_buf_ = bufa_.size();
+		cur_buf_ = max_buf_;
 		for(size_t i = 0; i < max_buf_; i++) {
 			bufa_[i].reset();
 			bufb_[i].reset();
@@ -143,7 +145,7 @@ struct PerThreadReadBuf {
 	 * Advance cursor to next element
 	 */
 	void next() {
-		assert_lt(cur_buf_, bufa_.size());
+		assert_lt(cur_buf_, max_buf_);
 		cur_buf_++;
 	}
 	
@@ -151,8 +153,8 @@ struct PerThreadReadBuf {
 	 * Return true when there's nothing left to dish out.
 	 */
 	bool exhausted() {
-		assert_leq(cur_buf_, bufa_.size());
-		return cur_buf_ >= bufa_.size()-1;
+		assert_leq(cur_buf_, max_buf_);
+		return cur_buf_ >= max_buf_ - 1;
 	}
 	
 	/**
@@ -172,8 +174,8 @@ struct PerThreadReadBuf {
 	}
 	
 	const size_t max_buf_; // max # reads to read into buffer at once
-	vector<Read> bufa_; // Read buffer for mate as
-	vector<Read> bufb_; // Read buffer for mate bs
+	Read *bufa_;           // Read buffer for mate as
+	Read *bufb_;           // Read buffer for mate bs
 	size_t cur_buf_;       // Read buffer currently active
 	TReadId rdid_;         // index of read at offset 0 of bufa_/bufb_
 };

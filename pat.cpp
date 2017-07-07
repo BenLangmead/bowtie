@@ -392,7 +392,7 @@ pair<bool, int> VectorPatternSource::nextBatchImpl(
 	bool batch_a)
 {
 	pt.setReadId(cur_);
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
 	for(; readi < pt.max_buf_ && cur_ < bufs_.size(); readi++, cur_++) {
 		readbuf[readi].readOrigBuf = bufs_[cur_];
@@ -561,7 +561,7 @@ pair<bool, int> FastaPatternSource::nextBatchFromFile(
 	bool batch_a)
 {
 	int c;
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	if(first_) {
 		c = getc_unlocked(fp_);
 		if(c == EOF) {
@@ -732,7 +732,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 	bool batch_a)
 {
 	int c = -1;
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
 	int nameoff = 0;
 	while(readi < pt.max_buf_) {
@@ -788,6 +788,7 @@ pair<bool, int> FastaContinuousPatternSource::nextBatchFromFile(
 				continue;
 			}
 			// install name
+			name_prefix_buf_[nameoff] = '\0';
 			readbuf[readi].readOrigBuf.install(name_prefix_buf_);
 			itoa10<TReadId>(readCnt_ - subReadCnt_, name_int_buf_);
 			readbuf[readi].readOrigBuf.append(name_int_buf_);
@@ -898,7 +899,7 @@ pair<bool, int> FastqPatternSource::nextBatchFromFile(
 	PerThreadReadBuf& pt,
 	bool batch_a)
 {
-	vector<Read>& readBuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readBuf = batch_a ? pt.bufa_ : pt.bufb_;
 	bool use_fread = true;  // TODO
 	if(pp_.reads_per_block > 0) {
 		// We're going to stick all the unparsed data into the buffer for the
@@ -1042,6 +1043,7 @@ bool FastqPatternSource::parse(
 			for(int i = 0; i < spacerun; i++) {
 				r.nameBuf[nameoff++] = ' ';
 			}
+			spacerun = 0;
 		}
 		assert_lt(nameoff, Read::BUF_SIZE-2);  // leaving room for /1 /2
 		r.nameBuf[nameoff++] = c;
@@ -1189,7 +1191,7 @@ pair<bool, int> TabbedPatternSource::nextBatchFromFile(
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_unlocked(fp_);
 	}
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
@@ -1371,7 +1373,7 @@ pair<bool, int> RawPatternSource::nextBatchFromFile(
 	while(c >= 0 && (c == '\n' || c == '\r')) {
 		c = getc_unlocked(fp_);
 	}
-	vector<Read>& readbuf = batch_a ? pt.bufa_ : pt.bufb_;
+	Read *readbuf = batch_a ? pt.bufa_ : pt.bufb_;
 	size_t readi = 0;
 	// Read until we run out of input or until we've filled the buffer
 	for(; readi < pt.max_buf_ && c >= 0; readi++) {
