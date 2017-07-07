@@ -235,7 +235,7 @@ public:
 	 */
 	virtual ~HitSink() {
 		if(ptNumAligned_ != NULL) {
-			delete ptNumAligned_;
+			delete[] ptNumAligned_;
 			ptNumAligned_ = NULL;
 		}
 		closeOuts();
