@@ -1024,7 +1024,7 @@ bool FastqPatternSource::parse(
 
 	// Parse read name
 	assert_eq(0, seqan::length(r.name));
-	int nameoff = 0;
+	int nameoff = 0, spacerun = 0;
 	while(true) {
 		assert_lt(off, buflen);
 		c = (*cura.buf)[off++];
@@ -1033,7 +1033,17 @@ bool FastqPatternSource::parse(
 				c = (*cura.buf)[off++];
 			} while(c == '\n' || c == '\r');
 			break;
+		} else if(c == ' ') {
+			spacerun++;
+			continue;
 		}
+		if(spacerun > 0) {
+			assert_leq(nameoff+spacerun, Read::BUF_SIZE-2);
+			for(int i = 0; i < spacerun; i++) {
+				r.nameBuf[nameoff++] = ' ';
+			}
+		}
+		assert_lt(nameoff, Read::BUF_SIZE-2);  // leaving room for /1 /2
 		r.nameBuf[nameoff++] = c;
 	}
 	r.nameBuf[nameoff] = '\0';
