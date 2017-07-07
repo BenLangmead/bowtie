@@ -18,6 +18,7 @@
 #include "filebuf.h"
 #include "qual.h"
 #include "hit_set.h"
+#include "read.h"
 #include "search_globals.h"
 
 #ifdef _WIN32
@@ -31,33 +32,6 @@
 using namespace std;
 using namespace seqan;
 
-/**
- * C++ version char* style "itoa":
- */
-template<typename T>
-char* itoa10(const T& value, char* result) {
-	// Check that base is valid
-	char* out = result;
-	T quotient = value;
-	if(std::numeric_limits<T>::is_signed) {
-		if(quotient <= 0) quotient = -quotient;
-	}
-	// Now write each digit from most to least significant
-	do {
-		*out = "0123456789"[quotient % 10];
-		++out;
-		quotient /= 10;
-	} while (quotient > 0);
-	// Only apply negative sign for base 10
-	if(std::numeric_limits<T>::is_signed) {
-		// Avoid compiler warning in cases where T is unsigned
-		if (value <= 0 && value != 0) *out++ = '-';
-	}
-	reverse( result, out );
-	*out = 0; // terminator
-	return out;
-}
-
 typedef uint64_t TReadId;
 
 /**
@@ -70,234 +44,57 @@ struct PatternParams {
 
 	PatternParams(
 		int format_,
+		bool color_,
 		bool fileParallel_,
 		uint32_t seed_,
 		size_t max_buf_,
 		bool solexa64_,
 		bool phred64_,
 		bool intQuals_,
+		int trim5_,
+		int trim3_,
 		int sampleLen_,
 		int sampleFreq_,
 		size_t skip_,
 		int nthreads_,
+		int block_bytes_,
+		int reads_per_block_,
 		bool fixName_) :
 		format(format_),
+		color(color_),
 		fileParallel(fileParallel_),
 		seed(seed_),
 		max_buf(max_buf_),
 		solexa64(solexa64_),
 		phred64(phred64_),
 		intQuals(intQuals_),
+		trim5(trim5_),
+		trim3(trim3_),
 		sampleLen(sampleLen_),
 		sampleFreq(sampleFreq_),
 		skip(skip_),
 		nthreads(nthreads_),
+		block_bytes(block_bytes_),
+		reads_per_block(reads_per_block_),
 		fixName(fixName_) { }
 
 	int format;           // file format
+	bool color;           // colorspace?
 	bool fileParallel;    // true -> wrap files with separate PatternComposers
 	uint32_t seed;        // pseudo-random seed
 	size_t max_buf;       // number of reads to buffer in one read
 	bool solexa64;        // true -> qualities are on solexa64 scale
 	bool phred64;         // true -> qualities are on phred64 scale
 	bool intQuals;        // true -> qualities are space-separated numbers
+	int trim5;            // amt to hard clip from 5' end
+	int trim3;            // amt to hard clip from 3' end
 	int sampleLen;        // length of sampled reads for FastaContinuous...
 	int sampleFreq;       // frequency of sampled reads for FastaContinuous...
 	size_t skip;          // skip the first 'skip' patterns
 	int nthreads;         // number of threads for locking
-	bool fixName;         //
-};
-
-/**
- * A buffer for keeping all relevant information about a single read.
- * Each search thread has one.
- */
-struct Read {
-	Read() { reset(); }
-
-	~Read() {
-		clearAll(); reset();
-		// Prevent seqan from trying to free buffers
-		_setBegin(patFw, NULL);
-		_setBegin(patRc, NULL);
-		_setBegin(qual, NULL);
-		_setBegin(patFwRev, NULL);
-		_setBegin(patRcRev, NULL);
-		_setBegin(qualRev, NULL);
-		_setBegin(name, NULL);
-	}
-
-#define RESET_BUF(str, buf, typ) _setBegin(str, (typ*)buf); _setLength(str, 0); _setCapacity(str, BUF_SIZE);
-#define RESET_BUF_LEN(str, buf, len, typ) _setBegin(str, (typ*)buf); _setLength(str, len); _setCapacity(str, BUF_SIZE);
-
-	/// Point all Strings to the beginning of their respective buffers
-	/// and set all lengths to 0
-	void reset() {
-		patid = 0;
-		readOrigBufLen = 0;
-		qualOrigBufLen = 0;
-		trimmed5 = trimmed3 = 0;
-		color = false;
-		primer = '?';
-		trimc = '?';
-		seed = 0;
-		parsed = false;
-		RESET_BUF(patFw, patBufFw, Dna5);
-		RESET_BUF(patRc, patBufRc, Dna5);
-		RESET_BUF(qual, qualBuf, char);
-		RESET_BUF(patFwRev, patBufFwRev, Dna5);
-		RESET_BUF(patRcRev, patBufRcRev, Dna5);
-		RESET_BUF(qualRev, qualBufRev, char);
-		RESET_BUF(name, nameBuf, char);
-	}
-
-	void clearAll() {
-		seqan::clear(patFw);
-		seqan::clear(patRc);
-		seqan::clear(qual);
-		seqan::clear(patFwRev);
-		seqan::clear(patRcRev);
-		seqan::clear(qualRev);
-		seqan::clear(name);
-		parsed = false;
-		trimmed5 = trimmed3 = 0;
-		readOrigBufLen = 0;
-		qualOrigBufLen = 0;
-		color = false;
-		primer = '?';
-		trimc = '?';
-		seed = 0;
-	}
-
-	/// Return true iff the read (pair) is empty
-	bool empty() const {
-		return seqan::empty(patFw);
-	}
-
-	/// Return length of the read in the buffer
-	uint32_t length() const {
-		return (uint32_t)seqan::length(patFw);
-	}
-
-	/**
-	 * Construct reverse complement of the pattern.  If read is in
-	 * colorspace, reverse color string.
-	 */
-	void constructRevComps() {
-		uint32_t len = length();
-		RESET_BUF_LEN(patRc, patBufRc, len, Dna5);
-		if(color) {
-			for(uint32_t i = 0; i < len; i++) {
-				// Reverse the sequence
-				patBufRc[i]  = patBufFw[len-i-1];
-			}
-		} else {
-			for(uint32_t i = 0; i < len; i++) {
-				// Reverse-complement the sequence
-				patBufRc[i]  = (patBufFw[len-i-1] == 4) ? 4 : (patBufFw[len-i-1] ^ 3);
-			}
-		}
-	}
-
-	/**
-	 * Given patFw, patRc, and qual, construct the *Rev versions in
-	 * place.  Assumes constructRevComps() was called previously.
-	 */
-	void constructReverses() {
-		uint32_t len = length();
-		RESET_BUF_LEN(patFwRev, patBufFwRev, len, Dna5);
-		RESET_BUF_LEN(patRcRev, patBufRcRev, len, Dna5);
-		RESET_BUF_LEN(qualRev, qualBufRev, len, char);
-		for(uint32_t i = 0; i < len; i++) {
-			patFwRev[i]  = patFw[len-i-1];
-			patRcRev[i]  = patRc[len-i-1];
-			qualRev[i]   = qual[len-i-1];
-		}
-	}
-
-	/**
-	 * Append a "/1" or "/2" string onto the end of the name buf if
-	 * it's not already there.
-	 */
-	void fixMateName(int i) {
-		assert(i == 1 || i == 2);
-		size_t namelen = seqan::length(name);
-		bool append = false;
-		if(namelen < 2) {
-			// Name is too short to possibly have /1 or /2 on the end
-			append = true;
-		} else {
-			if(i == 1) {
-				// append = true iff mate name does not already end in /1
-				append =
-					nameBuf[namelen-2] != '/' ||
-					nameBuf[namelen-1] != '1';
-			} else {
-				// append = true iff mate name does not already end in /2
-				append =
-					nameBuf[namelen-2] != '/' ||
-					nameBuf[namelen-1] != '2';
-			}
-		}
-		if(append) {
-			assert_leq(namelen, BUF_SIZE-2);
-			_setLength(name, namelen + 2);
-			nameBuf[namelen] = '/';
-			nameBuf[namelen+1] = "012"[i];
-		}
-	}
-
-	/**
-	 * Dump basic information about this read to the given ostream.
-	 */
-	void dump(std::ostream& os) const {
-		os << name << ' ';
-		if(color) {
-			for(size_t i = 0; i < seqan::length(patFw); i++) {
-				os << "0123."[(int)patFw[i]];
-			}
-		} else {
-			os << patFw;
-		}
-		os << qual << " ";
-	}
-
-	static const int BUF_SIZE = 1024;
-
-	String<Dna5>  patFw;               // forward-strand sequence
-	uint8_t       patBufFw[BUF_SIZE];  // forward-strand sequence buffer
-	String<Dna5>  patRc;               // reverse-complement sequence
-	uint8_t       patBufRc[BUF_SIZE];  // reverse-complement sequence buffer
-	String<char>  qual;                // quality values
-	char          qualBuf[BUF_SIZE];   // quality value buffer
-
-	String<Dna5>  patFwRev;               // forward-strand sequence reversed
-	uint8_t       patBufFwRev[BUF_SIZE];  // forward-strand sequence buffer reversed
-	String<Dna5>  patRcRev;               // reverse-complement sequence reversed
-	uint8_t       patBufRcRev[BUF_SIZE];  // reverse-complement sequence buffer reversed
-	String<char>  qualRev;                // quality values reversed
-	char          qualBufRev[BUF_SIZE];   // quality value buffer reversed
-
-	// For remembering the exact input text used to define a read
-	char          readOrigBuf[FileBuf::LASTN_BUF_SZ];
-	size_t        readOrigBufLen;
-
-	// For when qualities are in a separate file
-	char          qualOrigBuf[FileBuf::LASTN_BUF_SZ];
-	size_t        qualOrigBufLen;
-
-	String<char>  name;                // read name
-	char          nameBuf[BUF_SIZE];   // read name buffer
-	bool          parsed;              // whether read has been fully parsed
-	uint32_t      patid;               // unique 0-based id based on order in read file(s)
-	int           mate;                // 0 = single-end, 1 = mate1, 2 = mate2
-	uint32_t      seed;                // random seed
-	bool          color;               // whether read is in color space
-	char          primer;              // primer base, for csfasta files
-	char          trimc;               // trimmed color, for csfasta files
-	int           trimmed5;            // amount actually trimmed off 5' end
-	int           trimmed3;            // amount actually trimmed off 3' end
-	HitSet        hitset;              // holds previously-found hits; for chaining
+	int block_bytes;      // # bytes in one input block, 0 if we're not using blocked input
+	int reads_per_block;  // # reads per input block, 0 if we're not using blockeds input
+	bool fixName;         // whether to fix mate names
 };
 
 /**
@@ -393,7 +190,9 @@ struct PerThreadReadBuf {
 class PatternSource {
 public:
 	PatternSource(
+		const PatternParams& pp,
 		const char *dumpfile = NULL) :
+		pp_(pp),
 		readCnt_(0),
 		dumpfile_(dumpfile),
 		mutex()
@@ -425,7 +224,10 @@ public:
 	/**
 	 * Finishes parsing a given read.  Happens outside the critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const = 0;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const = 0;
 	
 	/// Reset state to start over again with the first read
 	virtual void reset() { readCnt_ = 0; }
@@ -434,6 +236,11 @@ public:
 	 * Return the number of reads attempted.
 	 */
 	TReadId readCount() const { return readCnt_; }
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const = 0;
 
 protected:
 
@@ -461,6 +268,9 @@ protected:
 	{
 		out << name << ": " << seq << " " << qual << endl;
 	}
+	
+	// Parsing parameters
+	const PatternParams& pp_;
 
 	/// The number of reads read by this PatternSource
 	volatile uint64_t readCnt_;
@@ -481,10 +291,11 @@ protected:
  */
 class TrimmingPatternSource : public PatternSource {
 public:
-	TrimmingPatternSource(const char *dumpfile = NULL,
+	TrimmingPatternSource(const PatternParams& pp,
+	                      const char *dumpfile = NULL,
 	                      int trim3 = 0,
 	                      int trim5 = 0) :
-		PatternSource(dumpfile),
+		PatternSource(pp, dumpfile),
 		trim3_(trim3), trim5_(trim5) { }
 protected:
 	int trim3_;
@@ -499,14 +310,14 @@ extern void tooManySeqChars(const String<char>& read_name);
 /**
  * Encapsulates a source of patterns which is an in-memory vector.
  */
-class VectorPatternSource : public TrimmingPatternSource {
+class VectorPatternSource : public PatternSource {
+
 public:
+
 	VectorPatternSource(
 		const vector<string>& v,
-		bool color,
-		const char *dumpfile = NULL,
-		int trim3 = 0,
-		int trim5 = 0);
+		const PatternParams& pp,
+		const char *dumpfile = NULL);
 	
 	virtual ~VectorPatternSource() { }
 	
@@ -525,7 +336,7 @@ public:
 	 * Reset so that next call to nextBatch* gets the first batch.
 	 */
 	virtual void reset() {
-		TrimmingPatternSource::reset();
+		PatternSource::reset();
 		cur_ = 0;
 		paired_ = false;
 	}
@@ -533,7 +344,15 @@ public:
 	/**
 	 * Finishes parsing outside the critical section
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+	
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const { return false; }
 
 private:
 
@@ -555,15 +374,14 @@ private:
  * from the file will take place in an otherwise-protected
  * critical section.
  */
-class CFilePatternSource : public TrimmingPatternSource {
+class CFilePatternSource : public PatternSource {
 public:
 	CFilePatternSource(
-	    const vector<string>& infiles,
-	    const vector<string>* qinfiles,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0) :
-		TrimmingPatternSource(dumpfile, trim3, trim5),
+		const vector<string>& infiles,
+		const vector<string>* qinfiles,
+		const PatternParams& pp,
+		const char *dumpfile = NULL) :
+		PatternSource(pp, dumpfile),
 		infiles_(infiles),
 		filecur_(0),
 		fp_(NULL),
@@ -586,6 +404,9 @@ public:
 		filecur_++;
 	}
 
+	/**
+	 * Close open file.
+	 */
 	virtual ~CFilePatternSource() {
 		if(is_open_) {
 			assert(fp_ != NULL);
@@ -616,7 +437,7 @@ public:
 	 * Should only be called by the master thread.
 	 */
 	virtual void reset() {
-		TrimmingPatternSource::reset();
+		PatternSource::reset();
 		filecur_ = 0,
 		open();
 		filecur_++;
@@ -671,25 +492,15 @@ public:
 
 	FastaPatternSource(
 		const vector<string>& infiles,
-	    const vector<string>* qinfiles,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solexa64 = false,
-	    bool phred64 = false,
-	    bool intQuals = false) :
+		const vector<string>* qinfiles,
+		const PatternParams& pp,
+		const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			qinfiles,
-		    dumpfile,
-			trim3,
-		    trim5),
-		first_(true),
-		color_(color),
-		solexa64_(solexa64),
-		phred64_(phred64),
-		intQuals_(intQuals) { }
+			pp,
+			dumpfile),
+		first_(true) { }
 	
 	/**
 	 * Reset so that next call to nextBatch* gets the first batch.
@@ -703,7 +514,17 @@ public:
 	/**
 	 * Finalize FASTA parsing outside critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const {
+		return false;  // but wouldn't be too much work to support it
+	}
 
 protected:
 
@@ -728,14 +549,8 @@ protected:
 	{
 		out << ">" << name << endl << seq << endl;
 	}
-	
-private:
 
 	bool first_;
-	bool color_;
-	bool solexa64_;
-	bool phred64_;
-	bool intQuals_;
 };
 
 
@@ -759,29 +574,29 @@ class TabbedPatternSource : public CFilePatternSource {
 public:
 	TabbedPatternSource(
 		const vector<string>& infiles,
-		bool secondName,  // whether it's --12/--tab5 or --tab6
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solQuals = false,
-	    bool phred64Quals = false,
-	    bool intQuals = false) :
+		const PatternParams& pp,
+		bool secondName, // whether it's --12/--tab5 or --tab6
+		const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-		    trim3,
-			trim5),
-		color_(color),
-		solQuals_(solQuals),
-		phred64Quals_(phred64Quals),
-		intQuals_(intQuals) { }
+			pp,
+			dumpfile) { }
 
 	/**
 	 * Finalize tabbed parsing outside critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const {
+		return false;  // but wouldn't be too much work to support it
+	}
 
 protected:
 	
@@ -806,10 +621,6 @@ protected:
 	
 protected:
 
-	bool color_;        // colorspace reads?
-	bool solQuals_;     // base qualities are log odds
-	bool phred64Quals_; // base qualities are on -64 scale
-	bool intQuals_;     // base qualities are space-separated strings
 	bool secondName_;   // true if --tab6, false if --tab5
 };
 
@@ -820,18 +631,16 @@ protected:
 class FastaContinuousPatternSource : public CFilePatternSource {
 public:
 	FastaContinuousPatternSource(
-			const vector<string>& infiles,
-			size_t length,
-			size_t freq,
-			const char *dumpfile = NULL) :
+		const vector<string>& infiles,
+		const PatternParams& pp,
+		const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-			0,
-			0),
-		length_(length),
-		freq_(freq),
+			pp,
+			dumpfile),
+		length_(pp.sampleLen),
+		freq_(pp.sampleFreq),
 		eat_(length_-1),
 		beginning_(true),
 		bufCur_(0),
@@ -850,7 +659,15 @@ public:
 	/**
 	 * Finalize FASTA parsing outside critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const { return false; }
 
 protected:
 	
@@ -866,7 +683,6 @@ protected:
 	 */
 	virtual void resetForNextFile() {
 		eat_ = length_-1;
-		//name_prefix_buf_.clear();
 		beginning_ = true;
 		bufCur_ = 0;
 		subReadCnt_ = readCnt_;
@@ -898,25 +714,14 @@ class FastqPatternSource : public CFilePatternSource {
 public:
 	FastqPatternSource(
 		const vector<string>& infiles,
-	    bool color,
-	    const char *dumpfile = NULL,
-	    int trim3 = 0,
-	    int trim5 = 0,
-	    bool solexa_quals = false,
-	    bool phred64Quals = false,
-	    bool integer_quals = false,
-	    uint32_t skip = 0) :
+		const PatternParams& pp,
+		const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-		    trim3,
-			trim5),
-		first_(true),
-		solQuals_(solexa_quals),
-		phred64Quals_(phred64Quals),
-		intQuals_(integer_quals),
-		color_(color) { }
+			pp,
+			dumpfile),
+		first_(true) { }
 	
 	virtual void reset() {
 		first_ = true;
@@ -926,7 +731,15 @@ public:
 	/**
 	 * Finalize FASTQ parsing outside critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const { return true; }
 
 protected:
 	
@@ -956,10 +769,6 @@ protected:
 private:
 
 	bool first_;
-	bool solQuals_;
-	bool phred64Quals_;
-	bool intQuals_;
-	bool color_;
 };
 
 /**
@@ -973,18 +782,14 @@ public:
 
 	RawPatternSource(
 		const vector<string>& infiles,
-	    bool color,
-	    const char *dumpfile = NULL,
-		int trim3 = 0,
-	    int trim5 = 0) :
+		const PatternParams& pp,
+		const char *dumpfile = NULL) :
 		CFilePatternSource(
 			infiles,
 			NULL,
-		    dumpfile,
-			trim3,
-			trim5),
-		first_(true),
-		color_(color) { }
+			pp,
+			dumpfile),
+		first_(true) { }
 
 	virtual void reset() {
 		first_ = true;
@@ -994,7 +799,17 @@ public:
 	/**
 	 * Finalize raw parsing outside critical section.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) const;
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const;
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const {
+		return false;  // but wouldn't be too much work to support it
+	}
 
 protected:
 	
@@ -1017,11 +832,7 @@ protected:
 		out << seq << endl;
 	}
 	
-	
-private:
-
 	bool first_;
-	bool color_;
 };
 
 /**
@@ -1029,8 +840,10 @@ private:
  * (and possibly also single-end reads).
  */
 class PatternComposer {
+
 public:
-	PatternComposer() { }
+
+	PatternComposer(const PatternParams& p) : pp_(p), mutex_() { }
 	
 	virtual ~PatternComposer() { }
 
@@ -1044,18 +857,28 @@ public:
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) = 0;
-
-	virtual void free_pmembers( const vector<PatternSource*> &elist) {
-    		for (size_t i = 0; i < elist.size(); i++) {
-        		if (elist[i] != NULL)
-            			delete elist[i];
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const = 0;
+	
+	virtual void free_pmembers(const vector<PatternSource*> &elist) {
+		for (size_t i = 0; i < elist.size(); i++) {
+			if (elist[i] != NULL) {
+				delete elist[i];
+			}
 		}
 	}
 
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const = 0;
+
 protected:
 
-	MUTEX_T mutex_m; /// mutex for locking critical regions
+	const PatternParams& pp_;
+	MUTEX_T mutex_;
 };
 
 /**
@@ -1066,14 +889,16 @@ class SoloPatternComposer : public PatternComposer {
 
 public:
 
-	SoloPatternComposer(const vector<PatternSource*>& src) :
-		PatternComposer(),
+	SoloPatternComposer(
+		const vector<PatternSource*>& src,
+		const PatternParams& p) :
+		PatternComposer(p),
 		cur_(0),
 		src_(src)
 	{
-	    for(size_t i = 0; i < src_.size(); i++) {
-	    	assert(src_[i] != NULL);
-	    }
+		for(size_t i = 0; i < src_.size(); i++) {
+			assert(src_[i] != NULL);
+		}
 	}
 
 	/**
@@ -1097,8 +922,19 @@ public:
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) {
-		return src_[0]->parse(ra, rb, rdid);
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const
+	{
+		return src_[0]->parse(ra, rb, cura, curb, rdid);
+	}
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const {
+		return src_[0]->supportsBlocks();
 	}
 
 protected:
@@ -1115,12 +951,11 @@ class DualPatternComposer : public PatternComposer {
 
 public:
 
-	DualPatternComposer(const vector<PatternSource*>& srca,
-	                        const vector<PatternSource*>& srcb) :
-		PatternComposer(),
-		cur_(0),
-		srca_(srca),
-		srcb_(srcb)
+	DualPatternComposer(
+		const vector<PatternSource*>& srca,
+		const vector<PatternSource*>& srcb,
+		const PatternParams& p) :
+		PatternComposer(p), cur_(0), srca_(srca), srcb_(srcb)
 	{
 		// srca_ and srcb_ must be parallel
 		assert_eq(srca_.size(), srcb_.size());
@@ -1159,8 +994,19 @@ public:
 	/**
 	 * Make appropriate call into the format layer to parse individual read.
 	 */
-	virtual bool parse(Read& ra, Read& rb, TReadId rdid) {
-		return srca_[0]->parse(ra, rb, rdid);
+	virtual bool parse(
+		Read& ra, Read& rb,
+		ParsingCursor& cura, ParsingCursor& curb,
+		TReadId rdid) const
+	{
+		return srca_[0]->parse(ra, rb, cura, curb, rdid);
+	}
+
+	/**
+	 * Returns true iff file format can be parsed in fixed-size blocks.
+	 */
+	virtual bool supportsBlocks() const {
+		return srca_[0]->supportsBlocks();
 	}
 
 
@@ -1184,15 +1030,14 @@ public:
 
 	PatternSourcePerThread(
 		PatternComposer& composer,
-		uint32_t max_buf,
-		uint32_t skip,
-		uint32_t seed) :
+		const PatternParams& pp) :
 		composer_(composer),
-		buf_(max_buf),
-      	last_batch_(false),
-		last_batch_size_(0),
-		skip_(skip),
-		seed_(seed) { }
+		pp_(pp),
+		blockReads_(pp.block_bytes > 0 && composer.supportsBlocks()),
+		buf_(blockReads_ ? pp.reads_per_block : pp.max_buf),
+		last_batch_(false),
+		last_batch_size_(0) { }
+
 
 	/**
 	 * Get the next paired or unpaired read from the wrapped
@@ -1232,6 +1077,9 @@ private:
 		buf_.reset();
 		std::pair<bool, int> res = composer_.nextBatch(buf_);
 		buf_.init();
+		cura_.buf = &(buf_.bufa_[0].readOrigBuf);
+		curb_.buf = &(buf_.bufb_[0].readOrigBuf);
+		cura_.off = curb_.off = 0;
 		return res;
 	}
 
@@ -1254,15 +1102,22 @@ private:
 	 * format layer) to parse the read.
 	 */
 	bool parse(Read& ra, Read& rb) {
-		return composer_.parse(ra, rb, buf_.rdid());
+		// advance cursors to next read in case of non-blocked input
+		if(!blockReads_) {
+			cura_.buf = &ra.readOrigBuf;
+			curb_.buf = &rb.readOrigBuf;
+			cura_.off = curb_.off = 0;
+		}
+		return composer_.parse(ra, rb, cura_, curb_, buf_.rdid());
 	}
 
 	PatternComposer& composer_; // pattern composer
-	PerThreadReadBuf buf_;    // read data buffer
-	bool last_batch_;         // true if this is final batch
-	int last_batch_size_;     // # reads read in previous batch
-	uint32_t skip_;           // skip reads with rdids less than this
-	uint32_t seed_;           // pseudo-random seed based on read content
+	const PatternParams& pp_;   // parsing parameters
+	bool blockReads_;           // read input in blocks?
+	PerThreadReadBuf buf_;      // read data buffer
+	ParsingCursor cura_, curb_; // parsing cursors
+	bool last_batch_;           // true if this is final batch
+	int last_batch_size_;       // # reads read in previous batch
 };
 
 /**
@@ -1272,19 +1127,15 @@ class PatternSourcePerThreadFactory {
 public:
 	PatternSourcePerThreadFactory(
 		PatternComposer& composer,
-		uint32_t max_buf,
-		uint32_t skip,
-		uint32_t seed):
+		const PatternParams& pp):
 		composer_(composer),
-		max_buf_(max_buf),
-		skip_(skip),
-		seed_(seed) {}
+		pp_(pp) { }
 
 	/**
 	 * Create a new heap-allocated PatternSourcePerThreads.
 	 */
 	virtual PatternSourcePerThread* create() const {
-		return new PatternSourcePerThread(composer_, max_buf_, skip_, seed_);
+		return new PatternSourcePerThread(composer_, pp_);
 	}
 
 	/**
@@ -1294,7 +1145,7 @@ public:
 	virtual std::vector<PatternSourcePerThread*>* create(uint32_t n) const {
 		std::vector<PatternSourcePerThread*>* v = new std::vector<PatternSourcePerThread*>;
 		for(size_t i = 0; i < n; i++) {
-			v->push_back(new PatternSourcePerThread(composer_, max_buf_, skip_, seed_));
+			v->push_back(new PatternSourcePerThread(composer_, pp_));
 			assert(v->back() != NULL);
 		}
 		return v;
@@ -1324,10 +1175,8 @@ public:
 private:
 	/// Container for obtaining paired reads from PatternSources
 	PatternComposer& composer_;
-	/// Maximum size of batch to read in
-	uint32_t max_buf_;
-	uint32_t skip_;
-	uint32_t seed_;
+	// Parsing parameters
+	const PatternParams& pp_;
 };
 
 #endif /*PAT_H_*/
