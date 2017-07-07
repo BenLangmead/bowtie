@@ -12,6 +12,7 @@ bowtie-inspect-s
 bowtie-inspect-s-debug
 .tmp*
 *.dSYM
-*.xcodeproj.simple_tests*
+*.xcodeproj
+.simple_tests*
 reads_*.fq
 reads_*.sam
