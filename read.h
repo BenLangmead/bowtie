@@ -13,7 +13,6 @@
 #include <sys/time.h>
 #include "sstring.h"
 #include "filebuf.h"
-#include "util.h"
 
 typedef uint64_t TReadId;
 typedef size_t TReadOff;
