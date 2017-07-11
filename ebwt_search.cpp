@@ -860,10 +860,10 @@ static void parseOptions(int argc, const char **argv) {
 				break;
 			}
 			case ARG_BLOCK_BYTES:
-				blockBytes = parseInt(1, "--block-bytes arg must be at least 1", optarg);
+				blockBytes = parseInt(0, "--block-bytes arg must be non-negative", optarg);
 				break;
 			case ARG_READS_PER_BLOCK:
-				readsPerBlock = parseInt(1, "--reads-per-block arg must be at least 1", optarg);
+				readsPerBlock = parseInt(0, "--reads-per-block arg must be non-negative", optarg);
 				break;
 			case ARG_ORIG:
 				if(optarg == NULL || strlen(optarg) == 0) {
